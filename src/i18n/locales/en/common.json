@@ -1,0 +1,12 @@
+{
+  "app": {
+    "title": "D2R Arcane Tracker",
+    "description": "Automatic tracker for everything D2R related"
+  },
+  "ui": {
+    "button": {
+      "count": "Count is {{count}}",
+      "test": "Click on the button above to test React functionality"
+    }
+  }
+}

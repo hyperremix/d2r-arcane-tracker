@@ -1,0 +1,75 @@
+{
+  "name": "@hyperremix/d2r-arcane-tracker",
+  "private": true,
+  "version": "0.0.1",
+  "description": "Automatic tracker for everything D2R related",
+  "author": "hyperremix",
+  "license": "MIT",
+  "type": "module",
+  "main": "dist-electron/main.js",
+  "scripts": {
+    "dev": "vite",
+    "preview": "electron-vite preview",
+    "build": "npm run typecheck && vite build && electron-builder",
+    "typecheck": "concurrently \"tsc -p tsconfig.json --noEmit\" \"tsc -p tsconfig.node.json --noEmit\"",
+    "typecheck:web": "tsc -p tsconfig.json --noEmit",
+    "typecheck:node": "tsc -p tsconfig.node.json --noEmit",
+    "format": "biome format .",
+    "format:fix": "biome format --write .",
+    "lint": "biome lint .",
+    "lint:fix": "biome lint --write .",
+    "check": "biome check .",
+    "check:fix": "biome check --write .",
+    "pre-commit": "lint-staged",
+    "prepare": "husky"
+  },
+  "dependencies": {
+    "i18next": "^25.4.2",
+    "i18next-browser-languagedetector": "^8.2.0",
+    "i18next-resources-to-backend": "^1.2.1",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-i18next": "^15.7.3"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.2.2",
+    "@tailwindcss/vite": "^4.1.12",
+    "@types/react": "^18.2.64",
+    "@types/react-dom": "^18.2.21",
+    "@typescript-eslint/eslint-plugin": "^7.1.1",
+    "@typescript-eslint/parser": "^7.1.1",
+    "@vitejs/plugin-react": "^4.2.1",
+    "concurrently": "^9.2.1",
+    "electron": "^30.0.1",
+    "electron-builder": "^24.13.3",
+    "husky": "^9.1.7",
+    "lint-staged": "^15.2.10",
+    "typescript": "^5.2.2",
+    "vite": "^5.1.6",
+    "vite-plugin-electron": "^0.28.6",
+    "vite-plugin-electron-renderer": "^0.14.5"
+  },
+  "lint-staged": {
+    "src/renderer/**/*.{ts,tsx}": [
+      "biome check --write",
+      "tsc --noEmit --project tsconfig.web.json",
+      "biome lint --write",
+      "biome format --write"
+    ],
+    "src/main/**/*.ts": [
+      "biome check --write",
+      "tsc --noEmit --project tsconfig.node.json",
+      "biome lint --write",
+      "biome format --write"
+    ],
+    "*.{css,json,js,jsx}": [
+      "biome check --write",
+      "biome lint --write",
+      "biome format --write"
+    ],
+    "*.{md,yml,yaml}": [
+      "biome format --write"
+    ]
+  },
+  "packageManager": "yarn@1.22.22+sha512.a6b2f7906b721bba3d67d4aff083df04dad64c399707841b7acf00f6b133b7ac24255f2652fa22ae3534329dc6180534e98d17432037ff6fd140556e2bb3137e"
+}

@@ -1,0 +1,93 @@
+# EditorConfig is awesome: https://EditorConfig.org
+
+# Top-most EditorConfig file
+root = true
+
+# All files
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+max_line_length = 100
+
+# TypeScript and JavaScript files
+[*.{ts,tsx,js,jsx}]
+indent_style = space
+indent_size = 2
+
+# JSON files
+[*.json]
+indent_style = space
+indent_size = 2
+
+# CSS and related files
+[*.{css,scss,sass,less}]
+indent_style = space
+indent_size = 2
+
+# HTML and template files
+[*.{html,htm,xml}]
+indent_style = space
+indent_size = 2
+
+# YAML files
+[*.{yml,yaml}]
+indent_style = space
+indent_size = 2
+
+# Markdown files
+[*.md]
+indent_style = space
+indent_size = 2
+trim_trailing_whitespace = false
+
+# Configuration files
+[*.{toml,ini,cfg}]
+indent_style = space
+indent_size = 2
+
+# Package manager files
+[{package.json,package-lock.json,yarn.lock,pnpm-lock.yaml}]
+indent_style = space
+indent_size = 2
+
+# TypeScript configuration files
+[tsconfig*.json]
+indent_style = space
+indent_size = 2
+
+# Vite and build configuration
+[*.config.{js,ts,mjs,cjs}]
+indent_style = space
+indent_size = 2
+
+# Environment files
+[.env*]
+indent_style = space
+indent_size = 2
+
+# Git files
+[{.gitignore,.gitattributes}]
+indent_style = space
+indent_size = 2
+
+# Biome configuration
+[biome.json]
+indent_style = space
+indent_size = 2
+
+# License and documentation
+[{LICENSE,README.md,CHANGELOG.md}]
+indent_style = space
+indent_size = 2
+
+# Electron main process specific files
+[src/main/**/*.{ts,js}]
+indent_style = space
+indent_size = 2
+
+# React renderer specific files
+[src/renderer/**/*.{ts,tsx,js,jsx}]
+indent_style = space
+indent_size = 2
