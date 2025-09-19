@@ -83,11 +83,11 @@ indent_style = space
 indent_size = 2
 
 # Electron main process specific files
-[src/main/**/*.{ts,js}]
+[electron/**/*.{ts,js}]
 indent_style = space
 indent_size = 2
 
 # React renderer specific files
-[src/renderer/**/*.{ts,tsx,js,jsx}]
+[src/**/*.{ts,tsx,js,jsx}]
 indent_style = space
 indent_size = 2

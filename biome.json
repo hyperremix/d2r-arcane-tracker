@@ -159,7 +159,7 @@
   },
   "overrides": [
     {
-      "includes": ["**/src/main/**/*.ts"],
+      "includes": ["**/electron/**/*.ts"],
       "linter": {
         "rules": {
           "style": {
@@ -172,7 +172,7 @@
       }
     },
     {
-      "includes": ["**/src/renderer/**/*.tsx", "**/src/renderer/**/*.ts"],
+      "includes": ["**/src/**/*.tsx", "**/src/**/*.ts"],
       "linter": {
         "rules": {
           "a11y": {
@@ -186,20 +186,7 @@
       }
     },
     {
-      "includes": ["**/*.config.ts", "**/*.config.js"],
-      "linter": {
-        "rules": {
-          "style": {
-            "useNodejsImportProtocol": "off"
-          },
-          "suspicious": {
-            "noExplicitAny": "off"
-          }
-        }
-      }
-    },
-    {
-      "includes": ["src/styles/globals.css"],
+      "includes": ["src/index.css"],
       "linter": {
         "rules": {
           "suspicious": {

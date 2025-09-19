@@ -1,0 +1,109 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img"
+    aria-labelledby="title desc">
+    <title>D2R Arcane Tracker Logo</title>
+    <desc>A luminous golden grail with a subtle flame.</desc>
+
+    <defs>
+        <linearGradient id="ringGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#4c4c4c" />
+            <stop offset="40%" stop-color="#2d2d2d" />
+            <stop offset="60%" stop-color="#6b6b6b" />
+            <stop offset="100%" stop-color="#1b1b1b" />
+        </linearGradient>
+
+        <linearGradient id="goldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#f7d67a" />
+            <stop offset="35%" stop-color="#d7b24f" />
+            <stop offset="60%" stop-color="#c49a3a" />
+            <stop offset="100%" stop-color="#8a6524" />
+        </linearGradient>
+
+        <linearGradient id="goldDeep" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stop-color="#7b541e" />
+            <stop offset="50%" stop-color="#b0812e" />
+            <stop offset="100%" stop-color="#5c3e15" />
+        </linearGradient>
+
+        <linearGradient id="emberGrad" x1="50%" y1="0%" x2="50%" y2="100%">
+            <stop offset="0%" stop-color="#fff2a8" />
+            <stop offset="40%" stop-color="#ffb247" />
+            <stop offset="80%" stop-color="#e9652b" />
+            <stop offset="100%" stop-color="#b22415" />
+        </linearGradient>
+
+        <filter id="softGlow" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur in="SourceGraphic" stdDeviation="2.5" result="blur" />
+            <feMerge>
+                <feMergeNode in="blur" />
+                <feMergeNode in="SourceGraphic" />
+            </feMerge>
+        </filter>
+
+        <filter id="dropShadow" x="-50%" y="-50%" width="200%" height="200%">
+            <feDropShadow dx="0" dy="2.5" stdDeviation="3.5" flood-color="#000000" flood-opacity="0.55" />
+        </filter>
+
+        <filter id="outerGlow" x="-80%" y="-80%" width="260%" height="260%">
+            <feGaussianBlur in="SourceGraphic" stdDeviation="6" result="glow" />
+            <feMerge>
+                <feMergeNode in="glow" />
+                <feMergeNode in="SourceGraphic" />
+            </feMerge>
+        </filter>
+    </defs>
+
+    <!-- Centered chalice + ember bundle -->
+    <g id="chaliceBundle" transform="translate(0,-39)">
+        <!-- Grail group -->
+        <g filter="url(#dropShadow)">
+
+            <!-- Base -->
+            <ellipse cx="256" cy="430" rx="90" ry="18" fill="url(#goldDeep)" />
+            <ellipse cx="256" cy="430" rx="88" ry="16" fill="url(#goldGrad)" opacity="0.95" />
+
+            <!-- Stem -->
+            <rect x="236" y="350" width="40" height="80" rx="8" fill="url(#goldGrad)" />
+
+            <!-- Bowl body -->
+            <path d="M 166 260
+               C 172 310, 210 344, 246 360
+               L 266 360
+               C 302 344, 340 310, 346 260
+               L 346 260
+               L 166 260 Z" fill="url(#goldGrad)" />
+
+
+            <!-- Rim ellipse -->
+            <ellipse cx="256" cy="258" rx="90" ry="17" fill="url(#goldDeep)" opacity="0.35" />
+            <ellipse cx="256" cy="258" rx="90" ry="15" fill="url(#goldGrad)" />
+            <ellipse cx="256" cy="260" rx="86" ry="13" fill="#1a1007" opacity="0.35" />
+
+            <!-- Liquid glow -->
+            <ellipse cx="256" cy="262" rx="70" ry="10" fill="url(#emberGrad)" opacity="0.9" filter="url(#softGlow)" />
+        </g>
+
+        <!-- Flame above the chalice -->
+        <g>
+            <path d="M256 220
+               C 246 208, 244 194, 254 182
+               C 266 166, 266 154, 258 142
+               C 280 154, 290 172, 286 190
+               C 283 204, 292 212, 300 220
+               C 286 218, 278 220, 272 228
+               C 268 232, 260 232, 256 228
+               C 252 232, 244 232, 240 228
+               C 234 220, 226 218, 212 220
+               C 224 208, 232 200, 230 188
+               C 228 168, 240 154, 254 146
+               C 246 162, 244 174, 252 186
+               C 260 198, 260 208, 256 220 Z" fill="url(#emberGrad)" filter="url(#softGlow)" opacity="0.95" />
+        </g>
+
+        <!-- Small ember sparkles -->
+        <g>
+            <circle cx="230" cy="210" r="2.2" fill="#ffd88a" />
+            <circle cx="282" cy="204" r="1.8" fill="#ffd88a" />
+            <circle cx="270" cy="238" r="1.6" fill="#ffd88a" opacity="0.8" />
+        </g>
+    </g>
+</svg>

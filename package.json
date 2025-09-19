@@ -20,16 +20,20 @@
     "lint:fix": "biome lint --write .",
     "check": "biome check .",
     "check:fix": "biome check --write .",
-    "pre-commit": "lint-staged",
     "prepare": "husky"
   },
   "dependencies": {
+    "@radix-ui/react-slot": "^1.2.3",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
     "i18next": "^25.4.2",
     "i18next-browser-languagedetector": "^8.2.0",
     "i18next-resources-to-backend": "^1.2.1",
+    "lucide-react": "^0.542.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "react-i18next": "^15.7.3"
+    "react-i18next": "^15.7.3",
+    "tailwind-merge": "^3.3.1"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.2.2",
@@ -44,21 +48,21 @@
     "electron-builder": "^24.13.3",
     "husky": "^9.1.7",
     "lint-staged": "^15.2.10",
+    "tailwindcss": "^4.1.12",
+    "tw-animate-css": "^1.3.7",
     "typescript": "^5.2.2",
     "vite": "^5.1.6",
     "vite-plugin-electron": "^0.28.6",
     "vite-plugin-electron-renderer": "^0.14.5"
   },
   "lint-staged": {
-    "src/renderer/**/*.{ts,tsx}": [
+    "src/**/*.{ts,tsx}": [
       "biome check --write",
-      "tsc --noEmit --project tsconfig.web.json",
       "biome lint --write",
       "biome format --write"
     ],
-    "src/main/**/*.ts": [
+    "electron/**/*.ts": [
       "biome check --write",
-      "tsc --noEmit --project tsconfig.node.json",
       "biome lint --write",
       "biome format --write"
     ],

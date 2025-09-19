@@ -29,8 +29,24 @@ process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL
 let win: BrowserWindow | null
 
 function createWindow() {
+  // Set the icon path based on platform and environment
+  let iconPath: string
+
+  if (VITE_DEV_SERVER_URL) {
+    // Development mode - use PNG from public folder
+    iconPath = path.join(process.env.VITE_PUBLIC, 'icon-256.png')
+  } else {
+    // Production mode - use platform-specific icons
+    iconPath =
+      process.platform === 'win32'
+        ? path.join(process.env.APP_ROOT, 'build/icon-win.png')
+        : path.join(process.env.APP_ROOT, 'build/icon.icns')
+  }
+
   win = new BrowserWindow({
-    icon: path.join(process.env.VITE_PUBLIC, 'electron-vite.svg'),
+    width: 1200,
+    height: 800,
+    icon: iconPath,
     webPreferences: {
       preload: path.join(__dirname, 'preload.mjs'),
     },

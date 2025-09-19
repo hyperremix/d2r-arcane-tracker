@@ -1,9 +1,9 @@
 // @see - https://www.electron.build/configuration/configuration
 {
   "$schema": "https://raw.githubusercontent.com/electron-userland/electron-builder/master/packages/app-builder-lib/scheme.json",
-  "appId": "YourAppID",
+  "appId": "d2r-arcane-tracker",
   "asar": true,
-  "productName": "YourAppName",
+  "productName": "D2R Arcane Tracker",
   "directories": {
     "output": "release/${version}"
   },
@@ -12,12 +12,14 @@
     "dist-electron"
   ],
   "mac": {
+    "icon": "build/icon.icns",
     "target": [
       "dmg"
     ],
     "artifactName": "${productName}-Mac-${version}-Installer.${ext}"
   },
   "win": {
+    "icon": "build/icon-win.png",
     "target": [
       {
         "target": "nsis",
