@@ -1,12 +1,12 @@
-import React, { Suspense } from 'react'
-import ReactDOM from 'react-dom/client'
-import App from './App'
-import './i18n'
-import './index.css'
+import React, { Suspense } from 'react';
+import ReactDOM from 'react-dom/client';
+import App from './App';
+import './i18n';
+import './index.css';
 
-const rootElement = document.getElementById('root')
+const rootElement = document.getElementById('root');
 if (!rootElement) {
-  throw new Error('Root element not found')
+  throw new Error('Root element not found');
 }
 
 ReactDOM.createRoot(rootElement).render(
@@ -14,5 +14,5 @@ ReactDOM.createRoot(rootElement).render(
     <Suspense fallback={<img src="/logo.svg" alt="logo" />}>
       <App />
     </Suspense>
-  </React.StrictMode>
-)
+  </React.StrictMode>,
+);

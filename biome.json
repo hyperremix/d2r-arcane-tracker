@@ -66,6 +66,10 @@
         "noUnusedLabels": "error",
         "noUnusedPrivateClassMembers": "warn",
         "noUnusedVariables": "error",
+        "noUnusedImports": {
+          "level": "error",
+          "fix": "safe"
+        },
         "useIsNan": "error",
         "useValidForDirection": "error",
         "useYield": "error",
@@ -125,7 +129,10 @@
         "noVar": "error"
       },
       "nursery": {
-        "useSortedClasses": "off"
+        "useSortedClasses": {
+          "level": "error",
+          "fix": "safe"
+        }
       }
     }
   },
@@ -133,8 +140,8 @@
     "formatter": {
       "jsxQuoteStyle": "double",
       "quoteProperties": "asNeeded",
-      "trailingCommas": "es5",
-      "semicolons": "asNeeded",
+      "trailingCommas": "all",
+      "semicolons": "always",
       "arrowParentheses": "always",
       "bracketSameLine": false,
       "quoteStyle": "single",
