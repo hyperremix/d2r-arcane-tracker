@@ -1,0 +1,60 @@
+---
+description: Holy Grail tracking specific patterns and conventions
+---
+
+# Holy Grail Tracking Patterns
+
+## Data Models
+- **HolyGrailItem**: Core item data structure
+- **GrailProgress**: Progress tracking for items
+- **Character**: Character information
+- **Settings**: Application configuration
+
+## Item Detection
+- **Save File Parsing**: Parse D2 save files (.d2s, .sss, .d2x, .d2i)
+- **Item Matching**: Match detected items to grail items
+- **Progress Tracking**: Track normal and ethereal versions separately
+- **Event Emission**: Emit events for new item discoveries
+
+## Database Schema
+- **Items Table**: Static grail items data
+- **Characters Table**: Character information
+- **Grail Progress Table**: Item discovery progress
+- **Settings Table**: Application settings
+
+## State Management
+- **Grail Store**: Global state for items, progress, and settings
+- **Filtered Items**: Use filtered queries based on settings
+- **Progress Lookup**: Efficient progress data lookup
+- **Statistics**: Real-time statistics calculation
+
+## UI Patterns
+- **Item Cards**: Display items with progress indicators
+- **Grid/List Views**: Toggle between grid and list layouts
+- **Status Indicators**: Show completion status and recent discoveries
+- **Character Attribution**: Show which character found items
+
+## Settings Integration
+- **Grail Configuration**: Normal/ethereal, runes, runewords
+- **Game Mode**: Softcore, hardcore, both, manual
+- **Game Version**: Classic vs Resurrected
+- **Notifications**: Sound, in-app, native notifications
+
+## Performance Considerations
+- **Large Datasets**: Handle thousands of items efficiently
+- **Real-time Updates**: Update UI when new items are discovered
+- **Filtering**: Efficient filtering based on multiple criteria
+- **Grouping**: Group items by category, type, or completion status
+
+## Data Flow
+1. **Save File Monitoring**: Watch for save file changes
+2. **Item Detection**: Parse and extract items from save files
+3. **Progress Update**: Update database with new discoveries
+4. **UI Update**: Refresh UI with new progress data
+5. **Statistics Update**: Recalculate completion statistics
+
+## Error Handling
+- **Save File Errors**: Handle corrupted or invalid save files
+- **Database Errors**: Handle constraint violations and connection issues
+- **Item Detection Errors**: Handle parsing and matching errors
+- **UI Errors**: Handle rendering and state errors gracefully

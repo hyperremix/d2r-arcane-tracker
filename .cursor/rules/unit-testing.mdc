@@ -1,0 +1,457 @@
+---
+globs: *.test.ts,*.test.tsx,*.spec.ts,*.spec.tsx
+description: Unit testing patterns and best practices using Vitest
+---
+
+# Unit Testing Patterns and Best Practices
+
+## Test Structure - "When, If, Then" Pattern
+
+### Describe Block Organization
+
+```typescript
+describe('When [FUNCTION_NAME] is called', () => {
+  describe('If [CONDITION_1]', () => {
+    it('Then [EXPECTED_OUTCOME_1]', () => {
+      // Arrange
+      // Act
+      // Assert
+    });
+  });
+
+  describe('If [CONDITION_2]', () => {
+    it('Then [EXPECTED_OUTCOME_2]', () => {
+      // Arrange
+      // Act
+      // Assert
+    });
+  });
+});
+```
+
+### Example Implementation
+
+```typescript
+describe('When calculateCompletionStatus is called', () => {
+  describe('If grailEthereal is false and normal item is found', () => {
+    it('Then should return true', () => {
+      // Arrange
+      const item = { id: 'test-item', type: 'unique' };
+      const normalProgress = [{ itemId: 'test-item', found: true }];
+      const etherealProgress = [];
+      const settings = { grailEthereal: false };
+
+      // Act
+      const result = calculateCompletionStatus(item, normalProgress, etherealProgress, settings);
+
+      // Assert
+      expect(result).toBe(true);
+    });
+  });
+
+  describe('If grailEthereal is true and only normal version is found', () => {
+    it('Then should return false', () => {
+      // Arrange
+      const item = { id: 'test-item', type: 'unique' };
+      const normalProgress = [{ itemId: 'test-item', found: true }];
+      const etherealProgress = [];
+      const settings = { grailEthereal: true };
+
+      // Act
+      const result = calculateCompletionStatus(item, normalProgress, etherealProgress, settings);
+
+      // Assert
+      expect(result).toBe(false);
+    });
+  });
+});
+```
+
+## Test Function Structure - AAA Pattern
+
+### Arrange, Act, Assert Comments
+
+Every test function must be structured with clear sections:
+
+```typescript
+it('Then should return expected result', () => {
+  // Arrange - Set up test data, mocks, and initial state
+  const input = 'test input';
+  const expectedOutput = 'expected output';
+
+  // Act - Execute the function or action being tested
+  const result = functionUnderTest(input);
+
+  // Assert - Verify the expected outcome
+  expect(result).toBe(expectedOutput);
+});
+```
+
+## Single Assertion Rule
+
+### One Assert Per Test
+
+Each test should verify only one specific behavior:
+
+```typescript
+// ✅ Good - Single assertion
+it('Then should return true for valid input', () => {
+  // Arrange
+  const input = 'valid';
+
+  // Act
+  const result = isValid(input);
+
+  // Assert
+  expect(result).toBe(true);
+});
+
+// ❌ Bad - Multiple assertions
+it('Then should handle various inputs', () => {
+  // Arrange
+  const validInput = 'valid';
+  const invalidInput = 'invalid';
+
+  // Act
+  const validResult = isValid(validInput);
+  const invalidResult = isValid(invalidInput);
+
+  // Assert
+  expect(validResult).toBe(true);    // First assertion
+  expect(invalidResult).toBe(false); // Second assertion - violates rule
+});
+```
+
+## Vitest Configuration and Usage
+
+### Test Setup
+
+```typescript
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+
+// Use vi for mocking
+const mockFunction = vi.fn();
+
+// Use beforeEach/afterEach for setup/cleanup
+beforeEach(() => {
+  // Setup before each test
+});
+
+afterEach(() => {
+  // Cleanup after each test
+  vi.clearAllMocks();
+});
+```
+
+### Mocking Patterns
+
+```typescript
+// Mock external dependencies
+vi.mock('@/stores/grailStore', () => ({
+  useGrailStore: vi.fn(() => ({
+    settings: { grailEthereal: false },
+    setSettings: vi.fn(),
+  })),
+}));
+
+// Mock React hooks
+vi.mock('react', async () => {
+  const actual = await vi.importActual('react');
+  return {
+    ...actual,
+    useState: vi.fn(),
+    useEffect: vi.fn(),
+  };
+});
+```
+
+## Component Testing Patterns
+
+### React Component Tests
+
+```typescript
+import { render, screen, fireEvent } from '@testing-library/react';
+import { describe, it, expect, vi } from 'vitest';
+
+describe('When ItemCard component is rendered', () => {
+  describe('If item has no progress', () => {
+    it('Then should display item name', () => {
+      // Arrange
+      const item = { id: 'test-item', name: 'Test Item', type: 'unique' };
+      const props = { item, normalProgress: [], etherealProgress: [] };
+
+      // Act
+      render(<ItemCard {...props} />);
+
+      // Assert
+      expect(screen.getByText('Test Item')).toBeInTheDocument();
+    });
+  });
+
+  describe('If item has progress', () => {
+    it('Then should display status indicator', () => {
+      // Arrange
+      const item = { id: 'test-item', name: 'Test Item', type: 'unique' };
+      const progress = [{ itemId: 'test-item', found: true }];
+      const props = { item, normalProgress: progress, etherealProgress: [] };
+
+      // Act
+      render(<ItemCard {...props} />);
+
+      // Assert
+      expect(screen.getByRole('button')).toBeInTheDocument();
+    });
+  });
+});
+```
+
+## Hook Testing Patterns
+
+### Custom Hook Tests
+
+```typescript
+import { renderHook, act } from '@testing-library/react';
+import { describe, it, expect, vi } from 'vitest';
+
+describe('When useProgressLookup hook is called', () => {
+  describe('If items array is empty', () => {
+    it('Then should return empty lookup map', () => {
+      // Arrange
+      const items = [];
+      const progress = [];
+      const selectedCharacterId = null;
+
+      // Act
+      const { result } = renderHook(() =>
+        useProgressLookup(items, progress, selectedCharacterId)
+      );
+
+      // Assert
+      expect(result.current.size).toBe(0);
+    });
+  });
+});
+```
+
+## Test Data Management
+
+### Test Fixtures with Builder Pattern
+
+When test fixtures are necessary, use the builder pattern for complex data structures:
+
+```typescript
+// HolyGrailItem Builder
+class HolyGrailItemBuilder {
+  private item: HolyGrailItem = {
+    id: 'default-item',
+    name: 'Default Item',
+    type: 'unique',
+    category: 'weapon',
+    subCategory: 'sword',
+    level: 1,
+    requiredLevel: 1,
+    rarity: 'common',
+    difficulty: ['normal'],
+    setName: null,
+    etherealType: 'none',
+  };
+
+  static new(): HolyGrailItemBuilder {
+    return new HolyGrailItemBuilder();
+  }
+
+  withId(id: string): this {
+    this.item.id = id;
+    return this;
+  }
+
+  withName(name: string): this {
+    this.item.name = name;
+    return this;
+  }
+
+  withType(type: ItemType): this {
+    this.item.type = type;
+    return this;
+  }
+
+  withEtherealType(etherealType: EtherealType): this {
+    this.item.etherealType = etherealType;
+    return this;
+  }
+
+  withSetName(setName: string): this {
+    this.item.setName = setName;
+    return this;
+  }
+
+  build(): HolyGrailItem {
+    return this.item;
+  }
+}
+
+// GrailProgress Builder
+class GrailProgressBuilder {
+  private progress: GrailProgress = {
+    id: 'default-progress',
+    itemId: 'default-item',
+    characterId: 'default-character',
+    found: true,
+    foundDate: new Date('2024-01-01'),
+  };
+
+  static new(): GrailProgressBuilder {
+    return new GrailProgressBuilder();
+  }
+
+  withItemId(itemId: string): this {
+    this.progress.itemId = itemId;
+    return this;
+  }
+
+  withCharacterId(characterId: string): this {
+    this.progress.characterId = characterId;
+    return this;
+  }
+
+  withFound(found: boolean): this {
+    this.progress.found = found;
+    return this;
+  }
+
+  withFoundDate(foundDate: Date): this {
+    this.progress.foundDate = foundDate;
+    return this;
+  }
+
+  build(): GrailProgress {
+    return this.progress;
+  }
+}
+
+// Usage Examples
+const testItem = HolyGrailItemBuilder.new()
+  .withId('test-item')
+  .withName('Test Item')
+  .withType('unique')
+  .withEtherealType('optional')
+  .build();
+
+const testProgress = GrailProgressBuilder.new()
+  .withItemId('test-item')
+  .withCharacterId('char-1')
+  .withFound(true)
+  .withFoundDate(new Date('2024-01-01'))
+  .build();
+```
+
+### Builder Pattern Benefits
+
+- **Fluent Interface**: Chainable methods for readable test setup
+- **Default Values**: Sensible defaults with ability to override specific properties
+- **Type Safety**: Full TypeScript support with proper typing
+- **Flexibility**: Easy to create variations of test data
+- **Maintainability**: Centralized test data creation logic
+
+### Test Utilities
+
+```typescript
+// Helper functions for common test operations
+const renderWithProviders = (component, options = {}) => {
+  return render(component, {
+    wrapper: ({ children }) => (
+      <TooltipProvider>
+        {children}
+      </TooltipProvider>
+    ),
+    ...options,
+  });
+};
+```
+
+## Error Testing
+
+### Exception Testing
+
+```typescript
+describe('When invalid input is provided', () => {
+  it('Then should throw appropriate error', () => {
+    // Arrange
+    const invalidInput = null;
+
+    // Act
+    const act = () => processInput(invalidInput);
+
+    // Assert
+    expect(act).toThrow('Input cannot be null');
+  });
+});
+```
+
+## Async Testing
+
+### Promise and Async Function Testing
+
+```typescript
+describe('When async function is called', () => {
+  it('Then should resolve with expected value', async () => {
+    // Arrange
+    const input = 'test';
+    const expectedResult = 'processed test';
+
+    // Act
+    const result = await asyncFunction(input);
+
+    // Assert
+    expect(result).toBe(expectedResult);
+  });
+});
+```
+
+## Test Organization
+
+### File Naming
+
+- Test files should mirror the source file structure
+- Use `.test.ts` or `.test.tsx` extensions
+- Place tests in the same directory as source files or in a `__tests__` directory
+
+### Test Categories
+
+```typescript
+// Group related tests
+describe('Utility Functions', () => {
+  describe('When isRecentFind is called', () => {
+    // Tests for isRecentFind
+  });
+});
+
+describe('Component Integration', () => {
+  describe('When ItemGrid renders items', () => {
+    // Integration tests
+  });
+});
+```
+
+## Best Practices
+
+### Test Quality
+
+- **Descriptive Names**: Test names should clearly describe the scenario
+- **Independent Tests**: Each test should be able to run independently
+- **Fast Execution**: Tests should run quickly (< 100ms per test)
+- **Deterministic**: Tests should produce consistent results
+
+### Coverage Guidelines
+
+- **Unit Tests**: Test individual functions and components in isolation
+- **Integration Tests**: Test component interactions and data flow
+- **Edge Cases**: Test boundary conditions and error scenarios
+- **Happy Path**: Test the most common usage scenarios
+
+### Maintenance
+
+- **Keep Tests Simple**: Avoid complex test logic
+- **Update Tests**: Update tests when requirements change
+- **Remove Dead Tests**: Remove tests for removed functionality
+- **Refactor Tests**: Refactor tests when they become hard to maintain

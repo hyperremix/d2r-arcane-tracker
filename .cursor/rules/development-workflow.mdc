@@ -1,0 +1,65 @@
+---
+description: Development workflow and best practices
+---
+
+# Development Workflow
+
+## Code Quality
+- **Linting**: Use Biome for linting and formatting
+- **Type Checking**: Run TypeScript compiler for type checking
+- **Testing**: Write tests for critical functionality
+- **Code Review**: Review code before merging
+
+## Git Workflow
+- **Branch Naming**: Use descriptive branch names (feature/, fix/, refactor/)
+- **Commit Messages**: Write clear, descriptive commit messages
+- **Pull Requests**: Create PRs for all changes
+- **Code Review**: Require code review before merging
+
+## Development Environment
+- **Node.js**: Use Node.js 18+ for development
+- **Package Manager**: Use pnpm for package management
+- **IDE**: Use VS Code with recommended extensions
+- **Debugging**: Use Electron DevTools for debugging
+
+## Build Process
+- **Development**: Use `yarn dev` for development server
+- **Production**: Use `yarn build` for production build
+- **Electron**: Use `yarn electron:dev` for Electron development
+- **Packaging**: Use `yarn electron:pack` for packaging
+
+## Testing Strategy
+- **Unit Tests**: Test individual functions and components
+- **Integration Tests**: Test component interactions
+- **E2E Tests**: Test complete user workflows
+- **Manual Testing**: Test on different platforms and configurations
+
+## Performance Monitoring
+- **Bundle Size**: Monitor bundle size and optimize
+- **Runtime Performance**: Monitor runtime performance
+- **Memory Usage**: Monitor memory usage and leaks
+- **Database Performance**: Monitor database query performance
+
+## Error Handling
+- **Error Boundaries**: Use error boundaries for React components
+- **Logging**: Implement comprehensive logging
+- **Error Reporting**: Report errors to monitoring service
+- **User Feedback**: Provide clear error messages to users
+
+## Documentation
+- **Code Comments**: Write clear, concise comments
+- **README**: Keep README up to date
+- **API Documentation**: Document API endpoints and types
+- **Component Documentation**: Document component props and usage
+
+## Security
+- **Input Validation**: Validate all user inputs
+- **File Access**: Restrict file access to necessary directories
+- **IPC Security**: Secure IPC communication
+- **Dependencies**: Keep dependencies up to date
+
+## Deployment
+- **Environment Variables**: Use environment variables for configuration
+- **Build Optimization**: Optimize builds for production
+- **Asset Optimization**: Optimize images and other assets
+- **Update Mechanism**: Implement automatic updates

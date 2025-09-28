@@ -1,0 +1,48 @@
+---
+globs: *.ts,*.tsx
+description: TypeScript coding patterns and conventions
+---
+
+# TypeScript Patterns and Conventions
+
+## Component Patterns
+- Use functional components with TypeScript interfaces for props
+- Prefer `React.FC` or explicit function declarations over arrow functions for components
+- Always define interfaces for component props, even for simple components
+- Use `React.forwardRef` for components that need ref forwarding
+
+## Type Definitions
+- Define interfaces in the same file as components when used only locally
+- Export interfaces from `electron/types/` for shared types
+- Use `type` for unions and intersections, `interface` for object shapes
+- Prefer `undefined` over `null` for optional values
+
+## State Management
+- Use Zustand for global state management
+- Create custom hooks for complex state logic (e.g., `useProgressLookup`)
+- Use `useMemo` and `useCallback` for performance optimization
+- Prefer `useState` for local component state
+
+## Error Handling
+- Use try-catch blocks for async operations
+- Provide meaningful error messages
+- Handle loading and error states in components
+- Use optional chaining (`?.`) and nullish coalescing (`??`) operators
+
+## Code Organization
+- Extract complex logic into helper functions
+- Use descriptive function and variable names
+- Group related functionality together
+- Keep components focused on a single responsibility
+
+## Import/Export
+- Use named exports for components and utilities
+- Group imports: external libraries, internal modules, relative imports
+- Use absolute imports with `@/` prefix for internal modules
+- Import types with `type` keyword when possible
+
+## Performance
+- Use `useMemo` for expensive calculations
+- Use `useCallback` for event handlers passed to child components
+- Avoid creating objects/arrays in render methods
+- Use `React.memo` for components that receive stable props

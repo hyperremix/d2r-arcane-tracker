@@ -1,0 +1,55 @@
+---
+globs: electron/**/*.ts,electron/**/*.js
+description: Electron-specific patterns and conventions
+---
+
+# Electron Patterns and Conventions
+
+## IPC Communication
+- **Main Process**: Handle IPC events in `electron/ipc-handlers/`
+- **Renderer Process**: Use preload script for secure IPC communication
+- **Type Safety**: Define IPC types in `electron/types/electron.d.ts`
+- **Error Handling**: Always handle errors in IPC handlers
+
+## Database Management
+- **SQLite**: Use `better-sqlite3` for database operations
+- **Schema**: Define database schema in `electron/database/database.ts`
+- **Migrations**: Use SQL migration files in `sqlc/migrations/`
+- **Queries**: Use sqlc for type-safe SQL queries
+- **Transactions**: Use database transactions for multi-step operations
+
+## File System Operations
+- **Path Handling**: Use `node:path` for cross-platform path operations
+- **File Watching**: Use `chokidar` for file system monitoring
+- **Error Handling**: Handle file system errors gracefully
+- **Permissions**: Check file permissions before operations
+
+## Service Architecture
+- **Background Services**: Implement services in `electron/services/`
+- **Event Emission**: Use EventEmitter for service communication
+- **Lifecycle Management**: Properly initialize and cleanup services
+- **Error Recovery**: Implement retry logic for failed operations
+
+## Security Considerations
+- **Preload Script**: Expose only necessary APIs to renderer
+- **Context Isolation**: Keep main and renderer processes isolated
+- **Input Validation**: Validate all inputs from renderer process
+- **File Access**: Restrict file access to necessary directories
+
+## Performance
+- **Async Operations**: Use async/await for non-blocking operations
+- **Memory Management**: Properly dispose of resources
+- **Event Cleanup**: Remove event listeners to prevent memory leaks
+- **Database Optimization**: Use prepared statements for repeated queries
+
+## Error Handling
+- **IPC Errors**: Return structured error responses
+- **Service Errors**: Log errors and emit error events
+- **Database Errors**: Handle constraint violations and connection issues
+- **File System Errors**: Handle permission and access errors
+
+## Code Organization
+- **Separation of Concerns**: Keep main process logic separate from UI
+- **Service Layer**: Use services for business logic
+- **Handler Layer**: Use handlers for IPC communication
+- **Type Layer**: Define types for all IPC communication

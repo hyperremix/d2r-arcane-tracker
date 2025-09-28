@@ -90,3 +90,27 @@ Lint-staged runs on commit with different rule sets:
 - Uses ESM modules throughout
 - Vite handles HMR for renderer, electron-vite handles main process reloading
 - The app icon is located at `public/logo.svg`
+
+## Cursor Rules
+
+This project includes comprehensive development rules in the `.cursor/rules/` directory:
+
+- **project-structure.mdc** - Project structure and organization guidelines (always applied)
+- **component-patterns.mdc** - React component patterns and best practices (applied to *.tsx files)
+- **development-workflow.mdc** - Development workflow and best practices
+- **electron-patterns.mdc** - Electron-specific patterns and conventions
+- **grail-specific.mdc** - Holy Grail tracking specific patterns and conventions
+- **typescript-patterns.mdc** - TypeScript coding patterns and conventions
+- **ui-components.mdc** - UI component patterns and conventions
+- **unit-testing.mdc** - Unit testing patterns and best practices using Vitest
+
+These rules provide detailed guidance for:
+- Component architecture and organization
+- State management with Zustand
+- Electron main/renderer process communication
+- Database operations and IPC handlers
+- UI component development with shadcn/ui
+- Testing strategies and patterns
+- TypeScript best practices
+
+Refer to these rules for specific implementation patterns and conventions used throughout the project.

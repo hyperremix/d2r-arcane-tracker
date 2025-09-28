@@ -1,0 +1,42 @@
+---
+alwaysApply: true
+description: Project structure and organization guidelines
+---
+
+# D2R Arcane Tracker - Project Structure
+
+## Core Architecture
+This is an Electron + React + TypeScript application for tracking Diablo II: Resurrected Holy Grail progress.
+
+## Directory Structure
+- `src/components/grail/` - Core grail tracking components (ItemCard, ItemGrid, GrailTracker, etc.)
+- `src/components/settings/` - Settings-related components (Settings, Database, GameModeSettings, etc.)
+- `src/components/ui/` - Reusable UI components (Button, Card, Tooltip, etc.)
+- `src/stores/` - Zustand state management
+- `src/hooks/` - Custom React hooks
+- `src/lib/` - Utility functions and helpers
+- `electron/` - Electron main process code
+- `electron/database/` - SQLite database management
+- `electron/ipc-handlers/` - IPC communication handlers
+- `electron/services/` - Background services (item detection, save file monitoring)
+
+## Component Organization
+- **Grail Components**: Core functionality for item tracking and display
+- **Settings Components**: Configuration and preferences management
+- **UI Components**: Reusable shadcn/ui components
+- **Helper Functions**: Utility functions should be in `src/lib/`
+
+## Import Patterns
+- Use absolute imports with `@/` prefix for internal modules
+- UI components: `@/components/ui/*`
+- Grail components: `@/components/grail/*`
+- Settings components: `@/components/settings/*`
+- Stores: `@/stores/*`
+- Utils: `@/lib/*`
+- Electron types: `electron/types/*`
+
+## File Naming
+- Components: PascalCase (e.g., `ItemCard.tsx`)
+- Utilities: camelCase (e.g., `utils.ts`)
+- Types: camelCase (e.g., `grail.ts`)
+- Hooks: camelCase with `use` prefix (e.g., `useProgressLookup.ts`)
