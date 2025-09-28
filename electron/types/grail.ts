@@ -112,23 +112,6 @@ export interface AdvancedGrailFilter {
   sortOrder: 'asc' | 'desc';
   fuzzySearch: boolean;
 }
-
-export interface D2SaveFile {
-  name: string;
-  path: string;
-  lastModified: Date;
-  characterClass: string;
-  level: number;
-  difficulty: 'normal' | 'nightmare' | 'hell';
-  hardcore: boolean;
-  expansion: boolean;
-}
-
-export interface SaveFileEvent {
-  type: 'created' | 'modified' | 'deleted';
-  file: D2SaveFile;
-}
-
 export interface MonitoringStatus {
   isMonitoring: boolean;
   directory: string | null;
@@ -299,4 +282,37 @@ export type ItemDetectionEvent = {
   type: 'item-found';
   item: D2Item;
   grailItem: HolyGrailItem;
+};
+
+export type D2SaveFile = {
+  name: string;
+  path: string;
+  lastModified: Date;
+  characterClass: string;
+  level: number;
+  difficulty: 'normal' | 'nightmare' | 'hell';
+  hardcore: boolean;
+  expansion: boolean;
+};
+
+export type SaveFileEvent = {
+  type: 'created' | 'modified' | 'deleted';
+  file: D2SaveFile;
+};
+
+// Type for magic attributes
+export type MagicAttribute = {
+  name: string;
+  [key: string]: unknown;
+};
+
+// Type for item with magic attributes
+export type ItemWithMagicAttributes = {
+  magic_attributes: MagicAttribute[];
+  [key: string]: unknown;
+};
+
+// Type for flat items mapping
+export type FlatItemsMap = {
+  [key: string]: unknown;
 };

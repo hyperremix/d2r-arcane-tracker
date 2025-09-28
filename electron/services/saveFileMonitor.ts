@@ -13,11 +13,16 @@ import { getHolyGrailSeedData, runesSeed } from '../items/grail';
 import { runesMapping } from '../items/runes';
 import {
   type AvailableRunes,
+  type D2SaveFile,
   type FileReaderResponse,
+  type FlatItemsMap,
   GameMode,
   type Item,
   type ItemDetails,
+  type ItemWithMagicAttributes,
+  type MagicAttribute,
   type RuneType,
+  type SaveFileEvent,
 } from '../types/grail';
 import {
   buildFlattenObjectCacheKey,
@@ -25,39 +30,6 @@ import {
   isRune,
   simplifyItemName,
 } from '../utils/objects';
-
-interface D2SaveFile {
-  name: string;
-  path: string;
-  lastModified: Date;
-  characterClass: string;
-  level: number;
-  difficulty: 'normal' | 'nightmare' | 'hell';
-  hardcore: boolean;
-  expansion: boolean;
-}
-
-interface SaveFileEvent {
-  type: 'created' | 'modified' | 'deleted';
-  file: D2SaveFile;
-}
-
-// Type for magic attributes
-interface MagicAttribute {
-  name: string;
-  [key: string]: unknown;
-}
-
-// Type for item with magic attributes
-interface ItemWithMagicAttributes {
-  magic_attributes: MagicAttribute[];
-  [key: string]: unknown;
-}
-
-// Type for flat items mapping
-interface FlatItemsMap {
-  [key: string]: unknown;
-}
 
 // Lookup table for magic attribute types
 const MAGIC_ATTRIBUTE_TYPES: { [key: string]: string } = {
