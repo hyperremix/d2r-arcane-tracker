@@ -10,6 +10,7 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': resolve(__dirname, './src'),
+      'electron/types/grail': resolve(__dirname, './electron/types/grail.ts'),
     },
   },
 });
