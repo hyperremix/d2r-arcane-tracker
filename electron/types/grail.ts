@@ -1,3 +1,5 @@
+import type { IEthGrailData } from 'd2-holy-grail/client/src/common/definitions/union/IEthGrailData';
+
 export type ItemType = 'unique' | 'set' | 'rune' | 'runeword';
 
 export type EtherealType = 'none' | 'optional' | 'only';
@@ -315,4 +317,55 @@ export type ItemWithMagicAttributes = {
 // Type for flat items mapping
 export type FlatItemsMap = {
   [key: string]: unknown;
+};
+
+export type GrailItems = Record<string, Record<string, unknown>>;
+export type GrailTiers = Record<string, GrailItems>;
+export type GrailCategory = Record<string, unknown>;
+export type GrailData = IHolyGrailData | IEthGrailData;
+
+export type DatabaseItem = {
+  id: string;
+  name: string;
+  type: 'unique' | 'set' | 'rune' | 'runeword';
+  category: string;
+  sub_category: string;
+  set_name?: string;
+  ethereal_type: EtherealType;
+  created_at: string;
+  updated_at: string;
+};
+
+export type DatabaseCharacter = {
+  id: string;
+  name: string;
+  character_class: string;
+  level: number;
+  difficulty: 'normal' | 'nightmare' | 'hell';
+  hardcore: boolean;
+  expansion: boolean;
+  save_file_path?: string;
+  deleted_at?: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type DatabaseGrailProgress = {
+  id: string;
+  character_id: string;
+  item_id: string;
+  found: boolean;
+  found_date?: string;
+  manually_added: boolean;
+  auto_detected: boolean;
+  difficulty?: 'normal' | 'nightmare' | 'hell';
+  notes?: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type DatabaseSetting = {
+  key: string;
+  value: string | null;
+  updated_at: string;
 };
