@@ -6,7 +6,24 @@ import type { D2SItem } from 'electron/types/grail';
  * Used in itemDetection tests to create real D2S library item structures
  */
 export class D2SItemBuilder {
-  private item: D2SItem = {};
+  private item: D2SItem = {
+    id: 'default-item',
+    type: 'armo',
+    type_name: 'Armor',
+    code: 'armo',
+    name: 'Default Item',
+    level: 1,
+    ethereal: 0,
+    quality: 1, // normal quality
+    location: 'inventory',
+    equipped: false,
+    socketed: 0,
+    socket_count: 0,
+    socketed_items: [],
+    gems: [],
+    magic_attributes: [],
+  };
+  private idWasSet = false;
 
   /**
    * Create a new builder instance
@@ -20,6 +37,7 @@ export class D2SItemBuilder {
    */
   withId(id: string | number): this {
     this.item.id = id;
+    this.idWasSet = true;
     return this;
   }
 
@@ -331,9 +349,10 @@ export class D2SItemBuilder {
    * Build multiple items with the same base configuration
    */
   buildMany(count: number): D2SItem[] {
+    const baseId = this.idWasSet ? this.item.id : 'item';
     return Array.from({ length: count }, (_, index) => ({
       ...this.item,
-      id: `${this.item.id || 'item'}-${index}`,
+      id: `${baseId}-${index}`,
     }));
   }
 }
