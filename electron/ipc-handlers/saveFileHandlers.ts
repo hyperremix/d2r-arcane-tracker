@@ -1,6 +1,5 @@
 import { ipcMain, webContents } from 'electron';
 import { grailDatabase } from '../database/database';
-import type { ItemDetectionEvent } from '../services/itemDetection';
 import { ItemDetectionService } from '../services/itemDetection';
 import type { D2SaveFile, SaveFileEvent } from '../services/saveFileMonitor';
 import { SaveFileMonitor } from '../services/saveFileMonitor';
@@ -9,6 +8,7 @@ import type {
   CharmSubCategory,
   HolyGrailItem,
   ItemCategory,
+  ItemDetectionEvent,
   JewelrySubCategory,
   RuneSubCategory,
   RunewordSubCategory,

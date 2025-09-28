@@ -2,52 +2,7 @@ import { EventEmitter } from 'node:events';
 import fs from 'node:fs/promises';
 import { read } from '@dschu012/d2s';
 import type { D2SaveFile } from '../services/saveFileMonitor';
-import type { HolyGrailItem } from '../types/grail';
-
-// Type definition for d2s library item structure
-interface D2SItem {
-  id?: string | number;
-  type?: string;
-  type_name?: string;
-  code?: string;
-  name?: string;
-  unique_name?: string;
-  set_name?: string;
-  rare_name?: string;
-  rare_name2?: string;
-  runeword_name?: string;
-  level?: number;
-  ethereal?: number;
-  quality?: number;
-  location?: string;
-  equipped?: boolean;
-  socketed?: number;
-  socket_count?: number;
-  socketed_items?: D2SItem[];
-  gems?: unknown[];
-  magic_attributes?: Array<{ name: string; value?: unknown }>;
-}
-
-// Simplified item structure
-interface D2Item {
-  id: string;
-  name: string;
-  type: string;
-  quality: 'normal' | 'magic' | 'rare' | 'set' | 'unique' | 'crafted';
-  level: number;
-  ethereal: boolean;
-  sockets: number;
-  timestamp: Date;
-  characterName: string;
-  location: 'inventory' | 'stash' | 'equipment';
-}
-
-// Simplified event structure - only item-found events
-interface ItemDetectionEvent {
-  type: 'item-found';
-  item: D2Item;
-  grailItem: HolyGrailItem;
-}
+import type { D2Item, D2SItem, HolyGrailItem, ItemDetectionEvent } from '../types/grail';
 
 // Rune mapping for proper rune detection
 const runesMapping: Record<string, string> = {
@@ -328,4 +283,3 @@ class ItemDetectionService extends EventEmitter {
 }
 
 export { ItemDetectionService };
-export type { D2Item, ItemDetectionEvent };

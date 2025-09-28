@@ -134,25 +134,6 @@ export interface MonitoringStatus {
   directory: string | null;
 }
 
-export interface D2Item {
-  id: string;
-  name: string;
-  type: string;
-  quality: 'normal' | 'magic' | 'rare' | 'set' | 'unique' | 'crafted';
-  level: number;
-  ethereal: boolean;
-  sockets: number;
-  timestamp: Date;
-  characterName: string;
-  location: 'inventory' | 'stash' | 'equipment';
-}
-
-export interface ItemDetectionEvent {
-  type: 'item-found' | 'item-lost';
-  item: D2Item;
-  match?: HolyGrailItem;
-}
-
 import type { IHolyGrailData } from 'd2-holy-grail/client/src/common/definitions/union/IHolyGrailData';
 
 export type SaveFileStats = {
@@ -274,4 +255,48 @@ export type SubStats = {
   other: Stats;
   sets: Stats;
   total: Stats;
+};
+
+export type D2SItem = {
+  id?: string | number;
+  type?: string;
+  type_name?: string;
+  code?: string;
+  name?: string;
+  unique_name?: string;
+  set_name?: string;
+  rare_name?: string;
+  rare_name2?: string;
+  runeword_name?: string;
+  level?: number;
+  ethereal?: number;
+  quality?: number;
+  location?: string;
+  equipped?: boolean;
+  socketed?: number;
+  socket_count?: number;
+  socketed_items?: D2SItem[];
+  gems?: unknown[];
+  magic_attributes?: Array<{ name: string; value?: unknown }>;
+};
+
+// Simplified item structure
+export type D2Item = {
+  id: string;
+  name: string;
+  type: string;
+  quality: 'normal' | 'magic' | 'rare' | 'set' | 'unique' | 'crafted';
+  level: number;
+  ethereal: boolean;
+  sockets: number;
+  timestamp: Date;
+  characterName: string;
+  location: 'inventory' | 'stash' | 'equipment';
+};
+
+// Simplified event structure - only item-found events
+export type ItemDetectionEvent = {
+  type: 'item-found';
+  item: D2Item;
+  grailItem: HolyGrailItem;
 };
