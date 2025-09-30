@@ -1,0 +1,48 @@
+import type { Item } from '../../types/grail';
+
+export const druid: Item[] = [
+  {
+    id: 'jalalsmane',
+    name: "Jalal's Mane",
+    link: 'https://diablo2.io/uniques/jalal-s-mane-t832.html',
+    etherealType: 'optional',
+    type: 'unique',
+    category: 'armor',
+    subCategory: 'druid',
+    treasureClass: 'exceptional',
+    code: 'dra',
+  },
+  {
+    id: 'cerebusbite',
+    name: "Cerebus' Bite",
+    link: 'https://diablo2.io/uniques/cerebus-bite-t721.html',
+    etherealType: 'optional',
+    type: 'unique',
+    category: 'armor',
+    subCategory: 'druid',
+    treasureClass: 'elite',
+    code: 'drb',
+  },
+  {
+    id: 'ravenlore',
+    name: 'Ravenlore',
+    link: 'https://diablo2.io/uniques/ravenlore-t885.html',
+    etherealType: 'optional',
+    type: 'unique',
+    category: 'armor',
+    subCategory: 'druid',
+    treasureClass: 'elite',
+    code: 'dre',
+  },
+  {
+    id: 'spiritkeeper',
+    name: 'Spirit Keeper',
+    link: 'https://diablo2.io/uniques/spirit-keeper-t927.html',
+    etherealType: 'optional',
+    type: 'unique',
+    category: 'armor',
+    subCategory: 'druid',
+    treasureClass: 'elite',
+    code: 'drd',
+  },
+];

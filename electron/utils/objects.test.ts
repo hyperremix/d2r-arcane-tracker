@@ -1,38 +1,30 @@
 import type { IItem } from '@dschu012/d2s/lib/d2/types';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { GameMode, GameVersion, type Item, type ItemsInSaves, type Settings } from '../types/grail';
+import { GameMode, type ItemsInSaves, type SaveFileItem, type Settings } from '../types/grail';
 import {
-  buildFlattenObjectCacheKey,
   clearPrevUniqItemsFound,
   computeStats,
   computeSubStats,
   countInSaves,
-  flattenObject,
   isRune,
   simplifyItemName,
 } from './objects';
 
-// Mock the grail items
-vi.mock('../items/grail', () => ({
-  runesSeed: {
-    r01: { name: 'El Rune' },
-    r02: { name: 'Eld Rune' },
-    r33: { name: 'Zod Rune' },
-  },
-  runewordsSeed: {
-    rw001: { name: 'Steel' },
-    rw002: { name: 'Stealth' },
-    rw003: { name: 'Leaf' },
-  },
+// Mock the items indexes
+vi.mock('../items/indexes', () => ({
+  isRunewordId: vi.fn(),
 }));
 
-// Mock the runewords mapping
-vi.mock('../items/runewords', () => ({
-  runewordsMapping: {
-    Steel: { patch: 1.0 },
-    Stealth: { patch: 1.0 },
-    Leaf: { patch: 2.4 },
-  },
+// Mock the items
+vi.mock('../items/index', () => ({
+  items: [
+    { id: 'el', type: 'rune', category: 'runes', etherealType: 'none' },
+    { id: 'eld', type: 'rune', category: 'runes', etherealType: 'none' },
+    { id: 'zod', type: 'rune', category: 'runes', etherealType: 'none' },
+    { id: 'steel', type: 'runeword', category: 'runewords', etherealType: 'none' },
+    { id: 'stealth', type: 'runeword', category: 'runewords', etherealType: 'none' },
+    { id: 'leaf', type: 'runeword', category: 'runewords', etherealType: 'none' },
+  ],
 }));
 
 describe('When simplifyItemName is called', () => {
@@ -126,203 +118,25 @@ describe('When isRune is called', () => {
   });
 });
 
-describe('When flattenObject is called', () => {
-  describe('If object is null', () => {
-    it('Then should return empty object', () => {
-      // Arrange
-      const object = null;
-
-      // Act
-      const result = flattenObject(object);
-
-      // Assert
-      expect(result).toEqual({});
-    });
-  });
-
-  describe('If object has nested structure', () => {
-    it('Then should flatten nested objects recursively', () => {
-      // Arrange
-      const object = {
-        Windforce: {
-          'Hydra Bow': {},
-        },
-        Shako: {},
-      };
-
-      // Act
-      const result = flattenObject(object);
-
-      // Assert
-      expect(result).toEqual({
-        hydrabow: {},
-        shako: {},
-      });
-    });
-  });
-
-  describe('If object has empty nested objects', () => {
-    it('Then should skip empty nested objects', () => {
-      // Arrange
-      const object = {
-        Windforce: {
-          'Hydra Bow': {},
-        },
-        Empty: {},
-      };
-
-      // Act
-      const result = flattenObject(object);
-
-      // Assert
-      expect(result).toEqual({
-        hydrabow: {},
-        empty: {},
-      });
-    });
-  });
-
-  describe('If cache key is provided', () => {
-    it('Then should use cache when available', () => {
-      // Arrange
-      const object = { Shako: {} };
-      const cacheKey = 'armor' as const;
-
-      // Act
-      const result1 = flattenObject(object, cacheKey);
-      const result2 = flattenObject(object, cacheKey);
-
-      // Assert
-      expect(result1).toEqual({ shako: {} });
-      expect(result2).toEqual({ shako: {} });
-      expect(result1).toBe(result2); // Should be the same reference (cached)
-    });
-  });
-});
-
-describe('When buildFlattenObjectCacheKey is called', () => {
-  describe('If settings have grailRunes enabled', () => {
-    it('Then should append R to cache key', () => {
-      // Arrange
-      const settings = {
-        grailRunes: true,
-        grailRunewords: false,
-        grailNormal: true,
-        grailEthereal: false,
-      } as Settings;
-      const cacheKey = 'armor' as const;
-
-      // Act
-      const result = buildFlattenObjectCacheKey(cacheKey, settings);
-
-      // Assert
-      expect(result).toBe('armorRE');
-    });
-  });
-
-  describe('If settings have grailRunewords enabled', () => {
-    it('Then should append W to cache key', () => {
-      // Arrange
-      const settings = {
-        grailRunes: false,
-        grailRunewords: true,
-        grailNormal: true,
-        grailEthereal: false,
-      } as Settings;
-      const cacheKey = 'armor' as const;
-
-      // Act
-      const result = buildFlattenObjectCacheKey(cacheKey, settings);
-
-      // Assert
-      expect(result).toBe('armorWE');
-    });
-  });
-
-  describe('If settings have both grailRunes and grailRunewords enabled', () => {
-    it('Then should append both R and W to cache key', () => {
-      // Arrange
-      const settings = {
-        grailRunes: true,
-        grailRunewords: true,
-        grailNormal: true,
-        grailEthereal: false,
-      } as Settings;
-      const cacheKey = 'armor' as const;
-
-      // Act
-      const result = buildFlattenObjectCacheKey(cacheKey, settings);
-
-      // Assert
-      expect(result).toBe('armorRWE');
-    });
-  });
-
-  describe('If settings have grailNormal enabled but grailEthereal disabled', () => {
-    it('Then should append E to cache key', () => {
-      // Arrange
-      const settings = {
-        grailRunes: false,
-        grailRunewords: false,
-        grailNormal: true,
-        grailEthereal: false,
-      } as Settings;
-      const cacheKey = 'armor' as const;
-
-      // Act
-      const result = buildFlattenObjectCacheKey(cacheKey, settings);
-
-      // Assert
-      expect(result).toBe('armorE');
-    });
-  });
-
-  describe('If all settings are enabled', () => {
-    it('Then should append RWE to cache key', () => {
-      // Arrange
-      const settings = {
-        grailRunes: true,
-        grailRunewords: true,
-        grailNormal: true,
-        grailEthereal: false,
-      } as Settings;
-      const cacheKey = 'armor' as const;
-
-      // Act
-      const result = buildFlattenObjectCacheKey(cacheKey, settings);
-
-      // Assert
-      expect(result).toBe('armorRWE');
-    });
-  });
-});
-
 describe('When computeSubStats is called', () => {
   describe('If items are found in saves', () => {
     it('Then should return statistics structure', () => {
       // Arrange
       const items: ItemsInSaves = {
-        shako: { name: 'Shako', type: 'armo', inSaves: {} } as Item,
+        shako: { name: 'Shako', type: 'armo', inSaves: {} } as SaveFileItem,
       };
       const ethItems: ItemsInSaves = {
-        shako: { name: 'Ethereal Shako', type: 'armo', inSaves: {} } as Item,
-      };
-      const template = {
-        shako: {},
-      };
-      const ethTemplate = {
-        shako: {},
+        shako: { name: 'Ethereal Shako', type: 'armo', inSaves: {} } as SaveFileItem,
       };
       const settings = {
         grailNormal: true,
         grailEthereal: true,
         grailRunes: false,
         grailRunewords: false,
-        gameVersion: GameVersion.Resurrected,
       } as Settings;
 
       // Act
-      const result = computeSubStats(items, ethItems, template, ethTemplate, settings, 'armor');
+      const result = computeSubStats(items, ethItems, 'armor', settings);
 
       // Assert
       expect(result).toHaveProperty('normal');
@@ -340,18 +154,15 @@ describe('When computeSubStats is called', () => {
       // Arrange
       const items = {};
       const ethItems = {};
-      const template = { shako: {} };
-      const ethTemplate = { shako: {} };
       const settings = {
         grailNormal: true,
         grailEthereal: true,
         grailRunes: true,
         grailRunewords: true,
-        gameVersion: GameVersion.Resurrected,
       } as Settings;
 
       // Act
-      const result = computeSubStats(items, ethItems, template, ethTemplate, settings, 'armor');
+      const result = computeSubStats(items, ethItems, 'armor', settings);
 
       // Assert
       expect(result.normal.owned).toBe(0);
@@ -366,28 +177,34 @@ describe('When computeSubStats is called', () => {
     it('Then should not count runes', () => {
       // Arrange
       const items: ItemsInSaves = {
-        shako: { name: 'Shako', type: 'armo', inSaves: {} } as Item,
-        r01: { name: 'El Rune', type: 'r01', inSaves: {} } as Item,
+        el: {
+          name: 'El Rune',
+          type: 'r01',
+          inSaves: {
+            TestChar: [{ ethereal: false, ilevel: 1, socketed: false }],
+          },
+        },
+        eld: {
+          name: 'Eld Rune',
+          type: 'r02',
+          inSaves: {
+            TestChar: [{ ethereal: false, ilevel: 1, socketed: false }],
+          },
+        },
       };
       const ethItems: ItemsInSaves = {};
-      const template = {
-        shako: {},
-        r01: {},
-      };
-      const ethTemplate = {};
       const settings = {
         grailNormal: true,
         grailEthereal: false,
         grailRunes: false,
         grailRunewords: false,
-        gameVersion: GameVersion.Resurrected,
       } as Settings;
 
       // Act
-      const result = computeSubStats(items, ethItems, template, ethTemplate, settings, 'armor');
+      const result = computeSubStats(items, ethItems, 'runes', settings);
 
       // Assert
-      expect(result.normal.owned).toBe(1);
+      expect(result.normal.owned).toBe(0);
       expect(result.runes.owned).toBe(0);
     });
   });
@@ -396,28 +213,34 @@ describe('When computeSubStats is called', () => {
     it('Then should not count runewords', () => {
       // Arrange
       const items: ItemsInSaves = {
-        shako: { name: 'Shako', type: 'armo', inSaves: {} } as Item,
-        rw001: { name: 'Steel', type: 'rw001', inSaves: {} } as Item,
+        delirium: {
+          name: 'Delirium',
+          type: 'runeword',
+          inSaves: {
+            TestChar: [{ ethereal: false, ilevel: 65, socketed: false }],
+          },
+        },
+        dream: {
+          name: 'Dream',
+          type: 'runeword',
+          inSaves: {
+            TestChar: [{ ethereal: false, ilevel: 65, socketed: false }],
+          },
+        },
       };
       const ethItems: ItemsInSaves = {};
-      const template = {
-        shako: {},
-        rw001: {},
-      };
-      const ethTemplate = {};
       const settings = {
         grailNormal: true,
         grailEthereal: false,
         grailRunes: false,
         grailRunewords: false,
-        gameVersion: GameVersion.Resurrected,
       } as Settings;
 
       // Act
-      const result = computeSubStats(items, ethItems, template, ethTemplate, settings, 'armor');
+      const result = computeSubStats(items, ethItems, 'runewords', settings);
 
       // Assert
-      expect(result.normal.owned).toBe(1);
+      expect(result.normal.owned).toBe(0);
       expect(result.runewords.owned).toBe(0);
     });
   });
@@ -427,18 +250,15 @@ describe('When computeSubStats is called', () => {
       // Arrange
       const items = {};
       const ethItems = {};
-      const template = {};
-      const ethTemplate = {};
       const settings = {
         grailNormal: true,
         grailEthereal: false,
         grailRunes: false,
         grailRunewords: false,
-        gameVersion: GameVersion.Classic,
       } as Settings;
 
       // Act
-      const result = computeSubStats(items, ethItems, template, ethTemplate, settings, 'runewords');
+      const result = computeSubStats(items, ethItems, 'runewords', settings);
 
       // Assert
       expect(result).toHaveProperty('runewords');
@@ -456,45 +276,25 @@ describe('When computeStats is called', () => {
     it('Then should return comprehensive statistics structure', () => {
       // Arrange
       const items: ItemsInSaves = {
-        shako: { name: 'Shako', type: 'armo', inSaves: {} } as Item,
-        windforce: { name: 'Windforce', type: 'weap', inSaves: {} } as Item,
-        r01: { name: 'El Rune', type: 'r01', inSaves: {} } as Item,
-        rw001: { name: 'Steel', type: 'rw001', inSaves: {} } as Item,
+        shako: { name: 'Shako', type: 'armo', inSaves: {} } as SaveFileItem,
+        windforce: { name: 'Windforce', type: 'weap', inSaves: {} } as SaveFileItem,
+        r01: { name: 'El Rune', type: 'r01', inSaves: {} } as SaveFileItem,
+        rw001: { name: 'Steel', type: 'rw001', inSaves: {} } as SaveFileItem,
       };
       const ethItems: ItemsInSaves = {
-        shako: { name: 'Ethereal Shako', type: 'armo', inSaves: {} } as Item,
-        windforce: { name: 'Ethereal Windforce', type: 'weap', inSaves: {} } as Item,
+        shako: { name: 'Ethereal Shako', type: 'armo', inSaves: {} } as SaveFileItem,
+        windforce: { name: 'Ethereal Windforce', type: 'weap', inSaves: {} } as SaveFileItem,
       };
-      const template = {
-        runes: { r01: {} },
-        runewords: { rw001: {} },
-        uniques: {
-          armor: { shako: {} },
-          weapons: { windforce: {} },
-          other: {},
-        },
-        sets: {},
-        // biome-ignore lint/suspicious/noExplicitAny: explanation
-      } as any;
-      const ethTemplate = {
-        uniques: {
-          armor: { shako: {} },
-          weapons: { windforce: {} },
-          other: {},
-        },
-        // biome-ignore lint/suspicious/noExplicitAny: explanation
-      } as any;
       const settings = {
         grailNormal: true,
         grailEthereal: true,
         grailRunes: true,
         grailRunewords: true,
-        gameVersion: GameVersion.Resurrected,
         gameMode: GameMode.Manual,
       } as Settings;
 
       // Act
-      const result = computeStats(items, ethItems, template, ethTemplate, settings);
+      const result = computeStats(items, ethItems, settings);
 
       // Assert
       expect(result).toHaveProperty('normal');
@@ -511,40 +311,22 @@ describe('When computeStats is called', () => {
   describe('If playSound function is provided', () => {
     it('Then should execute without errors', () => {
       // Arrange
-      const items: ItemsInSaves = { shako: { name: 'Shako', type: 'armo', inSaves: {} } as Item };
+      const items: ItemsInSaves = {
+        shako: { name: 'Shako', type: 'armo', inSaves: {} } as SaveFileItem,
+      };
       const ethItems: ItemsInSaves = {};
-      const template = {
-        runes: {},
-        runewords: {},
-        uniques: {
-          armor: { shako: {} },
-          weapons: {},
-          other: {},
-        },
-        sets: {},
-        // biome-ignore lint/suspicious/noExplicitAny: explanation
-      } as any;
-      const ethTemplate = {
-        uniques: {
-          armor: {},
-          weapons: {},
-          other: {},
-        },
-        // biome-ignore lint/suspicious/noExplicitAny: explanation
-      } as any;
       const settings = {
         grailNormal: true,
         grailEthereal: false,
         grailRunes: false,
         grailRunewords: false,
-        gameVersion: GameVersion.Resurrected,
         gameMode: GameMode.Manual,
       } as Settings;
       const playSound = vi.fn();
 
       // Act & Assert
       expect(() => {
-        computeStats(items, ethItems, template, ethTemplate, settings, playSound);
+        computeStats(items, ethItems, settings, playSound);
       }).not.toThrow();
     });
   });
@@ -552,39 +334,21 @@ describe('When computeStats is called', () => {
   describe('If gameMode is Manual', () => {
     it('Then should not call playSound', () => {
       // Arrange
-      const items: ItemsInSaves = { shako: { name: 'Shako', type: 'armo', inSaves: {} } as Item };
+      const items: ItemsInSaves = {
+        shako: { name: 'Shako', type: 'armo', inSaves: {} } as SaveFileItem,
+      };
       const ethItems: ItemsInSaves = {};
-      const template = {
-        runes: {},
-        runewords: {},
-        uniques: {
-          armor: { shako: {} },
-          weapons: {},
-          other: {},
-        },
-        sets: {},
-        // biome-ignore lint/suspicious/noExplicitAny: explanation
-      } as any;
-      const ethTemplate = {
-        uniques: {
-          armor: {},
-          weapons: {},
-          other: {},
-        },
-        // biome-ignore lint/suspicious/noExplicitAny: explanation
-      } as any;
       const settings = {
         grailNormal: true,
         grailEthereal: false,
         grailRunes: false,
         grailRunewords: false,
-        gameVersion: GameVersion.Resurrected,
         gameMode: GameMode.Manual,
       } as Settings;
       const playSound = vi.fn();
 
       // Act
-      computeStats(items, ethItems, template, ethTemplate, settings, playSound);
+      computeStats(items, ethItems, settings, playSound);
 
       // Assert
       expect(playSound).not.toHaveBeenCalled();
@@ -617,7 +381,7 @@ describe('When countInSaves is called', () => {
   describe('If item has no inSaves property', () => {
     it('Then should return 0', () => {
       // Arrange
-      const item = {} as Item;
+      const item = {} as SaveFileItem;
 
       // Act
       const result = countInSaves(item);
@@ -630,7 +394,7 @@ describe('When countInSaves is called', () => {
   describe('If item has empty inSaves property', () => {
     it('Then should return 0', () => {
       // Arrange
-      const item = { name: 'Test Item', type: 'armo', inSaves: {} } as Item;
+      const item = { name: 'Test Item', type: 'armo', inSaves: {} } as SaveFileItem;
 
       // Act
       const result = countInSaves(item);
@@ -644,40 +408,22 @@ describe('When countInSaves is called', () => {
 describe('When clearPrevUniqItemsFound is called', () => {
   it('Then should reset previous unique items found', () => {
     // Arrange
-    const items: ItemsInSaves = { shako: { name: 'Shako', type: 'armo', inSaves: {} } as Item };
+    const items: ItemsInSaves = {
+      shako: { name: 'Shako', type: 'armo', inSaves: {} } as SaveFileItem,
+    };
     const ethItems: ItemsInSaves = {};
-    const template = {
-      runes: {},
-      runewords: {},
-      uniques: {
-        armor: { shako: {} },
-        weapons: {},
-        other: {},
-      },
-      sets: {},
-      // biome-ignore lint/suspicious/noExplicitAny: explanation
-    } as any;
-    const ethTemplate = {
-      uniques: {
-        armor: {},
-        weapons: {},
-        other: {},
-      },
-      // biome-ignore lint/suspicious/noExplicitAny: explanation
-    } as any;
     const settings = {
       grailNormal: true,
       grailEthereal: false,
       grailRunes: false,
       grailRunewords: false,
-      gameVersion: GameVersion.Resurrected,
       gameMode: GameMode.Manual,
     } as Settings;
 
     // Act
-    computeStats(items, ethItems, template, ethTemplate, settings);
+    computeStats(items, ethItems, settings);
     clearPrevUniqItemsFound();
-    computeStats(items, ethItems, template, ethTemplate, settings);
+    computeStats(items, ethItems, settings);
 
     // Assert
     // The function should work without errors after clearing

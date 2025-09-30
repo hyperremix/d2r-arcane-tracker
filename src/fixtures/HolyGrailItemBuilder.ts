@@ -2,8 +2,9 @@ import type {
   ArmorSubCategory,
   CharmSubCategory,
   EtherealType,
-  HolyGrailItem,
+  Item,
   ItemCategory,
+  ItemSet,
   ItemType,
   JewelrySubCategory,
   RuneSubCategory,
@@ -12,16 +13,18 @@ import type {
 } from 'electron/types/grail';
 
 /**
- * Builder class for creating HolyGrailItem test fixtures
+ * Builder class for creating Item test fixtures
  * Follows the builder pattern for flexible test data creation
  */
 export class HolyGrailItemBuilder {
-  private item: HolyGrailItem = {
+  private item: Item = {
     id: 'default-item',
     name: 'Default Item',
+    link: 'https://example.com/default-item',
     type: 'unique',
     category: 'weapons',
-    subCategory: 'swords',
+    subCategory: '2h_swords',
+    treasureClass: 'normal',
     etherealType: 'none',
   };
 
@@ -129,8 +132,8 @@ export class HolyGrailItemBuilder {
   /**
    * Set the set name (for set items)
    */
-  withSetName(setName: string): this {
-    this.item.setName = setName;
+  withSetName(setName: string | undefined): this {
+    this.item.setName = setName as ItemSet | undefined;
     return this;
   }
 
@@ -143,16 +146,16 @@ export class HolyGrailItemBuilder {
   }
 
   /**
-   * Build and return the HolyGrailItem
+   * Build and return the Item
    */
-  build(): HolyGrailItem {
+  build(): Item {
     return { ...this.item };
   }
 
   /**
    * Build multiple items with the same base configuration
    */
-  buildMany(count: number): HolyGrailItem[] {
+  buildMany(count: number): Item[] {
     return Array.from({ length: count }, (_, index) => ({
       ...this.item,
       id: `${this.item.id}-${index}`,

@@ -1,0 +1,48 @@
+import type { Item } from '../../types/grail';
+
+export const assassin: Item[] = [
+  {
+    id: 'bartucscutthroat',
+    name: "Bartuc's Cut-Throat",
+    link: 'https://diablo2.io/uniques/bartuc-s-cut-throat-t685.html',
+    etherealType: 'optional',
+    type: 'unique',
+    category: 'weapons',
+    subCategory: 'assassin',
+    treasureClass: 'exceptional',
+    code: '9tw',
+  },
+  {
+    id: 'firelizardstalons',
+    name: "Firelizard's Talons",
+    link: 'https://diablo2.io/uniques/firelizard-s-talons-t768.html',
+    etherealType: 'optional',
+    type: 'unique',
+    category: 'weapons',
+    subCategory: 'assassin',
+    treasureClass: 'elite',
+    code: '7lw',
+  },
+  {
+    id: 'jadetalon',
+    name: 'Jade Talon',
+    link: 'https://diablo2.io/uniques/jade-talon-t831.html',
+    etherealType: 'optional',
+    type: 'unique',
+    category: 'weapons',
+    subCategory: 'assassin',
+    treasureClass: 'elite',
+    code: '7wb',
+  },
+  {
+    id: 'shadowkiller',
+    name: 'Shadow Killer',
+    link: 'https://diablo2.io/uniques/shadow-killer-t903.html',
+    etherealType: 'only',
+    type: 'unique',
+    category: 'weapons',
+    subCategory: 'assassin',
+    treasureClass: 'elite',
+    code: '7cs',
+  },
+];

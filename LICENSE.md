@@ -36,7 +36,6 @@ This software includes third-party libraries and components that are subject to 
 - **chokidar**: [License](https://github.com/paulmillr/chokidar/blob/main/LICENSE)
 - **class-variance-authority**: [License](https://github.com/joe-bell/cva/blob/main/LICENSE)
 - **clsx**: [License](https://github.com/lukeed/clsx/blob/main/LICENSE)
-- **d2-holy-grail**: [License](https://github.com/Nasicus/d2-holy-grail/blob/main/LICENSE)
 - **i18next**: [License](https://github.com/i18next/i18next/blob/main/LICENSE)
 - **lucide-react**: [License](https://github.com/lucide-icons/lucide/blob/main/LICENSE)
 - **platform-folders**: [License](https://github.com/octalmage/platform-folders/blob/main/LICENSE)

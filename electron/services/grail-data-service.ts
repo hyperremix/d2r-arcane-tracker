@@ -62,19 +62,6 @@ export class GrailDataService {
   }
 
   /**
-   * Retrieves all items available in the specified difficulty.
-   * Note: Since difficulties are no longer stored in the database, this method returns all items.
-   * In D2R, all items are available in all difficulties.
-   * @param {'normal' | 'nightmare' | 'hell'} _difficulty - The difficulty level to filter by (currently unused).
-   * @returns {DatabaseItem[]} An array of all items (difficulty filtering not implemented).
-   */
-  getItemsByDifficulty(_difficulty: 'normal' | 'nightmare' | 'hell'): DatabaseItem[] {
-    // Since difficulties are no longer stored, return all items for now
-    // All items are available in all difficulties in D2R
-    return this.database.getAllItems();
-  }
-
-  /**
    * Calculates and returns comprehensive statistics about all items in the database.
    * @returns {Object} An object containing item statistics with the following properties:
    * @returns {number} returns.total - The total number of items in the database.

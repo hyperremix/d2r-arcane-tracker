@@ -9,19 +9,25 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
 import { useGrailStore } from '@/stores/grailStore';
 
 /**
- * ThemeSettings component that provides controls for configuring theme preferences.
- * Allows users to switch between light, dark, and system themes.
- * @returns {JSX.Element} A settings card with theme configuration controls
+ * ThemeSettings component that provides controls for configuring theme and display preferences.
+ * Allows users to switch between light, dark, and system themes, and toggle item icons.
+ * @returns {JSX.Element} A settings card with theme and display configuration controls
  */
 export function ThemeSettings() {
   const themeSelectId = useId();
+  const itemIconsSwitchId = useId();
   const { settings, setSettings } = useGrailStore();
 
   const updateTheme = async (theme: 'light' | 'dark' | 'system') => {
     await setSettings({ theme });
+  };
+
+  const toggleItemIcons = async (checked: boolean) => {
+    await setSettings({ showItemIcons: checked });
   };
 
   const getThemeIcon = () => {
@@ -40,7 +46,7 @@ export function ThemeSettings() {
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-lg">
           {getThemeIcon()}
-          Theme Settings
+          Appearance Settings
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -80,10 +86,24 @@ export function ThemeSettings() {
           </div>
         </div>
 
+        <div className="flex items-center justify-between">
+          <div>
+            <Label htmlFor="item-icons-switch" className="font-medium text-sm">
+              Show Item Icons
+            </Label>
+            <p className="text-gray-600 text-xs">Display D2R item icons in cards</p>
+          </div>
+          <Switch
+            id={itemIconsSwitchId}
+            checked={settings.showItemIcons}
+            onCheckedChange={toggleItemIcons}
+          />
+        </div>
+
         <div className="rounded-lg bg-blue-50 p-3 dark:bg-blue-950">
           <p className="text-blue-800 text-xs dark:text-blue-200">
             <strong>Note:</strong> System theme will automatically match your operating system's
-            appearance preference.
+            appearance preference. Item icons are loaded from your D2R installation when available.
           </p>
         </div>
       </CardContent>

@@ -1,0 +1,37 @@
+import type { Item } from '../../types/grail';
+
+export const necromancer: Item[] = [
+  {
+    id: 'homunculus',
+    name: 'Homunculus',
+    link: 'https://diablo2.io/uniques/homunculus-t818.html',
+    etherealType: 'optional',
+    type: 'unique',
+    category: 'armor',
+    subCategory: 'necromancer',
+    treasureClass: 'exceptional',
+    code: 'nea',
+  },
+  {
+    id: 'boneflame',
+    name: 'Boneflame',
+    link: 'https://diablo2.io/uniques/boneflame-t708.html',
+    etherealType: 'optional',
+    type: 'unique',
+    category: 'armor',
+    subCategory: 'necromancer',
+    treasureClass: 'elite',
+    code: 'nee',
+  },
+  {
+    id: 'darkforcespawn',
+    name: 'Darkforce Spawn',
+    link: 'https://diablo2.io/uniques/darkforce-spawn-t739.html',
+    etherealType: 'optional',
+    type: 'unique',
+    category: 'armor',
+    subCategory: 'necromancer',
+    treasureClass: 'elite',
+    code: 'nef',
+  },
+];

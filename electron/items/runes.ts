@@ -1,337 +1,367 @@
-import type { RuneType } from '../types/grail';
+import type { Item } from '../types/grail';
 
-/**
- * Represents a Diablo 2 rune with its properties and effects.
- */
-export type Rune = {
-  name: string;
-  effect: Partial<
-    Record<'weapon' | 'armorhelmshield' | 'armorhelm' | 'armorshield' | 'shield', string>
-  >;
-  level: number | null;
-};
-
-/**
- * A record type mapping rune types to their corresponding Rune objects.
- */
-export type RuneList = Record<RuneType, Rune>;
-
-/**
- * Complete mapping of all Diablo 2 runes with their properties and effects.
- * Contains all 33 runes from El (r01) to Zod (r33) with their names, effects, and level requirements.
- */
-export const runesMapping: RuneList = {
-  r01: {
+export const runes: Item[] = [
+  {
+    id: 'el',
+    code: 'r01',
     name: 'El',
-    effect: {
-      weapon: '+50 AR, +1 Light Radius',
-      armorhelmshield: '+1 Light Radius, +15 Defense',
-    },
-    level: 11,
+    link: 'https://d2runewizard.com/runes/El',
+    etherealType: 'none',
+    type: 'rune',
+    category: 'runes',
+    subCategory: 'runes',
+    treasureClass: 'normal',
   },
-  r02: {
+  {
+    id: 'eld',
+    code: 'r02',
     name: 'Eld',
-    effect: {
-      weapon: '+75% Damage vs. Undead, +50 Attack Rating vs. Undead',
-      armorhelm: 'Lowers Stamina drain by 15%',
-      shield: '+7% Blocking',
-    },
-    level: 11,
+    link: 'https://d2runewizard.com/runes/Eld',
+    etherealType: 'none',
+    type: 'rune',
+    category: 'runes',
+    subCategory: 'runes',
+    treasureClass: 'normal',
   },
-  r03: {
+  {
+    id: 'tir',
+    code: 'r03',
     name: 'Tir',
-    effect: {
-      weapon: '+2 Mana Per Kill',
-      armorhelmshield: '+2 Mana Per Kill',
-    },
-    level: 13,
+    link: 'https://d2runewizard.com/runes/Tir',
+    etherealType: 'none',
+    type: 'rune',
+    category: 'runes',
+    subCategory: 'runes',
+    treasureClass: 'normal',
   },
-  r04: {
+  {
+    id: 'nef',
+    code: 'r04',
     name: 'Nef',
-    effect: {
-      weapon: 'Knockback',
-      armorhelmshield: '+30 Defense vs. Missile',
-    },
-    level: 13,
+    link: 'https://d2runewizard.com/runes/Nef',
+    etherealType: 'none',
+    type: 'rune',
+    category: 'runes',
+    subCategory: 'runes',
+    treasureClass: 'normal',
   },
-  r05: {
+  {
+    id: 'eth',
+    code: 'r05',
     name: 'Eth',
-    effect: {
-      weapon: '-25% Target Defense',
-      armorhelmshield: 'Regenerate Mana 15%',
-    },
-    level: 15,
+    link: 'https://d2runewizard.com/runes/Eth',
+    etherealType: 'none',
+    type: 'rune',
+    category: 'runes',
+    subCategory: 'runes',
+    treasureClass: 'normal',
   },
-  r06: {
+  {
+    id: 'ith',
+    code: 'r06',
     name: 'Ith',
-    effect: {
-      weapon: '+9 to Maximum Damage',
-      armorhelmshield: '15% Damage Taken Goes to Mana',
-    },
-    level: 15,
+    link: 'https://d2runewizard.com/runes/Ith',
+    etherealType: 'none',
+    type: 'rune',
+    category: 'runes',
+    subCategory: 'runes',
+    treasureClass: 'normal',
   },
-  r07: {
+  {
+    id: 'tal',
+    code: 'r07',
     name: 'Tal',
-    effect: {
-      weapon: '75 Poison damage over 5 seconds',
-      armorhelm: '+30% Poison Resistance',
-      shield: '+35% Poison Resistance',
-    },
-    level: 17,
+    link: 'https://d2runewizard.com/runes/Tal',
+    etherealType: 'none',
+    type: 'rune',
+    category: 'runes',
+    subCategory: 'runes',
+    treasureClass: 'normal',
   },
-  r08: {
+  {
+    id: 'ral',
+    code: 'r08',
     name: 'Ral',
-    effect: {
-      weapon: '+5-30 Fire Damage',
-      armorhelm: '+30% Fire Resistance',
-      shield: '+35% Fire Resistance',
-    },
-    level: 19,
+    link: 'https://d2runewizard.com/runes/Ral',
+    etherealType: 'none',
+    type: 'rune',
+    category: 'runes',
+    subCategory: 'runes',
+    treasureClass: 'normal',
   },
-  r09: {
+  {
+    id: 'ort',
+    code: 'r09',
     name: 'Ort',
-    effect: {
-      weapon: '+1-50 Lightning Damage',
-      armorhelm: '+30% Lightning Resistance',
-      shield: '+35% Lightning Resistance',
-    },
-    level: 21,
+    link: 'https://d2runewizard.com/runes/Ort',
+    etherealType: 'none',
+    type: 'rune',
+    category: 'runes',
+    subCategory: 'runes',
+    treasureClass: 'normal',
   },
-  r10: {
+  {
+    id: 'thul',
+    code: 'r10',
     name: 'Thul',
-    effect: {
-      weapon: '+3-14 Cold Damage (Cold Length 3 seconds)',
-      armorhelm: '+30% Cold Resistance',
-      shield: '+35% Cold Resistance',
-    },
-    level: 23,
+    link: 'https://d2runewizard.com/runes/Thul',
+    etherealType: 'none',
+    type: 'rune',
+    category: 'runes',
+    subCategory: 'runes',
+    treasureClass: 'normal',
   },
-  r11: {
+  {
+    id: 'amn',
+    code: 'r11',
     name: 'Amn',
-    effect: {
-      weapon: '7% Life Stolen Per Hit',
-      armorhelmshield: 'Attacker takes 14 damage',
-    },
-    level: 25,
+    link: 'https://d2runewizard.com/runes/Amn',
+    etherealType: 'none',
+    type: 'rune',
+    category: 'runes',
+    subCategory: 'runes',
+    treasureClass: 'normal',
   },
-  r12: {
+  {
+    id: 'sol',
+    code: 'r12',
     name: 'Sol',
-    effect: {
-      weapon: '+9 to Minimum Damage',
-      armorhelmshield: '-7 Damage Taken',
-    },
-    level: 27,
+    link: 'https://d2runewizard.com/runes/Sol',
+    etherealType: 'none',
+    type: 'rune',
+    category: 'runes',
+    subCategory: 'runes',
+    treasureClass: 'normal',
   },
-  r13: {
+  {
+    id: 'shael',
+    code: 'r13',
     name: 'Shael',
-    effect: {
-      weapon: 'Faster Attack Rate (+20)',
-      armorhelm: 'Faster Hit Recovery (+20)',
-      shield: 'Faster Block Rate (+20)',
-    },
-    level: 29,
+    link: 'https://d2runewizard.com/runes/Shael',
+    etherealType: 'none',
+    type: 'rune',
+    category: 'runes',
+    subCategory: 'runes',
+    treasureClass: 'normal',
   },
-  r14: {
+  {
+    id: 'dol',
+    code: 'r14',
     name: 'Dol',
-    effect: {
-      weapon: '25% Chance that Hit Causes Monster to Flee',
-      armorhelmshield: '+7 Replenish Life',
-    },
-    level: 31,
+    link: 'https://d2runewizard.com/runes/Dol',
+    etherealType: 'none',
+    type: 'rune',
+    category: 'runes',
+    subCategory: 'runes',
+    treasureClass: 'normal',
   },
-  r15: {
+  {
+    id: 'hel',
+    code: 'r15',
     name: 'Hel',
-    effect: {
-      weapon: '-20% Requirements',
-      armorhelmshield: '-15% Requirements',
-    },
-    level: null,
+    link: 'https://d2runewizard.com/runes/Hel',
+    etherealType: 'none',
+    type: 'rune',
+    category: 'runes',
+    subCategory: 'runes',
+    treasureClass: 'normal',
   },
-  r16: {
+  {
+    id: 'io',
+    code: 'r16',
     name: 'Io',
-    effect: {
-      weapon: '+10 Vitality',
-      armorhelmshield: '+10 Vitality',
-    },
-    level: 35,
+    link: 'https://d2runewizard.com/runes/Io',
+    etherealType: 'none',
+    type: 'rune',
+    category: 'runes',
+    subCategory: 'runes',
+    treasureClass: 'normal',
   },
-  r17: {
+  {
+    id: 'lum',
+    code: 'r17',
     name: 'Lum',
-    effect: {
-      weapon: '+10 Energy',
-      armorhelmshield: '+10 Energy',
-    },
-    level: 37,
+    link: 'https://d2runewizard.com/runes/Lum',
+    etherealType: 'none',
+    type: 'rune',
+    category: 'runes',
+    subCategory: 'runes',
+    treasureClass: 'normal',
   },
-  r18: {
+  {
+    id: 'ko',
+    code: 'r18',
     name: 'Ko',
-    effect: {
-      weapon: '+10 Dexterity',
-      armorhelmshield: '+10 Dexterity',
-    },
-    level: 39,
+    link: 'https://d2runewizard.com/runes/Ko',
+    etherealType: 'none',
+    type: 'rune',
+    category: 'runes',
+    subCategory: 'runes',
+    treasureClass: 'normal',
   },
-  r19: {
+  {
+    id: 'fal',
+    code: 'r19',
     name: 'Fal',
-    effect: {
-      weapon: '+10 Strength',
-      armorhelmshield: '+10 Strength',
-    },
-    level: 41,
+    link: 'https://d2runewizard.com/runes/Fal',
+    etherealType: 'none',
+    type: 'rune',
+    category: 'runes',
+    subCategory: 'runes',
+    treasureClass: 'normal',
   },
-  r20: {
+  {
+    id: 'lem',
+    code: 'r20',
     name: 'Lem',
-    effect: {
-      weapon: '+75% Extra Gold from Monsters',
-      armorhelmshield: '+50% Extra Gold from Monsters',
-    },
-    level: 43,
+    link: 'https://d2runewizard.com/runes/Lem',
+    etherealType: 'none',
+    type: 'rune',
+    category: 'runes',
+    subCategory: 'runes',
+    treasureClass: 'normal',
   },
-  r21: {
+  {
+    id: 'pul',
+    code: 'r21',
     name: 'Pul',
-    effect: {
-      weapon: '+75% Damage to Demons, +100 AR against Demons',
-      armorhelmshield: '+30% Defense',
-    },
-    level: 45,
+    link: 'https://d2runewizard.com/runes/Pul',
+    etherealType: 'none',
+    type: 'rune',
+    category: 'runes',
+    subCategory: 'runes',
+    treasureClass: 'normal',
   },
-  r22: {
+  {
+    id: 'um',
+    code: 'r22',
     name: 'Um',
-    effect: {
-      weapon: '25% Chance of Open Wounds',
-      armorhelm: '+15% Resist All',
-      shield: '+22% Resist All',
-    },
-    level: 47,
+    link: 'https://d2runewizard.com/runes/Um',
+    etherealType: 'none',
+    type: 'rune',
+    category: 'runes',
+    subCategory: 'runes',
+    treasureClass: 'normal',
   },
-  r23: {
+  {
+    id: 'mal',
+    code: 'r23',
     name: 'Mal',
-    effect: {
-      weapon: 'Prevent Monster Healing',
-      armorhelmshield: 'Reduce Magic Damage by 7',
-    },
-    level: 49,
+    link: 'https://d2runewizard.com/runes/Mal',
+    etherealType: 'none',
+    type: 'rune',
+    category: 'runes',
+    subCategory: 'runes',
+    treasureClass: 'normal',
   },
-  r24: {
+  {
+    id: 'ist',
+    code: 'r24',
     name: 'Ist',
-    effect: {
-      weapon: '+30% Better Chance of Finding Magical Items',
-      armorhelmshield: '+25% Better Chance of Finding Magical Items',
-    },
-    level: 51,
+    link: 'https://d2runewizard.com/runes/Ist',
+    etherealType: 'none',
+    type: 'rune',
+    category: 'runes',
+    subCategory: 'runes',
+    treasureClass: 'normal',
   },
-  r25: {
+  {
+    id: 'gul',
+    code: 'r25',
     name: 'Gul',
-    effect: {
-      weapon: '+20% AR',
-      armorhelmshield: '+5 to Max Resist Poison',
-    },
-    level: 53,
+    link: 'https://d2runewizard.com/runes/Gul',
+    etherealType: 'none',
+    type: 'rune',
+    category: 'runes',
+    subCategory: 'runes',
+    treasureClass: 'normal',
   },
-  r26: {
+  {
+    id: 'vex',
+    code: 'r26',
     name: 'Vex',
-    effect: {
-      weapon: '7% Mana Leech',
-      armorhelmshield: '+5 to Max Fire Resist',
-    },
-    level: 55,
+    link: 'https://d2runewizard.com/runes/Vex',
+    etherealType: 'none',
+    type: 'rune',
+    category: 'runes',
+    subCategory: 'runes',
+    treasureClass: 'normal',
   },
-  r27: {
+  {
+    id: 'ohm',
+    code: 'r27',
     name: 'Ohm',
-    effect: {
-      weapon: '+50% Damage',
-      armorhelmshield: '+5 to Max. Resist Cold',
-    },
-    level: 57,
+    link: 'https://d2runewizard.com/runes/Ohm',
+    etherealType: 'none',
+    type: 'rune',
+    category: 'runes',
+    subCategory: 'runes',
+    treasureClass: 'normal',
   },
-  r28: {
+  {
+    id: 'lo',
+    code: 'r28',
     name: 'Lo',
-    effect: {
-      weapon: '20% Chance of Deadly Strike',
-      armorhelmshield: '+5 to Max. Resist Lightning',
-    },
-    level: 59,
+    link: 'https://d2runewizard.com/runes/Lo',
+    etherealType: 'none',
+    type: 'rune',
+    category: 'runes',
+    subCategory: 'runes',
+    treasureClass: 'normal',
   },
-  r29: {
+  {
+    id: 'sur',
+    code: 'r29',
     name: 'Sur',
-    effect: {
-      weapon: '20% Chance of Hit Blinds Target',
-      armorhelm: '+5% total Mana',
-      shield: '+50 Mana',
-    },
-    level: 61,
+    link: 'https://d2runewizard.com/runes/Sur',
+    etherealType: 'none',
+    type: 'rune',
+    category: 'runes',
+    subCategory: 'runes',
+    treasureClass: 'normal',
   },
-  r30: {
+  {
+    id: 'ber',
+    code: 'r30',
     name: 'Ber',
-    effect: {
-      weapon: '20% Chance of Crushing Blow',
-      armorhelmshield: 'Damage Reduced by 8%',
-    },
-    level: 63,
+    link: 'https://d2runewizard.com/runes/Ber',
+    etherealType: 'none',
+    type: 'rune',
+    category: 'runes',
+    subCategory: 'runes',
+    treasureClass: 'normal',
   },
-  r31: {
+  {
+    id: 'jah',
+    code: 'r31',
     name: 'Jah',
-    effect: {
-      weapon: 'Ignores Target Defense',
-      armorhelm: '+5% of total Hit Points',
-      shield: '+50 Hit Points',
-    },
-    level: 65,
+    link: 'https://d2runewizard.com/runes/Jah',
+    etherealType: 'none',
+    type: 'rune',
+    category: 'runes',
+    subCategory: 'runes',
+    treasureClass: 'normal',
   },
-  r32: {
+  {
+    id: 'cham',
+    code: 'r32',
     name: 'Cham',
-    effect: {
-      weapon: '32% Chance of Hit Freezing Target for 3 seconds',
-      armorhelmshield: 'Cannot be Frozen',
-    },
-    level: 67,
+    link: 'https://d2runewizard.com/runes/Cham',
+    etherealType: 'none',
+    type: 'rune',
+    category: 'runes',
+    subCategory: 'runes',
+    treasureClass: 'normal',
   },
-  r33: {
+  {
+    id: 'zod',
+    code: 'r33',
     name: 'Zod',
-    effect: {
-      weapon: 'Indestructible',
-      armorhelmshield: 'Indestructible',
-    },
-    level: 69,
+    link: 'https://d2runewizard.com/runes/Zod',
+    etherealType: 'none',
+    type: 'rune',
+    category: 'runes',
+    subCategory: 'runes',
+    treasureClass: 'normal',
   },
-};
-
-/**
- * Reverse mapping of rune names to their corresponding rune types.
- * Allows lookup of rune type by lowercase rune name (e.g., "el" -> "r01").
- */
-export const reverseRunesMap: Record<string, RuneType> = {
-  el: 'r01',
-  eld: 'r02',
-  tir: 'r03',
-  nef: 'r04',
-  eth: 'r05',
-  ith: 'r06',
-  tal: 'r07',
-  ral: 'r08',
-  ort: 'r09',
-  thul: 'r10',
-  amn: 'r11',
-  sol: 'r12',
-  shael: 'r13',
-  dol: 'r14',
-  hel: 'r15',
-  io: 'r16',
-  lum: 'r17',
-  ko: 'r18',
-  fal: 'r19',
-  lem: 'r20',
-  pul: 'r21',
-  um: 'r22',
-  mal: 'r23',
-  ist: 'r24',
-  gul: 'r25',
-  vex: 'r26',
-  ohm: 'r27',
-  lo: 'r28',
-  sur: 'r29',
-  ber: 'r30',
-  jah: 'r31',
-  cham: 'r32',
-  zod: 'r33',
-};
+];

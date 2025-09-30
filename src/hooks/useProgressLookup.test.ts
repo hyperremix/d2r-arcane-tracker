@@ -1,5 +1,5 @@
 import { renderHook } from '@testing-library/react';
-import type { GrailProgress, HolyGrailItem } from 'electron/types/grail';
+import type { GrailProgress, Item } from 'electron/types/grail';
 import { describe, expect, it, vi } from 'vitest';
 import { GrailProgressBuilder, HolyGrailItemBuilder } from '@/fixtures';
 import { useProgressLookup } from './useProgressLookup';
@@ -16,7 +16,7 @@ describe('When useProgressLookup is used', () => {
   describe('If no items are provided', () => {
     it('Then should return empty lookup map', () => {
       // Arrange
-      const items: HolyGrailItem[] = [];
+      const items: Item[] = [];
       const progress: GrailProgress[] = [];
       const selectedCharacterId = null;
 

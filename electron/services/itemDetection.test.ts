@@ -15,14 +15,14 @@ import { readFile } from 'node:fs/promises';
 // Import mocked modules
 import { read } from '@dschu012/d2s';
 import { D2SaveFileBuilder, D2SItemBuilder, HolyGrailItemBuilder } from '@/fixtures';
-import type { D2Item, D2SItem, HolyGrailItem } from '../types/grail';
+import type { D2Item, D2SItem, Item } from '../types/grail';
 import { ItemDetectionService } from './itemDetection';
 
 // Mock data types
 
 describe('When ItemDetectionService is used', () => {
   let service: ItemDetectionService;
-  let mockGrailItems: HolyGrailItem[];
+  let mockGrailItems: Item[];
 
   beforeEach(() => {
     service = new ItemDetectionService();
@@ -99,7 +99,7 @@ describe('When ItemDetectionService is used', () => {
           .withId('angelic-raiment')
           .withName('angelicraiment')
           .withType('set')
-          .withArmorSubCategory('armor')
+          .withArmorSubCategory('body_armor')
           .withSetName('Angelic Raiment')
           .withEtherealType('none')
           .build(),
@@ -107,7 +107,7 @@ describe('When ItemDetectionService is used', () => {
           .withId('grandfather')
           .withName('grandfather')
           .withType('unique')
-          .withWeaponSubCategory('swords')
+          .withWeaponSubCategory('2h_swords')
           .withEtherealType('optional')
           .build(),
       ];
@@ -355,7 +355,7 @@ describe('When ItemDetectionService is used', () => {
       expect(items[2].quality).toBe('rare');
       expect(items[3].name).toBe('ber');
       expect(items[3].quality).toBe('normal');
-      expect(items[4].name).toBe('runewordenigma');
+      expect(items[4].name).toBe('enigma');
       expect(items[4].quality).toBe('normal');
     });
 
@@ -480,7 +480,7 @@ describe('When ItemDetectionService is used', () => {
       const result = (service as any).getItemName(runewordItem);
 
       // Assert
-      expect(result).toBe('runewordenigma');
+      expect(result).toBe('enigma');
     });
 
     it('Then should process rainbow facet correctly', () => {

@@ -1,4 +1,4 @@
-import type { DatabaseCharacter } from 'electron/types/grail';
+import type { CharacterClass, DatabaseCharacter } from 'electron/types/grail';
 
 /**
  * Builder class for creating DatabaseCharacter test fixtures
@@ -45,7 +45,7 @@ export class DatabaseCharacterBuilder {
   /**
    * Set the character class
    */
-  withCharacterClass(characterClass: string): this {
+  withCharacterClass(characterClass: CharacterClass): this {
     this.character.character_class = characterClass;
     return this;
   }

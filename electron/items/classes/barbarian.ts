@@ -1,0 +1,48 @@
+import type { Item } from '../../types/grail';
+
+export const barbarian: Item[] = [
+  {
+    id: 'arreatsface',
+    name: "Arreat's Face",
+    link: 'https://diablo2.io/uniques/arreat-s-face-t675.html',
+    etherealType: 'optional',
+    type: 'unique',
+    category: 'armor',
+    subCategory: 'barbarian',
+    treasureClass: 'exceptional',
+    code: 'baa',
+  },
+  {
+    id: 'demonhornsedge',
+    name: "Demonhorn's Edge",
+    link: 'https://diablo2.io/uniques/demonhorn-s-edge-t749.html',
+    etherealType: 'optional',
+    type: 'unique',
+    category: 'armor',
+    subCategory: 'barbarian',
+    treasureClass: 'elite',
+    code: 'bad',
+  },
+  {
+    id: 'halaberdsreign',
+    name: "Halaberd's Reign",
+    link: 'https://diablo2.io/uniques/halaberd-s-reign-t801.html',
+    etherealType: 'optional',
+    type: 'unique',
+    category: 'armor',
+    subCategory: 'barbarian',
+    treasureClass: 'elite',
+    code: 'bae',
+  },
+  {
+    id: 'wolfhowl',
+    name: 'Wolfhowl',
+    link: 'https://diablo2.io/uniques/wolfhowl-t1029.html',
+    etherealType: 'optional',
+    type: 'unique',
+    category: 'armor',
+    subCategory: 'barbarian',
+    treasureClass: 'elite',
+    code: 'bac',
+  },
+];

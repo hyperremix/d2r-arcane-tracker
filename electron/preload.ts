@@ -4,7 +4,7 @@ import type {
   D2SaveFile,
   FileReaderResponse,
   GrailProgress,
-  HolyGrailItem,
+  Item,
   MonitoringStatus,
   Settings,
 } from './types/grail';
@@ -73,15 +73,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
     /**
      * Retrieves all Holy Grail items from the database.
-     * @returns {Promise<HolyGrailItem[]>} A promise that resolves with an array of Holy Grail items.
+     * @returns {Promise<Item[]>} A promise that resolves with an array of Holy Grail items.
      */
-    getItems: (): Promise<HolyGrailItem[]> => ipcRenderer.invoke('grail:getItems'),
+    getItems: (): Promise<Item[]> => ipcRenderer.invoke('grail:getItems'),
     /**
      * Seeds the database with Holy Grail items.
-     * @param {HolyGrailItem[]} items - The items to seed the database with.
+     * @param {Item[]} items - The items to seed the database with.
      * @returns {Promise<{ success: boolean }>} A promise that resolves with a success indicator.
      */
-    seedItems: (items: HolyGrailItem[]): Promise<{ success: boolean }> =>
+    seedItems: (items: Item[]): Promise<{ success: boolean }> =>
       ipcRenderer.invoke('grail:seedItems', items),
     /**
      * Automatically seeds the database with default Holy Grail data if needed.
@@ -229,10 +229,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
     disable: (): Promise<{ success: boolean }> => ipcRenderer.invoke('itemDetection:disable'),
     /**
      * Sets the Holy Grail items to match against during detection.
-     * @param {HolyGrailItem[]} items - Array of Holy Grail items to use for matching.
+     * @param {Item[]} items - Array of Holy Grail items to use for matching.
      * @returns {Promise<{ success: boolean }>} A promise that resolves with a success indicator.
      */
-    setGrailItems: (items: HolyGrailItem[]): Promise<{ success: boolean }> =>
+    setGrailItems: (items: Item[]): Promise<{ success: boolean }> =>
       ipcRenderer.invoke('itemDetection:setGrailItems', items),
   },
 
@@ -285,5 +285,51 @@ contextBridge.exposeInMainWorld('electronAPI', {
      */
     onUpdate: (callback: (data: FileReaderResponse) => void) =>
       ipcRenderer.on('data:onUpdate', (_event, value) => callback(value)),
+  },
+
+  /**
+   * Icon API methods for managing item icons.
+   */
+  icon: {
+    /**
+     * Gets an item icon by item name.
+     * @param {string} itemName - The display name of the item.
+     * @returns {Promise<string | null>} Base64 data URL of the icon or null if not found.
+     */
+    getByName: (itemName: string): Promise<string | null> =>
+      ipcRenderer.invoke('icon:getByName', itemName),
+
+    /**
+     * Gets an item icon by D2R item code.
+     * @param {string} itemCode - The D2R internal item code.
+     * @returns {Promise<string | null>} Base64 data URL of the icon or null if not found.
+     */
+    getByCode: (itemCode: string): Promise<string | null> =>
+      ipcRenderer.invoke('icon:getByCode', itemCode),
+
+    /**
+     * Preloads popular item icons for faster display.
+     * @returns {Promise<{ success: boolean }>} Success indicator.
+     */
+    preloadPopular: (): Promise<{ success: boolean }> => ipcRenderer.invoke('icon:preloadPopular'),
+
+    /**
+     * Checks if D2R installation is available.
+     * @returns {Promise<boolean>} True if D2R is found.
+     */
+    isD2RAvailable: (): Promise<boolean> => ipcRenderer.invoke('icon:isD2RAvailable'),
+
+    /**
+     * Clears the icon cache.
+     * @returns {Promise<{ success: boolean }>} Success indicator.
+     */
+    clearCache: (): Promise<{ success: boolean }> => ipcRenderer.invoke('icon:clearCache'),
+
+    /**
+     * Gets cache statistics.
+     * @returns {Promise<{ size: number; d2rAvailable: boolean; cachePath: string }>} Cache stats.
+     */
+    getCacheStats: (): Promise<{ size: number; d2rAvailable: boolean; cachePath: string }> =>
+      ipcRenderer.invoke('icon:getCacheStats'),
   },
 });

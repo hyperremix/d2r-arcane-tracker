@@ -1,5 +1,3 @@
-import type { IEthGrailData } from 'd2-holy-grail/client/src/common/definitions/union/IEthGrailData';
-
 /**
  * Type representing the different categories of items in Diablo 2.
  */
@@ -19,29 +17,34 @@ export type ItemCategory = 'weapons' | 'armor' | 'jewelry' | 'charms' | 'runes' 
  * Type representing the subcategories of weapon items.
  */
 export type WeaponSubCategory =
-  | 'axes'
+  | '1h_swords'
+  | '2h_swords'
+  | '1h_axes'
+  | '2h_axes'
+  | '1h_maces'
+  | '2h_maces'
+  | '1h_clubs'
+  | '2h_clubs'
   | 'bows'
   | 'crossbows'
   | 'daggers'
   | 'javelins'
-  | 'maces'
   | 'polearms'
   | 'scepters'
   | 'spears'
   | 'staves'
-  | 'swords'
   | 'throwing'
   | 'wands';
 
 /**
  * Type representing the subcategories of armor items.
  */
-export type ArmorSubCategory = 'helms' | 'armor' | 'shields' | 'gloves' | 'boots' | 'belts';
+export type ArmorSubCategory = 'helms' | 'body_armor' | 'shields' | 'gloves' | 'boots' | 'belts';
 
 /**
  * Type representing the subcategories of jewelry items.
  */
-export type JewelrySubCategory = 'amulets' | 'rings';
+export type JewelrySubCategory = 'amulets' | 'rings' | 'rainbow_facets' | 'dies';
 
 /**
  * Type representing the subcategories of charm items.
@@ -56,11 +59,7 @@ export type RuneSubCategory = 'runes';
 /**
  * Type representing the subcategories of runeword items.
  */
-export type RunewordSubCategory =
-  | 'weapon_runewords'
-  | 'armor_runewords'
-  | 'shield_runewords'
-  | 'helm_runewords';
+export type RunewordSubCategory = 'runewords';
 
 /**
  * Type representing the difficulty levels in Diablo 2.
@@ -79,24 +78,81 @@ export type CharacterClass =
   | 'paladin'
   | 'sorceress';
 
-/**
- * Interface representing a Holy Grail item with all its properties.
- */
-export interface HolyGrailItem {
+export type ItemSet =
+  | 'Angelic Raiment'
+  | "Arcanna's Tricks"
+  | 'Arctic Gear'
+  | "Berserker's Arsenal"
+  | "Cathan's Traps"
+  | "Civerb's Vestments"
+  | "Cleglaw's Brace"
+  | "Death's Disguise"
+  | "Hsaru's Defense"
+  | 'Infernal Tools'
+  | "Iratha's Finery"
+  | "Isenhart's Armory"
+  | "Milabrega's Regalia"
+  | "Sigon's Complete Steel"
+  | "Tancred's Battlegear"
+  | "Vidala's Rig"
+  | "Aldur's Watchtower"
+  | "Bul-Kathos' Children"
+  | "Cow King's Leathers"
+  | "Griswold's Legacy"
+  | "Heaven's Brethren"
+  | "Hwanin's Majesty"
+  | 'Immortal King'
+  | "M'avina's Battle Hymn"
+  | "Naj's Ancient Vestige"
+  | "Natalya's Odium"
+  | "Orphan's Call"
+  | "Sander's Folly"
+  | "Sazabi's Grand Tribute"
+  | "Tal Rasha's Wrappings"
+  | 'The Disciple'
+  | "Trang-Oul's Avatar";
+
+export type ItemSubCategory =
+  | WeaponSubCategory
+  | ArmorSubCategory
+  | JewelrySubCategory
+  | CharmSubCategory
+  | RuneSubCategory
+  | RunewordSubCategory
+  | CharacterClass;
+
+export type ItemTreasureClass = 'normal' | 'exceptional' | 'elite';
+
+export interface Item {
   id: string;
   name: string;
+  link: string;
+  code?: string;
+  etherealType: EtherealType;
   type: ItemType;
   category: ItemCategory;
-  subCategory:
-    | WeaponSubCategory
-    | ArmorSubCategory
-    | JewelrySubCategory
-    | CharmSubCategory
-    | RuneSubCategory
-    | RunewordSubCategory;
-  setName?: string;
-  etherealType: EtherealType;
+  subCategory: ItemSubCategory;
+  treasureClass: ItemTreasureClass;
+  setName?: ItemSet;
 }
+
+/**
+ * Type representing an item as stored in the database.
+ */
+export type DatabaseItem = {
+  id: string;
+  name: string;
+  link: string;
+  code?: string;
+  ethereal_type: EtherealType;
+  type: ItemType;
+  category: ItemCategory;
+  sub_category: ItemSubCategory;
+  treasure_class: ItemTreasureClass;
+  set_name?: ItemSet;
+  created_at: string;
+  updated_at: string;
+};
 
 /**
  * Interface representing a Diablo 2 character with all its properties.
@@ -116,6 +172,23 @@ export interface Character {
 }
 
 /**
+ * Type representing a character as stored in the database.
+ */
+export type DatabaseCharacter = {
+  id: string;
+  name: string;
+  character_class: CharacterClass;
+  level: number;
+  difficulty: Difficulty;
+  hardcore: boolean;
+  expansion: boolean;
+  save_file_path?: string;
+  deleted_at?: string;
+  created_at: string;
+  updated_at: string;
+};
+
+/**
  * Interface representing the progress of finding a Holy Grail item.
  */
 export interface GrailProgress {
@@ -129,6 +202,23 @@ export interface GrailProgress {
   difficulty?: Difficulty;
   notes?: string;
 }
+
+/**
+ * Type representing grail progress as stored in the database.
+ */
+export type DatabaseGrailProgress = {
+  id: string;
+  character_id: string;
+  item_id: string;
+  found: boolean;
+  found_date?: string;
+  manually_added: boolean;
+  auto_detected: boolean;
+  difficulty?: 'normal' | 'nightmare' | 'hell';
+  notes?: string;
+  created_at: string;
+  updated_at: string;
+};
 
 /**
  * Interface representing Holy Grail completion statistics.
@@ -173,8 +263,6 @@ export interface MonitoringStatus {
   directory: string | null;
 }
 
-import type { IHolyGrailData } from 'd2-holy-grail/client/src/common/definitions/union/IHolyGrailData';
-
 /**
  * Type representing statistics for save files, mapping filenames to item counts.
  */
@@ -185,7 +273,7 @@ export type SaveFileStats = {
 /**
  * Type representing an item found in save files with its locations.
  */
-export type Item = {
+export type SaveFileItem = {
   name: string;
   type: string;
   inSaves: { [saveName: string]: ItemDetails[] };
@@ -204,7 +292,7 @@ export type ItemDetails = {
  * Type representing a mapping of item names to their Item objects.
  */
 export type ItemsInSaves = {
-  [itemName: string]: Item;
+  [itemName: string]: SaveFileItem;
 };
 
 /**
@@ -218,47 +306,9 @@ export type FileReaderResponse = {
 };
 
 /**
- * Type representing all possible rune types in Diablo 2 (El through Zod).
- */
-export type RuneType =
-  | 'r01'
-  | 'r02'
-  | 'r03'
-  | 'r04'
-  | 'r05'
-  | 'r06'
-  | 'r07'
-  | 'r08'
-  | 'r09'
-  | 'r10'
-  | 'r11'
-  | 'r12'
-  | 'r13'
-  | 'r14'
-  | 'r15'
-  | 'r16'
-  | 'r17'
-  | 'r18'
-  | 'r19'
-  | 'r20'
-  | 'r21'
-  | 'r22'
-  | 'r23'
-  | 'r24'
-  | 'r25'
-  | 'r26'
-  | 'r27'
-  | 'r28'
-  | 'r29'
-  | 'r30'
-  | 'r31'
-  | 'r32'
-  | 'r33';
-
-/**
  * Type representing available runes mapped by their rune ID.
  */
-export type AvailableRunes = { [runeId: string]: Item };
+export type AvailableRunes = { [runeId: string]: SaveFileItem };
 
 /**
  * Enum representing the different game modes for Holy Grail tracking.
@@ -298,14 +348,16 @@ export type Settings = {
   nativeNotifications: boolean;
   needsSeeding: boolean;
   theme: 'light' | 'dark' | 'system';
+  showItemIcons: boolean;
 };
 
 /**
- * Type representing the Holy Grail seed data with additional rune and runeword mappings.
+ * Type representing a setting as stored in the database.
  */
-export type HolyGrailSeed = IHolyGrailData & {
-  runes?: Record<RuneType, string>;
-  runewords?: { [runewordId: string]: string };
+export type DatabaseSetting = {
+  key: string;
+  value: string | null;
+  updated_at: string;
 };
 
 /**
@@ -387,7 +439,7 @@ export type D2Item = {
 export type ItemDetectionEvent = {
   type: 'item-found';
   item: D2Item;
-  grailItem: HolyGrailItem;
+  grailItem: Item;
 };
 
 /**
@@ -439,73 +491,13 @@ export type FlatItemsMap = {
  * Type representing Holy Grail items in a nested structure.
  */
 export type GrailItems = Record<string, Record<string, unknown>>;
+
 /**
  * Type representing Holy Grail tiers containing items.
  */
 export type GrailTiers = Record<string, GrailItems>;
+
 /**
  * Type representing a Holy Grail category.
  */
 export type GrailCategory = Record<string, unknown>;
-/**
- * Type representing Holy Grail data (either normal or ethereal).
- */
-export type GrailData = IHolyGrailData | IEthGrailData;
-
-/**
- * Type representing an item as stored in the database.
- */
-export type DatabaseItem = {
-  id: string;
-  name: string;
-  type: 'unique' | 'set' | 'rune' | 'runeword';
-  category: string;
-  sub_category: string;
-  set_name?: string;
-  ethereal_type: EtherealType;
-  created_at: string;
-  updated_at: string;
-};
-
-/**
- * Type representing a character as stored in the database.
- */
-export type DatabaseCharacter = {
-  id: string;
-  name: string;
-  character_class: string;
-  level: number;
-  difficulty: 'normal' | 'nightmare' | 'hell';
-  hardcore: boolean;
-  expansion: boolean;
-  save_file_path?: string;
-  deleted_at?: string;
-  created_at: string;
-  updated_at: string;
-};
-
-/**
- * Type representing grail progress as stored in the database.
- */
-export type DatabaseGrailProgress = {
-  id: string;
-  character_id: string;
-  item_id: string;
-  found: boolean;
-  found_date?: string;
-  manually_added: boolean;
-  auto_detected: boolean;
-  difficulty?: 'normal' | 'nightmare' | 'hell';
-  notes?: string;
-  created_at: string;
-  updated_at: string;
-};
-
-/**
- * Type representing a setting as stored in the database.
- */
-export type DatabaseSetting = {
-  key: string;
-  value: string | null;
-  updated_at: string;
-};
