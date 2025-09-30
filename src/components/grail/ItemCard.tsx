@@ -269,9 +269,9 @@ function StatusIndicators({
       <Tooltip>
         <TooltipTrigger>
           {allVersionsFound ? (
-            <CheckCheck className="h-5 w-5 rounded-full bg-white text-green-600" />
+            <CheckCheck className="h-5 w-5 rounded-full bg-white text-green-600 dark:bg-gray-950" />
           ) : (
-            <Check className="h-5 w-5 rounded-full bg-white text-yellow-600" />
+            <Check className="h-5 w-5 rounded-full bg-white text-yellow-600 dark:bg-gray-950" />
           )}
         </TooltipTrigger>
         <TooltipContent>
@@ -300,7 +300,7 @@ interface DiscoveryAttributionProps {
 function DiscoveryAttribution({ discoveringCharacters, item }: DiscoveryAttributionProps) {
   return (
     <div className="flex items-center justify-center gap-1 pt-3">
-      <span className="text-gray-500 text-xs">Found by:</span>
+      <span className="text-gray-500 text-xs dark:text-gray-400">Found by:</span>
       <div className="flex items-center gap-1">
         {discoveringCharacters.slice(0, 2).map((character, index) =>
           character ? (
@@ -308,7 +308,7 @@ function DiscoveryAttribution({ discoveringCharacters, item }: DiscoveryAttribut
               <TooltipTrigger>
                 <CharacterIcon
                   characterClass={character.characterClass}
-                  className="text-gray-500"
+                  className="text-gray-500 dark:text-gray-400"
                 />
               </TooltipTrigger>
               <TooltipContent>
@@ -320,7 +320,9 @@ function DiscoveryAttribution({ discoveringCharacters, item }: DiscoveryAttribut
           ) : null,
         )}
         {discoveringCharacters.length > 2 && (
-          <span className="text-gray-500 text-xs">+{discoveringCharacters.length - 2}</span>
+          <span className="text-gray-500 text-xs dark:text-gray-400">
+            +{discoveringCharacters.length - 2}
+          </span>
         )}
       </div>
     </div>
@@ -353,12 +355,12 @@ function VersionCounts({ item, normalProgress, etherealProgress }: VersionCounts
   return (
     <div className="flex items-center justify-center gap-2 pt-2">
       {shouldShowNormalStatus(item) && normalCount > 0 && (
-        <span className="rounded bg-green-100 px-2 py-1 font-medium text-green-700 text-xs">
+        <span className="rounded bg-green-100 px-2 py-1 font-medium text-green-700 text-xs dark:bg-green-900 dark:text-green-200">
           Normal: {normalCount}x
         </span>
       )}
       {shouldShowEtherealStatus(item) && etherealCount > 0 && (
-        <span className="rounded bg-blue-100 px-2 py-1 font-medium text-blue-700 text-xs">
+        <span className="rounded bg-blue-100 px-2 py-1 font-medium text-blue-700 text-xs dark:bg-blue-900 dark:text-blue-200">
           {isEtherealOnly(item) ? 'Ethereal Only' : 'Ethereal'}: {etherealCount}x
         </span>
       )}
@@ -498,11 +500,11 @@ interface ItemCardProps {
  */
 const typeColors = {
   unique:
-    'border-yellow-500 border-yellow-300 bg-yellow-50 shadow-yellow-200 dark:bg-yellow-950 dark:shadow-yellow-800',
-  set: 'border-green-500 border-green-300 bg-green-50 shadow-green-200 dark:bg-green-950 dark:shadow-green-800',
-  rune: 'border-orange-500 border-orange-300 bg-orange-50 shadow-orange-200 dark:bg-orange-950 dark:shadow-orange-800',
+    'border-yellow-300 bg-yellow-50 shadow-yellow-200 dark:bg-yellow-950 dark:shadow-yellow-800 dark:border-yellow-800',
+  set: 'border-green-300 bg-green-50 shadow-green-200 dark:bg-green-950 dark:shadow-green-800 dark:border-green-800',
+  rune: 'border-orange-300 bg-orange-50 shadow-orange-200 dark:bg-orange-950 dark:shadow-orange-800 dark:border-orange-800',
   runeword:
-    'border-purple-500 border-purple-300 bg-purple-50 shadow-purple-200 dark:bg-purple-950 dark:shadow-purple-800',
+    'border-purple-300 bg-purple-50 shadow-purple-200 dark:bg-purple-950 dark:shadow-purple-800 dark:border-purple-800',
 };
 
 /**

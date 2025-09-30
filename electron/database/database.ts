@@ -176,7 +176,8 @@ class GrailDatabase {
         ('notificationVolume', '0.5'),
         ('inAppNotifications', 'true'),
         ('nativeNotifications', 'true'),
-        ('needsSeeding', 'true');
+        ('needsSeeding', 'true'),
+        ('theme', 'system');
     `;
 
     this.db.exec(schema);
@@ -577,6 +578,7 @@ class GrailDatabase {
       inAppNotifications: settings.inAppNotifications === 'true',
       nativeNotifications: settings.nativeNotifications === 'true',
       needsSeeding: settings.needsSeeding === 'true',
+      theme: (settings.theme as 'light' | 'dark' | 'system') || 'system',
     };
 
     return typedSettings;

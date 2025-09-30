@@ -64,7 +64,9 @@ export function GameVersionSettings() {
                 <SelectItem key={version.value} value={version.value}>
                   <div className="flex flex-col">
                     <span className="font-medium">{version.label}</span>
-                    <span className="text-gray-500 text-xs">{version.description}</span>
+                    <span className="text-gray-500 text-xs dark:text-gray-400">
+                      {version.description}
+                    </span>
                   </div>
                 </SelectItem>
               ))}
@@ -72,8 +74,8 @@ export function GameVersionSettings() {
           </Select>
         </div>
 
-        <div className="rounded bg-blue-50 p-3">
-          <p className="text-blue-800 text-sm">
+        <div className="rounded bg-blue-50 p-3 dark:bg-blue-950">
+          <p className="text-blue-800 text-sm dark:text-blue-200">
             <strong>Note:</strong> The game version setting affects item detection compatibility and
             may influence which save file formats are supported. Make sure to select the version
             that matches your Diablo II installation.

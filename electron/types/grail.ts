@@ -297,6 +297,7 @@ export type Settings = {
   inAppNotifications: boolean;
   nativeNotifications: boolean;
   needsSeeding: boolean;
+  theme: 'light' | 'dark' | 'system';
 };
 
 /**

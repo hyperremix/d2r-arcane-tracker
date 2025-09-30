@@ -66,6 +66,7 @@ const defaultSettings: Settings = {
   inAppNotifications: true,
   nativeNotifications: true,
   needsSeeding: true,
+  theme: 'system',
 };
 
 /**
