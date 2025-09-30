@@ -9,6 +9,7 @@ import {
   type HolyGrailItem,
   type Settings,
 } from 'electron/types/grail';
+import { useMemo } from 'react';
 import { create } from 'zustand';
 import { isRecentFind } from '@/lib/utils';
 
@@ -413,22 +414,25 @@ const sortItems = (
 
 /**
  * Custom hook that returns filtered and sorted items based on current filter and sort settings.
+ * Memoized to avoid recalculating on every render when dependencies haven't changed.
  * @returns {HolyGrailItem[]} Array of filtered and sorted Holy Grail items
  */
 export const useFilteredItems = () => {
   const { items, progress, filter, advancedFilter } = useGrailStore();
 
-  const filtered = items.filter((item) => {
-    return (
-      matchesCategories(item, filter.categories) &&
-      matchesSubCategories(item, filter.subCategories) &&
-      matchesTypes(item, filter.types) &&
-      matchesFoundStatus(item, filter.foundStatus, progress) &&
-      matchesSearchTerm(item, filter.searchTerm, advancedFilter.fuzzySearch)
-    );
-  });
+  return useMemo(() => {
+    const filtered = items.filter((item) => {
+      return (
+        matchesCategories(item, filter.categories) &&
+        matchesSubCategories(item, filter.subCategories) &&
+        matchesTypes(item, filter.types) &&
+        matchesFoundStatus(item, filter.foundStatus, progress) &&
+        matchesSearchTerm(item, filter.searchTerm, advancedFilter.fuzzySearch)
+      );
+    });
 
-  return sortItems(filtered, advancedFilter.sortBy, advancedFilter.sortOrder, progress);
+    return sortItems(filtered, advancedFilter.sortBy, advancedFilter.sortOrder, progress);
+  }, [items, progress, filter, advancedFilter]);
 };
 
 /**

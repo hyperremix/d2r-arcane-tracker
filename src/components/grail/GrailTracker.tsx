@@ -1,9 +1,10 @@
 import { BarChart3, Grid, Settings } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState, useTransition } from 'react';
 import { Link } from 'react-router';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { TooltipProvider } from '@/components/ui/tooltip';
+import { cn } from '@/lib/utils';
 import { useGrailStatistics, useGrailStore } from '@/stores/grailStore';
 import { Button } from '../ui/button';
 import { AdvancedSearch } from './AdvancedSearch';
@@ -13,15 +14,39 @@ import { ProgressBar } from './ProgressBar';
 import { StatsDashboard } from './StatsDashboard';
 
 /**
+ * Loading skeleton for tab content.
+ */
+function TabLoadingSkeleton() {
+  return (
+    <div className="animate-pulse space-y-6">
+      <div className="h-16 rounded-lg bg-gray-200 dark:bg-gray-800" />
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+        {Array.from({ length: 20 }, (_, i) => (
+          // biome-ignore lint/suspicious/noArrayIndexKey: Static skeleton elements that never reorder
+          <div key={`skeleton-${i}`} className="h-32 rounded-lg bg-gray-200 dark:bg-gray-800" />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/**
  * GrailTracker component that serves as the main Holy Grail tracking interface.
  * Manages loading of grail data, displays statistics, and provides tabs for item tracking and statistics views.
  * @returns {JSX.Element} The main grail tracker interface with tabs, statistics, and item grid
  */
 export function GrailTracker() {
   const [activeTab, setActiveTab] = useState('tracker');
+  const [isPending, startTransition] = useTransition();
   const { setCharacters, setItems, setProgress, settings } = useGrailStore();
 
   const statistics = useGrailStatistics();
+
+  const handleTabChange = (value: string) => {
+    startTransition(() => {
+      setActiveTab(value);
+    });
+  };
 
   // Load initial data
   useEffect(() => {
@@ -155,28 +180,36 @@ export function GrailTracker() {
         )}
 
         {/* Tabbed Interface */}
-        <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <Tabs value={activeTab} onValueChange={handleTabChange}>
           <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="tracker" className="gap-2">
+            <TabsTrigger value="tracker" className="gap-2" disabled={isPending}>
               <Grid className="h-4 w-4" />
               Item Tracker
             </TabsTrigger>
-            <TabsTrigger value="stats" className="gap-2">
+            <TabsTrigger value="stats" className="gap-2" disabled={isPending}>
               <BarChart3 className="h-4 w-4" />
               Statistics
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="tracker" className="space-y-6">
-            {/* Advanced Search */}
-            <AdvancedSearch />
+          <TabsContent value="tracker" forceMount>
+            <div className={cn('space-y-6', activeTab !== 'tracker' ? 'hidden' : '')}>
+              {/* Advanced Search */}
+              <AdvancedSearch />
 
-            {/* Item Grid */}
-            <ItemGrid />
+              {/* Item Grid */}
+              <Suspense fallback={<TabLoadingSkeleton />}>
+                <ItemGrid />
+              </Suspense>
+            </div>
           </TabsContent>
 
-          <TabsContent value="stats" className="space-y-6">
-            <StatsDashboard />
+          <TabsContent value="stats" className="space-y-6" forceMount>
+            <div className={activeTab !== 'stats' ? 'hidden' : ''}>
+              <Suspense fallback={<TabLoadingSkeleton />}>
+                <StatsDashboard />
+              </Suspense>
+            </div>
           </TabsContent>
         </Tabs>
       </div>

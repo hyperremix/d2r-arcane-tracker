@@ -1,7 +1,7 @@
 import { useVirtualizer } from '@tanstack/react-virtual';
 import type { Character, HolyGrailItem } from 'electron/types/grail';
 import { Grid, List } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useProgressLookup } from '@/hooks/useProgressLookup';
@@ -58,9 +58,10 @@ type GroupMode = 'none' | 'category' | 'type' | 'ethereal';
 /**
  * ItemGrid component that displays Holy Grail items in a filterable, sortable, and groupable grid or list view.
  * Supports multiple view modes (grid/list) and grouping options (category, type, ethereal status).
+ * Memoized to prevent unnecessary re-renders when parent component updates.
  * @returns {JSX.Element} A grid or list of Holy Grail items with view and grouping controls
  */
-export function ItemGrid() {
+export const ItemGrid = memo(function ItemGrid() {
   const { progress, characters, selectedCharacterId, toggleItemFound, settings } = useGrailStore();
   const filteredItems = useFilteredItems(); // This uses DB items as base and applies all filters
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
@@ -199,7 +200,7 @@ export function ItemGrid() {
       />
     </div>
   );
-}
+});
 
 /**
  * Type representing a virtual row item, which can be either a group header or item row(s).
