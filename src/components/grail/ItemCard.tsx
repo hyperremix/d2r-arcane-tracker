@@ -1,5 +1,6 @@
 import type { Character, GrailProgress, HolyGrailItem } from 'electron/types/grail';
 import { Check, CheckCheck } from 'lucide-react';
+import { memo } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { isEtherealOnly, shouldShowEtherealStatus, shouldShowNormalStatus } from '@/lib/ethereal';
@@ -517,7 +518,7 @@ const typeColors = {
  * @param {'grid' | 'list'} [props.viewMode='grid'] - Display mode (grid or list)
  * @returns {JSX.Element} An item card with status indicators and discovery information
  */
-export function ItemCard({
+export const ItemCard = memo(function ItemCard({
   item,
   normalProgress = [],
   etherealProgress = [],
@@ -581,4 +582,4 @@ export function ItemCard({
       onClick={onClick}
     />
   );
-}
+});

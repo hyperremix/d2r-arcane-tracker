@@ -1,5 +1,5 @@
 import { BarChart3, Clock, Target, TrendingUp, Trophy, Users, Zap } from 'lucide-react';
-import { useMemo } from 'react';
+import { memo, useMemo } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useProgressLookup } from '@/hooks/useProgressLookup';
@@ -28,9 +28,10 @@ const formatTimeAgo = (date: Date): string => {
 /**
  * StatsDashboard component that displays comprehensive Holy Grail statistics and analytics.
  * Shows overall progress, category breakdowns, character comparisons, and recent activity.
+ * Memoized to prevent unnecessary re-renders when parent component updates.
  * @returns {JSX.Element} A dashboard with multiple statistical views and progress indicators
  */
-export function StatsDashboard() {
+export const StatsDashboard = memo(function StatsDashboard() {
   const stats = useGrailStatistics();
   const { items, progress, characters, selectedCharacterId } = useGrailStore();
   const progressLookup = useProgressLookup(items, progress, selectedCharacterId);
@@ -211,4 +212,4 @@ export function StatsDashboard() {
       </div>
     </div>
   );
-}
+});

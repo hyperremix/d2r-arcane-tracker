@@ -1,6 +1,7 @@
-import type { HolyGrailItem } from 'electron/types/grail';
+import { useVirtualizer } from '@tanstack/react-virtual';
+import type { Character, HolyGrailItem } from 'electron/types/grail';
 import { Grid, List } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useProgressLookup } from '@/hooks/useProgressLookup';
@@ -57,9 +58,10 @@ type GroupMode = 'none' | 'category' | 'type' | 'ethereal';
 /**
  * ItemGrid component that displays Holy Grail items in a filterable, sortable, and groupable grid or list view.
  * Supports multiple view modes (grid/list) and grouping options (category, type, ethereal status).
+ * Memoized to prevent unnecessary re-renders when parent component updates.
  * @returns {JSX.Element} A grid or list of Holy Grail items with view and grouping controls
  */
-export function ItemGrid() {
+export const ItemGrid = memo(function ItemGrid() {
   const { progress, characters, selectedCharacterId, toggleItemFound, settings } = useGrailStore();
   const filteredItems = useFilteredItems(); // This uses DB items as base and applies all filters
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
@@ -140,10 +142,13 @@ export function ItemGrid() {
     }));
   }, [displayItems, groupMode, progressLookup]);
 
-  const handleItemClick = (itemId: string) => {
-    if (!selectedCharacterId) return;
-    toggleItemFound(itemId, selectedCharacterId, true);
-  };
+  const handleItemClick = useCallback(
+    (itemId: string) => {
+      if (!selectedCharacterId) return;
+      toggleItemFound(itemId, selectedCharacterId, true);
+    },
+    [selectedCharacterId, toggleItemFound],
+  );
 
   return (
     <div className="space-y-6">
@@ -184,50 +189,266 @@ export function ItemGrid() {
         </div>
       </div>
 
-      {/* Items Grid */}
-      <div className="space-y-8">
-        {groupedItems.map((group) => (
-          <div key={group.title} className="space-y-4">
-            {groupMode !== 'none' && (
-              <div className="flex items-center gap-2">
-                <h3 className="font-semibold text-lg">{group.title}</h3>
-                <Badge variant="outline">
-                  {
-                    group.items.filter((item) => progressLookup.get(item.id)?.overallFound || false)
-                      .length
-                  }
-                  /{group.items.length}
-                </Badge>
+      {/* Items Grid with Virtual Scrolling */}
+      <VirtualizedItemsContainer
+        groupedItems={groupedItems}
+        viewMode={viewMode}
+        groupMode={groupMode}
+        progressLookup={progressLookup}
+        characters={characters}
+        handleItemClick={handleItemClick}
+      />
+    </div>
+  );
+});
+
+/**
+ * Type representing a virtual row item, which can be either a group header or item row(s).
+ */
+type VirtualRowType =
+  | { type: 'header'; groupTitle: string; itemCount: number; foundCount: number }
+  | { type: 'items'; items: HolyGrailItem[]; groupIndex: number };
+
+/**
+ * Props interface for VirtualizedItemsContainer component.
+ */
+interface VirtualizedItemsContainerProps {
+  groupedItems: Array<{ title: string; items: HolyGrailItem[] }>;
+  viewMode: ViewMode;
+  groupMode: GroupMode;
+  progressLookup: ReturnType<typeof useProgressLookup>;
+  characters: Character[];
+  handleItemClick: (itemId: string) => void;
+}
+
+/**
+ * Creates item rows for grid view by chunking items into rows based on column count.
+ * @param {HolyGrailItem[]} items - Items to chunk into rows
+ * @param {number} columnsCount - Number of columns per row
+ * @param {number} groupIndex - Index of the group
+ * @returns {VirtualRowType[]} Array of virtual row objects
+ */
+function createGridRows(
+  items: HolyGrailItem[],
+  columnsCount: number,
+  groupIndex: number,
+): VirtualRowType[] {
+  const rows: VirtualRowType[] = [];
+  for (let i = 0; i < items.length; i += columnsCount) {
+    rows.push({
+      type: 'items',
+      items: items.slice(i, i + columnsCount),
+      groupIndex,
+    });
+  }
+  return rows;
+}
+
+/**
+ * Creates item rows for list view with one item per row.
+ * @param {HolyGrailItem[]} items - Items to convert to rows
+ * @param {number} groupIndex - Index of the group
+ * @returns {VirtualRowType[]} Array of virtual row objects
+ */
+function createListRows(items: HolyGrailItem[], groupIndex: number): VirtualRowType[] {
+  return items.map((item) => ({
+    type: 'items' as const,
+    items: [item],
+    groupIndex,
+  }));
+}
+
+/**
+ * VirtualizedItemsContainer component that renders all items with virtual scrolling using parent scroll.
+ * Flattens grouped items into virtual rows and uses the parent container's scroll instead of creating a separate one.
+ * @param {VirtualizedItemsContainerProps} props - Component props
+ * @returns {JSX.Element} A virtualized container of all items
+ */
+function VirtualizedItemsContainer({
+  groupedItems,
+  viewMode,
+  groupMode,
+  progressLookup,
+  characters,
+  handleItemClick,
+}: VirtualizedItemsContainerProps) {
+  const parentRef = useRef<HTMLDivElement>(null);
+
+  // Calculate columns for grid view based on viewport width
+  const getColumnsCount = useCallback(() => {
+    if (viewMode === 'list') return 1;
+
+    const width = window.innerWidth;
+    if (width >= 1536) return 7; // 2xl
+    if (width >= 1280) return 6; // xl
+    if (width >= 1024) return 5; // lg
+    if (width >= 768) return 4; // md
+    if (width >= 640) return 3; // sm
+    return 2; // default
+  }, [viewMode]);
+
+  const [columnsCount, setColumnsCount] = useState(getColumnsCount);
+
+  // Update columns count on window resize
+  useEffect(() => {
+    const handleResize = () => setColumnsCount(getColumnsCount());
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [getColumnsCount]);
+
+  // Flatten groups into virtual rows (headers + item rows)
+  const virtualRows = useMemo<VirtualRowType[]>(() => {
+    const rows: VirtualRowType[] = [];
+
+    for (const [groupIndex, group] of groupedItems.entries()) {
+      // Add header row if grouping is enabled
+      if (groupMode !== 'none') {
+        const foundCount = group.items.filter(
+          (item) => progressLookup.get(item.id)?.overallFound || false,
+        ).length;
+        rows.push({
+          type: 'header',
+          groupTitle: group.title,
+          itemCount: group.items.length,
+          foundCount,
+        });
+      }
+
+      // Add item rows based on view mode
+      const itemRows =
+        viewMode === 'grid'
+          ? createGridRows(group.items, columnsCount, groupIndex)
+          : createListRows(group.items, groupIndex);
+      rows.push(...itemRows);
+    }
+
+    return rows;
+  }, [groupedItems, groupMode, viewMode, columnsCount, progressLookup]);
+
+  const rowVirtualizer = useVirtualizer({
+    count: virtualRows.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: (index) => {
+      const row = virtualRows[index];
+      if (row.type === 'header') return 56; // Header height
+      return viewMode === 'grid' ? 220 : 80; // Grid row or list item height
+    },
+    overscan: 5, // Render 5 rows above and below viewport
+  });
+
+  return (
+    <div ref={parentRef} className="w-full">
+      <div
+        style={{
+          height: `${rowVirtualizer.getTotalSize()}px`,
+          width: '100%',
+          position: 'relative',
+        }}
+      >
+        {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+          const row = virtualRows[virtualRow.index];
+
+          if (row.type === 'header') {
+            return (
+              <div
+                key={virtualRow.key}
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  width: '100%',
+                  height: `${virtualRow.size}px`,
+                  transform: `translateY(${virtualRow.start}px)`,
+                }}
+              >
+                <div className="flex items-center gap-2 py-4">
+                  <h3 className="font-semibold text-lg">{row.groupTitle}</h3>
+                  <Badge variant="outline">
+                    {row.foundCount}/{row.itemCount}
+                  </Badge>
+                </div>
               </div>
-            )}
+            );
+          }
 
+          // Item row
+          if (viewMode === 'list') {
+            const item = row.items[0];
+            if (!item) return null;
+
+            const itemProgressData = progressLookup.get(item.id);
+            const normalProgress = itemProgressData?.normalProgress || [];
+            const etherealProgress = itemProgressData?.etherealProgress || [];
+
+            return (
+              <div
+                key={virtualRow.key}
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  width: '100%',
+                  height: `${virtualRow.size}px`,
+                  transform: `translateY(${virtualRow.start}px)`,
+                }}
+              >
+                <ItemCard
+                  item={item}
+                  normalProgress={normalProgress}
+                  etherealProgress={etherealProgress}
+                  characters={characters}
+                  onClick={() => handleItemClick(item.id)}
+                  viewMode={viewMode}
+                />
+              </div>
+            );
+          }
+
+          // Grid view: render row of items
+          return (
             <div
-              className={cn(
-                viewMode === 'grid'
-                  ? 'grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7'
-                  : 'flex flex-col gap-2',
-              )}
+              key={virtualRow.key}
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                width: '100%',
+                height: `${virtualRow.size}px`,
+                transform: `translateY(${virtualRow.start}px)`,
+              }}
             >
-              {group.items.map((item) => {
-                const itemProgressData = progressLookup.get(item.id);
-                const normalProgress = itemProgressData?.normalProgress || [];
-                const etherealProgress = itemProgressData?.etherealProgress || [];
+              <div
+                className={cn(
+                  'grid gap-4',
+                  columnsCount === 2 && 'grid-cols-2',
+                  columnsCount === 3 && 'grid-cols-3',
+                  columnsCount === 4 && 'grid-cols-4',
+                  columnsCount === 5 && 'grid-cols-5',
+                  columnsCount === 6 && 'grid-cols-6',
+                  columnsCount === 7 && 'grid-cols-7',
+                )}
+              >
+                {row.items.map((item) => {
+                  const itemProgressData = progressLookup.get(item.id);
+                  const normalProgress = itemProgressData?.normalProgress || [];
+                  const etherealProgress = itemProgressData?.etherealProgress || [];
 
-                return (
-                  <ItemCard
-                    key={item.id}
-                    item={item}
-                    normalProgress={normalProgress}
-                    etherealProgress={etherealProgress}
-                    characters={characters}
-                    onClick={() => handleItemClick(item.id)}
-                    viewMode={viewMode}
-                  />
-                );
-              })}
+                  return (
+                    <ItemCard
+                      key={item.id}
+                      item={item}
+                      normalProgress={normalProgress}
+                      etherealProgress={etherealProgress}
+                      characters={characters}
+                      onClick={() => handleItemClick(item.id)}
+                      viewMode={viewMode}
+                    />
+                  );
+                })}
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
