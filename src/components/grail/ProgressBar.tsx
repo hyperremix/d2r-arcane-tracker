@@ -1,6 +1,9 @@
 import { Progress } from '@/components/ui/progress';
 import { cn } from '@/lib/utils';
 
+/**
+ * Props interface for the ProgressBar component.
+ */
 interface ProgressBarProps {
   label: string;
   current: number;
@@ -8,6 +11,15 @@ interface ProgressBarProps {
   className?: string;
 }
 
+/**
+ * ProgressBar component that displays a visual progress indicator with label and percentage.
+ * @param {ProgressBarProps} props - Component props
+ * @param {string} props.label - The label text to display above the progress bar
+ * @param {number} props.current - The current progress value
+ * @param {number} props.total - The total/maximum progress value
+ * @param {string} [props.className] - Optional additional CSS classes
+ * @returns {JSX.Element} A progress bar with label and percentage display
+ */
 export function ProgressBar({ label, current, total, className }: ProgressBarProps) {
   const percentage = total > 0 ? (current / total) * 100 : 0;
 

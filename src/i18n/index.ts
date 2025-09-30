@@ -1,3 +1,7 @@
+/**
+ * i18n configuration and initialization for the D2R Arcane Tracker application.
+ * Sets up i18next with language detection, React integration, and dynamic resource loading.
+ */
 import i18n from 'i18next';
 import LanguageDetector from 'i18next-browser-languagedetector';
 import resourcesToBackend from 'i18next-resources-to-backend';

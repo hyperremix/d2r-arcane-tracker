@@ -2,7 +2,15 @@ import type { GrailProgress, HolyGrailItem } from 'electron/types/grail';
 import { useMemo } from 'react';
 import { shouldShowEtherealStatus, shouldShowNormalStatus } from '@/lib/ethereal';
 
-// Helper function to calculate normal version progress
+/**
+ * Calculates progress for the normal (non-ethereal) version of an item.
+ * @param {HolyGrailItem} item - The Holy Grail item to calculate progress for
+ * @param {GrailProgress[]} progress - All progress records
+ * @param {string | null} selectedCharacterId - Optional character ID to filter by
+ * @returns {Object} Object containing found status and relevant progress records
+ * @returns {boolean} returns.found - Whether the normal version is found
+ * @returns {GrailProgress[]} returns.relevantProgress - Array of relevant progress records
+ */
 function calculateNormalProgress(
   item: HolyGrailItem,
   progress: GrailProgress[],
@@ -29,7 +37,15 @@ function calculateNormalProgress(
   };
 }
 
-// Helper function to calculate ethereal version progress
+/**
+ * Calculates progress for the ethereal version of an item.
+ * @param {HolyGrailItem} item - The Holy Grail item to calculate progress for
+ * @param {GrailProgress[]} progress - All progress records
+ * @param {string | null} selectedCharacterId - Optional character ID to filter by
+ * @returns {Object} Object containing found status and relevant progress records
+ * @returns {boolean} returns.found - Whether the ethereal version is found
+ * @returns {GrailProgress[]} returns.relevantProgress - Array of relevant progress records
+ */
 function calculateEtherealProgress(
   item: HolyGrailItem,
   progress: GrailProgress[],
@@ -58,6 +74,10 @@ function calculateEtherealProgress(
   };
 }
 
+/**
+ * Interface defining the structure of progress lookup data for an item.
+ * Contains found status and progress records for both normal and ethereal versions.
+ */
 export interface ProgressLookupData {
   normalFound: boolean;
   etherealFound: boolean;
@@ -66,6 +86,14 @@ export interface ProgressLookupData {
   overallFound: boolean;
 }
 
+/**
+ * Custom React hook that creates an optimized lookup map for item progress data.
+ * Memoizes the lookup to avoid recalculation on every render.
+ * @param {HolyGrailItem[]} items - Array of Holy Grail items to create lookup for
+ * @param {GrailProgress[]} progress - All progress records from the database
+ * @param {string | null} [selectedCharacterId] - Optional character ID to filter progress by
+ * @returns {Map<string, ProgressLookupData>} A Map with item IDs as keys and progress data as values
+ */
 export function useProgressLookup(
   items: HolyGrailItem[],
   progress: GrailProgress[],

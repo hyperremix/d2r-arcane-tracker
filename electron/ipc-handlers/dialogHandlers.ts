@@ -1,5 +1,9 @@
 import { dialog, ipcMain } from 'electron';
 
+/**
+ * Initializes IPC handlers for native dialog operations.
+ * Sets up handlers for save and open dialogs that can be called from the renderer process.
+ */
 export function initializeDialogHandlers(): void {
   // Save dialog handler
   ipcMain.handle('dialog:showSaveDialog', async (_, options) => {

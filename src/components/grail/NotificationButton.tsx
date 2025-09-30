@@ -6,6 +6,9 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useGrailStore } from '@/stores/grailStore';
 
+/**
+ * Interface extending ItemDetectionEvent with additional notification metadata.
+ */
 interface NotificationItem extends ItemDetectionEvent {
   id: string;
   timestamp: Date;
@@ -13,6 +16,11 @@ interface NotificationItem extends ItemDetectionEvent {
   seen: boolean;
 }
 
+/**
+ * NotificationButton component that displays and manages item detection notifications.
+ * Shows a badge with unread count, plays sounds, and displays a dropdown of recent item discoveries.
+ * @returns {JSX.Element} A notification button with dropdown showing recent item detections
+ */
 export function NotificationButton() {
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [isOpen, setIsOpen] = useState(false);

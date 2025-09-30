@@ -15,10 +15,18 @@ import type {
   WeaponSubCategory,
 } from '../types/grail';
 
+/**
+ * Global service instances for save file monitoring and item detection.
+ */
 let saveFileMonitor: SaveFileMonitor;
 let itemDetectionService: ItemDetectionService;
 
-// Helper function to handle automatic grail progress updates
+/**
+ * Handles automatic grail progress updates when items are detected.
+ * Creates or updates character information and grail progress entries.
+ * Emits events to renderer processes for first-time global discoveries.
+ * @param event - Item detection event containing the found item
+ */
 function handleAutomaticGrailProgress(event: ItemDetectionEvent): void {
   try {
     if (!event.item) return;
@@ -100,7 +108,11 @@ function handleAutomaticGrailProgress(event: ItemDetectionEvent): void {
   }
 }
 
-// Helper function to update character from save file data
+/**
+ * Updates character information from save file data.
+ * Creates new character if not found, or updates existing character with latest save file data.
+ * @param saveFile - Save file data containing character information
+ */
 function updateCharacterFromSaveFile(saveFile: D2SaveFile): void {
   try {
     const character =
@@ -140,6 +152,12 @@ function updateCharacterFromSaveFile(saveFile: D2SaveFile): void {
   }
 }
 
+/**
+ * Initializes IPC handlers for save file monitoring and item detection.
+ * Sets up event listeners for save file changes and item detection.
+ * Configures automatic grail progress updates and forwards events to renderer processes.
+ * Loads grail items into the detection service and starts monitoring automatically.
+ */
 export function initializeSaveFileHandlers(): void {
   // Initialize monitor and detection service with grail database
   saveFileMonitor = new SaveFileMonitor(grailDatabase);
@@ -267,6 +285,10 @@ export function initializeSaveFileHandlers(): void {
 
   // IPC handlers for status and file retrieval only
 
+  /**
+   * IPC handler for retrieving all save files.
+   * @returns Promise resolving to array of save file data
+   */
   ipcMain.handle('saveFile:getSaveFiles', async (): Promise<D2SaveFile[]> => {
     try {
       return await saveFileMonitor.getSaveFiles();
@@ -276,6 +298,10 @@ export function initializeSaveFileHandlers(): void {
     }
   });
 
+  /**
+   * IPC handler for getting the current monitoring status.
+   * @returns Object containing monitoring status and directory information
+   */
   ipcMain.handle('saveFile:getMonitoringStatus', async () => {
     try {
       return {
@@ -288,6 +314,12 @@ export function initializeSaveFileHandlers(): void {
     }
   });
 
+  /**
+   * IPC handler for updating the save directory.
+   * Updates database settings, truncates user data, and restarts monitoring.
+   * @param _ - IPC event (unused)
+   * @param saveDir - New save directory path
+   */
   ipcMain.handle('saveFile:updateSaveDirectory', async (_, saveDir: string) => {
     try {
       // Update the database setting
@@ -306,6 +338,10 @@ export function initializeSaveFileHandlers(): void {
     }
   });
 
+  /**
+   * IPC handler for restoring the default save directory.
+   * Gets platform-specific default directory and updates settings accordingly.
+   */
   ipcMain.handle('saveFile:restoreDefaultDirectory', async () => {
     try {
       // Get the platform default directory
@@ -328,6 +364,9 @@ export function initializeSaveFileHandlers(): void {
   });
 
   // Item detection handlers
+  /**
+   * IPC handler for enabling item detection.
+   */
   ipcMain.handle('itemDetection:enable', async () => {
     try {
       itemDetectionService.enable();
@@ -338,6 +377,9 @@ export function initializeSaveFileHandlers(): void {
     }
   });
 
+  /**
+   * IPC handler for disabling item detection.
+   */
   ipcMain.handle('itemDetection:disable', async () => {
     try {
       itemDetectionService.disable();
@@ -348,6 +390,11 @@ export function initializeSaveFileHandlers(): void {
     }
   });
 
+  /**
+   * IPC handler for setting grail items in the detection service.
+   * @param _ - IPC event (unused)
+   * @param items - Array of Holy Grail items to set for detection
+   */
   ipcMain.handle('itemDetection:setGrailItems', async (_, items: HolyGrailItem[]) => {
     try {
       itemDetectionService.setGrailItems(items);
@@ -361,6 +408,10 @@ export function initializeSaveFileHandlers(): void {
   console.log('Save file IPC handlers initialized');
 }
 
+/**
+ * Closes the save file monitor and stops monitoring.
+ * Should be called when the application is shutting down to properly clean up resources.
+ */
 export function closeSaveFileMonitor(): void {
   if (saveFileMonitor) {
     saveFileMonitor.stopMonitoring();

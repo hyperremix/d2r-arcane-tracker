@@ -2,7 +2,16 @@ import { ipcMain } from 'electron';
 import { GrailDatabase } from '../database/database';
 import type { Character, GrailProgress, HolyGrailItem, Settings } from '../types/grail';
 
+/**
+ * Global database instance for grail operations.
+ */
 let grailDB: GrailDatabase;
+
+/**
+ * Initializes IPC handlers for Holy Grail tracking operations.
+ * Sets up handlers for characters, items, progress, settings, statistics, and backup operations.
+ * Initializes the database connection and registers all IPC event handlers.
+ */
 export function initializeGrailHandlers(): void {
   // Initialize database
   try {
@@ -13,6 +22,10 @@ export function initializeGrailHandlers(): void {
   }
 
   // Character handlers
+  /**
+   * IPC handler for retrieving all characters.
+   * Maps database character format to renderer format with proper date conversion.
+   */
   ipcMain.handle('grail:getCharacters', async () => {
     try {
       const dbCharacters = grailDB.getAllCharacters();
@@ -38,6 +51,11 @@ export function initializeGrailHandlers(): void {
     }
   });
 
+  /**
+   * IPC handler for creating a new character.
+   * @param _ - IPC event (unused)
+   * @param character - Character data to create
+   */
   ipcMain.handle('grail:createCharacter', async (_, character: Character) => {
     try {
       grailDB.insertCharacter({
@@ -57,6 +75,12 @@ export function initializeGrailHandlers(): void {
     }
   });
 
+  /**
+   * IPC handler for updating an existing character.
+   * @param _ - IPC event (unused)
+   * @param characterId - ID of the character to update
+   * @param updates - Partial character data to update
+   */
   ipcMain.handle(
     'grail:updateCharacter',
     async (_, characterId: string, updates: Partial<Character>) => {
@@ -71,6 +95,11 @@ export function initializeGrailHandlers(): void {
     },
   );
 
+  /**
+   * IPC handler for deleting a character (soft delete).
+   * @param _ - IPC event (unused)
+   * @param characterId - ID of the character to delete
+   */
   ipcMain.handle('grail:deleteCharacter', async (_, characterId: string) => {
     try {
       grailDB.deleteCharacter(characterId);
@@ -82,6 +111,10 @@ export function initializeGrailHandlers(): void {
   });
 
   // Items handlers
+  /**
+   * IPC handler for retrieving all grail items.
+   * Returns items filtered by current settings and maps database format to renderer format.
+   */
   ipcMain.handle('grail:getItems', async () => {
     try {
       const settings = grailDB.getAllSettings();
@@ -108,6 +141,11 @@ export function initializeGrailHandlers(): void {
     }
   });
 
+  /**
+   * IPC handler for seeding items into the database.
+   * @param _ - IPC event (unused)
+   * @param items - Array of Holy Grail items to seed
+   */
   ipcMain.handle('grail:seedItems', async (_, items: HolyGrailItem[]) => {
     try {
       const dbItems = items.map((item) => ({
@@ -129,6 +167,11 @@ export function initializeGrailHandlers(): void {
   });
 
   // Progress handlers
+  /**
+   * IPC handler for retrieving grail progress.
+   * @param _ - IPC event (unused)
+   * @param characterId - Optional character ID to filter progress for specific character
+   */
   ipcMain.handle('grail:getProgress', async (_, characterId?: string) => {
     try {
       const settings = grailDB.getAllSettings();
@@ -160,6 +203,11 @@ export function initializeGrailHandlers(): void {
     }
   });
 
+  /**
+   * IPC handler for updating grail progress.
+   * @param _ - IPC event (unused)
+   * @param progress - Grail progress data to update
+   */
   ipcMain.handle('grail:updateProgress', async (_, progress: GrailProgress) => {
     try {
       grailDB.upsertProgress({
@@ -181,6 +229,9 @@ export function initializeGrailHandlers(): void {
   });
 
   // Settings handlers
+  /**
+   * IPC handler for retrieving all user settings.
+   */
   ipcMain.handle('grail:getSettings', async () => {
     try {
       return grailDB.getAllSettings();
@@ -190,6 +241,11 @@ export function initializeGrailHandlers(): void {
     }
   });
 
+  /**
+   * IPC handler for updating user settings.
+   * @param _ - IPC event (unused)
+   * @param settings - Partial settings object to update
+   */
   ipcMain.handle('grail:updateSettings', async (_, settings: Partial<Settings>) => {
     try {
       for (const key in settings) {
@@ -204,6 +260,11 @@ export function initializeGrailHandlers(): void {
   });
 
   // Statistics handlers
+  /**
+   * IPC handler for retrieving grail statistics.
+   * @param _ - IPC event (unused)
+   * @param characterId - Optional character ID to get statistics for specific character
+   */
   ipcMain.handle('grail:getStatistics', async (_, characterId?: string) => {
     try {
       const settings = grailDB.getAllSettings();
@@ -216,6 +277,11 @@ export function initializeGrailHandlers(): void {
   });
 
   // Backup handlers
+  /**
+   * IPC handler for creating a database backup.
+   * @param _ - IPC event (unused)
+   * @param backupPath - File path where the backup should be saved
+   */
   ipcMain.handle('grail:backup', async (_, backupPath: string) => {
     try {
       grailDB.backup(backupPath);
@@ -226,6 +292,11 @@ export function initializeGrailHandlers(): void {
     }
   });
 
+  /**
+   * IPC handler for restoring database from backup file.
+   * @param _ - IPC event (unused)
+   * @param backupPath - File path of the backup to restore from
+   */
   ipcMain.handle('grail:restore', async (_, backupPath: string) => {
     try {
       grailDB.restore(backupPath);
@@ -236,6 +307,11 @@ export function initializeGrailHandlers(): void {
     }
   });
 
+  /**
+   * IPC handler for restoring database from backup buffer.
+   * @param _ - IPC event (unused)
+   * @param backupBuffer - Buffer containing the backup data
+   */
   ipcMain.handle('grail:restoreFromBuffer', async (_, backupBuffer: Uint8Array) => {
     try {
       grailDB.restoreFromBuffer(Buffer.from(backupBuffer));
@@ -246,6 +322,10 @@ export function initializeGrailHandlers(): void {
     }
   });
 
+  /**
+   * IPC handler for truncating all user data (characters and progress).
+   * This removes all characters and their associated progress while keeping items and settings.
+   */
   ipcMain.handle('grail:truncateUserData', async () => {
     try {
       grailDB.truncateUserData();
@@ -259,6 +339,12 @@ export function initializeGrailHandlers(): void {
   console.log('Grail IPC handlers initialized');
 }
 
+/**
+ * Maps character update fields from the renderer format to database format.
+ * Converts camelCase field names to snake_case for database compatibility.
+ * @param updates - Partial character data to map
+ * @returns Mapped character data in database format
+ */
 function mapCharacterUpdates(updates: Partial<Character>): Record<string, unknown> {
   const dbUpdates: Record<string, unknown> = {};
   if (updates.name !== undefined) dbUpdates.name = updates.name;
@@ -272,6 +358,10 @@ function mapCharacterUpdates(updates: Partial<Character>): Record<string, unknow
   return dbUpdates;
 }
 
+/**
+ * Closes the grail database connection.
+ * Should be called when the application is shutting down to properly clean up resources.
+ */
 export function closeGrailDatabase(): void {
   if (grailDB) {
     grailDB.close();

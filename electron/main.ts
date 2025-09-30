@@ -7,30 +7,51 @@ import { closeGrailDatabase, initializeGrailHandlers } from './ipc-handlers/grai
 import { closeSaveFileMonitor, initializeSaveFileHandlers } from './ipc-handlers/saveFileHandlers';
 
 createRequire(import.meta.url);
+/**
+ * The directory name of the current module.
+ */
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-// The built directory structure
-//
-// ├─┬─┬ dist
-// │ │ └── index.html
-// │ │
-// │ ├─┬ dist-electron
-// │ │ ├── main.js
-// │ │ └── preload.mjs
-// │
+/**
+ * The built directory structure:
+ *
+ * ```
+ * ├─┬─┬ dist
+ * │ │ └── index.html
+ * │ │
+ * │ ├─┬ dist-electron
+ * │ │ ├── main.js
+ * │ │ └── preload.mjs
+ * ```
+ */
 process.env.APP_ROOT = path.join(__dirname, '..');
 
-// 🚧 Use ['ENV_NAME'] avoid vite:define plugin - Vite@2.x
+/**
+ * Vite development server URL (only available in development mode).
+ */
 export const VITE_DEV_SERVER_URL = process.env.VITE_DEV_SERVER_URL;
+/**
+ * Path to the main process distribution folder.
+ */
 export const MAIN_DIST = path.join(process.env.APP_ROOT, 'dist-electron');
+/**
+ * Path to the renderer process distribution folder.
+ */
 export const RENDERER_DIST = path.join(process.env.APP_ROOT, 'dist');
 
 process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL
   ? path.join(process.env.APP_ROOT, 'public')
   : RENDERER_DIST;
 
+/**
+ * The main application window instance.
+ */
 export let mainWindow: BrowserWindow | null;
 
+/**
+ * Creates the main application window with appropriate icon and web preferences.
+ * Loads the application from the Vite dev server in development or from built files in production.
+ */
 function createWindow() {
   // Set the icon path based on platform and environment
   let iconPath: string;
@@ -102,7 +123,14 @@ app.on('before-quit', () => {
   closeSaveFileMonitor();
 });
 
+/**
+ * Event object for IPC communication replies.
+ */
 export let eventToReply: IpcMainEvent | null;
+/**
+ * Sets the event object for IPC communication replies.
+ * @param {IpcMainEvent} e - The IPC event to set for replies.
+ */
 export function setEventToReply(e: IpcMainEvent) {
   eventToReply = e;
 }

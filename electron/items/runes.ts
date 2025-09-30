@@ -1,5 +1,8 @@
 import type { RuneType } from '../types/grail';
 
+/**
+ * Represents a Diablo 2 rune with its properties and effects.
+ */
 export type Rune = {
   name: string;
   effect: Partial<
@@ -8,8 +11,15 @@ export type Rune = {
   level: number | null;
 };
 
+/**
+ * A record type mapping rune types to their corresponding Rune objects.
+ */
 export type RuneList = Record<RuneType, Rune>;
 
+/**
+ * Complete mapping of all Diablo 2 runes with their properties and effects.
+ * Contains all 33 runes from El (r01) to Zod (r33) with their names, effects, and level requirements.
+ */
 export const runesMapping: RuneList = {
   r01: {
     name: 'El',
@@ -286,6 +296,10 @@ export const runesMapping: RuneList = {
   },
 };
 
+/**
+ * Reverse mapping of rune names to their corresponding rune types.
+ * Allows lookup of rune type by lowercase rune name (e.g., "el" -> "r01").
+ */
 export const reverseRunesMap: Record<string, RuneType> = {
   el: 'r01',
   eld: 'r02',

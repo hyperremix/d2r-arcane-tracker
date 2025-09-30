@@ -31,13 +31,17 @@ import {
   simplifyItemName,
 } from '../utils/objects';
 
-// Lookup table for magic attribute types
+/**
+ * Lookup table for magic attribute types used in rainbow facet processing.
+ */
 const MAGIC_ATTRIBUTE_TYPES: { [key: string]: string } = {
   item_skillondeath: 'death',
   item_skillonlevelup: 'levelup',
 };
 
-// Lookup table for magic attribute skills
+/**
+ * Lookup table for magic attribute skills used in rainbow facet processing.
+ */
 const MAGIC_ATTRIBUTE_SKILLS: { [key: string]: string } = {
   passive_cold_mastery: 'cold',
   passive_pois_mastery: 'poison',
@@ -45,7 +49,13 @@ const MAGIC_ATTRIBUTE_SKILLS: { [key: string]: string } = {
   passive_ltng_mastery: 'lightning',
 };
 
-// Helper function to process rainbow facet attributes
+/**
+ * Processes rainbow facet magic attributes to determine type and skill.
+ * @param {MagicAttribute[]} magicAttributes - Array of magic attributes from the item.
+ * @returns {Object} Object containing the type and skill of the rainbow facet.
+ * @returns {string} returns.type - The type of the rainbow facet (death, levelup).
+ * @returns {string} returns.skill - The skill of the rainbow facet (cold, poison, fire, lightning).
+ */
 const processRainbowFacetAttributes = (
   magicAttributes: MagicAttribute[],
 ): { type: string; skill: string } => {
@@ -64,7 +74,11 @@ const processRainbowFacetAttributes = (
   return { type, skill };
 };
 
-// Helper function to determine item name
+/**
+ * Processes an item to determine its normalized name.
+ * @param {d2s.types.IItem} item - The D2S item to process.
+ * @returns {string} The normalized item name.
+ */
 const processItemName = (item: d2s.types.IItem): string => {
   let name = item.unique_name || item.set_name || item.rare_name || item.rare_name2 || '';
   name = name.toLowerCase().replace(/[^a-z0-9]/gi, '');
@@ -86,7 +100,14 @@ const processItemName = (item: d2s.types.IItem): string => {
   return name;
 };
 
-// Helper function to check if item should be skipped
+/**
+ * Determines if an item should be skipped during processing.
+ * @param {string} name - The item name.
+ * @param {d2s.types.IItem} item - The D2S item.
+ * @param {FlatItemsMap} flatItems - Map of regular items.
+ * @param {FlatItemsMap} ethFlatItems - Map of ethereal items.
+ * @returns {boolean} True if the item should be skipped, false otherwise.
+ */
 const shouldSkipItem = (
   name: string,
   item: d2s.types.IItem,
@@ -102,7 +123,11 @@ const shouldSkipItem = (
   return false;
 };
 
-// Helper function to create saved item details
+/**
+ * Creates a saved item details object from a D2S item.
+ * @param {d2s.types.IItem} item - The D2S item to create details from.
+ * @returns {ItemDetails} The created item details object.
+ */
 const createSavedItem = (item: d2s.types.IItem): ItemDetails => {
   return {
     ethereal: !!item.ethereal,
@@ -111,7 +136,14 @@ const createSavedItem = (item: d2s.types.IItem): ItemDetails => {
   };
 };
 
-// Helper function to add item to results
+/**
+ * Adds an item to the results object.
+ * @param {FileReaderResponse} results - The results object to add the item to.
+ * @param {string} name - The item name.
+ * @param {ItemDetails} savedItem - The item details.
+ * @param {string} saveName - The save file name.
+ * @param {d2s.types.IItem} item - The D2S item.
+ */
 const addItemToResults = (
   results: FileReaderResponse,
   name: string,
@@ -136,7 +168,14 @@ const addItemToResults = (
   }
 };
 
-// Helper function to add rune to available runes
+/**
+ * Adds a rune to the available runes in the results object.
+ * @param {FileReaderResponse} results - The results object to add the rune to.
+ * @param {string} name - The rune name.
+ * @param {ItemDetails} savedItem - The rune details.
+ * @param {string} saveName - The save file name.
+ * @param {d2s.types.IItem} item - The D2S item.
+ */
 const addRuneToAvailableRunes = (
   results: FileReaderResponse,
   name: string,
@@ -159,17 +198,30 @@ const addRuneToAvailableRunes = (
   }
 };
 
-// Helper function to check if item should be included in parsing
+/**
+ * Determines if an item should be included in parsing based on its properties.
+ * @param {d2s.types.IItem} item - The D2S item to check.
+ * @returns {boolean} True if the item should be included, false otherwise.
+ */
 const shouldIncludeItem = (item: d2s.types.IItem): boolean => {
   return !!(item.unique_name || item.set_name || item.rare_name || item.rare_name2);
 };
 
-// Helper function to process unique or set items
+/**
+ * Processes unique or set items and adds them to the items array.
+ * @param {d2s.types.IItem} item - The D2S item to process.
+ * @param {d2s.types.IItem[]} items - The array to add the item to.
+ */
 const processUniqueOrSetItem = (item: d2s.types.IItem, items: d2s.types.IItem[]): void => {
   items.push(item);
 };
 
-// Helper function to process rune items
+/**
+ * Processes rune items and adds them to the items array.
+ * @param {d2s.types.IItem} item - The D2S item to process.
+ * @param {d2s.types.IItem[]} items - The array to add the item to.
+ * @param {boolean} isEmbed - Whether the rune is embedded in another item.
+ */
 const processRuneItem = (
   item: d2s.types.IItem,
   items: d2s.types.IItem[],
@@ -183,7 +235,11 @@ const processRuneItem = (
   }
 };
 
-// Helper function to process runeword items
+/**
+ * Processes runeword items and adds them to the items array.
+ * @param {d2s.types.IItem} item - The D2S item to process.
+ * @param {d2s.types.IItem[]} items - The array to add the item to.
+ */
 const processRunewordItem = (item: d2s.types.IItem, items: d2s.types.IItem[]): void => {
   if (item.runeword_name) {
     // super funny bug in d2s parser :D
@@ -199,6 +255,11 @@ const processRunewordItem = (item: d2s.types.IItem, items: d2s.types.IItem[]): v
   }
 };
 
+/**
+ * Service for monitoring Diablo 2 save files and extracting item data.
+ * This service watches save file directories, parses D2 save files, and maintains
+ * a database of found items for Holy Grail tracking.
+ */
 class SaveFileMonitor extends EventEmitter {
   private currentData: FileReaderResponse;
   private fileWatcher: FSWatcher | null;
@@ -209,6 +270,10 @@ class SaveFileMonitor extends EventEmitter {
   private grailDatabase: GrailDatabase | null = null;
   private saveDirectory: string | null = null;
 
+  /**
+   * Creates a new instance of the SaveFileMonitor.
+   * @param {GrailDatabase} [grailDatabase] - Optional grail database instance for settings and data storage.
+   */
   constructor(grailDatabase?: GrailDatabase) {
     super();
     this.grailDatabase = grailDatabase || null;
@@ -233,6 +298,10 @@ class SaveFileMonitor extends EventEmitter {
     setInterval(this.tickReader, 500);
   }
 
+  /**
+   * Initializes D2S library constants for different game versions.
+   * @private
+   */
   private initializeD2SConstants(): void {
     const constantVersions = [96, 97, 98, 99, 0, 1, 2];
 
@@ -246,6 +315,11 @@ class SaveFileMonitor extends EventEmitter {
     }
   }
 
+  /**
+   * Initializes save directories by reading settings from the database or using platform defaults.
+   * @private
+   * @returns {Promise<void>} A promise that resolves when initialization is complete.
+   */
   private async initializeSaveDirectories(): Promise<void> {
     // First, try to get saveDir from Settings via grail database
     let customSaveDir: string | null = null;
@@ -268,6 +342,11 @@ class SaveFileMonitor extends EventEmitter {
     }
   }
 
+  /**
+   * Gets the platform-specific default save directory for Diablo 2 Resurrected.
+   * @private
+   * @returns {string} The default save directory path for the current platform.
+   */
   private getPlatformDefaultDirectory(): string {
     const platform = process.platform;
 
@@ -297,11 +376,19 @@ class SaveFileMonitor extends EventEmitter {
     }
   }
 
-  // Public method to get the platform default directory
+  /**
+   * Gets the platform-specific default save directory for Diablo 2 Resurrected.
+   * @returns {string} The default save directory path for the current platform.
+   */
   getDefaultDirectory(): string {
     return this.getPlatformDefaultDirectory();
   }
 
+  /**
+   * Starts monitoring the save file directory for changes.
+   * Sets up file watching and parses existing save files.
+   * @returns {Promise<void>} A promise that resolves when monitoring is started.
+   */
   async startMonitoring(): Promise<void> {
     if (this.isMonitoring) {
       return;
@@ -366,6 +453,11 @@ class SaveFileMonitor extends EventEmitter {
     );
   }
 
+  /**
+   * Stops monitoring the save file directory.
+   * Closes the file watcher and emits a monitoring-stopped event.
+   * @returns {Promise<void>} A promise that resolves when monitoring is stopped.
+   */
   async stopMonitoring(): Promise<void> {
     if (this.fileWatcher) {
       await this.fileWatcher.close();
@@ -376,6 +468,11 @@ class SaveFileMonitor extends EventEmitter {
     this.emit('monitoring-stopped');
   }
 
+  /**
+   * Finds existing save directories that can be monitored.
+   * @private
+   * @returns {Promise<string[]>} A promise that resolves with an array of existing save directory paths.
+   */
   private async findExistingSaveDirectories(): Promise<string[]> {
     const existingDirs: string[] = [];
 
@@ -393,6 +490,12 @@ class SaveFileMonitor extends EventEmitter {
     return existingDirs;
   }
 
+  /**
+   * Parses all save files in the specified directories.
+   * @private
+   * @param {string[]} directories - Array of directory paths to parse.
+   * @returns {Promise<boolean>} A promise that resolves to true if parsing was successful, false otherwise.
+   */
   private async parseAllSaveDirectories(directories: string[]): Promise<boolean> {
     const allFiles: string[] = [];
 
@@ -424,6 +527,12 @@ class SaveFileMonitor extends EventEmitter {
     return true;
   }
 
+  /**
+   * Parses all save files in a single directory.
+   * @private
+   * @param {string} directory - The directory path to parse.
+   * @returns {Promise<boolean>} A promise that resolves to true if parsing was successful, false otherwise.
+   */
   private async parseSaveDirectory(directory: string): Promise<boolean> {
     try {
       const files = readdirSync(directory).filter(
@@ -457,6 +566,12 @@ class SaveFileMonitor extends EventEmitter {
     }
   }
 
+  /**
+   * Prepares a chokidar glob pattern for watching save files.
+   * @private
+   * @param {string} filename - The filename to create a glob pattern for.
+   * @returns {string} The chokidar glob pattern.
+   */
   private prepareChokidarGlobe(filename: string): string {
     if (filename.length < 2) {
       return filename;
@@ -465,6 +580,13 @@ class SaveFileMonitor extends EventEmitter {
     return `${resolved.substring(0, 1) + resolved.substring(1).split(sep).join('/')}/*.{d2s,sss,d2x,d2i}`;
   }
 
+  /**
+   * Parses multiple save files and updates the current data.
+   * @private
+   * @param {string[]} filePaths - Array of file paths to parse.
+   * @param {boolean} userRequested - Whether the parsing was requested by the user.
+   * @returns {Promise<void>} A promise that resolves when parsing is complete.
+   */
   private async parseFiles(filePaths: string[], userRequested: boolean): Promise<void> {
     const results: FileReaderResponse = {
       items: {},
@@ -548,6 +670,14 @@ class SaveFileMonitor extends EventEmitter {
     }
   }
 
+  /**
+   * Parses a single save file and extracts items from it.
+   * @private
+   * @param {string} saveName - The name of the save file.
+   * @param {Buffer} content - The binary content of the save file.
+   * @param {string} extension - The file extension (.d2s, .sss, .d2x, .d2i).
+   * @returns {Promise<d2s.types.IItem[]>} A promise that resolves with an array of extracted items.
+   */
   private async parseSave(
     saveName: string,
     content: Buffer,
@@ -619,6 +749,12 @@ class SaveFileMonitor extends EventEmitter {
     return items;
   }
 
+  /**
+   * Parses a save file to extract basic character information.
+   * @private
+   * @param {string} filePath - The path to the save file.
+   * @returns {Promise<D2SaveFile | null>} A promise that resolves with the parsed save file data or null if parsing fails.
+   */
   private async parseSaveFile(filePath: string): Promise<D2SaveFile | null> {
     try {
       const stats = await import('node:fs/promises').then((fs) => fs.stat(filePath));
@@ -672,6 +808,12 @@ class SaveFileMonitor extends EventEmitter {
     }
   }
 
+  /**
+   * Maps a character class ID to its name.
+   * @private
+   * @param {number} classId - The character class ID from the save file.
+   * @returns {string} The character class name.
+   */
   private getCharacterClass(classId: number): string {
     const classes = [
       'amazon',
@@ -685,6 +827,10 @@ class SaveFileMonitor extends EventEmitter {
     return classes[classId] || 'unknown';
   }
 
+  /**
+   * Retrieves all save files from the monitored directory.
+   * @returns {Promise<D2SaveFile[]>} A promise that resolves with an array of save file objects.
+   */
   async getSaveFiles(): Promise<D2SaveFile[]> {
     const saveFiles: D2SaveFile[] = [];
 
@@ -710,14 +856,26 @@ class SaveFileMonitor extends EventEmitter {
     return saveFiles;
   }
 
+  /**
+   * Checks if the monitor is currently active.
+   * @returns {boolean} True if monitoring is active, false otherwise.
+   */
   isCurrentlyMonitoring(): boolean {
     return this.isMonitoring;
   }
 
+  /**
+   * Gets the current save directory being monitored.
+   * @returns {string | null} The save directory path, or null if not set.
+   */
   getSaveDirectory(): string | null {
     return this.saveDirectory;
   }
 
+  /**
+   * Updates the save directory and restarts monitoring if it was active.
+   * @returns {Promise<void>} A promise that resolves when the update is complete.
+   */
   async updateSaveDirectory(): Promise<void> {
     // Update the save directory and restart monitoring if active
     const wasMonitoring = this.isMonitoring;
@@ -734,10 +892,18 @@ class SaveFileMonitor extends EventEmitter {
     }
   }
 
+  /**
+   * Gets the current parsed item data.
+   * @returns {FileReaderResponse} The current item data from all parsed save files.
+   */
   getItems(): FileReaderResponse {
     return this.currentData;
   }
 
+  /**
+   * Fills in available runes from the current item data.
+   * This method populates the availableRunes section of the current data.
+   */
   fillInAvailableRunes(): void {
     // filling in all the runes into the "available runes"
     this.currentData.availableRunes = Object.keys(this.currentData.items).reduce(
@@ -752,6 +918,11 @@ class SaveFileMonitor extends EventEmitter {
     );
   }
 
+  /**
+   * Creates a manual item entry for tracking purposes.
+   * @param {number} count - The number of items to create.
+   * @returns {Item} A manual item object.
+   */
   createManualItem(count: number): Item {
     return {
       inSaves: {
@@ -762,6 +933,11 @@ class SaveFileMonitor extends EventEmitter {
     };
   }
 
+  /**
+   * Periodic tick reader that checks for file changes and re-parses if needed.
+   * @private
+   * @returns {Promise<void>} A promise that resolves when the tick is complete.
+   */
   private tickReader = async (): Promise<void> => {
     if (!this.grailDatabase) return;
 
@@ -783,6 +959,10 @@ class SaveFileMonitor extends EventEmitter {
     }
   };
 
+  /**
+   * Shuts down the save file monitor and stops all monitoring activities.
+   * @returns {Promise<void>} A promise that resolves when shutdown is complete.
+   */
   async shutdown(): Promise<void> {
     await this.stopMonitoring();
   }

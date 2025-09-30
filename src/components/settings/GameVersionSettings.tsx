@@ -12,6 +12,9 @@ import {
 } from '@/components/ui/select';
 import { useGrailStore } from '@/stores/grailStore';
 
+/**
+ * Available game versions with their labels and descriptions.
+ */
 const gameVersions: { value: GameVersion; label: string; description: string }[] = [
   {
     value: GameVersion.Resurrected,
@@ -25,6 +28,11 @@ const gameVersions: { value: GameVersion; label: string; description: string }[]
   },
 ];
 
+/**
+ * GameVersionSettings component that allows users to select the Diablo II game version.
+ * Provides options for Diablo II: Resurrected or Diablo II: Classic.
+ * @returns {JSX.Element} A settings card with game version selection dropdown
+ */
 export function GameVersionSettings() {
   const gameVersionSelectId = useId();
   const { settings, setSettings } = useGrailStore();

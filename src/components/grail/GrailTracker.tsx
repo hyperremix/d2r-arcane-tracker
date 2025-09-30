@@ -12,6 +12,11 @@ import { NotificationButton } from './NotificationButton';
 import { ProgressBar } from './ProgressBar';
 import { StatsDashboard } from './StatsDashboard';
 
+/**
+ * GrailTracker component that serves as the main Holy Grail tracking interface.
+ * Manages loading of grail data, displays statistics, and provides tabs for item tracking and statistics views.
+ * @returns {JSX.Element} The main grail tracker interface with tabs, statistics, and item grid
+ */
 export function GrailTracker() {
   const [activeTab, setActiveTab] = useState('tracker');
   const { setCharacters, setItems, setProgress, settings } = useGrailStore();

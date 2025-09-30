@@ -9,6 +9,12 @@ import { GrailSettings } from './GrailSettings';
 import { NotificationSettings } from './NotificationSettings';
 import { SaveFileMonitor } from './SaveFileMonitor';
 
+/**
+ * Settings component that serves as the main settings page.
+ * Displays all configuration options including save file monitoring, grail settings,
+ * notifications, game mode, game version, and database management.
+ * @returns {JSX.Element} The main settings interface with all configuration cards
+ */
 export function Settings() {
   return (
     <TooltipProvider>

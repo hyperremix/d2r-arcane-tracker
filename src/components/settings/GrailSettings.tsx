@@ -5,6 +5,11 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { useGrailStore } from '@/stores/grailStore';
 
+/**
+ * GrailSettings component that provides controls for configuring Holy Grail tracking options.
+ * Allows users to toggle tracking of normal items, ethereal items, runes, and runewords.
+ * @returns {JSX.Element} A settings card with toggle switches for grail configuration
+ */
 export function GrailSettings() {
   const grailNormalId = useId();
   const grailEtherealId = useId();

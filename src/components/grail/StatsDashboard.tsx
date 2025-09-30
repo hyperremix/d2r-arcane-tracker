@@ -7,6 +7,11 @@ import { useGrailStatistics, useGrailStore } from '@/stores/grailStore';
 import { ItemCard } from './ItemCard';
 import { ProgressBar } from './ProgressBar';
 
+/**
+ * Formats a date as a relative time string (e.g., "2 days ago", "5 hours ago").
+ * @param {Date} date - The date to format
+ * @returns {string} A human-readable relative time string
+ */
 const formatTimeAgo = (date: Date): string => {
   const now = new Date();
   const diffMs = now.getTime() - date.getTime();
@@ -20,6 +25,11 @@ const formatTimeAgo = (date: Date): string => {
   return 'Just now';
 };
 
+/**
+ * StatsDashboard component that displays comprehensive Holy Grail statistics and analytics.
+ * Shows overall progress, category breakdowns, character comparisons, and recent activity.
+ * @returns {JSX.Element} A dashboard with multiple statistical views and progress indicators
+ */
 export function StatsDashboard() {
   const stats = useGrailStatistics();
   const { items, progress, characters, selectedCharacterId } = useGrailStore();

@@ -6,6 +6,11 @@ import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
 import { useGrailStore } from '@/stores/grailStore';
 
+/**
+ * NotificationSettings component that provides controls for configuring notification preferences.
+ * Allows users to enable/disable sound notifications, adjust volume, and toggle in-app and native notifications.
+ * @returns {JSX.Element} A settings card with notification configuration controls
+ */
 export function NotificationSettings() {
   const { settings, setSettings } = useGrailStore();
   const volumeSliderId = useId();

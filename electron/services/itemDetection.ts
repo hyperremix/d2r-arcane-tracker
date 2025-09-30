@@ -4,7 +4,10 @@ import { read } from '@dschu012/d2s';
 import type { D2SaveFile } from '../services/saveFileMonitor';
 import type { D2Item, D2SItem, HolyGrailItem, ItemDetectionEvent } from '../types/grail';
 
-// Rune mapping for proper rune detection
+/**
+ * Mapping of rune type IDs to their corresponding rune names.
+ * Used for proper rune detection and name resolution.
+ */
 const runesMapping: Record<string, string> = {
   r01: 'El',
   r02: 'Eld',
@@ -41,22 +44,44 @@ const runesMapping: Record<string, string> = {
   r33: 'Zod',
 };
 
+/**
+ * Service for detecting and analyzing items from Diablo 2 save files.
+ * This service parses D2 save files, extracts items, and matches them against
+ * the Holy Grail item database to identify found items.
+ */
 class ItemDetectionService extends EventEmitter {
   private grailItems: HolyGrailItem[] = [];
   private isEnabled = false;
 
+  /**
+   * Sets the Holy Grail items that will be used for matching detected items.
+   * @param {HolyGrailItem[]} items - Array of Holy Grail items to match against.
+   */
   setGrailItems(items: HolyGrailItem[]): void {
     this.grailItems = items;
   }
 
+  /**
+   * Enables the item detection service.
+   * When enabled, the service will process save files and emit item detection events.
+   */
   enable(): void {
     this.isEnabled = true;
   }
 
+  /**
+   * Disables the item detection service.
+   * When disabled, the service will not process save files or emit events.
+   */
   disable(): void {
     this.isEnabled = false;
   }
 
+  /**
+   * Analyzes a Diablo 2 save file to detect and match items against the Holy Grail database.
+   * @param {D2SaveFile} saveFile - The save file to analyze.
+   * @returns {Promise<void>} A promise that resolves when analysis is complete.
+   */
   async analyzeSaveFile(saveFile: D2SaveFile): Promise<void> {
     if (!this.isEnabled) {
       return;
@@ -81,6 +106,12 @@ class ItemDetectionService extends EventEmitter {
     }
   }
 
+  /**
+   * Extracts items from a D2 save file using the d2s library.
+   * @private
+   * @param {D2SaveFile} saveFile - The save file to extract items from.
+   * @returns {Promise<D2Item[]>} A promise that resolves with an array of extracted items.
+   */
   private async extractItemsFromSaveFile(saveFile: D2SaveFile): Promise<D2Item[]> {
     const items: D2Item[] = [];
 
@@ -120,6 +151,15 @@ class ItemDetectionService extends EventEmitter {
     return items;
   }
 
+  /**
+   * Extracts items from a list of D2S items and adds them to the results array.
+   * @private
+   * @param {D2SItem[]} itemList - The list of D2S items to process.
+   * @param {D2Item[]} items - The array to add extracted items to.
+   * @param {string} characterName - The name of the character owning these items.
+   * @param {D2Item['location']} defaultLocation - The default location for items.
+   * @param {boolean} [_isEmbed=false] - Whether these items are embedded in other items.
+   */
   private extractItemsFromList(
     itemList: D2SItem[],
     items: D2Item[],
@@ -170,11 +210,24 @@ class ItemDetectionService extends EventEmitter {
     }
   }
 
+  /**
+   * Determines if a D2S item is a rune based on its type.
+   * @private
+   * @param {D2SItem} item - The D2S item to check.
+   * @returns {boolean} True if the item is a rune, false otherwise.
+   */
   private isRune(item: D2SItem): boolean {
     // Improved rune detection based on d2rHolyGrail
     return Boolean(item.type && runesMapping[item.type]);
   }
 
+  /**
+   * Extracts and normalizes the name of a D2S item.
+   * Handles unique items, set items, rare items, runes, runewords, and rainbow facets.
+   * @private
+   * @param {D2SItem} d2Item - The D2S item to get the name from.
+   * @returns {string} The normalized item name.
+   */
   private getItemName(d2Item: D2SItem): string {
     let name = d2Item.unique_name || d2Item.set_name || d2Item.rare_name || d2Item.rare_name2 || '';
 
@@ -199,6 +252,13 @@ class ItemDetectionService extends EventEmitter {
     return name || d2Item.name || d2Item.type_name || d2Item.code || 'Unknown Item';
   }
 
+  /**
+   * Processes rainbow facet items to determine their specific type and skill.
+   * @private
+   * @param {D2SItem} d2Item - The D2S item containing rainbow facet data.
+   * @param {string} name - The base name of the rainbow facet.
+   * @returns {string} The processed rainbow facet name with type and skill information.
+   */
   private processRainbowFacet(d2Item: D2SItem, name: string): string {
     let type = '';
     let skill = '';
@@ -229,16 +289,34 @@ class ItemDetectionService extends EventEmitter {
     return `${name}${skill}${type}`;
   }
 
+  /**
+   * Simplifies an item name by converting to lowercase and removing special characters.
+   * @private
+   * @param {string} name - The item name to simplify.
+   * @returns {string} The simplified item name.
+   */
   private simplifyItemName(name: string): string {
     // Simplified name processing from d2rHolyGrail
     return name.toLowerCase().replace(/[^a-z0-9]/gi, '');
   }
 
+  /**
+   * Extracts the item type from a D2S item.
+   * @private
+   * @param {D2SItem} d2Item - The D2S item to get the type from.
+   * @returns {string} The item type in lowercase, or "misc" if no type is found.
+   */
   private getItemType(d2Item: D2SItem): string {
     const type = d2Item.type || d2Item.type_name || d2Item.code || '';
     return type.toLowerCase() || 'misc';
   }
 
+  /**
+   * Maps D2S quality values to our quality enum.
+   * @private
+   * @param {D2SItem} d2Item - The D2S item to get the quality from.
+   * @returns {D2Item['quality']} The mapped quality value.
+   */
   private getItemQuality(d2Item: D2SItem): D2Item['quality'] {
     // Map d2s quality values to our quality enum
     const quality = d2Item.quality || 0;
@@ -261,6 +339,12 @@ class ItemDetectionService extends EventEmitter {
     }
   }
 
+  /**
+   * Determines the location of a D2S item.
+   * @private
+   * @param {D2SItem} d2Item - The D2S item to get the location from.
+   * @returns {'inventory' | 'stash' | 'equipment'} The item location.
+   */
   private getItemLocation(d2Item: D2SItem): 'inventory' | 'stash' | 'equipment' {
     // Determine item location based on d2s data
     if (d2Item.location === 'equipped' || d2Item.equipped) return 'equipment';
@@ -268,6 +352,12 @@ class ItemDetectionService extends EventEmitter {
     return 'inventory';
   }
 
+  /**
+   * Extracts the socket count from a D2S item.
+   * @private
+   * @param {D2SItem} d2Item - The D2S item to get the socket count from.
+   * @returns {number} The number of sockets, or 0 if no socket information is available.
+   */
   private getItemSockets(d2Item: D2SItem): number {
     // Safely get socket count from d2s item data
     if (Array.isArray(d2Item.gems)) return d2Item.gems.length;
@@ -276,6 +366,12 @@ class ItemDetectionService extends EventEmitter {
     return 0;
   }
 
+  /**
+   * Finds a matching Holy Grail item for a detected D2 item.
+   * @private
+   * @param {D2Item} item - The detected D2 item to match.
+   * @returns {HolyGrailItem | null} The matching Holy Grail item, or null if no match is found.
+   */
   private findGrailMatch(item: D2Item): HolyGrailItem | null {
     // Simple exact name matching - no complex algorithms
     return this.grailItems.find((grailItem) => grailItem.name === item.name) || null;

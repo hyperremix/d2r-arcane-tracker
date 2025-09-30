@@ -14,6 +14,12 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useGrailStore } from '@/stores/grailStore';
 
+/**
+ * DatabaseCard component that provides database backup and restore functionality.
+ * Allows users to create backups of their Holy Grail database and restore from backup files.
+ * Supports both file selection dialog and drag-and-drop for restore operations.
+ * @returns {JSX.Element} A settings card with backup and restore controls
+ */
 export function DatabaseCard() {
   // Backup state
   const [isBackingUp, setIsBackingUp] = useState(false);

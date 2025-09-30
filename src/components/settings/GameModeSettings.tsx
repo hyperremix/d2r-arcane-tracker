@@ -12,6 +12,9 @@ import {
 } from '@/components/ui/select';
 import { useGrailStore } from '@/stores/grailStore';
 
+/**
+ * Available game modes with their labels, descriptions, and icons.
+ */
 const gameModes: { value: GameMode; label: string; description: string; icon: React.ReactNode }[] =
   [
     {
@@ -40,6 +43,11 @@ const gameModes: { value: GameMode; label: string; description: string; icon: Re
     },
   ];
 
+/**
+ * GameModeSettings component that allows users to select the game mode for Holy Grail tracking.
+ * Provides options for both softcore/hardcore, softcore only, hardcore only, or manual entry.
+ * @returns {JSX.Element} A settings card with game mode selection dropdown
+ */
 export function GameModeSettings() {
   const gameModeSelectId = useId();
   const { settings, setSettings } = useGrailStore();

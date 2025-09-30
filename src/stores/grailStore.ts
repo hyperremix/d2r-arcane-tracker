@@ -12,6 +12,10 @@ import {
 import { create } from 'zustand';
 import { isRecentFind } from '@/lib/utils';
 
+/**
+ * Interface defining the complete state structure and actions for the Grail store.
+ * Manages Holy Grail data, UI state, and provides actions for data manipulation.
+ */
 interface GrailState {
   // Data
   characters: Character[];
@@ -44,6 +48,9 @@ interface GrailState {
   reloadData: () => Promise<void>;
 }
 
+/**
+ * Default application settings.
+ */
 const defaultSettings: Settings = {
   saveDir: '',
   lang: 'en',
@@ -60,10 +67,16 @@ const defaultSettings: Settings = {
   needsSeeding: true,
 };
 
+/**
+ * Default filter configuration.
+ */
 const defaultFilter: GrailFilter = {
   foundStatus: 'all',
 };
 
+/**
+ * Default advanced filter configuration with sorting and search options.
+ */
 const defaultAdvancedFilter: AdvancedGrailFilter = {
   rarities: [],
   difficulties: [],
@@ -74,6 +87,10 @@ const defaultAdvancedFilter: AdvancedGrailFilter = {
   fuzzySearch: false,
 };
 
+/**
+ * Zustand store for managing Holy Grail state including items, progress, characters, and settings.
+ * Provides actions for data manipulation and persistence to the Electron backend.
+ */
 export const useGrailStore = create<GrailState>((set, get) => ({
   // Initial state
   characters: [],
@@ -229,20 +246,43 @@ export const useGrailStore = create<GrailState>((set, get) => ({
   },
 }));
 
-// Selectors for computed values
-// Helper functions for filtering
+/**
+ * Checks if an item matches the specified categories filter.
+ * @param {HolyGrailItem} item - The item to check
+ * @param {string[]} [categories] - Optional array of categories to match
+ * @returns {boolean} True if item matches (or no filter applied), false otherwise
+ */
 const matchesCategories = (item: HolyGrailItem, categories?: string[]): boolean => {
   return !categories || categories.length === 0 || categories.includes(item.category);
 };
 
+/**
+ * Checks if an item matches the specified subcategories filter.
+ * @param {HolyGrailItem} item - The item to check
+ * @param {string[]} [subCategories] - Optional array of subcategories to match
+ * @returns {boolean} True if item matches (or no filter applied), false otherwise
+ */
 const matchesSubCategories = (item: HolyGrailItem, subCategories?: string[]): boolean => {
   return !subCategories || subCategories.length === 0 || subCategories.includes(item.subCategory);
 };
 
+/**
+ * Checks if an item matches the specified types filter.
+ * @param {HolyGrailItem} item - The item to check
+ * @param {string[]} [types] - Optional array of types to match
+ * @returns {boolean} True if item matches (or no filter applied), false otherwise
+ */
 const matchesTypes = (item: HolyGrailItem, types?: string[]): boolean => {
   return !types || types.length === 0 || types.includes(item.type);
 };
 
+/**
+ * Checks if an item matches the specified found status filter.
+ * @param {HolyGrailItem} item - The item to check
+ * @param {string} [foundStatus] - Optional found status ('all', 'found', 'missing')
+ * @param {GrailProgress[]} [progress] - Optional progress records to check against
+ * @returns {boolean} True if item matches the found status, false otherwise
+ */
 const matchesFoundStatus = (
   item: HolyGrailItem,
   foundStatus?: string,
@@ -259,6 +299,13 @@ const matchesFoundStatus = (
   return true;
 };
 
+/**
+ * Checks if an item matches the specified search term.
+ * @param {HolyGrailItem} item - The item to check
+ * @param {string} [searchTerm] - Optional search term to match against item name
+ * @param {boolean} [fuzzySearch] - Whether to use fuzzy matching with Levenshtein distance
+ * @returns {boolean} True if item matches the search term, false otherwise
+ */
 const matchesSearchTerm = (
   item: HolyGrailItem,
   searchTerm?: string,
@@ -277,12 +324,24 @@ const matchesSearchTerm = (
   return name.includes(term);
 };
 
+/**
+ * Calculates the similarity between two strings using Levenshtein distance.
+ * @param {string} str1 - First string to compare
+ * @param {string} str2 - Second string to compare
+ * @returns {number} Similarity score between 0 and 1 (1 being identical)
+ */
 const calculateSimilarity = (str1: string, str2: string): number => {
   const distance = levenshteinDistance(str1, str2);
   const maxLength = Math.max(str1.length, str2.length);
   return 1 - distance / maxLength;
 };
 
+/**
+ * Calculates the Levenshtein distance between two strings.
+ * @param {string} str1 - First string to compare
+ * @param {string} str2 - Second string to compare
+ * @returns {number} The minimum number of single-character edits required to change str1 into str2
+ */
 const levenshteinDistance = (str1: string, str2: string): number => {
   const matrix = Array(str2.length + 1)
     .fill(null)
@@ -305,6 +364,14 @@ const levenshteinDistance = (str1: string, str2: string): number => {
   return matrix[str2.length][str1.length];
 };
 
+/**
+ * Sorts items based on the specified criteria and order.
+ * @param {HolyGrailItem[]} items - Array of items to sort
+ * @param {string} sortBy - Property to sort by ('name', 'category', 'type', 'found_date')
+ * @param {string} sortOrder - Sort order ('asc' or 'desc')
+ * @param {GrailProgress[]} [progress] - Optional progress records for sorting by found_date
+ * @returns {HolyGrailItem[]} Sorted array of items
+ */
 const sortItems = (
   items: HolyGrailItem[],
   sortBy: string,
@@ -344,6 +411,10 @@ const sortItems = (
   });
 };
 
+/**
+ * Custom hook that returns filtered and sorted items based on current filter and sort settings.
+ * @returns {HolyGrailItem[]} Array of filtered and sorted Holy Grail items
+ */
 export const useFilteredItems = () => {
   const { items, progress, filter, advancedFilter } = useGrailStore();
 
@@ -360,7 +431,13 @@ export const useFilteredItems = () => {
   return sortItems(filtered, advancedFilter.sortBy, advancedFilter.sortOrder, progress);
 };
 
-// Helper functions to reduce complexity
+/**
+ * Calculates current and maximum find streaks from an array of find dates.
+ * @param {string[]} findDates - Array of date strings representing find dates
+ * @returns {Object} Object containing current and maximum streak counts
+ * @returns {number} returns.currentStreak - Current consecutive days with finds
+ * @returns {number} returns.maxStreak - Maximum consecutive days with finds
+ */
 function calculateStreaks(findDates: string[]) {
   let currentStreak = 0;
   let maxStreak = 0;
@@ -404,6 +481,13 @@ function calculateStreaks(findDates: string[]) {
   return { currentStreak, maxStreak };
 }
 
+/**
+ * Calculates statistics for each item category.
+ * @param {HolyGrailItem[]} items - All Holy Grail items
+ * @param {GrailProgress[]} foundProgress - Progress records for found items
+ * @param {GrailProgress[]} recentFinds - Recent find progress records
+ * @returns {Array} Array of category statistics with totals, found counts, and percentages
+ */
 function calculateCategoryStats(
   items: HolyGrailItem[],
   foundProgress: GrailProgress[],
@@ -433,6 +517,13 @@ function calculateCategoryStats(
   });
 }
 
+/**
+ * Calculates statistics for each character.
+ * @param {Character[]} characters - All characters
+ * @param {GrailProgress[]} progress - All progress records
+ * @param {HolyGrailItem[]} items - All Holy Grail items
+ * @returns {Array} Array of character statistics with finds, favorite category, and activity
+ */
 function calculateCharacterStats(
   characters: Character[],
   progress: GrailProgress[],
@@ -478,6 +569,11 @@ function calculateCharacterStats(
   });
 }
 
+/**
+ * Calculates timeline statistics for the last 30 days.
+ * @param {GrailProgress[]} progress - All progress records
+ * @returns {Array} Array of daily statistics with dates, item counts, and character attributions
+ */
 function calculateTimelineStats(progress: GrailProgress[]) {
   const timelineStats = [];
   for (let i = 29; i >= 0; i--) {
@@ -498,6 +594,11 @@ function calculateTimelineStats(progress: GrailProgress[]) {
   return timelineStats;
 }
 
+/**
+ * Custom hook that calculates comprehensive Holy Grail statistics.
+ * Provides overall progress, type breakdowns, recent finds, streaks, and category/character stats.
+ * @returns {Object} Comprehensive statistics object with multiple data points
+ */
 export const useGrailStatistics = () => {
   const { items, progress, characters } = useGrailStore();
 

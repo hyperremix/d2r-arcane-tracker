@@ -25,6 +25,12 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useGrailStore } from '@/stores/grailStore';
 
+/**
+ * SaveFileMonitor component that displays and manages save file monitoring status.
+ * Shows monitoring status, monitored directory, detected characters, and provides controls
+ * for changing the monitored directory or restoring to the default platform location.
+ * @returns {JSX.Element} A settings card with save file monitoring status and controls
+ */
 export function SaveFileMonitor() {
   const [monitoringStatus, setMonitoringStatus] = useState<MonitoringStatus>({
     isMonitoring: false,

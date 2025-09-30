@@ -1,3 +1,13 @@
+/**
+ * Mapping of Diablo 2 item names to their corresponding diablo2.io URLs.
+ * This mapping allows the application to link to detailed item information on the diablo2.io website.
+ *
+ * @example
+ * ```typescript
+ * const shakoUrl = diablo2ioMapping['harlequincrest'];
+ * // Returns: 'https://diablo2.io/uniques/harlequin-crest-t37.html'
+ * ```
+ */
 export const diablo2ioMapping: { [itemName: string]: string } = {
   aldursadvance: 'https://diablo2.io/sets/aldur-s-advance-t1037.html',
   aldursdeception: 'https://diablo2.io/sets/aldur-s-deception-t1036.html',

@@ -17,10 +17,19 @@ import type {
 } from '../types/grail';
 import { GameMode, GameVersion } from '../types/grail';
 
+/**
+ * Main database class for managing Holy Grail tracking data.
+ * Handles SQLite database operations for items, characters, progress, and settings.
+ */
 class GrailDatabase {
   private db: Database.Database;
   private dbPath: string;
 
+  /**
+   * Initializes the GrailDatabase instance.
+   * Sets up the database connection, configures pragmas, and initializes the schema.
+   * The database file is stored in the user's data directory.
+   */
   constructor() {
     // Get the user data directory
     const userDataPath = app.getPath('userData');
@@ -34,6 +43,11 @@ class GrailDatabase {
     this.initializeSchema();
   }
 
+  /**
+   * Initializes the database schema by creating tables and indexes.
+   * This method is called during database construction and handles schema creation errors.
+   * @throws {Error} If schema initialization fails
+   */
   private initializeSchema(): void {
     try {
       // Just use the inline schema for now to avoid file path issues
@@ -44,6 +58,11 @@ class GrailDatabase {
     }
   }
 
+  /**
+   * Creates the complete database schema including tables, indexes, triggers, and default settings.
+   * This method defines the structure for items, characters, grail progress, and settings tables.
+   * Also seeds the items table with Holy Grail data if it's empty.
+   */
   private createBasicSchema(): void {
     const schema = `
       -- Items table - stores all Holy Grail items
@@ -173,17 +192,33 @@ class GrailDatabase {
   }
 
   // Items methods
+  /**
+   * Retrieves all items from the database.
+   * @returns Array of all database items, ordered by category, sub_category, and name
+   */
   getAllItems(): DatabaseItem[] {
     const stmt = this.db.prepare('SELECT * FROM items ORDER BY category, sub_category, name');
     return stmt.all() as DatabaseItem[];
   }
 
+  /**
+   * Retrieves items filtered by current user settings.
+   * @param settings - Current user settings for filtering items
+   * @returns Array of filtered database items based on settings
+   */
   getFilteredItems(settings: Settings): DatabaseItem[] {
     const allItems = this.getAllItems();
 
     return allItems.filter((item) => this.shouldIncludeItem(item, settings));
   }
 
+  /**
+   * Determines if an item should be included based on current settings.
+   * Filters items by type (runes, runewords), normal items, and ethereal items.
+   * @param item - The database item to check
+   * @param settings - Current user settings for filtering
+   * @returns True if the item should be included, false otherwise
+   */
   private shouldIncludeItem(item: DatabaseItem, settings: Settings): boolean {
     // Filter based on item type
     if (!this.isItemTypeEnabled(item.type, settings)) {
@@ -202,6 +237,12 @@ class GrailDatabase {
     return true;
   }
 
+  /**
+   * Checks if a specific item type is enabled in the settings.
+   * @param itemType - The type of item to check (rune, runeword, etc.)
+   * @param settings - Current user settings
+   * @returns True if the item type is enabled, false otherwise
+   */
   private isItemTypeEnabled(itemType: string, settings: Settings): boolean {
     if (itemType === 'rune' && !settings.grailRunes) {
       return false;
@@ -214,6 +255,12 @@ class GrailDatabase {
     return true;
   }
 
+  /**
+   * Checks if normal (non-ethereal) items are enabled in the settings.
+   * @param item - The database item to check
+   * @param settings - Current user settings
+   * @returns True if normal items are enabled, false otherwise
+   */
   private isNormalTypeEnabled(item: DatabaseItem, settings: Settings): boolean {
     if (!item.id.startsWith('eth_') && !settings.grailNormal) {
       return false;
@@ -221,6 +268,12 @@ class GrailDatabase {
     return true;
   }
 
+  /**
+   * Checks if ethereal items are enabled in the settings.
+   * @param item - The database item to check
+   * @param settings - Current user settings
+   * @returns True if ethereal items are enabled, false otherwise
+   */
   private isEtherealTypeEnabled(item: DatabaseItem, settings: Settings): boolean {
     if (item.id.startsWith('eth_') && !settings.grailEthereal) {
       return false;
@@ -229,11 +282,20 @@ class GrailDatabase {
     return true;
   }
 
+  /**
+   * Retrieves a specific item by its ID.
+   * @param id - The unique identifier of the item
+   * @returns The database item if found, undefined otherwise
+   */
   getItemById(id: string): DatabaseItem | undefined {
     const stmt = this.db.prepare('SELECT * FROM items WHERE id = ?');
     return stmt.get(id) as DatabaseItem | undefined;
   }
 
+  /**
+   * Inserts a single item into the database.
+   * @param item - The item to insert (without timestamps)
+   */
   insertItem(item: Omit<DatabaseItem, 'created_at' | 'updated_at'>): void {
     const stmt = this.db.prepare(`
       INSERT INTO items (id, name, type, category, sub_category, set_name, ethereal_type)
@@ -250,6 +312,11 @@ class GrailDatabase {
     );
   }
 
+  /**
+   * Inserts multiple items into the database using a transaction.
+   * Uses INSERT OR REPLACE to handle duplicate items.
+   * @param items - Array of items to insert (without timestamps)
+   */
   insertItems(items: Omit<DatabaseItem, 'created_at' | 'updated_at'>[]): void {
     const stmt = this.db.prepare(`
       INSERT OR REPLACE INTO items (id, name, type, category, sub_category, set_name, ethereal_type)
@@ -274,6 +341,10 @@ class GrailDatabase {
   }
 
   // Characters methods
+  /**
+   * Retrieves all non-deleted characters from the database.
+   * @returns Array of all active characters, ordered by most recently updated
+   */
   getAllCharacters(): DatabaseCharacter[] {
     const stmt = this.db.prepare(
       'SELECT * FROM characters WHERE deleted_at IS NULL ORDER BY updated_at DESC',
@@ -281,11 +352,20 @@ class GrailDatabase {
     return stmt.all() as DatabaseCharacter[];
   }
 
+  /**
+   * Retrieves a specific character by its ID.
+   * @param id - The unique identifier of the character
+   * @returns The database character if found, undefined otherwise
+   */
   getCharacterById(id: string): DatabaseCharacter | undefined {
     const stmt = this.db.prepare('SELECT * FROM characters WHERE id = ?');
     return stmt.get(id) as DatabaseCharacter | undefined;
   }
 
+  /**
+   * Inserts a new character into the database.
+   * @param character - The character data to insert (without timestamps and deleted_at)
+   */
   insertCharacter(
     character: Omit<DatabaseCharacter, 'created_at' | 'updated_at' | 'deleted_at'>,
   ): void {
@@ -305,6 +385,11 @@ class GrailDatabase {
     );
   }
 
+  /**
+   * Updates an existing character with new data.
+   * @param id - The unique identifier of the character to update
+   * @param updates - Partial character data to update (excluding id and timestamps)
+   */
   updateCharacter(
     id: string,
     updates: Partial<Omit<DatabaseCharacter, 'id' | 'created_at' | 'updated_at' | 'deleted_at'>>,
@@ -319,6 +404,10 @@ class GrailDatabase {
     stmt.run(...values, id);
   }
 
+  /**
+   * Soft deletes a character by setting the deleted_at timestamp.
+   * @param id - The unique identifier of the character to delete
+   */
   deleteCharacter(id: string): void {
     // Soft delete by setting deleted_at timestamp
     const stmt = this.db.prepare(
@@ -327,11 +416,21 @@ class GrailDatabase {
     stmt.run(id);
   }
 
+  /**
+   * Retrieves a character by its name.
+   * @param name - The name of the character to find
+   * @returns The database character if found, undefined otherwise
+   */
   getCharacterByName(name: string): DatabaseCharacter | undefined {
     const stmt = this.db.prepare('SELECT * FROM characters WHERE name = ? AND deleted_at IS NULL');
     return stmt.get(name) as DatabaseCharacter | undefined;
   }
 
+  /**
+   * Retrieves a character by its save file path.
+   * @param saveFilePath - The save file path of the character to find
+   * @returns The database character if found, undefined otherwise
+   */
   getCharacterBySaveFilePath(saveFilePath: string): DatabaseCharacter | undefined {
     const stmt = this.db.prepare(
       'SELECT * FROM characters WHERE save_file_path = ? AND deleted_at IS NULL',
@@ -339,6 +438,11 @@ class GrailDatabase {
     return stmt.get(saveFilePath) as DatabaseCharacter | undefined;
   }
 
+  /**
+   * Inserts a new character or updates an existing one.
+   * Uses INSERT OR REPLACE to handle both insert and update operations.
+   * @param character - The character data to insert or update (without timestamps and deleted_at)
+   */
   upsertCharacter(
     character: Omit<DatabaseCharacter, 'created_at' | 'updated_at' | 'deleted_at'>,
   ): void {
@@ -359,11 +463,20 @@ class GrailDatabase {
   }
 
   // Grail Progress methods
+  /**
+   * Retrieves all grail progress records from the database.
+   * @returns Array of all grail progress records, ordered by most recently updated
+   */
   getAllProgress(): DatabaseGrailProgress[] {
     const stmt = this.db.prepare('SELECT * FROM grail_progress ORDER BY updated_at DESC');
     return stmt.all() as DatabaseGrailProgress[];
   }
 
+  /**
+   * Retrieves grail progress records filtered by current user settings.
+   * @param settings - Current user settings for filtering progress
+   * @returns Array of filtered grail progress records based on settings
+   */
   getFilteredProgress(settings: Settings): DatabaseGrailProgress[] {
     const allProgress = this.getAllProgress();
     const filteredItems = this.getFilteredItems(settings);
@@ -381,16 +494,31 @@ class GrailDatabase {
     return allProgress.filter((progress) => filteredItemIds.has(progress.item_id));
   }
 
+  /**
+   * Retrieves all grail progress records for a specific character.
+   * @param characterId - The unique identifier of the character
+   * @returns Array of grail progress records for the specified character
+   */
   getProgressByCharacter(characterId: string): DatabaseGrailProgress[] {
     const stmt = this.db.prepare('SELECT * FROM grail_progress WHERE character_id = ?');
     return stmt.all(characterId) as DatabaseGrailProgress[];
   }
 
+  /**
+   * Retrieves all grail progress records for a specific item.
+   * @param itemId - The unique identifier of the item
+   * @returns Array of grail progress records for the specified item
+   */
   getProgressByItem(itemId: string): DatabaseGrailProgress[] {
     const stmt = this.db.prepare('SELECT * FROM grail_progress WHERE item_id = ?');
     return stmt.all(itemId) as DatabaseGrailProgress[];
   }
 
+  /**
+   * Inserts a new grail progress record or updates an existing one.
+   * Uses INSERT OR REPLACE to handle both insert and update operations.
+   * @param progress - The grail progress data to insert or update (without timestamps)
+   */
   upsertProgress(progress: Omit<DatabaseGrailProgress, 'created_at' | 'updated_at'>): void {
     const stmt = this.db.prepare(`
       INSERT OR REPLACE INTO grail_progress (id, character_id, item_id, found, found_date, manually_added, auto_detected, difficulty, notes)
@@ -409,6 +537,11 @@ class GrailDatabase {
     );
   }
 
+  /**
+   * Deletes a grail progress record for a specific character and item combination.
+   * @param characterId - The unique identifier of the character
+   * @param itemId - The unique identifier of the item
+   */
   deleteProgress(characterId: string, itemId: string): void {
     const stmt = this.db.prepare(
       'DELETE FROM grail_progress WHERE character_id = ? AND item_id = ?',
@@ -417,6 +550,11 @@ class GrailDatabase {
   }
 
   // Settings methods
+  /**
+   * Retrieves all user settings from the database.
+   * Converts string values back to their proper types based on the Settings interface.
+   * @returns Complete Settings object with all user preferences
+   */
   getAllSettings(): Settings {
     const stmt = this.db.prepare('SELECT * FROM settings');
     const settings: Record<string, string> = {};
@@ -444,18 +582,34 @@ class GrailDatabase {
     return typedSettings;
   }
 
+  /**
+   * Retrieves a specific setting value by its key.
+   * @param key - The setting key to retrieve
+   * @returns The setting value as a string, or undefined if not found
+   */
   getSetting(key: keyof Settings): string | undefined {
     const stmt = this.db.prepare('SELECT value FROM settings WHERE key = ?');
     const result = stmt.get(key) as { value: string } | undefined;
     return result?.value;
   }
 
+  /**
+   * Sets a specific setting value in the database.
+   * Uses INSERT OR REPLACE to handle both new and existing settings.
+   * @param key - The setting key to set
+   * @param value - The setting value as a string
+   */
   setSetting(key: keyof Settings, value: string): void {
     const stmt = this.db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)');
     stmt.run(key, value);
   }
 
   // Statistics methods
+  /**
+   * Retrieves comprehensive grail statistics for a character or globally.
+   * @param characterId - Optional character ID for character-specific statistics. If not provided, returns global statistics.
+   * @returns Object containing total items, found items, and breakdown by item type
+   */
   getGrailStatistics(characterId?: string): {
     totalItems: number;
     foundItems: number;
@@ -535,6 +689,12 @@ class GrailDatabase {
     };
   }
 
+  /**
+   * Retrieves grail statistics filtered by current user settings.
+   * @param settings - Current user settings for filtering statistics
+   * @param characterId - Optional character ID for character-specific statistics. If not provided, returns global statistics.
+   * @returns Object containing filtered total items, found items, and breakdown by item type
+   */
   getFilteredGrailStatistics(
     settings: Settings,
     characterId?: string,
@@ -590,6 +750,10 @@ class GrailDatabase {
   }
 
   // Seeding methods
+  /**
+   * Seeds the items table with Holy Grail data from the grail module.
+   * Clears existing items and populates with both regular and ethereal versions.
+   */
   seedItemsFromGrailData(): void {
     console.log('Starting Holy Grail data seeding...');
 
@@ -612,6 +776,13 @@ class GrailDatabase {
     console.log(`Seeded ${items.length} items from Holy Grail data`);
   }
 
+  /**
+   * Determines the ethereal type for an item based on its name and type.
+   * @param itemName - The name of the item
+   * @param itemType - The type of the item (unique, set, rune, runeword)
+   * @param _isEthereal - Whether the item is ethereal (currently unused)
+   * @returns The ethereal type: 'none', 'optional', or 'only'
+   */
   private getEtherealType(
     itemName: string,
     itemType: 'unique' | 'set' | 'rune' | 'runeword',
@@ -636,6 +807,12 @@ class GrailDatabase {
     return 'none';
   }
 
+  /**
+   * Traverses the grail data structure and extracts items for database insertion.
+   * @param grailData - The grail data structure to traverse
+   * @param items - Array to populate with extracted items
+   * @param isEthereal - Whether to process ethereal versions of items
+   */
   private traverseGrailData(
     grailData: GrailData,
     items: Omit<DatabaseItem, 'created_at' | 'updated_at'>[],
@@ -665,6 +842,12 @@ class GrailDatabase {
     }
   }
 
+  /**
+   * Traverses unique items from the grail data structure.
+   * @param uniques - The unique items category to traverse
+   * @param items - Array to populate with extracted unique items
+   * @param isEthereal - Whether to process ethereal versions
+   */
   private traverseUniques(
     uniques: GrailCategory,
     items: Omit<DatabaseItem, 'created_at' | 'updated_at'>[],
@@ -706,6 +889,12 @@ class GrailDatabase {
     }
   }
 
+  /**
+   * Traverses set items from the grail data structure.
+   * @param sets - The sets data to traverse
+   * @param items - Array to populate with extracted set items
+   * @param isEthereal - Whether to process ethereal versions (sets cannot be ethereal)
+   */
   private traverseSets(
     sets: Record<string, unknown>,
     items: Omit<DatabaseItem, 'created_at' | 'updated_at'>[],
@@ -729,6 +918,12 @@ class GrailDatabase {
     }
   }
 
+  /**
+   * Traverses rune items from the grail data structure.
+   * @param runes - The runes data to traverse
+   * @param items - Array to populate with extracted rune items
+   * @param isEthereal - Whether to process ethereal versions (runes cannot be ethereal)
+   */
   private traverseRunes(
     runes: Record<string, string>,
     items: Omit<DatabaseItem, 'created_at' | 'updated_at'>[],
@@ -749,6 +944,12 @@ class GrailDatabase {
     }
   }
 
+  /**
+   * Traverses runeword items from the grail data structure.
+   * @param runewords - The runewords data to traverse
+   * @param items - Array to populate with extracted runeword items
+   * @param isEthereal - Whether to process ethereal versions (runewords cannot be ethereal)
+   */
   private traverseRunewords(
     runewords: Record<string, string>,
     items: Omit<DatabaseItem, 'created_at' | 'updated_at'>[],
@@ -769,6 +970,12 @@ class GrailDatabase {
     }
   }
 
+  /**
+   * Traverses other items (jewelry, charms, rainbow facets, class items) from the grail data structure.
+   * @param other - The other items data to traverse
+   * @param items - Array to populate with extracted items
+   * @param isEthereal - Whether to process ethereal versions
+   */
   private traverseOther(
     other: Record<string, unknown>,
     items: Omit<DatabaseItem, 'created_at' | 'updated_at'>[],
@@ -795,6 +1002,12 @@ class GrailDatabase {
     }
   }
 
+  /**
+   * Traverses jewelry items (rings, amulets) from the grail data structure.
+   * @param jewelry - The jewelry data to traverse
+   * @param items - Array to populate with extracted jewelry items
+   * @param isEthereal - Whether to process ethereal versions
+   */
   private traverseJewelry(
     jewelry: Record<string, GrailItems>,
     items: Omit<DatabaseItem, 'created_at' | 'updated_at'>[],
@@ -817,6 +1030,12 @@ class GrailDatabase {
     }
   }
 
+  /**
+   * Traverses charm items from the grail data structure.
+   * @param charms - The charms data to traverse
+   * @param items - Array to populate with extracted charm items
+   * @param isEthereal - Whether to process ethereal versions
+   */
   private traverseCharms(
     charms: Record<string, GrailItems>,
     items: Omit<DatabaseItem, 'created_at' | 'updated_at'>[],
@@ -839,6 +1058,12 @@ class GrailDatabase {
     }
   }
 
+  /**
+   * Traverses rainbow facet jewel items from the grail data structure.
+   * @param facets - The rainbow facets data to traverse
+   * @param items - Array to populate with extracted rainbow facet items
+   * @param isEthereal - Whether to process ethereal versions
+   */
   private traverseRainbowFacets(
     facets: Record<string, GrailItems>,
     items: Omit<DatabaseItem, 'created_at' | 'updated_at'>[],
@@ -861,6 +1086,12 @@ class GrailDatabase {
     }
   }
 
+  /**
+   * Traverses class-specific items from the grail data structure.
+   * @param classes - The class items data to traverse
+   * @param items - Array to populate with extracted class items
+   * @param isEthereal - Whether to process ethereal versions
+   */
   private traverseClassItems(
     classes: Record<string, GrailItems>,
     items: Omit<DatabaseItem, 'created_at' | 'updated_at'>[],
@@ -883,6 +1114,16 @@ class GrailDatabase {
     }
   }
 
+  /**
+   * Traverses item tiers (normal, exceptional, elite) from the grail data structure.
+   * @param tiers - The tiers data to traverse
+   * @param items - Array to populate with extracted tier items
+   * @param type - The type of items (unique or set)
+   * @param category - The category of items (armor, weapons, etc.)
+   * @param subCategory - The subcategory of items
+   * @param setName - The set name for set items (undefined for unique items)
+   * @param isEthereal - Whether to process ethereal versions
+   */
   private traverseTiers(
     tiers: GrailTiers,
     items: Omit<DatabaseItem, 'created_at' | 'updated_at'>[],
@@ -929,10 +1170,19 @@ class GrailDatabase {
   }
 
   // Utility methods
+  /**
+   * Creates a backup of the database to the specified path.
+   * @param backupPath - The file path where the backup should be saved
+   */
   backup(backupPath: string): void {
     this.db.backup(backupPath);
   }
 
+  /**
+   * Restores the database from a backup file.
+   * Closes the current connection, copies the backup file, and reopens the database.
+   * @param backupPath - The file path of the backup to restore from
+   */
   restore(backupPath: string): void {
     // Close current database connection
     this.db.close();
@@ -945,6 +1195,11 @@ class GrailDatabase {
     this.initializeSchema();
   }
 
+  /**
+   * Restores the database from a backup buffer.
+   * Closes the current connection, writes the buffer to the database file, and reopens the database.
+   * @param backupBuffer - The buffer containing the backup data
+   */
   restoreFromBuffer(backupBuffer: Buffer): void {
     // Close current database connection
     this.db.close();
@@ -957,11 +1212,19 @@ class GrailDatabase {
     this.initializeSchema();
   }
 
+  /**
+   * Closes the database connection.
+   * Should be called when the application is shutting down.
+   */
   close(): void {
     this.db.close();
   }
 
-  // Truncate characters and grail_progress tables
+  /**
+   * Truncates all user data (characters and grail progress) from the database.
+   * This removes all characters and their associated progress while keeping items and settings.
+   * @throws {Error} If the truncation operation fails
+   */
   truncateUserData(): void {
     try {
       // Delete all characters
@@ -977,7 +1240,10 @@ class GrailDatabase {
     }
   }
 
-  // Get database path for external access
+  /**
+   * Gets the file path of the database for external access.
+   * @returns The absolute path to the database file
+   */
   getDatabasePath(): string {
     return this.dbPath;
   }

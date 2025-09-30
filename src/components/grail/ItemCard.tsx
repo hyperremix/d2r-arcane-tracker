@@ -7,7 +7,12 @@ import { cn, isRecentFind } from '@/lib/utils';
 import { useGrailStore } from '@/stores/grailStore';
 import { CharacterIcon, ItemTypeIcon, RecentDiscoveryIndicator } from './StatusIcons';
 
-// Helper function to get discovery metadata
+/**
+ * Extracts discovery metadata from normal and ethereal progress arrays.
+ * @param {GrailProgress[]} normalProgress - Progress records for normal version
+ * @param {GrailProgress[]} etherealProgress - Progress records for ethereal version
+ * @returns {Object} Object containing all progress, count, and most recent discovery
+ */
 function getDiscoveryMetadata(normalProgress: GrailProgress[], etherealProgress: GrailProgress[]) {
   const allProgress = [...normalProgress, ...etherealProgress];
   const discoveryCount = allProgress.length;
@@ -18,7 +23,12 @@ function getDiscoveryMetadata(normalProgress: GrailProgress[], etherealProgress:
   return { allProgress, discoveryCount, mostRecentDiscovery };
 }
 
-// Helper function to get discovering characters (deduplicated)
+/**
+ * Gets deduplicated list of characters who discovered versions of an item.
+ * @param {GrailProgress[]} allProgress - All progress records for the item
+ * @param {Character[]} characters - All available characters
+ * @returns {Character[]} Array of unique characters who discovered the item
+ */
 function getDiscoveringCharacters(allProgress: GrailProgress[], characters: Character[]) {
   const uniqueCharacterIds = new Set(allProgress.map((p) => p.characterId));
   return Array.from(uniqueCharacterIds)
@@ -26,12 +36,21 @@ function getDiscoveringCharacters(allProgress: GrailProgress[], characters: Char
     .filter(Boolean) as Character[];
 }
 
-// Component to render discovery info in tooltip
+/**
+ * Props interface for the DiscoveryInfo component.
+ */
 interface DiscoveryInfoProps {
   allProgress: GrailProgress[];
   characters: Character[];
 }
 
+/**
+ * DiscoveryInfo component that renders discovery details in a tooltip.
+ * @param {DiscoveryInfoProps} props - Component props
+ * @param {GrailProgress[]} props.allProgress - All progress records for the item
+ * @param {Character[]} props.characters - All available characters
+ * @returns {JSX.Element | null} Discovery information or null if no progress
+ */
 function DiscoveryInfo({ allProgress, characters }: DiscoveryInfoProps) {
   if (allProgress.length === 0) return null;
 
@@ -61,7 +80,9 @@ function DiscoveryInfo({ allProgress, characters }: DiscoveryInfoProps) {
   );
 }
 
-// Component to render list view
+/**
+ * Props interface for the ListView component.
+ */
 interface ListViewProps {
   item: HolyGrailItem;
   allProgress: GrailProgress[];
@@ -76,6 +97,11 @@ interface ListViewProps {
   onClick?: () => void;
 }
 
+/**
+ * ListView component that renders an item in list view mode.
+ * @param {ListViewProps} props - Component props
+ * @returns {JSX.Element} A list view representation of the item
+ */
 function ListView({
   item,
   allProgress,
@@ -150,7 +176,14 @@ function ListView({
   );
 }
 
-// Helper function to determine completion status based on grail settings
+/**
+ * Determines if an item is fully complete based on grail settings and found versions.
+ * @param {HolyGrailItem} item - The Holy Grail item to check
+ * @param {GrailProgress[]} normalProgress - Progress records for normal version
+ * @param {GrailProgress[]} etherealProgress - Progress records for ethereal version
+ * @param {{ grailEthereal: boolean }} settings - Grail settings
+ * @returns {boolean} True if all required versions are found, false otherwise
+ */
 function determineCompletionStatus(
   item: HolyGrailItem,
   normalProgress: GrailProgress[],
@@ -171,7 +204,12 @@ function determineCompletionStatus(
   return (canBeNormal ? normalFound : true) && (canBeEthereal ? etherealFound : true);
 }
 
-// Helper function to get tooltip text based on completion status
+/**
+ * Gets tooltip text based on completion status and ethereal settings.
+ * @param {boolean} allVersionsFound - Whether all required versions are found
+ * @param {{ grailEthereal: boolean }} settings - Grail settings
+ * @returns {string} Appropriate tooltip text for the completion status
+ */
 function getTooltipText(allVersionsFound: boolean, settings: { grailEthereal: boolean }) {
   if (allVersionsFound) {
     return settings.grailEthereal ? 'All versions found' : 'Item found';
@@ -179,7 +217,9 @@ function getTooltipText(allVersionsFound: boolean, settings: { grailEthereal: bo
   return settings.grailEthereal ? 'Some versions missing' : 'Item not found';
 }
 
-// Component to render status indicators overlay
+/**
+ * Props interface for the StatusIndicators component.
+ */
 interface StatusIndicatorsProps {
   mostRecentDiscovery: GrailProgress | undefined;
   item: HolyGrailItem;
@@ -188,6 +228,11 @@ interface StatusIndicatorsProps {
   settings: { grailEthereal: boolean };
 }
 
+/**
+ * StatusIndicators component that renders status overlay icons for an item.
+ * @param {StatusIndicatorsProps} props - Component props
+ * @returns {JSX.Element | null} Status indicator overlay or null if no discoveries
+ */
 function StatusIndicators({
   mostRecentDiscovery,
   item,
@@ -236,12 +281,21 @@ function StatusIndicators({
   );
 }
 
-// Component to render discovery attribution
+/**
+ * Props interface for the DiscoveryAttribution component.
+ */
 interface DiscoveryAttributionProps {
   discoveringCharacters: Character[];
   item: HolyGrailItem;
 }
 
+/**
+ * DiscoveryAttribution component that displays character icons showing who found the item.
+ * @param {DiscoveryAttributionProps} props - Component props
+ * @param {Character[]} props.discoveringCharacters - Characters who discovered the item
+ * @param {HolyGrailItem} props.item - The Holy Grail item
+ * @returns {JSX.Element} Character attribution display with tooltips
+ */
 function DiscoveryAttribution({ discoveringCharacters, item }: DiscoveryAttributionProps) {
   return (
     <div className="flex items-center justify-center gap-1 pt-3">
@@ -272,13 +326,23 @@ function DiscoveryAttribution({ discoveringCharacters, item }: DiscoveryAttribut
   );
 }
 
-// Component to render version counts
+/**
+ * Props interface for the VersionCounts component.
+ */
 interface VersionCountsProps {
   item: HolyGrailItem;
   normalProgress: GrailProgress[];
   etherealProgress: GrailProgress[];
 }
 
+/**
+ * VersionCounts component that displays badges showing count of normal and ethereal versions found.
+ * @param {VersionCountsProps} props - Component props
+ * @param {HolyGrailItem} props.item - The Holy Grail item
+ * @param {GrailProgress[]} props.normalProgress - Progress records for normal version
+ * @param {GrailProgress[]} props.etherealProgress - Progress records for ethereal version
+ * @returns {JSX.Element | null} Version count badges or null if no versions found
+ */
 function VersionCounts({ item, normalProgress, etherealProgress }: VersionCountsProps) {
   const normalCount = normalProgress.length;
   const etherealCount = etherealProgress.length;
@@ -301,7 +365,9 @@ function VersionCounts({ item, normalProgress, etherealProgress }: VersionCounts
   );
 }
 
-// Component to render grid view
+/**
+ * Props interface for the GridView component.
+ */
 interface GridViewProps {
   item: HolyGrailItem;
   allProgress: GrailProgress[];
@@ -316,6 +382,11 @@ interface GridViewProps {
   onClick?: () => void;
 }
 
+/**
+ * GridView component that renders an item in grid view mode.
+ * @param {GridViewProps} props - Component props
+ * @returns {JSX.Element} A grid view representation of the item
+ */
 function GridView({
   item,
   allProgress,
@@ -408,6 +479,9 @@ function GridView({
   );
 }
 
+/**
+ * Props interface for the ItemCard component.
+ */
 interface ItemCardProps {
   item: HolyGrailItem;
   normalProgress?: GrailProgress[]; // Progress for normal version
@@ -418,6 +492,9 @@ interface ItemCardProps {
   viewMode?: 'grid' | 'list';
 }
 
+/**
+ * Color mapping for different item types used for visual styling.
+ */
 const typeColors = {
   unique:
     'border-yellow-500 border-yellow-300 bg-yellow-50 shadow-yellow-200 dark:bg-yellow-950 dark:shadow-yellow-800',
@@ -427,6 +504,19 @@ const typeColors = {
     'border-purple-500 border-purple-300 bg-purple-50 shadow-purple-200 dark:bg-purple-950 dark:shadow-purple-800',
 };
 
+/**
+ * ItemCard component that displays a Holy Grail item with its discovery status and information.
+ * Supports both grid and list view modes, showing progress, character attribution, and version counts.
+ * @param {ItemCardProps} props - Component props
+ * @param {HolyGrailItem} props.item - The Holy Grail item to display
+ * @param {GrailProgress[]} [props.normalProgress=[]] - Progress records for normal version
+ * @param {GrailProgress[]} [props.etherealProgress=[]] - Progress records for ethereal version
+ * @param {Character[]} [props.characters=[]] - Available characters for attribution
+ * @param {() => void} [props.onClick] - Optional click handler
+ * @param {string} [props.className] - Optional additional CSS classes
+ * @param {'grid' | 'list'} [props.viewMode='grid'] - Display mode (grid or list)
+ * @returns {JSX.Element} An item card with status indicators and discovery information
+ */
 export function ItemCard({
   item,
   normalProgress = [],

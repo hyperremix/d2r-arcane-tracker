@@ -16,6 +16,9 @@ import {
 } from '@/components/ui/select';
 import { useGrailStore } from '@/stores/grailStore';
 
+/**
+ * Interface defining the structure of advanced filter options.
+ */
 interface AdvancedFilter {
   searchTerm: string;
   categories: ItemCategory[];
@@ -26,6 +29,9 @@ interface AdvancedFilter {
   fuzzySearch: boolean;
 }
 
+/**
+ * Default filter configuration with no active filters.
+ */
 const defaultFilter: AdvancedFilter = {
   searchTerm: '',
   categories: [],
@@ -36,6 +42,9 @@ const defaultFilter: AdvancedFilter = {
   fuzzySearch: false,
 };
 
+/**
+ * Available item categories for filtering.
+ */
 const categories: { value: ItemCategory; label: string }[] = [
   { value: 'weapons', label: 'Weapons' },
   { value: 'armor', label: 'Armor' },
@@ -43,6 +52,9 @@ const categories: { value: ItemCategory; label: string }[] = [
   { value: 'charms', label: 'Charms' },
 ];
 
+/**
+ * Available item types for filtering.
+ */
 const types: { value: ItemType; label: string }[] = [
   { value: 'unique', label: 'Unique' },
   { value: 'set', label: 'Set' },
@@ -50,6 +62,9 @@ const types: { value: ItemType; label: string }[] = [
   { value: 'runeword', label: 'Runeword' },
 ];
 
+/**
+ * Available sort options for item display.
+ */
 const sortOptions = [
   { value: 'name', label: 'Name' },
   { value: 'category', label: 'Category' },
@@ -59,6 +74,11 @@ const sortOptions = [
   { value: 'found_date', label: 'Found Date' },
 ];
 
+/**
+ * AdvancedSearch component that provides comprehensive filtering and sorting options for Holy Grail items.
+ * Includes search, category filters, type filters, found status filters, and sorting controls.
+ * @returns {JSX.Element} An advanced search interface with multiple filter controls
+ */
 export function AdvancedSearch() {
   const advancedSearchId = useId();
   const fuzzySearchId = useId();

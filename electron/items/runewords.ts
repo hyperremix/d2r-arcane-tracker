@@ -1,3 +1,6 @@
+/**
+ * Represents a Diablo 2 runeword with its complete properties and requirements.
+ */
 export type Runeword = {
   name: string;
   runes: string[];
@@ -9,8 +12,15 @@ export type Runeword = {
   wiki: string;
   level: number;
 };
+/**
+ * A record type mapping runeword names to their corresponding Runeword objects.
+ */
 export type RunewordsMapping = { [runewordName: string]: Runeword };
 
+/**
+ * Complete mapping of all Diablo 2 runewords with their properties, requirements, and effects.
+ * Contains all runewords from basic ones like Steel to high-end ones like Last Wish.
+ */
 export const runewordsMapping: RunewordsMapping = {
   Delirium: {
     level: 51,
@@ -2057,6 +2067,10 @@ export const runewordsMapping: RunewordsMapping = {
   },
 };
 
+/**
+ * Quick lookup mapping of rune combinations to runeword names.
+ * Allows fast lookup of runeword names by their rune sequence (e.g., "tal,thul,ort,amn" -> "Spirit").
+ */
 export const quickRunewordMap: { [runes: string]: string } = {
   'lem,ist,io': 'Delirium',
   'io,jah,pul': 'Dream',

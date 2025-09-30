@@ -9,7 +9,12 @@ import { cn } from '@/lib/utils';
 import { useFilteredItems, useGrailStore } from '@/stores/grailStore';
 import { ItemCard } from './ItemCard';
 
-// Helper function to get group key for ethereal grouping
+/**
+ * Determines the ethereal grouping key for an item based on its ethereal status and progress.
+ * @param {HolyGrailItem} itemData - The Holy Grail item data
+ * @param {{ normalFound: boolean; etherealFound: boolean } | undefined} itemProgress - The progress data for the item
+ * @returns {string} A string key representing the item's ethereal status group
+ */
 function getEtherealGroupKey(
   itemData: HolyGrailItem,
   itemProgress: { normalFound: boolean; etherealFound: boolean } | undefined,
@@ -40,9 +45,20 @@ function getEtherealGroupKey(
   return 'Neither Found';
 }
 
+/**
+ * Type representing the available view modes for displaying items.
+ */
 type ViewMode = 'grid' | 'list';
+/**
+ * Type representing the available grouping modes for organizing items.
+ */
 type GroupMode = 'none' | 'category' | 'type' | 'ethereal';
 
+/**
+ * ItemGrid component that displays Holy Grail items in a filterable, sortable, and groupable grid or list view.
+ * Supports multiple view modes (grid/list) and grouping options (category, type, ethereal status).
+ * @returns {JSX.Element} A grid or list of Holy Grail items with view and grouping controls
+ */
 export function ItemGrid() {
   const { progress, characters, selectedCharacterId, toggleItemFound, settings } = useGrailStore();
   const filteredItems = useFilteredItems(); // This uses DB items as base and applies all filters
