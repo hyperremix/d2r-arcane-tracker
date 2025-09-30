@@ -61,7 +61,7 @@ export function GrailSettings() {
               <Label htmlFor={grailNormalId} className="text-base">
                 Include Normal Items
               </Label>
-              <p className="text-gray-600 text-sm">
+              <p className="text-gray-600 text-sm dark:text-gray-400">
                 Track normal (non-ethereal) versions of items in your grail
               </p>
             </div>
@@ -77,7 +77,7 @@ export function GrailSettings() {
               <Label htmlFor={grailEtherealId} className="text-base">
                 Include Ethereal Items
               </Label>
-              <p className="text-gray-600 text-sm">
+              <p className="text-gray-600 text-sm dark:text-gray-400">
                 Track ethereal versions of items in your grail
               </p>
             </div>
@@ -96,7 +96,7 @@ export function GrailSettings() {
               <Label htmlFor={grailRunesId} className="text-base">
                 Include Runes
               </Label>
-              <p className="text-gray-600 text-sm">
+              <p className="text-gray-600 text-sm dark:text-gray-400">
                 Track individual runes (El, Eld, Tir, etc.) in your grail
               </p>
             </div>
@@ -112,7 +112,7 @@ export function GrailSettings() {
               <Label htmlFor={grailRunewordsId} className="text-base">
                 Include Runewords
               </Label>
-              <p className="text-gray-600 text-sm">
+              <p className="text-gray-600 text-sm dark:text-gray-400">
                 Track completed runewords (Spirit, Insight, etc.) in your grail
               </p>
             </div>
@@ -125,8 +125,8 @@ export function GrailSettings() {
         </div>
 
         {/* Information Box */}
-        <div className="rounded bg-blue-50 p-3">
-          <p className="text-blue-800 text-sm">
+        <div className="rounded bg-blue-50 p-3 dark:bg-blue-950">
+          <p className="text-blue-800 text-sm dark:text-blue-200">
             <strong>Note:</strong> These settings affect which items are tracked in your Holy Grail.
             Changes will apply to new item discoveries and may affect your completion statistics.
           </p>

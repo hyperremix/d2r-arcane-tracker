@@ -81,7 +81,9 @@ export function GameModeSettings() {
                     {mode.icon}
                     <div className="flex flex-col">
                       <span className="font-medium">{mode.label}</span>
-                      <span className="text-gray-500 text-xs">{mode.description}</span>
+                      <span className="text-gray-500 text-xs dark:text-gray-400">
+                        {mode.description}
+                      </span>
                     </div>
                   </div>
                 </SelectItem>
@@ -90,8 +92,8 @@ export function GameModeSettings() {
           </Select>
         </div>
 
-        <div className="rounded bg-blue-50 p-3">
-          <p className="text-blue-800 text-sm">
+        <div className="rounded bg-blue-50 p-3 dark:bg-blue-950">
+          <p className="text-blue-800 text-sm dark:text-blue-200">
             <strong>Note:</strong> The game mode setting determines which characters' items are
             tracked. This affects item detection from save files and may influence your completion
             statistics.

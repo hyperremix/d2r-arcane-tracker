@@ -59,13 +59,15 @@ export function NotificationSettings() {
                 <Bell className="h-4 w-4" />
                 Sound Notifications
               </h4>
-              <p className="text-gray-600 text-xs">Play sound when items are found</p>
+              <p className="text-gray-600 text-xs dark:text-gray-400">
+                Play sound when items are found
+              </p>
             </div>
             <Switch checked={settings.enableSounds} onCheckedChange={toggleSoundNotifications} />
           </div>
 
           <div className="flex items-center gap-2">
-            <Label htmlFor={volumeSliderId} className="text-gray-600 text-xs">
+            <Label htmlFor={volumeSliderId} className="text-gray-600 text-xs dark:text-gray-400">
               Volume:
             </Label>
             <Slider
@@ -78,7 +80,7 @@ export function NotificationSettings() {
               className="w-20"
               disabled={!settings.enableSounds}
             />
-            <span className="w-8 text-gray-600 text-xs">
+            <span className="w-8 text-gray-600 text-xs dark:text-gray-400">
               {Math.round((settings.enableSounds ? settings.notificationVolume : 0) * 100)}%
             </span>
           </div>
@@ -91,7 +93,9 @@ export function NotificationSettings() {
                 <Monitor className="h-4 w-4" />
                 In-App Notifications
               </h4>
-              <p className="text-gray-600 text-xs">Show notification cards in the app</p>
+              <p className="text-gray-600 text-xs dark:text-gray-400">
+                Show notification cards in the app
+              </p>
             </div>
             <Switch
               checked={settings.inAppNotifications}
@@ -107,7 +111,9 @@ export function NotificationSettings() {
                 <Smartphone className="h-4 w-4" />
                 Native Notifications
               </h4>
-              <p className="text-gray-600 text-xs">Show browser/OS notifications</p>
+              <p className="text-gray-600 text-xs dark:text-gray-400">
+                Show browser/OS notifications
+              </p>
             </div>
             <Switch
               checked={settings.nativeNotifications}
@@ -116,8 +122,8 @@ export function NotificationSettings() {
           </div>
         </div>
 
-        <div className="rounded-lg bg-blue-50 p-3">
-          <p className="text-blue-800 text-xs">
+        <div className="rounded-lg bg-blue-50 p-3 dark:bg-blue-950">
+          <p className="text-blue-800 text-xs dark:text-blue-200">
             <strong>Note:</strong> Native notifications require browser permission. You'll be
             prompted to allow notifications when you first enable this setting.
           </p>

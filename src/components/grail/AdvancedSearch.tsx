@@ -174,7 +174,7 @@ export function AdvancedSearch() {
         <div className="grid grid-cols-1 gap-3 lg:grid-cols-12 lg:items-end">
           {/* Search */}
           <div className="space-y-1 lg:col-span-3">
-            <Label htmlFor={advancedSearchId} className="text-gray-600 text-xs">
+            <Label htmlFor={advancedSearchId} className="text-gray-600 text-xs dark:text-gray-400">
               Search
             </Label>
             <div className="flex gap-2">
@@ -202,7 +202,7 @@ export function AdvancedSearch() {
 
           {/* Status */}
           <div className="space-y-1 lg:col-span-2">
-            <Label className="text-gray-600 text-xs">Status</Label>
+            <Label className="text-gray-600 text-xs dark:text-gray-400">Status</Label>
             <Select
               value={advancedFilter.foundStatus}
               onValueChange={(value) =>
@@ -222,7 +222,7 @@ export function AdvancedSearch() {
 
           {/* Categories */}
           <div className="space-y-1 lg:col-span-2">
-            <Label className="text-gray-600 text-xs">Categories</Label>
+            <Label className="text-gray-600 text-xs dark:text-gray-400">Categories</Label>
             <div className="flex flex-wrap gap-1">
               {categories.map((category) => (
                 <div key={category.value} className="flex items-center space-x-1">
@@ -241,7 +241,7 @@ export function AdvancedSearch() {
 
           {/* Types */}
           <div className="space-y-1 lg:col-span-2">
-            <Label className="text-gray-600 text-xs">Types</Label>
+            <Label className="text-gray-600 text-xs dark:text-gray-400">Types</Label>
             <div className="flex flex-wrap gap-1">
               {types.map((type) => (
                 <div key={type.value} className="flex items-center space-x-1">
@@ -260,7 +260,7 @@ export function AdvancedSearch() {
 
           {/* Sorting */}
           <div className="space-y-1 lg:col-span-3">
-            <Label className="text-gray-600 text-xs">Sort</Label>
+            <Label className="text-gray-600 text-xs dark:text-gray-400">Sort</Label>
             <div className="flex gap-1">
               <Select
                 value={advancedFilter.sortBy}

@@ -207,13 +207,17 @@ export function DatabaseCard() {
             <Upload className="h-4 w-4" />
             <h3 className="font-medium text-sm">Restore</h3>
           </div>
-          <p className="text-gray-600 text-xs">Restore your database from a backup file</p>
+          <p className="text-gray-600 text-xs dark:text-gray-400">
+            Restore your database from a backup file
+          </p>
 
           {/* Dropzone */}
           <button
             type="button"
             className={`w-full rounded-lg border-2 border-dashed p-4 text-center transition-colors ${
-              isDragOver ? 'border-blue-400 bg-blue-50' : 'border-gray-300 hover:border-gray-400'
+              isDragOver
+                ? 'border-blue-400 bg-blue-50'
+                : 'border-gray-300 hover:border-gray-400 dark:border-gray-700 dark:hover:border-gray-500'
             }`}
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
@@ -221,30 +225,30 @@ export function DatabaseCard() {
             onClick={handleFileSelect}
           >
             <Upload className="mx-auto mb-2 h-8 w-8 text-gray-400" />
-            <p className="text-gray-600 text-sm">
+            <p className="text-gray-600 text-sm dark:text-gray-400">
               Drag and drop a database file here, or{' '}
               <Button
                 type="button"
                 variant="link"
                 onClick={handleFileSelect}
-                className="h-auto p-0 text-blue-600 underline hover:text-blue-800"
+                className="h-auto p-0 text-blue-600 underline hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-200"
               >
                 click to browse
               </Button>
             </p>
-            <p className="text-gray-500 text-xs">Supports .db files</p>
+            <p className="text-gray-500 text-xs dark:text-gray-400">Supports .db files</p>
           </button>
 
           {/* Error/Success Messages */}
           {restoreError && (
             <div className="rounded-lg bg-red-50 p-3">
-              <p className="text-red-800 text-xs">{restoreError}</p>
+              <p className="text-red-800 text-xs dark:text-red-200">{restoreError}</p>
             </div>
           )}
 
           {restoreSuccess && (
             <div className="rounded-lg bg-green-50 p-3">
-              <p className="text-green-800 text-xs">
+              <p className="text-green-800 text-xs dark:text-green-200">
                 Database restored successfully! All data has been refreshed and is now up to date.
               </p>
             </div>

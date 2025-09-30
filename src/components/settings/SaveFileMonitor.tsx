@@ -297,7 +297,7 @@ export function SaveFileMonitor() {
             </div>
           </div>
           {monitoringStatus.directory ? (
-            <div className="rounded bg-gray-50 p-2 font-mono text-gray-600 text-xs">
+            <div className="rounded bg-gray-50 p-2 font-mono text-gray-600 text-xs dark:bg-gray-950 dark:text-gray-400">
               {monitoringStatus.directory}
             </div>
           ) : (
