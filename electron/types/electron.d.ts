@@ -7,6 +7,12 @@ import type { Character, D2Item, D2SaveFile, GrailProgress, HolyGrailItem, Monit
  */
 export interface ElectronAPI {
   /**
+   * Platform information from Node.js process.
+   * Returns 'darwin' for macOS, 'win32' for Windows, or 'linux' for Linux.
+   */
+  platform: 'darwin' | 'win32' | 'linux'
+
+  /**
    * Grail-related API methods for managing Holy Grail data.
    */
   grail: {

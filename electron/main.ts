@@ -71,6 +71,19 @@ function createWindow() {
     width: 1200,
     height: 800,
     icon: iconPath,
+    // Custom title bar configuration
+    titleBarStyle: 'hidden',
+    // Position macOS traffic lights to be vertically centered in 48px title bar
+    ...(process.platform === 'darwin'
+      ? { trafficLightPosition: { x: 10, y: 14 } }
+      : {
+          // Expose window controls on Windows/Linux with custom styling
+          titleBarOverlay: {
+            color: '#1f2937', // Dark background matching title bar
+            symbolColor: '#e5e7eb', // Light gray symbols
+            height: 48, // Match title bar height (h-12 = 48px)
+          },
+        }),
     webPreferences: {
       preload: path.join(__dirname, 'preload.mjs'),
     },

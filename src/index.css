@@ -4,17 +4,29 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme {
-  --color-primary-50: #fef7ee;
-  --color-primary-100: #fdedd6;
-  --color-primary-200: #fad7ac;
-  --color-primary-300: #f6ba77;
-  --color-primary-400: #f19540;
-  --color-primary-500: #ed7821;
-  --color-primary-600: #de5f17;
-  --color-primary-700: #b84715;
-  --color-primary-800: #933a18;
-  --color-primary-900: #763016;
-  --color-primary-950: #40180a;
+  --color-primary-50: #fef2f2;
+  --color-primary-100: #fee2e2;
+  --color-primary-200: #fecaca;
+  --color-primary-300: #fca5a5;
+  --color-primary-400: #f87171;
+  --color-primary-500: #8b0000;
+  --color-primary-600: #7a0000;
+  --color-primary-700: #6a0000;
+  --color-primary-800: #5a0000;
+  --color-primary-900: #4a0000;
+  --color-primary-950: #2a0000;
+
+  --color-secondary-50: #fefce8;
+  --color-secondary-100: #fef9c3;
+  --color-secondary-200: #fef08a;
+  --color-secondary-300: #fde047;
+  --color-secondary-400: #facc15;
+  --color-secondary-500: #c9a227;
+  --color-secondary-600: #b38c1f;
+  --color-secondary-700: #9d7719;
+  --color-secondary-800: #876214;
+  --color-secondary-900: #6d4e10;
+  --color-secondary-950: #3d2b09;
 
   --color-gray-50: #f9fafb;
   --color-gray-100: #f3f4f6;
@@ -165,4 +177,20 @@
   body {
     @apply bg-background text-foreground;
   }
+}
+
+/* Electron custom title bar drag regions */
+.titlebar {
+  -webkit-app-region: drag;
+  app-region: drag;
+}
+
+/* Allow clicks on interactive elements within the title bar */
+.titlebar button,
+.titlebar a,
+.titlebar input,
+.titlebar select,
+.titlebar [role='button'] {
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
 }
