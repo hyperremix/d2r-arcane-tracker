@@ -3,11 +3,7 @@ import { RouterProvider } from 'react-router';
 import { router } from './router';
 
 function App(): JSX.Element {
-  return (
-    <div className="min-h-screen bg-background">
-      <RouterProvider router={router} />
-    </div>
-  );
+  return <RouterProvider router={router} />;
 }
 
 export default App;

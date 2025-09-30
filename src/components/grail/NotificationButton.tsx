@@ -140,13 +140,12 @@ export function NotificationButton() {
   return (
     <div className="relative">
       <Button
-        variant="outline"
+        variant="ghost"
         size="sm"
         onClick={() => setIsOpen(!isOpen)}
         className="relative gap-2"
       >
         <Bell className="h-4 w-4" />
-        Notifications
         {unseenCount > 0 && (
           <Badge
             variant="destructive"

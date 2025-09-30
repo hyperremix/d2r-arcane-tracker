@@ -1,15 +1,12 @@
-import { BarChart3, Grid, Settings } from 'lucide-react';
+import { BarChart3, Grid } from 'lucide-react';
 import { Suspense, useEffect, useState, useTransition } from 'react';
-import { Link } from 'react-router';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import { useGrailStatistics, useGrailStore } from '@/stores/grailStore';
-import { Button } from '../ui/button';
 import { AdvancedSearch } from './AdvancedSearch';
 import { ItemGrid } from './ItemGrid';
-import { NotificationButton } from './NotificationButton';
 import { ProgressBar } from './ProgressBar';
 import { StatsDashboard } from './StatsDashboard';
 
@@ -86,23 +83,6 @@ export function GrailTracker() {
   return (
     <TooltipProvider>
       <div className="container mx-auto space-y-6 p-6">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center">
-            <img src="/logo.svg" alt="Holy Grail" className="h-12 w-12" />
-            <h1 className="font-bold text-3xl">Holy Grail Tracker</h1>
-          </div>
-          <div className="flex items-center gap-2">
-            <NotificationButton />
-            <Button asChild variant="outline">
-              <Link to="/settings" title="Settings">
-                <Settings className="h-4 w-4" />
-                Settings
-              </Link>
-            </Button>
-          </div>
-        </div>
-
         {/* Enhanced Statistics */}
         {statistics && (
           <Card>

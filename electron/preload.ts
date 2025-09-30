@@ -57,6 +57,11 @@ contextBridge.exposeInMainWorld('ipcRenderer', {
  */
 contextBridge.exposeInMainWorld('electronAPI', {
   /**
+   * Platform information from Node.js process.
+   */
+  platform: process.platform,
+
+  /**
    * Grail-related API methods for managing Holy Grail data.
    */
   grail: {
