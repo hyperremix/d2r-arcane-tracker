@@ -1,10 +1,10 @@
-import type { GrailProgress, HolyGrailItem } from 'electron/types/grail';
+import type { GrailProgress, Item } from 'electron/types/grail';
 import { useMemo } from 'react';
 import { shouldShowEtherealStatus, shouldShowNormalStatus } from '@/lib/ethereal';
 
 /**
  * Calculates progress for the normal (non-ethereal) version of an item.
- * @param {HolyGrailItem} item - The Holy Grail item to calculate progress for
+ * @param {Item} item - The Holy Grail item to calculate progress for
  * @param {GrailProgress[]} progress - All progress records
  * @param {string | null} selectedCharacterId - Optional character ID to filter by
  * @returns {Object} Object containing found status and relevant progress records
@@ -12,7 +12,7 @@ import { shouldShowEtherealStatus, shouldShowNormalStatus } from '@/lib/ethereal
  * @returns {GrailProgress[]} returns.relevantProgress - Array of relevant progress records
  */
 function calculateNormalProgress(
-  item: HolyGrailItem,
+  item: Item,
   progress: GrailProgress[],
   selectedCharacterId: string | null,
 ) {
@@ -39,7 +39,7 @@ function calculateNormalProgress(
 
 /**
  * Calculates progress for the ethereal version of an item.
- * @param {HolyGrailItem} item - The Holy Grail item to calculate progress for
+ * @param {Item} item - The Holy Grail item to calculate progress for
  * @param {GrailProgress[]} progress - All progress records
  * @param {string | null} selectedCharacterId - Optional character ID to filter by
  * @returns {Object} Object containing found status and relevant progress records
@@ -47,7 +47,7 @@ function calculateNormalProgress(
  * @returns {GrailProgress[]} returns.relevantProgress - Array of relevant progress records
  */
 function calculateEtherealProgress(
-  item: HolyGrailItem,
+  item: Item,
   progress: GrailProgress[],
   selectedCharacterId: string | null,
 ) {
@@ -89,13 +89,13 @@ export interface ProgressLookupData {
 /**
  * Custom React hook that creates an optimized lookup map for item progress data.
  * Memoizes the lookup to avoid recalculation on every render.
- * @param {HolyGrailItem[]} items - Array of Holy Grail items to create lookup for
+ * @param {Item[]} items - Array of Holy Grail items to create lookup for
  * @param {GrailProgress[]} progress - All progress records from the database
  * @param {string | null} [selectedCharacterId] - Optional character ID to filter progress by
  * @returns {Map<string, ProgressLookupData>} A Map with item IDs as keys and progress data as values
  */
 export function useProgressLookup(
-  items: HolyGrailItem[],
+  items: Item[],
   progress: GrailProgress[],
   selectedCharacterId?: string | null,
 ) {

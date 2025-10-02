@@ -1,48 +1,9 @@
 import { EventEmitter } from 'node:events';
 import fs from 'node:fs/promises';
 import { read } from '@dschu012/d2s';
+import { runesByCode } from '../items/indexes';
 import type { D2SaveFile } from '../services/saveFileMonitor';
-import type { D2Item, D2SItem, HolyGrailItem, ItemDetectionEvent } from '../types/grail';
-
-/**
- * Mapping of rune type IDs to their corresponding rune names.
- * Used for proper rune detection and name resolution.
- */
-const runesMapping: Record<string, string> = {
-  r01: 'El',
-  r02: 'Eld',
-  r03: 'Tir',
-  r04: 'Nef',
-  r05: 'Eth',
-  r06: 'Ith',
-  r07: 'Tal',
-  r08: 'Ral',
-  r09: 'Ort',
-  r10: 'Thul',
-  r11: 'Amn',
-  r12: 'Sol',
-  r13: 'Shael',
-  r14: 'Dol',
-  r15: 'Hel',
-  r16: 'Io',
-  r17: 'Lum',
-  r18: 'Ko',
-  r19: 'Fal',
-  r20: 'Lem',
-  r21: 'Pul',
-  r22: 'Um',
-  r23: 'Mal',
-  r24: 'Ist',
-  r25: 'Gul',
-  r26: 'Vex',
-  r27: 'Ohm',
-  r28: 'Lo',
-  r29: 'Sur',
-  r30: 'Ber',
-  r31: 'Jah',
-  r32: 'Cham',
-  r33: 'Zod',
-};
+import type { D2Item, D2SItem, Item, ItemDetectionEvent } from '../types/grail';
 
 /**
  * Service for detecting and analyzing items from Diablo 2 save files.
@@ -50,14 +11,14 @@ const runesMapping: Record<string, string> = {
  * the Holy Grail item database to identify found items.
  */
 class ItemDetectionService extends EventEmitter {
-  private grailItems: HolyGrailItem[] = [];
+  private grailItems: Item[] = [];
   private isEnabled = false;
 
   /**
    * Sets the Holy Grail items that will be used for matching detected items.
-   * @param {HolyGrailItem[]} items - Array of Holy Grail items to match against.
+   * @param {Item[]} items - Array of Holy Grail items to match against.
    */
-  setGrailItems(items: HolyGrailItem[]): void {
+  setGrailItems(items: Item[]): void {
     this.grailItems = items;
   }
 
@@ -218,7 +179,7 @@ class ItemDetectionService extends EventEmitter {
    */
   private isRune(item: D2SItem): boolean {
     // Improved rune detection based on d2rHolyGrail
-    return Boolean(item.type && runesMapping[item.type]);
+    return Boolean(item.type && runesByCode[item.type]);
   }
 
   /**
@@ -241,12 +202,12 @@ class ItemDetectionService extends EventEmitter {
     } else if (this.isRune(d2Item)) {
       // Proper rune name mapping (from d2rHolyGrail)
       const runeType = d2Item.type;
-      if (runeType && runesMapping[runeType]) {
-        name = runesMapping[runeType].toLowerCase();
+      if (runeType && runesByCode[runeType]) {
+        name = runesByCode[runeType].name.toLowerCase();
       }
     } else if (d2Item.runeword_name) {
       // Handle runewords with name simplification (from d2rHolyGrail)
-      name = `runeword${this.simplifyItemName(d2Item.runeword_name)}`;
+      name = this.simplifyItemName(d2Item.runeword_name);
     }
 
     return name || d2Item.name || d2Item.type_name || d2Item.code || 'Unknown Item';
@@ -370,9 +331,9 @@ class ItemDetectionService extends EventEmitter {
    * Finds a matching Holy Grail item for a detected D2 item.
    * @private
    * @param {D2Item} item - The detected D2 item to match.
-   * @returns {HolyGrailItem | null} The matching Holy Grail item, or null if no match is found.
+   * @returns {Item | null} The matching Holy Grail item, or null if no match is found.
    */
-  private findGrailMatch(item: D2Item): HolyGrailItem | null {
+  private findGrailMatch(item: D2Item): Item | null {
     // Simple exact name matching - no complex algorithms
     return this.grailItems.find((grailItem) => grailItem.name === item.name) || null;
   }

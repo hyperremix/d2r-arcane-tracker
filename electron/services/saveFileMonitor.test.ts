@@ -46,23 +46,14 @@ vi.mock('electron', () => ({
   },
 }));
 
-// Mock grail items
-vi.mock('../items/grail', () => ({
-  getHolyGrailSeedData: vi.fn(),
-  runesSeed: {},
-}));
-
-vi.mock('../items/runes', () => ({
-  runesMapping: {
-    r30: { name: 'Ber' },
-    r33: { name: 'Zod' },
-  },
+// Mock items indexes
+vi.mock('../items/indexes', () => ({
+  getItemIdForD2SItem: vi.fn(),
+  isRuneId: vi.fn(),
 }));
 
 // Mock utils
 vi.mock('../utils/objects', () => ({
-  buildFlattenObjectCacheKey: vi.fn(),
-  flattenObject: vi.fn(),
   isRune: vi.fn(),
   simplifyItemName: vi.fn(),
 }));
@@ -73,14 +64,9 @@ import * as d2s from '@dschu012/d2s';
 import * as d2stash from '@dschu012/d2s/lib/d2/stash';
 import { app } from 'electron';
 import { D2SaveFileBuilder } from '@/fixtures';
-import { getHolyGrailSeedData } from '../items/grail';
+import { getItemIdForD2SItem, isRuneId } from '../items/indexes';
 import { GameMode } from '../types/grail';
-import {
-  buildFlattenObjectCacheKey,
-  flattenObject,
-  isRune,
-  simplifyItemName,
-} from '../utils/objects';
+import { isRune, simplifyItemName } from '../utils/objects';
 import { SaveFileMonitor } from './saveFileMonitor';
 
 // Mock database interface
@@ -134,9 +120,8 @@ describe('When SaveFileMonitor is used', () => {
       hardcore: false,
       pages: [{ items: [] }],
     } as any);
-    vi.mocked(getHolyGrailSeedData).mockReturnValue({} as any);
-    vi.mocked(flattenObject).mockReturnValue({});
-    vi.mocked(buildFlattenObjectCacheKey).mockReturnValue('test-key' as any);
+    vi.mocked(getItemIdForD2SItem).mockReturnValue('test-item-id');
+    vi.mocked(isRuneId).mockReturnValue(false);
     vi.mocked(isRune).mockReturnValue(false);
     vi.mocked(simplifyItemName).mockReturnValue('test-item');
 

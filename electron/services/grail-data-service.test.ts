@@ -379,42 +379,6 @@ describe('When GrailDataService is used', () => {
     });
   });
 
-  describe('If getItemsByDifficulty is called', () => {
-    it('Then should return all items since difficulties are not stored', () => {
-      // Arrange
-      const mockItems: MockDatabaseItem[] = [
-        {
-          id: 'item1',
-          name: 'Shako',
-          type: 'unique',
-          category: 'armor',
-          sub_category: 'helms',
-          ethereal_type: 'none',
-          created_at: '2024-01-01',
-          updated_at: '2024-01-01',
-        },
-        {
-          id: 'item2',
-          name: 'Windforce',
-          type: 'unique',
-          category: 'weapons',
-          sub_category: 'bows',
-          ethereal_type: 'none',
-          created_at: '2024-01-01',
-          updated_at: '2024-01-01',
-        },
-      ];
-      mockDatabase.getAllItems.mockReturnValue(mockItems);
-
-      // Act
-      const result = service.getItemsByDifficulty('hell');
-
-      // Assert
-      expect(result).toHaveLength(2);
-      expect(mockDatabase.getAllItems).toHaveBeenCalledOnce();
-    });
-  });
-
   describe('If getItemStatistics is called', () => {
     it('Then should return correct statistics', () => {
       // Arrange

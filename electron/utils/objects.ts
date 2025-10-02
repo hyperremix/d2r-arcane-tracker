@@ -1,25 +1,12 @@
 import type { IItem } from '@dschu012/d2s/lib/d2/types';
-import type {
-  IEthGrailData,
-  IEthUniqueArmors,
-  IEthUniqueOther,
-  IEthUniqueWeapons,
-} from 'd2-holy-grail/client/src/common/definitions/union/IEthGrailData';
-import type {
-  ISetItems,
-  IUniqueArmors,
-  IUniqueOther,
-  IUniqueWeapons,
-} from 'd2-holy-grail/client/src/common/definitions/union/IHolyGrailData';
-import { runesSeed, runewordsSeed } from '../items/grail';
-import { runewordsMapping } from '../items/runewords';
+import { items } from '../items/index';
+import { isRunewordId } from '../items/indexes';
 import {
   GameMode,
-  GameVersion,
-  type HolyGrailSeed,
   type HolyGrailStats,
   type Item,
   type ItemsInSaves,
+  type SaveFileItem,
   type Settings,
   type Stats,
 } from '../types/grail';
@@ -35,154 +22,29 @@ export const simplifyItemName = (name: string): string =>
   name.replace(/[^a-z0-9]/gi, '').toLowerCase();
 /**
  * Determines if an item is a rune based on its type identifier.
- * @param {Item | IItem} item - The item to check.
+ * @param {SaveFileItem | IItem} item - The item to check.
  * @returns {boolean} True if the item is a rune (type matches pattern r01-r33), false otherwise.
  */
-export const isRune = (item: Item | IItem): boolean =>
+export const isRune = (item: SaveFileItem | IItem): boolean =>
   !!item.type && !!item.type.match(/^r[0-3][0-9]$/);
 
-/**
- * Interface representing a flattened item object.
- */
-interface FlattenedItem {
-  [key: string]: unknown;
-}
+export const isRuneword = (itemId: string): boolean => isRunewordId(itemId);
 
 /**
- * Interface representing generic object structures used in Holy Grail templates.
- */
-interface GenericItemTemplate {
-  [itemId: string]: unknown;
-}
-
-/**
- * Type representing flexible template parameters for different grail data structures.
- */
-type TemplateType =
-  | GenericItemTemplate
-  | IUniqueArmors
-  | IUniqueWeapons
-  | IUniqueOther
-  | ISetItems
-  | IEthUniqueArmors
-  | IEthUniqueWeapons
-  | IEthUniqueOther
-  | HolyGrailSeed
-  | IEthGrailData
-  | null;
-
-/**
- * Type representing a mapping of item IDs to flattened item objects.
- */
-export type ItemNames = { [itemId: string]: FlattenedItem };
-/**
- * Type representing the cache structure for flattened items across different categories and modes.
- */
-export type FlatItemsCache = {
-  runes: ItemNames;
-  runewords: ItemNames;
-  armor: ItemNames;
-  weapon: ItemNames;
-  other: ItemNames;
-  weaponE: ItemNames;
-  otherE: ItemNames;
-  sets: ItemNames;
-  all: ItemNames;
-  allR: ItemNames;
-  allW: ItemNames;
-  allRW: ItemNames;
-  allE: ItemNames;
-  allRE: ItemNames;
-  allWE: ItemNames;
-  allRWE: ItemNames;
-  ethall: ItemNames;
-  etharmor: ItemNames;
-  ethweapon: ItemNames;
-  ethother: ItemNames;
-};
-/**
- * Cache for flattened items to avoid repeated flattening operations.
- */
-const flatItemsCache: FlatItemsCache = {
-  runes: {},
-  runewords: {},
-  armor: {},
-  weapon: {},
-  other: {},
-  weaponE: {},
-  otherE: {},
-  sets: {},
-  all: {},
-  allR: {},
-  allW: {},
-  allRW: {},
-  allE: {},
-  allRE: {},
-  allWE: {},
-  allRWE: {},
-  etharmor: {},
-  ethweapon: {},
-  ethother: {},
-  ethall: {},
-};
-
-/**
- * Builds a cache key for flattened objects based on settings.
- * @param {keyof FlatItemsCache} cacheKey - The base cache key.
+ * Gets a filtered catalog of items based on settings.
  * @param {Settings} settings - The application settings.
- * @returns {keyof FlatItemsCache} The computed cache key with settings suffixes.
+ * @returns {Item[]} Filtered array of items based on settings.
  */
-export const buildFlattenObjectCacheKey = (
-  cacheKey: keyof FlatItemsCache,
-  settings: Settings,
-): keyof FlatItemsCache => {
-  const shouldHideNormalEthItems = settings.grailNormal && !settings.grailEthereal;
-  return `${cacheKey}${settings.grailRunes ? 'R' : ''}${settings.grailRunewords ? 'W' : ''}${shouldHideNormalEthItems ? 'E' : ''}` as keyof FlatItemsCache;
-};
+export const getCatalogForSettings = (_settings: Settings): Item[] => {
+  return items.filter((_item) => {
+    // Filter by game version (placeholder for future Classic/Resurrected filtering)
+    // For now, include all items
 
-/**
- * Flattens a nested object recursively, extracting only the key names.
- * Uses caching to avoid repeated flattening of the same objects.
- * @param {TemplateType} object - The nested object to flatten.
- * @param {keyof FlatItemsCache | null} [cacheKey=null] - Optional cache key for storing the result.
- * @returns {ItemNames} A flattened mapping of item names to empty objects.
- */
-export const flattenObject = (
-  object: TemplateType,
-  cacheKey: keyof FlatItemsCache | null = null,
-): ItemNames => {
-  const _flattenObject = (obj: GenericItemTemplate, flat: ItemNames) => {
-    Object.keys(obj).forEach((key: string) => {
-      const value = obj[key];
-      if (
-        typeof value === 'object' &&
-        value !== null &&
-        Object.keys(value as Record<string, unknown>).length > 0
-      ) {
-        _flattenObject(value as GenericItemTemplate, flat);
-      } else {
-        flat[simplifyItemName(key)] = {};
-      }
-    });
-  };
+    // Filter by grail type (placeholder for future grail type filtering)
+    // For now, include all items
 
-  if (
-    !cacheKey ||
-    !flatItemsCache[cacheKey] ||
-    Object.keys(flatItemsCache[cacheKey]).length === 0
-  ) {
-    const flat: ItemNames = {};
-    if (object) {
-      _flattenObject(object as GenericItemTemplate, flat);
-    }
-    if (cacheKey) {
-      flatItemsCache[cacheKey] = flat;
-      return flatItemsCache[cacheKey];
-    }
-    return flat;
-  }
-
-  return flatItemsCache[cacheKey];
+    return true;
+  });
 };
 
 /**
@@ -205,45 +67,41 @@ type StatsColl = {
  * @returns {boolean} True if a new rune was found, false otherwise.
  */
 const processRunes = (
-  items: ItemsInSaves,
+  itemsInSaves: ItemsInSaves,
   itemId: string,
   settings: Settings,
   runesFound: { [runeId: string]: boolean },
 ): boolean => {
-  const item = items[itemId];
-  if (item && runesSeed[itemId] && settings.grailRunes && !runesFound[itemId]) {
-    runesFound[itemId] = true;
-    return true;
+  const item = itemsInSaves[itemId];
+  if (item && settings.grailRunes && !runesFound[itemId]) {
+    // Check if this is a rune by looking at the item type in our catalog
+    const catalogItem = items.find((i) => i.id === itemId);
+    if (catalogItem?.type === 'rune') {
+      runesFound[itemId] = true;
+      return true;
+    }
   }
   return false;
 };
 
 /**
  * Processes runewords and updates the runewordsFound tracking object.
- * @param {ItemsInSaves} items - The items in saves.
+ * @param {ItemsInSaves} itemsInSaves - The items in saves.
  * @param {string} itemId - The item ID to process.
  * @param {Settings} settings - The application settings.
  * @param {Object} runewordsFound - Tracking object for found runewords.
  * @returns {boolean} True if a new runeword was found, false otherwise.
  */
 const processRunewords = (
-  items: ItemsInSaves,
+  itemsInSaves: ItemsInSaves,
   itemId: string,
   settings: Settings,
   runewordsFound: { [runewordId: string]: boolean },
 ): boolean => {
-  const item = items[itemId];
-  if (
-    item &&
-    runewordsSeed[itemId] &&
-    settings.grailRunewords &&
-    !runewordsFound[itemId] &&
-    !(
-      settings.gameVersion === GameVersion.Classic &&
-      runewordsMapping[runewordsSeed[itemId]].patch === 2.4
-    )
-  ) {
-    runewordsFound[item.name] = true;
+  const item = itemsInSaves[itemId];
+
+  if (item && isRuneword(itemId) && settings.grailRunewords && !runewordsFound[itemId]) {
+    runewordsFound[itemId] = true;
     return true;
   }
   return false;
@@ -251,7 +109,7 @@ const processRunewords = (
 
 /**
  * Processes normal and ethereal items and updates tracking objects.
- * @param {ItemsInSaves} items - The normal items in saves.
+ * @param {ItemsInSaves} itemsInSaves - The normal items in saves.
  * @param {ItemsInSaves} ethItems - The ethereal items in saves.
  * @param {string} itemId - The item ID to process.
  * @param {Settings} settings - The application settings.
@@ -262,7 +120,7 @@ const processRunewords = (
  * @returns {number} returns.etherealCount - Count of newly found ethereal items.
  */
 const processItems = (
-  items: ItemsInSaves,
+  itemsInSaves: ItemsInSaves,
   ethItems: ItemsInSaves,
   itemId: string,
   settings: Settings,
@@ -273,7 +131,7 @@ const processItems = (
   let etherealCount = 0;
 
   const isEthereal = !!ethItems[itemId];
-  const isNormal = !!items[itemId];
+  const isNormal = !!itemsInSaves[itemId];
 
   if (settings.grailNormal && settings.grailEthereal && !normalFound[itemId]) {
     normalCount++;
@@ -294,8 +152,8 @@ const processItems = (
 
 /**
  * Calculates statistics counts for all item categories.
- * @param {ItemNames} flat - The flattened item names.
- * @param {ItemsInSaves} items - The normal items in saves.
+ * @param {Item[]} catalog - The filtered item catalog.
+ * @param {ItemsInSaves} itemsInSaves - The normal items in saves.
  * @param {ItemsInSaves} ethItems - The ethereal items in saves.
  * @param {Settings} settings - The application settings.
  * @returns {Object} Object containing counts and tracking for all item categories.
@@ -309,8 +167,8 @@ const processItems = (
  * @returns {Object} returns.etherealFound - Tracking object for found ethereal items.
  */
 const calculateStatsCounts = (
-  flat: ItemNames,
-  items: ItemsInSaves,
+  catalog: Item[],
+  itemsInSaves: ItemsInSaves,
   ethItems: ItemsInSaves,
   settings: Settings,
 ): {
@@ -332,27 +190,45 @@ const calculateStatsCounts = (
   let etherealCount = 0;
   const etherealFound: { [itemId: string]: boolean } = {};
 
-  Object.keys(flat).forEach((itemId) => {
-    const item = items[itemId];
+  catalog.forEach((catalogItem) => {
+    const itemId = catalogItem.id;
+    const item = itemsInSaves[itemId];
     const ethItem = ethItems[itemId];
     if (!item && !ethItem) {
       return;
     }
 
+    // Skip runes if grailRunes is disabled
+    if (catalogItem.type === 'rune' && !settings.grailRunes) {
+      return;
+    }
+
+    // Skip runewords if grailRunewords is disabled
+    if (catalogItem.type === 'runeword' && !settings.grailRunewords) {
+      return;
+    }
+
     // Process runes
-    if (processRunes(items, itemId, settings, runesFound)) {
+    if (processRunes(itemsInSaves, itemId, settings, runesFound)) {
       runesCount++;
       return;
     }
 
     // Process runewords
-    if (processRunewords(items, itemId, settings, runewordsFound)) {
+    if (processRunewords(itemsInSaves, itemId, settings, runewordsFound)) {
       runewordsCount++;
       return;
     }
 
     // Process regular items
-    const itemCounts = processItems(items, ethItems, itemId, settings, normalFound, etherealFound);
+    const itemCounts = processItems(
+      itemsInSaves,
+      ethItems,
+      itemId,
+      settings,
+      normalFound,
+      etherealFound,
+    );
     normalCount += itemCounts.normalCount;
     etherealCount += itemCounts.etherealCount;
   });
@@ -372,8 +248,7 @@ const calculateStatsCounts = (
 /**
  * Calculates the total number of items that exist in each category.
  * @param {Settings} settings - The application settings.
- * @param {ItemNames} normalFlat - The flattened normal items.
- * @param {ItemNames} ethFlat - The flattened ethereal items.
+ * @param {Item[]} catalog - The filtered item catalog.
  * @returns {Object} Object containing existence counts for all categories.
  * @returns {number} returns.runesExists - Total number of runes that exist.
  * @returns {number} returns.runewordsExists - Total number of runewords that exist.
@@ -382,22 +257,27 @@ const calculateStatsCounts = (
  */
 const calculateExistsCounts = (
   settings: Settings,
-  normalFlat: ItemNames,
-  ethFlat: ItemNames,
+  catalog: Item[],
 ): {
   runesExists: number;
   runewordsExists: number;
   normalExists: number;
   etherealExists: number;
 } => {
-  const runesExists = settings.grailRunes ? 33 : 0;
-  const runewordsExists = settings.grailRunewords
-    ? settings.gameVersion === GameVersion.Resurrected
-      ? 85
-      : 78
+  const runesExists = settings.grailRunes
+    ? catalog.filter((item) => item.type === 'rune').length
     : 0;
-  const normalExists = settings.grailNormal ? Object.keys(normalFlat).length : 0;
-  const etherealExists = settings.grailEthereal ? Object.keys(ethFlat).length : 0;
+  const runewordsExists = settings.grailRunewords
+    ? catalog.filter((item) => item.type === 'runeword').length
+    : 0;
+  const normalExists = settings.grailNormal
+    ? catalog.filter((item) => item.etherealType === 'none' || item.etherealType === 'optional')
+        .length
+    : 0;
+  const etherealExists = settings.grailEthereal
+    ? catalog.filter((item) => item.etherealType === 'optional' || item.etherealType === 'only')
+        .length
+    : 0;
 
   return { runesExists, runewordsExists, normalExists, etherealExists };
 };
@@ -415,31 +295,24 @@ const calculatePercentages = (counts: number, exists: number): number => {
 
 /**
  * Computes sub-statistics for a specific category of items (armor, weapons, etc.).
- * @param {ItemsInSaves} items - The normal items in saves.
+ * @param {ItemsInSaves} itemsInSaves - The normal items in saves.
  * @param {ItemsInSaves} ethItems - The ethereal items in saves.
- * @param {Object | null} template - The template for normal items.
- * @param {Object | null} ethTemplate - The template for ethereal items.
+ * @param {string} category - The category to filter by (e.g., 'armor', 'weapons', 'jewelry').
  * @param {Settings} settings - The application settings.
- * @param {keyof FlatItemsCache | null} cacheKey - The cache key for this category.
  * @returns {StatsColl} Statistics collection for this category.
  */
 export const computeSubStats = (
-  items: ItemsInSaves,
+  itemsInSaves: ItemsInSaves,
   ethItems: ItemsInSaves,
-  template: GenericItemTemplate | IUniqueArmors | IUniqueWeapons | IUniqueOther | ISetItems | null,
-  ethTemplate: GenericItemTemplate | IEthUniqueArmors | IEthUniqueWeapons | IEthUniqueOther | null,
+  category: string,
   settings: Settings,
-  cacheKey: keyof FlatItemsCache | null,
 ): StatsColl => {
-  const normalFlat = template ? flattenObject(template, cacheKey) : {};
-  const ethFlat = ethTemplate
-    ? flattenObject(ethTemplate, `eth${cacheKey}` as keyof FlatItemsCache)
-    : {};
-  const flat = { ...normalFlat, ...ethFlat };
+  const catalog = getCatalogForSettings(settings);
+  const categoryCatalog = catalog.filter((item) => item.category === category);
 
   // Calculate counts
-  const counts = calculateStatsCounts(flat, items, ethItems, settings);
-  const exists = calculateExistsCounts(settings, normalFlat, ethFlat);
+  const counts = calculateStatsCounts(categoryCatalog, itemsInSaves, ethItems, settings);
+  const exists = calculateExistsCounts(settings, categoryCatalog);
 
   return {
     normal: {
@@ -576,64 +449,24 @@ const handleSoundPlay = (
 };
 /**
  * Computes comprehensive Holy Grail statistics from save file data.
- * @param {ItemsInSaves} items - The normal items found in saves.
+ * @param {ItemsInSaves} itemsInSaves - The normal items found in saves.
  * @param {ItemsInSaves} ethItems - The ethereal items found in saves.
- * @param {HolyGrailSeed} template - The Holy Grail seed template.
- * @param {IEthGrailData} ethTemplate - The ethereal grail data template.
  * @param {Settings} settings - The application settings.
  * @param {null | (() => void)} [playSound=null] - Optional sound playing function for notifications.
  * @returns {HolyGrailStats} Comprehensive Holy Grail statistics.
  */
 export const computeStats = (
-  items: ItemsInSaves,
+  itemsInSaves: ItemsInSaves,
   ethItems: ItemsInSaves,
-  template: HolyGrailSeed,
-  ethTemplate: IEthGrailData,
   settings: Settings,
   playSound: null | (() => void) = null,
 ): HolyGrailStats => {
-  const shouldHideNormalEthItems = settings.grailNormal && !settings.grailEthereal;
-  const runesStats = computeSubStats(
-    items,
-    ethItems,
-    template.runes || null,
-    null,
-    settings,
-    'runes',
-  );
-  const runewordsStats = computeSubStats(
-    items,
-    ethItems,
-    template.runewords || null,
-    null,
-    settings,
-    'runewords',
-  );
-  const armorStats = computeSubStats(
-    items,
-    ethItems,
-    template.uniques.armor,
-    ethTemplate.uniques.armor,
-    settings,
-    'armor',
-  );
-  const weaponStats = computeSubStats(
-    items,
-    ethItems,
-    template.uniques.weapons,
-    ethTemplate.uniques.weapons,
-    settings,
-    `weapon${shouldHideNormalEthItems ? 'E' : ''}`,
-  );
-  const otherStats = computeSubStats(
-    items,
-    ethItems,
-    template.uniques.other,
-    ethTemplate.uniques.other,
-    settings,
-    `other${shouldHideNormalEthItems ? 'E' : ''}`,
-  );
-  const setsStats = computeSubStats(items, ethItems, template.sets, null, settings, 'sets');
+  const runesStats = computeSubStats(itemsInSaves, ethItems, 'runes', settings);
+  const runewordsStats = computeSubStats(itemsInSaves, ethItems, 'runewords', settings);
+  const armorStats = computeSubStats(itemsInSaves, ethItems, 'armor', settings);
+  const weaponStats = computeSubStats(itemsInSaves, ethItems, 'weapons', settings);
+  const otherStats = computeSubStats(itemsInSaves, ethItems, 'jewelry', settings);
+  const setsStats = computeSubStats(itemsInSaves, ethItems, 'sets', settings);
 
   // Calculate total statistics
   const totalStats = calculateTotalStats(armorStats, weaponStats, otherStats, setsStats);
@@ -687,10 +520,10 @@ export const computeStats = (
 
 /**
  * Counts the total number of times an item appears across all save files.
- * @param {Item} item - The item to count.
+ * @param {SaveFileItem} item - The item to count.
  * @returns {number} The total count of the item across all saves.
  */
-export const countInSaves = (item: Item) => {
+export const countInSaves = (item: SaveFileItem) => {
   if (!item.inSaves) return 0;
   return Object.values(item.inSaves).reduce((acc, itemsInSave) => acc + itemsInSave.length, 0);
 };

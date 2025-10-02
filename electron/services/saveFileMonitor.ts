@@ -9,27 +9,19 @@ import { constants as constants99 } from '@dschu012/d2s/lib/data/versions/99_con
 import chokidar, { type FSWatcher } from 'chokidar';
 import { app } from 'electron';
 import type { GrailDatabase } from '../database/database';
-import { getHolyGrailSeedData, runesSeed } from '../items/grail';
-import { runesMapping } from '../items/runes';
+import { getItemIdForD2SItem, isRuneId } from '../items/indexes';
 import {
   type AvailableRunes,
   type D2SaveFile,
   type FileReaderResponse,
-  type FlatItemsMap,
   GameMode,
-  type Item,
   type ItemDetails,
   type ItemWithMagicAttributes,
   type MagicAttribute,
-  type RuneType,
   type SaveFileEvent,
+  type SaveFileItem,
 } from '../types/grail';
-import {
-  buildFlattenObjectCacheKey,
-  flattenObject,
-  isRune,
-  simplifyItemName,
-} from '../utils/objects';
+import { isRune, simplifyItemName } from '../utils/objects';
 
 /**
  * Lookup table for magic attribute types used in rainbow facet processing.
@@ -75,11 +67,18 @@ const processRainbowFacetAttributes = (
 };
 
 /**
- * Processes an item to determine its normalized name.
+ * Processes an item to determine its item ID from the flat items list.
  * @param {d2s.types.IItem} item - The D2S item to process.
- * @returns {string} The normalized item name.
+ * @returns {string} The item ID or simplified name as fallback.
  */
 const processItemName = (item: d2s.types.IItem): string => {
+  // Try to get the item ID from our flat items list
+  const itemId = getItemIdForD2SItem(item);
+  if (itemId) {
+    return itemId;
+  }
+
+  // Fallback to simplified name for items not in our list
   let name = item.unique_name || item.set_name || item.rare_name || item.rare_name2 || '';
   name = name.toLowerCase().replace(/[^a-z0-9]/gi, '');
 
@@ -90,11 +89,12 @@ const processItemName = (item: d2s.types.IItem): string => {
   }
 
   if (isRune(item)) {
-    return runesMapping[item.type as RuneType].name.toLowerCase();
+    // For runes, use the simplified name as fallback
+    return name;
   }
 
   if (item.type === 'runeword') {
-    return item.runeword_name;
+    return simplifyItemName(item.runeword_name || '');
   }
 
   return name;
@@ -102,21 +102,11 @@ const processItemName = (item: d2s.types.IItem): string => {
 
 /**
  * Determines if an item should be skipped during processing.
- * @param {string} name - The item name.
+ * @param {string} name - The item name/ID.
  * @param {d2s.types.IItem} item - The D2S item.
- * @param {FlatItemsMap} flatItems - Map of regular items.
- * @param {FlatItemsMap} ethFlatItems - Map of ethereal items.
  * @returns {boolean} True if the item should be skipped, false otherwise.
  */
-const shouldSkipItem = (
-  name: string,
-  item: d2s.types.IItem,
-  flatItems: FlatItemsMap,
-  ethFlatItems: FlatItemsMap,
-): boolean => {
-  if (!flatItems[name] && item.ethereal && !ethFlatItems[name]) {
-    return true;
-  }
+const shouldSkipItem = (name: string): boolean => {
   if (name === '') {
     return true;
   }
@@ -139,10 +129,11 @@ const createSavedItem = (item: d2s.types.IItem): ItemDetails => {
 /**
  * Adds an item to the results object.
  * @param {FileReaderResponse} results - The results object to add the item to.
- * @param {string} name - The item name.
+ * @param {string} name - The item name/ID.
  * @param {ItemDetails} savedItem - The item details.
  * @param {string} saveName - The save file name.
  * @param {d2s.types.IItem} item - The D2S item.
+ * @param {boolean} isEthereal - Whether the item is ethereal.
  */
 const addItemToResults = (
   results: FileReaderResponse,
@@ -150,8 +141,9 @@ const addItemToResults = (
   savedItem: ItemDetails,
   saveName: string,
   item: d2s.types.IItem,
+  isEthereal: boolean,
 ): void => {
-  const key: 'items' | 'ethItems' = 'items';
+  const key: 'items' | 'ethItems' = isEthereal ? 'ethItems' : 'items';
 
   if (results[key][name]) {
     if (!results[key][name].inSaves[saveName]) {
@@ -227,7 +219,7 @@ const processRuneItem = (
   items: d2s.types.IItem[],
   isEmbed: boolean,
 ): void => {
-  if (isRune(item) && runesMapping[item.type as RuneType]) {
+  if (isRune(item)) {
     if (isEmbed) {
       item.socketed = 1; // the "socketed" in Rune item types will indicated that *it* sits inside socket
     }
@@ -248,7 +240,7 @@ const processRunewordItem = (item: d2s.types.IItem, items: d2s.types.IItem[]): v
     }
     // we push Runewords as "items" for easier displaying in a list
     const newItem = {
-      runeword_name: `runeword${simplifyItemName(item.runeword_name)}`,
+      runeword_name: item.runeword_name,
       type: 'runeword',
     } as d2s.types.IItem;
     items.push(newItem);
@@ -600,13 +592,6 @@ class SaveFileMonitor extends EventEmitter {
       return;
     }
 
-    // Prepare item list
-    const settings = this.grailDatabase.getAllSettings();
-    const flatItems = flattenObject(
-      getHolyGrailSeedData(false),
-      buildFlattenObjectCacheKey('all', settings),
-    );
-    const ethFlatItems = flattenObject(getHolyGrailSeedData(true), 'ethall');
     const erroringSaves: string[] = [];
 
     const promises = filePaths.map((filePath) => {
@@ -622,12 +607,13 @@ class SaveFileMonitor extends EventEmitter {
           result.forEach((item) => {
             const name = processItemName(item);
 
-            if (shouldSkipItem(name, item, flatItems, ethFlatItems)) {
+            if (shouldSkipItem(name)) {
               return;
             }
 
             const savedItem = createSavedItem(item);
-            addItemToResults(results, name, savedItem, saveName, item);
+            const isEthereal = !!item.ethereal;
+            addItemToResults(results, name, savedItem, saveName, item, isEthereal);
 
             if (isRune(item) && !item.socketed) {
               addRuneToAvailableRunes(results, name, savedItem, saveName, item);
@@ -909,7 +895,7 @@ class SaveFileMonitor extends EventEmitter {
     this.currentData.availableRunes = Object.keys(this.currentData.items).reduce(
       (acc: AvailableRunes, itemKey: string) => {
         const item = this.currentData.items[itemKey];
-        if (runesSeed[itemKey]) {
+        if (isRuneId(itemKey)) {
           acc[itemKey] = item;
         }
         return acc;
@@ -921,9 +907,9 @@ class SaveFileMonitor extends EventEmitter {
   /**
    * Creates a manual item entry for tracking purposes.
    * @param {number} count - The number of items to create.
-   * @returns {Item} A manual item object.
+   * @returns {SaveFileItem} A manual item object.
    */
-  createManualItem(count: number): Item {
+  createManualItem(count: number): SaveFileItem {
     return {
       inSaves: {
         'Manual entry': new Array(count).fill({} as ItemDetails),

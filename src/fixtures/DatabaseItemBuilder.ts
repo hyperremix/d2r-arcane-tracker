@@ -1,4 +1,11 @@
-import type { DatabaseItem, EtherealType, ItemType } from 'electron/types/grail';
+import type {
+  DatabaseItem,
+  EtherealType,
+  ItemCategory,
+  ItemSet,
+  ItemSubCategory,
+  ItemType,
+} from 'electron/types/grail';
 
 /**
  * Builder class for creating DatabaseItem test fixtures
@@ -8,9 +15,11 @@ export class DatabaseItemBuilder {
   private item: DatabaseItem = {
     id: 'default-item-id',
     name: 'Default Item',
+    link: 'https://example.com/default-item',
     type: 'unique',
     category: 'armor',
     sub_category: 'helms',
+    treasure_class: 'normal',
     set_name: undefined,
     ethereal_type: 'none',
     created_at: '2024-01-01T00:00:00.000Z',
@@ -51,7 +60,7 @@ export class DatabaseItemBuilder {
   /**
    * Set the item category
    */
-  withCategory(category: string): this {
+  withCategory(category: ItemCategory): this {
     this.item.category = category;
     return this;
   }
@@ -59,7 +68,7 @@ export class DatabaseItemBuilder {
   /**
    * Set the item subcategory
    */
-  withSubCategory(subCategory: string): this {
+  withSubCategory(subCategory: ItemSubCategory): this {
     this.item.sub_category = subCategory;
     return this;
   }
@@ -67,8 +76,8 @@ export class DatabaseItemBuilder {
   /**
    * Set the set name (for set items)
    */
-  withSetName(setName: string): this {
-    this.item.set_name = setName;
+  withSetName(setName: string | undefined): this {
+    this.item.set_name = setName as ItemSet | undefined;
     return this;
   }
 
@@ -195,8 +204,8 @@ export class DatabaseItemBuilder {
   /**
    * Set as armor item (common test case)
    */
-  asArmorSubCategory(): this {
-    this.item.sub_category = 'armor';
+  asBodyArmor(): this {
+    this.item.sub_category = 'body_armor';
     return this;
   }
 
@@ -212,7 +221,7 @@ export class DatabaseItemBuilder {
    * Set as sword item (common test case)
    */
   asSword(): this {
-    this.item.sub_category = 'swords';
+    this.item.sub_category = '2h_swords';
     return this;
   }
 

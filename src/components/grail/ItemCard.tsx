@@ -1,8 +1,9 @@
-import type { Character, GrailProgress, HolyGrailItem } from 'electron/types/grail';
+import type { Character, GrailProgress, Item } from 'electron/types/grail';
 import { Check, CheckCheck } from 'lucide-react';
 import { memo } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { useItemIcon } from '@/hooks/useItemIcon';
 import { isEtherealOnly, shouldShowEtherealStatus, shouldShowNormalStatus } from '@/lib/ethereal';
 import { cn, isRecentFind } from '@/lib/utils';
 import { useGrailStore } from '@/stores/grailStore';
@@ -85,7 +86,7 @@ function DiscoveryInfo({ allProgress, characters }: DiscoveryInfoProps) {
  * Props interface for the ListView component.
  */
 interface ListViewProps {
-  item: HolyGrailItem;
+  item: Item;
   allProgress: GrailProgress[];
   characters: Character[];
   normalProgress: GrailProgress[];
@@ -116,6 +117,9 @@ function ListView({
   settings,
   onClick,
 }: ListViewProps) {
+  const { iconUrl, isLoading } = useItemIcon(item.name);
+  const { settings: appSettings } = useGrailStore();
+
   return (
     <TooltipProvider>
       {/** biome-ignore lint/a11y/noStaticElementInteractions: explanation */}
@@ -130,8 +134,30 @@ function ListView({
         onClick={onClick}
         onKeyDown={handleKeyDown}
       >
-        {/* Item Type Icon */}
-        <ItemTypeIcon type={item.type} className="h-6 w-6 flex-shrink-0" />
+        {/* Item Icon or Type Icon */}
+        {appSettings.showItemIcons && item.type !== 'runeword' ? (
+          <div className="relative h-12 w-12 flex-shrink-0">
+            <img
+              src={iconUrl}
+              alt={item.name}
+              className={cn(isLoading && 'opacity-0', 'h-full w-full object-contain')}
+              onError={(e) => {
+                // Prevent infinite loops
+                if (
+                  e.currentTarget.src !== `${window.location.origin}/images/placeholder-item.png`
+                ) {
+                  e.currentTarget.src = '/images/placeholder-item.png';
+                }
+              }}
+            />
+            {isLoading && (
+              <div className="absolute inset-0 animate-pulse rounded bg-gray-200 dark:bg-gray-700" />
+            )}
+            <ItemTypeIcon type={item.type} className="absolute right-0 bottom-0 h-4 w-4" />
+          </div>
+        ) : (
+          <ItemTypeIcon type={item.type} className="h-6 w-6 flex-shrink-0" />
+        )}
 
         {/* Status indicators */}
         <StatusIndicators
@@ -179,14 +205,14 @@ function ListView({
 
 /**
  * Determines if an item is fully complete based on grail settings and found versions.
- * @param {HolyGrailItem} item - The Holy Grail item to check
+ * @param {Item} item - The Holy Grail item to check
  * @param {GrailProgress[]} normalProgress - Progress records for normal version
  * @param {GrailProgress[]} etherealProgress - Progress records for ethereal version
  * @param {{ grailEthereal: boolean }} settings - Grail settings
  * @returns {boolean} True if all required versions are found, false otherwise
  */
 function determineCompletionStatus(
-  item: HolyGrailItem,
+  item: Item,
   normalProgress: GrailProgress[],
   etherealProgress: GrailProgress[],
   settings: { grailEthereal: boolean },
@@ -223,7 +249,7 @@ function getTooltipText(allVersionsFound: boolean, settings: { grailEthereal: bo
  */
 interface StatusIndicatorsProps {
   mostRecentDiscovery: GrailProgress | undefined;
-  item: HolyGrailItem;
+  item: Item;
   normalProgress: GrailProgress[];
   etherealProgress: GrailProgress[];
   settings: { grailEthereal: boolean };
@@ -287,14 +313,14 @@ function StatusIndicators({
  */
 interface DiscoveryAttributionProps {
   discoveringCharacters: Character[];
-  item: HolyGrailItem;
+  item: Item;
 }
 
 /**
  * DiscoveryAttribution component that displays character icons showing who found the item.
  * @param {DiscoveryAttributionProps} props - Component props
  * @param {Character[]} props.discoveringCharacters - Characters who discovered the item
- * @param {HolyGrailItem} props.item - The Holy Grail item
+ * @param {Item} props.item - The Holy Grail item
  * @returns {JSX.Element} Character attribution display with tooltips
  */
 function DiscoveryAttribution({ discoveringCharacters, item }: DiscoveryAttributionProps) {
@@ -333,7 +359,7 @@ function DiscoveryAttribution({ discoveringCharacters, item }: DiscoveryAttribut
  * Props interface for the VersionCounts component.
  */
 interface VersionCountsProps {
-  item: HolyGrailItem;
+  item: Item;
   normalProgress: GrailProgress[];
   etherealProgress: GrailProgress[];
 }
@@ -341,7 +367,7 @@ interface VersionCountsProps {
 /**
  * VersionCounts component that displays badges showing count of normal and ethereal versions found.
  * @param {VersionCountsProps} props - Component props
- * @param {HolyGrailItem} props.item - The Holy Grail item
+ * @param {Item} props.item - The Holy Grail item
  * @param {GrailProgress[]} props.normalProgress - Progress records for normal version
  * @param {GrailProgress[]} props.etherealProgress - Progress records for ethereal version
  * @returns {JSX.Element | null} Version count badges or null if no versions found
@@ -372,7 +398,7 @@ function VersionCounts({ item, normalProgress, etherealProgress }: VersionCounts
  * Props interface for the GridView component.
  */
 interface GridViewProps {
-  item: HolyGrailItem;
+  item: Item;
   allProgress: GrailProgress[];
   characters: Character[];
   discoveringCharacters: Character[];
@@ -403,6 +429,9 @@ function GridView({
   settings,
   onClick,
 }: GridViewProps) {
+  const { iconUrl, isLoading } = useItemIcon(item.name);
+  const { settings: appSettings } = useGrailStore();
+
   return (
     <TooltipProvider>
       {/** biome-ignore lint/a11y/noStaticElementInteractions: explanation */}
@@ -430,51 +459,72 @@ function GridView({
             settings={settings}
           />
 
-          <CardContent className="py-2">
-            <div>
-              {/* Item Name with Type Icon */}
-              <div className="flex items-center gap-2">
-                <ItemTypeIcon type={item.type} className="absolute top-2 left-2" />
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <h3 className="flex-1 truncate pt-2 font-semibold text-black text-sm leading-tight dark:text-white">
-                      {item.name}
-                    </h3>
-                  </TooltipTrigger>
-                  <TooltipContent side="top" className="max-w-sm">
-                    <div className="space-y-1">
-                      <p className="font-semibold">{item.name}</p>
-                      <p className="text-gray-500 text-xs">
-                        {item.category} • {item.subCategory.replace('_', ' ')}
-                      </p>
+          <CardContent className="p-3">
+            {/* Item Type Badge */}
+            <ItemTypeIcon type={item.type} className="absolute top-2 left-2" />
 
-                      {allProgress.length > 0 && (
-                        <DiscoveryInfo allProgress={allProgress} characters={characters} />
-                      )}
-                    </div>
-                  </TooltipContent>
-                </Tooltip>
+            {/* Item Icon */}
+            {appSettings.showItemIcons && item.type !== 'runeword' && (
+              <div className="relative mx-auto mb-2 h-16 w-16">
+                <img
+                  src={iconUrl}
+                  alt={item.name}
+                  className={cn('h-full w-full object-contain', isLoading && 'opacity-0')}
+                  onError={(e) => {
+                    // Prevent infinite loops
+                    if (
+                      e.currentTarget.src !==
+                      `${window.location.origin}/images/placeholder-item.png`
+                    ) {
+                      e.currentTarget.src = '/images/placeholder-item.png';
+                    }
+                  }}
+                />
+                {isLoading && (
+                  <div className="absolute inset-0 animate-pulse rounded bg-gray-200 dark:bg-gray-700" />
+                )}
               </div>
+            )}
 
-              {/* Set specific info */}
-              {item.setName && (
-                <p className="font-medium text-green-600 text-xs dark:text-green-400">
-                  Set: {item.setName}
-                </p>
-              )}
+            {/* Item Name */}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <h3 className="truncate text-center font-semibold text-black text-sm leading-tight dark:text-white">
+                  {item.name}
+                </h3>
+              </TooltipTrigger>
+              <TooltipContent side="top" className="max-w-sm">
+                <div className="space-y-1">
+                  <p className="font-semibold">{item.name}</p>
+                  <p className="text-gray-500 text-xs">
+                    {item.category} • {item.subCategory.replace('_', ' ')}
+                  </p>
 
-              {/* Discovery attribution */}
-              {allProgress.length > 0 && (
-                <DiscoveryAttribution discoveringCharacters={discoveringCharacters} item={item} />
-              )}
+                  {allProgress.length > 0 && (
+                    <DiscoveryInfo allProgress={allProgress} characters={characters} />
+                  )}
+                </div>
+              </TooltipContent>
+            </Tooltip>
 
-              {/* Version counts */}
-              <VersionCounts
-                item={item}
-                normalProgress={normalProgress}
-                etherealProgress={etherealProgress}
-              />
-            </div>
+            {/* Set specific info */}
+            {item.setName && (
+              <p className="truncate text-center font-medium text-green-600 text-xs dark:text-green-400">
+                Set: {item.setName}
+              </p>
+            )}
+
+            {/* Discovery attribution */}
+            {allProgress.length > 0 && (
+              <DiscoveryAttribution discoveringCharacters={discoveringCharacters} item={item} />
+            )}
+
+            {/* Version counts */}
+            <VersionCounts
+              item={item}
+              normalProgress={normalProgress}
+              etherealProgress={etherealProgress}
+            />
           </CardContent>
         </Card>
       </div>
@@ -486,7 +536,7 @@ function GridView({
  * Props interface for the ItemCard component.
  */
 interface ItemCardProps {
-  item: HolyGrailItem;
+  item: Item;
   normalProgress?: GrailProgress[]; // Progress for normal version
   etherealProgress?: GrailProgress[]; // Progress for ethereal version
   characters?: Character[];
@@ -511,7 +561,7 @@ const typeColors = {
  * ItemCard component that displays a Holy Grail item with its discovery status and information.
  * Supports both grid and list view modes, showing progress, character attribution, and version counts.
  * @param {ItemCardProps} props - Component props
- * @param {HolyGrailItem} props.item - The Holy Grail item to display
+ * @param {Item} props.item - The Holy Grail item to display
  * @param {GrailProgress[]} [props.normalProgress=[]] - Progress records for normal version
  * @param {GrailProgress[]} [props.etherealProgress=[]] - Progress records for ethereal version
  * @param {Character[]} [props.characters=[]] - Available characters for attribution

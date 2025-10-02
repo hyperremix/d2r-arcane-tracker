@@ -1,4 +1,4 @@
-import type { Character, D2Item, D2SaveFile, GrailProgress, HolyGrailItem, MonitoringStatus, Settings } from './grail'
+import type { Character, D2Item, D2SaveFile, GrailProgress, Item, MonitoringStatus, Settings } from './grail'
 
 /**
  * Main interface defining the Electron API available to the renderer process.
@@ -24,9 +24,9 @@ export interface ElectronAPI {
 
     /**
      * Retrieves all Holy Grail items from the database.
-     * @returns {Promise<HolyGrailItem[]>} A promise that resolves with an array of HolyGrailItem objects.
+     * @returns {Promise<Item[]>} A promise that resolves with an array of Item objects.
      */
-    getItems(): Promise<HolyGrailItem[]>
+    getItems(): Promise<Item[]>
 
     /**
      * Retrieves grail progress for a specific character or all characters.
@@ -155,10 +155,53 @@ export interface ElectronAPI {
     disable(): Promise<{ success: boolean }>
     /**
      * Sets the Holy Grail items to match against during detection.
-     * @param {HolyGrailItem[]} items - Array of Holy Grail items to use for matching.
+     * @param {Item[]} items - Array of Holy Grail items to use for matching.
      * @returns {Promise<{ success: boolean }>} A promise that resolves with a success indicator.
      */
-    setGrailItems(items: HolyGrailItem[]): Promise<{ success: boolean }>
+    setGrailItems(items: Item[]): Promise<{ success: boolean }>
+  }
+
+  /**
+   * Icon API methods for managing item icons.
+   */
+  icon: {
+    /**
+     * Gets an item icon by item name.
+     * @param {string} itemName - The display name of the item.
+     * @returns {Promise<string | null>} Base64 data URL of the icon or null if not found.
+     */
+    getByName(itemName: string): Promise<string | null>
+
+    /**
+     * Gets an item icon by D2R item code.
+     * @param {string} itemCode - The D2R internal item code.
+     * @returns {Promise<string | null>} Base64 data URL of the icon or null if not found.
+     */
+    getByCode(itemCode: string): Promise<string | null>
+
+    /**
+     * Preloads popular item icons for faster display.
+     * @returns {Promise<{ success: boolean }>} Success indicator.
+     */
+    preloadPopular(): Promise<{ success: boolean }>
+
+    /**
+     * Checks if D2R installation is available.
+     * @returns {Promise<boolean>} True if D2R is found.
+     */
+    isD2RAvailable(): Promise<boolean>
+
+    /**
+     * Clears the icon cache.
+     * @returns {Promise<{ success: boolean }>} Success indicator.
+     */
+    clearCache(): Promise<{ success: boolean }>
+
+    /**
+     * Gets cache statistics.
+     * @returns {Promise<{ size: number; d2rAvailable: boolean; cachePath: string }>} Cache stats.
+     */
+    getCacheStats(): Promise<{ size: number; d2rAvailable: boolean; cachePath: string }>
   }
 
   /**

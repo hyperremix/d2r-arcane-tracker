@@ -5,8 +5,9 @@ import type { D2SaveFile, SaveFileEvent } from '../services/saveFileMonitor';
 import { SaveFileMonitor } from '../services/saveFileMonitor';
 import type {
   ArmorSubCategory,
+  CharacterClass,
   CharmSubCategory,
-  HolyGrailItem,
+  Item,
   ItemCategory,
   ItemDetectionEvent,
   JewelrySubCategory,
@@ -43,7 +44,7 @@ function handleAutomaticGrailProgress(event: ItemDetectionEvent): void {
       grailDatabase.upsertCharacter({
         id: characterId,
         name: characterName,
-        character_class: 'unknown', // We'll update this from save file data
+        character_class: 'barbarian', // Default value, will be updated from save file data
         level: event.item.level || 1,
         difficulty: 'normal' as const,
         hardcore: false,
@@ -122,7 +123,7 @@ function updateCharacterFromSaveFile(saveFile: D2SaveFile): void {
     if (character) {
       // Update existing character
       grailDatabase.updateCharacter(character.id, {
-        character_class: saveFile.characterClass,
+        character_class: saveFile.characterClass as CharacterClass,
         level: saveFile.level,
         difficulty: saveFile.difficulty,
         hardcore: saveFile.hardcore,
@@ -136,7 +137,7 @@ function updateCharacterFromSaveFile(saveFile: D2SaveFile): void {
       grailDatabase.upsertCharacter({
         id: characterId,
         name: saveFile.name,
-        character_class: saveFile.characterClass,
+        character_class: saveFile.characterClass as CharacterClass,
         level: saveFile.level,
         difficulty: saveFile.difficulty,
         hardcore: saveFile.hardcore,
@@ -249,9 +250,11 @@ export function initializeSaveFileHandlers(): void {
 
   // Load grail items into item detection service
   try {
-    const grailItems: HolyGrailItem[] = grailDatabase.getAllItems().map((item) => ({
+    const grailItems: Item[] = grailDatabase.getAllItems().map((item) => ({
       id: item.id,
       name: item.name,
+      link: item.link,
+      code: item.code,
       type: item.type as 'unique' | 'set' | 'rune' | 'runeword',
       category: item.category as ItemCategory,
       subCategory: item.sub_category as
@@ -261,10 +264,7 @@ export function initializeSaveFileHandlers(): void {
         | CharmSubCategory
         | RuneSubCategory
         | RunewordSubCategory,
-      level: 1,
-      requiredLevel: 1,
-      rarity: 'common' as const,
-      difficulty: ['normal'] as const,
+      treasureClass: item.treasure_class,
       setName: item.set_name,
       etherealType: item.ethereal_type,
     }));
@@ -395,7 +395,7 @@ export function initializeSaveFileHandlers(): void {
    * @param _ - IPC event (unused)
    * @param items - Array of Holy Grail items to set for detection
    */
-  ipcMain.handle('itemDetection:setGrailItems', async (_, items: HolyGrailItem[]) => {
+  ipcMain.handle('itemDetection:setGrailItems', async (_, items: Item[]) => {
     try {
       itemDetectionService.setGrailItems(items);
       return { success: true };

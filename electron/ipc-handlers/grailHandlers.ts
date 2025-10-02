@@ -1,6 +1,6 @@
 import { ipcMain } from 'electron';
 import { GrailDatabase } from '../database/database';
-import type { Character, GrailProgress, HolyGrailItem, Settings } from '../types/grail';
+import type { Character, GrailProgress, Item, Settings } from '../types/grail';
 
 /**
  * Global database instance for grail operations.
@@ -124,16 +124,14 @@ export function initializeGrailHandlers(): void {
           ({
             id: dbItem.id,
             name: dbItem.name,
+            link: dbItem.link,
             type: dbItem.type,
             category: dbItem.category,
             subCategory: dbItem.sub_category,
-            level: 0, // Default values for missing fields
-            requiredLevel: 0,
-            rarity: 'common',
-            difficulty: ['normal', 'nightmare', 'hell'],
+            treasureClass: dbItem.treasure_class,
             setName: dbItem.set_name,
             etherealType: dbItem.ethereal_type,
-          }) as HolyGrailItem,
+          }) as Item,
       );
     } catch (error) {
       console.error('Failed to get items:', error);
@@ -146,16 +144,19 @@ export function initializeGrailHandlers(): void {
    * @param _ - IPC event (unused)
    * @param items - Array of Holy Grail items to seed
    */
-  ipcMain.handle('grail:seedItems', async (_, items: HolyGrailItem[]) => {
+  ipcMain.handle('grail:seedItems', async (_, items: Item[]) => {
     try {
       const dbItems = items.map((item) => ({
         id: item.id,
         name: item.name,
+        link: item.link,
+        code: item.code,
         type: item.type,
         category: item.category,
-        sub_category: item.subCategory,
-        set_name: item.setName,
-        ethereal_type: item.etherealType,
+        subCategory: item.subCategory,
+        setName: item.setName,
+        etherealType: item.etherealType,
+        treasureClass: item.treasureClass,
       }));
 
       grailDB.insertItems(dbItems);

@@ -292,13 +292,11 @@ describe('When grailHandlers is used', () => {
         {
           id: 'shako',
           name: 'shako',
+          link: 'https://example.com/default-item',
           type: 'unique',
           category: 'armor',
           subCategory: 'helms',
-          level: 0,
-          requiredLevel: 0,
-          rarity: 'common',
-          difficulty: ['normal', 'nightmare', 'hell'],
+          treasureClass: 'normal',
           setName: undefined,
           etherealType: 'none',
         },
@@ -329,11 +327,14 @@ describe('When grailHandlers is used', () => {
         {
           id: 'shako',
           name: 'shako',
+          link: 'https://example.com/default-item',
+          code: undefined,
           type: 'unique',
           category: 'armor',
-          sub_category: 'helms',
-          set_name: undefined,
-          ethereal_type: 'none',
+          subCategory: 'helms',
+          setName: undefined,
+          etherealType: 'none',
+          treasureClass: 'normal',
         },
       ]);
       expect(result).toEqual({ success: true });

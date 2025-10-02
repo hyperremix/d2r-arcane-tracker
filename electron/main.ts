@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { app, BrowserWindow, type IpcMainEvent } from 'electron';
 import { initializeDialogHandlers } from './ipc-handlers/dialogHandlers';
 import { closeGrailDatabase, initializeGrailHandlers } from './ipc-handlers/grailHandlers';
+import { initializeIconHandlers } from './ipc-handlers/iconHandlers';
 import { closeSaveFileMonitor, initializeSaveFileHandlers } from './ipc-handlers/saveFileHandlers';
 
 createRequire(import.meta.url);
@@ -125,6 +126,7 @@ app.whenReady().then(() => {
   initializeGrailHandlers();
   initializeSaveFileHandlers();
   initializeDialogHandlers();
+  initializeIconHandlers();
 
   // Create main window
   createWindow();

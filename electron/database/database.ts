@@ -2,17 +2,13 @@ import { copyFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import Database from 'better-sqlite3';
 import { app } from 'electron';
-import { getHolyGrailSeedData } from '../items/grail';
+import { items } from '../items';
 import type {
   DatabaseCharacter,
   DatabaseGrailProgress,
   DatabaseItem,
   DatabaseSetting,
-  EtherealType,
-  GrailCategory,
-  GrailData,
-  GrailItems,
-  GrailTiers,
+  Item,
   Settings,
 } from '../types/grail';
 import { GameMode, GameVersion } from '../types/grail';
@@ -69,9 +65,12 @@ class GrailDatabase {
       CREATE TABLE IF NOT EXISTS items (
         id TEXT PRIMARY KEY,
         name TEXT NOT NULL,
+        link TEXT,
+        code TEXT,
         type TEXT NOT NULL CHECK (type IN ('unique', 'set', 'rune', 'runeword')),
         category TEXT NOT NULL,
         sub_category TEXT NOT NULL,
+        treasure_class TEXT NOT NULL,
         set_name TEXT,
         ethereal_type TEXT NOT NULL CHECK (ethereal_type IN ('none', 'optional', 'only')),
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -171,13 +170,13 @@ class GrailDatabase {
         ('grailEthereal', 'false'),
         ('grailRunes', 'false'),
         ('grailRunewords', 'false'),
-        ('gameVersion', 'Resurrected'),
         ('enableSounds', 'true'),
         ('notificationVolume', '0.5'),
         ('inAppNotifications', 'true'),
         ('nativeNotifications', 'true'),
         ('needsSeeding', 'true'),
-        ('theme', 'system');
+        ('theme', 'system'),
+        ('showItemIcons', 'true');
     `;
 
     this.db.exec(schema);
@@ -318,23 +317,42 @@ class GrailDatabase {
    * Uses INSERT OR REPLACE to handle duplicate items.
    * @param items - Array of items to insert (without timestamps)
    */
-  insertItems(items: Omit<DatabaseItem, 'created_at' | 'updated_at'>[]): void {
+  insertItems(items: Item[]): void {
     const stmt = this.db.prepare(`
-      INSERT OR REPLACE INTO items (id, name, type, category, sub_category, set_name, ethereal_type)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
+      INSERT OR REPLACE INTO items (id, name, link, code, type, category, sub_category, set_name, ethereal_type, treasure_class)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     const transaction = this.db.transaction((itemsToInsert: typeof items) => {
       for (const item of itemsToInsert) {
-        stmt.run(
-          item.id,
-          item.name,
-          item.type,
-          item.category,
-          item.sub_category,
-          item.set_name,
-          item.ethereal_type,
-        );
+        if (item.etherealType === 'none' || item.etherealType === 'optional') {
+          stmt.run(
+            item.id,
+            item.name,
+            item.link,
+            item.code,
+            item.type,
+            item.category,
+            item.subCategory,
+            item.setName,
+            item.etherealType,
+            item.treasureClass,
+          );
+        }
+        if (item.etherealType === 'only' || item.etherealType === 'optional') {
+          stmt.run(
+            `eth_${item.id}`,
+            item.name,
+            item.link,
+            item.code,
+            item.type,
+            item.category,
+            item.subCategory,
+            item.setName,
+            item.etherealType,
+            item.treasureClass,
+          );
+        }
       }
     });
 
@@ -579,6 +597,7 @@ class GrailDatabase {
       nativeNotifications: settings.nativeNotifications === 'true',
       needsSeeding: settings.needsSeeding === 'true',
       theme: (settings.theme as 'light' | 'dark' | 'system') || 'system',
+      showItemIcons: settings.showItemIcons !== 'false', // Default to true
     };
 
     return typedSettings;
@@ -762,413 +781,10 @@ class GrailDatabase {
     // Clear existing items
     this.db.prepare('DELETE FROM items').run();
 
-    const items: Omit<DatabaseItem, 'created_at' | 'updated_at'>[] = [];
-
-    // Get regular grail data (includes normal versions of all items)
-    const regularGrailData = getHolyGrailSeedData(false);
-    this.traverseGrailData(regularGrailData, items, false);
-
-    // Get ethereal grail data (only for unique items that can be ethereal)
-    const etherealGrailData = getHolyGrailSeedData(true);
-    this.traverseGrailData(etherealGrailData, items, true);
-
     // Insert all items
     this.insertItems(items);
 
     console.log(`Seeded ${items.length} items from Holy Grail data`);
-  }
-
-  /**
-   * Determines the ethereal type for an item based on its name and type.
-   * @param itemName - The name of the item
-   * @param itemType - The type of the item (unique, set, rune, runeword)
-   * @param _isEthereal - Whether the item is ethereal (currently unused)
-   * @returns The ethereal type: 'none', 'optional', or 'only'
-   */
-  private getEtherealType(
-    itemName: string,
-    itemType: 'unique' | 'set' | 'rune' | 'runeword',
-    _isEthereal: boolean,
-  ): EtherealType {
-    // Sets, runes, and runewords cannot be ethereal
-    if (itemType === 'set' || itemType === 'rune' || itemType === 'runeword') {
-      return 'none';
-    }
-
-    // Check for items that can only be ethereal
-    const etherealOnlyItems = ['Ethereal Edge'];
-    if (etherealOnlyItems.includes(itemName)) {
-      return 'only';
-    }
-
-    // Unique items can be ethereal (optional)
-    if (itemType === 'unique') {
-      return 'optional';
-    }
-
-    return 'none';
-  }
-
-  /**
-   * Traverses the grail data structure and extracts items for database insertion.
-   * @param grailData - The grail data structure to traverse
-   * @param items - Array to populate with extracted items
-   * @param isEthereal - Whether to process ethereal versions of items
-   */
-  private traverseGrailData(
-    grailData: GrailData,
-    items: Omit<DatabaseItem, 'created_at' | 'updated_at'>[],
-    isEthereal: boolean,
-  ): void {
-    // Handle uniques
-    if (grailData.uniques) {
-      this.traverseUniques(grailData.uniques as unknown as GrailCategory, items, isEthereal);
-    }
-
-    // Handle sets, runes, and runewords only for normal (non-ethereal) data
-    if (!isEthereal) {
-      // Handle sets (only for regular grail data)
-      if ('sets' in grailData && grailData.sets) {
-        this.traverseSets(grailData.sets as unknown as Record<string, unknown>, items, isEthereal);
-      }
-
-      // Handle runes (if present)
-      if ('runes' in grailData && grailData.runes) {
-        this.traverseRunes(grailData.runes as Record<string, string>, items, isEthereal);
-      }
-
-      // Handle runewords (if present)
-      if ('runewords' in grailData && grailData.runewords) {
-        this.traverseRunewords(grailData.runewords as Record<string, string>, items, isEthereal);
-      }
-    }
-  }
-
-  /**
-   * Traverses unique items from the grail data structure.
-   * @param uniques - The unique items category to traverse
-   * @param items - Array to populate with extracted unique items
-   * @param isEthereal - Whether to process ethereal versions
-   */
-  private traverseUniques(
-    uniques: GrailCategory,
-    items: Omit<DatabaseItem, 'created_at' | 'updated_at'>[],
-    isEthereal: boolean,
-  ): void {
-    // Traverse armor
-    if (uniques.armor) {
-      for (const [subCategory, tiers] of Object.entries(uniques.armor)) {
-        this.traverseTiers(
-          tiers as GrailTiers,
-          items,
-          'unique',
-          'armor',
-          subCategory,
-          undefined,
-          isEthereal,
-        );
-      }
-    }
-
-    // Traverse weapons
-    if (uniques.weapons) {
-      for (const [subCategory, tiers] of Object.entries(uniques.weapons)) {
-        this.traverseTiers(
-          tiers as GrailTiers,
-          items,
-          'unique',
-          'weapons',
-          subCategory,
-          undefined,
-          isEthereal,
-        );
-      }
-    }
-
-    // Traverse other items
-    if (uniques.other) {
-      this.traverseOther(uniques.other as Record<string, unknown>, items, isEthereal);
-    }
-  }
-
-  /**
-   * Traverses set items from the grail data structure.
-   * @param sets - The sets data to traverse
-   * @param items - Array to populate with extracted set items
-   * @param isEthereal - Whether to process ethereal versions (sets cannot be ethereal)
-   */
-  private traverseSets(
-    sets: Record<string, unknown>,
-    items: Omit<DatabaseItem, 'created_at' | 'updated_at'>[],
-    isEthereal: boolean,
-  ): void {
-    for (const [setName, setItems] of Object.entries(sets)) {
-      for (const itemName of Object.keys(setItems as Record<string, unknown>)) {
-        const id = `${isEthereal ? 'eth_' : ''}set_${setName}_${itemName}`
-          .toLowerCase()
-          .replace(/[^a-z0-9_]/g, '_');
-        items.push({
-          id,
-          name: itemName,
-          type: 'set',
-          category: 'sets',
-          sub_category: setName,
-          set_name: setName,
-          ethereal_type: this.getEtherealType(itemName, 'set', isEthereal),
-        });
-      }
-    }
-  }
-
-  /**
-   * Traverses rune items from the grail data structure.
-   * @param runes - The runes data to traverse
-   * @param items - Array to populate with extracted rune items
-   * @param isEthereal - Whether to process ethereal versions (runes cannot be ethereal)
-   */
-  private traverseRunes(
-    runes: Record<string, string>,
-    items: Omit<DatabaseItem, 'created_at' | 'updated_at'>[],
-    isEthereal: boolean,
-  ): void {
-    for (const runeName of Object.keys(runes)) {
-      const id = `${isEthereal ? 'eth_' : ''}rune_${runeName}`
-        .toLowerCase()
-        .replace(/[^a-z0-9_]/g, '_');
-      items.push({
-        id,
-        name: runeName,
-        type: 'rune',
-        category: 'runes',
-        sub_category: 'runes',
-        ethereal_type: this.getEtherealType(runeName, 'rune', isEthereal),
-      });
-    }
-  }
-
-  /**
-   * Traverses runeword items from the grail data structure.
-   * @param runewords - The runewords data to traverse
-   * @param items - Array to populate with extracted runeword items
-   * @param isEthereal - Whether to process ethereal versions (runewords cannot be ethereal)
-   */
-  private traverseRunewords(
-    runewords: Record<string, string>,
-    items: Omit<DatabaseItem, 'created_at' | 'updated_at'>[],
-    isEthereal: boolean,
-  ): void {
-    for (const runewordName of Object.values(runewords)) {
-      const id = `${isEthereal ? 'eth_' : ''}runeword_${runewordName}`
-        .toLowerCase()
-        .replace(/[^a-z0-9_]/g, '_');
-      items.push({
-        id,
-        name: runewordName,
-        type: 'runeword',
-        category: 'runewords',
-        sub_category: 'runewords',
-        ethereal_type: this.getEtherealType(runewordName, 'runeword', isEthereal),
-      });
-    }
-  }
-
-  /**
-   * Traverses other items (jewelry, charms, rainbow facets, class items) from the grail data structure.
-   * @param other - The other items data to traverse
-   * @param items - Array to populate with extracted items
-   * @param isEthereal - Whether to process ethereal versions
-   */
-  private traverseOther(
-    other: Record<string, unknown>,
-    items: Omit<DatabaseItem, 'created_at' | 'updated_at'>[],
-    isEthereal: boolean,
-  ): void {
-    if (other.jewelry) {
-      this.traverseJewelry(other.jewelry as Record<string, GrailItems>, items, isEthereal);
-    }
-
-    if (other.charms) {
-      this.traverseCharms(other.charms as Record<string, GrailItems>, items, isEthereal);
-    }
-
-    if (other['rainbow facet (jewel)']) {
-      this.traverseRainbowFacets(
-        other['rainbow facet (jewel)'] as Record<string, GrailItems>,
-        items,
-        isEthereal,
-      );
-    }
-
-    if (other.classes) {
-      this.traverseClassItems(other.classes as Record<string, GrailItems>, items, isEthereal);
-    }
-  }
-
-  /**
-   * Traverses jewelry items (rings, amulets) from the grail data structure.
-   * @param jewelry - The jewelry data to traverse
-   * @param items - Array to populate with extracted jewelry items
-   * @param isEthereal - Whether to process ethereal versions
-   */
-  private traverseJewelry(
-    jewelry: Record<string, GrailItems>,
-    items: Omit<DatabaseItem, 'created_at' | 'updated_at'>[],
-    isEthereal: boolean,
-  ): void {
-    for (const [subCategory, jewelryItems] of Object.entries(jewelry)) {
-      for (const itemName of Object.keys(jewelryItems)) {
-        const id = `${isEthereal ? 'eth_' : ''}unique_jewelry_${subCategory}_${itemName}`
-          .toLowerCase()
-          .replace(/[^a-z0-9_]/g, '_');
-        items.push({
-          id,
-          name: itemName,
-          type: 'unique',
-          category: 'jewelry',
-          sub_category: subCategory,
-          ethereal_type: this.getEtherealType(itemName, 'unique', isEthereal),
-        });
-      }
-    }
-  }
-
-  /**
-   * Traverses charm items from the grail data structure.
-   * @param charms - The charms data to traverse
-   * @param items - Array to populate with extracted charm items
-   * @param isEthereal - Whether to process ethereal versions
-   */
-  private traverseCharms(
-    charms: Record<string, GrailItems>,
-    items: Omit<DatabaseItem, 'created_at' | 'updated_at'>[],
-    isEthereal: boolean,
-  ): void {
-    for (const [subCategory, charmItems] of Object.entries(charms)) {
-      for (const itemName of Object.keys(charmItems)) {
-        const id = `${isEthereal ? 'eth_' : ''}unique_charms_${subCategory}_${itemName}`
-          .toLowerCase()
-          .replace(/[^a-z0-9_]/g, '_');
-        items.push({
-          id,
-          name: itemName,
-          type: 'unique',
-          category: 'charms',
-          sub_category: subCategory,
-          ethereal_type: this.getEtherealType(itemName, 'unique', isEthereal),
-        });
-      }
-    }
-  }
-
-  /**
-   * Traverses rainbow facet jewel items from the grail data structure.
-   * @param facets - The rainbow facets data to traverse
-   * @param items - Array to populate with extracted rainbow facet items
-   * @param isEthereal - Whether to process ethereal versions
-   */
-  private traverseRainbowFacets(
-    facets: Record<string, GrailItems>,
-    items: Omit<DatabaseItem, 'created_at' | 'updated_at'>[],
-    isEthereal: boolean,
-  ): void {
-    for (const [subCategory, facetItems] of Object.entries(facets)) {
-      for (const itemName of Object.keys(facetItems)) {
-        const id = `${isEthereal ? 'eth_' : ''}unique_jewel_${subCategory}_${itemName}`
-          .toLowerCase()
-          .replace(/[^a-z0-9_]/g, '_');
-        items.push({
-          id,
-          name: itemName,
-          type: 'unique',
-          category: 'jewels',
-          sub_category: subCategory,
-          ethereal_type: this.getEtherealType(itemName, 'unique', isEthereal),
-        });
-      }
-    }
-  }
-
-  /**
-   * Traverses class-specific items from the grail data structure.
-   * @param classes - The class items data to traverse
-   * @param items - Array to populate with extracted class items
-   * @param isEthereal - Whether to process ethereal versions
-   */
-  private traverseClassItems(
-    classes: Record<string, GrailItems>,
-    items: Omit<DatabaseItem, 'created_at' | 'updated_at'>[],
-    isEthereal: boolean,
-  ): void {
-    for (const [className, classItems] of Object.entries(classes)) {
-      for (const itemName of Object.keys(classItems)) {
-        const id = `${isEthereal ? 'eth_' : ''}unique_class_${className}_${itemName}`
-          .toLowerCase()
-          .replace(/[^a-z0-9_]/g, '_');
-        items.push({
-          id,
-          name: itemName,
-          type: 'unique',
-          category: 'class_items',
-          sub_category: className,
-          ethereal_type: this.getEtherealType(itemName, 'unique', isEthereal),
-        });
-      }
-    }
-  }
-
-  /**
-   * Traverses item tiers (normal, exceptional, elite) from the grail data structure.
-   * @param tiers - The tiers data to traverse
-   * @param items - Array to populate with extracted tier items
-   * @param type - The type of items (unique or set)
-   * @param category - The category of items (armor, weapons, etc.)
-   * @param subCategory - The subcategory of items
-   * @param setName - The set name for set items (undefined for unique items)
-   * @param isEthereal - Whether to process ethereal versions
-   */
-  private traverseTiers(
-    tiers: GrailTiers,
-    items: Omit<DatabaseItem, 'created_at' | 'updated_at'>[],
-    type: 'unique' | 'set',
-    category: string,
-    subCategory: string,
-    setName: string | undefined,
-    isEthereal: boolean,
-  ): void {
-    // Handle normal, exceptional, elite tiers
-    for (const [tier, tierItems] of Object.entries(tiers)) {
-      if (tier === 'normal' || tier === 'exceptional' || tier === 'elite' || tier === 'all') {
-        for (const itemName of Object.keys(tierItems)) {
-          const id =
-            `${isEthereal ? 'eth_' : ''}${type}_${category}_${subCategory}_${tier}_${itemName}`
-              .toLowerCase()
-              .replace(/[^a-z0-9_]/g, '_');
-          items.push({
-            id,
-            name: itemName,
-            type,
-            category,
-            sub_category: `${subCategory}_${tier}`,
-            set_name: setName,
-            ethereal_type: this.getEtherealType(itemName, type, isEthereal),
-          });
-        }
-      } else {
-        // This might be a direct item entry, treat as "all" tier
-        const id = `${isEthereal ? 'eth_' : ''}${type}_${category}_${subCategory}_all_${tier}`
-          .toLowerCase()
-          .replace(/[^a-z0-9_]/g, '_');
-        items.push({
-          id,
-          name: tier,
-          type,
-          category,
-          sub_category: `${subCategory}_all`,
-          set_name: setName,
-          ethereal_type: this.getEtherealType(tier, type, isEthereal),
-        });
-      }
-    }
   }
 
   // Utility methods

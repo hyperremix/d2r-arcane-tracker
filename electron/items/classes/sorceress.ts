@@ -1,0 +1,37 @@
+import type { Item } from '../../types/grail';
+
+export const sorceress: Item[] = [
+  {
+    id: 'theoculus',
+    name: 'The Oculus',
+    link: 'https://diablo2.io/uniques/the-oculus-t982.html',
+    etherealType: 'optional',
+    type: 'unique',
+    category: 'armor',
+    subCategory: 'sorceress',
+    treasureClass: 'exceptional',
+    code: 'oba',
+  },
+  {
+    id: 'deathsfathom',
+    name: "Death's Fathom",
+    link: 'https://diablo2.io/uniques/death-s-fathom-t744.html',
+    etherealType: 'optional',
+    type: 'unique',
+    category: 'armor',
+    subCategory: 'sorceress',
+    treasureClass: 'elite',
+    code: 'obf',
+  },
+  {
+    id: 'eschutastemper',
+    name: "Eschuta's Temper",
+    link: 'https://diablo2.io/uniques/eschuta-s-temper-t764.html',
+    etherealType: 'optional',
+    type: 'unique',
+    category: 'armor',
+    subCategory: 'sorceress',
+    treasureClass: 'elite',
+    code: 'obc',
+  },
+];

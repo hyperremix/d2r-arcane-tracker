@@ -1,5 +1,5 @@
 import { useVirtualizer } from '@tanstack/react-virtual';
-import type { Character, HolyGrailItem } from 'electron/types/grail';
+import type { Character, Item } from 'electron/types/grail';
 import { Grid, List } from 'lucide-react';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
@@ -12,12 +12,12 @@ import { ItemCard } from './ItemCard';
 
 /**
  * Determines the ethereal grouping key for an item based on its ethereal status and progress.
- * @param {HolyGrailItem} itemData - The Holy Grail item data
+ * @param {Item} itemData - The Holy Grail item data
  * @param {{ normalFound: boolean; etherealFound: boolean } | undefined} itemProgress - The progress data for the item
  * @returns {string} A string key representing the item's ethereal status group
  */
 function getEtherealGroupKey(
-  itemData: HolyGrailItem,
+  itemData: Item,
   itemProgress: { normalFound: boolean; etherealFound: boolean } | undefined,
 ) {
   const hasEthereal = itemProgress?.etherealFound;
@@ -197,6 +197,7 @@ export const ItemGrid = memo(function ItemGrid() {
         progressLookup={progressLookup}
         characters={characters}
         handleItemClick={handleItemClick}
+        showItemIcons={settings.showItemIcons}
       />
     </div>
   );
@@ -207,32 +208,29 @@ export const ItemGrid = memo(function ItemGrid() {
  */
 type VirtualRowType =
   | { type: 'header'; groupTitle: string; itemCount: number; foundCount: number }
-  | { type: 'items'; items: HolyGrailItem[]; groupIndex: number };
+  | { type: 'items'; items: Item[]; groupIndex: number };
 
 /**
  * Props interface for VirtualizedItemsContainer component.
  */
 interface VirtualizedItemsContainerProps {
-  groupedItems: Array<{ title: string; items: HolyGrailItem[] }>;
+  groupedItems: Array<{ title: string; items: Item[] }>;
   viewMode: ViewMode;
   groupMode: GroupMode;
   progressLookup: ReturnType<typeof useProgressLookup>;
   characters: Character[];
   handleItemClick: (itemId: string) => void;
+  showItemIcons: boolean;
 }
 
 /**
  * Creates item rows for grid view by chunking items into rows based on column count.
- * @param {HolyGrailItem[]} items - Items to chunk into rows
+ * @param {Item[]} items - Items to chunk into rows
  * @param {number} columnsCount - Number of columns per row
  * @param {number} groupIndex - Index of the group
  * @returns {VirtualRowType[]} Array of virtual row objects
  */
-function createGridRows(
-  items: HolyGrailItem[],
-  columnsCount: number,
-  groupIndex: number,
-): VirtualRowType[] {
+function createGridRows(items: Item[], columnsCount: number, groupIndex: number): VirtualRowType[] {
   const rows: VirtualRowType[] = [];
   for (let i = 0; i < items.length; i += columnsCount) {
     rows.push({
@@ -246,11 +244,11 @@ function createGridRows(
 
 /**
  * Creates item rows for list view with one item per row.
- * @param {HolyGrailItem[]} items - Items to convert to rows
+ * @param {Item[]} items - Items to convert to rows
  * @param {number} groupIndex - Index of the group
  * @returns {VirtualRowType[]} Array of virtual row objects
  */
-function createListRows(items: HolyGrailItem[], groupIndex: number): VirtualRowType[] {
+function createListRows(items: Item[], groupIndex: number): VirtualRowType[] {
   return items.map((item) => ({
     type: 'items' as const,
     items: [item],
@@ -271,6 +269,7 @@ function VirtualizedItemsContainer({
   progressLookup,
   characters,
   handleItemClick,
+  showItemIcons,
 }: VirtualizedItemsContainerProps) {
   const parentRef = useRef<HTMLDivElement>(null);
 
@@ -331,7 +330,9 @@ function VirtualizedItemsContainer({
     estimateSize: (index) => {
       const row = virtualRows[index];
       if (row.type === 'header') return 56; // Header height
-      return viewMode === 'grid' ? 220 : 80; // Grid row or list item height
+      // Adjust grid height based on whether icons are shown
+      const gridHeight = showItemIcons ? 256 : 180;
+      return viewMode === 'grid' ? gridHeight : 80; // Grid row or list item height
     },
     overscan: 5, // Render 5 rows above and below viewport
   });
