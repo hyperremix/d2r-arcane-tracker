@@ -46,6 +46,8 @@ Built applications will be available in `release/${version}/`:
 - **macOS**: `D2R Arcane Tracker-Mac-${version}-Installer.dmg`
 - **Linux**: `D2R Arcane Tracker-Linux-${version}.AppImage`
 
+**Current Version**: 0.1.0
+
 ## Native Module Considerations
 
 This application uses several native modules that require special handling during packaging:
