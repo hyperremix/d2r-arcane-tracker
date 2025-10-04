@@ -1,7 +1,7 @@
 import { createRequire } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { app, BrowserWindow, type IpcMainEvent } from 'electron';
+import { app, BrowserWindow, type IpcMainEvent, session } from 'electron';
 import { initializeDialogHandlers } from './ipc-handlers/dialogHandlers';
 import { closeGrailDatabase, initializeGrailHandlers } from './ipc-handlers/grailHandlers';
 import { initializeIconHandlers } from './ipc-handlers/iconHandlers';
@@ -87,6 +87,10 @@ function createWindow() {
         }),
     webPreferences: {
       preload: path.join(__dirname, 'preload.mjs'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+      webSecurity: true,
     },
   });
 
@@ -122,6 +126,20 @@ app.on('activate', () => {
 });
 
 app.whenReady().then(() => {
+  const isDev = !!VITE_DEV_SERVER_URL;
+
+  // Set up Content Security Policy
+  const prodCsp =
+    "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; frame-src 'none'; object-src 'none'; base-uri 'self'";
+  const devCsp =
+    "default-src 'self' http://localhost:5173; script-src 'self' 'unsafe-inline' http://localhost:5173; style-src 'self' 'unsafe-inline' http://localhost:5173; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' ws://localhost:5173 http://localhost:5173; frame-src 'none'; object-src 'none'; base-uri 'self'";
+
+  session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
+    const headers = details.responseHeaders ?? {};
+    headers['Content-Security-Policy'] = [isDev ? devCsp : prodCsp];
+    callback({ responseHeaders: headers });
+  });
+
   // Initialize grail database and IPC handlers
   initializeGrailHandlers();
   initializeSaveFileHandlers();
