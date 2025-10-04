@@ -113,6 +113,7 @@ class GrailDatabase {
         auto_detected BOOLEAN NOT NULL DEFAULT TRUE,
         difficulty TEXT CHECK (difficulty IN ('normal', 'nightmare', 'hell')),
         notes TEXT,
+        is_ethereal BOOLEAN NOT NULL DEFAULT FALSE,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE CASCADE
@@ -257,28 +258,23 @@ class GrailDatabase {
 
   /**
    * Checks if normal (non-ethereal) items are enabled in the settings.
-   * @param item - The database item to check
-   * @param settings - Current user settings
+   * @param _item - The database item to check
+   * @param _settings - Current user settings
    * @returns True if normal items are enabled, false otherwise
    */
-  private isNormalTypeEnabled(item: DatabaseItem, settings: Settings): boolean {
-    if (!item.id.startsWith('eth_') && !settings.grailNormal) {
-      return false;
-    }
+  private isNormalTypeEnabled(_item: DatabaseItem, _settings: Settings): boolean {
+    // Always return true for item-level filtering - UI will handle granular normal/eth states
     return true;
   }
 
   /**
    * Checks if ethereal items are enabled in the settings.
-   * @param item - The database item to check
-   * @param settings - Current user settings
+   * @param _item - The database item to check
+   * @param _settings - Current user settings
    * @returns True if ethereal items are enabled, false otherwise
    */
-  private isEtherealTypeEnabled(item: DatabaseItem, settings: Settings): boolean {
-    if (item.id.startsWith('eth_') && !settings.grailEthereal) {
-      return false;
-    }
-
+  private isEtherealTypeEnabled(_item: DatabaseItem, _settings: Settings): boolean {
+    // Always return true for item-level filtering - UI will handle granular normal/eth states
     return true;
   }
 
@@ -318,6 +314,7 @@ class GrailDatabase {
   /**
    * Inserts multiple items into the database using a transaction.
    * Uses INSERT OR REPLACE to handle duplicate items.
+   * Only inserts base items (no eth_ duplicates).
    * @param items - Array of items to insert (without timestamps)
    */
   insertItems(items: Item[]): void {
@@ -328,34 +325,18 @@ class GrailDatabase {
 
     const transaction = this.db.transaction((itemsToInsert: typeof items) => {
       for (const item of itemsToInsert) {
-        if (item.etherealType === 'none' || item.etherealType === 'optional') {
-          stmt.run(
-            item.id,
-            item.name,
-            item.link,
-            item.code,
-            item.type,
-            item.category,
-            item.subCategory,
-            item.setName,
-            item.etherealType,
-            item.treasureClass,
-          );
-        }
-        if (item.etherealType === 'only' || item.etherealType === 'optional') {
-          stmt.run(
-            `eth_${item.id}`,
-            item.name,
-            item.link,
-            item.code,
-            item.type,
-            item.category,
-            item.subCategory,
-            item.setName,
-            item.etherealType,
-            item.treasureClass,
-          );
-        }
+        stmt.run(
+          item.id,
+          item.name,
+          item.link,
+          item.code,
+          item.type,
+          item.category,
+          item.subCategory,
+          item.setName,
+          item.etherealType,
+          item.treasureClass,
+        );
       }
     });
 
@@ -504,15 +485,6 @@ class GrailDatabase {
     const filteredItems = this.getFilteredItems(settings);
     const filteredItemIds = new Set(filteredItems.map((item) => item.id));
 
-    // Also include ethereal versions of items if ethereal is enabled
-    if (settings.grailEthereal) {
-      filteredItems.forEach((item) => {
-        if (item.ethereal_type === 'optional' || item.ethereal_type === 'only') {
-          filteredItemIds.add(`eth_${item.id}`);
-        }
-      });
-    }
-
     return allProgress.filter((progress) => filteredItemIds.has(progress.item_id));
   }
 
@@ -543,8 +515,8 @@ class GrailDatabase {
    */
   upsertProgress(progress: Omit<DatabaseGrailProgress, 'created_at' | 'updated_at'>): void {
     const stmt = this.db.prepare(`
-      INSERT OR REPLACE INTO grail_progress (id, character_id, item_id, found, found_date, manually_added, auto_detected, difficulty, notes)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT OR REPLACE INTO grail_progress (id, character_id, item_id, found, found_date, manually_added, auto_detected, difficulty, notes, is_ethereal)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     stmt.run(
       progress.id,
@@ -556,6 +528,7 @@ class GrailDatabase {
       progress.auto_detected,
       progress.difficulty,
       progress.notes,
+      progress.is_ethereal,
     );
   }
 

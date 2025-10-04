@@ -61,7 +61,7 @@ function DiscoveryInfo({ allProgress, characters }: DiscoveryInfoProps) {
       <p className="font-medium text-xs">Discovery Info:</p>
       {allProgress.slice(0, 3).map((p) => {
         const character = characters.find((c) => c.id === p.characterId);
-        const isEthProgress = p.itemId.startsWith('eth_');
+        const isEthProgress = p.isEthereal;
         return (
           <div key={`${character?.id}-${p.id}`} className="mt-1 flex items-center gap-1 text-xs">
             {character && (

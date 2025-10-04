@@ -201,6 +201,7 @@ export interface GrailProgress {
   manuallyAdded: boolean;
   difficulty?: Difficulty;
   notes?: string;
+  isEthereal: boolean;
 }
 
 /**
@@ -216,6 +217,7 @@ export type DatabaseGrailProgress = {
   auto_detected: boolean;
   difficulty?: 'normal' | 'nightmare' | 'hell';
   notes?: string;
+  is_ethereal: boolean;
   created_at: string;
   updated_at: string;
 };

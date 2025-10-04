@@ -11,6 +11,7 @@ import {
 } from 'electron/types/grail';
 import { useMemo } from 'react';
 import { create } from 'zustand';
+import { canItemBeEthereal, canItemBeNormal } from '@/lib/ethereal';
 import { isRecentFind } from '@/lib/utils';
 
 /**
@@ -197,6 +198,7 @@ export const useGrailStore = create<GrailState>((set, get) => ({
         foundDate: new Date(),
         foundBy,
         manuallyAdded,
+        isEthereal: false, // Default to normal version
       };
       newProgress = [...progress, newEntry];
     }
@@ -491,16 +493,53 @@ function calculateStreaks(findDates: string[]) {
 }
 
 /**
+ * Helper function to calculate statistics for a single category
+ */
+function calculateCategoryStatsForCategory(
+  categoryItems: Item[],
+  foundInCategory: GrailProgress[],
+  recentInCategory: GrailProgress[],
+  settings: Settings,
+) {
+  let categoryTotal = 0;
+  let categoryFound = 0;
+
+  for (const item of categoryItems) {
+    const itemProgress = foundInCategory.filter((p) => p.itemId === item.id);
+    const hasNormal = itemProgress.some((p) => !p.isEthereal);
+    const hasEthereal = itemProgress.some((p) => p.isEthereal);
+
+    if (settings.grailNormal && canItemBeNormal(item)) {
+      categoryTotal++;
+      if (hasNormal) categoryFound++;
+    }
+    if (settings.grailEthereal && canItemBeEthereal(item)) {
+      categoryTotal++;
+      if (hasEthereal) categoryFound++;
+    }
+  }
+
+  return {
+    total: categoryTotal,
+    found: categoryFound,
+    percentage: categoryTotal > 0 ? (categoryFound / categoryTotal) * 100 : 0,
+    recent: recentInCategory.length,
+  };
+}
+
+/**
  * Calculates statistics for each item category.
  * @param {Item[]} items - All Holy Grail items
  * @param {GrailProgress[]} foundProgress - Progress records for found items
  * @param {GrailProgress[]} recentFinds - Recent find progress records
+ * @param {Settings} settings - Grail settings to determine what counts as found
  * @returns {Array} Array of category statistics with totals, found counts, and percentages
  */
 function calculateCategoryStats(
   items: Item[],
   foundProgress: GrailProgress[],
   recentFinds: GrailProgress[],
+  settings: Settings,
 ) {
   const categories = [...new Set(items.map((item) => item.category))];
   return categories.map((category) => {
@@ -512,16 +551,16 @@ function calculateCategoryStats(
       categoryItems.some((item) => item.id === p.itemId),
     );
 
-    // Count unique items found in this category (not progress entries)
-    const uniqueFoundItemIds = new Set(foundInCategory.map((p) => p.itemId));
-    const uniqueFoundCount = uniqueFoundItemIds.size;
+    const stats = calculateCategoryStatsForCategory(
+      categoryItems,
+      foundInCategory,
+      recentInCategory,
+      settings,
+    );
 
     return {
       category,
-      total: categoryItems.length,
-      found: uniqueFoundCount,
-      percentage: categoryItems.length > 0 ? (uniqueFoundCount / categoryItems.length) * 100 : 0,
-      recent: recentInCategory.length,
+      ...stats,
     };
   });
 }
@@ -604,53 +643,116 @@ function calculateTimelineStats(progress: GrailProgress[]) {
 }
 
 /**
+ * Helper function to calculate item counts based on grail settings
+ */
+function calculateItemCounts(items: Item[], foundProgress: GrailProgress[], settings: Settings) {
+  let totalItems = 0;
+  let foundItems = 0;
+  let foundNormalItems = 0;
+  let foundEtherealItems = 0;
+
+  for (const item of items) {
+    const itemProgress = foundProgress.filter((p) => p.itemId === item.id);
+    const hasNormal = itemProgress.some((p) => !p.isEthereal);
+    const hasEthereal = itemProgress.some((p) => p.isEthereal);
+
+    if (settings.grailNormal && canItemBeNormal(item)) {
+      totalItems++;
+      if (hasNormal) {
+        foundItems++;
+        foundNormalItems++;
+      }
+    }
+    if (settings.grailEthereal && canItemBeEthereal(item)) {
+      totalItems++;
+      if (hasEthereal) {
+        foundItems++;
+        foundEtherealItems++;
+      }
+    }
+  }
+
+  return { totalItems, foundItems, foundNormalItems, foundEtherealItems };
+}
+
+/**
+ * Helper function to calculate statistics for a single item type
+ */
+function calculateTypeStatsForType(
+  typeItems: Item[],
+  foundProgress: GrailProgress[],
+  settings: Settings,
+) {
+  let typeTotal = 0;
+  let typeFound = 0;
+
+  for (const item of typeItems) {
+    const itemProgress = foundProgress.filter((p) => p.itemId === item.id);
+    const hasNormal = itemProgress.some((p) => !p.isEthereal);
+    const hasEthereal = itemProgress.some((p) => p.isEthereal);
+
+    if (settings.grailNormal && canItemBeNormal(item)) {
+      typeTotal++;
+      if (hasNormal) typeFound++;
+    }
+    if (settings.grailEthereal && canItemBeEthereal(item)) {
+      typeTotal++;
+      if (hasEthereal) typeFound++;
+    }
+  }
+
+  return {
+    total: typeTotal,
+    found: typeFound,
+    percentage: typeTotal > 0 ? (typeFound / typeTotal) * 100 : 0,
+  };
+}
+
+/**
+ * Helper function to calculate type statistics
+ */
+function calculateTypeStats(items: Item[], foundProgress: GrailProgress[], settings: Settings) {
+  return ['unique', 'set', 'rune', 'runeword'].map((type) => {
+    const typeItems = items.filter((item) => item.type === type);
+    const stats = calculateTypeStatsForType(typeItems, foundProgress, settings);
+
+    return {
+      type,
+      ...stats,
+    };
+  });
+}
+
+/**
  * Custom hook that calculates comprehensive Holy Grail statistics.
  * Provides overall progress, type breakdowns, recent finds, streaks, and category/character stats.
  * @returns {Object} Comprehensive statistics object with multiple data points
  */
 export const useGrailStatistics = () => {
-  const { items, progress, characters } = useGrailStore();
+  const { items, progress, characters, settings } = useGrailStore();
 
   // Note: items and progress are already filtered based on grail settings (grailNormal, grailEthereal, grailRunes, grailRunewords)
   // at the database level, so these statistics automatically reflect the current grail configuration
-  const totalItems = items.length;
   const foundProgress = progress.filter((p) => p.found);
 
-  // Global statistics - count unique items found by ANY character
-  const foundItemIds = new Set(
-    foundProgress.map((p) => p.itemId).filter((id) => items.find((item) => item.id === id)),
+  // Calculate item counts based on grail settings
+  const { totalItems, foundItems, foundNormalItems, foundEtherealItems } = calculateItemCounts(
+    items,
+    foundProgress,
+    settings,
   );
-  const foundItems = foundItemIds.size;
 
   // Calculate ethereal vs normal breakdown
   // Note: These calculations are based on the already-filtered items array
   // If grailEthereal is false, etherealItems will be empty
   // If grailNormal is false, normalItems will be empty
-  const normalItems = items.filter((item) => !item.id.startsWith('eth_'));
-  const etherealItems = items.filter((item) => item.id.startsWith('eth_'));
-
-  const globalFoundItems = new Set(foundProgress.map((p) => p.itemId));
-  const foundNormalItems = Array.from(globalFoundItems).filter(
-    (id) => !id.startsWith('eth_'),
-  ).length;
-  const foundEtherealItems = Array.from(globalFoundItems).filter((id) =>
-    id.startsWith('eth_'),
-  ).length;
+  const normalItems = items.filter((item) => canItemBeNormal(item));
+  const etherealItems = items.filter((item) => canItemBeEthereal(item));
 
   // Type breakdown - based on filtered items
   // If grailRunes is false, rune items will not be in the items array
   // If grailRunewords is false, runeword items will not be in the items array
-  const typeStats = ['unique', 'set', 'rune', 'runeword'].map((type) => {
-    const typeItems = items.filter((item) => item.type === type);
-    const typeFoundItems = typeItems.filter((item) => globalFoundItems.has(item.id)).length;
-
-    return {
-      type,
-      total: typeItems.length,
-      found: typeFoundItems,
-      percentage: typeItems.length > 0 ? (typeFoundItems / typeItems.length) * 100 : 0,
-    };
-  });
+  const typeStats = calculateTypeStats(items, foundProgress, settings);
 
   // Recent finds (last 7 days)
   const recentFinds = foundProgress.filter((p) => isRecentFind(p.foundDate));
@@ -686,7 +788,7 @@ export const useGrailStatistics = () => {
       : null;
 
   // Calculate complex statistics using helper functions
-  const categoryStats = calculateCategoryStats(items, foundProgress, recentFinds);
+  const categoryStats = calculateCategoryStats(items, foundProgress, recentFinds, settings);
   const characterStats = calculateCharacterStats(characters, progress, items);
   const timelineStats = calculateTimelineStats(progress);
 

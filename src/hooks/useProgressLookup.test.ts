@@ -131,8 +131,9 @@ describe('When useProgressLookup is used', () => {
         GrailProgressBuilder.new()
           .withId('prog1')
           .withCharacterId('char1')
-          .withItemId('eth_item1')
+          .withItemId('item1')
           .withFound(true)
+          .asEthereal()
           .build(),
       ];
       const selectedCharacterId = null;
@@ -172,8 +173,9 @@ describe('When useProgressLookup is used', () => {
         GrailProgressBuilder.new()
           .withId('prog2')
           .withCharacterId('char1')
-          .withItemId('eth_item1')
+          .withItemId('item1')
           .withFound(true)
+          .asEthereal()
           .build(),
       ];
       const selectedCharacterId = null;
@@ -363,8 +365,9 @@ describe('When useProgressLookup is used', () => {
         GrailProgressBuilder.new()
           .withId('prog2')
           .withCharacterId('char1')
-          .withItemId('eth_item2')
+          .withItemId('item2')
           .withFound(true)
+          .asEthereal()
           .build(),
         // item3 has no progress
       ];

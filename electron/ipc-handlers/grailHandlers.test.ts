@@ -401,6 +401,7 @@ describe('When grailHandlers is used', () => {
           manuallyAdded: false,
           difficulty: 'hell',
           notes: 'Found in Baal run',
+          isEthereal: false,
         },
       ]);
     });
@@ -448,6 +449,7 @@ describe('When grailHandlers is used', () => {
           manuallyAdded: false,
           difficulty: 'hell',
           notes: 'Found in Baal run',
+          isEthereal: false,
         },
       ]);
     });
@@ -483,6 +485,7 @@ describe('When grailHandlers is used', () => {
         auto_detected: false,
         difficulty: 'hell',
         notes: 'Found in Baal run',
+        is_ethereal: false,
       });
       expect(result).toEqual({ success: true });
     });

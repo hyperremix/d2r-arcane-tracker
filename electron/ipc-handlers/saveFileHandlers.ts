@@ -62,18 +62,19 @@ function handleAutomaticGrailProgress(event: ItemDetectionEvent): void {
 
     // Check if this item has been found by ANY character (global check)
     const existingGlobalProgress = grailDatabase
-      .getProgressByItem(event.item.id)
+      .getProgressByItem(event.grailItem.id)
       .find((p) => p.found);
 
     const isFirstTimeDiscovery = !existingGlobalProgress;
 
     // Create grail progress entry for this character
-    const progressId = `progress_${character.id}_${event.item.id}_${Date.now()}`;
+    const progressId = `progress_${character.id}_${event.grailItem.id}_${Date.now()}`;
     const grailProgress = {
       id: progressId,
       character_id: character.id,
-      item_id: event.item.id,
+      item_id: event.grailItem.id, // base ID
       found: true,
+      is_ethereal: Boolean(event.item.ethereal),
       found_date: new Date().toISOString(),
       manually_added: false,
       auto_detected: true,
