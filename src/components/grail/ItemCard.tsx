@@ -1,4 +1,4 @@
-import type { Character, GrailProgress, Item } from 'electron/types/grail';
+import type { Character, GrailProgress, Item, Settings } from 'electron/types/grail';
 import { Check, CheckCheck } from 'lucide-react';
 import { memo } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
@@ -95,7 +95,6 @@ interface ListViewProps {
   mostRecentDiscovery: GrailProgress | undefined;
   className: string | undefined;
   handleKeyDown: (event: React.KeyboardEvent) => void;
-  settings: { grailEthereal: boolean };
   onClick?: () => void;
 }
 
@@ -114,11 +113,10 @@ function ListView({
   mostRecentDiscovery,
   className,
   handleKeyDown,
-  settings,
   onClick,
 }: ListViewProps) {
   const { iconUrl, isLoading } = useItemIcon(item.name);
-  const { settings: appSettings } = useGrailStore();
+  const { settings } = useGrailStore();
 
   return (
     <TooltipProvider>
@@ -135,7 +133,7 @@ function ListView({
         onKeyDown={handleKeyDown}
       >
         {/* Item Icon or Type Icon */}
-        {appSettings.showItemIcons && item.type !== 'runeword' ? (
+        {settings.showItemIcons && item.type !== 'runeword' ? (
           <div className="relative h-12 w-12 flex-shrink-0">
             <img
               src={iconUrl}
@@ -197,6 +195,7 @@ function ListView({
           item={item}
           normalProgress={normalProgress}
           etherealProgress={etherealProgress}
+          settings={settings}
         />
       </div>
     </TooltipProvider>
@@ -208,19 +207,19 @@ function ListView({
  * @param {Item} item - The Holy Grail item to check
  * @param {GrailProgress[]} normalProgress - Progress records for normal version
  * @param {GrailProgress[]} etherealProgress - Progress records for ethereal version
- * @param {{ grailEthereal: boolean }} settings - Grail settings
+ * @param {Settings} settings - Grail settings
  * @returns {boolean} True if all required versions are found, false otherwise
  */
 function determineCompletionStatus(
   item: Item,
   normalProgress: GrailProgress[],
   etherealProgress: GrailProgress[],
-  settings: { grailEthereal: boolean },
+  settings: Settings,
 ) {
   const normalFound = normalProgress.length > 0;
   const etherealFound = etherealProgress.length > 0;
-  const canBeNormal = shouldShowNormalStatus(item);
-  const canBeEthereal = shouldShowEtherealStatus(item);
+  const canBeNormal = shouldShowNormalStatus(item, settings);
+  const canBeEthereal = shouldShowEtherealStatus(item, settings);
 
   if (!settings.grailEthereal) {
     // If ethereal tracking is disabled, only normal version matters
@@ -234,10 +233,10 @@ function determineCompletionStatus(
 /**
  * Gets tooltip text based on completion status and ethereal settings.
  * @param {boolean} allVersionsFound - Whether all required versions are found
- * @param {{ grailEthereal: boolean }} settings - Grail settings
+ * @param {Settings} settings - Grail settings
  * @returns {string} Appropriate tooltip text for the completion status
  */
-function getTooltipText(allVersionsFound: boolean, settings: { grailEthereal: boolean }) {
+function getTooltipText(allVersionsFound: boolean, settings: Settings) {
   if (allVersionsFound) {
     return settings.grailEthereal ? 'All versions found' : 'Item found';
   }
@@ -252,7 +251,7 @@ interface StatusIndicatorsProps {
   item: Item;
   normalProgress: GrailProgress[];
   etherealProgress: GrailProgress[];
-  settings: { grailEthereal: boolean };
+  settings: Settings;
 }
 
 /**
@@ -362,6 +361,7 @@ interface VersionCountsProps {
   item: Item;
   normalProgress: GrailProgress[];
   etherealProgress: GrailProgress[];
+  settings: Settings;
 }
 
 /**
@@ -370,9 +370,10 @@ interface VersionCountsProps {
  * @param {Item} props.item - The Holy Grail item
  * @param {GrailProgress[]} props.normalProgress - Progress records for normal version
  * @param {GrailProgress[]} props.etherealProgress - Progress records for ethereal version
+ * @param {Settings} props.settings - The application settings
  * @returns {JSX.Element | null} Version count badges or null if no versions found
  */
-function VersionCounts({ item, normalProgress, etherealProgress }: VersionCountsProps) {
+function VersionCounts({ item, normalProgress, etherealProgress, settings }: VersionCountsProps) {
   const normalCount = normalProgress.length;
   const etherealCount = etherealProgress.length;
 
@@ -380,12 +381,12 @@ function VersionCounts({ item, normalProgress, etherealProgress }: VersionCounts
 
   return (
     <div className="flex items-center justify-center gap-2 pt-2">
-      {shouldShowNormalStatus(item) && normalCount > 0 && (
+      {shouldShowNormalStatus(item, settings) && normalCount > 0 && (
         <span className="rounded bg-green-100 px-2 py-1 font-medium text-green-700 text-xs dark:bg-green-900 dark:text-green-200">
           Normal: {normalCount}x
         </span>
       )}
-      {shouldShowEtherealStatus(item) && etherealCount > 0 && (
+      {shouldShowEtherealStatus(item, settings) && etherealCount > 0 && (
         <span className="rounded bg-blue-100 px-2 py-1 font-medium text-blue-700 text-xs dark:bg-blue-900 dark:text-blue-200">
           {isEtherealOnly(item) ? 'Ethereal Only' : 'Ethereal'}: {etherealCount}x
         </span>
@@ -407,7 +408,6 @@ interface GridViewProps {
   mostRecentDiscovery: GrailProgress | undefined;
   className: string | undefined;
   handleKeyDown: (event: React.KeyboardEvent) => void;
-  settings: { grailEthereal: boolean };
   onClick?: () => void;
 }
 
@@ -426,11 +426,10 @@ function GridView({
   mostRecentDiscovery,
   className,
   handleKeyDown,
-  settings,
   onClick,
 }: GridViewProps) {
   const { iconUrl, isLoading } = useItemIcon(item.name);
-  const { settings: appSettings } = useGrailStore();
+  const { settings } = useGrailStore();
 
   return (
     <TooltipProvider>
@@ -464,7 +463,7 @@ function GridView({
             <ItemTypeIcon type={item.type} className="absolute top-2 left-2" />
 
             {/* Item Icon */}
-            {appSettings.showItemIcons && item.type !== 'runeword' && (
+            {settings.showItemIcons && item.type !== 'runeword' && (
               <div className="relative mx-auto mb-2 h-16 w-16">
                 <img
                   src={iconUrl}
@@ -524,6 +523,7 @@ function GridView({
               item={item}
               normalProgress={normalProgress}
               etherealProgress={etherealProgress}
+              settings={settings}
             />
           </CardContent>
         </Card>
@@ -579,9 +579,6 @@ export const ItemCard = memo(function ItemCard({
   className,
   viewMode = 'grid',
 }: ItemCardProps) {
-  // Get settings from the store
-  const { settings } = useGrailStore();
-
   // Calculate discovery metadata for both normal and ethereal versions
   const { allProgress, mostRecentDiscovery } = getDiscoveryMetadata(
     normalProgress,
@@ -612,7 +609,6 @@ export const ItemCard = memo(function ItemCard({
         mostRecentDiscovery={mostRecentDiscovery}
         className={className}
         handleKeyDown={handleKeyDown}
-        settings={settings}
         onClick={onClick}
       />
     );
@@ -630,7 +626,6 @@ export const ItemCard = memo(function ItemCard({
       mostRecentDiscovery={mostRecentDiscovery}
       className={className}
       handleKeyDown={handleKeyDown}
-      settings={settings}
       onClick={onClick}
     />
   );

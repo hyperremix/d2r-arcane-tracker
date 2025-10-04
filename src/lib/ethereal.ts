@@ -1,4 +1,4 @@
-import type { EtherealType, Item } from 'electron/types/grail';
+import type { EtherealType, Item, Settings } from 'electron/types/grail';
 
 /**
  * Check if an item can be ethereal (either optional or only).
@@ -50,8 +50,8 @@ export function getEtherealTypeDescription(etherealType: EtherealType): string {
  * @param {Item} item - The Holy Grail item to check
  * @returns {boolean} True if ethereal status should be displayed, false otherwise
  */
-export function shouldShowEtherealStatus(item: Item): boolean {
-  return canItemBeEthereal(item);
+export function shouldShowEtherealStatus(item: Item, settings: Settings): boolean {
+  return settings.grailEthereal && canItemBeEthereal(item);
 }
 
 /**
@@ -59,6 +59,6 @@ export function shouldShowEtherealStatus(item: Item): boolean {
  * @param {Item} item - The Holy Grail item to check
  * @returns {boolean} True if normal status should be displayed, false otherwise
  */
-export function shouldShowNormalStatus(item: Item): boolean {
-  return canItemBeNormal(item);
+export function shouldShowNormalStatus(item: Item, settings: Settings): boolean {
+  return settings.grailNormal && canItemBeNormal(item);
 }

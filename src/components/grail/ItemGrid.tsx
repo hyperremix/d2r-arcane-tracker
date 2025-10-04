@@ -1,5 +1,5 @@
 import { useVirtualizer } from '@tanstack/react-virtual';
-import type { Character, Item } from 'electron/types/grail';
+import type { Character, Item, Settings } from 'electron/types/grail';
 import { Grid, List } from 'lucide-react';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
@@ -9,6 +9,7 @@ import { shouldShowEtherealStatus, shouldShowNormalStatus } from '@/lib/ethereal
 import { cn } from '@/lib/utils';
 import { useFilteredItems, useGrailStore } from '@/stores/grailStore';
 import { ItemCard } from './ItemCard';
+import { ItemDetailsDialog } from './ItemDetailsDialog';
 
 /**
  * Determines the ethereal grouping key for an item based on its ethereal status and progress.
@@ -19,11 +20,12 @@ import { ItemCard } from './ItemCard';
 function getEtherealGroupKey(
   itemData: Item,
   itemProgress: { normalFound: boolean; etherealFound: boolean } | undefined,
+  settings: Settings,
 ) {
   const hasEthereal = itemProgress?.etherealFound;
   const hasNormal = itemProgress?.normalFound;
-  const canBeEthereal = shouldShowEtherealStatus(itemData);
-  const canBeNormal = shouldShowNormalStatus(itemData);
+  const canBeEthereal = shouldShowEtherealStatus(itemData, settings);
+  const canBeNormal = shouldShowNormalStatus(itemData, settings);
 
   if (!canBeEthereal && !canBeNormal) {
     return 'Not Applicable';
@@ -62,36 +64,94 @@ type GroupMode = 'none' | 'category' | 'type' | 'ethereal';
  * @returns {JSX.Element} A grid or list of Holy Grail items with view and grouping controls
  */
 export const ItemGrid = memo(function ItemGrid() {
-  const { progress, characters, selectedCharacterId, toggleItemFound, settings } = useGrailStore();
+  const { progress, characters, selectedCharacterId, settings } = useGrailStore();
   const filteredItems = useFilteredItems(); // This uses DB items as base and applies all filters
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
   const [groupMode, setGroupMode] = useState<GroupMode>('none');
+  const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
 
-  // Filter items based on grail settings - show items that match the current configuration
-  const displayItems = useMemo(() => {
-    return filteredItems.filter((item) => {
-      // If both normal and ethereal are enabled, show all items
-      if (settings.grailNormal && settings.grailEthereal) {
-        return true;
-      }
-
-      // If only normal is enabled, show only normal items
+  // Helper function to filter items when only one grail type is enabled
+  const filterSingleGrailType = useCallback(
+    (items: Item[]) => {
       if (settings.grailNormal && !settings.grailEthereal) {
-        return !item.id.startsWith('eth_');
+        return items.filter((item) => !item.id.startsWith('eth_'));
       }
-
-      // If only ethereal is enabled, show only ethereal items
       if (!settings.grailNormal && settings.grailEthereal) {
-        return item.id.startsWith('eth_');
+        return items.filter((item) => item.id.startsWith('eth_'));
+      }
+      return []; // Neither enabled
+    },
+    [settings.grailNormal, settings.grailEthereal],
+  );
+
+  // Helper function to group items by base ID
+  const groupItemsByBaseId = useCallback((items: Item[]) => {
+    const groups = new Map<string, Item[]>();
+    for (const item of items) {
+      const baseId = item.id.startsWith('eth_') ? item.id.slice(4) : item.id;
+      const arr = groups.get(baseId) ?? [];
+      arr.push(item);
+      groups.set(baseId, arr);
+    }
+    return groups;
+  }, []);
+
+  // Helper function to select canonical item from a family
+  const selectCanonicalItem = useCallback((family: Item[]) => {
+    const base = family.find((i) => !i.id.startsWith('eth_'));
+    const eth = family.find((i) => i.id.startsWith('eth_'));
+    const representative = base ?? eth;
+
+    if (!representative) return null;
+
+    const type = representative.etherealType;
+
+    if (type === 'optional' || type === 'none') {
+      return base || null;
+    }
+    if (type === 'only') {
+      return eth || null;
+    }
+    return null;
+  }, []);
+
+  // Helper function to deduplicate items when both grail types are enabled
+  const deduplicateItems = useCallback(
+    (items: Item[]) => {
+      const groups = groupItemsByBaseId(items);
+      const canonicalItems: Item[] = [];
+
+      for (const [, family] of groups) {
+        const canonicalItem = selectCanonicalItem(family);
+        if (canonicalItem) {
+          canonicalItems.push(canonicalItem);
+        }
       }
 
-      // If neither is enabled, show nothing (shouldn't happen due to DB filtering)
-      return false;
-    });
-  }, [filteredItems, settings.grailNormal, settings.grailEthereal]);
+      return canonicalItems;
+    },
+    [groupItemsByBaseId, selectCanonicalItem],
+  );
+
+  // Filter items based on grail settings and deduplicate optional ethereal items
+  const displayItems = useMemo(() => {
+    // If only one of normal/ethereal is enabled, use simple filtering
+    if (!settings.grailNormal || !settings.grailEthereal) {
+      return filterSingleGrailType(filteredItems);
+    }
+
+    // Both normal and ethereal are enabled - deduplicate optional items
+    return deduplicateItems(filteredItems);
+  }, [
+    filteredItems,
+    settings.grailNormal,
+    settings.grailEthereal,
+    filterSingleGrailType,
+    deduplicateItems,
+  ]);
 
   // Create a lookup map for progress data including both normal and ethereal versions
-  const progressLookup = useProgressLookup(displayItems, progress, selectedCharacterId);
+  const progressLookup = useProgressLookup(displayItems, progress, settings, selectedCharacterId);
 
   // Reset group mode to 'none' if ethereal grouping is selected but ethereal items are enabled
   useEffect(() => {
@@ -120,7 +180,7 @@ export const ItemGrid = memo(function ItemGrid() {
         case 'ethereal': {
           // For consolidated view, group by whether either version is found
           const itemProgress = progressLookup.get(itemData.id);
-          groupKey = getEtherealGroupKey(itemData, itemProgress);
+          groupKey = getEtherealGroupKey(itemData, itemProgress, settings);
           break;
         }
         default:
@@ -140,15 +200,11 @@ export const ItemGrid = memo(function ItemGrid() {
       title: title.charAt(0).toUpperCase() + title.slice(1),
       items,
     }));
-  }, [displayItems, groupMode, progressLookup]);
+  }, [displayItems, groupMode, progressLookup, settings]);
 
-  const handleItemClick = useCallback(
-    (itemId: string) => {
-      if (!selectedCharacterId) return;
-      toggleItemFound(itemId, selectedCharacterId, true);
-    },
-    [selectedCharacterId, toggleItemFound],
-  );
+  const handleItemClick = useCallback((itemId: string) => {
+    setSelectedItemId(itemId);
+  }, []);
 
   return (
     <div className="space-y-6">
@@ -198,6 +254,13 @@ export const ItemGrid = memo(function ItemGrid() {
         characters={characters}
         handleItemClick={handleItemClick}
         showItemIcons={settings.showItemIcons}
+      />
+
+      {/* Item Details Dialog */}
+      <ItemDetailsDialog
+        itemId={selectedItemId}
+        open={!!selectedItemId}
+        onOpenChange={(open) => !open && setSelectedItemId(null)}
       />
     </div>
   );

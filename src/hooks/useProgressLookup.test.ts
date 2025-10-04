@@ -1,8 +1,28 @@
 import { renderHook } from '@testing-library/react';
-import type { GrailProgress, Item } from 'electron/types/grail';
+import type { GrailProgress, Item, Settings } from 'electron/types/grail';
+import { GameMode, GameVersion } from 'electron/types/grail';
 import { describe, expect, it, vi } from 'vitest';
 import { GrailProgressBuilder, HolyGrailItemBuilder } from '@/fixtures';
 import { useProgressLookup } from './useProgressLookup';
+
+// Default settings for testing
+const settings: Settings = {
+  saveDir: '',
+  lang: 'en',
+  gameMode: GameMode.Both,
+  grailNormal: true,
+  grailEthereal: false,
+  grailRunes: false,
+  grailRunewords: false,
+  gameVersion: GameVersion.Resurrected,
+  enableSounds: true,
+  notificationVolume: 0.5,
+  inAppNotifications: true,
+  nativeNotifications: true,
+  needsSeeding: true,
+  theme: 'system',
+  showItemIcons: true,
+};
 
 // Mock the ethereal functions
 vi.mock('@/lib/ethereal', () => ({
@@ -21,7 +41,9 @@ describe('When useProgressLookup is used', () => {
       const selectedCharacterId = null;
 
       // Act
-      const { result } = renderHook(() => useProgressLookup(items, progress, selectedCharacterId));
+      const { result } = renderHook(() =>
+        useProgressLookup(items, progress, settings, selectedCharacterId),
+      );
 
       // Assert
       expect(result.current.size).toBe(0);
@@ -43,7 +65,9 @@ describe('When useProgressLookup is used', () => {
       vi.mocked(shouldShowEtherealStatus).mockReturnValue(true);
 
       // Act
-      const { result } = renderHook(() => useProgressLookup(items, progress, selectedCharacterId));
+      const { result } = renderHook(() =>
+        useProgressLookup(items, progress, settings, selectedCharacterId),
+      );
 
       // Assert
       expect(result.current.size).toBe(2);
@@ -83,7 +107,9 @@ describe('When useProgressLookup is used', () => {
       vi.mocked(shouldShowEtherealStatus).mockReturnValue(true);
 
       // Act
-      const { result } = renderHook(() => useProgressLookup(items, progress, selectedCharacterId));
+      const { result } = renderHook(() =>
+        useProgressLookup(items, progress, settings, selectedCharacterId),
+      );
 
       // Assert
       const lookupData = result.current.get('item1');
@@ -116,7 +142,9 @@ describe('When useProgressLookup is used', () => {
       vi.mocked(shouldShowEtherealStatus).mockReturnValue(true);
 
       // Act
-      const { result } = renderHook(() => useProgressLookup(items, progress, selectedCharacterId));
+      const { result } = renderHook(() =>
+        useProgressLookup(items, progress, settings, selectedCharacterId),
+      );
 
       // Assert
       const lookupData = result.current.get('item1');
@@ -155,7 +183,9 @@ describe('When useProgressLookup is used', () => {
       vi.mocked(shouldShowEtherealStatus).mockReturnValue(true);
 
       // Act
-      const { result } = renderHook(() => useProgressLookup(items, progress, selectedCharacterId));
+      const { result } = renderHook(() =>
+        useProgressLookup(items, progress, settings, selectedCharacterId),
+      );
 
       // Assert
       const lookupData = result.current.get('item1');
@@ -194,7 +224,9 @@ describe('When useProgressLookup is used', () => {
       vi.mocked(shouldShowEtherealStatus).mockReturnValue(true);
 
       // Act
-      const { result } = renderHook(() => useProgressLookup(items, progress, selectedCharacterId));
+      const { result } = renderHook(() =>
+        useProgressLookup(items, progress, settings, selectedCharacterId),
+      );
 
       // Assert
       const lookupData = result.current.get('item1');
@@ -227,7 +259,9 @@ describe('When useProgressLookup is used', () => {
       vi.mocked(shouldShowEtherealStatus).mockReturnValue(true);
 
       // Act
-      const { result } = renderHook(() => useProgressLookup(items, progress, selectedCharacterId));
+      const { result } = renderHook(() =>
+        useProgressLookup(items, progress, settings, selectedCharacterId),
+      );
 
       // Assert
       const lookupData = result.current.get('item1');
@@ -260,7 +294,9 @@ describe('When useProgressLookup is used', () => {
       vi.mocked(shouldShowEtherealStatus).mockReturnValue(true);
 
       // Act
-      const { result } = renderHook(() => useProgressLookup(items, progress, selectedCharacterId));
+      const { result } = renderHook(() =>
+        useProgressLookup(items, progress, settings, selectedCharacterId),
+      );
 
       // Assert
       const lookupData = result.current.get('item1');
@@ -293,7 +329,9 @@ describe('When useProgressLookup is used', () => {
       vi.mocked(shouldShowEtherealStatus).mockReturnValue(false);
 
       // Act
-      const { result } = renderHook(() => useProgressLookup(items, progress, selectedCharacterId));
+      const { result } = renderHook(() =>
+        useProgressLookup(items, progress, settings, selectedCharacterId),
+      );
 
       // Assert
       const lookupData = result.current.get('item1');
@@ -337,7 +375,9 @@ describe('When useProgressLookup is used', () => {
       vi.mocked(shouldShowEtherealStatus).mockReturnValue(true);
 
       // Act
-      const { result } = renderHook(() => useProgressLookup(items, progress, selectedCharacterId));
+      const { result } = renderHook(() =>
+        useProgressLookup(items, progress, settings, selectedCharacterId),
+      );
 
       // Assert
       expect(result.current.size).toBe(3);
@@ -390,7 +430,9 @@ describe('When useProgressLookup is used', () => {
       vi.mocked(shouldShowEtherealStatus).mockReturnValue(true);
 
       // Act
-      const { result } = renderHook(() => useProgressLookup(items, progress, selectedCharacterId));
+      const { result } = renderHook(() =>
+        useProgressLookup(items, progress, settings, selectedCharacterId),
+      );
 
       // Assert
       const lookupData = result.current.get('item1');
@@ -425,7 +467,7 @@ describe('When useProgressLookup is used', () => {
 
       // Act
       const { result, rerender } = renderHook(
-        ({ progress }) => useProgressLookup(items, progress, selectedCharacterId),
+        ({ progress }) => useProgressLookup(items, progress, settings, selectedCharacterId),
         { initialProps: { progress: initialProgress } },
       );
 
