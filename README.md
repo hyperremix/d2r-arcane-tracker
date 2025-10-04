@@ -114,6 +114,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ![GitHub last commit](https://img.shields.io/github/last-commit/hyperremix/d2r-arcane-tracker)
 ![GitHub issues](https://img.shields.io/github/issues/hyperremix/d2r-arcane-tracker)
 ![GitHub pull requests](https://img.shields.io/github/issues-pr/hyperremix/d2r-arcane-tracker)
+![GitHub release](https://img.shields.io/github/v/release/hyperremix/d2r-arcane-tracker)
 
 ---
 
