@@ -25,7 +25,7 @@ A modern Electron desktop application built to help Diablo II: Resurrected playe
 
 ### System Requirements
 
-- **Windows**: Windows 10 or later
+- **Windows**: Windows 10 or later (64-bit)
 - **macOS**: macOS 10.15 or later
 - **Linux**: Ubuntu 18.04+ or equivalent
 - **Diablo II: Resurrected** installed
@@ -34,11 +34,18 @@ A modern Electron desktop application built to help Diablo II: Resurrected playe
 
 1. **Download the latest release** from the [Releases page](https://github.com/hyperremix/d2r-arcane-tracker/releases)
 2. **Install the application** for your operating system:
-   - **Windows**: Run the `.exe` installer
+   - **Windows**: Run the `D2R Arcane Tracker-Windows-*-Setup.exe` installer
    - **macOS**: Open the `.dmg` file and drag to Applications
    - **Linux**: Extract the `.AppImage` and run directly
 
 3. **Launch the application** and follow the setup wizard
+
+### Windows Installation Notes
+
+- The installer will create a shortcut in your Start Menu
+- The application installs to your user directory (no admin rights required)
+- Windows may show a "Windows protected your PC" warning - click "More info" then "Run anyway"
+- This warning appears because the app is not code-signed (we're working on this!)
 
 ## 🎮 Usage
 
@@ -63,16 +70,24 @@ A modern Electron desktop application built to help Diablo II: Resurrected playe
 - Ensure you have the latest version installed
 - Check that your system meets the minimum requirements
 - Try running as administrator (Windows) or with sudo (Linux)
+- **Windows**: If you see "Windows protected your PC", click "More info" then "Run anyway"
 
 **Save files not detected:**
 - Verify the save file path in Settings is correct
 - Ensure D2R is installed and you have created at least one character
 - Check that the save files are not corrupted
+- **Windows**: Default save path is usually `%USERPROFILE%\Saved Games\Diablo II Resurrected`
 
 **Items not updating:**
 - Make sure the app has permission to read your save files
 - Try restarting the application
 - Check if D2R is running (some features require D2R to be closed)
+
+**Windows-specific issues:**
+- **Antivirus blocking**: Add the application to your antivirus exceptions
+- **Firewall prompts**: Allow the application through Windows Firewall
+- **Missing Visual C++ Redistributables**: Download and install from Microsoft
+- **Permission denied**: Run as administrator if save file access is restricted
 
 ### Getting Help
 

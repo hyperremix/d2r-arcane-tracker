@@ -7,6 +7,25 @@ release
 out
 dist-electron
 
+# Release artifacts
+*.exe
+*.dmg
+*.AppImage
+*.deb
+*.rpm
+*.snap
+*.msi
+*.nsis
+
+# Code signing
+*.p12
+*.pem
+*.crt
+*.cer
+*.pfx
+*.key
+sign-*.sh
+
 # TypeScript build info
 .tsbuildinfo
 *.tsbuildinfo

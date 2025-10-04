@@ -19,7 +19,7 @@
     "artifactName": "${productName}-Mac-${version}-Installer.${ext}"
   },
   "win": {
-    "icon": "build/icon-win.png",
+    "icon": "build/icon.ico",
     "target": [
       {
         "target": "nsis",
@@ -28,7 +28,11 @@
         ]
       }
     ],
-    "artifactName": "${productName}-Windows-${version}-Setup.${ext}"
+    "artifactName": "${productName}-Windows-${version}-Setup.${ext}",
+    "asarUnpack": [
+      "**/node_modules/better-sqlite3/**/*",
+      "**/node_modules/@dschu012/**/*"
+    ]
   },
   "nsis": {
     "oneClick": false,
