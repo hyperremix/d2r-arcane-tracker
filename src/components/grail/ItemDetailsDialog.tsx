@@ -248,8 +248,8 @@ function CharacterProgressRow({
   const characterProgress = progress.filter(
     (p) => p.characterId === character.id && p.itemId === item.id,
   );
-  const normalProgress = characterProgress.find((p) => !p.itemId.startsWith('eth_'));
-  const etherealProgress = characterProgress.find((p) => p.itemId.startsWith('eth_'));
+  const normalProgress = characterProgress.find((p) => !p.isEthereal);
+  const etherealProgress = characterProgress.find((p) => p.isEthereal);
 
   return (
     <TableRow>

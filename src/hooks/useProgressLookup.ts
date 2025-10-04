@@ -24,7 +24,8 @@ function calculateNormalProgress(
 
   if (selectedCharacterId) {
     const characterProgress = progress.find(
-      (p) => p.itemId === item.id && p.characterId === selectedCharacterId && p.found,
+      (p) =>
+        p.itemId === item.id && p.characterId === selectedCharacterId && p.found && !p.isEthereal,
     );
     return {
       found: Boolean(characterProgress),
@@ -32,7 +33,7 @@ function calculateNormalProgress(
     };
   }
 
-  const relevantProgress = progress.filter((p) => p.itemId === item.id && p.found);
+  const relevantProgress = progress.filter((p) => p.itemId === item.id && p.found && !p.isEthereal);
   return {
     found: relevantProgress.length > 0,
     relevantProgress,
@@ -55,15 +56,14 @@ function calculateEtherealProgress(
   selectedCharacterId: string | null,
   settings: Settings,
 ) {
-  const etherealItemId = `eth_${item.id}`;
-
   if (!shouldShowEtherealStatus(item, settings)) {
     return { found: false, relevantProgress: [] };
   }
 
   if (selectedCharacterId) {
     const characterProgress = progress.find(
-      (p) => p.itemId === etherealItemId && p.characterId === selectedCharacterId && p.found,
+      (p) =>
+        p.itemId === item.id && p.characterId === selectedCharacterId && p.found && p.isEthereal,
     );
     return {
       found: Boolean(characterProgress),
@@ -71,7 +71,7 @@ function calculateEtherealProgress(
     };
   }
 
-  const relevantProgress = progress.filter((p) => p.itemId === etherealItemId && p.found);
+  const relevantProgress = progress.filter((p) => p.itemId === item.id && p.found && p.isEthereal);
   return {
     found: relevantProgress.length > 0,
     relevantProgress,

@@ -197,6 +197,7 @@ export function initializeGrailHandlers(): void {
             manuallyAdded: dbProg.manually_added,
             difficulty: dbProg.difficulty,
             notes: dbProg.notes,
+            isEthereal: dbProg.is_ethereal,
           }) as GrailProgress,
       );
     } catch (error) {
@@ -222,6 +223,7 @@ export function initializeGrailHandlers(): void {
         auto_detected: false, // Manual updates are not auto-detected
         difficulty: progress.difficulty,
         notes: progress.notes,
+        is_ethereal: progress.isEthereal,
       });
       return { success: true };
     } catch (error) {

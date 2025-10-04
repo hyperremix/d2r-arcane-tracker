@@ -106,6 +106,7 @@ interface DatabaseProgress {
   manually_added: boolean;
   difficulty?: string;
   notes?: string;
+  is_ethereal: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -244,29 +245,20 @@ function generateFoundDate(): Date {
   return new Date(sixMonthsAgo.getTime() + Math.random() * (Date.now() - sixMonthsAgo.getTime()));
 }
 
-function determineItemId(item: DatabaseItem, db: SimplifiedGrailDatabase): string {
+function determineItemId(item: DatabaseItem, _db: SimplifiedGrailDatabase): string {
+  // Always use base item ID
+  return item.id;
+}
+
+function determineIsEthereal(item: DatabaseItem): boolean {
   if (item.type === 'unique' && item.ethereal_type === 'optional') {
     // 30% chance for ethereal version
-    if (Math.random() < 0.3) {
-      const etherealItemId = `eth_${item.id}`;
-      // Check if the ethereal version exists in the database
-      if (db.getItemById(etherealItemId)) {
-        return etherealItemId;
-      }
-      // Fall back to normal version if ethereal doesn't exist
-      return item.id;
-    }
+    return Math.random() < 0.3;
   } else if (item.ethereal_type === 'only') {
-    // Always use ethereal version for ethereal-only items
-    const etherealItemId = `eth_${item.id}`;
-    // Check if the ethereal version exists in the database
-    if (db.getItemById(etherealItemId)) {
-      return etherealItemId;
-    }
-    // Fall back to normal version if ethereal doesn't exist
-    return item.id;
+    // Always ethereal for ethereal-only items
+    return true;
   }
-  return item.id;
+  return false;
 }
 
 function generateDifficulty(characterDifficulty: Difficulty): Difficulty {
@@ -303,6 +295,7 @@ async function createProgressForItem(
     const foundDate = generateFoundDate();
     const manuallyAdded = Math.random() < 0.2;
     const itemId = determineItemId(item, db);
+    const isEthereal = determineIsEthereal(item);
     const foundDifficulty = generateDifficulty(testChar.difficulty);
     const notes = generateNotes(item);
     const progressId = randomUUID();
@@ -325,6 +318,7 @@ async function createProgressForItem(
       manually_added: manuallyAdded,
       difficulty: foundDifficulty,
       notes,
+      is_ethereal: isEthereal,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     });
@@ -515,8 +509,8 @@ async function seedTestData() {
       upsertProgress(progress: DatabaseProgress) {
         try {
           const stmt = this.db.prepare(`
-            INSERT OR REPLACE INTO grail_progress (id, character_id, item_id, found, found_date, manually_added, difficulty, notes)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT OR REPLACE INTO grail_progress (id, character_id, item_id, found, found_date, manually_added, difficulty, notes, is_ethereal)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
           `);
           stmt.run(
             progress.id,
@@ -527,6 +521,7 @@ async function seedTestData() {
             progress.manually_added ? 1 : 0,
             progress.difficulty || null,
             progress.notes || null,
+            progress.is_ethereal ? 1 : 0,
           );
         } catch (error) {
           console.error(
@@ -565,10 +560,14 @@ async function seedTestData() {
     }
 
     // Log some statistics about available items
-    const etherealItems = allItems.filter((item) => item.id.startsWith('eth_'));
-    const normalItems = allItems.filter((item) => !item.id.startsWith('eth_'));
+    const etherealCapableItems = allItems.filter(
+      (item) => item.ethereal_type === 'optional' || item.ethereal_type === 'only',
+    );
+    const normalCapableItems = allItems.filter(
+      (item) => item.ethereal_type === 'none' || item.ethereal_type === 'optional',
+    );
     console.log(
-      `   📊 Normal items: ${normalItems.length}, Ethereal items: ${etherealItems.length}`,
+      `   📊 Normal-capable items: ${normalCapableItems.length}, Ethereal-capable items: ${etherealCapableItems.length}`,
     );
 
     // Seed test characters

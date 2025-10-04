@@ -13,6 +13,7 @@ export class GrailProgressBuilder {
     foundDate: new Date('2024-01-01'),
     foundBy: 'Default Character',
     manuallyAdded: true,
+    isEthereal: false,
   };
 
   /**
@@ -123,6 +124,30 @@ export class GrailProgressBuilder {
    */
   withoutNotes(): this {
     delete this.progress.notes;
+    return this;
+  }
+
+  /**
+   * Set the ethereal status
+   */
+  withIsEthereal(isEthereal: boolean): this {
+    this.progress.isEthereal = isEthereal;
+    return this;
+  }
+
+  /**
+   * Set as ethereal item
+   */
+  asEthereal(): this {
+    this.progress.isEthereal = true;
+    return this;
+  }
+
+  /**
+   * Set as normal (non-ethereal) item
+   */
+  asNormal(): this {
+    this.progress.isEthereal = false;
     return this;
   }
 

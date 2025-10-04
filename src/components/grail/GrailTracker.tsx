@@ -106,16 +106,25 @@ export function GrailTracker() {
               <div
                 className={`grid gap-4 ${settings.grailEthereal ? 'grid-cols-2 md:grid-cols-4' : 'grid-cols-2 md:grid-cols-3'}`}
               >
-                <div className="text-center">
-                  <div className="font-bold text-2xl text-blue-600">{statistics.foundItems}</div>
-                  <div className="text-gray-500 text-sm">Items Found</div>
-                </div>
-                {settings.grailEthereal && (
-                  <div className="text-center">
-                    <div className="font-bold text-2xl text-blue-600">
-                      {statistics.etherealItems.found}
+                {settings.grailEthereal ? (
+                  <>
+                    <div className="text-center">
+                      <div className="font-bold text-2xl text-blue-600">
+                        {statistics.normalItems.found}
+                      </div>
+                      <div className="text-gray-500 text-sm">Normal Found</div>
                     </div>
-                    <div className="text-gray-500 text-sm">Ethereal Found</div>
+                    <div className="text-center">
+                      <div className="font-bold text-2xl text-blue-600">
+                        {statistics.etherealItems.found}
+                      </div>
+                      <div className="text-gray-500 text-sm">Ethereal Found</div>
+                    </div>
+                  </>
+                ) : (
+                  <div className="text-center">
+                    <div className="font-bold text-2xl text-blue-600">{statistics.foundItems}</div>
+                    <div className="text-gray-500 text-sm">Items Found</div>
                   </div>
                 )}
                 <div className="text-center">

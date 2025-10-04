@@ -5,7 +5,12 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useProgressLookup } from '@/hooks/useProgressLookup';
-import { shouldShowEtherealStatus, shouldShowNormalStatus } from '@/lib/ethereal';
+import {
+  canItemBeEthereal,
+  canItemBeNormal,
+  shouldShowEtherealStatus,
+  shouldShowNormalStatus,
+} from '@/lib/ethereal';
 import { cn } from '@/lib/utils';
 import { useFilteredItems, useGrailStore } from '@/stores/grailStore';
 import { ItemCard } from './ItemCard';
@@ -74,81 +79,26 @@ export const ItemGrid = memo(function ItemGrid() {
   const filterSingleGrailType = useCallback(
     (items: Item[]) => {
       if (settings.grailNormal && !settings.grailEthereal) {
-        return items.filter((item) => !item.id.startsWith('eth_'));
+        return items.filter((item) => canItemBeNormal(item));
       }
       if (!settings.grailNormal && settings.grailEthereal) {
-        return items.filter((item) => item.id.startsWith('eth_'));
+        return items.filter((item) => canItemBeEthereal(item));
       }
       return []; // Neither enabled
     },
     [settings.grailNormal, settings.grailEthereal],
   );
 
-  // Helper function to group items by base ID
-  const groupItemsByBaseId = useCallback((items: Item[]) => {
-    const groups = new Map<string, Item[]>();
-    for (const item of items) {
-      const baseId = item.id.startsWith('eth_') ? item.id.slice(4) : item.id;
-      const arr = groups.get(baseId) ?? [];
-      arr.push(item);
-      groups.set(baseId, arr);
-    }
-    return groups;
-  }, []);
-
-  // Helper function to select canonical item from a family
-  const selectCanonicalItem = useCallback((family: Item[]) => {
-    const base = family.find((i) => !i.id.startsWith('eth_'));
-    const eth = family.find((i) => i.id.startsWith('eth_'));
-    const representative = base ?? eth;
-
-    if (!representative) return null;
-
-    const type = representative.etherealType;
-
-    if (type === 'optional' || type === 'none') {
-      return base || null;
-    }
-    if (type === 'only') {
-      return eth || null;
-    }
-    return null;
-  }, []);
-
-  // Helper function to deduplicate items when both grail types are enabled
-  const deduplicateItems = useCallback(
-    (items: Item[]) => {
-      const groups = groupItemsByBaseId(items);
-      const canonicalItems: Item[] = [];
-
-      for (const [, family] of groups) {
-        const canonicalItem = selectCanonicalItem(family);
-        if (canonicalItem) {
-          canonicalItems.push(canonicalItem);
-        }
-      }
-
-      return canonicalItems;
-    },
-    [groupItemsByBaseId, selectCanonicalItem],
-  );
-
-  // Filter items based on grail settings and deduplicate optional ethereal items
+  // Filter items based on grail settings
   const displayItems = useMemo(() => {
     // If only one of normal/ethereal is enabled, use simple filtering
     if (!settings.grailNormal || !settings.grailEthereal) {
       return filterSingleGrailType(filteredItems);
     }
 
-    // Both normal and ethereal are enabled - deduplicate optional items
-    return deduplicateItems(filteredItems);
-  }, [
-    filteredItems,
-    settings.grailNormal,
-    settings.grailEthereal,
-    filterSingleGrailType,
-    deduplicateItems,
-  ]);
+    // Both normal and ethereal are enabled - return all items (no deduplication needed)
+    return filteredItems;
+  }, [filteredItems, settings.grailNormal, settings.grailEthereal, filterSingleGrailType]);
 
   // Create a lookup map for progress data including both normal and ethereal versions
   const progressLookup = useProgressLookup(displayItems, progress, settings, selectedCharacterId);

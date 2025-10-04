@@ -15,6 +15,7 @@ export class DatabaseProgressBuilder {
     auto_detected: true,
     difficulty: undefined,
     notes: undefined,
+    is_ethereal: false,
     created_at: '2024-01-01T00:00:00.000Z',
     updated_at: '2024-01-01T00:00:00.000Z',
   };
@@ -175,6 +176,30 @@ export class DatabaseProgressBuilder {
    */
   withoutNotes(): this {
     this.progress.notes = undefined;
+    return this;
+  }
+
+  /**
+   * Set the ethereal status
+   */
+  withIsEthereal(isEthereal: boolean): this {
+    this.progress.is_ethereal = isEthereal;
+    return this;
+  }
+
+  /**
+   * Set as ethereal item
+   */
+  asEthereal(): this {
+    this.progress.is_ethereal = true;
+    return this;
+  }
+
+  /**
+   * Set as normal (non-ethereal) item
+   */
+  asNormal(): this {
+    this.progress.is_ethereal = false;
     return this;
   }
 

@@ -751,7 +751,7 @@ describe('When saveFileHandlers is used', () => {
       expect(grailDatabase.upsertProgress).toHaveBeenCalledWith(
         expect.objectContaining({
           character_id: 'char-1',
-          item_id: 'test-item',
+          item_id: 'windforce',
           found: true,
           manually_added: false,
           auto_detected: true,
