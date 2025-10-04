@@ -24,6 +24,20 @@ Before you begin, ensure you have:
 - **Git** for version control
 - **Diablo II: Resurrected** (for testing game-related features)
 
+### Technology Stack
+
+This project uses modern web technologies:
+
+- **Frontend**: React 18 + TypeScript + Tailwind CSS v4
+- **Desktop**: Electron 30
+- **Build Tool**: Vite + electron-vite
+- **UI Components**: shadcn/ui (Radix UI primitives)
+- **State Management**: Zustand
+- **Database**: SQLite with better-sqlite3
+- **Internationalization**: i18next
+- **Code Quality**: Biome (linting, formatting, type checking)
+- **Testing**: Vitest + Testing Library
+
 ### Development Setup
 
 1. **Fork the repository**
@@ -59,6 +73,22 @@ Before you begin, ensure you have:
    ```bash
    yarn dev
    ```
+
+## 📦 Building
+
+### Development Build
+
+```bash
+yarn build
+```
+
+### Production Build
+
+```bash
+yarn build
+```
+
+Built applications will be available in the `dist/` directory.
 
 ## 🛠️ Development Workflow
 

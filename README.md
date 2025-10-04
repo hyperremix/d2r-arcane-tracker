@@ -21,64 +21,24 @@ A modern Electron desktop application built to help Diablo II: Resurrected playe
 - **💾 Local Database**: SQLite database for reliable data persistence
 - **🎨 Modern UI**: Built with shadcn/ui components and Tailwind CSS
 
-## 🚀 Quick Start
+## 🚀 Download & Install
 
-### Prerequisites
+### System Requirements
 
-- **Node.js** (v18 or higher)
-- **Yarn** package manager
+- **Windows**: Windows 10 or later
+- **macOS**: macOS 10.15 or later
+- **Linux**: Ubuntu 18.04+ or equivalent
 - **Diablo II: Resurrected** installed
 
 ### Installation
 
-1. **Clone the repository**
+1. **Download the latest release** from the [Releases page](https://github.com/hyperremix/d2r-arcane-tracker/releases)
+2. **Install the application** for your operating system:
+   - **Windows**: Run the `.exe` installer
+   - **macOS**: Open the `.dmg` file and drag to Applications
+   - **Linux**: Extract the `.AppImage` and run directly
 
-   ```bash
-   git clone https://github.com/hyperremix/d2r-arcane-tracker.git
-   cd d2r-arcane-tracker
-   ```
-
-2. **Install dependencies**
-
-   ```bash
-   yarn install
-   ```
-
-3. **Start development server**
-
-   ```bash
-   yarn dev
-   ```
-
-The application will launch automatically with hot-reload enabled for development.
-
-## 📦 Building
-
-### Development Build
-
-```bash
-yarn build
-```
-
-### Production Build
-
-```bash
-yarn build
-```
-
-Built applications will be available in the `dist/` directory.
-
-## 📚 Technology Stack
-
-- **Frontend**: React 18 + TypeScript + Tailwind CSS v4
-- **Desktop**: Electron 30
-- **Build Tool**: Vite + electron-vite
-- **UI Components**: shadcn/ui (Radix UI primitives)
-- **State Management**: Zustand
-- **Database**: SQLite with better-sqlite3
-- **Internationalization**: i18next
-- **Code Quality**: Biome (linting, formatting, type checking)
-- **Testing**: Vitest + Testing Library
+3. **Launch the application** and follow the setup wizard
 
 ## 🎮 Usage
 
@@ -95,25 +55,35 @@ Built applications will be available in the `dist/` directory.
 - **Advanced Search**: Filter and search through your tracked items
 - **Statistics Dashboard**: View detailed statistics about your progress
 
+## 🔧 Troubleshooting
+
+### Common Issues
+
+**App won't start:**
+- Ensure you have the latest version installed
+- Check that your system meets the minimum requirements
+- Try running as administrator (Windows) or with sudo (Linux)
+
+**Save files not detected:**
+- Verify the save file path in Settings is correct
+- Ensure D2R is installed and you have created at least one character
+- Check that the save files are not corrupted
+
+**Items not updating:**
+- Make sure the app has permission to read your save files
+- Try restarting the application
+- Check if D2R is running (some features require D2R to be closed)
+
+### Getting Help
+
+If you're still having issues:
+- Check the [GitHub Issues](https://github.com/hyperremix/d2r-arcane-tracker/issues) for known problems
+- Join the [GitHub Discussions](https://github.com/hyperremix/d2r-arcane-tracker/discussions) for community support
+- Create a new issue with detailed information about your problem
+
 ## 🤝 Contributing
 
-We welcome contributions! Please see our [Contributing Guidelines](CONTRIBUTING.md) for detailed information on:
-
-- Development setup and workflow
-- Code quality standards and guidelines
-- Testing requirements
-- Pull request process
-- Issue reporting
-- Community guidelines
-
-Quick start for contributors:
-
-```bash
-git clone https://github.com/YOUR_USERNAME/d2r-arcane-tracker.git
-cd d2r-arcane-tracker
-yarn install
-yarn dev
-```
+We welcome contributions! Please see our [Contributing Guidelines](CONTRIBUTING.md) for detailed information on how to get started.
 
 ## 📄 License
 
