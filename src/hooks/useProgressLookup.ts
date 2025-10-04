@@ -1,4 +1,4 @@
-import type { GrailProgress, Item } from 'electron/types/grail';
+import type { GrailProgress, Item, Settings } from 'electron/types/grail';
 import { useMemo } from 'react';
 import { shouldShowEtherealStatus, shouldShowNormalStatus } from '@/lib/ethereal';
 
@@ -7,6 +7,7 @@ import { shouldShowEtherealStatus, shouldShowNormalStatus } from '@/lib/ethereal
  * @param {Item} item - The Holy Grail item to calculate progress for
  * @param {GrailProgress[]} progress - All progress records
  * @param {string | null} selectedCharacterId - Optional character ID to filter by
+ * @param {Settings} settings - The application settings
  * @returns {Object} Object containing found status and relevant progress records
  * @returns {boolean} returns.found - Whether the normal version is found
  * @returns {GrailProgress[]} returns.relevantProgress - Array of relevant progress records
@@ -15,8 +16,9 @@ function calculateNormalProgress(
   item: Item,
   progress: GrailProgress[],
   selectedCharacterId: string | null,
+  settings: Settings,
 ) {
-  if (!shouldShowNormalStatus(item)) {
+  if (!shouldShowNormalStatus(item, settings)) {
     return { found: false, relevantProgress: [] };
   }
 
@@ -42,6 +44,7 @@ function calculateNormalProgress(
  * @param {Item} item - The Holy Grail item to calculate progress for
  * @param {GrailProgress[]} progress - All progress records
  * @param {string | null} selectedCharacterId - Optional character ID to filter by
+ * @param {Settings} settings - The application settings
  * @returns {Object} Object containing found status and relevant progress records
  * @returns {boolean} returns.found - Whether the ethereal version is found
  * @returns {GrailProgress[]} returns.relevantProgress - Array of relevant progress records
@@ -50,10 +53,11 @@ function calculateEtherealProgress(
   item: Item,
   progress: GrailProgress[],
   selectedCharacterId: string | null,
+  settings: Settings,
 ) {
   const etherealItemId = `eth_${item.id}`;
 
-  if (!shouldShowEtherealStatus(item)) {
+  if (!shouldShowEtherealStatus(item, settings)) {
     return { found: false, relevantProgress: [] };
   }
 
@@ -91,23 +95,31 @@ export interface ProgressLookupData {
  * Memoizes the lookup to avoid recalculation on every render.
  * @param {Item[]} items - Array of Holy Grail items to create lookup for
  * @param {GrailProgress[]} progress - All progress records from the database
+ * @param {Settings} settings - The application settings
  * @param {string | null} [selectedCharacterId] - Optional character ID to filter progress by
  * @returns {Map<string, ProgressLookupData>} A Map with item IDs as keys and progress data as values
  */
 export function useProgressLookup(
   items: Item[],
   progress: GrailProgress[],
+  settings: Settings,
   selectedCharacterId?: string | null,
 ) {
   return useMemo(() => {
     const lookup = new Map<string, ProgressLookupData>();
 
     items.forEach((item) => {
-      const normalProgress = calculateNormalProgress(item, progress, selectedCharacterId || null);
+      const normalProgress = calculateNormalProgress(
+        item,
+        progress,
+        selectedCharacterId || null,
+        settings,
+      );
       const etherealProgress = calculateEtherealProgress(
         item,
         progress,
         selectedCharacterId || null,
+        settings,
       );
 
       // Overall found status (either normal OR ethereal found)
@@ -123,5 +135,5 @@ export function useProgressLookup(
     });
 
     return lookup;
-  }, [items, progress, selectedCharacterId]);
+  }, [items, progress, selectedCharacterId, settings]);
 }

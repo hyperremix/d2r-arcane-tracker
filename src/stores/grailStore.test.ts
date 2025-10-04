@@ -7,6 +7,7 @@ import { useFilteredItems, useGrailStatistics, useGrailStore } from './grailStor
 const mockElectronAPI = {
   grail: {
     updateSettings: vi.fn(),
+    getSettings: vi.fn(),
     getItems: vi.fn(),
     getProgress: vi.fn(),
     getCharacters: vi.fn(),
@@ -294,6 +295,7 @@ describe('When useGrailStore is used', () => {
           .build(),
       ];
 
+      mockElectronAPI.grail.getSettings.mockResolvedValue({});
       mockElectronAPI.grail.getCharacters.mockResolvedValue(mockCharacters);
       mockElectronAPI.grail.getItems.mockResolvedValue(mockItems);
       mockElectronAPI.grail.getProgress.mockResolvedValue(mockProgress);
@@ -320,6 +322,7 @@ describe('When useGrailStore is used', () => {
       const { result } = renderHook(() => useGrailStore());
       const error = new Error('Database error');
 
+      mockElectronAPI.grail.getSettings.mockResolvedValue({});
       mockElectronAPI.grail.getCharacters.mockRejectedValue(error);
 
       // Act

@@ -298,17 +298,20 @@ class GrailDatabase {
    */
   insertItem(item: Omit<DatabaseItem, 'created_at' | 'updated_at'>): void {
     const stmt = this.db.prepare(`
-      INSERT INTO items (id, name, type, category, sub_category, set_name, ethereal_type)
+      INSERT INTO items (id, name, link, code, type, category, sub_category, set_name, ethereal_type, treasure_class)
       VALUES (?, ?, ?, ?, ?, ?, ?)
     `);
     stmt.run(
       item.id,
       item.name,
+      item.link,
+      item.code,
       item.type,
       item.category,
       item.sub_category,
       item.set_name,
       item.ethereal_type,
+      item.treasure_class,
     );
   }
 

@@ -1,4 +1,5 @@
-import type { EtherealType } from 'electron/types/grail';
+import type { EtherealType, Settings } from 'electron/types/grail';
+import { GameMode, GameVersion } from 'electron/types/grail';
 import { describe, expect, it } from 'vitest';
 import { HolyGrailItemBuilder } from '@/fixtures';
 import {
@@ -9,6 +10,25 @@ import {
   shouldShowEtherealStatus,
   shouldShowNormalStatus,
 } from './ethereal';
+
+// Default settings for testing
+const defaultSettings: Settings = {
+  saveDir: '',
+  lang: 'en',
+  gameMode: GameMode.Both,
+  grailNormal: true,
+  grailEthereal: true,
+  grailRunes: false,
+  grailRunewords: false,
+  gameVersion: GameVersion.Resurrected,
+  enableSounds: true,
+  notificationVolume: 0.5,
+  inAppNotifications: true,
+  nativeNotifications: true,
+  needsSeeding: true,
+  theme: 'system',
+  showItemIcons: true,
+};
 
 describe('When canItemBeEthereal is called', () => {
   describe('If item etherealType is "none"', () => {
@@ -194,7 +214,7 @@ describe('When shouldShowEtherealStatus is called', () => {
       const item = HolyGrailItemBuilder.new().withEtherealType('optional').build();
 
       // Act
-      const result = shouldShowEtherealStatus(item);
+      const result = shouldShowEtherealStatus(item, defaultSettings);
 
       // Assert
       expect(result).toBe(true);
@@ -207,7 +227,7 @@ describe('When shouldShowEtherealStatus is called', () => {
       const item = HolyGrailItemBuilder.new().withEtherealType('none').build();
 
       // Act
-      const result = shouldShowEtherealStatus(item);
+      const result = shouldShowEtherealStatus(item, defaultSettings);
 
       // Assert
       expect(result).toBe(false);
@@ -220,7 +240,7 @@ describe('When shouldShowEtherealStatus is called', () => {
       const item = HolyGrailItemBuilder.new().withEtherealType('only').build();
 
       // Act
-      const result = shouldShowEtherealStatus(item);
+      const result = shouldShowEtherealStatus(item, defaultSettings);
 
       // Assert
       expect(result).toBe(true);
@@ -235,7 +255,7 @@ describe('When shouldShowNormalStatus is called', () => {
       const item = HolyGrailItemBuilder.new().withEtherealType('optional').build();
 
       // Act
-      const result = shouldShowNormalStatus(item);
+      const result = shouldShowNormalStatus(item, defaultSettings);
 
       // Assert
       expect(result).toBe(true);
@@ -248,7 +268,7 @@ describe('When shouldShowNormalStatus is called', () => {
       const item = HolyGrailItemBuilder.new().withEtherealType('only').build();
 
       // Act
-      const result = shouldShowNormalStatus(item);
+      const result = shouldShowNormalStatus(item, defaultSettings);
 
       // Assert
       expect(result).toBe(false);
@@ -261,7 +281,7 @@ describe('When shouldShowNormalStatus is called', () => {
       const item = HolyGrailItemBuilder.new().withEtherealType('none').build();
 
       // Act
-      const result = shouldShowNormalStatus(item);
+      const result = shouldShowNormalStatus(item, defaultSettings);
 
       // Assert
       expect(result).toBe(true);

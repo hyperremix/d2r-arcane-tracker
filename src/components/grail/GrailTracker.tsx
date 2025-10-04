@@ -35,7 +35,7 @@ function TabLoadingSkeleton() {
 export function GrailTracker() {
   const [activeTab, setActiveTab] = useState('tracker');
   const [isPending, startTransition] = useTransition();
-  const { setCharacters, setItems, setProgress, settings } = useGrailStore();
+  const { setCharacters, setItems, setProgress, setSettings, settings } = useGrailStore();
 
   const statistics = useGrailStatistics();
 
@@ -49,6 +49,13 @@ export function GrailTracker() {
   useEffect(() => {
     const loadData = async () => {
       try {
+        // Load settings first
+        const settingsData = await window.electronAPI?.grail.getSettings();
+        if (settingsData) {
+          await setSettings(settingsData);
+          console.log('Loaded settings from database');
+        }
+
         // Load characters
         const charactersData = await window.electronAPI?.grail.getCharacters();
         if (charactersData) {
@@ -78,7 +85,7 @@ export function GrailTracker() {
     };
 
     loadData();
-  }, [setCharacters, setItems, setProgress]);
+  }, [setCharacters, setItems, setProgress, setSettings]);
 
   return (
     <TooltipProvider>

@@ -217,6 +217,13 @@ export const useGrailStore = create<GrailState>((set, get) => ({
     try {
       set({ loading: true, error: null });
 
+      // Load settings first
+      const settingsData = await window.electronAPI?.grail.getSettings();
+      if (settingsData) {
+        set((state) => ({ settings: { ...state.settings, ...settingsData } }));
+        console.log('Reloaded settings from database');
+      }
+
       // Load characters
       const charactersData = await window.electronAPI?.grail.getCharacters();
       if (charactersData) {

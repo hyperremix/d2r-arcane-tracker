@@ -125,6 +125,7 @@ export function initializeGrailHandlers(): void {
             id: dbItem.id,
             name: dbItem.name,
             link: dbItem.link,
+            code: dbItem.code,
             type: dbItem.type,
             category: dbItem.category,
             subCategory: dbItem.sub_category,
