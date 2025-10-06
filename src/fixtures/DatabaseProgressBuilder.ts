@@ -9,13 +9,13 @@ export class DatabaseProgressBuilder {
     id: 'default-progress-id',
     character_id: 'default-character-id',
     item_id: 'default-item-id',
-    found: false,
-    found_date: undefined,
-    manually_added: false,
-    auto_detected: true,
-    difficulty: undefined,
-    notes: undefined,
-    is_ethereal: false,
+    found: 0,
+    found_date: null,
+    manually_added: 0,
+    auto_detected: 1,
+    difficulty: null,
+    notes: null,
+    is_ethereal: 0,
     created_at: '2024-01-01T00:00:00.000Z',
     updated_at: '2024-01-01T00:00:00.000Z',
   };
@@ -55,7 +55,7 @@ export class DatabaseProgressBuilder {
    * Set the found status
    */
   withFound(found: boolean): this {
-    this.progress.found = found;
+    this.progress.found = found ? 1 : 0;
     return this;
   }
 
@@ -63,7 +63,7 @@ export class DatabaseProgressBuilder {
    * Set as found item
    */
   asFound(): this {
-    this.progress.found = true;
+    this.progress.found = 1;
     return this;
   }
 
@@ -71,7 +71,7 @@ export class DatabaseProgressBuilder {
    * Set as not found item
    */
   asNotFound(): this {
-    this.progress.found = false;
+    this.progress.found = 0;
     return this;
   }
 
@@ -87,7 +87,7 @@ export class DatabaseProgressBuilder {
    * Remove the found date
    */
   withoutFoundDate(): this {
-    this.progress.found_date = undefined;
+    this.progress.found_date = null;
     return this;
   }
 
@@ -95,7 +95,7 @@ export class DatabaseProgressBuilder {
    * Set the manually added status
    */
   withManuallyAdded(manuallyAdded: boolean): this {
-    this.progress.manually_added = manuallyAdded;
+    this.progress.manually_added = manuallyAdded ? 1 : 0;
     return this;
   }
 
@@ -103,7 +103,7 @@ export class DatabaseProgressBuilder {
    * Set as manually added
    */
   asManuallyAdded(): this {
-    this.progress.manually_added = true;
+    this.progress.manually_added = 1;
     return this;
   }
 
@@ -111,7 +111,7 @@ export class DatabaseProgressBuilder {
    * Set as auto detected
    */
   asAutoDetected(): this {
-    this.progress.manually_added = false;
+    this.progress.manually_added = 0;
     return this;
   }
 
@@ -119,7 +119,7 @@ export class DatabaseProgressBuilder {
    * Set the auto detected status
    */
   withAutoDetected(autoDetected: boolean): this {
-    this.progress.auto_detected = autoDetected;
+    this.progress.auto_detected = autoDetected ? 1 : 0;
     return this;
   }
 
@@ -159,7 +159,7 @@ export class DatabaseProgressBuilder {
    * Remove difficulty
    */
   withoutDifficulty(): this {
-    this.progress.difficulty = undefined;
+    this.progress.difficulty = null;
     return this;
   }
 
@@ -175,7 +175,7 @@ export class DatabaseProgressBuilder {
    * Remove the notes
    */
   withoutNotes(): this {
-    this.progress.notes = undefined;
+    this.progress.notes = null;
     return this;
   }
 
@@ -183,7 +183,7 @@ export class DatabaseProgressBuilder {
    * Set the ethereal status
    */
   withIsEthereal(isEthereal: boolean): this {
-    this.progress.is_ethereal = isEthereal;
+    this.progress.is_ethereal = isEthereal ? 1 : 0;
     return this;
   }
 
@@ -191,7 +191,7 @@ export class DatabaseProgressBuilder {
    * Set as ethereal item
    */
   asEthereal(): this {
-    this.progress.is_ethereal = true;
+    this.progress.is_ethereal = 1;
     return this;
   }
 
@@ -199,7 +199,7 @@ export class DatabaseProgressBuilder {
    * Set as normal (non-ethereal) item
    */
   asNormal(): this {
-    this.progress.is_ethereal = false;
+    this.progress.is_ethereal = 0;
     return this;
   }
 
@@ -223,7 +223,7 @@ export class DatabaseProgressBuilder {
    * Set as found item with date (common test case)
    */
   asFoundWithDate(foundDate: string = '2024-01-01T00:00:00.000Z'): this {
-    this.progress.found = true;
+    this.progress.found = 1;
     this.progress.found_date = foundDate;
     return this;
   }
@@ -232,9 +232,9 @@ export class DatabaseProgressBuilder {
    * Set as manually added found item (common test case)
    */
   asManuallyAddedFound(): this {
-    this.progress.found = true;
-    this.progress.manually_added = true;
-    this.progress.auto_detected = false;
+    this.progress.found = 1;
+    this.progress.manually_added = 1;
+    this.progress.auto_detected = 0;
     return this;
   }
 
@@ -242,9 +242,9 @@ export class DatabaseProgressBuilder {
    * Set as auto detected found item (common test case)
    */
   asAutoDetectedFound(): this {
-    this.progress.found = true;
-    this.progress.manually_added = false;
-    this.progress.auto_detected = true;
+    this.progress.found = 1;
+    this.progress.manually_added = 0;
+    this.progress.auto_detected = 1;
     return this;
   }
 
@@ -252,7 +252,7 @@ export class DatabaseProgressBuilder {
    * Set as hell difficulty found item (common test case)
    */
   asHellFound(): this {
-    this.progress.found = true;
+    this.progress.found = 1;
     this.progress.difficulty = 'hell';
     return this;
   }

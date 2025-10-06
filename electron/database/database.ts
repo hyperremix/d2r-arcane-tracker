@@ -4,14 +4,25 @@ import Database from 'better-sqlite3';
 import { app } from 'electron';
 import { items } from '../items';
 import type {
+  Character,
   DatabaseCharacter,
   DatabaseGrailProgress,
   DatabaseItem,
   DatabaseSetting,
+  GrailProgress,
   Item,
   Settings,
 } from '../types/grail';
 import { GameMode, GameVersion } from '../types/grail';
+import {
+  mapCharacterToDatabase,
+  mapDatabaseCharacterToCharacter,
+  mapDatabaseItemToItem,
+  mapDatabaseProgressToProgress,
+  mapItemToDatabase,
+  mapProgressToDatabase,
+  mapValuesToSqlite,
+} from './mappers';
 
 /**
  * Main database class for managing Holy Grail tracking data.
@@ -47,7 +58,7 @@ class GrailDatabase {
   private initializeSchema(): void {
     try {
       // Just use the inline schema for now to avoid file path issues
-      this.createBasicSchema();
+      this.createSchema();
     } catch (error) {
       console.error('Failed to initialize database schema:', error);
       throw error;
@@ -59,7 +70,7 @@ class GrailDatabase {
    * This method defines the structure for items, characters, grail progress, and settings tables.
    * Also seeds the items table with Holy Grail data if it's empty.
    */
-  private createBasicSchema(): void {
+  private createSchema(): void {
     const schema = `
       -- Items table - stores all Holy Grail items
       CREATE TABLE IF NOT EXISTS items (
@@ -195,19 +206,20 @@ class GrailDatabase {
   // Items methods
   /**
    * Retrieves all items from the database.
-   * @returns Array of all database items, ordered by category, sub_category, and name
+   * @returns Array of all items, ordered by category, sub_category, and name
    */
-  getAllItems(): DatabaseItem[] {
+  getAllItems(): Item[] {
     const stmt = this.db.prepare('SELECT * FROM items ORDER BY category, sub_category, name');
-    return stmt.all() as DatabaseItem[];
+    const dbItems = stmt.all() as DatabaseItem[];
+    return dbItems.map(mapDatabaseItemToItem);
   }
 
   /**
    * Retrieves items filtered by current user settings.
    * @param settings - Current user settings for filtering items
-   * @returns Array of filtered database items based on settings
+   * @returns Array of filtered items based on settings
    */
-  getFilteredItems(settings: Settings): DatabaseItem[] {
+  getFilteredItems(settings: Settings): Item[] {
     const allItems = this.getAllItems();
 
     return allItems.filter((item) => this.shouldIncludeItem(item, settings));
@@ -216,22 +228,13 @@ class GrailDatabase {
   /**
    * Determines if an item should be included based on current settings.
    * Filters items by type (runes, runewords), normal items, and ethereal items.
-   * @param item - The database item to check
+   * @param item - The item to check
    * @param settings - Current user settings for filtering
    * @returns True if the item should be included, false otherwise
    */
-  private shouldIncludeItem(item: DatabaseItem, settings: Settings): boolean {
+  private shouldIncludeItem(item: Item, settings: Settings): boolean {
     // Filter based on item type
     if (!this.isItemTypeEnabled(item.type, settings)) {
-      return false;
-    }
-
-    if (!this.isNormalTypeEnabled(item, settings)) {
-      return false;
-    }
-
-    // Filter based on ethereal type
-    if (!this.isEtherealTypeEnabled(item, settings)) {
       return false;
     }
 
@@ -257,61 +260,6 @@ class GrailDatabase {
   }
 
   /**
-   * Checks if normal (non-ethereal) items are enabled in the settings.
-   * @param _item - The database item to check
-   * @param _settings - Current user settings
-   * @returns True if normal items are enabled, false otherwise
-   */
-  private isNormalTypeEnabled(_item: DatabaseItem, _settings: Settings): boolean {
-    // Always return true for item-level filtering - UI will handle granular normal/eth states
-    return true;
-  }
-
-  /**
-   * Checks if ethereal items are enabled in the settings.
-   * @param _item - The database item to check
-   * @param _settings - Current user settings
-   * @returns True if ethereal items are enabled, false otherwise
-   */
-  private isEtherealTypeEnabled(_item: DatabaseItem, _settings: Settings): boolean {
-    // Always return true for item-level filtering - UI will handle granular normal/eth states
-    return true;
-  }
-
-  /**
-   * Retrieves a specific item by its ID.
-   * @param id - The unique identifier of the item
-   * @returns The database item if found, undefined otherwise
-   */
-  getItemById(id: string): DatabaseItem | undefined {
-    const stmt = this.db.prepare('SELECT * FROM items WHERE id = ?');
-    return stmt.get(id) as DatabaseItem | undefined;
-  }
-
-  /**
-   * Inserts a single item into the database.
-   * @param item - The item to insert (without timestamps)
-   */
-  insertItem(item: Omit<DatabaseItem, 'created_at' | 'updated_at'>): void {
-    const stmt = this.db.prepare(`
-      INSERT INTO items (id, name, link, code, type, category, sub_category, set_name, ethereal_type, treasure_class)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `);
-    stmt.run(
-      item.id,
-      item.name,
-      item.link,
-      item.code,
-      item.type,
-      item.category,
-      item.sub_category,
-      item.set_name,
-      item.ethereal_type,
-      item.treasure_class,
-    );
-  }
-
-  /**
    * Inserts multiple items into the database using a transaction.
    * Uses INSERT OR REPLACE to handle duplicate items.
    * Only inserts base items (no eth_ duplicates).
@@ -325,17 +273,18 @@ class GrailDatabase {
 
     const transaction = this.db.transaction((itemsToInsert: typeof items) => {
       for (const item of itemsToInsert) {
+        const mappedItem = mapItemToDatabase(item);
         stmt.run(
-          item.id,
-          item.name,
-          item.link,
-          item.code,
-          item.type,
-          item.category,
-          item.subCategory,
-          item.setName,
-          item.etherealType,
-          item.treasureClass,
+          mappedItem.id,
+          mappedItem.name,
+          mappedItem.link,
+          mappedItem.code,
+          mappedItem.type,
+          mappedItem.category,
+          mappedItem.sub_category,
+          mappedItem.set_name,
+          mappedItem.ethereal_type,
+          mappedItem.treasure_class,
         );
       }
     });
@@ -348,44 +297,12 @@ class GrailDatabase {
    * Retrieves all non-deleted characters from the database.
    * @returns Array of all active characters, ordered by most recently updated
    */
-  getAllCharacters(): DatabaseCharacter[] {
+  getAllCharacters(): Character[] {
     const stmt = this.db.prepare(
       'SELECT * FROM characters WHERE deleted_at IS NULL ORDER BY updated_at DESC',
     );
-    return stmt.all() as DatabaseCharacter[];
-  }
-
-  /**
-   * Retrieves a specific character by its ID.
-   * @param id - The unique identifier of the character
-   * @returns The database character if found, undefined otherwise
-   */
-  getCharacterById(id: string): DatabaseCharacter | undefined {
-    const stmt = this.db.prepare('SELECT * FROM characters WHERE id = ?');
-    return stmt.get(id) as DatabaseCharacter | undefined;
-  }
-
-  /**
-   * Inserts a new character into the database.
-   * @param character - The character data to insert (without timestamps and deleted_at)
-   */
-  insertCharacter(
-    character: Omit<DatabaseCharacter, 'created_at' | 'updated_at' | 'deleted_at'>,
-  ): void {
-    const stmt = this.db.prepare(`
-      INSERT INTO characters (id, name, character_class, level, difficulty, hardcore, expansion, save_file_path)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `);
-    stmt.run(
-      character.id,
-      character.name,
-      character.character_class,
-      character.level,
-      character.difficulty,
-      character.hardcore,
-      character.expansion,
-      character.save_file_path,
-    );
+    const dbCharacters = stmt.all() as DatabaseCharacter[];
+    return dbCharacters.map(mapDatabaseCharacterToCharacter);
   }
 
   /**
@@ -393,75 +310,81 @@ class GrailDatabase {
    * @param id - The unique identifier of the character to update
    * @param updates - Partial character data to update (excluding id and timestamps)
    */
-  updateCharacter(
-    id: string,
-    updates: Partial<Omit<DatabaseCharacter, 'id' | 'created_at' | 'updated_at' | 'deleted_at'>>,
-  ): void {
+  updateCharacter(id: string, updates: Partial<Character>): void {
     const fields = Object.keys(updates);
     const values = Object.values(updates);
 
     if (fields.length === 0) return;
 
-    const setClause = fields.map((field) => `${field} = ?`).join(', ');
-    const stmt = this.db.prepare(`UPDATE characters SET ${setClause} WHERE id = ?`);
-    stmt.run(...values, id);
-  }
+    // Map field names from Character to database field names
+    const dbFieldMap: Record<string, string> = {
+      characterClass: 'character_class',
+      saveFilePath: 'save_file_path',
+      lastUpdated: 'updated_at',
+      created: 'created_at',
+      deleted: 'deleted_at',
+    };
 
-  /**
-   * Soft deletes a character by setting the deleted_at timestamp.
-   * @param id - The unique identifier of the character to delete
-   */
-  deleteCharacter(id: string): void {
-    // Soft delete by setting deleted_at timestamp
-    const stmt = this.db.prepare(
-      'UPDATE characters SET deleted_at = CURRENT_TIMESTAMP WHERE id = ?',
-    );
-    stmt.run(id);
+    const dbFields = fields.map((field) => dbFieldMap[field] || field);
+    const setClause = dbFields.map((field) => `${field} = ?`).join(', ');
+    const stmt = this.db.prepare(`UPDATE characters SET ${setClause} WHERE id = ?`);
+    const mappedValues = mapValuesToSqlite(values);
+    stmt.run(...mappedValues, id);
   }
 
   /**
    * Retrieves a character by its name.
    * @param name - The name of the character to find
-   * @returns The database character if found, undefined otherwise
+   * @returns The character if found, undefined otherwise
    */
-  getCharacterByName(name: string): DatabaseCharacter | undefined {
+  getCharacterByName(name: string): Character | undefined {
     const stmt = this.db.prepare('SELECT * FROM characters WHERE name = ? AND deleted_at IS NULL');
-    return stmt.get(name) as DatabaseCharacter | undefined;
+    const dbCharacter = stmt.get(name) as DatabaseCharacter | undefined;
+    return dbCharacter ? mapDatabaseCharacterToCharacter(dbCharacter) : undefined;
   }
 
   /**
    * Retrieves a character by its save file path.
    * @param saveFilePath - The save file path of the character to find
-   * @returns The database character if found, undefined otherwise
+   * @returns The character if found, undefined otherwise
    */
-  getCharacterBySaveFilePath(saveFilePath: string): DatabaseCharacter | undefined {
+  getCharacterBySaveFilePath(saveFilePath: string): Character | undefined {
     const stmt = this.db.prepare(
       'SELECT * FROM characters WHERE save_file_path = ? AND deleted_at IS NULL',
     );
-    return stmt.get(saveFilePath) as DatabaseCharacter | undefined;
+    const dbCharacter = stmt.get(saveFilePath) as DatabaseCharacter | undefined;
+    return dbCharacter ? mapDatabaseCharacterToCharacter(dbCharacter) : undefined;
   }
 
   /**
    * Inserts a new character or updates an existing one.
    * Uses INSERT OR REPLACE to handle both insert and update operations.
-   * @param character - The character data to insert or update (without timestamps and deleted_at)
+   * @param character - The character data to insert or update
    */
-  upsertCharacter(
-    character: Omit<DatabaseCharacter, 'created_at' | 'updated_at' | 'deleted_at'>,
-  ): void {
+  upsertCharacter(character: Character): void {
     const stmt = this.db.prepare(`
       INSERT OR REPLACE INTO characters (id, name, character_class, level, difficulty, hardcore, expansion, save_file_path)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `);
+    const mappedCharacter = mapCharacterToDatabase({
+      id: character.id,
+      name: character.name,
+      character_class: character.characterClass,
+      level: character.level,
+      difficulty: character.difficulty,
+      hardcore: character.hardcore,
+      expansion: character.expansion,
+      save_file_path: character.saveFilePath,
+    });
     stmt.run(
-      character.id,
-      character.name,
-      character.character_class,
-      character.level,
-      character.difficulty,
-      character.hardcore,
-      character.expansion,
-      character.save_file_path,
+      mappedCharacter.id,
+      mappedCharacter.name,
+      mappedCharacter.character_class,
+      mappedCharacter.level,
+      mappedCharacter.difficulty,
+      mappedCharacter.hardcore,
+      mappedCharacter.expansion,
+      mappedCharacter.save_file_path,
     );
   }
 
@@ -470,9 +393,10 @@ class GrailDatabase {
    * Retrieves all grail progress records from the database.
    * @returns Array of all grail progress records, ordered by most recently updated
    */
-  getAllProgress(): DatabaseGrailProgress[] {
+  getAllProgress(): GrailProgress[] {
     const stmt = this.db.prepare('SELECT * FROM grail_progress ORDER BY updated_at DESC');
-    return stmt.all() as DatabaseGrailProgress[];
+    const dbProgress = stmt.all() as DatabaseGrailProgress[];
+    return dbProgress.map(mapDatabaseProgressToProgress);
   }
 
   /**
@@ -480,12 +404,12 @@ class GrailDatabase {
    * @param settings - Current user settings for filtering progress
    * @returns Array of filtered grail progress records based on settings
    */
-  getFilteredProgress(settings: Settings): DatabaseGrailProgress[] {
+  getFilteredProgress(settings: Settings): GrailProgress[] {
     const allProgress = this.getAllProgress();
     const filteredItems = this.getFilteredItems(settings);
     const filteredItemIds = new Set(filteredItems.map((item) => item.id));
 
-    return allProgress.filter((progress) => filteredItemIds.has(progress.item_id));
+    return allProgress.filter((progress) => filteredItemIds.has(progress.itemId));
   }
 
   /**
@@ -493,9 +417,10 @@ class GrailDatabase {
    * @param characterId - The unique identifier of the character
    * @returns Array of grail progress records for the specified character
    */
-  getProgressByCharacter(characterId: string): DatabaseGrailProgress[] {
+  getProgressByCharacter(characterId: string): GrailProgress[] {
     const stmt = this.db.prepare('SELECT * FROM grail_progress WHERE character_id = ?');
-    return stmt.all(characterId) as DatabaseGrailProgress[];
+    const dbProgress = stmt.all(characterId) as DatabaseGrailProgress[];
+    return dbProgress.map(mapDatabaseProgressToProgress);
   }
 
   /**
@@ -503,45 +428,46 @@ class GrailDatabase {
    * @param itemId - The unique identifier of the item
    * @returns Array of grail progress records for the specified item
    */
-  getProgressByItem(itemId: string): DatabaseGrailProgress[] {
+  getProgressByItem(itemId: string): GrailProgress[] {
     const stmt = this.db.prepare('SELECT * FROM grail_progress WHERE item_id = ?');
-    return stmt.all(itemId) as DatabaseGrailProgress[];
+    const dbProgress = stmt.all(itemId) as DatabaseGrailProgress[];
+    return dbProgress.map(mapDatabaseProgressToProgress);
   }
 
   /**
    * Inserts a new grail progress record or updates an existing one.
    * Uses INSERT OR REPLACE to handle both insert and update operations.
-   * @param progress - The grail progress data to insert or update (without timestamps)
+   * @param progress - The grail progress data to insert or update
    */
-  upsertProgress(progress: Omit<DatabaseGrailProgress, 'created_at' | 'updated_at'>): void {
+  upsertProgress(progress: GrailProgress): void {
     const stmt = this.db.prepare(`
       INSERT OR REPLACE INTO grail_progress (id, character_id, item_id, found, found_date, manually_added, auto_detected, difficulty, notes, is_ethereal)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
+    const mappedProgress = mapProgressToDatabase({
+      id: progress.id,
+      character_id: progress.characterId,
+      item_id: progress.itemId,
+      found: progress.found,
+      found_date: progress.foundDate,
+      manually_added: progress.manuallyAdded,
+      auto_detected: true, // Default value since it's not in GrailProgress interface
+      difficulty: progress.difficulty,
+      notes: progress.notes,
+      is_ethereal: progress.isEthereal,
+    });
     stmt.run(
-      progress.id,
-      progress.character_id,
-      progress.item_id,
-      progress.found,
-      progress.found_date,
-      progress.manually_added,
-      progress.auto_detected,
-      progress.difficulty,
-      progress.notes,
-      progress.is_ethereal,
+      mappedProgress.id,
+      mappedProgress.character_id,
+      mappedProgress.item_id,
+      mappedProgress.found,
+      mappedProgress.found_date,
+      mappedProgress.manually_added,
+      mappedProgress.auto_detected,
+      mappedProgress.difficulty,
+      mappedProgress.notes,
+      mappedProgress.is_ethereal,
     );
-  }
-
-  /**
-   * Deletes a grail progress record for a specific character and item combination.
-   * @param characterId - The unique identifier of the character
-   * @param itemId - The unique identifier of the item
-   */
-  deleteProgress(characterId: string, itemId: string): void {
-    const stmt = this.db.prepare(
-      'DELETE FROM grail_progress WHERE character_id = ? AND item_id = ?',
-    );
-    stmt.run(characterId, itemId);
   }
 
   // Settings methods
@@ -580,17 +506,6 @@ class GrailDatabase {
   }
 
   /**
-   * Retrieves a specific setting value by its key.
-   * @param key - The setting key to retrieve
-   * @returns The setting value as a string, or undefined if not found
-   */
-  getSetting(key: keyof Settings): string | undefined {
-    const stmt = this.db.prepare('SELECT value FROM settings WHERE key = ?');
-    const result = stmt.get(key) as { value: string } | undefined;
-    return result?.value;
-  }
-
-  /**
    * Sets a specific setting value in the database.
    * Uses INSERT OR REPLACE to handle both new and existing settings.
    * @param key - The setting key to set
@@ -599,91 +514,6 @@ class GrailDatabase {
   setSetting(key: keyof Settings, value: string): void {
     const stmt = this.db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)');
     stmt.run(key, value);
-  }
-
-  // Statistics methods
-  /**
-   * Retrieves comprehensive grail statistics for a character or globally.
-   * @param characterId - Optional character ID for character-specific statistics. If not provided, returns global statistics.
-   * @returns Object containing total items, found items, and breakdown by item type
-   */
-  getGrailStatistics(characterId?: string): {
-    totalItems: number;
-    foundItems: number;
-    uniqueItems: number;
-    setItems: number;
-    runes: number;
-    foundUnique: number;
-    foundSet: number;
-    foundRunes: number;
-  } {
-    let totalItems: number;
-    let foundItems: number;
-    let uniqueItems: number;
-    let setItems: number;
-    let runes: number;
-    let foundUnique: number;
-    let foundSet: number;
-    let foundRunes: number;
-
-    if (characterId) {
-      // Character-specific statistics
-      const totalStmt = this.db.prepare('SELECT COUNT(*) as count FROM items');
-      const foundStmt = this.db.prepare(`
-        SELECT COUNT(*) as count FROM grail_progress
-        WHERE character_id = ? AND found = 1
-      `);
-      const typeStmt = this.db.prepare('SELECT type, COUNT(*) as count FROM items GROUP BY type');
-      const foundTypeStmt = this.db.prepare(`
-        SELECT i.type, COUNT(*) as count
-        FROM grail_progress gp
-        JOIN items i ON gp.item_id = i.id
-        WHERE gp.character_id = ? AND gp.found = 1
-        GROUP BY i.type
-      `);
-
-      totalItems = (totalStmt.get() as { count: number }).count;
-      foundItems = (foundStmt.get(characterId) as { count: number }).count;
-
-      const typeResults = typeStmt.all() as { type: string; count: number }[];
-      const foundTypeResults = foundTypeStmt.all(characterId) as { type: string; count: number }[];
-
-      uniqueItems = typeResults.find((r) => r.type === 'unique')?.count || 0;
-      setItems = typeResults.find((r) => r.type === 'set')?.count || 0;
-      runes = typeResults.find((r) => r.type === 'rune')?.count || 0;
-
-      foundUnique = foundTypeResults.find((r) => r.type === 'unique')?.count || 0;
-      foundSet = foundTypeResults.find((r) => r.type === 'set')?.count || 0;
-      foundRunes = foundTypeResults.find((r) => r.type === 'rune')?.count || 0;
-    } else {
-      // Global statistics
-      const totalStmt = this.db.prepare('SELECT COUNT(*) as count FROM items');
-      const typeStmt = this.db.prepare('SELECT type, COUNT(*) as count FROM items GROUP BY type');
-
-      totalItems = (totalStmt.get() as { count: number }).count;
-      foundItems = 0; // Global found items would need more complex logic
-
-      const typeResults = typeStmt.all() as { type: string; count: number }[];
-
-      uniqueItems = typeResults.find((r) => r.type === 'unique')?.count || 0;
-      setItems = typeResults.find((r) => r.type === 'set')?.count || 0;
-      runes = typeResults.find((r) => r.type === 'rune')?.count || 0;
-
-      foundUnique = 0;
-      foundSet = 0;
-      foundRunes = 0;
-    }
-
-    return {
-      totalItems,
-      foundItems,
-      uniqueItems,
-      setItems,
-      runes,
-      foundUnique,
-      foundSet,
-      foundRunes,
-    };
   }
 
   /**
@@ -717,10 +547,10 @@ class GrailDatabase {
 
     // Count found items
     const foundProgress = characterId
-      ? filteredProgress.filter((p) => p.character_id === characterId && p.found)
+      ? filteredProgress.filter((p) => p.characterId === characterId && p.found)
       : filteredProgress.filter((p) => p.found);
 
-    const foundItemIds = new Set(foundProgress.map((p) => p.item_id));
+    const foundItemIds = new Set(foundProgress.map((p) => p.itemId));
     const foundItems = foundItemIds.size;
 
     // Count found items by type

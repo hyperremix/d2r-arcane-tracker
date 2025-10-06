@@ -11,10 +11,10 @@ export class DatabaseCharacterBuilder {
     character_class: 'amazon',
     level: 1,
     difficulty: 'normal',
-    hardcore: false,
-    expansion: true,
-    save_file_path: undefined,
-    deleted_at: undefined,
+    hardcore: 0,
+    expansion: 1,
+    save_file_path: null,
+    deleted_at: null,
     created_at: '2024-01-01T00:00:00.000Z',
     updated_at: '2024-01-01T00:00:00.000Z',
   };
@@ -70,7 +70,7 @@ export class DatabaseCharacterBuilder {
    * Set as hardcore character
    */
   asHardcore(): this {
-    this.character.hardcore = true;
+    this.character.hardcore = 1;
     return this;
   }
 
@@ -78,7 +78,7 @@ export class DatabaseCharacterBuilder {
    * Set as softcore character
    */
   asSoftcore(): this {
-    this.character.hardcore = false;
+    this.character.hardcore = 0;
     return this;
   }
 
@@ -86,7 +86,7 @@ export class DatabaseCharacterBuilder {
    * Set expansion status
    */
   withExpansion(expansion: boolean): this {
-    this.character.expansion = expansion;
+    this.character.expansion = expansion ? 1 : 0;
     return this;
   }
 
@@ -94,7 +94,7 @@ export class DatabaseCharacterBuilder {
    * Set as expansion character
    */
   asExpansion(): this {
-    this.character.expansion = true;
+    this.character.expansion = 1;
     return this;
   }
 
@@ -102,7 +102,7 @@ export class DatabaseCharacterBuilder {
    * Set as classic character
    */
   asClassic(): this {
-    this.character.expansion = false;
+    this.character.expansion = 0;
     return this;
   }
 
@@ -118,7 +118,7 @@ export class DatabaseCharacterBuilder {
    * Remove the save file path
    */
   withoutSaveFilePath(): this {
-    this.character.save_file_path = undefined;
+    this.character.save_file_path = null;
     return this;
   }
 
@@ -142,7 +142,7 @@ export class DatabaseCharacterBuilder {
    * Set as active character (not deleted)
    */
   asActive(): this {
-    this.character.deleted_at = undefined;
+    this.character.deleted_at = null;
     return this;
   }
 

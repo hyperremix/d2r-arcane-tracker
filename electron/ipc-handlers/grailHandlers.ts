@@ -1,6 +1,6 @@
 import { ipcMain } from 'electron';
 import { GrailDatabase } from '../database/database';
-import type { Character, GrailProgress, Item, Settings } from '../types/grail';
+import type { GrailProgress, Item, Settings } from '../types/grail';
 
 /**
  * Global database instance for grail operations.
@@ -28,84 +28,9 @@ export function initializeGrailHandlers(): void {
    */
   ipcMain.handle('grail:getCharacters', async () => {
     try {
-      const dbCharacters = grailDB.getAllCharacters();
-      return dbCharacters.map(
-        (dbChar) =>
-          ({
-            id: dbChar.id,
-            name: dbChar.name,
-            characterClass: dbChar.character_class,
-            level: dbChar.level,
-            difficulty: dbChar.difficulty,
-            hardcore: dbChar.hardcore,
-            expansion: dbChar.expansion,
-            saveFilePath: dbChar.save_file_path,
-            created: new Date(dbChar.created_at),
-            lastUpdated: new Date(dbChar.updated_at),
-            deleted: dbChar.deleted_at ? new Date(dbChar.deleted_at) : undefined,
-          }) as Character,
-      );
+      return grailDB.getAllCharacters();
     } catch (error) {
       console.error('Failed to get characters:', error);
-      throw error;
-    }
-  });
-
-  /**
-   * IPC handler for creating a new character.
-   * @param _ - IPC event (unused)
-   * @param character - Character data to create
-   */
-  ipcMain.handle('grail:createCharacter', async (_, character: Character) => {
-    try {
-      grailDB.insertCharacter({
-        id: character.id,
-        name: character.name,
-        character_class: character.characterClass,
-        level: character.level,
-        difficulty: character.difficulty,
-        hardcore: character.hardcore,
-        expansion: character.expansion,
-        save_file_path: character.saveFilePath,
-      });
-      return { success: true };
-    } catch (error) {
-      console.error('Failed to create character:', error);
-      throw error;
-    }
-  });
-
-  /**
-   * IPC handler for updating an existing character.
-   * @param _ - IPC event (unused)
-   * @param characterId - ID of the character to update
-   * @param updates - Partial character data to update
-   */
-  ipcMain.handle(
-    'grail:updateCharacter',
-    async (_, characterId: string, updates: Partial<Character>) => {
-      try {
-        const dbUpdates = mapCharacterUpdates(updates);
-        grailDB.updateCharacter(characterId, dbUpdates);
-        return { success: true };
-      } catch (error) {
-        console.error('Failed to update character:', error);
-        throw error;
-      }
-    },
-  );
-
-  /**
-   * IPC handler for deleting a character (soft delete).
-   * @param _ - IPC event (unused)
-   * @param characterId - ID of the character to delete
-   */
-  ipcMain.handle('grail:deleteCharacter', async (_, characterId: string) => {
-    try {
-      grailDB.deleteCharacter(characterId);
-      return { success: true };
-    } catch (error) {
-      console.error('Failed to delete character:', error);
       throw error;
     }
   });
@@ -118,22 +43,7 @@ export function initializeGrailHandlers(): void {
   ipcMain.handle('grail:getItems', async () => {
     try {
       const settings = grailDB.getAllSettings();
-      const dbItems = grailDB.getFilteredItems(settings);
-      return dbItems.map(
-        (dbItem) =>
-          ({
-            id: dbItem.id,
-            name: dbItem.name,
-            link: dbItem.link,
-            code: dbItem.code,
-            type: dbItem.type,
-            category: dbItem.category,
-            subCategory: dbItem.sub_category,
-            treasureClass: dbItem.treasure_class,
-            setName: dbItem.set_name,
-            etherealType: dbItem.ethereal_type,
-          }) as Item,
-      );
+      return grailDB.getFilteredItems(settings);
     } catch (error) {
       console.error('Failed to get items:', error);
       throw error;
@@ -147,20 +57,7 @@ export function initializeGrailHandlers(): void {
    */
   ipcMain.handle('grail:seedItems', async (_, items: Item[]) => {
     try {
-      const dbItems = items.map((item) => ({
-        id: item.id,
-        name: item.name,
-        link: item.link,
-        code: item.code,
-        type: item.type,
-        category: item.category,
-        subCategory: item.subCategory,
-        setName: item.setName,
-        etherealType: item.etherealType,
-        treasureClass: item.treasureClass,
-      }));
-
-      grailDB.insertItems(dbItems);
+      grailDB.insertItems(items);
       return { success: true };
     } catch (error) {
       console.error('Failed to seed items:', error);
@@ -185,21 +82,10 @@ export function initializeGrailHandlers(): void {
       const characters = grailDB.getAllCharacters();
       const characterMap = new Map(characters.map((c) => [c.id, c.name]));
 
-      return dbProgress.map(
-        (dbProg) =>
-          ({
-            id: dbProg.id,
-            characterId: dbProg.character_id,
-            itemId: dbProg.item_id,
-            found: dbProg.found,
-            foundDate: dbProg.found_date ? new Date(dbProg.found_date) : undefined,
-            foundBy: characterMap.get(dbProg.character_id),
-            manuallyAdded: dbProg.manually_added,
-            difficulty: dbProg.difficulty,
-            notes: dbProg.notes,
-            isEthereal: dbProg.is_ethereal,
-          }) as GrailProgress,
-      );
+      return dbProgress.map((prog) => ({
+        ...prog,
+        foundBy: characterMap.get(prog.characterId),
+      }));
     } catch (error) {
       console.error('Failed to get progress:', error);
       throw error;
@@ -213,18 +99,7 @@ export function initializeGrailHandlers(): void {
    */
   ipcMain.handle('grail:updateProgress', async (_, progress: GrailProgress) => {
     try {
-      grailDB.upsertProgress({
-        id: progress.id,
-        character_id: progress.characterId,
-        item_id: progress.itemId,
-        found: progress.found,
-        found_date: progress.foundDate?.toISOString(),
-        manually_added: progress.manuallyAdded,
-        auto_detected: false, // Manual updates are not auto-detected
-        difficulty: progress.difficulty,
-        notes: progress.notes,
-        is_ethereal: progress.isEthereal,
-      });
+      grailDB.upsertProgress(progress);
       return { success: true };
     } catch (error) {
       console.error('Failed to update progress:', error);
@@ -341,25 +216,6 @@ export function initializeGrailHandlers(): void {
   });
 
   console.log('Grail IPC handlers initialized');
-}
-
-/**
- * Maps character update fields from the renderer format to database format.
- * Converts camelCase field names to snake_case for database compatibility.
- * @param updates - Partial character data to map
- * @returns Mapped character data in database format
- */
-function mapCharacterUpdates(updates: Partial<Character>): Record<string, unknown> {
-  const dbUpdates: Record<string, unknown> = {};
-  if (updates.name !== undefined) dbUpdates.name = updates.name;
-  if (updates.characterClass !== undefined) dbUpdates.character_class = updates.characterClass;
-  if (updates.level !== undefined) dbUpdates.level = updates.level;
-  if (updates.difficulty !== undefined) dbUpdates.difficulty = updates.difficulty;
-  if (updates.hardcore !== undefined) dbUpdates.hardcore = updates.hardcore;
-  if (updates.expansion !== undefined) dbUpdates.expansion = updates.expansion;
-  if (updates.saveFilePath !== undefined) dbUpdates.save_file_path = updates.saveFilePath;
-  if (updates.deleted !== undefined) dbUpdates.deleted = updates.deleted;
-  return dbUpdates;
 }
 
 /**

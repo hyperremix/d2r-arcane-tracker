@@ -1,4 +1,5 @@
-import type { DatabaseItem, GrailDatabase } from '../database/database';
+import type { GrailDatabase } from '../database/database';
+import type { Item } from '../types/grail';
 
 /**
  * Service for managing Holy Grail item data and providing various filtering and querying capabilities.
@@ -19,9 +20,9 @@ export class GrailDataService {
   /**
    * Retrieves all items that belong to the specified category.
    * @param {string} category - The category to filter by (e.g., "armor", "weapons", "runes").
-   * @returns {DatabaseItem[]} An array of items matching the specified category.
+   * @returns {Item[]} An array of items matching the specified category.
    */
-  getItemsByCategory(category: string): DatabaseItem[] {
+  getItemsByCategory(category: string): Item[] {
     const allItems = this.database.getAllItems();
     return allItems.filter((item) => item.category === category);
   }
@@ -29,9 +30,9 @@ export class GrailDataService {
   /**
    * Retrieves all items of the specified type.
    * @param {'unique' | 'set' | 'rune'} type - The item type to filter by.
-   * @returns {DatabaseItem[]} An array of items matching the specified type.
+   * @returns {Item[]} An array of items matching the specified type.
    */
-  getItemsByType(type: 'unique' | 'set' | 'rune'): DatabaseItem[] {
+  getItemsByType(type: 'unique' | 'set' | 'rune'): Item[] {
     const allItems = this.database.getAllItems();
     return allItems.filter((item) => item.type === type);
   }
@@ -41,9 +42,9 @@ export class GrailDataService {
    * Note: Since rarity is no longer stored in the database, this method returns all items.
    * This could be enhanced by mapping item names to rarities if needed in the future.
    * @param {'common' | 'rare' | 'very_rare' | 'extremely_rare'} _rarity - The rarity level to filter by (currently unused).
-   * @returns {DatabaseItem[]} An array of all items (rarity filtering not implemented).
+   * @returns {Item[]} An array of all items (rarity filtering not implemented).
    */
-  getItemsByRarity(_rarity: 'common' | 'rare' | 'very_rare' | 'extremely_rare'): DatabaseItem[] {
+  getItemsByRarity(_rarity: 'common' | 'rare' | 'very_rare' | 'extremely_rare'): Item[] {
     // Since rarity is no longer stored, return all items for now
     // This could be enhanced by mapping item names to rarities if needed
     return this.database.getAllItems();
@@ -53,9 +54,9 @@ export class GrailDataService {
    * Searches for items whose names contain the specified search term.
    * The search is case-insensitive and performs partial matching.
    * @param {string} searchTerm - The term to search for in item names.
-   * @returns {DatabaseItem[]} An array of items whose names contain the search term.
+   * @returns {Item[]} An array of items whose names contain the search term.
    */
-  searchItemsByName(searchTerm: string): DatabaseItem[] {
+  searchItemsByName(searchTerm: string): Item[] {
     const allItems = this.database.getAllItems();
     const lowerSearchTerm = searchTerm.toLowerCase();
     return allItems.filter((item) => item.name.toLowerCase().includes(lowerSearchTerm));
@@ -105,15 +106,15 @@ export class GrailDataService {
     totalItems: number;
     foundItems: number;
     completionPercentage: number;
-    missingItems: DatabaseItem[];
+    missingItems: Item[];
   } {
     const allItems = this.database.getAllItems();
     let foundItems = 0;
-    const missingItems: DatabaseItem[] = [];
+    const missingItems: Item[] = [];
 
     if (characterId) {
       const progress = this.database.getProgressByCharacter(characterId);
-      const foundItemIds = new Set(progress.filter((p) => p.found).map((p) => p.item_id));
+      const foundItemIds = new Set(progress.filter((p) => p.found).map((p) => p.itemId));
 
       allItems.forEach((item) => {
         if (foundItemIds.has(item.id)) {

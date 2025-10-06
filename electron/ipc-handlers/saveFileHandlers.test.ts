@@ -216,10 +216,10 @@ describe('When saveFileHandlers is used', () => {
           code: undefined,
           type: 'unique',
           category: 'armor',
-          subCategory: undefined,
-          treasureClass: undefined,
+          subCategory: 'helms',
+          treasureClass: 'normal',
           setName: undefined,
-          etherealType: undefined,
+          etherealType: 'none',
         },
       ]);
     });
@@ -683,12 +683,12 @@ describe('When saveFileHandlers is used', () => {
 
       // Assert
       expect(grailDatabase.updateCharacter).toHaveBeenCalledWith('char-1', {
-        character_class: 'Amazon',
+        characterClass: 'Amazon',
         level: 85,
         difficulty: 'hell',
         hardcore: true,
         expansion: true,
-        save_file_path: '/path/to/amazon.d2s',
+        saveFilePath: '/path/to/amazon.d2s',
       });
     });
 
@@ -750,11 +750,10 @@ describe('When saveFileHandlers is used', () => {
       // Assert
       expect(grailDatabase.upsertProgress).toHaveBeenCalledWith(
         expect.objectContaining({
-          character_id: 'char-1',
-          item_id: 'windforce',
+          characterId: 'char-1',
+          itemId: 'windforce',
           found: true,
-          manually_added: false,
-          auto_detected: true,
+          manuallyAdded: false,
         }),
       );
     });

@@ -138,18 +138,19 @@ export interface Item {
 
 /**
  * Type representing an item as stored in the database.
+ * SQLite-compatible types: booleans as 0/1, undefined as null
  */
 export type DatabaseItem = {
   id: string;
   name: string;
   link: string;
-  code?: string;
+  code: string | null;
   ethereal_type: EtherealType;
   type: ItemType;
   category: ItemCategory;
   sub_category: ItemSubCategory;
   treasure_class: ItemTreasureClass;
-  set_name?: ItemSet;
+  set_name: ItemSet | null;
   created_at: string;
   updated_at: string;
 };
@@ -173,6 +174,7 @@ export interface Character {
 
 /**
  * Type representing a character as stored in the database.
+ * SQLite-compatible types: booleans as 0/1, undefined as null
  */
 export type DatabaseCharacter = {
   id: string;
@@ -180,10 +182,10 @@ export type DatabaseCharacter = {
   character_class: CharacterClass;
   level: number;
   difficulty: Difficulty;
-  hardcore: boolean;
-  expansion: boolean;
-  save_file_path?: string;
-  deleted_at?: string;
+  hardcore: 0 | 1;
+  expansion: 0 | 1;
+  save_file_path: string | null;
+  deleted_at: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -206,18 +208,19 @@ export interface GrailProgress {
 
 /**
  * Type representing grail progress as stored in the database.
+ * SQLite-compatible types: booleans as 0/1, undefined as null
  */
 export type DatabaseGrailProgress = {
   id: string;
   character_id: string;
   item_id: string;
-  found: boolean;
-  found_date?: string;
-  manually_added: boolean;
-  auto_detected: boolean;
-  difficulty?: 'normal' | 'nightmare' | 'hell';
-  notes?: string;
-  is_ethereal: boolean;
+  found: 0 | 1;
+  found_date: string | null;
+  manually_added: 0 | 1;
+  auto_detected: 0 | 1;
+  difficulty: 'normal' | 'nightmare' | 'hell' | null;
+  notes: string | null;
+  is_ethereal: 0 | 1;
   created_at: string;
   updated_at: string;
 };
