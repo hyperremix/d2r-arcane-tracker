@@ -13,10 +13,6 @@ const mockElectronAPI = {
     getCharacters: vi.fn(),
     updateProgress: vi.fn(),
   },
-  itemDetection: {
-    setGrailItems: vi.fn(),
-    enable: vi.fn(),
-  },
 };
 
 // Mock window.electronAPI
@@ -299,8 +295,6 @@ describe('When useGrailStore is used', () => {
       mockElectronAPI.grail.getCharacters.mockResolvedValue(mockCharacters);
       mockElectronAPI.grail.getItems.mockResolvedValue(mockItems);
       mockElectronAPI.grail.getProgress.mockResolvedValue(mockProgress);
-      mockElectronAPI.itemDetection.setGrailItems.mockResolvedValue(undefined);
-      mockElectronAPI.itemDetection.enable.mockResolvedValue(undefined);
 
       // Act
       await act(async () => {

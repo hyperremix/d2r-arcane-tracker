@@ -5,18 +5,33 @@ description: Development workflow and best practices
 # Development Workflow
 
 ## Code Quality
+
 - **Linting**: Use Biome for linting and formatting
 - **Type Checking**: Run TypeScript compiler for type checking
 - **Testing**: Write tests for critical functionality
 - **Code Review**: Review code before merging
 
+## Task Completion Criteria
+
+**All of the following commands MUST pass successfully before any task can be considered complete:**
+
+1. **`yarn typecheck`** - TypeScript type checking must pass without errors
+2. **`yarn format`** - Code formatting check must pass (no formatting issues)
+3. **`yarn lint`** - Linting check must pass without warnings or errors
+4. **`yarn run check`** - Combined linting and formatting check must pass
+5. **`yarn test:run`** - All tests must pass without failures
+
+**Note**: These commands should be run in sequence and all must succeed. If any command fails, the task is not complete and the issues must be resolved before proceeding.
+
 ## Git Workflow
+
 - **Branch Naming**: Use descriptive branch names (feature/, fix/, refactor/)
 - **Commit Messages**: Write clear, descriptive commit messages
 - **Pull Requests**: Create PRs for all changes
 - **Code Review**: Require code review before merging
 
 ## Development Environment
+
 - **Node.js**: Use Node.js 18+ for development
 - **Package Manager**: Use pnpm for package management
 - **IDE**: Use VS Code with recommended extensions
@@ -25,21 +40,25 @@ description: Development workflow and best practices
 ## Available NPM Scripts
 
 ### Development
+
 - **`npm run dev`**: Start development server with Electron rebuild for better-sqlite3
 - **`npm run preview`**: Preview the built application
 
 ### Building
+
 - **`npm run build`**: Type check, build, and package for all platforms
 - **`npm run build:win`**: Build and package for Windows
 - **`npm run build:mac`**: Build and package for macOS
 - **`npm run build:linux`**: Build and package for Linux
 
 ### Type Checking
+
 - **`npm run typecheck`**: Run TypeScript type checking for both web and node configs
 - **`npm run typecheck:web`**: Type check web TypeScript files only
 - **`npm run typecheck:node`**: Type check Node.js TypeScript files only
 
 ### Code Quality
+
 - **`npm run format`**: Check code formatting with Biome
 - **`npm run format:fix`**: Fix code formatting issues
 - **`npm run lint`**: Check code for linting issues
@@ -48,52 +67,61 @@ description: Development workflow and best practices
 - **`npm run check:fix`**: Fix both linting and formatting issues
 
 ### Testing
+
 - **`npm run test`**: Run tests in watch mode
 - **`npm run test:ui`**: Run tests with UI interface
 - **`npm run test:run`**: Run tests once and exit
 - **`npm run test:coverage`**: Run tests with coverage report
 
 ### Setup & Utilities
+
 - **`npm run prepare`**: Setup Husky git hooks
 - **`npm run seed:test`**: Setup native modules and seed test data
 
 ## Build Process
+
 - **Development**: Use `npm run dev` for development server
 - **Production**: Use `npm run build` for production build
 - **Platform-specific**: Use `npm run build:win|mac|linux` for specific platforms
 - **Type Safety**: Always run `npm run typecheck` before building
 
 ## Testing Strategy
+
 - **Unit Tests**: Test individual functions and components
 - **Integration Tests**: Test component interactions
 - **E2E Tests**: Test complete user workflows
 - **Manual Testing**: Test on different platforms and configurations
 
 ## Performance Monitoring
+
 - **Bundle Size**: Monitor bundle size and optimize
 - **Runtime Performance**: Monitor runtime performance
 - **Memory Usage**: Monitor memory usage and leaks
 - **Database Performance**: Monitor database query performance
 
 ## Error Handling
+
 - **Error Boundaries**: Use error boundaries for React components
 - **Logging**: Implement comprehensive logging
 - **Error Reporting**: Report errors to monitoring service
 - **User Feedback**: Provide clear error messages to users
 
 ## Documentation
+
 - **Code Comments**: Write clear, concise comments
 - **README**: Keep README up to date
 - **API Documentation**: Document API endpoints and types
 - **Component Documentation**: Document component props and usage
 
 ## Security
+
 - **Input Validation**: Validate all user inputs
 - **File Access**: Restrict file access to necessary directories
 - **IPC Security**: Secure IPC communication
 - **Dependencies**: Keep dependencies up to date
 
 ## Deployment
+
 - **Environment Variables**: Use environment variables for configuration
 - **Build Optimization**: Optimize builds for production
 - **Asset Optimization**: Optimize images and other assets

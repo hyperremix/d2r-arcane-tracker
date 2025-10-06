@@ -67,10 +67,6 @@ export function GrailTracker() {
         if (items) {
           setItems(items);
           console.log(`Loaded ${items.length} Holy Grail items from database`);
-
-          // Enable item detection and set grail items for monitoring
-          await window.electronAPI?.itemDetection.setGrailItems(items);
-          await window.electronAPI?.itemDetection.enable();
         }
 
         // Load progress data
@@ -86,6 +82,34 @@ export function GrailTracker() {
 
     loadData();
   }, [setCharacters, setItems, setProgress, setSettings]);
+
+  // Listen for grail progress updates from automatic detection
+  useEffect(() => {
+    const handleGrailProgressUpdate = async () => {
+      try {
+        // Reload progress data when items are auto-detected
+        const progressData = await window.electronAPI?.grail.getProgress();
+        if (progressData) {
+          setProgress(progressData);
+          console.log(`Reloaded ${progressData.length} progress entries after auto-detection`);
+        }
+
+        // Also reload characters in case new ones were created
+        const charactersData = await window.electronAPI?.grail.getCharacters();
+        if (charactersData) {
+          setCharacters(charactersData);
+        }
+      } catch (error) {
+        console.error('Failed to reload data after grail progress update:', error);
+      }
+    };
+
+    window.ipcRenderer?.on('grail-progress-updated', handleGrailProgressUpdate);
+
+    return () => {
+      window.ipcRenderer?.off('grail-progress-updated', handleGrailProgressUpdate);
+    };
+  }, [setProgress, setCharacters]);
 
   return (
     <TooltipProvider>

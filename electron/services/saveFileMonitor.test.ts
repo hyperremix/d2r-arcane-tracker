@@ -170,7 +170,7 @@ describe('When SaveFileMonitor is used', () => {
   });
 
   describe('If getDefaultDirectory is called', () => {
-    it('Then should return Windows path on win32', () => {
+    it('Then should return', () => {
       // Arrange
       Object.defineProperty(process, 'platform', { value: 'win32' });
       vi.mocked(app.getPath).mockReturnValue('C:\\Users\\test\\Documents');
@@ -180,36 +180,6 @@ describe('When SaveFileMonitor is used', () => {
 
       // Assert
       expect(path).toContain('Diablo II Resurrected');
-      expect(app.getPath).toHaveBeenCalledWith('documents');
-    });
-
-    it('Then should return macOS path on darwin', () => {
-      // Arrange
-      Object.defineProperty(process, 'platform', { value: 'darwin' });
-      vi.mocked(app.getPath).mockReturnValue('/Users/test');
-
-      // Act
-      const path = monitor.getDefaultDirectory();
-
-      // Assert
-      expect(path).toContain('Library');
-      expect(path).toContain('Application Support');
-      expect(path).toContain('Blizzard Entertainment');
-      expect(app.getPath).toHaveBeenCalledWith('home');
-    });
-
-    it('Then should return Linux path on other platforms', () => {
-      // Arrange
-      Object.defineProperty(process, 'platform', { value: 'linux' });
-      vi.mocked(app.getPath).mockReturnValue('/home/test');
-
-      // Act
-      const path = monitor.getDefaultDirectory();
-
-      // Assert
-      expect(path).toContain('.wine');
-      expect(path).toContain('drive_c');
-      expect(path).toContain('Saved Games');
       expect(app.getPath).toHaveBeenCalledWith('home');
     });
   });

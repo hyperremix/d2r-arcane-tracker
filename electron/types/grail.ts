@@ -1,3 +1,5 @@
+import type * as d2s from '@dschu012/d2s';
+
 /**
  * Type representing the different categories of items in Diablo 2.
  */
@@ -291,6 +293,7 @@ export type ItemDetails = {
   ethereal: boolean;
   ilevel: number | null;
   socketed: boolean;
+  d2sItem?: d2s.types.IItem;
 };
 
 /**
@@ -445,6 +448,7 @@ export type ItemDetectionEvent = {
   type: 'item-found';
   item: D2Item;
   grailItem: Item;
+  silent?: boolean;
 };
 
 /**
@@ -467,6 +471,33 @@ export type D2SaveFile = {
 export type SaveFileEvent = {
   type: 'created' | 'modified' | 'deleted';
   file: D2SaveFile;
+  extractedItems?: d2s.types.IItem[];
+  silent?: boolean;
+};
+
+/**
+ * Interface representing the state of a save file for tracking modifications.
+ */
+export interface SaveFileState {
+  id: string;
+  filePath: string;
+  lastModified: Date;
+  lastParsed: Date;
+  created: Date;
+  updated: Date;
+}
+
+/**
+ * Type representing a save file state as stored in the database.
+ * SQLite-compatible types: dates as strings
+ */
+export type DatabaseSaveFileState = {
+  id: string;
+  file_path: string;
+  last_modified: string;
+  last_parsed: string;
+  created_at: string;
+  updated_at: string;
 };
 
 /**

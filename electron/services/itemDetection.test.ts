@@ -158,56 +158,7 @@ describe('When ItemDetectionService is used', () => {
     });
   });
 
-  describe('If enable is called', () => {
-    it('Then should enable the service', () => {
-      // Arrange
-      service.disable();
-
-      // Act
-      service.enable();
-
-      // Assert
-      // We can't directly access private property, but we can test through analyzeSaveFile
-      expect(true).toBe(true); // Placeholder - functionality tested through other methods
-    });
-  });
-
-  describe('If disable is called', () => {
-    it('Then should disable the service', () => {
-      // Arrange
-      service.enable();
-
-      // Act
-      service.disable();
-
-      // Assert
-      // We can't directly access private property, but we can test through analyzeSaveFile
-      expect(true).toBe(true); // Placeholder - functionality tested through other methods
-    });
-  });
-
   describe('If analyzeSaveFile is called', () => {
-    it('Then should not emit events when service is disabled', async () => {
-      // Arrange
-      const mockSaveFile = D2SaveFileBuilder.new()
-        .withName('TestCharacter')
-        .withPath('/path/to/save.d2s')
-        .withLastModified(new Date())
-        .build();
-
-      service.setGrailItems(mockGrailItems);
-      service.disable();
-
-      const eventSpy = vi.fn();
-      service.on('item-detection', eventSpy);
-
-      // Act
-      await service.analyzeSaveFile(mockSaveFile);
-
-      // Assert
-      expect(eventSpy).not.toHaveBeenCalled();
-    });
-
     it('Then should work with different character types using builder convenience methods', async () => {
       // Arrange
       const amazonSaveFile = D2SaveFileBuilder.new()
@@ -231,17 +182,10 @@ describe('When ItemDetectionService is used', () => {
         .build();
 
       service.setGrailItems(mockGrailItems);
-      service.disable();
 
-      const eventSpy = vi.fn();
-      service.on('item-detection', eventSpy);
-
-      // Act
+      // Act & Assert
       await service.analyzeSaveFile(amazonSaveFile);
       await service.analyzeSaveFile(barbarianSaveFile);
-
-      // Assert
-      expect(eventSpy).not.toHaveBeenCalled();
       expect(amazonSaveFile.characterClass).toBe('Amazon');
       expect(amazonSaveFile.level).toBe(85);
       expect(amazonSaveFile.difficulty).toBe('hell');
@@ -267,10 +211,6 @@ describe('When ItemDetectionService is used', () => {
         .buildMany(3);
 
       service.setGrailItems(mockGrailItems);
-      service.disable();
-
-      const eventSpy = vi.fn();
-      service.on('item-detection', eventSpy);
 
       // Act
       for (const saveFile of saveFiles) {
@@ -278,7 +218,6 @@ describe('When ItemDetectionService is used', () => {
       }
 
       // Assert
-      expect(eventSpy).not.toHaveBeenCalled();
       expect(saveFiles).toHaveLength(3);
       expect(saveFiles[0].name).toBe('SorceressTest-0');
       expect(saveFiles[1].name).toBe('SorceressTest-1');

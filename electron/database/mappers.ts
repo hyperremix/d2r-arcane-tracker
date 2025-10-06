@@ -3,8 +3,10 @@ import type {
   DatabaseCharacter,
   DatabaseGrailProgress,
   DatabaseItem,
+  DatabaseSaveFileState,
   GrailProgress,
   Item,
+  SaveFileState,
 } from '../types/grail';
 
 /**
@@ -236,5 +238,39 @@ export function mapDatabaseItemToItem(dbItem: DatabaseItem): Item {
     subCategory: dbItem.sub_category,
     treasureClass: dbItem.treasure_class,
     setName: dbItem.set_name || undefined,
+  };
+}
+
+/**
+ * Maps a SaveFileState object to DatabaseSaveFileState format with SQLite-compatible types.
+ * @param saveFileState - The save file state object to map (with Date objects)
+ * @returns Database save file state object with converted types
+ */
+export function mapSaveFileStateToDatabase(
+  saveFileState: SaveFileState,
+): Omit<DatabaseSaveFileState, 'created_at' | 'updated_at'> {
+  return {
+    id: saveFileState.id,
+    file_path: saveFileState.filePath,
+    last_modified: saveFileState.lastModified.toISOString(),
+    last_parsed: saveFileState.lastParsed.toISOString(),
+  };
+}
+
+/**
+ * Maps a DatabaseSaveFileState back to SaveFileState format.
+ * @param dbSaveFileState - The database save file state object to convert
+ * @returns SaveFileState object with original types
+ */
+export function mapDatabaseSaveFileStateToSaveFileState(
+  dbSaveFileState: DatabaseSaveFileState,
+): SaveFileState {
+  return {
+    id: dbSaveFileState.id,
+    filePath: dbSaveFileState.file_path,
+    lastModified: new Date(dbSaveFileState.last_modified),
+    lastParsed: new Date(dbSaveFileState.last_parsed),
+    created: new Date(dbSaveFileState.created_at),
+    updated: new Date(dbSaveFileState.updated_at),
   };
 }
