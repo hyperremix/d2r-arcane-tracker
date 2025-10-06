@@ -22,11 +22,46 @@ description: Development workflow and best practices
 - **IDE**: Use VS Code with recommended extensions
 - **Debugging**: Use Electron DevTools for debugging
 
+## Available NPM Scripts
+
+### Development
+- **`npm run dev`**: Start development server with Electron rebuild for better-sqlite3
+- **`npm run preview`**: Preview the built application
+
+### Building
+- **`npm run build`**: Type check, build, and package for all platforms
+- **`npm run build:win`**: Build and package for Windows
+- **`npm run build:mac`**: Build and package for macOS
+- **`npm run build:linux`**: Build and package for Linux
+
+### Type Checking
+- **`npm run typecheck`**: Run TypeScript type checking for both web and node configs
+- **`npm run typecheck:web`**: Type check web TypeScript files only
+- **`npm run typecheck:node`**: Type check Node.js TypeScript files only
+
+### Code Quality
+- **`npm run format`**: Check code formatting with Biome
+- **`npm run format:fix`**: Fix code formatting issues
+- **`npm run lint`**: Check code for linting issues
+- **`npm run lint:fix`**: Fix linting issues automatically
+- **`npm run check`**: Run both linting and formatting checks
+- **`npm run check:fix`**: Fix both linting and formatting issues
+
+### Testing
+- **`npm run test`**: Run tests in watch mode
+- **`npm run test:ui`**: Run tests with UI interface
+- **`npm run test:run`**: Run tests once and exit
+- **`npm run test:coverage`**: Run tests with coverage report
+
+### Setup & Utilities
+- **`npm run prepare`**: Setup Husky git hooks
+- **`npm run seed:test`**: Setup native modules and seed test data
+
 ## Build Process
-- **Development**: Use `yarn dev` for development server
-- **Production**: Use `yarn build` for production build
-- **Electron**: Use `yarn electron:dev` for Electron development
-- **Packaging**: Use `yarn electron:pack` for packaging
+- **Development**: Use `npm run dev` for development server
+- **Production**: Use `npm run build` for production build
+- **Platform-specific**: Use `npm run build:win|mac|linux` for specific platforms
+- **Type Safety**: Always run `npm run typecheck` before building
 
 ## Testing Strategy
 - **Unit Tests**: Test individual functions and components

@@ -16,11 +16,12 @@ export class DatabaseItemBuilder {
     id: 'default-item-id',
     name: 'Default Item',
     link: 'https://example.com/default-item',
+    code: null,
     type: 'unique',
     category: 'armor',
     sub_category: 'helms',
     treasure_class: 'normal',
-    set_name: undefined,
+    set_name: null,
     ethereal_type: 'none',
     created_at: '2024-01-01T00:00:00.000Z',
     updated_at: '2024-01-01T00:00:00.000Z',
@@ -77,7 +78,7 @@ export class DatabaseItemBuilder {
    * Set the set name (for set items)
    */
   withSetName(setName: string | undefined): this {
-    this.item.set_name = setName as ItemSet | undefined;
+    this.item.set_name = (setName as ItemSet) || null;
     return this;
   }
 
@@ -85,7 +86,7 @@ export class DatabaseItemBuilder {
    * Remove the set name (for non-set items)
    */
   withoutSetName(): this {
-    this.item.set_name = undefined;
+    this.item.set_name = null;
     return this;
   }
 

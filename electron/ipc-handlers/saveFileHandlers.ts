@@ -3,18 +3,7 @@ import { grailDatabase } from '../database/database';
 import { ItemDetectionService } from '../services/itemDetection';
 import type { D2SaveFile, SaveFileEvent } from '../services/saveFileMonitor';
 import { SaveFileMonitor } from '../services/saveFileMonitor';
-import type {
-  ArmorSubCategory,
-  CharacterClass,
-  CharmSubCategory,
-  Item,
-  ItemCategory,
-  ItemDetectionEvent,
-  JewelrySubCategory,
-  RuneSubCategory,
-  RunewordSubCategory,
-  WeaponSubCategory,
-} from '../types/grail';
+import type { CharacterClass, Item, ItemDetectionEvent } from '../types/grail';
 
 /**
  * Global service instances for save file monitoring and item detection.
@@ -44,12 +33,14 @@ function handleAutomaticGrailProgress(event: ItemDetectionEvent): void {
       grailDatabase.upsertCharacter({
         id: characterId,
         name: characterName,
-        character_class: 'barbarian', // Default value, will be updated from save file data
+        characterClass: 'barbarian', // Default value, will be updated from save file data
         level: event.item.level || 1,
         difficulty: 'normal' as const,
         hardcore: false,
         expansion: true,
-        save_file_path: undefined,
+        saveFilePath: undefined,
+        lastUpdated: new Date(),
+        created: new Date(),
       });
       character = grailDatabase.getCharacterByName(characterName);
       console.log(`Created new character: ${characterName}`);
@@ -71,13 +62,12 @@ function handleAutomaticGrailProgress(event: ItemDetectionEvent): void {
     const progressId = `progress_${character.id}_${event.grailItem.id}_${Date.now()}`;
     const grailProgress = {
       id: progressId,
-      character_id: character.id,
-      item_id: event.grailItem.id, // base ID
+      characterId: character.id,
+      itemId: event.grailItem.id, // base ID
       found: true,
-      is_ethereal: Boolean(event.item.ethereal),
-      found_date: new Date().toISOString(),
-      manually_added: false,
-      auto_detected: true,
+      isEthereal: Boolean(event.item.ethereal),
+      foundDate: new Date(),
+      manuallyAdded: false,
       difficulty: character.difficulty,
       notes: `Auto-detected from ${event.item.location}`,
     };
@@ -124,12 +114,12 @@ function updateCharacterFromSaveFile(saveFile: D2SaveFile): void {
     if (character) {
       // Update existing character
       grailDatabase.updateCharacter(character.id, {
-        character_class: saveFile.characterClass as CharacterClass,
+        characterClass: saveFile.characterClass as CharacterClass,
         level: saveFile.level,
         difficulty: saveFile.difficulty,
         hardcore: saveFile.hardcore,
         expansion: saveFile.expansion,
-        save_file_path: saveFile.path,
+        saveFilePath: saveFile.path,
       });
     } else {
       // Create new character
@@ -138,12 +128,14 @@ function updateCharacterFromSaveFile(saveFile: D2SaveFile): void {
       grailDatabase.upsertCharacter({
         id: characterId,
         name: saveFile.name,
-        character_class: saveFile.characterClass as CharacterClass,
+        characterClass: saveFile.characterClass as CharacterClass,
         level: saveFile.level,
         difficulty: saveFile.difficulty,
         hardcore: saveFile.hardcore,
         expansion: saveFile.expansion,
-        save_file_path: saveFile.path,
+        saveFilePath: saveFile.path,
+        lastUpdated: new Date(),
+        created: new Date(),
       });
       console.log(
         `Created character from save file: ${saveFile.name} (${saveFile.characterClass})`,
@@ -251,24 +243,7 @@ export function initializeSaveFileHandlers(): void {
 
   // Load grail items into item detection service
   try {
-    const grailItems: Item[] = grailDatabase.getAllItems().map((item) => ({
-      id: item.id,
-      name: item.name,
-      link: item.link,
-      code: item.code,
-      type: item.type as 'unique' | 'set' | 'rune' | 'runeword',
-      category: item.category as ItemCategory,
-      subCategory: item.sub_category as
-        | WeaponSubCategory
-        | ArmorSubCategory
-        | JewelrySubCategory
-        | CharmSubCategory
-        | RuneSubCategory
-        | RunewordSubCategory,
-      treasureClass: item.treasure_class,
-      setName: item.set_name,
-      etherealType: item.ethereal_type,
-    }));
+    const grailItems: Item[] = grailDatabase.getAllItems();
     itemDetectionService.setGrailItems(grailItems);
     console.log(`Loaded ${grailItems.length} grail items into detection service`);
   } catch (error) {

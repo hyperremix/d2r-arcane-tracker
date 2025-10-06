@@ -32,14 +32,7 @@ vi.mock('../database/database', () => ({
 }));
 
 import { ipcMain } from 'electron';
-import {
-  CharacterBuilder,
-  DatabaseCharacterBuilder,
-  DatabaseItemBuilder,
-  DatabaseProgressBuilder,
-  GrailProgressBuilder,
-  HolyGrailItemBuilder,
-} from '@/fixtures';
+import { GrailProgressBuilder, HolyGrailItemBuilder } from '@/fixtures';
 import { GrailDatabase } from '../database/database';
 import type { Character } from '../types/grail';
 import { closeGrailDatabase, initializeGrailHandlers } from './grailHandlers';
@@ -104,9 +97,6 @@ describe('When grailHandlers is used', () => {
       // Assert
       expect(GrailDatabase).toHaveBeenCalled();
       expect(ipcMain.handle).toHaveBeenCalledWith('grail:getCharacters', expect.any(Function));
-      expect(ipcMain.handle).toHaveBeenCalledWith('grail:createCharacter', expect.any(Function));
-      expect(ipcMain.handle).toHaveBeenCalledWith('grail:updateCharacter', expect.any(Function));
-      expect(ipcMain.handle).toHaveBeenCalledWith('grail:deleteCharacter', expect.any(Function));
       expect(ipcMain.handle).toHaveBeenCalledWith('grail:getItems', expect.any(Function));
       expect(ipcMain.handle).toHaveBeenCalledWith('grail:seedItems', expect.any(Function));
       expect(ipcMain.handle).toHaveBeenCalledWith('grail:getProgress', expect.any(Function));
@@ -138,22 +128,22 @@ describe('When grailHandlers is used', () => {
 
     it('Then grail:getCharacters should return mapped characters', async () => {
       // Arrange
-      const mockDbCharacters = [
-        DatabaseCharacterBuilder.new()
-          .withId('char-1')
-          .withName('TestCharacter')
-          .asAmazon()
-          .withLevel(85)
-          .withDifficulty('hell')
-          .asHardcore()
-          .asExpansion()
-          .withSaveFilePath('/path/to/char.d2s')
-          .withCreatedAt('2024-01-01T00:00:00.000Z')
-          .withUpdatedAt('2024-01-02T00:00:00.000Z')
-          .asActive()
-          .build(),
+      const mockCharacters = [
+        {
+          id: 'char-1',
+          name: 'TestCharacter',
+          characterClass: 'amazon' as const,
+          level: 85,
+          difficulty: 'hell' as const,
+          hardcore: true,
+          expansion: true,
+          saveFilePath: '/path/to/char.d2s',
+          created: new Date('2024-01-01T00:00:00.000Z'),
+          lastUpdated: new Date('2024-01-02T00:00:00.000Z'),
+          deleted: undefined,
+        },
       ];
-      mockGrailDatabase.getAllCharacters.mockReturnValue(mockDbCharacters);
+      mockGrailDatabase.getAllCharacters.mockReturnValue(mockCharacters);
 
       const handler = vi
         .mocked(ipcMain.handle)
@@ -180,79 +170,6 @@ describe('When grailHandlers is used', () => {
       ]);
     });
 
-    it('Then grail:createCharacter should insert character', async () => {
-      // Arrange
-      const mockCharacter = CharacterBuilder.new()
-        .withId('char-1')
-        .withName('TestCharacter')
-        .withCharacterClass('amazon')
-        .withLevel(85)
-        .withDifficulty('hell')
-        .withHardcore(true)
-        .withExpansion(true)
-        .withSaveFilePath('/path/to/char.d2s')
-        .build();
-
-      const handler = vi
-        .mocked(ipcMain.handle)
-        .mock.calls.find((call) => call[0] === 'grail:createCharacter')?.[1] as any;
-
-      // Act
-      const result = await handler(null, mockCharacter);
-
-      // Assert
-      expect(mockGrailDatabase.insertCharacter).toHaveBeenCalledWith({
-        id: 'char-1',
-        name: 'TestCharacter',
-        character_class: 'amazon',
-        level: 85,
-        difficulty: 'hell',
-        hardcore: true,
-        expansion: true,
-        save_file_path: '/path/to/char.d2s',
-      });
-      expect(result).toEqual({ success: true });
-    });
-
-    it('Then grail:updateCharacter should update character', async () => {
-      // Arrange
-      const characterId = 'char-1';
-      const updates = {
-        name: 'UpdatedCharacter',
-        level: 90,
-      };
-
-      const handler = vi
-        .mocked(ipcMain.handle)
-        .mock.calls.find((call) => call[0] === 'grail:updateCharacter')?.[1] as any;
-
-      // Act
-      const result = await handler(null, characterId, updates);
-
-      // Assert
-      expect(mockGrailDatabase.updateCharacter).toHaveBeenCalledWith('char-1', {
-        name: 'UpdatedCharacter',
-        level: 90,
-      });
-      expect(result).toEqual({ success: true });
-    });
-
-    it('Then grail:deleteCharacter should delete character', async () => {
-      // Arrange
-      const characterId = 'char-1';
-
-      const handler = vi
-        .mocked(ipcMain.handle)
-        .mock.calls.find((call) => call[0] === 'grail:deleteCharacter')?.[1] as any;
-
-      // Act
-      const result = await handler(null, characterId);
-
-      // Assert
-      expect(mockGrailDatabase.deleteCharacter).toHaveBeenCalledWith('char-1');
-      expect(result).toEqual({ success: true });
-    });
-
     it('Then character handlers should handle errors properly', async () => {
       // Arrange
       mockGrailDatabase.getAllCharacters.mockImplementation(() => {
@@ -276,9 +193,21 @@ describe('When grailHandlers is used', () => {
     it('Then grail:getItems should return mapped items', async () => {
       // Arrange
       const mockSettings = { grailEthereal: false };
-      const mockDbItems = [DatabaseItemBuilder.new().asShako().build()];
+      const mockItems = [
+        {
+          id: 'shako',
+          name: 'shako',
+          link: 'https://example.com/default-item',
+          type: 'unique' as const,
+          category: 'armor' as const,
+          subCategory: 'helms' as const,
+          treasureClass: 'normal' as const,
+          setName: undefined,
+          etherealType: 'none' as const,
+        },
+      ];
       mockGrailDatabase.getAllSettings.mockReturnValue(mockSettings);
-      mockGrailDatabase.getFilteredItems.mockReturnValue(mockDbItems);
+      mockGrailDatabase.getFilteredItems.mockReturnValue(mockItems);
 
       const handler = vi
         .mocked(ipcMain.handle)
@@ -363,23 +292,37 @@ describe('When grailHandlers is used', () => {
     it('Then grail:getProgress should return mapped progress for all characters', async () => {
       // Arrange
       const mockSettings = { grailEthereal: false };
-      const mockDbProgress = [
-        DatabaseProgressBuilder.new()
-          .withId('progress-1')
-          .withCharacterId('char-1')
-          .forShako()
-          .asFound()
-          .withFoundDate('2024-01-01T00:00:00.000Z')
-          .asAutoDetected()
-          .asHellDifficulty()
-          .withNotes('Found in Baal run')
-          .build(),
+      const mockProgress = [
+        {
+          id: 'progress-1',
+          characterId: 'char-1',
+          itemId: 'shako',
+          found: true,
+          foundDate: new Date('2024-01-01T00:00:00.000Z'),
+          foundBy: undefined,
+          manuallyAdded: false,
+          difficulty: 'hell' as const,
+          notes: 'Found in Baal run',
+          isEthereal: false,
+        },
       ];
       const mockCharacters = [
-        DatabaseCharacterBuilder.new().withId('char-1').withName('TestCharacter').build(),
+        {
+          id: 'char-1',
+          name: 'TestCharacter',
+          characterClass: 'amazon' as const,
+          level: 85,
+          difficulty: 'hell' as const,
+          hardcore: true,
+          expansion: true,
+          saveFilePath: '/path/to/char.d2s',
+          created: new Date('2024-01-01T00:00:00.000Z'),
+          lastUpdated: new Date('2024-01-02T00:00:00.000Z'),
+          deleted: undefined,
+        },
       ];
       mockGrailDatabase.getAllSettings.mockReturnValue(mockSettings);
-      mockGrailDatabase.getFilteredProgress.mockReturnValue(mockDbProgress);
+      mockGrailDatabase.getFilteredProgress.mockReturnValue(mockProgress);
       mockGrailDatabase.getAllCharacters.mockReturnValue(mockCharacters);
 
       const handler = vi
@@ -410,23 +353,37 @@ describe('When grailHandlers is used', () => {
       // Arrange
       const characterId = 'char-1';
       const mockSettings = { grailEthereal: false };
-      const mockDbProgress = [
-        DatabaseProgressBuilder.new()
-          .withId('progress-1')
-          .withCharacterId('char-1')
-          .forShako()
-          .asFound()
-          .withFoundDate('2024-01-01T00:00:00.000Z')
-          .asAutoDetected()
-          .asHellDifficulty()
-          .withNotes('Found in Baal run')
-          .build(),
+      const mockProgress = [
+        {
+          id: 'progress-1',
+          characterId: 'char-1',
+          itemId: 'shako',
+          found: true,
+          foundDate: new Date('2024-01-01T00:00:00.000Z'),
+          foundBy: undefined,
+          manuallyAdded: false,
+          difficulty: 'hell' as const,
+          notes: 'Found in Baal run',
+          isEthereal: false,
+        },
       ];
       const mockCharacters = [
-        DatabaseCharacterBuilder.new().withId('char-1').withName('TestCharacter').build(),
+        {
+          id: 'char-1',
+          name: 'TestCharacter',
+          characterClass: 'amazon' as const,
+          level: 85,
+          difficulty: 'hell' as const,
+          hardcore: true,
+          expansion: true,
+          saveFilePath: '/path/to/char.d2s',
+          created: new Date('2024-01-01T00:00:00.000Z'),
+          lastUpdated: new Date('2024-01-02T00:00:00.000Z'),
+          deleted: undefined,
+        },
       ];
       mockGrailDatabase.getAllSettings.mockReturnValue(mockSettings);
-      mockGrailDatabase.getProgressByCharacter.mockReturnValue(mockDbProgress);
+      mockGrailDatabase.getProgressByCharacter.mockReturnValue(mockProgress);
       mockGrailDatabase.getAllCharacters.mockReturnValue(mockCharacters);
 
       const handler = vi
@@ -475,18 +432,7 @@ describe('When grailHandlers is used', () => {
       const result = await handler(null, mockProgress);
 
       // Assert
-      expect(mockGrailDatabase.upsertProgress).toHaveBeenCalledWith({
-        id: 'progress-1',
-        character_id: 'char-1',
-        item_id: 'shako',
-        found: true,
-        found_date: '2024-01-01T00:00:00.000Z',
-        manually_added: false,
-        auto_detected: false,
-        difficulty: 'hell',
-        notes: 'Found in Baal run',
-        is_ethereal: false,
-      });
+      expect(mockGrailDatabase.upsertProgress).toHaveBeenCalledWith(mockProgress);
       expect(result).toEqual({ success: true });
     });
 

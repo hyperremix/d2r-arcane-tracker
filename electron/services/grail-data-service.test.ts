@@ -14,18 +14,14 @@ interface MockDatabaseItem {
   updated_at: string;
 }
 
-interface MockDatabaseProgress {
+interface MockGrailProgress {
   id: string;
-  character_id: string;
-  item_id: string;
+  characterId: string;
+  itemId: string;
   found: boolean;
-  found_date?: string;
-  manually_added: boolean;
-  auto_detected: boolean;
-  difficulty?: 'normal' | 'nightmare' | 'hell';
-  notes?: string;
-  created_at: string;
-  updated_at: string;
+  foundDate?: Date;
+  manuallyAdded: boolean;
+  isEthereal: boolean;
 }
 
 interface MockGrailDatabase {
@@ -491,38 +487,32 @@ describe('When GrailDataService is used', () => {
         },
       ];
 
-      const mockProgress: MockDatabaseProgress[] = [
+      const mockProgress: MockGrailProgress[] = [
         {
           id: 'progress1',
-          character_id: 'char1',
-          item_id: 'item1',
+          characterId: 'char1',
+          itemId: 'item1',
           found: true,
-          found_date: '2024-01-01',
-          manually_added: false,
-          auto_detected: true,
-          created_at: '2024-01-01',
-          updated_at: '2024-01-01',
+          foundDate: new Date('2024-01-01'),
+          manuallyAdded: false,
+          isEthereal: false,
         },
         {
           id: 'progress2',
-          character_id: 'char1',
-          item_id: 'item2',
+          characterId: 'char1',
+          itemId: 'item2',
           found: true,
-          found_date: '2024-01-01',
-          manually_added: false,
-          auto_detected: true,
-          created_at: '2024-01-01',
-          updated_at: '2024-01-01',
+          foundDate: new Date('2024-01-01'),
+          manuallyAdded: false,
+          isEthereal: false,
         },
         {
           id: 'progress3',
-          character_id: 'char1',
-          item_id: 'item3',
+          characterId: 'char1',
+          itemId: 'item3',
           found: false,
-          manually_added: false,
-          auto_detected: false,
-          created_at: '2024-01-01',
-          updated_at: '2024-01-01',
+          manuallyAdded: false,
+          isEthereal: false,
         },
       ];
 
@@ -565,28 +555,24 @@ describe('When GrailDataService is used', () => {
         },
       ];
 
-      const mockProgress: MockDatabaseProgress[] = [
+      const mockProgress: MockGrailProgress[] = [
         {
           id: 'progress1',
-          character_id: 'char1',
-          item_id: 'item1',
+          characterId: 'char1',
+          itemId: 'item1',
           found: true,
-          found_date: '2024-01-01',
-          manually_added: false,
-          auto_detected: true,
-          created_at: '2024-01-01',
-          updated_at: '2024-01-01',
+          foundDate: new Date('2024-01-01'),
+          manuallyAdded: false,
+          isEthereal: false,
         },
         {
           id: 'progress2',
-          character_id: 'char1',
-          item_id: 'item2',
+          characterId: 'char1',
+          itemId: 'item2',
           found: true,
-          found_date: '2024-01-01',
-          manually_added: false,
-          auto_detected: true,
-          created_at: '2024-01-01',
-          updated_at: '2024-01-01',
+          foundDate: new Date('2024-01-01'),
+          manuallyAdded: false,
+          isEthereal: false,
         },
       ];
 
