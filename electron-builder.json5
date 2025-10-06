@@ -1,49 +1,40 @@
 // @see - https://www.electron.build/configuration/configuration
 {
-  "$schema": "https://raw.githubusercontent.com/electron-userland/electron-builder/master/packages/app-builder-lib/scheme.json",
-  "appId": "d2r-arcane-tracker",
-  "asar": true,
-  "productName": "D2R Arcane Tracker",
-  "directories": {
-    "output": "release/${version}"
+  $schema: "https://raw.githubusercontent.com/electron-userland/electron-builder/master/packages/app-builder-lib/scheme.json",
+  appId: "d2r-arcane-tracker",
+  asar: true,
+  productName: "D2R Arcane Tracker",
+  directories: {
+    output: "release/${version}",
   },
-  "files": [
-    "dist",
-    "dist-electron"
-  ],
-  "mac": {
-    "icon": "build/icon.icns",
-    "target": [
-      "dmg"
-    ],
-    "artifactName": "${productName}-Mac-${version}-Installer.${ext}"
+  files: ["dist", "dist-electron"],
+  mac: {
+    icon: "build/icon.icns",
+    target: ["dmg"],
+    artifactName: "${productName}-Mac-${version}-Installer.${ext}",
   },
-  "win": {
-    "icon": "build/icon.ico",
-    "target": [
+  win: {
+    icon: "build/icon.ico",
+    target: [
       {
-        "target": "nsis",
-        "arch": [
-          "x64"
-        ]
-      }
+        target: "nsis",
+        arch: ["x64"],
+      },
     ],
-    "artifactName": "${productName}-Windows-${version}-Setup.${ext}",
-    "asarUnpack": [
-      "**/node_modules/better-sqlite3/**/*",
-      "**/node_modules/@dschu012/**/*"
-    ]
+    artifactName: "${productName}-Windows-${version}-Setup.${ext}",
+    asarUnpack: ["**/node_modules/better-sqlite3/**/*", "**/node_modules/@dschu012/**/*"],
   },
-  "nsis": {
-    "oneClick": false,
-    "perMachine": false,
-    "allowToChangeInstallationDirectory": true,
-    "deleteAppDataOnUninstall": false
+  nsis: {
+    oneClick: false,
+    perMachine: false,
+    allowToChangeInstallationDirectory: true,
+    deleteAppDataOnUninstall: false,
   },
-  "linux": {
-    "target": [
-      "AppImage"
-    ],
-    "artifactName": "${productName}-Linux-${version}.${ext}"
-  }
+  linux: {
+    target: ["AppImage"],
+    artifactName: "${productName}-Linux-${version}.${ext}",
+  },
+  compression: "maximum",
+  removePackageScripts: true,
+  removePackageKeywords: true,
 }
