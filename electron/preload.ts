@@ -214,29 +214,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
 
   /**
-   * Item detection API methods for managing automatic item detection.
-   */
-  itemDetection: {
-    /**
-     * Enables automatic item detection from save files.
-     * @returns {Promise<{ success: boolean }>} A promise that resolves with a success indicator.
-     */
-    enable: (): Promise<{ success: boolean }> => ipcRenderer.invoke('itemDetection:enable'),
-    /**
-     * Disables automatic item detection from save files.
-     * @returns {Promise<{ success: boolean }>} A promise that resolves with a success indicator.
-     */
-    disable: (): Promise<{ success: boolean }> => ipcRenderer.invoke('itemDetection:disable'),
-    /**
-     * Sets the Holy Grail items to match against during detection.
-     * @param {Item[]} items - Array of Holy Grail items to use for matching.
-     * @returns {Promise<{ success: boolean }>} A promise that resolves with a success indicator.
-     */
-    setGrailItems: (items: Item[]): Promise<{ success: boolean }> =>
-      ipcRenderer.invoke('itemDetection:setGrailItems', items),
-  },
-
-  /**
    * Native dialog API methods for showing system file dialogs.
    */
   dialog: {

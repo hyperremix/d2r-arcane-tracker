@@ -1,5 +1,6 @@
 import { EventEmitter } from 'node:events';
 import fs from 'node:fs/promises';
+import type * as d2s from '@dschu012/d2s';
 import { read } from '@dschu012/d2s';
 import { runesByCode } from '../items/indexes';
 import type { D2SaveFile } from '../services/saveFileMonitor';
@@ -12,7 +13,6 @@ import type { D2Item, D2SItem, Item, ItemDetectionEvent } from '../types/grail';
  */
 class ItemDetectionService extends EventEmitter {
   private grailItems: Item[] = [];
-  private isEnabled = false;
 
   /**
    * Sets the Holy Grail items that will be used for matching detected items.
@@ -23,33 +23,29 @@ class ItemDetectionService extends EventEmitter {
   }
 
   /**
-   * Enables the item detection service.
-   * When enabled, the service will process save files and emit item detection events.
-   */
-  enable(): void {
-    this.isEnabled = true;
-  }
-
-  /**
-   * Disables the item detection service.
-   * When disabled, the service will not process save files or emit events.
-   */
-  disable(): void {
-    this.isEnabled = false;
-  }
-
-  /**
    * Analyzes a Diablo 2 save file to detect and match items against the Holy Grail database.
    * @param {D2SaveFile} saveFile - The save file to analyze.
+   * @param {d2s.types.IItem[]} [preExtractedItems] - Optional pre-extracted items to avoid re-parsing.
+   * @param {boolean} [silent=false] - If true, suppress notifications for detected items.
    * @returns {Promise<void>} A promise that resolves when analysis is complete.
    */
-  async analyzeSaveFile(saveFile: D2SaveFile): Promise<void> {
-    if (!this.isEnabled) {
-      return;
-    }
-
+  async analyzeSaveFile(
+    saveFile: D2SaveFile,
+    preExtractedItems?: d2s.types.IItem[],
+    silent: boolean = false,
+  ): Promise<void> {
     try {
-      const items = await this.extractItemsFromSaveFile(saveFile);
+      let items: D2Item[];
+
+      if (preExtractedItems && preExtractedItems.length > 0) {
+        // Use pre-extracted items to avoid duplicate parsing
+        console.log(`Using ${preExtractedItems.length} pre-extracted items for ${saveFile.name}`);
+        items = this.convertD2SItemsToD2Items(preExtractedItems, saveFile.name);
+      } else {
+        // Fallback to parsing the save file again
+        console.log(`No pre-extracted items provided, parsing save file: ${saveFile.name}`);
+        items = await this.extractItemsFromSaveFile(saveFile);
+      }
 
       // Simple processing - no complex state tracking
       for (const item of items) {
@@ -59,12 +55,55 @@ class ItemDetectionService extends EventEmitter {
             type: 'item-found',
             item,
             grailItem: grailMatch,
+            silent,
           } as ItemDetectionEvent);
         }
       }
     } catch (error) {
       console.error('Error analyzing save file:', error);
     }
+  }
+
+  /**
+   * Converts D2S items to D2Item format for grail detection.
+   * @private
+   * @param {d2s.types.IItem[]} d2sItems - Array of D2S items to convert.
+   * @param {string} characterName - Name of the character owning these items.
+   * @returns {D2Item[]} Array of converted D2Item objects.
+   */
+  private convertD2SItemsToD2Items(d2sItems: d2s.types.IItem[], characterName: string): D2Item[] {
+    const items: D2Item[] = [];
+
+    const processItems = (
+      itemList: d2s.types.IItem[],
+      defaultLocation: D2Item['location'] = 'inventory',
+    ) => {
+      for (const item of itemList) {
+        // Convert the D2S item to D2Item format
+        const d2Item: D2Item = {
+          id: `item-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          name: this.getItemName(item),
+          type: this.getItemType(item),
+          quality: this.getItemQuality(item),
+          location: defaultLocation,
+          characterName,
+          level: item.level || 1,
+          ethereal: !!item.ethereal,
+          sockets: this.getItemSockets(item),
+          timestamp: new Date(),
+        };
+
+        items.push(d2Item);
+
+        // Process socketed items recursively
+        if (item.socketed_items?.length) {
+          processItems(item.socketed_items, defaultLocation);
+        }
+      }
+    };
+
+    processItems(d2sItems);
+    return items;
   }
 
   /**
@@ -335,7 +374,7 @@ class ItemDetectionService extends EventEmitter {
    */
   private findGrailMatch(item: D2Item): Item | null {
     // Simple exact name matching - no complex algorithms
-    return this.grailItems.find((grailItem) => grailItem.name === item.name) || null;
+    return this.grailItems.find((grailItem) => grailItem.id === item.name) || null;
   }
 }
 

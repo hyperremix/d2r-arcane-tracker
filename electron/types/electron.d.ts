@@ -140,28 +140,6 @@ export interface ElectronAPI {
   }
 
   /**
-   * Item detection API methods for managing automatic item detection from save files.
-   */
-  itemDetection: {
-    /**
-     * Enables automatic item detection from save files.
-     * @returns {Promise<{ success: boolean }>} A promise that resolves with a success indicator.
-     */
-    enable(): Promise<{ success: boolean }>
-    /**
-     * Disables automatic item detection from save files.
-     * @returns {Promise<{ success: boolean }>} A promise that resolves with a success indicator.
-     */
-    disable(): Promise<{ success: boolean }>
-    /**
-     * Sets the Holy Grail items to match against during detection.
-     * @param {Item[]} items - Array of Holy Grail items to use for matching.
-     * @returns {Promise<{ success: boolean }>} A promise that resolves with a success indicator.
-     */
-    setGrailItems(items: Item[]): Promise<{ success: boolean }>
-  }
-
-  /**
    * Icon API methods for managing item icons.
    */
   icon: {

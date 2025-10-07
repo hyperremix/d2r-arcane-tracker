@@ -8,9 +8,11 @@ import type {
   DatabaseCharacter,
   DatabaseGrailProgress,
   DatabaseItem,
+  DatabaseSaveFileState,
   DatabaseSetting,
   GrailProgress,
   Item,
+  SaveFileState,
   Settings,
 } from '../types/grail';
 import { GameMode, GameVersion } from '../types/grail';
@@ -19,8 +21,10 @@ import {
   mapDatabaseCharacterToCharacter,
   mapDatabaseItemToItem,
   mapDatabaseProgressToProgress,
+  mapDatabaseSaveFileStateToSaveFileState,
   mapItemToDatabase,
   mapProgressToDatabase,
+  mapSaveFileStateToDatabase,
   mapValuesToSqlite,
 } from './mappers';
 
@@ -137,6 +141,16 @@ class GrailDatabase {
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
       );
 
+      -- Save file states table - tracks modification times of save files
+      CREATE TABLE IF NOT EXISTS save_file_states (
+        id TEXT PRIMARY KEY,
+        file_path TEXT NOT NULL UNIQUE,
+        last_modified DATETIME NOT NULL,
+        last_parsed DATETIME NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+
       -- Indexes for better performance
       CREATE INDEX IF NOT EXISTS idx_items_category ON items(category);
       CREATE INDEX IF NOT EXISTS idx_items_type ON items(type);
@@ -147,6 +161,8 @@ class GrailDatabase {
       CREATE INDEX IF NOT EXISTS idx_grail_progress_found ON grail_progress(found);
       CREATE INDEX IF NOT EXISTS idx_grail_progress_found_date ON grail_progress(found_date);
       CREATE INDEX IF NOT EXISTS idx_grail_progress_character_item ON grail_progress(character_id, item_id);
+      CREATE INDEX IF NOT EXISTS idx_save_file_states_path ON save_file_states(file_path);
+      CREATE INDEX IF NOT EXISTS idx_save_file_states_modified ON save_file_states(last_modified);
 
       -- Triggers to update the updated_at timestamp
       CREATE TRIGGER IF NOT EXISTS update_items_timestamp
@@ -171,6 +187,12 @@ class GrailDatabase {
         AFTER UPDATE ON settings
         BEGIN
           UPDATE settings SET updated_at = CURRENT_TIMESTAMP WHERE key = NEW.key;
+        END;
+
+      CREATE TRIGGER IF NOT EXISTS update_save_file_states_timestamp
+        AFTER UPDATE ON save_file_states
+        BEGIN
+          UPDATE save_file_states SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
         END;
 
       -- Insert default settings
@@ -636,6 +658,63 @@ class GrailDatabase {
     this.initializeSchema();
   }
 
+  // Save file states methods
+  /**
+   * Retrieves the save file state for a specific file path.
+   * @param filePath - The path to the save file
+   * @returns The save file state or null if not found
+   */
+  getSaveFileState(filePath: string): SaveFileState | null {
+    const stmt = this.db.prepare('SELECT * FROM save_file_states WHERE file_path = ?');
+    const dbState = stmt.get(filePath) as DatabaseSaveFileState | undefined;
+    return dbState ? mapDatabaseSaveFileStateToSaveFileState(dbState) : null;
+  }
+
+  /**
+   * Inserts or updates a save file state in the database.
+   * @param state - The save file state to store
+   */
+  upsertSaveFileState(state: SaveFileState): void {
+    const stmt = this.db.prepare(`
+      INSERT OR REPLACE INTO save_file_states (id, file_path, last_modified, last_parsed)
+      VALUES (?, ?, ?, ?)
+    `);
+    const mappedState = mapSaveFileStateToDatabase(state);
+    stmt.run(
+      mappedState.id,
+      mappedState.file_path,
+      mappedState.last_modified,
+      mappedState.last_parsed,
+    );
+  }
+
+  /**
+   * Retrieves all save file states from the database.
+   * @returns Array of all save file states
+   */
+  getAllSaveFileStates(): SaveFileState[] {
+    const stmt = this.db.prepare('SELECT * FROM save_file_states ORDER BY file_path');
+    const dbStates = stmt.all() as DatabaseSaveFileState[];
+    return dbStates.map(mapDatabaseSaveFileStateToSaveFileState);
+  }
+
+  /**
+   * Deletes the save file state for a specific file path.
+   * @param filePath - The path to the save file
+   */
+  deleteSaveFileState(filePath: string): void {
+    const stmt = this.db.prepare('DELETE FROM save_file_states WHERE file_path = ?');
+    stmt.run(filePath);
+  }
+
+  /**
+   * Clears all save file states from the database.
+   * Used when changing save directories.
+   */
+  clearAllSaveFileStates(): void {
+    this.db.prepare('DELETE FROM save_file_states').run();
+  }
+
   /**
    * Closes the database connection.
    * Should be called when the application is shutting down.
@@ -645,8 +724,8 @@ class GrailDatabase {
   }
 
   /**
-   * Truncates all user data (characters and grail progress) from the database.
-   * This removes all characters and their associated progress while keeping items and settings.
+   * Truncates all user data (characters, grail progress, and save file states) from the database.
+   * This removes all characters, their associated progress, and save file states while keeping items and settings.
    * @throws {Error} If the truncation operation fails
    */
   truncateUserData(): void {
@@ -657,7 +736,12 @@ class GrailDatabase {
       // Delete all grail progress
       this.db.prepare('DELETE FROM grail_progress').run();
 
-      console.log('User data truncated: characters and grail_progress tables cleared');
+      // Clear all save file states (when directory changes)
+      this.clearAllSaveFileStates();
+
+      console.log(
+        'User data truncated: characters, grail_progress, and save_file_states tables cleared',
+      );
     } catch (error) {
       console.error('Failed to truncate user data:', error);
       throw error;

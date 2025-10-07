@@ -20,6 +20,7 @@ import {
   type MagicAttribute,
   type SaveFileEvent,
   type SaveFileItem,
+  type SaveFileState,
 } from '../types/grail';
 import { isRune, simplifyItemName } from '../utils/objects';
 
@@ -123,6 +124,7 @@ const createSavedItem = (item: d2s.types.IItem): ItemDetails => {
     ethereal: !!item.ethereal,
     ilevel: item.level,
     socketed: !!item.socketed,
+    d2sItem: item,
   };
 };
 
@@ -261,6 +263,8 @@ class SaveFileMonitor extends EventEmitter {
   private isMonitoring = false;
   private grailDatabase: GrailDatabase | null = null;
   private saveDirectory: string | null = null;
+  private forceParseAll: boolean = false;
+  private isInitialParsing: boolean = false;
 
   /**
    * Creates a new instance of the SaveFileMonitor.
@@ -340,32 +344,7 @@ class SaveFileMonitor extends EventEmitter {
    * @returns {string} The default save directory path for the current platform.
    */
   private getPlatformDefaultDirectory(): string {
-    const platform = process.platform;
-
-    if (platform === 'win32') {
-      // Windows save location - use the most common one
-      return join(app.getPath('documents'), 'Diablo II Resurrected');
-    } else if (platform === 'darwin') {
-      // macOS save location - use the most common one
-      return join(
-        app.getPath('home'),
-        'Library',
-        'Application Support',
-        'Blizzard Entertainment',
-        'Diablo II Resurrected',
-      );
-    } else {
-      // Linux (through Wine/Proton) - use the most common one
-      return join(
-        app.getPath('home'),
-        '.wine',
-        'drive_c',
-        'users',
-        process.env.USER || 'user',
-        'Saved Games',
-        'Diablo II Resurrected',
-      );
-    }
+    return join(app.getPath('home'), 'Saved Games', 'Diablo II Resurrected');
   }
 
   /**
@@ -411,7 +390,9 @@ class SaveFileMonitor extends EventEmitter {
     }
 
     // Start file parsing to get initial data and file count
+    this.isInitialParsing = true;
     const parsedSuccessfully = await this.parseSaveDirectory(this.saveDirectory);
+    this.isInitialParsing = false;
 
     if (!parsedSuccessfully) {
       return; // Error was already emitted
@@ -503,6 +484,9 @@ class SaveFileMonitor extends EventEmitter {
       }
     }
 
+    // Clean up save file states for files that no longer exist
+    this.cleanupDeletedFileStates(allFiles);
+
     if (allFiles.length === 0) {
       console.warn('No D2R save files found in directories:', directories);
       this.emit('monitoring-error', {
@@ -573,6 +557,34 @@ class SaveFileMonitor extends EventEmitter {
   }
 
   /**
+   * Checks if a save file should be parsed based on modification time.
+   * @private
+   * @param {string} filePath - The path to the save file
+   * @returns {Promise<boolean>} True if the file should be parsed, false otherwise
+   */
+  private async shouldParseSaveFile(filePath: string): Promise<boolean> {
+    // If force parse flag is set, parse all files
+    if (this.forceParseAll) {
+      return true;
+    }
+
+    try {
+      const stats = await import('node:fs/promises').then((fs) => fs.stat(filePath));
+      const fileState = this.grailDatabase?.getSaveFileState(filePath);
+
+      if (!fileState) {
+        return true; // New file, should parse
+      }
+
+      // Parse if file is newer than last recorded modification
+      return stats.mtime > fileState.lastModified;
+    } catch (error) {
+      console.error(`Error checking file modification time for ${filePath}:`, error);
+      return true; // On error, parse the file to be safe
+    }
+  }
+
+  /**
    * Parses multiple save files and updates the current data.
    * @private
    * @param {string[]} filePaths - Array of file paths to parse.
@@ -593,8 +605,21 @@ class SaveFileMonitor extends EventEmitter {
     }
 
     const erroringSaves: string[] = [];
+    const filesToParse: string[] = [];
 
-    const promises = filePaths.map((filePath) => {
+    // Filter files that need parsing based on modification time
+    for (const filePath of filePaths) {
+      const shouldParse = await this.shouldParseSaveFile(filePath);
+      if (shouldParse) {
+        filesToParse.push(filePath);
+      }
+    }
+
+    console.log(
+      `Parsing ${filesToParse.length} out of ${filePaths.length} save files (${filePaths.length - filesToParse.length} skipped due to no changes)`,
+    );
+
+    const promises = filesToParse.map((filePath) => {
       const saveName = basename(filePath)
         .replace('.d2s', '')
         .replace('.sss', '')
@@ -602,7 +627,7 @@ class SaveFileMonitor extends EventEmitter {
         .replace('.d2i', '');
       return readFile(filePath)
         .then((buffer) => this.parseSave(saveName, buffer, extname(filePath).toLowerCase()))
-        .then((result) => {
+        .then(async (result) => {
           results.stats[saveName] = 0;
           result.forEach((item) => {
             const name = processItemName(item);
@@ -621,6 +646,22 @@ class SaveFileMonitor extends EventEmitter {
 
             results.stats[saveName] = (results.stats[saveName] || 0) + 1;
           });
+
+          // Update save file state after successful parsing
+          try {
+            const stats = await import('node:fs/promises').then((fs) => fs.stat(filePath));
+            const saveFileState: SaveFileState = {
+              id: `save-file-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+              filePath,
+              lastModified: stats.mtime,
+              lastParsed: new Date(),
+              created: new Date(),
+              updated: new Date(),
+            };
+            this.grailDatabase?.upsertSaveFileState(saveFileState);
+          } catch (error) {
+            console.error(`Failed to update save file state for ${filePath}:`, error);
+          }
         })
         .catch((e) => {
           console.log('ERROR parsing save file:', e);
@@ -631,6 +672,9 @@ class SaveFileMonitor extends EventEmitter {
 
     await Promise.all(promises);
 
+    // Reset force parse flag after parsing completes
+    this.forceParseAll = false;
+
     // Update save directory if user requested
     if (userRequested && filePaths.length > 0) {
       const firstDir = dirname(filePaths[0]);
@@ -640,14 +684,49 @@ class SaveFileMonitor extends EventEmitter {
     // Update current data
     this.currentData = results;
 
-    // Emit save file events for each found save file
-    for (const filePath of filePaths) {
+    // Emit save file events for each file that was actually parsed
+    for (const filePath of filesToParse) {
       try {
         const saveFile = await this.parseSaveFile(filePath);
         if (saveFile) {
+          const saveName = basename(filePath)
+            .replace('.d2s', '')
+            .replace('.sss', '')
+            .replace('.d2x', '')
+            .replace('.d2i', '');
+
+          // Get the extracted items for this save file from the results
+          const extractedItems: d2s.types.IItem[] = [];
+
+          // Collect items from the results object
+          Object.values(results.items).forEach((itemData) => {
+            if (itemData.inSaves[saveName]) {
+              itemData.inSaves[saveName].forEach((itemDetails) => {
+                if (itemDetails.d2sItem) {
+                  extractedItems.push(itemDetails.d2sItem);
+                }
+              });
+            }
+          });
+
+          Object.values(results.ethItems).forEach((itemData) => {
+            if (itemData.inSaves[saveName]) {
+              itemData.inSaves[saveName].forEach((itemDetails) => {
+                if (itemDetails.d2sItem) {
+                  extractedItems.push(itemDetails.d2sItem);
+                }
+              });
+            }
+          });
+
+          // Set silent flag when doing initial parsing or force parsing all files
+          const silent = this.isInitialParsing || this.forceParseAll;
+
           this.emit('save-file-event', {
             type: 'modified',
             file: saveFile,
+            extractedItems,
+            silent,
           } as SaveFileEvent);
         }
       } catch (error) {
@@ -870,6 +949,9 @@ class SaveFileMonitor extends EventEmitter {
       await this.stopMonitoring();
     }
 
+    // Force parse all files in new directory
+    this.forceParseAll = true;
+
     // Re-initialize directories with the new setting
     await this.initializeSaveDirectories();
 
@@ -944,6 +1026,27 @@ class SaveFileMonitor extends EventEmitter {
       this.readingFiles = false;
     }
   };
+
+  /**
+   * Cleans up save file states for files that no longer exist.
+   * @private
+   * @param {string[]} existingFilePaths - Array of file paths that currently exist
+   */
+  private cleanupDeletedFileStates(existingFilePaths: string[]): void {
+    if (!this.grailDatabase) {
+      return;
+    }
+
+    const existingPaths = new Set(existingFilePaths);
+    const allStates = this.grailDatabase.getAllSaveFileStates();
+
+    for (const state of allStates) {
+      if (!existingPaths.has(state.filePath)) {
+        console.log(`Cleaning up save file state for deleted file: ${state.filePath}`);
+        this.grailDatabase.deleteSaveFileState(state.filePath);
+      }
+    }
+  }
 
   /**
    * Shuts down the save file monitor and stops all monitoring activities.

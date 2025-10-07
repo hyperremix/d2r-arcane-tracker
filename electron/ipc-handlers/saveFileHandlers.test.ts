@@ -184,12 +184,6 @@ describe('When saveFileHandlers is used', () => {
         'saveFile:restoreDefaultDirectory',
         expect.any(Function),
       );
-      expect(ipcMain.handle).toHaveBeenCalledWith('itemDetection:enable', expect.any(Function));
-      expect(ipcMain.handle).toHaveBeenCalledWith('itemDetection:disable', expect.any(Function));
-      expect(ipcMain.handle).toHaveBeenCalledWith(
-        'itemDetection:setGrailItems',
-        expect.any(Function),
-      );
     });
 
     it('Then should load grail items into detection service', () => {
@@ -299,7 +293,11 @@ describe('When saveFileHandlers is used', () => {
       saveFileEventHandler?.(mockEvent);
 
       // Assert
-      expect(mockItemDetectionService.analyzeSaveFile).toHaveBeenCalledWith(mockEvent.file);
+      expect(mockItemDetectionService.analyzeSaveFile).toHaveBeenCalledWith(
+        mockEvent.file,
+        mockEvent.extractedItems,
+        mockEvent.silent,
+      );
     });
 
     it('Then should not analyze save file for non-modification events', () => {
@@ -575,57 +573,6 @@ describe('When saveFileHandlers is used', () => {
       expect(grailDatabase.truncateUserData).toHaveBeenCalled();
       expect(mockSaveFileMonitor.updateSaveDirectory).toHaveBeenCalled();
       expect(result).toEqual({ success: true, defaultDirectory: defaultDir });
-    });
-
-    it('Then itemDetection:enable should enable detection', async () => {
-      // Arrange
-      const handler = vi
-        .mocked(ipcMain.handle)
-        .mock.calls.find((call) => call[0] === 'itemDetection:enable')?.[1] as any;
-
-      // Act
-      const result = await handler();
-
-      // Assert
-      expect(mockItemDetectionService.enable).toHaveBeenCalled();
-      expect(result).toEqual({ success: true });
-    });
-
-    it('Then itemDetection:disable should disable detection', async () => {
-      // Arrange
-      const handler = vi
-        .mocked(ipcMain.handle)
-        .mock.calls.find((call) => call[0] === 'itemDetection:disable')?.[1] as any;
-
-      // Act
-      const result = await handler();
-
-      // Assert
-      expect(mockItemDetectionService.disable).toHaveBeenCalled();
-      expect(result).toEqual({ success: true });
-    });
-
-    it('Then itemDetection:setGrailItems should set items', async () => {
-      // Arrange
-      const mockItems = [
-        HolyGrailItemBuilder.new()
-          .withId('shako')
-          .withName('shako')
-          .withType('unique')
-          .withArmorSubCategory('helms')
-          .build(),
-      ];
-
-      const handler = vi
-        .mocked(ipcMain.handle)
-        .mock.calls.find((call) => call[0] === 'itemDetection:setGrailItems')?.[1] as any;
-
-      // Act
-      const result = await handler(null, mockItems);
-
-      // Assert
-      expect(mockItemDetectionService.setGrailItems).toHaveBeenCalledWith(mockItems);
-      expect(result).toEqual({ success: true });
     });
   });
 

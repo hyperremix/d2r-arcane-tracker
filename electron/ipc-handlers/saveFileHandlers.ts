@@ -3,13 +3,95 @@ import { grailDatabase } from '../database/database';
 import { ItemDetectionService } from '../services/itemDetection';
 import type { D2SaveFile, SaveFileEvent } from '../services/saveFileMonitor';
 import { SaveFileMonitor } from '../services/saveFileMonitor';
-import type { CharacterClass, Item, ItemDetectionEvent } from '../types/grail';
+import type {
+  Character,
+  CharacterClass,
+  Difficulty,
+  Item,
+  ItemDetectionEvent,
+} from '../types/grail';
 
 /**
  * Global service instances for save file monitoring and item detection.
  */
 let saveFileMonitor: SaveFileMonitor;
 let itemDetectionService: ItemDetectionService;
+
+/**
+ * Finds or creates a character by name.
+ * @param characterName - Name of the character to find or create
+ * @param level - Level of the character (used when creating new character)
+ * @returns Character object or null if creation fails
+ */
+function findOrCreateCharacter(characterName: string, level: number) {
+  let character = grailDatabase.getCharacterByName(characterName);
+
+  if (!character) {
+    const characterId = `char_${characterName}_${Date.now()}`;
+    grailDatabase.upsertCharacter({
+      id: characterId,
+      name: characterName,
+      characterClass: 'barbarian', // Default value, will be updated from save file data
+      level: level || 1,
+      difficulty: 'normal' as const,
+      hardcore: false,
+      expansion: true,
+      saveFilePath: undefined,
+      lastUpdated: new Date(),
+      created: new Date(),
+    });
+    character = grailDatabase.getCharacterByName(characterName);
+    console.log(`Created new character: ${characterName}`);
+  }
+
+  return character;
+}
+
+/**
+ * Creates a grail progress entry for a character and item.
+ * @param character - Character who found the item
+ * @param event - Item detection event
+ * @returns Grail progress object
+ */
+function createGrailProgress(character: Character, event: ItemDetectionEvent) {
+  const progressId = `progress_${character.id}_${event.grailItem.id}_${Date.now()}`;
+  return {
+    id: progressId,
+    characterId: character.id,
+    itemId: event.grailItem.id,
+    found: true,
+    isEthereal: Boolean(event.item.ethereal),
+    foundDate: new Date(),
+    manuallyAdded: false,
+    difficulty: character.difficulty as Difficulty,
+    notes: `Auto-detected from ${event.item.location}`,
+  };
+}
+
+/**
+ * Emits grail progress update event to all renderer processes.
+ * @param character - Character who found the item
+ * @param event - Item detection event
+ * @param grailProgress - Grail progress object
+ */
+function emitGrailProgressUpdate(
+  character: Character,
+  event: ItemDetectionEvent,
+  grailProgress: ReturnType<typeof createGrailProgress>,
+): void {
+  const allWebContents = webContents.getAllWebContents();
+  for (const wc of allWebContents) {
+    if (!wc.isDestroyed()) {
+      wc.send('grail-progress-updated', {
+        character: character,
+        item: event.item,
+        progress: grailProgress,
+        autoDetected: true,
+        firstTimeDiscovery: true,
+      });
+    }
+  }
+}
 
 /**
  * Handles automatic grail progress updates when items are detected.
@@ -22,73 +104,28 @@ function handleAutomaticGrailProgress(event: ItemDetectionEvent): void {
     if (!event.item) return;
 
     const characterName = event.item.characterName;
-
-    // Find or create character in database
-    let character = grailDatabase.getCharacterByName(characterName);
-
-    if (!character) {
-      // Create new character from item information
-      const characterId = `char_${characterName}_${Date.now()}`;
-
-      grailDatabase.upsertCharacter({
-        id: characterId,
-        name: characterName,
-        characterClass: 'barbarian', // Default value, will be updated from save file data
-        level: event.item.level || 1,
-        difficulty: 'normal' as const,
-        hardcore: false,
-        expansion: true,
-        saveFilePath: undefined,
-        lastUpdated: new Date(),
-        created: new Date(),
-      });
-      character = grailDatabase.getCharacterByName(characterName);
-      console.log(`Created new character: ${characterName}`);
-    }
+    const character = findOrCreateCharacter(characterName, event.item.level);
 
     if (!character) {
       console.error('Failed to create or find character:', characterName);
       return;
     }
 
-    // Check if this item has been found by ANY character (global check)
+    // Check if this is a first-time global discovery
     const existingGlobalProgress = grailDatabase
       .getProgressByItem(event.grailItem.id)
       .find((p) => p.found);
-
     const isFirstTimeDiscovery = !existingGlobalProgress;
 
-    // Create grail progress entry for this character
-    const progressId = `progress_${character.id}_${event.grailItem.id}_${Date.now()}`;
-    const grailProgress = {
-      id: progressId,
-      characterId: character.id,
-      itemId: event.grailItem.id, // base ID
-      found: true,
-      isEthereal: Boolean(event.item.ethereal),
-      foundDate: new Date(),
-      manuallyAdded: false,
-      difficulty: character.difficulty,
-      notes: `Auto-detected from ${event.item.location}`,
-    };
-
+    // Create and save grail progress entry
+    const grailProgress = createGrailProgress(character, event);
     grailDatabase.upsertProgress(grailProgress);
 
+    // Log and notify about the discovery
     if (isFirstTimeDiscovery) {
       console.log(`🎉 NEW GRAIL ITEM: ${event.item.name} found by ${characterName}`);
-
-      // Only emit event for first-time global discoveries
-      const allWebContents = webContents.getAllWebContents();
-      for (const wc of allWebContents) {
-        if (!wc.isDestroyed()) {
-          wc.send('grail-progress-updated', {
-            character: character,
-            item: event.item,
-            progress: grailProgress,
-            autoDetected: true,
-            firstTimeDiscovery: true,
-          });
-        }
+      if (!event.silent) {
+        emitGrailProgressUpdate(character, event, grailProgress);
       }
     } else {
       console.log(
@@ -172,7 +209,7 @@ export function initializeSaveFileHandlers(): void {
 
     // Analyze save file for item changes if it's a modification
     if (event.type === 'modified') {
-      itemDetectionService.analyzeSaveFile(event.file);
+      itemDetectionService.analyzeSaveFile(event.file, event.extractedItems, event.silent);
     }
   });
 
@@ -335,48 +372,6 @@ export function initializeSaveFileHandlers(): void {
       return { success: true, defaultDirectory };
     } catch (error) {
       console.error('Failed to restore default directory:', error);
-      throw error;
-    }
-  });
-
-  // Item detection handlers
-  /**
-   * IPC handler for enabling item detection.
-   */
-  ipcMain.handle('itemDetection:enable', async () => {
-    try {
-      itemDetectionService.enable();
-      return { success: true };
-    } catch (error) {
-      console.error('Failed to enable item detection:', error);
-      throw error;
-    }
-  });
-
-  /**
-   * IPC handler for disabling item detection.
-   */
-  ipcMain.handle('itemDetection:disable', async () => {
-    try {
-      itemDetectionService.disable();
-      return { success: true };
-    } catch (error) {
-      console.error('Failed to disable item detection:', error);
-      throw error;
-    }
-  });
-
-  /**
-   * IPC handler for setting grail items in the detection service.
-   * @param _ - IPC event (unused)
-   * @param items - Array of Holy Grail items to set for detection
-   */
-  ipcMain.handle('itemDetection:setGrailItems', async (_, items: Item[]) => {
-    try {
-      itemDetectionService.setGrailItems(items);
-      return { success: true };
-    } catch (error) {
-      console.error('Failed to set grail items:', error);
       throw error;
     }
   });

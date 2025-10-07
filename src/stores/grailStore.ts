@@ -134,7 +134,6 @@ export const useGrailStore = create<GrailState>((set, get) => ({
         if (items) {
           set({ items });
           console.log(`Reloaded ${items.length} filtered Holy Grail items from database`);
-          await window.electronAPI?.itemDetection.setGrailItems(items);
         }
 
         const progressData = await window.electronAPI?.grail.getProgress();
@@ -237,10 +236,6 @@ export const useGrailStore = create<GrailState>((set, get) => ({
       if (items) {
         set({ items });
         console.log(`Reloaded ${items.length} Holy Grail items from database`);
-
-        // Enable item detection and set grail items for monitoring
-        await window.electronAPI?.itemDetection.setGrailItems(items);
-        await window.electronAPI?.itemDetection.enable();
       }
 
       // Load progress data
