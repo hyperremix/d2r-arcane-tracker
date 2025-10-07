@@ -265,6 +265,7 @@ class SaveFileMonitor extends EventEmitter {
   private saveDirectory: string | null = null;
   private forceParseAll: boolean = false;
   private isInitialParsing: boolean = false;
+  private tickReaderInterval: NodeJS.Timeout | null = null;
 
   /**
    * Creates a new instance of the SaveFileMonitor.
@@ -291,7 +292,7 @@ class SaveFileMonitor extends EventEmitter {
     this.initializeSaveDirectories();
 
     // Start the tick reader for automatic file change detection
-    setInterval(this.tickReader, 500);
+    this.tickReaderInterval = setInterval(this.tickReader, 500);
   }
 
   /**
@@ -406,7 +407,8 @@ class SaveFileMonitor extends EventEmitter {
         ignoreInitial: true,
         depth: 0,
       })
-      .on('all', () => {
+      .on('all', (event, path) => {
+        console.log(`[Chokidar] Event: ${event} on ${path}`);
         this.filesChanged = true;
       })
       .on('error', (error) => console.error('Save file watcher error:', error));
@@ -573,11 +575,20 @@ class SaveFileMonitor extends EventEmitter {
       const fileState = this.grailDatabase?.getSaveFileState(filePath);
 
       if (!fileState) {
+        console.log(`[shouldParseSaveFile] ${filePath}: New file, will parse`);
         return true; // New file, should parse
       }
 
-      // Parse if file is newer than last recorded modification
-      return stats.mtime > fileState.lastModified;
+      // Use getTime() for more reliable comparison
+      const fileTime = stats.mtime.getTime();
+      const lastModTime = fileState.lastModified.getTime();
+      const shouldParse = fileTime > lastModTime;
+
+      console.log(
+        `[shouldParseSaveFile] ${filePath}: fileTime=${new Date(fileTime).toISOString()}, lastMod=${new Date(lastModTime).toISOString()}, willParse=${shouldParse}`,
+      );
+
+      return shouldParse;
     } catch (error) {
       console.error(`Error checking file modification time for ${filePath}:`, error);
       return true; // On error, parse the file to be safe
@@ -712,12 +723,18 @@ class SaveFileMonitor extends EventEmitter {
   private async updateSaveFileState(filePath: string): Promise<void> {
     try {
       const stats = await import('node:fs/promises').then((fs) => fs.stat(filePath));
+
+      // Check if state already exists and reuse its ID
+      const existingState = this.grailDatabase?.getSaveFileState(filePath);
+      const id =
+        existingState?.id || `save-file-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
       const saveFileState: SaveFileState = {
-        id: `save-file-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        id,
         filePath,
         lastModified: stats.mtime,
         lastParsed: new Date(),
-        created: new Date(),
+        created: existingState?.created || new Date(),
         updated: new Date(),
       };
       this.grailDatabase?.upsertSaveFileState(saveFileState);
@@ -1096,24 +1113,42 @@ class SaveFileMonitor extends EventEmitter {
    * @returns {Promise<void>} A promise that resolves when the tick is complete.
    */
   private tickReader = async (): Promise<void> => {
-    if (!this.grailDatabase) return;
+    if (!this.grailDatabase) {
+      console.log('[tickReader] Skipping: No grail database');
+      return;
+    }
 
     const settings = this.grailDatabase.getAllSettings();
-    if (
-      this.watchPath &&
-      this.filesChanged &&
-      !this.readingFiles &&
-      settings.gameMode !== GameMode.Manual
-    ) {
-      console.log('re-reading files!');
-      this.readingFiles = true;
-      this.filesChanged = false;
 
-      const directories = await this.findExistingSaveDirectories();
-      await this.parseAllSaveDirectories(directories);
-
-      this.readingFiles = false;
+    if (!this.watchPath) {
+      console.log('[tickReader] Skipping: No watch path');
+      return;
     }
+
+    if (!this.filesChanged) {
+      // Don't log every time - too verbose
+      return;
+    }
+
+    if (this.readingFiles) {
+      console.log('[tickReader] Skipping: Already reading files');
+      return;
+    }
+
+    if (settings.gameMode === GameMode.Manual) {
+      console.log('[tickReader] Skipping: Manual mode active');
+      return;
+    }
+
+    console.log('[tickReader] Processing file changes...');
+    this.readingFiles = true;
+    this.filesChanged = false;
+
+    const directories = await this.findExistingSaveDirectories();
+    await this.parseAllSaveDirectories(directories);
+
+    this.readingFiles = false;
+    console.log('[tickReader] Done processing file changes');
   };
 
   /**
@@ -1142,6 +1177,10 @@ class SaveFileMonitor extends EventEmitter {
    * @returns {Promise<void>} A promise that resolves when shutdown is complete.
    */
   async shutdown(): Promise<void> {
+    if (this.tickReaderInterval) {
+      clearInterval(this.tickReaderInterval);
+      this.tickReaderInterval = null;
+    }
     await this.stopMonitoring();
   }
 }

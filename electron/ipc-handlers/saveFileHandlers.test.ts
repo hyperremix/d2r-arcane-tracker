@@ -17,6 +17,7 @@ vi.mock('../database/database', () => ({
     getCharacterByName: vi.fn(),
     getCharacterBySaveFilePath: vi.fn(),
     getProgressByItem: vi.fn(),
+    getCharacterProgress: vi.fn(),
     upsertCharacter: vi.fn(),
     updateCharacter: vi.fn(),
     upsertProgress: vi.fn(),
@@ -139,6 +140,7 @@ describe('When saveFileHandlers is used', () => {
     vi.mocked(grailDatabase.getCharacterByName).mockReturnValue(undefined);
     vi.mocked(grailDatabase.getCharacterBySaveFilePath).mockReturnValue(undefined);
     vi.mocked(grailDatabase.getProgressByItem).mockReturnValue([]);
+    vi.mocked(grailDatabase.getCharacterProgress).mockReturnValue(null);
     vi.mocked(grailDatabase.getAllItems).mockReturnValue([]);
   });
 

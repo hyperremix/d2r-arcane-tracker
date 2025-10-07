@@ -458,6 +458,20 @@ class GrailDatabase {
   }
 
   /**
+   * Retrieves a specific grail progress record for a character and item combination.
+   * @param characterId - The character ID to filter by
+   * @param itemId - The item ID to filter by
+   * @returns The grail progress record if found, null otherwise
+   */
+  getCharacterProgress(characterId: string, itemId: string): GrailProgress | null {
+    const stmt = this.db.prepare(
+      'SELECT * FROM grail_progress WHERE character_id = ? AND item_id = ?',
+    );
+    const dbProgress = stmt.get(characterId, itemId) as DatabaseGrailProgress | undefined;
+    return dbProgress ? mapDatabaseProgressToProgress(dbProgress) : null;
+  }
+
+  /**
    * Inserts a new grail progress record or updates an existing one.
    * Uses INSERT OR REPLACE to handle both insert and update operations.
    * @param progress - The grail progress data to insert or update

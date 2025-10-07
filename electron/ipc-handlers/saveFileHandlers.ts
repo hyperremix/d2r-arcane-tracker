@@ -59,7 +59,9 @@ function findOrCreateCharacter(characterName: string, level: number) {
  * @returns Grail progress object
  */
 function createGrailProgress(character: Character, event: ItemDetectionEvent) {
-  const progressId = `progress_${character.id}_${event.grailItem.id}_${Date.now()}`;
+  // Use d2s item ID if available, otherwise fall back to timestamp for backward compatibility
+  const itemIdentifier = event.d2sItemId ? String(event.d2sItemId) : `timestamp_${Date.now()}`;
+  const progressId = `progress_${character.id}_${event.grailItem.id}_${itemIdentifier}`;
   return {
     id: progressId,
     characterId: character.id,
@@ -114,6 +116,17 @@ function handleAutomaticGrailProgress(event: ItemDetectionEvent): void {
     if (!character) {
       console.error('Failed to create or find character:', characterName);
       return;
+    }
+
+    // Check if this character already has this item marked as found
+    const existingCharacterProgress = grailDatabase.getCharacterProgress(
+      character.id,
+      event.grailItem.id,
+    );
+
+    if (existingCharacterProgress?.found) {
+      console.log(`Skipping: ${event.item.name} already found by ${characterName}`);
+      return; // Skip creating duplicate progress
     }
 
     // Check if this is a first-time global discovery

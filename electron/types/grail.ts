@@ -440,6 +440,7 @@ export type D2Item = {
   timestamp: Date;
   characterName: string;
   location: 'inventory' | 'stash' | 'equipment';
+  d2sItemId?: string | number;
 };
 
 /**
@@ -450,6 +451,7 @@ export type ItemDetectionEvent = {
   item: D2Item;
   grailItem: Item;
   silent?: boolean;
+  d2sItemId?: string | number;
 };
 
 /**

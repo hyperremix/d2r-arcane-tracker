@@ -56,6 +56,7 @@ class ItemDetectionService extends EventEmitter {
             item,
             grailItem: grailMatch,
             silent,
+            d2sItemId: item.d2sItemId,
           } as ItemDetectionEvent);
         }
       }
@@ -91,6 +92,7 @@ class ItemDetectionService extends EventEmitter {
           ethereal: !!item.ethereal,
           sockets: this.getItemSockets(item),
           timestamp: new Date(),
+          d2sItemId: item.id,
         };
 
         items.push(d2Item);
@@ -189,6 +191,7 @@ class ItemDetectionService extends EventEmitter {
             timestamp: new Date(),
             characterName,
             location: this.getItemLocation(d2Item) || defaultLocation,
+            d2sItemId: d2Item.id,
           };
 
           items.push(item);
