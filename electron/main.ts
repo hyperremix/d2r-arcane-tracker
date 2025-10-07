@@ -105,6 +105,20 @@ function createWindow() {
     // win.loadFile('dist/index.html')
     mainWindow.loadFile(path.join(RENDERER_DIST, 'index.html'));
   }
+
+  // Enable dev tools keyboard shortcut in production
+  // Cmd+Option+I (macOS) or Ctrl+Shift+I (Windows/Linux)
+  mainWindow.webContents.on('before-input-event', (event, input) => {
+    const isMac = process.platform === 'darwin';
+    const isDevToolsShortcut = isMac
+      ? input.meta && input.alt && input.key.toLowerCase() === 'i'
+      : input.control && input.shift && input.key.toLowerCase() === 'i';
+
+    if (isDevToolsShortcut) {
+      mainWindow?.webContents.toggleDevTools();
+      event.preventDefault();
+    }
+  });
 }
 
 // Quit when all windows are closed, except on macOS. There, it's common
