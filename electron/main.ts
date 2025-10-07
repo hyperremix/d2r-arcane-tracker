@@ -1,7 +1,7 @@
 import { createRequire } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { app, BrowserWindow, type IpcMainEvent, session } from 'electron';
+import { app, BrowserWindow, type IpcMainEvent, ipcMain, session } from 'electron';
 import { initializeDialogHandlers } from './ipc-handlers/dialogHandlers';
 import { closeGrailDatabase, initializeGrailHandlers } from './ipc-handlers/grailHandlers';
 import { initializeIconHandlers } from './ipc-handlers/iconHandlers';
@@ -159,6 +159,21 @@ app.whenReady().then(() => {
   initializeSaveFileHandlers();
   initializeDialogHandlers();
   initializeIconHandlers();
+
+  // Handle titlebar overlay updates (Windows/Linux only)
+  ipcMain.handle(
+    'update-titlebar-overlay',
+    (_event, colors: { backgroundColor: string; symbolColor: string }) => {
+      if (mainWindow && process.platform !== 'darwin') {
+        mainWindow.setTitleBarOverlay({
+          color: colors.backgroundColor,
+          symbolColor: colors.symbolColor,
+          height: 48,
+        });
+      }
+      return { success: true };
+    },
+  );
 
   // Create main window
   createWindow();

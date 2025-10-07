@@ -217,6 +217,18 @@ export interface ElectronAPI {
       properties?: string[]
     }): Promise<{ canceled: boolean; filePaths?: string[] }>
   }
+
+  /**
+   * Updates the title bar overlay colors (Windows/Linux only).
+   * @param {Object} colors - The colors to apply.
+   * @param {string} colors.backgroundColor - Background color of the title bar overlay.
+   * @param {string} colors.symbolColor - Color of window control symbols.
+   * @returns {Promise<{ success: boolean }>} Success indicator.
+   */
+  updateTitleBarOverlay(colors: {
+    backgroundColor: string
+    symbolColor: string
+  }): Promise<{ success: boolean }>
 }
 
 /**
