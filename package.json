@@ -28,7 +28,10 @@
     "test:run": "vitest run",
     "test:coverage": "vitest run --coverage",
     "prepare": "husky",
-    "seed:test": "node scripts/setup-native-modules.js && tsx scripts/seed-test-data.ts"
+    "seed:test": "node scripts/setup-native-modules.js && tsx scripts/seed-test-data.ts",
+    "version:major": "yarn version --new-version major && git push --follow-tags",
+    "version:minor": "yarn version --new-version minor && git push --follow-tags",
+    "version:patch": "yarn version --new-version patch && git push --follow-tags"
   },
   "dependencies": {
     "@dschu012/d2s": "^2.0.36",
