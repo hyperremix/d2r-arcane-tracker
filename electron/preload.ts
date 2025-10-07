@@ -309,4 +309,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
     getCacheStats: (): Promise<{ size: number; d2rAvailable: boolean; cachePath: string }> =>
       ipcRenderer.invoke('icon:getCacheStats'),
   },
+
+  /**
+   * Updates the title bar overlay colors (Windows/Linux only).
+   * @param {Object} colors - The colors to apply.
+   * @returns {Promise<{ success: boolean }>} Success indicator.
+   */
+  updateTitleBarOverlay: (colors: {
+    backgroundColor: string;
+    symbolColor: string;
+  }): Promise<{ success: boolean }> => ipcRenderer.invoke('update-titlebar-overlay', colors),
 });

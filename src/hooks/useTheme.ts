@@ -19,6 +19,14 @@ export function useTheme() {
       } else {
         root.classList.remove('dark');
       }
+
+      // Update Windows titlebar overlay colors to match theme
+      if (window.electronAPI?.platform === 'win32') {
+        window.electronAPI.updateTitleBarOverlay({
+          backgroundColor: theme === 'dark' ? '#1e1f23' : '#ffffff',
+          symbolColor: theme === 'dark' ? '#ffffff' : '#000000',
+        });
+      }
     };
 
     const handleSystemThemeChange = (e: MediaQueryListEvent | MediaQueryList) => {
