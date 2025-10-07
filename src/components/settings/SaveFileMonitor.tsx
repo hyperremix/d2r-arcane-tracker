@@ -336,18 +336,18 @@ export function SaveFileMonitor() {
               {saveFiles.map((file, index) => (
                 <div
                   key={`${file.path}-${index}`}
-                  className="flex items-center justify-between rounded bg-gray-50 p-2 text-xs"
+                  className="flex items-center justify-between rounded bg-gray-50 p-2 text-xs dark:bg-gray-950"
                 >
                   <div>
                     <div className="font-medium">{file.name}</div>
-                    <div className="text-gray-600">
+                    <div className="text-gray-600 dark:text-gray-400">
                       Level {file.level} {file.characterClass}
                       {file.hardcore && ' (HC)'}
                       {' • '}
                       {file.difficulty}
                     </div>
                   </div>
-                  <div className="text-gray-500">
+                  <div className="text-gray-500 dark:text-gray-400">
                     {new Date(file.lastModified).toLocaleDateString()}
                   </div>
                 </div>
