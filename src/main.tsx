@@ -1,6 +1,7 @@
 import React, { Suspense } from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import './i18n';
 import './index.css';
 
@@ -11,8 +12,10 @@ if (!rootElement) {
 
 ReactDOM.createRoot(rootElement).render(
   <React.StrictMode>
-    <Suspense fallback={<img src="/logo.svg" alt="logo" />}>
-      <App />
-    </Suspense>
+    <ErrorBoundary>
+      <Suspense fallback={<img src="/logo.svg" alt="logo" />}>
+        <App />
+      </Suspense>
+    </ErrorBoundary>
   </React.StrictMode>,
 );
