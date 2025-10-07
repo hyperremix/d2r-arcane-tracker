@@ -104,7 +104,8 @@ class GrailDatabase {
             'druid',
             'necromancer',
             'paladin',
-            'sorceress'
+            'sorceress',
+            'shared_stash'
           )
         ),
         level INTEGER NOT NULL DEFAULT 1,

@@ -5,6 +5,7 @@ import {
   Crown,
   Flame,
   HandFist,
+  Package,
   PawPrint,
   Scroll,
   Skull,
@@ -41,6 +42,7 @@ export function CharacterIcon({ characterClass, className }: CharacterIconProps)
     necromancer: Skull,
     paladin: Sword,
     sorceress: WandSparkles,
+    shared_stash: Package,
   };
 
   const Icon = iconMap[characterClass as keyof typeof iconMap] || User;

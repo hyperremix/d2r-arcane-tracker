@@ -28,13 +28,18 @@ function findOrCreateCharacter(characterName: string, level: number) {
 
   if (!character) {
     const characterId = `char_${characterName}_${Date.now()}`;
+    // Determine if this is a shared stash based on the character name
+    const isSharedStash =
+      characterName === 'Shared Stash Softcore' || characterName === 'Shared Stash Hardcore';
+    const defaultCharacterClass = isSharedStash ? 'shared_stash' : 'barbarian';
+
     grailDatabase.upsertCharacter({
       id: characterId,
       name: characterName,
-      characterClass: 'barbarian', // Default value, will be updated from save file data
+      characterClass: defaultCharacterClass, // Use shared_stash for shared stash files, will be updated from save file data for regular characters
       level: level || 1,
       difficulty: 'normal' as const,
-      hardcore: false,
+      hardcore: characterName === 'Shared Stash Hardcore',
       expansion: true,
       saveFilePath: undefined,
       lastUpdated: new Date(),

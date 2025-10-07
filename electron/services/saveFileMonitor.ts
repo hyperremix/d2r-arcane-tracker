@@ -585,6 +585,181 @@ class SaveFileMonitor extends EventEmitter {
   }
 
   /**
+   * Filters files that need parsing based on modification time.
+   * @private
+   * @param {string[]} filePaths - Array of all file paths to check.
+   * @returns {Promise<string[]>} Array of file paths that need parsing.
+   */
+  private async filterFilesToParse(filePaths: string[]): Promise<string[]> {
+    const filesToParse: string[] = [];
+
+    for (const filePath of filePaths) {
+      const shouldParse = await this.shouldParseSaveFile(filePath);
+      if (shouldParse) {
+        filesToParse.push(filePath);
+      }
+    }
+
+    return filesToParse;
+  }
+
+  /**
+   * Extracts the character/save name from a file path.
+   * For .d2i files, returns friendly names like "Shared Stash Hardcore".
+   * @private
+   * @param {string} filePath - The file path to extract the name from.
+   * @returns {string} The character/save name.
+   */
+  private getSaveNameFromPath(filePath: string): string {
+    const extension = extname(filePath).toLowerCase();
+    let saveName = basename(filePath)
+      .replace('.d2s', '')
+      .replace('.sss', '')
+      .replace('.d2x', '')
+      .replace('.d2i', '');
+
+    // Use friendly names for shared stash files
+    if (extension === '.d2i') {
+      const isHardcore = saveName.toLowerCase().includes('hardcore');
+      saveName = isHardcore ? 'Shared Stash Hardcore' : 'Shared Stash Softcore';
+    }
+
+    return saveName;
+  }
+
+  /**
+   * Collects extracted items for a specific save file from the results.
+   * @private
+   * @param {FileReaderResponse} results - The parsing results containing all items.
+   * @param {string} saveName - The save name to collect items for.
+   * @returns {d2s.types.IItem[]} Array of extracted items for this save.
+   */
+  private collectExtractedItems(results: FileReaderResponse, saveName: string): d2s.types.IItem[] {
+    const extractedItems: d2s.types.IItem[] = [];
+
+    // Collect items from both regular and ethereal item collections
+    const itemCollections = [results.items, results.ethItems];
+
+    for (const collection of itemCollections) {
+      Object.values(collection).forEach((itemData) => {
+        if (itemData.inSaves[saveName]) {
+          itemData.inSaves[saveName].forEach((itemDetails) => {
+            if (itemDetails.d2sItem) {
+              extractedItems.push(itemDetails.d2sItem);
+            }
+          });
+        }
+      });
+    }
+
+    return extractedItems;
+  }
+
+  /**
+   * Processes a single save file and updates results.
+   * @private
+   * @param {string} filePath - Path to the save file.
+   * @param {FileReaderResponse} results - Results object to update.
+   * @returns {Promise<{saveName: string, success: boolean}>} Parse result with save name and success status.
+   */
+  private async processSingleFile(
+    filePath: string,
+    results: FileReaderResponse,
+  ): Promise<{ saveName: string; success: boolean }> {
+    const saveName = this.getSaveNameFromPath(filePath);
+
+    try {
+      const buffer = await readFile(filePath);
+      const extension = extname(filePath).toLowerCase();
+      const parsedItems = await this.parseSave(saveName, buffer, extension);
+
+      results.stats[saveName] = 0;
+
+      for (const item of parsedItems) {
+        const name = processItemName(item);
+
+        if (shouldSkipItem(name)) {
+          continue;
+        }
+
+        const savedItem = createSavedItem(item);
+        const isEthereal = !!item.ethereal;
+        addItemToResults(results, name, savedItem, saveName, item, isEthereal);
+
+        if (isRune(item) && !item.socketed) {
+          addRuneToAvailableRunes(results, name, savedItem, saveName, item);
+        }
+
+        results.stats[saveName] = (results.stats[saveName] || 0) + 1;
+      }
+
+      // Update save file state after successful parsing
+      await this.updateSaveFileState(filePath);
+
+      return { saveName, success: true };
+    } catch (error) {
+      console.log('ERROR parsing save file:', error);
+      results.stats[saveName] = null;
+      return { saveName, success: false };
+    }
+  }
+
+  /**
+   * Updates the database state for a parsed save file.
+   * @private
+   * @param {string} filePath - Path to the save file.
+   */
+  private async updateSaveFileState(filePath: string): Promise<void> {
+    try {
+      const stats = await import('node:fs/promises').then((fs) => fs.stat(filePath));
+      const saveFileState: SaveFileState = {
+        id: `save-file-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        filePath,
+        lastModified: stats.mtime,
+        lastParsed: new Date(),
+        created: new Date(),
+        updated: new Date(),
+      };
+      this.grailDatabase?.upsertSaveFileState(saveFileState);
+    } catch (error) {
+      console.error(`Failed to update save file state for ${filePath}:`, error);
+    }
+  }
+
+  /**
+   * Emits save file events for all successfully parsed files.
+   * @private
+   * @param {string[]} filePaths - Array of file paths that were parsed.
+   * @param {FileReaderResponse} results - The parsing results.
+   */
+  private async emitSaveFileEvents(
+    filePaths: string[],
+    results: FileReaderResponse,
+  ): Promise<void> {
+    for (const filePath of filePaths) {
+      try {
+        const saveFile = await this.parseSaveFile(filePath);
+        if (!saveFile) continue;
+
+        const saveName = this.getSaveNameFromPath(filePath);
+        const extractedItems = this.collectExtractedItems(results, saveName);
+
+        // Set silent flag when doing initial parsing or force parsing all files
+        const silent = this.isInitialParsing || this.forceParseAll;
+
+        this.emit('save-file-event', {
+          type: 'modified',
+          file: saveFile,
+          extractedItems,
+          silent,
+        } as SaveFileEvent);
+      } catch (error) {
+        console.error('Error creating save file event:', error);
+      }
+    }
+  }
+
+  /**
    * Parses multiple save files and updates the current data.
    * @private
    * @param {string[]} filePaths - Array of file paths to parse.
@@ -604,73 +779,15 @@ class SaveFileMonitor extends EventEmitter {
       return;
     }
 
-    const erroringSaves: string[] = [];
-    const filesToParse: string[] = [];
-
     // Filter files that need parsing based on modification time
-    for (const filePath of filePaths) {
-      const shouldParse = await this.shouldParseSaveFile(filePath);
-      if (shouldParse) {
-        filesToParse.push(filePath);
-      }
-    }
+    const filesToParse = await this.filterFilesToParse(filePaths);
 
     console.log(
       `Parsing ${filesToParse.length} out of ${filePaths.length} save files (${filePaths.length - filesToParse.length} skipped due to no changes)`,
     );
 
-    const promises = filesToParse.map((filePath) => {
-      const saveName = basename(filePath)
-        .replace('.d2s', '')
-        .replace('.sss', '')
-        .replace('.d2x', '')
-        .replace('.d2i', '');
-      return readFile(filePath)
-        .then((buffer) => this.parseSave(saveName, buffer, extname(filePath).toLowerCase()))
-        .then(async (result) => {
-          results.stats[saveName] = 0;
-          result.forEach((item) => {
-            const name = processItemName(item);
-
-            if (shouldSkipItem(name)) {
-              return;
-            }
-
-            const savedItem = createSavedItem(item);
-            const isEthereal = !!item.ethereal;
-            addItemToResults(results, name, savedItem, saveName, item, isEthereal);
-
-            if (isRune(item) && !item.socketed) {
-              addRuneToAvailableRunes(results, name, savedItem, saveName, item);
-            }
-
-            results.stats[saveName] = (results.stats[saveName] || 0) + 1;
-          });
-
-          // Update save file state after successful parsing
-          try {
-            const stats = await import('node:fs/promises').then((fs) => fs.stat(filePath));
-            const saveFileState: SaveFileState = {
-              id: `save-file-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-              filePath,
-              lastModified: stats.mtime,
-              lastParsed: new Date(),
-              created: new Date(),
-              updated: new Date(),
-            };
-            this.grailDatabase?.upsertSaveFileState(saveFileState);
-          } catch (error) {
-            console.error(`Failed to update save file state for ${filePath}:`, error);
-          }
-        })
-        .catch((e) => {
-          console.log('ERROR parsing save file:', e);
-          erroringSaves.push(saveName);
-          results.stats[saveName] = null;
-        });
-    });
-
-    await Promise.all(promises);
+    // Parse all files in parallel
+    await Promise.all(filesToParse.map((filePath) => this.processSingleFile(filePath, results)));
 
     // Reset force parse flag after parsing completes
     this.forceParseAll = false;
@@ -685,54 +802,7 @@ class SaveFileMonitor extends EventEmitter {
     this.currentData = results;
 
     // Emit save file events for each file that was actually parsed
-    for (const filePath of filesToParse) {
-      try {
-        const saveFile = await this.parseSaveFile(filePath);
-        if (saveFile) {
-          const saveName = basename(filePath)
-            .replace('.d2s', '')
-            .replace('.sss', '')
-            .replace('.d2x', '')
-            .replace('.d2i', '');
-
-          // Get the extracted items for this save file from the results
-          const extractedItems: d2s.types.IItem[] = [];
-
-          // Collect items from the results object
-          Object.values(results.items).forEach((itemData) => {
-            if (itemData.inSaves[saveName]) {
-              itemData.inSaves[saveName].forEach((itemDetails) => {
-                if (itemDetails.d2sItem) {
-                  extractedItems.push(itemDetails.d2sItem);
-                }
-              });
-            }
-          });
-
-          Object.values(results.ethItems).forEach((itemData) => {
-            if (itemData.inSaves[saveName]) {
-              itemData.inSaves[saveName].forEach((itemDetails) => {
-                if (itemDetails.d2sItem) {
-                  extractedItems.push(itemDetails.d2sItem);
-                }
-              });
-            }
-          });
-
-          // Set silent flag when doing initial parsing or force parsing all files
-          const silent = this.isInitialParsing || this.forceParseAll;
-
-          this.emit('save-file-event', {
-            type: 'modified',
-            file: saveFile,
-            extractedItems,
-            silent,
-          } as SaveFileEvent);
-        }
-      } catch (error) {
-        console.error('Error creating save file event:', error);
-      }
-    }
+    await this.emitSaveFileEvents(filesToParse, results);
   }
 
   /**
@@ -824,6 +894,25 @@ class SaveFileMonitor extends EventEmitter {
     try {
       const stats = await import('node:fs/promises').then((fs) => fs.stat(filePath));
       const buffer = await readFile(filePath);
+      const extension = extname(filePath).toLowerCase();
+
+      // Handle shared stash files (.d2i)
+      if (extension === '.d2i') {
+        const fileName = basename(filePath);
+        const isHardcore = fileName.toLowerCase().includes('hardcore');
+        const characterName = isHardcore ? 'Shared Stash Hardcore' : 'Shared Stash Softcore';
+
+        return {
+          name: characterName,
+          path: filePath,
+          lastModified: stats.mtime,
+          characterClass: 'shared_stash',
+          level: 1,
+          difficulty: 'normal',
+          hardcore: isHardcore,
+          expansion: true,
+        };
+      }
 
       // Basic D2 save file parsing (simplified)
       const fileName = basename(filePath, '.d2s');

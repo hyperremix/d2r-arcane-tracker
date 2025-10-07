@@ -60,6 +60,11 @@ export function NotificationButton() {
       _event: Electron.IpcRendererEvent,
       itemEvent: ItemDetectionEvent,
     ) => {
+      // Skip all notifications if silent flag is set (e.g., during initial startup parsing)
+      if (itemEvent.silent) {
+        return;
+      }
+
       // Add to notifications if in-app notifications are enabled
       if (settings.inAppNotifications) {
         const notification: NotificationItem = {

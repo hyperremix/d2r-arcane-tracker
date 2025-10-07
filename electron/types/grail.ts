@@ -78,7 +78,8 @@ export type CharacterClass =
   | 'druid'
   | 'necromancer'
   | 'paladin'
-  | 'sorceress';
+  | 'sorceress'
+  | 'shared_stash';
 
 export type ItemSet =
   | 'Angelic Raiment'
