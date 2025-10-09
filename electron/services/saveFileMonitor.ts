@@ -1,7 +1,7 @@
 import { EventEmitter } from 'node:events';
 import { existsSync, readdirSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
-import { basename, dirname, extname, join, resolve, sep } from 'node:path';
+import { basename, dirname, extname, join } from 'node:path';
 import * as d2s from '@dschu012/d2s';
 import * as d2stash from '@dschu012/d2s/lib/d2/stash';
 import { constants as constants96 } from '@dschu012/d2s/lib/data/versions/96_constant_data';
@@ -425,10 +425,7 @@ class SaveFileMonitor extends EventEmitter {
     }
 
     console.log('[startMonitoring] Initial parsing successful');
-    // Set up file watching
     this.watchPath = this.saveDirectory;
-    const globPattern = this.prepareChokidarGlobe(this.saveDirectory);
-    console.log('[startMonitoring] Setting up file watcher with pattern:', globPattern);
 
     // Use polling mode for better compatibility with D2R (which uses atomic file writes)
     // Polling checks files periodically instead of relying on file system events
@@ -436,7 +433,11 @@ class SaveFileMonitor extends EventEmitter {
     console.log('[startMonitoring] Using polling mode:', usePolling);
 
     this.fileWatcher = chokidar
-      .watch(globPattern, {
+      .watch(this.saveDirectory, {
+        // Only watch files with save file extensions
+        ignored: (path, stats) =>
+          !!stats?.isFile() &&
+          !['.d2s', '.sss', '.d2x', '.d2i'].includes(extname(path).toLowerCase()),
         followSymlinks: false,
         ignoreInitial: true,
         depth: 0,
@@ -629,33 +630,6 @@ class SaveFileMonitor extends EventEmitter {
       });
       return false;
     }
-  }
-
-  /**
-   * Prepares a chokidar glob pattern for watching save files.
-   * @private
-   * @param {string} filename - The filename to create a glob pattern for.
-   * @returns {string} The chokidar glob pattern.
-   */
-  private prepareChokidarGlobe(filename: string): string {
-    if (filename.length < 2) {
-      console.log('[prepareChokidarGlobe] Filename too short:', filename);
-      return filename;
-    }
-    const resolved = resolve(filename);
-
-    // Convert Windows backslashes to forward slashes for chokidar
-    const normalizedPath = resolved.split(sep).join('/');
-
-    // Add glob pattern for save files
-    const globPattern = `${normalizedPath}/*.{d2s,sss,d2x,d2i}`;
-
-    console.log('[prepareChokidarGlobe] Input:', filename);
-    console.log('[prepareChokidarGlobe] Resolved:', resolved);
-    console.log('[prepareChokidarGlobe] Normalized:', normalizedPath);
-    console.log('[prepareChokidarGlobe] Glob pattern:', globPattern);
-
-    return globPattern;
   }
 
   /**
