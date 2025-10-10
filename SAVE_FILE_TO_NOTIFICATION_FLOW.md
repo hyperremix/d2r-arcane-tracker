@@ -849,18 +849,72 @@ await Promise.all(filesToParse.map((filePath) => this.processSingleFile(filePath
 
 ---
 
-#### 5. **No Debouncing on File Changes**
+#### 5. **No Debouncing on File Changes** ✅ RESOLVED
 
-**Location**: `electron/services/saveFileMonitor.ts` (Line 451)  
-**Problem**: While Chokidar has `awaitWriteFinish`, multiple rapid save events (e.g., picking up 3 items quickly) will trigger 3 separate parse cycles.
+**Previous Problem**: While Chokidar had `awaitWriteFinish`, multiple rapid save events (e.g., picking up 3 items quickly) triggered 3 separate parse cycles, causing unnecessary CPU and disk I/O.
 
-**Current Behavior**:
+**Solution Implemented**: Added debouncing to the tick reader to batch rapid file changes.
 
-- Player picks up item 1 → save file modified → `filesChanged=true` → parsing triggered
-- Player picks up item 2 (500ms later) → save file modified → `filesChanged=true` → parsing triggered again
-- Player picks up item 3 (500ms later) → save file modified → `filesChanged=true` → parsing triggered again
+**Implementation Details**:
 
-**Suggested Fix**: Add a debounce delay before processing changes (e.g., 2 seconds) to batch rapid changes.
+- Added `lastFileChangeTime` field to track when file changes occurred
+- Added `FILE_CHANGE_DEBOUNCE_MS` constant (2000ms / 2 seconds)
+- Modified Chokidar event handler to update `lastFileChangeTime` on file changes
+- Modified `tickReader()` to check time elapsed since last change
+- Bypasses debounce for initial parsing and force parse operations
+
+**Debouncing Strategy**:
+
+```typescript
+// Track timestamp when file changes
+this.fileWatcher.on('all', (event, path) => {
+  this.filesChanged = true;
+  this.lastFileChangeTime = Date.now(); // Track when change occurred
+});
+
+// In tickReader: Wait for quiet period before parsing
+const timeSinceLastChange = Date.now() - this.lastFileChangeTime;
+const shouldDebounce = !this.isInitialParsing && !this.forceParseAll;
+
+if (shouldDebounce && timeSinceLastChange < 2000) {
+  // Still within debounce window - don't process yet
+  return;
+}
+
+// Debounce period elapsed - safe to process
+await this.parseAllSaveDirectories(directories);
+```
+
+**Before/After Behavior**:
+
+**Before (No Debouncing)**:
+
+- Item 1 at T=0s → Parse at T=0.5s
+- Item 2 at T=1s → Parse at T=1.5s
+- Item 3 at T=2s → Parse at T=2.5s
+- **Total**: 3 parse cycles (3x CPU/disk usage)
+
+**After (With 2s Debounce)**:
+
+- Item 1 at T=0s → Set flag, start waiting
+- Item 2 at T=1s → Update timestamp, keep waiting
+- Item 3 at T=2s → Update timestamp, keep waiting
+- Parse at T=4s (2s after last change)
+- **Total**: 1 parse cycle (67% reduction)
+
+**Edge Cases Handled**:
+
+- Initial parsing bypasses debounce (immediate startup)
+- Force parse bypasses debounce (user-initiated)
+- Manual mode still respected
+- Already reading check still enforced
+
+**Performance Benefits**:
+
+- **Reduced CPU Usage**: 67% fewer parse cycles during rapid item pickups
+- **Reduced Disk I/O**: Fewer file reads when player is actively playing
+- **Better Batching**: Works with notification batching for optimal UX
+- **No User Impact**: 2-second delay is imperceptible during normal gameplay
 
 ---
 
@@ -1091,7 +1145,7 @@ batchWriter.queueProgress(grailProgress);
 ### Weaknesses
 
 ~~❌ **Duplicate Events**: Same item can trigger multiple notifications~~ ✅ RESOLVED  
-❌ **No Batching**: Rapid changes trigger multiple parse cycles  
+~~❌ **No Batching**: Rapid changes trigger multiple parse cycles~~ ✅ RESOLVED  
 ❌ **Fixed Timing**: Hardcoded intervals may not suit all use cases  
 ~~❌ **Notification Spam**: No debouncing or batching of notifications~~ ✅ RESOLVED  
 ❌ **Race Conditions**: Potential for lost file changes with current flag-based approach  
@@ -1102,7 +1156,7 @@ batchWriter.queueProgress(grailProgress);
 
 1. ~~**High Priority**: Fix duplicate item detection (#1)~~ ✅ RESOLVED
 2. ~~**High Priority**: Add notification batching (#9)~~ ✅ RESOLVED
-3. **Medium Priority**: Implement debouncing on file changes (#5)
+3. ~~**Medium Priority**: Implement debouncing on file changes (#5)~~ ✅ RESOLVED
 4. **Medium Priority**: Add concurrency limits to file parsing (#3)
 5. **Low Priority**: Make intervals configurable (#7)
 

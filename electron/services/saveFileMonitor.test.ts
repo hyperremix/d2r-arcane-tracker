@@ -1,5 +1,5 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: This file is testing private methods */
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Mock the d2s library
 vi.mock('@dschu012/d2s', () => ({
@@ -435,6 +435,141 @@ describe('When SaveFileMonitor is used', () => {
         expect(saveFile.hardcore).toBe(true);
         expect(saveFile.expansion).toBe(true);
       });
+    });
+  });
+
+  describe('When file changes are debounced', () => {
+    let monitor: SaveFileMonitor;
+    let mockDatabase: MockGrailDatabase;
+    let eventBus: EventBus;
+
+    beforeEach(() => {
+      vi.useFakeTimers();
+      eventBus = new EventBus();
+      mockDatabase = createMockDatabase();
+      mockDatabase.getAllSettings.mockReturnValue({
+        gameMode: GameMode.Softcore,
+        saveFileDirectory: '/test/saves',
+      });
+      monitor = new SaveFileMonitor(eventBus, mockDatabase as any);
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+      vi.clearAllMocks();
+    });
+
+    it('Then should not parse immediately after file change', async () => {
+      // Arrange
+      const parseAllSpy = vi.spyOn(monitor as any, 'parseAllSaveDirectories');
+      (monitor as any).filesChanged = true;
+      (monitor as any).lastFileChangeTime = Date.now();
+      (monitor as any).watchPath = '/test/saves';
+
+      // Act - advance time by only 500ms (less than 2000ms debounce)
+      await vi.advanceTimersByTimeAsync(500);
+
+      // Assert - should NOT have parsed yet
+      expect(parseAllSpy).not.toHaveBeenCalled();
+    });
+
+    it('Then should parse after debounce delay', async () => {
+      // Arrange
+      const parseAllSpy = vi
+        .spyOn(monitor as any, 'parseAllSaveDirectories')
+        .mockResolvedValue(undefined);
+      vi.spyOn(monitor as any, 'findExistingSaveDirectories').mockResolvedValue(['/test/saves']);
+      (monitor as any).filesChanged = true;
+      (monitor as any).lastFileChangeTime = Date.now();
+      (monitor as any).watchPath = '/test/saves';
+
+      // Act - advance time by 2500ms (more than 2000ms debounce)
+      await vi.advanceTimersByTimeAsync(2500);
+
+      // Assert - should have parsed
+      expect(parseAllSpy).toHaveBeenCalled();
+    });
+
+    it('Then should batch multiple rapid changes into single parse', async () => {
+      // Arrange
+      const parseAllSpy = vi
+        .spyOn(monitor as any, 'parseAllSaveDirectories')
+        .mockResolvedValue(undefined);
+      vi.spyOn(monitor as any, 'findExistingSaveDirectories').mockResolvedValue(['/test/saves']);
+      (monitor as any).watchPath = '/test/saves';
+
+      // Act - Simulate 3 rapid file changes
+      (monitor as any).filesChanged = true;
+      (monitor as any).lastFileChangeTime = Date.now();
+      await vi.advanceTimersByTimeAsync(500); // Change 1
+
+      (monitor as any).lastFileChangeTime = Date.now();
+      await vi.advanceTimersByTimeAsync(500); // Change 2
+
+      (monitor as any).lastFileChangeTime = Date.now();
+      await vi.advanceTimersByTimeAsync(500); // Change 3
+
+      // Now wait for debounce period to complete
+      await vi.advanceTimersByTimeAsync(2500);
+
+      // Assert - should only parse ONCE despite 3 changes
+      expect(parseAllSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it('Then should bypass debounce for initial parsing', async () => {
+      // Arrange
+      const parseAllSpy = vi
+        .spyOn(monitor as any, 'parseAllSaveDirectories')
+        .mockResolvedValue(undefined);
+      vi.spyOn(monitor as any, 'findExistingSaveDirectories').mockResolvedValue(['/test/saves']);
+      (monitor as any).filesChanged = true;
+      (monitor as any).lastFileChangeTime = Date.now();
+      (monitor as any).watchPath = '/test/saves';
+      (monitor as any).isInitialParsing = true; // Set initial parsing flag
+
+      // Act - advance time by only 500ms (less than debounce)
+      await vi.advanceTimersByTimeAsync(500);
+
+      // Assert - should parse immediately despite debounce
+      expect(parseAllSpy).toHaveBeenCalled();
+    });
+
+    it('Then should bypass debounce for force parse', async () => {
+      // Arrange
+      const parseAllSpy = vi
+        .spyOn(monitor as any, 'parseAllSaveDirectories')
+        .mockResolvedValue(undefined);
+      vi.spyOn(monitor as any, 'findExistingSaveDirectories').mockResolvedValue(['/test/saves']);
+      (monitor as any).filesChanged = true;
+      (monitor as any).lastFileChangeTime = Date.now();
+      (monitor as any).watchPath = '/test/saves';
+      (monitor as any).forceParseAll = true; // Set force parse flag
+
+      // Act - advance time by only 500ms (less than debounce)
+      await vi.advanceTimersByTimeAsync(500);
+
+      // Assert - should parse immediately despite debounce
+      expect(parseAllSpy).toHaveBeenCalled();
+    });
+
+    it('Then should respect manual mode even with debounce elapsed', async () => {
+      // Arrange
+      const parseAllSpy = vi
+        .spyOn(monitor as any, 'parseAllSaveDirectories')
+        .mockResolvedValue(undefined);
+      mockDatabase.getAllSettings.mockReturnValue({
+        gameMode: GameMode.Manual, // Manual mode
+        saveFileDirectory: '/test/saves',
+      });
+      (monitor as any).filesChanged = true;
+      (monitor as any).lastFileChangeTime = Date.now();
+      (monitor as any).watchPath = '/test/saves';
+
+      // Act - advance time past debounce period
+      await vi.advanceTimersByTimeAsync(2500);
+
+      // Assert - should NOT parse in manual mode
+      expect(parseAllSpy).not.toHaveBeenCalled();
     });
   });
 });

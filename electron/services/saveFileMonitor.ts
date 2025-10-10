@@ -268,6 +268,8 @@ class SaveFileMonitor {
   private tickReaderInterval: NodeJS.Timeout | null = null;
   private tickReaderCount: number = 0;
   private eventBus: EventBus;
+  private lastFileChangeTime: number = 0;
+  private readonly FILE_CHANGE_DEBOUNCE_MS = 2000; // 2 seconds
 
   /**
    * Creates a new instance of the SaveFileMonitor.
@@ -453,6 +455,7 @@ class SaveFileMonitor {
       .on('all', (event, path) => {
         console.log(`[Chokidar] Event: ${event} on ${path}`);
         this.filesChanged = true;
+        this.lastFileChangeTime = Date.now();
         console.log('[Chokidar] filesChanged flag set to true');
       })
       .on('error', (error) => console.error('[Chokidar] Save file watcher error:', error))
@@ -1256,6 +1259,7 @@ class SaveFileMonitor {
     // Force parse all files in new directory
     console.log('[updateSaveDirectory] Setting forceParseAll flag');
     this.forceParseAll = true;
+    this.lastFileChangeTime = 0; // Bypass debounce for force parse
 
     // Re-initialize directories with the new setting
     console.log('[updateSaveDirectory] Re-initializing save directories');
@@ -1350,6 +1354,23 @@ class SaveFileMonitor {
       return;
     }
 
+    // Check if enough time has passed since last file change (debouncing)
+    // Skip debounce for initial parsing or force parse
+    const timeSinceLastChange = Date.now() - this.lastFileChangeTime;
+    const shouldDebounce = !this.isInitialParsing && !this.forceParseAll;
+
+    if (shouldDebounce && timeSinceLastChange < this.FILE_CHANGE_DEBOUNCE_MS) {
+      // Still within debounce window - don't process yet
+      if (this.tickReaderCount % 4 === 0) {
+        // Log occasionally to show debouncing is working
+        console.log(
+          `[tickReader] Debouncing: ${timeSinceLastChange}ms since last change ` +
+            `(waiting for ${this.FILE_CHANGE_DEBOUNCE_MS}ms)`,
+        );
+      }
+      return;
+    }
+
     if (this.readingFiles) {
       console.log('[tickReader] Skipping: Already reading files');
       return;
@@ -1360,7 +1381,9 @@ class SaveFileMonitor {
       return;
     }
 
-    console.log('[tickReader] Processing file changes...');
+    console.log(
+      `[tickReader] Debounce period elapsed (${timeSinceLastChange}ms), processing file changes...`,
+    );
     this.readingFiles = true;
     this.filesChanged = false;
 
