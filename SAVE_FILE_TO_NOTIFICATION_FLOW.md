@@ -909,30 +909,61 @@ await Promise.all(filesToParse.map((filePath) => this.processSingleFile(filePath
 
 ---
 
-#### 9. **No Notification Batching**
+#### 9. **No Notification Batching** ✅ RESOLVED
 
-**Location**: `src/components/grail/NotificationButton.tsx` (Line 82)  
-**Problem**: If 5 items are detected in quick succession, 5 separate sounds play and 5 native notifications appear.
+**Previous Problem**: If 5 items were detected in quick succession, 5 separate sounds played and 5 native notifications appeared, creating notification spam.
 
-**Suggested Fix**: Batch notifications within a time window:
+**Solution Implemented**: Implemented notification batching with debounced queue processing.
+
+**Implementation Details**:
+
+- Added `notificationQueue` state to queue incoming item detection events
+- Added `batchTimer` to debounce batch processing (1000ms delay)
+- Created `processBatch()` function to handle queued notifications as a single batch
+- Created `showBatchNotification()` function to display multiple items in one notification
+- Modified `handleItemDetection` to queue events instead of immediate processing
+- Added cleanup effect to process remaining queue on component unmount
+
+**Batching Strategy**:
 
 ```typescript
-const notificationQueue = [];
-const BATCH_DELAY = 1000; // 1 second
-
-// Collect notifications
-notificationQueue.push(itemEvent);
-
-// After 1 second, show all at once
-setTimeout(() => {
-  if (notificationQueue.length > 1) {
-    showBatchNotification(notificationQueue);
-  } else {
-    showSingleNotification(notificationQueue[0]);
-  }
-  notificationQueue = [];
-}, BATCH_DELAY);
+// Queue events with debounced timer
+const handleItemDetection = (event, itemEvent) => {
+  setNotificationQueue((prev) => [...prev, itemEvent]);
+  
+  // Reset timer on each new event (debouncing)
+  if (batchTimer) clearTimeout(batchTimer);
+  
+  const newTimer = setTimeout(() => {
+    processBatch(); // Process all queued items
+    setBatchTimer(null);
+  }, BATCH_DELAY);
+  
+  setBatchTimer(newTimer);
+};
 ```
+
+**Before/After Behavior**:
+
+**Before (Spam)**:
+
+- 5 items detected in 2 seconds → 5 sounds + 5 native notifications
+- Each item triggers immediate sound and notification
+
+**After (Batched)**:
+
+- 5 items detected in 2 seconds → 1 sound + 1 notification showing "5 Holy Grail Items Found!"
+- Wait 1 second after last detection before displaying
+- Single items still show detailed notification (no batching needed)
+
+**Benefits**:
+
+- **No Audio Spam**: Sound plays once per batch instead of per item
+- **Clean Native Notifications**: Single notification for multiple items
+- **Smart Batching**: Single items still get detailed notifications
+- **Debounced Processing**: Waits for rapid detections to complete
+- **Safe Cleanup**: Processes remaining queue on component unmount
+- **Preserved In-App Notifications**: All items still appear in dropdown list
 
 ---
 
@@ -1059,10 +1090,10 @@ batchWriter.queueProgress(grailProgress);
 
 ### Weaknesses
 
-❌ **Duplicate Events**: Same item can trigger multiple notifications  
+~~❌ **Duplicate Events**: Same item can trigger multiple notifications~~ ✅ RESOLVED  
 ❌ **No Batching**: Rapid changes trigger multiple parse cycles  
 ❌ **Fixed Timing**: Hardcoded intervals may not suit all use cases  
-❌ **Notification Spam**: No debouncing or batching of notifications  
+~~❌ **Notification Spam**: No debouncing or batching of notifications~~ ✅ RESOLVED  
 ❌ **Race Conditions**: Potential for lost file changes with current flag-based approach  
 
 ---
@@ -1070,7 +1101,7 @@ batchWriter.queueProgress(grailProgress);
 ## Recommended Priority Fixes
 
 1. ~~**High Priority**: Fix duplicate item detection (#1)~~ ✅ RESOLVED
-2. **High Priority**: Add notification batching (#9)
+2. ~~**High Priority**: Add notification batching (#9)~~ ✅ RESOLVED
 3. **Medium Priority**: Implement debouncing on file changes (#5)
 4. **Medium Priority**: Add concurrency limits to file parsing (#3)
 5. **Low Priority**: Make intervals configurable (#7)

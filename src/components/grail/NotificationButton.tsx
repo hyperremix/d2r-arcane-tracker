@@ -24,7 +24,11 @@ interface NotificationItem extends ItemDetectionEvent {
 export function NotificationButton() {
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [isOpen, setIsOpen] = useState(false);
+  const [notificationQueue, setNotificationQueue] = useState<ItemDetectionEvent[]>([]);
+  const [batchTimer, setBatchTimer] = useState<NodeJS.Timeout | null>(null);
   const { settings } = useGrailStore();
+
+  const BATCH_DELAY = 1000; // 1 second
 
   const playNotificationSound = useCallback(() => {
     if (settings.enableSounds) {
@@ -54,6 +58,73 @@ export function NotificationButton() {
     }
   }, []);
 
+  const showBatchNotification = useCallback((events: ItemDetectionEvent[]) => {
+    const itemNames = events.map((e) => e.item.name).join(', ');
+    const notification = new Notification(`${events.length} Holy Grail Items Found!`, {
+      body:
+        itemNames.length > 100
+          ? `${events.length} items including ${events[0].item.name}...`
+          : itemNames,
+      icon: '/logo.svg',
+      tag: 'grail-batch',
+      requireInteraction: true,
+    });
+
+    // Auto-close after 5 seconds
+    setTimeout(() => notification.close(), 5000);
+  }, []);
+
+  const processBatch = useCallback(() => {
+    if (notificationQueue.length === 0) return;
+
+    console.log(
+      `[NotificationButton] Processing batch of ${notificationQueue.length} notifications`,
+    );
+
+    // Add ALL queued items to in-app notifications
+    if (settings.inAppNotifications) {
+      const newNotifications = notificationQueue.map((itemEvent) => ({
+        ...itemEvent,
+        id: `${Date.now()}_${itemEvent.item.id}_${Math.random()}`,
+        timestamp: new Date(),
+        dismissed: false,
+        seen: false,
+      }));
+      setNotifications((prev) => [
+        ...newNotifications,
+        ...prev.slice(0, 10 - newNotifications.length),
+      ]);
+    }
+
+    // Play sound ONCE for the batch
+    playNotificationSound();
+
+    // Show native notification
+    if (
+      settings.nativeNotifications &&
+      'Notification' in window &&
+      Notification.permission === 'granted'
+    ) {
+      if (notificationQueue.length === 1) {
+        // Single item: show detailed notification
+        showBrowserNotification(notificationQueue[0]);
+      } else {
+        // Multiple items: show batch notification
+        showBatchNotification(notificationQueue);
+      }
+    }
+
+    // Clear the queue
+    setNotificationQueue([]);
+  }, [
+    notificationQueue,
+    settings.inAppNotifications,
+    settings.nativeNotifications,
+    playNotificationSound,
+    showBrowserNotification,
+    showBatchNotification,
+  ]);
+
   useEffect(() => {
     // Listen for item detection events
     const handleItemDetection = (
@@ -65,30 +136,23 @@ export function NotificationButton() {
         return;
       }
 
-      // Add to notifications if in-app notifications are enabled
-      if (settings.inAppNotifications) {
-        const notification: NotificationItem = {
-          ...itemEvent,
-          id: `${Date.now()}_${itemEvent.item.id}`,
-          timestamp: new Date(),
-          dismissed: false,
-          seen: false, // New notifications are unseen by default
-        };
+      console.log(`[NotificationButton] Queueing notification for ${itemEvent.item.name}`);
 
-        setNotifications((prev) => [notification, ...prev.slice(0, 9)]); // Keep only last 10
+      // Add to queue
+      setNotificationQueue((prev) => [...prev, itemEvent]);
+
+      // Clear existing timer if any
+      if (batchTimer) {
+        clearTimeout(batchTimer);
       }
 
-      // Play notification sound if enabled
-      playNotificationSound();
+      // Set new timer to process batch after delay
+      const newTimer = setTimeout(() => {
+        processBatch();
+        setBatchTimer(null);
+      }, BATCH_DELAY);
 
-      // Show native browser notification if enabled and supported
-      if (
-        settings.nativeNotifications &&
-        'Notification' in window &&
-        Notification.permission === 'granted'
-      ) {
-        showBrowserNotification(itemEvent);
-      }
+      setBatchTimer(newTimer);
     };
 
     window.ipcRenderer?.on('item-detection-event', handleItemDetection);
@@ -96,12 +160,7 @@ export function NotificationButton() {
     return () => {
       window.ipcRenderer?.off('item-detection-event', handleItemDetection);
     };
-  }, [
-    settings.inAppNotifications,
-    settings.nativeNotifications,
-    showBrowserNotification,
-    playNotificationSound,
-  ]);
+  }, [batchTimer, processBatch]);
 
   const dismissNotification = (id: string) => {
     setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, dismissed: true } : n)));
@@ -121,6 +180,22 @@ export function NotificationButton() {
       markAllAsSeen();
     }
   }, [isOpen, markAllAsSeen]);
+
+  // Cleanup timer on unmount and process remaining queue
+  useEffect(() => {
+    return () => {
+      if (batchTimer) {
+        clearTimeout(batchTimer);
+        // Process any remaining items in queue on unmount
+        if (notificationQueue.length > 0) {
+          console.log(
+            `[NotificationButton] Component unmounting, processing ${notificationQueue.length} remaining notifications`,
+          );
+          processBatch();
+        }
+      }
+    };
+  }, [batchTimer, notificationQueue, processBatch]);
 
   const activeNotifications = notifications.filter((n) => !n.dismissed);
   const unseenCount = activeNotifications.filter((n) => !n.seen).length;
