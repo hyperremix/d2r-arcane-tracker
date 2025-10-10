@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { Item } from '../types/grail';
+import type { DatabaseGrailProgress, GrailProgress, Item } from '../types/grail';
 import {
   fromSqliteBoolean,
   fromSqliteDate,
@@ -105,17 +105,16 @@ describe('mappers', () => {
 
   describe('mapProgressToDatabase', () => {
     it('should map progress with all fields', () => {
-      const progress = {
+      const progress: GrailProgress = {
         id: 'progress-1',
-        character_id: 'char-1',
-        item_id: 'shako',
-        found: true,
-        found_date: new Date('2024-01-01T12:00:00.000Z'),
-        manually_added: false,
-        auto_detected: true,
+        characterId: 'char-1',
+        itemId: 'shako',
+        foundDate: new Date('2024-01-01T12:00:00.000Z'),
+        foundBy: 'TestCharacter',
+        manuallyAdded: false,
         difficulty: 'hell' as const,
         notes: 'Found in Baal run',
-        is_ethereal: false,
+        isEthereal: false,
       };
 
       const mapped = mapProgressToDatabase(progress);
@@ -124,7 +123,6 @@ describe('mappers', () => {
         id: 'progress-1',
         character_id: 'char-1',
         item_id: 'shako',
-        found: 1, // boolean converted to 1
         found_date: '2024-01-01T12:00:00.000Z', // Date converted to ISO string
         manually_added: 0, // boolean converted to 0
         auto_detected: 1, // boolean converted to 1
@@ -135,17 +133,16 @@ describe('mappers', () => {
     });
 
     it('should map progress with undefined optional fields', () => {
-      const progress = {
+      const progress: GrailProgress = {
         id: 'progress-1',
-        character_id: 'char-1',
-        item_id: 'shako',
-        found: false,
-        found_date: undefined,
-        manually_added: true,
-        auto_detected: false,
+        characterId: 'char-1',
+        itemId: 'shako',
+        foundDate: undefined,
+        foundBy: undefined,
+        manuallyAdded: true,
         difficulty: undefined,
         notes: undefined,
-        is_ethereal: true,
+        isEthereal: true,
       };
 
       const mapped = mapProgressToDatabase(progress);
@@ -305,11 +302,10 @@ describe('mappers', () => {
 
   describe('mapDatabaseProgressToProgress', () => {
     it('should map database progress to progress', () => {
-      const dbProgress = {
+      const dbProgress: DatabaseGrailProgress = {
         id: 'prog-1',
         character_id: 'char-1',
         item_id: 'item-1',
-        found: 1 as const,
         found_date: '2024-01-01T12:00:00.000Z',
         manually_added: 0 as const,
         auto_detected: 1 as const,
@@ -326,7 +322,6 @@ describe('mappers', () => {
         id: 'prog-1',
         characterId: 'char-1',
         itemId: 'item-1',
-        found: true,
         foundDate: new Date('2024-01-01T12:00:00.000Z'),
         foundBy: undefined,
         manuallyAdded: false,

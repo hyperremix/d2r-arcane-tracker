@@ -97,7 +97,7 @@ describe('When useProgressLookup is used', () => {
           .withId('prog1')
           .withCharacterId('char1')
           .withItemId('item1')
-          .withFound(true)
+          .withFoundDate(new Date('2024-01-01'))
           .build(),
       ];
       const selectedCharacterId = null;
@@ -132,7 +132,7 @@ describe('When useProgressLookup is used', () => {
           .withId('prog1')
           .withCharacterId('char1')
           .withItemId('item1')
-          .withFound(true)
+          .withFoundDate(new Date('2024-01-01'))
           .asEthereal()
           .build(),
       ];
@@ -168,13 +168,13 @@ describe('When useProgressLookup is used', () => {
           .withId('prog1')
           .withCharacterId('char1')
           .withItemId('item1')
-          .withFound(true)
+          .withFoundDate(new Date('2024-01-01'))
           .build(),
         GrailProgressBuilder.new()
           .withId('prog2')
           .withCharacterId('char1')
           .withItemId('item1')
-          .withFound(true)
+          .withFoundDate(new Date('2024-01-01'))
           .asEthereal()
           .build(),
       ];
@@ -210,13 +210,13 @@ describe('When useProgressLookup is used', () => {
           .withId('prog1')
           .withCharacterId('char1')
           .withItemId('item1')
-          .withFound(true)
+          .withFoundDate(new Date('2024-01-01'))
           .build(),
         GrailProgressBuilder.new()
           .withId('prog2')
           .withCharacterId('char2')
           .withItemId('item1')
-          .withFound(true)
+          .withFoundDate(new Date('2024-01-01'))
           .build(),
       ];
       const selectedCharacterId = 'char1';
@@ -251,7 +251,7 @@ describe('When useProgressLookup is used', () => {
           .withId('prog1')
           .withCharacterId('char2')
           .withItemId('item1')
-          .withFound(true)
+          .withFoundDate(new Date('2024-01-01'))
           .build(),
       ];
       const selectedCharacterId = 'char1';
@@ -286,7 +286,7 @@ describe('When useProgressLookup is used', () => {
           .withId('prog1')
           .withCharacterId('char1')
           .withItemId('item1')
-          .withFound(true)
+          .withFoundDate(new Date('2024-01-01'))
           .build(),
       ];
       const selectedCharacterId = null;
@@ -321,7 +321,7 @@ describe('When useProgressLookup is used', () => {
           .withId('prog1')
           .withCharacterId('char1')
           .withItemId('eth_item1')
-          .withFound(true)
+          .withFoundDate(new Date('2024-01-01'))
           .build(),
       ];
       const selectedCharacterId = null;
@@ -360,13 +360,13 @@ describe('When useProgressLookup is used', () => {
           .withId('prog1')
           .withCharacterId('char1')
           .withItemId('item1')
-          .withFound(true)
+          .withFoundDate(new Date('2024-01-01'))
           .build(),
         GrailProgressBuilder.new()
           .withId('prog2')
           .withCharacterId('char1')
           .withItemId('item2')
-          .withFound(true)
+          .withFoundDate(new Date('2024-01-01'))
           .asEthereal()
           .build(),
         // item3 has no progress
@@ -423,7 +423,7 @@ describe('When useProgressLookup is used', () => {
           .withId('prog1')
           .withCharacterId('char1')
           .withItemId('item1')
-          .withFound(false)
+          .withoutFoundDate()
           .build(),
       ];
       const selectedCharacterId = null;
@@ -459,7 +459,7 @@ describe('When useProgressLookup is used', () => {
           .withId('prog1')
           .withCharacterId('char1')
           .withItemId('item1')
-          .withFound(true)
+          .withFoundDate(new Date('2024-01-01'))
           .build(),
       ];
       const selectedCharacterId = null;

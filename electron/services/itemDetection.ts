@@ -1,18 +1,27 @@
-import { EventEmitter } from 'node:events';
 import fs from 'node:fs/promises';
 import type * as d2s from '@dschu012/d2s';
 import { read } from '@dschu012/d2s';
 import { runesByCode } from '../items/indexes';
 import type { D2SaveFile } from '../services/saveFileMonitor';
 import type { D2Item, D2SItem, Item, ItemDetectionEvent } from '../types/grail';
+import type { EventBus } from './EventBus';
 
 /**
  * Service for detecting and analyzing items from Diablo 2 save files.
  * This service parses D2 save files, extracts items, and matches them against
  * the Holy Grail item database to identify found items.
  */
-class ItemDetectionService extends EventEmitter {
+class ItemDetectionService {
   private grailItems: Item[] = [];
+  private eventBus: EventBus;
+
+  /**
+   * Creates a new instance of the ItemDetectionService.
+   * @param {EventBus} eventBus - EventBus instance for emitting events
+   */
+  constructor(eventBus: EventBus) {
+    this.eventBus = eventBus;
+  }
 
   /**
    * Sets the Holy Grail items that will be used for matching detected items.
@@ -51,12 +60,11 @@ class ItemDetectionService extends EventEmitter {
       for (const item of items) {
         const grailMatch = this.findGrailMatch(item);
         if (grailMatch) {
-          this.emit('item-detection', {
+          this.eventBus.emit('item-detection', {
             type: 'item-found',
             item,
             grailItem: grailMatch,
             silent,
-            d2sItemId: item.d2sItemId,
           } as ItemDetectionEvent);
         }
       }
@@ -82,7 +90,7 @@ class ItemDetectionService extends EventEmitter {
       for (const item of itemList) {
         // Convert the D2S item to D2Item format
         const d2Item: D2Item = {
-          id: `item-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          id: `${item.id}`,
           name: this.getItemName(item),
           type: this.getItemType(item),
           quality: this.getItemQuality(item),
@@ -92,7 +100,6 @@ class ItemDetectionService extends EventEmitter {
           ethereal: !!item.ethereal,
           sockets: this.getItemSockets(item),
           timestamp: new Date(),
-          d2sItemId: item.id,
         };
 
         items.push(d2Item);
@@ -169,38 +176,37 @@ class ItemDetectionService extends EventEmitter {
     defaultLocation: D2Item['location'],
     _isEmbed: boolean = false,
   ): void {
-    for (const d2Item of itemList) {
+    for (const item of itemList) {
       try {
         // Only extract items that are unique, set, rare, or have specific names
         if (
-          d2Item.unique_name ||
-          d2Item.set_name ||
-          d2Item.rare_name ||
-          d2Item.rare_name2 ||
-          this.isRune(d2Item) ||
-          d2Item.runeword_name
+          item.unique_name ||
+          item.set_name ||
+          item.rare_name ||
+          item.rare_name2 ||
+          this.isRune(item) ||
+          item.runeword_name
         ) {
-          const item: D2Item = {
-            id: `${characterName}_${d2Item.id || Date.now()}_${Math.random()}`,
-            name: this.getItemName(d2Item),
-            type: this.getItemType(d2Item),
-            quality: this.getItemQuality(d2Item),
-            level: d2Item.level || 1,
-            ethereal: Boolean(d2Item.ethereal),
-            sockets: this.getItemSockets(d2Item),
+          const d2Item: D2Item = {
+            id: `${item.id}`,
+            name: this.getItemName(item),
+            type: this.getItemType(item),
+            quality: this.getItemQuality(item),
+            level: item.level || 1,
+            ethereal: Boolean(item.ethereal),
+            sockets: this.getItemSockets(item),
             timestamp: new Date(),
             characterName,
-            location: this.getItemLocation(d2Item) || defaultLocation,
-            d2sItemId: d2Item.id,
+            location: this.getItemLocation(item) || defaultLocation,
           };
 
-          items.push(item);
+          items.push(d2Item);
         }
 
         // Recursively process socketed items
-        if (d2Item.socketed_items?.length) {
+        if (item.socketed_items?.length) {
           this.extractItemsFromList(
-            d2Item.socketed_items,
+            item.socketed_items,
             items,
             characterName,
             defaultLocation,

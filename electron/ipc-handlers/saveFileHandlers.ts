@@ -1,5 +1,6 @@
 import { ipcMain, webContents } from 'electron';
 import { grailDatabase } from '../database/database';
+import { EventBus } from '../services/EventBus';
 import { ItemDetectionService } from '../services/itemDetection';
 import type { D2SaveFile, SaveFileEvent } from '../services/saveFileMonitor';
 import { SaveFileMonitor } from '../services/saveFileMonitor';
@@ -14,8 +15,10 @@ import type {
 /**
  * Global service instances for save file monitoring and item detection.
  */
+const eventBus = new EventBus();
 let saveFileMonitor: SaveFileMonitor;
 let itemDetectionService: ItemDetectionService;
+const eventUnsubscribers: Array<() => void> = [];
 
 /**
  * Finds or creates a character by name.
@@ -61,7 +64,7 @@ function findOrCreateCharacter(characterName: string, level: number) {
 function createGrailProgress(character: Character, event: ItemDetectionEvent) {
   // Use d2s item ID if available, otherwise fall back to timestamp for backward compatibility
   const itemIdentifier = event.d2sItemId ? String(event.d2sItemId) : `timestamp_${Date.now()}`;
-  const progressId = `progress_${character.id}_${event.grailItem.id}_${itemIdentifier}`;
+  const progressId = `${character.id}_${event.grailItem.id}_${itemIdentifier}`;
   return {
     id: progressId,
     characterId: character.id,
@@ -118,21 +121,8 @@ function handleAutomaticGrailProgress(event: ItemDetectionEvent): void {
       return;
     }
 
-    // Check if this character already has this item marked as found
-    const existingCharacterProgress = grailDatabase.getCharacterProgress(
-      character.id,
-      event.grailItem.id,
-    );
-
-    if (existingCharacterProgress?.found) {
-      console.log(`Skipping: ${event.item.name} already found by ${characterName}`);
-      return; // Skip creating duplicate progress
-    }
-
     // Check if this is a first-time global discovery
-    const existingGlobalProgress = grailDatabase
-      .getProgressByItem(event.grailItem.id)
-      .find((p) => p.found);
+    const existingGlobalProgress = grailDatabase.getProgressByItem(event.grailItem.id);
     const isFirstTimeDiscovery = !existingGlobalProgress;
 
     // Create and save grail progress entry
@@ -145,10 +135,6 @@ function handleAutomaticGrailProgress(event: ItemDetectionEvent): void {
       if (!event.silent) {
         emitGrailProgressUpdate(character, event, grailProgress);
       }
-    } else {
-      console.log(
-        `Character discovery: ${event.item.name} found by ${characterName} (already discovered globally)`,
-      );
     }
   } catch (error) {
     console.error('Error handling automatic grail progress:', error);
@@ -208,12 +194,12 @@ function updateCharacterFromSaveFile(saveFile: D2SaveFile): void {
  * Loads grail items into the detection service and starts monitoring automatically.
  */
 export function initializeSaveFileHandlers(): void {
-  // Initialize monitor and detection service with grail database
-  saveFileMonitor = new SaveFileMonitor(grailDatabase);
-  itemDetectionService = new ItemDetectionService();
+  // Initialize monitor and detection service with EventBus and grail database
+  saveFileMonitor = new SaveFileMonitor(eventBus, grailDatabase);
+  itemDetectionService = new ItemDetectionService(eventBus);
 
   // Set up event forwarding to renderer process
-  saveFileMonitor.on('save-file-event', (event: SaveFileEvent) => {
+  const unsubscribeSaveFileEvent = eventBus.on('save-file-event', (event: SaveFileEvent) => {
     // Forward save file events to all renderer processes
     const allWebContents = webContents.getAllWebContents();
     for (const wc of allWebContents) {
@@ -230,9 +216,10 @@ export function initializeSaveFileHandlers(): void {
       itemDetectionService.analyzeSaveFile(event.file, event.extractedItems, event.silent);
     }
   });
+  eventUnsubscribers.push(unsubscribeSaveFileEvent);
 
   // Set up item detection event forwarding and automatic grail progress updates
-  itemDetectionService.on('item-detection', (event: ItemDetectionEvent) => {
+  const unsubscribeItemDetection = eventBus.on('item-detection', (event: ItemDetectionEvent) => {
     // Forward event to renderer processes
     const allWebContents = webContents.getAllWebContents();
     for (const wc of allWebContents) {
@@ -246,8 +233,9 @@ export function initializeSaveFileHandlers(): void {
       handleAutomaticGrailProgress(event);
     }
   });
+  eventUnsubscribers.push(unsubscribeItemDetection);
 
-  saveFileMonitor.on('monitoring-started', (data: { directory: string; saveFileCount: number }) => {
+  const unsubscribeMonitoringStarted = eventBus.on('monitoring-started', (data) => {
     console.log(
       `Save file monitoring started for directory: ${data.directory} - Found ${data.saveFileCount} save files`,
     );
@@ -262,8 +250,9 @@ export function initializeSaveFileHandlers(): void {
       }
     }
   });
+  eventUnsubscribers.push(unsubscribeMonitoringStarted);
 
-  saveFileMonitor.on('monitoring-stopped', () => {
+  const unsubscribeMonitoringStopped = eventBus.on('monitoring-stopped', () => {
     console.log('Save file monitoring stopped');
     const allWebContents = webContents.getAllWebContents();
     for (const wc of allWebContents) {
@@ -272,29 +261,23 @@ export function initializeSaveFileHandlers(): void {
       }
     }
   });
+  eventUnsubscribers.push(unsubscribeMonitoringStopped);
 
-  saveFileMonitor.on(
-    'monitoring-error',
-    (error: {
-      type: string;
-      message: string;
-      directory: string | null;
-      saveFileCount?: number;
-    }) => {
-      const allWebContents = webContents.getAllWebContents();
-      for (const wc of allWebContents) {
-        if (!wc.isDestroyed()) {
-          wc.send('monitoring-status-changed', {
-            status: 'error',
-            error: error.message,
-            errorType: error.type,
-            directory: error.directory,
-            saveFileCount: error.saveFileCount || 0,
-          });
-        }
+  const unsubscribeMonitoringError = eventBus.on('monitoring-error', (error) => {
+    const allWebContents = webContents.getAllWebContents();
+    for (const wc of allWebContents) {
+      if (!wc.isDestroyed()) {
+        wc.send('monitoring-status-changed', {
+          status: 'error',
+          error: error.message,
+          errorType: error.type,
+          directory: error.directory,
+          saveFileCount: error.saveFileCount || 0,
+        });
       }
-    },
-  );
+    }
+  });
+  eventUnsubscribers.push(unsubscribeMonitoringError);
 
   // Load grail items into item detection service
   try {
@@ -402,6 +385,16 @@ export function initializeSaveFileHandlers(): void {
  * Should be called when the application is shutting down to properly clean up resources.
  */
 export function closeSaveFileMonitor(): void {
+  // Unsubscribe all event listeners
+  for (const unsubscribe of eventUnsubscribers) {
+    unsubscribe();
+  }
+  eventUnsubscribers.length = 0;
+
+  // Clear all event bus listeners
+  eventBus.clear();
+
+  // Stop save file monitoring
   if (saveFileMonitor) {
     saveFileMonitor.stopMonitoring();
   }

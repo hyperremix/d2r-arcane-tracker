@@ -67,6 +67,7 @@ import { D2SaveFileBuilder } from '@/fixtures';
 import { getItemIdForD2SItem, isRuneId } from '../items/indexes';
 import { GameMode } from '../types/grail';
 import { isRune, simplifyItemName } from '../utils/objects';
+import { EventBus } from './EventBus';
 import { SaveFileMonitor } from './saveFileMonitor';
 
 // Mock database interface
@@ -83,6 +84,7 @@ const createMockDatabase = (): MockGrailDatabase => ({
 describe('When SaveFileMonitor is used', () => {
   let monitor: SaveFileMonitor;
   let mockDatabase: MockGrailDatabase;
+  let eventBus: EventBus;
 
   beforeEach(() => {
     // Clear all mocks
@@ -132,14 +134,20 @@ describe('When SaveFileMonitor is used', () => {
       gameMode: GameMode.Softcore,
     });
 
-    // Create monitor instance
-    monitor = new SaveFileMonitor(mockDatabase as any);
+    // Create EventBus instance
+    eventBus = new EventBus();
+
+    // Create monitor instance with EventBus
+    monitor = new SaveFileMonitor(eventBus, mockDatabase as any);
   });
 
   describe('If constructor is called', () => {
     it('Then should initialize with default values', () => {
-      // Arrange & Act
-      const newMonitor = new SaveFileMonitor();
+      // Arrange
+      const testEventBus = new EventBus();
+
+      // Act
+      const newMonitor = new SaveFileMonitor(testEventBus);
 
       // Assert
       expect(newMonitor).toBeInstanceOf(SaveFileMonitor);
@@ -149,8 +157,11 @@ describe('When SaveFileMonitor is used', () => {
     });
 
     it('Then should initialize with database', () => {
-      // Arrange & Act
-      const newMonitor = new SaveFileMonitor(mockDatabase as any);
+      // Arrange
+      const testEventBus = new EventBus();
+
+      // Act
+      const newMonitor = new SaveFileMonitor(testEventBus, mockDatabase as any);
 
       // Assert
       expect(newMonitor).toBeInstanceOf(SaveFileMonitor);
@@ -190,7 +201,7 @@ describe('When SaveFileMonitor is used', () => {
       vi.mocked(existsSync).mockReturnValue(false);
 
       const eventSpy = vi.fn();
-      monitor.on('monitoring-error', eventSpy);
+      eventBus.on('monitoring-error', eventSpy);
 
       // Act
       await monitor.startMonitoring();
@@ -210,7 +221,7 @@ describe('When SaveFileMonitor is used', () => {
       (monitor as any).isMonitoring = true;
 
       const eventSpy = vi.fn();
-      monitor.on('monitoring-started', eventSpy);
+      eventBus.on('monitoring-started', eventSpy);
 
       // Act
       await monitor.startMonitoring();
@@ -228,7 +239,7 @@ describe('When SaveFileMonitor is used', () => {
       await monitor.startMonitoring();
 
       const eventSpy = vi.fn();
-      monitor.on('monitoring-stopped', eventSpy);
+      eventBus.on('monitoring-stopped', eventSpy);
 
       // Act
       await monitor.stopMonitoring();
@@ -248,7 +259,8 @@ describe('When SaveFileMonitor is used', () => {
   describe('If getSaveFiles is called', () => {
     it('Then should return empty array when no save directory', async () => {
       // Arrange
-      const newMonitor = new SaveFileMonitor();
+      const testEventBus = new EventBus();
+      const newMonitor = new SaveFileMonitor(testEventBus);
 
       // Act
       const files = await newMonitor.getSaveFiles();

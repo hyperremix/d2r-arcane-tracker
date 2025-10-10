@@ -1,4 +1,3 @@
-import { EventEmitter } from 'node:events';
 import { existsSync, readdirSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { basename, dirname, extname, join } from 'node:path';
@@ -23,6 +22,7 @@ import {
   type SaveFileState,
 } from '../types/grail';
 import { isRune, simplifyItemName } from '../utils/objects';
+import type { EventBus } from './EventBus';
 
 /**
  * Lookup table for magic attribute types used in rainbow facet processing.
@@ -254,7 +254,7 @@ const processRunewordItem = (item: d2s.types.IItem, items: d2s.types.IItem[]): v
  * This service watches save file directories, parses D2 save files, and maintains
  * a database of found items for Holy Grail tracking.
  */
-class SaveFileMonitor extends EventEmitter {
+class SaveFileMonitor {
   private currentData: FileReaderResponse;
   private fileWatcher: FSWatcher | null;
   private watchPath: string | null;
@@ -267,14 +267,16 @@ class SaveFileMonitor extends EventEmitter {
   private isInitialParsing: boolean = false;
   private tickReaderInterval: NodeJS.Timeout | null = null;
   private tickReaderCount: number = 0;
+  private eventBus: EventBus;
 
   /**
    * Creates a new instance of the SaveFileMonitor.
+   * @param {EventBus} eventBus - EventBus instance for emitting events
    * @param {GrailDatabase} [grailDatabase] - Optional grail database instance for settings and data storage.
    */
-  constructor(grailDatabase?: GrailDatabase) {
-    super();
+  constructor(eventBus: EventBus, grailDatabase?: GrailDatabase) {
     console.log('[SaveFileMonitor] Constructor called');
+    this.eventBus = eventBus;
     this.grailDatabase = grailDatabase || null;
     this.currentData = {
       items: {},
@@ -393,7 +395,7 @@ class SaveFileMonitor extends EventEmitter {
 
     if (!this.saveDirectory) {
       console.warn('[startMonitoring] No save directory configured');
-      this.emit('monitoring-error', {
+      this.eventBus.emit('monitoring-error', {
         type: 'no-directory',
         message: 'No save directory configured',
         directory: null,
@@ -405,7 +407,7 @@ class SaveFileMonitor extends EventEmitter {
     // Check if directory exists
     if (!existsSync(this.saveDirectory)) {
       console.warn('[startMonitoring] Save directory does not exist:', this.saveDirectory);
-      this.emit('monitoring-error', {
+      this.eventBus.emit('monitoring-error', {
         type: 'directory-not-found',
         message: `Save directory does not exist: ${this.saveDirectory}`,
         directory: this.saveDirectory,
@@ -475,7 +477,7 @@ class SaveFileMonitor extends EventEmitter {
     // Count save files for status reporting
     const saveFiles = await this.getSaveFiles();
 
-    this.emit('monitoring-started', {
+    this.eventBus.emit('monitoring-started', {
       directory: this.saveDirectory,
       saveFileCount: saveFiles.length,
     });
@@ -501,7 +503,7 @@ class SaveFileMonitor extends EventEmitter {
     this.watchPath = null;
     this.isMonitoring = false;
     console.log('[stopMonitoring] Monitoring stopped');
-    this.emit('monitoring-stopped');
+    this.eventBus.emit('monitoring-stopped', {});
   }
 
   /**
@@ -569,10 +571,10 @@ class SaveFileMonitor extends EventEmitter {
         '[parseAllSaveDirectories] No D2R save files found in directories:',
         directories,
       );
-      this.emit('monitoring-error', {
+      this.eventBus.emit('monitoring-error', {
         type: 'no-save-files',
         message: `No D2R save files found in monitored directories`,
-        directories: directories,
+        directory: directories[0] || null,
         saveFileCount: 0,
       });
       return false;
@@ -606,7 +608,7 @@ class SaveFileMonitor extends EventEmitter {
 
       if (allFiles.length === 0) {
         console.warn('[parseSaveDirectory] No D2R save files found in directory:', directory);
-        this.emit('monitoring-error', {
+        this.eventBus.emit('monitoring-error', {
           type: 'no-save-files',
           message: `No D2R save files found in monitored directory`,
           directory: directory,
@@ -622,7 +624,7 @@ class SaveFileMonitor extends EventEmitter {
       return true;
     } catch (error) {
       console.error('[parseSaveDirectory] Error reading save directory:', directory, error);
-      this.emit('monitoring-error', {
+      this.eventBus.emit('monitoring-error', {
         type: 'directory-read-error',
         message: `Error reading save directory: ${error}`,
         directory: directory,
@@ -885,7 +887,7 @@ class SaveFileMonitor extends EventEmitter {
           type: 'modified',
         });
 
-        this.emit('save-file-event', {
+        this.eventBus.emit('save-file-event', {
           type: 'modified',
           file: saveFile,
           extractedItems,

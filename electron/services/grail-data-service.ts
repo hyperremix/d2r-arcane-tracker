@@ -114,7 +114,9 @@ export class GrailDataService {
 
     if (characterId) {
       const progress = this.database.getProgressByCharacter(characterId);
-      const foundItemIds = new Set(progress.filter((p) => p.found).map((p) => p.itemId));
+      const foundItemIds = new Set(
+        progress.filter((p) => p.foundDate !== undefined).map((p) => p.itemId),
+      );
 
       allItems.forEach((item) => {
         if (foundItemIds.has(item.id)) {

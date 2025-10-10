@@ -417,7 +417,7 @@ describe('When grailHandlers is used', () => {
         .withId('progress-1')
         .withCharacterId('char-1')
         .withItemId('shako')
-        .withFound(true)
+        .withFoundDate(new Date('2024-01-01'))
         .withFoundDate(new Date('2024-01-01T00:00:00.000Z'))
         .withManuallyAdded(false)
         .withDifficulty('hell')

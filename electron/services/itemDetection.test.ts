@@ -16,6 +16,7 @@ import { readFile } from 'node:fs/promises';
 import { read } from '@dschu012/d2s';
 import { D2SaveFileBuilder, D2SItemBuilder, HolyGrailItemBuilder } from '@/fixtures';
 import type { D2Item, D2SItem, Item } from '../types/grail';
+import { EventBus } from './EventBus';
 import { ItemDetectionService } from './itemDetection';
 
 // Mock data types
@@ -23,9 +24,14 @@ import { ItemDetectionService } from './itemDetection';
 describe('When ItemDetectionService is used', () => {
   let service: ItemDetectionService;
   let mockGrailItems: Item[];
+  let eventBus: EventBus;
 
   beforeEach(() => {
-    service = new ItemDetectionService();
+    // Create EventBus instance
+    eventBus = new EventBus();
+
+    // Create service with EventBus
+    service = new ItemDetectionService(eventBus);
     mockGrailItems = [
       HolyGrailItemBuilder.new()
         .withId('shako')

@@ -123,7 +123,6 @@ class GrailDatabase {
         id TEXT PRIMARY KEY,
         character_id TEXT NOT NULL,
         item_id TEXT NOT NULL,
-        found BOOLEAN NOT NULL DEFAULT FALSE,
         found_date DATETIME,
         manually_added BOOLEAN NOT NULL DEFAULT FALSE,
         auto_detected BOOLEAN NOT NULL DEFAULT TRUE,
@@ -478,26 +477,14 @@ class GrailDatabase {
    */
   upsertProgress(progress: GrailProgress): void {
     const stmt = this.db.prepare(`
-      INSERT OR REPLACE INTO grail_progress (id, character_id, item_id, found, found_date, manually_added, auto_detected, difficulty, notes, is_ethereal)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT OR REPLACE INTO grail_progress (id, character_id, item_id, found_date, manually_added, auto_detected, difficulty, notes, is_ethereal)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
-    const mappedProgress = mapProgressToDatabase({
-      id: progress.id,
-      character_id: progress.characterId,
-      item_id: progress.itemId,
-      found: progress.found,
-      found_date: progress.foundDate,
-      manually_added: progress.manuallyAdded,
-      auto_detected: true, // Default value since it's not in GrailProgress interface
-      difficulty: progress.difficulty,
-      notes: progress.notes,
-      is_ethereal: progress.isEthereal,
-    });
+    const mappedProgress = mapProgressToDatabase(progress);
     stmt.run(
       mappedProgress.id,
       mappedProgress.character_id,
       mappedProgress.item_id,
-      mappedProgress.found,
       mappedProgress.found_date,
       mappedProgress.manually_added,
       mappedProgress.auto_detected,
@@ -584,8 +571,8 @@ class GrailDatabase {
 
     // Count found items
     const foundProgress = characterId
-      ? filteredProgress.filter((p) => p.characterId === characterId && p.found)
-      : filteredProgress.filter((p) => p.found);
+      ? filteredProgress.filter((p) => p.characterId === characterId)
+      : filteredProgress;
 
     const foundItemIds = new Set(foundProgress.map((p) => p.itemId));
     const foundItems = foundItemIds.size;

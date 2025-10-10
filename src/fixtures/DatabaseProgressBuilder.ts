@@ -9,7 +9,6 @@ export class DatabaseProgressBuilder {
     id: 'default-progress-id',
     character_id: 'default-character-id',
     item_id: 'default-item-id',
-    found: 0,
     found_date: null,
     manually_added: 0,
     auto_detected: 1,
@@ -52,26 +51,18 @@ export class DatabaseProgressBuilder {
   }
 
   /**
-   * Set the found status
-   */
-  withFound(found: boolean): this {
-    this.progress.found = found ? 1 : 0;
-    return this;
-  }
-
-  /**
-   * Set as found item
+   * Set as found item (sets found_date to now)
    */
   asFound(): this {
-    this.progress.found = 1;
+    this.progress.found_date = new Date().toISOString();
     return this;
   }
 
   /**
-   * Set as not found item
+   * Set as not found item (sets found_date to null)
    */
   asNotFound(): this {
-    this.progress.found = 0;
+    this.progress.found_date = null;
     return this;
   }
 
@@ -223,7 +214,6 @@ export class DatabaseProgressBuilder {
    * Set as found item with date (common test case)
    */
   asFoundWithDate(foundDate: string = '2024-01-01T00:00:00.000Z'): this {
-    this.progress.found = 1;
     this.progress.found_date = foundDate;
     return this;
   }
@@ -232,7 +222,7 @@ export class DatabaseProgressBuilder {
    * Set as manually added found item (common test case)
    */
   asManuallyAddedFound(): this {
-    this.progress.found = 1;
+    this.progress.found_date = new Date().toISOString();
     this.progress.manually_added = 1;
     this.progress.auto_detected = 0;
     return this;
@@ -242,7 +232,7 @@ export class DatabaseProgressBuilder {
    * Set as auto detected found item (common test case)
    */
   asAutoDetectedFound(): this {
-    this.progress.found = 1;
+    this.progress.found_date = new Date().toISOString();
     this.progress.manually_added = 0;
     this.progress.auto_detected = 1;
     return this;
@@ -252,7 +242,7 @@ export class DatabaseProgressBuilder {
    * Set as hell difficulty found item (common test case)
    */
   asHellFound(): this {
-    this.progress.found = 1;
+    this.progress.found_date = new Date().toISOString();
     this.progress.difficulty = 'hell';
     return this;
   }

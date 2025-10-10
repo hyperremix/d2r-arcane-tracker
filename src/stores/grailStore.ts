@@ -176,13 +176,13 @@ export const useGrailStore = create<GrailState>((set, get) => ({
 
     if (existingProgress) {
       // Toggle existing progress
+      const isCurrentlyFound = existingProgress.foundDate !== undefined;
       newProgress = progress.map((p) =>
         p.itemId === itemId && p.characterId === selectedCharacterId
           ? {
               ...p,
-              found: !p.found,
-              foundDate: !p.found ? new Date() : undefined,
-              foundBy: !p.found ? foundBy : undefined,
+              foundDate: !isCurrentlyFound ? new Date() : undefined,
+              foundBy: !isCurrentlyFound ? foundBy : undefined,
               manuallyAdded,
             }
           : p,
@@ -193,7 +193,6 @@ export const useGrailStore = create<GrailState>((set, get) => ({
         id: `${selectedCharacterId}-${itemId}-${Date.now()}`,
         characterId: selectedCharacterId,
         itemId,
-        found: true,
         foundDate: new Date(),
         foundBy,
         manuallyAdded,
@@ -298,7 +297,7 @@ const matchesFoundStatus = (
   // Always show all items by default, regardless of found status
   if (!foundStatus || foundStatus === 'all') return true;
 
-  const itemProgress = progress?.find((p) => p.itemId === item.id && p.found);
+  const itemProgress = progress?.find((p) => p.itemId === item.id && p.foundDate !== undefined);
   const isFound = Boolean(itemProgress);
 
   if (foundStatus === 'found') return isFound;
@@ -573,7 +572,9 @@ function calculateCharacterStats(
   items: Item[],
 ) {
   return characters.map((character) => {
-    const charProgress = progress.filter((p) => p.found && p.characterId === character.id);
+    const charProgress = progress.filter(
+      (p) => p.foundDate !== undefined && p.characterId === character.id,
+    );
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
     const recentProgress = charProgress.filter((p) => {
@@ -625,7 +626,7 @@ function calculateTimelineStats(progress: GrailProgress[]) {
     const dateStr = date.toDateString();
 
     const dayProgress = progress.filter(
-      (p) => p.found && p.foundDate && new Date(p.foundDate).toDateString() === dateStr,
+      (p) => p.foundDate !== undefined && new Date(p.foundDate).toDateString() === dateStr,
     );
 
     timelineStats.push({
@@ -728,7 +729,7 @@ export const useGrailStatistics = () => {
 
   // Note: items and progress are already filtered based on grail settings (grailNormal, grailEthereal, grailRunes, grailRunewords)
   // at the database level, so these statistics automatically reflect the current grail configuration
-  const foundProgress = progress.filter((p) => p.found);
+  const foundProgress = progress.filter((p) => p.foundDate !== undefined);
 
   // Calculate item counts based on grail settings
   const { totalItems, foundItems, foundNormalItems, foundEtherealItems } = calculateItemCounts(

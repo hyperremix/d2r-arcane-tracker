@@ -200,7 +200,6 @@ export interface GrailProgress {
   id: string;
   characterId: string;
   itemId: string;
-  found: boolean;
   foundDate?: Date;
   foundBy?: string; // character name that found it
   manuallyAdded: boolean;
@@ -217,7 +216,6 @@ export type DatabaseGrailProgress = {
   id: string;
   character_id: string;
   item_id: string;
-  found: 0 | 1;
   found_date: string | null;
   manually_added: 0 | 1;
   auto_detected: 0 | 1;
@@ -440,7 +438,6 @@ export type D2Item = {
   timestamp: Date;
   characterName: string;
   location: 'inventory' | 'stash' | 'equipment';
-  d2sItemId?: string | number;
 };
 
 /**

@@ -242,7 +242,7 @@ describe('When useGrailStore is used', () => {
       expect(result.current.progress).toHaveLength(1);
       expect(result.current.progress[0].characterId).toBe(characterId);
       expect(result.current.progress[0].itemId).toBe(itemId);
-      expect(result.current.progress[0].found).toBe(true);
+      expect(result.current.progress[0].foundDate).toBeDefined();
       expect(result.current.progress[0].foundBy).toBe('Test Character');
       expect(result.current.progress[0].manuallyAdded).toBe(true);
     });
@@ -258,7 +258,7 @@ describe('When useGrailStore is used', () => {
         .withId('prog1')
         .withCharacterId(characterId)
         .withItemId(itemId)
-        .withFound(true)
+        .withFoundDate(new Date('2024-01-01'))
         .build();
 
       act(() => {
@@ -272,7 +272,6 @@ describe('When useGrailStore is used', () => {
       });
 
       // Assert
-      expect(result.current.progress[0].found).toBe(false);
       expect(result.current.progress[0].foundDate).toBeUndefined();
     });
   });
@@ -381,7 +380,7 @@ describe('When useFilteredItems is used', () => {
           .withId('prog1')
           .withCharacterId('char1')
           .withItemId('item1')
-          .withFound(true)
+          .withFoundDate(new Date('2024-01-01'))
           .build(),
       ];
 
@@ -413,7 +412,7 @@ describe('When useFilteredItems is used', () => {
           .withId('prog1')
           .withCharacterId('char1')
           .withItemId('item1')
-          .withFound(true)
+          .withFoundDate(new Date('2024-01-01'))
           .build(),
       ];
 
@@ -510,7 +509,7 @@ describe('When useGrailStatistics is used', () => {
           .withId('prog1')
           .withCharacterId('char1')
           .withItemId('item1')
-          .withFound(true)
+          .withFoundDate(new Date('2024-01-01'))
           .build(),
       ];
 
@@ -540,7 +539,7 @@ describe('When useGrailStatistics is used', () => {
           .withId('prog1')
           .withCharacterId('char1')
           .withItemId('item1')
-          .withFound(true)
+          .withFoundDate(new Date('2024-01-01'))
           .withFoundDate(recentDate)
           .build(),
       ];
@@ -571,13 +570,13 @@ describe('When useGrailStatistics is used', () => {
           .withId('prog1')
           .withCharacterId('char1')
           .withItemId('item1')
-          .withFound(true)
+          .withFoundDate(new Date('2024-01-01'))
           .build(),
         GrailProgressBuilder.new()
           .withId('prog2')
           .withCharacterId('char1')
           .withItemId('item3')
-          .withFound(true)
+          .withFoundDate(new Date('2024-01-01'))
           .build(),
       ];
 
