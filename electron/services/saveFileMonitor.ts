@@ -258,7 +258,8 @@ class SaveFileMonitor {
   private currentData: FileReaderResponse;
   private fileWatcher: FSWatcher | null;
   private watchPath: string | null;
-  private filesChanged: boolean;
+  private fileChangeCounter: number = 0;
+  private lastProcessedChangeCounter: number = 0;
   private readingFiles: boolean;
   private isMonitoring = false;
   private grailDatabase: GrailDatabase | null = null;
@@ -293,7 +294,8 @@ class SaveFileMonitor {
     };
     this.fileWatcher = null;
     this.watchPath = null;
-    this.filesChanged = false;
+    this.fileChangeCounter = 0;
+    this.lastProcessedChangeCounter = 0;
     this.readingFiles = false;
 
     // Initialize D2S constants
@@ -523,9 +525,9 @@ class SaveFileMonitor {
       })
       .on('all', (event, path) => {
         console.log(`[Chokidar] Event: ${event} on ${path}`);
-        this.filesChanged = true;
+        this.fileChangeCounter++;
         this.lastFileChangeTime = Date.now();
-        console.log('[Chokidar] filesChanged flag set to true');
+        console.log(`[Chokidar] fileChangeCounter incremented to ${this.fileChangeCounter}`);
       })
       .on('error', (error) => console.error('[Chokidar] Save file watcher error:', error))
       .on('ready', () => {
@@ -1448,8 +1450,10 @@ class SaveFileMonitor {
       console.log(
         '[tickReader] Heartbeat - watching:',
         this.watchPath,
-        'filesChanged:',
-        this.filesChanged,
+        'changeCounter:',
+        this.fileChangeCounter,
+        'lastProcessed:',
+        this.lastProcessedChangeCounter,
         'isMonitoring:',
         this.isMonitoring,
       );
@@ -1467,8 +1471,9 @@ class SaveFileMonitor {
       return;
     }
 
-    if (!this.filesChanged) {
-      // Don't log every time - too verbose
+    // Check if there are unprocessed file changes
+    if (this.fileChangeCounter === this.lastProcessedChangeCounter) {
+      // No new changes since last processing
       return;
     }
 
@@ -1508,14 +1513,32 @@ class SaveFileMonitor {
     console.log(
       `[tickReader] Debounce period elapsed (${timeSinceLastChange}ms), processing file changes...`,
     );
+    console.log(
+      `[tickReader] Processing changes: counter=${this.fileChangeCounter}, lastProcessed=${this.lastProcessedChangeCounter}`,
+    );
     this.readingFiles = true;
-    this.filesChanged = false;
+
+    // Capture current counter before processing (in case new changes arrive during processing)
+    const counterAtStartOfProcessing = this.fileChangeCounter;
 
     const directories = await this.findExistingSaveDirectories();
     await this.parseAllSaveDirectories(directories);
 
+    // Update last processed counter to what we started processing
+    // If new changes arrived during processing, they'll be caught on next tick
+    this.lastProcessedChangeCounter = counterAtStartOfProcessing;
+
     this.readingFiles = false;
-    console.log('[tickReader] Done processing file changes');
+    console.log(
+      `[tickReader] Done processing file changes (processed up to counter ${counterAtStartOfProcessing})`,
+    );
+
+    // Check if new changes arrived during processing
+    if (this.fileChangeCounter > counterAtStartOfProcessing) {
+      console.log(
+        `[tickReader] New changes detected during processing (counter now ${this.fileChangeCounter}), will process on next tick`,
+      );
+    }
   };
 
   /**

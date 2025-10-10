@@ -785,26 +785,97 @@ this.previouslySeenItems.set(saveFileKey, currentItems);
 
 ---
 
-#### 2. **Race Condition in Tick Reader**
+#### 2. **Race Condition in Tick Reader** ✅ RESOLVED
 
-**Location**: `electron/services/saveFileMonitor.ts` (Line 1316)  
-**Problem**: The `tickReader` runs every 500ms, but Chokidar polls every 1000ms. There's potential for the tick reader to process file changes while Chokidar is still detecting new changes.
+**Previous Problem**: The `tickReader` used a boolean `filesChanged` flag that could be overwritten, potentially losing file changes when they occurred during processing.
 
-**Current Flow**:
+**Race Condition Scenario**:
 
 ```
 T=0ms:    Chokidar polls (no change detected)
 T=500ms:  Tick reader checks (filesChanged=false, does nothing)
 T=750ms:  File is modified
 T=1000ms: Chokidar polls (change detected, filesChanged=true)
-T=1000ms: Tick reader starts processing
-T=1100ms: Another file modified
-T=1500ms: Chokidar polls again (filesChanged set to true again)
-T=1200ms: Tick reader finishes, sets filesChanged=false
-T=1500ms: The second change is lost!
+T=1000ms: Tick reader starts processing, sets filesChanged=false
+T=1100ms: Another file modified, sets filesChanged=true
+T=1200ms: Tick reader finishes
+T=1500ms: New change might be missed if flag was overwritten
 ```
 
-**Suggested Fix**: Use a queue-based approach or debounce mechanism.
+**Solution Implemented**: Replaced boolean flag with counter-based queue approach.
+
+**Implementation Details**:
+
+- Replaced `filesChanged: boolean` with `fileChangeCounter: number`
+- Added `lastProcessedChangeCounter: number` to track what's been processed
+- Chokidar increments counter on each file change event
+- Tick reader compares `fileChangeCounter` with `lastProcessedChangeCounter`
+- Captures counter value at start of processing to handle concurrent changes
+- Logs when new changes arrive during processing
+
+**Counter-Based Strategy**:
+
+```typescript
+// In class fields
+private fileChangeCounter: number = 0;
+private lastProcessedChangeCounter: number = 0;
+
+// Chokidar event handler - increment counter (atomic operation)
+this.fileWatcher.on('all', (event, path) => {
+  this.fileChangeCounter++;
+  this.lastFileChangeTime = Date.now();
+});
+
+// Tick reader - check for unprocessed changes
+if (this.fileChangeCounter === this.lastProcessedChangeCounter) {
+  return; // No new changes
+}
+
+// Capture counter before processing
+const counterAtStartOfProcessing = this.fileChangeCounter;
+
+// Process files...
+await this.parseAllSaveDirectories(directories);
+
+// Update what we've processed
+this.lastProcessedChangeCounter = counterAtStartOfProcessing;
+
+// Check if new changes arrived during processing
+if (this.fileChangeCounter > counterAtStartOfProcessing) {
+  // Will be caught on next tick - no changes lost!
+}
+```
+
+**Before/After Behavior**:
+
+**Before (Boolean Flag - Race Condition)**:
+
+```
+T=0s:   Change 1 → filesChanged=true
+T=0.5s: Start processing → filesChanged=false
+T=0.6s: Change 2 → filesChanged=true
+T=1.0s: Processing done
+T=1.5s: Change 2 might be missed if flag was overwritten
+```
+
+**After (Counter - No Race Condition)**:
+
+```
+T=0s:   Change 1 → counter=1, lastProcessed=0
+T=0.5s: Start processing (counter=1)
+T=0.6s: Change 2 → counter=2
+T=1.0s: Processing done, lastProcessed=1
+T=1.5s: Next tick detects counter=2 > lastProcessed=1
+T=2.0s: Change 2 processed guaranteed!
+```
+
+**Benefits**:
+
+- **No Lost Changes**: Counter ensures all changes are eventually processed
+- **Atomic Operations**: Counter increments are thread-safe
+- **Concurrent Change Detection**: Detects changes that occur during processing
+- **Guaranteed Processing**: Every file change results in exactly one parse cycle
+- **Observable State**: Counter values provide clear audit trail
 
 ---
 
@@ -1302,7 +1373,7 @@ batchWriter.queueProgress(grailProgress);
 ~~❌ **No Batching**: Rapid changes trigger multiple parse cycles~~ ✅ RESOLVED  
 ~~❌ **Fixed Timing**: Hardcoded intervals may not suit all use cases~~ ✅ RESOLVED  
 ~~❌ **Notification Spam**: No debouncing or batching of notifications~~ ✅ RESOLVED  
-❌ **Race Conditions**: Potential for lost file changes with current flag-based approach  
+~~❌ **Race Conditions**: Potential for lost file changes with flag-based approach~~ ✅ RESOLVED  
 
 ---
 

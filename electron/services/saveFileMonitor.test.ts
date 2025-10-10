@@ -462,7 +462,8 @@ describe('When SaveFileMonitor is used', () => {
     it('Then should not parse immediately after file change', async () => {
       // Arrange
       const parseAllSpy = vi.spyOn(monitor as any, 'parseAllSaveDirectories');
-      (monitor as any).filesChanged = true;
+      (monitor as any).fileChangeCounter = 1;
+      (monitor as any).lastProcessedChangeCounter = 0;
       (monitor as any).lastFileChangeTime = Date.now();
       (monitor as any).watchPath = '/test/saves';
 
@@ -479,7 +480,8 @@ describe('When SaveFileMonitor is used', () => {
         .spyOn(monitor as any, 'parseAllSaveDirectories')
         .mockResolvedValue(undefined);
       vi.spyOn(monitor as any, 'findExistingSaveDirectories').mockResolvedValue(['/test/saves']);
-      (monitor as any).filesChanged = true;
+      (monitor as any).fileChangeCounter = 1;
+      (monitor as any).lastProcessedChangeCounter = 0;
       (monitor as any).lastFileChangeTime = Date.now();
       (monitor as any).watchPath = '/test/saves';
 
@@ -497,15 +499,18 @@ describe('When SaveFileMonitor is used', () => {
         .mockResolvedValue(undefined);
       vi.spyOn(monitor as any, 'findExistingSaveDirectories').mockResolvedValue(['/test/saves']);
       (monitor as any).watchPath = '/test/saves';
+      (monitor as any).lastProcessedChangeCounter = 0;
 
       // Act - Simulate 3 rapid file changes
-      (monitor as any).filesChanged = true;
+      (monitor as any).fileChangeCounter = 1;
       (monitor as any).lastFileChangeTime = Date.now();
       await vi.advanceTimersByTimeAsync(500); // Change 1
 
+      (monitor as any).fileChangeCounter = 2;
       (monitor as any).lastFileChangeTime = Date.now();
       await vi.advanceTimersByTimeAsync(500); // Change 2
 
+      (monitor as any).fileChangeCounter = 3;
       (monitor as any).lastFileChangeTime = Date.now();
       await vi.advanceTimersByTimeAsync(500); // Change 3
 
@@ -522,7 +527,8 @@ describe('When SaveFileMonitor is used', () => {
         .spyOn(monitor as any, 'parseAllSaveDirectories')
         .mockResolvedValue(undefined);
       vi.spyOn(monitor as any, 'findExistingSaveDirectories').mockResolvedValue(['/test/saves']);
-      (monitor as any).filesChanged = true;
+      (monitor as any).fileChangeCounter = 1;
+      (monitor as any).lastProcessedChangeCounter = 0;
       (monitor as any).lastFileChangeTime = Date.now();
       (monitor as any).watchPath = '/test/saves';
       (monitor as any).isInitialParsing = true; // Set initial parsing flag
@@ -540,7 +546,8 @@ describe('When SaveFileMonitor is used', () => {
         .spyOn(monitor as any, 'parseAllSaveDirectories')
         .mockResolvedValue(undefined);
       vi.spyOn(monitor as any, 'findExistingSaveDirectories').mockResolvedValue(['/test/saves']);
-      (monitor as any).filesChanged = true;
+      (monitor as any).fileChangeCounter = 1;
+      (monitor as any).lastProcessedChangeCounter = 0;
       (monitor as any).lastFileChangeTime = Date.now();
       (monitor as any).watchPath = '/test/saves';
       (monitor as any).forceParseAll = true; // Set force parse flag
@@ -561,7 +568,8 @@ describe('When SaveFileMonitor is used', () => {
         gameMode: GameMode.Manual, // Manual mode
         saveFileDirectory: '/test/saves',
       });
-      (monitor as any).filesChanged = true;
+      (monitor as any).fileChangeCounter = 1;
+      (monitor as any).lastProcessedChangeCounter = 0;
       (monitor as any).lastFileChangeTime = Date.now();
       (monitor as any).watchPath = '/test/saves';
 
@@ -570,6 +578,35 @@ describe('When SaveFileMonitor is used', () => {
 
       // Assert - should NOT parse in manual mode
       expect(parseAllSpy).not.toHaveBeenCalled();
+    });
+
+    it('Then should handle race condition when changes occur during processing', async () => {
+      // Arrange
+      let parseCount = 0;
+      const parseAllSpy = vi
+        .spyOn(monitor as any, 'parseAllSaveDirectories')
+        .mockImplementation(async () => {
+          parseCount++;
+          // Simulate a file change happening during parsing
+          if (parseCount === 1) {
+            (monitor as any).fileChangeCounter++;
+            (monitor as any).lastFileChangeTime = Date.now();
+          }
+        });
+      vi.spyOn(monitor as any, 'findExistingSaveDirectories').mockResolvedValue(['/test/saves']);
+      (monitor as any).fileChangeCounter = 1;
+      (monitor as any).lastProcessedChangeCounter = 0;
+      (monitor as any).lastFileChangeTime = Date.now();
+      (monitor as any).watchPath = '/test/saves';
+
+      // Act - wait for debounce and first parse
+      await vi.advanceTimersByTimeAsync(2500);
+
+      // Wait for debounce again to process the change that occurred during first parse
+      await vi.advanceTimersByTimeAsync(2500);
+
+      // Assert - should have parsed TWICE (once for initial change, once for change during processing)
+      expect(parseAllSpy).toHaveBeenCalledTimes(2);
     });
   });
 
