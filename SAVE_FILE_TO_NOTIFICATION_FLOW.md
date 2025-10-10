@@ -1091,16 +1091,98 @@ await this.parseAllSaveDirectories(directories);
 
 ### 🟢 Code Quality Issues
 
-#### 6. **Inconsistent Silent Flag Handling**
+#### 6. **Inconsistent Silent Flag Handling** ✅ RESOLVED (Documentation)
 
-**Location**: Multiple files  
-**Problem**: The `silent` flag logic is inconsistent:
+**Previous Problem**: The `silent` flag logic appeared inconsistent because its purpose and behavior were not clearly documented.
 
-- Initial parsing sets `silent=true`
-- Force parse all sets `silent=true`
-- But the flag is checked at multiple levels (event emission, notification display)
+**Solution Implemented**: Added comprehensive documentation explaining the silent flag's purpose, usage, and effects throughout the application.
 
-**Suggested Improvement**: Document the purpose and expected behavior of the `silent` flag clearly.
+**Actual Behavior** (which is correct and consistent):
+
+The silent flag provides a clean separation between data processing (always happens) and user notifications (conditional based on context).
+
+**When Silent is True**:
+
+1. **Initial Parsing** (`isInitialParsing=true`)
+   - **Occurs**: Application startup
+   - **Reason**: Prevents notification spam for items already in grail
+   - **Behavior**: Parses files, saves to DB, but suppresses notifications
+
+2. **Force Parse All** (`forceParseAll=true`)
+   - **Occurs**: User clicks "Re-scan all files"
+   - **Reason**: Prevents re-notification of existing items
+   - **Behavior**: Re-parses files, updates DB, but suppresses notifications
+
+**When Silent is False**:
+
+- **Occurs**: Normal gameplay file changes (player picks up item)
+- **Reason**: User should be notified of genuinely new item
+- **Behavior**: Full processing with all notifications enabled
+
+**Silent Flag Propagation**:
+
+```typescript
+// 1. Set in SaveFileMonitor
+const silent = this.isInitialParsing || this.forceParseAll;
+
+// 2. Included in SaveFileEvent
+this.eventBus.emit('save-file-event', {
+  type: 'modified',
+  file: saveFile,
+  extractedItems,
+  silent, // ← Propagated
+});
+
+// 3. Passed to ItemDetectionService
+itemDetectionService.analyzeSaveFile(
+  event.file,
+  event.extractedItems,
+  event.silent // ← Propagated
+);
+
+// 4. Included in ItemDetectionEvent
+this.eventBus.emit('item-detection', {
+  type: 'item-found',
+  item,
+  grailItem,
+  silent, // ← Propagated
+});
+
+// 5. Checked at multiple points
+if (!event.silent) {
+  emitGrailProgressUpdate(); // Grail update notification
+}
+
+if (itemEvent.silent) {
+  return; // Skip all UI notifications
+}
+```
+
+**Effects of Silent Flag**:
+
+| Component | Silent=true | Silent=false |
+|-----------|-------------|--------------|
+| Database save | ✅ Always | ✅ Always |
+| Item detection | ✅ Always | ✅ Always |
+| Duplicate tracking | ✅ Always | ✅ Always |
+| Sound notification | ❌ Suppressed | ✅ Played |
+| Native OS notification | ❌ Suppressed | ✅ Shown |
+| In-app notification | ❌ Suppressed | ✅ Shown |
+| Grail update IPC event | ❌ Suppressed | ✅ Sent |
+
+**Benefits of This Design**:
+
+- **Consistent**: Same flag controls all notification points
+- **Separation of Concerns**: Data processing vs user notifications
+- **User-Friendly**: No spam during bulk operations
+- **Flexible**: Easy to add new notification points that respect the flag
+
+**Documentation Added**:
+
+- Comprehensive JSDoc on `SaveFileEvent.silent` and `ItemDetectionEvent.silent`
+- Inline comments at all 3 silent flag usage points
+- Flow diagram showing propagation through the system
+- Table showing effects on each component
 
 ---
 

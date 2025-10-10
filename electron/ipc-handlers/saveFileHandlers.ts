@@ -136,6 +136,9 @@ function handleAutomaticGrailProgress(event: ItemDetectionEvent): void {
     // Log and notify about the discovery (synchronous - don't delay user feedback)
     if (isFirstTimeDiscovery) {
       console.log(`🎉 NEW GRAIL ITEM: ${event.item.name} found by ${characterName}`);
+      // Only emit grail update notifications for non-silent events
+      // Silent events still save to database but don't trigger user notifications
+      // This prevents notification spam during initial parsing and force re-scans
       if (!event.silent) {
         emitGrailProgressUpdate(character, event, grailProgress);
       }

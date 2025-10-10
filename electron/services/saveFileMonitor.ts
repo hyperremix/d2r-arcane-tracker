@@ -952,7 +952,10 @@ class SaveFileMonitor {
         const saveName = this.getSaveNameFromPath(filePath);
         const extractedItems = this.collectExtractedItems(results, saveName);
 
-        // Set silent flag when doing initial parsing or force parsing all files
+        // Set silent flag to prevent notification spam during:
+        // - Initial parsing: avoid notifications for existing items on app startup
+        // - Force parse all: avoid notifications when user manually re-scans all files
+        // Items are still saved to database, only notifications are suppressed
         const silent = this.isInitialParsing || this.forceParseAll;
 
         console.log('[emitSaveFileEvents] Emitting save-file-event for:', saveName, {

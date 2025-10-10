@@ -131,7 +131,11 @@ export function NotificationButton() {
       _event: Electron.IpcRendererEvent,
       itemEvent: ItemDetectionEvent,
     ) => {
-      // Skip all notifications if silent flag is set (e.g., during initial startup parsing)
+      // Skip all notifications if silent flag is set
+      // Silent flag is true during:
+      // - Initial startup parsing: prevents spam for existing items
+      // - Force re-scan: prevents re-notification of already found items
+      // Items are still saved to database, only UI notifications are suppressed
       if (itemEvent.silent) {
         return;
       }
