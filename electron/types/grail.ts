@@ -356,6 +356,11 @@ export type Settings = {
   needsSeeding: boolean;
   theme: 'light' | 'dark' | 'system';
   showItemIcons: boolean;
+  // Advanced monitoring settings (optional, with defaults)
+  tickReaderIntervalMs?: number; // Default: 500
+  chokidarPollingIntervalMs?: number; // Default: 1000
+  fileStabilityThresholdMs?: number; // Default: 300
+  fileChangeDebounceMs?: number; // Default: 2000
 };
 
 /**

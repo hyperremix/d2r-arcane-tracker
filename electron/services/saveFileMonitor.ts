@@ -269,7 +269,11 @@ class SaveFileMonitor {
   private tickReaderCount: number = 0;
   private eventBus: EventBus;
   private lastFileChangeTime: number = 0;
-  private readonly FILE_CHANGE_DEBOUNCE_MS = 2000; // 2 seconds
+  // Default values for configurable intervals
+  private readonly DEFAULT_TICK_INTERVAL = 500;
+  private readonly DEFAULT_POLLING_INTERVAL = 1000;
+  private readonly DEFAULT_STABILITY_THRESHOLD = 300;
+  private readonly DEFAULT_DEBOUNCE_DELAY = 2000;
   private readonly MAX_CONCURRENT_PARSES = 5; // Limit concurrent file parsing
 
   /**
@@ -300,8 +304,9 @@ class SaveFileMonitor {
     this.initializeSaveDirectories();
 
     // Start the tick reader for automatic file change detection
-    this.tickReaderInterval = setInterval(this.tickReader, 500);
-    console.log('[SaveFileMonitor] Tick reader started (interval: 500ms)');
+    const tickInterval = this.getTickReaderInterval();
+    this.tickReaderInterval = setInterval(this.tickReader, tickInterval);
+    console.log(`[SaveFileMonitor] Tick reader started (interval: ${tickInterval}ms)`);
   }
 
   /**
@@ -381,6 +386,50 @@ class SaveFileMonitor {
   }
 
   /**
+   * Validates an interval value to ensure it's within acceptable bounds.
+   * @private
+   * @param {number | undefined} value - The value to validate
+   * @param {number} min - Minimum acceptable value
+   * @param {number} max - Maximum acceptable value
+   * @param {number} defaultValue - Default value to use if validation fails
+   * @returns {number} The validated interval value
+   */
+  private validateInterval(
+    value: number | undefined,
+    min: number,
+    max: number,
+    defaultValue: number,
+  ): number {
+    if (value === undefined) return defaultValue;
+    if (value < min || value > max) {
+      console.warn(
+        `[SaveFileMonitor] Invalid interval ${value} (valid range: ${min}-${max}ms), using default ${defaultValue}ms`,
+      );
+      return defaultValue;
+    }
+    return value;
+  }
+
+  /**
+   * Gets the tick reader interval from settings or returns default.
+   * @private
+   * @returns {number} The tick reader interval in milliseconds
+   */
+  private getTickReaderInterval(): number {
+    if (!this.grailDatabase) {
+      return this.DEFAULT_TICK_INTERVAL;
+    }
+
+    const settings = this.grailDatabase.getAllSettings();
+    return this.validateInterval(
+      settings.tickReaderIntervalMs,
+      100, // min 100ms
+      5000, // max 5 seconds
+      this.DEFAULT_TICK_INTERVAL,
+    );
+  }
+
+  /**
    * Starts monitoring the save file directory for changes.
    * Sets up file watching and parses existing save files.
    * @returns {Promise<void>} A promise that resolves when monitoring is started.
@@ -437,6 +486,25 @@ class SaveFileMonitor {
     const usePolling = true;
     console.log('[startMonitoring] Using polling mode:', usePolling);
 
+    // Get configurable intervals from settings
+    const settings = this.grailDatabase?.getAllSettings();
+    const pollingInterval = this.validateInterval(
+      settings?.chokidarPollingIntervalMs,
+      500, // min 500ms
+      5000, // max 5 seconds
+      this.DEFAULT_POLLING_INTERVAL,
+    );
+    const stabilityThreshold = this.validateInterval(
+      settings?.fileStabilityThresholdMs,
+      100, // min 100ms
+      2000, // max 2 seconds
+      this.DEFAULT_STABILITY_THRESHOLD,
+    );
+
+    console.log(
+      `[startMonitoring] Using intervals: polling=${pollingInterval}ms, stability=${stabilityThreshold}ms`,
+    );
+
     this.fileWatcher = chokidar
       .watch(this.saveDirectory, {
         // Only watch files with save file extensions
@@ -447,9 +515,9 @@ class SaveFileMonitor {
         ignoreInitial: true,
         depth: 0,
         usePolling: usePolling, // Polling is more reliable for games like D2R that use atomic writes
-        interval: 1000, // Poll every second
+        interval: pollingInterval,
         awaitWriteFinish: {
-          stabilityThreshold: 300,
+          stabilityThreshold: stabilityThreshold,
           pollInterval: 100,
         },
       })
@@ -1408,14 +1476,20 @@ class SaveFileMonitor {
     // Skip debounce for initial parsing or force parse
     const timeSinceLastChange = Date.now() - this.lastFileChangeTime;
     const shouldDebounce = !this.isInitialParsing && !this.forceParseAll;
+    const debounceDelay = this.validateInterval(
+      settings.fileChangeDebounceMs,
+      500, // min 500ms
+      10000, // max 10 seconds
+      this.DEFAULT_DEBOUNCE_DELAY,
+    );
 
-    if (shouldDebounce && timeSinceLastChange < this.FILE_CHANGE_DEBOUNCE_MS) {
+    if (shouldDebounce && timeSinceLastChange < debounceDelay) {
       // Still within debounce window - don't process yet
       if (this.tickReaderCount % 4 === 0) {
         // Log occasionally to show debouncing is working
         console.log(
           `[tickReader] Debouncing: ${timeSinceLastChange}ms since last change ` +
-            `(waiting for ${this.FILE_CHANGE_DEBOUNCE_MS}ms)`,
+            `(waiting for ${debounceDelay}ms)`,
         );
       }
       return;

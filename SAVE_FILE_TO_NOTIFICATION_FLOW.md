@@ -996,16 +996,107 @@ await this.parseAllSaveDirectories(directories);
 
 ---
 
-#### 7. **Hardcoded Polling Intervals**
+#### 7. **Hardcoded Polling Intervals** ✅ RESOLVED
 
-**Location**: `electron/services/saveFileMonitor.ts` (Line 298, 445)  
-**Problem**: Polling intervals are hardcoded:
+**Previous Problem**: Polling intervals were hardcoded, preventing power users from tuning detection speed vs resource usage.
 
-- Tick reader: 500ms
-- Chokidar polling: 1000ms
-- Stability threshold: 300ms
+**Solution Implemented**: Made all monitoring intervals configurable through settings with validation.
 
-**Suggested Improvement**: Make these configurable via settings for power users who want faster detection.
+**Implementation Details**:
+
+- Added 4 new optional settings fields to `Settings` type:
+  - `tickReaderIntervalMs` (default: 500ms, range: 100-5000ms)
+  - `chokidarPollingIntervalMs` (default: 1000ms, range: 500-5000ms)
+  - `fileStabilityThresholdMs` (default: 300ms, range: 100-2000ms)
+  - `fileChangeDebounceMs` (default: 2000ms, range: 500-10000ms)
+- Added validation method to ensure intervals are within safe bounds
+- Updated constructor to use settings with fallback to defaults
+- Updated Chokidar configuration to use settings intervals
+- Updated tick reader debounce logic to use settings
+
+**Configuration Strategy**:
+
+```typescript
+// Settings type with optional intervals
+export type Settings = {
+  // ... existing settings ...
+  tickReaderIntervalMs?: number;        // Default: 500
+  chokidarPollingIntervalMs?: number;   // Default: 1000
+  fileStabilityThresholdMs?: number;    // Default: 300
+  fileChangeDebounceMs?: number;        // Default: 2000
+};
+
+// Validation with bounds checking
+private validateInterval(value, min, max, defaultValue): number {
+  if (value === undefined) return defaultValue;
+  if (value < min || value > max) return defaultValue;
+  return value;
+}
+
+// Usage in constructor
+const tickInterval = this.getTickReaderInterval();
+this.tickReaderInterval = setInterval(this.tickReader, tickInterval);
+```
+
+**Default Values and Ranges**:
+
+| Setting | Default | Min | Max | Purpose |
+|---------|---------|-----|-----|---------|
+| Tick Reader Interval | 500ms | 100ms | 5000ms | How often to check for file changes |
+| Chokidar Polling | 1000ms | 500ms | 5000ms | How often to poll disk for changes |
+| Stability Threshold | 300ms | 100ms | 2000ms | How long to wait for file writes to finish |
+| File Change Debounce | 2000ms | 500ms | 10000ms | Delay before processing file changes |
+
+**Performance Trade-offs**:
+
+**Lower Intervals** (Fast Detection):
+
+- Pros: Faster item detection (sub-second response)
+- Cons: Higher CPU usage, more disk I/O, reduced battery life
+- Use case: Competitive players who want immediate feedback
+
+**Higher Intervals** (Conservative):
+
+- Pros: Lower resource usage, better battery life, less system load
+- Cons: Slower detection (2-3 second delay)
+- Use case: Casual players, resource-constrained systems
+
+**Recommended Configurations**:
+
+**Fast Mode** (minimum safe values):
+
+```typescript
+tickReaderIntervalMs: 250
+chokidarPollingIntervalMs: 500
+fileStabilityThresholdMs: 200
+fileChangeDebounceMs: 1000
+```
+
+**Default Mode** (balanced):
+
+```typescript
+tickReaderIntervalMs: 500
+chokidarPollingIntervalMs: 1000
+fileStabilityThresholdMs: 300
+fileChangeDebounceMs: 2000
+```
+
+**Power Saver Mode** (maximum safe values):
+
+```typescript
+tickReaderIntervalMs: 2000
+chokidarPollingIntervalMs: 3000
+fileStabilityThresholdMs: 500
+fileChangeDebounceMs: 5000
+```
+
+**Benefits**:
+
+- **User Control**: Power users can tune performance to their needs
+- **Safe Defaults**: Sensible defaults work for most users
+- **Validation**: Prevents invalid values that could break monitoring
+- **Backward Compatible**: Optional fields don't require database migration
+- **Flexibility**: Can optimize for speed or resource conservation
 
 ---
 
@@ -1209,7 +1300,7 @@ batchWriter.queueProgress(grailProgress);
 
 ~~❌ **Duplicate Events**: Same item can trigger multiple notifications~~ ✅ RESOLVED  
 ~~❌ **No Batching**: Rapid changes trigger multiple parse cycles~~ ✅ RESOLVED  
-❌ **Fixed Timing**: Hardcoded intervals may not suit all use cases  
+~~❌ **Fixed Timing**: Hardcoded intervals may not suit all use cases~~ ✅ RESOLVED  
 ~~❌ **Notification Spam**: No debouncing or batching of notifications~~ ✅ RESOLVED  
 ❌ **Race Conditions**: Potential for lost file changes with current flag-based approach  
 
@@ -1221,7 +1312,7 @@ batchWriter.queueProgress(grailProgress);
 2. ~~**High Priority**: Add notification batching (#9)~~ ✅ RESOLVED
 3. ~~**Medium Priority**: Implement debouncing on file changes (#5)~~ ✅ RESOLVED
 4. ~~**Medium Priority**: Add concurrency limits to file parsing (#3)~~ ✅ RESOLVED
-5. **Low Priority**: Make intervals configurable (#7)
+5. ~~**Low Priority**: Make intervals configurable (#7)~~ ✅ RESOLVED
 
 ---
 

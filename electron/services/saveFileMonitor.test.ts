@@ -696,4 +696,120 @@ describe('When SaveFileMonitor is used', () => {
       expect(results).toEqual([]);
     });
   });
+
+  describe('When configurable intervals are used', () => {
+    let monitor: SaveFileMonitor;
+    let mockDatabase: MockGrailDatabase;
+    let eventBus: EventBus;
+
+    beforeEach(() => {
+      eventBus = new EventBus();
+      mockDatabase = createMockDatabase();
+    });
+
+    it('Then should use default intervals when settings not provided', () => {
+      // Arrange
+      mockDatabase.getAllSettings.mockReturnValue({
+        gameMode: GameMode.Softcore,
+        saveFileDirectory: '/test/saves',
+      });
+
+      // Act
+      monitor = new SaveFileMonitor(eventBus, mockDatabase as any);
+
+      // Assert - verify defaults used (check via method calls)
+      const tickInterval = (monitor as any).getTickReaderInterval();
+      expect(tickInterval).toBe(500); // DEFAULT_TICK_INTERVAL
+    });
+
+    it('Then should use custom tick reader interval from settings', () => {
+      // Arrange
+      mockDatabase.getAllSettings.mockReturnValue({
+        gameMode: GameMode.Softcore,
+        saveFileDirectory: '/test/saves',
+        tickReaderIntervalMs: 1000, // Custom value
+      });
+
+      // Act
+      monitor = new SaveFileMonitor(eventBus, mockDatabase as any);
+
+      // Assert
+      const tickInterval = (monitor as any).getTickReaderInterval();
+      expect(tickInterval).toBe(1000);
+    });
+
+    it('Then should validate and reject invalid tick reader interval', () => {
+      // Arrange
+      mockDatabase.getAllSettings.mockReturnValue({
+        gameMode: GameMode.Softcore,
+        saveFileDirectory: '/test/saves',
+        tickReaderIntervalMs: 50, // Too low (min is 100)
+      });
+
+      // Act
+      monitor = new SaveFileMonitor(eventBus, mockDatabase as any);
+
+      // Assert - should fall back to default
+      const tickInterval = (monitor as any).getTickReaderInterval();
+      expect(tickInterval).toBe(500); // DEFAULT_TICK_INTERVAL
+    });
+
+    it('Then should validate interval with max constraint', () => {
+      // Arrange
+      mockDatabase.getAllSettings.mockReturnValue({
+        gameMode: GameMode.Softcore,
+        saveFileDirectory: '/test/saves',
+        tickReaderIntervalMs: 10000, // Too high (max is 5000)
+      });
+
+      // Act
+      monitor = new SaveFileMonitor(eventBus, mockDatabase as any);
+
+      // Assert - should fall back to default
+      const tickInterval = (monitor as any).getTickReaderInterval();
+      expect(tickInterval).toBe(500); // DEFAULT_TICK_INTERVAL
+    });
+
+    it('Then should validate interval and allow valid custom value', () => {
+      // Arrange
+      const validInterval = 250;
+      mockDatabase.getAllSettings.mockReturnValue({
+        gameMode: GameMode.Softcore,
+        saveFileDirectory: '/test/saves',
+        tickReaderIntervalMs: validInterval,
+      });
+
+      // Act
+      monitor = new SaveFileMonitor(eventBus, mockDatabase as any);
+
+      // Assert
+      const tickInterval = (monitor as any).getTickReaderInterval();
+      expect(tickInterval).toBe(validInterval);
+    });
+
+    it('Then should use default when database not available', () => {
+      // Arrange & Act
+      monitor = new SaveFileMonitor(eventBus); // No database
+
+      // Assert
+      const tickInterval = (monitor as any).getTickReaderInterval();
+      expect(tickInterval).toBe(500); // DEFAULT_TICK_INTERVAL
+    });
+
+    it('Then should validate debounce delay from settings', () => {
+      // Arrange
+      mockDatabase.getAllSettings.mockReturnValue({
+        gameMode: GameMode.Softcore,
+        saveFileDirectory: '/test/saves',
+        fileChangeDebounceMs: 3000, // Custom debounce
+      });
+      monitor = new SaveFileMonitor(eventBus, mockDatabase as any);
+
+      // Act
+      const validated = (monitor as any).validateInterval(3000, 500, 10000, 2000);
+
+      // Assert
+      expect(validated).toBe(3000);
+    });
+  });
 });
