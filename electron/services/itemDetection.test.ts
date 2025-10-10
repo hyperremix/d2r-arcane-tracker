@@ -919,4 +919,44 @@ describe('When ItemDetectionService is used', () => {
       expect(eventSpy).toHaveBeenCalledTimes(3); // file1, file2, file1 again
     });
   });
+
+  describe('When analyzeSaveFile is called with pre-extracted items', () => {
+    it('Then should use pre-extracted items even if empty array', async () => {
+      // Arrange
+      const saveFile = D2SaveFileBuilder.new()
+        .withPath('/test/char.d2s')
+        .withName('TestChar')
+        .build();
+      service.setGrailItems(mockGrailItems);
+
+      // Act - pass empty array (no grail items in save file)
+      await service.analyzeSaveFile(saveFile, []); // Empty array, not undefined
+
+      // Assert - should NOT call read (no re-parsing)
+      // This verifies the fix: empty arrays are accepted to avoid redundant parsing
+      expect(read).not.toHaveBeenCalled();
+      expect(readFile).not.toHaveBeenCalled();
+    });
+
+    it('Then should use pre-extracted items with grail items', async () => {
+      // Arrange
+      const saveFile = D2SaveFileBuilder.new()
+        .withPath('/test/char.d2s')
+        .withName('TestChar')
+        .build();
+      const d2sItem = D2SItemBuilder.new()
+        .withId('1234')
+        .asUniqueHelm()
+        .withUniqueName('shako')
+        .build();
+      service.setGrailItems(mockGrailItems);
+
+      // Act - pass pre-extracted items array
+      await service.analyzeSaveFile(saveFile, [d2sItem as any]);
+
+      // Assert - should NOT call read or readFile (no re-parsing)
+      expect(read).not.toHaveBeenCalled();
+      expect(readFile).not.toHaveBeenCalled();
+    });
+  });
 });

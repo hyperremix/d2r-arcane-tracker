@@ -961,25 +961,62 @@ await this.executeConcurrently(tasks, this.MAX_CONCURRENT_PARSES);
 
 ---
 
-#### 4. **Redundant File Parsing**
+#### 4. **Redundant File Parsing** ✅ RESOLVED
 
-**Location**: `electron/services/saveFileMonitor.ts` & `electron/services/itemDetection.ts`  
-**Problem**: Save files are parsed twice in some scenarios:
+**Previous Problem**: Save files were parsed twice in some scenarios - once in `SaveFileMonitor.parseSave()` to extract items, and again in `ItemDetectionService.extractItemsFromSaveFile()` when pre-extracted items weren't provided or were empty arrays.
 
-1. Once in `SaveFileMonitor.parseSave()` to extract items
-2. Again in `ItemDetectionService.extractItemsFromSaveFile()` if pre-extracted items aren't provided
+**Solution Implemented**: Changed condition in `ItemDetectionService` to trust pre-extracted items even if empty.
 
-**Evidence**:
+**Implementation Details**:
 
-```typescript:45:47:electron/services/itemDetection.ts
+- Changed condition from `if (preExtractedItems && preExtractedItems.length > 0)` to `if (preExtractedItems !== undefined)`
+- Now accepts empty arrays as valid pre-extracted items (e.g., save file with no grail-relevant items)
+- Only re-parses when `preExtractedItems` is explicitly `undefined`
+- Added tests to verify empty arrays don't trigger re-parsing
+
+**Fix**:
+
+```typescript
+// BEFORE (caused double parsing for empty arrays)
+if (preExtractedItems && preExtractedItems.length > 0) {
+  items = this.convertD2SItemsToD2Items(preExtractedItems, saveFile.name);
 } else {
-  // Fallback to parsing the save file again
-  console.log(`No pre-extracted items provided, parsing save file: ${saveFile.name}`);
+  // Re-parses even when empty array was passed!
+  items = await this.extractItemsFromSaveFile(saveFile);
+}
+
+// AFTER (trusts pre-extracted items, even if empty)
+if (preExtractedItems !== undefined) {
+  // Use pre-extracted items (even if empty array)
+  items = this.convertD2SItemsToD2Items(preExtractedItems, saveFile.name);
+} else {
+  // Only re-parse if pre-extracted items not provided at all
   items = await this.extractItemsFromSaveFile(saveFile);
 }
 ```
 
-**Suggested Fix**: Always pass pre-extracted items to avoid double parsing.
+**Before/After Behavior**:
+
+**Before (Redundant Parsing)**:
+
+- Save file with no grail items parsed
+- extractedItems = [] (empty array)
+- ItemDetectionService checks: `[] && [].length > 0` → false
+- Re-parses entire file again (wasteful!)
+
+**After (No Redundant Parsing)**:
+
+- Save file with no grail items parsed
+- extractedItems = [] (empty array)
+- ItemDetectionService checks: `[] !== undefined` → true
+- Uses empty array directly (no re-parse!)
+
+**Benefits**:
+
+- **Eliminates Double Parsing**: Files parsed exactly once
+- **Performance Improvement**: ~50% reduction in parsing time for files with no grail items
+- **Consistent Behavior**: Always uses pre-extracted items when provided
+- **Cleaner Code**: Simpler condition logic
 
 ---
 
