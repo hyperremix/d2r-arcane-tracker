@@ -270,6 +270,7 @@ class SaveFileMonitor {
   private eventBus: EventBus;
   private lastFileChangeTime: number = 0;
   private readonly FILE_CHANGE_DEBOUNCE_MS = 2000; // 2 seconds
+  private readonly MAX_CONCURRENT_PARSES = 5; // Limit concurrent file parsing
 
   /**
    * Creates a new instance of the SaveFileMonitor.
@@ -904,6 +905,46 @@ class SaveFileMonitor {
   }
 
   /**
+   * Executes an array of async tasks with a concurrency limit.
+   * This prevents resource exhaustion when many files need to be parsed.
+   * @private
+   * @template T - The return type of the tasks
+   * @param {Array<() => Promise<T>>} tasks - Array of async task functions
+   * @param {number} limit - Maximum number of concurrent tasks
+   * @returns {Promise<T[]>} Promise that resolves with all task results in order
+   */
+  private async executeConcurrently<T>(
+    tasks: Array<() => Promise<T>>,
+    limit: number,
+  ): Promise<T[]> {
+    const results: T[] = [];
+    let currentIndex = 0;
+
+    // Create worker function that processes tasks sequentially
+    const worker = async (): Promise<void> => {
+      while (currentIndex < tasks.length) {
+        const index = currentIndex++;
+        const task = tasks[index];
+        try {
+          results[index] = await task();
+        } catch (error) {
+          console.error(`[executeConcurrently] Error executing task ${index}:`, error);
+          // Store error or undefined to maintain result order
+          results[index] = undefined as T;
+        }
+      }
+    };
+
+    // Create array of worker promises (limited by 'limit' parameter)
+    const workers = Array.from({ length: Math.min(limit, tasks.length) }, () => worker());
+
+    // Wait for all workers to complete
+    await Promise.all(workers);
+
+    return results;
+  }
+
+  /**
    * Parses multiple save files and updates the current data.
    * @private
    * @param {string[]} filePaths - Array of file paths to parse.
@@ -941,10 +982,19 @@ class SaveFileMonitor {
       return;
     }
 
-    // Parse all files in parallel
-    console.log('[parseFiles] Starting parallel parsing of', filesToParse.length, 'files');
-    await Promise.all(filesToParse.map((filePath) => this.processSingleFile(filePath, results)));
-    console.log('[parseFiles] Parallel parsing complete');
+    // Parse files with concurrency limit to prevent resource exhaustion
+    console.log(
+      `[parseFiles] Starting concurrent parsing of ${filesToParse.length} files ` +
+        `(max ${this.MAX_CONCURRENT_PARSES} at a time)`,
+    );
+
+    const tasks = filesToParse.map((filePath) => {
+      return () => this.processSingleFile(filePath, results);
+    });
+
+    await this.executeConcurrently(tasks, this.MAX_CONCURRENT_PARSES);
+
+    console.log('[parseFiles] Concurrent parsing complete');
 
     // Reset force parse flag after parsing completes
     if (this.forceParseAll) {
