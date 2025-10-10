@@ -761,4 +761,162 @@ describe('When ItemDetectionService is used', () => {
       expect(result).toBeNull();
     });
   });
+
+  describe('If analyzeSaveFile detects duplicate items', () => {
+    it('Then should emit event on first detection', async () => {
+      // Arrange
+      const saveFile = D2SaveFileBuilder.new()
+        .withPath('/test/char.d2s')
+        .withName('TestChar')
+        .build();
+      const d2sItem = D2SItemBuilder.new()
+        .withId('1234')
+        .asUniqueHelm()
+        .withUniqueName('shako') // Must match mockGrailItems ID
+        .build();
+      const eventSpy = vi.fn();
+      eventBus.on('item-detection', eventSpy);
+      service.setGrailItems(mockGrailItems);
+
+      // Act - provide pre-extracted items to avoid parsing
+      await service.analyzeSaveFile(saveFile, [d2sItem as any]);
+
+      // Assert
+      expect(eventSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it('Then should NOT emit event on second detection of same item', async () => {
+      // Arrange
+      const saveFile = D2SaveFileBuilder.new()
+        .withPath('/test/char.d2s')
+        .withName('TestChar')
+        .build();
+      const d2sItem = D2SItemBuilder.new()
+        .withId('1234')
+        .asUniqueHelm()
+        .withUniqueName('shako') // Must match mockGrailItems ID
+        .build();
+      const eventSpy = vi.fn();
+      eventBus.on('item-detection', eventSpy);
+      service.setGrailItems(mockGrailItems);
+
+      // Act - provide pre-extracted items to avoid parsing
+      await service.analyzeSaveFile(saveFile, [d2sItem as any]); // First analysis
+      await service.analyzeSaveFile(saveFile, [d2sItem as any]); // Second analysis - should not emit
+
+      // Assert
+      expect(eventSpy).toHaveBeenCalledTimes(1); // Only called once
+    });
+
+    it('Then should emit event for new item in same save file', async () => {
+      // Arrange
+      const saveFile = D2SaveFileBuilder.new()
+        .withPath('/test/char.d2s')
+        .withName('TestChar')
+        .build();
+      const d2sItem1 = D2SItemBuilder.new()
+        .withId('1234')
+        .asUniqueHelm()
+        .withUniqueName('shako') // Must match mockGrailItems ID
+        .build();
+      const d2sItem2 = D2SItemBuilder.new()
+        .withId('5678')
+        .asUniqueHelm()
+        .withUniqueName('shako') // Same item but different ID
+        .build();
+      const eventSpy = vi.fn();
+      eventBus.on('item-detection', eventSpy);
+      service.setGrailItems(mockGrailItems);
+
+      // Act - provide pre-extracted items to avoid parsing
+      await service.analyzeSaveFile(saveFile, [d2sItem1 as any]); // First item
+      await service.analyzeSaveFile(saveFile, [d2sItem1 as any, d2sItem2 as any]); // Second item added
+
+      // Assert
+      expect(eventSpy).toHaveBeenCalledTimes(2); // One for each unique item
+    });
+
+    it('Then should emit event for same item in different save file', async () => {
+      // Arrange
+      const saveFile1 = D2SaveFileBuilder.new()
+        .withPath('/test/char1.d2s')
+        .withName('Char1')
+        .build();
+      const saveFile2 = D2SaveFileBuilder.new()
+        .withPath('/test/char2.d2s')
+        .withName('Char2')
+        .build();
+      const d2sItem = D2SItemBuilder.new()
+        .withId('1234')
+        .asUniqueHelm()
+        .withUniqueName('shako') // Must match mockGrailItems ID
+        .build();
+      const eventSpy = vi.fn();
+      eventBus.on('item-detection', eventSpy);
+      service.setGrailItems(mockGrailItems);
+
+      // Act - provide pre-extracted items to avoid parsing
+      await service.analyzeSaveFile(saveFile1, [d2sItem as any]); // First save file
+      await service.analyzeSaveFile(saveFile2, [d2sItem as any]); // Different save file
+
+      // Assert
+      expect(eventSpy).toHaveBeenCalledTimes(2); // Once per save file
+    });
+  });
+
+  describe('If clearSeenItems is called', () => {
+    it('Then should clear all tracking and allow re-detection', async () => {
+      // Arrange
+      const saveFile = D2SaveFileBuilder.new()
+        .withPath('/test/char.d2s')
+        .withName('TestChar')
+        .build();
+      const d2sItem = D2SItemBuilder.new()
+        .withId('1234')
+        .asUniqueHelm()
+        .withUniqueName('shako') // Must match mockGrailItems ID
+        .build();
+      const eventSpy = vi.fn();
+      eventBus.on('item-detection', eventSpy);
+      service.setGrailItems(mockGrailItems);
+
+      // Act - provide pre-extracted items to avoid parsing
+      await service.analyzeSaveFile(saveFile, [d2sItem as any]); // First detection
+      service.clearSeenItems(); // Clear tracking
+      await service.analyzeSaveFile(saveFile, [d2sItem as any]); // Should detect again
+
+      // Assert
+      expect(eventSpy).toHaveBeenCalledTimes(2); // Emitted twice after clear
+    });
+
+    it('Then should clear specific save file tracking', async () => {
+      // Arrange
+      const saveFile1 = D2SaveFileBuilder.new()
+        .withPath('/test/char1.d2s')
+        .withName('Char1')
+        .build();
+      const saveFile2 = D2SaveFileBuilder.new()
+        .withPath('/test/char2.d2s')
+        .withName('Char2')
+        .build();
+      const d2sItem = D2SItemBuilder.new()
+        .withId('1234')
+        .asUniqueHelm()
+        .withUniqueName('shako') // Must match mockGrailItems ID
+        .build();
+      const eventSpy = vi.fn();
+      eventBus.on('item-detection', eventSpy);
+      service.setGrailItems(mockGrailItems);
+
+      // Act - provide pre-extracted items to avoid parsing
+      await service.analyzeSaveFile(saveFile1, [d2sItem as any]); // Detect in file 1
+      await service.analyzeSaveFile(saveFile2, [d2sItem as any]); // Detect in file 2
+      service.clearSeenItems('/test/char1.d2s'); // Clear only file 1
+      await service.analyzeSaveFile(saveFile1, [d2sItem as any]); // Should detect again
+      await service.analyzeSaveFile(saveFile2, [d2sItem as any]); // Should NOT detect again
+
+      // Assert
+      expect(eventSpy).toHaveBeenCalledTimes(3); // file1, file2, file1 again
+    });
+  });
 });

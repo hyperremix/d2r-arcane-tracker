@@ -10,10 +10,12 @@ import type { EventBus } from './EventBus';
  * Service for detecting and analyzing items from Diablo 2 save files.
  * This service parses D2 save files, extracts items, and matches them against
  * the Holy Grail item database to identify found items.
+ * Tracks previously seen items to prevent duplicate notifications.
  */
 class ItemDetectionService {
   private grailItems: Item[] = [];
   private eventBus: EventBus;
+  private previouslySeenItems: Map<string, Set<string>> = new Map();
 
   /**
    * Creates a new instance of the ItemDetectionService.
@@ -56,18 +58,37 @@ class ItemDetectionService {
         items = await this.extractItemsFromSaveFile(saveFile);
       }
 
-      // Simple processing - no complex state tracking
+      // Track items to prevent duplicate notifications
+      const saveFileKey = saveFile.path;
+      const previousItems = this.previouslySeenItems.get(saveFileKey) || new Set<string>();
+      const currentItems = new Set<string>();
+
       for (const item of items) {
         const grailMatch = this.findGrailMatch(item);
         if (grailMatch) {
-          this.eventBus.emit('item-detection', {
-            type: 'item-found',
-            item,
-            grailItem: grailMatch,
-            silent,
-          } as ItemDetectionEvent);
+          // Create unique key for this item
+          const itemKey = `${item.name}_${item.id}`;
+          currentItems.add(itemKey);
+
+          // Only emit event if this is a NEW item not seen in previous analysis
+          if (!previousItems.has(itemKey)) {
+            console.log(`[ItemDetection] New item detected: ${item.name} in ${saveFile.name}`);
+            this.eventBus.emit('item-detection', {
+              type: 'item-found',
+              item,
+              grailItem: grailMatch,
+              silent,
+            } as ItemDetectionEvent);
+          } else {
+            console.log(
+              `[ItemDetection] Skipping duplicate: ${item.name} in ${saveFile.name} (already seen)`,
+            );
+          }
         }
       }
+
+      // Update tracking with current snapshot
+      this.previouslySeenItems.set(saveFileKey, currentItems);
     } catch (error) {
       console.error('Error analyzing save file:', error);
     }
@@ -384,6 +405,22 @@ class ItemDetectionService {
   private findGrailMatch(item: D2Item): Item | null {
     // Simple exact name matching - no complex algorithms
     return this.grailItems.find((grailItem) => grailItem.id === item.name) || null;
+  }
+
+  /**
+   * Clears the tracking of previously seen items.
+   * Can clear a specific save file's tracking or all tracking.
+   * Useful when monitoring restarts or save files are deleted.
+   * @param {string} [saveFilePath] - Optional specific save file path to clear. If not provided, clears all.
+   */
+  clearSeenItems(saveFilePath?: string): void {
+    if (saveFilePath) {
+      this.previouslySeenItems.delete(saveFilePath);
+      console.log(`[ItemDetection] Cleared seen items for: ${saveFilePath}`);
+    } else {
+      this.previouslySeenItems.clear();
+      console.log('[ItemDetection] Cleared all seen items tracking');
+    }
   }
 }
 

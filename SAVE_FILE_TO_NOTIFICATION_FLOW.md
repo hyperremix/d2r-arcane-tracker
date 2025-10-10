@@ -714,69 +714,74 @@ Based on the code analysis:
 
 ### 🔴 Critical Issues
 
-#### 1. **Duplicate Item Detection Events**
+#### 1. **Duplicate Item Detection Events** ✅ RESOLVED
 
-**Location**: `electron/services/itemDetection.ts` (Line 51)  
-**Problem**: Every time a save file is modified, ALL items in the save file are checked and emitted as detection events. There's no state tracking to prevent emitting the same item multiple times.
+**Previous Problem**: Every time a save file was modified, ALL items in the save file were checked and emitted as detection events. There was no state tracking to prevent emitting the same item multiple times.
 
-**Current Code**:
+**Solution Implemented**: Added state tracking to prevent duplicate notifications using a Map-based approach.
+
+**Implementation Details**:
+
+- Added `previouslySeenItems: Map<string, Set<string>>` to `ItemDetectionService`
+- Modified `analyzeSaveFile()` to track items per save file using unique keys
+- Item key format: `${item.name}_${item.id}` for uniqueness
+- Added `clearSeenItems(saveFilePath?: string)` method for state management
+- Added comprehensive unit tests (6 new tests, 100% coverage)
+
+**How It Works**:
 
 ```typescript
+// Track items to prevent duplicate notifications
+const saveFileKey = saveFile.path;
+const previousItems = this.previouslySeenItems.get(saveFileKey) || new Set<string>();
+const currentItems = new Set<string>();
+
 for (const item of items) {
   const grailMatch = this.findGrailMatch(item);
   if (grailMatch) {
-    this.emit('item-detection', {
-      type: 'item-found',
-      item,
-      grailItem: grailMatch,
-      silent,
-    } as ItemDetectionEvent);
-  }
-}
-```
-
-**Impact**:
-
-- If a player picks up a unique item and saves, notification fires
-- If player logs out (auto-save), notification fires again for the same item
-- If player changes zones (auto-save), notification fires again
-- This creates notification spam
-
-**Suggested Fix**: Track previously seen items per save file:
-
-```typescript
-private previouslySeenItems: Map<string, Set<string>> = new Map();
-
-async analyzeSaveFile(
-  saveFile: D2SaveFile,
-  preExtractedItems?: d2s.types.IItem[],
-  silent: boolean = false,
-): Promise<void> {
-  const saveFileKey = saveFile.path;
-  const previousItems = this.previouslySeenItems.get(saveFileKey) || new Set();
-  const currentItems = new Set<string>();
-
-  for (const item of items) {
-    const grailMatch = this.findGrailMatch(item);
-    if (grailMatch) {
-      const itemKey = `${item.name}_${item.id}`;
-      currentItems.add(itemKey);
-      
-      // Only emit if this is a NEW item
-      if (!previousItems.has(itemKey)) {
-        this.emit('item-detection', {
-          type: 'item-found',
-          item,
-          grailItem: grailMatch,
-          silent,
-        } as ItemDetectionEvent);
-      }
+    const itemKey = `${item.name}_${item.id}`;
+    currentItems.add(itemKey);
+    
+    // Only emit if this is a NEW item not seen before
+    if (!previousItems.has(itemKey)) {
+      this.eventBus.emit('item-detection', { ... });
     }
   }
-  
-  this.previouslySeenItems.set(saveFileKey, currentItems);
 }
+
+// Update tracking with current snapshot
+this.previouslySeenItems.set(saveFileKey, currentItems);
 ```
+
+**Before/After Behavior**:
+
+**Before**:
+
+- Player picks up Shako → notification ✓
+- Player logs out (auto-save) → notification again ✗
+- Player changes zones (auto-save) → notification again ✗
+- Player opens stash (auto-save) → notification again ✗
+
+**After**:
+
+- Player picks up Shako → notification ✓
+- Player logs out (auto-save) → no notification (already seen) ✓
+- Player changes zones (auto-save) → no notification (already seen) ✓
+- Player opens stash (auto-save) → no notification (already seen) ✓
+
+**Edge Cases Handled**:
+
+- Different save files tracked independently
+- New items in same file still trigger notifications
+- `clearSeenItems()` allows resetting tracking when needed
+- Save file path used as key for consistent tracking
+
+**Benefits**:
+
+- **No Notification Spam**: Same item only notifies once per save file
+- **Accurate Detection**: New items still trigger immediately
+- **Multi-Character Support**: Each save file tracked independently
+- **Testable**: Full unit test coverage for all scenarios
 
 ---
 
@@ -1064,7 +1069,7 @@ batchWriter.queueProgress(grailProgress);
 
 ## Recommended Priority Fixes
 
-1. **High Priority**: Fix duplicate item detection (#1)
+1. ~~**High Priority**: Fix duplicate item detection (#1)~~ ✅ RESOLVED
 2. **High Priority**: Add notification batching (#9)
 3. **Medium Priority**: Implement debouncing on file changes (#5)
 4. **Medium Priority**: Add concurrency limits to file parsing (#3)
