@@ -21,11 +21,30 @@ vi.mock('../database/database', () => ({
     upsertCharacter: vi.fn(),
     updateCharacter: vi.fn(),
     upsertProgress: vi.fn(),
+    upsertCharactersBatch: vi.fn(),
+    upsertProgressBatch: vi.fn(),
     getAllItems: vi.fn(),
     setSetting: vi.fn(),
     truncateUserData: vi.fn(),
   },
 }));
+
+// Mock DatabaseBatchWriter
+vi.mock('../services/DatabaseBatchWriter', () => {
+  // Create the mock instance once at module level
+  const mockInstance = {
+    queueCharacter: vi.fn(),
+    queueProgress: vi.fn(),
+    flush: vi.fn(),
+    clear: vi.fn(),
+    getCharacterQueueSize: vi.fn(),
+    getProgressQueueSize: vi.fn(),
+  };
+
+  return {
+    DatabaseBatchWriter: vi.fn().mockImplementation(() => mockInstance),
+  };
+});
 
 // Create a shared event handlers map that persists across test instances
 const eventHandlers = new Map<string, Array<(...args: any[]) => any>>();
@@ -92,6 +111,7 @@ import {
   HolyGrailItemBuilder,
 } from '@/fixtures';
 import { grailDatabase } from '../database/database';
+import { DatabaseBatchWriter } from '../services/DatabaseBatchWriter';
 import { EventBus } from '../services/EventBus';
 import { ItemDetectionService } from '../services/itemDetection';
 import { SaveFileMonitor } from '../services/saveFileMonitor';
@@ -110,6 +130,15 @@ interface MockEventBus {
   off: ReturnType<typeof vi.fn>;
   clear: ReturnType<typeof vi.fn>;
   listenerCount: ReturnType<typeof vi.fn>;
+}
+
+interface MockDatabaseBatchWriter {
+  queueCharacter: ReturnType<typeof vi.fn>;
+  queueProgress: ReturnType<typeof vi.fn>;
+  flush: ReturnType<typeof vi.fn>;
+  clear: ReturnType<typeof vi.fn>;
+  getCharacterQueueSize: ReturnType<typeof vi.fn>;
+  getProgressQueueSize: ReturnType<typeof vi.fn>;
 }
 
 interface MockSaveFileMonitor {
@@ -134,6 +163,7 @@ describe('When saveFileHandlers is used', () => {
   let mockSaveFileMonitor: MockSaveFileMonitor;
   let mockItemDetectionService: MockItemDetectionService;
   let mockEventBus: MockEventBus;
+  let mockBatchWriter: MockDatabaseBatchWriter;
 
   beforeEach(() => {
     // Clear all mocks
@@ -142,8 +172,9 @@ describe('When saveFileHandlers is used', () => {
     // Clear event handlers map
     eventHandlers.clear();
 
-    // Get the mock EventBus instance (created by the mock)
+    // Get the mock instances (created by the mocks)
     mockEventBus = new (EventBus as any)();
+    mockBatchWriter = new (DatabaseBatchWriter as any)();
 
     // Setup mock web contents
     mockWebContents = [
@@ -444,7 +475,7 @@ describe('When saveFileHandlers is used', () => {
       mockEventBus.emit('item-detection', mockEvent);
 
       // Assert
-      expect(grailDatabase.upsertProgress).toHaveBeenCalled();
+      expect(mockBatchWriter.queueProgress).toHaveBeenCalled();
     });
   });
 
@@ -597,12 +628,14 @@ describe('When saveFileHandlers is used', () => {
       closeSaveFileMonitor();
 
       // Assert
+      expect(mockBatchWriter.flush).toHaveBeenCalled();
       expect(mockSaveFileMonitor.stopMonitoring).toHaveBeenCalled();
     });
 
     it('Then should handle case when monitor is not initialized', () => {
       // Act & Assert
       expect(() => closeSaveFileMonitor()).not.toThrow();
+      expect(mockBatchWriter.flush).toHaveBeenCalled();
     });
   });
 
@@ -638,14 +671,17 @@ describe('When saveFileHandlers is used', () => {
       mockEventBus.emit('save-file-event', { type: 'modified', file: mockSaveFile });
 
       // Assert
-      expect(grailDatabase.updateCharacter).toHaveBeenCalledWith('char-1', {
-        characterClass: 'Amazon',
-        level: 85,
-        difficulty: 'hell',
-        hardcore: true,
-        expansion: true,
-        saveFilePath: '/path/to/amazon.d2s',
-      });
+      expect(mockBatchWriter.queueCharacter).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: 'char-1',
+          characterClass: 'Amazon',
+          level: 85,
+          difficulty: 'hell',
+          hardcore: true,
+          expansion: true,
+          saveFilePath: '/path/to/amazon.d2s',
+        }),
+      );
     });
 
     it('Then should work with HolyGrailItemBuilder for item detection', () => {
@@ -701,11 +737,10 @@ describe('When saveFileHandlers is used', () => {
       mockEventBus.emit('item-detection', mockEvent);
 
       // Assert
-      expect(grailDatabase.upsertProgress).toHaveBeenCalledWith(
+      expect(mockBatchWriter.queueProgress).toHaveBeenCalledWith(
         expect.objectContaining({
           characterId: 'char-1',
           itemId: 'windforce',
-          found: true,
           manuallyAdded: false,
         }),
       );

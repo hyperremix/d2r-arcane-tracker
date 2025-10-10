@@ -1,5 +1,6 @@
 import { ipcMain, webContents } from 'electron';
 import { grailDatabase } from '../database/database';
+import { DatabaseBatchWriter } from '../services/DatabaseBatchWriter';
 import { EventBus } from '../services/EventBus';
 import { ItemDetectionService } from '../services/itemDetection';
 import type { D2SaveFile, SaveFileEvent } from '../services/saveFileMonitor';
@@ -16,6 +17,7 @@ import type {
  * Global service instances for save file monitoring and item detection.
  */
 const eventBus = new EventBus();
+const batchWriter = new DatabaseBatchWriter(grailDatabase);
 let saveFileMonitor: SaveFileMonitor;
 let itemDetectionService: ItemDetectionService;
 const eventUnsubscribers: Array<() => void> = [];
@@ -36,7 +38,7 @@ function findOrCreateCharacter(characterName: string, level: number) {
       characterName === 'Shared Stash Softcore' || characterName === 'Shared Stash Hardcore';
     const defaultCharacterClass = isSharedStash ? 'shared_stash' : 'barbarian';
 
-    grailDatabase.upsertCharacter({
+    character = {
       id: characterId,
       name: characterName,
       characterClass: defaultCharacterClass, // Use shared_stash for shared stash files, will be updated from save file data for regular characters
@@ -47,9 +49,11 @@ function findOrCreateCharacter(characterName: string, level: number) {
       saveFilePath: undefined,
       lastUpdated: new Date(),
       created: new Date(),
-    });
-    character = grailDatabase.getCharacterByName(characterName);
-    console.log(`Created new character: ${characterName}`);
+    };
+
+    // Queue character creation for batch write
+    batchWriter.queueCharacter(character);
+    console.log(`Queued new character for batch write: ${characterName}`);
   }
 
   return character;
@@ -125,11 +129,11 @@ function handleAutomaticGrailProgress(event: ItemDetectionEvent): void {
     const existingGlobalProgress = grailDatabase.getProgressByItem(event.grailItem.id);
     const isFirstTimeDiscovery = !existingGlobalProgress;
 
-    // Create and save grail progress entry
+    // Create grail progress entry and queue for batch write
     const grailProgress = createGrailProgress(character, event);
-    grailDatabase.upsertProgress(grailProgress);
+    batchWriter.queueProgress(grailProgress);
 
-    // Log and notify about the discovery
+    // Log and notify about the discovery (synchronous - don't delay user feedback)
     if (isFirstTimeDiscovery) {
       console.log(`🎉 NEW GRAIL ITEM: ${event.item.name} found by ${characterName}`);
       if (!event.silent) {
@@ -153,20 +157,23 @@ function updateCharacterFromSaveFile(saveFile: D2SaveFile): void {
       grailDatabase.getCharacterByName(saveFile.name);
 
     if (character) {
-      // Update existing character
-      grailDatabase.updateCharacter(character.id, {
+      // Update existing character - queue for batch write
+      const updatedCharacter: Character = {
+        ...character,
         characterClass: saveFile.characterClass as CharacterClass,
         level: saveFile.level,
         difficulty: saveFile.difficulty,
         hardcore: saveFile.hardcore,
         expansion: saveFile.expansion,
         saveFilePath: saveFile.path,
-      });
+        lastUpdated: new Date(),
+      };
+      batchWriter.queueCharacter(updatedCharacter);
     } else {
-      // Create new character
+      // Create new character - queue for batch write
       const characterId = `char_${saveFile.name}_${Date.now()}`;
 
-      grailDatabase.upsertCharacter({
+      const newCharacter: Character = {
         id: characterId,
         name: saveFile.name,
         characterClass: saveFile.characterClass as CharacterClass,
@@ -177,9 +184,11 @@ function updateCharacterFromSaveFile(saveFile: D2SaveFile): void {
         saveFilePath: saveFile.path,
         lastUpdated: new Date(),
         created: new Date(),
-      });
+      };
+
+      batchWriter.queueCharacter(newCharacter);
       console.log(
-        `Created character from save file: ${saveFile.name} (${saveFile.characterClass})`,
+        `Queued character for batch write: ${saveFile.name} (${saveFile.characterClass})`,
       );
     }
   } catch (error) {
@@ -385,6 +394,10 @@ export function initializeSaveFileHandlers(): void {
  * Should be called when the application is shutting down to properly clean up resources.
  */
 export function closeSaveFileMonitor(): void {
+  // Flush any pending database writes before shutdown
+  console.log('[closeSaveFileMonitor] Flushing pending database writes');
+  batchWriter.flush();
+
   // Unsubscribe all event listeners
   for (const unsubscribe of eventUnsubscribers) {
     unsubscribe();

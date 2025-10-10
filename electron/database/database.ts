@@ -355,6 +355,47 @@ class GrailDatabase {
   }
 
   /**
+   * Inserts or updates multiple characters using a transaction.
+   * Much more efficient than calling upsertCharacter() multiple times.
+   * @param characters - Array of characters to upsert
+   */
+  upsertCharactersBatch(characters: Character[]): void {
+    if (characters.length === 0) return;
+
+    const stmt = this.db.prepare(`
+      INSERT OR REPLACE INTO characters (id, name, character_class, level, difficulty, hardcore, expansion, save_file_path)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+
+    const transaction = this.db.transaction((chars: Character[]) => {
+      for (const character of chars) {
+        const mappedCharacter = mapCharacterToDatabase({
+          id: character.id,
+          name: character.name,
+          character_class: character.characterClass,
+          level: character.level,
+          difficulty: character.difficulty,
+          hardcore: character.hardcore,
+          expansion: character.expansion,
+          save_file_path: character.saveFilePath,
+        });
+        stmt.run(
+          mappedCharacter.id,
+          mappedCharacter.name,
+          mappedCharacter.character_class,
+          mappedCharacter.level,
+          mappedCharacter.difficulty,
+          mappedCharacter.hardcore,
+          mappedCharacter.expansion,
+          mappedCharacter.save_file_path,
+        );
+      }
+    });
+
+    transaction(characters);
+  }
+
+  /**
    * Retrieves a character by its name.
    * @param name - The name of the character to find
    * @returns The character if found, undefined otherwise
@@ -492,6 +533,39 @@ class GrailDatabase {
       mappedProgress.notes,
       mappedProgress.is_ethereal,
     );
+  }
+
+  /**
+   * Inserts or updates multiple grail progress entries using a transaction.
+   * Much more efficient than calling upsertProgress() multiple times.
+   * @param progressList - Array of progress entries to upsert
+   */
+  upsertProgressBatch(progressList: GrailProgress[]): void {
+    if (progressList.length === 0) return;
+
+    const stmt = this.db.prepare(`
+      INSERT OR REPLACE INTO grail_progress (id, character_id, item_id, found_date, manually_added, auto_detected, difficulty, notes, is_ethereal)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+
+    const transaction = this.db.transaction((progList: GrailProgress[]) => {
+      for (const progress of progList) {
+        const mappedProgress = mapProgressToDatabase(progress);
+        stmt.run(
+          mappedProgress.id,
+          mappedProgress.character_id,
+          mappedProgress.item_id,
+          mappedProgress.found_date,
+          mappedProgress.manually_added,
+          mappedProgress.auto_detected,
+          mappedProgress.difficulty,
+          mappedProgress.notes,
+          mappedProgress.is_ethereal,
+        );
+      }
+    });
+
+    transaction(progressList);
   }
 
   // Settings methods
