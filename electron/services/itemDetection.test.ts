@@ -263,7 +263,7 @@ describe('When ItemDetectionService is used', () => {
       // Assert
       expect(result).toEqual([]);
       expect(consoleSpy).toHaveBeenCalledWith(
-        'Error parsing save file with d2s:',
+        'Error parsing save file after all retries:',
         expect.any(Error),
       );
       consoleSpy.mockRestore();

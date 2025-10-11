@@ -4,6 +4,7 @@ import { read } from '@dschu012/d2s';
 import { runesByCode } from '../items/indexes';
 import type { D2SaveFile } from '../services/saveFileMonitor';
 import type { D2Item, D2SItem, Item, ItemDetectionEvent } from '../types/grail';
+import { DEFAULT_RETRY_OPTIONS, retryWithBackoff } from '../utils/retry';
 import type { EventBus } from './EventBus';
 
 /**
@@ -150,15 +151,24 @@ class ItemDetectionService {
     const items: D2Item[] = [];
 
     try {
-      const buffer = await fs.readFile(saveFile.path);
+      // Wrap file reading and parsing in retry logic to handle transient errors
+      // (file locks, temporary I/O issues, race conditions with game writing files)
+      const saveData = await retryWithBackoff(
+        async () => {
+          const buffer = await fs.readFile(saveFile.path);
 
-      // Parse the D2 save file using the d2s library
-      const saveData = await read(buffer);
+          // Parse the D2 save file using the d2s library
+          const data = await read(buffer);
 
-      if (!saveData) {
-        console.warn('Failed to parse save file:', saveFile.path);
-        return []; // Return empty array instead of fallback
-      }
+          if (!data) {
+            throw new Error(`Failed to parse save file: ${saveFile.path}`);
+          }
+
+          return data;
+        },
+        DEFAULT_RETRY_OPTIONS,
+        `Parse ${saveFile.name}`,
+      );
 
       // Extract items from all possible locations
       const allItemLists = [
@@ -178,8 +188,8 @@ class ItemDetectionService {
 
       console.log(`Extracted ${items.length} items from ${saveFile.name}`);
     } catch (error) {
-      console.error('Error parsing save file with d2s:', error);
-      return []; // Return empty array instead of fallback
+      console.error('Error parsing save file after all retries:', error);
+      return []; // Return empty array after exhausting retries
     }
 
     return items;
