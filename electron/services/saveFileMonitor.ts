@@ -780,9 +780,10 @@ class SaveFileMonitor {
    * For .d2i files, returns friendly names like "Shared Stash Hardcore".
    * @private
    * @param {string} filePath - The file path to extract the name from.
+   * @param {boolean} [isHardcore] - Optional hardcore status (for shared stash files). If not provided, falls back to filename detection.
    * @returns {string} The character/save name.
    */
-  private getSaveNameFromPath(filePath: string): string {
+  private getSaveNameFromPath(filePath: string, isHardcore?: boolean): string {
     const extension = extname(filePath).toLowerCase();
     let saveName = basename(filePath)
       .replace('.d2s', '')
@@ -792,8 +793,10 @@ class SaveFileMonitor {
 
     // Use friendly names for shared stash files
     if (extension === '.d2i') {
-      const isHardcore = saveName.toLowerCase().includes('hardcore');
-      saveName = isHardcore ? 'Shared Stash Hardcore' : 'Shared Stash Softcore';
+      // Use provided hardcore status if available, otherwise fall back to filename
+      const hardcore =
+        isHardcore !== undefined ? isHardcore : saveName.toLowerCase().includes('hardcore');
+      saveName = hardcore ? 'Shared Stash Hardcore' : 'Shared Stash Softcore';
     }
 
     return saveName;
@@ -1160,7 +1163,8 @@ class SaveFileMonitor {
       }
 
       const settings = this.grailDatabase.getAllSettings();
-      const isHardcore = saveName.toLowerCase().includes('hardcore');
+      // Use hardcore flag from parsed stash header instead of filename
+      const isHardcore = response.hardcore;
       console.log(
         '[parseSave/parseStash] Stash is hardcore:',
         isHardcore,
@@ -1172,7 +1176,7 @@ class SaveFileMonitor {
         console.log('[parseSave/parseStash] Skipping hardcore stash (game mode is softcore)');
         return [];
       }
-      if (settings.gameMode === GameMode.Hardcore && !saveName.toLowerCase().includes('hardcore')) {
+      if (settings.gameMode === GameMode.Hardcore && !isHardcore) {
         console.log('[parseSave/parseStash] Skipping softcore stash (game mode is hardcore)');
         return [];
       }
@@ -1195,10 +1199,7 @@ class SaveFileMonitor {
       case '.sss':
       case '.d2x':
         console.log('[parseSave] Parsing as stash file (.sss/.d2x)');
-        await d2stash.read(content).then((response) => {
-          response.hardcore === saveName.toLowerCase().includes('hardcore');
-          parseStash(response);
-        });
+        await d2stash.read(content).then(parseStash);
         break;
       case '.d2i':
         console.log('[parseSave] Parsing as shared stash (.d2i)');
@@ -1227,9 +1228,22 @@ class SaveFileMonitor {
 
       // Handle shared stash files (.d2i)
       if (extension === '.d2i') {
-        const fileName = basename(filePath);
-        const isHardcore = fileName.toLowerCase().includes('hardcore');
-        const characterName = isHardcore ? 'Shared Stash Hardcore' : 'Shared Stash Softcore';
+        // Parse the stash file header to extract hardcore status
+        let isHardcore = false;
+        try {
+          const stashData = await d2stash.read(buffer);
+          isHardcore = stashData.hardcore;
+          console.log('[parseSaveFile] Parsed .d2i file, hardcore:', isHardcore);
+        } catch (parseError) {
+          console.warn(
+            '[parseSaveFile] Failed to parse .d2i file header, falling back to filename:',
+            parseError,
+          );
+          // Fallback to filename if parsing fails
+          isHardcore = basename(filePath).toLowerCase().includes('hardcore');
+        }
+
+        const characterName = this.getSaveNameFromPath(filePath, isHardcore);
 
         return {
           name: characterName,

@@ -849,4 +849,84 @@ describe('When SaveFileMonitor is used', () => {
       expect(validated).toBe(3000);
     });
   });
+
+  describe('When stash header parsing is used', () => {
+    describe('If getSaveNameFromPath is called with hardcore=true parameter', () => {
+      it('Then should return Shared Stash Hardcore regardless of filename', () => {
+        // Arrange
+        const filePath = '/test/SharedStashSoftcoreV2.d2i';
+
+        // Act
+        const result = (monitor as any).getSaveNameFromPath(filePath, true);
+
+        // Assert
+        expect(result).toBe('Shared Stash Hardcore'); // Uses parameter, not filename
+      });
+    });
+
+    describe('If getSaveNameFromPath is called with hardcore=false parameter', () => {
+      it('Then should return Shared Stash Softcore regardless of filename', () => {
+        // Arrange
+        const filePath = '/test/SharedStashHardcoreV2.d2i';
+
+        // Act
+        const result = (monitor as any).getSaveNameFromPath(filePath, false);
+
+        // Assert
+        expect(result).toBe('Shared Stash Softcore'); // Uses parameter, not filename
+      });
+    });
+
+    describe('If getSaveNameFromPath is called without hardcore parameter for hardcore stash', () => {
+      it('Then should fallback to filename detection', () => {
+        // Arrange
+        const filePath = '/test/SharedStashHardcoreV2.d2i';
+
+        // Act
+        const result = (monitor as any).getSaveNameFromPath(filePath);
+
+        // Assert
+        expect(result).toBe('Shared Stash Hardcore'); // Falls back to filename
+      });
+    });
+
+    describe('If getSaveNameFromPath is called without hardcore parameter for softcore stash', () => {
+      it('Then should fallback to filename detection', () => {
+        // Arrange
+        const filePath = '/test/SharedStashSoftcoreV2.d2i';
+
+        // Act
+        const result = (monitor as any).getSaveNameFromPath(filePath);
+
+        // Assert
+        expect(result).toBe('Shared Stash Softcore'); // Falls back to filename
+      });
+    });
+
+    describe('If getSaveNameFromPath is called with non-.d2i file', () => {
+      it('Then should return filename without extension', () => {
+        // Arrange
+        const filePath = '/test/MyCharacter.d2s';
+
+        // Act
+        const result = (monitor as any).getSaveNameFromPath(filePath);
+
+        // Assert
+        expect(result).toBe('MyCharacter');
+      });
+    });
+
+    describe('If getSaveNameFromPath is called with hardcore parameter on non-.d2i file', () => {
+      it('Then should ignore hardcore parameter', () => {
+        // Arrange
+        const filePath = '/test/MyCharacter.d2s';
+
+        // Act
+        const result = (monitor as any).getSaveNameFromPath(filePath, true);
+
+        // Assert
+        expect(result).toBe('MyCharacter'); // Hardcore parameter only applies to .d2i files
+      });
+    });
+  });
 });

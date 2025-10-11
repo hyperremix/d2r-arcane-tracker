@@ -1440,33 +1440,94 @@ const handleItemDetection = (event, itemEvent) => {
 
 ---
 
-#### 10. **Shared Stash Detection Ambiguity**
+#### 10. **Shared Stash Detection Ambiguity** ✅ RESOLVED
 
-**Location**: `electron/services/saveFileMonitor.ts` (Line 718)  
-**Problem**: Shared stash files are identified by checking if filename contains "hardcore", which could lead to false positives.
+**Previous Problem**: Shared stash files were identified by checking if filename contains "hardcore", which could lead to false positives (e.g., a file named "NotHardcore.d2i" would be detected as hardcore).
 
-**Current Code**:
+**Solution Implemented**: Parse actual file header using d2stash.read() to extract hardcore flag, with filename fallback.
 
-```typescript:709:724:electron/services/saveFileMonitor.ts
-private getSaveNameFromPath(filePath: string): string {
-  const extension = extname(filePath).toLowerCase();
-  let saveName = basename(filePath)
-    .replace('.d2s', '')
-    .replace('.sss', '')
-    .replace('.d2x', '')
-    .replace('.d2i', '');
+**Implementation Details**:
 
-  // Use friendly names for shared stash files
-  if (extension === '.d2i') {
-    const isHardcore = saveName.toLowerCase().includes('hardcore');
-    saveName = isHardcore ? 'Shared Stash Hardcore' : 'Shared Stash Softcore';
+- Updated `parseSaveFile()` to parse .d2i file headers using `d2stash.read()`
+- Extract `hardcore` boolean flag from parsed stash header
+- Updated `parseStash()` to use `response.hardcore` from parsed header instead of filename
+- Fixed bug at line 1203 where comparison was used instead of using header data
+- Updated `getSaveNameFromPath()` to accept optional `isHardcore` parameter
+- Fallback to filename detection only if header parsing fails
+- Added 6 comprehensive tests for stash header parsing
+
+**Header Parsing Strategy**:
+
+```typescript
+// parseSaveFile() for .d2i files
+if (extension === '.d2i') {
+  let isHardcore = false;
+  try {
+    // Parse stash file header to extract hardcore status
+    const stashData = await d2stash.read(buffer);
+    isHardcore = stashData.hardcore; // Use header flag
+  } catch (parseError) {
+    // Fallback to filename if parsing fails
+    isHardcore = basename(filePath).toLowerCase().includes('hardcore');
   }
+  
+  const characterName = this.getSaveNameFromPath(filePath, isHardcore);
+  return { ...saveFile, hardcore: isHardcore, name: characterName };
+}
 
+// parseStash() for stash file parsing
+const parseStash = (response: d2s.types.IStash) => {
+  const isHardcore = response.hardcore; // Use header, not filename
+  // ...rest of logic
+};
+
+// getSaveNameFromPath() with optional parameter
+private getSaveNameFromPath(filePath: string, isHardcore?: boolean): string {
+  if (extension === '.d2i') {
+    // Use provided hardcore status if available, otherwise fall back to filename
+    const hardcore = isHardcore !== undefined 
+      ? isHardcore 
+      : saveName.toLowerCase().includes('hardcore');
+    saveName = hardcore ? 'Shared Stash Hardcore' : 'Shared Stash Softcore';
+  }
   return saveName;
 }
 ```
 
-**Suggested Improvement**: Parse the actual file header to determine hardcore status instead of relying on filename.
+**IStash Interface** (from @dschu012/d2s):
+
+```typescript
+export interface IStash {
+  version: string;
+  type: EStashType;
+  pageCount: number;
+  sharedGold: number;
+  hardcore: boolean; // ← Extracted from file header
+  pages: IStashPage[];
+}
+```
+
+**Before/After Behavior**:
+
+**Before (Filename-Based)**:
+
+- File: `NotHardcoreButSaysHardcore.d2i` (softcore stash)
+- Detection: Parsed as hardcore (incorrect - filename contains "hardcore")
+- Bug: Line 1203 had useless comparison: `response.hardcore === saveName.includes('hardcore')`
+
+**After (Header-Based)**:
+
+- File: `NotHardcoreButSaysHardcore.d2i` (softcore stash)
+- Detection: Parses header → `hardcore: false` → Detected as softcore (correct!)
+- Bug Fixed: Uses `response.hardcore` directly from parsed header
+
+**Benefits**:
+
+- **Accurate Detection**: Uses actual file metadata instead of filename guessing
+- **Fallback Safety**: Falls back to filename if header parsing fails
+- **Bug Fixed**: Removed useless comparison at line 1203
+- **Type Safety**: `IStash.hardcore` is properly typed as boolean
+- **Well-Tested**: 6 tests covering various scenarios including edge cases
 
 ---
 
