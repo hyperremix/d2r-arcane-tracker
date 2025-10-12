@@ -85,19 +85,7 @@ export function NotificationButton() {
   }, []);
 
   const processBatch = useCallback(() => {
-    console.log(
-      `[NotificationButton] 🔄 processBatch called. Queue length: ${notificationQueue.length}`,
-    );
-
-    if (notificationQueue.length === 0) {
-      console.log('[NotificationButton] ❌ Queue is empty, skipping batch processing');
-      return;
-    }
-
-    console.log(
-      `[NotificationButton] 🎯 Processing batch of ${notificationQueue.length} notification(s):`,
-      notificationQueue.map((e) => e.item.name),
-    );
+    if (notificationQueue.length === 0) return;
 
     // Add ALL queued items to in-app notifications
     if (settings.inAppNotifications) {
@@ -108,9 +96,6 @@ export function NotificationButton() {
         dismissed: false,
         seen: false,
       }));
-      console.log(
-        `[NotificationButton] 📝 Adding ${newNotifications.length} in-app notification(s)`,
-      );
       setNotifications((prev) => [
         ...newNotifications,
         ...prev.slice(0, 10 - newNotifications.length),
@@ -118,7 +103,6 @@ export function NotificationButton() {
     }
 
     // Play sound ONCE for the batch
-    console.log('[NotificationButton] 🔊 Playing notification sound');
     playNotificationSound();
 
     // Show native notification
@@ -129,17 +113,14 @@ export function NotificationButton() {
     ) {
       if (notificationQueue.length === 1) {
         // Single item: show detailed notification
-        console.log('[NotificationButton] 🔔 Showing single native notification');
         showBrowserNotification(notificationQueue[0]);
       } else {
         // Multiple items: show batch notification
-        console.log('[NotificationButton] 🔔 Showing batch native notification');
         showBatchNotification(notificationQueue);
       }
     }
 
     // Clear the queue
-    console.log('[NotificationButton] 🧹 Clearing notification queue');
     setNotificationQueue([]);
   }, [
     notificationQueue,
@@ -155,7 +136,6 @@ export function NotificationButton() {
     processBatchRef.current = processBatch;
   }, [processBatch]);
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: notificationQueue accessed via closure, not direct dependency
   useEffect(() => {
     // Singleton pattern: Prevent duplicate IPC handler registration
     // This is critical because React Strict Mode (development) will mount components twice
@@ -174,40 +154,25 @@ export function NotificationButton() {
       _event: Electron.IpcRendererEvent,
       itemEvent: ItemDetectionEvent,
     ) => {
-      console.log(
-        `[NotificationButton] 📨 RECEIVED IPC EVENT for ${itemEvent.item.name} (silent: ${itemEvent.silent})`,
-      );
-
       // Skip all notifications if silent flag is set
       // Silent flag is true during:
       // - Initial startup parsing: prevents spam for existing items
       // - Force re-scan: prevents re-notification of already found items
       // Items are still saved to database, only UI notifications are suppressed
       if (itemEvent.silent) {
-        console.log('[NotificationButton] ⏭️  Skipping silent event');
         return;
       }
 
-      console.log(
-        `[NotificationButton] ➕ Queueing notification for ${itemEvent.item.name}. Current queue size: ${notificationQueue.length}`,
-      );
-
       // Add to queue
-      setNotificationQueue((prev) => {
-        const newQueue = [...prev, itemEvent];
-        console.log(`[NotificationButton] 📦 Queue updated. New size: ${newQueue.length}`);
-        return newQueue;
-      });
+      setNotificationQueue((prev) => [...prev, itemEvent]);
 
       // Clear existing timer if any
       if (batchTimerRef.current) {
-        console.log('[NotificationButton] ⏰ Clearing existing batch timer');
         clearTimeout(batchTimerRef.current);
       }
 
       // Set new timer to process batch after delay
       batchTimerRef.current = setTimeout(() => {
-        console.log('[NotificationButton] ⏰ Batch timer fired, processing notifications');
         // Use ref to get latest processBatch function
         if (processBatchRef.current) {
           processBatchRef.current();
@@ -216,13 +181,17 @@ export function NotificationButton() {
       }, BATCH_DELAY);
     };
 
-    console.log('[NotificationButton] Registering IPC handler for item-detection-event');
+    console.log('[NotificationButton] ✅ Registering IPC handler for item-detection-event');
     window.ipcRenderer?.on('item-detection-event', handleItemDetection);
 
     return () => {
-      console.log('[NotificationButton] Unregistering IPC handler for item-detection-event');
+      console.log('[NotificationButton] 🧹 Cleanup called - Unregistering IPC handler');
       window.ipcRenderer?.off('item-detection-event', handleItemDetection);
-      globalIpcHandlerRegistered = false;
+      // DO NOT reset globalIpcHandlerRegistered to false here!
+      // React Strict Mode in development will mount/unmount/mount components,
+      // and resetting the flag would allow duplicate handler registration.
+      // The flag should only be reset when the component is truly being destroyed,
+      // not during Strict Mode's intentional double-mounting behavior.
     };
   }, []); // Empty dependency array - only run once on mount (notificationQueue accessed via closure)
 
