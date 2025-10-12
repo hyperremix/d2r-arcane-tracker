@@ -967,7 +967,9 @@ class SaveFileMonitor {
           type: 'modified',
         });
 
-        this.eventBus.emit('save-file-event', {
+        // Emit event and wait for all handlers to complete processing
+        // This prevents race conditions in item detection by ensuring sequential processing
+        await this.eventBus.emitAsync('save-file-event', {
           type: 'modified',
           file: saveFile,
           extractedItems,

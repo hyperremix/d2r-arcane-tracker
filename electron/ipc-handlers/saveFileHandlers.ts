@@ -211,7 +211,7 @@ export function initializeSaveFileHandlers(): void {
   itemDetectionService = new ItemDetectionService(eventBus);
 
   // Set up event forwarding to renderer process
-  const unsubscribeSaveFileEvent = eventBus.on('save-file-event', (event: SaveFileEvent) => {
+  const unsubscribeSaveFileEvent = eventBus.on('save-file-event', async (event: SaveFileEvent) => {
     // Forward save file events to all renderer processes
     const allWebContents = webContents.getAllWebContents();
     for (const wc of allWebContents) {
@@ -224,8 +224,9 @@ export function initializeSaveFileHandlers(): void {
     updateCharacterFromSaveFile(event.file);
 
     // Analyze save file for item changes if it's a modification
+    // Await to ensure sequential processing and prevent race conditions
     if (event.type === 'modified') {
-      itemDetectionService.analyzeSaveFile(event.file, event.extractedItems, event.silent);
+      await itemDetectionService.analyzeSaveFile(event.file, event.extractedItems, event.silent);
     }
   });
   eventUnsubscribers.push(unsubscribeSaveFileEvent);

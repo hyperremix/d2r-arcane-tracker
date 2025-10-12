@@ -64,6 +64,38 @@ export class EventBus {
   }
 
   /**
+   * Emit an event with a typed payload and wait for all handlers to complete.
+   * This ensures sequential processing when needed to avoid race conditions.
+   * All registered handlers for this event type will be invoked sequentially.
+   * Errors in handlers are caught and logged to prevent cascade failures.
+   * @param event - The event type to emit
+   * @param payload - The event payload data
+   */
+  async emitAsync<T extends EventType>(event: T, payload: EventPayload<T>): Promise<void> {
+    const handlers = this.listeners.get(event);
+
+    if (!handlers || handlers.size === 0) {
+      return;
+    }
+
+    // Invoke all handlers sequentially, catching errors to prevent cascade failures
+    for (const handler of handlers) {
+      try {
+        // Type assertion needed due to Map limitations with generic types
+        const typedHandler = handler as unknown as EventHandler<T>;
+        const result = typedHandler(payload);
+
+        // Wait for async handlers to complete
+        if (result instanceof Promise) {
+          await result;
+        }
+      } catch (error) {
+        console.error(`[EventBus] Handler error for event '${event}':`, error);
+      }
+    }
+  }
+
+  /**
    * Unsubscribe a specific handler from an event.
    * @param event - The event type to unsubscribe from
    * @param handler - The specific handler to remove
