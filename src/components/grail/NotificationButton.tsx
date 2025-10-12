@@ -38,7 +38,7 @@ export function NotificationButton() {
   const batchTimerRef = useRef<NodeJS.Timeout | null>(null);
   const processBatchRef = useRef<() => void>();
 
-  const BATCH_DELAY = 1000; // 1 second
+  const BATCH_DELAY = 500; // 0.5 seconds
 
   const playNotificationSound = useCallback(() => {
     if (settings.enableSounds) {

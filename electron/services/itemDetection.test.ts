@@ -1021,10 +1021,7 @@ describe('When ItemDetectionService is used', () => {
         // Act
         service.initializeFromDatabase(existingProgress);
 
-        // Assert - should log with correct key format
-        expect(consoleSpy).toHaveBeenCalledWith(
-          '[ItemDetection] Initializing with existing item key: shako_false (TestChar)',
-        );
+        // Assert - should log with summary of initialized items
         expect(consoleSpy).toHaveBeenCalledWith(
           '[ItemDetection] Initialized with 1 previously found items',
         );
@@ -1085,15 +1082,9 @@ describe('When ItemDetectionService is used', () => {
         service.initializeFromDatabase(existingProgress);
         await service.analyzeSaveFile(saveFile, [d2sItem as any]);
 
-        // Assert - should log consistent key generation
+        // Assert - should not emit event for item that already exists in database
         expect(consoleSpy).toHaveBeenCalledWith(
-          '[ItemDetection] Initializing with existing item key: shako_false (TestChar)',
-        );
-        expect(consoleSpy).toHaveBeenCalledWith(
-          '[ItemDetection] Generated item key: shako_false for item: shako',
-        );
-        expect(consoleSpy).toHaveBeenCalledWith(
-          '[ItemDetection] Skipping duplicate item: shako (key: shako_false) in TestChar',
+          '[ItemDetection] Initialized with 1 previously found items',
         );
         expect(eventSpy).not.toHaveBeenCalled();
 

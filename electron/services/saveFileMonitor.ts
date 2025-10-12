@@ -274,7 +274,7 @@ class SaveFileMonitor {
   private readonly DEFAULT_TICK_INTERVAL = 500;
   private readonly DEFAULT_POLLING_INTERVAL = 1000;
   private readonly DEFAULT_STABILITY_THRESHOLD = 300;
-  private readonly DEFAULT_DEBOUNCE_DELAY = 2000;
+  private readonly DEFAULT_DEBOUNCE_DELAY = 500;
   private readonly MAX_CONCURRENT_PARSES = 5; // Limit concurrent file parsing
 
   /**

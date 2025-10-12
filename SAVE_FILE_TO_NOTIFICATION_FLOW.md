@@ -1198,7 +1198,7 @@ if (itemEvent.silent) {
   - `tickReaderIntervalMs` (default: 500ms, range: 100-5000ms)
   - `chokidarPollingIntervalMs` (default: 1000ms, range: 500-5000ms)
   - `fileStabilityThresholdMs` (default: 300ms, range: 100-2000ms)
-  - `fileChangeDebounceMs` (default: 2000ms, range: 500-10000ms)
+  - `fileChangeDebounceMs` (default: 500ms, range: 500-10000ms)
 - Added validation method to ensure intervals are within safe bounds
 - Updated constructor to use settings with fallback to defaults
 - Updated Chokidar configuration to use settings intervals
@@ -1213,7 +1213,7 @@ export type Settings = {
   tickReaderIntervalMs?: number;        // Default: 500
   chokidarPollingIntervalMs?: number;   // Default: 1000
   fileStabilityThresholdMs?: number;    // Default: 300
-  fileChangeDebounceMs?: number;        // Default: 2000
+  fileChangeDebounceMs?: number;        // Default: 500
 };
 
 // Validation with bounds checking

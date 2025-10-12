@@ -467,8 +467,8 @@ describe('When SaveFileMonitor is used', () => {
       (monitor as any).lastFileChangeTime = Date.now();
       (monitor as any).watchPath = '/test/saves';
 
-      // Act - advance time by only 500ms (less than 2000ms debounce)
-      await vi.advanceTimersByTimeAsync(500);
+      // Act - advance time by only 300ms (less than 500ms debounce)
+      await vi.advanceTimersByTimeAsync(300);
 
       // Assert - should NOT have parsed yet
       expect(parseAllSpy).not.toHaveBeenCalled();
@@ -485,8 +485,8 @@ describe('When SaveFileMonitor is used', () => {
       (monitor as any).lastFileChangeTime = Date.now();
       (monitor as any).watchPath = '/test/saves';
 
-      // Act - advance time by 2500ms (more than 2000ms debounce)
-      await vi.advanceTimersByTimeAsync(2500);
+      // Act - advance time by 600ms (more than 500ms debounce)
+      await vi.advanceTimersByTimeAsync(600);
 
       // Assert - should have parsed
       expect(parseAllSpy).toHaveBeenCalled();
@@ -501,21 +501,27 @@ describe('When SaveFileMonitor is used', () => {
       (monitor as any).watchPath = '/test/saves';
       (monitor as any).lastProcessedChangeCounter = 0;
 
-      // Act - Simulate 3 rapid file changes
+      // Get initial time from mocked timers
+      const startTime = Date.now();
+
+      // Act - Simulate 3 rapid file changes (each within debounce period)
       (monitor as any).fileChangeCounter = 1;
-      (monitor as any).lastFileChangeTime = Date.now();
-      await vi.advanceTimersByTimeAsync(500); // Change 1
+      (monitor as any).lastFileChangeTime = startTime;
+      await vi.advanceTimersByTimeAsync(100); // Change 1
 
       (monitor as any).fileChangeCounter = 2;
-      (monitor as any).lastFileChangeTime = Date.now();
-      await vi.advanceTimersByTimeAsync(500); // Change 2
+      (monitor as any).lastFileChangeTime = startTime + 100;
+      await vi.advanceTimersByTimeAsync(100); // Change 2
 
       (monitor as any).fileChangeCounter = 3;
-      (monitor as any).lastFileChangeTime = Date.now();
-      await vi.advanceTimersByTimeAsync(500); // Change 3
+      (monitor as any).lastFileChangeTime = startTime + 200;
+      await vi.advanceTimersByTimeAsync(100); // Change 3 (total 300ms)
 
-      // Now wait for debounce period to complete
-      await vi.advanceTimersByTimeAsync(2500);
+      // Now wait for debounce period (500ms from last change at 200ms) + tick cycle
+      // Last change was at 200ms, debounce = 500ms, so needs to wait until 700ms+
+      // Tick reader runs every 500ms (at 500ms, 1000ms, etc.)
+      // So we need to advance to at least 1000ms total to catch the tick at 1000ms
+      await vi.advanceTimersByTimeAsync(800); // Total 300 + 800 = 1100ms
 
       // Assert - should only parse ONCE despite 3 changes
       expect(parseAllSpy).toHaveBeenCalledTimes(1);
