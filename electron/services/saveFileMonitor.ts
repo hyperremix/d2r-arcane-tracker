@@ -1,7 +1,6 @@
-import { EventEmitter } from 'node:events';
 import { existsSync, readdirSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
-import { basename, dirname, extname, join, resolve, sep } from 'node:path';
+import { basename, dirname, extname, join } from 'node:path';
 import * as d2s from '@dschu012/d2s';
 import * as d2stash from '@dschu012/d2s/lib/d2/stash';
 import { constants as constants96 } from '@dschu012/d2s/lib/data/versions/96_constant_data';
@@ -23,6 +22,7 @@ import {
   type SaveFileState,
 } from '../types/grail';
 import { isRune, simplifyItemName } from '../utils/objects';
+import type { EventBus } from './EventBus';
 
 /**
  * Lookup table for magic attribute types used in rainbow facet processing.
@@ -254,24 +254,37 @@ const processRunewordItem = (item: d2s.types.IItem, items: d2s.types.IItem[]): v
  * This service watches save file directories, parses D2 save files, and maintains
  * a database of found items for Holy Grail tracking.
  */
-class SaveFileMonitor extends EventEmitter {
+class SaveFileMonitor {
   private currentData: FileReaderResponse;
   private fileWatcher: FSWatcher | null;
   private watchPath: string | null;
-  private filesChanged: boolean;
+  private fileChangeCounter: number = 0;
+  private lastProcessedChangeCounter: number = 0;
   private readingFiles: boolean;
   private isMonitoring = false;
   private grailDatabase: GrailDatabase | null = null;
   private saveDirectory: string | null = null;
   private forceParseAll: boolean = false;
   private isInitialParsing: boolean = false;
+  private tickReaderInterval: NodeJS.Timeout | null = null;
+  private tickReaderCount: number = 0;
+  private eventBus: EventBus;
+  private lastFileChangeTime: number = 0;
+  // Default values for configurable intervals
+  private readonly DEFAULT_TICK_INTERVAL = 500;
+  private readonly DEFAULT_POLLING_INTERVAL = 1000;
+  private readonly DEFAULT_STABILITY_THRESHOLD = 300;
+  private readonly DEFAULT_DEBOUNCE_DELAY = 500;
+  private readonly MAX_CONCURRENT_PARSES = 5; // Limit concurrent file parsing
 
   /**
    * Creates a new instance of the SaveFileMonitor.
+   * @param {EventBus} eventBus - EventBus instance for emitting events
    * @param {GrailDatabase} [grailDatabase] - Optional grail database instance for settings and data storage.
    */
-  constructor(grailDatabase?: GrailDatabase) {
-    super();
+  constructor(eventBus: EventBus, grailDatabase?: GrailDatabase) {
+    console.log('[SaveFileMonitor] Constructor called');
+    this.eventBus = eventBus;
     this.grailDatabase = grailDatabase || null;
     this.currentData = {
       items: {},
@@ -281,17 +294,21 @@ class SaveFileMonitor extends EventEmitter {
     };
     this.fileWatcher = null;
     this.watchPath = null;
-    this.filesChanged = false;
+    this.fileChangeCounter = 0;
+    this.lastProcessedChangeCounter = 0;
     this.readingFiles = false;
 
     // Initialize D2S constants
     this.initializeD2SConstants();
+    console.log('[SaveFileMonitor] D2S constants initialized');
 
     // Initialize save directories
     this.initializeSaveDirectories();
 
     // Start the tick reader for automatic file change detection
-    setInterval(this.tickReader, 500);
+    const tickInterval = this.getTickReaderInterval();
+    this.tickReaderInterval = setInterval(this.tickReader, tickInterval);
+    console.log(`[SaveFileMonitor] Tick reader started (interval: ${tickInterval}ms)`);
   }
 
   /**
@@ -317,24 +334,39 @@ class SaveFileMonitor extends EventEmitter {
    * @returns {Promise<void>} A promise that resolves when initialization is complete.
    */
   private async initializeSaveDirectories(): Promise<void> {
+    console.log('[initializeSaveDirectories] Starting initialization');
     // First, try to get saveDir from Settings via grail database
     let customSaveDir: string | null = null;
     if (this.grailDatabase) {
       try {
         const settings = this.grailDatabase.getAllSettings();
+        console.log('[initializeSaveDirectories] Settings retrieved:', {
+          saveDir: settings.saveDir,
+          gameMode: settings.gameMode,
+        });
         if (settings.saveDir && settings.saveDir.trim() !== '') {
           customSaveDir = settings.saveDir.trim();
+          console.log('[initializeSaveDirectories] Custom save directory found:', customSaveDir);
+        } else {
+          console.log('[initializeSaveDirectories] No custom save directory in settings');
         }
       } catch (error) {
-        console.warn('Failed to read saveDir from settings:', error);
+        console.warn('[initializeSaveDirectories] Failed to read saveDir from settings:', error);
       }
+    } else {
+      console.log('[initializeSaveDirectories] No grail database available');
     }
 
     // Use custom saveDir if available, otherwise fall back to platform default
     if (customSaveDir) {
       this.saveDirectory = customSaveDir;
+      console.log('[initializeSaveDirectories] Using custom directory:', this.saveDirectory);
     } else {
       this.saveDirectory = this.getPlatformDefaultDirectory();
+      console.log(
+        '[initializeSaveDirectories] Using platform default directory:',
+        this.saveDirectory,
+      );
     }
   }
 
@@ -356,21 +388,68 @@ class SaveFileMonitor extends EventEmitter {
   }
 
   /**
+   * Validates an interval value to ensure it's within acceptable bounds.
+   * @private
+   * @param {number | undefined} value - The value to validate
+   * @param {number} min - Minimum acceptable value
+   * @param {number} max - Maximum acceptable value
+   * @param {number} defaultValue - Default value to use if validation fails
+   * @returns {number} The validated interval value
+   */
+  private validateInterval(
+    value: number | undefined,
+    min: number,
+    max: number,
+    defaultValue: number,
+  ): number {
+    if (value === undefined) return defaultValue;
+    if (value < min || value > max) {
+      console.warn(
+        `[SaveFileMonitor] Invalid interval ${value} (valid range: ${min}-${max}ms), using default ${defaultValue}ms`,
+      );
+      return defaultValue;
+    }
+    return value;
+  }
+
+  /**
+   * Gets the tick reader interval from settings or returns default.
+   * @private
+   * @returns {number} The tick reader interval in milliseconds
+   */
+  private getTickReaderInterval(): number {
+    if (!this.grailDatabase) {
+      return this.DEFAULT_TICK_INTERVAL;
+    }
+
+    const settings = this.grailDatabase.getAllSettings();
+    return this.validateInterval(
+      settings.tickReaderIntervalMs,
+      100, // min 100ms
+      5000, // max 5 seconds
+      this.DEFAULT_TICK_INTERVAL,
+    );
+  }
+
+  /**
    * Starts monitoring the save file directory for changes.
    * Sets up file watching and parses existing save files.
    * @returns {Promise<void>} A promise that resolves when monitoring is started.
    */
   async startMonitoring(): Promise<void> {
+    console.log('[startMonitoring] Called');
     if (this.isMonitoring) {
+      console.log('[startMonitoring] Already monitoring, exiting');
       return;
     }
 
     // Refresh save directory from settings
+    console.log('[startMonitoring] Refreshing save directory from settings');
     await this.initializeSaveDirectories();
 
     if (!this.saveDirectory) {
-      console.warn('No save directory configured');
-      this.emit('monitoring-error', {
+      console.warn('[startMonitoring] No save directory configured');
+      this.eventBus.emit('monitoring-error', {
         type: 'no-directory',
         message: 'No save directory configured',
         directory: null,
@@ -378,10 +457,11 @@ class SaveFileMonitor extends EventEmitter {
       return;
     }
 
+    console.log('[startMonitoring] Checking if directory exists:', this.saveDirectory);
     // Check if directory exists
     if (!existsSync(this.saveDirectory)) {
-      console.warn(`Save directory does not exist: ${this.saveDirectory}`);
-      this.emit('monitoring-error', {
+      console.warn('[startMonitoring] Save directory does not exist:', this.saveDirectory);
+      this.eventBus.emit('monitoring-error', {
         type: 'directory-not-found',
         message: `Save directory does not exist: ${this.saveDirectory}`,
         directory: this.saveDirectory,
@@ -389,40 +469,95 @@ class SaveFileMonitor extends EventEmitter {
       return;
     }
 
+    console.log('[startMonitoring] Directory exists, starting initial parsing');
     // Start file parsing to get initial data and file count
     this.isInitialParsing = true;
     const parsedSuccessfully = await this.parseSaveDirectory(this.saveDirectory);
     this.isInitialParsing = false;
 
     if (!parsedSuccessfully) {
+      console.warn('[startMonitoring] Initial parsing failed');
       return; // Error was already emitted
     }
 
-    // Set up file watching
+    console.log('[startMonitoring] Initial parsing successful');
     this.watchPath = this.saveDirectory;
+
+    // Use polling mode for better compatibility with D2R (which uses atomic file writes)
+    // Polling checks files periodically instead of relying on file system events
+    const usePolling = true;
+    console.log('[startMonitoring] Using polling mode:', usePolling);
+
+    // Get configurable intervals from settings
+    const settings = this.grailDatabase?.getAllSettings();
+    const pollingInterval = this.validateInterval(
+      settings?.chokidarPollingIntervalMs,
+      500, // min 500ms
+      5000, // max 5 seconds
+      this.DEFAULT_POLLING_INTERVAL,
+    );
+    const stabilityThreshold = this.validateInterval(
+      settings?.fileStabilityThresholdMs,
+      100, // min 100ms
+      2000, // max 2 seconds
+      this.DEFAULT_STABILITY_THRESHOLD,
+    );
+
+    console.log(
+      `[startMonitoring] Using intervals: polling=${pollingInterval}ms, stability=${stabilityThreshold}ms`,
+    );
+
     this.fileWatcher = chokidar
-      .watch(this.prepareChokidarGlobe(this.saveDirectory), {
+      .watch(this.saveDirectory, {
+        // Only watch files with save file extensions
+        ignored: (path, stats) =>
+          !!stats?.isFile() &&
+          !['.d2s', '.sss', '.d2x', '.d2i'].includes(extname(path).toLowerCase()),
         followSymlinks: false,
         ignoreInitial: true,
         depth: 0,
+        usePolling: usePolling, // Polling is more reliable for games like D2R that use atomic writes
+        interval: pollingInterval,
+        awaitWriteFinish: {
+          stabilityThreshold: stabilityThreshold,
+          pollInterval: 100,
+        },
       })
-      .on('all', () => {
-        this.filesChanged = true;
+      .on('all', (event, path) => {
+        console.log(`[Chokidar] Event: ${event} on ${path}`);
+        this.fileChangeCounter++;
+        this.lastFileChangeTime = Date.now();
+        console.log(`[Chokidar] fileChangeCounter incremented to ${this.fileChangeCounter}`);
       })
-      .on('error', (error) => console.error('Save file watcher error:', error));
+      .on('error', (error) => console.error('[Chokidar] Save file watcher error:', error))
+      .on('ready', () => {
+        console.log('[Chokidar] File watcher ready');
+        const watched = this.fileWatcher?.getWatched();
+        if (watched) {
+          console.log('[Chokidar] Watching paths:', Object.keys(watched));
+          console.log(
+            '[Chokidar] Total files being watched:',
+            Object.values(watched).reduce((sum, files) => sum + files.length, 0),
+          );
+        }
+      })
+      .on('add', (path) => console.log('[Chokidar] File added:', path))
+      .on('change', (path) => console.log('[Chokidar] File changed:', path))
+      .on('unlink', (path) => console.log('[Chokidar] File removed:', path));
 
     this.isMonitoring = true;
+    console.log('[startMonitoring] Monitoring flag set to true');
 
     // Count save files for status reporting
     const saveFiles = await this.getSaveFiles();
 
-    this.emit('monitoring-started', {
+    this.eventBus.emit('monitoring-started', {
       directory: this.saveDirectory,
       saveFileCount: saveFiles.length,
     });
 
     console.log(
-      `Save file monitoring started for directory: ${this.saveDirectory} - Found ${saveFiles.length} save files`,
+      `[startMonitoring] Save file monitoring started for directory: ${this.saveDirectory} - Found ${saveFiles.length} save files`,
     );
   }
 
@@ -432,13 +567,17 @@ class SaveFileMonitor extends EventEmitter {
    * @returns {Promise<void>} A promise that resolves when monitoring is stopped.
    */
   async stopMonitoring(): Promise<void> {
+    console.log('[stopMonitoring] Called');
     if (this.fileWatcher) {
+      console.log('[stopMonitoring] Closing file watcher');
       await this.fileWatcher.close();
       this.fileWatcher = null;
+      console.log('[stopMonitoring] File watcher closed');
     }
     this.watchPath = null;
     this.isMonitoring = false;
-    this.emit('monitoring-stopped');
+    console.log('[stopMonitoring] Monitoring stopped');
+    this.eventBus.emit('monitoring-stopped', {});
   }
 
   /**
@@ -447,19 +586,27 @@ class SaveFileMonitor extends EventEmitter {
    * @returns {Promise<string[]>} A promise that resolves with an array of existing save directory paths.
    */
   private async findExistingSaveDirectories(): Promise<string[]> {
+    console.log('[findExistingSaveDirectories] Checking for existing directories');
     const existingDirs: string[] = [];
 
     if (this.saveDirectory) {
       const dir = this.saveDirectory;
+      console.log('[findExistingSaveDirectories] Checking directory:', dir);
       try {
         if (existsSync(dir)) {
+          console.log('[findExistingSaveDirectories] Directory exists:', dir);
           existingDirs.push(dir);
+        } else {
+          console.log('[findExistingSaveDirectories] Directory does not exist:', dir);
         }
-      } catch {
-        // Directory doesn't exist, skip it
+      } catch (error) {
+        console.log('[findExistingSaveDirectories] Error checking directory:', dir, error);
       }
+    } else {
+      console.log('[findExistingSaveDirectories] No save directory configured');
     }
 
+    console.log('[findExistingSaveDirectories] Found', existingDirs.length, 'existing directories');
     return existingDirs;
   }
 
@@ -470,36 +617,47 @@ class SaveFileMonitor extends EventEmitter {
    * @returns {Promise<boolean>} A promise that resolves to true if parsing was successful, false otherwise.
    */
   private async parseAllSaveDirectories(directories: string[]): Promise<boolean> {
+    console.log('[parseAllSaveDirectories] Parsing directories:', directories);
     const allFiles: string[] = [];
 
     // Collect all save files from all directories
     for (const dir of directories) {
+      console.log('[parseAllSaveDirectories] Reading directory:', dir);
       try {
-        const files = readdirSync(dir).filter(
+        const allFilesInDir = readdirSync(dir);
+        const files = allFilesInDir.filter(
           (file) => ['.d2s', '.sss', '.d2x', '.d2i'].indexOf(extname(file).toLowerCase()) !== -1,
         );
+        console.log('[parseAllSaveDirectories] Found', files.length, 'save files in', dir);
         allFiles.push(...files.map((file) => join(dir, file)));
       } catch (error) {
-        console.error(`Error reading save directory ${dir}:`, error);
+        console.error('[parseAllSaveDirectories] Error reading save directory', dir, ':', error);
       }
     }
+
+    console.log('[parseAllSaveDirectories] Total save files found:', allFiles.length);
 
     // Clean up save file states for files that no longer exist
     this.cleanupDeletedFileStates(allFiles);
 
     if (allFiles.length === 0) {
-      console.warn('No D2R save files found in directories:', directories);
-      this.emit('monitoring-error', {
+      console.warn(
+        '[parseAllSaveDirectories] No D2R save files found in directories:',
+        directories,
+      );
+      this.eventBus.emit('monitoring-error', {
         type: 'no-save-files',
         message: `No D2R save files found in monitored directories`,
-        directories: directories,
+        directory: directories[0] || null,
         saveFileCount: 0,
       });
       return false;
     }
 
     // Parse all files and update current data
+    console.log('[parseAllSaveDirectories] Starting to parse all files');
     await this.parseFiles(allFiles, false);
+    console.log('[parseAllSaveDirectories] All files parsed');
     return true;
   }
 
@@ -510,15 +668,21 @@ class SaveFileMonitor extends EventEmitter {
    * @returns {Promise<boolean>} A promise that resolves to true if parsing was successful, false otherwise.
    */
   private async parseSaveDirectory(directory: string): Promise<boolean> {
+    console.log('[parseSaveDirectory] Parsing directory:', directory);
     try {
-      const files = readdirSync(directory).filter(
+      const allFilesInDir = readdirSync(directory);
+      console.log('[parseSaveDirectory] Total files in directory:', allFilesInDir.length);
+
+      const files = allFilesInDir.filter(
         (file) => ['.d2s', '.sss', '.d2x', '.d2i'].indexOf(extname(file).toLowerCase()) !== -1,
       );
+      console.log('[parseSaveDirectory] D2R save files found:', files.length, files);
+
       const allFiles = files.map((file) => join(directory, file));
 
       if (allFiles.length === 0) {
-        console.warn(`No D2R save files found in directory: ${directory}`);
-        this.emit('monitoring-error', {
+        console.warn('[parseSaveDirectory] No D2R save files found in directory:', directory);
+        this.eventBus.emit('monitoring-error', {
           type: 'no-save-files',
           message: `No D2R save files found in monitored directory`,
           directory: directory,
@@ -528,11 +692,13 @@ class SaveFileMonitor extends EventEmitter {
       }
 
       // Parse all files and update current data
+      console.log('[parseSaveDirectory] Starting to parse files');
       await this.parseFiles(allFiles, false);
+      console.log('[parseSaveDirectory] All files parsed successfully');
       return true;
     } catch (error) {
-      console.error(`Error reading save directory ${directory}:`, error);
-      this.emit('monitoring-error', {
+      console.error('[parseSaveDirectory] Error reading save directory:', directory, error);
+      this.eventBus.emit('monitoring-error', {
         type: 'directory-read-error',
         message: `Error reading save directory: ${error}`,
         directory: directory,
@@ -540,20 +706,6 @@ class SaveFileMonitor extends EventEmitter {
       });
       return false;
     }
-  }
-
-  /**
-   * Prepares a chokidar glob pattern for watching save files.
-   * @private
-   * @param {string} filename - The filename to create a glob pattern for.
-   * @returns {string} The chokidar glob pattern.
-   */
-  private prepareChokidarGlobe(filename: string): string {
-    if (filename.length < 2) {
-      return filename;
-    }
-    const resolved = resolve(filename);
-    return `${resolved.substring(0, 1) + resolved.substring(1).split(sep).join('/')}/*.{d2s,sss,d2x,d2i}`;
   }
 
   /**
@@ -573,11 +725,20 @@ class SaveFileMonitor extends EventEmitter {
       const fileState = this.grailDatabase?.getSaveFileState(filePath);
 
       if (!fileState) {
+        console.log(`[shouldParseSaveFile] ${filePath}: New file, will parse`);
         return true; // New file, should parse
       }
 
-      // Parse if file is newer than last recorded modification
-      return stats.mtime > fileState.lastModified;
+      // Use getTime() for more reliable comparison
+      const fileTime = stats.mtime.getTime();
+      const lastModTime = fileState.lastModified.getTime();
+      const shouldParse = fileTime > lastModTime;
+
+      console.log(
+        `[shouldParseSaveFile] ${filePath}: fileTime=${new Date(fileTime).toISOString()}, lastMod=${new Date(lastModTime).toISOString()}, willParse=${shouldParse}`,
+      );
+
+      return shouldParse;
     } catch (error) {
       console.error(`Error checking file modification time for ${filePath}:`, error);
       return true; // On error, parse the file to be safe
@@ -591,15 +752,24 @@ class SaveFileMonitor extends EventEmitter {
    * @returns {Promise<string[]>} Array of file paths that need parsing.
    */
   private async filterFilesToParse(filePaths: string[]): Promise<string[]> {
+    console.log('[filterFilesToParse] Checking', filePaths.length, 'files');
     const filesToParse: string[] = [];
 
     for (const filePath of filePaths) {
       const shouldParse = await this.shouldParseSaveFile(filePath);
       if (shouldParse) {
         filesToParse.push(filePath);
+        console.log('[filterFilesToParse] Will parse:', filePath);
       }
     }
 
+    console.log(
+      '[filterFilesToParse] Will parse',
+      filesToParse.length,
+      'out of',
+      filePaths.length,
+      'files',
+    );
     return filesToParse;
   }
 
@@ -608,9 +778,10 @@ class SaveFileMonitor extends EventEmitter {
    * For .d2i files, returns friendly names like "Shared Stash Hardcore".
    * @private
    * @param {string} filePath - The file path to extract the name from.
+   * @param {boolean} [isHardcore] - Optional hardcore status (for shared stash files). If not provided, falls back to filename detection.
    * @returns {string} The character/save name.
    */
-  private getSaveNameFromPath(filePath: string): string {
+  private getSaveNameFromPath(filePath: string, isHardcore?: boolean): string {
     const extension = extname(filePath).toLowerCase();
     let saveName = basename(filePath)
       .replace('.d2s', '')
@@ -620,8 +791,10 @@ class SaveFileMonitor extends EventEmitter {
 
     // Use friendly names for shared stash files
     if (extension === '.d2i') {
-      const isHardcore = saveName.toLowerCase().includes('hardcore');
-      saveName = isHardcore ? 'Shared Stash Hardcore' : 'Shared Stash Softcore';
+      // Use provided hardcore status if available, otherwise fall back to filename
+      const hardcore =
+        isHardcore !== undefined ? isHardcore : saveName.toLowerCase().includes('hardcore');
+      saveName = hardcore ? 'Shared Stash Hardcore' : 'Shared Stash Softcore';
     }
 
     return saveName;
@@ -667,11 +840,15 @@ class SaveFileMonitor extends EventEmitter {
     results: FileReaderResponse,
   ): Promise<{ saveName: string; success: boolean }> {
     const saveName = this.getSaveNameFromPath(filePath);
+    console.log('[processSingleFile] Processing:', filePath, `(saveName: ${saveName})`);
 
     try {
       const buffer = await readFile(filePath);
+      console.log('[processSingleFile] File read, size:', buffer.length, 'bytes');
+
       const extension = extname(filePath).toLowerCase();
       const parsedItems = await this.parseSave(saveName, buffer, extension);
+      console.log('[processSingleFile] Parsed', parsedItems.length, 'items from', saveName);
 
       results.stats[saveName] = 0;
 
@@ -693,12 +870,19 @@ class SaveFileMonitor extends EventEmitter {
         results.stats[saveName] = (results.stats[saveName] || 0) + 1;
       }
 
+      console.log(
+        '[processSingleFile] Successfully processed',
+        results.stats[saveName],
+        'items from',
+        saveName,
+      );
+
       // Update save file state after successful parsing
       await this.updateSaveFileState(filePath);
 
       return { saveName, success: true };
     } catch (error) {
-      console.log('ERROR parsing save file:', error);
+      console.error('[processSingleFile] ERROR parsing save file:', filePath, error);
       results.stats[saveName] = null;
       return { saveName, success: false };
     }
@@ -710,19 +894,40 @@ class SaveFileMonitor extends EventEmitter {
    * @param {string} filePath - Path to the save file.
    */
   private async updateSaveFileState(filePath: string): Promise<void> {
+    console.log('[updateSaveFileState] Updating state for:', filePath);
     try {
       const stats = await import('node:fs/promises').then((fs) => fs.stat(filePath));
+
+      // Check if state already exists and reuse its ID
+      const existingState = this.grailDatabase?.getSaveFileState(filePath);
+      const id =
+        existingState?.id || `save-file-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
       const saveFileState: SaveFileState = {
-        id: `save-file-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        id,
         filePath,
         lastModified: stats.mtime,
         lastParsed: new Date(),
-        created: new Date(),
+        created: existingState?.created || new Date(),
         updated: new Date(),
       };
+
+      console.log('[updateSaveFileState] Saving state:', {
+        id,
+        filePath,
+        lastModified: stats.mtime.toISOString(),
+        isNew: !existingState,
+      });
+
       this.grailDatabase?.upsertSaveFileState(saveFileState);
+      console.log('[updateSaveFileState] State saved successfully');
     } catch (error) {
-      console.error(`Failed to update save file state for ${filePath}:`, error);
+      console.error(
+        '[updateSaveFileState] Failed to update save file state for',
+        filePath,
+        ':',
+        error,
+      );
     }
   }
 
@@ -736,27 +941,83 @@ class SaveFileMonitor extends EventEmitter {
     filePaths: string[],
     results: FileReaderResponse,
   ): Promise<void> {
+    console.log('[emitSaveFileEvents] Emitting events for', filePaths.length, 'files');
     for (const filePath of filePaths) {
       try {
         const saveFile = await this.parseSaveFile(filePath);
-        if (!saveFile) continue;
+        if (!saveFile) {
+          console.log('[emitSaveFileEvents] Failed to parse save file metadata for:', filePath);
+          continue;
+        }
 
         const saveName = this.getSaveNameFromPath(filePath);
         const extractedItems = this.collectExtractedItems(results, saveName);
 
-        // Set silent flag when doing initial parsing or force parsing all files
+        // Set silent flag to prevent notification spam during:
+        // - Initial parsing: avoid notifications for existing items on app startup
+        // - Force parse all: avoid notifications when user manually re-scans all files
+        // Items are still saved to database, only notifications are suppressed
         const silent = this.isInitialParsing || this.forceParseAll;
 
-        this.emit('save-file-event', {
+        console.log('[emitSaveFileEvents] Emitting save-file-event for:', saveName, {
+          itemCount: extractedItems.length,
+          silent,
+          type: 'modified',
+        });
+
+        // Emit event and wait for all handlers to complete processing
+        // This prevents race conditions in item detection by ensuring sequential processing
+        await this.eventBus.emitAsync('save-file-event', {
           type: 'modified',
           file: saveFile,
           extractedItems,
           silent,
         } as SaveFileEvent);
       } catch (error) {
-        console.error('Error creating save file event:', error);
+        console.error('[emitSaveFileEvents] Error creating save file event for:', filePath, error);
       }
     }
+    console.log('[emitSaveFileEvents] All events emitted');
+  }
+
+  /**
+   * Executes an array of async tasks with a concurrency limit.
+   * This prevents resource exhaustion when many files need to be parsed.
+   * @private
+   * @template T - The return type of the tasks
+   * @param {Array<() => Promise<T>>} tasks - Array of async task functions
+   * @param {number} limit - Maximum number of concurrent tasks
+   * @returns {Promise<T[]>} Promise that resolves with all task results in order
+   */
+  private async executeConcurrently<T>(
+    tasks: Array<() => Promise<T>>,
+    limit: number,
+  ): Promise<T[]> {
+    const results: T[] = [];
+    let currentIndex = 0;
+
+    // Create worker function that processes tasks sequentially
+    const worker = async (): Promise<void> => {
+      while (currentIndex < tasks.length) {
+        const index = currentIndex++;
+        const task = tasks[index];
+        try {
+          results[index] = await task();
+        } catch (error) {
+          console.error(`[executeConcurrently] Error executing task ${index}:`, error);
+          // Store error or undefined to maintain result order
+          results[index] = undefined as T;
+        }
+      }
+    };
+
+    // Create array of worker promises (limited by 'limit' parameter)
+    const workers = Array.from({ length: Math.min(limit, tasks.length) }, () => worker());
+
+    // Wait for all workers to complete
+    await Promise.all(workers);
+
+    return results;
   }
 
   /**
@@ -767,6 +1028,12 @@ class SaveFileMonitor extends EventEmitter {
    * @returns {Promise<void>} A promise that resolves when parsing is complete.
    */
   private async parseFiles(filePaths: string[], userRequested: boolean): Promise<void> {
+    console.log(
+      '[parseFiles] Starting to parse',
+      filePaths.length,
+      'files, userRequested:',
+      userRequested,
+    );
     const results: FileReaderResponse = {
       items: {},
       ethItems: {},
@@ -775,7 +1042,7 @@ class SaveFileMonitor extends EventEmitter {
     };
 
     if (!this.grailDatabase) {
-      console.warn('No grail database available for parsing');
+      console.warn('[parseFiles] No grail database available for parsing');
       return;
     }
 
@@ -783,26 +1050,48 @@ class SaveFileMonitor extends EventEmitter {
     const filesToParse = await this.filterFilesToParse(filePaths);
 
     console.log(
-      `Parsing ${filesToParse.length} out of ${filePaths.length} save files (${filePaths.length - filesToParse.length} skipped due to no changes)`,
+      `[parseFiles] Parsing ${filesToParse.length} out of ${filePaths.length} save files (${filePaths.length - filesToParse.length} skipped due to no changes)`,
     );
 
-    // Parse all files in parallel
-    await Promise.all(filesToParse.map((filePath) => this.processSingleFile(filePath, results)));
+    if (filesToParse.length === 0) {
+      console.log('[parseFiles] No files to parse, exiting early');
+      return;
+    }
+
+    // Parse files with concurrency limit to prevent resource exhaustion
+    console.log(
+      `[parseFiles] Starting concurrent parsing of ${filesToParse.length} files ` +
+        `(max ${this.MAX_CONCURRENT_PARSES} at a time)`,
+    );
+
+    const tasks = filesToParse.map((filePath) => {
+      return () => this.processSingleFile(filePath, results);
+    });
+
+    await this.executeConcurrently(tasks, this.MAX_CONCURRENT_PARSES);
+
+    console.log('[parseFiles] Concurrent parsing complete');
 
     // Reset force parse flag after parsing completes
-    this.forceParseAll = false;
+    if (this.forceParseAll) {
+      console.log('[parseFiles] Resetting forceParseAll flag');
+      this.forceParseAll = false;
+    }
 
     // Update save directory if user requested
     if (userRequested && filePaths.length > 0) {
       const firstDir = dirname(filePaths[0]);
+      console.log('[parseFiles] User requested parsing, updating saveDir to:', firstDir);
       this.grailDatabase.setSetting('saveDir', firstDir);
     }
 
     // Update current data
+    console.log('[parseFiles] Updating current data');
     this.currentData = results;
 
     // Emit save file events for each file that was actually parsed
     await this.emitSaveFileEvents(filesToParse, results);
+    console.log('[parseFiles] Complete');
   }
 
   /**
@@ -818,6 +1107,7 @@ class SaveFileMonitor extends EventEmitter {
     content: Buffer,
     extension: string,
   ): Promise<d2s.types.IItem[]> {
+    console.log('[parseSave] Parsing save:', saveName, 'extension:', extension);
     const items: d2s.types.IItem[] = [];
 
     const parseItems = (itemList: d2s.types.IItem[], isEmbed: boolean = false) => {
@@ -836,51 +1126,87 @@ class SaveFileMonitor extends EventEmitter {
     };
 
     const parseD2S = (response: d2s.types.ID2S) => {
-      if (!this.grailDatabase) return [];
-
-      const settings = this.grailDatabase.getAllSettings();
-      if (settings.gameMode === GameMode.Softcore && response.header.status.hardcore) {
+      if (!this.grailDatabase) {
+        console.log('[parseSave/parseD2S] No grail database');
         return [];
       }
-      if (settings.gameMode === GameMode.Hardcore && !response.header.status.hardcore) {
+
+      const settings = this.grailDatabase.getAllSettings();
+      const isHardcore = response.header.status.hardcore;
+      console.log(
+        '[parseSave/parseD2S] Character is hardcore:',
+        isHardcore,
+        'Game mode:',
+        settings.gameMode,
+      );
+
+      if (settings.gameMode === GameMode.Softcore && isHardcore) {
+        return [];
+      }
+      if (settings.gameMode === GameMode.Hardcore && !isHardcore) {
         return [];
       }
       const items = response.items || [];
       const mercItems = response.merc_items || [];
       const corpseItems = response.corpse_items || [];
       const itemList = [...items, ...mercItems, ...corpseItems];
+      console.log('[parseSave/parseD2S] Found', itemList.length, 'items in character file');
       parseItems(itemList);
     };
 
     const parseStash = (response: d2s.types.IStash) => {
-      if (!this.grailDatabase) return [];
+      if (!this.grailDatabase) {
+        console.log('[parseSave/parseStash] No grail database');
+        return [];
+      }
 
       const settings = this.grailDatabase.getAllSettings();
-      if (settings.gameMode === GameMode.Softcore && saveName.toLowerCase().includes('hardcore')) {
+      // Use hardcore flag from parsed stash header instead of filename
+      const isHardcore = response.hardcore;
+      console.log(
+        '[parseSave/parseStash] Stash is hardcore:',
+        isHardcore,
+        'Game mode:',
+        settings.gameMode,
+      );
+
+      if (settings.gameMode === GameMode.Softcore && isHardcore) {
         return [];
       }
-      if (settings.gameMode === GameMode.Hardcore && saveName.toLowerCase().includes('softcore')) {
+      if (settings.gameMode === GameMode.Hardcore && !isHardcore) {
         return [];
       }
+
+      let totalItems = 0;
       response.pages.forEach((page) => {
+        totalItems += page.items.length;
         parseItems(page.items);
       });
+      console.log(
+        '[parseSave/parseStash] Found',
+        totalItems,
+        'items across',
+        response.pages.length,
+        'pages',
+      );
     };
 
     switch (extension) {
       case '.sss':
       case '.d2x':
-        await d2stash.read(content).then((response) => {
-          response.hardcore === saveName.toLowerCase().includes('hardcore');
-          parseStash(response);
-        });
+        console.log('[parseSave] Parsing as stash file (.sss/.d2x)');
+        await d2stash.read(content).then(parseStash);
         break;
       case '.d2i':
+        console.log('[parseSave] Parsing as shared stash (.d2i)');
         await d2stash.read(content).then(parseStash);
         break;
       default:
+        console.log('[parseSave] Parsing as character file (.d2s)');
         await d2s.read(content).then(parseD2S);
     }
+
+    console.log('[parseSave] Total items extracted:', items.length);
     return items;
   }
 
@@ -898,9 +1224,22 @@ class SaveFileMonitor extends EventEmitter {
 
       // Handle shared stash files (.d2i)
       if (extension === '.d2i') {
-        const fileName = basename(filePath);
-        const isHardcore = fileName.toLowerCase().includes('hardcore');
-        const characterName = isHardcore ? 'Shared Stash Hardcore' : 'Shared Stash Softcore';
+        // Parse the stash file header to extract hardcore status
+        let isHardcore = false;
+        try {
+          const stashData = await d2stash.read(buffer);
+          isHardcore = stashData.hardcore;
+          console.log('[parseSaveFile] Parsed .d2i file, hardcore:', isHardcore);
+        } catch (parseError) {
+          console.warn(
+            '[parseSaveFile] Failed to parse .d2i file header, falling back to filename:',
+            parseError,
+          );
+          // Fallback to filename if parsing fails
+          isHardcore = basename(filePath).toLowerCase().includes('hardcore');
+        }
+
+        const characterName = this.getSaveNameFromPath(filePath, isHardcore);
 
         return {
           name: characterName,
@@ -986,27 +1325,36 @@ class SaveFileMonitor extends EventEmitter {
    * @returns {Promise<D2SaveFile[]>} A promise that resolves with an array of save file objects.
    */
   async getSaveFiles(): Promise<D2SaveFile[]> {
+    console.log('[getSaveFiles] Called');
     const saveFiles: D2SaveFile[] = [];
 
     if (!this.saveDirectory) {
+      console.log('[getSaveFiles] No save directory configured');
       return saveFiles;
     }
 
+    console.log('[getSaveFiles] Reading directory:', this.saveDirectory);
     try {
       const files = readdirSync(this.saveDirectory);
-      for (const file of files) {
-        if (file.endsWith('.d2s')) {
-          const filePath = join(this.saveDirectory, file);
-          const saveFile = await this.parseSaveFile(filePath);
-          if (saveFile) {
-            saveFiles.push(saveFile);
-          }
+      console.log('[getSaveFiles] Total files in directory:', files.length);
+
+      const d2sFiles = files.filter((file) => file.endsWith('.d2s'));
+      console.log('[getSaveFiles] .d2s files found:', d2sFiles.length);
+
+      for (const file of d2sFiles) {
+        const filePath = join(this.saveDirectory, file);
+        const saveFile = await this.parseSaveFile(filePath);
+        if (saveFile) {
+          saveFiles.push(saveFile);
+        } else {
+          console.log('[getSaveFiles] Failed to parse save file:', file);
         }
       }
     } catch (error) {
-      console.error(`Error reading save directory ${this.saveDirectory}:`, error);
+      console.error('[getSaveFiles] Error reading save directory', this.saveDirectory, ':', error);
     }
 
+    console.log('[getSaveFiles] Returning', saveFiles.length, 'save files');
     return saveFiles;
   }
 
@@ -1031,22 +1379,31 @@ class SaveFileMonitor extends EventEmitter {
    * @returns {Promise<void>} A promise that resolves when the update is complete.
    */
   async updateSaveDirectory(): Promise<void> {
+    console.log('[updateSaveDirectory] Called');
     // Update the save directory and restart monitoring if active
     const wasMonitoring = this.isMonitoring;
+    console.log('[updateSaveDirectory] Was monitoring:', wasMonitoring);
 
     if (wasMonitoring) {
+      console.log('[updateSaveDirectory] Stopping current monitoring');
       await this.stopMonitoring();
     }
 
     // Force parse all files in new directory
+    console.log('[updateSaveDirectory] Setting forceParseAll flag');
     this.forceParseAll = true;
+    this.lastFileChangeTime = 0; // Bypass debounce for force parse
 
     // Re-initialize directories with the new setting
+    console.log('[updateSaveDirectory] Re-initializing save directories');
     await this.initializeSaveDirectories();
 
     if (wasMonitoring) {
+      console.log('[updateSaveDirectory] Restarting monitoring');
       await this.startMonitoring();
     }
+
+    console.log('[updateSaveDirectory] Complete');
   }
 
   /**
@@ -1096,23 +1453,104 @@ class SaveFileMonitor extends EventEmitter {
    * @returns {Promise<void>} A promise that resolves when the tick is complete.
    */
   private tickReader = async (): Promise<void> => {
-    if (!this.grailDatabase) return;
+    // Log periodic heartbeat every 20 ticks (10 seconds)
+    if (!this.tickReaderCount) {
+      this.tickReaderCount = 0;
+    }
+    this.tickReaderCount++;
+
+    if (this.tickReaderCount % 20 === 0) {
+      console.log(
+        '[tickReader] Heartbeat - watching:',
+        this.watchPath,
+        'changeCounter:',
+        this.fileChangeCounter,
+        'lastProcessed:',
+        this.lastProcessedChangeCounter,
+        'isMonitoring:',
+        this.isMonitoring,
+      );
+    }
+
+    if (!this.grailDatabase) {
+      console.log('[tickReader] Skipping: No grail database');
+      return;
+    }
 
     const settings = this.grailDatabase.getAllSettings();
-    if (
-      this.watchPath &&
-      this.filesChanged &&
-      !this.readingFiles &&
-      settings.gameMode !== GameMode.Manual
-    ) {
-      console.log('re-reading files!');
-      this.readingFiles = true;
-      this.filesChanged = false;
 
-      const directories = await this.findExistingSaveDirectories();
-      await this.parseAllSaveDirectories(directories);
+    if (!this.watchPath) {
+      console.log('[tickReader] Skipping: No watch path');
+      return;
+    }
 
-      this.readingFiles = false;
+    // Check if there are unprocessed file changes
+    if (this.fileChangeCounter === this.lastProcessedChangeCounter) {
+      // No new changes since last processing
+      return;
+    }
+
+    // Check if enough time has passed since last file change (debouncing)
+    // Skip debounce for initial parsing or force parse
+    const timeSinceLastChange = Date.now() - this.lastFileChangeTime;
+    const shouldDebounce = !this.isInitialParsing && !this.forceParseAll;
+    const debounceDelay = this.validateInterval(
+      settings.fileChangeDebounceMs,
+      500, // min 500ms
+      10000, // max 10 seconds
+      this.DEFAULT_DEBOUNCE_DELAY,
+    );
+
+    if (shouldDebounce && timeSinceLastChange < debounceDelay) {
+      // Still within debounce window - don't process yet
+      if (this.tickReaderCount % 4 === 0) {
+        // Log occasionally to show debouncing is working
+        console.log(
+          `[tickReader] Debouncing: ${timeSinceLastChange}ms since last change ` +
+            `(waiting for ${debounceDelay}ms)`,
+        );
+      }
+      return;
+    }
+
+    if (this.readingFiles) {
+      console.log('[tickReader] Skipping: Already reading files');
+      return;
+    }
+
+    if (settings.gameMode === GameMode.Manual) {
+      console.log('[tickReader] Skipping: Manual mode active');
+      return;
+    }
+
+    console.log(
+      `[tickReader] Debounce period elapsed (${timeSinceLastChange}ms), processing file changes...`,
+    );
+    console.log(
+      `[tickReader] Processing changes: counter=${this.fileChangeCounter}, lastProcessed=${this.lastProcessedChangeCounter}`,
+    );
+    this.readingFiles = true;
+
+    // Capture current counter before processing (in case new changes arrive during processing)
+    const counterAtStartOfProcessing = this.fileChangeCounter;
+
+    const directories = await this.findExistingSaveDirectories();
+    await this.parseAllSaveDirectories(directories);
+
+    // Update last processed counter to what we started processing
+    // If new changes arrived during processing, they'll be caught on next tick
+    this.lastProcessedChangeCounter = counterAtStartOfProcessing;
+
+    this.readingFiles = false;
+    console.log(
+      `[tickReader] Done processing file changes (processed up to counter ${counterAtStartOfProcessing})`,
+    );
+
+    // Check if new changes arrived during processing
+    if (this.fileChangeCounter > counterAtStartOfProcessing) {
+      console.log(
+        `[tickReader] New changes detected during processing (counter now ${this.fileChangeCounter}), will process on next tick`,
+      );
     }
   };
 
@@ -1122,19 +1560,34 @@ class SaveFileMonitor extends EventEmitter {
    * @param {string[]} existingFilePaths - Array of file paths that currently exist
    */
   private cleanupDeletedFileStates(existingFilePaths: string[]): void {
+    console.log('[cleanupDeletedFileStates] Checking for deleted files');
     if (!this.grailDatabase) {
+      console.log('[cleanupDeletedFileStates] No database available');
       return;
     }
 
     const existingPaths = new Set(existingFilePaths);
     const allStates = this.grailDatabase.getAllSaveFileStates();
+    console.log(
+      '[cleanupDeletedFileStates] Existing files:',
+      existingFilePaths.length,
+      'Tracked states:',
+      allStates.length,
+    );
 
+    let deletedCount = 0;
     for (const state of allStates) {
       if (!existingPaths.has(state.filePath)) {
-        console.log(`Cleaning up save file state for deleted file: ${state.filePath}`);
+        console.log(
+          '[cleanupDeletedFileStates] Cleaning up state for deleted file:',
+          state.filePath,
+        );
         this.grailDatabase.deleteSaveFileState(state.filePath);
+        deletedCount++;
       }
     }
+
+    console.log('[cleanupDeletedFileStates] Cleaned up', deletedCount, 'deleted file states');
   }
 
   /**
@@ -1142,7 +1595,14 @@ class SaveFileMonitor extends EventEmitter {
    * @returns {Promise<void>} A promise that resolves when shutdown is complete.
    */
   async shutdown(): Promise<void> {
+    console.log('[shutdown] Shutting down save file monitor');
+    if (this.tickReaderInterval) {
+      console.log('[shutdown] Clearing tick reader interval');
+      clearInterval(this.tickReaderInterval);
+      this.tickReaderInterval = null;
+    }
     await this.stopMonitoring();
+    console.log('[shutdown] Shutdown complete');
   }
 }
 

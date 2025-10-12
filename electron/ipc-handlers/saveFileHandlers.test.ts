@@ -17,29 +17,83 @@ vi.mock('../database/database', () => ({
     getCharacterByName: vi.fn(),
     getCharacterBySaveFilePath: vi.fn(),
     getProgressByItem: vi.fn(),
+    getCharacterProgress: vi.fn(),
     upsertCharacter: vi.fn(),
     updateCharacter: vi.fn(),
     upsertProgress: vi.fn(),
+    upsertCharactersBatch: vi.fn(),
+    upsertProgressBatch: vi.fn(),
     getAllItems: vi.fn(),
+    getAllProgress: vi.fn(),
     setSetting: vi.fn(),
     truncateUserData: vi.fn(),
   },
 }));
 
+// Mock DatabaseBatchWriter
+vi.mock('../services/DatabaseBatchWriter', () => {
+  // Create the mock instance once at module level
+  const mockInstance = {
+    queueCharacter: vi.fn(),
+    queueProgress: vi.fn(),
+    flush: vi.fn(),
+    clear: vi.fn(),
+    getCharacterQueueSize: vi.fn(),
+    getProgressQueueSize: vi.fn(),
+  };
+
+  return {
+    DatabaseBatchWriter: vi.fn().mockImplementation(() => mockInstance),
+  };
+});
+
+// Create a shared event handlers map that persists across test instances
+const eventHandlers = new Map<string, Array<(...args: any[]) => any>>();
+
+// Mock EventBus with a working implementation
+vi.mock('../services/EventBus', () => {
+  // Create the mock instance once at module level
+  const mockInstance = {
+    on: vi.fn((event: string, handler: (...args: any[]) => any) => {
+      if (!eventHandlers.has(event)) {
+        eventHandlers.set(event, []);
+      }
+      eventHandlers.get(event)?.push(handler);
+      return vi.fn(); // Return unsubscribe function
+    }),
+    emit: vi.fn((event: string, payload: any) => {
+      const handlers = eventHandlers.get(event) || [];
+      for (const handler of handlers) {
+        handler(payload);
+      }
+    }),
+    off: vi.fn(),
+    clear: vi.fn(() => {
+      eventHandlers.clear();
+    }),
+    listenerCount: vi.fn((event: string) => {
+      return eventHandlers.get(event)?.length || 0;
+    }),
+  };
+
+  return {
+    EventBus: vi.fn().mockImplementation(() => mockInstance),
+  };
+});
+
 // Mock services
 vi.mock('../services/itemDetection', () => ({
   ItemDetectionService: vi.fn().mockImplementation(() => ({
-    on: vi.fn(),
     enable: vi.fn(),
     disable: vi.fn(),
     setGrailItems: vi.fn(),
+    initializeFromDatabase: vi.fn(),
     analyzeSaveFile: vi.fn(),
   })),
 }));
 
 vi.mock('../services/saveFileMonitor', () => ({
   SaveFileMonitor: vi.fn().mockImplementation(() => ({
-    on: vi.fn(),
     startMonitoring: vi.fn(),
     stopMonitoring: vi.fn(),
     getSaveFiles: vi.fn(),
@@ -56,9 +110,12 @@ import {
   D2ItemBuilder,
   D2SaveFileBuilder,
   D2SItemBuilder,
+  GrailProgressBuilder,
   HolyGrailItemBuilder,
 } from '@/fixtures';
 import { grailDatabase } from '../database/database';
+import { DatabaseBatchWriter } from '../services/DatabaseBatchWriter';
+import { EventBus } from '../services/EventBus';
 import { ItemDetectionService } from '../services/itemDetection';
 import { SaveFileMonitor } from '../services/saveFileMonitor';
 import type { ItemDetectionEvent, SaveFileEvent } from '../types/grail';
@@ -67,11 +124,28 @@ import { closeSaveFileMonitor, initializeSaveFileHandlers } from './saveFileHand
 // Mock data types
 interface MockWebContents {
   isDestroyed: ReturnType<typeof vi.fn>;
+  getType: ReturnType<typeof vi.fn>;
   send: ReturnType<typeof vi.fn>;
 }
 
-interface MockSaveFileMonitor {
+interface MockEventBus {
   on: ReturnType<typeof vi.fn>;
+  emit: ReturnType<typeof vi.fn>;
+  off: ReturnType<typeof vi.fn>;
+  clear: ReturnType<typeof vi.fn>;
+  listenerCount: ReturnType<typeof vi.fn>;
+}
+
+interface MockDatabaseBatchWriter {
+  queueCharacter: ReturnType<typeof vi.fn>;
+  queueProgress: ReturnType<typeof vi.fn>;
+  flush: ReturnType<typeof vi.fn>;
+  clear: ReturnType<typeof vi.fn>;
+  getCharacterQueueSize: ReturnType<typeof vi.fn>;
+  getProgressQueueSize: ReturnType<typeof vi.fn>;
+}
+
+interface MockSaveFileMonitor {
   startMonitoring: ReturnType<typeof vi.fn>;
   stopMonitoring: ReturnType<typeof vi.fn>;
   getSaveFiles: ReturnType<typeof vi.fn>;
@@ -82,10 +156,10 @@ interface MockSaveFileMonitor {
 }
 
 interface MockItemDetectionService {
-  on: ReturnType<typeof vi.fn>;
   enable: ReturnType<typeof vi.fn>;
   disable: ReturnType<typeof vi.fn>;
   setGrailItems: ReturnType<typeof vi.fn>;
+  initializeFromDatabase: ReturnType<typeof vi.fn>;
   analyzeSaveFile: ReturnType<typeof vi.fn>;
 }
 
@@ -93,19 +167,30 @@ describe('When saveFileHandlers is used', () => {
   let mockWebContents: MockWebContents[];
   let mockSaveFileMonitor: MockSaveFileMonitor;
   let mockItemDetectionService: MockItemDetectionService;
+  let mockEventBus: MockEventBus;
+  let mockBatchWriter: MockDatabaseBatchWriter;
 
   beforeEach(() => {
     // Clear all mocks
     vi.clearAllMocks();
 
+    // Clear event handlers map
+    eventHandlers.clear();
+
+    // Get the mock instances (created by the mocks)
+    mockEventBus = new (EventBus as any)();
+    mockBatchWriter = new (DatabaseBatchWriter as any)();
+
     // Setup mock web contents
     mockWebContents = [
       {
         isDestroyed: vi.fn().mockReturnValue(false),
+        getType: vi.fn().mockReturnValue('window'),
         send: vi.fn(),
       },
       {
         isDestroyed: vi.fn().mockReturnValue(false),
+        getType: vi.fn().mockReturnValue('window'),
         send: vi.fn(),
       },
     ];
@@ -114,7 +199,6 @@ describe('When saveFileHandlers is used', () => {
 
     // Setup mock services
     mockSaveFileMonitor = {
-      on: vi.fn(),
       startMonitoring: vi.fn().mockResolvedValue(undefined),
       stopMonitoring: vi.fn(),
       getSaveFiles: vi.fn().mockResolvedValue([]),
@@ -125,13 +209,14 @@ describe('When saveFileHandlers is used', () => {
     };
 
     mockItemDetectionService = {
-      on: vi.fn(),
       enable: vi.fn(),
       disable: vi.fn(),
       setGrailItems: vi.fn(),
+      initializeFromDatabase: vi.fn(),
       analyzeSaveFile: vi.fn(),
     };
 
+    // Setup service mocks
     vi.mocked(SaveFileMonitor).mockImplementation(() => mockSaveFileMonitor as any);
     vi.mocked(ItemDetectionService).mockImplementation(() => mockItemDetectionService as any);
 
@@ -139,7 +224,9 @@ describe('When saveFileHandlers is used', () => {
     vi.mocked(grailDatabase.getCharacterByName).mockReturnValue(undefined);
     vi.mocked(grailDatabase.getCharacterBySaveFilePath).mockReturnValue(undefined);
     vi.mocked(grailDatabase.getProgressByItem).mockReturnValue([]);
+    vi.mocked(grailDatabase.getCharacterProgress).mockReturnValue(null);
     vi.mocked(grailDatabase.getAllItems).mockReturnValue([]);
+    vi.mocked(grailDatabase.getAllProgress).mockReturnValue([]);
   });
 
   describe('If initializeSaveFileHandlers is called', () => {
@@ -148,22 +235,14 @@ describe('When saveFileHandlers is used', () => {
       initializeSaveFileHandlers();
 
       // Assert
-      expect(SaveFileMonitor).toHaveBeenCalledWith(grailDatabase);
-      expect(ItemDetectionService).toHaveBeenCalled();
-      expect(mockSaveFileMonitor.on).toHaveBeenCalledWith('save-file-event', expect.any(Function));
-      expect(mockSaveFileMonitor.on).toHaveBeenCalledWith(
-        'monitoring-started',
-        expect.any(Function),
-      );
-      expect(mockSaveFileMonitor.on).toHaveBeenCalledWith(
-        'monitoring-stopped',
-        expect.any(Function),
-      );
-      expect(mockSaveFileMonitor.on).toHaveBeenCalledWith('monitoring-error', expect.any(Function));
-      expect(mockItemDetectionService.on).toHaveBeenCalledWith(
-        'item-detection',
-        expect.any(Function),
-      );
+      expect(EventBus).toHaveBeenCalled();
+      expect(SaveFileMonitor).toHaveBeenCalledWith(mockEventBus, grailDatabase);
+      expect(ItemDetectionService).toHaveBeenCalledWith(mockEventBus);
+      expect(mockEventBus.on).toHaveBeenCalledWith('save-file-event', expect.any(Function));
+      expect(mockEventBus.on).toHaveBeenCalledWith('monitoring-started', expect.any(Function));
+      expect(mockEventBus.on).toHaveBeenCalledWith('monitoring-stopped', expect.any(Function));
+      expect(mockEventBus.on).toHaveBeenCalledWith('monitoring-error', expect.any(Function));
+      expect(mockEventBus.on).toHaveBeenCalledWith('item-detection', expect.any(Function));
     });
 
     it('Then should set up IPC handlers', () => {
@@ -218,6 +297,22 @@ describe('When saveFileHandlers is used', () => {
       ]);
     });
 
+    it('Then should initialize detection service with existing progress', () => {
+      // Arrange
+      const mockProgress = GrailProgressBuilder.new()
+        .withItemId('shako')
+        .withIsEthereal(false)
+        .buildMany(1);
+
+      vi.mocked(grailDatabase.getAllProgress).mockReturnValue(mockProgress as any);
+
+      // Act
+      initializeSaveFileHandlers();
+
+      // Assert
+      expect(mockItemDetectionService.initializeFromDatabase).toHaveBeenCalledWith(mockProgress);
+    });
+
     it('Then should handle grail items loading errors gracefully', () => {
       // Arrange
       vi.mocked(grailDatabase.getAllItems).mockImplementation(() => {
@@ -241,12 +336,9 @@ describe('When saveFileHandlers is used', () => {
       };
 
       initializeSaveFileHandlers();
-      const saveFileEventHandler = mockSaveFileMonitor.on.mock.calls.find(
-        (call) => call[0] === 'save-file-event',
-      )?.[1];
 
       // Act
-      saveFileEventHandler?.(mockEvent);
+      mockEventBus.emit('save-file-event', mockEvent);
 
       // Assert
       expect(mockWebContents[0].send).toHaveBeenCalledWith('save-file-event', mockEvent);
@@ -262,12 +354,9 @@ describe('When saveFileHandlers is used', () => {
       };
 
       initializeSaveFileHandlers();
-      const saveFileEventHandler = mockSaveFileMonitor.on.mock.calls.find(
-        (call) => call[0] === 'save-file-event',
-      )?.[1];
 
       // Act
-      saveFileEventHandler?.(mockEvent);
+      mockEventBus.emit('save-file-event', mockEvent);
 
       // Assert
       expect(mockWebContents[0].send).not.toHaveBeenCalled();
@@ -285,12 +374,9 @@ describe('When saveFileHandlers is used', () => {
       };
 
       initializeSaveFileHandlers();
-      const saveFileEventHandler = mockSaveFileMonitor.on.mock.calls.find(
-        (call) => call[0] === 'save-file-event',
-      )?.[1];
 
       // Act
-      saveFileEventHandler?.(mockEvent);
+      mockEventBus.emit('save-file-event', mockEvent);
 
       // Assert
       expect(mockItemDetectionService.analyzeSaveFile).toHaveBeenCalledWith(
@@ -308,12 +394,9 @@ describe('When saveFileHandlers is used', () => {
       };
 
       initializeSaveFileHandlers();
-      const saveFileEventHandler = mockSaveFileMonitor.on.mock.calls.find(
-        (call) => call[0] === 'save-file-event',
-      )?.[1];
 
       // Act
-      saveFileEventHandler?.(mockEvent);
+      mockEventBus.emit('save-file-event', mockEvent);
 
       // Assert
       expect(mockItemDetectionService.analyzeSaveFile).not.toHaveBeenCalled();
@@ -358,12 +441,9 @@ describe('When saveFileHandlers is used', () => {
       };
 
       initializeSaveFileHandlers();
-      const itemDetectionEventHandler = mockItemDetectionService.on.mock.calls.find(
-        (call) => call[0] === 'item-detection',
-      )?.[1];
 
       // Act
-      itemDetectionEventHandler?.(mockEvent);
+      mockEventBus.emit('item-detection', mockEvent);
 
       // Assert
       expect(mockWebContents[0].send).toHaveBeenCalledWith('item-detection-event', mockEvent);
@@ -415,15 +495,12 @@ describe('When saveFileHandlers is used', () => {
       vi.mocked(grailDatabase.getProgressByItem).mockReturnValue([]);
 
       initializeSaveFileHandlers();
-      const itemDetectionEventHandler = mockItemDetectionService.on.mock.calls.find(
-        (call) => call[0] === 'item-detection',
-      )?.[1];
 
       // Act
-      itemDetectionEventHandler?.(mockEvent);
+      mockEventBus.emit('item-detection', mockEvent);
 
       // Assert
-      expect(grailDatabase.upsertProgress).toHaveBeenCalled();
+      expect(mockBatchWriter.queueProgress).toHaveBeenCalled();
     });
   });
 
@@ -436,12 +513,9 @@ describe('When saveFileHandlers is used', () => {
       };
 
       initializeSaveFileHandlers();
-      const monitoringStartedHandler = mockSaveFileMonitor.on.mock.calls.find(
-        (call) => call[0] === 'monitoring-started',
-      )?.[1];
 
       // Act
-      monitoringStartedHandler?.(mockData);
+      mockEventBus.emit('monitoring-started', mockData);
 
       // Assert
       expect(mockWebContents[0].send).toHaveBeenCalledWith('monitoring-status-changed', {
@@ -454,12 +528,9 @@ describe('When saveFileHandlers is used', () => {
     it('Then should forward monitoring-stopped event', () => {
       // Arrange
       initializeSaveFileHandlers();
-      const monitoringStoppedHandler = mockSaveFileMonitor.on.mock.calls.find(
-        (call) => call[0] === 'monitoring-stopped',
-      )?.[1];
 
       // Act
-      monitoringStoppedHandler?.();
+      mockEventBus.emit('monitoring-stopped', {});
 
       // Assert
       expect(mockWebContents[0].send).toHaveBeenCalledWith('monitoring-status-changed', {
@@ -477,12 +548,9 @@ describe('When saveFileHandlers is used', () => {
       };
 
       initializeSaveFileHandlers();
-      const monitoringErrorHandler = mockSaveFileMonitor.on.mock.calls.find(
-        (call) => call[0] === 'monitoring-error',
-      )?.[1];
 
       // Act
-      monitoringErrorHandler?.(mockError);
+      mockEventBus.emit('monitoring-error', mockError);
 
       // Assert
       expect(mockWebContents[0].send).toHaveBeenCalledWith('monitoring-status-changed', {
@@ -585,12 +653,14 @@ describe('When saveFileHandlers is used', () => {
       closeSaveFileMonitor();
 
       // Assert
+      expect(mockBatchWriter.flush).toHaveBeenCalled();
       expect(mockSaveFileMonitor.stopMonitoring).toHaveBeenCalled();
     });
 
     it('Then should handle case when monitor is not initialized', () => {
       // Act & Assert
       expect(() => closeSaveFileMonitor()).not.toThrow();
+      expect(mockBatchWriter.flush).toHaveBeenCalled();
     });
   });
 
@@ -621,22 +691,22 @@ describe('When saveFileHandlers is used', () => {
       vi.mocked(grailDatabase.getCharacterBySaveFilePath).mockReturnValue(mockCharacter as any);
 
       initializeSaveFileHandlers();
-      const saveFileEventHandler = mockSaveFileMonitor.on.mock.calls.find(
-        (call) => call[0] === 'save-file-event',
-      )?.[1];
 
       // Act
-      saveFileEventHandler?.({ type: 'modified', file: mockSaveFile });
+      mockEventBus.emit('save-file-event', { type: 'modified', file: mockSaveFile });
 
       // Assert
-      expect(grailDatabase.updateCharacter).toHaveBeenCalledWith('char-1', {
-        characterClass: 'Amazon',
-        level: 85,
-        difficulty: 'hell',
-        hardcore: true,
-        expansion: true,
-        saveFilePath: '/path/to/amazon.d2s',
-      });
+      expect(mockBatchWriter.queueCharacter).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: 'char-1',
+          characterClass: 'Amazon',
+          level: 85,
+          difficulty: 'hell',
+          hardcore: true,
+          expansion: true,
+          saveFilePath: '/path/to/amazon.d2s',
+        }),
+      );
     });
 
     it('Then should work with HolyGrailItemBuilder for item detection', () => {
@@ -687,19 +757,15 @@ describe('When saveFileHandlers is used', () => {
       vi.mocked(grailDatabase.getProgressByItem).mockReturnValue([]);
 
       initializeSaveFileHandlers();
-      const itemDetectionEventHandler = mockItemDetectionService.on.mock.calls.find(
-        (call) => call[0] === 'item-detection',
-      )?.[1];
 
       // Act
-      itemDetectionEventHandler?.(mockEvent);
+      mockEventBus.emit('item-detection', mockEvent);
 
       // Assert
-      expect(grailDatabase.upsertProgress).toHaveBeenCalledWith(
+      expect(mockBatchWriter.queueProgress).toHaveBeenCalledWith(
         expect.objectContaining({
           characterId: 'char-1',
           itemId: 'windforce',
-          found: true,
           manuallyAdded: false,
         }),
       );

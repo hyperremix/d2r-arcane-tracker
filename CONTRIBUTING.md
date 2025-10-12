@@ -115,8 +115,8 @@ This project maintains high code quality standards using:
 | `yarn lint:fix` | Fix linting issues automatically |
 | `yarn format` | Format code with Biome |
 | `yarn format:fix` | Format and write changes |
-| `yarn check` | Run all code quality checks |
-| `yarn check:fix` | Fix all auto-fixable issues |
+| `yarn run check` | Run all code quality checks |
+| `yarn run check:fix` | Fix all auto-fixable issues |
 
 ### Project Structure
 
@@ -239,7 +239,7 @@ test(utils): add tests for ethereal item detection
 1. **Run quality checks**
 
    ```bash
-   yarn check
+   yarn run check
    yarn test
    yarn typecheck
    ```

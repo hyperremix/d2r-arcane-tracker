@@ -80,29 +80,19 @@ export function mapCharacterToDatabase(character: {
  * @param progress - The progress object to map (with booleans and optional fields)
  * @returns Database progress object with converted types
  */
-export function mapProgressToDatabase(progress: {
-  id: string;
-  character_id: string;
-  item_id: string;
-  found: boolean;
-  found_date?: string | Date;
-  manually_added: boolean;
-  auto_detected: boolean;
-  difficulty?: 'normal' | 'nightmare' | 'hell';
-  notes?: string;
-  is_ethereal: boolean;
-}): Omit<DatabaseGrailProgress, 'created_at' | 'updated_at'> {
+export function mapProgressToDatabase(
+  progress: GrailProgress,
+): Omit<DatabaseGrailProgress, 'created_at' | 'updated_at'> {
   return {
     id: progress.id,
-    character_id: progress.character_id,
-    item_id: progress.item_id,
-    found: toSqliteBoolean(progress.found),
-    found_date: toSqliteDate(progress.found_date),
-    manually_added: toSqliteBoolean(progress.manually_added),
-    auto_detected: toSqliteBoolean(progress.auto_detected),
+    character_id: progress.characterId,
+    item_id: progress.itemId,
+    found_date: toSqliteDate(progress.foundDate),
+    manually_added: toSqliteBoolean(progress.manuallyAdded),
+    auto_detected: toSqliteBoolean(true),
     difficulty: toSqliteNull(progress.difficulty),
     notes: toSqliteNull(progress.notes),
-    is_ethereal: toSqliteBoolean(progress.is_ethereal),
+    is_ethereal: toSqliteBoolean(progress.isEthereal),
   };
 }
 
@@ -211,7 +201,6 @@ export function mapDatabaseProgressToProgress(dbProgress: DatabaseGrailProgress)
     id: dbProgress.id,
     characterId: dbProgress.character_id,
     itemId: dbProgress.item_id,
-    found: fromSqliteBoolean(dbProgress.found),
     foundDate: fromSqliteDate(dbProgress.found_date),
     foundBy: undefined, // This field is not stored in the database
     manuallyAdded: fromSqliteBoolean(dbProgress.manually_added),

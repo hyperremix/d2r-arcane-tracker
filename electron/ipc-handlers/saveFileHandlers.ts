@@ -1,5 +1,7 @@
 import { ipcMain, webContents } from 'electron';
 import { grailDatabase } from '../database/database';
+import { DatabaseBatchWriter } from '../services/DatabaseBatchWriter';
+import { EventBus } from '../services/EventBus';
 import { ItemDetectionService } from '../services/itemDetection';
 import type { D2SaveFile, SaveFileEvent } from '../services/saveFileMonitor';
 import { SaveFileMonitor } from '../services/saveFileMonitor';
@@ -14,8 +16,11 @@ import type {
 /**
  * Global service instances for save file monitoring and item detection.
  */
+const eventBus = new EventBus();
+const batchWriter = new DatabaseBatchWriter(grailDatabase);
 let saveFileMonitor: SaveFileMonitor;
 let itemDetectionService: ItemDetectionService;
+const eventUnsubscribers: Array<() => void> = [];
 
 /**
  * Finds or creates a character by name.
@@ -33,7 +38,7 @@ function findOrCreateCharacter(characterName: string, level: number) {
       characterName === 'Shared Stash Softcore' || characterName === 'Shared Stash Hardcore';
     const defaultCharacterClass = isSharedStash ? 'shared_stash' : 'barbarian';
 
-    grailDatabase.upsertCharacter({
+    character = {
       id: characterId,
       name: characterName,
       characterClass: defaultCharacterClass, // Use shared_stash for shared stash files, will be updated from save file data for regular characters
@@ -44,9 +49,11 @@ function findOrCreateCharacter(characterName: string, level: number) {
       saveFilePath: undefined,
       lastUpdated: new Date(),
       created: new Date(),
-    });
-    character = grailDatabase.getCharacterByName(characterName);
-    console.log(`Created new character: ${characterName}`);
+    };
+
+    // Queue character creation for batch write
+    batchWriter.queueCharacter(character);
+    console.log(`Queued new character for batch write: ${characterName}`);
   }
 
   return character;
@@ -59,7 +66,9 @@ function findOrCreateCharacter(characterName: string, level: number) {
  * @returns Grail progress object
  */
 function createGrailProgress(character: Character, event: ItemDetectionEvent) {
-  const progressId = `progress_${character.id}_${event.grailItem.id}_${Date.now()}`;
+  // Use d2s item ID if available, otherwise fall back to timestamp for backward compatibility
+  const itemIdentifier = event.d2sItemId ? String(event.d2sItemId) : `timestamp_${Date.now()}`;
+  const progressId = `${character.id}_${event.grailItem.id}_${itemIdentifier}`;
   return {
     id: progressId,
     characterId: character.id,
@@ -117,25 +126,22 @@ function handleAutomaticGrailProgress(event: ItemDetectionEvent): void {
     }
 
     // Check if this is a first-time global discovery
-    const existingGlobalProgress = grailDatabase
-      .getProgressByItem(event.grailItem.id)
-      .find((p) => p.found);
+    const existingGlobalProgress = grailDatabase.getProgressByItem(event.grailItem.id);
     const isFirstTimeDiscovery = !existingGlobalProgress;
 
-    // Create and save grail progress entry
+    // Create grail progress entry and queue for batch write
     const grailProgress = createGrailProgress(character, event);
-    grailDatabase.upsertProgress(grailProgress);
+    batchWriter.queueProgress(grailProgress);
 
-    // Log and notify about the discovery
+    // Log and notify about the discovery (synchronous - don't delay user feedback)
     if (isFirstTimeDiscovery) {
       console.log(`🎉 NEW GRAIL ITEM: ${event.item.name} found by ${characterName}`);
+      // Only emit grail update notifications for non-silent events
+      // Silent events still save to database but don't trigger user notifications
+      // This prevents notification spam during initial parsing and force re-scans
       if (!event.silent) {
         emitGrailProgressUpdate(character, event, grailProgress);
       }
-    } else {
-      console.log(
-        `Character discovery: ${event.item.name} found by ${characterName} (already discovered globally)`,
-      );
     }
   } catch (error) {
     console.error('Error handling automatic grail progress:', error);
@@ -154,20 +160,23 @@ function updateCharacterFromSaveFile(saveFile: D2SaveFile): void {
       grailDatabase.getCharacterByName(saveFile.name);
 
     if (character) {
-      // Update existing character
-      grailDatabase.updateCharacter(character.id, {
+      // Update existing character - queue for batch write
+      const updatedCharacter: Character = {
+        ...character,
         characterClass: saveFile.characterClass as CharacterClass,
         level: saveFile.level,
         difficulty: saveFile.difficulty,
         hardcore: saveFile.hardcore,
         expansion: saveFile.expansion,
         saveFilePath: saveFile.path,
-      });
+        lastUpdated: new Date(),
+      };
+      batchWriter.queueCharacter(updatedCharacter);
     } else {
-      // Create new character
+      // Create new character - queue for batch write
       const characterId = `char_${saveFile.name}_${Date.now()}`;
 
-      grailDatabase.upsertCharacter({
+      const newCharacter: Character = {
         id: characterId,
         name: saveFile.name,
         characterClass: saveFile.characterClass as CharacterClass,
@@ -178,9 +187,11 @@ function updateCharacterFromSaveFile(saveFile: D2SaveFile): void {
         saveFilePath: saveFile.path,
         lastUpdated: new Date(),
         created: new Date(),
-      });
+      };
+
+      batchWriter.queueCharacter(newCharacter);
       console.log(
-        `Created character from save file: ${saveFile.name} (${saveFile.characterClass})`,
+        `Queued character for batch write: ${saveFile.name} (${saveFile.characterClass})`,
       );
     }
   } catch (error) {
@@ -195,16 +206,34 @@ function updateCharacterFromSaveFile(saveFile: D2SaveFile): void {
  * Loads grail items into the detection service and starts monitoring automatically.
  */
 export function initializeSaveFileHandlers(): void {
-  // Initialize monitor and detection service with grail database
-  saveFileMonitor = new SaveFileMonitor(grailDatabase);
-  itemDetectionService = new ItemDetectionService();
+  console.log('[initializeSaveFileHandlers] Starting initialization');
+  console.log('[initializeSaveFileHandlers] Current EventBus listener counts:', {
+    'save-file-event': eventBus.listenerCount('save-file-event'),
+    'item-detection': eventBus.listenerCount('item-detection'),
+  });
+
+  // Clean up any existing handlers before re-initialization (important for hot-reload scenarios)
+  if (eventUnsubscribers.length > 0) {
+    console.log(
+      `[initializeSaveFileHandlers] Cleaning up ${eventUnsubscribers.length} existing event handlers`,
+    );
+    for (const unsubscribe of eventUnsubscribers) {
+      unsubscribe();
+    }
+    eventUnsubscribers.length = 0;
+  }
+
+  // Initialize monitor and detection service with EventBus and grail database
+  saveFileMonitor = new SaveFileMonitor(eventBus, grailDatabase);
+  itemDetectionService = new ItemDetectionService(eventBus);
 
   // Set up event forwarding to renderer process
-  saveFileMonitor.on('save-file-event', (event: SaveFileEvent) => {
-    // Forward save file events to all renderer processes
+  const unsubscribeSaveFileEvent = eventBus.on('save-file-event', async (event: SaveFileEvent) => {
+    // Forward save file events to renderer processes
+    // Filter to only 'window' type to exclude DevTools, background pages, etc.
     const allWebContents = webContents.getAllWebContents();
     for (const wc of allWebContents) {
-      if (!wc.isDestroyed()) {
+      if (!wc.isDestroyed() && wc.getType() === 'window') {
         wc.send('save-file-event', event);
       }
     }
@@ -213,17 +242,20 @@ export function initializeSaveFileHandlers(): void {
     updateCharacterFromSaveFile(event.file);
 
     // Analyze save file for item changes if it's a modification
+    // Await to ensure sequential processing and prevent race conditions
     if (event.type === 'modified') {
-      itemDetectionService.analyzeSaveFile(event.file, event.extractedItems, event.silent);
+      await itemDetectionService.analyzeSaveFile(event.file, event.extractedItems, event.silent);
     }
   });
+  eventUnsubscribers.push(unsubscribeSaveFileEvent);
 
   // Set up item detection event forwarding and automatic grail progress updates
-  itemDetectionService.on('item-detection', (event: ItemDetectionEvent) => {
+  const unsubscribeItemDetection = eventBus.on('item-detection', (event: ItemDetectionEvent) => {
     // Forward event to renderer processes
+    // Filter to only 'window' type to exclude DevTools, background pages, etc.
     const allWebContents = webContents.getAllWebContents();
     for (const wc of allWebContents) {
-      if (!wc.isDestroyed()) {
+      if (!wc.isDestroyed() && wc.getType() === 'window') {
         wc.send('item-detection-event', event);
       }
     }
@@ -233,14 +265,16 @@ export function initializeSaveFileHandlers(): void {
       handleAutomaticGrailProgress(event);
     }
   });
+  eventUnsubscribers.push(unsubscribeItemDetection);
 
-  saveFileMonitor.on('monitoring-started', (data: { directory: string; saveFileCount: number }) => {
+  const unsubscribeMonitoringStarted = eventBus.on('monitoring-started', (data) => {
     console.log(
       `Save file monitoring started for directory: ${data.directory} - Found ${data.saveFileCount} save files`,
     );
+    // Filter to only 'window' type to exclude DevTools, background pages, etc.
     const allWebContents = webContents.getAllWebContents();
     for (const wc of allWebContents) {
-      if (!wc.isDestroyed()) {
+      if (!wc.isDestroyed() && wc.getType() === 'window') {
         wc.send('monitoring-status-changed', {
           status: 'started',
           directory: data.directory,
@@ -249,45 +283,46 @@ export function initializeSaveFileHandlers(): void {
       }
     }
   });
+  eventUnsubscribers.push(unsubscribeMonitoringStarted);
 
-  saveFileMonitor.on('monitoring-stopped', () => {
+  const unsubscribeMonitoringStopped = eventBus.on('monitoring-stopped', () => {
     console.log('Save file monitoring stopped');
+    // Filter to only 'window' type to exclude DevTools, background pages, etc.
     const allWebContents = webContents.getAllWebContents();
     for (const wc of allWebContents) {
-      if (!wc.isDestroyed()) {
+      if (!wc.isDestroyed() && wc.getType() === 'window') {
         wc.send('monitoring-status-changed', { status: 'stopped' });
       }
     }
   });
+  eventUnsubscribers.push(unsubscribeMonitoringStopped);
 
-  saveFileMonitor.on(
-    'monitoring-error',
-    (error: {
-      type: string;
-      message: string;
-      directory: string | null;
-      saveFileCount?: number;
-    }) => {
-      const allWebContents = webContents.getAllWebContents();
-      for (const wc of allWebContents) {
-        if (!wc.isDestroyed()) {
-          wc.send('monitoring-status-changed', {
-            status: 'error',
-            error: error.message,
-            errorType: error.type,
-            directory: error.directory,
-            saveFileCount: error.saveFileCount || 0,
-          });
-        }
+  const unsubscribeMonitoringError = eventBus.on('monitoring-error', (error) => {
+    // Filter to only 'window' type to exclude DevTools, background pages, etc.
+    const allWebContents = webContents.getAllWebContents();
+    for (const wc of allWebContents) {
+      if (!wc.isDestroyed() && wc.getType() === 'window') {
+        wc.send('monitoring-status-changed', {
+          status: 'error',
+          error: error.message,
+          errorType: error.type,
+          directory: error.directory,
+          saveFileCount: error.saveFileCount || 0,
+        });
       }
-    },
-  );
+    }
+  });
+  eventUnsubscribers.push(unsubscribeMonitoringError);
 
   // Load grail items into item detection service
   try {
     const grailItems: Item[] = grailDatabase.getAllItems();
     itemDetectionService.setGrailItems(grailItems);
     console.log(`Loaded ${grailItems.length} grail items into detection service`);
+
+    // Initialize with existing progress to prevent re-notification
+    const grailProgress = grailDatabase.getAllProgress();
+    itemDetectionService.initializeFromDatabase(grailProgress);
   } catch (error) {
     console.error('Failed to load grail items into detection service:', error);
   }
@@ -389,6 +424,20 @@ export function initializeSaveFileHandlers(): void {
  * Should be called when the application is shutting down to properly clean up resources.
  */
 export function closeSaveFileMonitor(): void {
+  // Flush any pending database writes before shutdown
+  console.log('[closeSaveFileMonitor] Flushing pending database writes');
+  batchWriter.flush();
+
+  // Unsubscribe all event listeners
+  for (const unsubscribe of eventUnsubscribers) {
+    unsubscribe();
+  }
+  eventUnsubscribers.length = 0;
+
+  // Clear all event bus listeners
+  eventBus.clear();
+
+  // Stop save file monitoring
   if (saveFileMonitor) {
     saveFileMonitor.stopMonitoring();
   }

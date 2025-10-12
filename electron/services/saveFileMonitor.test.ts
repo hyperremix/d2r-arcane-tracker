@@ -1,5 +1,5 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: This file is testing private methods */
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Mock the d2s library
 vi.mock('@dschu012/d2s', () => ({
@@ -67,6 +67,7 @@ import { D2SaveFileBuilder } from '@/fixtures';
 import { getItemIdForD2SItem, isRuneId } from '../items/indexes';
 import { GameMode } from '../types/grail';
 import { isRune, simplifyItemName } from '../utils/objects';
+import { EventBus } from './EventBus';
 import { SaveFileMonitor } from './saveFileMonitor';
 
 // Mock database interface
@@ -83,6 +84,7 @@ const createMockDatabase = (): MockGrailDatabase => ({
 describe('When SaveFileMonitor is used', () => {
   let monitor: SaveFileMonitor;
   let mockDatabase: MockGrailDatabase;
+  let eventBus: EventBus;
 
   beforeEach(() => {
     // Clear all mocks
@@ -132,14 +134,20 @@ describe('When SaveFileMonitor is used', () => {
       gameMode: GameMode.Softcore,
     });
 
-    // Create monitor instance
-    monitor = new SaveFileMonitor(mockDatabase as any);
+    // Create EventBus instance
+    eventBus = new EventBus();
+
+    // Create monitor instance with EventBus
+    monitor = new SaveFileMonitor(eventBus, mockDatabase as any);
   });
 
   describe('If constructor is called', () => {
     it('Then should initialize with default values', () => {
-      // Arrange & Act
-      const newMonitor = new SaveFileMonitor();
+      // Arrange
+      const testEventBus = new EventBus();
+
+      // Act
+      const newMonitor = new SaveFileMonitor(testEventBus);
 
       // Assert
       expect(newMonitor).toBeInstanceOf(SaveFileMonitor);
@@ -149,8 +157,11 @@ describe('When SaveFileMonitor is used', () => {
     });
 
     it('Then should initialize with database', () => {
-      // Arrange & Act
-      const newMonitor = new SaveFileMonitor(mockDatabase as any);
+      // Arrange
+      const testEventBus = new EventBus();
+
+      // Act
+      const newMonitor = new SaveFileMonitor(testEventBus, mockDatabase as any);
 
       // Assert
       expect(newMonitor).toBeInstanceOf(SaveFileMonitor);
@@ -190,7 +201,7 @@ describe('When SaveFileMonitor is used', () => {
       vi.mocked(existsSync).mockReturnValue(false);
 
       const eventSpy = vi.fn();
-      monitor.on('monitoring-error', eventSpy);
+      eventBus.on('monitoring-error', eventSpy);
 
       // Act
       await monitor.startMonitoring();
@@ -210,7 +221,7 @@ describe('When SaveFileMonitor is used', () => {
       (monitor as any).isMonitoring = true;
 
       const eventSpy = vi.fn();
-      monitor.on('monitoring-started', eventSpy);
+      eventBus.on('monitoring-started', eventSpy);
 
       // Act
       await monitor.startMonitoring();
@@ -228,7 +239,7 @@ describe('When SaveFileMonitor is used', () => {
       await monitor.startMonitoring();
 
       const eventSpy = vi.fn();
-      monitor.on('monitoring-stopped', eventSpy);
+      eventBus.on('monitoring-stopped', eventSpy);
 
       // Act
       await monitor.stopMonitoring();
@@ -248,7 +259,8 @@ describe('When SaveFileMonitor is used', () => {
   describe('If getSaveFiles is called', () => {
     it('Then should return empty array when no save directory', async () => {
       // Arrange
-      const newMonitor = new SaveFileMonitor();
+      const testEventBus = new EventBus();
+      const newMonitor = new SaveFileMonitor(testEventBus);
 
       // Act
       const files = await newMonitor.getSaveFiles();
@@ -422,6 +434,504 @@ describe('When SaveFileMonitor is used', () => {
         expect(saveFile.difficulty).toBe('hell');
         expect(saveFile.hardcore).toBe(true);
         expect(saveFile.expansion).toBe(true);
+      });
+    });
+  });
+
+  describe('When file changes are debounced', () => {
+    let monitor: SaveFileMonitor;
+    let mockDatabase: MockGrailDatabase;
+    let eventBus: EventBus;
+
+    beforeEach(() => {
+      vi.useFakeTimers();
+      eventBus = new EventBus();
+      mockDatabase = createMockDatabase();
+      mockDatabase.getAllSettings.mockReturnValue({
+        gameMode: GameMode.Softcore,
+        saveFileDirectory: '/test/saves',
+      });
+      monitor = new SaveFileMonitor(eventBus, mockDatabase as any);
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+      vi.clearAllMocks();
+    });
+
+    it('Then should not parse immediately after file change', async () => {
+      // Arrange
+      const parseAllSpy = vi.spyOn(monitor as any, 'parseAllSaveDirectories');
+      (monitor as any).fileChangeCounter = 1;
+      (monitor as any).lastProcessedChangeCounter = 0;
+      (monitor as any).lastFileChangeTime = Date.now();
+      (monitor as any).watchPath = '/test/saves';
+
+      // Act - advance time by only 300ms (less than 500ms debounce)
+      await vi.advanceTimersByTimeAsync(300);
+
+      // Assert - should NOT have parsed yet
+      expect(parseAllSpy).not.toHaveBeenCalled();
+    });
+
+    it('Then should parse after debounce delay', async () => {
+      // Arrange
+      const parseAllSpy = vi
+        .spyOn(monitor as any, 'parseAllSaveDirectories')
+        .mockResolvedValue(undefined);
+      vi.spyOn(monitor as any, 'findExistingSaveDirectories').mockResolvedValue(['/test/saves']);
+      (monitor as any).fileChangeCounter = 1;
+      (monitor as any).lastProcessedChangeCounter = 0;
+      (monitor as any).lastFileChangeTime = Date.now();
+      (monitor as any).watchPath = '/test/saves';
+
+      // Act - advance time by 600ms (more than 500ms debounce)
+      await vi.advanceTimersByTimeAsync(600);
+
+      // Assert - should have parsed
+      expect(parseAllSpy).toHaveBeenCalled();
+    });
+
+    it('Then should batch multiple rapid changes into single parse', async () => {
+      // Arrange
+      const parseAllSpy = vi
+        .spyOn(monitor as any, 'parseAllSaveDirectories')
+        .mockResolvedValue(undefined);
+      vi.spyOn(monitor as any, 'findExistingSaveDirectories').mockResolvedValue(['/test/saves']);
+      (monitor as any).watchPath = '/test/saves';
+      (monitor as any).lastProcessedChangeCounter = 0;
+
+      // Get initial time from mocked timers
+      const startTime = Date.now();
+
+      // Act - Simulate 3 rapid file changes (each within debounce period)
+      (monitor as any).fileChangeCounter = 1;
+      (monitor as any).lastFileChangeTime = startTime;
+      await vi.advanceTimersByTimeAsync(100); // Change 1
+
+      (monitor as any).fileChangeCounter = 2;
+      (monitor as any).lastFileChangeTime = startTime + 100;
+      await vi.advanceTimersByTimeAsync(100); // Change 2
+
+      (monitor as any).fileChangeCounter = 3;
+      (monitor as any).lastFileChangeTime = startTime + 200;
+      await vi.advanceTimersByTimeAsync(100); // Change 3 (total 300ms)
+
+      // Now wait for debounce period (500ms from last change at 200ms) + tick cycle
+      // Last change was at 200ms, debounce = 500ms, so needs to wait until 700ms+
+      // Tick reader runs every 500ms (at 500ms, 1000ms, etc.)
+      // So we need to advance to at least 1000ms total to catch the tick at 1000ms
+      await vi.advanceTimersByTimeAsync(800); // Total 300 + 800 = 1100ms
+
+      // Assert - should only parse ONCE despite 3 changes
+      expect(parseAllSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it('Then should bypass debounce for initial parsing', async () => {
+      // Arrange
+      const parseAllSpy = vi
+        .spyOn(monitor as any, 'parseAllSaveDirectories')
+        .mockResolvedValue(undefined);
+      vi.spyOn(monitor as any, 'findExistingSaveDirectories').mockResolvedValue(['/test/saves']);
+      (monitor as any).fileChangeCounter = 1;
+      (monitor as any).lastProcessedChangeCounter = 0;
+      (monitor as any).lastFileChangeTime = Date.now();
+      (monitor as any).watchPath = '/test/saves';
+      (monitor as any).isInitialParsing = true; // Set initial parsing flag
+
+      // Act - advance time by only 500ms (less than debounce)
+      await vi.advanceTimersByTimeAsync(500);
+
+      // Assert - should parse immediately despite debounce
+      expect(parseAllSpy).toHaveBeenCalled();
+    });
+
+    it('Then should bypass debounce for force parse', async () => {
+      // Arrange
+      const parseAllSpy = vi
+        .spyOn(monitor as any, 'parseAllSaveDirectories')
+        .mockResolvedValue(undefined);
+      vi.spyOn(monitor as any, 'findExistingSaveDirectories').mockResolvedValue(['/test/saves']);
+      (monitor as any).fileChangeCounter = 1;
+      (monitor as any).lastProcessedChangeCounter = 0;
+      (monitor as any).lastFileChangeTime = Date.now();
+      (monitor as any).watchPath = '/test/saves';
+      (monitor as any).forceParseAll = true; // Set force parse flag
+
+      // Act - advance time by only 500ms (less than debounce)
+      await vi.advanceTimersByTimeAsync(500);
+
+      // Assert - should parse immediately despite debounce
+      expect(parseAllSpy).toHaveBeenCalled();
+    });
+
+    it('Then should respect manual mode even with debounce elapsed', async () => {
+      // Arrange
+      const parseAllSpy = vi
+        .spyOn(monitor as any, 'parseAllSaveDirectories')
+        .mockResolvedValue(undefined);
+      mockDatabase.getAllSettings.mockReturnValue({
+        gameMode: GameMode.Manual, // Manual mode
+        saveFileDirectory: '/test/saves',
+      });
+      (monitor as any).fileChangeCounter = 1;
+      (monitor as any).lastProcessedChangeCounter = 0;
+      (monitor as any).lastFileChangeTime = Date.now();
+      (monitor as any).watchPath = '/test/saves';
+
+      // Act - advance time past debounce period
+      await vi.advanceTimersByTimeAsync(2500);
+
+      // Assert - should NOT parse in manual mode
+      expect(parseAllSpy).not.toHaveBeenCalled();
+    });
+
+    it('Then should handle race condition when changes occur during processing', async () => {
+      // Arrange
+      let parseCount = 0;
+      const parseAllSpy = vi
+        .spyOn(monitor as any, 'parseAllSaveDirectories')
+        .mockImplementation(async () => {
+          parseCount++;
+          // Simulate a file change happening during parsing
+          if (parseCount === 1) {
+            (monitor as any).fileChangeCounter++;
+            (monitor as any).lastFileChangeTime = Date.now();
+          }
+        });
+      vi.spyOn(monitor as any, 'findExistingSaveDirectories').mockResolvedValue(['/test/saves']);
+      (monitor as any).fileChangeCounter = 1;
+      (monitor as any).lastProcessedChangeCounter = 0;
+      (monitor as any).lastFileChangeTime = Date.now();
+      (monitor as any).watchPath = '/test/saves';
+
+      // Act - wait for debounce and first parse
+      await vi.advanceTimersByTimeAsync(2500);
+
+      // Wait for debounce again to process the change that occurred during first parse
+      await vi.advanceTimersByTimeAsync(2500);
+
+      // Assert - should have parsed TWICE (once for initial change, once for change during processing)
+      expect(parseAllSpy).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe('When concurrent file parsing is used', () => {
+    let monitor: SaveFileMonitor;
+    let eventBus: EventBus;
+
+    beforeEach(() => {
+      eventBus = new EventBus();
+      monitor = new SaveFileMonitor(eventBus);
+    });
+
+    it('Then should execute all tasks with concurrency limit', async () => {
+      // Arrange
+      let maxConcurrent = 0;
+      let currentConcurrent = 0;
+      const taskCount = 10;
+      const limit = 3;
+
+      const tasks = Array.from({ length: taskCount }, (_, i) => {
+        return async () => {
+          currentConcurrent++;
+          maxConcurrent = Math.max(maxConcurrent, currentConcurrent);
+          // Simulate async work
+          await new Promise((resolve) => setTimeout(resolve, 10));
+          currentConcurrent--;
+          return i;
+        };
+      });
+
+      // Act
+      const results = await (monitor as any).executeConcurrently(tasks, limit);
+
+      // Assert
+      expect(results).toHaveLength(taskCount);
+      expect(maxConcurrent).toBeLessThanOrEqual(limit);
+      expect(results).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
+    });
+
+    it('Then should preserve result order', async () => {
+      // Arrange
+      const tasks = [
+        async () => {
+          await new Promise((resolve) => setTimeout(resolve, 50));
+          return 'first';
+        },
+        async () => {
+          await new Promise((resolve) => setTimeout(resolve, 10));
+          return 'second';
+        },
+        async () => {
+          await new Promise((resolve) => setTimeout(resolve, 30));
+          return 'third';
+        },
+      ];
+
+      // Act
+      const results = await (monitor as any).executeConcurrently(tasks, 5);
+
+      // Assert - results should be in original order despite different completion times
+      expect(results).toEqual(['first', 'second', 'third']);
+    });
+
+    it('Then should handle errors in individual tasks gracefully', async () => {
+      // Arrange
+      const tasks = [
+        async () => 'success1',
+        async () => {
+          throw new Error('Task failed');
+        },
+        async () => 'success2',
+      ];
+
+      // Act
+      const results = await (monitor as any).executeConcurrently(tasks, 5);
+
+      // Assert - successful tasks should complete, failed task returns undefined
+      expect(results[0]).toBe('success1');
+      expect(results[1]).toBeUndefined();
+      expect(results[2]).toBe('success2');
+    });
+
+    it('Then should work with limit greater than task count', async () => {
+      // Arrange
+      const tasks = [async () => 1, async () => 2, async () => 3];
+
+      // Act
+      const results = await (monitor as any).executeConcurrently(tasks, 10);
+
+      // Assert
+      expect(results).toEqual([1, 2, 3]);
+    });
+
+    it('Then should work with limit of 1 (sequential execution)', async () => {
+      // Arrange
+      let maxConcurrent = 0;
+      let currentConcurrent = 0;
+      const tasks = Array.from({ length: 5 }, (_, i) => {
+        return async () => {
+          currentConcurrent++;
+          maxConcurrent = Math.max(maxConcurrent, currentConcurrent);
+          await new Promise((resolve) => setTimeout(resolve, 10));
+          currentConcurrent--;
+          return i;
+        };
+      });
+
+      // Act
+      const results = await (monitor as any).executeConcurrently(tasks, 1);
+
+      // Assert - should execute sequentially (max 1 at a time)
+      expect(maxConcurrent).toBe(1);
+      expect(results).toEqual([0, 1, 2, 3, 4]);
+    });
+
+    it('Then should work with empty task array', async () => {
+      // Arrange
+      const tasks: Array<() => Promise<number>> = [];
+
+      // Act
+      const results = await (monitor as any).executeConcurrently(tasks, 5);
+
+      // Assert
+      expect(results).toEqual([]);
+    });
+  });
+
+  describe('When configurable intervals are used', () => {
+    let monitor: SaveFileMonitor;
+    let mockDatabase: MockGrailDatabase;
+    let eventBus: EventBus;
+
+    beforeEach(() => {
+      eventBus = new EventBus();
+      mockDatabase = createMockDatabase();
+    });
+
+    it('Then should use default intervals when settings not provided', () => {
+      // Arrange
+      mockDatabase.getAllSettings.mockReturnValue({
+        gameMode: GameMode.Softcore,
+        saveFileDirectory: '/test/saves',
+      });
+
+      // Act
+      monitor = new SaveFileMonitor(eventBus, mockDatabase as any);
+
+      // Assert - verify defaults used (check via method calls)
+      const tickInterval = (monitor as any).getTickReaderInterval();
+      expect(tickInterval).toBe(500); // DEFAULT_TICK_INTERVAL
+    });
+
+    it('Then should use custom tick reader interval from settings', () => {
+      // Arrange
+      mockDatabase.getAllSettings.mockReturnValue({
+        gameMode: GameMode.Softcore,
+        saveFileDirectory: '/test/saves',
+        tickReaderIntervalMs: 1000, // Custom value
+      });
+
+      // Act
+      monitor = new SaveFileMonitor(eventBus, mockDatabase as any);
+
+      // Assert
+      const tickInterval = (monitor as any).getTickReaderInterval();
+      expect(tickInterval).toBe(1000);
+    });
+
+    it('Then should validate and reject invalid tick reader interval', () => {
+      // Arrange
+      mockDatabase.getAllSettings.mockReturnValue({
+        gameMode: GameMode.Softcore,
+        saveFileDirectory: '/test/saves',
+        tickReaderIntervalMs: 50, // Too low (min is 100)
+      });
+
+      // Act
+      monitor = new SaveFileMonitor(eventBus, mockDatabase as any);
+
+      // Assert - should fall back to default
+      const tickInterval = (monitor as any).getTickReaderInterval();
+      expect(tickInterval).toBe(500); // DEFAULT_TICK_INTERVAL
+    });
+
+    it('Then should validate interval with max constraint', () => {
+      // Arrange
+      mockDatabase.getAllSettings.mockReturnValue({
+        gameMode: GameMode.Softcore,
+        saveFileDirectory: '/test/saves',
+        tickReaderIntervalMs: 10000, // Too high (max is 5000)
+      });
+
+      // Act
+      monitor = new SaveFileMonitor(eventBus, mockDatabase as any);
+
+      // Assert - should fall back to default
+      const tickInterval = (monitor as any).getTickReaderInterval();
+      expect(tickInterval).toBe(500); // DEFAULT_TICK_INTERVAL
+    });
+
+    it('Then should validate interval and allow valid custom value', () => {
+      // Arrange
+      const validInterval = 250;
+      mockDatabase.getAllSettings.mockReturnValue({
+        gameMode: GameMode.Softcore,
+        saveFileDirectory: '/test/saves',
+        tickReaderIntervalMs: validInterval,
+      });
+
+      // Act
+      monitor = new SaveFileMonitor(eventBus, mockDatabase as any);
+
+      // Assert
+      const tickInterval = (monitor as any).getTickReaderInterval();
+      expect(tickInterval).toBe(validInterval);
+    });
+
+    it('Then should use default when database not available', () => {
+      // Arrange & Act
+      monitor = new SaveFileMonitor(eventBus); // No database
+
+      // Assert
+      const tickInterval = (monitor as any).getTickReaderInterval();
+      expect(tickInterval).toBe(500); // DEFAULT_TICK_INTERVAL
+    });
+
+    it('Then should validate debounce delay from settings', () => {
+      // Arrange
+      mockDatabase.getAllSettings.mockReturnValue({
+        gameMode: GameMode.Softcore,
+        saveFileDirectory: '/test/saves',
+        fileChangeDebounceMs: 3000, // Custom debounce
+      });
+      monitor = new SaveFileMonitor(eventBus, mockDatabase as any);
+
+      // Act
+      const validated = (monitor as any).validateInterval(3000, 500, 10000, 2000);
+
+      // Assert
+      expect(validated).toBe(3000);
+    });
+  });
+
+  describe('When stash header parsing is used', () => {
+    describe('If getSaveNameFromPath is called with hardcore=true parameter', () => {
+      it('Then should return Shared Stash Hardcore regardless of filename', () => {
+        // Arrange
+        const filePath = '/test/SharedStashSoftcoreV2.d2i';
+
+        // Act
+        const result = (monitor as any).getSaveNameFromPath(filePath, true);
+
+        // Assert
+        expect(result).toBe('Shared Stash Hardcore'); // Uses parameter, not filename
+      });
+    });
+
+    describe('If getSaveNameFromPath is called with hardcore=false parameter', () => {
+      it('Then should return Shared Stash Softcore regardless of filename', () => {
+        // Arrange
+        const filePath = '/test/SharedStashHardcoreV2.d2i';
+
+        // Act
+        const result = (monitor as any).getSaveNameFromPath(filePath, false);
+
+        // Assert
+        expect(result).toBe('Shared Stash Softcore'); // Uses parameter, not filename
+      });
+    });
+
+    describe('If getSaveNameFromPath is called without hardcore parameter for hardcore stash', () => {
+      it('Then should fallback to filename detection', () => {
+        // Arrange
+        const filePath = '/test/SharedStashHardcoreV2.d2i';
+
+        // Act
+        const result = (monitor as any).getSaveNameFromPath(filePath);
+
+        // Assert
+        expect(result).toBe('Shared Stash Hardcore'); // Falls back to filename
+      });
+    });
+
+    describe('If getSaveNameFromPath is called without hardcore parameter for softcore stash', () => {
+      it('Then should fallback to filename detection', () => {
+        // Arrange
+        const filePath = '/test/SharedStashSoftcoreV2.d2i';
+
+        // Act
+        const result = (monitor as any).getSaveNameFromPath(filePath);
+
+        // Assert
+        expect(result).toBe('Shared Stash Softcore'); // Falls back to filename
+      });
+    });
+
+    describe('If getSaveNameFromPath is called with non-.d2i file', () => {
+      it('Then should return filename without extension', () => {
+        // Arrange
+        const filePath = '/test/MyCharacter.d2s';
+
+        // Act
+        const result = (monitor as any).getSaveNameFromPath(filePath);
+
+        // Assert
+        expect(result).toBe('MyCharacter');
+      });
+    });
+
+    describe('If getSaveNameFromPath is called with hardcore parameter on non-.d2i file', () => {
+      it('Then should ignore hardcore parameter', () => {
+        // Arrange
+        const filePath = '/test/MyCharacter.d2s';
+
+        // Act
+        const result = (monitor as any).getSaveNameFromPath(filePath, true);
+
+        // Assert
+        expect(result).toBe('MyCharacter'); // Hardcore parameter only applies to .d2i files
       });
     });
   });

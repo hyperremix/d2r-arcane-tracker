@@ -1,10 +1,17 @@
 import type { ItemDetectionEvent } from 'electron/types/grail';
 import { Bell, Star, Trophy, X } from 'lucide-react';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useGrailStore } from '@/stores/grailStore';
+
+/**
+ * Module-level flag to prevent duplicate IPC handler registration.
+ * This is necessary because React Strict Mode in development will mount components twice,
+ * and without this guard, multiple handlers would accumulate.
+ */
+let globalIpcHandlerRegistered = false;
 
 /**
  * Interface extending ItemDetectionEvent with additional notification metadata.
@@ -24,7 +31,14 @@ interface NotificationItem extends ItemDetectionEvent {
 export function NotificationButton() {
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [isOpen, setIsOpen] = useState(false);
+  const [notificationQueue, setNotificationQueue] = useState<ItemDetectionEvent[]>([]);
   const { settings } = useGrailStore();
+
+  // Use refs to avoid useEffect re-registration on state/callback changes
+  const batchTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const processBatchRef = useRef<() => void>();
+
+  const BATCH_DELAY = 500; // 0.5 seconds
 
   const playNotificationSound = useCallback(() => {
     if (settings.enableSounds) {
@@ -54,54 +68,132 @@ export function NotificationButton() {
     }
   }, []);
 
+  const showBatchNotification = useCallback((events: ItemDetectionEvent[]) => {
+    const itemNames = events.map((e) => e.item.name).join(', ');
+    const notification = new Notification(`${events.length} Holy Grail Items Found!`, {
+      body:
+        itemNames.length > 100
+          ? `${events.length} items including ${events[0].item.name}...`
+          : itemNames,
+      icon: '/logo.svg',
+      tag: 'grail-batch',
+      requireInteraction: true,
+    });
+
+    // Auto-close after 5 seconds
+    setTimeout(() => notification.close(), 5000);
+  }, []);
+
+  const processBatch = useCallback(() => {
+    if (notificationQueue.length === 0) return;
+
+    // Add ALL queued items to in-app notifications
+    if (settings.inAppNotifications) {
+      const newNotifications = notificationQueue.map((itemEvent) => ({
+        ...itemEvent,
+        id: `${Date.now()}_${itemEvent.item.id}_${Math.random()}`,
+        timestamp: new Date(),
+        dismissed: false,
+        seen: false,
+      }));
+      setNotifications((prev) => [
+        ...newNotifications,
+        ...prev.slice(0, 10 - newNotifications.length),
+      ]);
+    }
+
+    // Play sound ONCE for the batch
+    playNotificationSound();
+
+    // Show native notification
+    if (
+      settings.nativeNotifications &&
+      'Notification' in window &&
+      Notification.permission === 'granted'
+    ) {
+      if (notificationQueue.length === 1) {
+        // Single item: show detailed notification
+        showBrowserNotification(notificationQueue[0]);
+      } else {
+        // Multiple items: show batch notification
+        showBatchNotification(notificationQueue);
+      }
+    }
+
+    // Clear the queue
+    setNotificationQueue([]);
+  }, [
+    notificationQueue,
+    settings.inAppNotifications,
+    settings.nativeNotifications,
+    playNotificationSound,
+    showBrowserNotification,
+    showBatchNotification,
+  ]);
+
+  // Update ref whenever processBatch changes
   useEffect(() => {
+    processBatchRef.current = processBatch;
+  }, [processBatch]);
+
+  useEffect(() => {
+    // Singleton pattern: Prevent duplicate IPC handler registration
+    // This is critical because React Strict Mode (development) will mount components twice
+    if (globalIpcHandlerRegistered) {
+      console.log(
+        '[NotificationButton] IPC handler already registered globally, skipping duplicate registration',
+      );
+      return;
+    }
+
+    // Mark as registered before setting up handler
+    globalIpcHandlerRegistered = true;
+
     // Listen for item detection events
     const handleItemDetection = (
       _event: Electron.IpcRendererEvent,
       itemEvent: ItemDetectionEvent,
     ) => {
-      // Skip all notifications if silent flag is set (e.g., during initial startup parsing)
+      // Skip all notifications if silent flag is set
+      // Silent flag is true during:
+      // - Initial startup parsing: prevents spam for existing items
+      // - Force re-scan: prevents re-notification of already found items
+      // Items are still saved to database, only UI notifications are suppressed
       if (itemEvent.silent) {
         return;
       }
 
-      // Add to notifications if in-app notifications are enabled
-      if (settings.inAppNotifications) {
-        const notification: NotificationItem = {
-          ...itemEvent,
-          id: `${Date.now()}_${itemEvent.item.id}`,
-          timestamp: new Date(),
-          dismissed: false,
-          seen: false, // New notifications are unseen by default
-        };
+      // Add to queue
+      setNotificationQueue((prev) => [...prev, itemEvent]);
 
-        setNotifications((prev) => [notification, ...prev.slice(0, 9)]); // Keep only last 10
+      // Clear existing timer if any
+      if (batchTimerRef.current) {
+        clearTimeout(batchTimerRef.current);
       }
 
-      // Play notification sound if enabled
-      playNotificationSound();
-
-      // Show native browser notification if enabled and supported
-      if (
-        settings.nativeNotifications &&
-        'Notification' in window &&
-        Notification.permission === 'granted'
-      ) {
-        showBrowserNotification(itemEvent);
-      }
+      // Set new timer to process batch after delay
+      batchTimerRef.current = setTimeout(() => {
+        // Use ref to get latest processBatch function
+        if (processBatchRef.current) {
+          processBatchRef.current();
+        }
+        batchTimerRef.current = null;
+      }, BATCH_DELAY);
     };
 
+    console.log('[NotificationButton] ✅ Registering IPC handler for item-detection-event');
     window.ipcRenderer?.on('item-detection-event', handleItemDetection);
 
     return () => {
+      console.log('[NotificationButton] 🧹 Cleanup called - Unregistering IPC handler');
       window.ipcRenderer?.off('item-detection-event', handleItemDetection);
+      // DO NOT reset globalIpcHandlerRegistered to false here!
+      // React Strict Mode in development will mount/unmount/mount components,
+      // and resetting the flag would allow duplicate handler registration.
+      // The flag should only be reset when the component is truly being destroyed,
+      // not during Strict Mode's intentional double-mounting behavior.
     };
-  }, [
-    settings.inAppNotifications,
-    settings.nativeNotifications,
-    showBrowserNotification,
-    playNotificationSound,
-  ]);
+  }, []); // Empty dependency array - only run once on mount (notificationQueue accessed via closure)
 
   const dismissNotification = (id: string) => {
     setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, dismissed: true } : n)));
@@ -121,6 +213,29 @@ export function NotificationButton() {
       markAllAsSeen();
     }
   }, [isOpen, markAllAsSeen]);
+
+  // Cleanup timer on unmount and process remaining queue
+  useEffect(() => {
+    return () => {
+      if (batchTimerRef.current) {
+        clearTimeout(batchTimerRef.current);
+        batchTimerRef.current = null;
+      }
+
+      // Process any remaining items in queue on unmount using functional setState
+      setNotificationQueue((currentQueue) => {
+        if (currentQueue.length > 0) {
+          console.log(
+            `[NotificationButton] Component unmounting, processing ${currentQueue.length} remaining notifications`,
+          );
+          if (processBatchRef.current) {
+            processBatchRef.current();
+          }
+        }
+        return [];
+      });
+    };
+  }, []); // Empty dependency array - cleanup only runs on unmount
 
   const activeNotifications = notifications.filter((n) => !n.dismissed);
   const unseenCount = activeNotifications.filter((n) => !n.seen).length;

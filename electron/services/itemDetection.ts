@@ -1,18 +1,30 @@
-import { EventEmitter } from 'node:events';
 import fs from 'node:fs/promises';
 import type * as d2s from '@dschu012/d2s';
 import { read } from '@dschu012/d2s';
 import { runesByCode } from '../items/indexes';
 import type { D2SaveFile } from '../services/saveFileMonitor';
-import type { D2Item, D2SItem, Item, ItemDetectionEvent } from '../types/grail';
+import type { D2Item, D2SItem, GrailProgress, Item, ItemDetectionEvent } from '../types/grail';
+import { DEFAULT_RETRY_OPTIONS, retryWithBackoff } from '../utils/retry';
+import type { EventBus } from './EventBus';
 
 /**
  * Service for detecting and analyzing items from Diablo 2 save files.
  * This service parses D2 save files, extracts items, and matches them against
  * the Holy Grail item database to identify found items.
+ * Tracks previously seen items to prevent duplicate notifications.
  */
-class ItemDetectionService extends EventEmitter {
+class ItemDetectionService {
   private grailItems: Item[] = [];
+  private eventBus: EventBus;
+  private previouslySeenItems: Set<string> = new Set();
+
+  /**
+   * Creates a new instance of the ItemDetectionService.
+   * @param {EventBus} eventBus - EventBus instance for emitting events
+   */
+  constructor(eventBus: EventBus) {
+    this.eventBus = eventBus;
+  }
 
   /**
    * Sets the Holy Grail items that will be used for matching detected items.
@@ -20,6 +32,21 @@ class ItemDetectionService extends EventEmitter {
    */
   setGrailItems(items: Item[]): void {
     this.grailItems = items;
+  }
+
+  /**
+   * Initializes tracking with items already found in the grail database.
+   * Prevents re-notification for items found in previous sessions.
+   * @param {GrailProgress[]} existingProgress - Array of existing grail progress entries
+   */
+  initializeFromDatabase(existingProgress: GrailProgress[]): void {
+    for (const progress of existingProgress) {
+      const itemKey = `${progress.itemId}_${progress.isEthereal}`;
+      this.previouslySeenItems.add(itemKey);
+    }
+    console.log(
+      `[ItemDetection] Initialized with ${this.previouslySeenItems.size} previously found items`,
+    );
   }
 
   /**
@@ -37,26 +64,39 @@ class ItemDetectionService extends EventEmitter {
     try {
       let items: D2Item[];
 
-      if (preExtractedItems && preExtractedItems.length > 0) {
-        // Use pre-extracted items to avoid duplicate parsing
-        console.log(`Using ${preExtractedItems.length} pre-extracted items for ${saveFile.name}`);
+      if (preExtractedItems !== undefined) {
+        // Use pre-extracted items to avoid duplicate parsing (even if empty)
+        console.log(
+          `[ItemDetection] Using ${preExtractedItems.length} pre-extracted items for ${saveFile.name}`,
+        );
         items = this.convertD2SItemsToD2Items(preExtractedItems, saveFile.name);
       } else {
-        // Fallback to parsing the save file again
-        console.log(`No pre-extracted items provided, parsing save file: ${saveFile.name}`);
+        // Fallback to parsing the save file again (only if pre-extracted items not provided)
+        console.log(
+          `[ItemDetection] No pre-extracted items provided, parsing save file: ${saveFile.name}`,
+        );
         items = await this.extractItemsFromSaveFile(saveFile);
       }
 
-      // Simple processing - no complex state tracking
+      // Track items to prevent duplicate notifications globally
       for (const item of items) {
         const grailMatch = this.findGrailMatch(item);
         if (grailMatch) {
-          this.emit('item-detection', {
-            type: 'item-found',
-            item,
-            grailItem: grailMatch,
-            silent,
-          } as ItemDetectionEvent);
+          // Create unique key for this item using stable properties
+          // Uses grailMatch.id (grail item ID) to match database initialization format
+          const itemKey = `${grailMatch.id}_${item.ethereal}`;
+
+          // Only emit event if this is a NEW item globally
+          if (!this.previouslySeenItems.has(itemKey)) {
+            console.log(`[ItemDetection] New item detected: ${item.name} in ${saveFile.name}`);
+            this.eventBus.emit('item-detection', {
+              type: 'item-found',
+              item,
+              grailItem: grailMatch,
+              silent,
+            } as ItemDetectionEvent);
+            this.previouslySeenItems.add(itemKey);
+          }
         }
       }
     } catch (error) {
@@ -81,7 +121,7 @@ class ItemDetectionService extends EventEmitter {
       for (const item of itemList) {
         // Convert the D2S item to D2Item format
         const d2Item: D2Item = {
-          id: `item-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          id: `${item.id}`,
           name: this.getItemName(item),
           type: this.getItemType(item),
           quality: this.getItemQuality(item),
@@ -116,15 +156,24 @@ class ItemDetectionService extends EventEmitter {
     const items: D2Item[] = [];
 
     try {
-      const buffer = await fs.readFile(saveFile.path);
+      // Wrap file reading and parsing in retry logic to handle transient errors
+      // (file locks, temporary I/O issues, race conditions with game writing files)
+      const saveData = await retryWithBackoff(
+        async () => {
+          const buffer = await fs.readFile(saveFile.path);
 
-      // Parse the D2 save file using the d2s library
-      const saveData = await read(buffer);
+          // Parse the D2 save file using the d2s library
+          const data = await read(buffer);
 
-      if (!saveData) {
-        console.warn('Failed to parse save file:', saveFile.path);
-        return []; // Return empty array instead of fallback
-      }
+          if (!data) {
+            throw new Error(`Failed to parse save file: ${saveFile.path}`);
+          }
+
+          return data;
+        },
+        DEFAULT_RETRY_OPTIONS,
+        `Parse ${saveFile.name}`,
+      );
 
       // Extract items from all possible locations
       const allItemLists = [
@@ -144,8 +193,8 @@ class ItemDetectionService extends EventEmitter {
 
       console.log(`Extracted ${items.length} items from ${saveFile.name}`);
     } catch (error) {
-      console.error('Error parsing save file with d2s:', error);
-      return []; // Return empty array instead of fallback
+      console.error('Error parsing save file after all retries:', error);
+      return []; // Return empty array after exhausting retries
     }
 
     return items;
@@ -167,37 +216,37 @@ class ItemDetectionService extends EventEmitter {
     defaultLocation: D2Item['location'],
     _isEmbed: boolean = false,
   ): void {
-    for (const d2Item of itemList) {
+    for (const item of itemList) {
       try {
         // Only extract items that are unique, set, rare, or have specific names
         if (
-          d2Item.unique_name ||
-          d2Item.set_name ||
-          d2Item.rare_name ||
-          d2Item.rare_name2 ||
-          this.isRune(d2Item) ||
-          d2Item.runeword_name
+          item.unique_name ||
+          item.set_name ||
+          item.rare_name ||
+          item.rare_name2 ||
+          this.isRune(item) ||
+          item.runeword_name
         ) {
-          const item: D2Item = {
-            id: `${characterName}_${d2Item.id || Date.now()}_${Math.random()}`,
-            name: this.getItemName(d2Item),
-            type: this.getItemType(d2Item),
-            quality: this.getItemQuality(d2Item),
-            level: d2Item.level || 1,
-            ethereal: Boolean(d2Item.ethereal),
-            sockets: this.getItemSockets(d2Item),
+          const d2Item: D2Item = {
+            id: `${item.id}`,
+            name: this.getItemName(item),
+            type: this.getItemType(item),
+            quality: this.getItemQuality(item),
+            level: item.level || 1,
+            ethereal: Boolean(item.ethereal),
+            sockets: this.getItemSockets(item),
             timestamp: new Date(),
             characterName,
-            location: this.getItemLocation(d2Item) || defaultLocation,
+            location: this.getItemLocation(item) || defaultLocation,
           };
 
-          items.push(item);
+          items.push(d2Item);
         }
 
         // Recursively process socketed items
-        if (d2Item.socketed_items?.length) {
+        if (item.socketed_items?.length) {
           this.extractItemsFromList(
-            d2Item.socketed_items,
+            item.socketed_items,
             items,
             characterName,
             defaultLocation,
@@ -375,6 +424,15 @@ class ItemDetectionService extends EventEmitter {
   private findGrailMatch(item: D2Item): Item | null {
     // Simple exact name matching - no complex algorithms
     return this.grailItems.find((grailItem) => grailItem.id === item.name) || null;
+  }
+
+  /**
+   * Clears the tracking of previously seen items.
+   * Useful when monitoring restarts or when you want to reset detection.
+   */
+  clearSeenItems(): void {
+    this.previouslySeenItems.clear();
+    console.log('[ItemDetection] Cleared all seen items tracking');
   }
 }
 

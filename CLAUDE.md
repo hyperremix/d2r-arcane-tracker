@@ -30,8 +30,8 @@ yarn typecheck:web    # Web/renderer code
 yarn typecheck:node   # Node/main code
 
 # Code quality
-yarn check           # Run all Biome checks
-yarn check:fix       # Fix auto-fixable issues
+yarn run check           # Run all Biome checks
+yarn run check:fix       # Fix auto-fixable issues
 yarn lint            # Lint only
 yarn lint:fix        # Fix linting issues
 yarn format          # Format code
@@ -105,6 +105,7 @@ This project includes comprehensive development rules in the `.cursor/rules/` di
 - **unit-testing.mdc** - Unit testing patterns and best practices using Vitest
 
 These rules provide detailed guidance for:
+
 - Component architecture and organization
 - State management with Zustand
 - Electron main/renderer process communication

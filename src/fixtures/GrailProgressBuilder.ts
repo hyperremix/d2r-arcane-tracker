@@ -9,7 +9,6 @@ export class GrailProgressBuilder {
     id: 'default-progress',
     characterId: 'default-character',
     itemId: 'default-item',
-    found: true,
     foundDate: new Date('2024-01-01'),
     foundBy: 'Default Character',
     manuallyAdded: true,
@@ -44,14 +43,6 @@ export class GrailProgressBuilder {
    */
   withItemId(itemId: string): this {
     this.progress.itemId = itemId;
-    return this;
-  }
-
-  /**
-   * Set the found status
-   */
-  withFound(found: boolean): this {
-    this.progress.found = found;
     return this;
   }
 

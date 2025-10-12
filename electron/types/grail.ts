@@ -200,7 +200,6 @@ export interface GrailProgress {
   id: string;
   characterId: string;
   itemId: string;
-  found: boolean;
   foundDate?: Date;
   foundBy?: string; // character name that found it
   manuallyAdded: boolean;
@@ -217,7 +216,6 @@ export type DatabaseGrailProgress = {
   id: string;
   character_id: string;
   item_id: string;
-  found: 0 | 1;
   found_date: string | null;
   manually_added: 0 | 1;
   auto_detected: 0 | 1;
@@ -358,6 +356,11 @@ export type Settings = {
   needsSeeding: boolean;
   theme: 'light' | 'dark' | 'system';
   showItemIcons: boolean;
+  // Advanced monitoring settings (optional, with defaults)
+  tickReaderIntervalMs?: number; // Default: 500
+  chokidarPollingIntervalMs?: number; // Default: 1000
+  fileStabilityThresholdMs?: number; // Default: 300
+  fileChangeDebounceMs?: number; // Default: 2000
 };
 
 /**
@@ -445,11 +448,30 @@ export type D2Item = {
 /**
  * Type representing an item detection event when a Holy Grail item is found.
  */
+/**
+ * Event emitted when a grail item is detected in a save file.
+ */
 export type ItemDetectionEvent = {
   type: 'item-found';
   item: D2Item;
   grailItem: Item;
+  /**
+   * When true, suppresses all user-facing notifications for this detection.
+   * Inherited from SaveFileEvent.silent.
+   *
+   * Effects when true:
+   * - No sound notification played
+   * - No native OS notification shown
+   * - No in-app notification popup displayed
+   * - No grail progress update event sent to renderer
+   * - Item is still saved to database
+   * - Item is still tracked for duplicate detection
+   *
+   * This allows bulk operations (startup, re-scan) to process items
+   * without overwhelming the user with notifications.
+   */
   silent?: boolean;
+  d2sItemId?: string | number;
 };
 
 /**
@@ -469,10 +491,28 @@ export type D2SaveFile = {
 /**
  * Type representing an event related to save file changes.
  */
+/**
+ * Event emitted when a save file is created, modified, or deleted.
+ */
 export type SaveFileEvent = {
   type: 'created' | 'modified' | 'deleted';
   file: D2SaveFile;
   extractedItems?: d2s.types.IItem[];
+  /**
+   * When true, suppresses all user-facing notifications for this event.
+   * Used during initial startup parsing and user-initiated force re-scans
+   * to prevent notification spam for items that were already found.
+   *
+   * Set to true when:
+   * - Initial parsing on application startup (isInitialParsing=true)
+   * - User manually triggers "Re-scan all files" (forceParseAll=true)
+   *
+   * Set to false when:
+   * - Normal gameplay file changes (user actually found a new item)
+   *
+   * Note: Items are ALWAYS saved to database regardless of silent flag.
+   * Only notifications are suppressed.
+   */
   silent?: boolean;
 };
 

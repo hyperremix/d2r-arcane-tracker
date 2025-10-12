@@ -16,6 +16,7 @@ import { readFile } from 'node:fs/promises';
 import { read } from '@dschu012/d2s';
 import { D2SaveFileBuilder, D2SItemBuilder, HolyGrailItemBuilder } from '@/fixtures';
 import type { D2Item, D2SItem, Item } from '../types/grail';
+import { EventBus } from './EventBus';
 import { ItemDetectionService } from './itemDetection';
 
 // Mock data types
@@ -23,9 +24,14 @@ import { ItemDetectionService } from './itemDetection';
 describe('When ItemDetectionService is used', () => {
   let service: ItemDetectionService;
   let mockGrailItems: Item[];
+  let eventBus: EventBus;
 
   beforeEach(() => {
-    service = new ItemDetectionService();
+    // Create EventBus instance
+    eventBus = new EventBus();
+
+    // Create service with EventBus
+    service = new ItemDetectionService(eventBus);
     mockGrailItems = [
       HolyGrailItemBuilder.new()
         .withId('shako')
@@ -257,7 +263,7 @@ describe('When ItemDetectionService is used', () => {
       // Assert
       expect(result).toEqual([]);
       expect(consoleSpy).toHaveBeenCalledWith(
-        'Error parsing save file with d2s:',
+        'Error parsing save file after all retries:',
         expect.any(Error),
       );
       consoleSpy.mockRestore();
@@ -753,6 +759,424 @@ describe('When ItemDetectionService is used', () => {
 
       // Assert
       expect(result).toBeNull();
+    });
+  });
+
+  describe('If analyzeSaveFile detects duplicate items', () => {
+    it('Then should emit event on first detection', async () => {
+      // Arrange
+      const saveFile = D2SaveFileBuilder.new()
+        .withPath('/test/char.d2s')
+        .withName('TestChar')
+        .build();
+      const d2sItem = D2SItemBuilder.new()
+        .withId('1234')
+        .asUniqueHelm()
+        .withUniqueName('shako') // Must match mockGrailItems ID
+        .build();
+      const eventSpy = vi.fn();
+      eventBus.on('item-detection', eventSpy);
+      service.setGrailItems(mockGrailItems);
+
+      // Act - provide pre-extracted items to avoid parsing
+      await service.analyzeSaveFile(saveFile, [d2sItem as any]);
+
+      // Assert
+      expect(eventSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it('Then should NOT emit event on second detection of same item', async () => {
+      // Arrange
+      const saveFile = D2SaveFileBuilder.new()
+        .withPath('/test/char.d2s')
+        .withName('TestChar')
+        .build();
+      const d2sItem = D2SItemBuilder.new()
+        .withId('1234')
+        .asUniqueHelm()
+        .withUniqueName('shako') // Must match mockGrailItems ID
+        .build();
+      const eventSpy = vi.fn();
+      eventBus.on('item-detection', eventSpy);
+      service.setGrailItems(mockGrailItems);
+
+      // Act - provide pre-extracted items to avoid parsing
+      await service.analyzeSaveFile(saveFile, [d2sItem as any]); // First analysis
+      await service.analyzeSaveFile(saveFile, [d2sItem as any]); // Second analysis - should not emit
+
+      // Assert
+      expect(eventSpy).toHaveBeenCalledTimes(1); // Only called once
+    });
+
+    it('Then should only emit once for same item with different IDs (stable key)', async () => {
+      // Arrange
+      const saveFile = D2SaveFileBuilder.new()
+        .withPath('/test/char.d2s')
+        .withName('TestChar')
+        .build();
+      const d2sItem1 = D2SItemBuilder.new()
+        .withId('1234')
+        .asUniqueHelm()
+        .withUniqueName('shako') // Must match mockGrailItems ID
+        .build();
+      const d2sItem2 = D2SItemBuilder.new()
+        .withId('5678')
+        .asUniqueHelm()
+        .withUniqueName('shako') // Same item but different ID
+        .build();
+      const eventSpy = vi.fn();
+      eventBus.on('item-detection', eventSpy);
+      service.setGrailItems(mockGrailItems);
+
+      // Act - provide pre-extracted items to avoid parsing
+      await service.analyzeSaveFile(saveFile, [d2sItem1 as any]); // First item
+      await service.analyzeSaveFile(saveFile, [d2sItem1 as any, d2sItem2 as any]); // Same item with different ID
+
+      // Assert - should only emit once because it's the same item (stable key by name+ethereal)
+      expect(eventSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it('Then should only emit once for same item in different save files (global tracking)', async () => {
+      // Arrange
+      const saveFile1 = D2SaveFileBuilder.new()
+        .withPath('/test/char1.d2s')
+        .withName('Char1')
+        .build();
+      const saveFile2 = D2SaveFileBuilder.new()
+        .withPath('/test/char2.d2s')
+        .withName('Char2')
+        .build();
+      const d2sItem = D2SItemBuilder.new()
+        .withId('1234')
+        .asUniqueHelm()
+        .withUniqueName('shako') // Must match mockGrailItems ID
+        .build();
+      const eventSpy = vi.fn();
+      eventBus.on('item-detection', eventSpy);
+      service.setGrailItems(mockGrailItems);
+
+      // Act - provide pre-extracted items to avoid parsing
+      await service.analyzeSaveFile(saveFile1, [d2sItem as any]); // First save file
+      await service.analyzeSaveFile(saveFile2, [d2sItem as any]); // Same item in different save file
+
+      // Assert - should only emit once (global tracking prevents duplicate notifications)
+      expect(eventSpy).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('If clearSeenItems is called', () => {
+    it('Then should clear all tracking and allow re-detection', async () => {
+      // Arrange
+      const saveFile = D2SaveFileBuilder.new()
+        .withPath('/test/char.d2s')
+        .withName('TestChar')
+        .build();
+      const d2sItem = D2SItemBuilder.new()
+        .withId('1234')
+        .asUniqueHelm()
+        .withUniqueName('shako') // Must match mockGrailItems ID
+        .build();
+      const eventSpy = vi.fn();
+      eventBus.on('item-detection', eventSpy);
+      service.setGrailItems(mockGrailItems);
+
+      // Act - provide pre-extracted items to avoid parsing
+      await service.analyzeSaveFile(saveFile, [d2sItem as any]); // First detection
+      service.clearSeenItems(); // Clear tracking
+      await service.analyzeSaveFile(saveFile, [d2sItem as any]); // Should detect again
+
+      // Assert
+      expect(eventSpy).toHaveBeenCalledTimes(2); // Emitted twice after clear
+    });
+
+    it('Then should track items globally across all save files', async () => {
+      // Arrange
+      const saveFile1 = D2SaveFileBuilder.new()
+        .withPath('/test/char1.d2s')
+        .withName('Char1')
+        .build();
+      const saveFile2 = D2SaveFileBuilder.new()
+        .withPath('/test/char2.d2s')
+        .withName('Char2')
+        .build();
+      const d2sItem = D2SItemBuilder.new()
+        .withId('1234')
+        .asUniqueHelm()
+        .withUniqueName('shako') // Must match mockGrailItems ID
+        .build();
+      const eventSpy = vi.fn();
+      eventBus.on('item-detection', eventSpy);
+      service.setGrailItems(mockGrailItems);
+
+      // Act - provide pre-extracted items to avoid parsing
+      await service.analyzeSaveFile(saveFile1, [d2sItem as any]); // Detect in file 1
+      await service.analyzeSaveFile(saveFile2, [d2sItem as any]); // Same item in file 2 - should NOT detect again
+      await service.analyzeSaveFile(saveFile1, [d2sItem as any]); // Same item in file 1 again - should NOT detect again
+
+      // Assert - should only emit once (global tracking)
+      expect(eventSpy).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('When analyzeSaveFile is called with pre-extracted items', () => {
+    it('Then should use pre-extracted items even if empty array', async () => {
+      // Arrange
+      const saveFile = D2SaveFileBuilder.new()
+        .withPath('/test/char.d2s')
+        .withName('TestChar')
+        .build();
+      service.setGrailItems(mockGrailItems);
+
+      // Act - pass empty array (no grail items in save file)
+      await service.analyzeSaveFile(saveFile, []); // Empty array, not undefined
+
+      // Assert - should NOT call read (no re-parsing)
+      // This verifies the fix: empty arrays are accepted to avoid redundant parsing
+      expect(read).not.toHaveBeenCalled();
+      expect(readFile).not.toHaveBeenCalled();
+    });
+
+    it('Then should use pre-extracted items with grail items', async () => {
+      // Arrange
+      const saveFile = D2SaveFileBuilder.new()
+        .withPath('/test/char.d2s')
+        .withName('TestChar')
+        .build();
+      const d2sItem = D2SItemBuilder.new()
+        .withId('1234')
+        .asUniqueHelm()
+        .withUniqueName('shako')
+        .build();
+      service.setGrailItems(mockGrailItems);
+
+      // Act - pass pre-extracted items array
+      await service.analyzeSaveFile(saveFile, [d2sItem as any]);
+
+      // Assert - should NOT call read or readFile (no re-parsing)
+      expect(read).not.toHaveBeenCalled();
+      expect(readFile).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('When initializeFromDatabase is called', () => {
+    describe('If existing progress is provided', () => {
+      it('Then should track items to prevent duplicate notifications', async () => {
+        // Arrange
+        const existingProgress = [
+          {
+            id: 'progress-1',
+            characterId: 'char-1',
+            itemId: 'shako',
+            foundDate: new Date('2024-01-01'),
+            foundBy: 'TestChar',
+            manuallyAdded: false,
+            isEthereal: false,
+          },
+          {
+            id: 'progress-2',
+            characterId: 'char-2',
+            itemId: 'windforce',
+            foundDate: new Date('2024-01-02'),
+            foundBy: 'TestChar2',
+            manuallyAdded: false,
+            isEthereal: true,
+          },
+        ];
+        const saveFile = D2SaveFileBuilder.new()
+          .withPath('/test/char.d2s')
+          .withName('TestChar')
+          .build();
+        const d2sItem = D2SItemBuilder.new()
+          .withId('1234')
+          .asUniqueHelm()
+          .withUniqueName('shako')
+          .build();
+        const eventSpy = vi.fn();
+        eventBus.on('item-detection', eventSpy);
+        service.setGrailItems(mockGrailItems);
+
+        // Act - initialize with existing progress, then try to detect same item
+        service.initializeFromDatabase(existingProgress);
+        await service.analyzeSaveFile(saveFile, [d2sItem as any]);
+
+        // Assert - should NOT emit because item is already tracked from database
+        expect(eventSpy).not.toHaveBeenCalled();
+      });
+
+      it('Then should log initialization with correct item keys', () => {
+        // Arrange
+        const existingProgress = [
+          {
+            id: 'progress-1',
+            characterId: 'char-1',
+            itemId: 'shako',
+            foundDate: new Date('2024-01-01'),
+            foundBy: 'TestChar',
+            manuallyAdded: false,
+            isEthereal: false,
+          },
+        ];
+        const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+
+        // Act
+        service.initializeFromDatabase(existingProgress);
+
+        // Assert - should log with summary of initialized items
+        expect(consoleSpy).toHaveBeenCalledWith(
+          '[ItemDetection] Initialized with 1 previously found items',
+        );
+
+        consoleSpy.mockRestore();
+      });
+    });
+
+    describe('If empty progress array is provided', () => {
+      it('Then should initialize with zero tracked items', () => {
+        // Arrange
+        const existingProgress: any[] = [];
+        const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+
+        // Act
+        service.initializeFromDatabase(existingProgress);
+
+        // Assert
+        expect(consoleSpy).toHaveBeenCalledWith(
+          '[ItemDetection] Initialized with 0 previously found items',
+        );
+
+        consoleSpy.mockRestore();
+      });
+    });
+  });
+
+  describe('When item key generation is used', () => {
+    describe('If item has matching ID and ethereal status from database', () => {
+      it('Then should generate consistent keys between initialization and runtime', async () => {
+        // Arrange
+        const existingProgress = [
+          {
+            id: 'progress-1',
+            characterId: 'char-1',
+            itemId: 'shako',
+            foundDate: new Date('2024-01-01'),
+            foundBy: 'TestChar',
+            manuallyAdded: false,
+            isEthereal: false,
+          },
+        ];
+        const saveFile = D2SaveFileBuilder.new()
+          .withPath('/test/char.d2s')
+          .withName('TestChar')
+          .build();
+        const d2sItem = D2SItemBuilder.new()
+          .withId('1234')
+          .asUniqueHelm()
+          .withUniqueName('shako')
+          .build();
+        const eventSpy = vi.fn();
+        const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+        eventBus.on('item-detection', eventSpy);
+        service.setGrailItems(mockGrailItems);
+
+        // Act
+        service.initializeFromDatabase(existingProgress);
+        await service.analyzeSaveFile(saveFile, [d2sItem as any]);
+
+        // Assert - should not emit event for item that already exists in database
+        expect(consoleSpy).toHaveBeenCalledWith(
+          '[ItemDetection] Initialized with 1 previously found items',
+        );
+        expect(eventSpy).not.toHaveBeenCalled();
+
+        consoleSpy.mockRestore();
+      });
+    });
+
+    describe('If item has different ethereal status than database', () => {
+      it('Then should treat as new item and emit notification', async () => {
+        // Arrange - database has normal version, but we detect ethereal version
+        const existingProgress = [
+          {
+            id: 'progress-1',
+            characterId: 'char-1',
+            itemId: 'shako',
+            foundDate: new Date('2024-01-01'),
+            foundBy: 'TestChar',
+            manuallyAdded: false,
+            isEthereal: false, // Normal version in database
+          },
+        ];
+        const saveFile = D2SaveFileBuilder.new()
+          .withPath('/test/char.d2s')
+          .withName('TestChar')
+          .build();
+        // Create ethereal version of same item
+        const d2sItem = D2SItemBuilder.new()
+          .withId('1234')
+          .asUniqueHelm()
+          .withUniqueName('shako')
+          .asEthereal() // Set as ethereal
+          .build();
+        const eventSpy = vi.fn();
+        eventBus.on('item-detection', eventSpy);
+        service.setGrailItems(mockGrailItems);
+
+        // Act
+        service.initializeFromDatabase(existingProgress);
+        await service.analyzeSaveFile(saveFile, [d2sItem as any]);
+
+        // Assert - should emit because ethereal version is different from normal
+        expect(eventSpy).toHaveBeenCalledTimes(1);
+        expect(eventSpy).toHaveBeenCalledWith(
+          expect.objectContaining({
+            type: 'item-found',
+            item: expect.objectContaining({
+              ethereal: true,
+            }),
+            grailItem: expect.objectContaining({
+              id: 'shako',
+            }),
+          }),
+        );
+      });
+    });
+
+    describe('If new item not in database is detected', () => {
+      it('Then should emit notification and track for future duplicates', async () => {
+        // Arrange - database is empty, detecting new item
+        const existingProgress: any[] = [];
+        const saveFile = D2SaveFileBuilder.new()
+          .withPath('/test/char.d2s')
+          .withName('TestChar')
+          .build();
+        const d2sItem = D2SItemBuilder.new()
+          .withId('1234')
+          .asUniqueHelm()
+          .withUniqueName('shako')
+          .build();
+        const eventSpy = vi.fn();
+        eventBus.on('item-detection', eventSpy);
+        service.setGrailItems(mockGrailItems);
+
+        // Act - initialize with empty database, then detect item twice
+        service.initializeFromDatabase(existingProgress);
+        await service.analyzeSaveFile(saveFile, [d2sItem as any]); // First detection
+        await service.analyzeSaveFile(saveFile, [d2sItem as any]); // Second detection
+
+        // Assert - should emit only once, then skip duplicate
+        expect(eventSpy).toHaveBeenCalledTimes(1);
+        expect(eventSpy).toHaveBeenCalledWith(
+          expect.objectContaining({
+            type: 'item-found',
+            item: expect.objectContaining({
+              ethereal: false,
+            }),
+            grailItem: expect.objectContaining({
+              id: 'shako',
+            }),
+          }),
+        );
+      });
     });
   });
 });

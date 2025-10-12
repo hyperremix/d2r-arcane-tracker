@@ -25,7 +25,10 @@ function calculateNormalProgress(
   if (selectedCharacterId) {
     const characterProgress = progress.find(
       (p) =>
-        p.itemId === item.id && p.characterId === selectedCharacterId && p.found && !p.isEthereal,
+        p.itemId === item.id &&
+        p.characterId === selectedCharacterId &&
+        p.foundDate !== undefined &&
+        !p.isEthereal,
     );
     return {
       found: Boolean(characterProgress),
@@ -33,7 +36,9 @@ function calculateNormalProgress(
     };
   }
 
-  const relevantProgress = progress.filter((p) => p.itemId === item.id && p.found && !p.isEthereal);
+  const relevantProgress = progress.filter(
+    (p) => p.itemId === item.id && p.foundDate !== undefined && !p.isEthereal,
+  );
   return {
     found: relevantProgress.length > 0,
     relevantProgress,
@@ -63,7 +68,10 @@ function calculateEtherealProgress(
   if (selectedCharacterId) {
     const characterProgress = progress.find(
       (p) =>
-        p.itemId === item.id && p.characterId === selectedCharacterId && p.found && p.isEthereal,
+        p.itemId === item.id &&
+        p.characterId === selectedCharacterId &&
+        p.foundDate !== undefined &&
+        p.isEthereal,
     );
     return {
       found: Boolean(characterProgress),
@@ -71,7 +79,9 @@ function calculateEtherealProgress(
     };
   }
 
-  const relevantProgress = progress.filter((p) => p.itemId === item.id && p.found && p.isEthereal);
+  const relevantProgress = progress.filter(
+    (p) => p.itemId === item.id && p.foundDate !== undefined && p.isEthereal,
+  );
   return {
     found: relevantProgress.length > 0,
     relevantProgress,
