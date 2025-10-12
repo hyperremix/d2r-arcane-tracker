@@ -7,6 +7,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useGrailStore } from '@/stores/grailStore';
 
 /**
+ * Module-level flag to prevent duplicate IPC handler registration.
+ * This is necessary because React Strict Mode in development will mount components twice,
+ * and without this guard, multiple handlers would accumulate.
+ */
+let globalIpcHandlerRegistered = false;
+
+/**
  * Interface extending ItemDetectionEvent with additional notification metadata.
  */
 interface NotificationItem extends ItemDetectionEvent {
@@ -134,8 +141,19 @@ export function NotificationButton() {
   }, [processBatch]);
 
   useEffect(() => {
+    // Singleton pattern: Prevent duplicate IPC handler registration
+    // This is critical because React Strict Mode (development) will mount components twice
+    if (globalIpcHandlerRegistered) {
+      console.log(
+        '[NotificationButton] IPC handler already registered globally, skipping duplicate registration',
+      );
+      return;
+    }
+
+    // Mark as registered before setting up handler
+    globalIpcHandlerRegistered = true;
+
     // Listen for item detection events
-    // This effect should only run once on mount to avoid multiple handler registrations
     const handleItemDetection = (
       _event: Electron.IpcRendererEvent,
       itemEvent: ItemDetectionEvent,
@@ -175,8 +193,9 @@ export function NotificationButton() {
     return () => {
       console.log('[NotificationButton] Unregistering IPC handler for item-detection-event');
       window.ipcRenderer?.off('item-detection-event', handleItemDetection);
+      globalIpcHandlerRegistered = false;
     };
-  }, []); // Empty dependency array - only run once on mount
+  }, []); // Empty dependency array - only run once on mount (but Strict Mode may try twice)
 
   const dismissNotification = (id: string) => {
     setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, dismissed: true } : n)));
