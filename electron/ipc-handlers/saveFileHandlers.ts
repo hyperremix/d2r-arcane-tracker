@@ -296,6 +296,10 @@ export function initializeSaveFileHandlers(): void {
     const grailItems: Item[] = grailDatabase.getAllItems();
     itemDetectionService.setGrailItems(grailItems);
     console.log(`Loaded ${grailItems.length} grail items into detection service`);
+
+    // Initialize with existing progress to prevent re-notification
+    const grailProgress = grailDatabase.getAllProgress();
+    itemDetectionService.initializeFromDatabase(grailProgress);
   } catch (error) {
     console.error('Failed to load grail items into detection service:', error);
   }

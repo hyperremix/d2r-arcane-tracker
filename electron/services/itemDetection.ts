@@ -3,7 +3,7 @@ import type * as d2s from '@dschu012/d2s';
 import { read } from '@dschu012/d2s';
 import { runesByCode } from '../items/indexes';
 import type { D2SaveFile } from '../services/saveFileMonitor';
-import type { D2Item, D2SItem, Item, ItemDetectionEvent } from '../types/grail';
+import type { D2Item, D2SItem, GrailProgress, Item, ItemDetectionEvent } from '../types/grail';
 import { DEFAULT_RETRY_OPTIONS, retryWithBackoff } from '../utils/retry';
 import type { EventBus } from './EventBus';
 
@@ -16,7 +16,7 @@ import type { EventBus } from './EventBus';
 class ItemDetectionService {
   private grailItems: Item[] = [];
   private eventBus: EventBus;
-  private previouslySeenItems: Map<string, Set<string>> = new Map();
+  private previouslySeenItems: Set<string> = new Set();
 
   /**
    * Creates a new instance of the ItemDetectionService.
@@ -32,6 +32,21 @@ class ItemDetectionService {
    */
   setGrailItems(items: Item[]): void {
     this.grailItems = items;
+  }
+
+  /**
+   * Initializes tracking with items already found in the grail database.
+   * Prevents re-notification for items found in previous sessions.
+   * @param {GrailProgress[]} existingProgress - Array of existing grail progress entries
+   */
+  initializeFromDatabase(existingProgress: GrailProgress[]): void {
+    for (const progress of existingProgress) {
+      const itemKey = `${progress.itemId}_${progress.isEthereal}`;
+      this.previouslySeenItems.add(itemKey);
+    }
+    console.log(
+      `[ItemDetection] Initialized with ${this.previouslySeenItems.size} previously found items`,
+    );
   }
 
   /**
@@ -63,20 +78,15 @@ class ItemDetectionService {
         items = await this.extractItemsFromSaveFile(saveFile);
       }
 
-      // Track items to prevent duplicate notifications
-      const saveFileKey = saveFile.path;
-      const previousItems = this.previouslySeenItems.get(saveFileKey) || new Set<string>();
-      const currentItems = new Set<string>();
-
+      // Track items to prevent duplicate notifications globally
       for (const item of items) {
         const grailMatch = this.findGrailMatch(item);
         if (grailMatch) {
-          // Create unique key for this item
-          const itemKey = `${item.name}_${item.id}`;
-          currentItems.add(itemKey);
+          // Create unique key for this item using stable properties
+          const itemKey = `${item.name}_${item.ethereal}`;
 
-          // Only emit event if this is a NEW item not seen in previous analysis
-          if (!previousItems.has(itemKey)) {
+          // Only emit event if this is a NEW item globally
+          if (!this.previouslySeenItems.has(itemKey)) {
             console.log(`[ItemDetection] New item detected: ${item.name} in ${saveFile.name}`);
             this.eventBus.emit('item-detection', {
               type: 'item-found',
@@ -84,16 +94,14 @@ class ItemDetectionService {
               grailItem: grailMatch,
               silent,
             } as ItemDetectionEvent);
+            this.previouslySeenItems.add(itemKey);
           } else {
             console.log(
-              `[ItemDetection] Skipping duplicate: ${item.name} in ${saveFile.name} (already seen)`,
+              `[ItemDetection] Skipping duplicate: ${item.name} (already found globally)`,
             );
           }
         }
       }
-
-      // Update tracking with current snapshot
-      this.previouslySeenItems.set(saveFileKey, currentItems);
     } catch (error) {
       console.error('Error analyzing save file:', error);
     }
@@ -423,18 +431,11 @@ class ItemDetectionService {
 
   /**
    * Clears the tracking of previously seen items.
-   * Can clear a specific save file's tracking or all tracking.
-   * Useful when monitoring restarts or save files are deleted.
-   * @param {string} [saveFilePath] - Optional specific save file path to clear. If not provided, clears all.
+   * Useful when monitoring restarts or when you want to reset detection.
    */
-  clearSeenItems(saveFilePath?: string): void {
-    if (saveFilePath) {
-      this.previouslySeenItems.delete(saveFilePath);
-      console.log(`[ItemDetection] Cleared seen items for: ${saveFilePath}`);
-    } else {
-      this.previouslySeenItems.clear();
-      console.log('[ItemDetection] Cleared all seen items tracking');
-    }
+  clearSeenItems(): void {
+    this.previouslySeenItems.clear();
+    console.log('[ItemDetection] Cleared all seen items tracking');
   }
 }
 

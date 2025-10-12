@@ -24,6 +24,7 @@ vi.mock('../database/database', () => ({
     upsertCharactersBatch: vi.fn(),
     upsertProgressBatch: vi.fn(),
     getAllItems: vi.fn(),
+    getAllProgress: vi.fn(),
     setSetting: vi.fn(),
     truncateUserData: vi.fn(),
   },
@@ -86,6 +87,7 @@ vi.mock('../services/itemDetection', () => ({
     enable: vi.fn(),
     disable: vi.fn(),
     setGrailItems: vi.fn(),
+    initializeFromDatabase: vi.fn(),
     analyzeSaveFile: vi.fn(),
   })),
 }));
@@ -108,6 +110,7 @@ import {
   D2ItemBuilder,
   D2SaveFileBuilder,
   D2SItemBuilder,
+  GrailProgressBuilder,
   HolyGrailItemBuilder,
 } from '@/fixtures';
 import { grailDatabase } from '../database/database';
@@ -155,6 +158,7 @@ interface MockItemDetectionService {
   enable: ReturnType<typeof vi.fn>;
   disable: ReturnType<typeof vi.fn>;
   setGrailItems: ReturnType<typeof vi.fn>;
+  initializeFromDatabase: ReturnType<typeof vi.fn>;
   analyzeSaveFile: ReturnType<typeof vi.fn>;
 }
 
@@ -205,6 +209,7 @@ describe('When saveFileHandlers is used', () => {
       enable: vi.fn(),
       disable: vi.fn(),
       setGrailItems: vi.fn(),
+      initializeFromDatabase: vi.fn(),
       analyzeSaveFile: vi.fn(),
     };
 
@@ -218,6 +223,7 @@ describe('When saveFileHandlers is used', () => {
     vi.mocked(grailDatabase.getProgressByItem).mockReturnValue([]);
     vi.mocked(grailDatabase.getCharacterProgress).mockReturnValue(null);
     vi.mocked(grailDatabase.getAllItems).mockReturnValue([]);
+    vi.mocked(grailDatabase.getAllProgress).mockReturnValue([]);
   });
 
   describe('If initializeSaveFileHandlers is called', () => {
@@ -286,6 +292,22 @@ describe('When saveFileHandlers is used', () => {
           etherealType: 'none',
         },
       ]);
+    });
+
+    it('Then should initialize detection service with existing progress', () => {
+      // Arrange
+      const mockProgress = GrailProgressBuilder.new()
+        .withItemId('shako')
+        .withIsEthereal(false)
+        .buildMany(1);
+
+      vi.mocked(grailDatabase.getAllProgress).mockReturnValue(mockProgress as any);
+
+      // Act
+      initializeSaveFileHandlers();
+
+      // Assert
+      expect(mockItemDetectionService.initializeFromDatabase).toHaveBeenCalledWith(mockProgress);
     });
 
     it('Then should handle grail items loading errors gracefully', () => {

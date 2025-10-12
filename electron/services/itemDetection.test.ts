@@ -808,7 +808,7 @@ describe('When ItemDetectionService is used', () => {
       expect(eventSpy).toHaveBeenCalledTimes(1); // Only called once
     });
 
-    it('Then should emit event for new item in same save file', async () => {
+    it('Then should only emit once for same item with different IDs (stable key)', async () => {
       // Arrange
       const saveFile = D2SaveFileBuilder.new()
         .withPath('/test/char.d2s')
@@ -830,13 +830,13 @@ describe('When ItemDetectionService is used', () => {
 
       // Act - provide pre-extracted items to avoid parsing
       await service.analyzeSaveFile(saveFile, [d2sItem1 as any]); // First item
-      await service.analyzeSaveFile(saveFile, [d2sItem1 as any, d2sItem2 as any]); // Second item added
+      await service.analyzeSaveFile(saveFile, [d2sItem1 as any, d2sItem2 as any]); // Same item with different ID
 
-      // Assert
-      expect(eventSpy).toHaveBeenCalledTimes(2); // One for each unique item
+      // Assert - should only emit once because it's the same item (stable key by name+ethereal)
+      expect(eventSpy).toHaveBeenCalledTimes(1);
     });
 
-    it('Then should emit event for same item in different save file', async () => {
+    it('Then should only emit once for same item in different save files (global tracking)', async () => {
       // Arrange
       const saveFile1 = D2SaveFileBuilder.new()
         .withPath('/test/char1.d2s')
@@ -857,10 +857,10 @@ describe('When ItemDetectionService is used', () => {
 
       // Act - provide pre-extracted items to avoid parsing
       await service.analyzeSaveFile(saveFile1, [d2sItem as any]); // First save file
-      await service.analyzeSaveFile(saveFile2, [d2sItem as any]); // Different save file
+      await service.analyzeSaveFile(saveFile2, [d2sItem as any]); // Same item in different save file
 
-      // Assert
-      expect(eventSpy).toHaveBeenCalledTimes(2); // Once per save file
+      // Assert - should only emit once (global tracking prevents duplicate notifications)
+      expect(eventSpy).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -889,7 +889,7 @@ describe('When ItemDetectionService is used', () => {
       expect(eventSpy).toHaveBeenCalledTimes(2); // Emitted twice after clear
     });
 
-    it('Then should clear specific save file tracking', async () => {
+    it('Then should track items globally across all save files', async () => {
       // Arrange
       const saveFile1 = D2SaveFileBuilder.new()
         .withPath('/test/char1.d2s')
@@ -910,13 +910,11 @@ describe('When ItemDetectionService is used', () => {
 
       // Act - provide pre-extracted items to avoid parsing
       await service.analyzeSaveFile(saveFile1, [d2sItem as any]); // Detect in file 1
-      await service.analyzeSaveFile(saveFile2, [d2sItem as any]); // Detect in file 2
-      service.clearSeenItems('/test/char1.d2s'); // Clear only file 1
-      await service.analyzeSaveFile(saveFile1, [d2sItem as any]); // Should detect again
-      await service.analyzeSaveFile(saveFile2, [d2sItem as any]); // Should NOT detect again
+      await service.analyzeSaveFile(saveFile2, [d2sItem as any]); // Same item in file 2 - should NOT detect again
+      await service.analyzeSaveFile(saveFile1, [d2sItem as any]); // Same item in file 1 again - should NOT detect again
 
-      // Assert
-      expect(eventSpy).toHaveBeenCalledTimes(3); // file1, file2, file1 again
+      // Assert - should only emit once (global tracking)
+      expect(eventSpy).toHaveBeenCalledTimes(1);
     });
   });
 
