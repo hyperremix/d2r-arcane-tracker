@@ -957,4 +957,235 @@ describe('When ItemDetectionService is used', () => {
       expect(readFile).not.toHaveBeenCalled();
     });
   });
+
+  describe('When initializeFromDatabase is called', () => {
+    describe('If existing progress is provided', () => {
+      it('Then should track items to prevent duplicate notifications', async () => {
+        // Arrange
+        const existingProgress = [
+          {
+            id: 'progress-1',
+            characterId: 'char-1',
+            itemId: 'shako',
+            foundDate: new Date('2024-01-01'),
+            foundBy: 'TestChar',
+            manuallyAdded: false,
+            isEthereal: false,
+          },
+          {
+            id: 'progress-2',
+            characterId: 'char-2',
+            itemId: 'windforce',
+            foundDate: new Date('2024-01-02'),
+            foundBy: 'TestChar2',
+            manuallyAdded: false,
+            isEthereal: true,
+          },
+        ];
+        const saveFile = D2SaveFileBuilder.new()
+          .withPath('/test/char.d2s')
+          .withName('TestChar')
+          .build();
+        const d2sItem = D2SItemBuilder.new()
+          .withId('1234')
+          .asUniqueHelm()
+          .withUniqueName('shako')
+          .build();
+        const eventSpy = vi.fn();
+        eventBus.on('item-detection', eventSpy);
+        service.setGrailItems(mockGrailItems);
+
+        // Act - initialize with existing progress, then try to detect same item
+        service.initializeFromDatabase(existingProgress);
+        await service.analyzeSaveFile(saveFile, [d2sItem as any]);
+
+        // Assert - should NOT emit because item is already tracked from database
+        expect(eventSpy).not.toHaveBeenCalled();
+      });
+
+      it('Then should log initialization with correct item keys', () => {
+        // Arrange
+        const existingProgress = [
+          {
+            id: 'progress-1',
+            characterId: 'char-1',
+            itemId: 'shako',
+            foundDate: new Date('2024-01-01'),
+            foundBy: 'TestChar',
+            manuallyAdded: false,
+            isEthereal: false,
+          },
+        ];
+        const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+
+        // Act
+        service.initializeFromDatabase(existingProgress);
+
+        // Assert - should log with correct key format
+        expect(consoleSpy).toHaveBeenCalledWith(
+          '[ItemDetection] Initializing with existing item key: shako_false (TestChar)',
+        );
+        expect(consoleSpy).toHaveBeenCalledWith(
+          '[ItemDetection] Initialized with 1 previously found items',
+        );
+
+        consoleSpy.mockRestore();
+      });
+    });
+
+    describe('If empty progress array is provided', () => {
+      it('Then should initialize with zero tracked items', () => {
+        // Arrange
+        const existingProgress: any[] = [];
+        const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+
+        // Act
+        service.initializeFromDatabase(existingProgress);
+
+        // Assert
+        expect(consoleSpy).toHaveBeenCalledWith(
+          '[ItemDetection] Initialized with 0 previously found items',
+        );
+
+        consoleSpy.mockRestore();
+      });
+    });
+  });
+
+  describe('When item key generation is used', () => {
+    describe('If item has matching ID and ethereal status from database', () => {
+      it('Then should generate consistent keys between initialization and runtime', async () => {
+        // Arrange
+        const existingProgress = [
+          {
+            id: 'progress-1',
+            characterId: 'char-1',
+            itemId: 'shako',
+            foundDate: new Date('2024-01-01'),
+            foundBy: 'TestChar',
+            manuallyAdded: false,
+            isEthereal: false,
+          },
+        ];
+        const saveFile = D2SaveFileBuilder.new()
+          .withPath('/test/char.d2s')
+          .withName('TestChar')
+          .build();
+        const d2sItem = D2SItemBuilder.new()
+          .withId('1234')
+          .asUniqueHelm()
+          .withUniqueName('shako')
+          .build();
+        const eventSpy = vi.fn();
+        const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+        eventBus.on('item-detection', eventSpy);
+        service.setGrailItems(mockGrailItems);
+
+        // Act
+        service.initializeFromDatabase(existingProgress);
+        await service.analyzeSaveFile(saveFile, [d2sItem as any]);
+
+        // Assert - should log consistent key generation
+        expect(consoleSpy).toHaveBeenCalledWith(
+          '[ItemDetection] Initializing with existing item key: shako_false (TestChar)',
+        );
+        expect(consoleSpy).toHaveBeenCalledWith(
+          '[ItemDetection] Generated item key: shako_false for item: shako',
+        );
+        expect(consoleSpy).toHaveBeenCalledWith(
+          '[ItemDetection] Skipping duplicate item: shako (key: shako_false) in TestChar',
+        );
+        expect(eventSpy).not.toHaveBeenCalled();
+
+        consoleSpy.mockRestore();
+      });
+    });
+
+    describe('If item has different ethereal status than database', () => {
+      it('Then should treat as new item and emit notification', async () => {
+        // Arrange - database has normal version, but we detect ethereal version
+        const existingProgress = [
+          {
+            id: 'progress-1',
+            characterId: 'char-1',
+            itemId: 'shako',
+            foundDate: new Date('2024-01-01'),
+            foundBy: 'TestChar',
+            manuallyAdded: false,
+            isEthereal: false, // Normal version in database
+          },
+        ];
+        const saveFile = D2SaveFileBuilder.new()
+          .withPath('/test/char.d2s')
+          .withName('TestChar')
+          .build();
+        // Create ethereal version of same item
+        const d2sItem = D2SItemBuilder.new()
+          .withId('1234')
+          .asUniqueHelm()
+          .withUniqueName('shako')
+          .asEthereal() // Set as ethereal
+          .build();
+        const eventSpy = vi.fn();
+        eventBus.on('item-detection', eventSpy);
+        service.setGrailItems(mockGrailItems);
+
+        // Act
+        service.initializeFromDatabase(existingProgress);
+        await service.analyzeSaveFile(saveFile, [d2sItem as any]);
+
+        // Assert - should emit because ethereal version is different from normal
+        expect(eventSpy).toHaveBeenCalledTimes(1);
+        expect(eventSpy).toHaveBeenCalledWith(
+          expect.objectContaining({
+            type: 'item-found',
+            item: expect.objectContaining({
+              ethereal: true,
+            }),
+            grailItem: expect.objectContaining({
+              id: 'shako',
+            }),
+          }),
+        );
+      });
+    });
+
+    describe('If new item not in database is detected', () => {
+      it('Then should emit notification and track for future duplicates', async () => {
+        // Arrange - database is empty, detecting new item
+        const existingProgress: any[] = [];
+        const saveFile = D2SaveFileBuilder.new()
+          .withPath('/test/char.d2s')
+          .withName('TestChar')
+          .build();
+        const d2sItem = D2SItemBuilder.new()
+          .withId('1234')
+          .asUniqueHelm()
+          .withUniqueName('shako')
+          .build();
+        const eventSpy = vi.fn();
+        eventBus.on('item-detection', eventSpy);
+        service.setGrailItems(mockGrailItems);
+
+        // Act - initialize with empty database, then detect item twice
+        service.initializeFromDatabase(existingProgress);
+        await service.analyzeSaveFile(saveFile, [d2sItem as any]); // First detection
+        await service.analyzeSaveFile(saveFile, [d2sItem as any]); // Second detection
+
+        // Assert - should emit only once, then skip duplicate
+        expect(eventSpy).toHaveBeenCalledTimes(1);
+        expect(eventSpy).toHaveBeenCalledWith(
+          expect.objectContaining({
+            type: 'item-found',
+            item: expect.objectContaining({
+              ethereal: false,
+            }),
+            grailItem: expect.objectContaining({
+              id: 'shako',
+            }),
+          }),
+        );
+      });
+    });
+  });
 });

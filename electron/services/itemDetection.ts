@@ -83,7 +83,8 @@ class ItemDetectionService {
         const grailMatch = this.findGrailMatch(item);
         if (grailMatch) {
           // Create unique key for this item using stable properties
-          const itemKey = `${item.name}_${item.ethereal}`;
+          // Uses grailMatch.id (grail item ID) to match database initialization format
+          const itemKey = `${grailMatch.id}_${item.ethereal}`;
 
           // Only emit event if this is a NEW item globally
           if (!this.previouslySeenItems.has(itemKey)) {
