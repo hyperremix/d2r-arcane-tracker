@@ -1,6 +1,6 @@
 import type { ItemDetectionEvent } from 'electron/types/grail';
 import { Bell, Star, Trophy, X } from 'lucide-react';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -25,8 +25,11 @@ export function NotificationButton() {
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [isOpen, setIsOpen] = useState(false);
   const [notificationQueue, setNotificationQueue] = useState<ItemDetectionEvent[]>([]);
-  const [batchTimer, setBatchTimer] = useState<NodeJS.Timeout | null>(null);
   const { settings } = useGrailStore();
+
+  // Use refs to avoid useEffect re-registration on state/callback changes
+  const batchTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const processBatchRef = useRef<() => void>();
 
   const BATCH_DELAY = 1000; // 1 second
 
@@ -125,8 +128,14 @@ export function NotificationButton() {
     showBatchNotification,
   ]);
 
+  // Update ref whenever processBatch changes
+  useEffect(() => {
+    processBatchRef.current = processBatch;
+  }, [processBatch]);
+
   useEffect(() => {
     // Listen for item detection events
+    // This effect should only run once on mount to avoid multiple handler registrations
     const handleItemDetection = (
       _event: Electron.IpcRendererEvent,
       itemEvent: ItemDetectionEvent,
@@ -146,25 +155,28 @@ export function NotificationButton() {
       setNotificationQueue((prev) => [...prev, itemEvent]);
 
       // Clear existing timer if any
-      if (batchTimer) {
-        clearTimeout(batchTimer);
+      if (batchTimerRef.current) {
+        clearTimeout(batchTimerRef.current);
       }
 
       // Set new timer to process batch after delay
-      const newTimer = setTimeout(() => {
-        processBatch();
-        setBatchTimer(null);
+      batchTimerRef.current = setTimeout(() => {
+        // Use ref to get latest processBatch function
+        if (processBatchRef.current) {
+          processBatchRef.current();
+        }
+        batchTimerRef.current = null;
       }, BATCH_DELAY);
-
-      setBatchTimer(newTimer);
     };
 
+    console.log('[NotificationButton] Registering IPC handler for item-detection-event');
     window.ipcRenderer?.on('item-detection-event', handleItemDetection);
 
     return () => {
+      console.log('[NotificationButton] Unregistering IPC handler for item-detection-event');
       window.ipcRenderer?.off('item-detection-event', handleItemDetection);
     };
-  }, [batchTimer, processBatch]);
+  }, []); // Empty dependency array - only run once on mount
 
   const dismissNotification = (id: string) => {
     setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, dismissed: true } : n)));
@@ -188,18 +200,25 @@ export function NotificationButton() {
   // Cleanup timer on unmount and process remaining queue
   useEffect(() => {
     return () => {
-      if (batchTimer) {
-        clearTimeout(batchTimer);
-        // Process any remaining items in queue on unmount
-        if (notificationQueue.length > 0) {
-          console.log(
-            `[NotificationButton] Component unmounting, processing ${notificationQueue.length} remaining notifications`,
-          );
-          processBatch();
-        }
+      if (batchTimerRef.current) {
+        clearTimeout(batchTimerRef.current);
+        batchTimerRef.current = null;
       }
+
+      // Process any remaining items in queue on unmount using functional setState
+      setNotificationQueue((currentQueue) => {
+        if (currentQueue.length > 0) {
+          console.log(
+            `[NotificationButton] Component unmounting, processing ${currentQueue.length} remaining notifications`,
+          );
+          if (processBatchRef.current) {
+            processBatchRef.current();
+          }
+        }
+        return [];
+      });
     };
-  }, [batchTimer, notificationQueue, processBatch]);
+  }, []); // Empty dependency array - cleanup only runs on unmount
 
   const activeNotifications = notifications.filter((n) => !n.dismissed);
   const unseenCount = activeNotifications.filter((n) => !n.seen).length;
