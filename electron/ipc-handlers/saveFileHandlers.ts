@@ -254,10 +254,16 @@ export function initializeSaveFileHandlers(): void {
     // Forward event to renderer processes
     // Filter to only 'window' type to exclude DevTools, background pages, etc.
     const allWebContents = webContents.getAllWebContents();
-    for (const wc of allWebContents) {
-      if (!wc.isDestroyed() && wc.getType() === 'window') {
-        wc.send('item-detection-event', event);
-      }
+    const windowContents = allWebContents.filter(
+      (wc) => !wc.isDestroyed() && wc.getType() === 'window',
+    );
+
+    console.log(
+      `[saveFileHandlers] Forwarding item-detection-event to ${windowContents.length} window(s) for item: ${event.item.name}`,
+    );
+
+    for (const wc of windowContents) {
+      wc.send('item-detection-event', event);
     }
 
     // Handle automatic grail progress updates for found items

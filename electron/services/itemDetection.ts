@@ -40,12 +40,15 @@ class ItemDetectionService {
    * @param {GrailProgress[]} existingProgress - Array of existing grail progress entries
    */
   initializeFromDatabase(existingProgress: GrailProgress[]): void {
+    console.log(
+      `[ItemDetection] 🗄️  Initializing from database with ${existingProgress.length} progress entries...`,
+    );
     for (const progress of existingProgress) {
       const itemKey = `${progress.itemId}_${progress.isEthereal}`;
       this.previouslySeenItems.add(itemKey);
     }
     console.log(
-      `[ItemDetection] Initialized with ${this.previouslySeenItems.size} previously found items`,
+      `[ItemDetection] ✅ Initialization complete. Tracking ${this.previouslySeenItems.size} previously found items`,
     );
   }
 
@@ -88,7 +91,9 @@ class ItemDetectionService {
 
           // Only emit event if this is a NEW item globally
           if (!this.previouslySeenItems.has(itemKey)) {
-            console.log(`[ItemDetection] New item detected: ${item.name} in ${saveFile.name}`);
+            console.log(
+              `[ItemDetection] ✨ NEW ITEM DETECTED - Emitting event for: ${item.name} (key: ${itemKey}) in ${saveFile.name}`,
+            );
             this.eventBus.emit('item-detection', {
               type: 'item-found',
               item,
