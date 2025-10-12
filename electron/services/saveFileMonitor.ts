@@ -760,8 +760,6 @@ class SaveFileMonitor {
       if (shouldParse) {
         filesToParse.push(filePath);
         console.log('[filterFilesToParse] Will parse:', filePath);
-      } else {
-        console.log('[filterFilesToParse] Skipping (unchanged):', filePath);
       }
     }
 
@@ -1143,11 +1141,9 @@ class SaveFileMonitor {
       );
 
       if (settings.gameMode === GameMode.Softcore && isHardcore) {
-        console.log('[parseSave/parseD2S] Skipping hardcore character (game mode is softcore)');
         return [];
       }
       if (settings.gameMode === GameMode.Hardcore && !isHardcore) {
-        console.log('[parseSave/parseD2S] Skipping softcore character (game mode is hardcore)');
         return [];
       }
       const items = response.items || [];
@@ -1175,11 +1171,9 @@ class SaveFileMonitor {
       );
 
       if (settings.gameMode === GameMode.Softcore && isHardcore) {
-        console.log('[parseSave/parseStash] Skipping hardcore stash (game mode is softcore)');
         return [];
       }
       if (settings.gameMode === GameMode.Hardcore && !isHardcore) {
-        console.log('[parseSave/parseStash] Skipping softcore stash (game mode is hardcore)');
         return [];
       }
 

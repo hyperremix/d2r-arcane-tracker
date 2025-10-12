@@ -95,10 +95,6 @@ class ItemDetectionService {
               silent,
             } as ItemDetectionEvent);
             this.previouslySeenItems.add(itemKey);
-          } else {
-            console.log(
-              `[ItemDetection] Skipping duplicate: ${item.name} (already found globally)`,
-            );
           }
         }
       }
