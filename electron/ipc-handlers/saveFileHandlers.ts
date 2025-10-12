@@ -229,10 +229,11 @@ export function initializeSaveFileHandlers(): void {
 
   // Set up event forwarding to renderer process
   const unsubscribeSaveFileEvent = eventBus.on('save-file-event', async (event: SaveFileEvent) => {
-    // Forward save file events to all renderer processes
+    // Forward save file events to renderer processes
+    // Filter to only 'window' type to exclude DevTools, background pages, etc.
     const allWebContents = webContents.getAllWebContents();
     for (const wc of allWebContents) {
-      if (!wc.isDestroyed()) {
+      if (!wc.isDestroyed() && wc.getType() === 'window') {
         wc.send('save-file-event', event);
       }
     }
@@ -251,9 +252,10 @@ export function initializeSaveFileHandlers(): void {
   // Set up item detection event forwarding and automatic grail progress updates
   const unsubscribeItemDetection = eventBus.on('item-detection', (event: ItemDetectionEvent) => {
     // Forward event to renderer processes
+    // Filter to only 'window' type to exclude DevTools, background pages, etc.
     const allWebContents = webContents.getAllWebContents();
     for (const wc of allWebContents) {
-      if (!wc.isDestroyed()) {
+      if (!wc.isDestroyed() && wc.getType() === 'window') {
         wc.send('item-detection-event', event);
       }
     }
@@ -269,9 +271,10 @@ export function initializeSaveFileHandlers(): void {
     console.log(
       `Save file monitoring started for directory: ${data.directory} - Found ${data.saveFileCount} save files`,
     );
+    // Filter to only 'window' type to exclude DevTools, background pages, etc.
     const allWebContents = webContents.getAllWebContents();
     for (const wc of allWebContents) {
-      if (!wc.isDestroyed()) {
+      if (!wc.isDestroyed() && wc.getType() === 'window') {
         wc.send('monitoring-status-changed', {
           status: 'started',
           directory: data.directory,
@@ -284,9 +287,10 @@ export function initializeSaveFileHandlers(): void {
 
   const unsubscribeMonitoringStopped = eventBus.on('monitoring-stopped', () => {
     console.log('Save file monitoring stopped');
+    // Filter to only 'window' type to exclude DevTools, background pages, etc.
     const allWebContents = webContents.getAllWebContents();
     for (const wc of allWebContents) {
-      if (!wc.isDestroyed()) {
+      if (!wc.isDestroyed() && wc.getType() === 'window') {
         wc.send('monitoring-status-changed', { status: 'stopped' });
       }
     }
@@ -294,9 +298,10 @@ export function initializeSaveFileHandlers(): void {
   eventUnsubscribers.push(unsubscribeMonitoringStopped);
 
   const unsubscribeMonitoringError = eventBus.on('monitoring-error', (error) => {
+    // Filter to only 'window' type to exclude DevTools, background pages, etc.
     const allWebContents = webContents.getAllWebContents();
     for (const wc of allWebContents) {
-      if (!wc.isDestroyed()) {
+      if (!wc.isDestroyed() && wc.getType() === 'window') {
         wc.send('monitoring-status-changed', {
           status: 'error',
           error: error.message,

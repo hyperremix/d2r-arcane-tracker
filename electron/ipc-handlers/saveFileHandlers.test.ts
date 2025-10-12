@@ -124,6 +124,7 @@ import { closeSaveFileMonitor, initializeSaveFileHandlers } from './saveFileHand
 // Mock data types
 interface MockWebContents {
   isDestroyed: ReturnType<typeof vi.fn>;
+  getType: ReturnType<typeof vi.fn>;
   send: ReturnType<typeof vi.fn>;
 }
 
@@ -184,10 +185,12 @@ describe('When saveFileHandlers is used', () => {
     mockWebContents = [
       {
         isDestroyed: vi.fn().mockReturnValue(false),
+        getType: vi.fn().mockReturnValue('window'),
         send: vi.fn(),
       },
       {
         isDestroyed: vi.fn().mockReturnValue(false),
+        getType: vi.fn().mockReturnValue('window'),
         send: vi.fn(),
       },
     ];
