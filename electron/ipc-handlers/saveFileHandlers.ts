@@ -206,6 +206,23 @@ function updateCharacterFromSaveFile(saveFile: D2SaveFile): void {
  * Loads grail items into the detection service and starts monitoring automatically.
  */
 export function initializeSaveFileHandlers(): void {
+  console.log('[initializeSaveFileHandlers] Starting initialization');
+  console.log('[initializeSaveFileHandlers] Current EventBus listener counts:', {
+    'save-file-event': eventBus.listenerCount('save-file-event'),
+    'item-detection': eventBus.listenerCount('item-detection'),
+  });
+
+  // Clean up any existing handlers before re-initialization (important for hot-reload scenarios)
+  if (eventUnsubscribers.length > 0) {
+    console.log(
+      `[initializeSaveFileHandlers] Cleaning up ${eventUnsubscribers.length} existing event handlers`,
+    );
+    for (const unsubscribe of eventUnsubscribers) {
+      unsubscribe();
+    }
+    eventUnsubscribers.length = 0;
+  }
+
   // Initialize monitor and detection service with EventBus and grail database
   saveFileMonitor = new SaveFileMonitor(eventBus, grailDatabase);
   itemDetectionService = new ItemDetectionService(eventBus);
