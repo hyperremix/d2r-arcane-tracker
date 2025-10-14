@@ -11,6 +11,7 @@ export const twoHandedAxes: Item[] = [
     subCategory: '2h_axes',
     treasureClass: 'normal',
     code: 'lax',
+    itemBase: 'Large Axe',
   },
   {
     id: 'goreshovel',
@@ -22,6 +23,7 @@ export const twoHandedAxes: Item[] = [
     subCategory: '2h_axes',
     treasureClass: 'normal',
     code: 'bax',
+    itemBase: 'Broad Axe',
   },
   {
     id: 'thechieftain',
@@ -33,6 +35,7 @@ export const twoHandedAxes: Item[] = [
     subCategory: '2h_axes',
     treasureClass: 'normal',
     code: 'btx',
+    itemBase: 'Battle Axe',
   },
   {
     id: 'brainhew',
@@ -44,6 +47,7 @@ export const twoHandedAxes: Item[] = [
     subCategory: '2h_axes',
     treasureClass: 'normal',
     code: 'gax',
+    itemBase: 'Great Axe',
   },
   {
     id: 'humongous',
@@ -55,6 +59,7 @@ export const twoHandedAxes: Item[] = [
     subCategory: '2h_axes',
     treasureClass: 'normal',
     code: 'gix',
+    itemBase: 'Giant Axe',
   },
   {
     id: 'warlordstrust',
@@ -66,6 +71,7 @@ export const twoHandedAxes: Item[] = [
     subCategory: '2h_axes',
     treasureClass: 'exceptional',
     code: '9la',
+    itemBase: 'Military Axe',
   },
   {
     id: 'spellsteel',
@@ -77,6 +83,7 @@ export const twoHandedAxes: Item[] = [
     subCategory: '2h_axes',
     treasureClass: 'exceptional',
     code: '9ba',
+    itemBase: 'Hatchet Hands',
   },
   {
     id: 'stormrider',
@@ -88,6 +95,7 @@ export const twoHandedAxes: Item[] = [
     subCategory: '2h_axes',
     treasureClass: 'exceptional',
     code: '9bt',
+    itemBase: 'Claws',
   },
   {
     id: 'boneslayerblade',
@@ -99,6 +107,7 @@ export const twoHandedAxes: Item[] = [
     subCategory: '2h_axes',
     treasureClass: 'exceptional',
     code: '9ga',
+    itemBase: 'Gothic Axe',
   },
   {
     id: 'theminotaur',
@@ -110,6 +119,7 @@ export const twoHandedAxes: Item[] = [
     subCategory: '2h_axes',
     treasureClass: 'exceptional',
     code: '9gi',
+    itemBase: 'Ancient Axe',
   },
   {
     id: 'etherealedge',
@@ -121,6 +131,7 @@ export const twoHandedAxes: Item[] = [
     subCategory: '2h_axes',
     treasureClass: 'elite',
     code: '7ba',
+    itemBase: 'Wrist Sword',
   },
   {
     id: 'hellslayer',
@@ -132,6 +143,7 @@ export const twoHandedAxes: Item[] = [
     subCategory: '2h_axes',
     treasureClass: 'elite',
     code: '7bt',
+    itemBase: 'Battle Cestus',
   },
   {
     id: 'messerschmidtsreaver',
@@ -143,6 +155,7 @@ export const twoHandedAxes: Item[] = [
     subCategory: '2h_axes',
     treasureClass: 'elite',
     code: '7ga',
+    itemBase: 'Champion Axe',
   },
   {
     id: 'executionersjustice',
@@ -154,5 +167,6 @@ export const twoHandedAxes: Item[] = [
     subCategory: '2h_axes',
     treasureClass: 'elite',
     code: '7gi',
+    itemBase: 'Glorious Axe',
   },
 ];

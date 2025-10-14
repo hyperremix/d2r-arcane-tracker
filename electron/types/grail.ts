@@ -131,6 +131,7 @@ export interface Item {
   name: string;
   link: string;
   code?: string;
+  itemBase?: string;
   etherealType: EtherealType;
   type: ItemType;
   category: ItemCategory;
@@ -148,6 +149,7 @@ export type DatabaseItem = {
   name: string;
   link: string;
   code: string | null;
+  item_base: string | null;
   ethereal_type: EtherealType;
   type: ItemType;
   category: ItemCategory;

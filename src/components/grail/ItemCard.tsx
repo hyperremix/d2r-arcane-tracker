@@ -179,6 +179,7 @@ function ListView({
               <p className="text-gray-500 text-xs">
                 {item.category} • {item.subCategory.replace('_', ' ')}
               </p>
+              {item.itemBase && <p className="text-gray-500 text-xs">Base: {item.itemBase}</p>}
 
               <DiscoveryInfo allProgress={allProgress} characters={characters} />
             </div>
@@ -498,6 +499,7 @@ function GridView({
                   <p className="text-gray-500 text-xs">
                     {item.category} • {item.subCategory.replace('_', ' ')}
                   </p>
+                  {item.itemBase && <p className="text-gray-500 text-xs">Base: {item.itemBase}</p>}
 
                   {allProgress.length > 0 && (
                     <DiscoveryInfo allProgress={allProgress} characters={characters} />

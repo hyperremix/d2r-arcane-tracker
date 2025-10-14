@@ -11,6 +11,7 @@ export const scepters: Item[] = [
     subCategory: 'scepters',
     treasureClass: 'normal',
     code: 'scp',
+    itemBase: 'Scepter',
   },
   {
     id: 'rusthandle',
@@ -22,6 +23,7 @@ export const scepters: Item[] = [
     subCategory: 'scepters',
     treasureClass: 'normal',
     code: 'gsc',
+    itemBase: 'Grand Scepter',
   },
   {
     id: 'stormeye',
@@ -33,6 +35,7 @@ export const scepters: Item[] = [
     subCategory: 'scepters',
     treasureClass: 'normal',
     code: 'wsp',
+    itemBase: 'War Scepter',
   },
   {
     id: 'zakarumshand',
@@ -44,6 +47,7 @@ export const scepters: Item[] = [
     subCategory: 'scepters',
     treasureClass: 'exceptional',
     code: '9sc',
+    itemBase: 'Blade Talons',
   },
   {
     id: 'thefetidsprinkler',
@@ -55,6 +59,7 @@ export const scepters: Item[] = [
     subCategory: 'scepters',
     treasureClass: 'exceptional',
     code: '9qs',
+    itemBase: 'Holy Water Sprinkler',
   },
   {
     id: 'handofblessedlight',
@@ -66,6 +71,7 @@ export const scepters: Item[] = [
     subCategory: 'scepters',
     treasureClass: 'exceptional',
     code: '9ws',
+    itemBase: 'Divine Scepter',
   },
   {
     id: 'astreonsironward',
@@ -77,6 +83,7 @@ export const scepters: Item[] = [
     subCategory: 'scepters',
     treasureClass: 'elite',
     code: '7ws',
+    itemBase: 'Caduceus',
   },
   {
     id: 'heavenslight',
@@ -88,6 +95,7 @@ export const scepters: Item[] = [
     subCategory: 'scepters',
     treasureClass: 'elite',
     code: '7sc',
+    itemBase: 'Feral Claws',
   },
   {
     id: 'theredeemer',
@@ -99,5 +107,6 @@ export const scepters: Item[] = [
     subCategory: 'scepters',
     treasureClass: 'elite',
     code: '7sc',
+    itemBase: 'Feral Claws',
   },
 ];

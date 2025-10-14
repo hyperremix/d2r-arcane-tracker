@@ -11,6 +11,7 @@ export const boots: Item[] = [
     subCategory: 'boots',
     treasureClass: 'normal',
     code: 'lbt',
+    itemBase: 'Boots',
   },
   {
     id: 'gorefoot',
@@ -22,6 +23,7 @@ export const boots: Item[] = [
     subCategory: 'boots',
     treasureClass: 'normal',
     code: 'vbt',
+    itemBase: 'Heavy Boots',
   },
   {
     id: 'treadsofcthon',
@@ -33,6 +35,7 @@ export const boots: Item[] = [
     subCategory: 'boots',
     treasureClass: 'normal',
     code: 'mbt',
+    itemBase: 'Chain Boots',
   },
   {
     id: 'goblintoe',
@@ -44,6 +47,7 @@ export const boots: Item[] = [
     subCategory: 'boots',
     treasureClass: 'normal',
     code: 'tbt',
+    itemBase: 'Light Plated Boots',
   },
   {
     id: 'tearhaunch',
@@ -55,6 +59,7 @@ export const boots: Item[] = [
     subCategory: 'boots',
     treasureClass: 'normal',
     code: 'hbt',
+    itemBase: 'Greaves',
   },
   {
     id: 'infernostride',
@@ -66,6 +71,7 @@ export const boots: Item[] = [
     subCategory: 'boots',
     treasureClass: 'exceptional',
     code: 'xlb',
+    itemBase: 'Demonhide Boots',
   },
   {
     id: 'waterwalk',
@@ -77,6 +83,7 @@ export const boots: Item[] = [
     subCategory: 'boots',
     treasureClass: 'exceptional',
     code: 'xvb',
+    itemBase: 'Sharkskin Boots',
   },
   {
     id: 'silkweave',
@@ -88,6 +95,7 @@ export const boots: Item[] = [
     subCategory: 'boots',
     treasureClass: 'exceptional',
     code: 'xmb',
+    itemBase: 'Mesh Boots',
   },
   {
     id: 'wartraveler',
@@ -99,6 +107,7 @@ export const boots: Item[] = [
     subCategory: 'boots',
     treasureClass: 'exceptional',
     code: 'xtb',
+    itemBase: 'Battle Boots',
   },
   {
     id: 'gorerider',
@@ -110,6 +119,7 @@ export const boots: Item[] = [
     subCategory: 'boots',
     treasureClass: 'exceptional',
     code: 'xhb',
+    itemBase: 'War Boots',
   },
   {
     id: 'marrowwalk',
@@ -121,6 +131,7 @@ export const boots: Item[] = [
     subCategory: 'boots',
     treasureClass: 'elite',
     code: 'umb1',
+    itemBase: 'Scarabshell Boots',
   },
   {
     id: 'sandstormtrek',
@@ -132,6 +143,7 @@ export const boots: Item[] = [
     subCategory: 'boots',
     treasureClass: 'elite',
     code: 'uvb',
+    itemBase: 'Wyrmhide Boots',
   },
   {
     id: 'shadowdancer',
@@ -143,5 +155,6 @@ export const boots: Item[] = [
     subCategory: 'boots',
     treasureClass: 'elite',
     code: 'uhb',
+    itemBase: 'Myrmidon Greaves',
   },
 ];

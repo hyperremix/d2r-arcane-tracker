@@ -11,6 +11,7 @@ export const amazon: Item[] = [
     subCategory: 'amazon',
     treasureClass: 'exceptional',
     code: 'am7',
+    itemBase: 'Stag Bow',
   },
   {
     id: 'titansrevenge',
@@ -22,6 +23,7 @@ export const amazon: Item[] = [
     subCategory: 'amazon',
     treasureClass: 'exceptional',
     code: 'ama',
+    itemBase: 'Ceremonial Bow',
   },
   {
     id: 'lycandersflank',
@@ -33,6 +35,7 @@ export const amazon: Item[] = [
     subCategory: 'amazon',
     treasureClass: 'exceptional',
     code: 'am9',
+    itemBase: 'Ashwood Bow',
   },
   {
     id: 'bloodravenscharge',
@@ -44,6 +47,7 @@ export const amazon: Item[] = [
     subCategory: 'amazon',
     treasureClass: 'elite',
     code: 'amb',
+    itemBase: 'Ceremonial Spear',
   },
   {
     id: 'thunderstroke',
@@ -55,6 +59,7 @@ export const amazon: Item[] = [
     subCategory: 'amazon',
     treasureClass: 'elite',
     code: 'amf',
+    itemBase: 'Ceremonial Pike',
   },
   {
     id: 'stoneraven',
@@ -66,5 +71,6 @@ export const amazon: Item[] = [
     subCategory: 'amazon',
     treasureClass: 'elite',
     code: 'amd',
+    itemBase: 'Ceremonial Javelin',
   },
 ];

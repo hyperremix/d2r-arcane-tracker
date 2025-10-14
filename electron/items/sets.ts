@@ -10,6 +10,7 @@ export const sets: Item[] = [
     category: 'jewelry',
     subCategory: 'amulets',
     code: 'amu',
+    itemBase: 'Amulet',
     treasureClass: 'normal',
     setName: 'Angelic Raiment',
   },
@@ -22,6 +23,7 @@ export const sets: Item[] = [
     category: 'jewelry',
     subCategory: 'rings',
     code: 'rin',
+    itemBase: 'Ring',
     treasureClass: 'normal',
     setName: 'Angelic Raiment',
   },
@@ -35,6 +37,7 @@ export const sets: Item[] = [
     subCategory: 'body_armor',
     treasureClass: 'normal',
     code: 'rng',
+    itemBase: 'Ring Mail',
     setName: 'Angelic Raiment',
   },
   {
@@ -47,6 +50,7 @@ export const sets: Item[] = [
     subCategory: '1h_swords',
     treasureClass: 'normal',
     code: 'sbr',
+    itemBase: 'Sabre',
     setName: 'Angelic Raiment',
   },
   {
@@ -58,6 +62,7 @@ export const sets: Item[] = [
     category: 'jewelry',
     subCategory: 'amulets',
     code: 'amu',
+    itemBase: 'Amulet',
     treasureClass: 'normal',
     setName: "Arcanna's Tricks",
   },
@@ -71,6 +76,7 @@ export const sets: Item[] = [
     subCategory: 'helms',
     treasureClass: 'normal',
     code: 'skp',
+    itemBase: 'Skull Cap',
     setName: "Arcanna's Tricks",
   },
   {
@@ -83,6 +89,7 @@ export const sets: Item[] = [
     subCategory: 'body_armor',
     treasureClass: 'normal',
     code: 'ltp',
+    itemBase: 'Light Plate',
     setName: "Arcanna's Tricks",
   },
   {
@@ -95,6 +102,7 @@ export const sets: Item[] = [
     subCategory: 'staves',
     treasureClass: 'normal',
     code: 'wst',
+    itemBase: 'War Staff',
     setName: "Arcanna's Tricks",
   },
   {
@@ -107,6 +115,7 @@ export const sets: Item[] = [
     subCategory: 'gloves',
     treasureClass: 'normal',
     code: 'tgl',
+    itemBase: 'Light Gauntlets',
     setName: 'Arctic Gear',
   },
   {
@@ -119,6 +128,7 @@ export const sets: Item[] = [
     subCategory: 'belts',
     treasureClass: 'normal',
     code: 'vbl',
+    itemBase: 'Light Belt',
     setName: 'Arctic Gear',
   },
   {
@@ -131,6 +141,7 @@ export const sets: Item[] = [
     subCategory: 'body_armor',
     treasureClass: 'normal',
     code: 'qui',
+    itemBase: 'Quilted Armor',
     setName: 'Arctic Gear',
   },
   {
@@ -143,6 +154,7 @@ export const sets: Item[] = [
     subCategory: 'bows',
     treasureClass: 'normal',
     code: 'swb',
+    itemBase: 'Short War Bow',
     setName: 'Arctic Gear',
   },
   {
@@ -155,6 +167,7 @@ export const sets: Item[] = [
     subCategory: '1h_axes',
     treasureClass: 'normal',
     code: '2ax',
+    itemBase: 'Double Axe',
     setName: "Berserker's Arsenal",
   },
   {
@@ -167,6 +180,7 @@ export const sets: Item[] = [
     subCategory: 'body_armor',
     treasureClass: 'normal',
     code: 'spl',
+    itemBase: 'Splint Mail',
     setName: "Berserker's Arsenal",
   },
   {
@@ -179,6 +193,7 @@ export const sets: Item[] = [
     subCategory: 'helms',
     treasureClass: 'normal',
     code: 'hlm',
+    itemBase: 'Helm',
     setName: "Berserker's Arsenal",
   },
   {
@@ -190,6 +205,7 @@ export const sets: Item[] = [
     category: 'jewelry',
     subCategory: 'rings',
     code: 'rin',
+    itemBase: 'Ring',
     treasureClass: 'normal',
     setName: "Cathan's Traps",
   },
@@ -202,6 +218,7 @@ export const sets: Item[] = [
     category: 'jewelry',
     subCategory: 'amulets',
     code: 'amu',
+    itemBase: 'Amulet',
     treasureClass: 'normal',
     setName: "Cathan's Traps",
   },
@@ -215,6 +232,7 @@ export const sets: Item[] = [
     subCategory: 'helms',
     treasureClass: 'normal',
     code: 'msk',
+    itemBase: 'Mask',
     setName: "Cathan's Traps",
   },
   {
@@ -227,6 +245,7 @@ export const sets: Item[] = [
     subCategory: 'body_armor',
     treasureClass: 'normal',
     code: 'chn',
+    itemBase: 'Chain Mail',
     setName: "Cathan's Traps",
   },
   {
@@ -239,6 +258,7 @@ export const sets: Item[] = [
     subCategory: 'staves',
     treasureClass: 'normal',
     code: 'bst',
+    itemBase: 'Battle Staff',
     setName: "Cathan's Traps",
   },
   {
@@ -251,6 +271,7 @@ export const sets: Item[] = [
     subCategory: '1h_maces',
     treasureClass: 'normal',
     code: 'gsc',
+    itemBase: 'Grand Scepter',
     setName: "Civerb's Vestments",
   },
   {
@@ -263,6 +284,7 @@ export const sets: Item[] = [
     subCategory: 'shields',
     treasureClass: 'normal',
     code: 'lrg',
+    itemBase: 'Large Shield',
     setName: "Civerb's Vestments",
   },
   {
@@ -274,6 +296,7 @@ export const sets: Item[] = [
     category: 'jewelry',
     subCategory: 'amulets',
     code: 'amu',
+    itemBase: 'Amulet',
     treasureClass: 'normal',
     setName: "Civerb's Vestments",
   },
@@ -287,6 +310,7 @@ export const sets: Item[] = [
     subCategory: '1h_swords',
     treasureClass: 'normal',
     code: 'lsd',
+    itemBase: 'Long Sword',
     setName: "Cleglaw's Brace",
   },
   {
@@ -299,6 +323,7 @@ export const sets: Item[] = [
     subCategory: 'shields',
     treasureClass: 'normal',
     code: 'sml',
+    itemBase: 'Small Shield',
     setName: "Cleglaw's Brace",
   },
   {
@@ -311,6 +336,7 @@ export const sets: Item[] = [
     subCategory: 'gloves',
     treasureClass: 'normal',
     code: 'mgl',
+    itemBase: 'Chain Gloves',
     setName: "Cleglaw's Brace",
   },
   {
@@ -323,6 +349,7 @@ export const sets: Item[] = [
     subCategory: '1h_swords',
     treasureClass: 'normal',
     code: 'wsd',
+    itemBase: 'War Sword',
     setName: "Death's Disguise",
   },
   {
@@ -335,6 +362,7 @@ export const sets: Item[] = [
     subCategory: 'belts',
     treasureClass: 'normal',
     code: 'lbl',
+    itemBase: 'Sash',
     setName: "Death's Disguise",
   },
   {
@@ -347,6 +375,7 @@ export const sets: Item[] = [
     subCategory: 'gloves',
     treasureClass: 'normal',
     code: 'lgl',
+    itemBase: 'Leather Gloves',
     setName: "Death's Disguise",
   },
   {
@@ -359,6 +388,7 @@ export const sets: Item[] = [
     subCategory: 'belts',
     treasureClass: 'normal',
     code: 'mbl',
+    itemBase: 'Belt',
     setName: "Hsaru's Defense",
   },
   {
@@ -371,6 +401,7 @@ export const sets: Item[] = [
     subCategory: 'shields',
     treasureClass: 'normal',
     code: 'buc',
+    itemBase: 'Buckler',
     setName: "Hsaru's Defense",
   },
   {
@@ -383,6 +414,7 @@ export const sets: Item[] = [
     subCategory: 'boots',
     treasureClass: 'normal',
     code: 'mbt',
+    itemBase: 'Chain Boots',
     setName: "Hsaru's Defense",
   },
   {
@@ -395,6 +427,7 @@ export const sets: Item[] = [
     subCategory: 'belts',
     treasureClass: 'normal',
     code: 'tbl',
+    itemBase: 'Heavy Belt',
     setName: 'Infernal Tools',
   },
   {
@@ -407,6 +440,7 @@ export const sets: Item[] = [
     subCategory: 'wands',
     treasureClass: 'normal',
     code: 'gwn',
+    itemBase: 'Grim Wand',
     setName: 'Infernal Tools',
   },
   {
@@ -419,6 +453,7 @@ export const sets: Item[] = [
     subCategory: 'helms',
     treasureClass: 'normal',
     code: 'cap',
+    itemBase: 'Cap',
     setName: 'Infernal Tools',
   },
   {
@@ -431,6 +466,7 @@ export const sets: Item[] = [
     subCategory: 'helms',
     treasureClass: 'normal',
     code: 'crn',
+    itemBase: 'Crown',
     setName: "Iratha's Finery",
   },
   {
@@ -443,6 +479,7 @@ export const sets: Item[] = [
     subCategory: 'gloves',
     treasureClass: 'normal',
     code: 'tgl',
+    itemBase: 'Light Gauntlets',
     setName: "Iratha's Finery",
   },
   {
@@ -455,6 +492,7 @@ export const sets: Item[] = [
     subCategory: 'belts',
     treasureClass: 'normal',
     code: 'tbl',
+    itemBase: 'Heavy Belt',
     setName: "Iratha's Finery",
   },
   {
@@ -466,6 +504,7 @@ export const sets: Item[] = [
     category: 'jewelry',
     subCategory: 'amulets',
     code: 'amu',
+    itemBase: 'Amulet',
     treasureClass: 'normal',
     setName: "Iratha's Finery",
   },
@@ -479,6 +518,7 @@ export const sets: Item[] = [
     subCategory: '1h_swords',
     treasureClass: 'normal',
     code: 'bsd',
+    itemBase: 'Broad Sword',
     setName: "Isenhart's Armory",
   },
   {
@@ -491,6 +531,7 @@ export const sets: Item[] = [
     subCategory: 'body_armor',
     treasureClass: 'normal',
     code: 'brs',
+    itemBase: 'Breast Plate',
     setName: "Isenhart's Armory",
   },
   {
@@ -503,6 +544,7 @@ export const sets: Item[] = [
     subCategory: 'helms',
     treasureClass: 'normal',
     code: 'fhl',
+    itemBase: 'Full Helm',
     setName: "Isenhart's Armory",
   },
   {
@@ -515,6 +557,7 @@ export const sets: Item[] = [
     subCategory: 'shields',
     treasureClass: 'normal',
     code: 'gts',
+    itemBase: 'Gothic Shield',
     setName: "Isenhart's Armory",
   },
   {
@@ -527,6 +570,7 @@ export const sets: Item[] = [
     subCategory: '1h_maces',
     treasureClass: 'normal',
     code: 'wsp',
+    itemBase: 'War Scepter',
     setName: "Milabrega's Regalia",
   },
   {
@@ -539,6 +583,7 @@ export const sets: Item[] = [
     subCategory: 'body_armor',
     treasureClass: 'normal',
     code: 'aar',
+    itemBase: 'Ancient Armor',
     setName: "Milabrega's Regalia",
   },
   {
@@ -551,6 +596,7 @@ export const sets: Item[] = [
     subCategory: 'helms',
     treasureClass: 'normal',
     code: 'crn',
+    itemBase: 'Crown',
     setName: "Milabrega's Regalia",
   },
   {
@@ -563,6 +609,7 @@ export const sets: Item[] = [
     subCategory: 'shields',
     treasureClass: 'normal',
     code: 'kit',
+    itemBase: 'Kite Shield',
     setName: "Milabrega's Regalia",
   },
   {
@@ -575,6 +622,7 @@ export const sets: Item[] = [
     subCategory: 'body_armor',
     treasureClass: 'normal',
     code: 'gth',
+    itemBase: 'Gothic Plate',
     setName: "Sigon's Complete Steel",
   },
   {
@@ -587,6 +635,7 @@ export const sets: Item[] = [
     subCategory: 'helms',
     treasureClass: 'normal',
     code: 'ghm',
+    itemBase: 'Great Helm',
     setName: "Sigon's Complete Steel",
   },
   {
@@ -599,6 +648,7 @@ export const sets: Item[] = [
     subCategory: 'shields',
     treasureClass: 'normal',
     code: 'tow',
+    itemBase: 'Tower Shield',
     setName: "Sigon's Complete Steel",
   },
   {
@@ -611,6 +661,7 @@ export const sets: Item[] = [
     subCategory: 'gloves',
     treasureClass: 'normal',
     code: 'hgl',
+    itemBase: 'Gauntlets',
     setName: "Sigon's Complete Steel",
   },
   {
@@ -623,6 +674,7 @@ export const sets: Item[] = [
     subCategory: 'boots',
     treasureClass: 'normal',
     code: 'hbt',
+    itemBase: 'Greaves',
     setName: "Sigon's Complete Steel",
   },
   {
@@ -635,6 +687,7 @@ export const sets: Item[] = [
     subCategory: 'belts',
     treasureClass: 'normal',
     code: 'hbl',
+    itemBase: 'Plated Belt',
     setName: "Sigon's Complete Steel",
   },
   {
@@ -647,6 +700,7 @@ export const sets: Item[] = [
     subCategory: 'helms',
     treasureClass: 'normal',
     code: 'bhm',
+    itemBase: 'Bone Helm',
     setName: "Tancred's Battlegear",
   },
   {
@@ -658,6 +712,7 @@ export const sets: Item[] = [
     category: 'jewelry',
     subCategory: 'amulets',
     code: 'amu',
+    itemBase: 'Amulet',
     treasureClass: 'normal',
     setName: "Tancred's Battlegear",
   },
@@ -671,6 +726,7 @@ export const sets: Item[] = [
     subCategory: 'boots',
     treasureClass: 'normal',
     code: 'lbt',
+    itemBase: 'Boots',
     setName: "Tancred's Battlegear",
   },
   {
@@ -683,6 +739,7 @@ export const sets: Item[] = [
     subCategory: 'body_armor',
     treasureClass: 'normal',
     code: 'ful',
+    itemBase: 'Full Plate Mail',
     setName: "Tancred's Battlegear",
   },
   {
@@ -695,6 +752,7 @@ export const sets: Item[] = [
     subCategory: '1h_maces',
     treasureClass: 'normal',
     code: 'mpi',
+    itemBase: 'Military Pick',
     setName: "Tancred's Battlegear",
   },
   {
@@ -706,6 +764,7 @@ export const sets: Item[] = [
     category: 'jewelry',
     subCategory: 'amulets',
     code: 'amu',
+    itemBase: 'Amulet',
     treasureClass: 'normal',
     setName: "Vidala's Rig",
   },
@@ -719,6 +778,7 @@ export const sets: Item[] = [
     subCategory: 'body_armor',
     treasureClass: 'normal',
     code: 'lea',
+    itemBase: 'Leather Armor',
     setName: "Vidala's Rig",
   },
   {
@@ -731,6 +791,7 @@ export const sets: Item[] = [
     subCategory: 'boots',
     treasureClass: 'normal',
     code: 'tbt',
+    itemBase: 'Light Plated Boots',
     setName: "Vidala's Rig",
   },
   {
@@ -743,6 +804,7 @@ export const sets: Item[] = [
     subCategory: 'bows',
     treasureClass: 'normal',
     code: 'lbb',
+    itemBase: 'Long Battle Bow',
     setName: "Vidala's Rig",
   },
   {
@@ -755,6 +817,7 @@ export const sets: Item[] = [
     subCategory: '1h_maces',
     treasureClass: 'exceptional',
     code: '9mt',
+    itemBase: 'Jagged Star',
     setName: "Aldur's Watchtower",
   },
   {
@@ -767,6 +830,7 @@ export const sets: Item[] = [
     subCategory: 'druid',
     treasureClass: 'exceptional',
     code: 'dr8',
+    itemBase: 'Stag Bow',
     setName: "Aldur's Watchtower",
   },
   {
@@ -779,6 +843,7 @@ export const sets: Item[] = [
     subCategory: 'body_armor',
     treasureClass: 'exceptional',
     code: 'uul',
+    itemBase: 'Lacquered Plate',
     setName: "Aldur's Watchtower",
   },
   {
@@ -791,6 +856,7 @@ export const sets: Item[] = [
     subCategory: 'boots',
     treasureClass: 'exceptional',
     code: 'xtb',
+    itemBase: 'Battle Boots',
     setName: "Aldur's Watchtower",
   },
   {
@@ -803,6 +869,7 @@ export const sets: Item[] = [
     subCategory: '2h_swords',
     treasureClass: 'elite',
     code: '7gd',
+    itemBase: 'Glorious Axe',
     setName: "Bul-Kathos' Children",
   },
   {
@@ -815,6 +882,7 @@ export const sets: Item[] = [
     subCategory: '1h_swords',
     treasureClass: 'elite',
     code: '7b7',
+    itemBase: 'Suwayyah',
     setName: "Bul-Kathos' Children",
   },
   {
@@ -827,6 +895,7 @@ export const sets: Item[] = [
     subCategory: 'helms',
     treasureClass: 'exceptional',
     code: 'xap',
+    itemBase: 'War Hat',
     setName: "Cow King's Leathers",
   },
   {
@@ -839,6 +908,7 @@ export const sets: Item[] = [
     subCategory: 'body_armor',
     treasureClass: 'exceptional',
     code: 'stu',
+    itemBase: 'Studded Leather',
     setName: "Cow King's Leathers",
   },
   {
@@ -851,6 +921,7 @@ export const sets: Item[] = [
     subCategory: 'boots',
     treasureClass: 'exceptional',
     code: 'vbt',
+    itemBase: 'Heavy Boots',
     setName: "Cow King's Leathers",
   },
   {
@@ -863,6 +934,7 @@ export const sets: Item[] = [
     subCategory: '1h_maces',
     treasureClass: 'elite',
     code: '7ws',
+    itemBase: 'Caduceus',
     setName: "Griswold's Legacy",
   },
   {
@@ -875,6 +947,7 @@ export const sets: Item[] = [
     subCategory: 'helms',
     treasureClass: 'elite',
     code: 'urn',
+    itemBase: 'Corona',
     setName: "Griswold's Legacy",
   },
   {
@@ -887,6 +960,7 @@ export const sets: Item[] = [
     subCategory: 'body_armor',
     treasureClass: 'elite',
     code: 'xar',
+    itemBase: 'Chaos Armor',
     setName: "Griswold's Legacy",
   },
   {
@@ -899,6 +973,7 @@ export const sets: Item[] = [
     subCategory: 'shields',
     treasureClass: 'elite',
     code: 'paf',
+    itemBase: 'Aerin Shield',
     setName: "Griswold's Legacy",
   },
   {
@@ -911,6 +986,7 @@ export const sets: Item[] = [
     subCategory: '1h_maces',
     treasureClass: 'elite',
     code: '7ma',
+    itemBase: 'Reinforced Mace',
     setName: "Heaven's Brethren",
   },
   {
@@ -923,6 +999,7 @@ export const sets: Item[] = [
     subCategory: 'body_armor',
     treasureClass: 'exceptional',
     code: 'xrs',
+    itemBase: 'Cuirass',
     setName: "Heaven's Brethren",
   },
   {
@@ -935,6 +1012,7 @@ export const sets: Item[] = [
     subCategory: 'shields',
     treasureClass: 'elite',
     code: 'uts',
+    itemBase: 'Ward',
     setName: "Heaven's Brethren",
   },
   {
@@ -947,6 +1025,7 @@ export const sets: Item[] = [
     subCategory: 'helms',
     treasureClass: 'elite',
     code: 'uhm',
+    itemBase: 'Spired Helm',
     setName: "Heaven's Brethren",
   },
   {
@@ -959,6 +1038,7 @@ export const sets: Item[] = [
     subCategory: 'polearms',
     treasureClass: 'exceptional',
     code: '9vo',
+    itemBase: 'Bill',
     setName: "Hwanin's Majesty",
   },
   {
@@ -971,6 +1051,7 @@ export const sets: Item[] = [
     subCategory: 'body_armor',
     treasureClass: 'exceptional',
     code: 'xcl',
+    itemBase: 'Tigulated Mail',
     setName: "Hwanin's Majesty",
   },
   {
@@ -983,6 +1064,7 @@ export const sets: Item[] = [
     subCategory: 'helms',
     treasureClass: 'exceptional',
     code: 'xrn',
+    itemBase: 'Grand Crown',
     setName: "Hwanin's Majesty",
   },
   {
@@ -995,6 +1077,7 @@ export const sets: Item[] = [
     subCategory: 'belts',
     treasureClass: 'exceptional',
     code: 'mbl',
+    itemBase: 'Belt',
     setName: "Hwanin's Majesty",
   },
   {
@@ -1007,6 +1090,7 @@ export const sets: Item[] = [
     subCategory: '2h_axes',
     treasureClass: 'elite',
     code: '7m7',
+    itemBase: 'Ogre Maul',
     setName: 'Immortal King',
   },
   {
@@ -1019,6 +1103,7 @@ export const sets: Item[] = [
     subCategory: 'helms',
     treasureClass: 'elite',
     code: 'ba5',
+    itemBase: 'Blade Talons',
     setName: 'Immortal King',
   },
   {
@@ -1031,6 +1116,7 @@ export const sets: Item[] = [
     subCategory: 'body_armor',
     treasureClass: 'elite',
     code: 'uar',
+    itemBase: 'Sacred Armor',
     setName: 'Immortal King',
   },
   {
@@ -1043,6 +1129,7 @@ export const sets: Item[] = [
     subCategory: 'belts',
     treasureClass: 'elite',
     code: 'zhb',
+    itemBase: 'War Belt',
     setName: 'Immortal King',
   },
   {
@@ -1055,6 +1142,7 @@ export const sets: Item[] = [
     subCategory: 'gloves',
     treasureClass: 'elite',
     code: 'xhg',
+    itemBase: 'War Gauntlets',
     setName: 'Immortal King',
   },
   {
@@ -1067,6 +1155,7 @@ export const sets: Item[] = [
     subCategory: 'boots',
     treasureClass: 'elite',
     code: 'xhb',
+    itemBase: 'War Boots',
     setName: 'Immortal King',
   },
   {
@@ -1079,6 +1168,7 @@ export const sets: Item[] = [
     subCategory: 'amazon',
     treasureClass: 'elite',
     code: 'amb',
+    itemBase: 'Ceremonial Spear',
     setName: "M'avina's Battle Hymn",
   },
   {
@@ -1091,6 +1181,7 @@ export const sets: Item[] = [
     subCategory: 'body_armor',
     treasureClass: 'elite',
     code: 'uld',
+    itemBase: 'Kraken Shell',
     setName: "M'avina's Battle Hymn",
   },
   {
@@ -1103,6 +1194,7 @@ export const sets: Item[] = [
     subCategory: 'helms',
     treasureClass: 'elite',
     code: 'ci3',
+    itemBase: 'Greater Talons',
     setName: "M'avina's Battle Hymn",
   },
   {
@@ -1115,6 +1207,7 @@ export const sets: Item[] = [
     subCategory: 'belts',
     treasureClass: 'elite',
     code: 'zvb',
+    itemBase: 'Sharkskin Belt',
     setName: "M'avina's Battle Hymn",
   },
   {
@@ -1127,6 +1220,7 @@ export const sets: Item[] = [
     subCategory: 'gloves',
     treasureClass: 'elite',
     code: 'xtg',
+    itemBase: 'Battle Gauntlets',
     setName: "M'avina's Battle Hymn",
   },
   {
@@ -1139,6 +1233,7 @@ export const sets: Item[] = [
     subCategory: 'helms',
     treasureClass: 'normal',
     code: 'ci0',
+    itemBase: 'Scissors Katar',
     setName: "Naj's Ancient Vestige",
   },
   {
@@ -1151,6 +1246,7 @@ export const sets: Item[] = [
     subCategory: 'body_armor',
     treasureClass: 'elite',
     code: 'ult',
+    itemBase: 'Heater',
     setName: "Naj's Ancient Vestige",
   },
   {
@@ -1163,6 +1259,7 @@ export const sets: Item[] = [
     subCategory: 'staves',
     treasureClass: 'elite',
     code: '6cs',
+    itemBase: 'Elder Staff',
     setName: "Naj's Ancient Vestige",
   },
   {
@@ -1175,6 +1272,7 @@ export const sets: Item[] = [
     subCategory: 'assassin',
     treasureClass: 'elite',
     code: '7lw',
+    itemBase: 'Runic Talons',
     setName: "Natalya's Odium",
   },
   {
@@ -1187,6 +1285,7 @@ export const sets: Item[] = [
     subCategory: 'body_armor',
     treasureClass: 'elite',
     code: 'ucl',
+    itemBase: 'Loricated Mail',
     setName: "Natalya's Odium",
   },
   {
@@ -1199,6 +1298,7 @@ export const sets: Item[] = [
     subCategory: 'helms',
     treasureClass: 'elite',
     code: 'xh9',
+    itemBase: 'Grim Helm',
     setName: "Natalya's Odium",
   },
   {
@@ -1211,6 +1311,7 @@ export const sets: Item[] = [
     subCategory: 'boots',
     treasureClass: 'elite',
     code: 'xmb',
+    itemBase: 'Mesh Boots',
     setName: "Natalya's Odium",
   },
   {
@@ -1223,6 +1324,7 @@ export const sets: Item[] = [
     subCategory: 'shields',
     treasureClass: 'exceptional',
     code: 'xml',
+    itemBase: 'Round Shield',
     setName: "Orphan's Call",
   },
   {
@@ -1235,6 +1337,7 @@ export const sets: Item[] = [
     subCategory: 'helms',
     treasureClass: 'exceptional',
     code: 'xhm',
+    itemBase: 'Winged Helm',
     setName: "Orphan's Call",
   },
   {
@@ -1247,6 +1350,7 @@ export const sets: Item[] = [
     subCategory: 'belts',
     treasureClass: 'exceptional',
     code: 'ztb',
+    itemBase: 'Battle Belt',
     setName: "Orphan's Call",
   },
   {
@@ -1259,6 +1363,7 @@ export const sets: Item[] = [
     subCategory: 'gloves',
     treasureClass: 'exceptional',
     code: 'xvg',
+    itemBase: 'Sharkskin Gloves',
     setName: "Orphan's Call",
   },
   {
@@ -1271,6 +1376,7 @@ export const sets: Item[] = [
     subCategory: 'wands',
     treasureClass: 'normal',
     code: 'bwn',
+    itemBase: 'Bone Wand',
     setName: "Sander's Folly",
   },
   {
@@ -1283,6 +1389,7 @@ export const sets: Item[] = [
     subCategory: 'helms',
     treasureClass: 'normal',
     code: 'cap',
+    itemBase: 'Cap',
     setName: "Sander's Folly",
   },
   {
@@ -1295,6 +1402,7 @@ export const sets: Item[] = [
     subCategory: 'gloves',
     treasureClass: 'normal',
     code: 'vgl',
+    itemBase: 'Heavy Gloves',
     setName: "Sander's Folly",
   },
   {
@@ -1307,6 +1415,7 @@ export const sets: Item[] = [
     subCategory: 'boots',
     treasureClass: 'normal',
     code: 'vbt',
+    itemBase: 'Heavy Boots',
     setName: "Sander's Folly",
   },
   {
@@ -1319,6 +1428,7 @@ export const sets: Item[] = [
     subCategory: '1h_swords',
     treasureClass: 'elite',
     code: '7ls',
+    itemBase: 'Stalagmite',
     setName: "Sazabi's Grand Tribute",
   },
   {
@@ -1331,6 +1441,7 @@ export const sets: Item[] = [
     subCategory: 'body_armor',
     treasureClass: 'elite',
     code: 'upl',
+    itemBase: 'Balrog Skin',
     setName: "Sazabi's Grand Tribute",
   },
   {
@@ -1343,6 +1454,7 @@ export const sets: Item[] = [
     subCategory: 'helms',
     treasureClass: 'elite',
     code: 'xhl',
+    itemBase: 'Basinet',
     setName: "Sazabi's Grand Tribute",
   },
   {
@@ -1354,6 +1466,7 @@ export const sets: Item[] = [
     category: 'jewelry',
     subCategory: 'amulets',
     code: 'amu',
+    itemBase: 'Amulet',
     treasureClass: 'normal',
     setName: "Tal Rasha's Wrappings",
   },
@@ -1367,6 +1480,7 @@ export const sets: Item[] = [
     subCategory: 'sorceress',
     treasureClass: 'exceptional',
     code: 'oba',
+    itemBase: 'Wrist Blade',
     setName: "Tal Rasha's Wrappings",
   },
   {
@@ -1379,6 +1493,7 @@ export const sets: Item[] = [
     subCategory: 'body_armor',
     treasureClass: 'exceptional',
     code: 'uld',
+    itemBase: 'Kraken Shell',
     setName: "Tal Rasha's Wrappings",
   },
   {
@@ -1391,6 +1506,7 @@ export const sets: Item[] = [
     subCategory: 'helms',
     treasureClass: 'exceptional',
     code: 'xsk',
+    itemBase: 'Death Mask',
     setName: "Tal Rasha's Wrappings",
   },
   {
@@ -1403,6 +1519,7 @@ export const sets: Item[] = [
     subCategory: 'belts',
     treasureClass: 'exceptional',
     code: 'zmb',
+    itemBase: 'Mesh Belt',
     setName: "Tal Rasha's Wrappings",
   },
   {
@@ -1415,6 +1532,7 @@ export const sets: Item[] = [
     subCategory: 'body_armor',
     treasureClass: 'elite',
     code: 'uui',
+    itemBase: 'Dusk Shroud',
     setName: 'The Disciple',
   },
   {
@@ -1427,6 +1545,7 @@ export const sets: Item[] = [
     subCategory: 'belts',
     treasureClass: 'elite',
     code: 'umc',
+    itemBase: 'Mithril Coil',
     setName: 'The Disciple',
   },
   {
@@ -1439,6 +1558,7 @@ export const sets: Item[] = [
     subCategory: 'gloves',
     treasureClass: 'elite',
     code: 'uts',
+    itemBase: 'Ward',
     setName: 'The Disciple',
   },
   {
@@ -1451,6 +1571,7 @@ export const sets: Item[] = [
     subCategory: 'boots',
     treasureClass: 'elite',
     code: 'xlb',
+    itemBase: 'Demonhide Boots',
     setName: 'The Disciple',
   },
   {
@@ -1462,6 +1583,7 @@ export const sets: Item[] = [
     category: 'jewelry',
     subCategory: 'amulets',
     code: 'amu',
+    itemBase: 'Amulet',
     treasureClass: 'normal',
     setName: 'The Disciple',
   },
@@ -1475,6 +1597,7 @@ export const sets: Item[] = [
     subCategory: 'helms',
     treasureClass: 'elite',
     code: 'uh9',
+    itemBase: 'Bone Visage',
     setName: "Trang-Oul's Avatar",
   },
   {
@@ -1487,6 +1610,7 @@ export const sets: Item[] = [
     subCategory: 'body_armor',
     treasureClass: 'elite',
     code: 'xul',
+    itemBase: 'Embossed Plate',
     setName: "Trang-Oul's Avatar",
   },
   {
@@ -1499,6 +1623,7 @@ export const sets: Item[] = [
     subCategory: 'belts',
     treasureClass: 'elite',
     code: 'umc',
+    itemBase: 'Mithril Coil',
     setName: "Trang-Oul's Avatar",
   },
   {
@@ -1511,6 +1636,7 @@ export const sets: Item[] = [
     subCategory: 'gloves',
     treasureClass: 'elite',
     code: 'xmg',
+    itemBase: 'Heavy Bracers',
     setName: "Trang-Oul's Avatar",
   },
   {
@@ -1523,6 +1649,7 @@ export const sets: Item[] = [
     subCategory: 'necromancer',
     treasureClass: 'elite',
     code: 'ne9',
+    itemBase: 'Preserved Head',
     setName: "Trang-Oul's Avatar",
   },
 ];

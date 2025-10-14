@@ -11,6 +11,7 @@ export const spears: Item[] = [
     subCategory: 'spears',
     treasureClass: 'normal',
     code: 'spr',
+    itemBase: 'Spear',
   },
   {
     id: 'razortine',
@@ -22,6 +23,7 @@ export const spears: Item[] = [
     subCategory: 'spears',
     treasureClass: 'normal',
     code: 'tri',
+    itemBase: 'Trident',
   },
   {
     id: 'bloodthief',
@@ -33,6 +35,7 @@ export const spears: Item[] = [
     subCategory: 'spears',
     treasureClass: 'normal',
     code: 'brn',
+    itemBase: 'Brandistock',
   },
   {
     id: 'lanceofyaggai',
@@ -44,6 +47,7 @@ export const spears: Item[] = [
     subCategory: 'spears',
     treasureClass: 'normal',
     code: 'spt',
+    itemBase: 'Spetum',
   },
   {
     id: 'thetannrgorerod',
@@ -55,6 +59,7 @@ export const spears: Item[] = [
     subCategory: 'spears',
     treasureClass: 'normal',
     code: 'pik',
+    itemBase: 'Pike',
   },
   {
     id: 'theimpaler',
@@ -66,6 +71,7 @@ export const spears: Item[] = [
     subCategory: 'spears',
     treasureClass: 'exceptional',
     code: '9sr',
+    itemBase: 'War Spear',
   },
   {
     id: 'kelpiesnare',
@@ -77,6 +83,7 @@ export const spears: Item[] = [
     subCategory: 'spears',
     treasureClass: 'exceptional',
     code: '9tr',
+    itemBase: 'Fuscina',
   },
   {
     id: 'soulfeasttine',
@@ -88,6 +95,7 @@ export const spears: Item[] = [
     subCategory: 'spears',
     treasureClass: 'exceptional',
     code: '9br',
+    itemBase: 'War Fork',
   },
   {
     id: 'honesundan',
@@ -99,6 +107,7 @@ export const spears: Item[] = [
     subCategory: 'spears',
     treasureClass: 'exceptional',
     code: '9st',
+    itemBase: 'Yari',
   },
   {
     id: 'spireofhonor',
@@ -110,6 +119,7 @@ export const spears: Item[] = [
     subCategory: 'spears',
     treasureClass: 'exceptional',
     code: '9p9',
+    itemBase: 'Akaran Rondache',
   },
   {
     id: 'ariocsneedle',
@@ -121,6 +131,7 @@ export const spears: Item[] = [
     subCategory: 'spears',
     treasureClass: 'elite',
     code: '7sr',
+    itemBase: 'Hyperion Spear',
   },
   {
     id: 'steelpillar',
@@ -132,6 +143,7 @@ export const spears: Item[] = [
     subCategory: 'spears',
     treasureClass: 'elite',
     code: '7p7',
+    itemBase: 'Sacred Rondache',
   },
   {
     id: 'viperfork',
@@ -143,5 +155,6 @@ export const spears: Item[] = [
     subCategory: 'spears',
     treasureClass: 'elite',
     code: '7br',
+    itemBase: 'War Fist',
   },
 ];

@@ -11,6 +11,7 @@ export const belts: Item[] = [
     subCategory: 'belts',
     treasureClass: 'normal',
     code: 'lbl',
+    itemBase: 'Sash',
   },
   {
     id: 'snakecord',
@@ -22,6 +23,7 @@ export const belts: Item[] = [
     subCategory: 'belts',
     treasureClass: 'normal',
     code: 'vbl',
+    itemBase: 'Light Belt',
   },
   {
     id: 'nightsmoke',
@@ -33,6 +35,7 @@ export const belts: Item[] = [
     subCategory: 'belts',
     treasureClass: 'normal',
     code: 'mbl',
+    itemBase: 'Belt',
   },
   {
     id: 'goldwrap',
@@ -44,6 +47,7 @@ export const belts: Item[] = [
     subCategory: 'belts',
     treasureClass: 'normal',
     code: 'tbl',
+    itemBase: 'Heavy Belt',
   },
   {
     id: 'bladebuckle',
@@ -55,6 +59,7 @@ export const belts: Item[] = [
     subCategory: 'belts',
     treasureClass: 'normal',
     code: 'hbl',
+    itemBase: 'Plated Belt',
   },
   {
     id: 'stringofears',
@@ -66,6 +71,7 @@ export const belts: Item[] = [
     subCategory: 'belts',
     treasureClass: 'exceptional',
     code: 'zlb',
+    itemBase: 'Demonhide Sash',
   },
   {
     id: 'razortail',
@@ -77,6 +83,7 @@ export const belts: Item[] = [
     subCategory: 'belts',
     treasureClass: 'exceptional',
     code: 'zvb',
+    itemBase: 'Sharkskin Belt',
   },
   {
     id: 'gloomstrap',
@@ -88,6 +95,7 @@ export const belts: Item[] = [
     subCategory: 'belts',
     treasureClass: 'exceptional',
     code: 'zmb',
+    itemBase: 'Mesh Belt',
   },
   {
     id: 'snowclash',
@@ -99,6 +107,7 @@ export const belts: Item[] = [
     subCategory: 'belts',
     treasureClass: 'exceptional',
     code: 'ztb',
+    itemBase: 'Battle Belt',
   },
   {
     id: 'thundergodsvigor',
@@ -110,6 +119,7 @@ export const belts: Item[] = [
     subCategory: 'belts',
     treasureClass: 'exceptional',
     code: 'zhb',
+    itemBase: 'War Belt',
   },
   {
     id: 'arachnidmesh',
@@ -121,6 +131,7 @@ export const belts: Item[] = [
     subCategory: 'belts',
     treasureClass: 'elite',
     code: 'ulc',
+    itemBase: 'Spiderweave Silk',
   },
   {
     id: 'nosferatuscoil',
@@ -132,6 +143,7 @@ export const belts: Item[] = [
     subCategory: 'belts',
     treasureClass: 'elite',
     code: 'uvc',
+    itemBase: 'Vampirefang Belt',
   },
   {
     id: 'verdungosheartycord',
@@ -143,5 +155,6 @@ export const belts: Item[] = [
     subCategory: 'belts',
     treasureClass: 'elite',
     code: 'umc',
+    itemBase: 'Mithril Coil',
   },
 ];

@@ -11,6 +11,7 @@ export const twoHandedClubs: Item[] = [
     subCategory: '2h_clubs',
     treasureClass: 'normal',
     code: 'mau',
+    itemBase: 'Maul',
   },
   {
     id: 'steeldriver',
@@ -22,6 +23,7 @@ export const twoHandedClubs: Item[] = [
     subCategory: '2h_clubs',
     treasureClass: 'normal',
     code: 'gma',
+    itemBase: 'Great Maul',
   },
   {
     id: 'bloodtreestump',
@@ -33,6 +35,7 @@ export const twoHandedClubs: Item[] = [
     subCategory: '2h_clubs',
     treasureClass: 'exceptional',
     code: '9m9',
+    itemBase: 'War Club',
   },
   {
     id: 'thegavelofpain',
@@ -44,6 +47,7 @@ export const twoHandedClubs: Item[] = [
     subCategory: '2h_clubs',
     treasureClass: 'exceptional',
     code: '9gm',
+    itemBase: 'Martel de Fer',
   },
   {
     id: 'windhammer',
@@ -55,6 +59,7 @@ export const twoHandedClubs: Item[] = [
     subCategory: '2h_clubs',
     treasureClass: 'elite',
     code: '7m7',
+    itemBase: 'Ogre Maul',
   },
   {
     id: 'earthshifter',
@@ -66,6 +71,7 @@ export const twoHandedClubs: Item[] = [
     subCategory: '2h_clubs',
     treasureClass: 'elite',
     code: '7gm',
+    itemBase: 'Thunder Maul',
   },
   {
     id: 'thecraniumbasher',
@@ -77,5 +83,6 @@ export const twoHandedClubs: Item[] = [
     subCategory: '2h_clubs',
     treasureClass: 'elite',
     code: '7gm',
+    itemBase: 'Thunder Maul',
   },
 ];

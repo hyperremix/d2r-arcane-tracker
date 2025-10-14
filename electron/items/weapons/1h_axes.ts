@@ -11,6 +11,7 @@ export const oneHandedAxes: Item[] = [
     subCategory: '1h_axes',
     treasureClass: 'normal',
     code: 'hax',
+    itemBase: 'Hand Axe',
   },
   {
     id: 'deathspade',
@@ -22,6 +23,7 @@ export const oneHandedAxes: Item[] = [
     subCategory: '1h_axes',
     treasureClass: 'normal',
     code: 'axe',
+    itemBase: 'Axe',
   },
   {
     id: 'bladebone',
@@ -33,6 +35,7 @@ export const oneHandedAxes: Item[] = [
     subCategory: '1h_axes',
     treasureClass: 'normal',
     code: '2ax',
+    itemBase: 'Double Axe',
   },
   {
     id: 'skullsplitter',
@@ -44,6 +47,7 @@ export const oneHandedAxes: Item[] = [
     subCategory: '1h_axes',
     treasureClass: 'normal',
     code: 'mpi',
+    itemBase: 'Military Pick',
   },
   {
     id: 'rakescar',
@@ -55,6 +59,7 @@ export const oneHandedAxes: Item[] = [
     subCategory: '1h_axes',
     treasureClass: 'normal',
     code: 'wax',
+    itemBase: 'War Axe',
   },
   {
     id: 'coldkill',
@@ -66,6 +71,7 @@ export const oneHandedAxes: Item[] = [
     subCategory: '1h_axes',
     treasureClass: 'exceptional',
     code: '9ha',
+    itemBase: 'Hatchet',
   },
   {
     id: 'butcherspupil',
@@ -77,6 +83,7 @@ export const oneHandedAxes: Item[] = [
     subCategory: '1h_axes',
     treasureClass: 'exceptional',
     code: '9ax',
+    itemBase: 'Cleaver',
   },
   {
     id: 'islestrike',
@@ -88,6 +95,7 @@ export const oneHandedAxes: Item[] = [
     subCategory: '1h_axes',
     treasureClass: 'exceptional',
     code: '92a',
+    itemBase: 'Twin Axe',
   },
   {
     id: 'pompeiiswrath',
@@ -99,6 +107,7 @@ export const oneHandedAxes: Item[] = [
     subCategory: '1h_axes',
     treasureClass: 'exceptional',
     code: '9mp',
+    itemBase: 'Crowbill',
   },
   {
     id: 'guardiannaga',
@@ -110,6 +119,7 @@ export const oneHandedAxes: Item[] = [
     subCategory: '1h_axes',
     treasureClass: 'exceptional',
     code: '9wa',
+    itemBase: 'Naga',
   },
   {
     id: 'razorsedge',
@@ -121,6 +131,7 @@ export const oneHandedAxes: Item[] = [
     subCategory: '1h_axes',
     treasureClass: 'elite',
     code: '7ha',
+    itemBase: 'Tomahawk',
   },
   {
     id: 'runemaster',
@@ -132,6 +143,7 @@ export const oneHandedAxes: Item[] = [
     subCategory: '1h_axes',
     treasureClass: 'elite',
     code: '72a',
+    itemBase: 'Ettin Axe',
   },
   {
     id: 'cranebeak',
@@ -143,6 +155,7 @@ export const oneHandedAxes: Item[] = [
     subCategory: '1h_axes',
     treasureClass: 'elite',
     code: '7mp',
+    itemBase: 'War Spike',
   },
   {
     id: 'deathcleaver',
@@ -154,5 +167,6 @@ export const oneHandedAxes: Item[] = [
     subCategory: '1h_axes',
     treasureClass: 'elite',
     code: '7wa',
+    itemBase: 'Berserker Axe',
   },
 ];

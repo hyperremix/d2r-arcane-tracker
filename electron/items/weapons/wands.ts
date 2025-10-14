@@ -11,6 +11,7 @@ export const wands: Item[] = [
     subCategory: 'wands',
     treasureClass: 'normal',
     code: 'wnd',
+    itemBase: 'Wand',
   },
   {
     id: 'maelstrom',
@@ -22,6 +23,7 @@ export const wands: Item[] = [
     subCategory: 'wands',
     treasureClass: 'normal',
     code: 'ywn',
+    itemBase: 'Yew Wand',
   },
   {
     id: 'gravenspine',
@@ -33,6 +35,7 @@ export const wands: Item[] = [
     subCategory: 'wands',
     treasureClass: 'normal',
     code: 'bwn',
+    itemBase: 'Bone Wand',
   },
   {
     id: 'umeslament',
@@ -44,6 +47,7 @@ export const wands: Item[] = [
     subCategory: 'wands',
     treasureClass: 'normal',
     code: 'gwn',
+    itemBase: 'Grim Wand',
   },
   {
     id: 'suicidebranch',
@@ -55,6 +59,7 @@ export const wands: Item[] = [
     subCategory: 'wands',
     treasureClass: 'exceptional',
     code: '9wn',
+    itemBase: 'Burnt Wand',
   },
   {
     id: 'carinshard',
@@ -66,6 +71,7 @@ export const wands: Item[] = [
     subCategory: 'wands',
     treasureClass: 'exceptional',
     code: '9yw',
+    itemBase: 'Petrified Wand',
   },
   {
     id: 'armofkingleoric',
@@ -77,6 +83,7 @@ export const wands: Item[] = [
     subCategory: 'wands',
     treasureClass: 'exceptional',
     code: '9bw',
+    itemBase: 'Tomb Wand',
   },
   {
     id: 'blackhandkey',
@@ -88,6 +95,7 @@ export const wands: Item[] = [
     subCategory: 'wands',
     treasureClass: 'exceptional',
     code: '9gw',
+    itemBase: 'Grave Wand',
   },
   {
     id: 'boneshade',
@@ -99,6 +107,7 @@ export const wands: Item[] = [
     subCategory: 'wands',
     treasureClass: 'elite',
     code: '7bw',
+    itemBase: 'Battle Cestus',
   },
   {
     id: 'deathsweb',
@@ -110,5 +119,6 @@ export const wands: Item[] = [
     subCategory: 'wands',
     treasureClass: 'elite',
     code: '7gw',
+    itemBase: 'Unearthed Wand',
   },
 ];

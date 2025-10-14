@@ -11,6 +11,7 @@ export const paladin: Item[] = [
     subCategory: 'paladin',
     treasureClass: 'exceptional',
     code: 'pa9',
+    itemBase: 'Targe',
   },
   {
     id: 'almanegra',
@@ -22,6 +23,7 @@ export const paladin: Item[] = [
     subCategory: 'paladin',
     treasureClass: 'elite',
     code: 'pac',
+    itemBase: 'Rondache',
   },
   {
     id: 'dragonscale',
@@ -33,5 +35,6 @@ export const paladin: Item[] = [
     subCategory: 'paladin',
     treasureClass: 'elite',
     code: 'pae',
+    itemBase: 'Heraldic Shield',
   },
 ];

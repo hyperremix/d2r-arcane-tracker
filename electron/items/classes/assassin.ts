@@ -11,6 +11,7 @@ export const assassin: Item[] = [
     subCategory: 'assassin',
     treasureClass: 'exceptional',
     code: '9tw',
+    itemBase: 'Tomahawk',
   },
   {
     id: 'firelizardstalons',
@@ -22,6 +23,7 @@ export const assassin: Item[] = [
     subCategory: 'assassin',
     treasureClass: 'elite',
     code: '7lw',
+    itemBase: 'Runic Talons',
   },
   {
     id: 'jadetalon',
@@ -33,6 +35,7 @@ export const assassin: Item[] = [
     subCategory: 'assassin',
     treasureClass: 'elite',
     code: '7wb',
+    itemBase: 'Legendary Mallet',
   },
   {
     id: 'shadowkiller',
@@ -44,5 +47,6 @@ export const assassin: Item[] = [
     subCategory: 'assassin',
     treasureClass: 'elite',
     code: '7cs',
+    itemBase: 'Runic Talons',
   },
 ];

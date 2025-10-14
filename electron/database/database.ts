@@ -82,6 +82,7 @@ class GrailDatabase {
         name TEXT NOT NULL,
         link TEXT,
         code TEXT,
+        item_base TEXT,
         type TEXT NOT NULL CHECK (type IN ('unique', 'set', 'rune', 'runeword')),
         category TEXT NOT NULL,
         sub_category TEXT NOT NULL,

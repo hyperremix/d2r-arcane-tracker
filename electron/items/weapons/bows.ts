@@ -11,6 +11,7 @@ export const bows: Item[] = [
     subCategory: 'bows',
     treasureClass: 'normal',
     code: 'sbw',
+    itemBase: 'Short Bow',
   },
   {
     id: 'witherstring',
@@ -22,6 +23,7 @@ export const bows: Item[] = [
     subCategory: 'bows',
     treasureClass: 'normal',
     code: 'hbw',
+    itemBase: "Hunter's Bow",
   },
   {
     id: 'ravenclaw',
@@ -33,6 +35,7 @@ export const bows: Item[] = [
     subCategory: 'bows',
     treasureClass: 'normal',
     code: 'lbw',
+    itemBase: 'Long Bow',
   },
   {
     id: 'roguesbow',
@@ -44,6 +47,7 @@ export const bows: Item[] = [
     subCategory: 'bows',
     treasureClass: 'normal',
     code: 'cbw',
+    itemBase: 'Composite Bow',
   },
   {
     id: 'stormstrike',
@@ -55,6 +59,7 @@ export const bows: Item[] = [
     subCategory: 'bows',
     treasureClass: 'normal',
     code: 'sbb',
+    itemBase: 'Short Battle Bow',
   },
   {
     id: 'wizendraw',
@@ -66,6 +71,7 @@ export const bows: Item[] = [
     subCategory: 'bows',
     treasureClass: 'normal',
     code: 'lbb',
+    itemBase: 'Long Battle Bow',
   },
   {
     id: 'hellclap',
@@ -77,6 +83,7 @@ export const bows: Item[] = [
     subCategory: 'bows',
     treasureClass: 'normal',
     code: 'swb',
+    itemBase: 'Short War Bow',
   },
   {
     id: 'blastbark',
@@ -88,6 +95,7 @@ export const bows: Item[] = [
     subCategory: 'bows',
     treasureClass: 'normal',
     code: 'lwb',
+    itemBase: 'Long War Bow',
   },
   {
     id: 'skystrike',
@@ -99,6 +107,7 @@ export const bows: Item[] = [
     subCategory: 'bows',
     treasureClass: 'exceptional',
     code: '8sb',
+    itemBase: 'Elegant Blade',
   },
   {
     id: 'riphook',
@@ -110,6 +119,7 @@ export const bows: Item[] = [
     subCategory: 'bows',
     treasureClass: 'exceptional',
     code: '8hb',
+    itemBase: 'Grand Matron Bow',
   },
   {
     id: 'kukoshakaku',
@@ -121,6 +131,7 @@ export const bows: Item[] = [
     subCategory: 'bows',
     treasureClass: 'exceptional',
     code: '8lb',
+    itemBase: 'Shadow Bow',
   },
   {
     id: 'endlesshail',
@@ -132,6 +143,7 @@ export const bows: Item[] = [
     subCategory: 'bows',
     treasureClass: 'exceptional',
     code: '8cb',
+    itemBase: 'Matriarchal Javelin',
   },
   {
     id: 'witchwildstring',
@@ -143,6 +155,7 @@ export const bows: Item[] = [
     subCategory: 'bows',
     treasureClass: 'exceptional',
     code: '8s8',
+    itemBase: 'Matriarchal Pike',
   },
   {
     id: 'cliffkiller',
@@ -154,6 +167,7 @@ export const bows: Item[] = [
     subCategory: 'bows',
     treasureClass: 'exceptional',
     code: '8l8',
+    itemBase: 'Matriarchal Spear',
   },
   {
     id: 'magewrath',
@@ -165,6 +179,7 @@ export const bows: Item[] = [
     subCategory: 'bows',
     treasureClass: 'exceptional',
     code: '8sw',
+    itemBase: 'Ward Bow',
   },
   {
     id: 'goldstrikearch',
@@ -176,6 +191,7 @@ export const bows: Item[] = [
     subCategory: 'bows',
     treasureClass: 'exceptional',
     code: '8lw',
+    itemBase: 'Hydra Bow',
   },
   {
     id: 'widowmaker',
@@ -187,6 +203,7 @@ export const bows: Item[] = [
     subCategory: 'bows',
     treasureClass: 'elite',
     code: '6sw',
+    itemBase: 'Ward Bow',
   },
   {
     id: 'eaglehorn',
@@ -198,6 +215,7 @@ export const bows: Item[] = [
     subCategory: 'bows',
     treasureClass: 'elite',
     code: '6l7',
+    itemBase: 'Hydra Bow',
   },
   {
     id: 'windforce',
@@ -209,5 +227,6 @@ export const bows: Item[] = [
     subCategory: 'bows',
     treasureClass: 'elite',
     code: '6lw',
+    itemBase: 'Hydra Bow',
   },
 ];

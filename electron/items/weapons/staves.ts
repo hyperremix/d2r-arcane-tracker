@@ -11,6 +11,7 @@ export const staves: Item[] = [
     subCategory: 'staves',
     treasureClass: 'normal',
     code: 'sst',
+    itemBase: 'Short Staff',
   },
   {
     id: 'serpentlord',
@@ -22,6 +23,7 @@ export const staves: Item[] = [
     subCategory: 'staves',
     treasureClass: 'normal',
     code: 'lst',
+    itemBase: 'Long Staff',
   },
   {
     id: 'spireoflazarus',
@@ -33,6 +35,7 @@ export const staves: Item[] = [
     subCategory: 'staves',
     treasureClass: 'normal',
     code: 'cst',
+    itemBase: 'Gnarled Staff',
   },
   {
     id: 'thesalamander',
@@ -44,6 +47,7 @@ export const staves: Item[] = [
     subCategory: 'staves',
     treasureClass: 'normal',
     code: 'bst',
+    itemBase: 'Battle Staff',
   },
   {
     id: 'theironjangbong',
@@ -55,6 +59,7 @@ export const staves: Item[] = [
     subCategory: 'staves',
     treasureClass: 'normal',
     code: 'wst',
+    itemBase: 'War Staff',
   },
   {
     id: 'razorswitch',
@@ -66,6 +71,7 @@ export const staves: Item[] = [
     subCategory: 'staves',
     treasureClass: 'exceptional',
     code: '8ss',
+    itemBase: 'Falcata',
   },
   {
     id: 'ribcracker',
@@ -77,6 +83,7 @@ export const staves: Item[] = [
     subCategory: 'staves',
     treasureClass: 'exceptional',
     code: '8ls',
+    itemBase: 'Cryptic Sword',
   },
   {
     id: 'chromaticire',
@@ -88,6 +95,7 @@ export const staves: Item[] = [
     subCategory: 'staves',
     treasureClass: 'exceptional',
     code: '8cs',
+    itemBase: 'Shillelagh',
   },
   {
     id: 'warpspear',
@@ -99,6 +107,7 @@ export const staves: Item[] = [
     subCategory: 'staves',
     treasureClass: 'exceptional',
     code: '8bs',
+    itemBase: 'Conquest Sword',
   },
   {
     id: 'skullcollector',
@@ -110,6 +119,7 @@ export const staves: Item[] = [
     subCategory: 'staves',
     treasureClass: 'exceptional',
     code: '8ws',
+    itemBase: 'Mythical Sword',
   },
   {
     id: 'mangsongslesson',
@@ -121,6 +131,7 @@ export const staves: Item[] = [
     subCategory: 'staves',
     treasureClass: 'elite',
     code: '6ws',
+    itemBase: 'Archon Staff',
   },
   {
     id: 'ondalswisdom',
@@ -132,5 +143,6 @@ export const staves: Item[] = [
     subCategory: 'staves',
     treasureClass: 'elite',
     code: '6cs',
+    itemBase: 'Elder Staff',
   },
 ];

@@ -4,6 +4,7 @@ export const jewels: Item[] = [
   {
     id: 'rainbowfacetcoldlevelup',
     code: 'jew',
+    itemBase: 'Jewel',
     name: 'Rainbow Facet: Cold Level-up',
     link: 'https://diablo2.io/uniques/rainbow-facet-cold-level-up-t3168.html',
     etherealType: 'none',
@@ -15,6 +16,7 @@ export const jewels: Item[] = [
   {
     id: 'rainbowfacetfirelevelup',
     code: 'jew',
+    itemBase: 'Jewel',
     name: 'Rainbow Facet: Fire Level-up',
     link: 'https://diablo2.io/uniques/rainbow-facet-fire-level-up-t3160.html',
     etherealType: 'none',
@@ -26,6 +28,7 @@ export const jewels: Item[] = [
   {
     id: 'rainbowfacetlightninglevelup',
     code: 'jew',
+    itemBase: 'Jewel',
     name: 'Rainbow Facet: Lightning Level-up',
     link: '',
     etherealType: 'none',
@@ -37,6 +40,7 @@ export const jewels: Item[] = [
   {
     id: 'rainbowfacetpoisonlevelup',
     code: 'jew',
+    itemBase: 'Jewel',
     name: 'Rainbow Facet: Poison Level-up',
     link: 'https://diablo2.io/uniques/rainbow-facet-poison-level-up-t3164.html',
     etherealType: 'none',
@@ -48,6 +52,7 @@ export const jewels: Item[] = [
   {
     id: 'rainbowfacetcolddeath',
     code: 'jew',
+    itemBase: 'Jewel',
     name: 'Rainbow Facet: Cold Death',
     link: 'https://diablo2.io/uniques/rainbow-facet-cold-death-t3169.html',
     etherealType: 'none',
@@ -59,6 +64,7 @@ export const jewels: Item[] = [
   {
     id: 'rainbowfacetfiredeath',
     code: 'jew',
+    itemBase: 'Jewel',
     name: 'Rainbow Facet: Fire Death',
     link: 'https://diablo2.io/uniques/rainbow-facet-fire-death-t3162.html',
     etherealType: 'none',
@@ -70,6 +76,7 @@ export const jewels: Item[] = [
   {
     id: 'rainbowfacetlightningdeath',
     code: 'jew',
+    itemBase: 'Jewel',
     name: 'Rainbow Facet: Lightning Death',
     link: 'https://diablo2.io/uniques/rainbow-facet-lightning-death-t3167.html',
     etherealType: 'none',
@@ -81,6 +88,7 @@ export const jewels: Item[] = [
   {
     id: 'rainbowfacetpoisondeath',
     code: 'jew',
+    itemBase: 'Jewel',
     name: 'Rainbow Facet: Poison Death',
     link: 'https://diablo2.io/uniques/rainbow-facet-poison-death-t3165.html',
     etherealType: 'none',

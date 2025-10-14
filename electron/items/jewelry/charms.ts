@@ -4,6 +4,7 @@ export const charms: Item[] = [
   {
     id: 'annihilus',
     code: 'cm1',
+    itemBase: 'Small Charm',
     name: 'Annihilus',
     link: 'https://diablo2.io/uniques/annihilus-t670.html',
     etherealType: 'none',
@@ -15,6 +16,7 @@ export const charms: Item[] = [
   {
     id: 'gheedsfortune',
     code: 'cm3',
+    itemBase: 'Grand Charm',
     name: "Gheed's Fortune",
     link: 'https://diablo2.io/uniques/gheed-s-fortune-t776.html',
     etherealType: 'none',
@@ -26,6 +28,7 @@ export const charms: Item[] = [
   {
     id: 'hellfiretorch',
     code: 'cm2',
+    itemBase: 'Large Charm',
     name: 'Hellfire Torch',
     link: 'https://diablo2.io/uniques/hellfire-torch-t39.html',
     etherealType: 'none',

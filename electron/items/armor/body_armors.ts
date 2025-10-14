@@ -11,6 +11,7 @@ export const bodyArmors: Item[] = [
     subCategory: 'body_armor',
     treasureClass: 'normal',
     code: 'qui',
+    itemBase: 'Quilted Armor',
   },
   {
     id: 'blinkbatsform',
@@ -22,6 +23,7 @@ export const bodyArmors: Item[] = [
     subCategory: 'body_armor',
     treasureClass: 'normal',
     code: 'lea',
+    itemBase: 'Leather Armor',
   },
   {
     id: 'thecenturion',
@@ -33,6 +35,7 @@ export const bodyArmors: Item[] = [
     subCategory: 'body_armor',
     treasureClass: 'normal',
     code: 'hla',
+    itemBase: 'Hard Leather Armor',
   },
   {
     id: 'twitchthroe',
@@ -44,6 +47,7 @@ export const bodyArmors: Item[] = [
     subCategory: 'body_armor',
     treasureClass: 'normal',
     code: 'stu',
+    itemBase: 'Studded Leather',
   },
   {
     id: 'darkglow',
@@ -55,6 +59,7 @@ export const bodyArmors: Item[] = [
     subCategory: 'body_armor',
     treasureClass: 'normal',
     code: 'rng',
+    itemBase: 'Ring Mail',
   },
   {
     id: 'hawkmail',
@@ -66,6 +71,7 @@ export const bodyArmors: Item[] = [
     subCategory: 'body_armor',
     treasureClass: 'normal',
     code: 'scl',
+    itemBase: 'Scale Mail',
   },
   {
     id: 'venomward',
@@ -77,6 +83,7 @@ export const bodyArmors: Item[] = [
     subCategory: 'body_armor',
     treasureClass: 'normal',
     code: 'brs',
+    itemBase: 'Breast Plate',
   },
   {
     id: 'sparkingmail',
@@ -88,6 +95,7 @@ export const bodyArmors: Item[] = [
     subCategory: 'body_armor',
     treasureClass: 'normal',
     code: 'chn',
+    itemBase: 'Chain Mail',
   },
   {
     id: 'iceblink',
@@ -99,6 +107,7 @@ export const bodyArmors: Item[] = [
     subCategory: 'body_armor',
     treasureClass: 'normal',
     code: 'spl',
+    itemBase: 'Splint Mail',
   },
   {
     id: 'heavenlygarb',
@@ -110,6 +119,7 @@ export const bodyArmors: Item[] = [
     subCategory: 'body_armor',
     treasureClass: 'normal',
     code: 'ltp',
+    itemBase: 'Light Plate',
   },
   {
     id: 'rockfleece',
@@ -121,6 +131,7 @@ export const bodyArmors: Item[] = [
     subCategory: 'body_armor',
     treasureClass: 'normal',
     code: 'fld',
+    itemBase: 'Field Plate',
   },
   {
     id: 'boneflesh',
@@ -132,6 +143,7 @@ export const bodyArmors: Item[] = [
     subCategory: 'body_armor',
     treasureClass: 'normal',
     code: 'plt',
+    itemBase: 'Plate Mail',
   },
   {
     id: 'rattlecage',
@@ -143,6 +155,7 @@ export const bodyArmors: Item[] = [
     subCategory: 'body_armor',
     treasureClass: 'normal',
     code: 'gth',
+    itemBase: 'Gothic Plate',
   },
   {
     id: 'goldskin',
@@ -154,6 +167,7 @@ export const bodyArmors: Item[] = [
     subCategory: 'body_armor',
     treasureClass: 'normal',
     code: 'ful',
+    itemBase: 'Full Plate Mail',
   },
   {
     id: 'silksofthevictor',
@@ -165,6 +179,7 @@ export const bodyArmors: Item[] = [
     subCategory: 'body_armor',
     treasureClass: 'normal',
     code: 'aar',
+    itemBase: 'Ancient Armor',
   },
   {
     id: 'thespiritshroud',
@@ -176,6 +191,7 @@ export const bodyArmors: Item[] = [
     subCategory: 'body_armor',
     treasureClass: 'exceptional',
     code: 'xui',
+    itemBase: 'Ghost Armor',
   },
   {
     id: 'skinofthevipermagi',
@@ -187,6 +203,7 @@ export const bodyArmors: Item[] = [
     subCategory: 'body_armor',
     treasureClass: 'exceptional',
     code: 'xea',
+    itemBase: 'Serpentskin Armor',
   },
   {
     id: 'skinoftheflayedone',
@@ -198,6 +215,7 @@ export const bodyArmors: Item[] = [
     subCategory: 'body_armor',
     treasureClass: 'exceptional',
     code: 'xla',
+    itemBase: 'Demonhide Armor',
   },
   {
     id: 'ironpelt',
@@ -209,6 +227,7 @@ export const bodyArmors: Item[] = [
     subCategory: 'body_armor',
     treasureClass: 'exceptional',
     code: 'xtu',
+    itemBase: 'Trellised Armor',
   },
   {
     id: 'crowcaw',
@@ -220,6 +239,7 @@ export const bodyArmors: Item[] = [
     subCategory: 'body_armor',
     treasureClass: 'exceptional',
     code: 'xcl',
+    itemBase: 'Tigulated Mail',
   },
   {
     id: 'spiritforge',
@@ -231,6 +251,7 @@ export const bodyArmors: Item[] = [
     subCategory: 'body_armor',
     treasureClass: 'exceptional',
     code: 'xng',
+    itemBase: 'Linked Mail',
   },
   {
     id: 'durielsshell',
@@ -242,6 +263,7 @@ export const bodyArmors: Item[] = [
     subCategory: 'body_armor',
     treasureClass: 'exceptional',
     code: 'xrs',
+    itemBase: 'Cuirass',
   },
   {
     id: 'shaftstop',
@@ -253,6 +275,7 @@ export const bodyArmors: Item[] = [
     subCategory: 'body_armor',
     treasureClass: 'exceptional',
     code: 'xhn',
+    itemBase: 'Mesh Armor',
   },
   {
     id: 'skulldersire',
@@ -264,6 +287,7 @@ export const bodyArmors: Item[] = [
     subCategory: 'body_armor',
     treasureClass: 'exceptional',
     code: 'xpl',
+    itemBase: 'Russet Armor',
   },
   {
     id: 'queheganswisdom',
@@ -275,6 +299,7 @@ export const bodyArmors: Item[] = [
     subCategory: 'body_armor',
     treasureClass: 'exceptional',
     code: 'xtp',
+    itemBase: 'Templar Coat',
   },
   {
     id: 'toothrow',
@@ -286,6 +311,7 @@ export const bodyArmors: Item[] = [
     subCategory: 'body_armor',
     treasureClass: 'exceptional',
     code: 'xld',
+    itemBase: 'Sharktooth Armor',
   },
   {
     id: 'guardianangel',
@@ -297,6 +323,7 @@ export const bodyArmors: Item[] = [
     subCategory: 'body_armor',
     treasureClass: 'exceptional',
     code: 'xlt',
+    itemBase: 'Mage Plate',
   },
   {
     id: 'atmaswail',
@@ -308,6 +335,7 @@ export const bodyArmors: Item[] = [
     subCategory: 'body_armor',
     treasureClass: 'exceptional',
     code: 'xth',
+    itemBase: 'Sharktooth Armor',
   },
   {
     id: 'blackhades',
@@ -319,6 +347,7 @@ export const bodyArmors: Item[] = [
     subCategory: 'body_armor',
     treasureClass: 'exceptional',
     code: 'xul',
+    itemBase: 'Embossed Plate',
   },
   {
     id: 'corpsemourn',
@@ -330,6 +359,7 @@ export const bodyArmors: Item[] = [
     subCategory: 'body_armor',
     treasureClass: 'exceptional',
     code: 'xar',
+    itemBase: 'Chaos Armor',
   },
   {
     id: 'ormusrobes',
@@ -341,6 +371,7 @@ export const bodyArmors: Item[] = [
     subCategory: 'body_armor',
     treasureClass: 'elite',
     code: 'uui',
+    itemBase: 'Dusk Shroud',
   },
   {
     id: 'thegladiatorsbane',
@@ -352,6 +383,7 @@ export const bodyArmors: Item[] = [
     subCategory: 'body_armor',
     treasureClass: 'elite',
     code: 'utu',
+    itemBase: 'Wire Fleece',
   },
   {
     id: 'arkainesvalor',
@@ -363,6 +395,7 @@ export const bodyArmors: Item[] = [
     subCategory: 'body_armor',
     treasureClass: 'elite',
     code: 'upl',
+    itemBase: 'Balrog Skin',
   },
   {
     id: 'leviathan',
@@ -374,6 +407,7 @@ export const bodyArmors: Item[] = [
     subCategory: 'body_armor',
     treasureClass: 'elite',
     code: 'uld',
+    itemBase: 'Kraken Shell',
   },
   {
     id: 'steelcarapace',
@@ -385,6 +419,7 @@ export const bodyArmors: Item[] = [
     subCategory: 'body_armor',
     treasureClass: 'elite',
     code: 'uul',
+    itemBase: 'Lacquered Plate',
   },
   {
     id: 'templarsmight',
@@ -396,6 +431,7 @@ export const bodyArmors: Item[] = [
     subCategory: 'body_armor',
     treasureClass: 'elite',
     code: 'uar',
+    itemBase: 'Sacred Armor',
   },
   {
     id: 'tyraelsmight',
@@ -407,5 +443,6 @@ export const bodyArmors: Item[] = [
     subCategory: 'body_armor',
     treasureClass: 'elite',
     code: 'uar',
+    itemBase: 'Sacred Armor',
   },
 ];

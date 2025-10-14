@@ -72,6 +72,16 @@ function ItemInfoSection({ item }: { item: Item }) {
             {item.treasureClass}
           </Badge>
 
+          {/* Item Base */}
+          {item.itemBase && (
+            <>
+              <span className="font-medium">Base:</span>
+              <Badge variant="secondary" className="w-fit capitalize">
+                {item.itemBase}
+              </Badge>
+            </>
+          )}
+
           {/* Set Name */}
           {item.setName && (
             <>

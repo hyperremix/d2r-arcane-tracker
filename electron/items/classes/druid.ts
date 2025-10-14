@@ -11,6 +11,7 @@ export const druid: Item[] = [
     subCategory: 'druid',
     treasureClass: 'exceptional',
     code: 'dra',
+    itemBase: 'Club',
   },
   {
     id: 'cerebusbite',
@@ -22,6 +23,7 @@ export const druid: Item[] = [
     subCategory: 'druid',
     treasureClass: 'elite',
     code: 'drb',
+    itemBase: 'Scepter',
   },
   {
     id: 'ravenlore',
@@ -33,6 +35,7 @@ export const druid: Item[] = [
     subCategory: 'druid',
     treasureClass: 'elite',
     code: 'dre',
+    itemBase: 'Totem',
   },
   {
     id: 'spiritkeeper',
@@ -44,5 +47,6 @@ export const druid: Item[] = [
     subCategory: 'druid',
     treasureClass: 'elite',
     code: 'drd',
+    itemBase: 'Fetish',
   },
 ];

@@ -11,6 +11,7 @@ export const necromancer: Item[] = [
     subCategory: 'necromancer',
     treasureClass: 'exceptional',
     code: 'nea',
+    itemBase: 'Zombie Head',
   },
   {
     id: 'boneflame',
@@ -22,6 +23,7 @@ export const necromancer: Item[] = [
     subCategory: 'necromancer',
     treasureClass: 'elite',
     code: 'nee',
+    itemBase: 'Unraveller Head',
   },
   {
     id: 'darkforcespawn',
@@ -33,5 +35,6 @@ export const necromancer: Item[] = [
     subCategory: 'necromancer',
     treasureClass: 'elite',
     code: 'nef',
+    itemBase: 'Gargoyle Head',
   },
 ];

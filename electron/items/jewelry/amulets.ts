@@ -10,6 +10,7 @@ export const amulets: Item[] = [
     category: 'jewelry',
     subCategory: 'amulets',
     code: 'amu',
+    itemBase: 'Amulet',
     treasureClass: 'normal',
   },
   {
@@ -21,6 +22,7 @@ export const amulets: Item[] = [
     category: 'jewelry',
     subCategory: 'amulets',
     code: 'amu',
+    itemBase: 'Amulet',
     treasureClass: 'normal',
   },
   {
@@ -32,6 +34,7 @@ export const amulets: Item[] = [
     category: 'jewelry',
     subCategory: 'amulets',
     code: 'amu',
+    itemBase: 'Amulet',
     treasureClass: 'normal',
   },
   {
@@ -43,6 +46,7 @@ export const amulets: Item[] = [
     category: 'jewelry',
     subCategory: 'amulets',
     code: 'amu',
+    itemBase: 'Amulet',
     treasureClass: 'normal',
   },
   {
@@ -54,6 +58,7 @@ export const amulets: Item[] = [
     category: 'jewelry',
     subCategory: 'amulets',
     code: 'amu',
+    itemBase: 'Amulet',
     treasureClass: 'normal',
   },
   {
@@ -65,6 +70,7 @@ export const amulets: Item[] = [
     category: 'jewelry',
     subCategory: 'amulets',
     code: 'amu',
+    itemBase: 'Amulet',
     treasureClass: 'normal',
   },
   {
@@ -76,6 +82,7 @@ export const amulets: Item[] = [
     category: 'jewelry',
     subCategory: 'amulets',
     code: 'amu',
+    itemBase: 'Amulet',
     treasureClass: 'normal',
   },
   {
@@ -87,6 +94,7 @@ export const amulets: Item[] = [
     category: 'jewelry',
     subCategory: 'amulets',
     code: 'amu',
+    itemBase: 'Amulet',
     treasureClass: 'normal',
   },
   {
@@ -98,6 +106,7 @@ export const amulets: Item[] = [
     category: 'jewelry',
     subCategory: 'amulets',
     code: 'amu',
+    itemBase: 'Amulet',
     treasureClass: 'normal',
   },
   {
@@ -109,6 +118,7 @@ export const amulets: Item[] = [
     category: 'jewelry',
     subCategory: 'amulets',
     code: 'amu',
+    itemBase: 'Amulet',
     treasureClass: 'normal',
   },
   {
@@ -120,6 +130,7 @@ export const amulets: Item[] = [
     category: 'jewelry',
     subCategory: 'amulets',
     code: 'amu',
+    itemBase: 'Amulet',
     treasureClass: 'normal',
   },
   {
@@ -131,6 +142,7 @@ export const amulets: Item[] = [
     category: 'jewelry',
     subCategory: 'amulets',
     code: 'amu',
+    itemBase: 'Amulet',
     treasureClass: 'normal',
   },
 ];

@@ -11,6 +11,7 @@ export const twoHandedSwords: Item[] = [
     subCategory: '2h_swords',
     treasureClass: 'normal',
     code: '2hs',
+    itemBase: 'Two-Handed Sword',
   },
   {
     id: 'soulflay',
@@ -22,6 +23,7 @@ export const twoHandedSwords: Item[] = [
     subCategory: '2h_swords',
     treasureClass: 'normal',
     code: 'clm',
+    itemBase: 'Claymore',
   },
   {
     id: 'kinemilsawl',
@@ -33,6 +35,7 @@ export const twoHandedSwords: Item[] = [
     subCategory: '2h_swords',
     treasureClass: 'normal',
     code: 'gis',
+    itemBase: 'Gladius',
   },
   {
     id: 'blacktongue',
@@ -44,6 +47,7 @@ export const twoHandedSwords: Item[] = [
     subCategory: '2h_swords',
     treasureClass: 'normal',
     code: 'bsw',
+    itemBase: 'Bastard Sword',
   },
   {
     id: 'ripsaw',
@@ -55,6 +59,7 @@ export const twoHandedSwords: Item[] = [
     subCategory: '2h_swords',
     treasureClass: 'normal',
     code: 'flb',
+    itemBase: 'Flamberge',
   },
   {
     id: 'thepatriarch',
@@ -66,6 +71,7 @@ export const twoHandedSwords: Item[] = [
     subCategory: '2h_swords',
     treasureClass: 'normal',
     code: 'gsd',
+    itemBase: 'Great Sword',
   },
   {
     id: 'craintevomir',
@@ -77,6 +83,7 @@ export const twoHandedSwords: Item[] = [
     subCategory: '2h_swords',
     treasureClass: 'exceptional',
     code: '92h',
+    itemBase: 'Suwayyah',
   },
   {
     id: 'bingszwang',
@@ -88,6 +95,7 @@ export const twoHandedSwords: Item[] = [
     subCategory: '2h_swords',
     treasureClass: 'exceptional',
     code: '9cm',
+    itemBase: 'Dacian Falx',
   },
   {
     id: 'thevilehusk',
@@ -99,6 +107,7 @@ export const twoHandedSwords: Item[] = [
     subCategory: '2h_swords',
     treasureClass: 'exceptional',
     code: '9gs',
+    itemBase: 'Tusk Sword',
   },
   {
     id: 'cloudcrack',
@@ -110,6 +119,7 @@ export const twoHandedSwords: Item[] = [
     subCategory: '2h_swords',
     treasureClass: 'exceptional',
     code: '9b9',
+    itemBase: 'Gothic Sword',
   },
   {
     id: 'todesfaelleflamme',
@@ -121,6 +131,7 @@ export const twoHandedSwords: Item[] = [
     subCategory: '2h_swords',
     treasureClass: 'exceptional',
     code: '9fb',
+    itemBase: 'Zweihander',
   },
   {
     id: 'swordguard',
@@ -132,6 +143,7 @@ export const twoHandedSwords: Item[] = [
     subCategory: '2h_swords',
     treasureClass: 'exceptional',
     code: '9gd',
+    itemBase: 'Executioner Sword',
   },
   {
     id: 'flamebellow',
@@ -143,6 +155,7 @@ export const twoHandedSwords: Item[] = [
     subCategory: '2h_swords',
     treasureClass: 'elite',
     code: '7gs',
+    itemBase: 'Colossus Blade',
   },
   {
     id: 'doombringer',
@@ -154,6 +167,7 @@ export const twoHandedSwords: Item[] = [
     subCategory: '2h_swords',
     treasureClass: 'elite',
     code: '7b7',
+    itemBase: 'Suwayyah',
   },
   {
     id: 'thegrandfather',
@@ -165,5 +179,6 @@ export const twoHandedSwords: Item[] = [
     subCategory: '2h_swords',
     treasureClass: 'elite',
     code: '7gd',
+    itemBase: 'Glorious Axe',
   },
 ];

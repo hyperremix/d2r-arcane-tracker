@@ -11,6 +11,7 @@ export const gloves: Item[] = [
     subCategory: 'gloves',
     treasureClass: 'normal',
     code: 'lgl',
+    itemBase: 'Leather Gloves',
   },
   {
     id: 'bloodfist',
@@ -22,6 +23,7 @@ export const gloves: Item[] = [
     subCategory: 'gloves',
     treasureClass: 'normal',
     code: 'vgl',
+    itemBase: 'Heavy Gloves',
   },
   {
     id: 'chanceguards',
@@ -33,6 +35,7 @@ export const gloves: Item[] = [
     subCategory: 'gloves',
     treasureClass: 'normal',
     code: 'mgl',
+    itemBase: 'Chain Gloves',
   },
   {
     id: 'magefist',
@@ -44,6 +47,7 @@ export const gloves: Item[] = [
     subCategory: 'gloves',
     treasureClass: 'normal',
     code: 'tgl',
+    itemBase: 'Light Gauntlets',
   },
   {
     id: 'frostburn',
@@ -55,6 +59,7 @@ export const gloves: Item[] = [
     subCategory: 'gloves',
     treasureClass: 'normal',
     code: 'hgl',
+    itemBase: 'Gauntlets',
   },
   {
     id: 'venomgrip',
@@ -66,6 +71,7 @@ export const gloves: Item[] = [
     subCategory: 'gloves',
     treasureClass: 'exceptional',
     code: 'xlg',
+    itemBase: 'Demonhide Gloves',
   },
   {
     id: 'gravepalm',
@@ -77,6 +83,7 @@ export const gloves: Item[] = [
     subCategory: 'gloves',
     treasureClass: 'exceptional',
     code: 'xvg',
+    itemBase: 'Sharkskin Gloves',
   },
   {
     id: 'ghoulhide',
@@ -88,6 +95,7 @@ export const gloves: Item[] = [
     subCategory: 'gloves',
     treasureClass: 'exceptional',
     code: 'xmg',
+    itemBase: 'Heavy Bracers',
   },
   {
     id: 'lavagout',
@@ -99,6 +107,7 @@ export const gloves: Item[] = [
     subCategory: 'gloves',
     treasureClass: 'exceptional',
     code: 'xtg',
+    itemBase: 'Battle Gauntlets',
   },
   {
     id: 'hellmouth',
@@ -110,6 +119,7 @@ export const gloves: Item[] = [
     subCategory: 'gloves',
     treasureClass: 'exceptional',
     code: 'xhg',
+    itemBase: 'War Gauntlets',
   },
   {
     id: 'draculsgrasp',
@@ -121,6 +131,7 @@ export const gloves: Item[] = [
     subCategory: 'gloves',
     treasureClass: 'elite',
     code: 'uvg',
+    itemBase: 'Vampirebone Gloves',
   },
   {
     id: 'souldrainer',
@@ -132,6 +143,7 @@ export const gloves: Item[] = [
     subCategory: 'gloves',
     treasureClass: 'elite',
     code: 'umg',
+    itemBase: 'Vambraces',
   },
   {
     id: 'steelrend',
@@ -143,5 +155,6 @@ export const gloves: Item[] = [
     subCategory: 'gloves',
     treasureClass: 'elite',
     code: 'uhg',
+    itemBase: 'Ogre Gauntlets',
   },
 ];

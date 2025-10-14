@@ -4,6 +4,7 @@ export const runes: Item[] = [
   {
     id: 'el',
     code: 'r01',
+    itemBase: 'El Rune',
     name: 'El',
     link: 'https://d2runewizard.com/runes/El',
     etherealType: 'none',
@@ -15,6 +16,7 @@ export const runes: Item[] = [
   {
     id: 'eld',
     code: 'r02',
+    itemBase: 'Eld Rune',
     name: 'Eld',
     link: 'https://d2runewizard.com/runes/Eld',
     etherealType: 'none',
@@ -26,6 +28,7 @@ export const runes: Item[] = [
   {
     id: 'tir',
     code: 'r03',
+    itemBase: 'Tir Rune',
     name: 'Tir',
     link: 'https://d2runewizard.com/runes/Tir',
     etherealType: 'none',
@@ -37,6 +40,7 @@ export const runes: Item[] = [
   {
     id: 'nef',
     code: 'r04',
+    itemBase: 'Nef Rune',
     name: 'Nef',
     link: 'https://d2runewizard.com/runes/Nef',
     etherealType: 'none',
@@ -48,6 +52,7 @@ export const runes: Item[] = [
   {
     id: 'eth',
     code: 'r05',
+    itemBase: 'Eth Rune',
     name: 'Eth',
     link: 'https://d2runewizard.com/runes/Eth',
     etherealType: 'none',
@@ -59,6 +64,7 @@ export const runes: Item[] = [
   {
     id: 'ith',
     code: 'r06',
+    itemBase: 'Ith Rune',
     name: 'Ith',
     link: 'https://d2runewizard.com/runes/Ith',
     etherealType: 'none',
@@ -70,6 +76,7 @@ export const runes: Item[] = [
   {
     id: 'tal',
     code: 'r07',
+    itemBase: 'Tal Rune',
     name: 'Tal',
     link: 'https://d2runewizard.com/runes/Tal',
     etherealType: 'none',
@@ -81,6 +88,7 @@ export const runes: Item[] = [
   {
     id: 'ral',
     code: 'r08',
+    itemBase: 'Ral Rune',
     name: 'Ral',
     link: 'https://d2runewizard.com/runes/Ral',
     etherealType: 'none',
@@ -92,6 +100,7 @@ export const runes: Item[] = [
   {
     id: 'ort',
     code: 'r09',
+    itemBase: 'Ort Rune',
     name: 'Ort',
     link: 'https://d2runewizard.com/runes/Ort',
     etherealType: 'none',
@@ -103,6 +112,7 @@ export const runes: Item[] = [
   {
     id: 'thul',
     code: 'r10',
+    itemBase: 'Thul Rune',
     name: 'Thul',
     link: 'https://d2runewizard.com/runes/Thul',
     etherealType: 'none',
@@ -114,6 +124,7 @@ export const runes: Item[] = [
   {
     id: 'amn',
     code: 'r11',
+    itemBase: 'Amn Rune',
     name: 'Amn',
     link: 'https://d2runewizard.com/runes/Amn',
     etherealType: 'none',
@@ -125,6 +136,7 @@ export const runes: Item[] = [
   {
     id: 'sol',
     code: 'r12',
+    itemBase: 'Sol Rune',
     name: 'Sol',
     link: 'https://d2runewizard.com/runes/Sol',
     etherealType: 'none',
@@ -136,6 +148,7 @@ export const runes: Item[] = [
   {
     id: 'shael',
     code: 'r13',
+    itemBase: 'Shael Rune',
     name: 'Shael',
     link: 'https://d2runewizard.com/runes/Shael',
     etherealType: 'none',
@@ -147,6 +160,7 @@ export const runes: Item[] = [
   {
     id: 'dol',
     code: 'r14',
+    itemBase: 'Dol Rune',
     name: 'Dol',
     link: 'https://d2runewizard.com/runes/Dol',
     etherealType: 'none',
@@ -158,6 +172,7 @@ export const runes: Item[] = [
   {
     id: 'hel',
     code: 'r15',
+    itemBase: 'Hel Rune',
     name: 'Hel',
     link: 'https://d2runewizard.com/runes/Hel',
     etherealType: 'none',
@@ -169,6 +184,7 @@ export const runes: Item[] = [
   {
     id: 'io',
     code: 'r16',
+    itemBase: 'Io Rune',
     name: 'Io',
     link: 'https://d2runewizard.com/runes/Io',
     etherealType: 'none',
@@ -180,6 +196,7 @@ export const runes: Item[] = [
   {
     id: 'lum',
     code: 'r17',
+    itemBase: 'Lum Rune',
     name: 'Lum',
     link: 'https://d2runewizard.com/runes/Lum',
     etherealType: 'none',
@@ -191,6 +208,7 @@ export const runes: Item[] = [
   {
     id: 'ko',
     code: 'r18',
+    itemBase: 'Ko Rune',
     name: 'Ko',
     link: 'https://d2runewizard.com/runes/Ko',
     etherealType: 'none',
@@ -202,6 +220,7 @@ export const runes: Item[] = [
   {
     id: 'fal',
     code: 'r19',
+    itemBase: 'Fal Rune',
     name: 'Fal',
     link: 'https://d2runewizard.com/runes/Fal',
     etherealType: 'none',
@@ -213,6 +232,7 @@ export const runes: Item[] = [
   {
     id: 'lem',
     code: 'r20',
+    itemBase: 'Lem Rune',
     name: 'Lem',
     link: 'https://d2runewizard.com/runes/Lem',
     etherealType: 'none',
@@ -224,6 +244,7 @@ export const runes: Item[] = [
   {
     id: 'pul',
     code: 'r21',
+    itemBase: 'Pul Rune',
     name: 'Pul',
     link: 'https://d2runewizard.com/runes/Pul',
     etherealType: 'none',
@@ -235,6 +256,7 @@ export const runes: Item[] = [
   {
     id: 'um',
     code: 'r22',
+    itemBase: 'Um Rune',
     name: 'Um',
     link: 'https://d2runewizard.com/runes/Um',
     etherealType: 'none',
@@ -246,6 +268,7 @@ export const runes: Item[] = [
   {
     id: 'mal',
     code: 'r23',
+    itemBase: 'Mal Rune',
     name: 'Mal',
     link: 'https://d2runewizard.com/runes/Mal',
     etherealType: 'none',
@@ -257,6 +280,7 @@ export const runes: Item[] = [
   {
     id: 'ist',
     code: 'r24',
+    itemBase: 'Ist Rune',
     name: 'Ist',
     link: 'https://d2runewizard.com/runes/Ist',
     etherealType: 'none',
@@ -268,6 +292,7 @@ export const runes: Item[] = [
   {
     id: 'gul',
     code: 'r25',
+    itemBase: 'Gul Rune',
     name: 'Gul',
     link: 'https://d2runewizard.com/runes/Gul',
     etherealType: 'none',
@@ -279,6 +304,7 @@ export const runes: Item[] = [
   {
     id: 'vex',
     code: 'r26',
+    itemBase: 'Vex Rune',
     name: 'Vex',
     link: 'https://d2runewizard.com/runes/Vex',
     etherealType: 'none',
@@ -290,6 +316,7 @@ export const runes: Item[] = [
   {
     id: 'ohm',
     code: 'r27',
+    itemBase: 'Ohm Rune',
     name: 'Ohm',
     link: 'https://d2runewizard.com/runes/Ohm',
     etherealType: 'none',
@@ -301,6 +328,7 @@ export const runes: Item[] = [
   {
     id: 'lo',
     code: 'r28',
+    itemBase: 'Lo Rune',
     name: 'Lo',
     link: 'https://d2runewizard.com/runes/Lo',
     etherealType: 'none',
@@ -312,6 +340,7 @@ export const runes: Item[] = [
   {
     id: 'sur',
     code: 'r29',
+    itemBase: 'Sur Rune',
     name: 'Sur',
     link: 'https://d2runewizard.com/runes/Sur',
     etherealType: 'none',
@@ -323,6 +352,7 @@ export const runes: Item[] = [
   {
     id: 'ber',
     code: 'r30',
+    itemBase: 'Ber Rune',
     name: 'Ber',
     link: 'https://d2runewizard.com/runes/Ber',
     etherealType: 'none',
@@ -334,6 +364,7 @@ export const runes: Item[] = [
   {
     id: 'jah',
     code: 'r31',
+    itemBase: 'Jah Rune',
     name: 'Jah',
     link: 'https://d2runewizard.com/runes/Jah',
     etherealType: 'none',
@@ -345,6 +376,7 @@ export const runes: Item[] = [
   {
     id: 'cham',
     code: 'r32',
+    itemBase: 'Cham Rune',
     name: 'Cham',
     link: 'https://d2runewizard.com/runes/Cham',
     etherealType: 'none',
@@ -356,6 +388,7 @@ export const runes: Item[] = [
   {
     id: 'zod',
     code: 'r33',
+    itemBase: 'Zod Rune',
     name: 'Zod',
     link: 'https://d2runewizard.com/runes/Zod',
     etherealType: 'none',

@@ -11,6 +11,7 @@ export const crossbows: Item[] = [
     subCategory: 'crossbows',
     treasureClass: 'normal',
     code: 'lxb',
+    itemBase: 'Light Crossbow',
   },
   {
     id: 'ichorsting',
@@ -22,6 +23,7 @@ export const crossbows: Item[] = [
     subCategory: 'crossbows',
     treasureClass: 'normal',
     code: 'mxb',
+    itemBase: 'Crossbow',
   },
   {
     id: 'hellcast',
@@ -33,6 +35,7 @@ export const crossbows: Item[] = [
     subCategory: 'crossbows',
     treasureClass: 'normal',
     code: 'hxb',
+    itemBase: 'Heavy Crossbow',
   },
   {
     id: 'doomslinger',
@@ -44,6 +47,7 @@ export const crossbows: Item[] = [
     subCategory: 'crossbows',
     treasureClass: 'normal',
     code: 'rxb',
+    itemBase: 'Repeating Crossbow',
   },
   {
     id: 'langerbriser',
@@ -55,6 +59,7 @@ export const crossbows: Item[] = [
     subCategory: 'crossbows',
     treasureClass: 'exceptional',
     code: '8lx',
+    itemBase: 'Pellet Bow',
   },
   {
     id: 'pusspitter',
@@ -66,6 +71,7 @@ export const crossbows: Item[] = [
     subCategory: 'crossbows',
     treasureClass: 'exceptional',
     code: '8mx',
+    itemBase: 'Gorgon Crossbow',
   },
   {
     id: 'burizadokyanon',
@@ -77,6 +83,7 @@ export const crossbows: Item[] = [
     subCategory: 'crossbows',
     treasureClass: 'exceptional',
     code: '8hx',
+    itemBase: 'Colossus Crossbow',
   },
   {
     id: 'demonmachine',
@@ -88,6 +95,7 @@ export const crossbows: Item[] = [
     subCategory: 'crossbows',
     treasureClass: 'exceptional',
     code: '8rx',
+    itemBase: 'Demon Crossbow',
   },
   {
     id: 'gutsiphon',
@@ -99,6 +107,7 @@ export const crossbows: Item[] = [
     subCategory: 'crossbows',
     treasureClass: 'elite',
     code: '6rx',
+    itemBase: 'Demon Crossbow',
   },
   {
     id: 'hellrack',
@@ -110,5 +119,6 @@ export const crossbows: Item[] = [
     subCategory: 'crossbows',
     treasureClass: 'elite',
     code: '6hx',
+    itemBase: 'Colossus Crossbow',
   },
 ];

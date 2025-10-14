@@ -11,6 +11,7 @@ export const daggers: Item[] = [
     subCategory: 'daggers',
     treasureClass: 'normal',
     code: 'dgr',
+    itemBase: 'Dagger',
   },
   {
     id: 'thediggler',
@@ -22,6 +23,7 @@ export const daggers: Item[] = [
     subCategory: 'daggers',
     treasureClass: 'normal',
     code: 'dir',
+    itemBase: 'Dirk',
   },
   {
     id: 'thejadetando',
@@ -33,6 +35,7 @@ export const daggers: Item[] = [
     subCategory: 'daggers',
     treasureClass: 'normal',
     code: 'kri',
+    itemBase: 'Kris',
   },
   {
     id: 'spectralshard',
@@ -44,6 +47,7 @@ export const daggers: Item[] = [
     subCategory: 'daggers',
     treasureClass: 'normal',
     code: 'bld',
+    itemBase: 'Blade',
   },
   {
     id: 'spineripper',
@@ -55,6 +59,7 @@ export const daggers: Item[] = [
     subCategory: 'daggers',
     treasureClass: 'exceptional',
     code: '9dg',
+    itemBase: 'Poignard',
   },
   {
     id: 'heartcarver',
@@ -66,6 +71,7 @@ export const daggers: Item[] = [
     subCategory: 'daggers',
     treasureClass: 'exceptional',
     code: '9di',
+    itemBase: 'Rondel',
   },
   {
     id: 'blackbogssharp',
@@ -77,6 +83,7 @@ export const daggers: Item[] = [
     subCategory: 'daggers',
     treasureClass: 'exceptional',
     code: '9kr',
+    itemBase: 'Cinquedeas',
   },
   {
     id: 'stormspike',
@@ -88,6 +95,7 @@ export const daggers: Item[] = [
     subCategory: 'daggers',
     treasureClass: 'exceptional',
     code: '9bl',
+    itemBase: 'Cestus',
   },
   {
     id: 'fleshripper',
@@ -99,6 +107,7 @@ export const daggers: Item[] = [
     subCategory: 'daggers',
     treasureClass: 'elite',
     code: '7kr',
+    itemBase: 'Fanged Knife',
   },
   {
     id: 'ghostflame',
@@ -110,6 +119,7 @@ export const daggers: Item[] = [
     subCategory: 'daggers',
     treasureClass: 'elite',
     code: '7bl',
+    itemBase: 'War Fist',
   },
   {
     id: 'wizardspike',
@@ -121,5 +131,6 @@ export const daggers: Item[] = [
     subCategory: 'daggers',
     treasureClass: 'elite',
     code: '7dg',
+    itemBase: 'Bone Knife',
   },
 ];

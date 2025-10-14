@@ -11,6 +11,7 @@ export const sorceress: Item[] = [
     subCategory: 'sorceress',
     treasureClass: 'exceptional',
     code: 'oba',
+    itemBase: 'Wrist Blade',
   },
   {
     id: 'deathsfathom',
@@ -22,6 +23,7 @@ export const sorceress: Item[] = [
     subCategory: 'sorceress',
     treasureClass: 'elite',
     code: 'obf',
+    itemBase: 'Cestus',
   },
   {
     id: 'eschutastemper',
@@ -33,5 +35,6 @@ export const sorceress: Item[] = [
     subCategory: 'sorceress',
     treasureClass: 'elite',
     code: 'obc',
+    itemBase: 'Hatchet Hands',
   },
 ];

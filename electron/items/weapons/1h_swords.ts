@@ -11,6 +11,7 @@ export const oneHandedSwords: Item[] = [
     subCategory: '1h_swords',
     treasureClass: 'normal',
     code: 'ssd',
+    itemBase: 'Short Sword',
   },
   {
     id: 'bloodcrescent',
@@ -22,6 +23,7 @@ export const oneHandedSwords: Item[] = [
     subCategory: '1h_swords',
     treasureClass: 'normal',
     code: 'scm',
+    itemBase: 'Scimitar',
   },
   {
     id: 'skewerofkrintiz',
@@ -33,6 +35,7 @@ export const oneHandedSwords: Item[] = [
     subCategory: '1h_swords',
     treasureClass: 'normal',
     code: 'sbr',
+    itemBase: 'Sabre',
   },
   {
     id: 'gleamscythe',
@@ -44,6 +47,7 @@ export const oneHandedSwords: Item[] = [
     subCategory: '1h_swords',
     treasureClass: 'normal',
     code: 'flc',
+    itemBase: 'Falchion',
   },
   {
     id: 'griswoldsedge',
@@ -55,6 +59,7 @@ export const oneHandedSwords: Item[] = [
     subCategory: '1h_swords',
     treasureClass: 'normal',
     code: 'bsd',
+    itemBase: 'Broad Sword',
   },
   {
     id: 'hellplague',
@@ -66,6 +71,7 @@ export const oneHandedSwords: Item[] = [
     subCategory: '1h_swords',
     treasureClass: 'normal',
     code: 'lsd',
+    itemBase: 'Long Sword',
   },
   {
     id: 'culwenspoint',
@@ -77,6 +83,7 @@ export const oneHandedSwords: Item[] = [
     subCategory: '1h_swords',
     treasureClass: 'normal',
     code: 'wsd',
+    itemBase: 'War Sword',
   },
   {
     id: 'bloodletter',
@@ -88,6 +95,7 @@ export const oneHandedSwords: Item[] = [
     subCategory: '1h_swords',
     treasureClass: 'exceptional',
     code: '9ss',
+    itemBase: 'Falcata',
   },
   {
     id: 'coldsteeleye',
@@ -99,6 +107,7 @@ export const oneHandedSwords: Item[] = [
     subCategory: '1h_swords',
     treasureClass: 'exceptional',
     code: '9sm',
+    itemBase: 'Ataghan',
   },
   {
     id: 'hexfire',
@@ -110,6 +119,7 @@ export const oneHandedSwords: Item[] = [
     subCategory: '1h_swords',
     treasureClass: 'exceptional',
     code: '9sb',
+    itemBase: 'Scissors Katar',
   },
   {
     id: 'bladeofalibaba',
@@ -121,6 +131,7 @@ export const oneHandedSwords: Item[] = [
     subCategory: '1h_swords',
     treasureClass: 'exceptional',
     code: '9fc',
+    itemBase: 'Hydra Edge',
   },
   {
     id: 'ginthersrift',
@@ -132,6 +143,7 @@ export const oneHandedSwords: Item[] = [
     subCategory: '1h_swords',
     treasureClass: 'exceptional',
     code: '9cr',
+    itemBase: 'Phase Blade',
   },
   {
     id: 'headstriker',
@@ -143,6 +155,7 @@ export const oneHandedSwords: Item[] = [
     subCategory: '1h_swords',
     treasureClass: 'exceptional',
     code: '9bs',
+    itemBase: 'Gothic Staff',
   },
   {
     id: 'plaguebearer',
@@ -154,6 +167,7 @@ export const oneHandedSwords: Item[] = [
     subCategory: '1h_swords',
     treasureClass: 'exceptional',
     code: '9ls',
+    itemBase: 'Quarterstaff',
   },
   {
     id: 'theatlantean',
@@ -165,6 +179,7 @@ export const oneHandedSwords: Item[] = [
     subCategory: '1h_swords',
     treasureClass: 'exceptional',
     code: '9wd',
+    itemBase: 'Mythical Sword',
   },
   {
     id: 'azurewrath',
@@ -176,6 +191,7 @@ export const oneHandedSwords: Item[] = [
     subCategory: '1h_swords',
     treasureClass: 'elite',
     code: '7cr',
+    itemBase: 'Phase Blade',
   },
   {
     id: 'bloodmoon',
@@ -187,6 +203,7 @@ export const oneHandedSwords: Item[] = [
     subCategory: '1h_swords',
     treasureClass: 'elite',
     code: '7sb',
+    itemBase: 'Runic Talons',
   },
   {
     id: 'djinnslayer',
@@ -198,6 +215,7 @@ export const oneHandedSwords: Item[] = [
     subCategory: '1h_swords',
     treasureClass: 'elite',
     code: '7sm',
+    itemBase: 'Mythical Sword',
   },
   {
     id: 'frostwind',
@@ -209,6 +227,7 @@ export const oneHandedSwords: Item[] = [
     subCategory: '1h_swords',
     treasureClass: 'elite',
     code: '7ls',
+    itemBase: 'Stalagmite',
   },
   {
     id: 'lightsabre',
@@ -220,5 +239,6 @@ export const oneHandedSwords: Item[] = [
     subCategory: '1h_swords',
     treasureClass: 'elite',
     code: '7cr',
+    itemBase: 'Phase Blade',
   },
 ];

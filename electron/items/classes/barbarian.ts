@@ -11,6 +11,7 @@ export const barbarian: Item[] = [
     subCategory: 'barbarian',
     treasureClass: 'exceptional',
     code: 'baa',
+    itemBase: 'Scissors Katar',
   },
   {
     id: 'demonhornsedge',
@@ -22,6 +23,7 @@ export const barbarian: Item[] = [
     subCategory: 'barbarian',
     treasureClass: 'elite',
     code: 'bad',
+    itemBase: 'Wrist Blade',
   },
   {
     id: 'halaberdsreign',
@@ -33,6 +35,7 @@ export const barbarian: Item[] = [
     subCategory: 'barbarian',
     treasureClass: 'elite',
     code: 'bae',
+    itemBase: 'Fascia',
   },
   {
     id: 'wolfhowl',
@@ -44,5 +47,6 @@ export const barbarian: Item[] = [
     subCategory: 'barbarian',
     treasureClass: 'elite',
     code: 'bac',
+    itemBase: 'Quhab',
   },
 ];

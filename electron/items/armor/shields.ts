@@ -11,6 +11,7 @@ export const shields: Item[] = [
     subCategory: 'shields',
     treasureClass: 'normal',
     code: 'buc',
+    itemBase: 'Buckler',
   },
   {
     id: 'umbraldisk',
@@ -22,6 +23,7 @@ export const shields: Item[] = [
     subCategory: 'shields',
     treasureClass: 'normal',
     code: 'sml',
+    itemBase: 'Small Shield',
   },
   {
     id: 'stormguild',
@@ -33,6 +35,7 @@ export const shields: Item[] = [
     subCategory: 'shields',
     treasureClass: 'normal',
     code: 'lrg',
+    itemBase: 'Large Shield',
   },
   {
     id: 'swordbackhold',
@@ -44,6 +47,7 @@ export const shields: Item[] = [
     subCategory: 'shields',
     treasureClass: 'normal',
     code: 'spk',
+    itemBase: 'Spiked Shield',
   },
   {
     id: 'steelclash',
@@ -55,6 +59,7 @@ export const shields: Item[] = [
     subCategory: 'shields',
     treasureClass: 'normal',
     code: 'kit',
+    itemBase: 'Kite Shield',
   },
   {
     id: 'walloftheeyeless',
@@ -66,6 +71,7 @@ export const shields: Item[] = [
     subCategory: 'shields',
     treasureClass: 'normal',
     code: 'bsh',
+    itemBase: 'Bone Shield',
   },
   {
     id: 'bverritkeep',
@@ -77,6 +83,7 @@ export const shields: Item[] = [
     subCategory: 'shields',
     treasureClass: 'normal',
     code: 'tow',
+    itemBase: 'Tower Shield',
   },
   {
     id: 'theward',
@@ -88,6 +95,7 @@ export const shields: Item[] = [
     subCategory: 'shields',
     treasureClass: 'normal',
     code: 'gts',
+    itemBase: 'Gothic Shield',
   },
   {
     id: 'visceratuant',
@@ -99,6 +107,7 @@ export const shields: Item[] = [
     subCategory: 'shields',
     treasureClass: 'exceptional',
     code: 'xuc',
+    itemBase: 'Defender',
   },
   {
     id: 'mosersblessedcircle',
@@ -110,6 +119,7 @@ export const shields: Item[] = [
     subCategory: 'shields',
     treasureClass: 'exceptional',
     code: 'xml',
+    itemBase: 'Round Shield',
   },
   {
     id: 'stormchaser',
@@ -121,6 +131,7 @@ export const shields: Item[] = [
     subCategory: 'shields',
     treasureClass: 'exceptional',
     code: 'xrg',
+    itemBase: 'Scutum',
   },
   {
     id: 'lanceguard',
@@ -132,6 +143,7 @@ export const shields: Item[] = [
     subCategory: 'shields',
     treasureClass: 'exceptional',
     code: 'xpk',
+    itemBase: 'Barbed Shield',
   },
   {
     id: 'tiamatsrebuke',
@@ -143,6 +155,7 @@ export const shields: Item[] = [
     subCategory: 'shields',
     treasureClass: 'exceptional',
     code: 'xit',
+    itemBase: 'Dragon Shield',
   },
   {
     id: 'lidlesswall',
@@ -154,6 +167,7 @@ export const shields: Item[] = [
     subCategory: 'shields',
     treasureClass: 'exceptional',
     code: 'xsh',
+    itemBase: 'Grim Shield',
   },
   {
     id: 'gerkessanctuary',
@@ -165,6 +179,7 @@ export const shields: Item[] = [
     subCategory: 'shields',
     treasureClass: 'exceptional',
     code: 'xow',
+    itemBase: 'Pavise',
   },
   {
     id: 'radamentssphere',
@@ -176,6 +191,7 @@ export const shields: Item[] = [
     subCategory: 'shields',
     treasureClass: 'exceptional',
     code: 'xts',
+    itemBase: 'Ancient Shield',
   },
   {
     id: 'blackoakshield',
@@ -187,6 +203,7 @@ export const shields: Item[] = [
     subCategory: 'shields',
     treasureClass: 'elite',
     code: 'uml',
+    itemBase: 'Luna',
   },
   {
     id: 'stormshield',
@@ -198,6 +215,7 @@ export const shields: Item[] = [
     subCategory: 'shields',
     treasureClass: 'elite',
     code: 'uit',
+    itemBase: 'Monarch',
   },
   {
     id: 'headhuntersglory',
@@ -209,6 +227,7 @@ export const shields: Item[] = [
     subCategory: 'shields',
     treasureClass: 'elite',
     code: 'ush',
+    itemBase: 'Troll Nest',
   },
   {
     id: 'medusasgaze',
@@ -220,6 +239,7 @@ export const shields: Item[] = [
     subCategory: 'shields',
     treasureClass: 'elite',
     code: 'uow',
+    itemBase: 'Aegis',
   },
   {
     id: 'spikethorn',
@@ -231,6 +251,7 @@ export const shields: Item[] = [
     subCategory: 'shields',
     treasureClass: 'elite',
     code: 'upk',
+    itemBase: 'Blade Barrier',
   },
   {
     id: 'spiritward',
@@ -242,5 +263,6 @@ export const shields: Item[] = [
     subCategory: 'shields',
     treasureClass: 'elite',
     code: 'uts',
+    itemBase: 'Ward',
   },
 ];

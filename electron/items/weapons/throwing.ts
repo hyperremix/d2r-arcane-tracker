@@ -11,6 +11,7 @@ export const throwing: Item[] = [
     subCategory: 'throwing',
     treasureClass: 'exceptional',
     code: '9tk',
+    itemBase: 'Francisca',
   },
   {
     id: 'thescalper',
@@ -22,6 +23,7 @@ export const throwing: Item[] = [
     subCategory: 'throwing',
     treasureClass: 'exceptional',
     code: '9ta',
+    itemBase: 'Francisca',
   },
   {
     id: 'gimmershred',
@@ -33,6 +35,7 @@ export const throwing: Item[] = [
     subCategory: 'throwing',
     treasureClass: 'elite',
     code: '7ta',
+    itemBase: 'Tomahawk',
   },
   {
     id: 'lacerator',
@@ -44,6 +47,7 @@ export const throwing: Item[] = [
     subCategory: 'throwing',
     treasureClass: 'elite',
     code: '7b8',
+    itemBase: 'Wrist Sword',
   },
   {
     id: 'warshrike',
@@ -55,6 +59,7 @@ export const throwing: Item[] = [
     subCategory: 'throwing',
     treasureClass: 'elite',
     code: '7bk',
+    itemBase: 'Winged Knife',
   },
   {
     id: 'demonsarch',
@@ -66,6 +71,7 @@ export const throwing: Item[] = [
     subCategory: 'throwing',
     treasureClass: 'elite',
     code: '7s7',
+    itemBase: 'Balrog Spear',
   },
   {
     id: 'wraithflight',
@@ -77,6 +83,7 @@ export const throwing: Item[] = [
     subCategory: 'throwing',
     treasureClass: 'elite',
     code: '7gl',
+    itemBase: 'Ghost Glaive',
   },
   {
     id: 'gargoylesbite',
@@ -88,5 +95,6 @@ export const throwing: Item[] = [
     subCategory: 'throwing',
     treasureClass: 'elite',
     code: '7ts',
+    itemBase: 'Winged Harpoon',
   },
 ];

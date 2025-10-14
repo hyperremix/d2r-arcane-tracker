@@ -11,6 +11,7 @@ export const helms: Item[] = [
     subCategory: 'helms',
     treasureClass: 'normal',
     code: 'cap',
+    itemBase: 'Cap',
   },
   {
     id: 'tarnhelm',
@@ -22,6 +23,7 @@ export const helms: Item[] = [
     subCategory: 'helms',
     treasureClass: 'normal',
     code: 'skp',
+    itemBase: 'Skull Cap',
   },
   {
     id: 'coifofglory',
@@ -33,6 +35,7 @@ export const helms: Item[] = [
     subCategory: 'helms',
     treasureClass: 'normal',
     code: 'hlm',
+    itemBase: 'Helm',
   },
   {
     id: 'duskdeep',
@@ -44,6 +47,7 @@ export const helms: Item[] = [
     subCategory: 'helms',
     treasureClass: 'normal',
     code: 'fhl',
+    itemBase: 'Full Helm',
   },
   {
     id: 'wormskull',
@@ -55,6 +59,7 @@ export const helms: Item[] = [
     subCategory: 'helms',
     treasureClass: 'normal',
     code: 'bhm',
+    itemBase: 'Bone Helm',
   },
   {
     id: 'howltusk',
@@ -66,6 +71,7 @@ export const helms: Item[] = [
     subCategory: 'helms',
     treasureClass: 'normal',
     code: 'ghm',
+    itemBase: 'Great Helm',
   },
   {
     id: 'undeadcrown',
@@ -77,6 +83,7 @@ export const helms: Item[] = [
     subCategory: 'helms',
     treasureClass: 'normal',
     code: 'crn',
+    itemBase: 'Crown',
   },
   {
     id: 'thefaceofhorror',
@@ -88,6 +95,7 @@ export const helms: Item[] = [
     subCategory: 'helms',
     treasureClass: 'normal',
     code: 'msk',
+    itemBase: 'Mask',
   },
   {
     id: 'peasantcrown',
@@ -99,6 +107,7 @@ export const helms: Item[] = [
     subCategory: 'helms',
     treasureClass: 'exceptional',
     code: 'xap',
+    itemBase: 'War Hat',
   },
   {
     id: 'rockstopper',
@@ -110,6 +119,7 @@ export const helms: Item[] = [
     subCategory: 'helms',
     treasureClass: 'exceptional',
     code: 'xkp',
+    itemBase: 'Sallet',
   },
   {
     id: 'stealskull',
@@ -121,6 +131,7 @@ export const helms: Item[] = [
     subCategory: 'helms',
     treasureClass: 'exceptional',
     code: 'xlm',
+    itemBase: 'Casque',
   },
   {
     id: 'darksighthelm',
@@ -132,6 +143,7 @@ export const helms: Item[] = [
     subCategory: 'helms',
     treasureClass: 'exceptional',
     code: 'xhl',
+    itemBase: 'Basinet',
   },
   {
     id: 'vampiregaze',
@@ -143,6 +155,7 @@ export const helms: Item[] = [
     subCategory: 'helms',
     treasureClass: 'exceptional',
     code: 'xh9',
+    itemBase: 'Grim Helm',
   },
   {
     id: 'valkyriewing',
@@ -154,6 +167,7 @@ export const helms: Item[] = [
     subCategory: 'helms',
     treasureClass: 'exceptional',
     code: 'xhm',
+    itemBase: 'Winged Helm',
   },
   {
     id: 'crownofthieves',
@@ -165,6 +179,7 @@ export const helms: Item[] = [
     subCategory: 'helms',
     treasureClass: 'exceptional',
     code: 'xrn',
+    itemBase: 'Grand Crown',
   },
   {
     id: 'blackhornsface',
@@ -176,6 +191,7 @@ export const helms: Item[] = [
     subCategory: 'helms',
     treasureClass: 'exceptional',
     code: 'xsk',
+    itemBase: 'Death Mask',
   },
   {
     id: 'andarielsvisage',
@@ -187,6 +203,7 @@ export const helms: Item[] = [
     subCategory: 'helms',
     treasureClass: 'elite',
     code: 'usk',
+    itemBase: 'Demonhead',
   },
   {
     id: 'crownofages',
@@ -198,6 +215,7 @@ export const helms: Item[] = [
     subCategory: 'helms',
     treasureClass: 'elite',
     code: 'urn',
+    itemBase: 'Corona',
   },
   {
     id: 'giantskull',
@@ -209,6 +227,7 @@ export const helms: Item[] = [
     subCategory: 'helms',
     treasureClass: 'elite',
     code: 'uh9',
+    itemBase: 'Bone Visage',
   },
   {
     id: 'harlequincrest',
@@ -220,6 +239,7 @@ export const helms: Item[] = [
     subCategory: 'helms',
     treasureClass: 'elite',
     code: 'uap',
+    itemBase: 'Shako',
   },
   {
     id: 'nightwingsveil',
@@ -231,6 +251,7 @@ export const helms: Item[] = [
     subCategory: 'helms',
     treasureClass: 'elite',
     code: 'uhm',
+    itemBase: 'Spired Helm',
   },
   {
     id: 'steelshade',
@@ -242,6 +263,7 @@ export const helms: Item[] = [
     subCategory: 'helms',
     treasureClass: 'elite',
     code: 'ulm',
+    itemBase: 'Armet',
   },
   {
     id: 'veilofsteel',
@@ -253,6 +275,7 @@ export const helms: Item[] = [
     subCategory: 'helms',
     treasureClass: 'elite',
     code: 'uhm',
+    itemBase: 'Spired Helm',
   },
   {
     id: 'kirasguardian',
@@ -264,6 +287,7 @@ export const helms: Item[] = [
     subCategory: 'helms',
     treasureClass: 'elite',
     code: 'ci2',
+    itemBase: 'Greater Claws',
   },
   {
     id: 'griffonseye',
@@ -275,5 +299,6 @@ export const helms: Item[] = [
     subCategory: 'helms',
     treasureClass: 'elite',
     code: 'ci3',
+    itemBase: 'Greater Talons',
   },
 ];

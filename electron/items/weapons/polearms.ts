@@ -11,6 +11,7 @@ export const polearms: Item[] = [
     subCategory: 'polearms',
     treasureClass: 'normal',
     code: 'bar',
+    itemBase: 'Bardiche',
   },
   {
     id: 'steelgoad',
@@ -22,6 +23,7 @@ export const polearms: Item[] = [
     subCategory: 'polearms',
     treasureClass: 'normal',
     code: 'vou',
+    itemBase: 'Voulge',
   },
   {
     id: 'soulharvest',
@@ -33,6 +35,7 @@ export const polearms: Item[] = [
     subCategory: 'polearms',
     treasureClass: 'normal',
     code: 'scy',
+    itemBase: 'Scythe',
   },
   {
     id: 'thebattlebranch',
@@ -44,6 +47,7 @@ export const polearms: Item[] = [
     subCategory: 'polearms',
     treasureClass: 'normal',
     code: 'pax',
+    itemBase: 'Poleaxe',
   },
   {
     id: 'woestave',
@@ -55,6 +59,7 @@ export const polearms: Item[] = [
     subCategory: 'polearms',
     treasureClass: 'normal',
     code: 'hal',
+    itemBase: 'Halberd',
   },
   {
     id: 'thegrimreaper',
@@ -66,6 +71,7 @@ export const polearms: Item[] = [
     subCategory: 'polearms',
     treasureClass: 'normal',
     code: 'wsc',
+    itemBase: 'War Scythe',
   },
   {
     id: 'themeatscraper',
@@ -77,6 +83,7 @@ export const polearms: Item[] = [
     subCategory: 'polearms',
     treasureClass: 'exceptional',
     code: '9b7',
+    itemBase: 'Edge Bow',
   },
   {
     id: 'blackleachblade',
@@ -88,6 +95,7 @@ export const polearms: Item[] = [
     subCategory: 'polearms',
     treasureClass: 'exceptional',
     code: '9vo',
+    itemBase: 'Bill',
   },
   {
     id: 'athenaswrath',
@@ -99,6 +107,7 @@ export const polearms: Item[] = [
     subCategory: 'polearms',
     treasureClass: 'exceptional',
     code: '9s8',
+    itemBase: 'Short Siege Bow',
   },
   {
     id: 'pierretombalecouant',
@@ -110,6 +119,7 @@ export const polearms: Item[] = [
     subCategory: 'polearms',
     treasureClass: 'exceptional',
     code: '9pa',
+    itemBase: 'Akaran Targe',
   },
   {
     id: 'husoldalevo',
@@ -121,6 +131,7 @@ export const polearms: Item[] = [
     subCategory: 'polearms',
     treasureClass: 'exceptional',
     code: '9h9',
+    itemBase: 'Razor Bow',
   },
   {
     id: 'grimsburningdead',
@@ -132,6 +143,7 @@ export const polearms: Item[] = [
     subCategory: 'polearms',
     treasureClass: 'exceptional',
     code: '9wc',
+    itemBase: 'Grim Scythe',
   },
   {
     id: 'bonehew',
@@ -143,6 +155,7 @@ export const polearms: Item[] = [
     subCategory: 'polearms',
     treasureClass: 'elite',
     code: '7o7',
+    itemBase: 'Ogre Axe',
   },
   {
     id: 'thereaperstoll',
@@ -154,6 +167,7 @@ export const polearms: Item[] = [
     subCategory: 'polearms',
     treasureClass: 'elite',
     code: '7s8',
+    itemBase: 'Thresher',
   },
   {
     id: 'tombreaver',
@@ -165,6 +179,7 @@ export const polearms: Item[] = [
     subCategory: 'polearms',
     treasureClass: 'elite',
     code: '7pa',
+    itemBase: 'Sacred Targe',
   },
   {
     id: 'stormspire',
@@ -176,5 +191,6 @@ export const polearms: Item[] = [
     subCategory: 'polearms',
     treasureClass: 'elite',
     code: '7wc',
+    itemBase: 'Giant Thresher',
   },
 ];
