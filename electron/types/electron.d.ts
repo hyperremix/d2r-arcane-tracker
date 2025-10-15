@@ -144,6 +144,47 @@ export interface ElectronAPI {
    */
   icon: {
     /**
+     * Sets the D2R installation path.
+     * @param {string} path - Path to D2R installation.
+     * @returns {Promise<void>}
+     */
+    setD2RPath(path: string): Promise<void>
+
+    /**
+     * Gets the current D2R installation path.
+     * @returns {Promise<string | null>} D2R path or null if not set.
+     */
+    getD2RPath(): Promise<string | null>
+
+    /**
+     * Converts all sprite files from D2R installation to PNGs.
+     * @returns {Promise<{ success: boolean; totalFiles: number; convertedFiles: number; skippedFiles: number; errors: Array<{ file: string; error: string }> }>} Conversion result.
+     */
+    convertSprites(): Promise<{
+      success: boolean
+      totalFiles: number
+      convertedFiles: number
+      skippedFiles: number
+      errors: Array<{ file: string; error: string }>
+    }>
+
+    /**
+     * Gets the current conversion status.
+     * @returns {Promise<{ status: 'not_started' | 'in_progress' | 'completed' | 'failed'; progress?: { current: number; total: number }; lastResult?: any }>} Conversion status.
+     */
+    getConversionStatus(): Promise<{
+      status: 'not_started' | 'in_progress' | 'completed' | 'failed'
+      progress?: { current: number; total: number }
+      lastResult?: {
+        success: boolean
+        totalFiles: number
+        convertedFiles: number
+        skippedFiles: number
+        errors: Array<{ file: string; error: string }>
+      }
+    }>
+
+    /**
      * Gets an item icon by item name.
      * @param {string} itemName - The display name of the item.
      * @returns {Promise<string | null>} Base64 data URL of the icon or null if not found.
@@ -151,23 +192,11 @@ export interface ElectronAPI {
     getByName(itemName: string): Promise<string | null>
 
     /**
-     * Gets an item icon by D2R item code.
-     * @param {string} itemCode - The D2R internal item code.
+     * Gets an item icon by filename.
+     * @param {string} filename - The icon filename (e.g., "item.png").
      * @returns {Promise<string | null>} Base64 data URL of the icon or null if not found.
      */
-    getByCode(itemCode: string): Promise<string | null>
-
-    /**
-     * Preloads popular item icons for faster display.
-     * @returns {Promise<{ success: boolean }>} Success indicator.
-     */
-    preloadPopular(): Promise<{ success: boolean }>
-
-    /**
-     * Checks if D2R installation is available.
-     * @returns {Promise<boolean>} True if D2R is found.
-     */
-    isD2RAvailable(): Promise<boolean>
+    getByFilename(filename: string): Promise<string | null>
 
     /**
      * Clears the icon cache.
@@ -177,9 +206,17 @@ export interface ElectronAPI {
 
     /**
      * Gets cache statistics.
-     * @returns {Promise<{ size: number; d2rAvailable: boolean; cachePath: string }>} Cache stats.
+     * @returns {Promise<{ size: number; iconDirectory: string; cacheFile: string; conversionStatus: any }>} Cache stats.
      */
-    getCacheStats(): Promise<{ size: number; d2rAvailable: boolean; cachePath: string }>
+    getCacheStats(): Promise<{
+      size: number
+      iconDirectory: string
+      cacheFile: string
+      conversionStatus: {
+        status: 'not_started' | 'in_progress' | 'completed' | 'failed'
+        progress?: { current: number; total: number }
+      }
+    }>
   }
 
   /**

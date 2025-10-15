@@ -3,6 +3,7 @@ import { DatabaseCard } from './Database';
 import { GameModeSettings } from './GameModeSettings';
 import { GameVersionSettings } from './GameVersionSettings';
 import { GrailSettings } from './GrailSettings';
+import { ItemIconSettings } from './ItemIconSettings';
 import { NotificationSettings } from './NotificationSettings';
 import { SaveFileMonitor } from './SaveFileMonitor';
 import { ThemeSettings } from './ThemeSettings';
@@ -22,6 +23,7 @@ export function Settings() {
           <GrailSettings />
           <NotificationSettings />
           <ThemeSettings />
+          <ItemIconSettings />
           <GameModeSettings />
           <GameVersionSettings />
           <DatabaseCard />

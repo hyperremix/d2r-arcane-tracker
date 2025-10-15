@@ -444,8 +444,19 @@ export function ItemDetailsDialog({ itemId, open, onOpenChange }: ItemDetailsDia
     [item, progressLookup],
   );
 
-  // Get icon for the item
-  const { iconUrl, isLoading } = useItemIcon(item?.name || '');
+  // Get icon for the item (must be called before early return)
+  // Create a placeholder item for the hook when item is null
+  const placeholderItem: Item = {
+    id: '',
+    name: '',
+    link: '',
+    etherealType: 'none',
+    type: 'unique',
+    category: 'weapons',
+    subCategory: '1h_swords',
+    treasureClass: 'normal',
+  };
+  const { iconUrl, isLoading } = useItemIcon(item || placeholderItem);
 
   // Handle toggle found action
   const handleToggleFound = useCallback(() => {

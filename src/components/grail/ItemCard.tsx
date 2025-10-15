@@ -115,7 +115,7 @@ function ListView({
   handleKeyDown,
   onClick,
 }: ListViewProps) {
-  const { iconUrl, isLoading } = useItemIcon(item.name);
+  const { iconUrl, isLoading } = useItemIcon(item);
   const { settings } = useGrailStore();
 
   return (
@@ -429,7 +429,7 @@ function GridView({
   handleKeyDown,
   onClick,
 }: GridViewProps) {
-  const { iconUrl, isLoading } = useItemIcon(item.name);
+  const { iconUrl, isLoading } = useItemIcon(item);
   const { settings } = useGrailStore();
 
   return (

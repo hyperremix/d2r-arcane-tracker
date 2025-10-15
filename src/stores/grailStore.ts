@@ -68,7 +68,7 @@ const defaultSettings: Settings = {
   nativeNotifications: true,
   needsSeeding: true,
   theme: 'system',
-  showItemIcons: true,
+  showItemIcons: false,
 };
 
 /**

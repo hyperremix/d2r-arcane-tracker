@@ -360,6 +360,9 @@ export type Settings = {
   needsSeeding: boolean;
   theme: 'light' | 'dark' | 'system';
   showItemIcons: boolean;
+  d2rInstallPath?: string; // Path to D2R installation
+  iconConversionStatus?: 'not_started' | 'in_progress' | 'completed' | 'failed';
+  iconConversionProgress?: { current: number; total: number };
   // Advanced monitoring settings (optional, with defaults)
   tickReaderIntervalMs?: number; // Default: 500
   chokidarPollingIntervalMs?: number; // Default: 1000
