@@ -11,7 +11,8 @@ export const necromancer: Item[] = [
     subCategory: 'necromancer',
     treasureClass: 'exceptional',
     code: 'nea',
-    itemBase: 'Zombie Head',
+    itemBase: 'Hierophant Mask',
+    imageFilename: 'demon_head.png',
   },
   {
     id: 'boneflame',
@@ -23,7 +24,8 @@ export const necromancer: Item[] = [
     subCategory: 'necromancer',
     treasureClass: 'elite',
     code: 'nee',
-    itemBase: 'Unraveller Head',
+    itemBase: 'Succubus Skill',
+    imageFilename: 'gargoyle_head.png',
   },
   {
     id: 'darkforcespawn',
@@ -35,6 +37,7 @@ export const necromancer: Item[] = [
     subCategory: 'necromancer',
     treasureClass: 'elite',
     code: 'nef',
-    itemBase: 'Gargoyle Head',
+    itemBase: 'Bloodlord Skull',
+    imageFilename: 'demon_head.png',
   },
 ];

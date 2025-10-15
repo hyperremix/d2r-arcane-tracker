@@ -12,6 +12,7 @@ export const bows: Item[] = [
     treasureClass: 'normal',
     code: 'sbw',
     itemBase: 'Short Bow',
+    imageFilename: 'short_bow.png',
   },
   {
     id: 'witherstring',
@@ -24,6 +25,7 @@ export const bows: Item[] = [
     treasureClass: 'normal',
     code: 'hbw',
     itemBase: "Hunter's Bow",
+    imageFilename: 'hunters_bow.png',
   },
   {
     id: 'ravenclaw',
@@ -36,6 +38,7 @@ export const bows: Item[] = [
     treasureClass: 'normal',
     code: 'lbw',
     itemBase: 'Long Bow',
+    imageFilename: 'long_bow.png',
   },
   {
     id: 'roguesbow',
@@ -48,6 +51,7 @@ export const bows: Item[] = [
     treasureClass: 'normal',
     code: 'cbw',
     itemBase: 'Composite Bow',
+    imageFilename: 'composite_bow.png',
   },
   {
     id: 'stormstrike',
@@ -60,6 +64,7 @@ export const bows: Item[] = [
     treasureClass: 'normal',
     code: 'sbb',
     itemBase: 'Short Battle Bow',
+    imageFilename: 'short_battle_bow.png',
   },
   {
     id: 'wizendraw',
@@ -72,6 +77,7 @@ export const bows: Item[] = [
     treasureClass: 'normal',
     code: 'lbb',
     itemBase: 'Long Battle Bow',
+    imageFilename: 'long_battle_bow.png',
   },
   {
     id: 'hellclap',
@@ -84,6 +90,7 @@ export const bows: Item[] = [
     treasureClass: 'normal',
     code: 'swb',
     itemBase: 'Short War Bow',
+    imageFilename: 'hellclap.png',
   },
   {
     id: 'blastbark',
@@ -96,6 +103,7 @@ export const bows: Item[] = [
     treasureClass: 'normal',
     code: 'lwb',
     itemBase: 'Long War Bow',
+    imageFilename: 'long_war_bow.png',
   },
   {
     id: 'skystrike',
@@ -108,6 +116,7 @@ export const bows: Item[] = [
     treasureClass: 'exceptional',
     code: '8sb',
     itemBase: 'Elegant Blade',
+    imageFilename: 'falchion.png',
   },
   {
     id: 'riphook',
@@ -119,7 +128,8 @@ export const bows: Item[] = [
     subCategory: 'bows',
     treasureClass: 'exceptional',
     code: '8hb',
-    itemBase: 'Grand Matron Bow',
+    itemBase: 'Razor Bow',
+    imageFilename: 'hunters_bow.png',
   },
   {
     id: 'kukoshakaku',
@@ -131,7 +141,8 @@ export const bows: Item[] = [
     subCategory: 'bows',
     treasureClass: 'exceptional',
     code: '8lb',
-    itemBase: 'Shadow Bow',
+    itemBase: 'Cedar Bow',
+    imageFilename: 'kuko_shakaku.png',
   },
   {
     id: 'endlesshail',
@@ -143,7 +154,8 @@ export const bows: Item[] = [
     subCategory: 'bows',
     treasureClass: 'exceptional',
     code: '8cb',
-    itemBase: 'Matriarchal Javelin',
+    itemBase: 'Double Bow',
+    imageFilename: 'piercerib.png',
   },
   {
     id: 'witchwildstring',
@@ -155,7 +167,8 @@ export const bows: Item[] = [
     subCategory: 'bows',
     treasureClass: 'exceptional',
     code: '8s8',
-    itemBase: 'Matriarchal Pike',
+    itemBase: 'Short Siege Bow',
+    imageFilename: 'short_battle_bow.png',
   },
   {
     id: 'cliffkiller',
@@ -167,7 +180,8 @@ export const bows: Item[] = [
     subCategory: 'bows',
     treasureClass: 'exceptional',
     code: '8l8',
-    itemBase: 'Matriarchal Spear',
+    itemBase: 'Large Siege Bow',
+    imageFilename: 'long_battle_bow.png',
   },
   {
     id: 'magewrath',
@@ -179,7 +193,8 @@ export const bows: Item[] = [
     subCategory: 'bows',
     treasureClass: 'exceptional',
     code: '8sw',
-    itemBase: 'Ward Bow',
+    itemBase: 'Rune Bow',
+    imageFilename: 'hellclap.png',
   },
   {
     id: 'goldstrikearch',
@@ -191,7 +206,8 @@ export const bows: Item[] = [
     subCategory: 'bows',
     treasureClass: 'exceptional',
     code: '8lw',
-    itemBase: 'Hydra Bow',
+    itemBase: 'Gothic Bow',
+    imageFilename: 'long_war_bow.png',
   },
   {
     id: 'widowmaker',
@@ -204,6 +220,7 @@ export const bows: Item[] = [
     treasureClass: 'elite',
     code: '6sw',
     itemBase: 'Ward Bow',
+    imageFilename: 'hellclap.png',
   },
   {
     id: 'eaglehorn',
@@ -215,7 +232,8 @@ export const bows: Item[] = [
     subCategory: 'bows',
     treasureClass: 'elite',
     code: '6l7',
-    itemBase: 'Hydra Bow',
+    itemBase: 'Crusader Bow',
+    imageFilename: 'long_war_bow.png',
   },
   {
     id: 'windforce',
@@ -228,5 +246,6 @@ export const bows: Item[] = [
     treasureClass: 'elite',
     code: '6lw',
     itemBase: 'Hydra Bow',
+    imageFilename: 'long_war_bow.png',
   },
 ];

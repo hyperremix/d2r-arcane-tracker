@@ -12,6 +12,7 @@ export const polearms: Item[] = [
     treasureClass: 'normal',
     code: 'bar',
     itemBase: 'Bardiche',
+    imageFilename: 'bardiche.png',
   },
   {
     id: 'steelgoad',
@@ -24,6 +25,7 @@ export const polearms: Item[] = [
     treasureClass: 'normal',
     code: 'vou',
     itemBase: 'Voulge',
+    imageFilename: 'voulge.png',
   },
   {
     id: 'soulharvest',
@@ -36,6 +38,7 @@ export const polearms: Item[] = [
     treasureClass: 'normal',
     code: 'scy',
     itemBase: 'Scythe',
+    imageFilename: 'soul_harvest.png',
   },
   {
     id: 'thebattlebranch',
@@ -48,6 +51,7 @@ export const polearms: Item[] = [
     treasureClass: 'normal',
     code: 'pax',
     itemBase: 'Poleaxe',
+    imageFilename: 'poleaxe.png',
   },
   {
     id: 'woestave',
@@ -60,6 +64,7 @@ export const polearms: Item[] = [
     treasureClass: 'normal',
     code: 'hal',
     itemBase: 'Halberd',
+    imageFilename: 'halberd.png',
   },
   {
     id: 'thegrimreaper',
@@ -72,6 +77,7 @@ export const polearms: Item[] = [
     treasureClass: 'normal',
     code: 'wsc',
     itemBase: 'War Scythe',
+    imageFilename: 'war_scythe.png',
   },
   {
     id: 'themeatscraper',
@@ -84,6 +90,7 @@ export const polearms: Item[] = [
     treasureClass: 'exceptional',
     code: '9b7',
     itemBase: 'Edge Bow',
+    imageFilename: 'short_bow.png',
   },
   {
     id: 'blackleachblade',
@@ -96,6 +103,7 @@ export const polearms: Item[] = [
     treasureClass: 'exceptional',
     code: '9vo',
     itemBase: 'Bill',
+    imageFilename: 'voulge.png',
   },
   {
     id: 'athenaswrath',
@@ -108,6 +116,7 @@ export const polearms: Item[] = [
     treasureClass: 'exceptional',
     code: '9s8',
     itemBase: 'Short Siege Bow',
+    imageFilename: 'short_battle_bow.png',
   },
   {
     id: 'pierretombalecouant',
@@ -119,7 +128,8 @@ export const polearms: Item[] = [
     subCategory: 'polearms',
     treasureClass: 'exceptional',
     code: '9pa',
-    itemBase: 'Akaran Targe',
+    itemBase: 'Partizan',
+    imageFilename: 'poleaxe.png',
   },
   {
     id: 'husoldalevo',
@@ -131,7 +141,8 @@ export const polearms: Item[] = [
     subCategory: 'polearms',
     treasureClass: 'exceptional',
     code: '9h9',
-    itemBase: 'Razor Bow',
+    itemBase: 'Bec-De-Corbin',
+    imageFilename: 'halberd.png',
   },
   {
     id: 'grimsburningdead',
@@ -144,6 +155,7 @@ export const polearms: Item[] = [
     treasureClass: 'exceptional',
     code: '9wc',
     itemBase: 'Grim Scythe',
+    imageFilename: 'war_scythe.png',
   },
   {
     id: 'bonehew',
@@ -156,6 +168,7 @@ export const polearms: Item[] = [
     treasureClass: 'elite',
     code: '7o7',
     itemBase: 'Ogre Axe',
+    imageFilename: 'bardiche.png',
   },
   {
     id: 'thereaperstoll',
@@ -168,6 +181,7 @@ export const polearms: Item[] = [
     treasureClass: 'elite',
     code: '7s8',
     itemBase: 'Thresher',
+    imageFilename: 'scythe.png',
   },
   {
     id: 'tombreaver',
@@ -179,7 +193,8 @@ export const polearms: Item[] = [
     subCategory: 'polearms',
     treasureClass: 'elite',
     code: '7pa',
-    itemBase: 'Sacred Targe',
+    itemBase: 'Cryptic Axe',
+    imageFilename: 'poleaxe.png',
   },
   {
     id: 'stormspire',
@@ -192,5 +207,6 @@ export const polearms: Item[] = [
     treasureClass: 'elite',
     code: '7wc',
     itemBase: 'Giant Thresher',
+    imageFilename: 'war_scythe.png',
   },
 ];

@@ -11,7 +11,8 @@ export const paladin: Item[] = [
     subCategory: 'paladin',
     treasureClass: 'exceptional',
     code: 'pa9',
-    itemBase: 'Targe',
+    itemBase: 'Gilded Shield',
+    imageFilename: 'aerin_shield.png',
   },
   {
     id: 'almanegra',
@@ -24,6 +25,7 @@ export const paladin: Item[] = [
     treasureClass: 'elite',
     code: 'pac',
     itemBase: 'Rondache',
+    imageFilename: 'rondache.png',
   },
   {
     id: 'dragonscale',
@@ -35,6 +37,7 @@ export const paladin: Item[] = [
     subCategory: 'paladin',
     treasureClass: 'elite',
     code: 'pae',
-    itemBase: 'Heraldic Shield',
+    itemBase: 'Zakarum Shield',
+    imageFilename: 'heraldic_shield.png',
   },
 ];

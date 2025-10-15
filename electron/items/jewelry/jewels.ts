@@ -12,6 +12,7 @@ export const jewels: Item[] = [
     category: 'jewelry',
     subCategory: 'rainbow_facets',
     treasureClass: 'normal',
+    imageFilename: 'perfect_diamond2.png',
   },
   {
     id: 'rainbowfacetfirelevelup',
@@ -24,6 +25,7 @@ export const jewels: Item[] = [
     category: 'jewelry',
     subCategory: 'rainbow_facets',
     treasureClass: 'normal',
+    imageFilename: 'perfect_diamond5.png',
   },
   {
     id: 'rainbowfacetlightninglevelup',
@@ -36,6 +38,7 @@ export const jewels: Item[] = [
     category: 'jewelry',
     subCategory: 'rainbow_facets',
     treasureClass: 'normal',
+    imageFilename: 'perfect_diamond6.png',
   },
   {
     id: 'rainbowfacetpoisonlevelup',
@@ -48,6 +51,7 @@ export const jewels: Item[] = [
     category: 'jewelry',
     subCategory: 'rainbow_facets',
     treasureClass: 'normal',
+    imageFilename: 'perfect_diamond4.png',
   },
   {
     id: 'rainbowfacetcolddeath',
@@ -60,6 +64,7 @@ export const jewels: Item[] = [
     category: 'jewelry',
     subCategory: 'dies',
     treasureClass: 'normal',
+    imageFilename: 'perfect_diamond2.png',
   },
   {
     id: 'rainbowfacetfiredeath',
@@ -72,6 +77,7 @@ export const jewels: Item[] = [
     category: 'jewelry',
     subCategory: 'dies',
     treasureClass: 'normal',
+    imageFilename: 'perfect_diamond5.png',
   },
   {
     id: 'rainbowfacetlightningdeath',
@@ -84,6 +90,7 @@ export const jewels: Item[] = [
     category: 'jewelry',
     subCategory: 'dies',
     treasureClass: 'normal',
+    imageFilename: 'perfect_diamond6.png',
   },
   {
     id: 'rainbowfacetpoisondeath',
@@ -96,5 +103,6 @@ export const jewels: Item[] = [
     category: 'jewelry',
     subCategory: 'dies',
     treasureClass: 'normal',
+    imageFilename: 'perfect_diamond4.png',
   },
 ];

@@ -11,6 +11,7 @@ export const rings: Item[] = [
     subCategory: 'rings',
     code: 'rin',
     itemBase: 'Ring',
+    imageFilename: 'ring1.png',
     treasureClass: 'normal',
   },
   {
@@ -23,6 +24,7 @@ export const rings: Item[] = [
     subCategory: 'rings',
     code: 'rin',
     itemBase: 'Ring',
+    imageFilename: 'ring2.png',
     treasureClass: 'normal',
   },
   {
@@ -35,6 +37,7 @@ export const rings: Item[] = [
     subCategory: 'rings',
     code: 'rin',
     itemBase: 'Ring',
+    imageFilename: 'ring3.png',
     treasureClass: 'normal',
   },
   {
@@ -47,6 +50,7 @@ export const rings: Item[] = [
     subCategory: 'rings',
     code: 'rin',
     itemBase: 'Ring',
+    imageFilename: 'ring4.png',
     treasureClass: 'normal',
   },
   {
@@ -59,6 +63,7 @@ export const rings: Item[] = [
     subCategory: 'rings',
     code: 'rin',
     itemBase: 'Ring',
+    imageFilename: 'ring5.png',
     treasureClass: 'normal',
   },
   {
@@ -71,6 +76,7 @@ export const rings: Item[] = [
     subCategory: 'rings',
     code: 'rin',
     itemBase: 'Ring',
+    imageFilename: 'ring1.png',
     treasureClass: 'normal',
   },
   {
@@ -83,6 +89,7 @@ export const rings: Item[] = [
     subCategory: 'rings',
     code: 'rin',
     itemBase: 'Ring',
+    imageFilename: 'ring2.png',
     treasureClass: 'normal',
   },
   {
@@ -95,6 +102,7 @@ export const rings: Item[] = [
     subCategory: 'rings',
     code: 'rin',
     itemBase: 'Ring',
+    imageFilename: 'ring3.png',
     treasureClass: 'normal',
   },
   {
@@ -107,6 +115,7 @@ export const rings: Item[] = [
     subCategory: 'rings',
     code: 'rin',
     itemBase: 'Ring',
+    imageFilename: 'ring4.png',
     treasureClass: 'normal',
   },
 ];

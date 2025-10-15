@@ -12,6 +12,7 @@ export const boots: Item[] = [
     treasureClass: 'normal',
     code: 'lbt',
     itemBase: 'Boots',
+    imageFilename: 'boots.png',
   },
   {
     id: 'gorefoot',
@@ -24,6 +25,7 @@ export const boots: Item[] = [
     treasureClass: 'normal',
     code: 'vbt',
     itemBase: 'Heavy Boots',
+    imageFilename: 'heavy_boots.png',
   },
   {
     id: 'treadsofcthon',
@@ -36,6 +38,7 @@ export const boots: Item[] = [
     treasureClass: 'normal',
     code: 'mbt',
     itemBase: 'Chain Boots',
+    imageFilename: 'chain_boots.png',
   },
   {
     id: 'goblintoe',
@@ -48,6 +51,7 @@ export const boots: Item[] = [
     treasureClass: 'normal',
     code: 'tbt',
     itemBase: 'Light Plated Boots',
+    imageFilename: 'light_plate_boots.png',
   },
   {
     id: 'tearhaunch',
@@ -60,6 +64,7 @@ export const boots: Item[] = [
     treasureClass: 'normal',
     code: 'hbt',
     itemBase: 'Greaves',
+    imageFilename: 'plate_boots.png',
   },
   {
     id: 'infernostride',
@@ -72,6 +77,7 @@ export const boots: Item[] = [
     treasureClass: 'exceptional',
     code: 'xlb',
     itemBase: 'Demonhide Boots',
+    imageFilename: 'leather_boots.png',
   },
   {
     id: 'waterwalk',
@@ -84,6 +90,7 @@ export const boots: Item[] = [
     treasureClass: 'exceptional',
     code: 'xvb',
     itemBase: 'Sharkskin Boots',
+    imageFilename: 'heavy_boots.png',
   },
   {
     id: 'silkweave',
@@ -96,6 +103,7 @@ export const boots: Item[] = [
     treasureClass: 'exceptional',
     code: 'xmb',
     itemBase: 'Mesh Boots',
+    imageFilename: 'chain_boots.png',
   },
   {
     id: 'wartraveler',
@@ -108,6 +116,7 @@ export const boots: Item[] = [
     treasureClass: 'exceptional',
     code: 'xtb',
     itemBase: 'Battle Boots',
+    imageFilename: 'light_plate_boots.png',
   },
   {
     id: 'gorerider',
@@ -120,6 +129,7 @@ export const boots: Item[] = [
     treasureClass: 'exceptional',
     code: 'xhb',
     itemBase: 'War Boots',
+    imageFilename: 'plate_boots.png',
   },
   {
     id: 'marrowwalk',
@@ -132,6 +142,7 @@ export const boots: Item[] = [
     treasureClass: 'elite',
     code: 'umb1',
     itemBase: 'Scarabshell Boots',
+    imageFilename: 'heavy_boots.png',
   },
   {
     id: 'sandstormtrek',
@@ -144,6 +155,7 @@ export const boots: Item[] = [
     treasureClass: 'elite',
     code: 'uvb',
     itemBase: 'Wyrmhide Boots',
+    imageFilename: 'leather_boots.png',
   },
   {
     id: 'shadowdancer',
@@ -156,5 +168,6 @@ export const boots: Item[] = [
     treasureClass: 'elite',
     code: 'uhb',
     itemBase: 'Myrmidon Greaves',
+    imageFilename: 'plate_boots.png',
   },
 ];

@@ -12,6 +12,7 @@ export const wands: Item[] = [
     treasureClass: 'normal',
     code: 'wnd',
     itemBase: 'Wand',
+    imageFilename: 'wand.png',
   },
   {
     id: 'maelstrom',
@@ -24,6 +25,7 @@ export const wands: Item[] = [
     treasureClass: 'normal',
     code: 'ywn',
     itemBase: 'Yew Wand',
+    imageFilename: 'yew_wand.png',
   },
   {
     id: 'gravenspine',
@@ -36,6 +38,7 @@ export const wands: Item[] = [
     treasureClass: 'normal',
     code: 'bwn',
     itemBase: 'Bone Wand',
+    imageFilename: 'gravenspine.png',
   },
   {
     id: 'umeslament',
@@ -48,6 +51,7 @@ export const wands: Item[] = [
     treasureClass: 'normal',
     code: 'gwn',
     itemBase: 'Grim Wand',
+    imageFilename: 'grim_wand.png',
   },
   {
     id: 'suicidebranch',
@@ -60,6 +64,7 @@ export const wands: Item[] = [
     treasureClass: 'exceptional',
     code: '9wn',
     itemBase: 'Burnt Wand',
+    imageFilename: 'wand.png',
   },
   {
     id: 'carinshard',
@@ -72,6 +77,7 @@ export const wands: Item[] = [
     treasureClass: 'exceptional',
     code: '9yw',
     itemBase: 'Petrified Wand',
+    imageFilename: 'yew_wand.png',
   },
   {
     id: 'armofkingleoric',
@@ -84,6 +90,7 @@ export const wands: Item[] = [
     treasureClass: 'exceptional',
     code: '9bw',
     itemBase: 'Tomb Wand',
+    imageFilename: 'bone_wand.png',
   },
   {
     id: 'blackhandkey',
@@ -96,6 +103,7 @@ export const wands: Item[] = [
     treasureClass: 'exceptional',
     code: '9gw',
     itemBase: 'Grave Wand',
+    imageFilename: 'blackhand_key.png',
   },
   {
     id: 'boneshade',
@@ -107,7 +115,8 @@ export const wands: Item[] = [
     subCategory: 'wands',
     treasureClass: 'elite',
     code: '7bw',
-    itemBase: 'Battle Cestus',
+    itemBase: 'Lich Wand',
+    imageFilename: 'gravenspine.png',
   },
   {
     id: 'deathsweb',
@@ -120,5 +129,6 @@ export const wands: Item[] = [
     treasureClass: 'elite',
     code: '7gw',
     itemBase: 'Unearthed Wand',
+    imageFilename: 'grim_wand.png',
   },
 ];

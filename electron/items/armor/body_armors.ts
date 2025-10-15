@@ -12,6 +12,7 @@ export const bodyArmors: Item[] = [
     treasureClass: 'normal',
     code: 'qui',
     itemBase: 'Quilted Armor',
+    imageFilename: 'quilted_armor.png',
   },
   {
     id: 'blinkbatsform',
@@ -24,6 +25,7 @@ export const bodyArmors: Item[] = [
     treasureClass: 'normal',
     code: 'lea',
     itemBase: 'Leather Armor',
+    imageFilename: 'leather_armor.png',
   },
   {
     id: 'thecenturion',
@@ -36,6 +38,7 @@ export const bodyArmors: Item[] = [
     treasureClass: 'normal',
     code: 'hla',
     itemBase: 'Hard Leather Armor',
+    imageFilename: 'hard_leather_armor.png',
   },
   {
     id: 'twitchthroe',
@@ -48,6 +51,7 @@ export const bodyArmors: Item[] = [
     treasureClass: 'normal',
     code: 'stu',
     itemBase: 'Studded Leather',
+    imageFilename: 'studded_leather.png',
   },
   {
     id: 'darkglow',
@@ -60,6 +64,7 @@ export const bodyArmors: Item[] = [
     treasureClass: 'normal',
     code: 'rng',
     itemBase: 'Ring Mail',
+    imageFilename: 'ring_mail.png',
   },
   {
     id: 'hawkmail',
@@ -72,6 +77,7 @@ export const bodyArmors: Item[] = [
     treasureClass: 'normal',
     code: 'scl',
     itemBase: 'Scale Mail',
+    imageFilename: 'scale_mail.png',
   },
   {
     id: 'venomward',
@@ -84,6 +90,7 @@ export const bodyArmors: Item[] = [
     treasureClass: 'normal',
     code: 'brs',
     itemBase: 'Breast Plate',
+    imageFilename: 'breast_plate.png',
   },
   {
     id: 'sparkingmail',
@@ -96,6 +103,7 @@ export const bodyArmors: Item[] = [
     treasureClass: 'normal',
     code: 'chn',
     itemBase: 'Chain Mail',
+    imageFilename: 'chain_mail.png',
   },
   {
     id: 'iceblink',
@@ -108,6 +116,7 @@ export const bodyArmors: Item[] = [
     treasureClass: 'normal',
     code: 'spl',
     itemBase: 'Splint Mail',
+    imageFilename: 'splint_mail.png',
   },
   {
     id: 'heavenlygarb',
@@ -120,6 +129,7 @@ export const bodyArmors: Item[] = [
     treasureClass: 'normal',
     code: 'ltp',
     itemBase: 'Light Plate',
+    imageFilename: 'light_plate.png',
   },
   {
     id: 'rockfleece',
@@ -132,6 +142,7 @@ export const bodyArmors: Item[] = [
     treasureClass: 'normal',
     code: 'fld',
     itemBase: 'Field Plate',
+    imageFilename: 'field_plate.png',
   },
   {
     id: 'boneflesh',
@@ -144,6 +155,7 @@ export const bodyArmors: Item[] = [
     treasureClass: 'normal',
     code: 'plt',
     itemBase: 'Plate Mail',
+    imageFilename: 'plate_mail.png',
   },
   {
     id: 'rattlecage',
@@ -156,6 +168,7 @@ export const bodyArmors: Item[] = [
     treasureClass: 'normal',
     code: 'gth',
     itemBase: 'Gothic Plate',
+    imageFilename: 'gothic_plate.png',
   },
   {
     id: 'goldskin',
@@ -168,6 +181,7 @@ export const bodyArmors: Item[] = [
     treasureClass: 'normal',
     code: 'ful',
     itemBase: 'Full Plate Mail',
+    imageFilename: 'goldskin.png',
   },
   {
     id: 'silksofthevictor',
@@ -180,6 +194,7 @@ export const bodyArmors: Item[] = [
     treasureClass: 'normal',
     code: 'aar',
     itemBase: 'Ancient Armor',
+    imageFilename: 'victors_silk.png',
   },
   {
     id: 'thespiritshroud',
@@ -192,6 +207,7 @@ export const bodyArmors: Item[] = [
     treasureClass: 'exceptional',
     code: 'xui',
     itemBase: 'Ghost Armor',
+    imageFilename: 'quilted_armor.png',
   },
   {
     id: 'skinofthevipermagi',
@@ -204,6 +220,7 @@ export const bodyArmors: Item[] = [
     treasureClass: 'exceptional',
     code: 'xea',
     itemBase: 'Serpentskin Armor',
+    imageFilename: 'leather_armor.png',
   },
   {
     id: 'skinoftheflayedone',
@@ -216,6 +233,7 @@ export const bodyArmors: Item[] = [
     treasureClass: 'exceptional',
     code: 'xla',
     itemBase: 'Demonhide Armor',
+    imageFilename: 'hard_leather_armor.png',
   },
   {
     id: 'ironpelt',
@@ -228,6 +246,7 @@ export const bodyArmors: Item[] = [
     treasureClass: 'exceptional',
     code: 'xtu',
     itemBase: 'Trellised Armor',
+    imageFilename: 'studded_leather.png',
   },
   {
     id: 'crowcaw',
@@ -240,6 +259,7 @@ export const bodyArmors: Item[] = [
     treasureClass: 'exceptional',
     code: 'xcl',
     itemBase: 'Tigulated Mail',
+    imageFilename: 'scale_mail.png',
   },
   {
     id: 'spiritforge',
@@ -252,6 +272,7 @@ export const bodyArmors: Item[] = [
     treasureClass: 'exceptional',
     code: 'xng',
     itemBase: 'Linked Mail',
+    imageFilename: 'ring_mail.png',
   },
   {
     id: 'durielsshell',
@@ -264,6 +285,7 @@ export const bodyArmors: Item[] = [
     treasureClass: 'exceptional',
     code: 'xrs',
     itemBase: 'Cuirass',
+    imageFilename: 'breast_plate.png',
   },
   {
     id: 'shaftstop',
@@ -276,6 +298,7 @@ export const bodyArmors: Item[] = [
     treasureClass: 'exceptional',
     code: 'xhn',
     itemBase: 'Mesh Armor',
+    imageFilename: 'chain_mail.png',
   },
   {
     id: 'skulldersire',
@@ -288,6 +311,7 @@ export const bodyArmors: Item[] = [
     treasureClass: 'exceptional',
     code: 'xpl',
     itemBase: 'Russet Armor',
+    imageFilename: 'splint_mail.png',
   },
   {
     id: 'queheganswisdom',
@@ -300,6 +324,7 @@ export const bodyArmors: Item[] = [
     treasureClass: 'exceptional',
     code: 'xtp',
     itemBase: 'Templar Coat',
+    imageFilename: 'plate_mail.png',
   },
   {
     id: 'toothrow',
@@ -312,6 +337,7 @@ export const bodyArmors: Item[] = [
     treasureClass: 'exceptional',
     code: 'xld',
     itemBase: 'Sharktooth Armor',
+    imageFilename: 'field_plate.png',
   },
   {
     id: 'guardianangel',
@@ -336,6 +362,7 @@ export const bodyArmors: Item[] = [
     treasureClass: 'exceptional',
     code: 'xth',
     itemBase: 'Sharktooth Armor',
+    imageFilename: 'field_plate.png',
   },
   {
     id: 'blackhades',
@@ -348,6 +375,7 @@ export const bodyArmors: Item[] = [
     treasureClass: 'exceptional',
     code: 'xul',
     itemBase: 'Embossed Plate',
+    imageFilename: 'gothic_plate.png',
   },
   {
     id: 'corpsemourn',
@@ -360,6 +388,7 @@ export const bodyArmors: Item[] = [
     treasureClass: 'exceptional',
     code: 'xar',
     itemBase: 'Chaos Armor',
+    imageFilename: 'corpsemourn.png',
   },
   {
     id: 'ormusrobes',
@@ -372,6 +401,7 @@ export const bodyArmors: Item[] = [
     treasureClass: 'elite',
     code: 'uui',
     itemBase: 'Dusk Shroud',
+    imageFilename: 'quilted_armor.png',
   },
   {
     id: 'thegladiatorsbane',
@@ -384,6 +414,7 @@ export const bodyArmors: Item[] = [
     treasureClass: 'elite',
     code: 'utu',
     itemBase: 'Wire Fleece',
+    imageFilename: 'studded_leather.png',
   },
   {
     id: 'arkainesvalor',
@@ -396,6 +427,7 @@ export const bodyArmors: Item[] = [
     treasureClass: 'elite',
     code: 'upl',
     itemBase: 'Balrog Skin',
+    imageFilename: 'splint_mail.png',
   },
   {
     id: 'leviathan',
@@ -408,6 +440,7 @@ export const bodyArmors: Item[] = [
     treasureClass: 'elite',
     code: 'uld',
     itemBase: 'Kraken Shell',
+    imageFilename: 'field_plate.png',
   },
   {
     id: 'steelcarapace',
@@ -420,6 +453,7 @@ export const bodyArmors: Item[] = [
     treasureClass: 'elite',
     code: 'uul',
     itemBase: 'Lacquered Plate',
+    imageFilename: 'gothic_plate.png',
   },
   {
     id: 'templarsmight',
@@ -432,6 +466,7 @@ export const bodyArmors: Item[] = [
     treasureClass: 'elite',
     code: 'uar',
     itemBase: 'Sacred Armor',
+    imageFilename: 'ancient_armor.png',
   },
   {
     id: 'tyraelsmight',
@@ -444,5 +479,6 @@ export const bodyArmors: Item[] = [
     treasureClass: 'elite',
     code: 'uar',
     itemBase: 'Sacred Armor',
+    imageFilename: 'ancient_armor.png',
   },
 ];

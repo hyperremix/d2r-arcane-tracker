@@ -11,7 +11,8 @@ export const throwing: Item[] = [
     subCategory: 'throwing',
     treasureClass: 'exceptional',
     code: '9tk',
-    itemBase: 'Francisca',
+    itemBase: 'Battle Dart',
+    imageFilename: 'throwing_knife.png',
   },
   {
     id: 'thescalper',
@@ -24,6 +25,7 @@ export const throwing: Item[] = [
     treasureClass: 'exceptional',
     code: '9ta',
     itemBase: 'Francisca',
+    imageFilename: 'throwing_axe.png',
   },
   {
     id: 'gimmershred',
@@ -36,6 +38,7 @@ export const throwing: Item[] = [
     treasureClass: 'elite',
     code: '7ta',
     itemBase: 'Tomahawk',
+    imageFilename: 'throwing_axe.png',
   },
   {
     id: 'lacerator',
@@ -47,7 +50,8 @@ export const throwing: Item[] = [
     subCategory: 'throwing',
     treasureClass: 'elite',
     code: '7b8',
-    itemBase: 'Wrist Sword',
+    itemBase: 'Winged Axe',
+    imageFilename: 'balanced_axe.png',
   },
   {
     id: 'warshrike',
@@ -60,6 +64,7 @@ export const throwing: Item[] = [
     treasureClass: 'elite',
     code: '7bk',
     itemBase: 'Winged Knife',
+    imageFilename: 'warshrike.png',
   },
   {
     id: 'demonsarch',
@@ -72,6 +77,7 @@ export const throwing: Item[] = [
     treasureClass: 'elite',
     code: '7s7',
     itemBase: 'Balrog Spear',
+    imageFilename: 'short_spear.png',
   },
   {
     id: 'wraithflight',
@@ -84,6 +90,7 @@ export const throwing: Item[] = [
     treasureClass: 'elite',
     code: '7gl',
     itemBase: 'Ghost Glaive',
+    imageFilename: 'glaive.png',
   },
   {
     id: 'gargoylesbite',
@@ -96,5 +103,6 @@ export const throwing: Item[] = [
     treasureClass: 'elite',
     code: '7ts',
     itemBase: 'Winged Harpoon',
+    imageFilename: 'throwing_spear.png',
   },
 ];

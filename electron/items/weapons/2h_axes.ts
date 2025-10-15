@@ -12,6 +12,7 @@ export const twoHandedAxes: Item[] = [
     treasureClass: 'normal',
     code: 'lax',
     itemBase: 'Large Axe',
+    imageFilename: 'large_axe.png',
   },
   {
     id: 'goreshovel',
@@ -24,6 +25,7 @@ export const twoHandedAxes: Item[] = [
     treasureClass: 'normal',
     code: 'bax',
     itemBase: 'Broad Axe',
+    imageFilename: 'broad_axe.png',
   },
   {
     id: 'thechieftain',
@@ -36,6 +38,7 @@ export const twoHandedAxes: Item[] = [
     treasureClass: 'normal',
     code: 'btx',
     itemBase: 'Battle Axe',
+    imageFilename: 'the_chieftain.png',
   },
   {
     id: 'brainhew',
@@ -48,6 +51,7 @@ export const twoHandedAxes: Item[] = [
     treasureClass: 'normal',
     code: 'gax',
     itemBase: 'Great Axe',
+    imageFilename: 'brainhew.png',
   },
   {
     id: 'humongous',
@@ -60,6 +64,7 @@ export const twoHandedAxes: Item[] = [
     treasureClass: 'normal',
     code: 'gix',
     itemBase: 'Giant Axe',
+    imageFilename: 'giant_axe.png',
   },
   {
     id: 'warlordstrust',
@@ -72,6 +77,7 @@ export const twoHandedAxes: Item[] = [
     treasureClass: 'exceptional',
     code: '9la',
     itemBase: 'Military Axe',
+    imageFilename: 'military_axe.png',
   },
   {
     id: 'spellsteel',
@@ -83,7 +89,8 @@ export const twoHandedAxes: Item[] = [
     subCategory: '2h_axes',
     treasureClass: 'exceptional',
     code: '9ba',
-    itemBase: 'Hatchet Hands',
+    itemBase: 'Bearded Axe',
+    imageFilename: 'broad_axe.png',
   },
   {
     id: 'stormrider',
@@ -95,7 +102,8 @@ export const twoHandedAxes: Item[] = [
     subCategory: '2h_axes',
     treasureClass: 'exceptional',
     code: '9bt',
-    itemBase: 'Claws',
+    itemBase: 'Tabar',
+    imageFilename: 'stormrider.png',
   },
   {
     id: 'boneslayerblade',
@@ -108,6 +116,7 @@ export const twoHandedAxes: Item[] = [
     treasureClass: 'exceptional',
     code: '9ga',
     itemBase: 'Gothic Axe',
+    imageFilename: 'brainhew.png',
   },
   {
     id: 'theminotaur',
@@ -120,6 +129,7 @@ export const twoHandedAxes: Item[] = [
     treasureClass: 'exceptional',
     code: '9gi',
     itemBase: 'Ancient Axe',
+    imageFilename: 'the_minotaur.png',
   },
   {
     id: 'etherealedge',
@@ -131,7 +141,8 @@ export const twoHandedAxes: Item[] = [
     subCategory: '2h_axes',
     treasureClass: 'elite',
     code: '7ba',
-    itemBase: 'Wrist Sword',
+    itemBase: 'Silver-Edged Axe',
+    imageFilename: 'broad_axe.png',
   },
   {
     id: 'hellslayer',
@@ -143,7 +154,8 @@ export const twoHandedAxes: Item[] = [
     subCategory: '2h_axes',
     treasureClass: 'elite',
     code: '7bt',
-    itemBase: 'Battle Cestus',
+    itemBase: 'Decapitator',
+    imageFilename: 'the_chieftain.png',
   },
   {
     id: 'messerschmidtsreaver',
@@ -156,6 +168,7 @@ export const twoHandedAxes: Item[] = [
     treasureClass: 'elite',
     code: '7ga',
     itemBase: 'Champion Axe',
+    imageFilename: 'brainhew.png',
   },
   {
     id: 'executionersjustice',
@@ -168,5 +181,6 @@ export const twoHandedAxes: Item[] = [
     treasureClass: 'elite',
     code: '7gi',
     itemBase: 'Glorious Axe',
+    imageFilename: 'great_axe.png',
   },
 ];

@@ -12,6 +12,7 @@ export const oneHandedAxes: Item[] = [
     treasureClass: 'normal',
     code: 'hax',
     itemBase: 'Hand Axe',
+    imageFilename: 'the_gnasher.png',
   },
   {
     id: 'deathspade',
@@ -24,6 +25,7 @@ export const oneHandedAxes: Item[] = [
     treasureClass: 'normal',
     code: 'axe',
     itemBase: 'Axe',
+    imageFilename: 'deathspade.png',
   },
   {
     id: 'bladebone',
@@ -36,6 +38,7 @@ export const oneHandedAxes: Item[] = [
     treasureClass: 'normal',
     code: '2ax',
     itemBase: 'Double Axe',
+    imageFilename: 'double_axe.png',
   },
   {
     id: 'skullsplitter',
@@ -48,6 +51,7 @@ export const oneHandedAxes: Item[] = [
     treasureClass: 'normal',
     code: 'mpi',
     itemBase: 'Military Pick',
+    imageFilename: 'mindrend.png',
   },
   {
     id: 'rakescar',
@@ -60,6 +64,7 @@ export const oneHandedAxes: Item[] = [
     treasureClass: 'normal',
     code: 'wax',
     itemBase: 'War Axe',
+    imageFilename: 'war_axe.png',
   },
   {
     id: 'coldkill',
@@ -72,6 +77,7 @@ export const oneHandedAxes: Item[] = [
     treasureClass: 'exceptional',
     code: '9ha',
     itemBase: 'Hatchet',
+    imageFilename: 'the_gnasher.png',
   },
   {
     id: 'butcherspupil',
@@ -84,6 +90,7 @@ export const oneHandedAxes: Item[] = [
     treasureClass: 'exceptional',
     code: '9ax',
     itemBase: 'Cleaver',
+    imageFilename: 'deathspade.png',
   },
   {
     id: 'islestrike',
@@ -96,6 +103,7 @@ export const oneHandedAxes: Item[] = [
     treasureClass: 'exceptional',
     code: '92a',
     itemBase: 'Twin Axe',
+    imageFilename: 'double_axe.png',
   },
   {
     id: 'pompeiiswrath',
@@ -108,6 +116,7 @@ export const oneHandedAxes: Item[] = [
     treasureClass: 'exceptional',
     code: '9mp',
     itemBase: 'Crowbill',
+    imageFilename: 'mindrend.png',
   },
   {
     id: 'guardiannaga',
@@ -120,6 +129,7 @@ export const oneHandedAxes: Item[] = [
     treasureClass: 'exceptional',
     code: '9wa',
     itemBase: 'Naga',
+    imageFilename: 'war_axe.png',
   },
   {
     id: 'razorsedge',
@@ -132,6 +142,7 @@ export const oneHandedAxes: Item[] = [
     treasureClass: 'elite',
     code: '7ha',
     itemBase: 'Tomahawk',
+    imageFilename: 'the_gnasher.png',
   },
   {
     id: 'runemaster',
@@ -144,6 +155,7 @@ export const oneHandedAxes: Item[] = [
     treasureClass: 'elite',
     code: '72a',
     itemBase: 'Ettin Axe',
+    imageFilename: 'double_axe.png',
   },
   {
     id: 'cranebeak',
@@ -156,6 +168,7 @@ export const oneHandedAxes: Item[] = [
     treasureClass: 'elite',
     code: '7mp',
     itemBase: 'War Spike',
+    imageFilename: 'mindrend.png',
   },
   {
     id: 'deathcleaver',
@@ -168,5 +181,6 @@ export const oneHandedAxes: Item[] = [
     treasureClass: 'elite',
     code: '7wa',
     itemBase: 'Berserker Axe',
+    imageFilename: 'war_axe.png',
   },
 ];

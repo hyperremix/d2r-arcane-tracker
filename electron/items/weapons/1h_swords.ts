@@ -12,6 +12,7 @@ export const oneHandedSwords: Item[] = [
     treasureClass: 'normal',
     code: 'ssd',
     itemBase: 'Short Sword',
+    imageFilename: 'short_sword.png',
   },
   {
     id: 'bloodcrescent',
@@ -24,6 +25,7 @@ export const oneHandedSwords: Item[] = [
     treasureClass: 'normal',
     code: 'scm',
     itemBase: 'Scimitar',
+    imageFilename: 'blood_crescent.png',
   },
   {
     id: 'skewerofkrintiz',
@@ -36,6 +38,7 @@ export const oneHandedSwords: Item[] = [
     treasureClass: 'normal',
     code: 'sbr',
     itemBase: 'Sabre',
+    imageFilename: 'krintizs_skewer.png',
   },
   {
     id: 'gleamscythe',
@@ -48,6 +51,7 @@ export const oneHandedSwords: Item[] = [
     treasureClass: 'normal',
     code: 'flc',
     itemBase: 'Falchion',
+    imageFilename: 'gleamscythe.png',
   },
   {
     id: 'griswoldsedge',
@@ -60,6 +64,7 @@ export const oneHandedSwords: Item[] = [
     treasureClass: 'normal',
     code: 'bsd',
     itemBase: 'Broad Sword',
+    imageFilename: 'broad_sword.png',
   },
   {
     id: 'hellplague',
@@ -72,6 +77,7 @@ export const oneHandedSwords: Item[] = [
     treasureClass: 'normal',
     code: 'lsd',
     itemBase: 'Long Sword',
+    imageFilename: 'hellplague.png',
   },
   {
     id: 'culwenspoint',
@@ -84,6 +90,7 @@ export const oneHandedSwords: Item[] = [
     treasureClass: 'normal',
     code: 'wsd',
     itemBase: 'War Sword',
+    imageFilename: 'war_sword.png',
   },
   {
     id: 'bloodletter',
@@ -96,6 +103,7 @@ export const oneHandedSwords: Item[] = [
     treasureClass: 'exceptional',
     code: '9ss',
     itemBase: 'Falcata',
+    imageFilename: 'scimitar.png',
   },
   {
     id: 'coldsteeleye',
@@ -108,6 +116,7 @@ export const oneHandedSwords: Item[] = [
     treasureClass: 'exceptional',
     code: '9sm',
     itemBase: 'Ataghan',
+    imageFilename: 'saber.png',
   },
   {
     id: 'hexfire',
@@ -120,6 +129,7 @@ export const oneHandedSwords: Item[] = [
     treasureClass: 'exceptional',
     code: '9sb',
     itemBase: 'Scissors Katar',
+    imageFilename: 'hexfire.png',
   },
   {
     id: 'bladeofalibaba',
@@ -131,7 +141,8 @@ export const oneHandedSwords: Item[] = [
     subCategory: '1h_swords',
     treasureClass: 'exceptional',
     code: '9fc',
-    itemBase: 'Hydra Edge',
+    itemBase: 'Tulwar',
+    imageFilename: 'falchion.png',
   },
   {
     id: 'ginthersrift',
@@ -144,6 +155,7 @@ export const oneHandedSwords: Item[] = [
     treasureClass: 'exceptional',
     code: '9cr',
     itemBase: 'Phase Blade',
+    imageFilename: 'crystal_sword.png',
   },
   {
     id: 'headstriker',
@@ -156,6 +168,7 @@ export const oneHandedSwords: Item[] = [
     treasureClass: 'exceptional',
     code: '9bs',
     itemBase: 'Gothic Staff',
+    imageFilename: 'battle_staff.png',
   },
   {
     id: 'plaguebearer',
@@ -168,6 +181,7 @@ export const oneHandedSwords: Item[] = [
     treasureClass: 'exceptional',
     code: '9ls',
     itemBase: 'Quarterstaff',
+    imageFilename: 'plague_bearer.png',
   },
   {
     id: 'theatlantean',
@@ -180,6 +194,7 @@ export const oneHandedSwords: Item[] = [
     treasureClass: 'exceptional',
     code: '9wd',
     itemBase: 'Mythical Sword',
+    imageFilename: 'war_sword.png',
   },
   {
     id: 'azurewrath',
@@ -192,6 +207,7 @@ export const oneHandedSwords: Item[] = [
     treasureClass: 'elite',
     code: '7cr',
     itemBase: 'Phase Blade',
+    imageFilename: 'crystal_sword.png',
   },
   {
     id: 'bloodmoon',
@@ -203,7 +219,8 @@ export const oneHandedSwords: Item[] = [
     subCategory: '1h_swords',
     treasureClass: 'elite',
     code: '7sb',
-    itemBase: 'Runic Talons',
+    itemBase: 'Elegant Blade',
+    imageFilename: 'hexfire.png',
   },
   {
     id: 'djinnslayer',
@@ -216,6 +233,7 @@ export const oneHandedSwords: Item[] = [
     treasureClass: 'elite',
     code: '7sm',
     itemBase: 'Mythical Sword',
+    imageFilename: 'war_sword.png',
   },
   {
     id: 'frostwind',
@@ -227,7 +245,8 @@ export const oneHandedSwords: Item[] = [
     subCategory: '1h_swords',
     treasureClass: 'elite',
     code: '7ls',
-    itemBase: 'Stalagmite',
+    itemBase: 'Cryptic Sword',
+    imageFilename: 'hellplague.png',
   },
   {
     id: 'lightsabre',
@@ -240,5 +259,6 @@ export const oneHandedSwords: Item[] = [
     treasureClass: 'elite',
     code: '7cr',
     itemBase: 'Phase Blade',
+    imageFilename: 'lightsabre.png',
   },
 ];

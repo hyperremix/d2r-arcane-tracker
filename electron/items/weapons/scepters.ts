@@ -12,6 +12,7 @@ export const scepters: Item[] = [
     treasureClass: 'normal',
     code: 'scp',
     itemBase: 'Scepter',
+    imageFilename: 'scepter.png',
   },
   {
     id: 'rusthandle',
@@ -24,6 +25,7 @@ export const scepters: Item[] = [
     treasureClass: 'normal',
     code: 'gsc',
     itemBase: 'Grand Scepter',
+    imageFilename: 'grand_scepter.png',
   },
   {
     id: 'stormeye',
@@ -36,6 +38,7 @@ export const scepters: Item[] = [
     treasureClass: 'normal',
     code: 'wsp',
     itemBase: 'War Scepter',
+    imageFilename: 'war_scepter.png',
   },
   {
     id: 'zakarumshand',
@@ -47,7 +50,8 @@ export const scepters: Item[] = [
     subCategory: 'scepters',
     treasureClass: 'exceptional',
     code: '9sc',
-    itemBase: 'Blade Talons',
+    itemBase: 'Rune Scepter',
+    imageFilename: 'scepter.png',
   },
   {
     id: 'thefetidsprinkler',
@@ -60,6 +64,7 @@ export const scepters: Item[] = [
     treasureClass: 'exceptional',
     code: '9qs',
     itemBase: 'Holy Water Sprinkler',
+    imageFilename: 'grand_scepter.png',
   },
   {
     id: 'handofblessedlight',
@@ -72,6 +77,7 @@ export const scepters: Item[] = [
     treasureClass: 'exceptional',
     code: '9ws',
     itemBase: 'Divine Scepter',
+    imageFilename: 'war_scepter.png',
   },
   {
     id: 'astreonsironward',
@@ -84,6 +90,7 @@ export const scepters: Item[] = [
     treasureClass: 'elite',
     code: '7ws',
     itemBase: 'Caduceus',
+    imageFilename: 'war_scepter.png',
   },
   {
     id: 'heavenslight',
@@ -95,7 +102,8 @@ export const scepters: Item[] = [
     subCategory: 'scepters',
     treasureClass: 'elite',
     code: '7sc',
-    itemBase: 'Feral Claws',
+    itemBase: 'Mighty Scepter',
+    imageFilename: 'scepter.png',
   },
   {
     id: 'theredeemer',
@@ -107,6 +115,7 @@ export const scepters: Item[] = [
     subCategory: 'scepters',
     treasureClass: 'elite',
     code: '7sc',
-    itemBase: 'Feral Claws',
+    itemBase: 'Mighty Scepter',
+    imageFilename: 'scepter.png',
   },
 ];

@@ -11,7 +11,8 @@ export const druid: Item[] = [
     subCategory: 'druid',
     treasureClass: 'exceptional',
     code: 'dra',
-    itemBase: 'Club',
+    itemBase: 'Totemic Mask',
+    imageFilename: 'spirit_mask.png',
   },
   {
     id: 'cerebusbite',
@@ -23,7 +24,8 @@ export const druid: Item[] = [
     subCategory: 'druid',
     treasureClass: 'elite',
     code: 'drb',
-    itemBase: 'Scepter',
+    itemBase: 'Blood Spirit',
+    imageFilename: 'spirit_mask.png',
   },
   {
     id: 'ravenlore',
@@ -35,7 +37,8 @@ export const druid: Item[] = [
     subCategory: 'druid',
     treasureClass: 'elite',
     code: 'dre',
-    itemBase: 'Totem',
+    itemBase: 'Sky Spirit',
+    imageFilename: 'falcon_mask.png',
   },
   {
     id: 'spiritkeeper',
@@ -47,6 +50,7 @@ export const druid: Item[] = [
     subCategory: 'druid',
     treasureClass: 'elite',
     code: 'drd',
-    itemBase: 'Fetish',
+    itemBase: 'Earth Spirit',
+    imageFilename: 'antlers.png',
   },
 ];

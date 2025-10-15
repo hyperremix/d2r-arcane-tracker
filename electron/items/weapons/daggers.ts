@@ -12,6 +12,7 @@ export const daggers: Item[] = [
     treasureClass: 'normal',
     code: 'dgr',
     itemBase: 'Dagger',
+    imageFilename: 'dagger.png',
   },
   {
     id: 'thediggler',
@@ -24,6 +25,7 @@ export const daggers: Item[] = [
     treasureClass: 'normal',
     code: 'dir',
     itemBase: 'Dirk',
+    imageFilename: 'dirk.png',
   },
   {
     id: 'thejadetando',
@@ -36,6 +38,7 @@ export const daggers: Item[] = [
     treasureClass: 'normal',
     code: 'kri',
     itemBase: 'Kris',
+    imageFilename: 'the_jade_tan_do.png',
   },
   {
     id: 'spectralshard',
@@ -48,6 +51,7 @@ export const daggers: Item[] = [
     treasureClass: 'normal',
     code: 'bld',
     itemBase: 'Blade',
+    imageFilename: 'blade.png',
   },
   {
     id: 'spineripper',
@@ -60,6 +64,7 @@ export const daggers: Item[] = [
     treasureClass: 'exceptional',
     code: '9dg',
     itemBase: 'Poignard',
+    imageFilename: 'dagger.png',
   },
   {
     id: 'heartcarver',
@@ -72,6 +77,7 @@ export const daggers: Item[] = [
     treasureClass: 'exceptional',
     code: '9di',
     itemBase: 'Rondel',
+    imageFilename: 'dirk.png',
   },
   {
     id: 'blackbogssharp',
@@ -84,6 +90,7 @@ export const daggers: Item[] = [
     treasureClass: 'exceptional',
     code: '9kr',
     itemBase: 'Cinquedeas',
+    imageFilename: 'the_jade_tan_do.png',
   },
   {
     id: 'stormspike',
@@ -95,7 +102,8 @@ export const daggers: Item[] = [
     subCategory: 'daggers',
     treasureClass: 'exceptional',
     code: '9bl',
-    itemBase: 'Cestus',
+    itemBase: 'Stiletto',
+    imageFilename: 'stormspike.png',
   },
   {
     id: 'fleshripper',
@@ -108,6 +116,7 @@ export const daggers: Item[] = [
     treasureClass: 'elite',
     code: '7kr',
     itemBase: 'Fanged Knife',
+    imageFilename: 'the_jade_tan_do.png',
   },
   {
     id: 'ghostflame',
@@ -119,7 +128,8 @@ export const daggers: Item[] = [
     subCategory: 'daggers',
     treasureClass: 'elite',
     code: '7bl',
-    itemBase: 'War Fist',
+    itemBase: 'Legend Spike',
+    imageFilename: 'blade.png',
   },
   {
     id: 'wizardspike',
@@ -132,5 +142,6 @@ export const daggers: Item[] = [
     treasureClass: 'elite',
     code: '7dg',
     itemBase: 'Bone Knife',
+    imageFilename: 'dagger.png',
   },
 ];

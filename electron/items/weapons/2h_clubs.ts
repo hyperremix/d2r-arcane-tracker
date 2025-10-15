@@ -12,6 +12,7 @@ export const twoHandedClubs: Item[] = [
     treasureClass: 'normal',
     code: 'mau',
     itemBase: 'Maul',
+    imageFilename: 'maul.png',
   },
   {
     id: 'steeldriver',
@@ -24,6 +25,7 @@ export const twoHandedClubs: Item[] = [
     treasureClass: 'normal',
     code: 'gma',
     itemBase: 'Great Maul',
+    imageFilename: 'great_maul.png',
   },
   {
     id: 'bloodtreestump',
@@ -36,6 +38,7 @@ export const twoHandedClubs: Item[] = [
     treasureClass: 'exceptional',
     code: '9m9',
     itemBase: 'War Club',
+    imageFilename: 'maul.png',
   },
   {
     id: 'thegavelofpain',
@@ -48,6 +51,7 @@ export const twoHandedClubs: Item[] = [
     treasureClass: 'exceptional',
     code: '9gm',
     itemBase: 'Martel de Fer',
+    imageFilename: 'the_gavel_of_pain.png',
   },
   {
     id: 'windhammer',
@@ -60,6 +64,7 @@ export const twoHandedClubs: Item[] = [
     treasureClass: 'elite',
     code: '7m7',
     itemBase: 'Ogre Maul',
+    imageFilename: 'maul.png',
   },
   {
     id: 'earthshifter',
@@ -72,6 +77,7 @@ export const twoHandedClubs: Item[] = [
     treasureClass: 'elite',
     code: '7gm',
     itemBase: 'Thunder Maul',
+    imageFilename: 'great_maul.png',
   },
   {
     id: 'thecraniumbasher',
@@ -84,5 +90,6 @@ export const twoHandedClubs: Item[] = [
     treasureClass: 'elite',
     code: '7gm',
     itemBase: 'Thunder Maul',
+    imageFilename: 'great_maul.png',
   },
 ];

@@ -12,6 +12,7 @@ export const charms: Item[] = [
     category: 'jewelry',
     subCategory: 'small_charms',
     treasureClass: 'normal',
+    imageFilename: 'mephisto_soul_stone.png',
   },
   {
     id: 'gheedsfortune',
@@ -24,6 +25,7 @@ export const charms: Item[] = [
     category: 'jewelry',
     subCategory: 'grand_charms',
     treasureClass: 'normal',
+    imageFilename: 'charm_large3.png',
   },
   {
     id: 'hellfiretorch',
@@ -36,5 +38,6 @@ export const charms: Item[] = [
     category: 'jewelry',
     subCategory: 'large_charms',
     treasureClass: 'normal',
+    imageFilename: 'torch.png',
   },
 ];

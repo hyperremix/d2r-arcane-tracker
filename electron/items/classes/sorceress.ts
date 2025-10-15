@@ -11,7 +11,8 @@ export const sorceress: Item[] = [
     subCategory: 'sorceress',
     treasureClass: 'exceptional',
     code: 'oba',
-    itemBase: 'Wrist Blade',
+    itemBase: 'Swirling Crystal',
+    imageFilename: 'dragon_stone.png',
   },
   {
     id: 'deathsfathom',
@@ -23,7 +24,8 @@ export const sorceress: Item[] = [
     subCategory: 'sorceress',
     treasureClass: 'elite',
     code: 'obf',
-    itemBase: 'Cestus',
+    itemBase: 'Dimensional Shard',
+    imageFilename: 'dragon_stone.png',
   },
   {
     id: 'eschutastemper',
@@ -35,6 +37,7 @@ export const sorceress: Item[] = [
     subCategory: 'sorceress',
     treasureClass: 'elite',
     code: 'obc',
-    itemBase: 'Hatchet Hands',
+    itemBase: 'Eldritch Orb',
+    imageFilename: 'sacred_globe.png',
   },
 ];

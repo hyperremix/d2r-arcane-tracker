@@ -12,6 +12,7 @@ export const spears: Item[] = [
     treasureClass: 'normal',
     code: 'spr',
     itemBase: 'Spear',
+    imageFilename: 'spear.png',
   },
   {
     id: 'razortine',
@@ -24,6 +25,7 @@ export const spears: Item[] = [
     treasureClass: 'normal',
     code: 'tri',
     itemBase: 'Trident',
+    imageFilename: 'razortine.png',
   },
   {
     id: 'bloodthief',
@@ -36,6 +38,7 @@ export const spears: Item[] = [
     treasureClass: 'normal',
     code: 'brn',
     itemBase: 'Brandistock',
+    imageFilename: 'brandistock.png',
   },
   {
     id: 'lanceofyaggai',
@@ -48,6 +51,7 @@ export const spears: Item[] = [
     treasureClass: 'normal',
     code: 'spt',
     itemBase: 'Spetum',
+    imageFilename: 'spetum.png',
   },
   {
     id: 'thetannrgorerod',
@@ -60,6 +64,7 @@ export const spears: Item[] = [
     treasureClass: 'normal',
     code: 'pik',
     itemBase: 'Pike',
+    imageFilename: 'pike.png',
   },
   {
     id: 'theimpaler',
@@ -72,6 +77,7 @@ export const spears: Item[] = [
     treasureClass: 'exceptional',
     code: '9sr',
     itemBase: 'War Spear',
+    imageFilename: 'spear.png',
   },
   {
     id: 'kelpiesnare',
@@ -84,6 +90,7 @@ export const spears: Item[] = [
     treasureClass: 'exceptional',
     code: '9tr',
     itemBase: 'Fuscina',
+    imageFilename: 'razortine.png',
   },
   {
     id: 'soulfeasttine',
@@ -96,6 +103,7 @@ export const spears: Item[] = [
     treasureClass: 'exceptional',
     code: '9br',
     itemBase: 'War Fork',
+    imageFilename: 'soulfeast_tine.png',
   },
   {
     id: 'honesundan',
@@ -108,6 +116,7 @@ export const spears: Item[] = [
     treasureClass: 'exceptional',
     code: '9st',
     itemBase: 'Yari',
+    imageFilename: 'brandistock.png',
   },
   {
     id: 'spireofhonor',
@@ -119,7 +128,8 @@ export const spears: Item[] = [
     subCategory: 'spears',
     treasureClass: 'exceptional',
     code: '9p9',
-    itemBase: 'Akaran Rondache',
+    itemBase: 'Lance',
+    imageFilename: 'pike.png',
   },
   {
     id: 'ariocsneedle',
@@ -132,6 +142,7 @@ export const spears: Item[] = [
     treasureClass: 'elite',
     code: '7sr',
     itemBase: 'Hyperion Spear',
+    imageFilename: 'spear.png',
   },
   {
     id: 'steelpillar',
@@ -143,7 +154,8 @@ export const spears: Item[] = [
     subCategory: 'spears',
     treasureClass: 'elite',
     code: '7p7',
-    itemBase: 'Sacred Rondache',
+    itemBase: 'War Pike',
+    imageFilename: 'pike.png',
   },
   {
     id: 'viperfork',
@@ -156,5 +168,6 @@ export const spears: Item[] = [
     treasureClass: 'elite',
     code: '7br',
     itemBase: 'War Fist',
+    imageFilename: 'hatchet_hands.png',
   },
 ];
