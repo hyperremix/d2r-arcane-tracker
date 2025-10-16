@@ -65,8 +65,8 @@ export function ProgressGauge({
   const degree = useMemo(() => Math.floor((percentage / 100) * 75), [percentage]);
   const colors = colorConfig[color];
 
-  const sizeClasses = 'size-40';
-  const percentageTextSize = 'text-2xl';
+  const sizeClasses = 'size-22';
+  const percentageTextSize = 'text-lg';
   const ratioTextSize = 'text-xs';
   const labelTextSize = 'text-xs';
 
@@ -131,7 +131,7 @@ export function ProgressGauge({
     return (
       <div className={cn('flex flex-col items-center', className)}>
         {gaugeElement}
-        <div className={cn('-mt-5 text-center text-gray-500 dark:text-gray-400', labelTextSize)}>
+        <div className={cn('-mt-2 text-center text-gray-500 dark:text-gray-400', labelTextSize)}>
           {label}
         </div>
       </div>

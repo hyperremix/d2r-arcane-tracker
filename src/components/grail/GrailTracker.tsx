@@ -86,10 +86,10 @@ export function GrailTracker() {
     <TooltipProvider>
       <div className="p-6">
         <div className="flex gap-6">
-          {/* Left Sidebar - Progress Overview */}
-          <div className="w-50 shrink-0">
+          {/* Left Sidebar - Progress Overview and Advanced Search */}
+          <div className="w-60 shrink-0 space-y-6">
             {statistics && (
-              <Card className="sticky top-6">
+              <Card>
                 <CardHeader>
                   <CardTitle>Progress Overview</CardTitle>
                 </CardHeader>
@@ -104,7 +104,7 @@ export function GrailTracker() {
 
                   {/* Progress breakdown */}
                   {settings.grailEthereal && (
-                    <>
+                    <div className="flex gap-4">
                       <ProgressGauge
                         label="Normal Items"
                         current={statistics.normalItems.found}
@@ -119,19 +119,18 @@ export function GrailTracker() {
                         showLabel
                         color="blue"
                       />
-                    </>
+                    </div>
                   )}
                 </CardContent>
               </Card>
             )}
-          </div>
 
-          {/* Right Content - Advanced Search and Item Grid */}
-          <div className="min-w-0 flex-1 space-y-6">
             {/* Advanced Search */}
             <AdvancedSearch />
+          </div>
 
-            {/* Item Grid */}
+          {/* Right Content - Item Grid */}
+          <div className="min-w-0 flex-1">
             <ItemGrid />
           </div>
         </div>

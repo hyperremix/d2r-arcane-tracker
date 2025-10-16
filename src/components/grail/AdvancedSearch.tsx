@@ -148,7 +148,7 @@ export function AdvancedSearch() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center justify-between">
+        <CardTitle className="flex flex-col gap-2">
           <div className="flex items-center gap-2">
             <Search className="h-4 w-4" />
             <span className="text-base">Advanced Search</span>
@@ -158,74 +158,71 @@ export function AdvancedSearch() {
               </Badge>
             )}
           </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={resetFilters}
-            className="h-7 gap-1 px-2 text-xs"
-          >
-            <RotateCcw className="h-3 w-3" />
-            Reset
-          </Button>
+          <div className="flex justify-end">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={resetFilters}
+              className="h-7 gap-1 px-2 text-xs"
+            >
+              <RotateCcw className="h-3 w-3" />
+              Reset
+            </Button>
+          </div>
         </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-3">
-        {/* Main Row - All controls in one compact row */}
-        <div className="grid grid-cols-1 gap-3 lg:grid-cols-12 lg:items-end">
-          {/* Search */}
-          <div className="space-y-1 lg:col-span-3">
-            <Label htmlFor={advancedSearchId} className="text-gray-600 text-xs dark:text-gray-400">
-              Search
+      <CardContent className="space-y-4">
+        {/* Search */}
+        <div className="space-y-2">
+          <Label htmlFor={advancedSearchId} className="text-gray-600 text-xs dark:text-gray-400">
+            Search
+          </Label>
+          <Input
+            id={advancedSearchId}
+            placeholder="Search items..."
+            value={advancedFilter.searchTerm}
+            onChange={(e) => updateAdvancedFilter({ searchTerm: e.target.value })}
+            className="h-8 text-sm"
+          />
+          <div className="flex items-center space-x-2">
+            <Checkbox
+              id={fuzzySearchId}
+              checked={advancedFilter.fuzzySearch}
+              onCheckedChange={(checked) => updateAdvancedFilter({ fuzzySearch: Boolean(checked) })}
+            />
+            <Label htmlFor={fuzzySearchId} className="text-xs">
+              Fuzzy Search
             </Label>
-            <div className="flex gap-2">
-              <Input
-                id={advancedSearchId}
-                placeholder="Search items..."
-                value={advancedFilter.searchTerm}
-                onChange={(e) => updateAdvancedFilter({ searchTerm: e.target.value })}
-                className="h-8 flex-1 text-sm"
-              />
-              <div className="flex items-center space-x-1">
-                <Checkbox
-                  id={fuzzySearchId}
-                  checked={advancedFilter.fuzzySearch}
-                  onCheckedChange={(checked) =>
-                    updateAdvancedFilter({ fuzzySearch: Boolean(checked) })
-                  }
-                />
-                <Label htmlFor={fuzzySearchId} className="text-xs">
-                  Fuzzy
-                </Label>
-              </div>
-            </div>
           </div>
+        </div>
 
-          {/* Status */}
-          <div className="space-y-1 lg:col-span-2">
-            <Label className="text-gray-600 text-xs dark:text-gray-400">Status</Label>
-            <Select
-              value={advancedFilter.foundStatus}
-              onValueChange={(value) =>
-                updateAdvancedFilter({ foundStatus: value as 'all' | 'found' | 'missing' })
-              }
-            >
-              <SelectTrigger className="h-8 text-sm">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Items</SelectItem>
-                <SelectItem value="found">Found Only</SelectItem>
-                <SelectItem value="missing">Missing Only</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+        {/* Status */}
+        <div className="space-y-2">
+          <Label className="text-gray-600 text-xs dark:text-gray-400">Status</Label>
+          <Select
+            value={advancedFilter.foundStatus}
+            onValueChange={(value) =>
+              updateAdvancedFilter({ foundStatus: value as 'all' | 'found' | 'missing' })
+            }
+          >
+            <SelectTrigger className="h-8 text-sm">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Items</SelectItem>
+              <SelectItem value="found">Found Only</SelectItem>
+              <SelectItem value="missing">Missing Only</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
 
+        <div className="flex gap-2">
           {/* Categories */}
-          <div className="space-y-1 lg:col-span-2">
+          <div className="space-y-2">
             <Label className="text-gray-600 text-xs dark:text-gray-400">Categories</Label>
-            <div className="flex flex-wrap gap-1">
+            <div className="space-y-2">
               {categories.map((category) => (
-                <div key={category.value} className="flex items-center space-x-1">
+                <div key={category.value} className="flex items-center space-x-2">
                   <Checkbox
                     id={`cat-${category.value}`}
                     checked={advancedFilter.categories.includes(category.value)}
@@ -240,11 +237,11 @@ export function AdvancedSearch() {
           </div>
 
           {/* Types */}
-          <div className="space-y-1 lg:col-span-2">
+          <div className="space-y-2">
             <Label className="text-gray-600 text-xs dark:text-gray-400">Types</Label>
-            <div className="flex flex-wrap gap-1">
+            <div className="space-y-2">
               {types.map((type) => (
-                <div key={type.value} className="flex items-center space-x-1">
+                <div key={type.value} className="flex items-center space-x-2">
                   <Checkbox
                     id={`type-${type.value}`}
                     checked={advancedFilter.types.includes(type.value)}
@@ -257,46 +254,46 @@ export function AdvancedSearch() {
               ))}
             </div>
           </div>
+        </div>
 
-          {/* Sorting */}
-          <div className="space-y-1 lg:col-span-3">
-            <Label className="text-gray-600 text-xs dark:text-gray-400">Sort</Label>
-            <div className="flex gap-1">
-              <Select
-                value={advancedFilter.sortBy}
-                onValueChange={(value) =>
-                  updateAdvancedFilter({
-                    sortBy: value as 'name' | 'category' | 'type' | 'found_date',
-                  })
-                }
-              >
-                <SelectTrigger className="text-xs">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {sortOptions.map((option) => (
-                    <SelectItem key={option.value} value={option.value}>
-                      {option.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Select
-                value={advancedFilter.sortOrder}
-                onValueChange={(value) =>
-                  updateAdvancedFilter({ sortOrder: value as 'asc' | 'desc' })
-                }
-              >
-                <SelectTrigger className="text-xs">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="asc">Ascending</SelectItem>
-                  <SelectItem value="desc">Descending</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
+        {/* Sorting */}
+        <div className="space-y-2">
+          <Label className="text-gray-600 text-xs dark:text-gray-400">Sort By</Label>
+          <Select
+            value={advancedFilter.sortBy}
+            onValueChange={(value) =>
+              updateAdvancedFilter({
+                sortBy: value as 'name' | 'category' | 'type' | 'found_date',
+              })
+            }
+          >
+            <SelectTrigger className="h-8 text-sm">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {sortOptions.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="space-y-2">
+          <Label className="text-gray-600 text-xs dark:text-gray-400">Sort Order</Label>
+          <Select
+            value={advancedFilter.sortOrder}
+            onValueChange={(value) => updateAdvancedFilter({ sortOrder: value as 'asc' | 'desc' })}
+          >
+            <SelectTrigger className="h-8 text-sm">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="asc">Ascending</SelectItem>
+              <SelectItem value="desc">Descending</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
       </CardContent>
     </Card>

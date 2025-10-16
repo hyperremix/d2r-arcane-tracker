@@ -440,12 +440,12 @@ function VirtualizedItemsContainer({
     if (viewMode === 'list') return 1;
 
     const width = window.innerWidth;
-    if (width >= 1536) return 7; // 2xl
-    if (width >= 1280) return 6; // xl
-    if (width >= 1024) return 5; // lg
-    if (width >= 768) return 4; // md
-    if (width >= 640) return 3; // sm
-    return 2; // default
+    if (width >= 1536) return 6; // 2xl
+    if (width >= 1280) return 5; // xl
+    if (width >= 1024) return 4; // lg
+    if (width >= 768) return 3; // md
+    if (width >= 640) return 2; // sm
+    return 1; // default
   }, [viewMode]);
 
   const [columnsCount, setColumnsCount] = useState(getColumnsCount);
