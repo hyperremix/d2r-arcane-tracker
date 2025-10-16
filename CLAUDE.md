@@ -89,7 +89,7 @@ Lint-staged runs on commit with different rule sets:
 - Renderer process enforces Node.js import protocols
 - Uses ESM modules throughout
 - Vite handles HMR for renderer, electron-vite handles main process reloading
-- The app icon is located at `public/logo.svg`
+- The app icon is located at `public/logo.png`
 
 ## Cursor Rules
 

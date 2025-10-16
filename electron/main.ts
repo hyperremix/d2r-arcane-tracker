@@ -55,23 +55,11 @@ export let mainWindow: BrowserWindow | null;
  */
 function createWindow() {
   // Set the icon path based on platform and environment
-  let iconPath: string;
-
-  if (VITE_DEV_SERVER_URL) {
-    // Development mode - use PNG from public folder
-    iconPath = path.join(process.env.VITE_PUBLIC, 'icon-256.png');
-  } else {
-    // Production mode - use platform-specific icons
-    iconPath =
-      process.platform === 'win32'
-        ? path.join(process.env.APP_ROOT, 'build/icon-win.png')
-        : path.join(process.env.APP_ROOT, 'build/icon.icns');
-  }
 
   mainWindow = new BrowserWindow({
     width: 1200,
     height: 856,
-    icon: iconPath,
+    icon: path.join(process.env.VITE_PUBLIC, 'logo.png'),
     // Custom title bar configuration
     titleBarStyle: 'hidden',
     // Position macOS traffic lights to be vertically centered in 48px title bar

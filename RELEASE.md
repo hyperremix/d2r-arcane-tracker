@@ -5,6 +5,7 @@ This document provides comprehensive instructions for building and distributing 
 ## Prerequisites
 
 ### Development Environment
+
 - **Node.js** v22.15.0 or higher
 - **Yarn** package manager
 - **Git** for version control
@@ -12,10 +13,12 @@ This document provides comprehensive instructions for building and distributing 
 ### Platform-Specific Requirements
 
 #### Windows Builds (from macOS/Linux)
+
 - **Wine** (optional, for testing Windows installers)
 - **Cross-platform compilation** requires proper native module handling
 
 #### Code Signing (Optional but Recommended)
+
 - **Windows**: Code signing certificate (EV certificate recommended)
 - **macOS**: Apple Developer account and certificates
 - **Linux**: No signing required for most distributions
@@ -53,11 +56,14 @@ Built applications will be available in `release/${version}/`:
 This application uses several native modules that require special handling during packaging:
 
 ### Critical Native Dependencies
+
 1. **better-sqlite3** - SQLite database engine
 2. **@dschu012/d2s** - Diablo II save file parser
 
 ### Configuration
+
 The `electron-builder.json5` configuration includes:
+
 ```json5
 "asarUnpack": [
   "**/node_modules/better-sqlite3/**/*",
@@ -72,6 +78,7 @@ This ensures native `.node` binaries are unpacked from the ASAR archive and rema
 If you encounter issues with native modules:
 
 1. **Rebuild for target platform**:
+
    ```bash
    # For Electron (production)
    yarn dev  # This runs electron-rebuild automatically
@@ -91,12 +98,14 @@ If you encounter issues with native modules:
 Cross-platform builds for Windows from macOS are supported but require attention to native modules:
 
 1. **Ensure proper native module configuration**:
+
    ```bash
    # The asarUnpack configuration in electron-builder.json5 handles this
    yarn build:win
    ```
 
 2. **Test the installer** (if Wine is available):
+
    ```bash
    # Install Wine on macOS
    brew install --cask wine-stable
@@ -108,17 +117,20 @@ Cross-platform builds for Windows from macOS are supported but require attention
 ### Windows-Specific Configuration
 
 #### Icon Format
-- Uses `build/icon.ico` (converted from PNG)
+
+- Uses `build/icon.png`
 - Must be in ICO format for proper Windows integration
 - Supports multiple resolutions in single ICO file
 
 #### Installer Behavior
+
 - **NSIS installer** with custom configuration
 - **Per-user installation** (not system-wide)
 - **Custom installation directory** allowed
 - **App data preserved** on uninstall
 
 #### Windows Defender / Antivirus
+
 - Unsigned applications may trigger warnings
 - Users may need to click "More info" → "Run anyway"
 - Code signing eliminates these warnings
@@ -128,12 +140,15 @@ Cross-platform builds for Windows from macOS are supported but require attention
 ### Windows Code Signing
 
 #### Prerequisites
+
 - Code signing certificate (EV certificate recommended)
 - Certificate must be installed in Windows Certificate Store
 - Access to Windows machine or Wine for signing
 
 #### Configuration
+
 Add to `electron-builder.json5`:
+
 ```json5
 "win": {
   "certificateFile": "path/to/certificate.p12",
@@ -144,6 +159,7 @@ Add to `electron-builder.json5`:
 ```
 
 #### Signing Process
+
 ```bash
 # Sign the installer after build
 yarn build:win
@@ -153,11 +169,13 @@ yarn build:win
 ### macOS Code Signing
 
 #### Prerequisites
+
 - Apple Developer account
 - Developer certificates installed in Keychain
 - App Store Connect app record (for notarization)
 
 #### Configuration
+
 ```json5
 "mac": {
   "identity": "Developer ID Application: Your Name (TEAM_ID)",
@@ -184,6 +202,7 @@ yarn build:win
 ### Platform-Specific Testing
 
 #### Windows Testing
+
 - [ ] Installer runs without errors
 - [ ] Application launches from Start Menu
 - [ ] Icon displays in taskbar
@@ -192,12 +211,14 @@ yarn build:win
 - [ ] Database operations function
 
 #### macOS Testing
+
 - [ ] DMG mounts and installs correctly
 - [ ] Application launches from Applications folder
 - [ ] No Gatekeeper warnings (if signed)
 - [ ] Native modules load properly
 
 #### Linux Testing
+
 - [ ] AppImage is executable
 - [ ] Application launches correctly
 - [ ] File permissions are correct
@@ -219,6 +240,7 @@ yarn build:win
    - Include SHA256 checksums
 
 3. **Release Notes Template**:
+
    ```markdown
    ## D2R Arcane Tracker v0.0.1
    
@@ -248,47 +270,58 @@ yarn build:win
 ### Common Build Issues
 
 #### Native Module Errors
+
 ```
 Error: The module 'better-sqlite3' was compiled against a different Node.js version
 ```
+
 **Solution**: Run `yarn dev` to rebuild native modules for Electron
 
 #### Cross-Platform Build Issues
+
 ```
 Error: Cannot find module 'better-sqlite3'
 ```
+
 **Solution**: Ensure `asarUnpack` configuration includes all native modules
 
 #### Icon Issues
+
 ```
 Warning: Icon file not found or invalid format
 ```
-**Solution**: Verify `build/icon.ico` exists and is valid ICO format
+
+**Solution**: Verify `build/icon.png` exists and is valid ICO format
 
 ### Platform-Specific Issues
 
 #### Windows
+
 - **"Unknown Publisher" Warning**: Normal for unsigned apps, document for users
 - **Antivirus False Positive**: Common with Electron apps, consider code signing
 - **Path Length Issues**: Ensure install path doesn't exceed Windows limits
 
 #### macOS
+
 - **Gatekeeper Warnings**: Expected for unsigned apps
 - **Notarization Issues**: Required for distribution outside App Store
 
 #### Linux
+
 - **Permission Issues**: Ensure AppImage has execute permissions
 - **Missing Dependencies**: AppImage should be self-contained
 
 ## Security Considerations
 
 ### Code Signing Benefits
+
 - Eliminates "Unknown Publisher" warnings
 - Prevents tampering with distributed files
 - Improves user trust and adoption
 - Required for some enterprise environments
 
 ### Unsigned Distribution
+
 - Users will see security warnings
 - May be blocked by enterprise firewalls
 - Document the warnings and provide guidance
@@ -297,18 +330,21 @@ Warning: Icon file not found or invalid format
 ## Future Improvements
 
 ### Automated Releases
+
 - GitHub Actions for automated building
 - Automated code signing (with secure secrets)
 - Automated upload to GitHub Releases
 - Automated testing across platforms
 
 ### Update Mechanism
+
 - Implement electron-updater
 - Host update server
 - Configure automatic update checks
 - Handle update rollback scenarios
 
 ### Enhanced Distribution
+
 - Windows Package Manager integration
 - Homebrew Cask for macOS
 - Snap package for Linux
@@ -319,6 +355,7 @@ Warning: Icon file not found or invalid format
 ## Quick Reference
 
 ### Build Commands
+
 ```bash
 yarn build:win    # Windows installer
 yarn build:mac    # macOS DMG
@@ -327,12 +364,12 @@ yarn build        # All platforms
 ```
 
 ### Key Files
+
 - `electron-builder.json5` - Build configuration
-- `build/icon.ico` - Windows icon
-- `build/icon.icns` - macOS icon
-- `package.json` - Build scripts
+- `build/icon.png` - icon
 
 ### Release Checklist
+
 - [ ] Version bump in package.json
 - [ ] Update CHANGELOG.md
 - [ ] Run tests: `yarn test`

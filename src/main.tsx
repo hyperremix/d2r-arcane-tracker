@@ -13,7 +13,7 @@ if (!rootElement) {
 ReactDOM.createRoot(rootElement).render(
   <React.StrictMode>
     <ErrorBoundary>
-      <Suspense fallback={<img src="/logo.svg" alt="logo" />}>
+      <Suspense fallback={<img src="/logo.png" alt="logo" />}>
         <App />
       </Suspense>
     </ErrorBoundary>

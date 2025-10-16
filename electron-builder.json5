@@ -9,12 +9,12 @@
   },
   files: ["dist", "dist-electron"],
   mac: {
-    icon: "build/icon.icns",
+    icon: "build/icon.png",
     target: ["dmg"],
     artifactName: "${productName}-Mac-${version}-Installer.${ext}",
   },
   win: {
-    icon: "build/icon.ico",
+    icon: "build/icon.png",
     target: [
       {
         target: "nsis",

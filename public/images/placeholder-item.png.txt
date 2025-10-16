@@ -1,3 +1,0 @@
-This is a placeholder file.
-In a real implementation, you would replace this with an actual PNG image.
-For now, you can create a simple 32x32 or 48x48 gray square with a question mark.

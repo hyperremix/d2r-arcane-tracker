@@ -58,7 +58,7 @@ export function NotificationButton() {
     if (itemEvent.type === 'item-found' && itemEvent.grailItem) {
       const notification = new Notification('Holy Grail Item Found!', {
         body: `${itemEvent.grailItem.name} found by ${itemEvent.item.characterName}`,
-        icon: '/logo.svg',
+        icon: '/logo.png',
         tag: 'grail-item',
         requireInteraction: true,
       });
@@ -75,7 +75,7 @@ export function NotificationButton() {
         itemNames.length > 100
           ? `${events.length} items including ${events[0].item.name}...`
           : itemNames,
-      icon: '/logo.svg',
+      icon: '/logo.png',
       tag: 'grail-batch',
       requireInteraction: true,
     });

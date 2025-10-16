@@ -107,7 +107,7 @@ export function TitleBar() {
 
       {/* Center section - App title */}
       <div className="flex flex-1 items-center justify-center gap-2">
-        <img src="/logo.svg" alt="D2R Arcane Tracker" className="h-5 w-5" />
+        <img src="/logo.png" alt="D2R Arcane Tracker" className="h-5 w-5" />
         <span className="font-semibold text-sm tracking-wide">D2R Arcane Tracker</span>
       </div>
 
