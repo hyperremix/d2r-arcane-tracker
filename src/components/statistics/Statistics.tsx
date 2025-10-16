@@ -9,7 +9,7 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 export function Statistics() {
   return (
     <TooltipProvider>
-      <div className="container mx-auto space-y-6 p-6">
+      <div className="space-y-6 p-6">
         <StatsDashboard />
       </div>
     </TooltipProvider>

@@ -4,7 +4,7 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import { useGrailStatistics, useGrailStore } from '@/stores/grailStore';
 import { AdvancedSearch } from './AdvancedSearch';
 import { ItemGrid } from './ItemGrid';
-import { ProgressBar } from './ProgressBar';
+import { ProgressGauge } from './ProgressGauge';
 
 /**
  * GrailTracker component that serves as the main Holy Grail tracking interface.
@@ -84,97 +84,57 @@ export function GrailTracker() {
 
   return (
     <TooltipProvider>
-      <div className="container mx-auto space-y-6 p-6">
-        {/* Enhanced Statistics */}
-        {statistics && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Progress Overview</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ProgressBar
-                label="Total Progress"
-                current={statistics.foundItems}
-                total={statistics.totalItems}
-                className="mb-4"
-              />
-              <div
-                className={`grid gap-4 ${settings.grailEthereal ? 'grid-cols-2 md:grid-cols-4' : 'grid-cols-2 md:grid-cols-3'}`}
-              >
-                {settings.grailEthereal ? (
-                  <>
-                    <div className="text-center">
-                      <div className="font-bold text-2xl text-blue-600">
-                        {statistics.normalItems.found}
-                      </div>
-                      <div className="text-gray-500 text-sm">Normal Found</div>
-                    </div>
-                    <div className="text-center">
-                      <div className="font-bold text-2xl text-blue-600">
-                        {statistics.etherealItems.found}
-                      </div>
-                      <div className="text-gray-500 text-sm">Ethereal Found</div>
-                    </div>
-                  </>
-                ) : (
-                  <div className="text-center">
-                    <div className="font-bold text-2xl text-blue-600">{statistics.foundItems}</div>
-                    <div className="text-gray-500 text-sm">Items Found</div>
-                  </div>
-                )}
-                <div className="text-center">
-                  <div className="font-bold text-2xl text-purple-600">
-                    {statistics.totalItems - statistics.foundItems}
-                  </div>
-                  <div className="text-gray-500 text-sm">Items Remaining</div>
-                </div>
-                <div className="text-center">
-                  <div className="font-bold text-2xl text-green-600">
-                    {statistics.completionPercentage.toFixed(1)}%
-                  </div>
-                  <div className="text-gray-500 text-sm">Complete</div>
-                </div>
-              </div>
+      <div className="p-6">
+        <div className="flex gap-6">
+          {/* Left Sidebar - Progress Overview */}
+          <div className="w-50 shrink-0">
+            {statistics && (
+              <Card className="sticky top-6">
+                <CardHeader>
+                  <CardTitle>Progress Overview</CardTitle>
+                </CardHeader>
+                <CardContent className="flex flex-col items-center gap-4">
+                  <ProgressGauge
+                    label="Total Progress"
+                    current={statistics.foundItems}
+                    total={statistics.totalItems}
+                    showLabel
+                    color="purple"
+                  />
 
-              {/* Progress breakdown */}
-              {settings.grailEthereal && (
-                <div
-                  className={`mt-4 grid gap-4 ${settings.grailEthereal ? 'grid-cols-2' : 'grid-cols-1'}`}
-                >
-                  <div>
-                    <ProgressBar
-                      label="Normal Items"
-                      current={statistics.normalItems.found}
-                      total={statistics.normalItems.total}
-                      className="mb-2"
-                    />
-                    <div className="text-center text-gray-500 text-xs">
-                      {statistics.normalItems.found}/{statistics.normalItems.total} Normal
-                    </div>
-                  </div>
+                  {/* Progress breakdown */}
+                  {settings.grailEthereal && (
+                    <>
+                      <ProgressGauge
+                        label="Normal Items"
+                        current={statistics.normalItems.found}
+                        total={statistics.normalItems.total}
+                        showLabel
+                        color="orange"
+                      />
+                      <ProgressGauge
+                        label="Ethereal Items"
+                        current={statistics.etherealItems.found}
+                        total={statistics.etherealItems.total}
+                        showLabel
+                        color="blue"
+                      />
+                    </>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+          </div>
 
-                  <div>
-                    <ProgressBar
-                      label="Ethereal Items"
-                      current={statistics.etherealItems.found}
-                      total={statistics.etherealItems.total}
-                      className="mb-2"
-                    />
-                    <div className="text-center text-gray-500 text-xs">
-                      {statistics.etherealItems.found}/{statistics.etherealItems.total} Ethereal
-                    </div>
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        )}
+          {/* Right Content - Advanced Search and Item Grid */}
+          <div className="min-w-0 flex-1 space-y-6">
+            {/* Advanced Search */}
+            <AdvancedSearch />
 
-        {/* Advanced Search */}
-        <AdvancedSearch />
-
-        {/* Item Grid */}
-        <ItemGrid />
+            {/* Item Grid */}
+            <ItemGrid />
+          </div>
+        </div>
       </div>
     </TooltipProvider>
   );

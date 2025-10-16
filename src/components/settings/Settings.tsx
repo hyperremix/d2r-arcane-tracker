@@ -17,7 +17,7 @@ import { ThemeSettings } from './ThemeSettings';
 export function Settings() {
   return (
     <TooltipProvider>
-      <div className="container mx-auto space-y-6 p-6">
+      <div className="space-y-6 p-6">
         <div className="space-y-6">
           <SaveFileMonitor />
           <GrailSettings />
