@@ -30,6 +30,8 @@ interface GrailState {
   selectedCharacterId: string | null;
   filter: GrailFilter;
   advancedFilter: AdvancedGrailFilter;
+  viewMode: 'grid' | 'list';
+  groupMode: 'none' | 'category' | 'type' | 'ethereal';
   loading: boolean;
   error: string | null;
 
@@ -42,6 +44,8 @@ interface GrailState {
   setSelectedCharacterId: (characterId: string | null) => void;
   setFilter: (filter: Partial<GrailFilter>) => void;
   setAdvancedFilter: (filter: Partial<AdvancedGrailFilter>) => void;
+  setViewMode: (mode: 'grid' | 'list') => void;
+  setGroupMode: (mode: 'none' | 'category' | 'type' | 'ethereal') => void;
   setLoading: (loading: boolean) => void;
   setError: (error: string | null) => void;
 
@@ -105,6 +109,8 @@ export const useGrailStore = create<GrailState>((set, get) => ({
   selectedCharacterId: null,
   filter: defaultFilter,
   advancedFilter: defaultAdvancedFilter,
+  viewMode: 'grid',
+  groupMode: 'none',
   loading: false,
   error: null,
 
@@ -155,6 +161,8 @@ export const useGrailStore = create<GrailState>((set, get) => ({
     set((state) => ({
       advancedFilter: { ...state.advancedFilter, ...filterUpdate },
     })),
+  setViewMode: (viewMode) => set({ viewMode }),
+  setGroupMode: (groupMode) => set({ groupMode }),
   setLoading: (loading) => set({ loading }),
   setError: (error) => set({ error }),
 

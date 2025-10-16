@@ -70,7 +70,7 @@ function createWindow() {
 
   mainWindow = new BrowserWindow({
     width: 1200,
-    height: 800,
+    height: 856,
     icon: iconPath,
     // Custom title bar configuration
     titleBarStyle: 'hidden',

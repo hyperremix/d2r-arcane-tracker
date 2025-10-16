@@ -1,9 +1,9 @@
 import type { ItemCategory, ItemType } from 'electron/types/grail';
-import { RotateCcw, Search } from 'lucide-react';
+import { Grid, List, RotateCcw } from 'lucide-react';
 import { useId, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -83,8 +83,15 @@ export function AdvancedSearch() {
   const advancedSearchId = useId();
   const fuzzySearchId = useId();
   const [advancedFilter, setAdvancedFilter] = useState<AdvancedFilter>(defaultFilter);
-  const { setFilter, setAdvancedFilter: setStoreAdvancedFilter } = useGrailStore();
-
+  const {
+    setFilter,
+    setAdvancedFilter: setStoreAdvancedFilter,
+    viewMode,
+    setViewMode,
+    groupMode,
+    setGroupMode,
+    settings,
+  } = useGrailStore();
   const updateAdvancedFilter = (updates: Partial<AdvancedFilter>) => {
     const newFilter = { ...advancedFilter, ...updates };
     setAdvancedFilter(newFilter);
@@ -147,73 +154,112 @@ export function AdvancedSearch() {
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle className="flex flex-col gap-2">
-          <div className="flex items-center gap-2">
-            <Search className="h-4 w-4" />
-            <span className="text-base">Advanced Search</span>
-            {getActiveFiltersCount() > 0 && (
-              <Badge variant="secondary" className="text-xs">
-                {getActiveFiltersCount()}
-              </Badge>
-            )}
-          </div>
-          <div className="flex justify-end">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={resetFilters}
-              className="h-7 gap-1 px-2 text-xs"
-            >
-              <RotateCcw className="h-3 w-3" />
-              Reset
-            </Button>
-          </div>
-        </CardTitle>
-      </CardHeader>
       <CardContent className="space-y-4">
-        {/* Search */}
-        <div className="space-y-2">
-          <Label htmlFor={advancedSearchId} className="text-gray-600 text-xs dark:text-gray-400">
-            Search
-          </Label>
-          <Input
-            id={advancedSearchId}
-            placeholder="Search items..."
-            value={advancedFilter.searchTerm}
-            onChange={(e) => updateAdvancedFilter({ searchTerm: e.target.value })}
-            className="h-8 text-sm"
-          />
-          <div className="flex items-center space-x-2">
-            <Checkbox
-              id={fuzzySearchId}
-              checked={advancedFilter.fuzzySearch}
-              onCheckedChange={(checked) => updateAdvancedFilter({ fuzzySearch: Boolean(checked) })}
-            />
-            <Label htmlFor={fuzzySearchId} className="text-xs">
-              Fuzzy Search
-            </Label>
-          </div>
+        <div className="flex items-center justify-end gap-2">
+          {getActiveFiltersCount() > 0 && (
+            <Badge variant="secondary" className="text-xs">
+              {getActiveFiltersCount()}
+            </Badge>
+          )}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={resetFilters}
+            className="h-7 gap-1 px-2 text-xs"
+          >
+            <RotateCcw className="h-3 w-3" />
+            Reset
+          </Button>
         </div>
 
-        {/* Status */}
+        {/* Group By */}
         <div className="space-y-2">
-          <Label className="text-gray-600 text-xs dark:text-gray-400">Status</Label>
           <Select
-            value={advancedFilter.foundStatus}
-            onValueChange={(value) =>
-              updateAdvancedFilter({ foundStatus: value as 'all' | 'found' | 'missing' })
-            }
+            value={groupMode}
+            onValueChange={(value) => setGroupMode(value as typeof groupMode)}
           >
             <SelectTrigger className="h-8 text-sm">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All Items</SelectItem>
-              <SelectItem value="found">Found Only</SelectItem>
-              <SelectItem value="missing">Missing Only</SelectItem>
+              <SelectItem value="none">No Grouping</SelectItem>
+              <SelectItem value="category">By Category</SelectItem>
+              <SelectItem value="type">By Type</SelectItem>
+              {settings.grailEthereal && <SelectItem value="ethereal">By Ethereal</SelectItem>}
             </SelectContent>
           </Select>
+        </div>
+
+        {/* View Mode */}
+        <div className="space-y-2">
+          <div className="flex gap-2">
+            <Button
+              variant={viewMode === 'grid' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setViewMode('grid')}
+              className="flex-1"
+            >
+              <Grid className="mr-2 h-4 w-4" />
+              Grid
+            </Button>
+            <Button
+              variant={viewMode === 'list' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setViewMode('list')}
+              className="flex-1"
+            >
+              <List className="mr-2 h-4 w-4" />
+              List
+            </Button>
+          </div>
+        </div>
+
+        <div className="flex gap-2">
+          {/* Search */}
+          <div className="space-y-2">
+            <Label htmlFor={advancedSearchId} className="text-gray-600 text-xs dark:text-gray-400">
+              Search
+            </Label>
+            <Input
+              id={advancedSearchId}
+              placeholder="Search items..."
+              value={advancedFilter.searchTerm}
+              onChange={(e) => updateAdvancedFilter({ searchTerm: e.target.value })}
+              className="h-8 text-sm"
+            />
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id={fuzzySearchId}
+                checked={advancedFilter.fuzzySearch}
+                onCheckedChange={(checked) =>
+                  updateAdvancedFilter({ fuzzySearch: Boolean(checked) })
+                }
+              />
+              <Label htmlFor={fuzzySearchId} className="text-xs">
+                Fuzzy Search
+              </Label>
+            </div>
+          </div>
+
+          {/* Status */}
+          <div className="space-y-2">
+            <Label className="text-gray-600 text-xs dark:text-gray-400">Status</Label>
+            <Select
+              value={advancedFilter.foundStatus}
+              onValueChange={(value) =>
+                updateAdvancedFilter({ foundStatus: value as 'all' | 'found' | 'missing' })
+              }
+            >
+              <SelectTrigger className="h-8 text-sm">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Items</SelectItem>
+                <SelectItem value="found">Found Only</SelectItem>
+                <SelectItem value="missing">Missing Only</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
 
         <div className="flex gap-2">
@@ -257,43 +303,46 @@ export function AdvancedSearch() {
         </div>
 
         {/* Sorting */}
-        <div className="space-y-2">
-          <Label className="text-gray-600 text-xs dark:text-gray-400">Sort By</Label>
-          <Select
-            value={advancedFilter.sortBy}
-            onValueChange={(value) =>
-              updateAdvancedFilter({
-                sortBy: value as 'name' | 'category' | 'type' | 'found_date',
-              })
-            }
-          >
-            <SelectTrigger className="h-8 text-sm">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {sortOptions.map((option) => (
-                <SelectItem key={option.value} value={option.value}>
-                  {option.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div className="space-y-2">
-          <Label className="text-gray-600 text-xs dark:text-gray-400">Sort Order</Label>
-          <Select
-            value={advancedFilter.sortOrder}
-            onValueChange={(value) => updateAdvancedFilter({ sortOrder: value as 'asc' | 'desc' })}
-          >
-            <SelectTrigger className="h-8 text-sm">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="asc">Ascending</SelectItem>
-              <SelectItem value="desc">Descending</SelectItem>
-            </SelectContent>
-          </Select>
+        <div className="flex items-center gap-2">
+          <div className="space-y-2">
+            <Label className="text-gray-600 text-xs dark:text-gray-400">Sort By</Label>
+            <Select
+              value={advancedFilter.sortBy}
+              onValueChange={(value) =>
+                updateAdvancedFilter({
+                  sortBy: value as 'name' | 'category' | 'type' | 'found_date',
+                })
+              }
+            >
+              <SelectTrigger className="h-8 text-sm">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {sortOptions.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label className="text-gray-600 text-xs dark:text-gray-400">Sort Order</Label>
+            <Select
+              value={advancedFilter.sortOrder}
+              onValueChange={(value) =>
+                updateAdvancedFilter({ sortOrder: value as 'asc' | 'desc' })
+              }
+            >
+              <SelectTrigger className="h-8 text-sm">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="asc">Ascending</SelectItem>
+                <SelectItem value="desc">Descending</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
       </CardContent>
     </Card>

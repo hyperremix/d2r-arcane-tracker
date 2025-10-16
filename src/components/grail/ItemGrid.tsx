@@ -1,9 +1,7 @@
 import { useVirtualizer } from '@tanstack/react-virtual';
 import type { Character, GrailProgress, Item, Settings } from 'electron/types/grail';
-import { Grid, List } from 'lucide-react';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { useProgressLookup } from '@/hooks/useProgressLookup';
 import {
   canItemBeEthereal,
@@ -69,10 +67,9 @@ type GroupMode = 'none' | 'category' | 'type' | 'ethereal';
  * @returns {JSX.Element} A grid or list of Holy Grail items with view and grouping controls
  */
 export const ItemGrid = memo(function ItemGrid() {
-  const { progress, characters, selectedCharacterId, settings } = useGrailStore();
+  const { progress, characters, selectedCharacterId, settings, viewMode, groupMode, setGroupMode } =
+    useGrailStore();
   const filteredItems = useFilteredItems(); // This uses DB items as base and applies all filters
-  const [viewMode, setViewMode] = useState<ViewMode>('grid');
-  const [groupMode, setGroupMode] = useState<GroupMode>('none');
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
 
   // Helper function to filter items when only one grail type is enabled
@@ -108,7 +105,7 @@ export const ItemGrid = memo(function ItemGrid() {
     if (groupMode === 'ethereal' && settings.grailEthereal) {
       setGroupMode('none');
     }
-  }, [groupMode, settings.grailEthereal]);
+  }, [groupMode, settings.grailEthereal, setGroupMode]);
 
   const groupedItems = useMemo(() => {
     if (groupMode === 'none') {
@@ -157,44 +154,7 @@ export const ItemGrid = memo(function ItemGrid() {
   }, []);
 
   return (
-    <div className="space-y-6">
-      {/* Controls */}
-      <div className="flex items-center justify-end">
-        <div className="flex items-center gap-2">
-          {/* Group Mode */}
-          <select
-            value={groupMode}
-            onChange={(e) => setGroupMode(e.target.value as GroupMode)}
-            className="rounded border px-2 py-1 text-sm"
-          >
-            <option value="none">No Grouping</option>
-            <option value="category">By Category</option>
-            <option value="type">By Type</option>
-            {settings.grailEthereal && <option value="ethereal">By Ethereal</option>}
-          </select>
-
-          {/* View Mode Toggle */}
-          <div className="flex rounded border">
-            <Button
-              variant={viewMode === 'grid' ? 'default' : 'ghost'}
-              size="sm"
-              onClick={() => setViewMode('grid')}
-              className="rounded-r-none"
-            >
-              <Grid className="h-4 w-4" />
-            </Button>
-            <Button
-              variant={viewMode === 'list' ? 'default' : 'ghost'}
-              size="sm"
-              onClick={() => setViewMode('list')}
-              className="rounded-l-none"
-            >
-              <List className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
-      </div>
-
+    <div>
       {/* Items Grid with Virtual Scrolling */}
       <VirtualizedItemsContainer
         groupedItems={groupedItems}
@@ -509,7 +469,7 @@ function VirtualizedItemsContainer({
       ref={listRef}
       className="w-full p-4"
       style={{
-        height: '800px',
+        height: '760px',
         overflow: 'auto',
       }}
     >

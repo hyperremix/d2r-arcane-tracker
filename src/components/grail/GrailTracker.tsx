@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { useGrailStatistics, useGrailStore } from '@/stores/grailStore';
 import { AdvancedSearch } from './AdvancedSearch';
@@ -87,12 +87,9 @@ export function GrailTracker() {
       <div className="p-6">
         <div className="flex gap-6">
           {/* Left Sidebar - Progress Overview and Advanced Search */}
-          <div className="w-60 shrink-0 space-y-6">
+          <div className="w-80 shrink-0 space-y-6">
             {statistics && (
               <Card>
-                <CardHeader>
-                  <CardTitle>Progress Overview</CardTitle>
-                </CardHeader>
                 <CardContent className="flex flex-col items-center gap-4">
                   <ProgressGauge
                     label="Total Progress"
