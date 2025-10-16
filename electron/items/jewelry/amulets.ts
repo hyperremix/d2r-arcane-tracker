@@ -10,6 +10,8 @@ export const amulets: Item[] = [
     category: 'jewelry',
     subCategory: 'amulets',
     code: 'amu',
+    itemBase: 'Amulet',
+    imageFilename: 'amulet1.png',
     treasureClass: 'normal',
   },
   {
@@ -21,6 +23,8 @@ export const amulets: Item[] = [
     category: 'jewelry',
     subCategory: 'amulets',
     code: 'amu',
+    itemBase: 'Amulet',
+    imageFilename: 'amulet2.png',
     treasureClass: 'normal',
   },
   {
@@ -32,6 +36,8 @@ export const amulets: Item[] = [
     category: 'jewelry',
     subCategory: 'amulets',
     code: 'amu',
+    itemBase: 'Amulet',
+    imageFilename: 'amulet3.png',
     treasureClass: 'normal',
   },
   {
@@ -43,6 +49,8 @@ export const amulets: Item[] = [
     category: 'jewelry',
     subCategory: 'amulets',
     code: 'amu',
+    itemBase: 'Amulet',
+    imageFilename: 'amulet1.png',
     treasureClass: 'normal',
   },
   {
@@ -54,6 +62,8 @@ export const amulets: Item[] = [
     category: 'jewelry',
     subCategory: 'amulets',
     code: 'amu',
+    itemBase: 'Amulet',
+    imageFilename: 'amulet2.png',
     treasureClass: 'normal',
   },
   {
@@ -65,6 +75,8 @@ export const amulets: Item[] = [
     category: 'jewelry',
     subCategory: 'amulets',
     code: 'amu',
+    itemBase: 'Amulet',
+    imageFilename: 'amulet3.png',
     treasureClass: 'normal',
   },
   {
@@ -76,6 +88,8 @@ export const amulets: Item[] = [
     category: 'jewelry',
     subCategory: 'amulets',
     code: 'amu',
+    itemBase: 'Amulet',
+    imageFilename: 'amulet1.png',
     treasureClass: 'normal',
   },
   {
@@ -87,6 +101,8 @@ export const amulets: Item[] = [
     category: 'jewelry',
     subCategory: 'amulets',
     code: 'amu',
+    itemBase: 'Amulet',
+    imageFilename: 'amulet2.png',
     treasureClass: 'normal',
   },
   {
@@ -98,6 +114,8 @@ export const amulets: Item[] = [
     category: 'jewelry',
     subCategory: 'amulets',
     code: 'amu',
+    itemBase: 'Amulet',
+    imageFilename: 'amulet3.png',
     treasureClass: 'normal',
   },
   {
@@ -109,6 +127,8 @@ export const amulets: Item[] = [
     category: 'jewelry',
     subCategory: 'amulets',
     code: 'amu',
+    itemBase: 'Amulet',
+    imageFilename: 'amulet1.png',
     treasureClass: 'normal',
   },
   {
@@ -120,6 +140,8 @@ export const amulets: Item[] = [
     category: 'jewelry',
     subCategory: 'amulets',
     code: 'amu',
+    itemBase: 'Amulet',
+    imageFilename: 'amulet2.png',
     treasureClass: 'normal',
   },
   {
@@ -131,6 +153,8 @@ export const amulets: Item[] = [
     category: 'jewelry',
     subCategory: 'amulets',
     code: 'amu',
+    itemBase: 'Amulet',
+    imageFilename: 'amulet3.png',
     treasureClass: 'normal',
   },
 ];

@@ -11,6 +11,8 @@ export const oneHandedClubs: Item[] = [
     subCategory: '1h_clubs',
     treasureClass: 'normal',
     code: 'clb',
+    itemBase: 'Club',
+    imageFilename: 'felloak.png',
   },
   {
     id: 'stoutnail',
@@ -22,6 +24,8 @@ export const oneHandedClubs: Item[] = [
     subCategory: '1h_clubs',
     treasureClass: 'normal',
     code: 'spc',
+    itemBase: 'Spiked Club',
+    imageFilename: 'stoutnail.png',
   },
   {
     id: 'crushflange',
@@ -33,6 +37,8 @@ export const oneHandedClubs: Item[] = [
     subCategory: '1h_clubs',
     treasureClass: 'normal',
     code: 'mac',
+    itemBase: 'Mace',
+    imageFilename: 'mace.png',
   },
   {
     id: 'bloodrise',
@@ -44,6 +50,8 @@ export const oneHandedClubs: Item[] = [
     subCategory: '1h_clubs',
     treasureClass: 'normal',
     code: 'mst',
+    itemBase: 'Morning Star',
+    imageFilename: 'bloodrise.png',
   },
   {
     id: 'thegeneralstandoliga',
@@ -55,6 +63,8 @@ export const oneHandedClubs: Item[] = [
     subCategory: '1h_clubs',
     treasureClass: 'normal',
     code: 'fla',
+    itemBase: 'Flail',
+    imageFilename: 'flail.png',
   },
   {
     id: 'ironstone',
@@ -66,6 +76,8 @@ export const oneHandedClubs: Item[] = [
     subCategory: '1h_clubs',
     treasureClass: 'normal',
     code: 'whm',
+    itemBase: 'War Hammer',
+    imageFilename: 'war_hammer.png',
   },
   {
     id: 'darkclancrusher',
@@ -77,6 +89,8 @@ export const oneHandedClubs: Item[] = [
     subCategory: '1h_clubs',
     treasureClass: 'exceptional',
     code: '9cl',
+    itemBase: 'Cudgel',
+    imageFilename: 'club.png',
   },
   {
     id: 'fleshrender',
@@ -88,6 +102,8 @@ export const oneHandedClubs: Item[] = [
     subCategory: '1h_clubs',
     treasureClass: 'exceptional',
     code: '9sp',
+    itemBase: 'Barbed Club',
+    imageFilename: 'spiked_club.png',
   },
   {
     id: 'sureshrillfrost',
@@ -99,6 +115,8 @@ export const oneHandedClubs: Item[] = [
     subCategory: '1h_clubs',
     treasureClass: 'exceptional',
     code: '9ma',
+    itemBase: 'Flanged Mace',
+    imageFilename: 'mace.png',
   },
   {
     id: 'moonfall',
@@ -110,6 +128,8 @@ export const oneHandedClubs: Item[] = [
     subCategory: '1h_clubs',
     treasureClass: 'exceptional',
     code: '9mt',
+    itemBase: 'Jagged Star',
+    imageFilename: 'morning_star.png',
   },
   {
     id: 'baezilsvortex',
@@ -121,6 +141,8 @@ export const oneHandedClubs: Item[] = [
     subCategory: '1h_clubs',
     treasureClass: 'exceptional',
     code: '9fl',
+    itemBase: 'Knout',
+    imageFilename: 'flail.png',
   },
   {
     id: 'earthshaker',
@@ -132,6 +154,7 @@ export const oneHandedClubs: Item[] = [
     subCategory: '1h_clubs',
     treasureClass: 'exceptional',
     code: '9wh',
+    itemBase: 'Battle Hammer',
   },
   {
     id: 'nordstenderizer',
@@ -143,6 +166,8 @@ export const oneHandedClubs: Item[] = [
     subCategory: '1h_clubs',
     treasureClass: 'elite',
     code: '7cl',
+    itemBase: 'Truncheon',
+    imageFilename: 'club.png',
   },
   {
     id: 'baranarsstar',
@@ -154,6 +179,8 @@ export const oneHandedClubs: Item[] = [
     subCategory: '1h_clubs',
     treasureClass: 'elite',
     code: '7mt',
+    itemBase: 'Devil Star',
+    imageFilename: 'morning_star.png',
   },
   {
     id: 'demonlimb',
@@ -165,6 +192,8 @@ export const oneHandedClubs: Item[] = [
     subCategory: '1h_clubs',
     treasureClass: 'elite',
     code: '7sp',
+    itemBase: 'Tyrant Club',
+    imageFilename: 'spiked_club.png',
   },
   {
     id: 'stormlash',
@@ -176,6 +205,8 @@ export const oneHandedClubs: Item[] = [
     subCategory: '1h_clubs',
     treasureClass: 'elite',
     code: '7fl',
+    itemBase: 'Scourge',
+    imageFilename: 'flail.png',
   },
   {
     id: 'horizonstornado',
@@ -187,6 +218,8 @@ export const oneHandedClubs: Item[] = [
     subCategory: '1h_clubs',
     treasureClass: 'elite',
     code: '7fl',
+    itemBase: 'Scourge',
+    imageFilename: 'flail.png',
   },
   {
     id: 'stonecrusher',
@@ -198,6 +231,8 @@ export const oneHandedClubs: Item[] = [
     subCategory: '1h_clubs',
     treasureClass: 'elite',
     code: '7wh',
+    itemBase: 'Legendary Mallet',
+    imageFilename: 'war_hammer.png',
   },
   {
     id: 'schaefershammer',
@@ -209,5 +244,7 @@ export const oneHandedClubs: Item[] = [
     subCategory: '1h_clubs',
     treasureClass: 'elite',
     code: '7wh',
+    itemBase: 'Legendary Mallet',
+    imageFilename: 'war_hammer.png',
   },
 ];

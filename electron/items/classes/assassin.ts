@@ -11,6 +11,8 @@ export const assassin: Item[] = [
     subCategory: 'assassin',
     treasureClass: 'exceptional',
     code: '9tw',
+    itemBase: 'Greater Talons',
+    imageFilename: 'claws.png',
   },
   {
     id: 'firelizardstalons',
@@ -22,6 +24,8 @@ export const assassin: Item[] = [
     subCategory: 'assassin',
     treasureClass: 'elite',
     code: '7lw',
+    itemBase: 'Feral Claws',
+    imageFilename: 'claws.png',
   },
   {
     id: 'jadetalon',
@@ -33,6 +37,8 @@ export const assassin: Item[] = [
     subCategory: 'assassin',
     treasureClass: 'elite',
     code: '7wb',
+    itemBase: 'Wrist Sword',
+    imageFilename: 'katar.png',
   },
   {
     id: 'shadowkiller',
@@ -44,5 +50,7 @@ export const assassin: Item[] = [
     subCategory: 'assassin',
     treasureClass: 'elite',
     code: '7cs',
+    itemBase: 'Battle Cestus',
+    imageFilename: 'hatchet_hands.png',
   },
 ];

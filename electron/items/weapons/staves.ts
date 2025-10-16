@@ -11,6 +11,8 @@ export const staves: Item[] = [
     subCategory: 'staves',
     treasureClass: 'normal',
     code: 'sst',
+    itemBase: 'Short Staff',
+    imageFilename: 'short_staff.png',
   },
   {
     id: 'serpentlord',
@@ -22,6 +24,8 @@ export const staves: Item[] = [
     subCategory: 'staves',
     treasureClass: 'normal',
     code: 'lst',
+    itemBase: 'Long Staff',
+    imageFilename: 'long_staff.png',
   },
   {
     id: 'spireoflazarus',
@@ -33,6 +37,8 @@ export const staves: Item[] = [
     subCategory: 'staves',
     treasureClass: 'normal',
     code: 'cst',
+    itemBase: 'Gnarled Staff',
+    imageFilename: 'gnarled_staff.png',
   },
   {
     id: 'thesalamander',
@@ -44,6 +50,8 @@ export const staves: Item[] = [
     subCategory: 'staves',
     treasureClass: 'normal',
     code: 'bst',
+    itemBase: 'Battle Staff',
+    imageFilename: 'battle_staff.png',
   },
   {
     id: 'theironjangbong',
@@ -55,6 +63,8 @@ export const staves: Item[] = [
     subCategory: 'staves',
     treasureClass: 'normal',
     code: 'wst',
+    itemBase: 'War Staff',
+    imageFilename: 'war_staff.png',
   },
   {
     id: 'razorswitch',
@@ -66,6 +76,8 @@ export const staves: Item[] = [
     subCategory: 'staves',
     treasureClass: 'exceptional',
     code: '8ss',
+    itemBase: 'Jo Staff',
+    imageFilename: 'short_staff.png',
   },
   {
     id: 'ribcracker',
@@ -77,6 +89,8 @@ export const staves: Item[] = [
     subCategory: 'staves',
     treasureClass: 'exceptional',
     code: '8ls',
+    itemBase: 'Quarterstaff',
+    imageFilename: 'long_staff.png',
   },
   {
     id: 'chromaticire',
@@ -88,6 +102,8 @@ export const staves: Item[] = [
     subCategory: 'staves',
     treasureClass: 'exceptional',
     code: '8cs',
+    itemBase: 'Shillelagh',
+    imageFilename: 'staff_of_the_kings.png',
   },
   {
     id: 'warpspear',
@@ -99,6 +115,8 @@ export const staves: Item[] = [
     subCategory: 'staves',
     treasureClass: 'exceptional',
     code: '8bs',
+    itemBase: 'Gothic Staff',
+    imageFilename: 'battle_staff.png',
   },
   {
     id: 'skullcollector',
@@ -110,6 +128,8 @@ export const staves: Item[] = [
     subCategory: 'staves',
     treasureClass: 'exceptional',
     code: '8ws',
+    itemBase: 'Rune Staff',
+    imageFilename: 'skullcollector.png',
   },
   {
     id: 'mangsongslesson',
@@ -121,6 +141,8 @@ export const staves: Item[] = [
     subCategory: 'staves',
     treasureClass: 'elite',
     code: '6ws',
+    itemBase: 'Archon Staff',
+    imageFilename: 'skullcollector.png',
   },
   {
     id: 'ondalswisdom',
@@ -132,5 +154,7 @@ export const staves: Item[] = [
     subCategory: 'staves',
     treasureClass: 'elite',
     code: '6cs',
+    itemBase: 'Elder Staff',
+    imageFilename: 'staff_of_the_kings.png',
   },
 ];

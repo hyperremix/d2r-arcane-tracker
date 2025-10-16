@@ -9,7 +9,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Switch } from '@/components/ui/switch';
 import { useGrailStore } from '@/stores/grailStore';
 
 /**
@@ -19,15 +18,10 @@ import { useGrailStore } from '@/stores/grailStore';
  */
 export function ThemeSettings() {
   const themeSelectId = useId();
-  const itemIconsSwitchId = useId();
   const { settings, setSettings } = useGrailStore();
 
   const updateTheme = async (theme: 'light' | 'dark' | 'system') => {
     await setSettings({ theme });
-  };
-
-  const toggleItemIcons = async (checked: boolean) => {
-    await setSettings({ showItemIcons: checked });
   };
 
   const getThemeIcon = () => {
@@ -86,24 +80,10 @@ export function ThemeSettings() {
           </div>
         </div>
 
-        <div className="flex items-center justify-between">
-          <div>
-            <Label htmlFor="item-icons-switch" className="font-medium text-sm">
-              Show Item Icons
-            </Label>
-            <p className="text-gray-600 text-xs">Display D2R item icons in cards</p>
-          </div>
-          <Switch
-            id={itemIconsSwitchId}
-            checked={settings.showItemIcons}
-            onCheckedChange={toggleItemIcons}
-          />
-        </div>
-
         <div className="rounded-lg bg-blue-50 p-3 dark:bg-blue-950">
           <p className="text-blue-800 text-xs dark:text-blue-200">
             <strong>Note:</strong> System theme will automatically match your operating system's
-            appearance preference. Item icons are loaded from your D2R installation when available.
+            appearance preference.
           </p>
         </div>
       </CardContent>

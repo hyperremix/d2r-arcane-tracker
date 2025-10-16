@@ -1,80 +1,156 @@
-import { ipcMain } from 'electron';
-import { getItemCode, getPopularItemCodes, itemsByNameSimple } from '../items/indexes';
+import { BrowserWindow, ipcMain } from 'electron';
+import { grailDatabase } from '../database/database';
+import type { ConversionResult, ConversionStatus } from '../services/iconService';
 import { iconService } from '../services/iconService';
-import { simplifyItemName } from '../utils/objects';
+import type { Settings } from '../types/grail';
+
+/**
+ * Updates multiple settings in the database
+ */
+function updateSettings(settings: Partial<Settings>): void {
+  for (const key in settings) {
+    const settingsKey = key as keyof Settings;
+    grailDatabase.setSetting(settingsKey, String(settings[settingsKey]));
+  }
+}
 
 /**
  * Initializes IPC handlers for icon-related operations.
  */
 export function initializeIconHandlers(): void {
   /**
-   * Gets an item icon as base64 data URL.
-   * Note: Runewords are excluded as they don't have individual item codes or icons.
-   * @param _ - IPC event (unused)
-   * @param itemName - The display name of the item
-   * @returns Base64 data URL or null if not found
+   * Sets the D2R installation path
    */
-  ipcMain.handle('icon:getByName', async (_, itemName: string): Promise<string | null> => {
+  ipcMain.handle('icon:setD2RPath', async (_, d2rPath: string): Promise<void> => {
     try {
-      // Check if this is a runeword first - runewords should never have icons
-      const simpleName = simplifyItemName(itemName);
-      const item = itemsByNameSimple[simpleName];
-      if (item?.type === 'runeword') {
-        return null; // No icon for runewords
-      }
-
-      const itemCode = getItemCode(itemName);
-      if (!itemCode) {
-        console.warn(`No item code mapping for: ${itemName}`);
-        return null;
-      }
-
-      return await iconService.getIconAsBase64(itemCode);
+      iconService.setD2RPath(d2rPath);
+      // Save to settings
+      updateSettings({ d2rInstallPath: d2rPath });
     } catch (error) {
-      console.error(`Failed to get icon for ${itemName}:`, error);
+      console.error('Failed to set D2R path:', error);
+      throw error;
+    }
+  });
+
+  /**
+   * Gets the current D2R installation path
+   */
+  ipcMain.handle('icon:getD2RPath', async (): Promise<string | null> => {
+    try {
+      // Try to get from service first
+      let d2rPath = iconService.getD2RPath();
+
+      // If not set, try to load from settings
+      if (!d2rPath) {
+        const settings = grailDatabase.getAllSettings();
+        d2rPath = settings.d2rInstallPath || null;
+        if (d2rPath) {
+          iconService.setD2RPath(d2rPath);
+        }
+      }
+
+      // If still not set, try to auto-detect
+      if (!d2rPath) {
+        d2rPath = iconService.findD2RInstallation();
+        if (d2rPath) {
+          updateSettings({ d2rInstallPath: d2rPath });
+        }
+      }
+
+      return d2rPath;
+    } catch (error) {
+      console.error('Failed to get D2R path:', error);
       return null;
     }
   });
 
   /**
-   * Gets an item icon by D2R item code.
-   * @param _ - IPC event (unused)
-   * @param itemCode - The D2R internal item code
+   * Converts all sprite files from D2R installation to PNGs
+   */
+  ipcMain.handle('icon:convertSprites', async (): Promise<ConversionResult> => {
+    try {
+      // Get D2R path
+      const d2rPath = iconService.getD2RPath();
+      if (!d2rPath) {
+        throw new Error('D2R installation path not set');
+      }
+
+      // Update status to in_progress
+      updateSettings({
+        iconConversionStatus: 'in_progress',
+        iconConversionProgress: { current: 0, total: 0 },
+      });
+
+      // Progress callback
+      const onProgress = (current: number, total: number) => {
+        // Send progress update to renderer
+        const window = BrowserWindow.getAllWindows()[0];
+        if (window) {
+          window.webContents.send('icon:conversionProgress', { current, total });
+        }
+
+        // Update settings
+        updateSettings({
+          iconConversionProgress: { current, total },
+        });
+      };
+
+      // Convert sprites
+      const result = await iconService.convertAllSprites(d2rPath, onProgress);
+
+      // Update final status
+      updateSettings({
+        iconConversionStatus: result.success ? 'completed' : 'failed',
+        iconConversionProgress: { current: result.totalFiles, total: result.totalFiles },
+      });
+
+      return result;
+    } catch (error) {
+      console.error('Failed to convert sprites:', error);
+      updateSettings({
+        iconConversionStatus: 'failed',
+      });
+      throw error;
+    }
+  });
+
+  /**
+   * Gets the current conversion status
+   */
+  ipcMain.handle('icon:getConversionStatus', async (): Promise<ConversionStatus> => {
+    try {
+      return iconService.getConversionStatus();
+    } catch (error) {
+      console.error('Failed to get conversion status:', error);
+      throw error;
+    }
+  });
+
+  /**
+   * Gets an item icon by item name.
    * @returns Base64 data URL or null if not found
    */
-  ipcMain.handle('icon:getByCode', async (_, itemCode: string): Promise<string | null> => {
+  ipcMain.handle('icon:getByName', async (): Promise<string | null> => {
     try {
-      return await iconService.getIconAsBase64(itemCode);
+      return await iconService.getIconByName();
     } catch (error) {
-      console.error(`Failed to get icon for code ${itemCode}:`, error);
+      console.error('Failed to get icon:', error);
       return null;
     }
   });
 
   /**
-   * Preloads popular item icons for faster initial display.
+   * Gets an item icon by filename.
+   * @param _ - IPC event (unused)
+   * @param filename - The icon filename (e.g., "item.png")
+   * @returns Base64 data URL or null if not found
    */
-  ipcMain.handle('icon:preloadPopular', async (): Promise<{ success: boolean }> => {
+  ipcMain.handle('icon:getByFilename', async (_, filename: string): Promise<string | null> => {
     try {
-      const popularCodes = getPopularItemCodes();
-      await iconService.preloadIcons(popularCodes);
-      return { success: true };
+      return await iconService.getIconByFilename(filename);
     } catch (error) {
-      console.error('Failed to preload icons:', error);
-      return { success: false };
-    }
-  });
-
-  /**
-   * Checks if D2R installation is available.
-   * @returns True if D2R is found
-   */
-  ipcMain.handle('icon:isD2RAvailable', async (): Promise<boolean> => {
-    try {
-      return iconService.isD2RAvailable();
-    } catch (error) {
-      console.error('Failed to check D2R availability:', error);
-      return false;
+      console.error(`Failed to get icon for filename ${filename}:`, error);
+      return null;
     }
   });
 

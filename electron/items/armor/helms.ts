@@ -11,6 +11,8 @@ export const helms: Item[] = [
     subCategory: 'helms',
     treasureClass: 'normal',
     code: 'cap',
+    itemBase: 'Cap',
+    imageFilename: 'cap_hat.png',
   },
   {
     id: 'tarnhelm',
@@ -22,6 +24,8 @@ export const helms: Item[] = [
     subCategory: 'helms',
     treasureClass: 'normal',
     code: 'skp',
+    itemBase: 'Skull Cap',
+    imageFilename: 'skull_cap.png',
   },
   {
     id: 'coifofglory',
@@ -33,6 +37,8 @@ export const helms: Item[] = [
     subCategory: 'helms',
     treasureClass: 'normal',
     code: 'hlm',
+    itemBase: 'Helm',
+    imageFilename: 'coif_of_glory.png',
   },
   {
     id: 'duskdeep',
@@ -44,6 +50,8 @@ export const helms: Item[] = [
     subCategory: 'helms',
     treasureClass: 'normal',
     code: 'fhl',
+    itemBase: 'Full Helm',
+    imageFilename: 'duskdeep.png',
   },
   {
     id: 'wormskull',
@@ -55,6 +63,8 @@ export const helms: Item[] = [
     subCategory: 'helms',
     treasureClass: 'normal',
     code: 'bhm',
+    itemBase: 'Bone Helm',
+    imageFilename: 'wormskull.png',
   },
   {
     id: 'howltusk',
@@ -66,6 +76,8 @@ export const helms: Item[] = [
     subCategory: 'helms',
     treasureClass: 'normal',
     code: 'ghm',
+    itemBase: 'Great Helm',
+    imageFilename: 'great_helm.png',
   },
   {
     id: 'undeadcrown',
@@ -77,6 +89,8 @@ export const helms: Item[] = [
     subCategory: 'helms',
     treasureClass: 'normal',
     code: 'crn',
+    itemBase: 'Crown',
+    imageFilename: 'crown.png',
   },
   {
     id: 'thefaceofhorror',
@@ -88,6 +102,8 @@ export const helms: Item[] = [
     subCategory: 'helms',
     treasureClass: 'normal',
     code: 'msk',
+    itemBase: 'Mask',
+    imageFilename: 'mask.png',
   },
   {
     id: 'peasantcrown',
@@ -99,6 +115,8 @@ export const helms: Item[] = [
     subCategory: 'helms',
     treasureClass: 'exceptional',
     code: 'xap',
+    itemBase: 'War Hat',
+    imageFilename: 'cap_hat.png',
   },
   {
     id: 'rockstopper',
@@ -110,6 +128,8 @@ export const helms: Item[] = [
     subCategory: 'helms',
     treasureClass: 'exceptional',
     code: 'xkp',
+    itemBase: 'Sallet',
+    imageFilename: 'rockstopper.png',
   },
   {
     id: 'stealskull',
@@ -121,6 +141,8 @@ export const helms: Item[] = [
     subCategory: 'helms',
     treasureClass: 'exceptional',
     code: 'xlm',
+    itemBase: 'Casque',
+    imageFilename: 'helm.png',
   },
   {
     id: 'darksighthelm',
@@ -132,6 +154,8 @@ export const helms: Item[] = [
     subCategory: 'helms',
     treasureClass: 'exceptional',
     code: 'xhl',
+    itemBase: 'Basinet',
+    imageFilename: 'full_helm.png',
   },
   {
     id: 'vampiregaze',
@@ -143,6 +167,8 @@ export const helms: Item[] = [
     subCategory: 'helms',
     treasureClass: 'exceptional',
     code: 'xh9',
+    itemBase: 'Grim Helm',
+    imageFilename: 'bone_helm.png',
   },
   {
     id: 'valkyriewing',
@@ -154,6 +180,8 @@ export const helms: Item[] = [
     subCategory: 'helms',
     treasureClass: 'exceptional',
     code: 'xhm',
+    itemBase: 'Winged Helm',
+    imageFilename: 'great_helm.png',
   },
   {
     id: 'crownofthieves',
@@ -165,6 +193,8 @@ export const helms: Item[] = [
     subCategory: 'helms',
     treasureClass: 'exceptional',
     code: 'xrn',
+    itemBase: 'Grand Crown',
+    imageFilename: 'crown_of_thieves.png',
   },
   {
     id: 'blackhornsface',
@@ -176,6 +206,8 @@ export const helms: Item[] = [
     subCategory: 'helms',
     treasureClass: 'exceptional',
     code: 'xsk',
+    itemBase: 'Death Mask',
+    imageFilename: 'mask.png',
   },
   {
     id: 'andarielsvisage',
@@ -187,6 +219,8 @@ export const helms: Item[] = [
     subCategory: 'helms',
     treasureClass: 'elite',
     code: 'usk',
+    itemBase: 'Demonhead',
+    imageFilename: 'mask.png',
   },
   {
     id: 'crownofages',
@@ -198,6 +232,8 @@ export const helms: Item[] = [
     subCategory: 'helms',
     treasureClass: 'elite',
     code: 'urn',
+    itemBase: 'Corona',
+    imageFilename: 'crown.png',
   },
   {
     id: 'giantskull',
@@ -209,6 +245,8 @@ export const helms: Item[] = [
     subCategory: 'helms',
     treasureClass: 'elite',
     code: 'uh9',
+    itemBase: 'Bone Visage',
+    imageFilename: 'bone_helm.png',
   },
   {
     id: 'harlequincrest',
@@ -220,6 +258,8 @@ export const helms: Item[] = [
     subCategory: 'helms',
     treasureClass: 'elite',
     code: 'uap',
+    itemBase: 'Shako',
+    imageFilename: 'cap_hat.png',
   },
   {
     id: 'nightwingsveil',
@@ -231,6 +271,8 @@ export const helms: Item[] = [
     subCategory: 'helms',
     treasureClass: 'elite',
     code: 'uhm',
+    itemBase: 'Spired Helm',
+    imageFilename: 'great_helm.png',
   },
   {
     id: 'steelshade',
@@ -242,6 +284,8 @@ export const helms: Item[] = [
     subCategory: 'helms',
     treasureClass: 'elite',
     code: 'ulm',
+    itemBase: 'Armet',
+    imageFilename: 'helm.png',
   },
   {
     id: 'veilofsteel',
@@ -253,6 +297,8 @@ export const helms: Item[] = [
     subCategory: 'helms',
     treasureClass: 'elite',
     code: 'uhm',
+    itemBase: 'Spired Helm',
+    imageFilename: 'great_helm.png',
   },
   {
     id: 'kirasguardian',
@@ -264,6 +310,8 @@ export const helms: Item[] = [
     subCategory: 'helms',
     treasureClass: 'elite',
     code: 'ci2',
+    itemBase: 'Tiara',
+    imageFilename: 'tiara.png',
   },
   {
     id: 'griffonseye',
@@ -275,5 +323,7 @@ export const helms: Item[] = [
     subCategory: 'helms',
     treasureClass: 'elite',
     code: 'ci3',
+    itemBase: 'Diadem',
+    imageFilename: 'diadem.png',
   },
 ];

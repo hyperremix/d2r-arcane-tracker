@@ -1,4 +1,4 @@
-import { ChevronLeft, ChevronRight, Settings, Trophy } from 'lucide-react';
+import { BarChart3, ChevronLeft, ChevronRight, Settings, Trophy } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router';
 import { Button } from '@/components/ui/button';
@@ -40,6 +40,7 @@ export function TitleBar() {
 
   // Check if routes are active
   const isTrackerActive = location.pathname === '/';
+  const isStatisticsActive = location.pathname === '/statistics';
   const isSettingsActive = location.pathname === '/settings';
 
   const handleBack = () => {
@@ -137,6 +138,27 @@ export function TitleBar() {
           >
             <Link to="/" title="Holy Grail Tracker">
               <Trophy className="h-4 w-4" />
+            </Link>
+          </Button>
+        </div>
+        <div className="relative">
+          <div
+            className={cn(
+              '-top-2 absolute right-0 left-0',
+              isStatisticsActive && 'border-t-2 border-t-primary-500',
+            )}
+          />
+          <Button
+            asChild
+            variant="ghost"
+            size="sm"
+            className={cn(
+              'relative hover:text-primary-500',
+              isStatisticsActive && 'text-primary-500',
+            )}
+          >
+            <Link to="/statistics" title="Statistics">
+              <BarChart3 className="h-4 w-4" />
             </Link>
           </Button>
         </div>

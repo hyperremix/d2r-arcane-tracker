@@ -131,6 +131,8 @@ export interface Item {
   name: string;
   link: string;
   code?: string;
+  itemBase?: string;
+  imageFilename?: string;
   etherealType: EtherealType;
   type: ItemType;
   category: ItemCategory;
@@ -148,6 +150,8 @@ export type DatabaseItem = {
   name: string;
   link: string;
   code: string | null;
+  item_base: string | null;
+  image_filename: string | null;
   ethereal_type: EtherealType;
   type: ItemType;
   category: ItemCategory;
@@ -356,6 +360,9 @@ export type Settings = {
   needsSeeding: boolean;
   theme: 'light' | 'dark' | 'system';
   showItemIcons: boolean;
+  d2rInstallPath?: string; // Path to D2R installation
+  iconConversionStatus?: 'not_started' | 'in_progress' | 'completed' | 'failed';
+  iconConversionProgress?: { current: number; total: number };
   // Advanced monitoring settings (optional, with defaults)
   tickReaderIntervalMs?: number; // Default: 500
   chokidarPollingIntervalMs?: number; // Default: 1000

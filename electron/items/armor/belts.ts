@@ -11,6 +11,8 @@ export const belts: Item[] = [
     subCategory: 'belts',
     treasureClass: 'normal',
     code: 'lbl',
+    itemBase: 'Sash',
+    imageFilename: 'sash_l.png',
   },
   {
     id: 'snakecord',
@@ -22,6 +24,8 @@ export const belts: Item[] = [
     subCategory: 'belts',
     treasureClass: 'normal',
     code: 'vbl',
+    itemBase: 'Light Belt',
+    imageFilename: 'light_belt.png',
   },
   {
     id: 'nightsmoke',
@@ -33,6 +37,8 @@ export const belts: Item[] = [
     subCategory: 'belts',
     treasureClass: 'normal',
     code: 'mbl',
+    itemBase: 'Belt',
+    imageFilename: 'belt_m.png',
   },
   {
     id: 'goldwrap',
@@ -44,6 +50,8 @@ export const belts: Item[] = [
     subCategory: 'belts',
     treasureClass: 'normal',
     code: 'tbl',
+    itemBase: 'Heavy Belt',
+    imageFilename: 'heavy_belt.png',
   },
   {
     id: 'bladebuckle',
@@ -55,6 +63,8 @@ export const belts: Item[] = [
     subCategory: 'belts',
     treasureClass: 'normal',
     code: 'hbl',
+    itemBase: 'Plated Belt',
+    imageFilename: 'girdle_h.png',
   },
   {
     id: 'stringofears',
@@ -66,6 +76,8 @@ export const belts: Item[] = [
     subCategory: 'belts',
     treasureClass: 'exceptional',
     code: 'zlb',
+    itemBase: 'Demonhide Sash',
+    imageFilename: 'sash_l.png',
   },
   {
     id: 'razortail',
@@ -77,6 +89,8 @@ export const belts: Item[] = [
     subCategory: 'belts',
     treasureClass: 'exceptional',
     code: 'zvb',
+    itemBase: 'Sharkskin Belt',
+    imageFilename: 'light_belt.png',
   },
   {
     id: 'gloomstrap',
@@ -88,6 +102,8 @@ export const belts: Item[] = [
     subCategory: 'belts',
     treasureClass: 'exceptional',
     code: 'zmb',
+    itemBase: 'Mesh Belt',
+    imageFilename: 'belt_m.png',
   },
   {
     id: 'snowclash',
@@ -99,6 +115,8 @@ export const belts: Item[] = [
     subCategory: 'belts',
     treasureClass: 'exceptional',
     code: 'ztb',
+    itemBase: 'Battle Belt',
+    imageFilename: 'heavy_belt.png',
   },
   {
     id: 'thundergodsvigor',
@@ -110,6 +128,8 @@ export const belts: Item[] = [
     subCategory: 'belts',
     treasureClass: 'exceptional',
     code: 'zhb',
+    itemBase: 'War Belt',
+    imageFilename: 'girdle_h.png',
   },
   {
     id: 'arachnidmesh',
@@ -121,6 +141,8 @@ export const belts: Item[] = [
     subCategory: 'belts',
     treasureClass: 'elite',
     code: 'ulc',
+    itemBase: 'Spiderweave Silk',
+    imageFilename: 'sash_l.png',
   },
   {
     id: 'nosferatuscoil',
@@ -132,6 +154,8 @@ export const belts: Item[] = [
     subCategory: 'belts',
     treasureClass: 'elite',
     code: 'uvc',
+    itemBase: 'Vampirefang Belt',
+    imageFilename: 'light_belt.png',
   },
   {
     id: 'verdungosheartycord',
@@ -143,5 +167,7 @@ export const belts: Item[] = [
     subCategory: 'belts',
     treasureClass: 'elite',
     code: 'umc',
+    itemBase: 'Mithril Coil',
+    imageFilename: 'belt_m.png',
   },
 ];

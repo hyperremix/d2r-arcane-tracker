@@ -269,6 +269,47 @@ contextBridge.exposeInMainWorld('electronAPI', {
    */
   icon: {
     /**
+     * Sets the D2R installation path.
+     * @param {string} path - Path to D2R installation.
+     * @returns {Promise<void>}
+     */
+    setD2RPath: (path: string): Promise<void> => ipcRenderer.invoke('icon:setD2RPath', path),
+
+    /**
+     * Gets the current D2R installation path.
+     * @returns {Promise<string | null>} D2R path or null if not set.
+     */
+    getD2RPath: (): Promise<string | null> => ipcRenderer.invoke('icon:getD2RPath'),
+
+    /**
+     * Converts all sprite files from D2R installation to PNGs.
+     * @returns {Promise<ConversionResult>} Conversion result.
+     */
+    convertSprites: (): Promise<{
+      success: boolean;
+      totalFiles: number;
+      convertedFiles: number;
+      skippedFiles: number;
+      errors: Array<{ file: string; error: string }>;
+    }> => ipcRenderer.invoke('icon:convertSprites'),
+
+    /**
+     * Gets the current conversion status.
+     * @returns {Promise<ConversionStatus>} Conversion status.
+     */
+    getConversionStatus: (): Promise<{
+      status: 'not_started' | 'in_progress' | 'completed' | 'failed';
+      progress?: { current: number; total: number };
+      lastResult?: {
+        success: boolean;
+        totalFiles: number;
+        convertedFiles: number;
+        skippedFiles: number;
+        errors: Array<{ file: string; error: string }>;
+      };
+    }> => ipcRenderer.invoke('icon:getConversionStatus'),
+
+    /**
      * Gets an item icon by item name.
      * @param {string} itemName - The display name of the item.
      * @returns {Promise<string | null>} Base64 data URL of the icon or null if not found.
@@ -277,24 +318,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.invoke('icon:getByName', itemName),
 
     /**
-     * Gets an item icon by D2R item code.
-     * @param {string} itemCode - The D2R internal item code.
+     * Gets an item icon by filename.
+     * @param {string} filename - The icon filename (e.g., "item.png").
      * @returns {Promise<string | null>} Base64 data URL of the icon or null if not found.
      */
-    getByCode: (itemCode: string): Promise<string | null> =>
-      ipcRenderer.invoke('icon:getByCode', itemCode),
-
-    /**
-     * Preloads popular item icons for faster display.
-     * @returns {Promise<{ success: boolean }>} Success indicator.
-     */
-    preloadPopular: (): Promise<{ success: boolean }> => ipcRenderer.invoke('icon:preloadPopular'),
-
-    /**
-     * Checks if D2R installation is available.
-     * @returns {Promise<boolean>} True if D2R is found.
-     */
-    isD2RAvailable: (): Promise<boolean> => ipcRenderer.invoke('icon:isD2RAvailable'),
+    getByFilename: (filename: string): Promise<string | null> =>
+      ipcRenderer.invoke('icon:getByFilename', filename),
 
     /**
      * Clears the icon cache.
@@ -304,10 +333,17 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
     /**
      * Gets cache statistics.
-     * @returns {Promise<{ size: number; d2rAvailable: boolean; cachePath: string }>} Cache stats.
+     * @returns {Promise<CacheStats>} Cache stats.
      */
-    getCacheStats: (): Promise<{ size: number; d2rAvailable: boolean; cachePath: string }> =>
-      ipcRenderer.invoke('icon:getCacheStats'),
+    getCacheStats: (): Promise<{
+      size: number;
+      iconDirectory: string;
+      cacheFile: string;
+      conversionStatus: {
+        status: 'not_started' | 'in_progress' | 'completed' | 'failed';
+        progress?: { current: number; total: number };
+      };
+    }> => ipcRenderer.invoke('icon:getCacheStats'),
   },
 
   /**

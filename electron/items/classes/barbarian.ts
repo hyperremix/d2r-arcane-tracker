@@ -11,6 +11,8 @@ export const barbarian: Item[] = [
     subCategory: 'barbarian',
     treasureClass: 'exceptional',
     code: 'baa',
+    itemBase: 'Slayer Guard',
+    imageFilename: 'avenger_guard.png',
   },
   {
     id: 'demonhornsedge',
@@ -22,6 +24,8 @@ export const barbarian: Item[] = [
     subCategory: 'barbarian',
     treasureClass: 'elite',
     code: 'bad',
+    itemBase: 'Destroyer Helm',
+    imageFilename: 'horned_helm.png',
   },
   {
     id: 'halaberdsreign',
@@ -33,6 +37,8 @@ export const barbarian: Item[] = [
     subCategory: 'barbarian',
     treasureClass: 'elite',
     code: 'bae',
+    itemBase: 'Conqueror Crown',
+    imageFilename: 'assault_helmet.png',
   },
   {
     id: 'wolfhowl',
@@ -44,5 +50,7 @@ export const barbarian: Item[] = [
     subCategory: 'barbarian',
     treasureClass: 'elite',
     code: 'bac',
+    itemBase: 'Fury Visor',
+    imageFilename: 'fanged_helm.png',
   },
 ];

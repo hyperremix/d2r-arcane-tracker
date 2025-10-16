@@ -82,6 +82,8 @@ class GrailDatabase {
         name TEXT NOT NULL,
         link TEXT,
         code TEXT,
+        item_base TEXT,
+        image_filename TEXT,
         type TEXT NOT NULL CHECK (type IN ('unique', 'set', 'rune', 'runeword')),
         category TEXT NOT NULL,
         sub_category TEXT NOT NULL,
@@ -210,7 +212,7 @@ class GrailDatabase {
         ('nativeNotifications', 'true'),
         ('needsSeeding', 'true'),
         ('theme', 'system'),
-        ('showItemIcons', 'true');
+        ('showItemIcons', 'false');
     `;
 
     this.db.exec(schema);
@@ -289,8 +291,8 @@ class GrailDatabase {
    */
   insertItems(items: Item[]): void {
     const stmt = this.db.prepare(`
-      INSERT OR REPLACE INTO items (id, name, link, code, type, category, sub_category, set_name, ethereal_type, treasure_class)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT OR REPLACE INTO items (id, name, link, code, type, category, sub_category, set_name, ethereal_type, treasure_class, image_filename)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     const transaction = this.db.transaction((itemsToInsert: typeof items) => {
@@ -307,6 +309,7 @@ class GrailDatabase {
           mappedItem.set_name,
           mappedItem.ethereal_type,
           mappedItem.treasure_class,
+          mappedItem.image_filename,
         );
       }
     });

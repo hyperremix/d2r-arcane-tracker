@@ -11,6 +11,8 @@ export const twoHandedSwords: Item[] = [
     subCategory: '2h_swords',
     treasureClass: 'normal',
     code: '2hs',
+    itemBase: 'Two-Handed Sword',
+    imageFilename: 'shadowfang.png',
   },
   {
     id: 'soulflay',
@@ -22,6 +24,8 @@ export const twoHandedSwords: Item[] = [
     subCategory: '2h_swords',
     treasureClass: 'normal',
     code: 'clm',
+    itemBase: 'Claymore',
+    imageFilename: 'claymore.png',
   },
   {
     id: 'kinemilsawl',
@@ -33,6 +37,8 @@ export const twoHandedSwords: Item[] = [
     subCategory: '2h_swords',
     treasureClass: 'normal',
     code: 'gis',
+    itemBase: 'Gladius',
+    imageFilename: 'kinemils_awl.png',
   },
   {
     id: 'blacktongue',
@@ -44,6 +50,8 @@ export const twoHandedSwords: Item[] = [
     subCategory: '2h_swords',
     treasureClass: 'normal',
     code: 'bsw',
+    itemBase: 'Bastard Sword',
+    imageFilename: 'blacktongue.png',
   },
   {
     id: 'ripsaw',
@@ -55,6 +63,8 @@ export const twoHandedSwords: Item[] = [
     subCategory: '2h_swords',
     treasureClass: 'normal',
     code: 'flb',
+    itemBase: 'Flamberge',
+    imageFilename: 'flamberge.png',
   },
   {
     id: 'thepatriarch',
@@ -66,6 +76,8 @@ export const twoHandedSwords: Item[] = [
     subCategory: '2h_swords',
     treasureClass: 'normal',
     code: 'gsd',
+    itemBase: 'Great Sword',
+    imageFilename: 'the_patriarch.png',
   },
   {
     id: 'craintevomir',
@@ -77,6 +89,8 @@ export const twoHandedSwords: Item[] = [
     subCategory: '2h_swords',
     treasureClass: 'exceptional',
     code: '92h',
+    itemBase: 'Suwayyah',
+    imageFilename: 'katar.png',
   },
   {
     id: 'bingszwang',
@@ -88,6 +102,8 @@ export const twoHandedSwords: Item[] = [
     subCategory: '2h_swords',
     treasureClass: 'exceptional',
     code: '9cm',
+    itemBase: 'Dacian Falx',
+    imageFilename: 'claymore.png',
   },
   {
     id: 'thevilehusk',
@@ -99,6 +115,8 @@ export const twoHandedSwords: Item[] = [
     subCategory: '2h_swords',
     treasureClass: 'exceptional',
     code: '9gs',
+    itemBase: 'Tusk Sword',
+    imageFilename: 'kinemils_awl.png',
   },
   {
     id: 'cloudcrack',
@@ -110,6 +128,8 @@ export const twoHandedSwords: Item[] = [
     subCategory: '2h_swords',
     treasureClass: 'exceptional',
     code: '9b9',
+    itemBase: 'Gothic Sword',
+    imageFilename: 'blacktongue.png',
   },
   {
     id: 'todesfaelleflamme',
@@ -121,6 +141,8 @@ export const twoHandedSwords: Item[] = [
     subCategory: '2h_swords',
     treasureClass: 'exceptional',
     code: '9fb',
+    itemBase: 'Zweihander',
+    imageFilename: 'todesfaelle_flamme.png',
   },
   {
     id: 'swordguard',
@@ -132,6 +154,8 @@ export const twoHandedSwords: Item[] = [
     subCategory: '2h_swords',
     treasureClass: 'exceptional',
     code: '9gd',
+    itemBase: 'Executioner Sword',
+    imageFilename: 'the_patriarch.png',
   },
   {
     id: 'flamebellow',
@@ -143,6 +167,8 @@ export const twoHandedSwords: Item[] = [
     subCategory: '2h_swords',
     treasureClass: 'elite',
     code: '7gs',
+    itemBase: 'Colossus Blade',
+    imageFilename: 'kinemils_awl.png',
   },
   {
     id: 'doombringer',
@@ -154,6 +180,8 @@ export const twoHandedSwords: Item[] = [
     subCategory: '2h_swords',
     treasureClass: 'elite',
     code: '7b7',
+    itemBase: 'Champion Sword',
+    imageFilename: 'blacktongue.png',
   },
   {
     id: 'thegrandfather',
@@ -165,5 +193,7 @@ export const twoHandedSwords: Item[] = [
     subCategory: '2h_swords',
     treasureClass: 'elite',
     code: '7gd',
+    itemBase: 'Glorious Axe',
+    imageFilename: 'the_patriarch.png',
   },
 ];

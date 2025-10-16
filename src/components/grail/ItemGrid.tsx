@@ -1,9 +1,7 @@
 import { useVirtualizer } from '@tanstack/react-virtual';
-import type { Character, Item, Settings } from 'electron/types/grail';
-import { Grid, List } from 'lucide-react';
+import type { Character, GrailProgress, Item, Settings } from 'electron/types/grail';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { useProgressLookup } from '@/hooks/useProgressLookup';
 import {
   canItemBeEthereal,
@@ -69,10 +67,9 @@ type GroupMode = 'none' | 'category' | 'type' | 'ethereal';
  * @returns {JSX.Element} A grid or list of Holy Grail items with view and grouping controls
  */
 export const ItemGrid = memo(function ItemGrid() {
-  const { progress, characters, selectedCharacterId, settings } = useGrailStore();
+  const { progress, characters, selectedCharacterId, settings, viewMode, groupMode, setGroupMode } =
+    useGrailStore();
   const filteredItems = useFilteredItems(); // This uses DB items as base and applies all filters
-  const [viewMode, setViewMode] = useState<ViewMode>('grid');
-  const [groupMode, setGroupMode] = useState<GroupMode>('none');
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
 
   // Helper function to filter items when only one grail type is enabled
@@ -108,7 +105,7 @@ export const ItemGrid = memo(function ItemGrid() {
     if (groupMode === 'ethereal' && settings.grailEthereal) {
       setGroupMode('none');
     }
-  }, [groupMode, settings.grailEthereal]);
+  }, [groupMode, settings.grailEthereal, setGroupMode]);
 
   const groupedItems = useMemo(() => {
     if (groupMode === 'none') {
@@ -157,44 +154,7 @@ export const ItemGrid = memo(function ItemGrid() {
   }, []);
 
   return (
-    <div className="space-y-6">
-      {/* Controls */}
-      <div className="flex items-center justify-end">
-        <div className="flex items-center gap-2">
-          {/* Group Mode */}
-          <select
-            value={groupMode}
-            onChange={(e) => setGroupMode(e.target.value as GroupMode)}
-            className="rounded border px-2 py-1 text-sm"
-          >
-            <option value="none">No Grouping</option>
-            <option value="category">By Category</option>
-            <option value="type">By Type</option>
-            {settings.grailEthereal && <option value="ethereal">By Ethereal</option>}
-          </select>
-
-          {/* View Mode Toggle */}
-          <div className="flex rounded border">
-            <Button
-              variant={viewMode === 'grid' ? 'default' : 'ghost'}
-              size="sm"
-              onClick={() => setViewMode('grid')}
-              className="rounded-r-none"
-            >
-              <Grid className="h-4 w-4" />
-            </Button>
-            <Button
-              variant={viewMode === 'list' ? 'default' : 'ghost'}
-              size="sm"
-              onClick={() => setViewMode('list')}
-              className="rounded-l-none"
-            >
-              <List className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
-      </div>
-
+    <div>
       {/* Items Grid with Virtual Scrolling */}
       <VirtualizedItemsContainer
         groupedItems={groupedItems}
@@ -269,9 +229,158 @@ function createListRows(items: Item[], groupIndex: number): VirtualRowType[] {
   }));
 }
 
+// Stable empty arrays to avoid breaking memoization
+const EMPTY_PROGRESS_ARRAY: GrailProgress[] = [];
+
 /**
- * VirtualizedItemsContainer component that renders all items with virtual scrolling using parent scroll.
- * Flattens grouped items into virtual rows and uses the parent container's scroll instead of creating a separate one.
+ * Calculates the number of items found in a group.
+ * @param {Item[]} items - Items in the group
+ * @param {Map} progressLookup - Progress lookup map
+ * @returns {number} Number of found items
+ */
+function calculateGroupFoundCount(
+  items: Item[],
+  progressLookup: Map<string, { overallFound: boolean }>,
+): number {
+  let foundCount = 0;
+  for (const item of items) {
+    if (progressLookup.get(item.id)?.overallFound) {
+      foundCount++;
+    }
+  }
+  return foundCount;
+}
+
+/**
+ * Props for renderVirtualRow function.
+ */
+interface RenderVirtualRowProps {
+  virtualRow: ReturnType<ReturnType<typeof useVirtualizer>['getVirtualItems']>[number];
+  row: VirtualRowType;
+  viewMode: ViewMode;
+  progressLookup: ReturnType<typeof useProgressLookup>;
+  characters: Character[];
+  handleItemClick: (itemId: string) => void;
+  columnsCount: number;
+}
+
+/**
+ * Renders a single virtual row (header, list item, or grid row).
+ */
+function renderVirtualRow({
+  virtualRow,
+  row,
+  viewMode,
+  progressLookup,
+  characters,
+  handleItemClick,
+  columnsCount,
+}: RenderVirtualRowProps): JSX.Element | null {
+  if (row.type === 'header') {
+    return (
+      <div
+        key={virtualRow.key}
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          width: '100%',
+          height: `${virtualRow.size}px`,
+          transform: `translateY(${virtualRow.start}px)`,
+        }}
+      >
+        <div className="flex items-center gap-2 py-4">
+          <h3 className="font-semibold text-lg">{row.groupTitle}</h3>
+          <Badge variant="outline">
+            {row.foundCount}/{row.itemCount}
+          </Badge>
+        </div>
+      </div>
+    );
+  }
+
+  // List view
+  if (viewMode === 'list') {
+    const item = row.items[0];
+    if (!item) return null;
+
+    const itemProgressData = progressLookup.get(item.id);
+    const normalProgress = itemProgressData?.normalProgress ?? EMPTY_PROGRESS_ARRAY;
+    const etherealProgress = itemProgressData?.etherealProgress ?? EMPTY_PROGRESS_ARRAY;
+
+    return (
+      <div
+        key={virtualRow.key}
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          width: '100%',
+          height: `${virtualRow.size}px`,
+          transform: `translateY(${virtualRow.start}px)`,
+        }}
+      >
+        <ItemCard
+          item={item}
+          normalProgress={normalProgress}
+          etherealProgress={etherealProgress}
+          characters={characters}
+          onClick={() => handleItemClick(item.id)}
+          viewMode={viewMode}
+        />
+      </div>
+    );
+  }
+
+  // Grid view
+  return (
+    <div
+      key={virtualRow.key}
+      style={{
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        width: '100%',
+        height: `${virtualRow.size}px`,
+        transform: `translateY(${virtualRow.start}px)`,
+      }}
+    >
+      <div
+        className={cn(
+          'grid gap-4',
+          columnsCount === 2 && 'grid-cols-2',
+          columnsCount === 3 && 'grid-cols-3',
+          columnsCount === 4 && 'grid-cols-4',
+          columnsCount === 5 && 'grid-cols-5',
+          columnsCount === 6 && 'grid-cols-6',
+          columnsCount === 7 && 'grid-cols-7',
+        )}
+      >
+        {row.items.map((item) => {
+          const itemProgressData = progressLookup.get(item.id);
+          const normalProgress = itemProgressData?.normalProgress ?? EMPTY_PROGRESS_ARRAY;
+          const etherealProgress = itemProgressData?.etherealProgress ?? EMPTY_PROGRESS_ARRAY;
+
+          return (
+            <ItemCard
+              key={item.id}
+              item={item}
+              normalProgress={normalProgress}
+              etherealProgress={etherealProgress}
+              characters={characters}
+              onClick={() => handleItemClick(item.id)}
+              viewMode={viewMode}
+            />
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * VirtualizedItemsContainer component that renders all items with virtual scrolling using window scroll.
+ * Flattens grouped items into virtual rows and uses the window as the scroll element for optimal performance.
  * @param {VirtualizedItemsContainerProps} props - Component props
  * @returns {JSX.Element} A virtualized container of all items
  */
@@ -284,40 +393,45 @@ function VirtualizedItemsContainer({
   handleItemClick,
   showItemIcons,
 }: VirtualizedItemsContainerProps) {
-  const parentRef = useRef<HTMLDivElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
 
   // Calculate columns for grid view based on viewport width
   const getColumnsCount = useCallback(() => {
     if (viewMode === 'list') return 1;
 
     const width = window.innerWidth;
-    if (width >= 1536) return 7; // 2xl
-    if (width >= 1280) return 6; // xl
-    if (width >= 1024) return 5; // lg
-    if (width >= 768) return 4; // md
-    if (width >= 640) return 3; // sm
-    return 2; // default
+    if (width >= 1536) return 6; // 2xl
+    if (width >= 1280) return 5; // xl
+    if (width >= 1024) return 4; // lg
+    if (width >= 768) return 3; // md
+    if (width >= 640) return 2; // sm
+    return 1; // default
   }, [viewMode]);
 
   const [columnsCount, setColumnsCount] = useState(getColumnsCount);
 
-  // Update columns count on window resize
+  // Update columns count on window resize with debouncing
   useEffect(() => {
-    const handleResize = () => setColumnsCount(getColumnsCount());
+    let timeoutId: NodeJS.Timeout;
+    const handleResize = () => {
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => setColumnsCount(getColumnsCount()), 150);
+    };
     window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
+    return () => {
+      clearTimeout(timeoutId);
+      window.removeEventListener('resize', handleResize);
+    };
   }, [getColumnsCount]);
 
-  // Flatten groups into virtual rows (headers + item rows)
+  // Flatten groups into virtual rows (headers + item rows) with cached foundCount
   const virtualRows = useMemo<VirtualRowType[]>(() => {
     const rows: VirtualRowType[] = [];
 
     for (const [groupIndex, group] of groupedItems.entries()) {
       // Add header row if grouping is enabled
       if (groupMode !== 'none') {
-        const foundCount = group.items.filter(
-          (item) => progressLookup.get(item.id)?.overallFound || false,
-        ).length;
+        const foundCount = calculateGroupFoundCount(group.items, progressLookup);
         rows.push({
           type: 'header',
           groupTitle: group.title,
@@ -339,7 +453,7 @@ function VirtualizedItemsContainer({
 
   const rowVirtualizer = useVirtualizer({
     count: virtualRows.length,
-    getScrollElement: () => parentRef.current,
+    getScrollElement: () => listRef.current,
     estimateSize: (index) => {
       const row = virtualRows[index];
       if (row.type === 'header') return 56; // Header height
@@ -351,7 +465,14 @@ function VirtualizedItemsContainer({
   });
 
   return (
-    <div ref={parentRef} className="w-full">
+    <div
+      ref={listRef}
+      className="w-full p-4"
+      style={{
+        height: '760px',
+        overflow: 'auto',
+      }}
+    >
       <div
         style={{
           height: `${rowVirtualizer.getTotalSize()}px`,
@@ -359,110 +480,17 @@ function VirtualizedItemsContainer({
           position: 'relative',
         }}
       >
-        {rowVirtualizer.getVirtualItems().map((virtualRow) => {
-          const row = virtualRows[virtualRow.index];
-
-          if (row.type === 'header') {
-            return (
-              <div
-                key={virtualRow.key}
-                style={{
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  width: '100%',
-                  height: `${virtualRow.size}px`,
-                  transform: `translateY(${virtualRow.start}px)`,
-                }}
-              >
-                <div className="flex items-center gap-2 py-4">
-                  <h3 className="font-semibold text-lg">{row.groupTitle}</h3>
-                  <Badge variant="outline">
-                    {row.foundCount}/{row.itemCount}
-                  </Badge>
-                </div>
-              </div>
-            );
-          }
-
-          // Item row
-          if (viewMode === 'list') {
-            const item = row.items[0];
-            if (!item) return null;
-
-            const itemProgressData = progressLookup.get(item.id);
-            const normalProgress = itemProgressData?.normalProgress || [];
-            const etherealProgress = itemProgressData?.etherealProgress || [];
-
-            return (
-              <div
-                key={virtualRow.key}
-                style={{
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  width: '100%',
-                  height: `${virtualRow.size}px`,
-                  transform: `translateY(${virtualRow.start}px)`,
-                }}
-              >
-                <ItemCard
-                  item={item}
-                  normalProgress={normalProgress}
-                  etherealProgress={etherealProgress}
-                  characters={characters}
-                  onClick={() => handleItemClick(item.id)}
-                  viewMode={viewMode}
-                />
-              </div>
-            );
-          }
-
-          // Grid view: render row of items
-          return (
-            <div
-              key={virtualRow.key}
-              style={{
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                width: '100%',
-                height: `${virtualRow.size}px`,
-                transform: `translateY(${virtualRow.start}px)`,
-              }}
-            >
-              <div
-                className={cn(
-                  'grid gap-4',
-                  columnsCount === 2 && 'grid-cols-2',
-                  columnsCount === 3 && 'grid-cols-3',
-                  columnsCount === 4 && 'grid-cols-4',
-                  columnsCount === 5 && 'grid-cols-5',
-                  columnsCount === 6 && 'grid-cols-6',
-                  columnsCount === 7 && 'grid-cols-7',
-                )}
-              >
-                {row.items.map((item) => {
-                  const itemProgressData = progressLookup.get(item.id);
-                  const normalProgress = itemProgressData?.normalProgress || [];
-                  const etherealProgress = itemProgressData?.etherealProgress || [];
-
-                  return (
-                    <ItemCard
-                      key={item.id}
-                      item={item}
-                      normalProgress={normalProgress}
-                      etherealProgress={etherealProgress}
-                      characters={characters}
-                      onClick={() => handleItemClick(item.id)}
-                      viewMode={viewMode}
-                    />
-                  );
-                })}
-              </div>
-            </div>
-          );
-        })}
+        {rowVirtualizer.getVirtualItems().map((virtualRow) =>
+          renderVirtualRow({
+            virtualRow,
+            row: virtualRows[virtualRow.index],
+            viewMode,
+            progressLookup,
+            characters,
+            handleItemClick,
+            columnsCount,
+          }),
+        )}
       </div>
     </div>
   );

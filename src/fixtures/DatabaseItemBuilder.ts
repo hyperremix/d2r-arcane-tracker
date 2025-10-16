@@ -17,6 +17,8 @@ export class DatabaseItemBuilder {
     name: 'Default Item',
     link: 'https://example.com/default-item',
     code: null,
+    item_base: null,
+    image_filename: null,
     type: 'unique',
     category: 'armor',
     sub_category: 'helms',

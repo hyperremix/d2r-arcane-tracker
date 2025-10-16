@@ -11,6 +11,8 @@ export const shields: Item[] = [
     subCategory: 'shields',
     treasureClass: 'normal',
     code: 'buc',
+    itemBase: 'Buckler',
+    imageFilename: 'pelta_lunata.png',
   },
   {
     id: 'umbraldisk',
@@ -22,6 +24,8 @@ export const shields: Item[] = [
     subCategory: 'shields',
     treasureClass: 'normal',
     code: 'sml',
+    itemBase: 'Small Shield',
+    imageFilename: 'umbral_disk.png',
   },
   {
     id: 'stormguild',
@@ -33,6 +37,8 @@ export const shields: Item[] = [
     subCategory: 'shields',
     treasureClass: 'normal',
     code: 'lrg',
+    itemBase: 'Large Shield',
+    imageFilename: 'stormguild.png',
   },
   {
     id: 'swordbackhold',
@@ -44,6 +50,8 @@ export const shields: Item[] = [
     subCategory: 'shields',
     treasureClass: 'normal',
     code: 'spk',
+    itemBase: 'Spiked Shield',
+    imageFilename: 'swordback_hold.png',
   },
   {
     id: 'steelclash',
@@ -55,6 +63,8 @@ export const shields: Item[] = [
     subCategory: 'shields',
     treasureClass: 'normal',
     code: 'kit',
+    itemBase: 'Kite Shield',
+    imageFilename: 'steelclash.png',
   },
   {
     id: 'walloftheeyeless',
@@ -66,6 +76,8 @@ export const shields: Item[] = [
     subCategory: 'shields',
     treasureClass: 'normal',
     code: 'bsh',
+    itemBase: 'Bone Shield',
+    imageFilename: 'wall_of_the_eyeless.png',
   },
   {
     id: 'bverritkeep',
@@ -77,6 +89,8 @@ export const shields: Item[] = [
     subCategory: 'shields',
     treasureClass: 'normal',
     code: 'tow',
+    itemBase: 'Tower Shield',
+    imageFilename: 'bverrit_keep.png',
   },
   {
     id: 'theward',
@@ -88,6 +102,8 @@ export const shields: Item[] = [
     subCategory: 'shields',
     treasureClass: 'normal',
     code: 'gts',
+    itemBase: 'Gothic Shield',
+    imageFilename: 'the_ward.png',
   },
   {
     id: 'visceratuant',
@@ -99,6 +115,8 @@ export const shields: Item[] = [
     subCategory: 'shields',
     treasureClass: 'exceptional',
     code: 'xuc',
+    itemBase: 'Defender',
+    imageFilename: 'small_shield.png',
   },
   {
     id: 'mosersblessedcircle',
@@ -110,6 +128,8 @@ export const shields: Item[] = [
     subCategory: 'shields',
     treasureClass: 'exceptional',
     code: 'xml',
+    itemBase: 'Round Shield',
+    imageFilename: 'buckler.png',
   },
   {
     id: 'stormchaser',
@@ -121,6 +141,8 @@ export const shields: Item[] = [
     subCategory: 'shields',
     treasureClass: 'exceptional',
     code: 'xrg',
+    itemBase: 'Scutum',
+    imageFilename: 'stormchaser.png',
   },
   {
     id: 'lanceguard',
@@ -132,6 +154,8 @@ export const shields: Item[] = [
     subCategory: 'shields',
     treasureClass: 'exceptional',
     code: 'xpk',
+    itemBase: 'Barbed Shield',
+    imageFilename: 'lance_guard.png',
   },
   {
     id: 'tiamatsrebuke',
@@ -143,6 +167,8 @@ export const shields: Item[] = [
     subCategory: 'shields',
     treasureClass: 'exceptional',
     code: 'xit',
+    itemBase: 'Dragon Shield',
+    imageFilename: 'kite_shield.png',
   },
   {
     id: 'lidlesswall',
@@ -154,6 +180,8 @@ export const shields: Item[] = [
     subCategory: 'shields',
     treasureClass: 'exceptional',
     code: 'xsh',
+    itemBase: 'Grim Shield',
+    imageFilename: 'lidless_wall.png',
   },
   {
     id: 'gerkessanctuary',
@@ -165,6 +193,8 @@ export const shields: Item[] = [
     subCategory: 'shields',
     treasureClass: 'exceptional',
     code: 'xow',
+    itemBase: 'Pavise',
+    imageFilename: 'tower_shield.png',
   },
   {
     id: 'radamentssphere',
@@ -176,6 +206,8 @@ export const shields: Item[] = [
     subCategory: 'shields',
     treasureClass: 'exceptional',
     code: 'xts',
+    itemBase: 'Ancient Shield',
+    imageFilename: 'gothic_shield.png',
   },
   {
     id: 'blackoakshield',
@@ -187,6 +219,8 @@ export const shields: Item[] = [
     subCategory: 'shields',
     treasureClass: 'elite',
     code: 'uml',
+    itemBase: 'Luna',
+    imageFilename: 'buckler.png',
   },
   {
     id: 'stormshield',
@@ -198,6 +232,8 @@ export const shields: Item[] = [
     subCategory: 'shields',
     treasureClass: 'elite',
     code: 'uit',
+    itemBase: 'Monarch',
+    imageFilename: 'kite_shield.png',
   },
   {
     id: 'headhuntersglory',
@@ -209,6 +245,8 @@ export const shields: Item[] = [
     subCategory: 'shields',
     treasureClass: 'elite',
     code: 'ush',
+    itemBase: 'Troll Nest',
+    imageFilename: 'falchion.png',
   },
   {
     id: 'medusasgaze',
@@ -220,6 +258,8 @@ export const shields: Item[] = [
     subCategory: 'shields',
     treasureClass: 'elite',
     code: 'uow',
+    itemBase: 'Aegis',
+    imageFilename: 'tower_shield.png',
   },
   {
     id: 'spikethorn',
@@ -231,6 +271,7 @@ export const shields: Item[] = [
     subCategory: 'shields',
     treasureClass: 'elite',
     code: 'upk',
+    itemBase: 'Blade Barrier',
   },
   {
     id: 'spiritward',
@@ -242,5 +283,7 @@ export const shields: Item[] = [
     subCategory: 'shields',
     treasureClass: 'elite',
     code: 'uts',
+    itemBase: 'Ward',
+    imageFilename: 'gothic_shield.png',
   },
 ];

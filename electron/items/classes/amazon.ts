@@ -11,6 +11,8 @@ export const amazon: Item[] = [
     subCategory: 'amazon',
     treasureClass: 'exceptional',
     code: 'am7',
+    itemBase: 'Stag Bow',
+    imageFilename: 'reflex_bow.png',
   },
   {
     id: 'titansrevenge',
@@ -22,6 +24,8 @@ export const amazon: Item[] = [
     subCategory: 'amazon',
     treasureClass: 'exceptional',
     code: 'ama',
+    itemBase: 'Ceremonial Javelin',
+    imageFilename: 'maiden_javelin.png',
   },
   {
     id: 'lycandersflank',
@@ -33,6 +37,8 @@ export const amazon: Item[] = [
     subCategory: 'amazon',
     treasureClass: 'exceptional',
     code: 'am9',
+    itemBase: 'Ceremonial Pike',
+    imageFilename: 'maiden_pike.png',
   },
   {
     id: 'bloodravenscharge',
@@ -44,6 +50,8 @@ export const amazon: Item[] = [
     subCategory: 'amazon',
     treasureClass: 'elite',
     code: 'amb',
+    itemBase: 'Matriarchal Bow',
+    imageFilename: 'hellclap.png',
   },
   {
     id: 'thunderstroke',
@@ -55,6 +63,8 @@ export const amazon: Item[] = [
     subCategory: 'amazon',
     treasureClass: 'elite',
     code: 'amf',
+    itemBase: 'Matriarchal Javelin',
+    imageFilename: 'maiden_javelin.png',
   },
   {
     id: 'stoneraven',
@@ -66,5 +76,7 @@ export const amazon: Item[] = [
     subCategory: 'amazon',
     treasureClass: 'elite',
     code: 'amd',
+    itemBase: 'Matriarchal Spear',
+    imageFilename: 'maiden_spear.png',
   },
 ];

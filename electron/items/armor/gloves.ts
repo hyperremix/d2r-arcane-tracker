@@ -11,6 +11,8 @@ export const gloves: Item[] = [
     subCategory: 'gloves',
     treasureClass: 'normal',
     code: 'lgl',
+    itemBase: 'Leather Gloves',
+    imageFilename: 'gloves_l.png',
   },
   {
     id: 'bloodfist',
@@ -22,6 +24,8 @@ export const gloves: Item[] = [
     subCategory: 'gloves',
     treasureClass: 'normal',
     code: 'vgl',
+    itemBase: 'Heavy Gloves',
+    imageFilename: 'heavy_gloves.png',
   },
   {
     id: 'chanceguards',
@@ -33,6 +37,8 @@ export const gloves: Item[] = [
     subCategory: 'gloves',
     treasureClass: 'normal',
     code: 'mgl',
+    itemBase: 'Chain Gloves',
+    imageFilename: 'bracers_m.png',
   },
   {
     id: 'magefist',
@@ -44,6 +50,8 @@ export const gloves: Item[] = [
     subCategory: 'gloves',
     treasureClass: 'normal',
     code: 'tgl',
+    itemBase: 'Light Gauntlets',
+    imageFilename: 'light_gauntlets.png',
   },
   {
     id: 'frostburn',
@@ -55,6 +63,8 @@ export const gloves: Item[] = [
     subCategory: 'gloves',
     treasureClass: 'normal',
     code: 'hgl',
+    itemBase: 'Gauntlets',
+    imageFilename: 'gaunlets_h.png',
   },
   {
     id: 'venomgrip',
@@ -66,6 +76,8 @@ export const gloves: Item[] = [
     subCategory: 'gloves',
     treasureClass: 'exceptional',
     code: 'xlg',
+    itemBase: 'Demonhide Gloves',
+    imageFilename: 'gloves_l.png',
   },
   {
     id: 'gravepalm',
@@ -77,6 +89,8 @@ export const gloves: Item[] = [
     subCategory: 'gloves',
     treasureClass: 'exceptional',
     code: 'xvg',
+    itemBase: 'Sharkskin Gloves',
+    imageFilename: 'heavy_gloves.png',
   },
   {
     id: 'ghoulhide',
@@ -88,6 +102,8 @@ export const gloves: Item[] = [
     subCategory: 'gloves',
     treasureClass: 'exceptional',
     code: 'xmg',
+    itemBase: 'Heavy Bracers',
+    imageFilename: 'bracers_m.png',
   },
   {
     id: 'lavagout',
@@ -99,6 +115,8 @@ export const gloves: Item[] = [
     subCategory: 'gloves',
     treasureClass: 'exceptional',
     code: 'xtg',
+    itemBase: 'Battle Gauntlets',
+    imageFilename: 'light_gauntlets.png',
   },
   {
     id: 'hellmouth',
@@ -110,6 +128,8 @@ export const gloves: Item[] = [
     subCategory: 'gloves',
     treasureClass: 'exceptional',
     code: 'xhg',
+    itemBase: 'War Gauntlets',
+    imageFilename: 'gaunlets_h.png',
   },
   {
     id: 'draculsgrasp',
@@ -121,6 +141,8 @@ export const gloves: Item[] = [
     subCategory: 'gloves',
     treasureClass: 'elite',
     code: 'uvg',
+    itemBase: 'Vampirebone Gloves',
+    imageFilename: 'heavy_gloves.png',
   },
   {
     id: 'souldrainer',
@@ -132,6 +154,8 @@ export const gloves: Item[] = [
     subCategory: 'gloves',
     treasureClass: 'elite',
     code: 'umg',
+    itemBase: 'Vambraces',
+    imageFilename: 'bracers_m.png',
   },
   {
     id: 'steelrend',
@@ -143,5 +167,7 @@ export const gloves: Item[] = [
     subCategory: 'gloves',
     treasureClass: 'elite',
     code: 'uhg',
+    itemBase: 'Ogre Gauntlets',
+    imageFilename: 'gaunlets_h.png',
   },
 ];
