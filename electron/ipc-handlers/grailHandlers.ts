@@ -1,4 +1,4 @@
-import { ipcMain } from 'electron';
+import { ipcMain, webContents } from 'electron';
 import { GrailDatabase } from '../database/database';
 import type { GrailProgress, Item, Settings } from '../types/grail';
 
@@ -94,12 +94,22 @@ export function initializeGrailHandlers(): void {
 
   /**
    * IPC handler for updating grail progress.
+   * Emits a grail-progress-updated event to all renderer windows after successful update.
    * @param _ - IPC event (unused)
    * @param progress - Grail progress data to update
    */
   ipcMain.handle('grail:updateProgress', async (_, progress: GrailProgress) => {
     try {
       grailDB.upsertProgress(progress);
+
+      // Emit event to all renderer windows to refresh their progress data
+      const allWebContents = webContents.getAllWebContents();
+      for (const wc of allWebContents) {
+        if (!wc.isDestroyed() && wc.getType() === 'window') {
+          wc.send('grail-progress-updated');
+        }
+      }
+
       return { success: true };
     } catch (error) {
       console.error('Failed to update progress:', error);
