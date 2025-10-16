@@ -313,7 +313,7 @@ export function NotificationButton() {
             </CardHeader>
             <CardContent className="space-y-3">
               {activeNotifications.length === 0 ? (
-                <div className="py-4 text-center text-gray-500">
+                <div className="py-4 text-center text-gray-500 dark:text-gray-400">
                   <Trophy className="mx-auto mb-2 h-8 w-8 opacity-50" />
                   <p className="text-sm">No recent item detections</p>
                 </div>
@@ -323,17 +323,17 @@ export function NotificationButton() {
                     key={notification.id}
                     className={`rounded-lg border p-3 ${
                       notification.type === 'item-found'
-                        ? 'border-green-200 bg-green-50'
-                        : 'border-red-200 bg-red-50'
-                    } ${!notification.seen ? 'ring-2 ring-blue-200' : ''}`}
+                        ? 'border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950/50'
+                        : 'border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950/50'
+                    } ${!notification.seen ? 'ring-2 ring-blue-200 dark:ring-blue-800' : ''}`}
                   >
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
                         <div className="mb-1 flex items-center gap-2">
                           {notification.type === 'item-found' ? (
-                            <Trophy className="h-4 w-4 text-green-600" />
+                            <Trophy className="h-4 w-4 text-green-600 dark:text-green-400" />
                           ) : (
-                            <Star className="h-4 w-4 text-red-600" />
+                            <Star className="h-4 w-4 text-red-600 dark:text-red-400" />
                           )}
                           <span className="font-medium text-sm">{notification.item.name}</span>
                           {notification.item.quality && (
@@ -344,7 +344,7 @@ export function NotificationButton() {
                             </Badge>
                           )}
                         </div>
-                        <p className="text-gray-600 text-xs">
+                        <p className="text-gray-600 text-xs dark:text-gray-400">
                           Found by {notification.item.characterName} •{' '}
                           {notification.timestamp.toLocaleTimeString()}
                         </p>
