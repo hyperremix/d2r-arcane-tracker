@@ -7,6 +7,7 @@ import { ItemIconSettings } from './ItemIconSettings';
 import { NotificationSettings } from './NotificationSettings';
 import { SaveFileMonitor } from './SaveFileMonitor';
 import { ThemeSettings } from './ThemeSettings';
+import { UpdateSettings } from './UpdateSettings';
 
 /**
  * Settings component that serves as the main settings page.
@@ -17,8 +18,9 @@ import { ThemeSettings } from './ThemeSettings';
 export function Settings() {
   return (
     <TooltipProvider>
-      <div className="space-y-6 p-6">
-        <div className="space-y-6">
+      <div className="h-[calc(100vh-48px)] overflow-y-auto">
+        <div className="space-y-6 p-6">
+          <UpdateSettings />
           <SaveFileMonitor />
           <GrailSettings />
           <NotificationSettings />

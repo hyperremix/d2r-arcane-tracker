@@ -1,4 +1,14 @@
-import type { Character, D2Item, D2SaveFile, GrailProgress, Item, MonitoringStatus, Settings } from './grail'
+import type {
+  Character,
+  D2Item,
+  D2SaveFile,
+  GrailProgress,
+  Item,
+  MonitoringStatus,
+  Settings,
+  UpdateInfo,
+  UpdateStatus,
+} from './grail'
 
 /**
  * Main interface defining the Electron API available to the renderer process.
@@ -217,6 +227,41 @@ export interface ElectronAPI {
         progress?: { current: number; total: number }
       }
     }>
+  }
+
+  /**
+   * Application update API methods for managing automatic updates.
+   */
+  update: {
+    /**
+     * Checks for available application updates.
+     * @returns {Promise<UpdateStatus>} A promise that resolves with the current update status.
+     */
+    checkForUpdates(): Promise<UpdateStatus>
+
+    /**
+     * Downloads the available update.
+     * @returns {Promise<{ success: boolean }>} A promise that resolves with a success indicator.
+     */
+    downloadUpdate(): Promise<{ success: boolean }>
+
+    /**
+     * Quits the application and installs the downloaded update.
+     * @returns {Promise<void>} A promise that resolves when the quit is initiated.
+     */
+    quitAndInstall(): Promise<void>
+
+    /**
+     * Gets the current version and update status.
+     * @returns {Promise<{ currentVersion: string; status: UpdateStatus }>} A promise that resolves with version and status.
+     */
+    getUpdateInfo(): Promise<{ currentVersion: string; status: UpdateStatus }>
+
+    /**
+     * Registers a callback to be notified of update status changes.
+     * @param {(status: UpdateStatus) => void} callback - Function to call when update status changes.
+     */
+    onUpdateStatus(callback: (status: UpdateStatus) => void): void
   }
 
   /**

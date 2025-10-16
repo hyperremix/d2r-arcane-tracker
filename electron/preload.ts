@@ -7,6 +7,7 @@ import type {
   Item,
   MonitoringStatus,
   Settings,
+  UpdateStatus,
 } from './types/grail';
 
 /**
@@ -355,4 +356,42 @@ contextBridge.exposeInMainWorld('electronAPI', {
     backgroundColor: string;
     symbolColor: string;
   }): Promise<{ success: boolean }> => ipcRenderer.invoke('update-titlebar-overlay', colors),
+
+  /**
+   * Application update API methods.
+   */
+  update: {
+    /**
+     * Checks for available application updates.
+     * @returns {Promise<UpdateStatus>} Update status.
+     */
+    checkForUpdates: (): Promise<UpdateStatus> => ipcRenderer.invoke('update:checkForUpdates'),
+
+    /**
+     * Downloads the available update.
+     * @returns {Promise<{ success: boolean }>} Success indicator.
+     */
+    downloadUpdate: (): Promise<{ success: boolean }> =>
+      ipcRenderer.invoke('update:downloadUpdate'),
+
+    /**
+     * Quits the application and installs the downloaded update.
+     * @returns {Promise<void>} Resolves when quit is initiated.
+     */
+    quitAndInstall: (): Promise<void> => ipcRenderer.invoke('update:quitAndInstall'),
+
+    /**
+     * Gets the current version and update status.
+     * @returns {Promise<{ currentVersion: string; status: UpdateStatus }>} Version and status.
+     */
+    getUpdateInfo: (): Promise<{ currentVersion: string; status: UpdateStatus }> =>
+      ipcRenderer.invoke('update:getUpdateInfo'),
+
+    /**
+     * Registers a callback to be notified of update status changes.
+     * @param {(status: UpdateStatus) => void} callback - Function to call when status changes.
+     */
+    onUpdateStatus: (callback: (status: UpdateStatus) => void) =>
+      ipcRenderer.on('update:status', (_event, value) => callback(value)),
+  },
 });

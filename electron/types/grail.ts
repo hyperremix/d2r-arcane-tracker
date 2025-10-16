@@ -585,3 +585,25 @@ export type GrailTiers = Record<string, GrailItems>;
  * Type representing a Holy Grail category.
  */
 export type GrailCategory = Record<string, unknown>;
+
+/**
+ * Information about an available update.
+ */
+export interface UpdateInfo {
+  version: string;
+  releaseDate: string;
+  releaseNotes?: string;
+  downloadedPercent?: number;
+}
+
+/**
+ * Current status of the application update process.
+ */
+export interface UpdateStatus {
+  checking: boolean;
+  available: boolean;
+  downloading: boolean;
+  downloaded: boolean;
+  error?: string;
+  info?: UpdateInfo;
+}

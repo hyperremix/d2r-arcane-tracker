@@ -6,6 +6,7 @@ import { initializeDialogHandlers } from './ipc-handlers/dialogHandlers';
 import { closeGrailDatabase, initializeGrailHandlers } from './ipc-handlers/grailHandlers';
 import { initializeIconHandlers } from './ipc-handlers/iconHandlers';
 import { closeSaveFileMonitor, initializeSaveFileHandlers } from './ipc-handlers/saveFileHandlers';
+import { initializeUpdateHandlers } from './ipc-handlers/updateHandlers';
 
 createRequire(import.meta.url);
 /**
@@ -147,6 +148,7 @@ app.whenReady().then(() => {
   initializeSaveFileHandlers();
   initializeDialogHandlers();
   initializeIconHandlers();
+  initializeUpdateHandlers();
 
   // Handle titlebar overlay updates (Windows/Linux only)
   ipcMain.handle(

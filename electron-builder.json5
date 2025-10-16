@@ -8,6 +8,11 @@
     output: "release/${version}",
   },
   files: ["dist", "dist-electron"],
+  publish: {
+    provider: "github",
+    owner: "hyperremix",
+    repo: "d2r-arcane-tracker"
+  },
   mac: {
     icon: "build/icon.png",
     target: ["dmg"],
@@ -29,6 +34,7 @@
     perMachine: false,
     allowToChangeInstallationDirectory: true,
     deleteAppDataOnUninstall: false,
+    allowElevation: true,
   },
   linux: {
     target: ["AppImage"],
