@@ -507,7 +507,7 @@ function VirtualizedItemsContainer({
   return (
     <div
       ref={listRef}
-      className="w-full"
+      className="w-full p-4"
       style={{
         height: '800px',
         overflow: 'auto',

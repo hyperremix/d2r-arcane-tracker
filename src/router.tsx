@@ -1,6 +1,7 @@
 import { createBrowserRouter, Outlet } from 'react-router';
 import { GrailTracker } from './components/grail/GrailTracker';
 import { Settings } from './components/settings/Settings';
+import { Statistics } from './components/statistics/Statistics';
 import { TitleBar } from './components/TitleBar';
 
 /**
@@ -25,6 +26,10 @@ export const router = createBrowserRouter([
       {
         path: '/',
         Component: GrailTracker,
+      },
+      {
+        path: '/statistics',
+        Component: Statistics,
       },
       {
         path: '/settings',
