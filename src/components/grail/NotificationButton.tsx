@@ -57,7 +57,7 @@ export function NotificationButton() {
   const showBrowserNotification = useCallback((itemEvent: ItemDetectionEvent) => {
     if (itemEvent.type === 'item-found' && itemEvent.grailItem) {
       const notification = new Notification('Holy Grail Item Found!', {
-        body: `${itemEvent.item.name} found by ${itemEvent.item.characterName}`,
+        body: `${itemEvent.grailItem.name} found by ${itemEvent.item.characterName}`,
         icon: '/logo.svg',
         tag: 'grail-item',
         requireInteraction: true,
