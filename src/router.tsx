@@ -1,4 +1,4 @@
-import { createBrowserRouter, Outlet } from 'react-router';
+import { createHashRouter, Outlet } from 'react-router';
 import { GrailTracker } from './components/grail/GrailTracker';
 import { Settings } from './components/settings/Settings';
 import { Statistics } from './components/statistics/Statistics';
@@ -19,7 +19,7 @@ function RootLayout() {
   );
 }
 
-export const router = createBrowserRouter([
+export const router = createHashRouter([
   {
     element: <RootLayout />,
     children: [
