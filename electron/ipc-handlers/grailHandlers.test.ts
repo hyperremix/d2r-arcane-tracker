@@ -6,6 +6,9 @@ vi.mock('electron', () => ({
   ipcMain: {
     handle: vi.fn(),
   },
+  webContents: {
+    getAllWebContents: vi.fn(() => []),
+  },
 }));
 
 // Mock database

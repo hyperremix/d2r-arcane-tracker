@@ -17,7 +17,15 @@ import type {
  * Global service instances for save file monitoring and item detection.
  */
 const eventBus = new EventBus();
-const batchWriter = new DatabaseBatchWriter(grailDatabase);
+const batchWriter = new DatabaseBatchWriter(grailDatabase, () => {
+  // Emit grail-progress-updated event to all renderer windows after batch flush
+  const allWebContents = webContents.getAllWebContents();
+  for (const wc of allWebContents) {
+    if (!wc.isDestroyed() && wc.getType() === 'window') {
+      wc.send('grail-progress-updated');
+    }
+  }
+});
 let saveFileMonitor: SaveFileMonitor;
 let itemDetectionService: ItemDetectionService;
 const eventUnsubscribers: Array<() => void> = [];

@@ -12,16 +12,19 @@ export class DatabaseBatchWriter {
   private readonly database: GrailDatabase;
   private readonly BATCH_DELAY = 100; // ms - delay before auto-flushing
   private readonly BATCH_SIZE_THRESHOLD = 50; // items - flush immediately if queue exceeds this
+  private onFlushCallback?: () => void;
 
   /**
    * Creates a new DatabaseBatchWriter instance.
    * @param database - GrailDatabase instance to write batches to
+   * @param onFlushCallback - Optional callback invoked after successful flush
    */
-  constructor(database: GrailDatabase) {
+  constructor(database: GrailDatabase, onFlushCallback?: () => void) {
     this.database = database;
     this.characterQueue = new Map();
     this.progressQueue = new Map();
     this.flushTimer = null;
+    this.onFlushCallback = onFlushCallback;
   }
 
   /**
@@ -111,6 +114,11 @@ export class DatabaseBatchWriter {
         this.database.upsertProgressBatch(progressList);
         this.progressQueue.clear();
         console.log(`[DatabaseBatchWriter] Flushed ${progressCount} progress entries`);
+      }
+
+      // Invoke callback after successful flush
+      if (this.onFlushCallback) {
+        this.onFlushCallback();
       }
     } catch (error) {
       console.error('[DatabaseBatchWriter] Error flushing batch:', error);
