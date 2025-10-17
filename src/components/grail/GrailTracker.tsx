@@ -87,7 +87,7 @@ export function GrailTracker() {
       <div className="p-6">
         <div className="flex gap-6">
           {/* Left Sidebar - Progress Overview and Advanced Search */}
-          <div className="w-80 shrink-0 space-y-6">
+          <div className="max-h-[91vh] w-80 shrink-0 space-y-6 overflow-y-auto">
             {statistics && (
               <Card>
                 <CardContent className="flex flex-col items-center gap-4">
