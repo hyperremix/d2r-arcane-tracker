@@ -55,12 +55,17 @@ export let mainWindow: BrowserWindow | null;
  * Loads the application from the Vite dev server in development or from built files in production.
  */
 function createWindow() {
-  // Set the icon path based on platform and environment
+  // Set icon path - use ICO on Windows for better compatibility
+  // In production, the ICO file is unpacked from ASAR for Windows to read
+  const iconPath =
+    process.platform === 'win32' && !VITE_DEV_SERVER_URL
+      ? path.join(process.resourcesPath, 'app.asar.unpacked', 'dist', 'logo.ico')
+      : path.join(process.env.VITE_PUBLIC, 'logo.png');
 
   mainWindow = new BrowserWindow({
     width: 1200,
     height: 856,
-    icon: path.join(process.env.VITE_PUBLIC, 'logo.png'),
+    icon: iconPath,
     // Custom title bar configuration
     titleBarStyle: 'hidden',
     // Position macOS traffic lights to be vertically centered in 48px title bar

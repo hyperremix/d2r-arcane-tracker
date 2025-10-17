@@ -19,7 +19,7 @@
     artifactName: "${productName}-Mac-${version}-Installer.${ext}",
   },
   win: {
-    icon: "build/logo.png",
+    icon: "build/logo.ico",
     target: [
       {
         target: "nsis",
@@ -27,7 +27,7 @@
       },
     ],
     artifactName: "${productName}-Windows-${version}-Setup.${ext}",
-    asarUnpack: ["**/node_modules/better-sqlite3/**/*", "**/node_modules/@dschu012/**/*"],
+    asarUnpack: ["**/node_modules/better-sqlite3/**/*", "**/node_modules/@dschu012/**/*", "**/dist/logo.ico"],
   },
   nsis: {
     oneClick: false,
