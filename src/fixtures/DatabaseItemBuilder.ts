@@ -24,6 +24,7 @@ export class DatabaseItemBuilder {
     sub_category: 'helms',
     treasure_class: 'normal',
     set_name: null,
+    runes: null,
     ethereal_type: 'none',
     created_at: '2024-01-01T00:00:00.000Z',
     updated_at: '2024-01-01T00:00:00.000Z',

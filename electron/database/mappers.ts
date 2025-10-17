@@ -114,6 +114,7 @@ export function mapItemToDatabase(item: Item): Omit<DatabaseItem, 'created_at' |
     sub_category: item.subCategory,
     treasure_class: item.treasureClass,
     set_name: toSqliteNull(item.setName),
+    runes: item.runes ? JSON.stringify(item.runes) : null,
     ethereal_type: item.etherealType,
   };
 }
@@ -218,6 +219,16 @@ export function mapDatabaseProgressToProgress(dbProgress: DatabaseGrailProgress)
  * @returns Item object with original types
  */
 export function mapDatabaseItemToItem(dbItem: DatabaseItem): Item {
+  let runes: string[] | undefined;
+  if (dbItem.runes) {
+    try {
+      runes = JSON.parse(dbItem.runes) as string[];
+    } catch (error) {
+      console.error('Failed to parse runes JSON:', error);
+      runes = undefined;
+    }
+  }
+
   return {
     id: dbItem.id,
     name: dbItem.name,
@@ -231,6 +242,7 @@ export function mapDatabaseItemToItem(dbItem: DatabaseItem): Item {
     subCategory: dbItem.sub_category,
     treasureClass: dbItem.treasure_class,
     setName: dbItem.set_name || undefined,
+    runes,
   };
 }
 

@@ -949,8 +949,8 @@ export const sets: Item[] = [
     subCategory: '1h_swords',
     treasureClass: 'elite',
     code: '7b7',
-    itemBase: 'Suwayyah',
-    imageFilename: 'katar.png',
+    itemBase: 'Mythical Sword',
+    imageFilename: 'war_sword.png',
     setName: "Bul-Kathos' Children",
   },
   {

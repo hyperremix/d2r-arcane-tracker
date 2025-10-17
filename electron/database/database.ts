@@ -89,6 +89,7 @@ class GrailDatabase {
         sub_category TEXT NOT NULL,
         treasure_class TEXT NOT NULL,
         set_name TEXT,
+        runes TEXT,
         ethereal_type TEXT NOT NULL CHECK (ethereal_type IN ('none', 'optional', 'only')),
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
@@ -291,8 +292,8 @@ class GrailDatabase {
    */
   insertItems(items: Item[]): void {
     const stmt = this.db.prepare(`
-      INSERT OR REPLACE INTO items (id, name, link, code, type, category, sub_category, set_name, ethereal_type, treasure_class, image_filename, item_base)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT OR REPLACE INTO items (id, name, link, code, type, category, sub_category, set_name, ethereal_type, treasure_class, image_filename, item_base, runes)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     const transaction = this.db.transaction((itemsToInsert: typeof items) => {
@@ -311,6 +312,7 @@ class GrailDatabase {
           mappedItem.treasure_class,
           mappedItem.image_filename,
           mappedItem.item_base,
+          mappedItem.runes,
         );
       }
     });
