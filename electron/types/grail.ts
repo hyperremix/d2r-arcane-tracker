@@ -139,6 +139,7 @@ export interface Item {
   subCategory: ItemSubCategory;
   treasureClass: ItemTreasureClass;
   setName?: ItemSet;
+  runes?: string[];
 }
 
 /**
@@ -158,6 +159,7 @@ export type DatabaseItem = {
   sub_category: ItemSubCategory;
   treasure_class: ItemTreasureClass;
   set_name: ItemSet | null;
+  runes: string | null;
   created_at: string;
   updated_at: string;
 };

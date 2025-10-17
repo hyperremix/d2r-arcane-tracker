@@ -182,6 +182,7 @@ describe('mappers', () => {
         sub_category: 'helms',
         treasure_class: 'elite',
         set_name: null, // undefined converted to null
+        runes: null, // undefined converted to null
         ethereal_type: 'none',
       });
     });
@@ -349,6 +350,7 @@ describe('mappers', () => {
         sub_category: 'rings' as const,
         treasure_class: 'elite' as const,
         set_name: 'Angelic Raiment' as const,
+        runes: null,
         created_at: '2024-01-01T00:00:00.000Z',
         updated_at: '2024-01-01T00:00:00.000Z',
       };

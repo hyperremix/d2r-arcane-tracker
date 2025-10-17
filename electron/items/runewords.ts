@@ -10,6 +10,7 @@ export const runewords: Item[] = [
     category: 'runewords',
     subCategory: 'runewords',
     treasureClass: 'normal',
+    runes: ['lem', 'ist', 'io'],
   },
   {
     id: 'dream',
@@ -20,6 +21,7 @@ export const runewords: Item[] = [
     category: 'runewords',
     subCategory: 'runewords',
     treasureClass: 'normal',
+    runes: ['io', 'jah', 'pul'],
   },
   {
     id: 'flickeringflame',
@@ -30,6 +32,7 @@ export const runewords: Item[] = [
     category: 'runewords',
     subCategory: 'runewords',
     treasureClass: 'normal',
+    runes: ['nef', 'pul', 'vex'],
   },
   {
     id: 'lore',
@@ -40,6 +43,7 @@ export const runewords: Item[] = [
     category: 'runewords',
     subCategory: 'runewords',
     treasureClass: 'normal',
+    runes: ['ort', 'sol'],
   },
   {
     id: 'nadir',
@@ -50,6 +54,7 @@ export const runewords: Item[] = [
     category: 'runewords',
     subCategory: 'runewords',
     treasureClass: 'normal',
+    runes: ['nef', 'tir'],
   },
   {
     id: 'radiance',
@@ -60,6 +65,7 @@ export const runewords: Item[] = [
     category: 'runewords',
     subCategory: 'runewords',
     treasureClass: 'normal',
+    runes: ['nef', 'sol', 'ith'],
   },
   {
     id: 'wisdom',
@@ -70,6 +76,7 @@ export const runewords: Item[] = [
     category: 'runewords',
     subCategory: 'runewords',
     treasureClass: 'normal',
+    runes: ['pul', 'ith', 'eld'],
   },
   {
     id: 'bone',
@@ -80,6 +87,7 @@ export const runewords: Item[] = [
     category: 'runewords',
     subCategory: 'runewords',
     treasureClass: 'normal',
+    runes: ['sol', 'um', 'um'],
   },
   {
     id: 'bramble',
@@ -90,6 +98,7 @@ export const runewords: Item[] = [
     category: 'runewords',
     subCategory: 'runewords',
     treasureClass: 'normal',
+    runes: ['ral', 'ohm', 'sur', 'eth'],
   },
   {
     id: 'chainsofhonor',
@@ -100,6 +109,7 @@ export const runewords: Item[] = [
     category: 'runewords',
     subCategory: 'runewords',
     treasureClass: 'normal',
+    runes: ['dol', 'um', 'ber', 'ist'],
   },
   {
     id: 'dragon',
@@ -110,6 +120,7 @@ export const runewords: Item[] = [
     category: 'runewords',
     subCategory: 'runewords',
     treasureClass: 'normal',
+    runes: ['sur', 'lo', 'sol'],
   },
   {
     id: 'duress',
@@ -120,6 +131,7 @@ export const runewords: Item[] = [
     category: 'runewords',
     subCategory: 'runewords',
     treasureClass: 'normal',
+    runes: ['shael', 'um', 'thul'],
   },
   {
     id: 'enigma',
@@ -130,6 +142,7 @@ export const runewords: Item[] = [
     category: 'runewords',
     subCategory: 'runewords',
     treasureClass: 'normal',
+    runes: ['jah', 'ith', 'ber'],
   },
   {
     id: 'enlightenment',
@@ -140,6 +153,7 @@ export const runewords: Item[] = [
     category: 'runewords',
     subCategory: 'runewords',
     treasureClass: 'normal',
+    runes: ['pul', 'ral', 'sol'],
   },
   {
     id: 'fortitude',
@@ -150,6 +164,7 @@ export const runewords: Item[] = [
     category: 'runewords',
     subCategory: 'runewords',
     treasureClass: 'normal',
+    runes: ['el', 'sol', 'dol', 'lo'],
   },
   {
     id: 'gloom',
@@ -160,6 +175,7 @@ export const runewords: Item[] = [
     category: 'runewords',
     subCategory: 'runewords',
     treasureClass: 'normal',
+    runes: ['fal', 'um', 'pul'],
   },
   {
     id: 'lionheart',
@@ -170,6 +186,7 @@ export const runewords: Item[] = [
     category: 'runewords',
     subCategory: 'runewords',
     treasureClass: 'normal',
+    runes: ['hel', 'lum', 'fal'],
   },
   {
     id: 'myth',
@@ -180,6 +197,7 @@ export const runewords: Item[] = [
     category: 'runewords',
     subCategory: 'runewords',
     treasureClass: 'normal',
+    runes: ['hel', 'amn', 'nef'],
   },
   {
     id: 'peace',
@@ -190,6 +208,7 @@ export const runewords: Item[] = [
     category: 'runewords',
     subCategory: 'runewords',
     treasureClass: 'normal',
+    runes: ['shael', 'thul', 'amn'],
   },
   {
     id: 'principle',
@@ -200,6 +219,7 @@ export const runewords: Item[] = [
     category: 'runewords',
     subCategory: 'runewords',
     treasureClass: 'normal',
+    runes: ['ral', 'gul', 'eld'],
   },
   {
     id: 'prudence',
@@ -210,6 +230,7 @@ export const runewords: Item[] = [
     category: 'runewords',
     subCategory: 'runewords',
     treasureClass: 'normal',
+    runes: ['mal', 'tir'],
   },
   {
     id: 'rain',
@@ -220,6 +241,7 @@ export const runewords: Item[] = [
     category: 'runewords',
     subCategory: 'runewords',
     treasureClass: 'normal',
+    runes: ['ort', 'mal', 'ith'],
   },
   {
     id: 'smoke',
@@ -230,6 +252,7 @@ export const runewords: Item[] = [
     category: 'runewords',
     subCategory: 'runewords',
     treasureClass: 'normal',
+    runes: ['nef', 'lum'],
   },
   {
     id: 'stealth',
@@ -240,6 +263,7 @@ export const runewords: Item[] = [
     category: 'runewords',
     subCategory: 'runewords',
     treasureClass: 'normal',
+    runes: ['tal', 'eth'],
   },
   {
     id: 'stone',
@@ -250,6 +274,7 @@ export const runewords: Item[] = [
     category: 'runewords',
     subCategory: 'runewords',
     treasureClass: 'normal',
+    runes: ['shael', 'um', 'pul', 'lum'],
   },
   {
     id: 'treachery',
@@ -260,6 +285,7 @@ export const runewords: Item[] = [
     category: 'runewords',
     subCategory: 'runewords',
     treasureClass: 'normal',
+    runes: ['shael', 'thul', 'lem'],
   },
   {
     id: 'wealth',
@@ -270,6 +296,7 @@ export const runewords: Item[] = [
     category: 'runewords',
     subCategory: 'runewords',
     treasureClass: 'normal',
+    runes: ['lem', 'ko', 'tir'],
   },
   {
     id: 'beast',
@@ -280,6 +307,7 @@ export const runewords: Item[] = [
     category: 'runewords',
     subCategory: 'runewords',
     treasureClass: 'normal',
+    runes: ['ber', 'tir', 'um', 'mal', 'lum'],
   },
   {
     id: 'black',
@@ -290,6 +318,7 @@ export const runewords: Item[] = [
     category: 'runewords',
     subCategory: 'runewords',
     treasureClass: 'normal',
+    runes: ['thul', 'io', 'nef'],
   },
   {
     id: 'brand',
@@ -300,6 +329,7 @@ export const runewords: Item[] = [
     category: 'runewords',
     subCategory: 'runewords',
     treasureClass: 'normal',
+    runes: ['jah', 'lo', 'mal', 'gul'],
   },
   {
     id: 'breathofthedying',
@@ -310,6 +340,7 @@ export const runewords: Item[] = [
     category: 'runewords',
     subCategory: 'runewords',
     treasureClass: 'normal',
+    runes: ['vex', 'hel', 'el', 'eld', 'zod', 'eth'],
   },
   {
     id: 'calltoarms',
@@ -320,6 +351,7 @@ export const runewords: Item[] = [
     category: 'runewords',
     subCategory: 'runewords',
     treasureClass: 'normal',
+    runes: ['amn', 'ral', 'mal', 'ist', 'ohm'],
   },
   {
     id: 'chaos',
@@ -330,6 +362,7 @@ export const runewords: Item[] = [
     category: 'runewords',
     subCategory: 'runewords',
     treasureClass: 'normal',
+    runes: ['fal', 'ohm', 'um'],
   },
   {
     id: 'crescentmoon-runeword',
@@ -340,6 +373,7 @@ export const runewords: Item[] = [
     category: 'runewords',
     subCategory: 'runewords',
     treasureClass: 'normal',
+    runes: ['shael', 'um', 'tir'],
   },
   {
     id: 'death',
@@ -350,6 +384,7 @@ export const runewords: Item[] = [
     category: 'runewords',
     subCategory: 'runewords',
     treasureClass: 'normal',
+    runes: ['hel', 'el', 'vex', 'ort', 'gul'],
   },
   {
     id: 'destruction',
@@ -360,6 +395,7 @@ export const runewords: Item[] = [
     category: 'runewords',
     subCategory: 'runewords',
     treasureClass: 'normal',
+    runes: ['vex', 'lo', 'ber', 'jah', 'ko'],
   },
   {
     id: 'doom',
@@ -370,6 +406,7 @@ export const runewords: Item[] = [
     category: 'runewords',
     subCategory: 'runewords',
     treasureClass: 'normal',
+    runes: ['hel', 'ohm', 'um', 'lo', 'cham'],
   },
   {
     id: 'edge',
@@ -380,6 +417,7 @@ export const runewords: Item[] = [
     category: 'runewords',
     subCategory: 'runewords',
     treasureClass: 'normal',
+    runes: ['tir', 'tal', 'amn'],
   },
   {
     id: 'eternity',
@@ -390,6 +428,7 @@ export const runewords: Item[] = [
     category: 'runewords',
     subCategory: 'runewords',
     treasureClass: 'normal',
+    runes: ['amn', 'ber', 'ist', 'sol', 'sur'],
   },
   {
     id: 'faith',
@@ -400,6 +439,7 @@ export const runewords: Item[] = [
     category: 'runewords',
     subCategory: 'runewords',
     treasureClass: 'normal',
+    runes: ['ohm', 'jah', 'lem', 'eld'],
   },
   {
     id: 'famine',
@@ -410,6 +450,7 @@ export const runewords: Item[] = [
     category: 'runewords',
     subCategory: 'runewords',
     treasureClass: 'normal',
+    runes: ['fal', 'ohm', 'ort', 'jah'],
   },
   {
     id: 'fury',
@@ -420,6 +461,7 @@ export const runewords: Item[] = [
     category: 'runewords',
     subCategory: 'runewords',
     treasureClass: 'normal',
+    runes: ['jah', 'gul', 'eth'],
   },
   {
     id: 'grief',
@@ -430,6 +472,7 @@ export const runewords: Item[] = [
     category: 'runewords',
     subCategory: 'runewords',
     treasureClass: 'normal',
+    runes: ['eth', 'tir', 'lo', 'mal', 'ral'],
   },
   {
     id: 'handofjustice',
@@ -440,6 +483,7 @@ export const runewords: Item[] = [
     category: 'runewords',
     subCategory: 'runewords',
     treasureClass: 'normal',
+    runes: ['sur', 'cham', 'amn', 'lo'],
   },
   {
     id: 'harmony',
@@ -450,6 +494,7 @@ export const runewords: Item[] = [
     category: 'runewords',
     subCategory: 'runewords',
     treasureClass: 'normal',
+    runes: ['tir', 'ith', 'sol', 'ko'],
   },
   {
     id: 'heartoftheoak',
@@ -460,6 +505,7 @@ export const runewords: Item[] = [
     category: 'runewords',
     subCategory: 'runewords',
     treasureClass: 'normal',
+    runes: ['ko', 'vex', 'pul', 'thul'],
   },
   {
     id: 'holythunder',
@@ -470,6 +516,7 @@ export const runewords: Item[] = [
     category: 'runewords',
     subCategory: 'runewords',
     treasureClass: 'normal',
+    runes: ['eth', 'ral', 'ort', 'tal'],
   },
   {
     id: 'honor',
@@ -480,6 +527,7 @@ export const runewords: Item[] = [
     category: 'runewords',
     subCategory: 'runewords',
     treasureClass: 'normal',
+    runes: ['amn', 'el', 'ith', 'tir', 'sol'],
   },
   {
     id: 'ice',
@@ -490,6 +538,7 @@ export const runewords: Item[] = [
     category: 'runewords',
     subCategory: 'runewords',
     treasureClass: 'normal',
+    runes: ['amn', 'shael', 'jah', 'lo'],
   },
   {
     id: 'infinity',
@@ -500,6 +549,7 @@ export const runewords: Item[] = [
     category: 'runewords',
     subCategory: 'runewords',
     treasureClass: 'normal',
+    runes: ['ber', 'mal', 'ber', 'ist'],
   },
   {
     id: 'insight',
@@ -510,6 +560,7 @@ export const runewords: Item[] = [
     category: 'runewords',
     subCategory: 'runewords',
     treasureClass: 'normal',
+    runes: ['ral', 'tir', 'tal', 'sol'],
   },
   {
     id: 'kingsgrace',
@@ -520,6 +571,7 @@ export const runewords: Item[] = [
     category: 'runewords',
     subCategory: 'runewords',
     treasureClass: 'normal',
+    runes: ['amn', 'ral', 'thul'],
   },
   {
     id: 'kingslayer',
@@ -530,6 +582,7 @@ export const runewords: Item[] = [
     category: 'runewords',
     subCategory: 'runewords',
     treasureClass: 'normal',
+    runes: ['mal', 'um', 'gul', 'fal'],
   },
   {
     id: 'lastwish',
@@ -540,6 +593,7 @@ export const runewords: Item[] = [
     category: 'runewords',
     subCategory: 'runewords',
     treasureClass: 'normal',
+    runes: ['jah', 'mal', 'jah', 'sur', 'jah', 'ber'],
   },
   {
     id: 'lawbringer',
@@ -550,6 +604,7 @@ export const runewords: Item[] = [
     category: 'runewords',
     subCategory: 'runewords',
     treasureClass: 'normal',
+    runes: ['amn', 'lem', 'ko'],
   },
   {
     id: 'leaf',
@@ -560,6 +615,7 @@ export const runewords: Item[] = [
     category: 'runewords',
     subCategory: 'runewords',
     treasureClass: 'normal',
+    runes: ['tir', 'ral'],
   },
   {
     id: 'malice',
@@ -570,6 +626,7 @@ export const runewords: Item[] = [
     category: 'runewords',
     subCategory: 'runewords',
     treasureClass: 'normal',
+    runes: ['ith', 'el', 'eth'],
   },
   {
     id: 'melody',
@@ -580,6 +637,7 @@ export const runewords: Item[] = [
     category: 'runewords',
     subCategory: 'runewords',
     treasureClass: 'normal',
+    runes: ['shael', 'ko', 'nef'],
   },
   {
     id: 'memory',
@@ -590,6 +648,7 @@ export const runewords: Item[] = [
     category: 'runewords',
     subCategory: 'runewords',
     treasureClass: 'normal',
+    runes: ['lum', 'io', 'sol', 'eth'],
   },
   {
     id: 'mist',
@@ -600,6 +659,7 @@ export const runewords: Item[] = [
     category: 'runewords',
     subCategory: 'runewords',
     treasureClass: 'normal',
+    runes: ['cham', 'shael', 'gul', 'thul', 'ith'],
   },
   {
     id: 'oath',
@@ -610,6 +670,7 @@ export const runewords: Item[] = [
     category: 'runewords',
     subCategory: 'runewords',
     treasureClass: 'normal',
+    runes: ['shael', 'pul', 'mal', 'lum'],
   },
   {
     id: 'obedience',
@@ -620,6 +681,7 @@ export const runewords: Item[] = [
     category: 'runewords',
     subCategory: 'runewords',
     treasureClass: 'normal',
+    runes: ['hel', 'ko', 'thul', 'eth', 'fal'],
   },
   {
     id: 'obsession',
@@ -630,6 +692,7 @@ export const runewords: Item[] = [
     category: 'runewords',
     subCategory: 'runewords',
     treasureClass: 'normal',
+    runes: ['zod', 'ist', 'lem', 'lum', 'io', 'nef'],
   },
   {
     id: 'passion',
@@ -640,6 +703,7 @@ export const runewords: Item[] = [
     category: 'runewords',
     subCategory: 'runewords',
     treasureClass: 'normal',
+    runes: ['dol', 'ort', 'eld', 'lem'],
   },
   {
     id: 'pattern',
@@ -650,6 +714,7 @@ export const runewords: Item[] = [
     category: 'runewords',
     subCategory: 'runewords',
     treasureClass: 'normal',
+    runes: ['tal', 'ort', 'thul'],
   },
   {
     id: 'phoenix',
@@ -660,6 +725,7 @@ export const runewords: Item[] = [
     category: 'runewords',
     subCategory: 'runewords',
     treasureClass: 'normal',
+    runes: ['vex', 'vex', 'lo', 'jah'],
   },
   {
     id: 'plague',
@@ -670,6 +736,7 @@ export const runewords: Item[] = [
     category: 'runewords',
     subCategory: 'runewords',
     treasureClass: 'normal',
+    runes: ['cham', 'shael', 'um'],
   },
   {
     id: 'pride',
@@ -680,6 +747,7 @@ export const runewords: Item[] = [
     category: 'runewords',
     subCategory: 'runewords',
     treasureClass: 'normal',
+    runes: ['cham', 'sur', 'io', 'lo'],
   },
   {
     id: 'rift',
@@ -690,6 +758,7 @@ export const runewords: Item[] = [
     category: 'runewords',
     subCategory: 'runewords',
     treasureClass: 'normal',
+    runes: ['hel', 'ko', 'lem', 'gul'],
   },
   {
     id: 'silence',
@@ -700,6 +769,7 @@ export const runewords: Item[] = [
     category: 'runewords',
     subCategory: 'runewords',
     treasureClass: 'normal',
+    runes: ['dol', 'eld', 'hel', 'ist', 'tir', 'vex'],
   },
   {
     id: 'spirit',
@@ -710,6 +780,7 @@ export const runewords: Item[] = [
     category: 'runewords',
     subCategory: 'runewords',
     treasureClass: 'normal',
+    runes: ['tal', 'thul', 'ort', 'amn'],
   },
   {
     id: 'steel',
@@ -720,6 +791,7 @@ export const runewords: Item[] = [
     category: 'runewords',
     subCategory: 'runewords',
     treasureClass: 'normal',
+    runes: ['tir', 'el'],
   },
   {
     id: 'strength',
@@ -730,6 +802,7 @@ export const runewords: Item[] = [
     category: 'runewords',
     subCategory: 'runewords',
     treasureClass: 'normal',
+    runes: ['amn', 'tir'],
   },
   {
     id: 'unbendingwill',
@@ -740,6 +813,7 @@ export const runewords: Item[] = [
     category: 'runewords',
     subCategory: 'runewords',
     treasureClass: 'normal',
+    runes: ['fal', 'io', 'ith', 'eld', 'el', 'hel'],
   },
   {
     id: 'venom',
@@ -750,6 +824,7 @@ export const runewords: Item[] = [
     category: 'runewords',
     subCategory: 'runewords',
     treasureClass: 'normal',
+    runes: ['tal', 'dol', 'mal'],
   },
   {
     id: 'voiceofreason',
@@ -760,6 +835,7 @@ export const runewords: Item[] = [
     category: 'runewords',
     subCategory: 'runewords',
     treasureClass: 'normal',
+    runes: ['lem', 'ko', 'el', 'eld'],
   },
   {
     id: 'white',
@@ -770,6 +846,7 @@ export const runewords: Item[] = [
     category: 'runewords',
     subCategory: 'runewords',
     treasureClass: 'normal',
+    runes: ['dol', 'io'],
   },
   {
     id: 'wind',
@@ -780,6 +857,7 @@ export const runewords: Item[] = [
     category: 'runewords',
     subCategory: 'runewords',
     treasureClass: 'normal',
+    runes: ['sur', 'el'],
   },
   {
     id: 'wrath',
@@ -790,6 +868,7 @@ export const runewords: Item[] = [
     category: 'runewords',
     subCategory: 'runewords',
     treasureClass: 'normal',
+    runes: ['pul', 'lum', 'ber', 'mal'],
   },
   {
     id: 'zephyr',
@@ -800,6 +879,7 @@ export const runewords: Item[] = [
     category: 'runewords',
     subCategory: 'runewords',
     treasureClass: 'normal',
+    runes: ['ort', 'eth'],
   },
   {
     id: 'ancientspledge',
@@ -810,6 +890,7 @@ export const runewords: Item[] = [
     category: 'runewords',
     subCategory: 'runewords',
     treasureClass: 'normal',
+    runes: ['ral', 'ort', 'tal'],
   },
   {
     id: 'exile',
@@ -820,6 +901,7 @@ export const runewords: Item[] = [
     category: 'runewords',
     subCategory: 'runewords',
     treasureClass: 'normal',
+    runes: ['vex', 'ohm', 'ist', 'dol'],
   },
   {
     id: 'rhyme',
@@ -830,6 +912,7 @@ export const runewords: Item[] = [
     category: 'runewords',
     subCategory: 'runewords',
     treasureClass: 'normal',
+    runes: ['shael', 'eth'],
   },
   {
     id: 'sanctuary',
@@ -840,6 +923,7 @@ export const runewords: Item[] = [
     category: 'runewords',
     subCategory: 'runewords',
     treasureClass: 'normal',
+    runes: ['ko', 'ko', 'mal'],
   },
   {
     id: 'splendor',
@@ -850,6 +934,7 @@ export const runewords: Item[] = [
     category: 'runewords',
     subCategory: 'runewords',
     treasureClass: 'normal',
+    runes: ['eth', 'lum'],
   },
   {
     id: 'bulwark',
@@ -860,6 +945,7 @@ export const runewords: Item[] = [
     category: 'runewords',
     subCategory: 'runewords',
     treasureClass: 'normal',
+    runes: ['shael', 'io', 'sol'],
   },
   {
     id: 'cure',
@@ -870,6 +956,7 @@ export const runewords: Item[] = [
     category: 'runewords',
     subCategory: 'runewords',
     treasureClass: 'normal',
+    runes: ['shael', 'io', 'tal'],
   },
   {
     id: 'ground',
@@ -880,6 +967,7 @@ export const runewords: Item[] = [
     category: 'runewords',
     subCategory: 'runewords',
     treasureClass: 'normal',
+    runes: ['shael', 'io', 'ort'],
   },
   {
     id: 'hearth',
@@ -890,6 +978,7 @@ export const runewords: Item[] = [
     category: 'runewords',
     subCategory: 'runewords',
     treasureClass: 'normal',
+    runes: ['shael', 'io', 'thul'],
   },
   {
     id: 'temper',
@@ -900,6 +989,7 @@ export const runewords: Item[] = [
     category: 'runewords',
     subCategory: 'runewords',
     treasureClass: 'normal',
+    runes: ['shael', 'io', 'ral'],
   },
   {
     id: 'hustle',
@@ -910,6 +1000,7 @@ export const runewords: Item[] = [
     category: 'runewords',
     subCategory: 'runewords',
     treasureClass: 'normal',
+    runes: ['shael', 'ko', 'eld'],
   },
   {
     id: 'mosaic',
@@ -920,6 +1011,7 @@ export const runewords: Item[] = [
     category: 'runewords',
     subCategory: 'runewords',
     treasureClass: 'normal',
+    runes: ['mal', 'gul', 'amn'],
   },
   {
     id: 'metamorphosis',
@@ -930,5 +1022,6 @@ export const runewords: Item[] = [
     category: 'runewords',
     subCategory: 'runewords',
     treasureClass: 'normal',
+    runes: ['io', 'cham', 'fal'],
   },
 ];

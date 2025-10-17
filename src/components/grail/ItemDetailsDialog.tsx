@@ -23,6 +23,8 @@ import { useItemIcon } from '@/hooks/useItemIcon';
 import { useProgressLookup } from '@/hooks/useProgressLookup';
 import { cn } from '@/lib/utils';
 import { useGrailStore } from '@/stores/grailStore';
+import { runes } from '../../../electron/items/runes';
+import { RuneImages } from './RuneImages';
 
 interface ItemDetailsDialogProps {
   itemId: string | null;
@@ -89,6 +91,23 @@ function ItemInfoSection({ item }: { item: Item }) {
               <Badge variant="secondary" className="w-fit capitalize">
                 {item.setName}
               </Badge>
+            </>
+          )}
+
+          {/* Required Runes */}
+          {item.type === 'runeword' && item.runes && item.runes.length > 0 && (
+            <>
+              <span className="font-medium">Required Runes:</span>
+              <div className="flex flex-col gap-2">
+                <Badge variant="secondary">
+                  {item.runes
+                    .map((runeId) => {
+                      const rune = runes.find((r) => r.id === runeId);
+                      return rune?.name || runeId;
+                    })
+                    .join(' + ')}
+                </Badge>
+              </div>
             </>
           )}
 
@@ -422,6 +441,7 @@ function CharacterProgressTable({
  * ItemDetailsDialog component that displays comprehensive information about a Holy Grail item.
  * Shows item metadata, icon, and per-character progress with toggle actions.
  */
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Complex dialog component with many features
 export function ItemDetailsDialog({ itemId, open, onOpenChange }: ItemDetailsDialogProps) {
   const { items, progress, characters, selectedCharacterId, toggleItemFound, settings } =
     useGrailStore();
@@ -475,8 +495,12 @@ export function ItemDetailsDialog({ itemId, open, onOpenChange }: ItemDetailsDia
       <DialogContent>
         <DialogHeader>
           <div className="flex justify-between gap-4">
-            {/* Item Icon */}
-            {settings.showItemIcons && item.type !== 'runeword' && (
+            {/* Item Icon or Rune Images */}
+            {item.type === 'runeword' && item.runes && item.runes.length > 0 ? (
+              <div className="flex items-center">
+                <RuneImages runeIds={item.runes} viewMode="grid" />
+              </div>
+            ) : settings.showItemIcons && item.type !== 'runeword' ? (
               <div className="relative h-20 w-20">
                 <img
                   src={iconUrl}
@@ -495,12 +519,13 @@ export function ItemDetailsDialog({ itemId, open, onOpenChange }: ItemDetailsDia
                   <div className="absolute inset-0 animate-pulse rounded bg-gray-200 dark:bg-gray-700" />
                 )}
               </div>
-            )}
+            ) : null}
 
             <div>
               <DialogTitle className="font-bold text-2xl">{item.name}</DialogTitle>
             </div>
-            {settings.showItemIcons && item.type !== 'runeword' && (
+            {((item.type === 'runeword' && item.runes && item.runes.length > 0) ||
+              (settings.showItemIcons && item.type !== 'runeword')) && (
               <div className="relative w-20" />
             )}
           </div>

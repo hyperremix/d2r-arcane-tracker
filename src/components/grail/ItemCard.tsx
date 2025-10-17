@@ -7,6 +7,7 @@ import { useItemIcon } from '@/hooks/useItemIcon';
 import { isEtherealOnly, shouldShowEtherealStatus, shouldShowNormalStatus } from '@/lib/ethereal';
 import { cn, isRecentFind } from '@/lib/utils';
 import { useGrailStore } from '@/stores/grailStore';
+import { RuneImages } from './RuneImages';
 import { CharacterIcon, ItemTypeIcon, RecentDiscoveryIndicator } from './StatusIcons';
 
 /**
@@ -132,8 +133,13 @@ function ListView({
         onClick={onClick}
         onKeyDown={handleKeyDown}
       >
-        {/* Item Icon or Type Icon */}
-        {settings.showItemIcons && item.type !== 'runeword' ? (
+        {/* Item Icon, Rune Images, or Type Icon */}
+        {item.type === 'runeword' && item.runes && item.runes.length > 0 ? (
+          <div className="relative flex-shrink-0">
+            <RuneImages runeIds={item.runes} viewMode="list" />
+            <ItemTypeIcon type={item.type} className="-right-2 -bottom-1 absolute h-4 w-4" />
+          </div>
+        ) : settings.showItemIcons && item.type !== 'runeword' ? (
           <div className="relative h-12 w-12 flex-shrink-0">
             <img
               src={iconUrl}
@@ -465,8 +471,12 @@ function GridView({
             {/* Item Type Badge */}
             <ItemTypeIcon type={item.type} className="absolute top-2 left-2" />
 
-            {/* Item Icon */}
-            {settings.showItemIcons && item.type !== 'runeword' && (
+            {/* Item Icon or Rune Images */}
+            {item.type === 'runeword' && item.runes && item.runes.length > 0 ? (
+              <div className="mx-auto mb-2 flex justify-center">
+                <RuneImages runeIds={item.runes} />
+              </div>
+            ) : settings.showItemIcons && item.type !== 'runeword' ? (
               <div className="relative mx-auto mb-2 h-16 w-16">
                 <img
                   src={iconUrl}
@@ -486,7 +496,7 @@ function GridView({
                   <div className="absolute inset-0 animate-pulse rounded bg-gray-200 dark:bg-gray-700" />
                 )}
               </div>
-            )}
+            ) : null}
 
             {/* Item Name */}
             <Tooltip>
