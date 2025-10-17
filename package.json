@@ -27,7 +27,6 @@
     "test:ui": "vitest --ui",
     "test:run": "vitest run",
     "test:coverage": "vitest run --coverage",
-    "sprite:convert": "tsx scripts/convert-sprite-to-png.ts",
     "prepare": "husky",
     "seed:test": "node scripts/setup-native-modules.js && tsx scripts/seed-test-data.ts",
     "version:major": "yarn version --new-version major && git push --follow-tags",
