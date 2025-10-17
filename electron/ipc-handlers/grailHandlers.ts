@@ -8,6 +8,27 @@ import type { GrailProgress, Item, Settings } from '../types/grail';
 let grailDB: GrailDatabase;
 
 /**
+ * Converts a setting value to a string suitable for database storage.
+ * Handles objects (JSON.stringify), undefined (skip), and primitives (String).
+ * @param value - The setting value to convert
+ * @returns String representation or null if value should be skipped
+ */
+function convertSettingValueToString(value: unknown): string | null {
+  // Skip undefined values - don't save them
+  if (value === undefined) {
+    return null;
+  }
+
+  // Convert complex objects to JSON strings
+  if (typeof value === 'object' && value !== null) {
+    return JSON.stringify(value);
+  }
+
+  // Convert primitives to strings
+  return String(value);
+}
+
+/**
  * Initializes IPC handlers for Holy Grail tracking operations.
  * Sets up handlers for characters, items, progress, settings, statistics, and backup operations.
  * Initializes the database connection and registers all IPC event handlers.
@@ -132,6 +153,7 @@ export function initializeGrailHandlers(): void {
 
   /**
    * IPC handler for updating user settings.
+   * Emits a settings-updated event to all renderer windows after successful update.
    * @param _ - IPC event (unused)
    * @param settings - Partial settings object to update
    */
@@ -139,8 +161,23 @@ export function initializeGrailHandlers(): void {
     try {
       for (const key in settings) {
         const settingsKey = key as keyof Settings;
-        grailDB.setSetting(settingsKey, String(settings[settingsKey]));
+        const value = settings[settingsKey];
+        const stringValue = convertSettingValueToString(value);
+
+        // Skip if value should not be saved (undefined)
+        if (stringValue !== null) {
+          grailDB.setSetting(settingsKey, stringValue);
+        }
       }
+
+      // Emit event to all renderer windows to notify them of settings changes
+      const allWebContents = webContents.getAllWebContents();
+      for (const wc of allWebContents) {
+        if (!wc.isDestroyed() && wc.getType() === 'window') {
+          wc.send('settings-updated', settings);
+        }
+      }
+
       return { success: true };
     } catch (error) {
       console.error('Failed to update settings:', error);

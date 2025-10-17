@@ -607,9 +607,37 @@ class GrailDatabase {
       needsSeeding: settings.needsSeeding === 'true',
       theme: (settings.theme as 'light' | 'dark' | 'system') || 'system',
       showItemIcons: settings.showItemIcons !== 'false', // Default to true
+      // Widget settings
+      widgetEnabled: settings.widgetEnabled === 'true',
+      widgetDisplay: (settings.widgetDisplay as 'overall' | 'split' | 'all') || 'overall',
+      widgetPosition:
+        settings.widgetPosition && settings.widgetPosition !== ''
+          ? (this.parseJSON(settings.widgetPosition) as { x: number; y: number } | undefined)
+          : undefined,
+      widgetOpacity: settings.widgetOpacity ? Number.parseFloat(settings.widgetOpacity) : 0.9,
     };
 
     return typedSettings;
+  }
+
+  /**
+   * Safely parses a JSON string, returning undefined if parsing fails.
+   * Handles invalid JSON gracefully (e.g., "[object Object]" strings or "undefined" strings).
+   * @param jsonString - The JSON string to parse
+   * @returns Parsed JSON object or undefined if parsing fails
+   */
+  private parseJSON(jsonString: string): unknown {
+    // Handle empty or invalid strings
+    if (!jsonString || jsonString === 'undefined' || jsonString === 'null') {
+      return undefined;
+    }
+
+    try {
+      return JSON.parse(jsonString);
+    } catch {
+      console.warn(`Failed to parse JSON setting: "${jsonString}". Using undefined.`);
+      return undefined;
+    }
   }
 
   /**

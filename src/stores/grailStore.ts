@@ -73,6 +73,9 @@ const defaultSettings: Settings = {
   needsSeeding: true,
   theme: 'system',
   showItemIcons: false,
+  widgetEnabled: false,
+  widgetDisplay: 'overall',
+  widgetOpacity: 0.9,
 };
 
 /**

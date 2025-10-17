@@ -177,6 +177,16 @@
   body {
     @apply bg-background text-foreground;
   }
+  /* Widget window should have transparent body and root */
+  body.widget {
+    @apply bg-transparent text-foreground;
+  }
+  /* !important is required to override Tailwind's base layer background */
+  html:has(body.widget),
+  body.widget,
+  body.widget #root {
+    background: transparent !important;
+  }
 }
 
 /* Electron custom title bar drag regions */

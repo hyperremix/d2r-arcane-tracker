@@ -301,6 +301,58 @@ export interface ElectronAPI {
   }
 
   /**
+   * Widget window API methods for managing the overlay widget.
+   */
+  widget: {
+    /**
+     * Toggles the widget window on or off.
+     * @param {boolean} enabled - Whether to enable or disable the widget.
+     * @param {Partial<Settings>} settings - Current application settings for widget configuration.
+     * @returns {Promise<{ success: boolean; error?: string }>} A promise that resolves with a success indicator.
+     */
+    toggle(enabled: boolean, settings: Partial<Settings>): Promise<{ success: boolean; error?: string }>
+
+    /**
+     * Gets the current widget window position.
+     * @returns {Promise<{ success: boolean; position: { x: number; y: number } | null; error?: string }>} A promise that resolves with the widget position.
+     */
+    getPosition(): Promise<{ success: boolean; position: { x: number; y: number } | null; error?: string }>
+
+    /**
+     * Updates the widget window position.
+     * @param {{ x: number; y: number }} position - The new position for the widget.
+     * @returns {Promise<{ success: boolean; error?: string }>} A promise that resolves with a success indicator.
+     */
+    updatePosition(position: { x: number; y: number }): Promise<{ success: boolean; error?: string }>
+
+    /**
+     * Updates the widget display mode.
+     * @param {'overall' | 'split' | 'all'} display - The new display mode for the widget.
+     * @returns {Promise<{ success: boolean; error?: string }>} A promise that resolves with a success indicator.
+     */
+    updateDisplay(display: 'overall' | 'split' | 'all'): Promise<{ success: boolean; error?: string }>
+
+    /**
+     * Updates the widget window opacity.
+     * @param {number} opacity - The new opacity value (0.0 to 1.0).
+     * @returns {Promise<{ success: boolean; error?: string }>} A promise that resolves with a success indicator.
+     */
+    updateOpacity(opacity: number): Promise<{ success: boolean; error?: string }>
+
+    /**
+     * Checks if the widget window is currently open.
+     * @returns {Promise<{ success: boolean; isOpen: boolean }>} A promise that resolves with the widget status.
+     */
+    isOpen(): Promise<{ success: boolean; isOpen: boolean }>
+
+    /**
+     * Resets the widget position to the center of the screen.
+     * @returns {Promise<{ success: boolean; position: { x: number; y: number } | null; error?: string }>} A promise that resolves with the new position.
+     */
+    resetPosition(): Promise<{ success: boolean; position: { x: number; y: number } | null; error?: string }>
+  }
+
+  /**
    * Updates the title bar overlay colors (Windows/Linux only).
    * @param {Object} colors - The colors to apply.
    * @param {string} colors.backgroundColor - Background color of the title bar overlay.
