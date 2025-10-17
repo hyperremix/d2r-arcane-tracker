@@ -2,11 +2,14 @@ import { createRequire } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { app, BrowserWindow, type IpcMainEvent, ipcMain, session } from 'electron';
+import { GrailDatabase } from './database/database';
 import { initializeDialogHandlers } from './ipc-handlers/dialogHandlers';
 import { closeGrailDatabase, initializeGrailHandlers } from './ipc-handlers/grailHandlers';
 import { initializeIconHandlers } from './ipc-handlers/iconHandlers';
 import { closeSaveFileMonitor, initializeSaveFileHandlers } from './ipc-handlers/saveFileHandlers';
 import { initializeUpdateHandlers } from './ipc-handlers/updateHandlers';
+import { initializeWidgetHandlers } from './ipc-handlers/widgetHandlers';
+import { closeWidgetWindow, showWidgetWindow } from './window/widgetWindow';
 
 createRequire(import.meta.url);
 /**
@@ -155,6 +158,19 @@ app.whenReady().then(() => {
   initializeIconHandlers();
   initializeUpdateHandlers();
 
+  // Initialize widget handlers with callback for position updates
+  const onWidgetPositionChange = (position: { x: number; y: number }) => {
+    // Save widget position to database
+    try {
+      const db = new GrailDatabase();
+      db.setSetting('widgetPosition', JSON.stringify(position));
+    } catch (error) {
+      console.error('Failed to save widget position:', error);
+    }
+  };
+
+  initializeWidgetHandlers(__dirname, VITE_DEV_SERVER_URL, RENDERER_DIST, onWidgetPositionChange);
+
   // Handle titlebar overlay updates (Windows/Linux only)
   ipcMain.handle(
     'update-titlebar-overlay',
@@ -172,12 +188,30 @@ app.whenReady().then(() => {
 
   // Create main window
   createWindow();
+
+  // Initialize widget window if enabled in settings
+  try {
+    const db = new GrailDatabase();
+    const settings = db.getAllSettings();
+    if (settings.widgetEnabled) {
+      showWidgetWindow(
+        settings,
+        __dirname,
+        VITE_DEV_SERVER_URL,
+        RENDERER_DIST,
+        onWidgetPositionChange,
+      );
+    }
+  } catch (error) {
+    console.error('Failed to initialize widget window:', error);
+  }
 });
 
 // Clean up database connection when app is about to quit
 app.on('before-quit', () => {
   closeGrailDatabase();
   closeSaveFileMonitor();
+  closeWidgetWindow();
 });
 
 /**

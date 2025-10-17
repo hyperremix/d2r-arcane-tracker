@@ -237,7 +237,17 @@ export interface GrailStatistics {
   totalItems: number;
   foundItems: number;
   completionPercentage: number;
-  recentFinds: GrailProgress[];
+  recentFinds: number;
+  normalItems: {
+    total: number;
+    found: number;
+  };
+  etherealItems: {
+    total: number;
+    found: number;
+  };
+  currentStreak: number;
+  maxStreak: number;
 }
 
 /**
@@ -368,6 +378,11 @@ export type Settings = {
   chokidarPollingIntervalMs?: number; // Default: 1000
   fileStabilityThresholdMs?: number; // Default: 300
   fileChangeDebounceMs?: number; // Default: 2000
+  // Widget settings
+  widgetEnabled?: boolean; // Whether the widget is enabled
+  widgetDisplay?: 'overall' | 'split' | 'all'; // Widget display mode (overall only, normal+ethereal, or all three)
+  widgetPosition?: { x: number; y: number }; // Widget position on screen
+  widgetOpacity?: number; // Widget opacity (0.0 to 1.0)
 };
 
 /**

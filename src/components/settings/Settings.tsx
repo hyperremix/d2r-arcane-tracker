@@ -8,6 +8,7 @@ import { NotificationSettings } from './NotificationSettings';
 import { SaveFileMonitor } from './SaveFileMonitor';
 import { ThemeSettings } from './ThemeSettings';
 import { UpdateSettings } from './UpdateSettings';
+import { WidgetSettings } from './WidgetSettings';
 
 /**
  * Settings component that serves as the main settings page.
@@ -24,6 +25,7 @@ export function Settings() {
           <SaveFileMonitor />
           <GrailSettings />
           <NotificationSettings />
+          <WidgetSettings />
           <ThemeSettings />
           <ItemIconSettings />
           <GameModeSettings />
