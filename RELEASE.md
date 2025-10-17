@@ -118,7 +118,7 @@ Cross-platform builds for Windows from macOS are supported but require attention
 
 #### Icon Format
 
-- Uses `build/icon.png`
+- Uses `build/logo.png`
 - Must be in ICO format for proper Windows integration
 - Supports multiple resolutions in single ICO file
 
@@ -291,7 +291,7 @@ Error: Cannot find module 'better-sqlite3'
 Warning: Icon file not found or invalid format
 ```
 
-**Solution**: Verify `build/icon.png` exists and is valid ICO format
+**Solution**: Verify `build/logo.png` exists and is valid ICO format
 
 ### Platform-Specific Issues
 
@@ -366,7 +366,7 @@ yarn build        # All platforms
 ### Key Files
 
 - `electron-builder.json5` - Build configuration
-- `build/icon.png` - icon
+- `build/logo.png` - icon
 
 ### Release Checklist
 

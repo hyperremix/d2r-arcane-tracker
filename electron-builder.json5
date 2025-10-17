@@ -11,15 +11,15 @@
   publish: {
     provider: "github",
     owner: "hyperremix",
-    repo: "d2r-arcane-tracker"
+    repo: "d2r-arcane-tracker",
   },
   mac: {
-    icon: "build/icon.png",
+    icon: "build/logo.png",
     target: ["dmg"],
     artifactName: "${productName}-Mac-${version}-Installer.${ext}",
   },
   win: {
-    icon: "build/icon.png",
+    icon: "build/logo.png",
     target: [
       {
         target: "nsis",
