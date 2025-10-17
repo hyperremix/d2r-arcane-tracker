@@ -272,6 +272,7 @@ export const shields: Item[] = [
     treasureClass: 'elite',
     code: 'upk',
     itemBase: 'Blade Barrier',
+    imageFilename: 'swordback_hold.png',
   },
   {
     id: 'spiritward',

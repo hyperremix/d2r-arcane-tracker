@@ -155,6 +155,7 @@ export const oneHandedClubs: Item[] = [
     treasureClass: 'exceptional',
     code: '9wh',
     itemBase: 'Battle Hammer',
+    imageFilename: 'war_hammer.png',
   },
   {
     id: 'nordstenderizer',

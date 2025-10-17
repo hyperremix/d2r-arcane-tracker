@@ -55,6 +55,7 @@ export const sets: Item[] = [
     code: 'sbr',
     itemBase: 'Sabre',
     setName: 'Angelic Raiment',
+    imageFilename: 'krintizs_skewer.png',
   },
   {
     id: 'arcannassign',
@@ -180,6 +181,7 @@ export const sets: Item[] = [
     code: '2ax',
     itemBase: 'Double Axe',
     setName: "Berserker's Arsenal",
+    imageFilename: 'double_axe.png',
   },
   {
     id: 'berserkershauberk',
@@ -361,6 +363,7 @@ export const sets: Item[] = [
     code: 'mgl',
     itemBase: 'Chain Gloves',
     setName: "Cleglaw's Brace",
+    imageFilename: 'bracers_m.png',
   },
   {
     id: 'deathstouch',
@@ -402,6 +405,7 @@ export const sets: Item[] = [
     code: 'lgl',
     itemBase: 'Leather Gloves',
     setName: "Death's Disguise",
+    imageFilename: 'gloves_l.png',
   },
   {
     id: 'hsarusironstay',
@@ -709,6 +713,7 @@ export const sets: Item[] = [
     code: 'hgl',
     itemBase: 'Gauntlets',
     setName: "Sigon's Complete Steel",
+    imageFilename: 'gaunlets_h.png',
   },
   {
     id: 'sigonssabot',
@@ -722,6 +727,7 @@ export const sets: Item[] = [
     code: 'hbt',
     itemBase: 'Greaves',
     setName: "Sigon's Complete Steel",
+    imageFilename: 'plate_boots.png',
   },
   {
     id: 'sigonswrap',
@@ -735,6 +741,7 @@ export const sets: Item[] = [
     code: 'hbl',
     itemBase: 'Plated Belt',
     setName: "Sigon's Complete Steel",
+    imageFilename: 'girdle_h.png',
   },
   {
     id: 'tancredsskull',
@@ -776,6 +783,7 @@ export const sets: Item[] = [
     code: 'lbt',
     itemBase: 'Boots',
     setName: "Tancred's Battlegear",
+    imageFilename: 'leather_boots.png',
   },
   {
     id: 'tancredsspine',
@@ -803,6 +811,7 @@ export const sets: Item[] = [
     code: 'mpi',
     itemBase: 'Military Pick',
     setName: "Tancred's Battlegear",
+    imageFilename: 'mindrend.png',
   },
   {
     id: 'vidalassnare',
@@ -844,6 +853,7 @@ export const sets: Item[] = [
     code: 'tbt',
     itemBase: 'Light Plated Boots',
     setName: "Vidala's Rig",
+    imageFilename: 'light_plate_boots.png',
   },
   {
     id: 'vidalasbarb',
@@ -925,8 +935,9 @@ export const sets: Item[] = [
     subCategory: '2h_swords',
     treasureClass: 'elite',
     code: '7gd',
-    itemBase: 'Glorious Axe',
+    itemBase: 'Colossus Blade',
     setName: "Bul-Kathos' Children",
+    imageFilename: 'the_patriarch.png',
   },
   {
     id: 'bulkathostribalguardian',
@@ -1164,6 +1175,7 @@ export const sets: Item[] = [
     code: '7m7',
     itemBase: 'Ogre Maul',
     setName: 'Immortal King',
+    imageFilename: 'maul.png',
   },
   {
     id: 'immortalkingswill',
@@ -1175,8 +1187,9 @@ export const sets: Item[] = [
     subCategory: 'helms',
     treasureClass: 'elite',
     code: 'ba5',
-    itemBase: 'Blade Talons',
+    itemBase: 'Avenger Guard',
     setName: 'Immortal King',
+    imageFilename: 'avenger_guard.png',
   },
   {
     id: 'immortalkingssoulcage',
@@ -1218,6 +1231,7 @@ export const sets: Item[] = [
     code: 'xhg',
     itemBase: 'War Gauntlets',
     setName: 'Immortal King',
+    imageFilename: 'gaunlets_h.png',
   },
   {
     id: 'immortalkingspillar',
@@ -1243,8 +1257,9 @@ export const sets: Item[] = [
     subCategory: 'amazon',
     treasureClass: 'elite',
     code: 'amb',
-    itemBase: 'Ceremonial Spear',
+    itemBase: 'Grand Matron Bow',
     setName: "M'avina's Battle Hymn",
+    imageFilename: 'reflex_bow.png',
   },
   {
     id: 'mavinasembrace',
@@ -1270,7 +1285,8 @@ export const sets: Item[] = [
     subCategory: 'helms',
     treasureClass: 'elite',
     code: 'ci3',
-    itemBase: 'Greater Talons',
+    itemBase: 'Diadem',
+    imageFilename: 'diadem.png',
     setName: "M'avina's Battle Hymn",
   },
   {
@@ -1353,8 +1369,9 @@ export const sets: Item[] = [
     subCategory: 'assassin',
     treasureClass: 'elite',
     code: '7lw',
-    itemBase: 'Runic Talons',
+    itemBase: 'Scissors Suwayyah',
     setName: "Natalya's Odium",
+    imageFilename: 'natalyas_mark.png',
   },
   {
     id: 'natalyasshadow',
@@ -1382,6 +1399,7 @@ export const sets: Item[] = [
     code: 'xh9',
     itemBase: 'Grim Helm',
     setName: "Natalya's Odium",
+    imageFilename: 'wormskull.png',
   },
   {
     id: 'natalyassoul',
@@ -1575,8 +1593,9 @@ export const sets: Item[] = [
     subCategory: 'sorceress',
     treasureClass: 'exceptional',
     code: 'oba',
-    itemBase: 'Wrist Blade',
+    itemBase: 'Swirling Crystal',
     setName: "Tal Rasha's Wrappings",
+    imageFilename: 'dragon_stone.png',
   },
   {
     id: 'talrashasguardianship',
@@ -1701,7 +1720,7 @@ export const sets: Item[] = [
     treasureClass: 'elite',
     code: 'uh9',
     itemBase: 'Bone Visage',
-    imageFilename: 'bone_helm.png',
+    imageFilename: 'wormskull.png',
     setName: "Trang-Oul's Avatar",
   },
   {
@@ -1744,6 +1763,7 @@ export const sets: Item[] = [
     code: 'xmg',
     itemBase: 'Heavy Bracers',
     setName: "Trang-Oul's Avatar",
+    imageFilename: 'bracers_m.png',
   },
   {
     id: 'trangoulswing',
