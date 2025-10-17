@@ -219,13 +219,8 @@ class GrailDatabase {
     this.db.exec(schema);
     console.log('Database schema created successfully');
 
-    // Check if items table is empty and seed it if needed
-    const itemCount = this.db.prepare('SELECT COUNT(*) as count FROM items').get() as {
-      count: number;
-    };
-    if (itemCount.count === 0) {
-      this.seedItemsFromGrailData();
-    }
+    // Always upsert items to ensure latest changes are available
+    this.upsertItemsFromGrailData();
   }
 
   // Items methods
@@ -285,15 +280,28 @@ class GrailDatabase {
   }
 
   /**
-   * Inserts multiple items into the database using a transaction.
-   * Uses INSERT OR REPLACE to handle duplicate items.
-   * Only inserts base items (no eth_ duplicates).
-   * @param items - Array of items to insert (without timestamps)
+   * Inserts or updates multiple items in the database using a transaction.
+   * Uses INSERT ... ON CONFLICT DO UPDATE (proper UPSERT) to safely handle duplicates
+   * without triggering ON DELETE CASCADE, preserving grail_progress foreign key relationships.
+   * @param items - Array of items to insert or update
    */
   insertItems(items: Item[]): void {
     const stmt = this.db.prepare(`
-      INSERT OR REPLACE INTO items (id, name, link, code, type, category, sub_category, set_name, ethereal_type, treasure_class, image_filename, item_base, runes)
+      INSERT INTO items (id, name, link, code, type, category, sub_category, set_name, ethereal_type, treasure_class, image_filename, item_base, runes)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(id) DO UPDATE SET
+        name = excluded.name,
+        link = excluded.link,
+        code = excluded.code,
+        type = excluded.type,
+        category = excluded.category,
+        sub_category = excluded.sub_category,
+        set_name = excluded.set_name,
+        ethereal_type = excluded.ethereal_type,
+        treasure_class = excluded.treasure_class,
+        image_filename = excluded.image_filename,
+        item_base = excluded.item_base,
+        runes = excluded.runes
     `);
 
     const transaction = this.db.transaction((itemsToInsert: typeof items) => {
@@ -682,19 +690,17 @@ class GrailDatabase {
 
   // Seeding methods
   /**
-   * Seeds the items table with Holy Grail data from the grail module.
-   * Clears existing items and populates with both regular and ethereal versions.
+   * Upserts all items from the Holy Grail data into the database.
+   * This ensures the database always has the latest item definitions, including any new fields or corrected data.
+   * Uses INSERT OR REPLACE to update existing items without affecting grail progress.
    */
-  seedItemsFromGrailData(): void {
-    console.log('Starting Holy Grail data seeding...');
+  upsertItemsFromGrailData(): void {
+    console.log('Upserting Holy Grail item data...');
 
-    // Clear existing items
-    this.db.prepare('DELETE FROM items').run();
-
-    // Insert all items
+    // Upsert all items (insertItems already uses INSERT OR REPLACE)
     this.insertItems(items);
 
-    console.log(`Seeded ${items.length} items from Holy Grail data`);
+    console.log(`Upserted ${items.length} items from Holy Grail data`);
   }
 
   // Utility methods

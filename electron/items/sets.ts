@@ -907,7 +907,7 @@ export const sets: Item[] = [
     subCategory: 'body_armor',
     treasureClass: 'exceptional',
     code: 'uul',
-    itemBase: 'Lacquered Plate',
+    itemBase: 'Shadow Plate',
     imageFilename: 'gothic_plate.png',
     setName: "Aldur's Watchtower",
   },
