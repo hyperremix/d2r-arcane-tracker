@@ -168,7 +168,7 @@ export const helms: Item[] = [
     treasureClass: 'exceptional',
     code: 'xh9',
     itemBase: 'Grim Helm',
-    imageFilename: 'bone_helm.png',
+    imageFilename: 'wormskull.png',
   },
   {
     id: 'valkyriewing',

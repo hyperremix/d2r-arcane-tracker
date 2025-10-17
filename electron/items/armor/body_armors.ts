@@ -349,7 +349,8 @@ export const bodyArmors: Item[] = [
     subCategory: 'body_armor',
     treasureClass: 'exceptional',
     code: 'xlt',
-    itemBase: 'Mage Plate',
+    itemBase: 'Templar Coat',
+    imageFilename: 'plate_mail.png',
   },
   {
     id: 'atmaswail',

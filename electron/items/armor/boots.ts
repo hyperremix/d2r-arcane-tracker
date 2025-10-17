@@ -12,7 +12,7 @@ export const boots: Item[] = [
     treasureClass: 'normal',
     code: 'lbt',
     itemBase: 'Boots',
-    imageFilename: 'boots.png',
+    imageFilename: 'leather_boots.png',
   },
   {
     id: 'gorefoot',

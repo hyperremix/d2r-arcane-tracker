@@ -38,7 +38,7 @@ export const twoHandedAxes: Item[] = [
     treasureClass: 'normal',
     code: 'btx',
     itemBase: 'Battle Axe',
-    imageFilename: 'the_chieftain.png',
+    imageFilename: 'the_chieftan.png',
   },
   {
     id: 'brainhew',
@@ -77,7 +77,7 @@ export const twoHandedAxes: Item[] = [
     treasureClass: 'exceptional',
     code: '9la',
     itemBase: 'Military Axe',
-    imageFilename: 'military_axe.png',
+    imageFilename: 'large_axe.png',
   },
   {
     id: 'spellsteel',
@@ -129,7 +129,7 @@ export const twoHandedAxes: Item[] = [
     treasureClass: 'exceptional',
     code: '9gi',
     itemBase: 'Ancient Axe',
-    imageFilename: 'the_minotaur.png',
+    imageFilename: 'the_minataur.png',
   },
   {
     id: 'etherealedge',
@@ -155,7 +155,7 @@ export const twoHandedAxes: Item[] = [
     treasureClass: 'elite',
     code: '7bt',
     itemBase: 'Decapitator',
-    imageFilename: 'the_chieftain.png',
+    imageFilename: 'the_chieftan.png',
   },
   {
     id: 'messerschmidtsreaver',

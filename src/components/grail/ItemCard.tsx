@@ -175,11 +175,13 @@ function ListView({
           </TooltipTrigger>
           <TooltipContent side="top" className="max-w-sm">
             <div className="space-y-1">
-              <p className="font-semibold">{item.name}</p>
+              <p className="font-semibold">
+                {item.name}
+                {item.itemBase && ` • ${item.itemBase}`}
+              </p>
               <p className="text-gray-500 text-xs">
                 {item.category} • {item.subCategory.replace('_', ' ')}
               </p>
-              {item.itemBase && <p className="text-gray-500 text-xs">Base: {item.itemBase}</p>}
 
               <DiscoveryInfo allProgress={allProgress} characters={characters} />
             </div>
@@ -495,11 +497,13 @@ function GridView({
               </TooltipTrigger>
               <TooltipContent side="top" className="max-w-sm">
                 <div className="space-y-1">
-                  <p className="font-semibold">{item.name}</p>
+                  <p className="font-semibold">
+                    {item.name}
+                    {item.itemBase && ` • ${item.itemBase}`}
+                  </p>
                   <p className="text-gray-500 text-xs">
                     {item.category} • {item.subCategory.replace('_', ' ')}
                   </p>
-                  {item.itemBase && <p className="text-gray-500 text-xs">Base: {item.itemBase}</p>}
 
                   {allProgress.length > 0 && (
                     <DiscoveryInfo allProgress={allProgress} characters={characters} />
