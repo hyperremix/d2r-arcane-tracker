@@ -112,7 +112,6 @@ class GrailDatabase {
           )
         ),
         level INTEGER NOT NULL DEFAULT 1,
-        difficulty TEXT NOT NULL CHECK (difficulty IN ('normal', 'nightmare', 'hell')),
         hardcore BOOLEAN NOT NULL DEFAULT FALSE,
         expansion BOOLEAN NOT NULL DEFAULT TRUE,
         save_file_path TEXT,
@@ -377,8 +376,8 @@ class GrailDatabase {
     if (characters.length === 0) return;
 
     const stmt = this.db.prepare(`
-      INSERT OR REPLACE INTO characters (id, name, character_class, level, difficulty, hardcore, expansion, save_file_path)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT OR REPLACE INTO characters (id, name, character_class, level, hardcore, expansion, save_file_path)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
     `);
 
     const transaction = this.db.transaction((chars: Character[]) => {
@@ -388,7 +387,6 @@ class GrailDatabase {
           name: character.name,
           character_class: character.characterClass,
           level: character.level,
-          difficulty: character.difficulty,
           hardcore: character.hardcore,
           expansion: character.expansion,
           save_file_path: character.saveFilePath,
@@ -398,7 +396,6 @@ class GrailDatabase {
           mappedCharacter.name,
           mappedCharacter.character_class,
           mappedCharacter.level,
-          mappedCharacter.difficulty,
           mappedCharacter.hardcore,
           mappedCharacter.expansion,
           mappedCharacter.save_file_path,
@@ -440,15 +437,14 @@ class GrailDatabase {
    */
   upsertCharacter(character: Character): void {
     const stmt = this.db.prepare(`
-      INSERT OR REPLACE INTO characters (id, name, character_class, level, difficulty, hardcore, expansion, save_file_path)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT OR REPLACE INTO characters (id, name, character_class, level, hardcore, expansion, save_file_path)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
     `);
     const mappedCharacter = mapCharacterToDatabase({
       id: character.id,
       name: character.name,
       character_class: character.characterClass,
       level: character.level,
-      difficulty: character.difficulty,
       hardcore: character.hardcore,
       expansion: character.expansion,
       save_file_path: character.saveFilePath,
@@ -458,7 +454,6 @@ class GrailDatabase {
       mappedCharacter.name,
       mappedCharacter.character_class,
       mappedCharacter.level,
-      mappedCharacter.difficulty,
       mappedCharacter.hardcore,
       mappedCharacter.expansion,
       mappedCharacter.save_file_path,

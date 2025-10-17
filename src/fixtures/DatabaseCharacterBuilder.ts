@@ -10,7 +10,6 @@ export class DatabaseCharacterBuilder {
     name: 'DefaultCharacter',
     character_class: 'amazon',
     level: 1,
-    difficulty: 'normal',
     hardcore: 0,
     expansion: 1,
     save_file_path: null,
@@ -55,14 +54,6 @@ export class DatabaseCharacterBuilder {
    */
   withLevel(level: number): this {
     this.character.level = level;
-    return this;
-  }
-
-  /**
-   * Set the difficulty
-   */
-  withDifficulty(difficulty: DatabaseCharacter['difficulty']): this {
-    this.character.difficulty = difficulty;
     return this;
   }
 

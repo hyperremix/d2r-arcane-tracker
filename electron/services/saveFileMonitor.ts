@@ -1247,7 +1247,6 @@ class SaveFileMonitor {
           lastModified: stats.mtime,
           characterClass: 'shared_stash',
           level: 1,
-          difficulty: 'normal',
           hardcore: isHardcore,
           expansion: true,
         };
@@ -1260,7 +1259,6 @@ class SaveFileMonitor {
       const characterName = fileName;
       let characterClass = 'unknown';
       let level = 1;
-      let difficulty: 'normal' | 'nightmare' | 'hell' = 'normal';
       let hardcore = false;
       let expansion = true;
 
@@ -1277,12 +1275,6 @@ class SaveFileMonitor {
         const status = buffer.readUInt8(36);
         hardcore = (status & 0x04) !== 0;
         expansion = (status & 0x20) !== 0;
-
-        // Difficulty completion flags at offset 168
-        const difficultyFlags = buffer.readUInt8(168);
-        if (difficultyFlags & 0x80) difficulty = 'hell';
-        else if (difficultyFlags & 0x40) difficulty = 'nightmare';
-        else difficulty = 'normal';
       }
 
       return {
@@ -1291,7 +1283,6 @@ class SaveFileMonitor {
         lastModified: stats.mtime,
         characterClass,
         level,
-        difficulty,
         hardcore,
         expansion,
       };

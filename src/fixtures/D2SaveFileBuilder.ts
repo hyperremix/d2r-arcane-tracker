@@ -7,7 +7,6 @@ export class D2SaveFileBuilder {
     lastModified: new Date('2024-01-01T00:00:00Z'),
     characterClass: 'Amazon',
     level: 1,
-    difficulty: 'normal',
     hardcore: false,
     expansion: true,
   };
@@ -38,11 +37,6 @@ export class D2SaveFileBuilder {
 
   withLevel(level: number): this {
     this.saveFile.level = level;
-    return this;
-  }
-
-  withDifficulty(difficulty: 'normal' | 'nightmare' | 'hell'): this {
-    this.saveFile.difficulty = difficulty;
     return this;
   }
 
@@ -85,19 +79,6 @@ export class D2SaveFileBuilder {
     return this.withCharacterClass('Assassin');
   }
 
-  // Convenience methods for difficulties
-  inNormal(): this {
-    return this.withDifficulty('normal');
-  }
-
-  inNightmare(): this {
-    return this.withDifficulty('nightmare');
-  }
-
-  inHell(): this {
-    return this.withDifficulty('hell');
-  }
-
   // Convenience methods for character types
   asHardcore(): this {
     return this.withHardcore(true);
@@ -133,7 +114,6 @@ export class D2SaveFileBuilder {
         .withLastModified(this.saveFile.lastModified)
         .withCharacterClass(this.saveFile.characterClass)
         .withLevel(this.saveFile.level)
-        .withDifficulty(this.saveFile.difficulty)
         .withHardcore(this.saveFile.hardcore)
         .withExpansion(this.saveFile.expansion)
         .build(),

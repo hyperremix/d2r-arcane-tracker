@@ -670,7 +670,6 @@ describe('When saveFileHandlers is used', () => {
       const mockSaveFile = D2SaveFileBuilder.new()
         .asAmazon()
         .atLevel(85)
-        .inHell()
         .asHardcore()
         .asExpansion()
         .withName('AmazonTest')
@@ -682,7 +681,6 @@ describe('When saveFileHandlers is used', () => {
         .withName('AmazonTest')
         .withCharacterClass('amazon')
         .withLevel(85)
-        .withDifficulty('hell')
         .withHardcore(true)
         .withExpansion(true)
         .withSaveFilePath('/path/to/amazon.d2s')
@@ -701,7 +699,6 @@ describe('When saveFileHandlers is used', () => {
           id: 'char-1',
           characterClass: 'Amazon',
           level: 85,
-          difficulty: 'hell',
           hardcore: true,
           expansion: true,
           saveFilePath: '/path/to/amazon.d2s',

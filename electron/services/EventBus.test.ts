@@ -348,7 +348,6 @@ describe('When EventBus is instantiated', () => {
             lastModified: new Date(),
             characterClass: 'barbarian',
             level: 1,
-            difficulty: 'normal',
             hardcore: false,
             expansion: true,
           },

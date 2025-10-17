@@ -172,7 +172,6 @@ export interface Character {
   name: string;
   characterClass: CharacterClass;
   level: number;
-  difficulty: Difficulty;
   hardcore: boolean;
   expansion: boolean;
   saveFilePath?: string;
@@ -190,7 +189,6 @@ export type DatabaseCharacter = {
   name: string;
   character_class: CharacterClass;
   level: number;
-  difficulty: Difficulty;
   hardcore: 0 | 1;
   expansion: 0 | 1;
   save_file_path: string | null;
@@ -492,7 +490,6 @@ export type D2SaveFile = {
   lastModified: Date;
   characterClass: string;
   level: number;
-  difficulty: 'normal' | 'nightmare' | 'hell';
   hardcore: boolean;
   expansion: boolean;
 };

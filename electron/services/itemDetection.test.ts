@@ -170,7 +170,6 @@ describe('When ItemDetectionService is used', () => {
       const amazonSaveFile = D2SaveFileBuilder.new()
         .asAmazon()
         .atLevel(85)
-        .inHell()
         .asHardcore()
         .asExpansion()
         .withName('AmazonTest')
@@ -180,7 +179,6 @@ describe('When ItemDetectionService is used', () => {
       const barbarianSaveFile = D2SaveFileBuilder.new()
         .asBarbarian()
         .atLevel(90)
-        .inNightmare()
         .asSoftcore()
         .asClassic()
         .withName('BarbarianTest')
@@ -194,12 +192,10 @@ describe('When ItemDetectionService is used', () => {
       await service.analyzeSaveFile(barbarianSaveFile);
       expect(amazonSaveFile.characterClass).toBe('Amazon');
       expect(amazonSaveFile.level).toBe(85);
-      expect(amazonSaveFile.difficulty).toBe('hell');
       expect(amazonSaveFile.hardcore).toBe(true);
       expect(amazonSaveFile.expansion).toBe(true);
       expect(barbarianSaveFile.characterClass).toBe('Barbarian');
       expect(barbarianSaveFile.level).toBe(90);
-      expect(barbarianSaveFile.difficulty).toBe('nightmare');
       expect(barbarianSaveFile.hardcore).toBe(false);
       expect(barbarianSaveFile.expansion).toBe(false);
     });
@@ -209,7 +205,6 @@ describe('When ItemDetectionService is used', () => {
       const saveFiles = D2SaveFileBuilder.new()
         .asSorceress()
         .atLevel(80)
-        .inHell()
         .asHardcore()
         .asExpansion()
         .withName('SorceressTest')
@@ -235,7 +230,6 @@ describe('When ItemDetectionService is used', () => {
       saveFiles.forEach((saveFile) => {
         expect(saveFile.characterClass).toBe('Sorceress');
         expect(saveFile.level).toBe(80);
-        expect(saveFile.difficulty).toBe('hell');
         expect(saveFile.hardcore).toBe(true);
         expect(saveFile.expansion).toBe(true);
       });

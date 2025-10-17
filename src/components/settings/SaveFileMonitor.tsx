@@ -321,8 +321,6 @@ export function SaveFileMonitor() {
               <div className="text-gray-600">
                 Level {lastEvent.file.level} {lastEvent.file.characterClass}
                 {lastEvent.file.hardcore && ' (HC)'}
-                {' • '}
-                {lastEvent.file.difficulty}
               </div>
             </div>
           </div>
@@ -343,8 +341,6 @@ export function SaveFileMonitor() {
                     <div className="text-gray-600 dark:text-gray-400">
                       Level {file.level} {file.characterClass}
                       {file.hardcore && ' (HC)'}
-                      {' • '}
-                      {file.difficulty}
                     </div>
                   </div>
                   <div className="text-gray-500 dark:text-gray-400">

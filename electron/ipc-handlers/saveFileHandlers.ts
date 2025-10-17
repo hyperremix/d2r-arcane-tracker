@@ -5,13 +5,7 @@ import { EventBus } from '../services/EventBus';
 import { ItemDetectionService } from '../services/itemDetection';
 import type { D2SaveFile, SaveFileEvent } from '../services/saveFileMonitor';
 import { SaveFileMonitor } from '../services/saveFileMonitor';
-import type {
-  Character,
-  CharacterClass,
-  Difficulty,
-  Item,
-  ItemDetectionEvent,
-} from '../types/grail';
+import type { Character, CharacterClass, Item, ItemDetectionEvent } from '../types/grail';
 
 /**
  * Global service instances for save file monitoring and item detection.
@@ -51,7 +45,6 @@ function findOrCreateCharacter(characterName: string, level: number) {
       name: characterName,
       characterClass: defaultCharacterClass, // Use shared_stash for shared stash files, will be updated from save file data for regular characters
       level: level || 1,
-      difficulty: 'normal' as const,
       hardcore: characterName === 'Shared Stash Hardcore',
       expansion: true,
       saveFilePath: undefined,
@@ -85,7 +78,6 @@ function createGrailProgress(character: Character, event: ItemDetectionEvent) {
     isEthereal: Boolean(event.item.ethereal),
     foundDate: new Date(),
     manuallyAdded: false,
-    difficulty: character.difficulty as Difficulty,
     notes: `Auto-detected from ${event.item.location}`,
   };
 }
@@ -173,7 +165,6 @@ function updateCharacterFromSaveFile(saveFile: D2SaveFile): void {
         ...character,
         characterClass: saveFile.characterClass as CharacterClass,
         level: saveFile.level,
-        difficulty: saveFile.difficulty,
         hardcore: saveFile.hardcore,
         expansion: saveFile.expansion,
         saveFilePath: saveFile.path,
@@ -189,7 +180,6 @@ function updateCharacterFromSaveFile(saveFile: D2SaveFile): void {
         name: saveFile.name,
         characterClass: saveFile.characterClass as CharacterClass,
         level: saveFile.level,
-        difficulty: saveFile.difficulty,
         hardcore: saveFile.hardcore,
         expansion: saveFile.expansion,
         saveFilePath: saveFile.path,

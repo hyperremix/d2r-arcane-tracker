@@ -137,7 +137,6 @@ describe('When grailHandlers is used', () => {
           name: 'TestCharacter',
           characterClass: 'amazon' as const,
           level: 85,
-          difficulty: 'hell' as const,
           hardcore: true,
           expansion: true,
           saveFilePath: '/path/to/char.d2s',
@@ -162,7 +161,6 @@ describe('When grailHandlers is used', () => {
           name: 'TestCharacter',
           characterClass: 'amazon',
           level: 85,
-          difficulty: 'hell',
           hardcore: true,
           expansion: true,
           saveFilePath: '/path/to/char.d2s',
@@ -315,7 +313,6 @@ describe('When grailHandlers is used', () => {
           name: 'TestCharacter',
           characterClass: 'amazon' as const,
           level: 85,
-          difficulty: 'hell' as const,
           hardcore: true,
           expansion: true,
           saveFilePath: '/path/to/char.d2s',
@@ -376,7 +373,6 @@ describe('When grailHandlers is used', () => {
           name: 'TestCharacter',
           characterClass: 'amazon' as const,
           level: 85,
-          difficulty: 'hell' as const,
           hardcore: true,
           expansion: true,
           saveFilePath: '/path/to/char.d2s',
@@ -423,7 +419,6 @@ describe('When grailHandlers is used', () => {
         .withFoundDate(new Date('2024-01-01'))
         .withFoundDate(new Date('2024-01-01T00:00:00.000Z'))
         .withManuallyAdded(false)
-        .withDifficulty('hell')
         .withNotes('Found in Baal run')
         .build();
 
@@ -696,7 +691,6 @@ describe('When grailHandlers is used', () => {
         name: 'UpdatedName',
         characterClass: 'sorceress',
         level: 90,
-        difficulty: 'hell',
         hardcore: true,
         expansion: true,
         saveFilePath: '/new/path/to/save.d2s',
@@ -711,7 +705,6 @@ describe('When grailHandlers is used', () => {
         name: 'UpdatedName',
         character_class: 'sorceress',
         level: 90,
-        difficulty: 'hell',
         hardcore: true,
         expansion: true,
         save_file_path: '/new/path/to/save.d2s',
@@ -755,7 +748,6 @@ function mapCharacterUpdates(updates: Partial<Character>): Record<string, unknow
   if (updates.name !== undefined) dbUpdates.name = updates.name;
   if (updates.characterClass !== undefined) dbUpdates.character_class = updates.characterClass;
   if (updates.level !== undefined) dbUpdates.level = updates.level;
-  if (updates.difficulty !== undefined) dbUpdates.difficulty = updates.difficulty;
   if (updates.hardcore !== undefined) dbUpdates.hardcore = updates.hardcore;
   if (updates.expansion !== undefined) dbUpdates.expansion = updates.expansion;
   if (updates.saveFilePath !== undefined) dbUpdates.save_file_path = updates.saveFilePath;

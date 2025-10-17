@@ -58,7 +58,6 @@ export function mapCharacterToDatabase(character: {
   name: string;
   character_class: DatabaseCharacter['character_class'];
   level: number;
-  difficulty: DatabaseCharacter['difficulty'];
   hardcore: boolean;
   expansion: boolean;
   save_file_path?: string;
@@ -68,7 +67,6 @@ export function mapCharacterToDatabase(character: {
     name: character.name,
     character_class: character.character_class,
     level: character.level,
-    difficulty: character.difficulty,
     hardcore: toSqliteBoolean(character.hardcore),
     expansion: toSqliteBoolean(character.expansion),
     save_file_path: toSqliteNull(character.save_file_path),
@@ -184,7 +182,6 @@ export function mapDatabaseCharacterToCharacter(dbCharacter: DatabaseCharacter):
     name: dbCharacter.name,
     characterClass: dbCharacter.character_class,
     level: dbCharacter.level,
-    difficulty: dbCharacter.difficulty,
     hardcore: fromSqliteBoolean(dbCharacter.hardcore),
     expansion: fromSqliteBoolean(dbCharacter.expansion),
     saveFilePath: dbCharacter.save_file_path || undefined,

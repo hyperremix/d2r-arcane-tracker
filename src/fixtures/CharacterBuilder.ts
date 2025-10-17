@@ -1,4 +1,4 @@
-import type { Character, CharacterClass, Difficulty } from 'electron/types/grail';
+import type { Character, CharacterClass } from 'electron/types/grail';
 
 /**
  * Builder class for creating Character test fixtures
@@ -10,7 +10,6 @@ export class CharacterBuilder {
     name: 'Default Character',
     characterClass: 'sorceress',
     level: 1,
-    difficulty: 'normal',
     hardcore: false,
     expansion: true,
     lastUpdated: new Date('2024-01-01'),
@@ -53,14 +52,6 @@ export class CharacterBuilder {
    */
   withLevel(level: number): this {
     this.character.level = level;
-    return this;
-  }
-
-  /**
-   * Set the difficulty
-   */
-  withDifficulty(difficulty: Difficulty): this {
-    this.character.difficulty = difficulty;
     return this;
   }
 
