@@ -291,8 +291,8 @@ class GrailDatabase {
    */
   insertItems(items: Item[]): void {
     const stmt = this.db.prepare(`
-      INSERT OR REPLACE INTO items (id, name, link, code, type, category, sub_category, set_name, ethereal_type, treasure_class, image_filename)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT OR REPLACE INTO items (id, name, link, code, type, category, sub_category, set_name, ethereal_type, treasure_class, image_filename, item_base)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     const transaction = this.db.transaction((itemsToInsert: typeof items) => {
@@ -310,6 +310,7 @@ class GrailDatabase {
           mappedItem.ethereal_type,
           mappedItem.treasure_class,
           mappedItem.image_filename,
+          mappedItem.item_base,
         );
       }
     });
