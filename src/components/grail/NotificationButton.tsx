@@ -1,6 +1,7 @@
-import type { ItemDetectionEvent } from 'electron/types/grail';
-import { Bell, Star, Trophy, X } from 'lucide-react';
+import type { Character, GrailProgress, ItemDetectionEvent } from 'electron/types/grail';
+import { Bell, Trophy, X } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { ItemCard } from '@/components/grail/ItemCard';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -21,6 +22,8 @@ interface NotificationItem extends ItemDetectionEvent {
   timestamp: Date;
   dismissed: boolean;
   seen: boolean;
+  normalProgress: GrailProgress[];
+  etherealProgress: GrailProgress[];
 }
 
 /**
@@ -32,6 +35,7 @@ export function NotificationButton() {
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [isOpen, setIsOpen] = useState(false);
   const [notificationQueue, setNotificationQueue] = useState<ItemDetectionEvent[]>([]);
+  const [characters, setCharacters] = useState<Character[]>([]);
   const { settings } = useGrailStore();
 
   // Use refs to avoid useEffect re-registration on state/callback changes
@@ -39,6 +43,22 @@ export function NotificationButton() {
   const processBatchRef = useRef<() => void>();
 
   const BATCH_DELAY = 500; // 0.5 seconds
+
+  // Fetch characters on mount
+  useEffect(() => {
+    const fetchCharacters = async () => {
+      try {
+        const chars = await window.ipcRenderer?.invoke('grail:getCharacters');
+        if (chars) {
+          setCharacters(chars);
+        }
+      } catch (error) {
+        console.error('Failed to fetch characters:', error);
+      }
+    };
+
+    fetchCharacters();
+  }, []);
 
   const playNotificationSound = useCallback(() => {
     if (settings.enableSounds) {
@@ -84,18 +104,40 @@ export function NotificationButton() {
     setTimeout(() => notification.close(), 5000);
   }, []);
 
-  const processBatch = useCallback(() => {
+  const processBatch = useCallback(async () => {
     if (notificationQueue.length === 0) return;
 
     // Add ALL queued items to in-app notifications
     if (settings.inAppNotifications) {
-      const newNotifications = notificationQueue.map((itemEvent) => ({
-        ...itemEvent,
-        id: `${Date.now()}_${itemEvent.item.id}_${Math.random()}`,
-        timestamp: new Date(),
-        dismissed: false,
-        seen: false,
-      }));
+      // Fetch progress data for each item
+      const newNotifications = await Promise.all(
+        notificationQueue.map(async (itemEvent) => {
+          let allProgress: GrailProgress[] = [];
+          try {
+            allProgress = await window.ipcRenderer?.invoke(
+              'grail:getProgressByItem',
+              itemEvent.grailItem.id,
+            );
+          } catch (error) {
+            console.error('Failed to fetch progress for item:', error);
+          }
+
+          // Separate into normal and ethereal progress
+          const normalProgress = allProgress.filter((p) => !p.isEthereal);
+          const etherealProgress = allProgress.filter((p) => p.isEthereal);
+
+          return {
+            ...itemEvent,
+            id: `${Date.now()}_${itemEvent.item.id}_${Math.random()}`,
+            timestamp: new Date(),
+            dismissed: false,
+            seen: false,
+            normalProgress,
+            etherealProgress,
+          };
+        }),
+      );
+
       setNotifications((prev) => [
         ...newNotifications,
         ...prev.slice(0, 10 - newNotifications.length),
@@ -240,23 +282,6 @@ export function NotificationButton() {
   const activeNotifications = notifications.filter((n) => !n.dismissed);
   const unseenCount = activeNotifications.filter((n) => !n.seen).length;
 
-  const getQualityColor = (quality: string) => {
-    switch (quality) {
-      case 'unique':
-        return 'bg-orange-500 text-white';
-      case 'set':
-        return 'bg-green-500 text-white';
-      case 'rare':
-        return 'bg-yellow-500 text-black';
-      case 'magic':
-        return 'bg-blue-500 text-white';
-      case 'normal':
-        return 'bg-gray-500 text-white';
-      default:
-        return 'bg-gray-500 text-white';
-    }
-  };
-
   return (
     <div className="relative">
       <Button
@@ -321,43 +346,23 @@ export function NotificationButton() {
                 activeNotifications.map((notification) => (
                   <div
                     key={notification.id}
-                    className={`rounded-lg border p-3 ${
-                      notification.type === 'item-found'
-                        ? 'border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950/50'
-                        : 'border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950/50'
-                    } ${!notification.seen ? 'ring-2 ring-blue-200 dark:ring-blue-800' : ''}`}
+                    className={`relative ${!notification.seen ? 'rounded-lg ring-2 ring-blue-200 dark:ring-blue-800' : ''}`}
                   >
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <div className="mb-1 flex items-center gap-2">
-                          {notification.type === 'item-found' ? (
-                            <Trophy className="h-4 w-4 text-green-600 dark:text-green-400" />
-                          ) : (
-                            <Star className="h-4 w-4 text-red-600 dark:text-red-400" />
-                          )}
-                          <span className="font-medium text-sm">{notification.item.name}</span>
-                          {notification.item.quality && (
-                            <Badge
-                              className={`text-xs ${getQualityColor(notification.item.quality)}`}
-                            >
-                              {notification.item.quality}
-                            </Badge>
-                          )}
-                        </div>
-                        <p className="text-gray-600 text-xs dark:text-gray-400">
-                          Found by {notification.item.characterName} •{' '}
-                          {notification.timestamp.toLocaleTimeString()}
-                        </p>
-                      </div>
-                      <Button
-                        onClick={() => dismissNotification(notification.id)}
-                        variant="ghost"
-                        size="sm"
-                        className="h-6 w-6 p-0"
-                      >
-                        <X className="h-3 w-3" />
-                      </Button>
-                    </div>
+                    <ItemCard
+                      item={notification.grailItem}
+                      normalProgress={notification.normalProgress}
+                      etherealProgress={notification.etherealProgress}
+                      characters={characters}
+                      viewMode="list"
+                    />
+                    <Button
+                      onClick={() => dismissNotification(notification.id)}
+                      variant="ghost"
+                      size="sm"
+                      className="absolute top-2 right-2 z-10 h-6 w-6 rounded-full bg-white p-0 shadow-sm hover:bg-gray-100 dark:bg-gray-950 dark:hover:bg-gray-900"
+                    >
+                      <X className="h-3 w-3" />
+                    </Button>
                   </div>
                 ))
               )}
