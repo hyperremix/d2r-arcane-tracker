@@ -138,6 +138,20 @@ export function initializeGrailHandlers(): void {
     }
   });
 
+  /**
+   * IPC handler for retrieving grail progress for a specific item.
+   * @param _ - IPC event (unused)
+   * @param itemId - The item ID to get progress for
+   */
+  ipcMain.handle('grail:getProgressByItem', async (_, itemId: string) => {
+    try {
+      return grailDB.getProgressByItem(itemId);
+    } catch (error) {
+      console.error('Failed to get progress by item:', error);
+      throw error;
+    }
+  });
+
   // Settings handlers
   /**
    * IPC handler for retrieving all user settings.
