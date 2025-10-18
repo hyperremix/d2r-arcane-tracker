@@ -54,12 +54,14 @@ class ItemDetectionService {
    * @param {D2SaveFile} saveFile - The save file to analyze.
    * @param {d2s.types.IItem[]} [preExtractedItems] - Optional pre-extracted items to avoid re-parsing.
    * @param {boolean} [silent=false] - If true, suppress notifications for detected items.
+   * @param {boolean} [isInitialScan=false] - If true, marks items as being from initial scan for statistics exclusion.
    * @returns {Promise<void>} A promise that resolves when analysis is complete.
    */
   async analyzeSaveFile(
     saveFile: D2SaveFile,
     preExtractedItems?: d2s.types.IItem[],
     silent: boolean = false,
+    isInitialScan: boolean = false,
   ): Promise<void> {
     try {
       let items: D2Item[];
@@ -94,6 +96,7 @@ class ItemDetectionService {
               item,
               grailItem: grailMatch,
               silent,
+              isInitialScan,
             } as ItemDetectionEvent);
             this.previouslySeenItems.add(itemKey);
           }

@@ -79,6 +79,7 @@ function createGrailProgress(character: Character, event: ItemDetectionEvent) {
     foundDate: new Date(),
     manuallyAdded: false,
     notes: `Auto-detected from ${event.item.location}`,
+    fromInitialScan: event.isInitialScan ?? false,
   };
 }
 
@@ -242,7 +243,12 @@ export function initializeSaveFileHandlers(): void {
     // Analyze save file for item changes if it's a modification
     // Await to ensure sequential processing and prevent race conditions
     if (event.type === 'modified') {
-      await itemDetectionService.analyzeSaveFile(event.file, event.extractedItems, event.silent);
+      await itemDetectionService.analyzeSaveFile(
+        event.file,
+        event.extractedItems,
+        event.silent,
+        event.isInitialScan,
+      );
     }
   });
   eventUnsubscribers.push(unsubscribeSaveFileEvent);

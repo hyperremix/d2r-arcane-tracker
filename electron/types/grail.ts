@@ -210,6 +210,7 @@ export interface GrailProgress {
   difficulty?: Difficulty;
   notes?: string;
   isEthereal: boolean;
+  fromInitialScan?: boolean; // true if found during initial application startup scan
 }
 
 /**
@@ -226,6 +227,7 @@ export type DatabaseGrailProgress = {
   difficulty: 'normal' | 'nightmare' | 'hell' | null;
   notes: string | null;
   is_ethereal: 0 | 1;
+  from_initial_scan: 0 | 1;
   created_at: string;
   updated_at: string;
 };
@@ -493,6 +495,16 @@ export type ItemDetectionEvent = {
    * without overwhelming the user with notifications.
    */
   silent?: boolean;
+  /**
+   * When true, marks this item as being found during the initial application
+   * startup scan. Inherited from SaveFileEvent.isInitialScan.
+   *
+   * Items with this flag will be excluded from statistics like:
+   * - Recent Finds
+   * - Current Streak
+   * - Avg per Day
+   */
+  isInitialScan?: boolean;
   d2sItemId?: string | number;
 };
 
@@ -535,6 +547,19 @@ export type SaveFileEvent = {
    * Only notifications are suppressed.
    */
   silent?: boolean;
+  /**
+   * When true, marks items found during this event as being from the initial
+   * application startup scan. These items will be excluded from statistics
+   * like Recent Finds, Current Streak, and Avg per Day.
+   *
+   * Set to true ONLY when:
+   * - Initial parsing on application startup (isInitialParsing=true)
+   *
+   * Set to false when:
+   * - User manually triggers "Re-scan all files" (forceParseAll=true)
+   * - Normal gameplay file changes
+   */
+  isInitialScan?: boolean;
 };
 
 /**

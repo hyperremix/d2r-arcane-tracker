@@ -959,9 +959,16 @@ class SaveFileMonitor {
         // Items are still saved to database, only notifications are suppressed
         const silent = this.isInitialParsing || this.forceParseAll;
 
+        // Set isInitialScan flag ONLY during initial parsing (not force re-scan)
+        // This marks items for exclusion from statistics like Recent Finds, Streaks, and Avg per Day
+        const isInitialScan = this.isInitialParsing;
+
         console.log('[emitSaveFileEvents] Emitting save-file-event for:', saveName, {
           itemCount: extractedItems.length,
           silent,
+          isInitialScan,
+          isInitialParsing: this.isInitialParsing,
+          forceParseAll: this.forceParseAll,
           type: 'modified',
         });
 
@@ -972,6 +979,7 @@ class SaveFileMonitor {
           file: saveFile,
           extractedItems,
           silent,
+          isInitialScan,
         } as SaveFileEvent);
       } catch (error) {
         console.error('[emitSaveFileEvents] Error creating save file event for:', filePath, error);

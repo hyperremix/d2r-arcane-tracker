@@ -131,6 +131,7 @@ class GrailDatabase {
         difficulty TEXT CHECK (difficulty IN ('normal', 'nightmare', 'hell')),
         notes TEXT,
         is_ethereal BOOLEAN NOT NULL DEFAULT FALSE,
+        from_initial_scan BOOLEAN NOT NULL DEFAULT FALSE,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE CASCADE
@@ -527,8 +528,8 @@ class GrailDatabase {
    */
   upsertProgress(progress: GrailProgress): void {
     const stmt = this.db.prepare(`
-      INSERT OR REPLACE INTO grail_progress (id, character_id, item_id, found_date, manually_added, auto_detected, difficulty, notes, is_ethereal)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT OR REPLACE INTO grail_progress (id, character_id, item_id, found_date, manually_added, auto_detected, difficulty, notes, is_ethereal, from_initial_scan)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     const mappedProgress = mapProgressToDatabase(progress);
     stmt.run(
@@ -541,6 +542,7 @@ class GrailDatabase {
       mappedProgress.difficulty,
       mappedProgress.notes,
       mappedProgress.is_ethereal,
+      mappedProgress.from_initial_scan,
     );
   }
 
@@ -553,8 +555,8 @@ class GrailDatabase {
     if (progressList.length === 0) return;
 
     const stmt = this.db.prepare(`
-      INSERT OR REPLACE INTO grail_progress (id, character_id, item_id, found_date, manually_added, auto_detected, difficulty, notes, is_ethereal)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT OR REPLACE INTO grail_progress (id, character_id, item_id, found_date, manually_added, auto_detected, difficulty, notes, is_ethereal, from_initial_scan)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     const transaction = this.db.transaction((progList: GrailProgress[]) => {
@@ -570,6 +572,7 @@ class GrailDatabase {
           mappedProgress.difficulty,
           mappedProgress.notes,
           mappedProgress.is_ethereal,
+          mappedProgress.from_initial_scan,
         );
       }
     });

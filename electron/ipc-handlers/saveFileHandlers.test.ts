@@ -383,6 +383,7 @@ describe('When saveFileHandlers is used', () => {
         mockEvent.file,
         mockEvent.extractedItems,
         mockEvent.silent,
+        mockEvent.isInitialScan,
       );
     });
 
