@@ -126,8 +126,8 @@ export function TitleBar() {
         <div className="relative">
           <div
             className={cn(
-              '-top-2 absolute right-0 left-0',
-              isTrackerActive && 'border-t-2 border-t-primary-500',
+              '-top-1.75 absolute right-0 left-0',
+              isTrackerActive && 'border-t-4 border-t-primary-500',
             )}
           />
           <Button
@@ -144,8 +144,8 @@ export function TitleBar() {
         <div className="relative">
           <div
             className={cn(
-              '-top-2 absolute right-0 left-0',
-              isStatisticsActive && 'border-t-2 border-t-primary-500',
+              '-top-1.75 absolute right-0 left-0',
+              isStatisticsActive && 'border-t-4 border-t-primary-500',
             )}
           />
           <Button
@@ -165,8 +165,8 @@ export function TitleBar() {
         <div className="relative">
           <div
             className={cn(
-              '-top-2 absolute right-0 left-0',
-              isSettingsActive && 'border-t-2 border-t-primary-500',
+              '-top-1.75 absolute right-0 left-0',
+              isSettingsActive && 'border-t-4 border-t-primary-500',
             )}
           />
           <Button
