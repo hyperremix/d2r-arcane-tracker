@@ -467,4 +467,17 @@ contextBridge.exposeInMainWorld('electronAPI', {
     onUpdateStatus: (callback: (status: UpdateStatus) => void) =>
       ipcRenderer.on('update:status', (_event, value) => callback(value)),
   },
+
+  /**
+   * Shell API methods for opening external URLs and files.
+   */
+  shell: {
+    /**
+     * Opens an external URL in the system's default browser.
+     * @param {string} url - The URL to open.
+     * @returns {Promise<{ success: boolean; error?: string }>} Success indicator.
+     */
+    openExternal: (url: string): Promise<{ success: boolean; error?: string }> =>
+      ipcRenderer.invoke('shell:openExternal', url),
+  },
 });
