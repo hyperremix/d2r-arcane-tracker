@@ -363,6 +363,18 @@ export interface ElectronAPI {
     backgroundColor: string
     symbolColor: string
   }): Promise<{ success: boolean }>
+
+  /**
+   * Shell API methods for opening external URLs and files.
+   */
+  shell: {
+    /**
+     * Opens an external URL in the system's default browser.
+     * @param {string} url - The URL to open.
+     * @returns {Promise<{ success: boolean; error?: string }>} A promise that resolves with a success indicator.
+     */
+    openExternal(url: string): Promise<{ success: boolean; error?: string }>
+  }
 }
 
 /**

@@ -5,6 +5,7 @@ import { GameVersionSettings } from './GameVersionSettings';
 import { GrailSettings } from './GrailSettings';
 import { ItemIconSettings } from './ItemIconSettings';
 import { NotificationSettings } from './NotificationSettings';
+import { ReportIssues } from './ReportIssues';
 import { SaveFileMonitor } from './SaveFileMonitor';
 import { ThemeSettings } from './ThemeSettings';
 import { UpdateSettings } from './UpdateSettings';
@@ -31,6 +32,7 @@ export function Settings() {
           <GameModeSettings />
           <GameVersionSettings />
           <DatabaseCard />
+          <ReportIssues />
         </div>
       </div>
     </TooltipProvider>
