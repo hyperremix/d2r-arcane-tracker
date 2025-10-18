@@ -126,6 +126,7 @@ describe('mappers', () => {
         difficulty: 'hell',
         notes: 'Found in Baal run',
         is_ethereal: 0, // boolean converted to 0
+        from_initial_scan: 0, // boolean converted to 0 (default false)
       });
     });
 
@@ -310,6 +311,7 @@ describe('mappers', () => {
         difficulty: 'hell' as const,
         notes: 'Found in Baal run',
         is_ethereal: 1 as const,
+        from_initial_scan: 0 as const,
         created_at: '2024-01-01T00:00:00.000Z',
         updated_at: '2024-01-01T12:00:00.000Z',
       };
@@ -326,6 +328,7 @@ describe('mappers', () => {
         difficulty: 'hell',
         notes: 'Found in Baal run',
         isEthereal: true,
+        fromInitialScan: false,
       });
     });
   });

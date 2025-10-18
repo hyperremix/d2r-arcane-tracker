@@ -588,8 +588,9 @@ function calculateCharacterStats(
     );
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    // Exclude items from initial scan when calculating recent finds
     const recentProgress = charProgress.filter((p) => {
-      return p.foundDate && new Date(p.foundDate) > sevenDaysAgo;
+      return p.foundDate && new Date(p.foundDate) > sevenDaysAgo && !p.fromInitialScan;
     });
 
     // Find favorite category
@@ -631,12 +632,15 @@ function calculateCharacterStats(
  */
 function calculateTimelineStats(progress: GrailProgress[]) {
   const timelineStats = [];
+  // Exclude items from initial scan from timeline statistics
+  const progressForTimeline = progress.filter((p) => !p.fromInitialScan);
+
   for (let i = 29; i >= 0; i--) {
     const date = new Date();
     date.setDate(date.getDate() - i);
     const dateStr = date.toDateString();
 
-    const dayProgress = progress.filter(
+    const dayProgress = progressForTimeline.filter(
       (p) => p.foundDate !== undefined && new Date(p.foundDate).toDateString() === dateStr,
     );
 
@@ -761,11 +765,15 @@ export const useGrailStatistics = () => {
   // If grailRunewords is false, runeword items will not be in the items array
   const typeStats = calculateTypeStats(items, foundProgress, settings);
 
-  // Recent finds (last 7 days)
-  const recentFinds = foundProgress.filter((p) => isRecentFind(p.foundDate));
+  // Filter out items from initial scan for statistics calculations
+  // Items from initial scan should not count towards Recent Finds, Streaks, or Avg per Day
+  const progressForStats = foundProgress.filter((p) => !p.fromInitialScan);
 
-  // Find streak calculation
-  const findDates = foundProgress
+  // Recent finds (last 7 days) - excluding items from initial scan
+  const recentFinds = progressForStats.filter((p) => isRecentFind(p.foundDate));
+
+  // Find streak calculation - excluding items from initial scan
+  const findDates = progressForStats
     .filter((p) => p.foundDate)
     .map((p) => (p.foundDate ? new Date(p.foundDate).toDateString() : ''))
     .filter(Boolean)
@@ -773,9 +781,9 @@ export const useGrailStatistics = () => {
 
   const { currentStreak, maxStreak } = calculateStreaks(findDates);
 
-  // Most active day
+  // Most active day - excluding items from initial scan
   const dayCount: Record<string, number> = {};
-  for (const p of foundProgress) {
+  for (const p of progressForStats) {
     if (p.foundDate) {
       const day = new Date(p.foundDate).toLocaleDateString('en-US', { weekday: 'long' });
       dayCount[day] = (dayCount[day] || 0) + 1;

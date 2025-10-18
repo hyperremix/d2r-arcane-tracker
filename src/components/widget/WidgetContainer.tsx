@@ -128,6 +128,10 @@ function isRecentFind(progress: GrailProgress, sevenDaysAgo: Date): boolean {
   if (!progress.foundDate) {
     return false;
   }
+  // Exclude items from initial scan from recent finds statistics
+  if (progress.fromInitialScan) {
+    return false;
+  }
   const foundDate = new Date(progress.foundDate);
   return foundDate >= sevenDaysAgo;
 }

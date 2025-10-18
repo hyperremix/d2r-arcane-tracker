@@ -15,6 +15,7 @@ export class DatabaseProgressBuilder {
     difficulty: null,
     notes: null,
     is_ethereal: 0,
+    from_initial_scan: 0,
     created_at: '2024-01-01T00:00:00.000Z',
     updated_at: '2024-01-01T00:00:00.000Z',
   };
@@ -191,6 +192,30 @@ export class DatabaseProgressBuilder {
    */
   asNormal(): this {
     this.progress.is_ethereal = 0;
+    return this;
+  }
+
+  /**
+   * Set the from initial scan status
+   */
+  withFromInitialScan(fromInitialScan: boolean): this {
+    this.progress.from_initial_scan = fromInitialScan ? 1 : 0;
+    return this;
+  }
+
+  /**
+   * Set as from initial scan
+   */
+  asFromInitialScan(): this {
+    this.progress.from_initial_scan = 1;
+    return this;
+  }
+
+  /**
+   * Set as not from initial scan (found during normal gameplay)
+   */
+  asNotFromInitialScan(): this {
+    this.progress.from_initial_scan = 0;
     return this;
   }
 

@@ -91,6 +91,7 @@ export function mapProgressToDatabase(
     difficulty: toSqliteNull(progress.difficulty),
     notes: toSqliteNull(progress.notes),
     is_ethereal: toSqliteBoolean(progress.isEthereal),
+    from_initial_scan: toSqliteBoolean(progress.fromInitialScan ?? false),
   };
 }
 
@@ -207,6 +208,7 @@ export function mapDatabaseProgressToProgress(dbProgress: DatabaseGrailProgress)
     difficulty: dbProgress.difficulty || undefined,
     notes: dbProgress.notes || undefined,
     isEthereal: fromSqliteBoolean(dbProgress.is_ethereal),
+    fromInitialScan: fromSqliteBoolean(dbProgress.from_initial_scan),
   };
 }
 
