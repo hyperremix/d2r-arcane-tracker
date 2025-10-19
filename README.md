@@ -1,4 +1,4 @@
-# D2R Arcane Tracker
+# D2R Arcane Tracker - Holy Grail Tracker for Diablo 2 Resurrected
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.2-blue.svg)](https://www.typescriptlang.org/)
@@ -6,9 +6,11 @@
 [![Electron](https://img.shields.io/badge/Electron-30.0-blue.svg)](https://www.electronjs.org/)
 [![Vite](https://img.shields.io/badge/Vite-5.1-purple.svg)](https://vitejs.dev/)
 
-> **Automatic tracker for everything Diablo II: Resurrected related**
+**The ultimate Holy Grail tracker for Diablo 2 Resurrected (D2R)** - Automatically track your unique items, set items, runes, and complete your Holy Grail challenge
 
-A modern Electron desktop application built to help Diablo II: Resurrected players track their Holy Grail progress, with more features on the way.
+## What is a Holy Grail in D2R?
+
+The Holy Grail challenge in Diablo 2 Resurrected is a popular endgame goal where players aim to find every unique and set item in the game. D2R Arcane Tracker makes this challenge easier by automatically tracking your progress as you play.
 
 ## ✨ Features
 
@@ -17,7 +19,6 @@ A modern Electron desktop application built to help Diablo II: Resurrected playe
 - **📊 Progress Analytics**: Visual progress bars, statistics, and completion tracking
 - **🎮 Multiple Game Modes**: Support for different game versions and modes
 - **🔔 Smart Notifications**: Get notified when new items are found
-- **🌐 Internationalization**: Multi-language support with i18next
 - **💾 Local Database**: SQLite database for reliable data persistence
 - **🎨 Modern UI**: Built with shadcn/ui components and Tailwind CSS
 
@@ -67,23 +68,27 @@ A modern Electron desktop application built to help Diablo II: Resurrected playe
 ### Common Issues
 
 **App won't start:**
+
 - Ensure you have the latest version installed
 - Check that your system meets the minimum requirements
 - Try running as administrator (Windows) or with sudo (Linux)
 - **Windows**: If you see "Windows protected your PC", click "More info" then "Run anyway"
 
 **Save files not detected:**
+
 - Verify the save file path in Settings is correct
 - Ensure D2R is installed and you have created at least one character
 - Check that the save files are not corrupted
 - **Windows**: Default save path is usually `%USERPROFILE%\Saved Games\Diablo II Resurrected`
 
 **Items not updating:**
+
 - Make sure the app has permission to read your save files
 - Try restarting the application
 - Check if D2R is running (some features require D2R to be closed)
 
 **Windows-specific issues:**
+
 - **Antivirus blocking**: Add the application to your antivirus exceptions
 - **Firewall prompts**: Allow the application through Windows Firewall
 - **Missing Visual C++ Redistributables**: Download and install from Microsoft
@@ -92,6 +97,7 @@ A modern Electron desktop application built to help Diablo II: Resurrected playe
 ### Getting Help
 
 If you're still having issues:
+
 - Check the [GitHub Issues](https://github.com/hyperremix/d2r-arcane-tracker/issues) for known problems
 - Join the [GitHub Discussions](https://github.com/hyperremix/d2r-arcane-tracker/discussions) for community support
 - Create a new issue with detailed information about your problem
@@ -115,6 +121,10 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ![GitHub issues](https://img.shields.io/github/issues/hyperremix/d2r-arcane-tracker)
 ![GitHub pull requests](https://img.shields.io/github/issues-pr/hyperremix/d2r-arcane-tracker)
 ![GitHub release](https://img.shields.io/github/v/release/hyperremix/d2r-arcane-tracker)
+
+## Keywords
+
+Diablo 2 Resurrected tracker, D2R grail tracker, Holy Grail D2R, D2R item tracker, Diablo 2 Holy Grail tracker, D2R unique tracker, D2R set tracker, Diablo 2 Resurrected item finder
 
 ---
 
