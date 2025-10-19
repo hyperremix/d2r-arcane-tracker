@@ -18,17 +18,17 @@ The Holy Grail challenge in Diablo 2 Resurrected is a popular endgame goal where
 
 ### Grail Tracker Dashboard
 
-![Grail Tracker](screenshots/grail-tracker.jpg)
+![Grail Tracker](docs/screenshots/grail-tracker.jpg)
 *Track your Holy Grail progress with an intuitive, searchable interface showing all unique items, sets, and runes*
 
 ### Item Details
 
-![Item Dialog](screenshots/item-dialog.jpg)
+![Item Dialog](docs/screenshots/item-dialog.jpg)
 *View detailed information about each item, including stats and which characters have found it*
 
 ### Statistics Overview
 
-![Statistics](screenshots/statistics.jpg)
+![Statistics](docs/screenshots/statistics.jpg)
 *Comprehensive statistics dashboard showing your progress across all item categories*
 
 ## ✨ Features
