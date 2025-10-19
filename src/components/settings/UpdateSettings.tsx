@@ -84,7 +84,7 @@ export function UpdateSettings() {
 
     // Listen for update status changes (for manual checks only)
     // Automatic update toasts are handled by the useUpdateNotifications hook in App.tsx
-    const cleanup = window.electronAPI.update.onUpdateStatus((status) => {
+    const unsubscribe = window.electronAPI.update.onUpdateStatus((status) => {
       setUpdateStatus(status);
 
       // Use dialogs for manual checks only
@@ -93,7 +93,7 @@ export function UpdateSettings() {
       }
     });
 
-    return cleanup;
+    return unsubscribe;
   }, [handleManualUpdateStatus]);
 
   const handleCheckForUpdates = async () => {
