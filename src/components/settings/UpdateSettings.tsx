@@ -23,15 +23,9 @@ export function UpdateSettings() {
   const [showUpdateDialog, setShowUpdateDialog] = useState(false);
   const [showInstallDialog, setShowInstallDialog] = useState(false);
   const isManualCheck = useRef(false);
-  const updateToastId = useRef<string | number | undefined>();
 
   const handleDownloadUpdate = useCallback(async () => {
     setShowUpdateDialog(false);
-    // Dismiss the update available toast
-    if (updateToastId.current) {
-      toast.dismiss(updateToastId.current);
-      updateToastId.current = undefined;
-    }
     try {
       await window.electronAPI.update.downloadUpdate();
       toast.info('Downloading Update', {
@@ -47,11 +41,6 @@ export function UpdateSettings() {
 
   const handleInstallUpdate = useCallback(async () => {
     setShowInstallDialog(false);
-    // Dismiss the update ready toast
-    if (updateToastId.current) {
-      toast.dismiss(updateToastId.current);
-      updateToastId.current = undefined;
-    }
     try {
       await window.electronAPI.update.quitAndInstall();
     } catch (error) {
@@ -61,65 +50,6 @@ export function UpdateSettings() {
       });
     }
   }, []);
-
-  const handleAutomaticUpdateStatus = useCallback(
-    (status: UpdateStatus) => {
-      // Dismiss any existing update toast
-      if (updateToastId.current) {
-        toast.dismiss(updateToastId.current);
-      }
-
-      // Show toast when update is available
-      if (status.available && !status.downloaded && !status.downloading) {
-        updateToastId.current = toast('Update Available', {
-          description: `Version ${status.info?.version} is ready to download`,
-          action: {
-            label: 'Download',
-            onClick: handleDownloadUpdate,
-          },
-          cancel: {
-            label: 'Dismiss',
-            onClick: () => {
-              if (updateToastId.current) {
-                toast.dismiss(updateToastId.current);
-                updateToastId.current = undefined;
-              }
-            },
-          },
-          duration: Number.POSITIVE_INFINITY,
-        });
-      }
-
-      // Show toast when update is downloaded
-      if (status.downloaded) {
-        updateToastId.current = toast('Update Ready', {
-          description: 'Restart to install the update',
-          action: {
-            label: 'Restart Now',
-            onClick: handleInstallUpdate,
-          },
-          cancel: {
-            label: 'Later',
-            onClick: () => {
-              if (updateToastId.current) {
-                toast.dismiss(updateToastId.current);
-                updateToastId.current = undefined;
-              }
-            },
-          },
-          duration: Number.POSITIVE_INFINITY,
-        });
-      }
-
-      // Show error toast if there's an error
-      if (status.error) {
-        toast.error('Update Check Failed', {
-          description: status.error,
-        });
-      }
-    },
-    [handleDownloadUpdate, handleInstallUpdate],
-  );
 
   const handleManualUpdateStatus = useCallback((status: UpdateStatus) => {
     // For manual checks, use dialogs (more prominent)
@@ -152,18 +82,19 @@ export function UpdateSettings() {
     // Load initial update info
     loadUpdateInfo();
 
-    // Listen for update status changes
-    window.electronAPI.update.onUpdateStatus((status) => {
+    // Listen for update status changes (for manual checks only)
+    // Automatic update toasts are handled by the useUpdateNotifications hook in App.tsx
+    const cleanup = window.electronAPI.update.onUpdateStatus((status) => {
       setUpdateStatus(status);
 
-      // Use toasts for automatic checks, dialogs for manual checks
+      // Use dialogs for manual checks only
       if (isManualCheck.current) {
         handleManualUpdateStatus(status);
-      } else {
-        handleAutomaticUpdateStatus(status);
       }
     });
-  }, [handleAutomaticUpdateStatus, handleManualUpdateStatus]);
+
+    return cleanup;
+  }, [handleManualUpdateStatus]);
 
   const handleCheckForUpdates = async () => {
     // Mark this as a manual check

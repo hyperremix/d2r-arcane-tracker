@@ -3,6 +3,7 @@ import { RouterProvider } from 'react-router';
 import { Toaster } from '@/components/ui/sonner';
 import { useIconPreloader } from './hooks/useItemIcon';
 import { useTheme } from './hooks/useTheme';
+import { useUpdateNotifications } from './hooks/useUpdateNotifications';
 import { router } from './router';
 
 function App(): JSX.Element {
@@ -11,6 +12,9 @@ function App(): JSX.Element {
 
   // Preload popular item icons
   useIconPreloader();
+
+  // Listen for automatic update notifications
+  useUpdateNotifications();
 
   return (
     <>
