@@ -5,6 +5,17 @@
   "description": "Automatic tracker for everything D2R related",
   "author": "hyperremix",
   "license": "MIT",
+  "homepage": "https://hyperremix.github.io/d2r-arcane-tracker",
+  "keywords": [
+    "d2r",
+    "diablo-2-resurrected",
+    "holy-grail",
+    "grail-tracker",
+    "item-tracker",
+    "d2r-tracker",
+    "diablo-2",
+    "gaming"
+  ],
   "type": "module",
   "main": "dist-electron/main.js",
   "scripts": {

@@ -8,6 +8,8 @@
 
 **The ultimate Holy Grail tracker for Diablo 2 Resurrected (D2R)** - Automatically track your unique items, set items, runes, and complete your Holy Grail challenge
 
+🌐 **[Visit the Website](https://hyperremix.github.io/d2r-arcane-tracker/)** | 📥 **[Download Latest Release](https://github.com/hyperremix/d2r-arcane-tracker/releases)**
+
 ## What is a Holy Grail in D2R?
 
 The Holy Grail challenge in Diablo 2 Resurrected is a popular endgame goal where players aim to find every unique and set item in the game. D2R Arcane Tracker makes this challenge easier by automatically tracking your progress as you play.
