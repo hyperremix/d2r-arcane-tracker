@@ -261,7 +261,7 @@ export interface ElectronAPI {
      * Registers a callback to be notified of update status changes.
      * @param {(status: UpdateStatus) => void} callback - Function to call when update status changes.
      */
-    onUpdateStatus(callback: (status: UpdateStatus) => void): void
+    onUpdateStatus(callback: (status: UpdateStatus) => void): () => void
   }
 
   /**

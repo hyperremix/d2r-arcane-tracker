@@ -107,10 +107,10 @@ export function useUpdateNotifications() {
 
   useEffect(() => {
     // Listen for automatic update status changes from the main process
-    const cleanup = window.electronAPI.update.onUpdateStatus((status) => {
+    const unsubscribe = window.electronAPI.update.onUpdateStatus((status) => {
       handleAutomaticUpdateStatus(status);
     });
 
-    return cleanup;
+    return unsubscribe;
   }, [handleAutomaticUpdateStatus]);
 }

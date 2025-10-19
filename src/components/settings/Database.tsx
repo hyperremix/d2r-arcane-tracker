@@ -227,14 +227,9 @@ export function DatabaseCard() {
             <Upload className="mx-auto mb-2 h-8 w-8 text-gray-400" />
             <p className="text-gray-600 text-sm dark:text-gray-400">
               Drag and drop a database file here, or{' '}
-              <Button
-                type="button"
-                variant="link"
-                onClick={handleFileSelect}
-                className="h-auto p-0 text-blue-600 underline hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-200"
-              >
+              <span className="text-blue-600 underline hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-200">
                 click to browse
-              </Button>
+              </span>
             </p>
             <p className="text-gray-500 text-xs dark:text-gray-400">Supports .db files</p>
           </button>

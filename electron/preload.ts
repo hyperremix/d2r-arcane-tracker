@@ -463,9 +463,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
     /**
      * Registers a callback to be notified of update status changes.
      * @param {(status: UpdateStatus) => void} callback - Function to call when status changes.
+     * @returns {() => void} Cleanup function to remove the listener.
      */
-    onUpdateStatus: (callback: (status: UpdateStatus) => void) =>
-      ipcRenderer.on('update:status', (_event, value) => callback(value)),
+    onUpdateStatus: (callback: (status: UpdateStatus) => void) => {
+      const listener = (_event: Electron.IpcRendererEvent, value: UpdateStatus) => callback(value);
+      ipcRenderer.on('update:status', listener);
+      return () => ipcRenderer.removeListener('update:status', listener);
+    },
   },
 
   /**

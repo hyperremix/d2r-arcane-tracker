@@ -12,6 +12,25 @@
 
 The Holy Grail challenge in Diablo 2 Resurrected is a popular endgame goal where players aim to find every unique and set item in the game. D2R Arcane Tracker makes this challenge easier by automatically tracking your progress as you play.
 
+📖 **[Read the complete Holy Grail Guide](docs/HOLY_GRAIL_GUIDE.md)** for an in-depth explanation of the challenge, tracking strategies, and how to use D2R Arcane Tracker effectively.
+
+## 📸 Screenshots
+
+### Grail Tracker Dashboard
+
+![Grail Tracker](screenshots/grail-tracker.jpg)
+*Track your Holy Grail progress with an intuitive, searchable interface showing all unique items, sets, and runes*
+
+### Item Details
+
+![Item Dialog](screenshots/item-dialog.jpg)
+*View detailed information about each item, including stats and which characters have found it*
+
+### Statistics Overview
+
+![Statistics](screenshots/statistics.jpg)
+*Comprehensive statistics dashboard showing your progress across all item categories*
+
 ## ✨ Features
 
 - **🏆 Holy Grail Tracking**: Comprehensive tracking of unique items, sets, and runes
@@ -102,6 +121,13 @@ If you're still having issues:
 - Join the [GitHub Discussions](https://github.com/hyperremix/d2r-arcane-tracker/discussions) for community support
 - Create a new issue with detailed information about your problem
 
+## 📚 Documentation
+
+### Comprehensive Guides
+
+- **[Holy Grail Guide](docs/HOLY_GRAIL_GUIDE.md)** - Complete guide to the Holy Grail challenge, tracking strategies, and using D2R Arcane Tracker
+- **[Tracker Comparison](docs/COMPARISON.md)** - Detailed comparison with other Holy Grail tracking solutions to help you choose the right tool
+
 ## 🤝 Contributing
 
 We welcome contributions! Please see our [Contributing Guidelines](CONTRIBUTING.md) for detailed information on how to get started.
@@ -109,6 +135,8 @@ We welcome contributions! Please see our [Contributing Guidelines](CONTRIBUTING.
 ## 📄 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+For information about third-party licenses, trademarks, disclaimers, and usage guidelines, see [THIRD_PARTY_LICENSES.md](docs/THIRD_PARTY_LICENSES.md).
 
 ## 🆘 Support
 
@@ -128,6 +156,6 @@ Diablo 2 Resurrected tracker, D2R grail tracker, Holy Grail D2R, D2R item tracke
 
 ---
 
-**Made with ❤️ for the Diablo II: Resurrected community**
+Made with ❤️ for the Diablo II: Resurrected community
 
-*Happy farming! 🏆*
+Happy farming! 🏆
