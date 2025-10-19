@@ -1,3 +1,4 @@
+import DOMPurify from 'dompurify';
 import type { UpdateInfo } from 'electron/types/grail';
 import {
   AlertDialog,
@@ -74,7 +75,13 @@ export function UpdateDialog({
                 <div className="rounded-lg bg-gray-50 p-3 dark:bg-gray-900">
                   <p className="mb-2 font-medium text-sm">Release Notes:</p>
                   <div className="max-h-48 overflow-y-auto text-xs">
-                    <pre className="whitespace-pre-wrap font-sans">{updateInfo.releaseNotes}</pre>
+                    <div
+                      className="release-notes"
+                      // biome-ignore lint/security/noDangerouslySetInnerHtml: HTML is sanitized with DOMPurify before rendering
+                      dangerouslySetInnerHTML={{
+                        __html: DOMPurify.sanitize(updateInfo.releaseNotes),
+                      }}
+                    />
                   </div>
                 </div>
               )}
