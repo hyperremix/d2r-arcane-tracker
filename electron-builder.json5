@@ -13,11 +13,6 @@
     owner: "hyperremix",
     repo: "d2r-arcane-tracker",
   },
-  mac: {
-    icon: "build/logo.png",
-    target: ["dmg"],
-    artifactName: "${productName}-Mac-${version}-Installer.${ext}",
-  },
   win: {
     icon: "build/logo.ico",
     target: [
@@ -26,8 +21,12 @@
         arch: ["x64"],
       },
     ],
-    artifactName: "${productName}-Windows-${version}-Setup.${ext}",
-    asarUnpack: ["**/node_modules/better-sqlite3/**/*", "**/node_modules/@dschu012/**/*", "**/dist/logo.ico"],
+    artifactName: "D2R-Arcane-Tracker-Windows-${version}-Setup.${ext}",
+    asarUnpack: [
+      "**/node_modules/better-sqlite3/**/*",
+      "**/node_modules/@dschu012/**/*",
+      "**/dist/logo.ico",
+    ],
   },
   nsis: {
     oneClick: false,
@@ -35,10 +34,6 @@
     allowToChangeInstallationDirectory: true,
     deleteAppDataOnUninstall: false,
     allowElevation: true,
-  },
-  linux: {
-    target: ["AppImage"],
-    artifactName: "${productName}-Linux-${version}.${ext}",
   },
   compression: "maximum",
   removePackageScripts: true,
