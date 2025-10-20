@@ -365,6 +365,12 @@ export interface ElectronAPI {
   }): Promise<{ success: boolean }>
 
   /**
+   * Gets the absolute path to the app icon for use in native notifications.
+   * @returns {Promise<string>} A promise that resolves with the absolute path to the app icon.
+   */
+  getIconPath(): Promise<string>
+
+  /**
    * Shell API methods for opening external URLs and files.
    */
   shell: {
