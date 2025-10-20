@@ -1,0 +1,43 @@
+import type { Item } from '../../types/grail';
+
+export const javelins: Item[] = [
+  {
+    id: 'gargoylesbite',
+    name: "Gargoyle's Bite",
+    link: 'https://diablo2.io/uniques/gargoyle-s-bite-t774.html',
+    etherealType: 'optional',
+    type: 'unique',
+    category: 'weapons',
+    subCategory: 'javelins',
+    treasureClass: 'elite',
+    code: '7ts',
+    itemBase: 'Winged Harpoon',
+    imageFilename: 'throwing_spear.png',
+  },
+  {
+    id: 'wraithflight',
+    name: 'Wraith Flight',
+    link: 'https://diablo2.io/uniques/wraith-flight-t1031.html',
+    etherealType: 'only',
+    type: 'unique',
+    category: 'weapons',
+    subCategory: 'javelins',
+    treasureClass: 'elite',
+    code: '7gl',
+    itemBase: 'Ghost Glaive',
+    imageFilename: 'glaive.png',
+  },
+  {
+    id: 'demonsarch',
+    name: "Demon's Arch",
+    link: 'https://diablo2.io/uniques/demon-s-arch-t750.html',
+    etherealType: 'optional',
+    type: 'unique',
+    category: 'weapons',
+    subCategory: 'javelins',
+    treasureClass: 'elite',
+    code: '7s7',
+    itemBase: 'Balrog Spear',
+    imageFilename: 'short_spear.png',
+  },
+];

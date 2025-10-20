@@ -3,11 +3,14 @@ import { oneHandedAxes } from './1h_axes';
 import { oneHandedClubs } from './1h_clubs';
 import { oneHandedSwords } from './1h_swords';
 import { twoHandedAxes } from './2h_axes';
-import { twoHandedClubs } from './2h_clubs';
 import { twoHandedSwords } from './2h_swords';
 import { bows } from './bows';
 import { crossbows } from './crossbows';
 import { daggers } from './daggers';
+import { hammers } from './hammers';
+import { javelins } from './javelins';
+import { maces } from './maces';
+import { mauls } from './mauls';
 import { polearms } from './polearms';
 import { scepters } from './scepters';
 import { spears } from './spears';
@@ -20,7 +23,6 @@ export const weapons: Item[] = [
   ...oneHandedClubs,
   ...oneHandedSwords,
   ...twoHandedAxes,
-  ...twoHandedClubs,
   ...twoHandedSwords,
   ...bows,
   ...crossbows,
@@ -31,4 +33,8 @@ export const weapons: Item[] = [
   ...staves,
   ...throwing,
   ...wands,
+  ...hammers,
+  ...mauls,
+  ...maces,
+  ...javelins,
 ];
