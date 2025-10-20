@@ -1,18 +1,7 @@
 import type { Item } from '../types/grail';
-import { armor } from './armor';
-import { classes } from './classes';
-import { jewelry } from './jewelry';
 import { runes } from './runes';
 import { runewords } from './runewords';
 import { sets } from './sets';
-import { weapons } from './weapons';
+import { uniques } from './uniques';
 
-export const items: Item[] = [
-  ...armor,
-  ...classes,
-  ...jewelry,
-  ...weapons,
-  ...runes,
-  ...runewords,
-  ...sets,
-];
+export const items: Item[] = [...uniques, ...runes, ...runewords, ...sets];
