@@ -26,7 +26,6 @@ export type WeaponSubCategory =
   | '1h_maces'
   | '2h_maces'
   | '1h_clubs'
-  | '2h_clubs'
   | 'bows'
   | 'crossbows'
   | 'daggers'
@@ -36,7 +35,11 @@ export type WeaponSubCategory =
   | 'spears'
   | 'staves'
   | 'throwing'
-  | 'wands';
+  | 'wands'
+  | 'hammers'
+  | 'mauls'
+  | 'maces'
+  | 'javelins';
 
 /**
  * Type representing the subcategories of armor items.
