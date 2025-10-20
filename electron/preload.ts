@@ -431,6 +431,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   }): Promise<{ success: boolean }> => ipcRenderer.invoke('update-titlebar-overlay', colors),
 
   /**
+   * Gets the absolute path to the app icon for use in native notifications.
+   * @returns {Promise<string>} The absolute path to the app icon.
+   */
+  getIconPath: (): Promise<string> => ipcRenderer.invoke('app:getIconPath'),
+
+  /**
    * Application update API methods.
    */
   update: {

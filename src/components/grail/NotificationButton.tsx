@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useGrailStore } from '@/stores/grailStore';
+import dingSound from '/ding.mp3';
 
 /**
  * Module-level flag to prevent duplicate IPC handler registration.
@@ -36,6 +37,7 @@ export function NotificationButton() {
   const [isOpen, setIsOpen] = useState(false);
   const [notificationQueue, setNotificationQueue] = useState<ItemDetectionEvent[]>([]);
   const [characters, setCharacters] = useState<Character[]>([]);
+  const [iconPath, setIconPath] = useState<string>('/logo.png');
   const { settings } = useGrailStore();
 
   // Use refs to avoid useEffect re-registration on state/callback changes
@@ -44,7 +46,7 @@ export function NotificationButton() {
 
   const BATCH_DELAY = 500; // 0.5 seconds
 
-  // Fetch characters on mount
+  // Fetch characters and icon path on mount
   useEffect(() => {
     const fetchCharacters = async () => {
       try {
@@ -57,52 +59,92 @@ export function NotificationButton() {
       }
     };
 
+    const fetchIconPath = async () => {
+      try {
+        const path = await window.electronAPI?.getIconPath();
+        if (path) {
+          setIconPath(path);
+        }
+      } catch (error) {
+        console.error('Failed to fetch icon path:', error);
+      }
+    };
+
     fetchCharacters();
+    fetchIconPath();
   }, []);
 
   const playNotificationSound = useCallback(() => {
     if (settings.enableSounds) {
       try {
-        const audio = new Audio('/ding.mp3');
+        const audio = new Audio(dingSound);
         audio.volume = settings.notificationVolume;
-        audio.play().catch((error) => {
-          console.warn('Failed to play notification sound:', error);
+
+        // Add detailed logging to diagnose the issue
+        console.log('[NotificationButton] Attempting to play sound:', {
+          path: dingSound,
+          volume: audio.volume,
+          enableSounds: settings.enableSounds,
         });
+
+        audio
+          .play()
+          .then(() => {
+            console.log('[NotificationButton] ✅ Sound played successfully');
+          })
+          .catch((error) => {
+            console.error('[NotificationButton] ❌ Failed to play sound:', error);
+            // Log more details about the error
+            console.error('Error details:', {
+              name: error.name,
+              message: error.message,
+              audioSrc: audio.src,
+              audioReadyState: audio.readyState,
+            });
+          });
       } catch (error) {
-        console.warn('Failed to create audio for notification sound:', error);
+        console.error('[NotificationButton] ❌ Failed to create audio:', error);
       }
+    } else {
+      console.log('[NotificationButton] Sound disabled in settings');
     }
   }, [settings.enableSounds, settings.notificationVolume]);
 
-  const showBrowserNotification = useCallback((itemEvent: ItemDetectionEvent) => {
-    if (itemEvent.type === 'item-found' && itemEvent.grailItem) {
-      const notification = new Notification('Holy Grail Item Found!', {
-        body: `${itemEvent.grailItem.name} found by ${itemEvent.item.characterName}`,
-        icon: '/logo.png',
-        tag: 'grail-item',
+  const showBrowserNotification = useCallback(
+    (itemEvent: ItemDetectionEvent) => {
+      if (itemEvent.type === 'item-found' && itemEvent.grailItem) {
+        const notification = new Notification('Holy Grail Item Found!', {
+          body: `${itemEvent.grailItem.name} found by ${itemEvent.item.characterName}`,
+          icon: iconPath,
+          tag: 'grail-item',
+          requireInteraction: true,
+        });
+
+        // Auto-close after 5 seconds
+        setTimeout(() => notification.close(), 5000);
+      }
+    },
+    [iconPath],
+  );
+
+  const showBatchNotification = useCallback(
+    (events: ItemDetectionEvent[]) => {
+      const itemNames = events.map((e) => e.item.name).join(', ');
+      const notification = new Notification(`${events.length} Holy Grail Items Found!`, {
+        body:
+          itemNames.length > 100
+            ? `${events.length} items including ${events[0].item.name}...`
+            : itemNames,
+        icon: iconPath,
+        tag: 'grail-batch',
         requireInteraction: true,
       });
 
       // Auto-close after 5 seconds
       setTimeout(() => notification.close(), 5000);
-    }
-  }, []);
-
-  const showBatchNotification = useCallback((events: ItemDetectionEvent[]) => {
-    const itemNames = events.map((e) => e.item.name).join(', ');
-    const notification = new Notification(`${events.length} Holy Grail Items Found!`, {
-      body:
-        itemNames.length > 100
-          ? `${events.length} items including ${events[0].item.name}...`
-          : itemNames,
-      icon: '/logo.png',
-      tag: 'grail-batch',
-      requireInteraction: true,
-    });
-
-    // Auto-close after 5 seconds
-    setTimeout(() => notification.close(), 5000);
-  }, []);
+    },
+    [iconPath],
+  );
 
   const processBatch = useCallback(async () => {
     if (notificationQueue.length === 0) return;

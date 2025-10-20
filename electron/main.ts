@@ -137,6 +137,9 @@ app.on('activate', () => {
   }
 });
 
+// Set the app name to ensure native notifications display correctly
+app.setName('D2R Arcane Tracker');
+
 app.whenReady().then(() => {
   const isDev = !!VITE_DEV_SERVER_URL;
 
@@ -187,6 +190,21 @@ app.whenReady().then(() => {
       return { success: true };
     },
   );
+
+  // Handle app icon path requests for native notifications
+  ipcMain.handle('app:getIconPath', () => {
+    // In development mode, return relative URL for Vite dev server
+    if (VITE_DEV_SERVER_URL) {
+      return '/logo.png';
+    }
+
+    // In production, return absolute file path for native notifications
+    const iconPath =
+      process.platform === 'win32'
+        ? path.join(process.resourcesPath, 'app.asar.unpacked', 'dist', 'logo.ico')
+        : path.join(process.env.VITE_PUBLIC, 'logo.png');
+    return iconPath;
+  });
 
   // Create main window
   createWindow();
