@@ -76,6 +76,8 @@ const defaultSettings: Settings = {
   widgetEnabled: false,
   widgetDisplay: 'overall',
   widgetOpacity: 0.9,
+  wizardCompleted: false,
+  wizardSkipped: false,
 };
 
 /**
