@@ -1,4 +1,8 @@
+import { Sparkles } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { TooltipProvider } from '@/components/ui/tooltip';
+import { useWizardStore } from '@/stores/wizardStore';
 import { DatabaseCard } from './Database';
 import { GameModeSettings } from './GameModeSettings';
 import { GameVersionSettings } from './GameVersionSettings';
@@ -18,6 +22,8 @@ import { WidgetSettings } from './WidgetSettings';
  * @returns {JSX.Element} The main settings interface with all configuration cards
  */
 export function Settings() {
+  const { openWizard } = useWizardStore();
+
   return (
     <TooltipProvider>
       <div className="h-[calc(100vh-48px)] overflow-y-auto">
@@ -32,6 +38,25 @@ export function Settings() {
           <GameModeSettings />
           <GameVersionSettings />
           <DatabaseCard />
+          {/* Setup Wizard Card */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Sparkles className="h-5 w-5" />
+                Setup Wizard
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-muted-foreground text-sm">
+                Run the guided setup wizard to configure all essential settings at once. This is
+                helpful if you want to review or change multiple settings quickly.
+              </p>
+              <Button onClick={openWizard} variant="default">
+                <Sparkles className="mr-2 h-4 w-4" />
+                Run Setup Wizard
+              </Button>
+            </CardContent>
+          </Card>
           <ReportIssues />
         </div>
       </div>
