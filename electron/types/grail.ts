@@ -276,7 +276,7 @@ export interface AdvancedGrailFilter {
   difficulties: Difficulty[];
   levelRange: { min: number; max: number };
   requiredLevelRange: { min: number; max: number };
-  sortBy: 'name' | 'category' | 'type' | 'level' | 'rarity' | 'found_date';
+  sortBy: 'name' | 'category' | 'type' | 'found_date';
   sortOrder: 'asc' | 'desc';
   fuzzySearch: boolean;
 }

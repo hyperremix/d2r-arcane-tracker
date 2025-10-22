@@ -53,24 +53,12 @@ const categories: { value: ItemCategory; label: string }[] = [
 ];
 
 /**
- * Available item types for filtering.
- */
-const types: { value: ItemType; label: string }[] = [
-  { value: 'unique', label: 'Unique' },
-  { value: 'set', label: 'Set' },
-  { value: 'rune', label: 'Rune' },
-  { value: 'runeword', label: 'Runeword' },
-];
-
-/**
  * Available sort options for item display.
  */
 const sortOptions = [
   { value: 'name', label: 'Name' },
   { value: 'category', label: 'Category' },
   { value: 'type', label: 'Type' },
-  { value: 'level', label: 'Level' },
-  { value: 'rarity', label: 'Rarity' },
   { value: 'found_date', label: 'Found Date' },
 ];
 
@@ -92,6 +80,16 @@ export function AdvancedSearch() {
     setGroupMode,
     settings,
   } = useGrailStore();
+
+  /**
+   * Available item types for filtering, filtered based on grail settings.
+   */
+  const types: { value: ItemType; label: string }[] = [
+    { value: 'unique', label: 'Unique' },
+    { value: 'set', label: 'Set' },
+    ...(settings.grailRunes ? [{ value: 'rune' as ItemType, label: 'Rune' }] : []),
+    ...(settings.grailRunewords ? [{ value: 'runeword' as ItemType, label: 'Runeword' }] : []),
+  ];
   const updateAdvancedFilter = (updates: Partial<AdvancedFilter>) => {
     const newFilter = { ...advancedFilter, ...updates };
     setAdvancedFilter(newFilter);
