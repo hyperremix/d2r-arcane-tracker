@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 This is a Diablo 2 Resurrected Arcane Tracker - an Electron application built with Vite, React, TypeScript, and Tailwind CSS. The project uses a dual-tsconfig setup for web (renderer) and Node.js (main) processes.
 
-## Architecture
+## Technology Stack
 
 - **Frontend**: React 18 with TypeScript, styled with Tailwind CSS v4
 - **Backend**: Electron main process (Node.js environment)
@@ -16,102 +16,56 @@ This is a Diablo 2 Resurrected Arcane Tracker - an Electron application built wi
 - **Code Quality**: Biome for linting, formatting, and static analysis
 - **Package Manager**: Yarn (specified in packageManager field)
 
-## Development Commands
-
-```bash
-# Development server (starts Vite + Electron)
-yarn dev
-
-# Type checking (both web and node)
-yarn typecheck
-
-# Individual type checking
-yarn typecheck:web    # Web/renderer code
-yarn typecheck:node   # Node/main code
-
-# Code quality
-yarn run check           # Run all Biome checks
-yarn run check:fix       # Fix auto-fixable issues
-yarn lint            # Lint only
-yarn lint:fix        # Fix linting issues
-yarn format          # Format code
-yarn format:fix      # Format and write changes
-
-# Build and preview
-yarn build           # Full build (typecheck + vite build + electron-builder)
-yarn preview         # Preview built app
-```
-
-## Project Structure
-
-- `src/` - React renderer code (web environment)
-
-  - `components/` - UI components (uses shadcn/ui pattern)
-  - `lib/` - Utility functions
-  - `i18n/` - Internationalization setup and translations
-  - `types/` - TypeScript type definitions
-
-- `electron/` - Electron main process code (Node.js environment)
-
-  - `main.ts` - Main electron process
-  - `preload.ts` - Preload script
-
-- `public/` - Static assets
-
 ## TypeScript Configuration
 
 - `tsconfig.json` - Web/renderer configuration (includes src/, electron/)
 - `tsconfig.node.json` - Node.js configuration for build tools
+- Both configs use path mapping `@/*` → `./src/*` for imports
 
-Both configs use path mapping `@/*` → `./src/*` for imports.
+## Quick Start
 
-## Code Quality Standards
+```bash
+# Development
+yarn dev              # Start development server
 
-The project uses Biome with strict rules including:
+# Code Quality (must pass before task completion)
+yarn typecheck        # Type check both web and node
+yarn run check        # Run all Biome checks
+yarn lint             # Lint only
+yarn format           # Format check
+yarn test:run         # Run all tests
 
-- Accessibility rules enabled
-- React-specific rules for hooks and dependencies
-- Security rules (no dangerouslySetInnerHTML, no eval)
-- Node.js import protocol enforcement (except in main process)
-- Consistent code style with 100 character line width
+# Build
+yarn build            # Full production build
+```
 
-## Pre-commit Hooks
+## Comprehensive Documentation
 
-Lint-staged runs on commit with different rule sets:
+This project includes detailed development rules in `.cursor/rules/`:
 
-- Renderer files: Biome check + TypeScript check + lint + format
-- Main process files: Biome check + TypeScript check + lint + format
-- Other files: Biome check + lint + format as appropriate
+- **[development-workflow.mdc](.cursor/rules/development-workflow.mdc)** - Complete list of npm scripts, task completion criteria, testing strategy, and workflow best practices (always applied)
+- **[project-structure.mdc](.cursor/rules/project-structure.mdc)** - Full directory structure, import patterns, file naming conventions, and component organization (always applied)
+- **[component-patterns.mdc](.cursor/rules/component-patterns.mdc)** - React component patterns and best practices
+- **[electron-patterns.mdc](.cursor/rules/electron-patterns.mdc)** - Electron-specific patterns and IPC conventions
+- **[typescript-patterns.mdc](.cursor/rules/typescript-patterns.mdc)** - TypeScript coding patterns and conventions
+- **[ui-components.mdc](.cursor/rules/ui-components.mdc)** - UI component patterns with shadcn/ui
+- **[grail-specific.mdc](.cursor/rules/grail-specific.mdc)** - Holy Grail tracking specific patterns
+- **[unit-testing.mdc](.cursor/rules/unit-testing.mdc)** - Testing patterns with Vitest
 
-## Development Notes
+**Please refer to these rule files for detailed guidance on:**
+- All available npm scripts and commands
+- Complete project directory structure
+- Component architecture and organization
+- State management with Zustand
+- Electron main/renderer process communication
+- Database operations and IPC handlers
+- Testing strategies and patterns
+- Code quality standards and pre-commit hooks
+
+## Key Development Notes
 
 - The main process uses standard Node.js imports (no protocol enforcement)
 - Renderer process enforces Node.js import protocols
 - Uses ESM modules throughout
 - Vite handles HMR for renderer, electron-vite handles main process reloading
 - The app icon is located at `public/logo.png`
-
-## Cursor Rules
-
-This project includes comprehensive development rules in the `.cursor/rules/` directory:
-
-- **project-structure.mdc** - Project structure and organization guidelines (always applied)
-- **component-patterns.mdc** - React component patterns and best practices (applied to *.tsx files)
-- **development-workflow.mdc** - Development workflow and best practices
-- **electron-patterns.mdc** - Electron-specific patterns and conventions
-- **grail-specific.mdc** - Holy Grail tracking specific patterns and conventions
-- **typescript-patterns.mdc** - TypeScript coding patterns and conventions
-- **ui-components.mdc** - UI component patterns and conventions
-- **unit-testing.mdc** - Unit testing patterns and best practices using Vitest
-
-These rules provide detailed guidance for:
-
-- Component architecture and organization
-- State management with Zustand
-- Electron main/renderer process communication
-- Database operations and IPC handlers
-- UI component development with shadcn/ui
-- Testing strategies and patterns
-- TypeScript best practices
-
-Refer to these rules for specific implementation patterns and conventions used throughout the project.
