@@ -213,14 +213,39 @@ class GrailDatabase {
         ('nativeNotifications', 'true'),
         ('needsSeeding', 'true'),
         ('theme', 'system'),
-        ('showItemIcons', 'false');
+        ('showItemIcons', 'false'),
+        ('wizardCompleted', 'false'),
+        ('wizardSkipped', 'false');
     `;
 
     this.db.exec(schema);
     console.log('Database schema created successfully');
 
+    // Ensure wizard settings exist for existing databases
+    this.ensureWizardSettings();
+
     // Always upsert items to ensure latest changes are available
     this.upsertItemsFromGrailData();
+  }
+
+  /**
+   * Ensures wizard-related settings exist in the database.
+   * This handles migration for existing databases that were created before wizard settings were added.
+   */
+  private ensureWizardSettings(): void {
+    const wizardSettings = [
+      { key: 'wizardCompleted', value: 'false' },
+      { key: 'wizardSkipped', value: 'false' },
+    ];
+
+    const stmt = this.db.prepare('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)');
+    const transaction = this.db.transaction(() => {
+      for (const setting of wizardSettings) {
+        stmt.run(setting.key, setting.value);
+      }
+    });
+
+    transaction();
   }
 
   // Items methods
@@ -618,6 +643,9 @@ class GrailDatabase {
           ? (this.parseJSON(settings.widgetPosition) as { x: number; y: number } | undefined)
           : undefined,
       widgetOpacity: settings.widgetOpacity ? Number.parseFloat(settings.widgetOpacity) : 0.9,
+      // Wizard settings
+      wizardCompleted: settings.wizardCompleted === 'true',
+      wizardSkipped: settings.wizardSkipped === 'true',
     };
 
     return typedSettings;

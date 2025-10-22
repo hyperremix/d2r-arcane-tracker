@@ -1,5 +1,5 @@
 import type { JSX } from 'react';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { RouterProvider } from 'react-router';
 import { Toaster } from '@/components/ui/sonner';
 import { SetupWizard } from '@/components/wizard/SetupWizard';
@@ -11,8 +11,9 @@ import { useGrailStore } from './stores/grailStore';
 import { useWizardStore } from './stores/wizardStore';
 
 function App(): JSX.Element {
-  const { settings } = useGrailStore();
+  const { setSettings } = useGrailStore();
   const { openWizard } = useWizardStore();
+  const hasCheckedWizard = useRef(false);
 
   // Apply theme based on user settings
   useTheme();
@@ -23,16 +24,45 @@ function App(): JSX.Element {
   // Listen for automatic update notifications
   useUpdateNotifications();
 
-  // Check if wizard should be shown on first launch
+  // Load settings on app startup and check if wizard should be shown
   useEffect(() => {
-    const shouldShowWizard = !settings.wizardCompleted && !settings.wizardSkipped;
-    if (shouldShowWizard) {
-      // Small delay to ensure everything is loaded
-      setTimeout(() => {
-        openWizard();
-      }, 500);
-    }
-  }, [settings.wizardCompleted, settings.wizardSkipped, openWizard]);
+    const loadSettingsAndCheckWizard = async () => {
+      // Only check wizard once per app session
+      if (hasCheckedWizard.current) {
+        return;
+      }
+
+      try {
+        const settingsData = await window.electronAPI?.grail.getSettings();
+        if (settingsData) {
+          await setSettings(settingsData);
+          console.log('Loaded settings on app startup:', {
+            wizardCompleted: settingsData.wizardCompleted,
+            wizardSkipped: settingsData.wizardSkipped,
+          });
+
+          // Check if wizard should be shown based on loaded settings
+          const shouldShowWizard = !settingsData.wizardCompleted && !settingsData.wizardSkipped;
+
+          hasCheckedWizard.current = true;
+
+          if (shouldShowWizard) {
+            console.log('Opening wizard for first-time setup');
+            // Small delay to ensure everything is loaded
+            setTimeout(() => {
+              openWizard();
+            }, 500);
+          } else {
+            console.log('Wizard already completed or skipped, not showing');
+          }
+        }
+      } catch (error) {
+        console.error('Failed to load settings on startup:', error);
+      }
+    };
+
+    loadSettingsAndCheckWizard();
+  }, [setSettings, openWizard]);
 
   return (
     <>

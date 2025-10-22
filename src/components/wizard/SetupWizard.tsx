@@ -110,7 +110,7 @@ export function SetupWizard() {
         </div>
 
         {/* Step Content */}
-        <div className="max-h-[calc(90vh-200px)] min-h-[400px] overflow-y-auto py-4">
+        <div className="h-[600px] max-h-[calc(90vh-200px)] overflow-y-auto py-4">
           {CurrentStepComponent && <CurrentStepComponent />}
         </div>
 
