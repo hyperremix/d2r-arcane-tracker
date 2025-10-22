@@ -381,6 +381,24 @@ export interface ElectronAPI {
      */
     openExternal(url: string): Promise<{ success: boolean; error?: string }>
   }
+
+  /**
+   * Runeword calculator API methods for managing rune inventory.
+   */
+  runeword: {
+    /**
+     * Retrieves the user's rune inventory from storage.
+     * @returns {Promise<Record<string, number>>} A promise that resolves with the rune inventory (rune ID -> quantity).
+     */
+    getInventory(): Promise<Record<string, number>>
+
+    /**
+     * Saves the user's rune inventory to storage.
+     * @param {Record<string, number>} inventory - The rune inventory to save (rune ID -> quantity).
+     * @returns {Promise<void>} A promise that resolves when the inventory is saved.
+     */
+    saveInventory(inventory: Record<string, number>): Promise<void>
+  }
 }
 
 /**

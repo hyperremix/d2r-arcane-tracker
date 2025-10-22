@@ -6,6 +6,7 @@ import { GrailDatabase } from './database/database';
 import { initializeDialogHandlers } from './ipc-handlers/dialogHandlers';
 import { closeGrailDatabase, initializeGrailHandlers } from './ipc-handlers/grailHandlers';
 import { initializeIconHandlers } from './ipc-handlers/iconHandlers';
+import { registerRunewordHandlers } from './ipc-handlers/runewordHandlers';
 import { closeSaveFileMonitor, initializeSaveFileHandlers } from './ipc-handlers/saveFileHandlers';
 import { initializeShellHandlers } from './ipc-handlers/shellHandlers';
 import { initializeUpdateHandlers } from './ipc-handlers/updateHandlers';
@@ -162,6 +163,7 @@ app.whenReady().then(() => {
   initializeShellHandlers();
   initializeIconHandlers();
   initializeUpdateHandlers();
+  registerRunewordHandlers();
 
   // Initialize widget handlers with callback for position updates
   const onWidgetPositionChange = (position: { x: number; y: number }) => {
