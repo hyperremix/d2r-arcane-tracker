@@ -6,6 +6,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 This is a Diablo 2 Resurrected Arcane Tracker - an Electron application built with Vite, React, TypeScript, and Tailwind CSS. The project uses a dual-tsconfig setup for web (renderer) and Node.js (main) processes.
 
+### Main Features
+
+- **Holy Grail Tracking**: Track unique items, set items, runes, and runewords
+- **Save File Monitoring**: Automatic detection and parsing of D2R save files
+- **Runeword Calculator**: View all runewords and see which ones you can craft based on available runes
+- **Statistics Dashboard**: Comprehensive analytics and progress tracking
+- **Smart Notifications**: In-app and native notifications for new item discoveries
+
 ## Technology Stack
 
 - **Frontend**: React 18 with TypeScript, styled with Tailwind CSS v4

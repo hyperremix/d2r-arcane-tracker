@@ -1447,6 +1447,67 @@ class SaveFileMonitor {
   }
 
   /**
+   * Gets the count of each available rune from the most recent save file scan.
+   * Returns a map of rune IDs to their total counts across all save files.
+   * @returns {Record<string, number>} A record mapping rune IDs to their counts.
+   */
+  getAvailableRunesCount(): Record<string, number> {
+    const runeCounts: Record<string, number> = {};
+
+    for (const [runeId, saveFileItem] of Object.entries(this.currentData.availableRunes)) {
+      let totalCount = 0;
+      // Sum up rune counts across all save files
+      for (const itemsArray of Object.values(saveFileItem.inSaves)) {
+        totalCount += itemsArray.length;
+      }
+      runeCounts[runeId] = totalCount;
+    }
+
+    return runeCounts;
+  }
+
+  /**
+   * Triggers a manual refresh/rescan of all save files.
+   * This forces a re-parse of all save files to get the latest item data.
+   * @returns {Promise<void>} A promise that resolves when the refresh is complete.
+   */
+  async refreshSaveFiles(): Promise<void> {
+    console.log('[refreshSaveFiles] Manual refresh requested');
+
+    if (!this.isMonitoring) {
+      console.log('[refreshSaveFiles] Not monitoring, cannot refresh');
+      throw new Error('Save file monitoring is not active');
+    }
+
+    // Set force parse flag and trigger immediate parsing
+    this.forceParseAll = true;
+    this.lastFileChangeTime = 0; // Bypass debounce
+
+    // Increment file change counter to trigger tick reader
+    this.fileChangeCounter++;
+
+    console.log('[refreshSaveFiles] Triggered force parse, waiting for completion...');
+
+    // Wait for the tick reader to process the changes
+    // Poll until forceParseAll is reset (which happens after parsing completes)
+    const maxWaitTime = 30000; // 30 seconds timeout
+    const pollInterval = 100; // Check every 100ms
+    let elapsed = 0;
+
+    while (this.forceParseAll && elapsed < maxWaitTime) {
+      await new Promise((resolve) => setTimeout(resolve, pollInterval));
+      elapsed += pollInterval;
+    }
+
+    if (this.forceParseAll) {
+      console.log('[refreshSaveFiles] Timeout waiting for parse to complete');
+      throw new Error('Timeout waiting for save file refresh to complete');
+    }
+
+    console.log('[refreshSaveFiles] Refresh completed');
+  }
+
+  /**
    * Periodic tick reader that checks for file changes and re-parses if needed.
    * @private
    * @returns {Promise<void>} A promise that resolves when the tick is complete.

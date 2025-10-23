@@ -1,4 +1,4 @@
-import { BarChart3, ChevronLeft, ChevronRight, Settings, Trophy } from 'lucide-react';
+import { BarChart3, Calculator, ChevronLeft, ChevronRight, Settings, Trophy } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router';
 import { Button } from '@/components/ui/button';
@@ -41,6 +41,7 @@ export function TitleBar() {
   // Check if routes are active
   const isTrackerActive = location.pathname === '/';
   const isStatisticsActive = location.pathname === '/statistics';
+  const isRunewordsActive = location.pathname === '/runewords';
   const isSettingsActive = location.pathname === '/settings';
 
   const handleBack = () => {
@@ -159,6 +160,27 @@ export function TitleBar() {
           >
             <Link to="/statistics" title="Statistics">
               <BarChart3 className="h-4 w-4" />
+            </Link>
+          </Button>
+        </div>
+        <div className="relative">
+          <div
+            className={cn(
+              '-top-1.75 absolute right-0 left-0',
+              isRunewordsActive && 'border-t-4 border-t-primary-500',
+            )}
+          />
+          <Button
+            asChild
+            variant="ghost"
+            size="sm"
+            className={cn(
+              'relative hover:text-primary-500',
+              isRunewordsActive && 'text-primary-500',
+            )}
+          >
+            <Link to="/runewords" title="Runeword Calculator">
+              <Calculator className="h-4 w-4" />
             </Link>
           </Button>
         </div>

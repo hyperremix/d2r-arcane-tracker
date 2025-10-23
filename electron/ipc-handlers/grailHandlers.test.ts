@@ -22,6 +22,7 @@ vi.mock('../database/database', () => ({
     getFilteredItems: vi.fn(),
     insertItems: vi.fn(),
     getProgressByCharacter: vi.fn(),
+    getAllProgress: vi.fn(),
     getFilteredProgress: vi.fn(),
     upsertProgress: vi.fn(),
     getFilteredGrailStatistics: vi.fn(),
@@ -50,6 +51,7 @@ interface MockGrailDatabase {
   getFilteredItems: ReturnType<typeof vi.fn>;
   insertItems: ReturnType<typeof vi.fn>;
   getProgressByCharacter: ReturnType<typeof vi.fn>;
+  getAllProgress: ReturnType<typeof vi.fn>;
   getFilteredProgress: ReturnType<typeof vi.fn>;
   upsertProgress: ReturnType<typeof vi.fn>;
   getFilteredGrailStatistics: ReturnType<typeof vi.fn>;
@@ -78,6 +80,7 @@ describe('When grailHandlers is used', () => {
       getFilteredItems: vi.fn(),
       insertItems: vi.fn(),
       getProgressByCharacter: vi.fn(),
+      getAllProgress: vi.fn(),
       getFilteredProgress: vi.fn(),
       upsertProgress: vi.fn(),
       getFilteredGrailStatistics: vi.fn(),
@@ -322,7 +325,7 @@ describe('When grailHandlers is used', () => {
         },
       ];
       mockGrailDatabase.getAllSettings.mockReturnValue(mockSettings);
-      mockGrailDatabase.getFilteredProgress.mockReturnValue(mockProgress);
+      mockGrailDatabase.getAllProgress.mockReturnValue(mockProgress);
       mockGrailDatabase.getAllCharacters.mockReturnValue(mockCharacters);
 
       const handler = vi
@@ -436,7 +439,7 @@ describe('When grailHandlers is used', () => {
 
     it('Then progress handlers should handle errors properly', async () => {
       // Arrange
-      mockGrailDatabase.getAllSettings.mockImplementation(() => {
+      mockGrailDatabase.getAllProgress.mockImplementation(() => {
         throw new Error('Database error');
       });
 

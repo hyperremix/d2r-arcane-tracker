@@ -5,7 +5,13 @@ import { EventBus } from '../services/EventBus';
 import { ItemDetectionService } from '../services/itemDetection';
 import type { D2SaveFile, SaveFileEvent } from '../services/saveFileMonitor';
 import { SaveFileMonitor } from '../services/saveFileMonitor';
-import type { Character, CharacterClass, Item, ItemDetectionEvent } from '../types/grail';
+import type {
+  Character,
+  CharacterClass,
+  GrailProgress,
+  Item,
+  ItemDetectionEvent,
+} from '../types/grail';
 
 /**
  * Global service instances for save file monitoring and item detection.
@@ -66,7 +72,7 @@ function findOrCreateCharacter(characterName: string, level: number) {
  * @param event - Item detection event
  * @returns Grail progress object
  */
-function createGrailProgress(character: Character, event: ItemDetectionEvent) {
+function createGrailProgress(character: Character, event: ItemDetectionEvent): GrailProgress {
   // Use d2s item ID if available, otherwise fall back to timestamp for backward compatibility
   const itemIdentifier = event.d2sItemId ? String(event.d2sItemId) : `timestamp_${Date.now()}`;
   const progressId = `${character.id}_${event.grailItem.id}_${itemIdentifier}`;
@@ -74,7 +80,6 @@ function createGrailProgress(character: Character, event: ItemDetectionEvent) {
     id: progressId,
     characterId: character.id,
     itemId: event.grailItem.id,
-    found: true,
     isEthereal: Boolean(event.item.ethereal),
     foundDate: new Date(),
     manuallyAdded: false,
@@ -92,7 +97,7 @@ function createGrailProgress(character: Character, event: ItemDetectionEvent) {
 function emitGrailProgressUpdate(
   character: Character,
   event: ItemDetectionEvent,
-  grailProgress: ReturnType<typeof createGrailProgress>,
+  grailProgress: GrailProgress,
 ): void {
   const allWebContents = webContents.getAllWebContents();
   for (const wc of allWebContents) {
@@ -416,6 +421,35 @@ export function initializeSaveFileHandlers(): void {
       return { success: true, defaultDirectory };
     } catch (error) {
       console.error('Failed to restore default directory:', error);
+      throw error;
+    }
+  });
+
+  /**
+   * IPC handler for retrieving available runes from the most recent save file scan.
+   * Returns a map of rune IDs to their counts from current inventory/stash.
+   * @returns Promise resolving to record of rune IDs mapped to their counts
+   */
+  ipcMain.handle('saveFile:getAvailableRunes', async (): Promise<Record<string, number>> => {
+    try {
+      return saveFileMonitor.getAvailableRunesCount();
+    } catch (error) {
+      console.error('Failed to get available runes:', error);
+      throw error;
+    }
+  });
+
+  /**
+   * IPC handler for triggering a manual refresh/rescan of all save files.
+   * Forces a re-parse of all save files to get the latest item data.
+   * @returns Promise resolving when the refresh is complete
+   */
+  ipcMain.handle('saveFile:refreshSaveFiles', async (): Promise<{ success: boolean }> => {
+    try {
+      await saveFileMonitor.refreshSaveFiles();
+      return { success: true };
+    } catch (error) {
+      console.error('Failed to refresh save files:', error);
       throw error;
     }
   });

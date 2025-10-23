@@ -744,8 +744,10 @@ function calculateTypeStats(items: Item[], foundProgress: GrailProgress[], setti
 export const useGrailStatistics = () => {
   const { items, progress, characters, settings } = useGrailStore();
 
-  // Note: items and progress are already filtered based on grail settings (grailNormal, grailEthereal, grailRunes, grailRunewords)
-  // at the database level, so these statistics automatically reflect the current grail configuration
+  // Note: items are filtered based on grail settings (grailNormal, grailEthereal, grailRunes, grailRunewords)
+  // at the database level. Progress contains ALL progress data, but statistics calculations only consider
+  // progress for items that are in the filtered items array. This allows features like the runeword
+  // calculator to access runeword collection counts even when grailRunewords tracking is disabled.
   const foundProgress = progress.filter((p) => p.foundDate !== undefined);
 
   // Calculate item counts based on grail settings

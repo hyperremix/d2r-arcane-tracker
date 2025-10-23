@@ -38,6 +38,7 @@ The Holy Grail challenge in Diablo 2 Resurrected is a popular endgame goal where
 - **🏆 Holy Grail Tracking**: Comprehensive tracking of unique items, sets, and runes
 - **📁 Save File Monitoring**: Automatic detection and parsing of D2R save files
 - **📊 Progress Analytics**: Visual progress bars, statistics, and completion tracking
+- **🔮 Runeword Calculator**: Find which runewords you can craft with your available runes
 - **🎮 Multiple Game Modes**: Support for different game versions and modes
 - **🔔 Smart Notifications**: Get notified when new items are found
 - **💾 Local Database**: SQLite database for reliable data persistence
@@ -81,6 +82,7 @@ The Holy Grail challenge in Diablo 2 Resurrected is a popular endgame goal where
 
 - **Automatic Detection**: The app monitors your save files and automatically updates when new items are found
 - **Progress Tracking**: Visual progress bars show completion percentages for different item categories
+- **Runeword Calculator**: View all available runewords, see which ones you can craft based on your current rune inventory, and track how many of each you've collected
 - **Advanced Search**: Filter and search through your tracked items
 - **Statistics Dashboard**: View detailed statistics about your progress
 

@@ -78,6 +78,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
      */
     getItems: (): Promise<Item[]> => ipcRenderer.invoke('grail:getItems'),
     /**
+     * Retrieves all runewords from the database, regardless of grailRunewords setting.
+     * @returns {Promise<Item[]>} A promise that resolves with an array of runeword items.
+     */
+    getAllRunewords: (): Promise<Item[]> => ipcRenderer.invoke('grail:getAllRunewords'),
+    /**
      * Seeds the database with Holy Grail items.
      * @param {Item[]} items - The items to seed the database with.
      * @returns {Promise<{ success: boolean }>} A promise that resolves with a success indicator.
@@ -212,6 +217,18 @@ contextBridge.exposeInMainWorld('electronAPI', {
      */
     restoreDefaultDirectory: (): Promise<{ success: boolean; defaultDirectory: string }> =>
       ipcRenderer.invoke('saveFile:restoreDefaultDirectory'),
+    /**
+     * Retrieves the count of each available rune from the most recent save file scan.
+     * @returns {Promise<Record<string, number>>} A promise that resolves with a record mapping rune IDs to counts.
+     */
+    getAvailableRunes: (): Promise<Record<string, number>> =>
+      ipcRenderer.invoke('saveFile:getAvailableRunes'),
+    /**
+     * Triggers a manual refresh/rescan of all save files.
+     * @returns {Promise<{ success: boolean }>} A promise that resolves when the refresh is complete.
+     */
+    refreshSaveFiles: (): Promise<{ success: boolean }> =>
+      ipcRenderer.invoke('saveFile:refreshSaveFiles'),
   },
 
   /**
