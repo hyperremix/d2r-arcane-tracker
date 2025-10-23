@@ -1,0 +1,43 @@
+import { readFileSync } from 'fs';
+
+const CSV='/Users/f00486/playground/d2r-arcane-tracker/terrorzone-schedule.csv';
+const SEED64=16664395743969097666n;
+const HOURS=938; const ZONE_COUNT=36;
+
+function parseCsvNames(){ const lines=readFileSync(CSV,'utf8').trim().split(/\r?\n/).slice(1); return lines.map(l=>l.split(/,(?=(?:[^"]*"[^"]*")*[^"]*$)/)[3].replace(/^"|"$/g,'')).slice(0,HOURS); }
+const idToName=['Burial Grounds, Crypt, Mausoleum','Cathedral, Catacombs','Cold Plains, Cave','Dark Wood, Underground Passage','Blood Moor, Den of Evil','Barracks, Jail','The Secret Cow Level','Stony Field','Black Marsh, The Hole','Forgotten Tower','Pit','Tristram','Lut Gholein Sewers','Rocky Waste, Stony Tomb','Dry Hills, Halls of the Dead','Far Oasis','Lost City, Valley of Snakes, Claw Viper Temple','Ancient Tunnels',"Tal Rasha's Tombs, Tal Rasha's Chamber",'Arcane Sanctuary','Spider Forest, Spider Cavern','Great Marsh','Flayer Jungle, Flayer Dungeon','Kurast Bazaar, Ruined Temple, Disused Fane','Travincal','Durance of Hate','Outer Steppes, Plains of Despair','City of the Damned, River of Flame','Chaos Sanctuary','Bloody Foothills, Frigid Highlands, Abaddon','Arreat Plateau, Pit of Acheron','Crystalline Passage, Frozen River',"Nihlathak's Temple, Temple Halls",'Glacial Trail, Drifter Cavern',"Ancient's Way, Icy Cellar",'Worldstone Keep, Throne of Destruction, Worldstone Chamber'];
+const nameToId=new Map(idToName.map((n,i)=>[n,i]));
+
+function uniformBoundedU32(nextU32,bound){ const B=0x1_0000_0000n; const boundN=BigInt(bound>>>0); const threshold=(B-boundN)%boundN; while(true){ const r=nextU32(); const rN=BigInt(r>>>0); if(rN>=threshold) return Number(rN%boundN)>>>0; } }
+
+// Java LCG 48-bit
+class JavaLCG{ constructor(seed48){ this.state=(BigInt(seed48)&((1n<<48n)-1n)); }
+  static fromSeed64(seed64){ return new JavaLCG(seed64 & ((1n<<48n)-1n)); }
+  next(bits){ this.state = (this.state*25214903917n + 11n) & ((1n<<48n)-1n); return Number(this.state >> (48n - BigInt(bits)))>>>0; }
+  nextInt(){ return ((this.next(16)<<16) | this.next(16))>>>0; }
+}
+
+// xoroshiro128**
+function rotl64(x,k){ return ((x<<BigInt(k))|(x>>(64n-BigInt(k)))) & 0xFFFF_FFFF_FFFF_FFFFn; }
+function splitmix64_step(x){ x=(x+0x9E3779B97F4A7C15n)&0xFFFF_FFFF_FFFF_FFFFn; let z=x; z=(z^(z>>30n))*0xBF58476D1CE4E5B9n & 0xFFFF_FFFF_FFFF_FFFFn; z=(z^(z>>27n))*0x94D049BB133111EBn & 0xFFFF_FFFF_FFFF_FFFFn; z^=z>>31n; return z; }
+class Xoroshiro128ss{ constructor(seed){ let x=seed; this.s0=splitmix64_step(x); x=(x+1n)&0xFFFF_FFFF_FFFF_FFFFn; this.s1=splitmix64_step(x);} nextU32(){ const res=Number((rotl64(this.s0*5n,7)*9n)>>32n)>>>0; let s1=this.s0^this.s1; this.s0=rotl64(this.s0,24)^s1^(s1<<16n); this.s1=rotl64(s1,37); return res; } }
+
+function simulatePrefix(nextU32, cfg, names){ const recent=[]; for(let i=0;i<cfg.preWarmup;i++) nextU32(); let matched=0; for(let h=0;h<HOURS;h++){ for(let k=0;k<cfg.perHourSkips;k++) nextU32(); let chosen=-1; while(true){ const r= cfg.useBounded? uniformBoundedU32(nextU32, ZONE_COUNT) : (nextU32()%ZONE_COUNT); const id=r>>>0; if(!recent.includes(id)){ chosen=id; break; } } const expectedId=nameToId.get(names[h]); if(chosen!==expectedId) return matched; matched++; recent.push(chosen); if(recent.length>cfg.windowSize) recent.shift(); for(let k=0;k<cfg.postHourSkips;k++) nextU32(); } return matched; }
+
+function run(){ const names=parseCsvNames(); let best={prefix:0};
+  // Java LCG variants
+  for(const seedInit of [SEED64 & ((1n<<48n)-1n), (SEED64>>16n)&((1n<<48n)-1n), (SEED64 ^ (SEED64>>16n)) & ((1n<<48n)-1n)]){
+    for(const useBounded of [false,true]) for(const windowSize of [2,3,4]) for(const preWarmup of [0,1,4,16,64,256,1024]) for(const perHourSkips of [0,1,2,3,4,5,6,7,8,9,10]) for(const postHourSkips of [0,1,2,3,4,5,6,7,8,9,10]){
+      const j=new JavaLCG(seedInit); const nextU32=()=>j.nextInt(); const prefix=simulatePrefix(nextU32,{useBounded,windowSize,preWarmup,perHourSkips,postHourSkips},names); if(prefix>best.prefix){ best={prefix, label:'java48', cfg:{useBounded,windowSize,preWarmup,perHourSkips,postHourSkips}}; if(prefix===HOURS){ console.log(JSON.stringify({success:true,best},null,2)); return; } }
+    }
+  }
+  // xoroshiro128** variants
+  for(const seedInit of [SEED64, (SEED64<<1n)&0xFFFF_FFFF_FFFF_FFFFn, SEED64^ (SEED64>>1n)]){
+    for(const useBounded of [false,true]) for(const windowSize of [2,3,4]) for(const preWarmup of [0,1,4,16,64,256,1024]) for(const perHourSkips of [0,1,2,3,4,5,6,7,8,9,10]) for(const postHourSkips of [0,1,2,3,4,5,6,7,8,9,10]){
+      const xr=new Xoroshiro128ss(seedInit); const nextU32=()=>xr.nextU32(); const prefix=simulatePrefix(nextU32,{useBounded,windowSize,preWarmup,perHourSkips,postHourSkips},names); if(prefix>best.prefix){ best={prefix, label:'xoroshiro128**', cfg:{useBounded,windowSize,preWarmup,perHourSkips,postHourSkips}}; if(prefix===HOURS){ console.log(JSON.stringify({success:true,best},null,2)); return; } }
+    }
+  }
+  console.log(JSON.stringify({success:false,best},null,2));
+}
+
+run();
