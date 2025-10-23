@@ -72,6 +72,20 @@ export function initializeGrailHandlers(): void {
   });
 
   /**
+   * IPC handler for retrieving all runewords from the database.
+   * Returns all runewords regardless of grailRunewords setting.
+   * Used by the runeword calculator to work independently of tracking settings.
+   */
+  ipcMain.handle('grail:getAllRunewords', async () => {
+    try {
+      return grailDB.getAllRunewords();
+    } catch (error) {
+      console.error('Failed to get all runewords:', error);
+      throw error;
+    }
+  });
+
+  /**
    * IPC handler for seeding items into the database.
    * @param _ - IPC event (unused)
    * @param items - Array of Holy Grail items to seed
@@ -89,15 +103,17 @@ export function initializeGrailHandlers(): void {
   // Progress handlers
   /**
    * IPC handler for retrieving grail progress.
+   * Returns all progress regardless of grail settings - filtering is done on the frontend.
+   * This allows features like the runeword calculator to show collection counts even when
+   * grailRunewords tracking is disabled.
    * @param _ - IPC event (unused)
    * @param characterId - Optional character ID to filter progress for specific character
    */
   ipcMain.handle('grail:getProgress', async (_, characterId?: string) => {
     try {
-      const settings = grailDB.getAllSettings();
       const dbProgress = characterId
         ? grailDB.getProgressByCharacter(characterId)
-        : grailDB.getFilteredProgress(settings);
+        : grailDB.getAllProgress();
 
       // Get all characters to map character IDs to names
       const characters = grailDB.getAllCharacters();

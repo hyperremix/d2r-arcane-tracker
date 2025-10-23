@@ -22,6 +22,7 @@ A comprehensive guide to the Holy Grail challenge in Diablo II: Resurrected and 
   - [Automatic Item Detection](#automatic-item-detection)
   - [Manual Entry Mode](#manual-entry-mode)
   - [Progress Tracking Interface](#progress-tracking-interface)
+  - [Runeword Calculator](#runeword-calculator)
   - [Statistics and Analytics](#statistics-and-analytics)
   - [Notifications](#notifications)
 - [External Resources](#external-resources)
@@ -634,6 +635,81 @@ Customize your interface:
 - **Item Icons**: Show or hide item images
 - **Compact Mode**: Reduce spacing for more items on screen
 - **Color Coding**: Different colors for found/missing/recent
+
+### Runeword Calculator
+
+The Runeword Calculator is a powerful tool that helps you determine which runewords you can craft based on your current rune inventory. It works independently of the grailRunewords tracking setting, making it useful for all players regardless of whether they track runewords as part of their Holy Grail.
+
+#### Accessing the Calculator
+
+Navigate to the Runeword Calculator by clicking the **calculator icon** in the top navigation bar (between Statistics and Settings).
+
+#### How It Works
+
+When you open the Runeword Calculator:
+
+1. **Automatic Scan**: The app scans your save files to get your current rune inventory
+2. **Displays All Runewords**: Shows all 93 runewords from Diablo II: Resurrected
+3. **Real-time Status**: Each runeword card shows whether you can craft it based on available runes
+
+#### Features
+
+**Search by Name:**
+
+- Type in the search box to filter runewords by name
+- Case-insensitive substring matching
+- Quickly find specific runewords like "Enigma" or "Infinity"
+
+**Filter by Runes:**
+
+- Each rune (El through Zod) has a checkbox in the left sidebar
+- Rune images are displayed for easy visual identification
+- Rune counts show how many of each rune you have
+- Red highlighting indicates runes you don't have (count: 0)
+- Select runes to see which runewords use them
+
+**Show Partial Toggle:**
+
+- **ON (default)**: Shows all runewords matching your filters
+- **OFF**: Shows only runewords you can fully craft (have all required runes)
+
+**Visual Indicators:**
+
+Each runeword card displays:
+
+- **Runeword Name**: The name of the runeword
+- **Required Runes**: Visual display of all required runes with images
+- **Completion Status**: Green checkmark if you can craft (all runes available)
+- **Missing Runes**: List of which specific runes you're missing
+
+#### Smart Rune Display
+
+The calculator intelligently handles duplicate rune requirements:
+
+- If a runeword requires 2 Ber runes and you have 1, it shows:
+  - ✅ First Ber (available, normal appearance)
+  - ❌ Second Ber (missing, red background)
+- This makes it easy to see exactly which runes you still need to find
+
+#### Use Cases
+
+**Planning Your Builds:**
+
+- See what runewords you can make with your current rune collection
+- Decide which runes to save vs. use
+- Plan which runes to farm next
+
+**Rune Management:**
+
+- Get a quick overview of your rune inventory
+- See how many of each rune you have across all characters
+- Identify which runes are bottlenecks for desired runewords
+
+#### Tips
+
+- Use the "Show Partial" toggle OFF to see only craftable runewords
+- Select specific high-value runes (Jah, Ber, Sur) to see premium runeword options
+- Check the calculator before making runeword decisions to avoid wasting runes
 
 ### Statistics and Analytics
 

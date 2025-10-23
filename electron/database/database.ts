@@ -161,7 +161,6 @@ class GrailDatabase {
       CREATE INDEX IF NOT EXISTS idx_characters_deleted_at ON characters(deleted_at);
       CREATE INDEX IF NOT EXISTS idx_grail_progress_character ON grail_progress(character_id);
       CREATE INDEX IF NOT EXISTS idx_grail_progress_item ON grail_progress(item_id);
-      CREATE INDEX IF NOT EXISTS idx_grail_progress_found ON grail_progress(found);
       CREATE INDEX IF NOT EXISTS idx_grail_progress_found_date ON grail_progress(found_date);
       CREATE INDEX IF NOT EXISTS idx_grail_progress_character_item ON grail_progress(character_id, item_id);
       CREATE INDEX IF NOT EXISTS idx_save_file_states_path ON save_file_states(file_path);
@@ -255,6 +254,17 @@ class GrailDatabase {
    */
   getAllItems(): Item[] {
     const stmt = this.db.prepare('SELECT * FROM items ORDER BY category, sub_category, name');
+    const dbItems = stmt.all() as DatabaseItem[];
+    return dbItems.map(mapDatabaseItemToItem);
+  }
+
+  /**
+   * Retrieves all runewords from the database, regardless of grailRunewords setting.
+   * Used by the runeword calculator to show all runewords independently of tracking settings.
+   * @returns Array of all runeword items
+   */
+  getAllRunewords(): Item[] {
+    const stmt = this.db.prepare("SELECT * FROM items WHERE type = 'runeword' ORDER BY name");
     const dbItems = stmt.all() as DatabaseItem[];
     return dbItems.map(mapDatabaseItemToItem);
   }

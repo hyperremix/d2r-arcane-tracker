@@ -37,6 +37,11 @@ export interface ElectronAPI {
      * @returns {Promise<Item[]>} A promise that resolves with an array of Item objects.
      */
     getItems(): Promise<Item[]>
+    /**
+     * Retrieves all runewords from the database, regardless of grailRunewords setting.
+     * @returns {Promise<Item[]>} A promise that resolves with an array of runeword items.
+     */
+    getAllRunewords(): Promise<Item[]>
 
     /**
      * Retrieves grail progress for a specific character or all characters.
@@ -147,6 +152,18 @@ export interface ElectronAPI {
      * @returns {Promise<{ success: boolean; defaultDirectory: string }>} A promise that resolves with success indicator and default directory path.
      */
     restoreDefaultDirectory(): Promise<{ success: boolean; defaultDirectory: string }>
+    /**
+     * Retrieves the count of each available rune from the most recent save file scan.
+     * Returns a map of rune IDs to their total counts from current inventory/stash.
+     * @returns {Promise<Record<string, number>>} A promise that resolves with a record mapping rune IDs to counts.
+     */
+    getAvailableRunes(): Promise<Record<string, number>>
+    /**
+     * Triggers a manual refresh/rescan of all save files.
+     * Forces a re-parse of all save files to get the latest item data.
+     * @returns {Promise<{ success: boolean }>} A promise that resolves when the refresh is complete.
+     */
+    refreshSaveFiles(): Promise<{ success: boolean }>
   }
 
   /**

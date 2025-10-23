@@ -185,6 +185,7 @@
   html:has(body.widget),
   body.widget,
   body.widget #root {
+    /* biome-ignore lint/complexity/noImportantStyles: Required to override Tailwind's base layer background for transparent widget window */
     background: transparent !important;
   }
 }
