@@ -11,6 +11,7 @@ This is a Diablo 2 Resurrected Arcane Tracker - an Electron application built wi
 - **Holy Grail Tracking**: Track unique items, set items, runes, and runewords
 - **Save File Monitoring**: Automatic detection and parsing of D2R save files
 - **Runeword Calculator**: View all runewords and see which ones you can craft based on available runes
+- **Terror Zone Configuration**: Customize which terror zones are active in your D2R installation
 - **Statistics Dashboard**: Comprehensive analytics and progress tracking
 - **Smart Notifications**: In-app and native notifications for new item discoveries
 

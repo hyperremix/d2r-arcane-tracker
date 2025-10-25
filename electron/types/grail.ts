@@ -391,6 +391,9 @@ export type Settings = {
   // Wizard settings
   wizardCompleted?: boolean; // Whether the setup wizard has been completed
   wizardSkipped?: boolean; // Whether the user skipped the setup wizard
+  // Terror zone configuration
+  terrorZoneConfig?: Record<number, boolean>; // Zone ID -> enabled state
+  terrorZoneBackupCreated?: boolean; // Whether backup has been created
 };
 
 /**
@@ -401,6 +404,15 @@ export type DatabaseSetting = {
   value: string | null;
   updated_at: string;
 };
+
+/**
+ * Interface representing a terror zone configuration.
+ */
+export interface TerrorZone {
+  id: number;
+  name: string;
+  levels: Array<{ level_id: number; waypoint_level_id?: number }>;
+}
 
 /**
  * Type representing comprehensive Holy Grail statistics.

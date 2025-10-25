@@ -8,6 +8,7 @@ import { closeGrailDatabase, initializeGrailHandlers } from './ipc-handlers/grai
 import { initializeIconHandlers } from './ipc-handlers/iconHandlers';
 import { closeSaveFileMonitor, initializeSaveFileHandlers } from './ipc-handlers/saveFileHandlers';
 import { initializeShellHandlers } from './ipc-handlers/shellHandlers';
+import { initializeTerrorZoneHandlers } from './ipc-handlers/terrorZoneHandlers';
 import { initializeUpdateHandlers } from './ipc-handlers/updateHandlers';
 import { initializeWidgetHandlers } from './ipc-handlers/widgetHandlers';
 import { closeWidgetWindow, showWidgetWindow } from './window/widgetWindow';
@@ -161,6 +162,7 @@ app.whenReady().then(() => {
   initializeDialogHandlers();
   initializeShellHandlers();
   initializeIconHandlers();
+  initializeTerrorZoneHandlers();
   initializeUpdateHandlers();
 
   // Initialize widget handlers with callback for position updates

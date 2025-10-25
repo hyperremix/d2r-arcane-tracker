@@ -7,6 +7,7 @@ import type {
   Item,
   MonitoringStatus,
   Settings,
+  TerrorZone,
   UpdateStatus,
 } from './types/grail';
 
@@ -506,5 +507,46 @@ contextBridge.exposeInMainWorld('electronAPI', {
      */
     openExternal: (url: string): Promise<{ success: boolean; error?: string }> =>
       ipcRenderer.invoke('shell:openExternal', url),
+  },
+
+  /**
+   * Terror zone configuration API methods.
+   */
+  terrorZone: {
+    /**
+     * Retrieves all terror zones from the game file.
+     * @returns {Promise<TerrorZone[]>} A promise that resolves with an array of terror zones.
+     */
+    getZones: (): Promise<TerrorZone[]> => ipcRenderer.invoke('terrorZone:getZones'),
+
+    /**
+     * Retrieves current terror zone configuration from database.
+     * @returns {Promise<Record<number, boolean>>} A promise that resolves with zone configuration.
+     */
+    getConfig: (): Promise<Record<number, boolean>> => ipcRenderer.invoke('terrorZone:getConfig'),
+
+    /**
+     * Updates terror zone configuration and applies to game file.
+     * @param {Record<number, boolean>} config - Zone configuration (zone ID -> enabled state).
+     * @returns {Promise<{ success: boolean; requiresRestart: boolean }>} A promise that resolves with update result.
+     */
+    updateConfig: (
+      config: Record<number, boolean>,
+    ): Promise<{ success: boolean; requiresRestart: boolean }> =>
+      ipcRenderer.invoke('terrorZone:updateConfig', config),
+
+    /**
+     * Restores the original desecratedzones.json file from backup.
+     * @returns {Promise<{ success: boolean }>} A promise that resolves with restore result.
+     */
+    restoreOriginal: (): Promise<{ success: boolean }> =>
+      ipcRenderer.invoke('terrorZone:restoreOriginal'),
+
+    /**
+     * Validates the D2R installation path for terror zone configuration.
+     * @returns {Promise<{ valid: boolean; path?: string; error?: string }>} A promise that resolves with validation result.
+     */
+    validatePath: (): Promise<{ valid: boolean; path?: string; error?: string }> =>
+      ipcRenderer.invoke('terrorZone:validatePath'),
   },
 });

@@ -398,6 +398,42 @@ export interface ElectronAPI {
      */
     openExternal(url: string): Promise<{ success: boolean; error?: string }>
   }
+
+  /**
+   * Terror zone configuration API methods.
+   */
+  terrorZone: {
+    /**
+     * Retrieves all terror zones from the game file.
+     * @returns {Promise<TerrorZone[]>} A promise that resolves with an array of terror zones.
+     */
+    getZones(): Promise<TerrorZone[]>
+
+    /**
+     * Retrieves current terror zone configuration from database.
+     * @returns {Promise<Record<number, boolean>>} A promise that resolves with zone configuration.
+     */
+    getConfig(): Promise<Record<number, boolean>>
+
+    /**
+     * Updates terror zone configuration and applies to game file.
+     * @param {Record<number, boolean>} config - Zone configuration (zone ID -> enabled state).
+     * @returns {Promise<{ success: boolean; requiresRestart: boolean }>} A promise that resolves with update result.
+     */
+    updateConfig(config: Record<number, boolean>): Promise<{ success: boolean; requiresRestart: boolean }>
+
+    /**
+     * Restores the original desecratedzones.json file from backup.
+     * @returns {Promise<{ success: boolean }>} A promise that resolves with restore result.
+     */
+    restoreOriginal(): Promise<{ success: boolean }>
+
+    /**
+     * Validates the D2R installation path for terror zone configuration.
+     * @returns {Promise<{ valid: boolean; path?: string; error?: string }>} A promise that resolves with validation result.
+     */
+    validatePath(): Promise<{ valid: boolean; path?: string; error?: string }>
+  }
 }
 
 /**

@@ -39,6 +39,7 @@ The Holy Grail challenge in Diablo 2 Resurrected is a popular endgame goal where
 - **📁 Save File Monitoring**: Automatic detection and parsing of D2R save files
 - **📊 Progress Analytics**: Visual progress bars, statistics, and completion tracking
 - **🔮 Runeword Calculator**: Find which runewords you can craft with your available runes
+- **⚡ Terror Zone Configuration**: Customize which terror zones are active in your game
 - **🎮 Multiple Game Modes**: Support for different game versions and modes
 - **🔔 Smart Notifications**: Get notified when new items are found
 - **💾 Local Database**: SQLite database for reliable data persistence
@@ -83,6 +84,7 @@ The Holy Grail challenge in Diablo 2 Resurrected is a popular endgame goal where
 - **Automatic Detection**: The app monitors your save files and automatically updates when new items are found
 - **Progress Tracking**: Visual progress bars show completion percentages for different item categories
 - **Runeword Calculator**: View all available runewords, see which ones you can craft based on your current rune inventory, and track how many of each you've collected
+- **Terror Zone Configuration**: Customize which terror zones are active in your D2R installation by modifying the game's configuration files
 - **Advanced Search**: Filter and search through your tracked items
 - **Statistics Dashboard**: View detailed statistics about your progress
 
@@ -130,6 +132,7 @@ If you're still having issues:
 ### Comprehensive Guides
 
 - **[Holy Grail Guide](docs/HOLY_GRAIL_GUIDE.md)** - Complete guide to the Holy Grail challenge, tracking strategies, and using D2R Arcane Tracker
+- **[Terror Zone Configuration Guide](docs/TERROR_ZONE_CONFIGURATION.md)** - Comprehensive guide to customizing terror zones in your D2R installation
 - **[Tracker Comparison](docs/COMPARISON.md)** - Detailed comparison with other Holy Grail tracking solutions to help you choose the right tool
 
 ## 🤝 Contributing

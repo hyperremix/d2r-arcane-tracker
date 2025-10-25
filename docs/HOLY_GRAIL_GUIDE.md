@@ -23,6 +23,7 @@ A comprehensive guide to the Holy Grail challenge in Diablo II: Resurrected and 
   - [Manual Entry Mode](#manual-entry-mode)
   - [Progress Tracking Interface](#progress-tracking-interface)
   - [Runeword Calculator](#runeword-calculator)
+  - [Terror Zone Configuration](#terror-zone-configuration)
   - [Statistics and Analytics](#statistics-and-analytics)
   - [Notifications](#notifications)
 - [External Resources](#external-resources)
@@ -710,6 +711,126 @@ The calculator intelligently handles duplicate rune requirements:
 - Use the "Show Partial" toggle OFF to see only craftable runewords
 - Select specific high-value runes (Jah, Ber, Sur) to see premium runeword options
 - Check the calculator before making runeword decisions to avoid wasting runes
+
+### Terror Zone Configuration
+
+D2R Arcane Tracker includes a powerful feature that allows you to customize which terror zones are active in your Diablo II: Resurrected installation. This feature modifies the game's `desecratedzones.json` file to enable or disable specific terror zones according to your preferences.
+
+#### What are Terror Zones?
+
+Terror Zones are special areas in Diablo II: Resurrected that rotate on a schedule, providing enhanced monster levels and better loot drops. The terror zone system includes 36 different zones across all acts of the game.
+
+#### Accessing Terror Zone Configuration
+
+Navigate to the Terror Zone Configuration by clicking the **alert triangle icon** in the top navigation bar (between Runeword Calculator and Settings).
+
+#### Key Features
+
+**Zone Management:**
+
+- **Enable/Disable Individual Zones**: Toggle specific terror zones on or off
+- **"Only" Buttons**: Enable only a specific zone while disabling all others
+- **Global Controls**: "Enable All" and "Disable All" buttons for quick management
+- **Search Functionality**: Find specific zones by name
+- **Zone Details**: View which levels are included in each terror zone
+
+**Safety Features:**
+
+- **Automatic Backup**: Creates a backup of the original game file before any modifications
+- **Restore Functionality**: Restore the original configuration at any time
+- **Validation**: Checks that your D2R installation path is correct and the game file exists
+- **Warning System**: Clear warnings about game file modification and restart requirements
+
+#### How It Works
+
+1. **File Location**: The feature modifies `{D2R Installation}/Data/hd/global/excel/desecratedzones.json`
+2. **Backup Creation**: On first use, creates an immutable backup in the app's data directory
+3. **Configuration Storage**: Your zone preferences are stored in the app's database
+4. **Game File Modification**: The app writes your selected zones to the game's configuration file
+5. **Restart Required**: Changes take effect after restarting Diablo II: Resurrected
+
+#### Important Considerations
+
+**Game File Modification:**
+
+- This feature directly modifies game files in your D2R installation
+- Always ensure D2R is closed before making changes
+- The original file is automatically backed up and can be restored
+- Any issues related to these changes are your responsibility
+
+**Restart Requirements:**
+
+- Changes require restarting Diablo II: Resurrected to take effect
+- The app will remind you of this requirement
+- Terror zone schedules will update based on your configuration
+
+**Backup Safety:**
+
+- The backup file is never modified and remains as a safety net
+- You can restore the original configuration at any time
+- The backup is stored in the app's user data directory
+
+#### Use Cases
+
+**Focused Farming:**
+
+- Enable only zones that drop items you're hunting for
+- Disable zones that don't interest you
+- Create custom terror zone rotations
+
+**Testing and Experimentation:**
+
+- Try different zone combinations
+- Test specific farming strategies
+- Experiment with zone preferences
+
+**Streaming and Content Creation:**
+
+- Create predictable terror zone schedules
+- Focus on specific areas for content
+- Customize the experience for your audience
+
+#### Safety and Best Practices
+
+**Before Making Changes:**
+
+- Ensure Diablo II: Resurrected is completely closed
+- Verify your D2R installation path is correct
+- Consider backing up your save files as an extra precaution
+
+**After Making Changes:**
+
+- Restart Diablo II: Resurrected to apply changes
+- Test that the game launches normally
+- Verify that your selected terror zones are active
+
+**If Issues Occur:**
+
+- Use the "Restore Original" button to revert changes
+- Check that your D2R installation path is correct
+- Ensure you have write permissions to the game directory
+
+#### Technical Details
+
+**File Structure:**
+
+- The `desecratedzones.json` file contains an array of terror zone configurations
+- Each zone has an ID, name, and list of included levels
+- The app filters this array based on your preferences
+
+**Zone Information:**
+
+- All 36 terror zones are supported
+- Each zone includes multiple levels and waypoints
+- Zone names are human-readable (e.g., "Burial Grounds, Crypt, and Mausoleum")
+
+**Configuration Persistence:**
+
+- Your zone preferences are saved in the app's SQLite database
+- Settings persist between app restarts
+- Configuration is applied automatically when the app starts
+
+📖 **For detailed information about Terror Zone Configuration, see the [Terror Zone Configuration Guide](TERROR_ZONE_CONFIGURATION.md).**
 
 ### Statistics and Analytics
 

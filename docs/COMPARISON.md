@@ -24,6 +24,7 @@ This document compares D2R Arcane Tracker with other popular Holy Grail tracking
 | **Ethereal Tracking** | ✅ | ✅ | ✅ | ✅ | ❌ | ✅ |
 | **Multi-Platform** | Windows, macOS, Linux | Browser | Browser | Windows, macOS, Linux | Browser | Browser |
 | **Streaming Features** | ✅ Notifications | ❌ | ❌ | ✅ OBS integration | ❌ | ❌ |
+| **Terror Zone Configuration** | ✅ Game file modification | ❌ | ❌ | ❌ | ❌ | ❌ |
 | **Classic D2 Support** | ⚠️ Basic | ❌ | ❌ | ✅ Full (LoD/Plugy) | ❌ | ✅ |
 | **Cost** | Free | Free | Free | Free | Free | Free |
 | **Account Required** | ❌ | ✅ | ✅ | ❌ | ⚠️ For tracking | ⚠️ Optional |
@@ -52,6 +53,7 @@ D2R Arcane Tracker is a modern, offline-first desktop application built specific
 - **Multiple Game Modes**: Track softcore, hardcore, or both separately
 - **Advanced Filtering**: Search and filter by category, rarity, found status, and more
 - **Statistics Dashboard**: Detailed progress analytics and completion percentages
+- **Terror Zone Configuration**: Customize which terror zones are active in your D2R installation
 - **No Mule Characters Needed**: Items are tracked in the database, so you can sell or trade them after they're recorded
 
 #### Best For
@@ -271,7 +273,11 @@ Native desktop applications for Windows, macOS, and Linux, each optimized for th
 
 Your Holy Grail data is stored in a local SQLite database on your machine. You have complete ownership and control—export it, back it up, or migrate it as you wish. No vendor lock-in or dependency on external servers.
 
-### 7. Active Development
+### 7. Terror Zone Configuration
+
+D2R Arcane Tracker is the only tracker that allows you to customize which terror zones are active in your game installation. This unique feature modifies the game's `desecratedzones.json` file to enable or disable specific terror zones, giving you complete control over the terror zone rotation.
+
+### 8. Active Development
 
 Regular updates, bug fixes, and new features based on community feedback. Modern CI/CD practices ensure quality and reliability.
 
@@ -323,13 +329,19 @@ D2R Arcane Tracker keeps all data local with zero cloud dependency. Self-hosting
 
 The ability to sell or trade items after they're recorded is unique to D2R Arcane Tracker, eliminating the need for mule characters entirely.
 
+### For Terror Zone Customization
+
+**Best Choice:** D2R Arcane Tracker
+
+D2R Arcane Tracker is the only solution that allows you to customize which terror zones are active in your game installation, providing complete control over the terror zone rotation.
+
 ---
 
 ## Conclusion
 
 The D2R Holy Grail tracking landscape offers several excellent solutions, each with distinct strengths:
 
-- **D2R Arcane Tracker** excels in automatic offline tracking, modern UI, local data ownership, and eliminating mule character requirements
+- **D2R Arcane Tracker** excels in automatic offline tracking, modern UI, local data ownership, eliminating mule character requirements, and terror zone customization
 - **d2grail.com** provides a stable, proven web-based platform with excellent item database features
 - **diablo2.io** integrates tracking with a larger trading community and offers save file upload
 - **holygrail.link** is the top choice for streamers and classic D2 players with its OBS integration and multi-version support
@@ -338,7 +350,7 @@ The D2R Holy Grail tracking landscape offers several excellent solutions, each w
 
 **There is no single "best" tracker**—the ideal choice depends on your priorities:
 
-- Value **automatic tracking** and **no mule characters**? → D2R Arcane Tracker
+- Value **automatic tracking**, **no mule characters**, or **terror zone customization**? → D2R Arcane Tracker
 - Need **OBS integration** or play **classic D2**? → holygrail.link
 - Prefer **web-based** and **proven stability**? → d2grail.com or diablo2.io
 - Want to **self-host** everything? → Nasicus/d2-holy-grail
@@ -356,5 +368,6 @@ The most important thing is to choose a tool that fits your workflow and start t
 ## Additional Resources
 
 - [D2R Arcane Tracker Holy Grail Guide](HOLY_GRAIL_GUIDE.md)
+- [D2R Arcane Tracker Terror Zone Configuration Guide](TERROR_ZONE_CONFIGURATION.md)
 - [D2R Arcane Tracker GitHub Repository](https://github.com/hyperremix/d2r-arcane-tracker)
 - [Contributing to D2R Arcane Tracker](../CONTRIBUTING.md)
