@@ -6,6 +6,7 @@ import { Progress } from '@/components/ui/progress';
 import { useGrailStore } from '@/stores/grailStore';
 import { useWizardStore } from '@/stores/wizardStore';
 import { CompletionStep } from './steps/CompletionStep';
+import { D2RInstallationStep } from './steps/D2RInstallationStep';
 import { GameModeStep } from './steps/GameModeStep';
 import { GameVersionStep } from './steps/GameVersionStep';
 import { GrailSettingsStep } from './steps/GrailSettingsStep';
@@ -21,6 +22,7 @@ import { WidgetStep } from './steps/WidgetStep';
 const steps = [
   { component: WelcomeStep, title: 'Welcome' },
   { component: SaveDirectoryStep, title: 'Save Directory' },
+  { component: D2RInstallationStep, title: 'D2R Installation' },
   { component: GameModeStep, title: 'Game Mode' },
   { component: GameVersionStep, title: 'Game Version' },
   { component: GrailSettingsStep, title: 'Grail Settings' },

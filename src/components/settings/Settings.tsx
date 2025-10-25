@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { useWizardStore } from '@/stores/wizardStore';
+import { D2RInstallationSettings } from './D2RInstallationSettings';
 import { DatabaseCard } from './Database';
 import { GameModeSettings } from './GameModeSettings';
 import { GameVersionSettings } from './GameVersionSettings';
@@ -30,6 +31,7 @@ export function Settings() {
         <div className="space-y-6 p-6">
           <UpdateSettings />
           <SaveFileMonitor />
+          <D2RInstallationSettings />
           <GrailSettings />
           <NotificationSettings />
           <WidgetSettings />

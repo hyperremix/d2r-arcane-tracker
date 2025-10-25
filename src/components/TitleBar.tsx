@@ -1,4 +1,12 @@
-import { BarChart3, Calculator, ChevronLeft, ChevronRight, Settings, Trophy } from 'lucide-react';
+import {
+  AlertTriangle,
+  BarChart3,
+  Calculator,
+  ChevronLeft,
+  ChevronRight,
+  Settings,
+  Trophy,
+} from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router';
 import { Button } from '@/components/ui/button';
@@ -42,6 +50,7 @@ export function TitleBar() {
   const isTrackerActive = location.pathname === '/';
   const isStatisticsActive = location.pathname === '/statistics';
   const isRunewordsActive = location.pathname === '/runewords';
+  const isTerrorZonesActive = location.pathname === '/terror-zones';
   const isSettingsActive = location.pathname === '/settings';
 
   const handleBack = () => {
@@ -181,6 +190,27 @@ export function TitleBar() {
           >
             <Link to="/runewords" title="Runeword Calculator">
               <Calculator className="h-4 w-4" />
+            </Link>
+          </Button>
+        </div>
+        <div className="relative">
+          <div
+            className={cn(
+              '-top-1.75 absolute right-0 left-0',
+              isTerrorZonesActive && 'border-t-4 border-t-primary-500',
+            )}
+          />
+          <Button
+            asChild
+            variant="ghost"
+            size="sm"
+            className={cn(
+              'relative hover:text-primary-500',
+              isTerrorZonesActive && 'text-primary-500',
+            )}
+          >
+            <Link to="/terror-zones" title="Terror Zone Configuration">
+              <AlertTriangle className="h-4 w-4" />
             </Link>
           </Button>
         </div>

@@ -13,7 +13,8 @@
       "!**/dist",
       "!**/release",
       "!**/.tsbuildinfo",
-      "!**/*.d.ts"
+      "!**/*.d.ts",
+      "!desecratedzones.json"
     ]
   },
   "formatter": {

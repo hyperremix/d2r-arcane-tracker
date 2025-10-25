@@ -4,6 +4,7 @@ import { RunewordCalculator } from './components/runeword/RunewordCalculator';
 import { Settings } from './components/settings/Settings';
 import { Statistics } from './components/statistics/Statistics';
 import { TitleBar } from './components/TitleBar';
+import { TerrorZoneConfiguration } from './components/terror-zone/TerrorZoneConfiguration';
 
 /**
  * Root layout component that wraps all routes with the TitleBar.
@@ -39,6 +40,10 @@ export const router = createHashRouter([
       {
         path: '/settings',
         Component: Settings,
+      },
+      {
+        path: '/terror-zones',
+        Component: TerrorZoneConfiguration,
       },
     ],
   },
