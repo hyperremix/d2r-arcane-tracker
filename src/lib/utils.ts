@@ -31,3 +31,33 @@ export function isRecentFind(
 
   return now - foundTime < thresholdMs;
 }
+
+/**
+ * Formats a duration in milliseconds into a human-readable time string.
+ * @param {number} durationMs - Duration in milliseconds
+ * @returns {string} Formatted time string (e.g., "2h 34m 12s", "45m 30s", "1m 5s")
+ */
+export function formatDuration(durationMs: number): string {
+  if (durationMs < 0) return '0s';
+
+  const totalSeconds = Math.floor(durationMs / 1000);
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+
+  const parts: string[] = [];
+
+  if (hours > 0) {
+    parts.push(`${hours}h`);
+  }
+
+  if (minutes > 0) {
+    parts.push(`${minutes}m`);
+  }
+
+  if (seconds > 0 || parts.length === 0) {
+    parts.push(`${seconds}s`);
+  }
+
+  return parts.join(' ');
+}
