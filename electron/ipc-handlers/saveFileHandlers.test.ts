@@ -27,6 +27,14 @@ vi.mock('../database/database', () => ({
     getAllProgress: vi.fn(),
     setSetting: vi.fn(),
     truncateUserData: vi.fn(),
+    // Run tracking methods
+    getActiveSession: vi.fn(),
+    getActiveRun: vi.fn(),
+    upsertSession: vi.fn(),
+    archiveSession: vi.fn(),
+    getRunsBySession: vi.fn(),
+    upsertRun: vi.fn(),
+    addRunItem: vi.fn(),
   },
 }));
 
@@ -44,6 +52,27 @@ vi.mock('../services/DatabaseBatchWriter', () => {
 
   return {
     DatabaseBatchWriter: vi.fn().mockImplementation(() => mockInstance),
+  };
+});
+
+// Mock RunTrackerService
+vi.mock('../services/runTracker', () => {
+  const mockInstance = {
+    getActiveRun: vi.fn(),
+    getActiveSession: vi.fn(),
+    startSession: vi.fn(),
+    endSession: vi.fn(),
+    startRun: vi.fn(),
+    endRun: vi.fn(),
+    pauseRun: vi.fn(),
+    resumeRun: vi.fn(),
+    setRunType: vi.fn(),
+    getState: vi.fn(),
+    shutdown: vi.fn(),
+  };
+
+  return {
+    RunTrackerService: vi.fn().mockImplementation(() => mockInstance),
   };
 });
 
@@ -117,6 +146,7 @@ import { grailDatabase } from '../database/database';
 import { DatabaseBatchWriter } from '../services/DatabaseBatchWriter';
 import { EventBus } from '../services/EventBus';
 import { ItemDetectionService } from '../services/itemDetection';
+import { RunTrackerService } from '../services/runTracker';
 import { SaveFileMonitor } from '../services/saveFileMonitor';
 import type { ItemDetectionEvent, SaveFileEvent } from '../types/grail';
 import { closeSaveFileMonitor, initializeSaveFileHandlers } from './saveFileHandlers';
@@ -167,6 +197,7 @@ describe('When saveFileHandlers is used', () => {
   let mockWebContents: MockWebContents[];
   let mockSaveFileMonitor: MockSaveFileMonitor;
   let mockItemDetectionService: MockItemDetectionService;
+  let mockRunTrackerService: any;
   let mockEventBus: MockEventBus;
   let mockBatchWriter: MockDatabaseBatchWriter;
 
@@ -216,9 +247,24 @@ describe('When saveFileHandlers is used', () => {
       analyzeSaveFile: vi.fn(),
     };
 
+    mockRunTrackerService = {
+      getActiveRun: vi.fn().mockReturnValue(null),
+      getActiveSession: vi.fn().mockReturnValue(null),
+      startSession: vi.fn(),
+      endSession: vi.fn(),
+      startRun: vi.fn(),
+      endRun: vi.fn(),
+      pauseRun: vi.fn(),
+      resumeRun: vi.fn(),
+      setRunType: vi.fn(),
+      getState: vi.fn(),
+      shutdown: vi.fn(),
+    };
+
     // Setup service mocks
     vi.mocked(SaveFileMonitor).mockImplementation(() => mockSaveFileMonitor as any);
     vi.mocked(ItemDetectionService).mockImplementation(() => mockItemDetectionService as any);
+    vi.mocked(RunTrackerService).mockImplementation(() => mockRunTrackerService as any);
 
     // Setup default database mocks
     vi.mocked(grailDatabase.getCharacterByName).mockReturnValue(undefined);
@@ -227,6 +273,23 @@ describe('When saveFileHandlers is used', () => {
     vi.mocked(grailDatabase.getCharacterProgress).mockReturnValue(null);
     vi.mocked(grailDatabase.getAllItems).mockReturnValue([]);
     vi.mocked(grailDatabase.getAllProgress).mockReturnValue([]);
+
+    // Setup run tracking database mocks
+    vi.mocked(grailDatabase.getActiveSession).mockReturnValue(null);
+    vi.mocked(grailDatabase.getActiveRun).mockReturnValue(null);
+    vi.mocked(grailDatabase.upsertSession).mockImplementation(() => {
+      // Mock implementation - no-op
+    });
+    vi.mocked(grailDatabase.archiveSession).mockImplementation(() => {
+      // Mock implementation - no-op
+    });
+    vi.mocked(grailDatabase.getRunsBySession).mockReturnValue([]);
+    vi.mocked(grailDatabase.upsertRun).mockImplementation(() => {
+      // Mock implementation - no-op
+    });
+    vi.mocked(grailDatabase.addRunItem).mockImplementation(() => {
+      // Mock implementation - no-op
+    });
   });
 
   describe('If initializeSaveFileHandlers is called', () => {
@@ -236,7 +299,11 @@ describe('When saveFileHandlers is used', () => {
 
       // Assert
       expect(EventBus).toHaveBeenCalled();
-      expect(SaveFileMonitor).toHaveBeenCalledWith(mockEventBus, grailDatabase);
+      expect(SaveFileMonitor).toHaveBeenCalledWith(
+        mockEventBus,
+        grailDatabase,
+        mockRunTrackerService,
+      );
       expect(ItemDetectionService).toHaveBeenCalledWith(mockEventBus);
       expect(mockEventBus.on).toHaveBeenCalledWith('save-file-event', expect.any(Function));
       expect(mockEventBus.on).toHaveBeenCalledWith('monitoring-started', expect.any(Function));
