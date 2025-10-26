@@ -574,6 +574,30 @@ export interface ElectronAPI {
      * @returns {Promise<{ success: boolean }>} A promise that resolves with a success indicator.
      */
     deleteRunType(runType: string): Promise<{ success: boolean }>
+
+    /**
+     * Statistics Queries
+     */
+    /**
+     * Gets overall run statistics across all sessions.
+     * @param {string} [characterId] - Optional character ID to filter statistics to specific character.
+     * @returns {Promise<RunStatistics>} A promise that resolves with overall run statistics.
+     */
+    getOverallStatistics(characterId?: string): Promise<RunStatistics>
+
+    /**
+     * Gets run statistics grouped by run type.
+     * @param {string} [characterId] - Optional character ID to filter statistics to specific character.
+     * @returns {Promise<RunTypeStats[]>} A promise that resolves with run type statistics.
+     */
+    getStatisticsByType(characterId?: string): Promise<RunTypeStats[]>
+
+    /**
+     * Gets summary statistics for a specific character.
+     * @param {string} characterId - The character ID to get summary for.
+     * @returns {Promise<CharacterRunSummary>} A promise that resolves with character summary.
+     */
+    getCharacterSummary(characterId: string): Promise<CharacterRunSummary>
   }
 
   /**
