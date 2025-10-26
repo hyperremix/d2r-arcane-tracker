@@ -538,7 +538,7 @@ export type Settings = {
   fileChangeDebounceMs?: number; // Default: 2000
   // Widget settings
   widgetEnabled?: boolean; // Whether the widget is enabled
-  widgetDisplay?: 'overall' | 'split' | 'all'; // Widget display mode (overall only, normal+ethereal, or all three)
+  widgetDisplay?: 'overall' | 'split' | 'all' | 'run-only'; // Widget display mode (overall only, normal+ethereal, all three, or run counter only)
   widgetPosition?: { x: number; y: number }; // Widget position on screen
   widgetOpacity?: number; // Widget opacity (0.0 to 1.0)
   widgetSizeOverall?: { width: number; height: number }; // Custom size for overall mode

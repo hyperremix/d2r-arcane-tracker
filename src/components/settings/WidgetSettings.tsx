@@ -26,7 +26,7 @@ export function WidgetSettings() {
   );
 
   const updateDisplay = useCallback(
-    async (display: 'overall' | 'split' | 'all') => {
+    async (display: 'overall' | 'split' | 'all' | 'run-only') => {
       await setSettings({ widgetDisplay: display });
       // Update widget display mode via IPC
       await window.electronAPI?.widget.updateDisplay(display, settings);
@@ -99,7 +99,7 @@ export function WidgetSettings() {
           {/* Display Mode Selection */}
           <div className="space-y-2">
             <Label className="font-medium text-sm">Display Mode</Label>
-            <div className="flex gap-2">
+            <div className="grid grid-cols-2 gap-2">
               <Button
                 variant={widgetDisplay === 'overall' ? 'default' : 'outline'}
                 size="sm"
@@ -127,9 +127,19 @@ export function WidgetSettings() {
               >
                 All
               </Button>
+              <Button
+                variant={widgetDisplay === 'run-only' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => updateDisplay('run-only')}
+                disabled={!widgetEnabled}
+                className="flex-1"
+              >
+                Run Only
+              </Button>
             </div>
             <p className="text-muted-foreground text-xs">
-              Overall: Total progress only | Split: Normal + Ethereal | All: All three gauges
+              Overall: Total progress only | Split: Normal + Ethereal | All: All three gauges | Run
+              Only: Current run counter
               {!settings.grailEthereal && (
                 <span className="text-yellow-600"> (Split & All require Ethereal tracking)</span>
               )}

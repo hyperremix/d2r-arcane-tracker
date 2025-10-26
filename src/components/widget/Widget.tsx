@@ -1,6 +1,8 @@
 import type { GrailStatistics, Settings } from 'electron/types/grail';
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ProgressGauge } from '@/components/grail/ProgressGauge';
+import { formatDuration } from '@/lib/utils';
+import { useRunTrackerStore } from '@/stores/runTrackerStore';
 
 /**
  * Props for the Widget component.
@@ -21,6 +23,32 @@ export function Widget({ statistics, settings, onDragStart, onDragEnd }: WidgetP
   const opacity = settings.widgetOpacity ?? 0.9;
   const backgroundColor = `rgba(0, 0, 0, ${opacity})`;
 
+  // Run tracker state for run-only mode
+  const { activeRun } = useRunTrackerStore();
+  const [runDuration, setRunDuration] = useState<number>(0);
+
+  // Real-time timer for run duration updates
+  useEffect(() => {
+    if (!activeRun || displayMode !== 'run-only') {
+      setRunDuration(0);
+      return;
+    }
+
+    const updateTimer = () => {
+      const now = Date.now();
+      const elapsed = now - activeRun.startTime.getTime();
+      setRunDuration(elapsed);
+    };
+
+    // Update immediately
+    updateTimer();
+
+    // Set up interval for updates
+    const interval = setInterval(updateTimer, 1000);
+
+    return () => clearInterval(interval);
+  }, [activeRun, displayMode]);
+
   // Calculate container styles based on display mode
   const containerClasses = useMemo(() => {
     const baseClasses = 'flex flex-col items-center justify-center p-2';
@@ -28,6 +56,7 @@ export function Widget({ statistics, settings, onDragStart, onDragEnd }: WidgetP
       overall: 'gap-4',
       split: 'gap-4',
       all: 'gap-6',
+      'run-only': 'gap-2',
     };
     return `${baseClasses} ${gapClasses[displayMode]}`;
   }, [displayMode]);
@@ -38,8 +67,52 @@ export function Widget({ statistics, settings, onDragStart, onDragEnd }: WidgetP
       overall: 1.8, // Single gauge, can be larger
       split: 1.4, // Two gauges side by side
       all: 1.4, // Multiple gauges, standard size
+      'run-only': 1.0, // No gauge scaling for run-only mode
     }[displayMode];
   }, [displayMode]);
+
+  // Handle run-only mode separately (doesn't need statistics)
+  if (displayMode === 'run-only') {
+    return (
+      // biome-ignore lint/a11y/useSemanticElements: Widget is a draggable container, not a traditional button
+      <div
+        role="button"
+        tabIndex={0}
+        className={containerClasses}
+        style={{
+          backgroundColor,
+          backdropFilter: 'blur(10px)',
+          cursor: 'move',
+          height: '100vh',
+          width: '100vw',
+          // @ts-expect-error - WebkitAppRegion is an Electron-specific CSS property
+          WebkitAppRegion: 'drag',
+        }}
+        onMouseDown={onDragStart}
+        onMouseUp={onDragEnd}
+        // biome-ignore lint/suspicious/noEmptyBlockStatements: No keyboard interaction needed for drag-only widget
+        onKeyDown={() => {}}
+      >
+        {activeRun ? (
+          <div className="flex flex-col items-center justify-center gap-2">
+            <div className="text-center">
+              <p className="text-gray-200 text-xs">Run</p>
+              <p className="font-bold text-2xl text-white">#{activeRun.runNumber}</p>
+            </div>
+            <div className="text-center">
+              <p className="text-gray-200 text-xs">Duration</p>
+              <p className="font-mono text-lg text-white">{formatDuration(runDuration)}</p>
+            </div>
+          </div>
+        ) : (
+          <div className="text-center">
+            <p className="text-gray-200 text-sm">No Active Run</p>
+            <p className="text-gray-400 text-xs">Start a session to track runs</p>
+          </div>
+        )}
+      </div>
+    );
+  }
 
   if (!statistics) {
     return (

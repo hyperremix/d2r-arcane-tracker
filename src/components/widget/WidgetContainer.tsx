@@ -1,6 +1,7 @@
 import type { GrailProgress, GrailStatistics, Item, Settings } from 'electron/types/grail';
 import { useEffect, useState } from 'react';
 import { canItemBeEthereal, canItemBeNormal } from '@/lib/ethereal';
+import { useRunTrackerStore } from '@/stores/runTrackerStore';
 import { Widget } from './Widget';
 
 /**
@@ -10,6 +11,9 @@ import { Widget } from './Widget';
 export function WidgetContainer() {
   const [statistics, setStatistics] = useState<GrailStatistics | null>(null);
   const [settings, setSettings] = useState<Partial<Settings>>({});
+
+  // Subscribe to run tracker store for real-time updates
+  useRunTrackerStore();
 
   // Load initial data and calculate statistics
   useEffect(() => {
@@ -111,6 +115,42 @@ export function WidgetContainer() {
       window.ipcRenderer?.off('settings-updated', handleSettingsUpdate);
     };
   }, [settings]);
+
+  // Listen for run tracker events for real-time updates
+  useEffect(() => {
+    const handleRunStarted = () => {
+      // Force re-render when run starts
+      console.log('[WidgetContainer] Run started');
+    };
+
+    const handleRunEnded = () => {
+      // Force re-render when run ends
+      console.log('[WidgetContainer] Run ended');
+    };
+
+    const handleSessionStarted = () => {
+      // Force re-render when session starts
+      console.log('[WidgetContainer] Session started');
+    };
+
+    const handleSessionEnded = () => {
+      // Force re-render when session ends
+      console.log('[WidgetContainer] Session ended');
+    };
+
+    // Listen for run tracker events
+    window.ipcRenderer?.on('run-started', handleRunStarted);
+    window.ipcRenderer?.on('run-ended', handleRunEnded);
+    window.ipcRenderer?.on('session-started', handleSessionStarted);
+    window.ipcRenderer?.on('session-ended', handleSessionEnded);
+
+    return () => {
+      window.ipcRenderer?.off('run-started', handleRunStarted);
+      window.ipcRenderer?.off('run-ended', handleRunEnded);
+      window.ipcRenderer?.off('session-started', handleSessionStarted);
+      window.ipcRenderer?.off('session-ended', handleSessionEnded);
+    };
+  }, []);
 
   const handleDragStart = () => {
     // Empty function - drag is handled by Electron
