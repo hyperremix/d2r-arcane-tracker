@@ -5,6 +5,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Settings,
+  Timer,
   Trophy,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
@@ -49,6 +50,7 @@ export function TitleBar() {
   // Check if routes are active
   const isTrackerActive = location.pathname === '/';
   const isStatisticsActive = location.pathname === '/statistics';
+  const isRunsActive = location.pathname === '/runs';
   const isRunewordsActive = location.pathname === '/runewords';
   const isTerrorZonesActive = location.pathname === '/terror-zones';
   const isSettingsActive = location.pathname === '/settings';
@@ -169,6 +171,24 @@ export function TitleBar() {
           >
             <Link to="/statistics" title="Statistics">
               <BarChart3 className="h-4 w-4" />
+            </Link>
+          </Button>
+        </div>
+        <div className="relative">
+          <div
+            className={cn(
+              '-top-1.75 absolute right-0 left-0',
+              isRunsActive && 'border-t-4 border-t-primary-500',
+            )}
+          />
+          <Button
+            asChild
+            variant="ghost"
+            size="sm"
+            className={cn('relative hover:text-primary-500', isRunsActive && 'text-primary-500')}
+          >
+            <Link to="/runs" title="Run Counter">
+              <Timer className="h-4 w-4" />
             </Link>
           </Button>
         </div>
