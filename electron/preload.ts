@@ -271,6 +271,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
       properties?: string[];
     }): Promise<{ canceled: boolean; filePaths?: string[] }> =>
       ipcRenderer.invoke('dialog:showOpenDialog', options),
+
+    /**
+     * Writes content to a file at the specified path.
+     * @param {string} filePath - The file path to write to.
+     * @param {string} content - The content to write.
+     * @returns {Promise<{ success: boolean }>} A promise that resolves with success status.
+     */
+    writeFile: (filePath: string, content: string): Promise<{ success: boolean }> =>
+      ipcRenderer.invoke('dialog:writeFile', filePath, content),
   },
 
   /**

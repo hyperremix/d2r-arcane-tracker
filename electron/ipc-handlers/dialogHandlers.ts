@@ -1,3 +1,4 @@
+import { writeFile } from 'node:fs/promises';
 import { dialog, ipcMain } from 'electron';
 
 /**
@@ -23,6 +24,17 @@ export function initializeDialogHandlers(): void {
       return result;
     } catch (error) {
       console.error('Failed to show open dialog:', error);
+      throw error;
+    }
+  });
+
+  // Write file handler
+  ipcMain.handle('dialog:writeFile', async (_, filePath: string, content: string) => {
+    try {
+      await writeFile(filePath, content, 'utf-8');
+      return { success: true };
+    } catch (error) {
+      console.error('Failed to write file:', error);
       throw error;
     }
   });
