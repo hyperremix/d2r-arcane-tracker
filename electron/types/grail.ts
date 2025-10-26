@@ -200,6 +200,55 @@ export type DatabaseCharacter = {
   updated_at: string;
 };
 
+// ============================================================================
+// Run Tracking Types
+// ============================================================================
+
+/**
+ * Interface representing a run tracking session.
+ */
+export interface Session {
+  id: string;
+  characterId?: string;
+  startTime: Date;
+  endTime?: Date;
+  totalRunTime: number; // milliseconds spent in runs
+  totalSessionTime: number; // total milliseconds
+  runCount: number;
+  archived: boolean;
+  notes?: string;
+  created: Date;
+  lastUpdated: Date;
+}
+
+/**
+ * Interface representing a single run within a session.
+ */
+export interface Run {
+  id: string;
+  sessionId: string;
+  characterId: string;
+  runNumber: number;
+  runType?: string;
+  startTime: Date;
+  endTime?: Date;
+  duration?: number; // milliseconds
+  area?: string;
+  created: Date;
+  lastUpdated: Date;
+}
+
+/**
+ * Interface representing an item found during a run.
+ */
+export interface RunItem {
+  id: string;
+  runId: string;
+  grailProgressId: string;
+  foundTime: Date;
+  created: Date;
+}
+
 /**
  * Interface representing the progress of finding a Holy Grail item.
  */
@@ -236,6 +285,54 @@ export type DatabaseGrailProgress = {
 };
 
 /**
+ * Type representing a session as stored in the database.
+ * SQLite-compatible types: booleans as 0/1, undefined as null
+ */
+export type DatabaseSession = {
+  id: string;
+  character_id: string | null;
+  start_time: string; // ISO datetime string
+  end_time: string | null;
+  total_run_time: number;
+  total_session_time: number;
+  run_count: number;
+  archived: 0 | 1; // SQLite boolean
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+/**
+ * Type representing a run as stored in the database.
+ * SQLite-compatible types: booleans as 0/1, undefined as null
+ */
+export type DatabaseRun = {
+  id: string;
+  session_id: string;
+  character_id: string;
+  run_number: number;
+  run_type: string | null;
+  start_time: string;
+  end_time: string | null;
+  duration: number | null;
+  area: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+/**
+ * Type representing a run item as stored in the database.
+ * SQLite-compatible types: booleans as 0/1, undefined as null
+ */
+export type DatabaseRunItem = {
+  id: string;
+  run_id: string;
+  grail_progress_id: string;
+  found_time: string;
+  created_at: string;
+};
+
+/**
  * Interface representing Holy Grail completion statistics.
  */
 export interface GrailStatistics {
@@ -253,6 +350,46 @@ export interface GrailStatistics {
   };
   currentStreak: number;
   maxStreak: number;
+}
+
+/**
+ * Interface representing statistics for a single session.
+ */
+export interface SessionStats {
+  sessionId: string;
+  totalRuns: number;
+  totalTime: number;
+  totalRunTime: number;
+  averageRunDuration: number;
+  fastestRun: number;
+  slowestRun: number;
+  itemsFound: number;
+  newGrailItems: number;
+}
+
+/**
+ * Interface representing overall run statistics across all sessions.
+ */
+export interface RunStatistics {
+  totalSessions: number;
+  totalRuns: number;
+  totalTime: number;
+  averageRunDuration: number;
+  fastestRun: { runId: string; duration: number; timestamp: Date };
+  slowestRun: { runId: string; duration: number; timestamp: Date };
+  itemsPerRun: number;
+  mostCommonRunType: string;
+}
+
+/**
+ * Interface representing statistics grouped by run type.
+ */
+export interface RunTypeStats {
+  runType: string;
+  count: number;
+  totalDuration: number;
+  averageDuration: number;
+  itemsFound: number;
 }
 
 /**
@@ -287,6 +424,22 @@ export interface MonitoringStatus {
   isMonitoring: boolean;
   directory: string | null;
 }
+
+/**
+ * Interface representing the current state of run tracking.
+ */
+export interface RunState {
+  isRunning: boolean;
+  isPaused: boolean;
+  activeSession?: Session;
+  activeRun?: Run;
+  lastRunEndTime?: Date;
+}
+
+/**
+ * Type representing the state of the run tracker.
+ */
+export type RunTrackerState = 'idle' | 'running' | 'paused';
 
 /**
  * Type representing statistics for save files, mapping filenames to item counts.
