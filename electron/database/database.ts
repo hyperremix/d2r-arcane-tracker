@@ -321,7 +321,9 @@ class GrailDatabase {
         ('theme', 'system'),
         ('showItemIcons', 'false'),
         ('wizardCompleted', 'false'),
-        ('wizardSkipped', 'false');
+        ('wizardSkipped', 'false'),
+        ('runTrackerAutoStart', 'true'),
+        ('runTrackerEndThreshold', '10');
     `;
 
     this.db.exec(schema);
@@ -795,6 +797,9 @@ class GrailDatabase {
       // Terror zone configuration
       terrorZoneConfig: this.parseJSONSetting<Record<number, boolean>>(settings.terrorZoneConfig),
       terrorZoneBackupCreated: this.parseBooleanSetting(settings.terrorZoneBackupCreated),
+      // Run tracker settings
+      runTrackerAutoStart: this.parseBooleanSetting(settings.runTrackerAutoStart),
+      runTrackerEndThreshold: this.parseIntSetting(settings.runTrackerEndThreshold) ?? 10,
     };
 
     return typedSettings;

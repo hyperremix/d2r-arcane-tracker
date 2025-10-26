@@ -566,6 +566,9 @@ export type Settings = {
   // Terror zone configuration
   terrorZoneConfig?: Record<number, boolean>; // Zone ID -> enabled state
   terrorZoneBackupCreated?: boolean; // Whether backup has been created
+  // Run tracker settings
+  runTrackerAutoStart?: boolean; // Whether to automatically start runs when save files are modified
+  runTrackerEndThreshold?: number; // Time in seconds before ending a run (default: 10)
 };
 
 /**

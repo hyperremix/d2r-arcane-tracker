@@ -10,7 +10,7 @@ export class RunTrackerService {
   private currentSession: Session | null = null;
   private currentRun: Run | null = null;
   private lastSaveFileTime: Date | null = null;
-  private inGameThreshold = 10000; // 10 seconds
+  private inGameThreshold = 10000; // 10 seconds (will be updated from settings)
   private paused = false;
   private checkInterval: NodeJS.Timeout | null = null;
 
@@ -18,8 +18,29 @@ export class RunTrackerService {
     private eventBus: EventBus,
     private database: GrailDatabase,
   ) {
+    this.loadSettings();
     this.restoreState();
     this.startMonitoring();
+  }
+
+  /**
+   * Loads run tracker settings from the database.
+   */
+  private loadSettings(): void {
+    try {
+      const settings = this.database.getAllSettings();
+      this.inGameThreshold = (settings.runTrackerEndThreshold ?? 10) * 1000; // Convert to milliseconds
+    } catch (error) {
+      console.error('[RunTrackerService] Failed to load settings:', error);
+      // Keep default threshold
+    }
+  }
+
+  /**
+   * Updates run tracker settings dynamically.
+   */
+  updateSettings(): void {
+    this.loadSettings();
   }
 
   /**
@@ -29,6 +50,12 @@ export class RunTrackerService {
   handleSaveFileEvent(event: SaveFileEvent): void {
     // Skip auto-tracking when paused
     if (this.paused) {
+      return;
+    }
+
+    // Check if auto-start is enabled
+    const settings = this.database.getAllSettings();
+    if (!settings.runTrackerAutoStart) {
       return;
     }
 
