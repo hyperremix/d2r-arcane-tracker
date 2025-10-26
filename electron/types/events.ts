@@ -1,4 +1,4 @@
-import type { ItemDetectionEvent, SaveFileEvent } from './grail';
+import type { ItemDetectionEvent, Run, SaveFileEvent, Session } from './grail';
 
 /**
  * Payload for monitoring-started event
@@ -19,6 +19,54 @@ export interface MonitoringErrorPayload {
 }
 
 /**
+ * Payload for run-started event
+ */
+export interface RunStartedPayload {
+  run: Run;
+  session: Session;
+  manual: boolean;
+}
+
+/**
+ * Payload for run-ended event
+ */
+export interface RunEndedPayload {
+  run: Run;
+  session: Session;
+  manual: boolean;
+}
+
+/**
+ * Payload for run-paused event
+ */
+export interface RunPausedPayload {
+  run: Run;
+  session: Session;
+}
+
+/**
+ * Payload for run-resumed event
+ */
+export interface RunResumedPayload {
+  run: Run;
+  session: Session;
+}
+
+/**
+ * Payload for session-started event
+ */
+export interface SessionStartedPayload {
+  session: Session;
+}
+
+/**
+ * Payload for session-ended event
+ */
+export interface SessionEndedPayload {
+  session: Session;
+}
+
+/**
  * Union type of all application events with their payloads
  */
 export type AppEvent =
@@ -26,7 +74,13 @@ export type AppEvent =
   | { type: 'item-detection'; payload: ItemDetectionEvent }
   | { type: 'monitoring-started'; payload: MonitoringStartedPayload }
   | { type: 'monitoring-stopped'; payload: Record<string, never> }
-  | { type: 'monitoring-error'; payload: MonitoringErrorPayload };
+  | { type: 'monitoring-error'; payload: MonitoringErrorPayload }
+  | { type: 'run-started'; payload: RunStartedPayload }
+  | { type: 'run-ended'; payload: RunEndedPayload }
+  | { type: 'run-paused'; payload: RunPausedPayload }
+  | { type: 'run-resumed'; payload: RunResumedPayload }
+  | { type: 'session-started'; payload: SessionStartedPayload }
+  | { type: 'session-ended'; payload: SessionEndedPayload };
 
 /**
  * Extract event type names

@@ -6,7 +6,12 @@ import { GrailDatabase, grailDatabase } from './database/database';
 import { initializeDialogHandlers } from './ipc-handlers/dialogHandlers';
 import { closeGrailDatabase, initializeGrailHandlers } from './ipc-handlers/grailHandlers';
 import { initializeIconHandlers } from './ipc-handlers/iconHandlers';
-import { closeSaveFileMonitor, initializeSaveFileHandlers } from './ipc-handlers/saveFileHandlers';
+import { closeRunTracker, initializeRunTrackerHandlers } from './ipc-handlers/runTrackerHandlers';
+import {
+  closeSaveFileMonitor,
+  getRunTracker,
+  initializeSaveFileHandlers,
+} from './ipc-handlers/saveFileHandlers';
 import { initializeShellHandlers } from './ipc-handlers/shellHandlers';
 import { initializeTerrorZoneHandlers } from './ipc-handlers/terrorZoneHandlers';
 import { initializeUpdateHandlers } from './ipc-handlers/updateHandlers';
@@ -234,6 +239,13 @@ app.whenReady().then(() => {
   // Initialize grail database and IPC handlers
   initializeGrailHandlers();
   initializeSaveFileHandlers();
+
+  // Initialize run tracker handlers after save file handlers
+  const runTracker = getRunTracker();
+  if (runTracker) {
+    initializeRunTrackerHandlers(runTracker);
+  }
+
   initializeDialogHandlers();
   initializeShellHandlers();
   initializeIconHandlers();
@@ -339,6 +351,7 @@ app.whenReady().then(() => {
 app.on('before-quit', () => {
   closeGrailDatabase();
   closeSaveFileMonitor();
+  closeRunTracker();
   closeWidgetWindow();
 });
 

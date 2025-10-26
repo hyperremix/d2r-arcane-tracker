@@ -3,6 +3,7 @@ import { grailDatabase } from '../database/database';
 import { DatabaseBatchWriter } from '../services/DatabaseBatchWriter';
 import { EventBus } from '../services/EventBus';
 import { ItemDetectionService } from '../services/itemDetection';
+import { RunTrackerService } from '../services/runTracker';
 import type { D2SaveFile, SaveFileEvent } from '../services/saveFileMonitor';
 import { SaveFileMonitor } from '../services/saveFileMonitor';
 import type {
@@ -28,6 +29,7 @@ const batchWriter = new DatabaseBatchWriter(grailDatabase, () => {
 });
 let saveFileMonitor: SaveFileMonitor;
 let itemDetectionService: ItemDetectionService;
+let runTracker: RunTrackerService;
 const eventUnsubscribers: Array<() => void> = [];
 
 /**
@@ -227,8 +229,11 @@ export function initializeSaveFileHandlers(): void {
     eventUnsubscribers.length = 0;
   }
 
+  // Initialize run tracker service
+  runTracker = new RunTrackerService(eventBus, grailDatabase);
+
   // Initialize monitor and detection service with EventBus and grail database
-  saveFileMonitor = new SaveFileMonitor(eventBus, grailDatabase);
+  saveFileMonitor = new SaveFileMonitor(eventBus, grailDatabase, runTracker);
   itemDetectionService = new ItemDetectionService(eventBus);
 
   // Set up event forwarding to renderer process
@@ -461,6 +466,13 @@ export function initializeSaveFileHandlers(): void {
  * Closes the save file monitor and stops monitoring.
  * Should be called when the application is shutting down to properly clean up resources.
  */
+/**
+ * Gets the run tracker instance.
+ */
+export function getRunTracker(): RunTrackerService | undefined {
+  return runTracker;
+}
+
 export function closeSaveFileMonitor(): void {
   // Flush any pending database writes before shutdown
   console.log('[closeSaveFileMonitor] Flushing pending database writes');
