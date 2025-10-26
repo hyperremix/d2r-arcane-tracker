@@ -569,6 +569,12 @@ export type Settings = {
   // Run tracker settings
   runTrackerAutoStart?: boolean; // Whether to automatically start runs when save files are modified
   runTrackerEndThreshold?: number; // Time in seconds before ending a run (default: 10)
+  runTrackerShortcuts?: {
+    startRun: string; // default: 'Ctrl+R'
+    pauseRun: string; // default: 'Ctrl+Space'
+    endRun: string; // default: 'Ctrl+E'
+    endSession: string; // default: 'Ctrl+Shift+E'
+  };
 };
 
 /**

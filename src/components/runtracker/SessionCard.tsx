@@ -144,16 +144,16 @@ export function SessionCard({ session }: SessionCardProps) {
   }
 
   const sessionCard = (
-    <Card>
+    <Card className="transition-all duration-300 ease-in-out hover:shadow-md">
       <CardHeader>
         <CardTitle className="flex items-center justify-between">
-          <span>Session Card</span>
-          <Badge variant="secondary" className="text-xs">
+          <span className="transition-colors duration-200">Session Card</span>
+          <Badge variant="secondary" className="text-xs transition-all duration-200">
             Active
           </Badge>
         </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-4 transition-all duration-300">
         {/* Session Statistics */}
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-1">
@@ -211,7 +211,7 @@ export function SessionCard({ session }: SessionCardProps) {
             size="sm"
             onClick={handleEndSession}
             disabled={loading}
-            className="flex-1"
+            className="flex-1 transition-all duration-200 hover:scale-105"
           >
             End Session
           </Button>
@@ -220,7 +220,7 @@ export function SessionCard({ session }: SessionCardProps) {
             size="sm"
             onClick={handleArchiveSession}
             disabled={loading}
-            className="flex-1"
+            className="flex-1 transition-all duration-200 hover:scale-105"
           >
             Archive Session
           </Button>
@@ -230,6 +230,7 @@ export function SessionCard({ session }: SessionCardProps) {
             onClick={handleExportClick}
             disabled={loading || currentSession.runCount === 0}
             title={currentSession.runCount === 0 ? 'No runs to export' : 'Export session data'}
+            className="transition-all duration-200 hover:scale-105"
           >
             <FileDownIcon className="h-4 w-4" />
           </Button>

@@ -1,3 +1,4 @@
+import { useVirtualizer } from '@tanstack/react-virtual';
 import type { Run, RunItem } from 'electron/types/grail';
 import {
   ChevronDown,
@@ -5,7 +6,8 @@ import {
   ChevronRight,
   ChevronRight as ChevronRightIcon,
 } from 'lucide-react';
-import { useCallback, useEffect, useId, useMemo, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
+import { useDebouncedCallback } from 'use-debounce';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -17,6 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
   Table,
   TableBody,
@@ -25,7 +28,9 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { formatDuration } from '@/lib/utils';
+import { useGrailStore } from '@/stores/grailStore';
 import { useRunTrackerStore } from '@/stores/runTrackerStore';
 
 interface RunListProps {
@@ -36,6 +41,33 @@ type SortField = 'duration' | 'startTime' | 'runType' | 'itemsFound';
 type SortOrder = 'asc' | 'desc';
 
 const ITEMS_PER_PAGE = 10;
+const VIRTUAL_SCROLLING_THRESHOLD = 100;
+
+// Skeleton loader for table rows
+function TableRowSkeleton() {
+  return (
+    <TableRow>
+      <TableCell>
+        <Skeleton className="h-4 w-8" />
+      </TableCell>
+      <TableCell>
+        <Skeleton className="h-4 w-16" />
+      </TableCell>
+      <TableCell>
+        <Skeleton className="h-4 w-20" />
+      </TableCell>
+      <TableCell>
+        <Skeleton className="h-4 w-16" />
+      </TableCell>
+      <TableCell>
+        <Skeleton className="h-4 w-8" />
+      </TableCell>
+      <TableCell>
+        <Skeleton className="h-4 w-8" />
+      </TableCell>
+    </TableRow>
+  );
+}
 
 interface RunRowProps {
   run: Run;
@@ -45,6 +77,7 @@ interface RunRowProps {
   loading: boolean;
   onToggleExpansion: (runId: string) => void;
   formatTimestamp: (date: Date) => string;
+  getItemInfo: (runItem: RunItem) => { name: string; isNewGrail: boolean };
 }
 
 function RunRow({
@@ -55,6 +88,7 @@ function RunRow({
   loading,
   onToggleExpansion,
   formatTimestamp,
+  getItemInfo,
 }: RunRowProps) {
   return (
     <Collapsible open={isExpanded} onOpenChange={() => onToggleExpansion(run.id)}>
@@ -99,52 +133,47 @@ function RunRow({
       <CollapsibleContent asChild>
         <TableRow>
           <TableCell colSpan={6} className="p-0">
-            <div className="border-t bg-muted/25 p-4">
-              <div className="space-y-4">
-                {/* Run Statistics */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <p className="font-medium text-muted-foreground text-sm">Area</p>
-                    <p className="text-sm">{run.area || 'Unknown'}</p>
-                  </div>
-                  <div className="space-y-1">
-                    <p className="font-medium text-muted-foreground text-sm">End Time</p>
-                    <p className="font-mono text-sm">
-                      {run.endTime ? formatTimestamp(run.endTime) : 'Incomplete'}
-                    </p>
-                  </div>
+            <div className="border-t bg-muted/20 p-4">
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="font-medium text-sm">Items Found</h4>
+                  <Badge variant="outline" className="text-xs">
+                    {itemsCount} items
+                  </Badge>
                 </div>
 
-                {/* Items Found */}
-                <div className="space-y-2">
-                  <p className="font-medium text-muted-foreground text-sm">
-                    Items Found ({itemsCount})
-                  </p>
-                  {loading && !runItemsData.length ? (
-                    <div className="flex items-center gap-2 text-muted-foreground text-sm">
-                      <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-                      Loading items...
-                    </div>
-                  ) : itemsCount > 0 ? (
-                    <div className="space-y-1">
-                      {runItemsData.map((item) => (
-                        <div
-                          key={item.id}
-                          className="flex items-center gap-2 rounded bg-background p-2 text-sm"
-                        >
-                          <Badge variant="outline" className="text-xs">
-                            {item.foundTime.toLocaleTimeString()}
-                          </Badge>
-                          <span className="text-muted-foreground">
-                            Item ID: {item.grailProgressId}
-                          </span>
+                {loading ? (
+                  <div className="space-y-2">
+                    {Array.from({ length: 3 }, (_, i) => (
+                      <div
+                        key={`loading-skeleton-${i}-${Date.now()}`}
+                        className="flex items-center gap-2"
+                      >
+                        <Skeleton className="h-4 w-4" />
+                        <Skeleton className="h-4 w-32" />
+                      </div>
+                    ))}
+                  </div>
+                ) : runItemsData.length > 0 ? (
+                  <div className="space-y-2">
+                    {runItemsData.map((item) => {
+                      const itemInfo = getItemInfo(item);
+                      return (
+                        <div key={item.id} className="flex items-center gap-2">
+                          <div className="h-4 w-4 rounded bg-primary/20" />
+                          <span className="text-sm">{itemInfo.name}</span>
+                          {itemInfo.isNewGrail && (
+                            <Badge variant="secondary" className="text-xs">
+                              New
+                            </Badge>
+                          )}
                         </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-muted-foreground text-sm">No items found in this run</p>
-                  )}
-                </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <p className="text-muted-foreground text-sm">No items found in this run.</p>
+                )}
               </div>
             </div>
           </TableCell>
@@ -160,6 +189,7 @@ function RunRow({
  */
 export function RunList({ runs }: RunListProps) {
   const { runItems, loadRunItems, loading } = useRunTrackerStore();
+  const { items, progress } = useGrailStore();
   const runTypeFilterId = useId();
   const sortFieldId = useId();
 
@@ -169,6 +199,8 @@ export function RunList({ runs }: RunListProps) {
   const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
   const [selectedRunTypes, setSelectedRunTypes] = useState<string[]>([]);
   const [expandedRunIds, setExpandedRunIds] = useState<Set<string>>(new Set());
+  const [filteredRuns, setFilteredRuns] = useState<Run[]>([]);
+  const [sortedRuns, setSortedRuns] = useState<Run[]>([]);
 
   // Get unique run types from all runs
   const availableRunTypes = useMemo(() => {
@@ -179,7 +211,7 @@ export function RunList({ runs }: RunListProps) {
     return Array.from(new Set(types)).sort();
   }, [runs]);
 
-  // Calculate items count for each run
+  // Calculate items count for each run (memoized)
   const getRunItemsCount = useCallback(
     (runId: string) => {
       const items = runItems.get(runId) || [];
@@ -188,48 +220,87 @@ export function RunList({ runs }: RunListProps) {
     [runItems],
   );
 
-  // Filter runs by selected run types
-  const filteredRuns = useMemo(() => {
-    if (!runs) return [];
-    if (selectedRunTypes.length === 0) return runs;
-    return runs.filter((run) => run.runType && selectedRunTypes.includes(run.runType));
-  }, [runs, selectedRunTypes]);
+  // Debounced filter and sort operations
+  const debouncedFilterRuns = useDebouncedCallback(
+    (runs: Run[], selectedTypes: string[]): Run[] => {
+      if (!runs || runs.length === 0) return [];
+      if (selectedTypes.length === 0) return runs;
+      return runs.filter((run) => run.runType && selectedTypes.includes(run.runType));
+    },
+    300,
+  );
 
-  // Sort runs based on selected field and order
-  const sortedRuns = useMemo(() => {
-    const sorted = [...filteredRuns].sort((a, b) => {
-      let comparison = 0;
+  const debouncedSortRuns = useDebouncedCallback(
+    (runs: Run[], sortField: SortField, sortOrder: SortOrder): Run[] => {
+      if (!runs || runs.length === 0) return [];
+      return [...runs].sort((a, b) => {
+        let comparison = 0;
 
-      switch (sortField) {
-        case 'duration': {
-          const durationA = a.duration || 0;
-          const durationB = b.duration || 0;
-          comparison = durationA - durationB;
-          break;
+        switch (sortField) {
+          case 'duration': {
+            const durationA = a.duration || 0;
+            const durationB = b.duration || 0;
+            comparison = durationA - durationB;
+            break;
+          }
+          case 'startTime': {
+            comparison = a.startTime.getTime() - b.startTime.getTime();
+            break;
+          }
+          case 'runType': {
+            const typeA = a.runType || '';
+            const typeB = b.runType || '';
+            comparison = typeA.localeCompare(typeB);
+            break;
+          }
+          case 'itemsFound': {
+            const itemsA = getRunItemsCount(a.id);
+            const itemsB = getRunItemsCount(b.id);
+            comparison = itemsA - itemsB;
+            break;
+          }
         }
-        case 'startTime': {
-          comparison = a.startTime.getTime() - b.startTime.getTime();
-          break;
-        }
-        case 'runType': {
-          const typeA = a.runType || '';
-          const typeB = b.runType || '';
-          comparison = typeA.localeCompare(typeB);
-          break;
-        }
-        case 'itemsFound': {
-          const itemsA = getRunItemsCount(a.id);
-          const itemsB = getRunItemsCount(b.id);
-          comparison = itemsA - itemsB;
-          break;
-        }
-      }
 
-      return sortOrder === 'asc' ? comparison : -comparison;
-    });
+        return sortOrder === 'asc' ? comparison : -comparison;
+      });
+    },
+    300,
+  );
 
-    return sorted;
-  }, [filteredRuns, sortField, sortOrder, getRunItemsCount]);
+  // Effect to trigger filtering when runs or selectedRunTypes change
+  useEffect(() => {
+    if (!runs) {
+      setFilteredRuns([]);
+      return;
+    }
+    const filtered = debouncedFilterRuns(runs, selectedRunTypes);
+    if (filtered) {
+      setFilteredRuns(filtered);
+    }
+  }, [runs, selectedRunTypes, debouncedFilterRuns]);
+
+  // Effect to trigger sorting when filteredRuns, sortField, or sortOrder change
+  useEffect(() => {
+    if (filteredRuns.length === 0) {
+      setSortedRuns([]);
+      return;
+    }
+    const sorted = debouncedSortRuns(filteredRuns, sortField, sortOrder);
+    if (sorted) {
+      setSortedRuns(sorted);
+    }
+  }, [filteredRuns, sortField, sortOrder, debouncedSortRuns]);
+
+  // Virtual scrolling setup
+  const parentRef = useRef<HTMLDivElement>(null);
+  const shouldUseVirtualScrolling = sortedRuns.length > VIRTUAL_SCROLLING_THRESHOLD;
+
+  const virtualizer = useVirtualizer({
+    count: sortedRuns.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => 60, // Estimated row height
+    enabled: shouldUseVirtualScrolling,
+  });
 
   // Paginate runs
   const totalPages = Math.ceil(sortedRuns.length / ITEMS_PER_PAGE);
@@ -259,28 +330,10 @@ export function RunList({ runs }: RunListProps) {
         setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
       } else {
         setSortField(field);
-        setSortOrder('desc');
+        setSortOrder('asc');
       }
     },
     [sortField, sortOrder],
-  );
-
-  // Handle row expansion
-  const toggleRunExpansion = useCallback(
-    async (runId: string) => {
-      const newExpanded = new Set(expandedRunIds);
-      if (newExpanded.has(runId)) {
-        newExpanded.delete(runId);
-      } else {
-        newExpanded.add(runId);
-        // Load items for this run if not already loaded
-        if (!runItems.has(runId)) {
-          await loadRunItems(runId);
-        }
-      }
-      setExpandedRunIds(newExpanded);
-    },
-    [expandedRunIds, runItems, loadRunItems],
   );
 
   // Handle pagination
@@ -291,29 +344,91 @@ export function RunList({ runs }: RunListProps) {
     [totalPages],
   );
 
-  // Format timestamp for display
+  // Handle run expansion
+  const toggleRunExpansion = useCallback(
+    (runId: string) => {
+      setExpandedRunIds((prev) => {
+        const newSet = new Set(prev);
+        if (newSet.has(runId)) {
+          newSet.delete(runId);
+        } else {
+          newSet.add(runId);
+          // Load run items when expanding
+          loadRunItems(runId);
+        }
+        return newSet;
+      });
+    },
+    [loadRunItems],
+  );
+
+  // Format timestamp helper
   const formatTimestamp = useCallback((date: Date) => {
-    return date.toLocaleString('en-US', {
-      month: 'short',
-      day: 'numeric',
+    return date.toLocaleTimeString('en-US', {
       hour: '2-digit',
       minute: '2-digit',
+      second: '2-digit',
     });
   }, []);
 
-  // Empty state
-  if (!runs || runs.length === 0) {
+  // Helper function to get item information
+  const getItemInfo = useCallback(
+    (runItem: RunItem) => {
+      const item = items.find((i) => i.id === runItem.grailProgressId);
+      const progressRecord = progress.find((p) => p.itemId === runItem.grailProgressId);
+      return {
+        name: item?.name || 'Unknown Item',
+        isNewGrail: Boolean(
+          progressRecord?.foundDate && progressRecord.foundDate >= runItem.foundTime,
+        ),
+      };
+    },
+    [items, progress],
+  );
+
+  // Show loading state if runs are undefined
+  if (runs === undefined) {
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Run History</CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            <Skeleton className="h-6 w-32" />
+            <Skeleton className="h-6 w-16" />
+          </CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="flex flex-col items-center justify-center py-8 text-center">
-            <p className="mb-2 font-medium text-muted-foreground">No runs recorded</p>
-            <p className="text-muted-foreground text-sm">
-              Start tracking runs to see your farming history here.
-            </p>
+        <CardContent className="space-y-4">
+          {/* Filter and Sort Controls Skeleton */}
+          <div className="flex flex-wrap gap-4">
+            <div className="flex items-center gap-2">
+              <Skeleton className="h-4 w-20" />
+              <Skeleton className="h-8 w-40" />
+            </div>
+            <div className="flex items-center gap-2">
+              <Skeleton className="h-4 w-16" />
+              <Skeleton className="h-8 w-32" />
+              <Skeleton className="h-8 w-8" />
+            </div>
+          </div>
+
+          {/* Table Skeleton */}
+          <div className="space-y-2">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-16">Run #</TableHead>
+                  <TableHead>Type</TableHead>
+                  <TableHead>Start Time</TableHead>
+                  <TableHead>Duration</TableHead>
+                  <TableHead className="w-24">Items</TableHead>
+                  <TableHead className="w-16">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {Array.from({ length: 5 }, (_, i) => (
+                  <TableRowSkeleton key={`table-skeleton-${i}-${Date.now()}`} />
+                ))}
+              </TableBody>
+            </Table>
           </div>
         </CardContent>
       </Card>
@@ -323,9 +438,9 @@ export function RunList({ runs }: RunListProps) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center justify-between">
-          <span>Run History</span>
-          <Badge variant="secondary" className="text-xs">
+        <CardTitle className="flex items-center gap-2">
+          Run History
+          <Badge variant="outline" className="text-xs">
             {sortedRuns.length} runs
           </Badge>
         </CardTitle>
@@ -334,9 +449,19 @@ export function RunList({ runs }: RunListProps) {
         {/* Filter and Sort Controls */}
         <div className="flex flex-wrap gap-4">
           <div className="flex items-center gap-2">
-            <label htmlFor={runTypeFilterId} className="font-medium text-muted-foreground text-sm">
-              Filter by type:
-            </label>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <label
+                  htmlFor={runTypeFilterId}
+                  className="font-medium text-muted-foreground text-sm"
+                >
+                  Filter by type:
+                </label>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Filter runs by their type (e.g., Mephisto, Chaos, etc.)</p>
+              </TooltipContent>
+            </Tooltip>
             <Select
               value={selectedRunTypes.length === 0 ? 'all' : selectedRunTypes[0]}
               onValueChange={handleRunTypeFilter}
@@ -356,9 +481,16 @@ export function RunList({ runs }: RunListProps) {
           </div>
 
           <div className="flex items-center gap-2">
-            <label htmlFor={sortFieldId} className="font-medium text-muted-foreground text-sm">
-              Sort by:
-            </label>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <label htmlFor={sortFieldId} className="font-medium text-muted-foreground text-sm">
+                  Sort by:
+                </label>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Choose how to sort the runs list</p>
+              </TooltipContent>
+            </Tooltip>
             <Select value={sortField} onValueChange={(value) => handleSort(value as SortField)}>
               <SelectTrigger id={sortFieldId} className="w-32">
                 <SelectValue />
@@ -370,111 +502,186 @@ export function RunList({ runs }: RunListProps) {
                 <SelectItem value="itemsFound">Items Found</SelectItem>
               </SelectContent>
             </Select>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
-              className="px-2"
-            >
-              {sortOrder === 'asc' ? '↑' : '↓'}
-            </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+                  className="px-2"
+                >
+                  {sortOrder === 'asc' ? '↑' : '↓'}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>{sortOrder === 'asc' ? 'Sort ascending' : 'Sort descending'}</p>
+              </TooltipContent>
+            </Tooltip>
           </div>
         </div>
 
         {/* Runs Table */}
-        {paginatedRuns.length > 0 ? (
+        {sortedRuns.length > 0 ? (
           <div className="space-y-2">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-16">Run #</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Start Time</TableHead>
-                  <TableHead>Duration</TableHead>
-                  <TableHead className="w-24">Items</TableHead>
-                  <TableHead className="w-16">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {paginatedRuns.map((run) => {
-                  const itemsCount = getRunItemsCount(run.id);
-                  const isExpanded = expandedRunIds.has(run.id);
-                  const runItemsData = runItems.get(run.id) || [];
-
-                  return (
-                    <RunRow
-                      key={run.id}
-                      run={run}
-                      itemsCount={itemsCount}
-                      isExpanded={isExpanded}
-                      runItemsData={runItemsData}
-                      loading={loading}
-                      onToggleExpansion={toggleRunExpansion}
-                      formatTimestamp={formatTimestamp}
-                    />
-                  );
-                })}
-              </TableBody>
-            </Table>
-
-            {/* Pagination */}
-            {totalPages > 1 && (
-              <div className="flex items-center justify-between pt-4">
+            {shouldUseVirtualScrolling ? (
+              // Virtual scrolling table
+              <div className="space-y-2">
                 <div className="text-muted-foreground text-sm">
-                  Showing {startIndex + 1}-{Math.min(endIndex, sortedRuns.length)} of{' '}
-                  {sortedRuns.length} runs
+                  Showing {sortedRuns.length} runs (virtual scrolling enabled)
                 </div>
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => goToPage(currentPage - 1)}
-                    disabled={currentPage === 1}
+                <div ref={parentRef} className="h-[600px] overflow-auto rounded-md border">
+                  <div
+                    style={{
+                      height: `${virtualizer.getTotalSize()}px`,
+                      width: '100%',
+                      position: 'relative',
+                    }}
                   >
-                    <ChevronLeft className="h-4 w-4" />
-                    Previous
-                  </Button>
-                  <div className="flex items-center gap-1">
-                    {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                      const page = i + 1;
-                      const isCurrentPage = page === currentPage;
-                      return (
-                        <Button
-                          key={page}
-                          variant={isCurrentPage ? 'default' : 'outline'}
-                          size="sm"
-                          className="h-8 w-8 p-0"
-                          onClick={() => goToPage(page)}
-                        >
-                          {page}
-                        </Button>
-                      );
-                    })}
-                    {totalPages > 5 && (
-                      <>
-                        <span className="text-muted-foreground text-sm">...</span>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="h-8 w-8 p-0"
-                          onClick={() => goToPage(totalPages)}
-                        >
-                          {totalPages}
-                        </Button>
-                      </>
-                    )}
+                    <Table>
+                      <TableHeader className="sticky top-0 z-10 bg-background">
+                        <TableRow>
+                          <TableHead className="w-16">Run #</TableHead>
+                          <TableHead>Type</TableHead>
+                          <TableHead>Start Time</TableHead>
+                          <TableHead>Duration</TableHead>
+                          <TableHead className="w-24">Items</TableHead>
+                          <TableHead className="w-16">Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {virtualizer.getVirtualItems().map((virtualItem) => {
+                          const run = sortedRuns[virtualItem.index];
+                          const itemsCount = getRunItemsCount(run.id);
+                          const isExpanded = expandedRunIds.has(run.id);
+                          const runItemsData = runItems.get(run.id) || [];
+
+                          return (
+                            <div
+                              key={virtualItem.key}
+                              style={{
+                                position: 'absolute',
+                                top: 0,
+                                left: 0,
+                                width: '100%',
+                                height: `${virtualItem.size}px`,
+                                transform: `translateY(${virtualItem.start}px)`,
+                              }}
+                            >
+                              <RunRow
+                                run={run}
+                                itemsCount={itemsCount}
+                                isExpanded={isExpanded}
+                                runItemsData={runItemsData}
+                                loading={loading}
+                                onToggleExpansion={toggleRunExpansion}
+                                formatTimestamp={formatTimestamp}
+                                getItemInfo={getItemInfo}
+                              />
+                            </div>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
                   </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => goToPage(currentPage + 1)}
-                    disabled={currentPage === totalPages}
-                  >
-                    Next
-                    <ChevronRightIcon className="h-4 w-4" />
-                  </Button>
                 </div>
               </div>
+            ) : (
+              // Regular paginated table
+              <>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-16">Run #</TableHead>
+                      <TableHead>Type</TableHead>
+                      <TableHead>Start Time</TableHead>
+                      <TableHead>Duration</TableHead>
+                      <TableHead className="w-24">Items</TableHead>
+                      <TableHead className="w-16">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {paginatedRuns.map((run) => {
+                      const itemsCount = getRunItemsCount(run.id);
+                      const isExpanded = expandedRunIds.has(run.id);
+                      const runItemsData = runItems.get(run.id) || [];
+
+                      return (
+                        <RunRow
+                          key={run.id}
+                          run={run}
+                          itemsCount={itemsCount}
+                          isExpanded={isExpanded}
+                          runItemsData={runItemsData}
+                          loading={loading}
+                          onToggleExpansion={toggleRunExpansion}
+                          formatTimestamp={formatTimestamp}
+                          getItemInfo={getItemInfo}
+                        />
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+
+                {/* Pagination */}
+                {totalPages > 1 && (
+                  <div className="flex items-center justify-between pt-4">
+                    <div className="text-muted-foreground text-sm">
+                      Showing {startIndex + 1}-{Math.min(endIndex, sortedRuns.length)} of{' '}
+                      {sortedRuns.length} runs
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => goToPage(currentPage - 1)}
+                        disabled={currentPage === 1}
+                      >
+                        <ChevronLeft className="h-4 w-4" />
+                        Previous
+                      </Button>
+                      <div className="flex items-center gap-1">
+                        {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                          const page = i + 1;
+                          const isCurrentPage = page === currentPage;
+                          return (
+                            <Button
+                              key={page}
+                              variant={isCurrentPage ? 'default' : 'outline'}
+                              size="sm"
+                              className="h-8 w-8 p-0"
+                              onClick={() => goToPage(page)}
+                            >
+                              {page}
+                            </Button>
+                          );
+                        })}
+                        {totalPages > 5 && (
+                          <>
+                            <span className="text-muted-foreground text-sm">...</span>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-8 w-8 p-0"
+                              onClick={() => goToPage(totalPages)}
+                            >
+                              {totalPages}
+                            </Button>
+                          </>
+                        )}
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => goToPage(currentPage + 1)}
+                        disabled={currentPage === totalPages}
+                      >
+                        Next
+                        <ChevronRightIcon className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </>
             )}
           </div>
         ) : (

@@ -1,13 +1,16 @@
 import '@testing-library/jest-dom';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { useGrailStore } from '@/stores/grailStore';
 import { useRunTrackerStore } from '@/stores/runTrackerStore';
 import { SessionControls } from './SessionControls';
 
-// Mock the store
+// Mock the stores
 vi.mock('@/stores/runTrackerStore');
+vi.mock('@/stores/grailStore');
 
 const mockUseRunTrackerStore = vi.mocked(useRunTrackerStore);
+const mockUseGrailStore = vi.mocked(useGrailStore);
 
 // Mock document methods
 const mockAddEventListener = vi.fn();
@@ -68,11 +71,26 @@ const defaultStoreState = {
   ...mockStoreActions,
 };
 
+const defaultGrailStoreState = {
+  settings: {
+    runTrackerShortcuts: {
+      startRun: 'Ctrl+R',
+      pauseRun: 'Ctrl+Space',
+      endRun: 'Ctrl+E',
+      endSession: 'Ctrl+Shift+E',
+    },
+  },
+};
+
 describe('SessionControls', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockAddEventListener.mockClear();
     mockRemoveEventListener.mockClear();
+
+    // Set up default mocks
+    mockUseRunTrackerStore.mockReturnValue(defaultStoreState);
+    mockUseGrailStore.mockReturnValue(defaultGrailStoreState);
   });
 
   describe('Rendering', () => {
@@ -394,6 +412,7 @@ describe('SessionControls', () => {
         activeRun: mockRun,
         isPaused: false,
       });
+      mockUseGrailStore.mockReturnValue(defaultGrailStoreState);
 
       render(<SessionControls />);
 
@@ -419,6 +438,7 @@ describe('SessionControls', () => {
         activeRun: mockRun,
         isPaused: true,
       });
+      mockUseGrailStore.mockReturnValue(defaultGrailStoreState);
 
       render(<SessionControls />);
 
