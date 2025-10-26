@@ -32,46 +32,6 @@ Please implement this story according to the acceptance criteria and technical n
 [Any other relevant information, constraints, or special considerations]
 ```
 
-## Example for US-001
-
-```
-I'm implementing US-001: Database Schema for Run Tracking from the Run Counter epic.
-
-**Story Details:**
-- Story: As a developer, I want to create database tables for run tracking so that we can persist session and run data.
-- File path: docs/user-stories/run-counter/01-database-foundation/US-001-database-schema.md
-- Dependencies: None (foundational story)
-- Complexity: Medium
-
-**Requirements:**
-Please implement this story according to the acceptance criteria and technical notes in the user story document. Specifically:
-
-1. Create three new tables (sessions, runs, run_items) in the database schema
-2. Add appropriate indexes for query performance
-3. Add triggers for automatic timestamp updates
-4. Add foreign key constraints to maintain referential integrity
-5. Ensure schema updates are backwards compatible
-
-**Context:**
-- The database schema is defined in electron/database/database.ts in the createSchema() method
-- Follow the existing patterns used for other tables (items, characters, grail_progress, etc.)
-- Use SQLite-specific syntax as appropriate
-- Include the schema in the existing schema creation block
-
-**Deliverables:**
-- [ ] Three tables created with all required columns
-- [ ] Indexes added for common queries
-- [ ] Triggers added for timestamp updates
-- [ ] Foreign key constraints added
-- [ ] Schema tested on existing database (no data loss)
-- [ ] Migration works on existing databases
-
-**Additional Context:**
-- This is a foundational story - everything else depends on it
-- Make sure to use existing helper patterns from the codebase
-- Test with both fresh and existing databases to ensure compatibility
-```
-
 ## Quick Reference Checklist
 
 When implementing any story:
