@@ -15,10 +15,14 @@ export let widgetWindow: BrowserWindow | null = null;
 /**
  * Size mapping for different widget display modes.
  */
-const SIZE_MAP: Record<'overall' | 'split' | 'all', { width: number; height: number }> = {
+const SIZE_MAP: Record<
+  'overall' | 'split' | 'all' | 'run-only',
+  { width: number; height: number }
+> = {
   overall: { width: 250, height: 250 }, // Single large gauge
   split: { width: 350, height: 250 }, // Two gauges side by side
   all: { width: 300, height: 350 }, // Overall on top, normal+ethereal below
+  'run-only': { width: 200, height: 120 }, // Compact run counter display
 };
 
 /**
@@ -190,9 +194,9 @@ export function getWidgetWindowPosition(): { x: number; y: number } | null {
 /**
  * Updates the widget window size based on new display mode.
  *
- * @param display - The new display mode ('overall', 'split', or 'all')
+ * @param display - The new display mode ('overall', 'split', 'all', or 'run-only')
  */
-export function updateWidgetWindowSize(display: 'overall' | 'split' | 'all'): void {
+export function updateWidgetWindowSize(display: 'overall' | 'split' | 'all' | 'run-only'): void {
   if (widgetWindow) {
     const newSize = SIZE_MAP[display];
     const currentBounds = widgetWindow.getBounds();

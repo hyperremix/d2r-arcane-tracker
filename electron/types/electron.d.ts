@@ -348,10 +348,10 @@ export interface ElectronAPI {
 
     /**
      * Updates the widget display mode.
-     * @param {'overall' | 'split' | 'all'} display - The new display mode for the widget.
+     * @param {'overall' | 'split' | 'all' | 'run-only'} display - The new display mode for the widget.
      * @returns {Promise<{ success: boolean; error?: string }>} A promise that resolves with a success indicator.
      */
-    updateDisplay(display: 'overall' | 'split' | 'all'): Promise<{ success: boolean; error?: string }>
+    updateDisplay(display: 'overall' | 'split' | 'all' | 'run-only'): Promise<{ success: boolean; error?: string }>
 
     /**
      * Updates the widget window opacity.

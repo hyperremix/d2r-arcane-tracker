@@ -407,11 +407,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
     /**
      * Updates the widget display mode.
-     * @param {'overall' | 'split' | 'all'} display - The new display mode for the widget.
+     * @param {'overall' | 'split' | 'all' | 'run-only'} display - The new display mode for the widget.
      * @returns {Promise<{ success: boolean; error?: string }>} Success indicator.
      */
     updateDisplay: (
-      display: 'overall' | 'split' | 'all',
+      display: 'overall' | 'split' | 'all' | 'run-only',
     ): Promise<{ success: boolean; error?: string }> =>
       ipcRenderer.invoke('widget:update-display', display),
 
