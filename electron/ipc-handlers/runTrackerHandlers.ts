@@ -1,13 +1,19 @@
-import { ipcMain } from 'electron';
+import { ipcMain, webContents } from 'electron';
+import type { EventBus } from '../services/EventBus';
 import type { RunTrackerService } from '../services/runTracker';
 
 let runTracker: RunTrackerService | null = null;
+const eventUnsubscribers: Array<() => void> = [];
 
 /**
  * Initialize run tracker IPC handlers.
  * @param runTrackerInstance - The run tracker service instance
+ * @param eventBus - The EventBus instance for event forwarding
  */
-export function initializeRunTrackerHandlers(runTrackerInstance: RunTrackerService): void {
+export function initializeRunTrackerHandlers(
+  runTrackerInstance: RunTrackerService,
+  eventBus: EventBus,
+): void {
   runTracker = runTrackerInstance;
 
   // Session management handlers
@@ -242,6 +248,69 @@ export function initializeRunTrackerHandlers(runTrackerInstance: RunTrackerServi
     }
   });
 
+  // Set up event forwarding to renderer processes
+  // Session events
+  const unsubscribeSessionStarted = eventBus.on('session-started', (payload) => {
+    const allWebContents = webContents.getAllWebContents();
+    for (const wc of allWebContents) {
+      if (!wc.isDestroyed() && wc.getType() === 'window') {
+        wc.send('run-tracker:session-started', payload);
+      }
+    }
+  });
+  eventUnsubscribers.push(unsubscribeSessionStarted);
+
+  const unsubscribeSessionEnded = eventBus.on('session-ended', (payload) => {
+    const allWebContents = webContents.getAllWebContents();
+    for (const wc of allWebContents) {
+      if (!wc.isDestroyed() && wc.getType() === 'window') {
+        wc.send('run-tracker:session-ended', payload);
+      }
+    }
+  });
+  eventUnsubscribers.push(unsubscribeSessionEnded);
+
+  // Run events
+  const unsubscribeRunStarted = eventBus.on('run-started', (payload) => {
+    const allWebContents = webContents.getAllWebContents();
+    for (const wc of allWebContents) {
+      if (!wc.isDestroyed() && wc.getType() === 'window') {
+        wc.send('run-tracker:run-started', payload);
+      }
+    }
+  });
+  eventUnsubscribers.push(unsubscribeRunStarted);
+
+  const unsubscribeRunEnded = eventBus.on('run-ended', (payload) => {
+    const allWebContents = webContents.getAllWebContents();
+    for (const wc of allWebContents) {
+      if (!wc.isDestroyed() && wc.getType() === 'window') {
+        wc.send('run-tracker:run-ended', payload);
+      }
+    }
+  });
+  eventUnsubscribers.push(unsubscribeRunEnded);
+
+  const unsubscribeRunPaused = eventBus.on('run-paused', (payload) => {
+    const allWebContents = webContents.getAllWebContents();
+    for (const wc of allWebContents) {
+      if (!wc.isDestroyed() && wc.getType() === 'window') {
+        wc.send('run-tracker:run-paused', payload);
+      }
+    }
+  });
+  eventUnsubscribers.push(unsubscribeRunPaused);
+
+  const unsubscribeRunResumed = eventBus.on('run-resumed', (payload) => {
+    const allWebContents = webContents.getAllWebContents();
+    for (const wc of allWebContents) {
+      if (!wc.isDestroyed() && wc.getType() === 'window') {
+        wc.send('run-tracker:run-resumed', payload);
+      }
+    }
+  });
+  eventUnsubscribers.push(unsubscribeRunResumed);
+
   console.log('[runTrackerHandlers] IPC handlers initialized');
 }
 
@@ -249,6 +318,12 @@ export function initializeRunTrackerHandlers(runTrackerInstance: RunTrackerServi
  * Close run tracker service.
  */
 export function closeRunTracker(): void {
+  // Clean up event listeners
+  for (const unsubscribe of eventUnsubscribers) {
+    unsubscribe();
+  }
+  eventUnsubscribers.length = 0;
+
   if (runTracker) {
     runTracker.shutdown();
     runTracker = null;
