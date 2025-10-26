@@ -3,10 +3,16 @@ import type {
   DatabaseCharacter,
   DatabaseGrailProgress,
   DatabaseItem,
+  DatabaseRun,
+  DatabaseRunItem,
   DatabaseSaveFileState,
+  DatabaseSession,
   GrailProgress,
   Item,
+  Run,
+  RunItem,
   SaveFileState,
+  Session,
 } from '../types/grail';
 
 /**
@@ -276,5 +282,116 @@ export function mapDatabaseSaveFileStateToSaveFileState(
     lastParsed: new Date(dbSaveFileState.last_parsed),
     created: new Date(dbSaveFileState.created_at),
     updated: new Date(dbSaveFileState.updated_at),
+  };
+}
+
+/**
+ * Maps a Session object to DatabaseSession format with SQLite-compatible types.
+ * @param session - The session object to map (with Date objects and optional fields)
+ * @returns Database session object with converted types
+ */
+export function mapSessionToDatabase(
+  session: Session,
+): Omit<DatabaseSession, 'created_at' | 'updated_at'> {
+  return {
+    id: session.id,
+    character_id: toSqliteNull(session.characterId),
+    start_time: session.startTime.toISOString(),
+    end_time: toSqliteDate(session.endTime),
+    total_run_time: session.totalRunTime,
+    total_session_time: session.totalSessionTime,
+    run_count: session.runCount,
+    archived: toSqliteBoolean(session.archived),
+    notes: toSqliteNull(session.notes),
+  };
+}
+
+/**
+ * Maps a DatabaseSession back to Session format.
+ * @param dbSession - The database session object to convert
+ * @returns Session object with original types
+ */
+export function mapDatabaseSessionToSession(dbSession: DatabaseSession): Session {
+  return {
+    id: dbSession.id,
+    characterId: dbSession.character_id || undefined,
+    startTime: new Date(dbSession.start_time),
+    endTime: fromSqliteDate(dbSession.end_time),
+    totalRunTime: dbSession.total_run_time,
+    totalSessionTime: dbSession.total_session_time,
+    runCount: dbSession.run_count,
+    archived: fromSqliteBoolean(dbSession.archived),
+    notes: dbSession.notes || undefined,
+    created: new Date(dbSession.created_at),
+    lastUpdated: new Date(dbSession.updated_at),
+  };
+}
+
+/**
+ * Maps a Run object to DatabaseRun format with SQLite-compatible types.
+ * @param run - The run object to map (with Date objects and optional fields)
+ * @returns Database run object with converted types
+ */
+export function mapRunToDatabase(run: Run): Omit<DatabaseRun, 'created_at' | 'updated_at'> {
+  return {
+    id: run.id,
+    session_id: run.sessionId,
+    character_id: run.characterId,
+    run_number: run.runNumber,
+    run_type: toSqliteNull(run.runType),
+    start_time: run.startTime.toISOString(),
+    end_time: toSqliteDate(run.endTime),
+    duration: toSqliteNull(run.duration),
+    area: toSqliteNull(run.area),
+  };
+}
+
+/**
+ * Maps a DatabaseRun back to Run format.
+ * @param dbRun - The database run object to convert
+ * @returns Run object with original types
+ */
+export function mapDatabaseRunToRun(dbRun: DatabaseRun): Run {
+  return {
+    id: dbRun.id,
+    sessionId: dbRun.session_id,
+    characterId: dbRun.character_id,
+    runNumber: dbRun.run_number,
+    runType: dbRun.run_type || undefined,
+    startTime: new Date(dbRun.start_time),
+    endTime: fromSqliteDate(dbRun.end_time),
+    duration: dbRun.duration || undefined,
+    area: dbRun.area || undefined,
+    created: new Date(dbRun.created_at),
+    lastUpdated: new Date(dbRun.updated_at),
+  };
+}
+
+/**
+ * Maps a RunItem object to DatabaseRunItem format with SQLite-compatible types.
+ * @param runItem - The run item object to map (with Date objects)
+ * @returns Database run item object with converted types
+ */
+export function mapRunItemToDatabase(runItem: RunItem): Omit<DatabaseRunItem, 'created_at'> {
+  return {
+    id: runItem.id,
+    run_id: runItem.runId,
+    grail_progress_id: runItem.grailProgressId,
+    found_time: runItem.foundTime.toISOString(),
+  };
+}
+
+/**
+ * Maps a DatabaseRunItem back to RunItem format.
+ * @param dbRunItem - The database run item object to convert
+ * @returns RunItem object with original types
+ */
+export function mapDatabaseRunItemToRunItem(dbRunItem: DatabaseRunItem): RunItem {
+  return {
+    id: dbRunItem.id,
+    runId: dbRunItem.run_id,
+    grailProgressId: dbRunItem.grail_progress_id,
+    foundTime: new Date(dbRunItem.found_time),
+    created: new Date(dbRunItem.created_at),
   };
 }
