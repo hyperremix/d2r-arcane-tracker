@@ -1,4 +1,5 @@
 import type { Session } from 'electron/types/grail';
+import { FileDownIcon } from 'lucide-react';
 import { useCallback, useEffect, useId, useMemo, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -6,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { formatDuration } from '@/lib/utils';
 import { useRunTrackerStore } from '@/stores/runTrackerStore';
+import { ExportDialog } from './ExportDialog';
 
 interface SessionCardProps {
   session: Session | null;
@@ -28,6 +30,7 @@ export function SessionCard({ session }: SessionCardProps) {
   const [sessionTime, setSessionTime] = useState<number>(0);
   const [notes, setNotes] = useState<string>(session?.notes || '');
   const [isSavingNotes, setIsSavingNotes] = useState<boolean>(false);
+  const [showExportDialog, setShowExportDialog] = useState<boolean>(false);
   const notesId = useId();
 
   // Calculate current session time
@@ -115,6 +118,12 @@ export function SessionCard({ session }: SessionCardProps) {
     }
   }, [currentSession, notes, updateSessionNotes]);
 
+  const handleExportClick = useCallback(() => {
+    if (currentSession) {
+      setShowExportDialog(true);
+    }
+  }, [currentSession]);
+
   // Empty state
   if (!currentSession) {
     return (
@@ -134,7 +143,7 @@ export function SessionCard({ session }: SessionCardProps) {
     );
   }
 
-  return (
+  const sessionCard = (
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center justify-between">
@@ -215,8 +224,28 @@ export function SessionCard({ session }: SessionCardProps) {
           >
             Archive Session
           </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleExportClick}
+            disabled={loading || currentSession.runCount === 0}
+            title={currentSession.runCount === 0 ? 'No runs to export' : 'Export session data'}
+          >
+            <FileDownIcon className="h-4 w-4" />
+          </Button>
         </div>
       </CardContent>
     </Card>
+  );
+
+  return (
+    <>
+      {sessionCard}
+      <ExportDialog
+        sessionId={currentSession?.id || ''}
+        open={showExportDialog}
+        onOpenChange={setShowExportDialog}
+      />
+    </>
   );
 }
