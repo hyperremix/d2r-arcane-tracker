@@ -9,6 +9,7 @@ import { initializeIconHandlers } from './ipc-handlers/iconHandlers';
 import { closeRunTracker, initializeRunTrackerHandlers } from './ipc-handlers/runTrackerHandlers';
 import {
   closeSaveFileMonitor,
+  eventBus,
   getRunTracker,
   initializeSaveFileHandlers,
 } from './ipc-handlers/saveFileHandlers';
@@ -243,7 +244,7 @@ app.whenReady().then(() => {
   // Initialize run tracker handlers after save file handlers
   const runTracker = getRunTracker();
   if (runTracker) {
-    initializeRunTrackerHandlers(runTracker);
+    initializeRunTrackerHandlers(runTracker, eventBus);
   }
 
   initializeDialogHandlers();

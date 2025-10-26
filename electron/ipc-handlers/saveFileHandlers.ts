@@ -18,7 +18,7 @@ import type {
 /**
  * Global service instances for save file monitoring and item detection.
  */
-const eventBus = new EventBus();
+export const eventBus = new EventBus();
 const batchWriter = new DatabaseBatchWriter(grailDatabase, () => {
   // Emit grail-progress-updated event to all renderer windows after batch flush
   const allWebContents = webContents.getAllWebContents();
