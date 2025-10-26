@@ -1,4 +1,11 @@
-import type { ItemDetectionEvent, Run, SaveFileEvent, Session } from './grail';
+import type {
+  D2Item,
+  GrailProgress,
+  ItemDetectionEvent,
+  Run,
+  SaveFileEvent,
+  Session,
+} from './grail';
 
 /**
  * Payload for monitoring-started event
@@ -67,6 +74,15 @@ export interface SessionEndedPayload {
 }
 
 /**
+ * Payload for run-item-added event
+ */
+export interface RunItemAddedPayload {
+  runId: string;
+  grailProgress: GrailProgress;
+  item: D2Item;
+}
+
+/**
  * Union type of all application events with their payloads
  */
 export type AppEvent =
@@ -80,7 +96,8 @@ export type AppEvent =
   | { type: 'run-paused'; payload: RunPausedPayload }
   | { type: 'run-resumed'; payload: RunResumedPayload }
   | { type: 'session-started'; payload: SessionStartedPayload }
-  | { type: 'session-ended'; payload: SessionEndedPayload };
+  | { type: 'session-ended'; payload: SessionEndedPayload }
+  | { type: 'run-item-added'; payload: RunItemAddedPayload };
 
 /**
  * Extract event type names

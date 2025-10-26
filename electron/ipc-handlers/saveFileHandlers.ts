@@ -12,6 +12,7 @@ import type {
   GrailProgress,
   Item,
   ItemDetectionEvent,
+  RunItem,
 } from '../types/grail';
 
 /**
@@ -140,6 +141,31 @@ function handleAutomaticGrailProgress(event: ItemDetectionEvent): void {
     // Create grail progress entry and queue for batch write
     const grailProgress = createGrailProgress(character, event);
     batchWriter.queueProgress(grailProgress);
+
+    // Check for active run and associate item if found
+    try {
+      const activeRun = runTracker?.getActiveRun();
+      if (activeRun && !event.silent) {
+        const runItem: RunItem = {
+          id: `run_item_${activeRun.id}_${grailProgress.id}`,
+          runId: activeRun.id,
+          grailProgressId: grailProgress.id,
+          foundTime: new Date(),
+          created: new Date(),
+        };
+        grailDatabase.addRunItem(runItem);
+
+        // Emit event for UI updates
+        eventBus.emit('run-item-added', {
+          runId: activeRun.id,
+          grailProgress,
+          item: event.item,
+        });
+      }
+    } catch (runAssociationError) {
+      console.error('Error associating item with run:', runAssociationError);
+      // Don't throw - grail progress is already saved, run association is secondary
+    }
 
     // Log and notify about the discovery (synchronous - don't delay user feedback)
     if (isFirstTimeDiscovery) {
