@@ -14,6 +14,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useRunTrackerStore } from '@/stores/runTrackerStore';
+import { RunTypeSelector } from './RunTypeSelector';
 
 /**
  * SessionControls component that provides controls for managing run tracking.
@@ -215,90 +216,100 @@ export function SessionControls() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="flex flex-wrap gap-2">
-            {/* Start Run Button */}
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="default"
-                  size="sm"
-                  onClick={handleStartRun}
-                  disabled={!canStartRun}
-                  className="flex items-center gap-2"
-                >
-                  <Play className="h-4 w-4" />
-                  Start Run
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Start a new run (Ctrl+R)</p>
-              </TooltipContent>
-            </Tooltip>
+          <div className="flex flex-col gap-4">
+            {/* Run Type Selector - only show when there's an active run */}
+            {activeRun && (
+              <div className="flex items-center gap-2">
+                <span className="font-medium text-sm">Run Type:</span>
+                <RunTypeSelector />
+              </div>
+            )}
 
-            {/* Pause/Resume Button */}
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={isPaused ? handleResumeRun : handlePauseRun}
-                  disabled={!canPauseResume}
-                  className="flex items-center gap-2"
-                >
-                  {isPaused ? <Play className="h-4 w-4" /> : <Pause className="h-4 w-4" />}
-                  {isPaused ? 'Resume' : 'Pause'}
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>{isPaused ? 'Resume run (Ctrl+Space)' : 'Pause run (Ctrl+Space)'}</p>
-              </TooltipContent>
-            </Tooltip>
+            <div className="flex flex-wrap gap-2">
+              {/* Start Run Button */}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="default"
+                    size="sm"
+                    onClick={handleStartRun}
+                    disabled={!canStartRun}
+                    className="flex items-center gap-2"
+                  >
+                    <Play className="h-4 w-4" />
+                    Start Run
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Start a new run (Ctrl+R)</p>
+                </TooltipContent>
+              </Tooltip>
 
-            {/* End Run Button */}
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setShowEndRunDialog(true)}
-                  disabled={!canEndRun}
-                  className="flex items-center gap-2"
-                >
-                  <Square className="h-4 w-4" />
-                  End Run
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>End current run (Ctrl+E)</p>
-              </TooltipContent>
-            </Tooltip>
+              {/* Pause/Resume Button */}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={isPaused ? handleResumeRun : handlePauseRun}
+                    disabled={!canPauseResume}
+                    className="flex items-center gap-2"
+                  >
+                    {isPaused ? <Play className="h-4 w-4" /> : <Pause className="h-4 w-4" />}
+                    {isPaused ? 'Resume' : 'Pause'}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>{isPaused ? 'Resume run (Ctrl+Space)' : 'Pause run (Ctrl+Space)'}</p>
+                </TooltipContent>
+              </Tooltip>
 
-            {/* End Session Button */}
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="destructive"
-                  size="sm"
-                  onClick={() => setShowEndSessionDialog(true)}
-                  disabled={!canEndSession}
-                  className="flex items-center gap-2"
-                >
-                  <StopCircle className="h-4 w-4" />
-                  End Session
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>End current session (Ctrl+Shift+E)</p>
-              </TooltipContent>
-            </Tooltip>
-          </div>
+              {/* End Run Button */}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowEndRunDialog(true)}
+                    disabled={!canEndRun}
+                    className="flex items-center gap-2"
+                  >
+                    <Square className="h-4 w-4" />
+                    End Run
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>End current run (Ctrl+E)</p>
+                </TooltipContent>
+              </Tooltip>
 
-          {/* Keyboard Shortcuts Info */}
-          <div className="mt-4 rounded-md bg-muted p-3">
-            <p className="text-muted-foreground text-xs">
-              <strong>Keyboard Shortcuts:</strong> Ctrl+R (Start), Ctrl+Space (Pause/Resume), Ctrl+E
-              (End Run), Ctrl+Shift+E (End Session)
-            </p>
+              {/* End Session Button */}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={() => setShowEndSessionDialog(true)}
+                    disabled={!canEndSession}
+                    className="flex items-center gap-2"
+                  >
+                    <StopCircle className="h-4 w-4" />
+                    End Session
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>End current session (Ctrl+Shift+E)</p>
+                </TooltipContent>
+              </Tooltip>
+            </div>
+
+            {/* Keyboard Shortcuts Info */}
+            <div className="mt-4 rounded-md bg-muted p-3">
+              <p className="text-muted-foreground text-xs">
+                <strong>Keyboard Shortcuts:</strong> Ctrl+R (Start), Ctrl+Space (Pause/Resume),
+                Ctrl+E (End Run), Ctrl+Shift+E (End Session)
+              </p>
+            </div>
           </div>
         </CardContent>
       </Card>

@@ -248,6 +248,54 @@ export function initializeRunTrackerHandlers(
     }
   });
 
+  // Recent run types handlers
+  ipcMain.handle('run-tracker:get-recent-run-types', async (_event, limit?: number) => {
+    try {
+      if (!runTracker) {
+        throw new Error('Run tracker not initialized');
+      }
+      const database = runTracker.getDatabase();
+      return database.getRecentRunTypes(limit);
+    } catch (error) {
+      console.error('[runTrackerHandlers] Error getting recent run types:', error);
+      throw error;
+    }
+  });
+
+  ipcMain.handle('run-tracker:save-run-type', async (_event, runType: string) => {
+    try {
+      if (!runTracker) {
+        throw new Error('Run tracker not initialized');
+      }
+      if (!runType || typeof runType !== 'string') {
+        throw new Error('Invalid run type');
+      }
+      const database = runTracker.getDatabase();
+      database.saveRunType(runType);
+      return { success: true };
+    } catch (error) {
+      console.error('[runTrackerHandlers] Error saving run type:', error);
+      throw error;
+    }
+  });
+
+  ipcMain.handle('run-tracker:delete-run-type', async (_event, runType: string) => {
+    try {
+      if (!runTracker) {
+        throw new Error('Run tracker not initialized');
+      }
+      if (!runType || typeof runType !== 'string') {
+        throw new Error('Invalid run type');
+      }
+      const database = runTracker.getDatabase();
+      database.deleteRunType(runType);
+      return { success: true };
+    } catch (error) {
+      console.error('[runTrackerHandlers] Error deleting run type:', error);
+      throw error;
+    }
+  });
+
   // Set up event forwarding to renderer processes
   // Session events
   const unsubscribeSessionStarted = eventBus.on('session-started', (payload) => {

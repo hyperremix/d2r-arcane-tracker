@@ -210,6 +210,16 @@ class GrailDatabase {
         FOREIGN KEY (grail_progress_id) REFERENCES grail_progress(id) ON DELETE CASCADE
       );
 
+      -- Recent run types table - stores recently used run types
+      CREATE TABLE IF NOT EXISTS recent_run_types (
+        id TEXT PRIMARY KEY,
+        run_type TEXT NOT NULL UNIQUE,
+        last_used DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        use_count INTEGER NOT NULL DEFAULT 1,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+
       -- Indexes for better performance
       CREATE INDEX IF NOT EXISTS idx_items_category ON items(category);
       CREATE INDEX IF NOT EXISTS idx_items_type ON items(type);
@@ -236,6 +246,9 @@ class GrailDatabase {
       -- Run items indexes
       CREATE INDEX IF NOT EXISTS idx_run_items_run ON run_items(run_id);
       CREATE INDEX IF NOT EXISTS idx_run_items_progress ON run_items(grail_progress_id);
+
+      -- Recent run types indexes
+      CREATE INDEX IF NOT EXISTS idx_recent_run_types_last_used ON recent_run_types(last_used);
 
       -- Triggers to update the updated_at timestamp
       CREATE TRIGGER IF NOT EXISTS update_items_timestamp
@@ -278,6 +291,12 @@ class GrailDatabase {
         AFTER UPDATE ON runs
         BEGIN
           UPDATE runs SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
+        END;
+
+      CREATE TRIGGER IF NOT EXISTS update_recent_run_types_timestamp
+        AFTER UPDATE ON recent_run_types
+        BEGIN
+          UPDATE recent_run_types SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
         END;
 
       -- Insert default settings
@@ -1223,6 +1242,46 @@ class GrailDatabase {
   deleteRunItem(itemId: string): void {
     const stmt = this.db.prepare('DELETE FROM run_items WHERE id = ?');
     stmt.run(itemId);
+  }
+
+  /**
+   * Gets recent run types ordered by last_used.
+   * @param limit - Optional limit on the number of recent run types to return (default: 20)
+   * @returns Array of run type strings
+   */
+  getRecentRunTypes(limit = 20): string[] {
+    const stmt = this.db.prepare(
+      'SELECT run_type FROM recent_run_types ORDER BY last_used DESC LIMIT ?',
+    );
+    const rows = stmt.all(limit) as Array<{ run_type: string }>;
+    return rows.map((row) => row.run_type);
+  }
+
+  /**
+   * Saves a run type to the recent run types table.
+   * If the run type already exists, it updates the last_used timestamp and increments use_count.
+   * @param runType - The run type to save
+   */
+  saveRunType(runType: string): void {
+    const id = runType.toLowerCase().replace(/\s+/g, '-');
+    const stmt = this.db.prepare(`
+      INSERT INTO recent_run_types (id, run_type, last_used, use_count, created_at)
+      VALUES (?, ?, CURRENT_TIMESTAMP, 1, CURRENT_TIMESTAMP)
+      ON CONFLICT(run_type) DO UPDATE SET
+        last_used = CURRENT_TIMESTAMP,
+        use_count = use_count + 1,
+        updated_at = CURRENT_TIMESTAMP
+    `);
+    stmt.run(id, runType);
+  }
+
+  /**
+   * Deletes a run type from the recent run types table.
+   * @param runType - The run type to delete
+   */
+  deleteRunType(runType: string): void {
+    const stmt = this.db.prepare('DELETE FROM recent_run_types WHERE run_type = ?');
+    stmt.run(runType);
   }
 
   /**

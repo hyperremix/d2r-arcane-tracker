@@ -550,6 +550,30 @@ export interface ElectronAPI {
      * @returns {Promise<RunItem[]>} A promise that resolves with an array of run items.
      */
     getSessionItems(sessionId: string): Promise<RunItem[]>
+
+    /**
+     * Recent Run Types Management
+     */
+    /**
+     * Gets recent run types from the database.
+     * @param {number} [limit] - Optional limit on the number of recent run types to return.
+     * @returns {Promise<string[]>} A promise that resolves with an array of recent run type names.
+     */
+    getRecentRunTypes(limit?: number): Promise<string[]>
+
+    /**
+     * Saves a run type to the recent run types list.
+     * @param {string} runType - The run type to save.
+     * @returns {Promise<{ success: boolean }>} A promise that resolves with a success indicator.
+     */
+    saveRunType(runType: string): Promise<{ success: boolean }>
+
+    /**
+     * Deletes a run type from the recent run types list.
+     * @param {string} runType - The run type to delete.
+     * @returns {Promise<{ success: boolean }>} A promise that resolves with a success indicator.
+     */
+    deleteRunType(runType: string): Promise<{ success: boolean }>
   }
 
   /**

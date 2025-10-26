@@ -12,6 +12,7 @@ interface RunTrackerState {
   sessions: Session[];
   runs: Map<string, Run[]>; // sessionId -> runs
   runItems: Map<string, RunItem[]>; // runId -> items
+  recentRunTypes: string[];
   isTracking: boolean;
   isPaused: boolean;
   loading: boolean;
@@ -35,6 +36,8 @@ interface RunTrackerState {
   loadSessionRuns: (sessionId: string) => Promise<void>;
   loadRunItems: (runId: string) => Promise<void>;
   refreshActiveRun: () => Promise<void>;
+  loadRecentRunTypes: () => Promise<void>;
+  saveRunType: (runType: string) => Promise<void>;
 
   // Actions - State Management
   setLoading: (loading: boolean) => void;
@@ -64,6 +67,7 @@ export const useRunTrackerStore = create<RunTrackerState>((set, get) => ({
   sessions: [],
   runs: new Map(),
   runItems: new Map(),
+  recentRunTypes: [],
   isTracking: false,
   isPaused: false,
   loading: false,
@@ -282,6 +286,39 @@ export const useRunTrackerStore = create<RunTrackerState>((set, get) => ({
       const errorMessage = error instanceof Error ? error.message : String(error);
       set({ error: errorMessage, loading: false });
       console.error('[RunTrackerStore] Error refreshing active run:', error);
+    }
+  },
+
+  // Recent run types actions
+  loadRecentRunTypes: async () => {
+    set({ loading: true, error: null });
+    try {
+      const recentTypes = await window.electronAPI?.runTracker.getRecentRunTypes();
+      if (recentTypes) {
+        set({ recentRunTypes: recentTypes, loading: false });
+        console.log('[RunTrackerStore] Loaded recent run types:', recentTypes.length);
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      set({ error: errorMessage, loading: false });
+      console.error('[RunTrackerStore] Error loading recent run types:', error);
+    }
+  },
+
+  saveRunType: async (runType) => {
+    set({ loading: true, error: null });
+    try {
+      await window.electronAPI?.runTracker.saveRunType(runType);
+      // Reload recent run types to get updated list
+      const recentTypes = await window.electronAPI?.runTracker.getRecentRunTypes();
+      if (recentTypes) {
+        set({ recentRunTypes: recentTypes, loading: false });
+        console.log('[RunTrackerStore] Saved run type and reloaded recent types');
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      set({ error: errorMessage, loading: false });
+      console.error('[RunTrackerStore] Error saving run type:', error);
     }
   },
 
