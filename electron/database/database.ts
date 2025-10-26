@@ -8,11 +8,17 @@ import type {
   DatabaseCharacter,
   DatabaseGrailProgress,
   DatabaseItem,
+  DatabaseRun,
+  DatabaseRunItem,
   DatabaseSaveFileState,
+  DatabaseSession,
   DatabaseSetting,
   GrailProgress,
   Item,
+  Run,
+  RunItem,
   SaveFileState,
+  Session,
   Settings,
 } from '../types/grail';
 import { GameMode, GameVersion } from '../types/grail';
@@ -21,10 +27,16 @@ import {
   mapDatabaseCharacterToCharacter,
   mapDatabaseItemToItem,
   mapDatabaseProgressToProgress,
+  mapDatabaseRunItemToRunItem,
+  mapDatabaseRunToRun,
   mapDatabaseSaveFileStateToSaveFileState,
+  mapDatabaseSessionToSession,
   mapItemToDatabase,
   mapProgressToDatabase,
+  mapRunItemToDatabase,
+  mapRunToDatabase,
   mapSaveFileStateToDatabase,
+  mapSessionToDatabase,
   mapValuesToSqlite,
 } from './mappers';
 
@@ -1022,6 +1034,195 @@ class GrailDatabase {
    */
   clearAllSaveFileStates(): void {
     this.db.prepare('DELETE FROM save_file_states').run();
+  }
+
+  // Session methods
+  /**
+   * Retrieves all non-archived sessions for a character.
+   * @param characterId - The unique identifier of the character
+   * @returns Array of sessions ordered by start time (most recent first)
+   */
+  getSessionsByCharacter(characterId: string): Session[] {
+    const stmt = this.db.prepare(
+      'SELECT * FROM sessions WHERE character_id = ? AND archived = 0 ORDER BY start_time DESC',
+    );
+    const dbSessions = stmt.all(characterId) as DatabaseSession[];
+    return dbSessions.map(mapDatabaseSessionToSession);
+  }
+
+  /**
+   * Retrieves a session by ID.
+   * @param sessionId - The unique identifier of the session
+   * @returns The session if found, null otherwise
+   */
+  getSessionById(sessionId: string): Session | null {
+    const stmt = this.db.prepare('SELECT * FROM sessions WHERE id = ?');
+    const dbSession = stmt.get(sessionId) as DatabaseSession | undefined;
+    return dbSession ? mapDatabaseSessionToSession(dbSession) : null;
+  }
+
+  /**
+   * Retrieves the active session (not archived, no end time).
+   * @returns The active session if found, null otherwise
+   */
+  getActiveSession(): Session | null {
+    const stmt = this.db.prepare(
+      'SELECT * FROM sessions WHERE archived = 0 AND end_time IS NULL ORDER BY start_time DESC LIMIT 1',
+    );
+    const dbSession = stmt.get() as DatabaseSession | undefined;
+    return dbSession ? mapDatabaseSessionToSession(dbSession) : null;
+  }
+
+  /**
+   * Inserts or updates a session.
+   * Uses INSERT OR REPLACE to handle both insert and update operations.
+   * @param session - The session data to insert or update
+   */
+  upsertSession(session: Session): void {
+    const stmt = this.db.prepare(`
+      INSERT OR REPLACE INTO sessions (id, character_id, start_time, end_time, total_run_time, total_session_time, run_count, archived, notes)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+    const mapped = mapSessionToDatabase(session);
+    stmt.run(
+      mapped.id,
+      mapped.character_id,
+      mapped.start_time,
+      mapped.end_time,
+      mapped.total_run_time,
+      mapped.total_session_time,
+      mapped.run_count,
+      mapped.archived,
+      mapped.notes,
+    );
+  }
+
+  /**
+   * Archives a session.
+   * @param sessionId - The unique identifier of the session to archive
+   */
+  archiveSession(sessionId: string): void {
+    const stmt = this.db.prepare('UPDATE sessions SET archived = 1 WHERE id = ?');
+    stmt.run(sessionId);
+  }
+
+  /**
+   * Deletes a session and all related runs (CASCADE).
+   * @param sessionId - The unique identifier of the session to delete
+   */
+  deleteSession(sessionId: string): void {
+    const stmt = this.db.prepare('DELETE FROM sessions WHERE id = ?');
+    stmt.run(sessionId);
+  }
+
+  // Run methods
+  /**
+   * Retrieves all runs for a session.
+   * @param sessionId - The unique identifier of the session
+   * @returns Array of runs ordered by run number
+   */
+  getRunsBySession(sessionId: string): Run[] {
+    const stmt = this.db.prepare('SELECT * FROM runs WHERE session_id = ? ORDER BY run_number ASC');
+    const dbRuns = stmt.all(sessionId) as DatabaseRun[];
+    return dbRuns.map(mapDatabaseRunToRun);
+  }
+
+  /**
+   * Retrieves the active run for a session (no end time).
+   * @param sessionId - The unique identifier of the session
+   * @returns The active run if found, null otherwise
+   */
+  getActiveRun(sessionId: string): Run | null {
+    const stmt = this.db.prepare(
+      'SELECT * FROM runs WHERE session_id = ? AND end_time IS NULL ORDER BY start_time DESC LIMIT 1',
+    );
+    const dbRun = stmt.get(sessionId) as DatabaseRun | undefined;
+    return dbRun ? mapDatabaseRunToRun(dbRun) : null;
+  }
+
+  /**
+   * Inserts or updates a run.
+   * Uses INSERT OR REPLACE to handle both insert and update operations.
+   * @param run - The run data to insert or update
+   */
+  upsertRun(run: Run): void {
+    const stmt = this.db.prepare(`
+      INSERT OR REPLACE INTO runs (id, session_id, character_id, run_number, run_type, start_time, end_time, duration, area)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+    const mapped = mapRunToDatabase(run);
+    stmt.run(
+      mapped.id,
+      mapped.session_id,
+      mapped.character_id,
+      mapped.run_number,
+      mapped.run_type,
+      mapped.start_time,
+      mapped.end_time,
+      mapped.duration,
+      mapped.area,
+    );
+  }
+
+  /**
+   * Deletes a run and all related items (CASCADE).
+   * @param runId - The unique identifier of the run to delete
+   */
+  deleteRun(runId: string): void {
+    const stmt = this.db.prepare('DELETE FROM runs WHERE id = ?');
+    stmt.run(runId);
+  }
+
+  // RunItem methods
+  /**
+   * Retrieves all items for a run.
+   * @param runId - The unique identifier of the run
+   * @returns Array of run items ordered by found time
+   */
+  getRunItems(runId: string): RunItem[] {
+    const stmt = this.db.prepare(
+      'SELECT * FROM run_items WHERE run_id = ? ORDER BY found_time ASC',
+    );
+    const dbItems = stmt.all(runId) as DatabaseRunItem[];
+    return dbItems.map(mapDatabaseRunItemToRunItem);
+  }
+
+  /**
+   * Retrieves all items for a session (across all runs).
+   * @param sessionId - The unique identifier of the session
+   * @returns Array of run items ordered by found time
+   */
+  getSessionItems(sessionId: string): RunItem[] {
+    const stmt = this.db.prepare(`
+      SELECT ri.* FROM run_items ri
+      INNER JOIN runs r ON ri.run_id = r.id
+      WHERE r.session_id = ?
+      ORDER BY ri.found_time ASC
+    `);
+    const dbItems = stmt.all(sessionId) as DatabaseRunItem[];
+    return dbItems.map(mapDatabaseRunItemToRunItem);
+  }
+
+  /**
+   * Inserts a run item.
+   * @param runItem - The run item to insert
+   */
+  addRunItem(runItem: RunItem): void {
+    const stmt = this.db.prepare(`
+      INSERT INTO run_items (id, run_id, grail_progress_id, found_time)
+      VALUES (?, ?, ?, ?)
+    `);
+    const mapped = mapRunItemToDatabase(runItem);
+    stmt.run(mapped.id, mapped.run_id, mapped.grail_progress_id, mapped.found_time);
+  }
+
+  /**
+   * Deletes a run item.
+   * @param itemId - The unique identifier of the run item to delete
+   */
+  deleteRunItem(itemId: string): void {
+    const stmt = this.db.prepare('DELETE FROM run_items WHERE id = ?');
+    stmt.run(itemId);
   }
 
   /**
