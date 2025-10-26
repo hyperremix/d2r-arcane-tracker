@@ -270,6 +270,13 @@ export class RunTrackerService {
   }
 
   /**
+   * Gets the database instance for external access.
+   */
+  getDatabase(): GrailDatabase {
+    return this.database;
+  }
+
+  /**
    * Gets the current state of the run tracker.
    */
   getState() {
