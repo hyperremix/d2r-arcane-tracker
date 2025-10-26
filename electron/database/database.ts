@@ -5,6 +5,7 @@ import { app } from 'electron';
 import { items } from '../items';
 import type {
   Character,
+  CharacterRunSummary,
   DatabaseCharacter,
   DatabaseGrailProgress,
   DatabaseItem,
@@ -17,8 +18,11 @@ import type {
   Item,
   Run,
   RunItem,
+  RunStatistics,
+  RunTypeStats,
   SaveFileState,
   Session,
+  SessionStats,
   Settings,
 } from '../types/grail';
 import { GameMode, GameVersion } from '../types/grail';
@@ -242,6 +246,7 @@ class GrailDatabase {
       CREATE INDEX IF NOT EXISTS idx_runs_character ON runs(character_id);
       CREATE INDEX IF NOT EXISTS idx_runs_start_time ON runs(start_time);
       CREATE INDEX IF NOT EXISTS idx_runs_session_number ON runs(session_id, run_number);
+      CREATE INDEX IF NOT EXISTS idx_runs_run_type ON runs(run_type);
 
       -- Run items indexes
       CREATE INDEX IF NOT EXISTS idx_run_items_run ON run_items(run_id);
@@ -1134,7 +1139,306 @@ class GrailDatabase {
     stmt.run(sessionId);
   }
 
-  // Run methods
+  // Session Statistics methods
+  /**
+   * Retrieves comprehensive statistics for a specific session.
+   * @param sessionId - The unique identifier of the session
+   * @returns Session statistics or null if session not found
+   */
+  getSessionStatistics(sessionId: string): SessionStats | null {
+    const sessionStmt = this.db.prepare('SELECT * FROM sessions WHERE id = ?');
+    const session = sessionStmt.get(sessionId) as DatabaseSession | undefined;
+
+    if (!session) {
+      return null;
+    }
+
+    // Get run statistics for this session
+    const runStatsStmt = this.db.prepare(`
+      SELECT
+        COUNT(*) as totalRuns,
+        AVG(CASE WHEN duration IS NOT NULL THEN duration ELSE 0 END) as averageRunDuration,
+        MIN(CASE WHEN duration IS NOT NULL THEN duration ELSE NULL END) as fastestRun,
+        MAX(CASE WHEN duration IS NOT NULL THEN duration ELSE NULL END) as slowestRun
+      FROM runs
+      WHERE session_id = ?
+    `);
+    const runStats = runStatsStmt.get(sessionId) as {
+      totalRuns: number;
+      averageRunDuration: number | null;
+      fastestRun: number | null;
+      slowestRun: number | null;
+    };
+
+    // Get item statistics for this session
+    const itemStatsStmt = this.db.prepare(`
+      SELECT
+        COUNT(ri.id) as itemsFound,
+        COUNT(CASE WHEN gp.from_initial_scan = 0 THEN ri.id END) as newGrailItems
+      FROM run_items ri
+      INNER JOIN runs r ON ri.run_id = r.id
+      INNER JOIN grail_progress gp ON ri.grail_progress_id = gp.id
+      WHERE r.session_id = ?
+    `);
+    const itemStats = itemStatsStmt.get(sessionId) as {
+      itemsFound: number;
+      newGrailItems: number;
+    };
+
+    return {
+      sessionId: session.id,
+      totalRuns: runStats.totalRuns,
+      totalTime: session.total_session_time,
+      totalRunTime: session.total_run_time,
+      averageRunDuration: runStats.averageRunDuration || 0,
+      fastestRun: runStats.fastestRun || 0,
+      slowestRun: runStats.slowestRun || 0,
+      itemsFound: itemStats.itemsFound,
+      newGrailItems: itemStats.newGrailItems,
+    };
+  }
+
+  /**
+   * Retrieves statistics for all non-archived sessions for a character.
+   * @param characterId - The unique identifier of the character
+   * @returns Array of session statistics ordered by start time descending
+   */
+  getSessionStatisticsByCharacter(characterId: string): SessionStats[] {
+    const sessionsStmt = this.db.prepare(`
+      SELECT id FROM sessions
+      WHERE character_id = ? AND archived = 0
+      ORDER BY start_time DESC
+    `);
+    const sessions = sessionsStmt.all(characterId) as Array<{ id: string }>;
+
+    return sessions
+      .map((session) => this.getSessionStatistics(session.id))
+      .filter((stats): stats is SessionStats => stats !== null);
+  }
+
+  // Run Statistics methods
+  /**
+   * Retrieves overall run statistics across all sessions.
+   * @param characterId - Optional character ID to filter statistics to specific character
+   * @returns Overall run statistics
+   */
+  getOverallRunStatistics(characterId?: string): RunStatistics {
+    const characterFilter = characterId ? 'AND s.character_id = ?' : '';
+    const params = characterId ? [characterId] : [];
+
+    // Get session and run counts
+    const sessionStatsStmt = this.db.prepare(`
+      SELECT
+        COUNT(DISTINCT s.id) as totalSessions,
+        COUNT(r.id) as totalRuns,
+        SUM(s.total_session_time) as totalTime
+      FROM sessions s
+      LEFT JOIN runs r ON s.id = r.session_id
+      WHERE s.archived = 0 ${characterFilter}
+    `);
+    const sessionStats = sessionStatsStmt.get(...params) as {
+      totalSessions: number;
+      totalRuns: number;
+      totalTime: number | null;
+    };
+
+    // Get run duration statistics
+    const runDurationStmt = this.db.prepare(`
+      SELECT
+        AVG(CASE WHEN r.duration IS NOT NULL THEN r.duration ELSE 0 END) as averageRunDuration,
+        MIN(CASE WHEN r.duration IS NOT NULL THEN r.duration ELSE NULL END) as minDuration,
+        MAX(CASE WHEN r.duration IS NOT NULL THEN r.duration ELSE NULL END) as maxDuration
+      FROM runs r
+      INNER JOIN sessions s ON r.session_id = s.id
+      WHERE s.archived = 0 ${characterFilter}
+    `);
+    const runDuration = runDurationStmt.get(...params) as {
+      averageRunDuration: number | null;
+      minDuration: number | null;
+      maxDuration: number | null;
+    };
+
+    // Get fastest and slowest run details
+    const fastestRunStmt = this.db.prepare(`
+      SELECT r.id, r.duration, r.start_time
+      FROM runs r
+      INNER JOIN sessions s ON r.session_id = s.id
+      WHERE s.archived = 0 AND r.duration IS NOT NULL ${characterFilter}
+      ORDER BY r.duration ASC
+      LIMIT 1
+    `);
+    const fastestRun = fastestRunStmt.get(...params) as
+      | { id: string; duration: number; start_time: string }
+      | undefined;
+
+    const slowestRunStmt = this.db.prepare(`
+      SELECT r.id, r.duration, r.start_time
+      FROM runs r
+      INNER JOIN sessions s ON r.session_id = s.id
+      WHERE s.archived = 0 AND r.duration IS NOT NULL ${characterFilter}
+      ORDER BY r.duration DESC
+      LIMIT 1
+    `);
+    const slowestRun = slowestRunStmt.get(...params) as
+      | { id: string; duration: number; start_time: string }
+      | undefined;
+
+    // Get items per run average
+    const itemsPerRunStmt = this.db.prepare(`
+      SELECT
+        COUNT(ri.id) as totalItems,
+        COUNT(DISTINCT r.id) as runsWithItems
+      FROM runs r
+      INNER JOIN sessions s ON r.session_id = s.id
+      LEFT JOIN run_items ri ON r.id = ri.run_id
+      WHERE s.archived = 0 ${characterFilter}
+    `);
+    const itemsPerRun = itemsPerRunStmt.get(...params) as {
+      totalItems: number;
+      runsWithItems: number;
+    };
+
+    // Get most common run type
+    const mostCommonRunTypeStmt = this.db.prepare(`
+      SELECT r.run_type, COUNT(*) as count
+      FROM runs r
+      INNER JOIN sessions s ON r.session_id = s.id
+      WHERE s.archived = 0 AND r.run_type IS NOT NULL ${characterFilter}
+      GROUP BY r.run_type
+      ORDER BY count DESC
+      LIMIT 1
+    `);
+    const mostCommonRunType = mostCommonRunTypeStmt.get(...params) as
+      | { run_type: string }
+      | undefined;
+
+    return {
+      totalSessions: sessionStats.totalSessions,
+      totalRuns: sessionStats.totalRuns,
+      totalTime: sessionStats.totalTime || 0,
+      averageRunDuration: runDuration.averageRunDuration || 0,
+      fastestRun: fastestRun
+        ? {
+            runId: fastestRun.id,
+            duration: fastestRun.duration,
+            timestamp: new Date(fastestRun.start_time),
+          }
+        : { runId: '', duration: 0, timestamp: new Date() },
+      slowestRun: slowestRun
+        ? {
+            runId: slowestRun.id,
+            duration: slowestRun.duration,
+            timestamp: new Date(slowestRun.start_time),
+          }
+        : { runId: '', duration: 0, timestamp: new Date() },
+      itemsPerRun:
+        itemsPerRun.runsWithItems > 0 ? itemsPerRun.totalItems / itemsPerRun.runsWithItems : 0,
+      mostCommonRunType: mostCommonRunType?.run_type || '',
+    };
+  }
+
+  /**
+   * Retrieves statistics grouped by run type.
+   * @param characterId - Optional character ID to filter statistics to specific character
+   * @returns Array of run type statistics ordered by run count descending
+   */
+  getRunStatisticsByType(characterId?: string): RunTypeStats[] {
+    const characterFilter = characterId ? 'AND s.character_id = ?' : '';
+    const params = characterId ? [characterId] : [];
+
+    const stmt = this.db.prepare(`
+      SELECT
+        r.run_type,
+        COUNT(r.id) as count,
+        SUM(CASE WHEN r.duration IS NOT NULL THEN r.duration ELSE 0 END) as totalDuration,
+        AVG(CASE WHEN r.duration IS NOT NULL THEN r.duration ELSE 0 END) as averageDuration,
+        COUNT(ri.id) as itemsFound
+      FROM runs r
+      INNER JOIN sessions s ON r.session_id = s.id
+      LEFT JOIN run_items ri ON r.id = ri.run_id
+      WHERE s.archived = 0 AND r.run_type IS NOT NULL ${characterFilter}
+      GROUP BY r.run_type
+      ORDER BY count DESC
+    `);
+
+    const results = stmt.all(...params) as Array<{
+      run_type: string;
+      count: number;
+      totalDuration: number | null;
+      averageDuration: number | null;
+      itemsFound: number;
+    }>;
+
+    return results.map((row) => ({
+      runType: row.run_type,
+      count: row.count,
+      totalDuration: row.totalDuration || 0,
+      averageDuration: row.averageDuration || 0,
+      itemsFound: row.itemsFound,
+    }));
+  }
+
+  // Character Statistics methods
+  /**
+   * Retrieves summary statistics for a specific character.
+   * @param characterId - The unique identifier of the character
+   * @returns Character run summary statistics
+   */
+  getCharacterRunSummary(characterId: string): CharacterRunSummary {
+    // Get session and run counts
+    const sessionStatsStmt = this.db.prepare(`
+      SELECT
+        COUNT(s.id) as totalSessions,
+        COUNT(r.id) as totalRuns,
+        SUM(s.total_session_time) as totalTimePlayed,
+        AVG(s.total_session_time) as averageSessionDuration
+      FROM sessions s
+      LEFT JOIN runs r ON s.id = r.session_id
+      WHERE s.character_id = ? AND s.archived = 0
+    `);
+    const sessionStats = sessionStatsStmt.get(characterId) as {
+      totalSessions: number;
+      totalRuns: number;
+      totalTimePlayed: number | null;
+      averageSessionDuration: number | null;
+    };
+
+    // Get total items found
+    const itemsFoundStmt = this.db.prepare(`
+      SELECT COUNT(ri.id) as totalItemsFound
+      FROM run_items ri
+      INNER JOIN runs r ON ri.run_id = r.id
+      INNER JOIN sessions s ON r.session_id = s.id
+      WHERE s.character_id = ? AND s.archived = 0
+    `);
+    const itemsFound = itemsFoundStmt.get(characterId) as { totalItemsFound: number };
+
+    // Get favorite run type
+    const favoriteRunTypeStmt = this.db.prepare(`
+      SELECT r.run_type, COUNT(*) as count
+      FROM runs r
+      INNER JOIN sessions s ON r.session_id = s.id
+      WHERE s.character_id = ? AND s.archived = 0 AND r.run_type IS NOT NULL
+      GROUP BY r.run_type
+      ORDER BY count DESC
+      LIMIT 1
+    `);
+    const favoriteRunType = favoriteRunTypeStmt.get(characterId) as
+      | { run_type: string }
+      | undefined;
+
+    return {
+      characterId,
+      totalSessions: sessionStats.totalSessions,
+      totalRuns: sessionStats.totalRuns,
+      totalTimePlayed: sessionStats.totalTimePlayed || 0,
+      averageSessionDuration: sessionStats.averageSessionDuration || 0,
+      averageRunsPerSession:
+        sessionStats.totalSessions > 0 ? sessionStats.totalRuns / sessionStats.totalSessions : 0,
+      totalItemsFound: itemsFound.totalItemsFound,
+      favoriteRunType: favoriteRunType?.run_type || '',
+    };
+  }
   /**
    * Retrieves all runs for a session.
    * @param sessionId - The unique identifier of the session

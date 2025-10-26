@@ -393,6 +393,20 @@ export interface RunTypeStats {
 }
 
 /**
+ * Interface representing character run summary statistics.
+ */
+export interface CharacterRunSummary {
+  characterId: string;
+  totalSessions: number;
+  totalRuns: number;
+  totalTimePlayed: number;
+  averageSessionDuration: number;
+  averageRunsPerSession: number;
+  totalItemsFound: number;
+  favoriteRunType: string;
+}
+
+/**
  * Interface representing filter options for Holy Grail items.
  */
 export interface GrailFilter {
