@@ -3,6 +3,7 @@ import { useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { useRunTrackerStore } from '@/stores/runTrackerStore';
+import { ErrorDisplay } from './ErrorDisplay';
 import { RunList } from './RunList';
 import { SessionCard } from './SessionCard';
 import { SessionControls } from './SessionControls';
@@ -18,6 +19,8 @@ export function RunTracker() {
     runs,
     loading,
     error,
+    errorType,
+    retryCount,
     loadSessions,
     loadSessionRuns,
     refreshActiveRun,
@@ -28,6 +31,8 @@ export function RunTracker() {
     handleRunPaused,
     handleRunResumed,
     setError,
+    clearError,
+    retryLastAction,
   } = useRunTrackerStore();
 
   // Load initial data on mount
@@ -186,6 +191,16 @@ export function RunTracker() {
   // Main layout with all components
   return (
     <div className="space-y-6">
+      {/* Error Display */}
+      <ErrorDisplay
+        error={error}
+        errorType={errorType}
+        retryCount={retryCount}
+        loading={loading}
+        onRetry={retryLastAction}
+        onDismiss={clearError}
+      />
+
       <SessionCard session={activeSession} />
       <SessionControls />
       <RunList runs={sessionRuns} />

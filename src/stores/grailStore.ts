@@ -80,6 +80,12 @@ const defaultSettings: Settings = {
   wizardSkipped: false,
   runTrackerAutoStart: true,
   runTrackerEndThreshold: 10,
+  runTrackerShortcuts: {
+    startRun: 'Ctrl+R',
+    pauseRun: 'Ctrl+Space',
+    endRun: 'Ctrl+E',
+    endSession: 'Ctrl+Shift+E',
+  },
 };
 
 /**
