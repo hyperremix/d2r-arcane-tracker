@@ -5,7 +5,11 @@ import type {
   GrailProgress,
   Item,
   MonitoringStatus,
+  Run,
+  RunItem,
+  Session,
   Settings,
+  TerrorZone,
   UpdateInfo,
   UpdateStatus,
 } from './grail'
@@ -419,6 +423,133 @@ export interface ElectronAPI {
      * @returns {Promise<{ success: boolean; error?: string }>} A promise that resolves with a success indicator.
      */
     openExternal(url: string): Promise<{ success: boolean; error?: string }>
+  }
+
+  /**
+   * Run tracker API methods for managing run tracking sessions and runs.
+   */
+  runTracker: {
+    /**
+     * Session Management
+     */
+    /**
+     * Starts a new run tracking session.
+     * @param {string} [characterId] - Optional character ID to associate with the session.
+     * @returns {Promise<Session>} A promise that resolves with the created session.
+     */
+    startSession(characterId?: string): Promise<Session>
+
+    /**
+     * Ends the current run tracking session.
+     * @returns {Promise<{ success: boolean }>} A promise that resolves with a success indicator.
+     */
+    endSession(): Promise<{ success: boolean }>
+
+    /**
+     * Archives a session by ID.
+     * @param {string} sessionId - The ID of the session to archive.
+     * @returns {Promise<{ success: boolean }>} A promise that resolves with a success indicator.
+     */
+    archiveSession(sessionId: string): Promise<{ success: boolean }>
+
+    /**
+     * Run Management
+     */
+    /**
+     * Starts a new run within the current session.
+     * @param {string} characterId - The character ID for the run.
+     * @returns {Promise<Run>} A promise that resolves with the created run.
+     */
+    startRun(characterId: string): Promise<Run>
+
+    /**
+     * Ends the current run.
+     * @returns {Promise<{ success: boolean }>} A promise that resolves with a success indicator.
+     */
+    endRun(): Promise<{ success: boolean }>
+
+    /**
+     * Pauses the current run.
+     * @returns {Promise<{ success: boolean }>} A promise that resolves with a success indicator.
+     */
+    pauseRun(): Promise<{ success: boolean }>
+
+    /**
+     * Resumes the current run.
+     * @returns {Promise<{ success: boolean }>} A promise that resolves with a success indicator.
+     */
+    resumeRun(): Promise<{ success: boolean }>
+
+    /**
+     * Sets the run type for the current run.
+     * @param {string} runType - The type of run (e.g., 'boss', 'area', 'cow').
+     * @returns {Promise<{ success: boolean }>} A promise that resolves with a success indicator.
+     */
+    setRunType(runType: string): Promise<{ success: boolean }>
+
+    /**
+     * State Queries
+     */
+    /**
+     * Gets the current state of the run tracker.
+     * @returns {Promise<{ isRunning: boolean; isPaused: boolean; activeSession: Session | null; activeRun: Run | null }>} A promise that resolves with the current state.
+     */
+    getState(): Promise<{
+      isRunning: boolean;
+      isPaused: boolean;
+      activeSession: Session | null;
+      activeRun: Run | null;
+    }>
+
+    /**
+     * Gets the currently active session.
+     * @returns {Promise<Session | null>} A promise that resolves with the active session or null.
+     */
+    getActiveSession(): Promise<Session | null>
+
+    /**
+     * Gets the currently active run.
+     * @returns {Promise<Run | null>} A promise that resolves with the active run or null.
+     */
+    getActiveRun(): Promise<Run | null>
+
+    /**
+     * Statistics Queries
+     */
+    /**
+     * Gets all sessions for a specific character.
+     * @param {string} characterId - The character ID to get sessions for.
+     * @returns {Promise<Session[]>} A promise that resolves with an array of sessions.
+     */
+    getSessionsByCharacter(characterId: string): Promise<Session[]>
+
+    /**
+     * Gets a specific session by ID.
+     * @param {string} sessionId - The session ID to retrieve.
+     * @returns {Promise<Session | null>} A promise that resolves with the session or null.
+     */
+    getSessionById(sessionId: string): Promise<Session | null>
+
+    /**
+     * Gets all runs for a specific session.
+     * @param {string} sessionId - The session ID to get runs for.
+     * @returns {Promise<Run[]>} A promise that resolves with an array of runs.
+     */
+    getRunsBySession(sessionId: string): Promise<Run[]>
+
+    /**
+     * Gets all items found during a specific run.
+     * @param {string} runId - The run ID to get items for.
+     * @returns {Promise<RunItem[]>} A promise that resolves with an array of run items.
+     */
+    getRunItems(runId: string): Promise<RunItem[]>
+
+    /**
+     * Gets all items found during a specific session (across all runs).
+     * @param {string} sessionId - The session ID to get items for.
+     * @returns {Promise<RunItem[]>} A promise that resolves with an array of run items.
+     */
+    getSessionItems(sessionId: string): Promise<RunItem[]>
   }
 
   /**

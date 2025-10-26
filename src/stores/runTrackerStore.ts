@@ -1,0 +1,377 @@
+import type { Run, RunItem, Session, SessionStats } from 'electron/types/grail';
+import { create } from 'zustand';
+
+/**
+ * Interface defining the complete state structure and actions for the Run Tracker store.
+ * Manages run tracking sessions, runs, and associated items with real-time updates.
+ */
+interface RunTrackerState {
+  // State
+  activeSession: Session | null;
+  activeRun: Run | null;
+  sessions: Session[];
+  runs: Map<string, Run[]>; // sessionId -> runs
+  runItems: Map<string, RunItem[]>; // runId -> items
+  isTracking: boolean;
+  isPaused: boolean;
+  loading: boolean;
+  error: string | null;
+
+  // Actions - Session Management
+  startSession: (characterId?: string) => Promise<void>;
+  endSession: () => Promise<void>;
+  archiveSession: (sessionId: string) => Promise<void>;
+  updateSessionNotes: (sessionId: string, notes: string) => Promise<void>;
+
+  // Actions - Run Management
+  startRun: (characterId: string) => Promise<void>;
+  endRun: () => Promise<void>;
+  pauseRun: () => Promise<void>;
+  resumeRun: () => Promise<void>;
+  setRunType: (runType: string) => Promise<void>;
+
+  // Actions - Data Loading
+  loadSessions: (characterId?: string) => Promise<void>;
+  loadSessionRuns: (sessionId: string) => Promise<void>;
+  loadRunItems: (runId: string) => Promise<void>;
+  refreshActiveRun: () => Promise<void>;
+
+  // Actions - State Management
+  setLoading: (loading: boolean) => void;
+  setError: (error: string | null) => void;
+
+  // Internal event handlers (called from components)
+  handleSessionStarted: (session: Session) => void;
+  handleSessionEnded: () => void;
+  handleRunStarted: (run: Run) => void;
+  handleRunEnded: () => void;
+  handleRunPaused: () => void;
+  handleRunResumed: () => void;
+
+  // Computed/Helper Methods
+  getCurrentRunDuration: () => number;
+  getSessionStats: (sessionId: string) => SessionStats | null;
+}
+
+/**
+ * Zustand store for managing run tracking state including sessions, runs, and items.
+ * Provides actions for data manipulation and real-time updates from the Electron backend.
+ */
+export const useRunTrackerStore = create<RunTrackerState>((set, get) => ({
+  // Initial state
+  activeSession: null,
+  activeRun: null,
+  sessions: [],
+  runs: new Map(),
+  runItems: new Map(),
+  isTracking: false,
+  isPaused: false,
+  loading: false,
+  error: null,
+
+  // Session management actions
+  startSession: async (characterId) => {
+    set({ loading: true, error: null });
+    try {
+      const session = await window.electronAPI?.runTracker.startSession(characterId);
+      if (session) {
+        set({ activeSession: session, isTracking: true, loading: false });
+        console.log('[RunTrackerStore] Session started:', session.id);
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      set({ error: errorMessage, loading: false });
+      console.error('[RunTrackerStore] Error starting session:', error);
+    }
+  },
+
+  endSession: async () => {
+    set({ loading: true, error: null });
+    try {
+      await window.electronAPI?.runTracker.endSession();
+      set({
+        activeSession: null,
+        activeRun: null,
+        isTracking: false,
+        isPaused: false,
+        loading: false,
+      });
+      console.log('[RunTrackerStore] Session ended');
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      set({ error: errorMessage, loading: false });
+      console.error('[RunTrackerStore] Error ending session:', error);
+    }
+  },
+
+  archiveSession: async (sessionId) => {
+    set({ loading: true, error: null });
+    try {
+      await window.electronAPI?.runTracker.archiveSession(sessionId);
+      set({ loading: false });
+      console.log('[RunTrackerStore] Session archived:', sessionId);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      set({ error: errorMessage, loading: false });
+      console.error('[RunTrackerStore] Error archiving session:', error);
+    }
+  },
+
+  updateSessionNotes: async (sessionId, notes) => {
+    set({ loading: true, error: null });
+    try {
+      // Note: This would need to be implemented in the IPC handlers if not already available
+      // For now, we'll update the local state
+      const { sessions } = get();
+      const updatedSessions = sessions.map((session) =>
+        session.id === sessionId ? { ...session, notes, lastUpdated: new Date() } : session,
+      );
+      set({ sessions: updatedSessions, loading: false });
+      console.log('[RunTrackerStore] Session notes updated:', sessionId);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      set({ error: errorMessage, loading: false });
+      console.error('[RunTrackerStore] Error updating session notes:', error);
+    }
+  },
+
+  // Run management actions
+  startRun: async (characterId) => {
+    set({ loading: true, error: null });
+    try {
+      const run = await window.electronAPI?.runTracker.startRun(characterId);
+      if (run) {
+        set({ activeRun: run, isPaused: false, loading: false });
+        console.log('[RunTrackerStore] Run started:', run.id);
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      set({ error: errorMessage, loading: false });
+      console.error('[RunTrackerStore] Error starting run:', error);
+    }
+  },
+
+  endRun: async () => {
+    set({ loading: true, error: null });
+    try {
+      await window.electronAPI?.runTracker.endRun();
+      set({ activeRun: null, isPaused: false, loading: false });
+      console.log('[RunTrackerStore] Run ended');
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      set({ error: errorMessage, loading: false });
+      console.error('[RunTrackerStore] Error ending run:', error);
+    }
+  },
+
+  pauseRun: async () => {
+    set({ loading: true, error: null });
+    try {
+      await window.electronAPI?.runTracker.pauseRun();
+      set({ isPaused: true, loading: false });
+      console.log('[RunTrackerStore] Run paused');
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      set({ error: errorMessage, loading: false });
+      console.error('[RunTrackerStore] Error pausing run:', error);
+    }
+  },
+
+  resumeRun: async () => {
+    set({ loading: true, error: null });
+    try {
+      await window.electronAPI?.runTracker.resumeRun();
+      set({ isPaused: false, loading: false });
+      console.log('[RunTrackerStore] Run resumed');
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      set({ error: errorMessage, loading: false });
+      console.error('[RunTrackerStore] Error resuming run:', error);
+    }
+  },
+
+  setRunType: async (runType) => {
+    set({ loading: true, error: null });
+    try {
+      await window.electronAPI?.runTracker.setRunType(runType);
+      set({ loading: false });
+      console.log('[RunTrackerStore] Run type set:', runType);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      set({ error: errorMessage, loading: false });
+      console.error('[RunTrackerStore] Error setting run type:', error);
+    }
+  },
+
+  // Data loading actions
+  loadSessions: async (characterId) => {
+    set({ loading: true, error: null });
+    try {
+      if (characterId) {
+        const sessions = await window.electronAPI?.runTracker.getSessionsByCharacter(characterId);
+        if (sessions) {
+          set({ sessions, loading: false });
+          console.log(
+            `[RunTrackerStore] Loaded ${sessions.length} sessions for character:`,
+            characterId,
+          );
+        }
+      } else {
+        // Load all sessions - this would need to be implemented in IPC handlers
+        set({ loading: false });
+        console.log('[RunTrackerStore] Loading all sessions not yet implemented');
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      set({ error: errorMessage, loading: false });
+      console.error('[RunTrackerStore] Error loading sessions:', error);
+    }
+  },
+
+  loadSessionRuns: async (sessionId) => {
+    set({ loading: true, error: null });
+    try {
+      const runs = await window.electronAPI?.runTracker.getRunsBySession(sessionId);
+      if (runs) {
+        const { runs: currentRuns } = get();
+        const newRuns = new Map(currentRuns);
+        newRuns.set(sessionId, runs);
+        set({ runs: newRuns, loading: false });
+        console.log(`[RunTrackerStore] Loaded ${runs.length} runs for session:`, sessionId);
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      set({ error: errorMessage, loading: false });
+      console.error('[RunTrackerStore] Error loading session runs:', error);
+    }
+  },
+
+  loadRunItems: async (runId) => {
+    set({ loading: true, error: null });
+    try {
+      const items = await window.electronAPI?.runTracker.getRunItems(runId);
+      if (items) {
+        const { runItems: currentRunItems } = get();
+        const newRunItems = new Map(currentRunItems);
+        newRunItems.set(runId, items);
+        set({ runItems: newRunItems, loading: false });
+        console.log(`[RunTrackerStore] Loaded ${items.length} items for run:`, runId);
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      set({ error: errorMessage, loading: false });
+      console.error('[RunTrackerStore] Error loading run items:', error);
+    }
+  },
+
+  refreshActiveRun: async () => {
+    set({ loading: true, error: null });
+    try {
+      const state = await window.electronAPI?.runTracker.getState();
+      if (state) {
+        set({
+          activeSession: state.activeSession,
+          activeRun: state.activeRun,
+          isTracking: state.isRunning,
+          isPaused: state.isPaused,
+          loading: false,
+        });
+        console.log('[RunTrackerStore] Active run refreshed');
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      set({ error: errorMessage, loading: false });
+      console.error('[RunTrackerStore] Error refreshing active run:', error);
+    }
+  },
+
+  // State management actions
+  setLoading: (loading) => set({ loading }),
+  setError: (error) => set({ error }),
+
+  // Internal event handlers (called from components)
+  handleSessionStarted: (session) => {
+    set({ activeSession: session, isTracking: true });
+    console.log('[RunTrackerStore] Session started event:', session.id);
+  },
+
+  handleSessionEnded: () => {
+    set({
+      activeSession: null,
+      activeRun: null,
+      isTracking: false,
+      isPaused: false,
+    });
+    console.log('[RunTrackerStore] Session ended event');
+  },
+
+  handleRunStarted: (run) => {
+    set({ activeRun: run, isPaused: false });
+    console.log('[RunTrackerStore] Run started event:', run.id);
+  },
+
+  handleRunEnded: () => {
+    set({ activeRun: null, isPaused: false });
+    console.log('[RunTrackerStore] Run ended event');
+  },
+
+  handleRunPaused: () => {
+    set({ isPaused: true });
+    console.log('[RunTrackerStore] Run paused event');
+  },
+
+  handleRunResumed: () => {
+    set({ isPaused: false });
+    console.log('[RunTrackerStore] Run resumed event');
+  },
+
+  // Computed/Helper methods
+  getCurrentRunDuration: () => {
+    const { activeRun } = get();
+    if (!activeRun || activeRun.endTime) return 0;
+    return Date.now() - activeRun.startTime.getTime();
+  },
+
+  getSessionStats: (sessionId) => {
+    const { sessions, runs, runItems } = get();
+    const session = sessions.find((s) => s.id === sessionId);
+    if (!session) return null;
+
+    const sessionRuns = runs.get(sessionId) || [];
+    const totalItems = sessionRuns.reduce((total, run) => {
+      const items = runItems.get(run.id) || [];
+      return total + items.length;
+    }, 0);
+
+    const newGrailItems = sessionRuns.reduce((total, _run) => {
+      // Note: RunItem doesn't have isNewGrailItem property, so we'll use 0 for now
+      // This would need to be calculated based on grail progress data
+      return total;
+    }, 0);
+
+    // Calculate run durations
+    const runDurations = sessionRuns
+      .filter((run) => run.duration !== undefined)
+      .map((run) => run.duration as number);
+
+    const averageRunDuration =
+      runDurations.length > 0
+        ? runDurations.reduce((sum, duration) => sum + duration, 0) / runDurations.length
+        : 0;
+
+    const fastestRun = runDurations.length > 0 ? Math.min(...runDurations) : 0;
+    const slowestRun = runDurations.length > 0 ? Math.max(...runDurations) : 0;
+
+    return {
+      sessionId,
+      totalRuns: sessionRuns.length,
+      totalTime: session.totalSessionTime,
+      totalRunTime: session.totalRunTime,
+      averageRunDuration,
+      fastestRun,
+      slowestRun,
+      itemsFound: totalItems,
+      newGrailItems,
+    };
+  },
+}));
