@@ -321,7 +321,9 @@ class GrailDatabase {
         ('theme', 'system'),
         ('showItemIcons', 'false'),
         ('wizardCompleted', 'false'),
-        ('wizardSkipped', 'false');
+        ('wizardSkipped', 'false'),
+        ('runTrackerAutoStart', 'true'),
+        ('runTrackerEndThreshold', '10');
     `;
 
     this.db.exec(schema);
@@ -763,6 +765,11 @@ class GrailDatabase {
       // Wizard settings
       wizardCompleted: settings.wizardCompleted === 'true',
       wizardSkipped: settings.wizardSkipped === 'true',
+      // Run tracker settings
+      runTrackerAutoStart: settings.runTrackerAutoStart === 'true',
+      runTrackerEndThreshold: settings.runTrackerEndThreshold
+        ? Number.parseInt(settings.runTrackerEndThreshold, 10)
+        : 10,
     };
 
     return typedSettings;

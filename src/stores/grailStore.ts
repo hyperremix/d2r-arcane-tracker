@@ -78,6 +78,8 @@ const defaultSettings: Settings = {
   widgetOpacity: 0.9,
   wizardCompleted: false,
   wizardSkipped: false,
+  runTrackerAutoStart: true,
+  runTrackerEndThreshold: 10,
 };
 
 /**

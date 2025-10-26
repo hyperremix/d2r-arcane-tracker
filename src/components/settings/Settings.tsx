@@ -11,6 +11,7 @@ import { GrailSettings } from './GrailSettings';
 import { ItemIconSettings } from './ItemIconSettings';
 import { NotificationSettings } from './NotificationSettings';
 import { ReportIssues } from './ReportIssues';
+import { RunTrackerSettings } from './RunTrackerSettings';
 import { SaveFileMonitor } from './SaveFileMonitor';
 import { ThemeSettings } from './ThemeSettings';
 import { UpdateSettings } from './UpdateSettings';
@@ -35,6 +36,7 @@ export function Settings() {
           <GrailSettings />
           <NotificationSettings />
           <WidgetSettings />
+          <RunTrackerSettings />
           <ThemeSettings />
           <ItemIconSettings />
           <GameModeSettings />
