@@ -296,6 +296,55 @@ export function initializeRunTrackerHandlers(
     }
   });
 
+  // Statistics query handlers
+  ipcMain.handle('run-tracker:get-overall-statistics', async (_event, characterId?: string) => {
+    try {
+      if (!runTracker) {
+        throw new Error('Run tracker not initialized');
+      }
+      if (characterId && typeof characterId !== 'string') {
+        throw new Error('Invalid character ID');
+      }
+      const database = runTracker.getDatabase();
+      return database.getOverallRunStatistics(characterId);
+    } catch (error) {
+      console.error('[runTrackerHandlers] Error getting overall statistics:', error);
+      throw error;
+    }
+  });
+
+  ipcMain.handle('run-tracker:get-statistics-by-type', async (_event, characterId?: string) => {
+    try {
+      if (!runTracker) {
+        throw new Error('Run tracker not initialized');
+      }
+      if (characterId && typeof characterId !== 'string') {
+        throw new Error('Invalid character ID');
+      }
+      const database = runTracker.getDatabase();
+      return database.getRunStatisticsByType(characterId);
+    } catch (error) {
+      console.error('[runTrackerHandlers] Error getting statistics by type:', error);
+      throw error;
+    }
+  });
+
+  ipcMain.handle('run-tracker:get-character-summary', async (_event, characterId: string) => {
+    try {
+      if (!runTracker) {
+        throw new Error('Run tracker not initialized');
+      }
+      if (!characterId || typeof characterId !== 'string') {
+        throw new Error('Invalid character ID');
+      }
+      const database = runTracker.getDatabase();
+      return database.getCharacterRunSummary(characterId);
+    } catch (error) {
+      console.error('[runTrackerHandlers] Error getting character summary:', error);
+      throw error;
+    }
+  });
+
   // Set up event forwarding to renderer processes
   // Session events
   const unsubscribeSessionStarted = eventBus.on('session-started', (payload) => {

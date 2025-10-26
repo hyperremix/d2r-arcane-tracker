@@ -15,6 +15,57 @@ import { cn } from '@/lib/utils';
 import { NotificationButton } from './grail/NotificationButton';
 
 /**
+ * Navigation button component
+ */
+function NavigationButton({
+  to,
+  title,
+  icon: Icon,
+  isActive,
+}: {
+  to: string;
+  title: string;
+  icon: React.ComponentType<{ className?: string }>;
+  isActive: boolean;
+}) {
+  return (
+    <div className="relative">
+      <div
+        className={cn(
+          '-top-1.75 absolute right-0 left-0',
+          isActive && 'border-t-4 border-t-primary-500',
+        )}
+      />
+      <Button
+        asChild
+        variant="ghost"
+        size="sm"
+        className={cn('relative hover:text-primary-500', isActive && 'text-primary-500')}
+      >
+        <Link to={to} title={title}>
+          <Icon className="h-4 w-4" />
+        </Link>
+      </Button>
+    </div>
+  );
+}
+
+/**
+ * Hook to get route active states
+ */
+function useRouteStates(pathname: string) {
+  return {
+    isTrackerActive: pathname === '/',
+    isStatisticsActive: pathname === '/statistics',
+    isRunsActive: pathname === '/runs',
+    isAnalyticsActive: pathname === '/analytics',
+    isRunewordsActive: pathname === '/runewords',
+    isTerrorZonesActive: pathname === '/terror-zones',
+    isSettingsActive: pathname === '/settings',
+  };
+}
+
+/**
  * TitleBar component that provides a custom draggable title bar for the Electron app.
  * Works across macOS, Linux, and Windows with platform-specific styling.
  * Follows Electron best practices from: https://www.electronjs.org/docs/latest/tutorial/custom-title-bar
@@ -46,14 +97,7 @@ export function TitleBar() {
   const isMac = platform === 'darwin';
   const canGoBack = historyIndex > 0;
   const canGoForward = historyIndex < historyLength - 1;
-
-  // Check if routes are active
-  const isTrackerActive = location.pathname === '/';
-  const isStatisticsActive = location.pathname === '/statistics';
-  const isRunsActive = location.pathname === '/runs';
-  const isRunewordsActive = location.pathname === '/runewords';
-  const isTerrorZonesActive = location.pathname === '/terror-zones';
-  const isSettingsActive = location.pathname === '/settings';
+  const routeStates = useRouteStates(location.pathname);
 
   const handleBack = () => {
     if (canGoBack) {
@@ -135,126 +179,48 @@ export function TitleBar() {
         }
       >
         <NotificationButton />
-        <div className="relative">
-          <div
-            className={cn(
-              '-top-1.75 absolute right-0 left-0',
-              isTrackerActive && 'border-t-4 border-t-primary-500',
-            )}
-          />
-          <Button
-            asChild
-            variant="ghost"
-            size="sm"
-            className={cn('relative hover:text-primary-500', isTrackerActive && 'text-primary-500')}
-          >
-            <Link to="/" title="Holy Grail Tracker">
-              <Trophy className="h-4 w-4" />
-            </Link>
-          </Button>
-        </div>
-        <div className="relative">
-          <div
-            className={cn(
-              '-top-1.75 absolute right-0 left-0',
-              isStatisticsActive && 'border-t-4 border-t-primary-500',
-            )}
-          />
-          <Button
-            asChild
-            variant="ghost"
-            size="sm"
-            className={cn(
-              'relative hover:text-primary-500',
-              isStatisticsActive && 'text-primary-500',
-            )}
-          >
-            <Link to="/statistics" title="Statistics">
-              <BarChart3 className="h-4 w-4" />
-            </Link>
-          </Button>
-        </div>
-        <div className="relative">
-          <div
-            className={cn(
-              '-top-1.75 absolute right-0 left-0',
-              isRunsActive && 'border-t-4 border-t-primary-500',
-            )}
-          />
-          <Button
-            asChild
-            variant="ghost"
-            size="sm"
-            className={cn('relative hover:text-primary-500', isRunsActive && 'text-primary-500')}
-          >
-            <Link to="/runs" title="Run Counter">
-              <Timer className="h-4 w-4" />
-            </Link>
-          </Button>
-        </div>
-        <div className="relative">
-          <div
-            className={cn(
-              '-top-1.75 absolute right-0 left-0',
-              isRunewordsActive && 'border-t-4 border-t-primary-500',
-            )}
-          />
-          <Button
-            asChild
-            variant="ghost"
-            size="sm"
-            className={cn(
-              'relative hover:text-primary-500',
-              isRunewordsActive && 'text-primary-500',
-            )}
-          >
-            <Link to="/runewords" title="Runeword Calculator">
-              <Calculator className="h-4 w-4" />
-            </Link>
-          </Button>
-        </div>
-        <div className="relative">
-          <div
-            className={cn(
-              '-top-1.75 absolute right-0 left-0',
-              isTerrorZonesActive && 'border-t-4 border-t-primary-500',
-            )}
-          />
-          <Button
-            asChild
-            variant="ghost"
-            size="sm"
-            className={cn(
-              'relative hover:text-primary-500',
-              isTerrorZonesActive && 'text-primary-500',
-            )}
-          >
-            <Link to="/terror-zones" title="Terror Zone Configuration">
-              <AlertTriangle className="h-4 w-4" />
-            </Link>
-          </Button>
-        </div>
-        <div className="relative">
-          <div
-            className={cn(
-              '-top-1.75 absolute right-0 left-0',
-              isSettingsActive && 'border-t-4 border-t-primary-500',
-            )}
-          />
-          <Button
-            asChild
-            variant="ghost"
-            size="sm"
-            className={cn(
-              'relative hover:text-primary-500',
-              isSettingsActive && 'text-primary-500',
-            )}
-          >
-            <Link to="/settings" title="Settings">
-              <Settings className="h-4 w-4" />
-            </Link>
-          </Button>
-        </div>
+        <NavigationButton
+          to="/"
+          title="Holy Grail Tracker"
+          icon={Trophy}
+          isActive={routeStates.isTrackerActive}
+        />
+        <NavigationButton
+          to="/statistics"
+          title="Statistics"
+          icon={BarChart3}
+          isActive={routeStates.isStatisticsActive}
+        />
+        <NavigationButton
+          to="/runs"
+          title="Run Counter"
+          icon={Timer}
+          isActive={routeStates.isRunsActive}
+        />
+        <NavigationButton
+          to="/analytics"
+          title="Run Analytics"
+          icon={BarChart3}
+          isActive={routeStates.isAnalyticsActive}
+        />
+        <NavigationButton
+          to="/runewords"
+          title="Runeword Calculator"
+          icon={Calculator}
+          isActive={routeStates.isRunewordsActive}
+        />
+        <NavigationButton
+          to="/terror-zones"
+          title="Terror Zone Configuration"
+          icon={AlertTriangle}
+          isActive={routeStates.isTerrorZonesActive}
+        />
+        <NavigationButton
+          to="/settings"
+          title="Settings"
+          icon={Settings}
+          isActive={routeStates.isSettingsActive}
+        />
       </div>
 
       {/* Spacing for Windows/Linux native controls overlay */}
