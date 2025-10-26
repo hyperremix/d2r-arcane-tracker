@@ -5,7 +5,7 @@ import {
   ChevronRight,
   ChevronRight as ChevronRightIcon,
 } from 'lucide-react';
-import { useCallback, useId, useMemo, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -238,7 +238,8 @@ export function RunList({ runs }: RunListProps) {
   const paginatedRuns = sortedRuns.slice(startIndex, endIndex);
 
   // Reset to first page when filters change
-  useMemo(() => {
+  // biome-ignore lint/correctness/useExhaustiveDependencies: Dependencies are necessary to reset page when filters change
+  useEffect(() => {
     setCurrentPage(1);
   }, [selectedRunTypes.length, sortField, sortOrder]);
 
