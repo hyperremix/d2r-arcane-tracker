@@ -17,12 +17,12 @@ export function initializeRunTrackerHandlers(
   runTracker = runTrackerInstance;
 
   // Session management handlers
-  ipcMain.handle('run-tracker:start-session', async (_event, characterId?: string) => {
+  ipcMain.handle('run-tracker:start-session', async (_event) => {
     try {
       if (!runTracker) {
         throw new Error('Run tracker not initialized');
       }
-      return runTracker.startSession(characterId);
+      return runTracker.startSession();
     } catch (error) {
       console.error('[runTrackerHandlers] Error starting session:', error);
       throw error;
@@ -59,12 +59,13 @@ export function initializeRunTrackerHandlers(
   });
 
   // Run management handlers
-  ipcMain.handle('run-tracker:start-run', async (_event, characterId: string) => {
+  ipcMain.handle('run-tracker:start-run', async (_event, characterId?: string) => {
     try {
       if (!runTracker) {
         throw new Error('Run tracker not initialized');
       }
-      if (!characterId || typeof characterId !== 'string') {
+      // characterId is optional - validate only if provided
+      if (characterId !== undefined && (typeof characterId !== 'string' || characterId === '')) {
         throw new Error('Invalid character ID');
       }
       return runTracker.startRun(characterId, true);
@@ -133,56 +134,69 @@ export function initializeRunTrackerHandlers(
   ipcMain.handle('run-tracker:get-state', async (_event) => {
     try {
       if (!runTracker) {
-        throw new Error('Run tracker not initialized');
+        console.warn('[runTrackerHandlers] Run tracker not initialized, returning default state');
+        return {
+          isRunning: false,
+          isPaused: false,
+          activeSession: null,
+          activeRun: null,
+        };
       }
       return runTracker.getState();
     } catch (error) {
       console.error('[runTrackerHandlers] Error getting state:', error);
-      throw error;
+      return {
+        isRunning: false,
+        isPaused: false,
+        activeSession: null,
+        activeRun: null,
+      };
     }
   });
 
   ipcMain.handle('run-tracker:get-active-session', async (_event) => {
     try {
       if (!runTracker) {
-        throw new Error('Run tracker not initialized');
+        console.warn('[runTrackerHandlers] Run tracker not initialized, returning null');
+        return null;
       }
       return runTracker.getActiveSession();
     } catch (error) {
       console.error('[runTrackerHandlers] Error getting active session:', error);
-      throw error;
+      return null;
     }
   });
 
   ipcMain.handle('run-tracker:get-active-run', async (_event) => {
     try {
       if (!runTracker) {
-        throw new Error('Run tracker not initialized');
+        console.warn('[runTrackerHandlers] Run tracker not initialized, returning null');
+        return null;
       }
       return runTracker.getActiveRun();
     } catch (error) {
       console.error('[runTrackerHandlers] Error getting active run:', error);
-      throw error;
+      return null;
     }
   });
 
   // Statistics query handlers
-  ipcMain.handle('run-tracker:get-sessions-by-character', async (_event, characterId: string) => {
-    try {
-      if (!runTracker) {
-        throw new Error('Run tracker not initialized');
+  ipcMain.handle(
+    'run-tracker:get-all-sessions',
+    async (_event, includeArchived: boolean = false) => {
+      try {
+        if (!runTracker) {
+          throw new Error('Run tracker not initialized');
+        }
+        // Access database through runTracker service
+        const database = runTracker.getDatabase();
+        return database.getAllSessions(includeArchived);
+      } catch (error) {
+        console.error('[runTrackerHandlers] Error getting all sessions:', error);
+        throw error;
       }
-      if (!characterId || typeof characterId !== 'string') {
-        throw new Error('Invalid character ID');
-      }
-      // Access database through runTracker service
-      const database = runTracker.getDatabase();
-      return database.getSessionsByCharacter(characterId);
-    } catch (error) {
-      console.error('[runTrackerHandlers] Error getting sessions by character:', error);
-      throw error;
-    }
-  });
+    },
+  );
 
   ipcMain.handle('run-tracker:get-session-by-id', async (_event, sessionId: string) => {
     try {
@@ -252,20 +266,22 @@ export function initializeRunTrackerHandlers(
   ipcMain.handle('run-tracker:get-recent-run-types', async (_event, limit?: number) => {
     try {
       if (!runTracker) {
-        throw new Error('Run tracker not initialized');
+        console.warn('[runTrackerHandlers] Run tracker not initialized, returning empty array');
+        return [];
       }
       const database = runTracker.getDatabase();
       return database.getRecentRunTypes(limit);
     } catch (error) {
       console.error('[runTrackerHandlers] Error getting recent run types:', error);
-      throw error;
+      return [];
     }
   });
 
   ipcMain.handle('run-tracker:save-run-type', async (_event, runType: string) => {
     try {
       if (!runTracker) {
-        throw new Error('Run tracker not initialized');
+        console.warn('[runTrackerHandlers] Run tracker not initialized, cannot save run type');
+        return { success: false };
       }
       if (!runType || typeof runType !== 'string') {
         throw new Error('Invalid run type');
@@ -275,14 +291,15 @@ export function initializeRunTrackerHandlers(
       return { success: true };
     } catch (error) {
       console.error('[runTrackerHandlers] Error saving run type:', error);
-      throw error;
+      return { success: false };
     }
   });
 
   ipcMain.handle('run-tracker:delete-run-type', async (_event, runType: string) => {
     try {
       if (!runTracker) {
-        throw new Error('Run tracker not initialized');
+        console.warn('[runTrackerHandlers] Run tracker not initialized, cannot delete run type');
+        return { success: false };
       }
       if (!runType || typeof runType !== 'string') {
         throw new Error('Invalid run type');
@@ -292,55 +309,35 @@ export function initializeRunTrackerHandlers(
       return { success: true };
     } catch (error) {
       console.error('[runTrackerHandlers] Error deleting run type:', error);
-      throw error;
+      return { success: false };
     }
   });
 
   // Statistics query handlers
-  ipcMain.handle('run-tracker:get-overall-statistics', async (_event, characterId?: string) => {
+  ipcMain.handle('run-tracker:get-overall-statistics', async (_event) => {
     try {
       if (!runTracker) {
         throw new Error('Run tracker not initialized');
       }
-      if (characterId && typeof characterId !== 'string') {
-        throw new Error('Invalid character ID');
-      }
+
       const database = runTracker.getDatabase();
-      return database.getOverallRunStatistics(characterId);
+      return database.getOverallRunStatistics();
     } catch (error) {
       console.error('[runTrackerHandlers] Error getting overall statistics:', error);
       throw error;
     }
   });
 
-  ipcMain.handle('run-tracker:get-statistics-by-type', async (_event, characterId?: string) => {
+  ipcMain.handle('run-tracker:get-statistics-by-type', async (_event) => {
     try {
       if (!runTracker) {
         throw new Error('Run tracker not initialized');
       }
-      if (characterId && typeof characterId !== 'string') {
-        throw new Error('Invalid character ID');
-      }
+
       const database = runTracker.getDatabase();
-      return database.getRunStatisticsByType(characterId);
+      return database.getRunStatisticsByType();
     } catch (error) {
       console.error('[runTrackerHandlers] Error getting statistics by type:', error);
-      throw error;
-    }
-  });
-
-  ipcMain.handle('run-tracker:get-character-summary', async (_event, characterId: string) => {
-    try {
-      if (!runTracker) {
-        throw new Error('Run tracker not initialized');
-      }
-      if (!characterId || typeof characterId !== 'string') {
-        throw new Error('Invalid character ID');
-      }
-      const database = runTracker.getDatabase();
-      return database.getCharacterRunSummary(characterId);
-    } catch (error) {
-      console.error('[runTrackerHandlers] Error getting character summary:', error);
       throw error;
     }
   });

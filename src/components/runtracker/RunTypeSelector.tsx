@@ -35,10 +35,12 @@ export function RunTypeSelector() {
   const [open, setOpen] = useState(false);
   const [value, setValue] = useState<string>('');
 
-  // Load recent run types on mount
+  // Load recent run types only when an active run exists and list is empty
   useEffect(() => {
-    loadRecentRunTypes();
-  }, [loadRecentRunTypes]);
+    if (activeRun && (recentRunTypes?.length ?? 0) === 0) {
+      loadRecentRunTypes();
+    }
+  }, [activeRun, recentRunTypes?.length, loadRecentRunTypes]);
 
   // Update value when active run changes
   useEffect(() => {

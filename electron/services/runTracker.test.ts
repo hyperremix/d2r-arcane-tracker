@@ -42,6 +42,16 @@ describe('When RunTrackerService is instantiated', () => {
     });
 
     mockDatabase.getActiveSession = vi.fn().mockReturnValue(null);
+    mockDatabase.getCharacterByName = vi.fn().mockReturnValue({
+      id: 'char-1',
+      name: 'TestCharacter',
+      characterClass: 'sorceress',
+      level: 90,
+      hardcore: false,
+      expansion: true,
+      lastUpdated: new Date(),
+      created: new Date(),
+    });
     mockDatabase.getRunsBySession = vi.fn().mockImplementation((sessionId: string) => {
       return runsBySession.get(sessionId) || [];
     });
@@ -71,17 +81,15 @@ describe('When RunTrackerService is instantiated', () => {
   describe('If startSession is called', () => {
     it('Then should create a new session with correct data', () => {
       // Arrange
-      const characterId = 'char-1';
       const now = new Date('2024-01-01T10:00:00Z');
       vi.setSystemTime(now);
 
       // Act
-      const session = service.startSession(characterId);
+      const session = service.startSession();
 
       // Assert
       expect(session).toBeDefined();
       expect(session.id).toContain('session-');
-      expect(session.characterId).toBe(characterId);
       expect(session.startTime).toEqual(now);
       expect(session.totalRunTime).toBe(0);
       expect(session.totalSessionTime).toBe(0);
@@ -93,12 +101,11 @@ describe('When RunTrackerService is instantiated', () => {
 
     it('Then should return existing session if already started', () => {
       // Arrange
-      const characterId = 'char-1';
-      const firstSession = service.startSession(characterId);
+      const firstSession = service.startSession();
       vi.clearAllMocks();
 
       // Act
-      const secondSession = service.startSession(characterId);
+      const secondSession = service.startSession();
 
       // Assert
       expect(secondSession).toBe(firstSession);
@@ -116,7 +123,6 @@ describe('When RunTrackerService is instantiated', () => {
 
       // Assert
       expect(session).toBeDefined();
-      expect(session.characterId).toBeUndefined();
     });
   });
 
@@ -125,7 +131,7 @@ describe('When RunTrackerService is instantiated', () => {
       // Arrange
       const now = new Date('2024-01-01T10:00:00Z');
       vi.setSystemTime(now);
-      service.startSession('char-1');
+      service.startSession();
       const later = new Date('2024-01-01T11:00:00Z');
       vi.setSystemTime(later);
       vi.clearAllMocks();
@@ -143,7 +149,6 @@ describe('When RunTrackerService is instantiated', () => {
 
     it('Then should end active run before ending session', () => {
       // Arrange
-      service.startSession('char-1');
       service.startRun('char-1');
       vi.clearAllMocks();
 
@@ -174,7 +179,7 @@ describe('When RunTrackerService is instantiated', () => {
       const characterId = 'char-1';
       const now = new Date('2024-01-01T10:00:00Z');
       vi.setSystemTime(now);
-      service.startSession(characterId);
+      service.startSession();
       vi.clearAllMocks();
 
       // Act
@@ -207,7 +212,7 @@ describe('When RunTrackerService is instantiated', () => {
     it('Then should increment run number for subsequent runs', () => {
       // Arrange
       const characterId = 'char-1';
-      service.startSession(characterId);
+      service.startSession();
 
       // Act & Assert
       const run1 = service.startRun(characterId);
@@ -222,7 +227,7 @@ describe('When RunTrackerService is instantiated', () => {
     it('Then should update session run count', () => {
       // Arrange
       const characterId = 'char-1';
-      service.startSession(characterId);
+      service.startSession();
       vi.clearAllMocks();
 
       // Act
@@ -239,7 +244,7 @@ describe('When RunTrackerService is instantiated', () => {
     it('Then should end the current run and calculate duration', () => {
       // Arrange
       const characterId = 'char-1';
-      service.startSession(characterId);
+      service.startSession();
       const startTime = new Date('2024-01-01T10:00:00Z');
       vi.setSystemTime(startTime);
       service.startRun(characterId);
@@ -261,7 +266,7 @@ describe('When RunTrackerService is instantiated', () => {
     it('Then should update session statistics', () => {
       // Arrange
       const characterId = 'char-1';
-      service.startSession(characterId);
+      service.startSession();
       service.startRun(characterId);
       vi.clearAllMocks();
 
@@ -279,7 +284,7 @@ describe('When RunTrackerService is instantiated', () => {
 
     it('Then should do nothing if no active run', () => {
       // Arrange
-      service.startSession('char-1');
+      service.startSession();
       vi.clearAllMocks();
 
       // Act
@@ -295,7 +300,7 @@ describe('When RunTrackerService is instantiated', () => {
     it('Then should pause the current run', () => {
       // Arrange
       const characterId = 'char-1';
-      service.startSession(characterId);
+      service.startSession();
       service.startRun(characterId);
       vi.clearAllMocks();
 
@@ -309,7 +314,7 @@ describe('When RunTrackerService is instantiated', () => {
 
     it('Then should do nothing if no active run', () => {
       // Arrange
-      service.startSession('char-1');
+      service.startSession();
       vi.clearAllMocks();
 
       // Act
@@ -322,7 +327,7 @@ describe('When RunTrackerService is instantiated', () => {
     it('Then should do nothing if already paused', () => {
       // Arrange
       const characterId = 'char-1';
-      service.startSession(characterId);
+      service.startSession();
       service.startRun(characterId);
       service.pauseRun();
       vi.clearAllMocks();
@@ -339,7 +344,7 @@ describe('When RunTrackerService is instantiated', () => {
     it('Then should resume the paused run', () => {
       // Arrange
       const characterId = 'char-1';
-      service.startSession(characterId);
+      service.startSession();
       service.startRun(characterId);
       service.pauseRun();
       vi.clearAllMocks();
@@ -355,7 +360,7 @@ describe('When RunTrackerService is instantiated', () => {
     it('Then should do nothing if not paused', () => {
       // Arrange
       const characterId = 'char-1';
-      service.startSession(characterId);
+      service.startSession();
       service.startRun(characterId);
       vi.clearAllMocks();
 
@@ -371,7 +376,7 @@ describe('When RunTrackerService is instantiated', () => {
     it('Then should update the current run type', () => {
       // Arrange
       const characterId = 'char-1';
-      service.startSession(characterId);
+      service.startSession();
       service.startRun(characterId);
       const runType = 'Mephisto';
       vi.clearAllMocks();
@@ -385,7 +390,7 @@ describe('When RunTrackerService is instantiated', () => {
 
     it('Then should do nothing if no active run', () => {
       // Arrange
-      service.startSession('char-1');
+      service.startSession();
       vi.clearAllMocks();
 
       // Act
@@ -399,8 +404,7 @@ describe('When RunTrackerService is instantiated', () => {
   describe('If handleSaveFileEvent is called', () => {
     it('Then should start run when save file is modified and auto-start enabled', () => {
       // Arrange
-      const characterId = 'char-1';
-      service.startSession(characterId);
+      service.startSession();
       vi.clearAllMocks();
 
       const event: SaveFileEvent = {
@@ -429,7 +433,7 @@ describe('When RunTrackerService is instantiated', () => {
     it('Then should not start run when paused', () => {
       // Arrange
       const characterId = 'char-1';
-      service.startSession(characterId);
+      service.startSession();
       service.startRun(characterId); // Need an active run to pause
       service.pauseRun();
       service.endRun(); // End the current run
@@ -459,8 +463,7 @@ describe('When RunTrackerService is instantiated', () => {
 
     it('Then should not start run when auto-start is disabled', () => {
       // Arrange
-      const characterId = 'char-1';
-      service.startSession(characterId);
+      service.startSession();
       mockDatabase.getAllSettings = vi.fn().mockReturnValue({
         runTrackerAutoStart: false,
       });
@@ -490,8 +493,7 @@ describe('When RunTrackerService is instantiated', () => {
 
     it('Then should end run when no save activity for threshold period', async () => {
       // Arrange
-      const characterId = 'char-1';
-      service.startSession(characterId);
+      service.startSession();
 
       const event: SaveFileEvent = {
         type: 'modified',
@@ -539,7 +541,7 @@ describe('When RunTrackerService is instantiated', () => {
     it('Then should return current run tracker state', () => {
       // Arrange
       const characterId = 'char-1';
-      service.startSession(characterId);
+      service.startSession();
       service.startRun(characterId);
 
       // Act
@@ -557,7 +559,7 @@ describe('When RunTrackerService is instantiated', () => {
     it('Then should cleanup and end active run and session', () => {
       // Arrange
       const characterId = 'char-1';
-      service.startSession(characterId);
+      service.startSession();
       service.startRun(characterId);
       vi.clearAllMocks();
 

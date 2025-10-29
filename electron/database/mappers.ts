@@ -295,7 +295,6 @@ export function mapSessionToDatabase(
 ): Omit<DatabaseSession, 'created_at' | 'updated_at'> {
   return {
     id: session.id,
-    character_id: toSqliteNull(session.characterId),
     start_time: session.startTime.toISOString(),
     end_time: toSqliteDate(session.endTime),
     total_run_time: session.totalRunTime,
@@ -314,7 +313,6 @@ export function mapSessionToDatabase(
 export function mapDatabaseSessionToSession(dbSession: DatabaseSession): Session {
   return {
     id: dbSession.id,
-    characterId: dbSession.character_id || undefined,
     startTime: new Date(dbSession.start_time),
     endTime: fromSqliteDate(dbSession.end_time),
     totalRunTime: dbSession.total_run_time,
@@ -336,7 +334,7 @@ export function mapRunToDatabase(run: Run): Omit<DatabaseRun, 'created_at' | 'up
   return {
     id: run.id,
     session_id: run.sessionId,
-    character_id: run.characterId,
+    character_id: run.characterId || null,
     run_number: run.runNumber,
     run_type: toSqliteNull(run.runType),
     start_time: run.startTime.toISOString(),
@@ -355,7 +353,7 @@ export function mapDatabaseRunToRun(dbRun: DatabaseRun): Run {
   return {
     id: dbRun.id,
     sessionId: dbRun.session_id,
-    characterId: dbRun.character_id,
+    characterId: dbRun.character_id || undefined,
     runNumber: dbRun.run_number,
     runType: dbRun.run_type || undefined,
     startTime: new Date(dbRun.start_time),

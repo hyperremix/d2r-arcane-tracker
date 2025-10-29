@@ -30,7 +30,7 @@ const batchWriter = new DatabaseBatchWriter(grailDatabase, () => {
 });
 let saveFileMonitor: SaveFileMonitor;
 let itemDetectionService: ItemDetectionService;
-let runTracker: RunTrackerService;
+let runTracker: RunTrackerService | undefined;
 const eventUnsubscribers: Array<() => void> = [];
 
 /**
@@ -256,10 +256,16 @@ export function initializeSaveFileHandlers(): void {
   }
 
   // Initialize run tracker service
-  runTracker = new RunTrackerService(eventBus, grailDatabase);
+  try {
+    runTracker = new RunTrackerService(eventBus, grailDatabase);
+    console.log('[initializeSaveFileHandlers] Run tracker initialized successfully');
+  } catch (error) {
+    console.error('[initializeSaveFileHandlers] Failed to initialize run tracker:', error);
+    runTracker = undefined;
+  }
 
   // Initialize monitor and detection service with EventBus and grail database
-  saveFileMonitor = new SaveFileMonitor(eventBus, grailDatabase, runTracker);
+  saveFileMonitor = new SaveFileMonitor(eventBus, grailDatabase, runTracker || undefined);
   itemDetectionService = new ItemDetectionService(eventBus);
 
   // Set up event forwarding to renderer process

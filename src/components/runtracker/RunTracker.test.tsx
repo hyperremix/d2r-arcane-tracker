@@ -33,16 +33,27 @@ vi.mock('./SessionControls', () => ({
   SessionControls: () => <div data-testid="session-controls">Session Controls</div>,
 }));
 
-vi.mock('./RunList', () => ({
-  RunList: ({ runs }: { runs: Run[] | undefined }) => (
-    <div data-testid="run-list">Run List - {runs ? `${runs.length} runs` : 'No runs'}</div>
-  ),
+vi.mock('./SessionsList', () => ({
+  SessionsList: ({
+    onSessionSelect: _onSessionSelect,
+  }: {
+    onSessionSelect: (sessionId: string) => void;
+  }) => <div data-testid="sessions-list">Sessions List</div>,
+}));
+
+vi.mock('./SessionDetailView', () => ({
+  SessionDetailView: ({
+    sessionId,
+    onBack: _onBack,
+  }: {
+    sessionId: string;
+    onBack: () => void;
+  }) => <div data-testid="session-detail-view">Session Detail View - {sessionId}</div>,
 }));
 
 describe('RunTracker', () => {
   const mockSession: Session = {
     id: 'session-1',
-    characterId: 'char-1',
     startTime: new Date('2024-01-01T10:00:00Z'),
     endTime: undefined,
     totalRunTime: 300000, // 5 minutes
@@ -81,6 +92,7 @@ describe('RunTracker', () => {
     loading: false,
     error: null,
     loadSessions: vi.fn(),
+    loadAllSessions: vi.fn(),
     loadSessionRuns: vi.fn(),
     refreshActiveRun: vi.fn(),
     handleSessionStarted: vi.fn(),
@@ -103,7 +115,11 @@ describe('RunTracker', () => {
 
   it('renders without crashing', () => {
     render(<RunTracker />);
-    expect(screen.getByText('No Active Session')).toBeDefined();
+    expect(
+      screen.getByText((_content, element) => {
+        return element?.textContent === 'Session Card - No Session';
+      }),
+    ).toBeDefined();
   });
 
   it('displays loading state correctly', () => {
@@ -131,8 +147,13 @@ describe('RunTracker', () => {
 
   it('displays empty state when no active session', () => {
     render(<RunTracker />);
-    expect(screen.getByText('No Active Session')).toBeDefined();
-    expect(screen.getByText('Start New Session')).toBeDefined();
+    expect(
+      screen.getByText((_content, element) => {
+        return element?.textContent === 'Session Card - No Session';
+      }),
+    ).toBeDefined();
+    expect(screen.getByTestId('session-controls')).toBeDefined();
+    expect(screen.getByTestId('sessions-list')).toBeDefined();
   });
 
   it('renders main layout with child components when active session exists', () => {
@@ -149,17 +170,17 @@ describe('RunTracker', () => {
 
     expect(screen.getByTestId('session-card')).toBeDefined();
     expect(screen.getByTestId('session-controls')).toBeDefined();
-    expect(screen.getByTestId('run-list')).toBeDefined();
+    expect(screen.getByTestId('sessions-list')).toBeDefined();
   });
 
   it('loads initial data on mount', async () => {
-    const mockLoadSessions = vi.fn().mockResolvedValue(undefined);
+    const mockLoadAllSessions = vi.fn().mockResolvedValue(undefined);
     const mockLoadSessionRuns = vi.fn().mockResolvedValue(undefined);
     const mockRefreshActiveRun = vi.fn().mockResolvedValue(undefined);
 
     mockUseRunTrackerStore.mockReturnValue({
       ...defaultStoreState,
-      loadSessions: mockLoadSessions,
+      loadAllSessions: mockLoadAllSessions,
       loadSessionRuns: mockLoadSessionRuns,
       refreshActiveRun: mockRefreshActiveRun,
     });
@@ -167,20 +188,20 @@ describe('RunTracker', () => {
     render(<RunTracker />);
 
     await waitFor(() => {
-      expect(mockLoadSessions).toHaveBeenCalled();
+      expect(mockLoadAllSessions).toHaveBeenCalled();
       expect(mockRefreshActiveRun).toHaveBeenCalled();
     });
   });
 
   it('loads session runs when active session exists', async () => {
-    const mockLoadSessions = vi.fn().mockResolvedValue(undefined);
+    const mockLoadAllSessions = vi.fn().mockResolvedValue(undefined);
     const mockLoadSessionRuns = vi.fn().mockResolvedValue(undefined);
     const mockRefreshActiveRun = vi.fn().mockResolvedValue(undefined);
 
     mockUseRunTrackerStore.mockReturnValue({
       ...defaultStoreState,
       activeSession: mockSession,
-      loadSessions: mockLoadSessions,
+      loadAllSessions: mockLoadAllSessions,
       loadSessionRuns: mockLoadSessionRuns,
       refreshActiveRun: mockRefreshActiveRun,
     });
@@ -188,7 +209,7 @@ describe('RunTracker', () => {
     render(<RunTracker />);
 
     await waitFor(() => {
-      expect(mockLoadSessions).toHaveBeenCalled();
+      expect(mockLoadAllSessions).toHaveBeenCalled();
       expect(mockLoadSessionRuns).toHaveBeenCalledWith('session-1');
       expect(mockRefreshActiveRun).toHaveBeenCalled();
     });
@@ -260,17 +281,17 @@ describe('RunTracker', () => {
     // Check that SessionCard receives the session prop
     expect(screen.getByText('Session Card - Session session-1')).toBeDefined();
 
-    // Check that RunList receives the runs prop
-    expect(screen.getByText('Run List - 1 runs')).toBeDefined();
+    // Check that SessionsList is rendered
+    expect(screen.getByTestId('sessions-list')).toBeDefined();
   });
 
   it('handles data loading errors gracefully', async () => {
     const mockSetError = vi.fn();
-    const mockLoadSessions = vi.fn().mockRejectedValue(new Error('Network error'));
+    const mockLoadAllSessions = vi.fn().mockRejectedValue(new Error('Network error'));
 
     mockUseRunTrackerStore.mockReturnValue({
       ...defaultStoreState,
-      loadSessions: mockLoadSessions,
+      loadAllSessions: mockLoadAllSessions,
       setError: mockSetError,
     });
 
@@ -282,7 +303,7 @@ describe('RunTracker', () => {
   });
 
   it('retry button calls data loading functions', async () => {
-    const mockLoadSessions = vi.fn().mockResolvedValue(undefined);
+    const mockLoadAllSessions = vi.fn().mockResolvedValue(undefined);
     const mockLoadSessionRuns = vi.fn().mockResolvedValue(undefined);
     const mockRefreshActiveRun = vi.fn().mockResolvedValue(undefined);
     const mockSetError = vi.fn();
@@ -291,7 +312,7 @@ describe('RunTracker', () => {
       ...defaultStoreState,
       error: 'Test error',
       activeSession: mockSession,
-      loadSessions: mockLoadSessions,
+      loadAllSessions: mockLoadAllSessions,
       loadSessionRuns: mockLoadSessionRuns,
       refreshActiveRun: mockRefreshActiveRun,
       setError: mockSetError,
@@ -304,7 +325,7 @@ describe('RunTracker', () => {
 
     await waitFor(() => {
       expect(mockSetError).toHaveBeenCalledWith(null);
-      expect(mockLoadSessions).toHaveBeenCalled();
+      expect(mockLoadAllSessions).toHaveBeenCalled();
       expect(mockLoadSessionRuns).toHaveBeenCalledWith('session-1');
       expect(mockRefreshActiveRun).toHaveBeenCalled();
     });

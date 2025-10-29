@@ -264,7 +264,7 @@ describe('SessionControls', () => {
       const startButton = screen.getByText('Start Run');
       fireEvent.click(startButton);
 
-      expect(mockStoreActions.startRun).toHaveBeenCalledWith('char-1');
+      expect(mockStoreActions.startRun).toHaveBeenCalledWith();
     });
 
     it('calls pauseRun when pause button is clicked', () => {
@@ -402,7 +402,7 @@ describe('SessionControls', () => {
 
       keyboardHandler(event);
 
-      expect(mockStoreActions.startRun).toHaveBeenCalledWith('char-1');
+      expect(mockStoreActions.startRun).toHaveBeenCalledWith();
     });
 
     it('triggers pause on Ctrl+Space when not paused', () => {
@@ -565,7 +565,7 @@ describe('SessionControls', () => {
 
       keyboardHandler(event);
 
-      expect(mockStoreActions.startRun).toHaveBeenCalledWith('char-1');
+      expect(mockStoreActions.startRun).toHaveBeenCalledWith();
     });
   });
 

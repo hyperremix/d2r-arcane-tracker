@@ -33,7 +33,6 @@ export function formatSessionAsCSV(
   // Session header
   rows.push(['Session Information']);
   rows.push(['Session ID', session.id]);
-  rows.push(['Character ID', session.characterId || 'N/A']);
   rows.push(['Start Time', session.startTime.toISOString()]);
   rows.push(['End Time', session.endTime?.toISOString() || 'N/A']);
   rows.push(['Total Run Time (ms)', session.totalRunTime.toString()]);
@@ -108,7 +107,6 @@ export function formatSessionAsJSON(
   const exportData = {
     session: {
       id: session.id,
-      characterId: session.characterId,
       startTime: session.startTime.toISOString(),
       endTime: session.endTime?.toISOString(),
       totalRunTime: session.totalRunTime,
@@ -170,7 +168,6 @@ export function formatSessionAsTextSummary(
   lines.push('SESSION INFORMATION');
   lines.push('-'.repeat(20));
   lines.push(`Session ID: ${session.id}`);
-  lines.push(`Character ID: ${session.characterId || 'N/A'}`);
   lines.push(`Start Time: ${session.startTime.toLocaleString()}`);
   lines.push(`End Time: ${session.endTime?.toLocaleString() || 'N/A'}`);
   lines.push(`Total Run Time: ${formatDuration(session.totalRunTime)}`);
