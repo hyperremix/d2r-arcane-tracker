@@ -7,7 +7,6 @@ import type { Run, RunItem, Session } from '../../types/grail';
 export class SessionBuilder {
   private session: Session = {
     id: 'default-session',
-    characterId: 'default-character',
     startTime: new Date('2024-01-01T10:00:00Z'),
     endTime: undefined,
     totalRunTime: 0,
@@ -31,14 +30,6 @@ export class SessionBuilder {
    */
   withId(id: string): this {
     this.session.id = id;
-    return this;
-  }
-
-  /**
-   * Set the character ID
-   */
-  withCharacterId(characterId: string): this {
-    this.session.characterId = characterId;
     return this;
   }
 

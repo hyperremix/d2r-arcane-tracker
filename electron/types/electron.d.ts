@@ -442,10 +442,9 @@ export interface ElectronAPI {
      */
     /**
      * Starts a new run tracking session.
-     * @param {string} [characterId] - Optional character ID to associate with the session.
      * @returns {Promise<Session>} A promise that resolves with the created session.
      */
-    startSession(characterId?: string): Promise<Session>
+    startSession(): Promise<Session>
 
     /**
      * Ends the current run tracking session.
@@ -465,10 +464,10 @@ export interface ElectronAPI {
      */
     /**
      * Starts a new run within the current session.
-     * @param {string} characterId - The character ID for the run.
+     * @param {string} [characterId] - Optional character ID for the run.
      * @returns {Promise<Run>} A promise that resolves with the created run.
      */
-    startRun(characterId: string): Promise<Run>
+    startRun(characterId?: string): Promise<Run>
 
     /**
      * Ends the current run.
@@ -525,11 +524,11 @@ export interface ElectronAPI {
      * Statistics Queries
      */
     /**
-     * Gets all sessions for a specific character.
-     * @param {string} characterId - The character ID to get sessions for.
+     * Gets all sessions regardless of character.
+     * @param {boolean} includeArchived - Whether to include archived sessions (default: false).
      * @returns {Promise<Session[]>} A promise that resolves with an array of sessions.
      */
-    getSessionsByCharacter(characterId: string): Promise<Session[]>
+    getAllSessions(includeArchived?: boolean): Promise<Session[]>
 
     /**
      * Gets a specific session by ID.
@@ -588,24 +587,27 @@ export interface ElectronAPI {
      */
     /**
      * Gets overall run statistics across all sessions.
-     * @param {string} [characterId] - Optional character ID to filter statistics to specific character.
      * @returns {Promise<RunStatistics>} A promise that resolves with overall run statistics.
      */
-    getOverallStatistics(characterId?: string): Promise<RunStatistics>
+    getOverallStatistics(): Promise<RunStatistics>
 
     /**
      * Gets run statistics grouped by run type.
-     * @param {string} [characterId] - Optional character ID to filter statistics to specific character.
      * @returns {Promise<RunTypeStats[]>} A promise that resolves with run type statistics.
      */
-    getStatisticsByType(characterId?: string): Promise<RunTypeStats[]>
+    getStatisticsByType(): Promise<RunTypeStats[]>
 
     /**
-     * Gets summary statistics for a specific character.
-     * @param {string} characterId - The character ID to get summary for.
-     * @returns {Promise<CharacterRunSummary>} A promise that resolves with character summary.
+     * Gets the currently active session.
+     * @returns {Promise<Session | null>} A promise that resolves with the active session or null.
      */
-    getCharacterSummary(characterId: string): Promise<CharacterRunSummary>
+    getActiveSession(): Promise<Session | null>
+
+    /**
+     * Gets the currently active run.
+     * @returns {Promise<Run | null>} A promise that resolves with the active run or null.
+     */
+    getActiveRun(): Promise<Run | null>
   }
 
   /**

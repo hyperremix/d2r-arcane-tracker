@@ -14,6 +14,7 @@ interface RunTrackerState {
   runs: Map<string, Run[]>; // sessionId -> runs
   runItems: Map<string, RunItem[]>; // runId -> items
   recentRunTypes: string[];
+  recentRunTypesLoading?: boolean;
   isTracking: boolean;
   isPaused: boolean;
   loading: boolean;
@@ -23,20 +24,22 @@ interface RunTrackerState {
   sessionStatsCache: Map<string, SessionStats>; // sessionId -> stats
 
   // Actions - Session Management
-  startSession: (characterId?: string) => Promise<void>;
+  startSession: () => Promise<void>;
   endSession: () => Promise<void>;
   archiveSession: (sessionId: string) => Promise<void>;
   updateSessionNotes: (sessionId: string, notes: string) => Promise<void>;
 
   // Actions - Run Management
-  startRun: (characterId: string) => Promise<void>;
+  startRun: (characterId?: string) => Promise<void>;
   endRun: () => Promise<void>;
   pauseRun: () => Promise<void>;
   resumeRun: () => Promise<void>;
   setRunType: (runType: string) => Promise<void>;
 
   // Actions - Data Loading
-  loadSessions: (characterId?: string) => Promise<void>;
+  loadSessions: (includeArchived?: boolean) => Promise<void>;
+  loadAllSessions: () => Promise<void>;
+  loadSessionById: (sessionId: string) => Promise<void>;
   loadSessionRuns: (sessionId: string) => Promise<void>;
   loadRunItems: (runId: string) => Promise<void>;
   refreshActiveRun: () => Promise<void>;
@@ -78,6 +81,7 @@ export const useRunTrackerStore = create<RunTrackerState>()(
     runs: new Map(),
     runItems: new Map(),
     recentRunTypes: [],
+    recentRunTypesLoading: false,
     isTracking: false,
     isPaused: false,
     loading: false,
@@ -87,10 +91,10 @@ export const useRunTrackerStore = create<RunTrackerState>()(
     sessionStatsCache: new Map(),
 
     // Session management actions
-    startSession: async (characterId) => {
+    startSession: async () => {
       set({ loading: true, error: null, errorType: null });
       try {
-        const session = await window.electronAPI?.runTracker.startSession(characterId);
+        const session = await window.electronAPI?.runTracker.startSession();
         if (session) {
           set({ activeSession: session, isTracking: true, loading: false });
           console.log('[RunTrackerStore] Session started:', session.id);
@@ -235,27 +239,55 @@ export const useRunTrackerStore = create<RunTrackerState>()(
     },
 
     // Data loading actions
-    loadSessions: async (characterId) => {
+    loadSessions: async (includeArchived = false) => {
       set({ loading: true, error: null });
       try {
-        if (characterId) {
-          const sessions = await window.electronAPI?.runTracker.getSessionsByCharacter(characterId);
-          if (sessions) {
-            set({ sessions, loading: false });
-            console.log(
-              `[RunTrackerStore] Loaded ${sessions.length} sessions for character:`,
-              characterId,
-            );
-          }
-        } else {
-          // Load all sessions - this would need to be implemented in IPC handlers
-          set({ loading: false });
-          console.log('[RunTrackerStore] Loading all sessions not yet implemented');
+        const sessions = await window.electronAPI?.runTracker.getAllSessions(includeArchived);
+        if (sessions) {
+          set({ sessions, loading: false });
+          console.log(`[RunTrackerStore] Loaded ${sessions.length} sessions`);
         }
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
         set({ error: errorMessage, loading: false });
         console.error('[RunTrackerStore] Error loading sessions:', error);
+      }
+    },
+
+    loadAllSessions: async () => {
+      set({ loading: true, error: null });
+      try {
+        // Load all sessions regardless of character
+        const sessions = await window.electronAPI?.runTracker.getAllSessions(true); // Include archived
+        if (sessions) {
+          set({ sessions, loading: false });
+          console.log(`[RunTrackerStore] Loaded ${sessions.length} sessions (all characters)`);
+        }
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        set({ error: errorMessage, loading: false });
+        console.error('[RunTrackerStore] Error loading all sessions:', error);
+      }
+    },
+
+    loadSessionById: async (sessionId) => {
+      set({ loading: true, error: null });
+      try {
+        const session = await window.electronAPI?.runTracker.getSessionById(sessionId);
+        if (session) {
+          const { sessions: currentSessions } = get();
+          const sessionExists = currentSessions.some((s) => s.id === sessionId);
+          if (!sessionExists) {
+            set({ sessions: [...currentSessions, session], loading: false });
+            console.log('[RunTrackerStore] Loaded session by ID:', sessionId);
+          } else {
+            set({ loading: false });
+          }
+        }
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        set({ error: errorMessage, loading: false });
+        console.error('[RunTrackerStore] Error loading session by ID:', error);
       }
     },
 
@@ -318,33 +350,51 @@ export const useRunTrackerStore = create<RunTrackerState>()(
 
     // Recent run types actions
     loadRecentRunTypes: async () => {
-      set({ loading: true, error: null });
+      // Skip if already loaded (prevents excessive loading)
+      const { recentRunTypes, recentRunTypesLoading } = get();
+      if (recentRunTypes.length > 0 || recentRunTypesLoading) {
+        return;
+      }
+
+      set({ recentRunTypesLoading: true, error: null });
       try {
         const recentTypes = await window.electronAPI?.runTracker.getRecentRunTypes();
         if (recentTypes) {
-          set({ recentRunTypes: recentTypes, loading: false });
+          set({ recentRunTypes: recentTypes, recentRunTypesLoading: false });
           console.log('[RunTrackerStore] Loaded recent run types:', recentTypes.length);
+        } else {
+          set({ recentRunTypesLoading: false });
         }
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
-        set({ error: errorMessage, loading: false });
+
+        // Silently handle "not initialized" errors to prevent spam
+        if (errorMessage.includes('not initialized')) {
+          console.log(
+            '[RunTrackerStore] Run tracker not initialized yet, skipping recent run types load',
+          );
+          set({ recentRunTypesLoading: false });
+          return;
+        }
+
+        set({ error: errorMessage, recentRunTypesLoading: false });
         console.error('[RunTrackerStore] Error loading recent run types:', error);
       }
     },
 
     saveRunType: async (runType) => {
-      set({ loading: true, error: null });
+      set({ error: null });
       try {
         await window.electronAPI?.runTracker.saveRunType(runType);
         // Reload recent run types to get updated list
         const recentTypes = await window.electronAPI?.runTracker.getRecentRunTypes();
         if (recentTypes) {
-          set({ recentRunTypes: recentTypes, loading: false });
+          set({ recentRunTypes: recentTypes });
           console.log('[RunTrackerStore] Saved run type and reloaded recent types');
         }
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
-        set({ error: errorMessage, loading: false });
+        set({ error: errorMessage });
         console.error('[RunTrackerStore] Error saving run type:', error);
       }
     },

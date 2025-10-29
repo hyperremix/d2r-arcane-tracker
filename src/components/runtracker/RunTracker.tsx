@@ -1,12 +1,13 @@
 import type { Run, Session } from 'electron/types/grail';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { useRunTrackerStore } from '@/stores/runTrackerStore';
 import { ErrorDisplay } from './ErrorDisplay';
-import { RunList } from './RunList';
 import { SessionCard } from './SessionCard';
 import { SessionControls } from './SessionControls';
+import { SessionDetailView } from './SessionDetailView';
+import { SessionsList } from './SessionsList';
 
 /**
  * RunTracker component that serves as the main entry point for the Run Counter tab.
@@ -16,12 +17,11 @@ import { SessionControls } from './SessionControls';
 export function RunTracker() {
   const {
     activeSession,
-    runs,
     loading,
     error,
     errorType,
     retryCount,
-    loadSessions,
+    loadAllSessions,
     loadSessionRuns,
     refreshActiveRun,
     handleSessionStarted,
@@ -35,12 +35,16 @@ export function RunTracker() {
     retryLastAction,
   } = useRunTrackerStore();
 
+  // Navigation state
+  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
+
   // Load initial data on mount
+  // biome-ignore lint/correctness/useExhaustiveDependencies: Zustand actions are stable
   useEffect(() => {
     const loadInitialData = async () => {
       try {
-        // Load sessions first
-        await loadSessions();
+        // Load all sessions (including archived) for the sessions list
+        await loadAllSessions();
 
         // Load runs for active session if it exists
         if (activeSession?.id) {
@@ -56,9 +60,10 @@ export function RunTracker() {
     };
 
     loadInitialData();
-  }, [loadSessions, loadSessionRuns, refreshActiveRun, activeSession?.id, setError]);
+  }, [activeSession?.id]); // Only re-run when active session changes
 
   // Set up IPC event listeners for real-time updates
+  // biome-ignore lint/correctness/useExhaustiveDependencies: Event listeners should only be set up once
   useEffect(() => {
     const handleSessionStartedEvent = (_event: Electron.IpcRendererEvent, session: Session) => {
       handleSessionStarted(session);
@@ -104,14 +109,7 @@ export function RunTracker() {
       window.ipcRenderer?.off('run-tracker:run-resumed', handleRunResumedEvent);
       console.log('[RunTracker] IPC event listeners cleaned up');
     };
-  }, [
-    handleSessionStarted,
-    handleSessionEnded,
-    handleRunStarted,
-    handleRunEnded,
-    handleRunPaused,
-    handleRunResumed,
-  ]);
+  }, []); // Only set up once on mount
 
   // Handle loading state
   if (loading) {
@@ -140,7 +138,7 @@ export function RunTracker() {
                 onClick={() => {
                   setError(null);
                   // Retry loading data
-                  loadSessions();
+                  loadAllSessions();
                   if (activeSession?.id) {
                     loadSessionRuns(activeSession.id);
                   }
@@ -157,40 +155,18 @@ export function RunTracker() {
     );
   }
 
-  // Handle empty state (no active session)
-  if (!activeSession) {
-    return (
-      <div className="flex items-center justify-center p-8">
-        <Card className="w-full max-w-md">
-          <CardContent className="flex flex-col items-center gap-4 p-6 text-center">
-            <div className="text-center text-muted-foreground">
-              <h3 className="mb-2 font-semibold">No Active Session</h3>
-              <p className="mb-4 text-sm">
-                Start a new farming session to begin tracking your runs and items.
-              </p>
-              <Button
-                onClick={() => {
-                  // This would typically open a dialog to start a session
-                  // For now, we'll just log it
-                  console.log('[RunTracker] Start session requested');
-                }}
-                className="w-full"
-              >
-                Start New Session
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
+  // Navigation handlers
+  const handleSessionSelect = (sessionId: string) => {
+    setSelectedSessionId(sessionId);
+  };
 
-  // Get runs for the active session
-  const sessionRuns = activeSession?.id ? runs.get(activeSession.id) || [] : [];
+  const handleBackToMain = () => {
+    setSelectedSessionId(null);
+  };
 
-  // Main layout with all components
+  // Main layout with conditional rendering
   return (
-    <div className="space-y-6">
+    <div className="max-h-[94vh] space-y-6 overflow-y-auto p-6">
       {/* Error Display */}
       <ErrorDisplay
         error={error}
@@ -201,9 +177,17 @@ export function RunTracker() {
         onDismiss={clearError}
       />
 
-      <SessionCard session={activeSession} />
-      <SessionControls />
-      <RunList runs={sessionRuns} />
+      {selectedSessionId ? (
+        // Detail view for selected session
+        <SessionDetailView sessionId={selectedSessionId} onBack={handleBackToMain} />
+      ) : (
+        // Main view with active session and sessions list
+        <>
+          <SessionCard session={activeSession} />
+          <SessionControls />
+          <SessionsList onSessionSelect={handleSessionSelect} />
+        </>
+      )}
     </div>
   );
 }

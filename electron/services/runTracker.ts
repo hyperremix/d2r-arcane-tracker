@@ -68,7 +68,18 @@ export class RunTrackerService {
       // Check if we should start a new run
       if (!this.currentRun) {
         // No active run, start a new one
-        this.startRun(event.file.name, false);
+        // Find or get the character ID from the database
+        const character = this.database.getCharacterByName(event.file.name);
+        const characterId = character?.id;
+
+        if (characterId) {
+          this.startRun(characterId, false);
+        } else {
+          console.warn(
+            '[RunTrackerService] Could not find character for automatic run start:',
+            event.file.name,
+          );
+        }
       }
     }
   }
@@ -77,7 +88,7 @@ export class RunTrackerService {
    * Starts a new session.
    * Creates a new session if one doesn't exist.
    */
-  startSession(characterId?: string): Session {
+  startSession(): Session {
     if (this.currentSession) {
       return this.currentSession;
     }
@@ -85,7 +96,6 @@ export class RunTrackerService {
     const now = new Date();
     const session: Session = {
       id: `session-${Date.now()}`,
-      characterId,
       startTime: now,
       totalRunTime: 0,
       totalSessionTime: 0,
@@ -144,10 +154,10 @@ export class RunTrackerService {
   /**
    * Starts a new run.
    */
-  startRun(characterId: string, manual: boolean = false): Run {
+  startRun(characterId?: string, manual: boolean = false): Run {
     // Ensure we have a session
     if (!this.currentSession) {
-      this.startSession(characterId);
+      this.startSession();
     }
 
     const session = this.currentSession;

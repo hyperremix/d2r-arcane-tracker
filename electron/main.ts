@@ -244,7 +244,13 @@ app.whenReady().then(() => {
   // Initialize run tracker handlers after save file handlers
   const runTracker = getRunTracker();
   if (runTracker) {
+    console.log('[main] Run tracker instance found, initializing handlers');
     initializeRunTrackerHandlers(runTracker, eventBus);
+  } else {
+    console.error(
+      '[main] Failed to get run tracker instance - this may indicate an initialization error',
+    );
+    console.error('[main] Check the logs above for any RunTrackerService creation errors');
   }
 
   initializeDialogHandlers();

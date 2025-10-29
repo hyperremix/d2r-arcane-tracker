@@ -5,7 +5,6 @@ import { app } from 'electron';
 import { items } from '../items';
 import type {
   Character,
-  CharacterRunSummary,
   DatabaseCharacter,
   DatabaseGrailProgress,
   DatabaseItem,
@@ -173,7 +172,6 @@ class GrailDatabase {
       -- Sessions table - tracks gaming sessions
       CREATE TABLE IF NOT EXISTS sessions (
         id TEXT PRIMARY KEY,
-        character_id TEXT,
         start_time DATETIME NOT NULL,
         end_time DATETIME,
         total_run_time INTEGER DEFAULT 0, -- milliseconds
@@ -182,15 +180,14 @@ class GrailDatabase {
         archived BOOLEAN DEFAULT FALSE,
         notes TEXT,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (character_id) REFERENCES characters(id)
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
       );
 
       -- Runs table - tracks individual runs within sessions
       CREATE TABLE IF NOT EXISTS runs (
         id TEXT PRIMARY KEY,
         session_id TEXT NOT NULL,
-        character_id TEXT NOT NULL,
+        character_id TEXT,
         run_number INTEGER NOT NULL, -- sequential within session
         run_type TEXT, -- e.g., "Mephisto", "Chaos", "Cows"
         start_time DATETIME NOT NULL,
@@ -237,7 +234,6 @@ class GrailDatabase {
       CREATE INDEX IF NOT EXISTS idx_save_file_states_modified ON save_file_states(last_modified);
 
       -- Sessions indexes
-      CREATE INDEX IF NOT EXISTS idx_sessions_character ON sessions(character_id);
       CREATE INDEX IF NOT EXISTS idx_sessions_start_time ON sessions(start_time);
       CREATE INDEX IF NOT EXISTS idx_sessions_archived ON sessions(archived);
 
@@ -329,6 +325,9 @@ class GrailDatabase {
     this.db.exec(schema);
     console.log('Database schema created successfully');
 
+    // Run migrations for existing databases
+    this.migrateRunsTableCharacterId();
+
     // Ensure wizard settings exist for existing databases
     this.ensureWizardSettings();
 
@@ -354,6 +353,97 @@ class GrailDatabase {
     });
 
     transaction();
+  }
+
+  /**
+   * Migrates the runs table to make character_id nullable.
+   * This handles existing databases that were created before character_id was made optional.
+   */
+  private migrateRunsTableCharacterId(): void {
+    try {
+      // Check if runs table exists
+      const tableInfo = this.db
+        .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='runs'")
+        .get() as { name: string } | undefined;
+
+      if (!tableInfo) {
+        // Table doesn't exist yet, schema creation will handle it
+        return;
+      }
+
+      // Check if character_id column has NOT NULL constraint by checking table_info
+      const columnInfo = this.db.prepare('PRAGMA table_info(runs)').all() as Array<{
+        cid: number;
+        name: string;
+        type: string;
+        notnull: number;
+        dflt_value: unknown;
+        pk: number;
+      }>;
+
+      const characterIdColumn = columnInfo.find((col) => col.name === 'character_id');
+
+      if (!characterIdColumn) {
+        // Column doesn't exist, schema creation will handle it
+        return;
+      }
+
+      // If column has NOT NULL constraint (notnull = 1), we need to migrate
+      if (characterIdColumn.notnull === 1) {
+        console.log(
+          '[migrateRunsTableCharacterId] Migrating runs table to make character_id nullable',
+        );
+
+        // SQLite doesn't support ALTER TABLE to remove NOT NULL, so we recreate the table
+        this.db.exec(`
+          -- Create temporary table with nullable character_id
+          CREATE TABLE runs_new (
+            id TEXT PRIMARY KEY,
+            session_id TEXT NOT NULL,
+            character_id TEXT,
+            run_number INTEGER NOT NULL,
+            run_type TEXT,
+            start_time DATETIME NOT NULL,
+            end_time DATETIME,
+            duration INTEGER,
+            area TEXT,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE,
+            FOREIGN KEY (character_id) REFERENCES characters(id)
+          );
+
+          -- Copy data from old table
+          INSERT INTO runs_new SELECT * FROM runs;
+
+          -- Drop old table
+          DROP TABLE runs;
+
+          -- Rename new table
+          ALTER TABLE runs_new RENAME TO runs;
+
+          -- Recreate indexes
+          CREATE INDEX IF NOT EXISTS idx_runs_session ON runs(session_id);
+          CREATE INDEX IF NOT EXISTS idx_runs_character ON runs(character_id);
+          CREATE INDEX IF NOT EXISTS idx_runs_start_time ON runs(start_time);
+          CREATE INDEX IF NOT EXISTS idx_runs_session_number ON runs(session_id, run_number);
+          CREATE INDEX IF NOT EXISTS idx_runs_run_type ON runs(run_type);
+
+          -- Recreate trigger
+          CREATE TRIGGER IF NOT EXISTS update_runs_timestamp
+            AFTER UPDATE ON runs
+            BEGIN
+              UPDATE runs SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
+            END;
+        `);
+
+        console.log('[migrateRunsTableCharacterId] Migration completed successfully');
+      }
+    } catch (error) {
+      console.error('[migrateRunsTableCharacterId] Migration failed:', error);
+      // Don't throw - allow application to continue even if migration fails
+      // The schema creation will still create the table correctly for new databases
+    }
   }
 
   // Items methods
@@ -1067,15 +1157,16 @@ class GrailDatabase {
 
   // Session methods
   /**
-   * Retrieves all non-archived sessions for a character.
-   * @param characterId - The unique identifier of the character
+   * Retrieves all sessions regardless of character.
+   * @param includeArchived - Whether to include archived sessions (default: false)
    * @returns Array of sessions ordered by start time (most recent first)
    */
-  getSessionsByCharacter(characterId: string): Session[] {
+  getAllSessions(includeArchived: boolean = false): Session[] {
+    const archivedCondition = includeArchived ? '' : 'AND archived = 0';
     const stmt = this.db.prepare(
-      'SELECT * FROM sessions WHERE character_id = ? AND archived = 0 ORDER BY start_time DESC',
+      `SELECT * FROM sessions ${archivedCondition ? `WHERE ${archivedCondition}` : ''} ORDER BY start_time DESC`,
     );
-    const dbSessions = stmt.all(characterId) as DatabaseSession[];
+    const dbSessions = stmt.all() as DatabaseSession[];
     return dbSessions.map(mapDatabaseSessionToSession);
   }
 
@@ -1109,13 +1200,12 @@ class GrailDatabase {
    */
   upsertSession(session: Session): void {
     const stmt = this.db.prepare(`
-      INSERT OR REPLACE INTO sessions (id, character_id, start_time, end_time, total_run_time, total_session_time, run_count, archived, notes)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT OR REPLACE INTO sessions (id, start_time, end_time, total_run_time, total_session_time, run_count, archived, notes)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `);
     const mapped = mapSessionToDatabase(session);
     stmt.run(
       mapped.id,
-      mapped.character_id,
       mapped.start_time,
       mapped.end_time,
       mapped.total_run_time,
@@ -1203,34 +1293,12 @@ class GrailDatabase {
     };
   }
 
-  /**
-   * Retrieves statistics for all non-archived sessions for a character.
-   * @param characterId - The unique identifier of the character
-   * @returns Array of session statistics ordered by start time descending
-   */
-  getSessionStatisticsByCharacter(characterId: string): SessionStats[] {
-    const sessionsStmt = this.db.prepare(`
-      SELECT id FROM sessions
-      WHERE character_id = ? AND archived = 0
-      ORDER BY start_time DESC
-    `);
-    const sessions = sessionsStmt.all(characterId) as Array<{ id: string }>;
-
-    return sessions
-      .map((session) => this.getSessionStatistics(session.id))
-      .filter((stats): stats is SessionStats => stats !== null);
-  }
-
   // Run Statistics methods
   /**
    * Retrieves overall run statistics across all sessions.
-   * @param characterId - Optional character ID to filter statistics to specific character
    * @returns Overall run statistics
    */
-  getOverallRunStatistics(characterId?: string): RunStatistics {
-    const characterFilter = characterId ? 'AND s.character_id = ?' : '';
-    const params = characterId ? [characterId] : [];
-
+  getOverallRunStatistics(): RunStatistics {
     // Get session and run counts
     const sessionStatsStmt = this.db.prepare(`
       SELECT
@@ -1239,9 +1307,9 @@ class GrailDatabase {
         SUM(s.total_session_time) as totalTime
       FROM sessions s
       LEFT JOIN runs r ON s.id = r.session_id
-      WHERE s.archived = 0 ${characterFilter}
+      WHERE s.archived = 0
     `);
-    const sessionStats = sessionStatsStmt.get(...params) as {
+    const sessionStats = sessionStatsStmt.get([]) as {
       totalSessions: number;
       totalRuns: number;
       totalTime: number | null;
@@ -1255,9 +1323,9 @@ class GrailDatabase {
         MAX(CASE WHEN r.duration IS NOT NULL THEN r.duration ELSE NULL END) as maxDuration
       FROM runs r
       INNER JOIN sessions s ON r.session_id = s.id
-      WHERE s.archived = 0 ${characterFilter}
+      WHERE s.archived = 0
     `);
-    const runDuration = runDurationStmt.get(...params) as {
+    const runDuration = runDurationStmt.get([]) as {
       averageRunDuration: number | null;
       minDuration: number | null;
       maxDuration: number | null;
@@ -1268,11 +1336,11 @@ class GrailDatabase {
       SELECT r.id, r.duration, r.start_time
       FROM runs r
       INNER JOIN sessions s ON r.session_id = s.id
-      WHERE s.archived = 0 AND r.duration IS NOT NULL ${characterFilter}
+      WHERE s.archived = 0 AND r.duration IS NOT NULL
       ORDER BY r.duration ASC
       LIMIT 1
     `);
-    const fastestRun = fastestRunStmt.get(...params) as
+    const fastestRun = fastestRunStmt.get([]) as
       | { id: string; duration: number; start_time: string }
       | undefined;
 
@@ -1280,11 +1348,11 @@ class GrailDatabase {
       SELECT r.id, r.duration, r.start_time
       FROM runs r
       INNER JOIN sessions s ON r.session_id = s.id
-      WHERE s.archived = 0 AND r.duration IS NOT NULL ${characterFilter}
+      WHERE s.archived = 0 AND r.duration IS NOT NULL
       ORDER BY r.duration DESC
       LIMIT 1
     `);
-    const slowestRun = slowestRunStmt.get(...params) as
+    const slowestRun = slowestRunStmt.get() as
       | { id: string; duration: number; start_time: string }
       | undefined;
 
@@ -1296,9 +1364,9 @@ class GrailDatabase {
       FROM runs r
       INNER JOIN sessions s ON r.session_id = s.id
       LEFT JOIN run_items ri ON r.id = ri.run_id
-      WHERE s.archived = 0 ${characterFilter}
+      WHERE s.archived = 0
     `);
-    const itemsPerRun = itemsPerRunStmt.get(...params) as {
+    const itemsPerRun = itemsPerRunStmt.get([]) as {
       totalItems: number;
       runsWithItems: number;
     };
@@ -1308,14 +1376,12 @@ class GrailDatabase {
       SELECT r.run_type, COUNT(*) as count
       FROM runs r
       INNER JOIN sessions s ON r.session_id = s.id
-      WHERE s.archived = 0 AND r.run_type IS NOT NULL ${characterFilter}
+      WHERE s.archived = 0 AND r.run_type IS NOT NULL
       GROUP BY r.run_type
       ORDER BY count DESC
       LIMIT 1
     `);
-    const mostCommonRunType = mostCommonRunTypeStmt.get(...params) as
-      | { run_type: string }
-      | undefined;
+    const mostCommonRunType = mostCommonRunTypeStmt.get([]) as { run_type: string } | undefined;
 
     return {
       totalSessions: sessionStats.totalSessions,
@@ -1344,13 +1410,9 @@ class GrailDatabase {
 
   /**
    * Retrieves statistics grouped by run type.
-   * @param characterId - Optional character ID to filter statistics to specific character
    * @returns Array of run type statistics ordered by run count descending
    */
-  getRunStatisticsByType(characterId?: string): RunTypeStats[] {
-    const characterFilter = characterId ? 'AND s.character_id = ?' : '';
-    const params = characterId ? [characterId] : [];
-
+  getRunStatisticsByType(): RunTypeStats[] {
     const stmt = this.db.prepare(`
       SELECT
         r.run_type,
@@ -1361,12 +1423,12 @@ class GrailDatabase {
       FROM runs r
       INNER JOIN sessions s ON r.session_id = s.id
       LEFT JOIN run_items ri ON r.id = ri.run_id
-      WHERE s.archived = 0 AND r.run_type IS NOT NULL ${characterFilter}
+      WHERE s.archived = 0 AND r.run_type IS NOT NULL
       GROUP BY r.run_type
       ORDER BY count DESC
     `);
 
-    const results = stmt.all(...params) as Array<{
+    const results = stmt.all([]) as Array<{
       run_type: string;
       count: number;
       totalDuration: number | null;
@@ -1383,67 +1445,6 @@ class GrailDatabase {
     }));
   }
 
-  // Character Statistics methods
-  /**
-   * Retrieves summary statistics for a specific character.
-   * @param characterId - The unique identifier of the character
-   * @returns Character run summary statistics
-   */
-  getCharacterRunSummary(characterId: string): CharacterRunSummary {
-    // Get session and run counts
-    const sessionStatsStmt = this.db.prepare(`
-      SELECT
-        COUNT(s.id) as totalSessions,
-        COUNT(r.id) as totalRuns,
-        SUM(s.total_session_time) as totalTimePlayed,
-        AVG(s.total_session_time) as averageSessionDuration
-      FROM sessions s
-      LEFT JOIN runs r ON s.id = r.session_id
-      WHERE s.character_id = ? AND s.archived = 0
-    `);
-    const sessionStats = sessionStatsStmt.get(characterId) as {
-      totalSessions: number;
-      totalRuns: number;
-      totalTimePlayed: number | null;
-      averageSessionDuration: number | null;
-    };
-
-    // Get total items found
-    const itemsFoundStmt = this.db.prepare(`
-      SELECT COUNT(ri.id) as totalItemsFound
-      FROM run_items ri
-      INNER JOIN runs r ON ri.run_id = r.id
-      INNER JOIN sessions s ON r.session_id = s.id
-      WHERE s.character_id = ? AND s.archived = 0
-    `);
-    const itemsFound = itemsFoundStmt.get(characterId) as { totalItemsFound: number };
-
-    // Get favorite run type
-    const favoriteRunTypeStmt = this.db.prepare(`
-      SELECT r.run_type, COUNT(*) as count
-      FROM runs r
-      INNER JOIN sessions s ON r.session_id = s.id
-      WHERE s.character_id = ? AND s.archived = 0 AND r.run_type IS NOT NULL
-      GROUP BY r.run_type
-      ORDER BY count DESC
-      LIMIT 1
-    `);
-    const favoriteRunType = favoriteRunTypeStmt.get(characterId) as
-      | { run_type: string }
-      | undefined;
-
-    return {
-      characterId,
-      totalSessions: sessionStats.totalSessions,
-      totalRuns: sessionStats.totalRuns,
-      totalTimePlayed: sessionStats.totalTimePlayed || 0,
-      averageSessionDuration: sessionStats.averageSessionDuration || 0,
-      averageRunsPerSession:
-        sessionStats.totalSessions > 0 ? sessionStats.totalRuns / sessionStats.totalSessions : 0,
-      totalItemsFound: itemsFound.totalItemsFound,
-      favoriteRunType: favoriteRunType?.run_type || '',
-    };
-  }
   /**
    * Retrieves all runs for a session.
    * @param sessionId - The unique identifier of the session

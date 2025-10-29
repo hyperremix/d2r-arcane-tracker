@@ -589,10 +589,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
      */
     /**
      * Starts a new run within the current session.
-     * @param {string} characterId - The character ID for the run.
+     * @param {string} [characterId] - Optional character ID for the run.
      * @returns {Promise<Run>} A promise that resolves with the created run.
      */
-    startRun: (characterId: string): Promise<Run> =>
+    startRun: (characterId?: string): Promise<Run> =>
       ipcRenderer.invoke('run-tracker:start-run', characterId),
 
     /**
@@ -652,12 +652,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
      * Statistics Queries
      */
     /**
-     * Gets all sessions for a specific character.
-     * @param {string} characterId - The character ID to get sessions for.
+     * Gets all sessions regardless of character.
+     * @param {boolean} includeArchived - Whether to include archived sessions (default: false).
      * @returns {Promise<Session[]>} A promise that resolves with an array of sessions.
      */
-    getSessionsByCharacter: (characterId: string): Promise<Session[]> =>
-      ipcRenderer.invoke('run-tracker:get-sessions-by-character', characterId),
+    getAllSessions: (includeArchived?: boolean): Promise<Session[]> =>
+      ipcRenderer.invoke('run-tracker:get-all-sessions', includeArchived),
 
     /**
      * Gets a specific session by ID.
@@ -690,6 +690,26 @@ contextBridge.exposeInMainWorld('electronAPI', {
      */
     getSessionItems: (sessionId: string): Promise<RunItem[]> =>
       ipcRenderer.invoke('run-tracker:get-session-items', sessionId),
+
+    /**
+     * Gets recent run types ordered by last used.
+     * @param {number} [limit] - Optional limit on the number of recent run types to return.
+     * @returns {Promise<string[]>} A promise that resolves with an array of run type strings.
+     */
+    getRecentRunTypes: (limit?: number): Promise<string[]> =>
+      ipcRenderer.invoke('run-tracker:get-recent-run-types', limit),
+
+    /**
+     * Gets overall run statistics across all sessions.
+     * @returns {Promise<RunStatistics>} A promise that resolves with overall run statistics.
+     */
+    getOverallStatistics: () => ipcRenderer.invoke('run-tracker:get-overall-statistics'),
+
+    /**
+     * Gets run statistics grouped by run type.
+     * @returns {Promise<RunTypeStats[]>} A promise that resolves with run type statistics.
+     */
+    getStatisticsByType: () => ipcRenderer.invoke('run-tracker:get-statistics-by-type'),
   },
 
   /**

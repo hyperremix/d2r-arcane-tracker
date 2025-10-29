@@ -209,7 +209,6 @@ export type DatabaseCharacter = {
  */
 export interface Session {
   id: string;
-  characterId?: string;
   startTime: Date;
   endTime?: Date;
   totalRunTime: number; // milliseconds spent in runs
@@ -227,7 +226,7 @@ export interface Session {
 export interface Run {
   id: string;
   sessionId: string;
-  characterId: string;
+  characterId?: string;
   runNumber: number;
   runType?: string;
   startTime: Date;
@@ -290,7 +289,6 @@ export type DatabaseGrailProgress = {
  */
 export type DatabaseSession = {
   id: string;
-  character_id: string | null;
   start_time: string; // ISO datetime string
   end_time: string | null;
   total_run_time: number;
@@ -309,7 +307,7 @@ export type DatabaseSession = {
 export type DatabaseRun = {
   id: string;
   session_id: string;
-  character_id: string;
+  character_id: string | null;
   run_number: number;
   run_type: string | null;
   start_time: string;

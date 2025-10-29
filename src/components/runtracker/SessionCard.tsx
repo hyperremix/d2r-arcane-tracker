@@ -25,6 +25,7 @@ export function SessionCard({ session }: SessionCardProps) {
     archiveSession,
     updateSessionNotes,
     getSessionStats,
+    startSession,
   } = useRunTrackerStore();
 
   const [sessionTime, setSessionTime] = useState<number>(0);
@@ -42,7 +43,7 @@ export function SessionCard({ session }: SessionCardProps) {
 
   // Real-time timer updates
   useEffect(() => {
-    if (!currentSession) {
+    if (!currentSession || !currentSession.startTime) {
       setSessionTime(0);
       return;
     }
@@ -138,6 +139,18 @@ export function SessionCard({ session }: SessionCardProps) {
               Start a session to begin tracking your runs and items.
             </p>
           </div>
+          <Button
+            onClick={async () => {
+              try {
+                await startSession();
+              } catch (error) {
+                console.error('[RunTracker] Failed to start session:', error);
+              }
+            }}
+            className="w-full"
+          >
+            Start New Session
+          </Button>
         </CardContent>
       </Card>
     );

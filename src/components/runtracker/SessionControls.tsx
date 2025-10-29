@@ -224,13 +224,13 @@ export function SessionControls() {
 
   // Button click handlers
   const handleStartRun = useCallback(async () => {
-    if (!activeSession?.characterId) return;
     try {
-      await startRun(activeSession.characterId);
+      // Manual run start - no character association
+      await startRun();
     } catch (error) {
       console.error('Failed to start run:', error);
     }
-  }, [activeSession, startRun]);
+  }, [startRun]);
 
   const handlePauseRun = useCallback(async () => {
     try {
@@ -381,7 +381,7 @@ export function SessionControls() {
         </CardHeader>
         <CardContent>
           <div className="flex flex-col gap-4">
-            {/* Run Type Selector - only show when there's an active run */}
+            {/* Run Type Selector - only mounted when there's an active run */}
             {activeRun && (
               <div className="flex items-center gap-2">
                 <span className="font-medium text-sm">Run Type:</span>
