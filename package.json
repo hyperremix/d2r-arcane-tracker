@@ -20,6 +20,7 @@
   "main": "dist-electron/main.js",
   "scripts": {
     "dev": "electron-rebuild --force --module-dir . --which-module better-sqlite3 && vite",
+    "dev:debug": "node scripts/dev-with-debug.js",
     "preview": "electron-vite preview",
     "build": "npm run typecheck && vite build && electron-builder --win",
     "typecheck": "concurrently \"tsc -p tsconfig.json --noEmit\" \"tsc -p tsconfig.node.json --noEmit\"",
@@ -37,6 +38,8 @@
     "test:coverage": "vitest run --coverage",
     "prepare": "husky",
     "seed:test": "node scripts/setup-native-modules.js && tsx scripts/seed-test-data.ts",
+    "debug:url": "node scripts/get-cdp-url.js",
+    "debug:update": "node scripts/update-cursor-debug.js",
     "version:major": "yarn version --new-version major && git push --follow-tags",
     "version:minor": "yarn version --new-version minor && git push --follow-tags",
     "version:patch": "yarn version --new-version patch && git push --follow-tags"
