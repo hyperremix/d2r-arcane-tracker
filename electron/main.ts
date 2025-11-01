@@ -57,6 +57,12 @@ process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL
   ? path.join(process.env.APP_ROOT, 'public')
   : RENDERER_DIST;
 
+// Enable Chrome DevTools Protocol (CDP) remote debugging in development only
+if (VITE_DEV_SERVER_URL) {
+  // Default to port 9222; change if needed
+  app.commandLine.appendSwitch('remote-debugging-port', '9222');
+}
+
 /**
  * The main application window instance.
  */
