@@ -149,6 +149,7 @@ describe('When RunTrackerService is instantiated', () => {
 
     it('Then should end active run before ending session', () => {
       // Arrange
+      service.startSession();
       service.startRun('char-1');
       vi.clearAllMocks();
 
@@ -195,18 +196,14 @@ describe('When RunTrackerService is instantiated', () => {
       expect(mockEventBus.emit).toHaveBeenCalledWith('run-started', expect.any(Object));
     });
 
-    it('Then should create session if it does not exist', () => {
+    it('Then should throw error if no active session', () => {
       // Arrange
       const characterId = 'char-1';
-      vi.clearAllMocks();
 
-      // Act
-      const run = service.startRun(characterId);
-
-      // Assert
-      expect(run).toBeDefined();
-      expect(mockDatabase.upsertSession).toHaveBeenCalled(); // Session created
-      expect(mockDatabase.upsertRun).toHaveBeenCalled();
+      // Act & Assert
+      expect(() => service.startRun(characterId)).toThrow(
+        'No active session. Please start a session first before starting a run.',
+      );
     });
 
     it('Then should increment run number for subsequent runs', () => {

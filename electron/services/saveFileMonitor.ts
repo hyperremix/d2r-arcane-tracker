@@ -586,27 +586,19 @@ class SaveFileMonitor {
    * @returns {Promise<string[]>} A promise that resolves with an array of existing save directory paths.
    */
   private async findExistingSaveDirectories(): Promise<string[]> {
-    console.log('[findExistingSaveDirectories] Checking for existing directories');
     const existingDirs: string[] = [];
 
     if (this.saveDirectory) {
       const dir = this.saveDirectory;
-      console.log('[findExistingSaveDirectories] Checking directory:', dir);
       try {
         if (existsSync(dir)) {
-          console.log('[findExistingSaveDirectories] Directory exists:', dir);
           existingDirs.push(dir);
-        } else {
-          console.log('[findExistingSaveDirectories] Directory does not exist:', dir);
         }
       } catch (error) {
-        console.log('[findExistingSaveDirectories] Error checking directory:', dir, error);
+        console.error('[findExistingSaveDirectories] Error checking directory:', dir, error);
       }
-    } else {
-      console.log('[findExistingSaveDirectories] No save directory configured');
     }
 
-    console.log('[findExistingSaveDirectories] Found', existingDirs.length, 'existing directories');
     return existingDirs;
   }
 
@@ -617,25 +609,22 @@ class SaveFileMonitor {
    * @returns {Promise<boolean>} A promise that resolves to true if parsing was successful, false otherwise.
    */
   private async parseAllSaveDirectories(directories: string[]): Promise<boolean> {
-    console.log('[parseAllSaveDirectories] Parsing directories:', directories);
     const allFiles: string[] = [];
 
     // Collect all save files from all directories
     for (const dir of directories) {
-      console.log('[parseAllSaveDirectories] Reading directory:', dir);
       try {
         const allFilesInDir = readdirSync(dir);
         const files = allFilesInDir.filter(
           (file) => ['.d2s', '.sss', '.d2x', '.d2i'].indexOf(extname(file).toLowerCase()) !== -1,
         );
-        console.log('[parseAllSaveDirectories] Found', files.length, 'save files in', dir);
         allFiles.push(...files.map((file) => join(dir, file)));
       } catch (error) {
         console.error('[parseAllSaveDirectories] Error reading save directory', dir, ':', error);
       }
     }
 
-    console.log('[parseAllSaveDirectories] Total save files found:', allFiles.length);
+    console.log('[parseAllSaveDirectories] Found', allFiles.length, 'save files total');
 
     // Clean up save file states for files that no longer exist
     this.cleanupDeletedFileStates(allFiles);
@@ -655,9 +644,8 @@ class SaveFileMonitor {
     }
 
     // Parse all files and update current data
-    console.log('[parseAllSaveDirectories] Starting to parse all files');
     await this.parseFiles(allFiles, false);
-    console.log('[parseAllSaveDirectories] All files parsed');
+    console.log('[parseAllSaveDirectories] Parsing complete');
     return true;
   }
 
@@ -668,15 +656,12 @@ class SaveFileMonitor {
    * @returns {Promise<boolean>} A promise that resolves to true if parsing was successful, false otherwise.
    */
   private async parseSaveDirectory(directory: string): Promise<boolean> {
-    console.log('[parseSaveDirectory] Parsing directory:', directory);
     try {
       const allFilesInDir = readdirSync(directory);
-      console.log('[parseSaveDirectory] Total files in directory:', allFilesInDir.length);
 
       const files = allFilesInDir.filter(
         (file) => ['.d2s', '.sss', '.d2x', '.d2i'].indexOf(extname(file).toLowerCase()) !== -1,
       );
-      console.log('[parseSaveDirectory] D2R save files found:', files.length, files);
 
       const allFiles = files.map((file) => join(directory, file));
 
@@ -692,9 +677,9 @@ class SaveFileMonitor {
       }
 
       // Parse all files and update current data
-      console.log('[parseSaveDirectory] Starting to parse files');
+      console.log('[parseSaveDirectory] Parsing', allFiles.length, 'save files');
       await this.parseFiles(allFiles, false);
-      console.log('[parseSaveDirectory] All files parsed successfully');
+      console.log('[parseSaveDirectory] Parsing complete');
       return true;
     } catch (error) {
       console.error('[parseSaveDirectory] Error reading save directory:', directory, error);
@@ -725,7 +710,6 @@ class SaveFileMonitor {
       const fileState = this.grailDatabase?.getSaveFileState(filePath);
 
       if (!fileState) {
-        console.log(`[shouldParseSaveFile] ${filePath}: New file, will parse`);
         return true; // New file, should parse
       }
 
@@ -733,10 +717,6 @@ class SaveFileMonitor {
       const fileTime = stats.mtime.getTime();
       const lastModTime = fileState.lastModified.getTime();
       const shouldParse = fileTime > lastModTime;
-
-      console.log(
-        `[shouldParseSaveFile] ${filePath}: fileTime=${new Date(fileTime).toISOString()}, lastMod=${new Date(lastModTime).toISOString()}, willParse=${shouldParse}`,
-      );
 
       return shouldParse;
     } catch (error) {
@@ -752,14 +732,12 @@ class SaveFileMonitor {
    * @returns {Promise<string[]>} Array of file paths that need parsing.
    */
   private async filterFilesToParse(filePaths: string[]): Promise<string[]> {
-    console.log('[filterFilesToParse] Checking', filePaths.length, 'files');
     const filesToParse: string[] = [];
 
     for (const filePath of filePaths) {
       const shouldParse = await this.shouldParseSaveFile(filePath);
       if (shouldParse) {
         filesToParse.push(filePath);
-        console.log('[filterFilesToParse] Will parse:', filePath);
       }
     }
 
@@ -840,15 +818,11 @@ class SaveFileMonitor {
     results: FileReaderResponse,
   ): Promise<{ saveName: string; success: boolean }> {
     const saveName = this.getSaveNameFromPath(filePath);
-    console.log('[processSingleFile] Processing:', filePath, `(saveName: ${saveName})`);
 
     try {
       const buffer = await readFile(filePath);
-      console.log('[processSingleFile] File read, size:', buffer.length, 'bytes');
-
       const extension = extname(filePath).toLowerCase();
       const parsedItems = await this.parseSave(saveName, buffer, extension);
-      console.log('[processSingleFile] Parsed', parsedItems.length, 'items from', saveName);
 
       results.stats[saveName] = 0;
 
@@ -870,13 +844,6 @@ class SaveFileMonitor {
         results.stats[saveName] = (results.stats[saveName] || 0) + 1;
       }
 
-      console.log(
-        '[processSingleFile] Successfully processed',
-        results.stats[saveName],
-        'items from',
-        saveName,
-      );
-
       // Update save file state after successful parsing
       await this.updateSaveFileState(filePath);
 
@@ -894,7 +861,6 @@ class SaveFileMonitor {
    * @param {string} filePath - Path to the save file.
    */
   private async updateSaveFileState(filePath: string): Promise<void> {
-    console.log('[updateSaveFileState] Updating state for:', filePath);
     try {
       const stats = await import('node:fs/promises').then((fs) => fs.stat(filePath));
 
@@ -912,15 +878,7 @@ class SaveFileMonitor {
         updated: new Date(),
       };
 
-      console.log('[updateSaveFileState] Saving state:', {
-        id,
-        filePath,
-        lastModified: stats.mtime.toISOString(),
-        isNew: !existingState,
-      });
-
       this.grailDatabase?.upsertSaveFileState(saveFileState);
-      console.log('[updateSaveFileState] State saved successfully');
     } catch (error) {
       console.error(
         '[updateSaveFileState] Failed to update save file state for',
@@ -946,7 +904,6 @@ class SaveFileMonitor {
       try {
         const saveFile = await this.parseSaveFile(filePath);
         if (!saveFile) {
-          console.log('[emitSaveFileEvents] Failed to parse save file metadata for:', filePath);
           continue;
         }
 
@@ -962,15 +919,6 @@ class SaveFileMonitor {
         // Set isInitialScan flag ONLY during initial parsing (not force re-scan)
         // This marks items for exclusion from statistics like Recent Finds, Streaks, and Avg per Day
         const isInitialScan = this.isInitialParsing;
-
-        console.log('[emitSaveFileEvents] Emitting save-file-event for:', saveName, {
-          itemCount: extractedItems.length,
-          silent,
-          isInitialScan,
-          isInitialParsing: this.isInitialParsing,
-          forceParseAll: this.forceParseAll,
-          type: 'modified',
-        });
 
         // Note: Save file events are no longer used for run tracking
         // Auto mode uses memory reading instead (RunTrackerService listens to game-entered/game-exited events)
@@ -1097,12 +1045,11 @@ class SaveFileMonitor {
     }
 
     // Update current data
-    console.log('[parseFiles] Updating current data');
     this.currentData = results;
 
     // Emit save file events for each file that was actually parsed
     await this.emitSaveFileEvents(filesToParse, results);
-    console.log('[parseFiles] Complete');
+    console.log('[parseFiles] Complete - processed', filesToParse.length, 'files');
   }
 
   /**
@@ -1114,11 +1061,10 @@ class SaveFileMonitor {
    * @returns {Promise<d2s.types.IItem[]>} A promise that resolves with an array of extracted items.
    */
   private async parseSave(
-    saveName: string,
+    _saveName: string,
     content: Buffer,
     extension: string,
   ): Promise<d2s.types.IItem[]> {
-    console.log('[parseSave] Parsing save:', saveName, 'extension:', extension);
     const items: d2s.types.IItem[] = [];
 
     const parseItems = (itemList: d2s.types.IItem[], isEmbed: boolean = false) => {
@@ -1138,18 +1084,11 @@ class SaveFileMonitor {
 
     const parseD2S = (response: d2s.types.ID2S) => {
       if (!this.grailDatabase) {
-        console.log('[parseSave/parseD2S] No grail database');
         return [];
       }
 
       const settings = this.grailDatabase.getAllSettings();
       const isHardcore = response.header.status.hardcore;
-      console.log(
-        '[parseSave/parseD2S] Character is hardcore:',
-        isHardcore,
-        'Game mode:',
-        settings.gameMode,
-      );
 
       if (settings.gameMode === GameMode.Softcore && isHardcore) {
         return [];
@@ -1161,25 +1100,17 @@ class SaveFileMonitor {
       const mercItems = response.merc_items || [];
       const corpseItems = response.corpse_items || [];
       const itemList = [...items, ...mercItems, ...corpseItems];
-      console.log('[parseSave/parseD2S] Found', itemList.length, 'items in character file');
       parseItems(itemList);
     };
 
     const parseStash = (response: d2s.types.IStash) => {
       if (!this.grailDatabase) {
-        console.log('[parseSave/parseStash] No grail database');
         return [];
       }
 
       const settings = this.grailDatabase.getAllSettings();
       // Use hardcore flag from parsed stash header instead of filename
       const isHardcore = response.hardcore;
-      console.log(
-        '[parseSave/parseStash] Stash is hardcore:',
-        isHardcore,
-        'Game mode:',
-        settings.gameMode,
-      );
 
       if (settings.gameMode === GameMode.Softcore && isHardcore) {
         return [];
@@ -1188,36 +1119,23 @@ class SaveFileMonitor {
         return [];
       }
 
-      let totalItems = 0;
       response.pages.forEach((page) => {
-        totalItems += page.items.length;
         parseItems(page.items);
       });
-      console.log(
-        '[parseSave/parseStash] Found',
-        totalItems,
-        'items across',
-        response.pages.length,
-        'pages',
-      );
     };
 
     switch (extension) {
       case '.sss':
       case '.d2x':
-        console.log('[parseSave] Parsing as stash file (.sss/.d2x)');
         await d2stash.read(content).then(parseStash);
         break;
       case '.d2i':
-        console.log('[parseSave] Parsing as shared stash (.d2i)');
         await d2stash.read(content).then(parseStash);
         break;
       default:
-        console.log('[parseSave] Parsing as character file (.d2s)');
         await d2s.read(content).then(parseD2S);
     }
 
-    console.log('[parseSave] Total items extracted:', items.length);
     return items;
   }
 

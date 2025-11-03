@@ -68,15 +68,9 @@ class ItemDetectionService {
 
       if (preExtractedItems !== undefined) {
         // Use pre-extracted items to avoid duplicate parsing (even if empty)
-        console.log(
-          `[ItemDetection] Using ${preExtractedItems.length} pre-extracted items for ${saveFile.name}`,
-        );
         items = this.convertD2SItemsToD2Items(preExtractedItems, saveFile.name);
       } else {
         // Fallback to parsing the save file again (only if pre-extracted items not provided)
-        console.log(
-          `[ItemDetection] No pre-extracted items provided, parsing save file: ${saveFile.name}`,
-        );
         items = await this.extractItemsFromSaveFile(saveFile);
       }
 

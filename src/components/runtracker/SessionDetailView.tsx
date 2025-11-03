@@ -62,10 +62,12 @@ export function SessionDetailView({ sessionId, onBack }: SessionDetailViewProps)
 
   // Load session runs when component mounts
   useEffect(() => {
-    if (sessionId) {
+    // Only load if we don't already have runs for this session
+    const existingRuns = runs.get(sessionId);
+    if (sessionId && !existingRuns) {
       loadSessionRuns(sessionId);
     }
-  }, [sessionId, loadSessionRuns]);
+  }, [sessionId, loadSessionRuns, runs.get]);
 
   // Update notes when session changes
   useEffect(() => {

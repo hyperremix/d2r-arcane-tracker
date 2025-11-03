@@ -21,7 +21,12 @@ export class RunTrackerService {
   ) {
     this.memoryReader = memoryReader || null;
     this.loadSettings();
-    this.restoreState();
+    // Don't restore state automatically - sessions should only be created manually
+    // this.restoreState();
+
+    // Clean up any stale sessions from previous app crashes or improper shutdowns
+    this.cleanupStaleSessions();
+
     this.setupEventListeners();
 
     // Start memory reading if auto mode is enabled
@@ -63,6 +68,40 @@ export class RunTrackerService {
       }
     } catch (error) {
       console.error('[RunTrackerService] Failed to load settings:', error);
+    }
+  }
+
+  /**
+   * Cleans up stale sessions from previous app crashes or improper shutdowns.
+   * Closes any sessions that were left open (end_time IS NULL) by setting their end_time.
+   * @private
+   */
+  private cleanupStaleSessions(): void {
+    try {
+      console.log('[RunTrackerService] Checking for stale sessions...');
+      // Get the active session from database (sessions with end_time IS NULL)
+      const staleSession = this.database.getActiveSession();
+
+      if (staleSession) {
+        // Since we're not restoring state, any session in the database with end_time IS NULL
+        // is a stale session that should be closed
+        const now = new Date();
+        const closedSession = {
+          ...staleSession,
+          endTime: now,
+          totalSessionTime: now.getTime() - staleSession.startTime.getTime(),
+          lastUpdated: now,
+        };
+
+        this.database.upsertSession(closedSession);
+        console.log(
+          `[RunTrackerService] ✓ Cleaned up stale session: ${staleSession.id} (was left open from previous app run)`,
+        );
+      } else {
+        console.log('[RunTrackerService] ✓ No stale sessions found');
+      }
+    } catch (error) {
+      console.error('[RunTrackerService] Failed to cleanup stale sessions:', error);
     }
   }
 
@@ -110,6 +149,14 @@ export class RunTrackerService {
       return;
     }
 
+    // Require an active session for auto mode
+    if (!this.currentSession) {
+      console.warn(
+        '[RunTrackerService] No active session - cannot auto-start run. Please start a session manually first.',
+      );
+      return;
+    }
+
     // If already in a run, don't start a new one
     if (this.currentRun) {
       return;
@@ -152,7 +199,10 @@ export class RunTrackerService {
    * Creates a new session if one doesn't exist.
    */
   startSession(): Session {
+    console.log('[RunTrackerService] startSession() called');
+
     if (this.currentSession) {
+      console.log('[RunTrackerService] Returning existing session:', this.currentSession.id);
       return this.currentSession;
     }
 
@@ -173,7 +223,8 @@ export class RunTrackerService {
 
     this.eventBus.emit('session-started', { session });
 
-    console.log('[RunTrackerService] Session started:', session.id);
+    console.log('[RunTrackerService] ✓ NEW SESSION CREATED:', session.id);
+    console.trace('[RunTrackerService] Session creation stack trace:');
     return session;
   }
 
@@ -216,17 +267,15 @@ export class RunTrackerService {
 
   /**
    * Starts a new run.
+   * Requires an active session - will throw error if no session exists.
    */
   startRun(characterId?: string, manual: boolean = false): Run {
-    // Ensure we have a session
+    // Require an active session - don't auto-create
     if (!this.currentSession) {
-      this.startSession();
+      throw new Error('No active session. Please start a session first before starting a run.');
     }
 
     const session = this.currentSession;
-    if (!session) {
-      throw new Error('Failed to create or retrieve session');
-    }
 
     // Get next run number
     const runs = this.database.getRunsBySession(session.id);
@@ -380,37 +429,18 @@ export class RunTrackerService {
    * Gets the current state of the run tracker.
    */
   getState() {
-    return {
+    const state = {
       isRunning: this.currentRun !== null,
       isPaused: this.paused,
       activeSession: this.currentSession,
       activeRun: this.currentRun,
     };
-  }
-
-  /**
-   * Restores state from database on startup.
-   */
-  private restoreState(): void {
-    const activeSession = this.database.getActiveSession();
-    if (!activeSession) {
-      return;
-    }
-
-    this.currentSession = activeSession;
-
-    // Try to restore active run if exists
-    const activeRun = this.database.getActiveRun(activeSession.id);
-    if (activeRun) {
-      this.currentRun = activeRun;
-    }
-
-    console.log(
-      '[RunTrackerService] State restored - session:',
-      activeSession.id,
-      'run:',
-      activeRun?.id,
-    );
+    console.log('[RunTrackerService] getState() called:', {
+      hasSession: state.activeSession !== null,
+      hasRun: state.activeRun !== null,
+      sessionId: state.activeSession?.id,
+    });
+    return state;
   }
 
   /**
