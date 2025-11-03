@@ -567,6 +567,8 @@ export type Settings = {
   // Run tracker settings
   runTrackerAutoStart?: boolean; // Whether to automatically start runs when save files are modified
   runTrackerEndThreshold?: number; // Time in seconds before ending a run (default: 10)
+  runTrackerMemoryReading?: boolean; // Whether to use memory reading for game detection (Windows only, default: false)
+  runTrackerMemoryPollingInterval?: number; // How often to poll memory in milliseconds (default: 500)
   runTrackerShortcuts?: {
     startRun: string; // default: 'Ctrl+R'
     pauseRun: string; // default: 'Ctrl+Space'

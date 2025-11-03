@@ -319,7 +319,9 @@ class GrailDatabase {
         ('wizardCompleted', 'false'),
         ('wizardSkipped', 'false'),
         ('runTrackerAutoStart', 'true'),
-        ('runTrackerEndThreshold', '10');
+        ('runTrackerEndThreshold', '10'),
+        ('runTrackerMemoryReading', 'false'),
+        ('runTrackerMemoryPollingInterval', '500');
     `;
 
     this.db.exec(schema);
@@ -653,6 +655,17 @@ class GrailDatabase {
   }
 
   /**
+   * Retrieves a character by its ID.
+   * @param id - The ID of the character to find
+   * @returns The character if found, undefined otherwise
+   */
+  getCharacterById(id: string): Character | undefined {
+    const stmt = this.db.prepare('SELECT * FROM characters WHERE id = ? AND deleted_at IS NULL');
+    const dbCharacter = stmt.get(id) as DatabaseCharacter | undefined;
+    return dbCharacter ? mapDatabaseCharacterToCharacter(dbCharacter) : undefined;
+  }
+
+  /**
    * Retrieves a character by its save file path.
    * @param saveFilePath - The save file path of the character to find
    * @returns The character if found, undefined otherwise
@@ -890,7 +903,24 @@ class GrailDatabase {
       // Run tracker settings
       runTrackerAutoStart: this.parseBooleanSetting(settings.runTrackerAutoStart),
       runTrackerEndThreshold: this.parseIntSetting(settings.runTrackerEndThreshold) ?? 10,
+      runTrackerMemoryReading: this.parseBooleanSetting(settings.runTrackerMemoryReading),
+      runTrackerMemoryPollingInterval:
+        this.parseIntSetting(settings.runTrackerMemoryPollingInterval) ?? 500,
+      runTrackerShortcuts: this.parseJSONSetting<Settings['runTrackerShortcuts']>(
+        settings.runTrackerShortcuts,
+      ),
     };
+
+    // Migration: If runTrackerAutoStart was enabled, enable runTrackerMemoryReading
+    // This migrates users from the old auto-start (save file) mode to new auto mode (memory reading)
+    if (settings.runTrackerAutoStart === 'true' && settings.runTrackerMemoryReading !== 'true') {
+      console.log(
+        '[Database] Migrating runTrackerAutoStart to runTrackerMemoryReading (auto mode)',
+      );
+      typedSettings.runTrackerMemoryReading = true;
+      // Persist the migration
+      this.setSetting('runTrackerMemoryReading', 'true');
+    }
 
     return typedSettings;
   }

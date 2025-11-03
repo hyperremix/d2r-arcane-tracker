@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { GrailDatabase } from '../database/database';
-import type { Run, SaveFileEvent } from '../types/grail';
+import type { Run } from '../types/grail';
 import type { EventBus } from './EventBus';
 import { RunTrackerService } from './runTracker';
 
@@ -37,8 +37,8 @@ describe('When RunTrackerService is instantiated', () => {
     runsBySession = new Map<string, Run[]>();
 
     mockDatabase.getAllSettings = vi.fn().mockReturnValue({
-      runTrackerAutoStart: true,
-      runTrackerEndThreshold: 10,
+      runTrackerMemoryReading: false, // Auto mode disabled for tests
+      runTrackerMemoryPollingInterval: 500,
     });
 
     mockDatabase.getActiveSession = vi.fn().mockReturnValue(null);
@@ -401,127 +401,7 @@ describe('When RunTrackerService is instantiated', () => {
     });
   });
 
-  describe('If handleSaveFileEvent is called', () => {
-    it('Then should start run when save file is modified and auto-start enabled', () => {
-      // Arrange
-      service.startSession();
-      vi.clearAllMocks();
-
-      const event: SaveFileEvent = {
-        type: 'modified',
-        file: {
-          name: 'TestCharacter.d2s',
-          path: '/test/path',
-          lastModified: new Date(),
-          characterClass: 'sorceress',
-          level: 90,
-          hardcore: false,
-          expansion: true,
-        },
-        extractedItems: [],
-        silent: false,
-      };
-
-      // Act
-      service.handleSaveFileEvent(event);
-
-      // Assert
-      expect(mockDatabase.upsertRun).toHaveBeenCalled();
-      expect(mockEventBus.emit).toHaveBeenCalledWith('run-started', expect.any(Object));
-    });
-
-    it('Then should not start run when paused', () => {
-      // Arrange
-      const characterId = 'char-1';
-      service.startSession();
-      service.startRun(characterId); // Need an active run to pause
-      service.pauseRun();
-      service.endRun(); // End the current run
-      vi.clearAllMocks();
-
-      const event: SaveFileEvent = {
-        type: 'modified',
-        file: {
-          name: 'TestCharacter.d2s',
-          path: '/test/path',
-          lastModified: new Date(),
-          characterClass: 'sorceress',
-          level: 90,
-          hardcore: false,
-          expansion: true,
-        },
-        extractedItems: [],
-        silent: false,
-      };
-
-      // Act
-      service.handleSaveFileEvent(event);
-
-      // Assert
-      expect(mockDatabase.upsertRun).not.toHaveBeenCalled();
-    });
-
-    it('Then should not start run when auto-start is disabled', () => {
-      // Arrange
-      service.startSession();
-      mockDatabase.getAllSettings = vi.fn().mockReturnValue({
-        runTrackerAutoStart: false,
-      });
-      vi.clearAllMocks();
-
-      const event: SaveFileEvent = {
-        type: 'modified',
-        file: {
-          name: 'TestCharacter.d2s',
-          path: '/test/path',
-          lastModified: new Date(),
-          characterClass: 'sorceress',
-          level: 90,
-          hardcore: false,
-          expansion: true,
-        },
-        extractedItems: [],
-        silent: false,
-      };
-
-      // Act
-      service.handleSaveFileEvent(event);
-
-      // Assert
-      expect(mockDatabase.upsertRun).not.toHaveBeenCalled();
-    });
-
-    it('Then should end run when no save activity for threshold period', async () => {
-      // Arrange
-      service.startSession();
-
-      const event: SaveFileEvent = {
-        type: 'modified',
-        file: {
-          name: 'TestCharacter.d2s',
-          path: '/test/path',
-          lastModified: new Date(),
-          characterClass: 'sorceress',
-          level: 90,
-          hardcore: false,
-          expansion: true,
-        },
-        extractedItems: [],
-        silent: false,
-      };
-
-      service.handleSaveFileEvent(event);
-      vi.clearAllMocks();
-
-      // Act - Wait for threshold (10 seconds + some buffer)
-      vi.advanceTimersByTime(11000);
-
-      // Assert
-      expect(mockDatabase.upsertRun).toHaveBeenCalledWith(
-        expect.objectContaining({ endTime: expect.any(Date) }),
-      );
-    });
-  });
+  // Save file event handling tests removed - auto mode now uses memory reading only
 
   describe('If archiveSession is called', () => {
     it('Then should archive the session', () => {

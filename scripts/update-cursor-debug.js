@@ -187,7 +187,9 @@ function updateVSCodeLaunchConfig(cdpUrl) {
     request: 'attach',
     port: 9222,
     address: 'localhost',
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: VS Code variable placeholder, not a template literal
     localRoot: '${workspaceFolder}',
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: VS Code variable placeholder, not a template literal
     remoteRoot: '${workspaceFolder}',
     webSocketUrl: cdpUrl,
     skipFiles: ['<node_internals>/**'],

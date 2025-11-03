@@ -2091,6 +2091,11 @@
     loupe "^3.1.4"
     tinyrainbow "^2.0.0"
 
+"@waiting/shared-types@^23.24.0":
+  version "23.24.0"
+  resolved "https://registry.yarnpkg.com/@waiting/shared-types/-/shared-types-23.24.0.tgz#7fceaa892d9e5f039f44a44ea07916e2759ff5f4"
+  integrity sha512-E7U3ulMbHiT05Jd8RlepovGeixCQMAdJMkGE83s/JMtCOx0n02Ss7OURLVgV+j06SeHZ52wCBoHfriqlW6Pa3w==
+
 "@xmldom/xmldom@^0.8.8":
   version "0.8.11"
   resolved "https://registry.yarnpkg.com/@xmldom/xmldom/-/xmldom-0.8.11.tgz#b79de2d67389734c57c52595f7a7305e30c2d608"
@@ -4160,6 +4165,11 @@ keyv@^4.0.0:
   dependencies:
     json-buffer "3.0.1"
 
+koffi@^2.9.2:
+  version "2.14.1"
+  resolved "https://registry.yarnpkg.com/koffi/-/koffi-2.14.1.tgz#8d1f94ef5d14af26d2120e27f633dadde1196db0"
+  integrity sha512-IMFL3IbRDXacSIjs7pPbPxgNlJ2hUtawQXU2QPdr6iw38jmv5AesAUG8HPX00xl0PPA2BbEa3noTw1YdHY+gHg==
+
 lazy-val@^1.0.4, lazy-val@^1.0.5:
   version "1.0.5"
   resolved "https://registry.yarnpkg.com/lazy-val/-/lazy-val-1.0.5.tgz#6cf3b9f5bc31cee7ee3e369c0832b7583dcd923d"
@@ -6119,6 +6129,21 @@ wide-align@^1.1.5:
   integrity sha512-eDMORYaPNZ4sQIuuYPDHdQvf4gyCF9rEEV/yPxGfwPkRodwEgiMUUXTx/dex+Me0wxx53S+NgUHaP7y3MGlDmg==
   dependencies:
     string-width "^1.0.2 || 2 || 3 || 4"
+
+win32-api@^26.1.2:
+  version "26.1.2"
+  resolved "https://registry.yarnpkg.com/win32-api/-/win32-api-26.1.2.tgz#7954317521396569fee0a89a2762613c6bfb51c5"
+  integrity sha512-6pFihEkolpU8PIPk3pbBa/Wn2S9esHAbRrlvRObKRARMdXb2dpe50J5FRApOhK8HCbyI4/uS6qtxZ/hKpr+8Kw==
+  dependencies:
+    win32-def "^26.1.2"
+
+win32-def@^26.1.2:
+  version "26.1.2"
+  resolved "https://registry.yarnpkg.com/win32-def/-/win32-def-26.1.2.tgz#d2abd3e04eb3b50fc70d5352f034ba9d7c395e65"
+  integrity sha512-vk65D1jZt6t0cTpP8fdUPbHobneOKPyYpk8ADIjUTq4aDkfNiHtbIAPqz/bqYABFZqRU7NCREqf5v7EOz3lstg==
+  dependencies:
+    "@waiting/shared-types" "^23.24.0"
+    koffi "^2.9.2"
 
 "wrap-ansi-cjs@npm:wrap-ansi@^7.0.0":
   version "7.0.0"

@@ -1,5 +1,6 @@
-import { Keyboard, Play, Timer } from 'lucide-react';
+import { AlertCircle, Keyboard, Timer } from 'lucide-react';
 import { useCallback, useId } from 'react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -9,40 +10,42 @@ import { useGrailStore } from '@/stores/grailStore';
 
 /**
  * RunTrackerSettings component that provides controls for configuring run tracking behavior.
- * Allows users to enable/disable auto-start and adjust the run end threshold.
+ * Allows users to enable/disable auto mode (memory reading) and configure keyboard shortcuts.
  * @returns {JSX.Element} A settings card with run tracker configuration controls
  */
 export function RunTrackerSettings() {
   const { settings, setSettings } = useGrailStore();
-  const thresholdSliderId = useId();
   const startRunShortcutId = useId();
   const pauseRunShortcutId = useId();
   const endRunShortcutId = useId();
   const endSessionShortcutId = useId();
+  const pollingIntervalId = useId();
 
-  const toggleAutoStart = useCallback(
-    async (checked: boolean) => {
-      await setSettings({ runTrackerAutoStart: checked });
-    },
-    [setSettings],
-  );
-
-  const updateThreshold = useCallback(
-    async (values: number[]) => {
-      const threshold = Math.max(5, Math.min(60, values[0])); // Clamp between 5-60 seconds
-      await setSettings({ runTrackerEndThreshold: threshold });
-    },
-    [setSettings],
-  );
-
-  const runTrackerAutoStart = settings.runTrackerAutoStart ?? true;
-  const runTrackerEndThreshold = settings.runTrackerEndThreshold ?? 10;
+  const autoModeEnabled = settings.runTrackerMemoryReading ?? false;
+  const runTrackerMemoryPollingInterval = settings.runTrackerMemoryPollingInterval ?? 500;
   const runTrackerShortcuts = settings.runTrackerShortcuts ?? {
     startRun: 'Ctrl+R',
     pauseRun: 'Ctrl+Space',
     endRun: 'Ctrl+E',
     endSession: 'Ctrl+Shift+E',
   };
+
+  const isWindows = window.electronAPI?.platform === 'win32';
+
+  const toggleAutoMode = useCallback(
+    async (checked: boolean) => {
+      await setSettings({ runTrackerMemoryReading: checked });
+    },
+    [setSettings],
+  );
+
+  const updatePollingInterval = useCallback(
+    async (values: number[]) => {
+      const interval = Math.max(100, Math.min(5000, values[0])); // Clamp between 100ms and 5s
+      await setSettings({ runTrackerMemoryPollingInterval: interval });
+    },
+    [setSettings],
+  );
 
   const updateShortcut = useCallback(
     async (key: keyof typeof runTrackerShortcuts, value: string) => {
@@ -66,42 +69,70 @@ export function RunTrackerSettings() {
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="space-y-3">
-          {/* Auto-Start Toggle */}
-          <div className="flex items-center justify-between">
-            <div>
-              <h4 className="flex items-center gap-2 font-medium text-sm">
-                <Play className="h-4 w-4" />
-                Auto-Start Runs
-              </h4>
-              <p className="text-muted-foreground text-xs">
-                Automatically start runs when save files are modified
-              </p>
-            </div>
-            <Switch checked={runTrackerAutoStart} onCheckedChange={toggleAutoStart} />
-          </div>
+          {/* Auto Mode Toggle (Windows only) */}
+          {isWindows && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h4 className="flex items-center gap-2 font-medium text-sm">
+                    <Timer className="h-4 w-4" />
+                    Auto Mode (Memory Reading)
+                  </h4>
+                  <p className="text-muted-foreground text-xs">
+                    Automatically detect game start/end by reading D2R process memory. Requires D2R
+                    to be running.
+                  </p>
+                </div>
+                <Switch checked={autoModeEnabled} onCheckedChange={toggleAutoMode} />
+              </div>
 
-          {/* Threshold Slider */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <Label htmlFor={thresholdSliderId} className="font-medium text-sm">
-                Run End Threshold
-              </Label>
-              <span className="text-muted-foreground text-sm">{runTrackerEndThreshold}s</span>
+              {autoModeEnabled && (
+                <Alert>
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription className="text-xs">
+                    Auto mode is enabled. Runs will start/end automatically when you enter/exit
+                    games in D2R. If D2R is not running or offsets are invalid, auto detection will
+                    not work.
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              {autoModeEnabled && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor={pollingIntervalId} className="font-medium text-sm">
+                      Memory Polling Interval
+                    </Label>
+                    <span className="text-muted-foreground text-sm">
+                      {runTrackerMemoryPollingInterval}ms
+                    </span>
+                  </div>
+                  <Slider
+                    min={100}
+                    max={5000}
+                    step={100}
+                    value={[runTrackerMemoryPollingInterval]}
+                    onValueChange={updatePollingInterval}
+                    className="w-full"
+                  />
+                  <p className="text-muted-foreground text-xs">
+                    How often to check memory for game state changes (100-5000ms). Lower values
+                    provide faster detection but use more CPU.
+                  </p>
+                </div>
+              )}
             </div>
-            <Slider
-              id={thresholdSliderId}
-              min={5}
-              max={60}
-              step={1}
-              value={[runTrackerEndThreshold]}
-              onValueChange={updateThreshold}
-              className="w-full"
-            />
-            <p className="text-muted-foreground text-xs">
-              Time in seconds before ending a run when no save file activity is detected (5-60
-              seconds)
-            </p>
-          </div>
+          )}
+
+          {!isWindows && (
+            <Alert>
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription className="text-xs">
+                Auto mode (memory reading) is only available on Windows. Manual run tracking is
+                always available.
+              </AlertDescription>
+            </Alert>
+          )}
         </div>
 
         {/* Keyboard Shortcuts Settings */}
@@ -170,10 +201,11 @@ export function RunTrackerSettings() {
         <div className="rounded-md border border-dashed p-3">
           <p className="text-muted-foreground text-xs">
             <strong>Run Tracking:</strong>
-            <br />• Auto-start detects when you enter a game by monitoring save file changes
-            <br />• Runs automatically end after the threshold period with no save activity
-            <br />• Manual controls are always available regardless of auto-start setting
-            <br />• Threshold helps distinguish between active gameplay and idle time
+            <br />• Auto mode uses memory reading to detect game start/end instantly (Windows only)
+            <br />• Requires D2R.exe to be running and valid memory offsets configured
+            <br />• If auto mode cannot work, you can always use manual run controls (keyboard
+            shortcuts)
+            <br />• Manual controls are available at any time via the keyboard shortcuts above
           </p>
         </div>
       </CardContent>

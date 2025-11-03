@@ -1,6 +1,51 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: This file is testing private methods */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+// Mock process.platform to non-Windows to prevent Windows-specific services from initializing
+Object.defineProperty(process, 'platform', {
+  value: 'darwin',
+  writable: false,
+});
+
+// Mock win32-api (native module that won't work in test environment)
+vi.mock('win32-api', () => ({
+  Kernel32: {
+    load: vi.fn().mockReturnValue({
+      OpenProcess: vi.fn(),
+      GetLastError: vi.fn(),
+    }),
+  },
+  ffi: {
+    load: vi.fn().mockReturnValue({
+      func: vi.fn().mockReturnValue(vi.fn()),
+    }),
+  },
+}));
+
+// Mock ProcessMonitor
+vi.mock('../services/processMonitor', () => ({
+  ProcessMonitor: vi.fn().mockImplementation(() => ({
+    startMonitoring: vi.fn(),
+    stopMonitoring: vi.fn(),
+    getProcessId: vi.fn().mockReturnValue(null),
+    isRunning: vi.fn().mockReturnValue(false),
+    shutdown: vi.fn(),
+  })),
+}));
+
+// Mock MemoryReader
+vi.mock('../services/memoryReader', () => ({
+  MemoryReader: vi.fn().mockImplementation(() => ({
+    startPolling: vi.fn(),
+    stopPolling: vi.fn(),
+    updatePollingInterval: vi.fn(),
+    isInGame: vi.fn().mockResolvedValue(false),
+    readGameState: vi.fn().mockResolvedValue(null),
+    getGameId: vi.fn().mockResolvedValue(null),
+    getCharacterName: vi.fn().mockResolvedValue(null),
+  })),
+}));
+
 // Mock electron modules
 vi.mock('electron', () => ({
   ipcMain: {
@@ -299,11 +344,13 @@ describe('When saveFileHandlers is used', () => {
 
       // Assert
       expect(EventBus).toHaveBeenCalled();
-      expect(SaveFileMonitor).toHaveBeenCalledWith(
+      // RunTrackerService is called with memoryReader (null on non-Windows)
+      expect(RunTrackerService).toHaveBeenCalledWith(
         mockEventBus,
         grailDatabase,
-        mockRunTrackerService,
+        null, // memoryReader is null on non-Windows platforms (macOS test environment)
       );
+      expect(SaveFileMonitor).toHaveBeenCalledWith(mockEventBus, grailDatabase);
       expect(ItemDetectionService).toHaveBeenCalledWith(mockEventBus);
       expect(mockEventBus.on).toHaveBeenCalledWith('save-file-event', expect.any(Function));
       expect(mockEventBus.on).toHaveBeenCalledWith('monitoring-started', expect.any(Function));
