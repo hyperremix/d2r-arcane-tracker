@@ -1,26 +1,49 @@
 import type { GrailDatabase } from '../database/database';
-import type { Run, SaveFileEvent, Session } from '../types/grail';
+import type { Run, Session } from '../types/grail';
 import type { EventBus } from './EventBus';
+import type { MemoryReader } from './memoryReader';
 
 /**
- * Service for tracking gaming sessions and runs by monitoring save file changes.
- * Automatically detects when players enter/exit games and manages run lifecycle.
+ * Service for tracking gaming sessions and runs using memory reading (auto mode).
+ * Automatically detects when players enter/exit games via D2R memory reading and manages run lifecycle.
  */
 export class RunTrackerService {
   private currentSession: Session | null = null;
   private currentRun: Run | null = null;
-  private lastSaveFileTime: Date | null = null;
-  private inGameThreshold = 10000; // 10 seconds (will be updated from settings)
   private paused = false;
-  private checkInterval: NodeJS.Timeout | null = null;
+  private memoryReader: MemoryReader | null = null;
+  private autoModeEnabled = false;
 
   constructor(
     private eventBus: EventBus,
     private database: GrailDatabase,
+    memoryReader?: MemoryReader | null,
   ) {
+    this.memoryReader = memoryReader || null;
     this.loadSettings();
     this.restoreState();
-    this.startMonitoring();
+    this.setupEventListeners();
+
+    // Start memory reading if auto mode is enabled
+    if (this.autoModeEnabled && this.memoryReader) {
+      this.memoryReader.startPolling();
+    }
+  }
+
+  /**
+   * Sets up event listeners for memory reading events.
+   * @private
+   */
+  private setupEventListeners(): void {
+    // Listen for game-entered events from memory reader
+    this.eventBus.on('game-entered', (payload) => {
+      this.handleGameEntered(payload.characterId);
+    });
+
+    // Listen for game-exited events from memory reader
+    this.eventBus.on('game-exited', (payload) => {
+      this.handleGameExited(payload.characterId);
+    });
   }
 
   /**
@@ -29,10 +52,17 @@ export class RunTrackerService {
   private loadSettings(): void {
     try {
       const settings = this.database.getAllSettings();
-      this.inGameThreshold = (settings.runTrackerEndThreshold ?? 10) * 1000; // Convert to milliseconds
+      // Auto mode is only available on Windows with memory reading
+      this.autoModeEnabled =
+        settings.runTrackerMemoryReading === true && process.platform === 'win32';
+
+      // Update memory reader polling interval if enabled
+      if (this.memoryReader && this.autoModeEnabled) {
+        const pollingInterval = settings.runTrackerMemoryPollingInterval ?? 500;
+        this.memoryReader.updatePollingInterval(pollingInterval);
+      }
     } catch (error) {
       console.error('[RunTrackerService] Failed to load settings:', error);
-      // Keep default threshold
     }
   }
 
@@ -40,47 +70,80 @@ export class RunTrackerService {
    * Updates run tracker settings dynamically.
    */
   updateSettings(): void {
+    const wasAutoModeEnabled = this.autoModeEnabled;
     this.loadSettings();
+
+    // If auto mode was just enabled, start memory reading
+    if (this.autoModeEnabled && !wasAutoModeEnabled && this.memoryReader) {
+      console.log('[RunTrackerService] Auto mode enabled, starting memory reader');
+      this.memoryReader.startPolling();
+    }
+
+    // If auto mode was just disabled, stop memory reading
+    if (!this.autoModeEnabled && wasAutoModeEnabled && this.memoryReader) {
+      console.log('[RunTrackerService] Auto mode disabled, stopping memory reader');
+      this.memoryReader.stopPolling();
+    }
   }
 
   /**
-   * Handles save file events from the save file monitor.
-   * Decides when to start/stop runs based on save file activity.
+   * Sets the memory reader instance.
+   * Used for dependency injection when memory reader is created after RunTrackerService.
    */
-  handleSaveFileEvent(event: SaveFileEvent): void {
-    // Skip auto-tracking when paused
+  setMemoryReader(memoryReader: MemoryReader | null): void {
+    this.memoryReader = memoryReader;
+    this.loadSettings();
+
+    // Start memory reading if auto mode is enabled
+    if (this.autoModeEnabled && this.memoryReader) {
+      this.memoryReader.startPolling();
+    }
+  }
+
+  /**
+   * Handles game-entered event from memory reader.
+   * Starts a new run when player enters a game (auto mode only).
+   */
+  handleGameEntered(characterId?: string): void {
+    // Skip if paused or auto mode not enabled
+    if (this.paused || !this.autoModeEnabled) {
+      return;
+    }
+
+    // If already in a run, don't start a new one
+    if (this.currentRun) {
+      return;
+    }
+
+    // Find character if characterId provided
+    let finalCharacterId = characterId;
+    if (characterId) {
+      const character = this.database.getCharacterById(characterId);
+      if (!character) {
+        // Try finding by name if characterId is actually a name
+        const characterByName = this.database.getCharacterByName(characterId);
+        finalCharacterId = characterByName?.id;
+      }
+    }
+
+    console.log('[RunTrackerService] Game entered detected, starting run');
+    this.startRun(finalCharacterId, false);
+  }
+
+  /**
+   * Handles game-exited event from memory reader.
+   * Ends the current run when player exits a game.
+   */
+  handleGameExited(_characterId?: string): void {
+    // Skip if paused
     if (this.paused) {
       return;
     }
 
-    // Check if auto-start is enabled
-    const settings = this.database.getAllSettings();
-    if (!settings.runTrackerAutoStart) {
-      return;
-    }
-
-    const now = new Date();
-
-    // If save file modified, update last save time
-    if (event.type === 'modified') {
-      this.lastSaveFileTime = now;
-
-      // Check if we should start a new run
-      if (!this.currentRun) {
-        // No active run, start a new one
-        // Find or get the character ID from the database
-        const character = this.database.getCharacterByName(event.file.name);
-        const characterId = character?.id;
-
-        if (characterId) {
-          this.startRun(characterId, false);
-        } else {
-          console.warn(
-            '[RunTrackerService] Could not find character for automatic run start:',
-            event.file.name,
-          );
-        }
-      }
+    // End current run if active
+    if (this.currentRun) {
+      console.log('[RunTrackerService] Game exited detected, ending run');
+      this.endRun(false);
     }
   }
 
@@ -351,42 +414,12 @@ export class RunTrackerService {
   }
 
   /**
-   * Starts monitoring for run timeout.
-   * Checks periodically if no save file activity for threshold.
-   */
-  private startMonitoring(): void {
-    // Check every second if threshold exceeded
-    this.checkInterval = setInterval(() => {
-      if (this.paused || !this.currentRun) {
-        return;
-      }
-
-      if (!this.lastSaveFileTime) {
-        return;
-      }
-
-      const now = Date.now();
-      const timeSinceLastSave = now - this.lastSaveFileTime.getTime();
-
-      if (timeSinceLastSave > this.inGameThreshold) {
-        // No save file activity for threshold period, end the run
-        console.log(
-          '[RunTrackerService] No save activity for',
-          timeSinceLastSave,
-          'ms, ending run',
-        );
-        this.endRun(false);
-      }
-    }, 1000);
-  }
-
-  /**
    * Stops monitoring and cleans up resources.
    */
   shutdown(): void {
-    if (this.checkInterval) {
-      clearInterval(this.checkInterval);
-      this.checkInterval = null;
+    // Stop memory reading if running
+    if (this.memoryReader) {
+      this.memoryReader.stopPolling();
     }
 
     // End current session and run on shutdown

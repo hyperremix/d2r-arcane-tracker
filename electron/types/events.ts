@@ -83,6 +83,37 @@ export interface RunItemAddedPayload {
 }
 
 /**
+ * Payload for d2r-started event
+ */
+export interface D2RStartedPayload {
+  processId: number;
+  processName: string;
+}
+
+/**
+ * Payload for d2r-stopped event
+ */
+export interface D2RStoppedPayload {
+  processId: null;
+  processName: string;
+}
+
+/**
+ * Payload for game-entered event (from memory reading)
+ */
+export interface GameEnteredPayload {
+  characterId?: string;
+  gameId?: string;
+}
+
+/**
+ * Payload for game-exited event (from memory reading)
+ */
+export interface GameExitedPayload {
+  characterId?: string;
+}
+
+/**
  * Union type of all application events with their payloads
  */
 export type AppEvent =
@@ -97,7 +128,11 @@ export type AppEvent =
   | { type: 'run-resumed'; payload: RunResumedPayload }
   | { type: 'session-started'; payload: SessionStartedPayload }
   | { type: 'session-ended'; payload: SessionEndedPayload }
-  | { type: 'run-item-added'; payload: RunItemAddedPayload };
+  | { type: 'run-item-added'; payload: RunItemAddedPayload }
+  | { type: 'd2r-started'; payload: D2RStartedPayload }
+  | { type: 'd2r-stopped'; payload: D2RStoppedPayload }
+  | { type: 'game-entered'; payload: GameEnteredPayload }
+  | { type: 'game-exited'; payload: GameExitedPayload };
 
 /**
  * Extract event type names

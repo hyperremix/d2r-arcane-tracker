@@ -23,7 +23,6 @@ import {
 } from '../types/grail';
 import { isRune, simplifyItemName } from '../utils/objects';
 import type { EventBus } from './EventBus';
-import type { RunTrackerService } from './runTracker';
 
 /**
  * Lookup table for magic attribute types used in rainbow facet processing.
@@ -264,7 +263,6 @@ class SaveFileMonitor {
   private readingFiles: boolean;
   private isMonitoring = false;
   private grailDatabase: GrailDatabase | null = null;
-  private runTracker: RunTrackerService | null = null;
   private saveDirectory: string | null = null;
   private forceParseAll: boolean = false;
   private isInitialParsing: boolean = false;
@@ -283,13 +281,11 @@ class SaveFileMonitor {
    * Creates a new instance of the SaveFileMonitor.
    * @param {EventBus} eventBus - EventBus instance for emitting events
    * @param {GrailDatabase} [grailDatabase] - Optional grail database instance for settings and data storage.
-   * @param {RunTrackerService} [runTracker] - Optional run tracker service for tracking run lifecycle.
    */
-  constructor(eventBus: EventBus, grailDatabase?: GrailDatabase, runTracker?: RunTrackerService) {
+  constructor(eventBus: EventBus, grailDatabase?: GrailDatabase) {
     console.log('[SaveFileMonitor] Constructor called');
     this.eventBus = eventBus;
     this.grailDatabase = grailDatabase || null;
-    this.runTracker = runTracker || null;
     this.currentData = {
       items: {},
       ethItems: {},
@@ -976,16 +972,8 @@ class SaveFileMonitor {
           type: 'modified',
         });
 
-        // Forward event to run tracker
-        if (this.runTracker) {
-          this.runTracker.handleSaveFileEvent({
-            type: 'modified',
-            file: saveFile,
-            extractedItems,
-            silent,
-            isInitialScan,
-          } as SaveFileEvent);
-        }
+        // Note: Save file events are no longer used for run tracking
+        // Auto mode uses memory reading instead (RunTrackerService listens to game-entered/game-exited events)
 
         // Emit event and wait for all handlers to complete processing
         // This prevents race conditions in item detection by ensuring sequential processing

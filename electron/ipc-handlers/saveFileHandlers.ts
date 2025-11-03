@@ -3,6 +3,8 @@ import { grailDatabase } from '../database/database';
 import { DatabaseBatchWriter } from '../services/DatabaseBatchWriter';
 import { EventBus } from '../services/EventBus';
 import { ItemDetectionService } from '../services/itemDetection';
+import { MemoryReader } from '../services/memoryReader';
+import { ProcessMonitor } from '../services/processMonitor';
 import { RunTrackerService } from '../services/runTracker';
 import type { D2SaveFile, SaveFileEvent } from '../services/saveFileMonitor';
 import { SaveFileMonitor } from '../services/saveFileMonitor';
@@ -31,6 +33,8 @@ const batchWriter = new DatabaseBatchWriter(grailDatabase, () => {
 let saveFileMonitor: SaveFileMonitor;
 let itemDetectionService: ItemDetectionService;
 let runTracker: RunTrackerService | undefined;
+let processMonitor: ProcessMonitor | undefined;
+let memoryReader: MemoryReader | undefined;
 const eventUnsubscribers: Array<() => void> = [];
 
 /**
@@ -232,6 +236,38 @@ function updateCharacterFromSaveFile(saveFile: D2SaveFile): void {
 }
 
 /**
+ * Initializes Windows-specific services (process monitor and memory reader).
+ * @private
+ */
+function initializeWindowsServices(): void {
+  if (process.platform !== 'win32') {
+    return;
+  }
+
+  // Initialize process monitor
+  try {
+    processMonitor = new ProcessMonitor(eventBus);
+    processMonitor.startMonitoring();
+    console.log('[initializeSaveFileHandlers] Process monitor initialized successfully');
+  } catch (error) {
+    console.error('[initializeSaveFileHandlers] Failed to initialize process monitor:', error);
+    processMonitor = undefined;
+    return;
+  }
+
+  // Initialize memory reader (optional, depends on process monitor)
+  if (processMonitor) {
+    try {
+      memoryReader = new MemoryReader(eventBus, processMonitor);
+      console.log('[initializeSaveFileHandlers] Memory reader initialized successfully');
+    } catch (error) {
+      console.error('[initializeSaveFileHandlers] Failed to initialize memory reader:', error);
+      memoryReader = undefined;
+    }
+  }
+}
+
+/**
  * Initializes IPC handlers for save file monitoring and item detection.
  * Sets up event listeners for save file changes and item detection.
  * Configures automatic grail progress updates and forwards events to renderer processes.
@@ -255,17 +291,25 @@ export function initializeSaveFileHandlers(): void {
     eventUnsubscribers.length = 0;
   }
 
-  // Initialize run tracker service
+  // Initialize Windows-specific services
+  initializeWindowsServices();
+
+  // Initialize run tracker service with optional memory reader
   try {
-    runTracker = new RunTrackerService(eventBus, grailDatabase);
+    runTracker = new RunTrackerService(eventBus, grailDatabase, memoryReader || null);
     console.log('[initializeSaveFileHandlers] Run tracker initialized successfully');
+
+    // If memory reader was created after run tracker, set it now
+    if (memoryReader && runTracker) {
+      runTracker.setMemoryReader(memoryReader);
+    }
   } catch (error) {
     console.error('[initializeSaveFileHandlers] Failed to initialize run tracker:', error);
     runTracker = undefined;
   }
 
   // Initialize monitor and detection service with EventBus and grail database
-  saveFileMonitor = new SaveFileMonitor(eventBus, grailDatabase, runTracker || undefined);
+  saveFileMonitor = new SaveFileMonitor(eventBus, grailDatabase);
   itemDetectionService = new ItemDetectionService(eventBus);
 
   // Set up event forwarding to renderer process
