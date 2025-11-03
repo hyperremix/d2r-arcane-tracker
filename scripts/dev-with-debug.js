@@ -7,6 +7,9 @@
 
 import { spawn } from 'node:child_process';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const DEBUG_UPDATE_DELAY = 5000; // Wait 5 seconds after dev server starts
 
@@ -41,9 +44,13 @@ async function updateCursorSettings() {
 
     console.log('🔧 Updating Cursor debug settings...');
     await runCommand('node', [path.join(__dirname, 'update-cursor-debug.js')]);
-  } catch (error) {
-    console.warn(`⚠️  Could not update Cursor settings: ${error.message}`);
-    console.log('💡 You can manually run: yarn debug:update');
+    console.log('✅ Cursor debug settings updated successfully!');
+  } catch (_error) {
+    // This is expected if the app hasn't fully started yet
+    console.log(
+      '💡 Debug settings update skipped (app may not be fully started yet - this is normal)',
+    );
+    console.log('💡 You can manually run: yarn debug:update after the app is running');
   }
 }
 

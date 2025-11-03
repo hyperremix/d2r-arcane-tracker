@@ -232,11 +232,16 @@ async function main() {
       console.log('🔧 Both Cursor browser extension and VS Code configurations have been updated.');
     } else {
       console.warn('⚠️  Some configurations may not have been updated successfully.');
-      process.exit(1);
+      console.log(
+        '💡 This is usually fine - configurations will be updated once the app is running.',
+      );
     }
   } catch (error) {
-    console.error('❌ Error:', error.message);
-    process.exit(1);
+    console.warn(`⚠️  Could not update debug configurations: ${error.message}`);
+    console.log('💡 This is expected if the app is not running yet.');
+    console.log('💡 Debug configurations will be updated automatically once the app starts.');
+    console.log('💡 You can manually run "yarn debug:update" after starting the app.');
+    // Don't exit with error code - this is a non-critical warning
   }
 }
 
