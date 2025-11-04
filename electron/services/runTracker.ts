@@ -224,7 +224,6 @@ export class RunTrackerService {
     this.eventBus.emit('session-started', { session });
 
     console.log('[RunTrackerService] ✓ NEW SESSION CREATED:', session.id);
-    console.trace('[RunTrackerService] Session creation stack trace:');
     return session;
   }
 

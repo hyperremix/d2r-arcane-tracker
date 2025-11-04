@@ -224,7 +224,7 @@ export function SessionCard({ session }: SessionCardProps) {
             size="sm"
             onClick={handleEndSession}
             disabled={loading}
-            className="flex-1 transition-all duration-200 hover:scale-105"
+            className="flex-1"
           >
             End Session
           </Button>
@@ -233,7 +233,7 @@ export function SessionCard({ session }: SessionCardProps) {
             size="sm"
             onClick={handleArchiveSession}
             disabled={loading}
-            className="flex-1 transition-all duration-200 hover:scale-105"
+            className="flex-1"
           >
             Archive Session
           </Button>
@@ -243,7 +243,6 @@ export function SessionCard({ session }: SessionCardProps) {
             onClick={handleExportClick}
             disabled={loading || currentSession.runCount === 0}
             title={currentSession.runCount === 0 ? 'No runs to export' : 'Export session data'}
-            className="transition-all duration-200 hover:scale-105"
           >
             <FileDownIcon className="h-4 w-4" />
           </Button>
