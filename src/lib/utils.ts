@@ -37,8 +37,8 @@ export function isRecentFind(
  * @param {number} durationMs - Duration in milliseconds
  * @returns {string} Formatted time string (e.g., "2h 34m 12s", "45m 30s", "1m 5s")
  */
-export function formatDuration(durationMs: number): string {
-  if (durationMs < 0) return '0s';
+export function formatDuration(durationMs?: number): string {
+  if (durationMs === undefined || durationMs === null || durationMs < 0) return '0s';
 
   const totalSeconds = Math.floor(durationMs / 1000);
   const hours = Math.floor(totalSeconds / 3600);

@@ -1,4 +1,4 @@
-import type { GrailStatistics, Settings } from 'electron/types/grail';
+import type { GrailStatistics, Run, Session, SessionStats, Settings } from 'electron/types/grail';
 import { useEffect, useMemo, useState } from 'react';
 import { ProgressGauge } from '@/components/grail/ProgressGauge';
 import { formatDuration } from '@/lib/utils';
@@ -15,6 +15,66 @@ interface WidgetProps {
 }
 
 /**
+ * Props for the RunOnlyDisplay component.
+ */
+interface RunOnlyDisplayProps {
+  activeSession: Session | null;
+  activeRun: Run | null;
+  runDuration: number;
+  sessionStats: SessionStats | null;
+}
+
+/**
+ * RunOnlyDisplay component that shows run tracking statistics.
+ * Displays current run info and session-wide statistics.
+ */
+function RunOnlyDisplay({
+  activeSession,
+  activeRun,
+  runDuration,
+  sessionStats,
+}: RunOnlyDisplayProps) {
+  if (!activeSession) {
+    return (
+      <div className="text-center">
+        <p className="text-gray-200 text-sm">No Active Session</p>
+        <p className="text-gray-400 text-xs">Start a session to track runs</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex w-full flex-col gap-3 px-4">
+      {/* Top Row: Run # and Current Duration */}
+      <div className="grid grid-cols-2 gap-4">
+        <div className="text-center">
+          <p className="text-gray-300 text-xs">Run</p>
+          <p className="font-bold text-white text-xl">#{activeRun?.runNumber ?? 0}</p>
+        </div>
+        <div className="text-center">
+          <p className="text-gray-300 text-xs">Current</p>
+          <p className="font-mono text-lg text-white">{formatDuration(runDuration)}</p>
+        </div>
+      </div>
+
+      {/* Bottom Row: Session Stats */}
+      <div className="grid grid-cols-2 gap-4 border-gray-600 border-t pt-3">
+        <div className="text-center">
+          <p className="text-gray-300 text-xs">Fastest</p>
+          <p className="font-mono text-sm text-white">{formatDuration(sessionStats?.fastestRun)}</p>
+        </div>
+        <div className="text-center">
+          <p className="text-gray-300 text-xs">Avg</p>
+          <p className="font-mono text-sm text-white">
+            {formatDuration(sessionStats?.averageRunDuration)}
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
  * Widget component that displays grail progress statistics in a compact overlay format.
  * Supports multiple size configurations and dynamic opacity.
  */
@@ -24,7 +84,7 @@ export function Widget({ statistics, settings, onDragStart, onDragEnd }: WidgetP
   const backgroundColor = `rgba(0, 0, 0, ${opacity})`;
 
   // Run tracker state for run-only mode
-  const { activeRun } = useRunTrackerStore();
+  const { activeRun, activeSession, getSessionStats } = useRunTrackerStore();
   const [runDuration, setRunDuration] = useState<number>(0);
 
   // Real-time timer for run duration updates
@@ -48,6 +108,14 @@ export function Widget({ statistics, settings, onDragStart, onDragEnd }: WidgetP
 
     return () => clearInterval(interval);
   }, [activeRun, displayMode]);
+
+  // Calculate session statistics for run-only mode
+  const sessionStats = useMemo(() => {
+    if (!activeSession || displayMode !== 'run-only') {
+      return null;
+    }
+    return getSessionStats(activeSession.id);
+  }, [activeSession, displayMode, getSessionStats]);
 
   // Calculate container styles based on display mode
   const containerClasses = useMemo(() => {
@@ -93,23 +161,12 @@ export function Widget({ statistics, settings, onDragStart, onDragEnd }: WidgetP
         // biome-ignore lint/suspicious/noEmptyBlockStatements: No keyboard interaction needed for drag-only widget
         onKeyDown={() => {}}
       >
-        {activeRun ? (
-          <div className="flex flex-col items-center justify-center gap-2">
-            <div className="text-center">
-              <p className="text-gray-200 text-xs">Run</p>
-              <p className="font-bold text-2xl text-white">#{activeRun.runNumber}</p>
-            </div>
-            <div className="text-center">
-              <p className="text-gray-200 text-xs">Duration</p>
-              <p className="font-mono text-lg text-white">{formatDuration(runDuration)}</p>
-            </div>
-          </div>
-        ) : (
-          <div className="text-center">
-            <p className="text-gray-200 text-sm">No Active Run</p>
-            <p className="text-gray-400 text-xs">Start a session to track runs</p>
-          </div>
-        )}
+        <RunOnlyDisplay
+          activeSession={activeSession}
+          activeRun={activeRun}
+          runDuration={runDuration}
+          sessionStats={sessionStats}
+        />
       </div>
     );
   }
