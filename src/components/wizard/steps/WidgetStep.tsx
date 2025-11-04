@@ -30,7 +30,7 @@ export function WidgetStep() {
   );
 
   const handleDisplayChange = useCallback(
-    async (display: 'overall' | 'split' | 'all') => {
+    async (display: 'overall' | 'split' | 'all' | 'run-only') => {
       await setSettings({ widgetDisplay: display });
       // Update widget display mode via IPC
       await window.electronAPI?.widget.updateDisplay(display, settings);
@@ -75,7 +75,7 @@ export function WidgetStep() {
         {/* Display Mode Selection */}
         <div className="space-y-2">
           <Label className="font-medium text-sm">Display Mode</Label>
-          <div className="flex gap-2">
+          <div className="grid grid-cols-2 gap-2">
             <Button
               variant={widgetDisplay === 'overall' ? 'default' : 'outline'}
               size="sm"
@@ -103,9 +103,19 @@ export function WidgetStep() {
             >
               All
             </Button>
+            <Button
+              variant={widgetDisplay === 'run-only' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => handleDisplayChange('run-only')}
+              disabled={!widgetEnabled}
+              className="flex-1"
+            >
+              Run Only
+            </Button>
           </div>
           <p className="text-muted-foreground text-xs">
-            Overall: Total progress only | Split: Normal + Ethereal | All: All three gauges
+            Overall: Total progress only | Split: Normal + Ethereal | All: All three gauges | Run
+            Only: Current run counter
             {!grailEthereal && (
               <span className="text-yellow-600"> (Split & All require Ethereal tracking)</span>
             )}
@@ -136,19 +146,16 @@ export function WidgetStep() {
         </div>
 
         {/* Widget Preview Description */}
-        <div className="rounded-md border border-dashed p-4">
-          <p className="text-muted-foreground text-xs">
+        <div className="rounded-lg bg-blue-50 p-3 dark:bg-blue-950">
+          <p className="text-blue-800 text-xs dark:text-blue-200">
             <strong>Widget Features:</strong>
             <br />• Always on top of other windows
             <br />• Transparent background
             <br />• Drag to reposition
             <br />• Auto-snaps to screen edges and corners
             <br />• Updates in real-time with grail progress
-          </p>
-        </div>
-
-        <div className="rounded-lg bg-blue-50 p-4 dark:bg-blue-950">
-          <p className="text-blue-800 text-sm dark:text-blue-200">
+            <br />
+            <br />
             <strong>Tip:</strong> The widget is great for monitoring progress while playing in
             fullscreen mode. You can always enable it later from settings!
           </p>
