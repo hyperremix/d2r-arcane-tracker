@@ -33,10 +33,7 @@ function SessionCard({
   const sessionDate = formatSessionDate(session.startTime);
 
   return (
-    <Card
-      className="cursor-pointer transition-all duration-200 hover:scale-[1.02] hover:shadow-md"
-      onClick={() => onSessionClick(session.id)}
-    >
+    <Card className="cursor-pointer hover:shadow-md" onClick={() => onSessionClick(session.id)}>
       <CardContent className="p-4">
         <div className="flex items-start justify-between">
           <div className="flex-1 space-y-2">
