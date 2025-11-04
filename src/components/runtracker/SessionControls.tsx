@@ -1,4 +1,4 @@
-import { Loader2, Pause, Play, Square, StopCircle } from 'lucide-react';
+import { Loader2, Pause, Play, Square, StopCircle, Timer } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import {
   AlertDialog,
@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Switch } from '@/components/ui/switch';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useGrailStore } from '@/stores/grailStore';
 import { useRunTrackerStore } from '@/stores/runTrackerStore';
@@ -211,7 +212,7 @@ export function SessionControls() {
     endSession,
   } = useRunTrackerStore();
 
-  const { settings } = useGrailStore();
+  const { settings, setSettings } = useGrailStore();
   const shortcuts = settings.runTrackerShortcuts ?? {
     startRun: 'Ctrl+R',
     pauseRun: 'Ctrl+Space',
@@ -219,8 +220,18 @@ export function SessionControls() {
     endSession: 'Ctrl+Shift+E',
   };
 
+  const autoModeEnabled = settings.runTrackerMemoryReading ?? false;
+  const isWindows = window.electronAPI?.platform === 'win32';
+
   const [showEndRunDialog, setShowEndRunDialog] = useState(false);
   const [showEndSessionDialog, setShowEndSessionDialog] = useState(false);
+
+  const toggleAutoMode = useCallback(
+    async (checked: boolean) => {
+      await setSettings({ runTrackerMemoryReading: checked });
+    },
+    [setSettings],
+  );
 
   // Button click handlers
   const handleStartRun = useCallback(async () => {
@@ -356,10 +367,10 @@ export function SessionControls() {
   }, [handleKeyDown]);
 
   // Determine button states
-  const canStartRun = Boolean(activeSession && !activeRun && !loading);
-  const canPauseResume = Boolean(activeRun && !loading);
-  const canEndRun = Boolean(activeRun && !loading);
-  const canEndSession = Boolean(activeSession && !loading);
+  const canStartRun = Boolean(activeSession && !activeRun && !loading && !autoModeEnabled);
+  const canPauseResume = Boolean(activeRun && !loading && !autoModeEnabled);
+  const canEndRun = Boolean(activeRun && !loading && !autoModeEnabled);
+  const canEndSession = Boolean(activeSession && !loading && !autoModeEnabled);
 
   return (
     <>
@@ -386,6 +397,18 @@ export function SessionControls() {
               <div className="flex items-center gap-2">
                 <span className="font-medium text-sm">Run Type:</span>
                 <RunTypeSelector />
+              </div>
+            )}
+
+            {/* Auto Mode Toggle - Windows only */}
+            {isWindows && activeSession && (
+              <div className="flex items-center justify-between rounded-md border p-3">
+                <div className="flex items-center gap-2">
+                  <Timer className="h-4 w-4" />
+                  <span className="font-medium text-sm">Auto Mode</span>
+                  <span className="text-muted-foreground text-xs">(Memory Reading)</span>
+                </div>
+                <Switch checked={autoModeEnabled} onCheckedChange={toggleAutoMode} />
               </div>
             )}
 
