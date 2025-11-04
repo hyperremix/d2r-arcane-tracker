@@ -5,7 +5,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
-import { Switch } from '@/components/ui/switch';
 import { useGrailStore } from '@/stores/grailStore';
 
 /**
@@ -31,13 +30,6 @@ export function RunTrackerSettings() {
   };
 
   const isWindows = window.electronAPI?.platform === 'win32';
-
-  const toggleAutoMode = useCallback(
-    async (checked: boolean) => {
-      await setSettings({ runTrackerMemoryReading: checked });
-    },
-    [setSettings],
-  );
 
   const updatePollingInterval = useCallback(
     async (values: number[]) => {
@@ -69,58 +61,43 @@ export function RunTrackerSettings() {
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="space-y-3">
-          {/* Auto Mode Toggle (Windows only) */}
-          {isWindows && (
+          {/* Memory Polling Interval - visible when auto mode is enabled */}
+          {isWindows && autoModeEnabled && (
             <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h4 className="flex items-center gap-2 font-medium text-sm">
-                    <Timer className="h-4 w-4" />
-                    Auto Mode (Memory Reading)
-                  </h4>
-                  <p className="text-muted-foreground text-xs">
-                    Automatically detect game start/end by reading D2R process memory. Requires D2R
-                    to be running.
-                  </p>
-                </div>
-                <Switch checked={autoModeEnabled} onCheckedChange={toggleAutoMode} />
+              <div className="flex items-center gap-2">
+                <Timer className="h-4 w-4" />
+                <h4 className="font-medium text-sm">Auto Mode Settings</h4>
               </div>
-
-              {autoModeEnabled && (
-                <Alert>
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertDescription className="text-xs">
-                    Auto mode is enabled. Runs will start/end automatically when you enter/exit
-                    games in D2R. If D2R is not running or offsets are invalid, auto detection will
-                    not work.
-                  </AlertDescription>
-                </Alert>
-              )}
-
-              {autoModeEnabled && (
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor={pollingIntervalId} className="font-medium text-sm">
-                      Memory Polling Interval
-                    </Label>
-                    <span className="text-muted-foreground text-sm">
-                      {runTrackerMemoryPollingInterval}ms
-                    </span>
-                  </div>
-                  <Slider
-                    min={100}
-                    max={5000}
-                    step={100}
-                    value={[runTrackerMemoryPollingInterval]}
-                    onValueChange={updatePollingInterval}
-                    className="w-full"
-                  />
-                  <p className="text-muted-foreground text-xs">
-                    How often to check memory for game state changes (100-5000ms). Lower values
-                    provide faster detection but use more CPU.
-                  </p>
+              <Alert>
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription className="text-xs">
+                  Auto mode is enabled. Runs will start/end automatically when you enter/exit games
+                  in D2R. If D2R is not running or offsets are invalid, auto detection will not
+                  work.
+                </AlertDescription>
+              </Alert>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor={pollingIntervalId} className="font-medium text-sm">
+                    Memory Polling Interval
+                  </Label>
+                  <span className="text-muted-foreground text-sm">
+                    {runTrackerMemoryPollingInterval}ms
+                  </span>
                 </div>
-              )}
+                <Slider
+                  min={100}
+                  max={5000}
+                  step={100}
+                  value={[runTrackerMemoryPollingInterval]}
+                  onValueChange={updatePollingInterval}
+                  className="w-full"
+                />
+                <p className="text-muted-foreground text-xs">
+                  How often to check memory for game state changes (100-5000ms). Lower values
+                  provide faster detection but use more CPU.
+                </p>
+              </div>
             </div>
           )}
 
@@ -198,8 +175,8 @@ export function RunTrackerSettings() {
         </div>
 
         {/* Information Box */}
-        <div className="rounded-md border border-dashed p-3">
-          <p className="text-muted-foreground text-xs">
+        <div className="rounded-lg bg-blue-50 p-3 dark:bg-blue-950">
+          <p className="text-blue-800 text-xs dark:text-blue-200">
             <strong>Run Tracking:</strong>
             <br />• Auto mode uses memory reading to detect game start/end instantly (Windows only)
             <br />• Requires D2R.exe to be running and valid memory offsets configured

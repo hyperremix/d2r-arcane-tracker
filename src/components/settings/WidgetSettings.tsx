@@ -200,8 +200,8 @@ export function WidgetSettings() {
           </div>
 
           {/* Widget Preview Description */}
-          <div className="rounded-md border border-dashed p-3">
-            <p className="text-muted-foreground text-xs">
+          <div className="rounded-lg bg-blue-50 p-3 dark:bg-blue-950">
+            <p className="text-blue-800 text-xs dark:text-blue-200">
               <strong>Widget Features:</strong>
               <br />• Always on top of other windows
               <br />• Transparent background
