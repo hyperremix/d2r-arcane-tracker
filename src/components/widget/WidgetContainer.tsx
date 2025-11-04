@@ -1,4 +1,11 @@
-import type { GrailProgress, GrailStatistics, Item, Settings } from 'electron/types/grail';
+import type {
+  GrailProgress,
+  GrailStatistics,
+  Item,
+  Run,
+  Session,
+  Settings,
+} from 'electron/types/grail';
 import { useEffect, useState } from 'react';
 import { canItemBeEthereal, canItemBeNormal } from '@/lib/ethereal';
 import { useRunTrackerStore } from '@/stores/runTrackerStore';
@@ -12,8 +19,13 @@ export function WidgetContainer() {
   const [statistics, setStatistics] = useState<GrailStatistics | null>(null);
   const [settings, setSettings] = useState<Partial<Settings>>({});
 
-  // Subscribe to run tracker store for real-time updates
-  useRunTrackerStore();
+  // Get run tracker store actions to handle IPC events
+  const {
+    handleSessionStarted: storeHandleSessionStarted,
+    handleSessionEnded: storeHandleSessionEnded,
+    handleRunStarted: storeHandleRunStarted,
+    handleRunEnded: storeHandleRunEnded,
+  } = useRunTrackerStore();
 
   // Load initial data and calculate statistics
   useEffect(() => {
@@ -118,39 +130,44 @@ export function WidgetContainer() {
 
   // Listen for run tracker events for real-time updates
   useEffect(() => {
-    const handleRunStarted = () => {
-      // Force re-render when run starts
-      console.log('[WidgetContainer] Run started');
+    const handleRunStarted = (_event: Electron.IpcRendererEvent, run: Run) => {
+      console.log('[WidgetContainer] Run started:', run.id);
+      storeHandleRunStarted(run);
     };
 
     const handleRunEnded = () => {
-      // Force re-render when run ends
       console.log('[WidgetContainer] Run ended');
+      storeHandleRunEnded();
     };
 
-    const handleSessionStarted = () => {
-      // Force re-render when session starts
-      console.log('[WidgetContainer] Session started');
+    const handleSessionStarted = (_event: Electron.IpcRendererEvent, session: Session) => {
+      console.log('[WidgetContainer] Session started:', session.id);
+      storeHandleSessionStarted(session);
     };
 
     const handleSessionEnded = () => {
-      // Force re-render when session ends
       console.log('[WidgetContainer] Session ended');
+      storeHandleSessionEnded();
     };
 
-    // Listen for run tracker events
-    window.ipcRenderer?.on('run-started', handleRunStarted);
-    window.ipcRenderer?.on('run-ended', handleRunEnded);
-    window.ipcRenderer?.on('session-started', handleSessionStarted);
-    window.ipcRenderer?.on('session-ended', handleSessionEnded);
+    // Listen for run tracker events (note: events are prefixed with 'run-tracker:')
+    window.ipcRenderer?.on('run-tracker:run-started', handleRunStarted);
+    window.ipcRenderer?.on('run-tracker:run-ended', handleRunEnded);
+    window.ipcRenderer?.on('run-tracker:session-started', handleSessionStarted);
+    window.ipcRenderer?.on('run-tracker:session-ended', handleSessionEnded);
 
     return () => {
-      window.ipcRenderer?.off('run-started', handleRunStarted);
-      window.ipcRenderer?.off('run-ended', handleRunEnded);
-      window.ipcRenderer?.off('session-started', handleSessionStarted);
-      window.ipcRenderer?.off('session-ended', handleSessionEnded);
+      window.ipcRenderer?.off('run-tracker:run-started', handleRunStarted);
+      window.ipcRenderer?.off('run-tracker:run-ended', handleRunEnded);
+      window.ipcRenderer?.off('run-tracker:session-started', handleSessionStarted);
+      window.ipcRenderer?.off('run-tracker:session-ended', handleSessionEnded);
     };
-  }, []);
+  }, [
+    storeHandleRunStarted,
+    storeHandleRunEnded,
+    storeHandleSessionStarted,
+    storeHandleSessionEnded,
+  ]);
 
   const handleDragStart = () => {
     // Empty function - drag is handled by Electron

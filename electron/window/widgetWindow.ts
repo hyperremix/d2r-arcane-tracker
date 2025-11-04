@@ -23,7 +23,7 @@ const SIZE_MAP: Record<
   overall: { width: 250, height: 250 }, // Single large gauge
   split: { width: 350, height: 250 }, // Two gauges side by side
   all: { width: 300, height: 350 }, // Overall on top, normal+ethereal below
-  'run-only': { width: 200, height: 120 }, // Compact run counter display
+  'run-only': { width: 250, height: 150 }, // Compact run counter display
 };
 
 /**
