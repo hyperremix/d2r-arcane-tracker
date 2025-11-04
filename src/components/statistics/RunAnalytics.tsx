@@ -8,8 +8,8 @@ import {
   Cell,
   Pie,
   PieChart,
+  Tooltip as RechartsTooltip,
   ResponsiveContainer,
-  Tooltip,
   XAxis,
   YAxis,
 } from 'recharts';
@@ -38,10 +38,11 @@ interface RunTypeChartData {
 }
 
 /**
- * Analytics component that displays comprehensive run statistics and visualizations.
+ * RunAnalytics component that displays comprehensive run statistics and visualizations.
  * Shows session statistics, run duration charts, item find rates, and run type distributions.
+ * @returns {JSX.Element} Run analytics dashboard with charts and statistics
  */
-export function Analytics() {
+export function RunAnalytics() {
   const [overallStats, setOverallStats] = useState<RunStatistics | null>(null);
   const [runTypeStats, setRunTypeStats] = useState<RunTypeStats[]>([]);
   const [loading, setLoading] = useState(true);
@@ -207,21 +208,13 @@ export function Analytics() {
   }
 
   return (
-    <div className="max-h-[94vh] space-y-6 overflow-y-auto p-6">
+    <div className="space-y-6 p-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="font-bold text-2xl">Run Analytics</h1>
-          <p className="text-muted-foreground">
-            Comprehensive statistics and visualizations of your farming runs
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button onClick={exportData} variant="outline" size="sm">
-            <Download className="mr-2 h-4 w-4" />
-            Export Data
-          </Button>
-        </div>
+      <div className="flex justify-end gap-2">
+        <Button onClick={exportData} variant="outline" size="sm">
+          <Download className="h-4 w-4" />
+          Export Data
+        </Button>
       </div>
 
       {/* Overview Cards */}
@@ -299,7 +292,7 @@ export function Analytics() {
                     <Cell key={`cell-${data.name}-${index}`} fill={COLORS[index % COLORS.length]} />
                   ))}
                 </Pie>
-                <Tooltip />
+                <RechartsTooltip />
               </PieChart>
             </ResponsiveContainer>
           </CardContent>
@@ -316,7 +309,7 @@ export function Analytics() {
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="name" />
                 <YAxis />
-                <Tooltip />
+                <RechartsTooltip />
                 <Bar dataKey="runs" fill="#8884d8" />
               </BarChart>
             </ResponsiveContainer>
@@ -334,7 +327,7 @@ export function Analytics() {
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="name" />
                 <YAxis />
-                <Tooltip formatter={(value) => formatDuration(value as number)} />
+                <RechartsTooltip formatter={(value) => formatDuration(value as number)} />
                 <Bar dataKey="avgDuration" fill="#82ca9d" />
               </BarChart>
             </ResponsiveContainer>
@@ -352,7 +345,7 @@ export function Analytics() {
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="name" />
                 <YAxis />
-                <Tooltip />
+                <RechartsTooltip />
                 <Bar dataKey="itemsFound" fill="#ffc658" />
               </BarChart>
             </ResponsiveContainer>

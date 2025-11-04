@@ -58,7 +58,6 @@ function useRouteStates(pathname: string) {
     isTrackerActive: pathname === '/',
     isStatisticsActive: pathname === '/statistics',
     isRunsActive: pathname === '/runs',
-    isAnalyticsActive: pathname === '/analytics',
     isRunewordsActive: pathname === '/runewords',
     isTerrorZonesActive: pathname === '/terror-zones',
     isSettingsActive: pathname === '/settings',
@@ -196,12 +195,6 @@ export function TitleBar() {
           title="Run Counter"
           icon={Timer}
           isActive={routeStates.isRunsActive}
-        />
-        <NavigationButton
-          to="/analytics"
-          title="Run Analytics"
-          icon={BarChart3}
-          isActive={routeStates.isAnalyticsActive}
         />
         <NavigationButton
           to="/runewords"

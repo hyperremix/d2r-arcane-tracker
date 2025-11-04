@@ -1,11 +1,11 @@
 import { BarChart3, Clock, Target, TrendingUp, Trophy, Users, Zap } from 'lucide-react';
 import { memo, useMemo } from 'react';
+import { ItemCard } from '@/components/grail/ItemCard';
+import { ProgressBar } from '@/components/grail/ProgressBar';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useProgressLookup } from '@/hooks/useProgressLookup';
 import { useGrailStatistics, useGrailStore } from '@/stores/grailStore';
-import { ItemCard } from './ItemCard';
-import { ProgressBar } from './ProgressBar';
 
 /**
  * Formats a date as a relative time string (e.g., "2 days ago", "5 hours ago").
