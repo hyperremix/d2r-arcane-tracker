@@ -632,30 +632,46 @@ class GrailDatabase {
     const typedSettings: Settings = {
       saveDir: settings.saveDir || '',
       lang: settings.lang || 'en',
-      gameMode: (settings.gameMode as GameMode) || GameMode.Both,
-      grailNormal: settings.grailNormal === 'true',
-      grailEthereal: settings.grailEthereal === 'true',
-      grailRunes: settings.grailRunes === 'true',
-      grailRunewords: settings.grailRunewords === 'true',
-      gameVersion: (settings.gameVersion as GameVersion) || GameVersion.Resurrected,
-      enableSounds: settings.enableSounds === 'true',
-      notificationVolume: Number.parseFloat(settings.notificationVolume) || 0.5,
-      inAppNotifications: settings.inAppNotifications === 'true',
-      nativeNotifications: settings.nativeNotifications === 'true',
-      needsSeeding: settings.needsSeeding === 'true',
-      theme: (settings.theme as 'light' | 'dark' | 'system') || 'system',
+      gameMode: this.parseEnumSetting(settings.gameMode, GameMode.Both),
+      grailNormal: this.parseBooleanSetting(settings.grailNormal),
+      grailEthereal: this.parseBooleanSetting(settings.grailEthereal),
+      grailRunes: this.parseBooleanSetting(settings.grailRunes),
+      grailRunewords: this.parseBooleanSetting(settings.grailRunewords),
+      gameVersion: this.parseEnumSetting(settings.gameVersion, GameVersion.Resurrected),
+      enableSounds: this.parseBooleanSetting(settings.enableSounds),
+      notificationVolume: this.parseFloatSetting(settings.notificationVolume, 0.5) || 0.5,
+      inAppNotifications: this.parseBooleanSetting(settings.inAppNotifications),
+      nativeNotifications: this.parseBooleanSetting(settings.nativeNotifications),
+      needsSeeding: this.parseBooleanSetting(settings.needsSeeding),
+      theme: this.parseEnumSetting(settings.theme, 'system' as const),
       showItemIcons: settings.showItemIcons !== 'false', // Default to true
+      // D2R installation settings
+      d2rInstallPath: settings.d2rInstallPath || undefined,
+      iconConversionStatus: settings.iconConversionStatus as
+        | 'not_started'
+        | 'in_progress'
+        | 'completed'
+        | 'failed'
+        | undefined,
+      iconConversionProgress: this.parseJSONSetting<{ current: number; total: number }>(
+        settings.iconConversionProgress,
+      ),
+      // Advanced monitoring settings
+      tickReaderIntervalMs: this.parseIntSetting(settings.tickReaderIntervalMs),
+      chokidarPollingIntervalMs: this.parseIntSetting(settings.chokidarPollingIntervalMs),
+      fileStabilityThresholdMs: this.parseIntSetting(settings.fileStabilityThresholdMs),
+      fileChangeDebounceMs: this.parseIntSetting(settings.fileChangeDebounceMs),
       // Widget settings
-      widgetEnabled: settings.widgetEnabled === 'true',
-      widgetDisplay: (settings.widgetDisplay as 'overall' | 'split' | 'all') || 'overall',
-      widgetPosition:
-        settings.widgetPosition && settings.widgetPosition !== ''
-          ? (this.parseJSON(settings.widgetPosition) as { x: number; y: number } | undefined)
-          : undefined,
-      widgetOpacity: settings.widgetOpacity ? Number.parseFloat(settings.widgetOpacity) : 0.9,
+      widgetEnabled: this.parseBooleanSetting(settings.widgetEnabled),
+      widgetDisplay: this.parseEnumSetting(settings.widgetDisplay, 'overall' as const),
+      widgetPosition: this.parseJSONSetting<{ x: number; y: number }>(settings.widgetPosition),
+      widgetOpacity: this.parseFloatSetting(settings.widgetOpacity, 0.9) || 0.9,
       // Wizard settings
-      wizardCompleted: settings.wizardCompleted === 'true',
-      wizardSkipped: settings.wizardSkipped === 'true',
+      wizardCompleted: this.parseBooleanSetting(settings.wizardCompleted),
+      wizardSkipped: this.parseBooleanSetting(settings.wizardSkipped),
+      // Terror zone configuration
+      terrorZoneConfig: this.parseJSONSetting<Record<number, boolean>>(settings.terrorZoneConfig),
+      terrorZoneBackupCreated: this.parseBooleanSetting(settings.terrorZoneBackupCreated),
     };
 
     return typedSettings;
@@ -679,6 +695,60 @@ class GrailDatabase {
       console.warn(`Failed to parse JSON setting: "${jsonString}". Using undefined.`);
       return undefined;
     }
+  }
+
+  /**
+   * Parses a JSON setting string into a typed object.
+   * @param value - The setting value to parse
+   * @returns Parsed object or undefined
+   */
+  private parseJSONSetting<T>(value: string | undefined): T | undefined {
+    if (!value || value === '') {
+      return undefined;
+    }
+    return this.parseJSON(value) as T | undefined;
+  }
+
+  /**
+   * Parses an integer setting string.
+   * @param value - The setting value to parse
+   * @returns Parsed integer or undefined
+   */
+  private parseIntSetting(value: string | undefined): number | undefined {
+    return value ? Number.parseInt(value, 10) : undefined;
+  }
+
+  /**
+   * Parses a float setting string.
+   * @param value - The setting value to parse
+   * @param defaultValue - Optional default value if parsing fails
+   * @returns Parsed float, default value, or undefined
+   */
+  private parseFloatSetting(value: string | undefined, defaultValue?: number): number | undefined {
+    if (!value) {
+      return defaultValue;
+    }
+    const parsed = Number.parseFloat(value);
+    return Number.isNaN(parsed) ? defaultValue : parsed;
+  }
+
+  /**
+   * Parses a boolean setting string.
+   * @param value - The setting value to parse
+   * @returns True if value is 'true', false otherwise
+   */
+  private parseBooleanSetting(value: string | undefined): boolean {
+    return value === 'true';
+  }
+
+  /**
+   * Parses an enum setting string with a default value.
+   * @param value - The setting value to parse
+   * @param defaultValue - Default value if not set
+   * @returns The parsed value or default
+   */
+  private parseEnumSetting<T>(value: string | undefined, defaultValue: T): T {
+    return (value as T) || defaultValue;
   }
 
   /**
