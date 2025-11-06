@@ -174,7 +174,7 @@ export function TerrorZoneConfiguration() {
   if (isLoading) {
     return (
       <TooltipProvider>
-        <div className="h-[calc(100vh-48px)] overflow-y-auto">
+        <div className="flex-1 overflow-y-auto">
           <div className="space-y-6 p-6">
             <Card>
               <CardHeader>
@@ -197,7 +197,7 @@ export function TerrorZoneConfiguration() {
 
   return (
     <TooltipProvider>
-      <div className="h-[calc(100vh-48px)] overflow-y-auto">
+      <div className="flex-1 overflow-y-auto">
         <div className="space-y-6 p-6">
           <Card>
             <CardHeader>

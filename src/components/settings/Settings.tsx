@@ -27,7 +27,7 @@ export function Settings() {
 
   return (
     <TooltipProvider>
-      <div className="h-[calc(100vh-48px)] overflow-y-auto">
+      <div className="flex-1 overflow-y-auto">
         <div className="space-y-6 p-6">
           <UpdateSettings />
           <SaveFileMonitor />

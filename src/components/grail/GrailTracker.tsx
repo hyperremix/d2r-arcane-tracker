@@ -84,52 +84,50 @@ export function GrailTracker() {
 
   return (
     <TooltipProvider>
-      <div className="p-6">
-        <div className="flex gap-6">
-          {/* Left Sidebar - Progress Overview and Advanced Search */}
-          <div className="max-h-[91vh] w-80 shrink-0 space-y-6 overflow-y-auto">
-            {statistics && (
-              <Card>
-                <CardContent className="flex flex-col items-center gap-4">
-                  <ProgressGauge
-                    label="Total Progress"
-                    current={statistics.foundItems}
-                    total={statistics.totalItems}
-                    showLabel
-                    color="purple"
-                  />
+      <div className="flex h-full gap-6 p-6">
+        {/* Left Sidebar - Progress Overview and Advanced Search */}
+        <div className="flex w-80 shrink-0 flex-col gap-6 overflow-y-auto">
+          {statistics && (
+            <Card>
+              <CardContent className="flex flex-col items-center gap-4">
+                <ProgressGauge
+                  label="Total Progress"
+                  current={statistics.foundItems}
+                  total={statistics.totalItems}
+                  showLabel
+                  color="purple"
+                />
 
-                  {/* Progress breakdown */}
-                  {settings.grailEthereal && (
-                    <div className="flex gap-4">
-                      <ProgressGauge
-                        label="Normal Items"
-                        current={statistics.normalItems.found}
-                        total={statistics.normalItems.total}
-                        showLabel
-                        color="orange"
-                      />
-                      <ProgressGauge
-                        label="Ethereal Items"
-                        current={statistics.etherealItems.found}
-                        total={statistics.etherealItems.total}
-                        showLabel
-                        color="blue"
-                      />
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            )}
+                {/* Progress breakdown */}
+                {settings.grailEthereal && (
+                  <div className="flex gap-4">
+                    <ProgressGauge
+                      label="Normal Items"
+                      current={statistics.normalItems.found}
+                      total={statistics.normalItems.total}
+                      showLabel
+                      color="orange"
+                    />
+                    <ProgressGauge
+                      label="Ethereal Items"
+                      current={statistics.etherealItems.found}
+                      total={statistics.etherealItems.total}
+                      showLabel
+                      color="blue"
+                    />
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
 
-            {/* Advanced Search */}
-            <AdvancedSearch />
-          </div>
+          {/* Advanced Search */}
+          <AdvancedSearch />
+        </div>
 
-          {/* Right Content - Item Grid */}
-          <div className="min-w-0 flex-1">
-            <ItemGrid />
-          </div>
+        {/* Right Content - Item Grid */}
+        <div className="flex min-w-0 flex-1 flex-col overflow-y-auto">
+          <ItemGrid />
         </div>
       </div>
     </TooltipProvider>

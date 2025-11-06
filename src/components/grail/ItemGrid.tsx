@@ -465,14 +465,7 @@ function VirtualizedItemsContainer({
   });
 
   return (
-    <div
-      ref={listRef}
-      className="w-full p-4"
-      style={{
-        height: '760px',
-        overflow: 'auto',
-      }}
-    >
+    <div ref={listRef} className="h-full w-full overflow-auto p-4">
       <div
         style={{
           height: `${rowVirtualizer.getTotalSize()}px`,
