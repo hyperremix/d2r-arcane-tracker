@@ -666,6 +666,22 @@ class GrailDatabase {
       widgetDisplay: this.parseEnumSetting(settings.widgetDisplay, 'overall' as const),
       widgetPosition: this.parseJSONSetting<{ x: number; y: number }>(settings.widgetPosition),
       widgetOpacity: this.parseFloatSetting(settings.widgetOpacity, 0.9) || 0.9,
+      widgetSizeOverall: this.parseJSONSetting<{ width: number; height: number }>(
+        settings.widgetSizeOverall,
+      ),
+      widgetSizeSplit: this.parseJSONSetting<{ width: number; height: number }>(
+        settings.widgetSizeSplit,
+      ),
+      widgetSizeAll: this.parseJSONSetting<{ width: number; height: number }>(
+        settings.widgetSizeAll,
+      ),
+      // Main window settings
+      mainWindowBounds: this.parseJSONSetting<{
+        x: number;
+        y: number;
+        width: number;
+        height: number;
+      }>(settings.mainWindowBounds),
       // Wizard settings
       wizardCompleted: this.parseBooleanSetting(settings.wizardCompleted),
       wizardSkipped: this.parseBooleanSetting(settings.wizardSkipped),

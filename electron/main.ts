@@ -1,7 +1,7 @@
 import { createRequire } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { app, BrowserWindow, type IpcMainEvent, ipcMain, session } from 'electron';
+import { app, BrowserWindow, type IpcMainEvent, ipcMain, screen, session } from 'electron';
 import { GrailDatabase, grailDatabase } from './database/database';
 import { initializeDialogHandlers } from './ipc-handlers/dialogHandlers';
 import { closeGrailDatabase, initializeGrailHandlers } from './ipc-handlers/grailHandlers';
@@ -11,6 +11,7 @@ import { initializeShellHandlers } from './ipc-handlers/shellHandlers';
 import { initializeTerrorZoneHandlers } from './ipc-handlers/terrorZoneHandlers';
 import { initializeUpdateHandlers } from './ipc-handlers/updateHandlers';
 import { initializeWidgetHandlers } from './ipc-handlers/widgetHandlers';
+import { isPositionOnScreen } from './utils/windowSnapping';
 import { closeWidgetWindow, showWidgetWindow } from './window/widgetWindow';
 
 createRequire(import.meta.url);
@@ -56,6 +57,22 @@ process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL
 export let mainWindow: BrowserWindow | null;
 
 /**
+ * Saves the current main window bounds (position and size) to the database.
+ */
+function saveMainWindowBounds() {
+  if (!mainWindow) {
+    return;
+  }
+
+  try {
+    const bounds = mainWindow.getBounds();
+    grailDatabase.setSetting('mainWindowBounds', JSON.stringify(bounds));
+  } catch (error) {
+    console.error('Failed to save main window bounds:', error);
+  }
+}
+
+/**
  * Creates the main application window with appropriate icon and web preferences.
  * Loads the application from the Vite dev server in development or from built files in production.
  */
@@ -67,9 +84,39 @@ function createWindow() {
       ? path.join(process.resourcesPath, 'app.asar.unpacked', 'dist', 'logo.ico')
       : path.join(process.env.VITE_PUBLIC, 'logo.png');
 
-  mainWindow = new BrowserWindow({
+  // Load saved window bounds from settings
+  let windowBounds = {
     width: 1200,
     height: 856,
+    x: undefined as number | undefined,
+    y: undefined as number | undefined,
+  };
+  try {
+    const db = new GrailDatabase();
+    const settings = db.getAllSettings();
+
+    if (settings.mainWindowBounds) {
+      const { x, y, width, height } = settings.mainWindowBounds;
+
+      // Validate that saved position is still on screen
+      const displays = screen.getAllDisplays();
+      if (isPositionOnScreen(x, y, displays)) {
+        windowBounds = { x, y, width, height };
+      } else {
+        // Position is off-screen, use saved size but let OS choose position
+        windowBounds = { width, height, x: undefined, y: undefined };
+      }
+    }
+  } catch (error) {
+    console.error('Failed to load main window bounds from settings:', error);
+  }
+
+  mainWindow = new BrowserWindow({
+    width: windowBounds.width,
+    height: windowBounds.height,
+    ...(windowBounds.x !== undefined && windowBounds.y !== undefined
+      ? { x: windowBounds.x, y: windowBounds.y }
+      : {}),
     icon: iconPath,
     // Custom title bar configuration
     titleBarStyle: 'hidden',
@@ -117,6 +164,34 @@ function createWindow() {
       mainWindow?.webContents.toggleDevTools();
       event.preventDefault();
     }
+  });
+
+  // Save window bounds when moved
+  mainWindow.on('moved', () => {
+    saveMainWindowBounds();
+  });
+
+  // Debounce timer for window resize
+  let resizeTimeout: NodeJS.Timeout | null = null;
+
+  // Save window bounds when resized (debounced)
+  mainWindow.on('resize', () => {
+    if (resizeTimeout) {
+      clearTimeout(resizeTimeout);
+    }
+
+    resizeTimeout = setTimeout(() => {
+      saveMainWindowBounds();
+    }, 500); // Wait 500ms after resize stops before saving
+  });
+
+  // Ensure bounds are saved before window closes
+  mainWindow.on('close', () => {
+    // Clear any pending resize timeout
+    if (resizeTimeout) {
+      clearTimeout(resizeTimeout);
+    }
+    saveMainWindowBounds();
   });
 }
 

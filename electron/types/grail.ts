@@ -391,6 +391,8 @@ export type Settings = {
   widgetSizeOverall?: { width: number; height: number }; // Custom size for overall mode
   widgetSizeSplit?: { width: number; height: number }; // Custom size for split mode
   widgetSizeAll?: { width: number; height: number }; // Custom size for all mode
+  // Main window settings
+  mainWindowBounds?: { x: number; y: number; width: number; height: number }; // Main window position and size
   // Wizard settings
   wizardCompleted?: boolean; // Whether the setup wizard has been completed
   wizardSkipped?: boolean; // Whether the user skipped the setup wizard
