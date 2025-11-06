@@ -33,9 +33,9 @@ export function WidgetStep() {
     async (display: 'overall' | 'split' | 'all') => {
       await setSettings({ widgetDisplay: display });
       // Update widget display mode via IPC
-      await window.electronAPI?.widget.updateDisplay(display);
+      await window.electronAPI?.widget.updateDisplay(display, settings);
     },
-    [setSettings],
+    [setSettings, settings],
   );
 
   const handleOpacityChange = useCallback(

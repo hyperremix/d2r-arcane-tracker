@@ -67,15 +67,24 @@ export function WidgetContainer() {
   // Listen for settings updates
   useEffect(() => {
     const handleSettingsUpdate = async (_event: unknown, updatedSettings: Partial<Settings>) => {
-      setSettings((prev) => ({ ...prev, ...updatedSettings }));
+      setSettings((prev) => {
+        const newSettings = { ...prev, ...updatedSettings };
 
-      // Update widget appearance based on new settings
-      if (updatedSettings.widgetDisplay) {
-        await window.electronAPI?.widget.updateDisplay(updatedSettings.widgetDisplay);
-      }
-      if (updatedSettings.widgetOpacity !== undefined) {
-        await window.electronAPI?.widget.updateOpacity(updatedSettings.widgetOpacity);
-      }
+        // Update widget appearance based on new settings (use async IIFE to handle promises)
+        (async () => {
+          if (updatedSettings.widgetDisplay) {
+            await window.electronAPI?.widget.updateDisplay(
+              updatedSettings.widgetDisplay,
+              newSettings,
+            );
+          }
+          if (updatedSettings.widgetOpacity !== undefined) {
+            await window.electronAPI?.widget.updateOpacity(updatedSettings.widgetOpacity);
+          }
+        })();
+
+        return newSettings;
+      });
 
       // Recalculate statistics if grail settings changed
       if (

@@ -405,12 +405,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
     /**
      * Updates the widget display mode.
      * @param {'overall' | 'split' | 'all'} display - The new display mode for the widget.
+     * @param {Partial<Settings>} settings - Application settings containing custom sizes.
      * @returns {Promise<{ success: boolean; error?: string }>} Success indicator.
      */
     updateDisplay: (
       display: 'overall' | 'split' | 'all',
+      settings: Partial<Settings>,
     ): Promise<{ success: boolean; error?: string }> =>
-      ipcRenderer.invoke('widget:update-display', display),
+      ipcRenderer.invoke('widget:update-display', display, settings),
 
     /**
      * Updates the widget window opacity.
@@ -419,6 +421,31 @@ contextBridge.exposeInMainWorld('electronAPI', {
      */
     updateOpacity: (opacity: number): Promise<{ success: boolean; error?: string }> =>
       ipcRenderer.invoke('widget:update-opacity', opacity),
+
+    /**
+     * Updates the widget window size.
+     * @param {'overall' | 'split' | 'all'} display - The display mode for the size.
+     * @param {{ width: number; height: number }} size - The new size for the widget.
+     * @returns {Promise<{ success: boolean; error?: string }>} Success indicator.
+     */
+    updateSize: (
+      display: 'overall' | 'split' | 'all',
+      size: { width: number; height: number },
+    ): Promise<{ success: boolean; error?: string }> =>
+      ipcRenderer.invoke('widget:update-size', display, size),
+
+    /**
+     * Resets the widget size to default for the current display mode.
+     * @param {'overall' | 'split' | 'all'} display - The display mode to reset size for.
+     * @returns {Promise<{ success: boolean; size: { width: number; height: number } | null; error?: string }>} Default size.
+     */
+    resetSize: (
+      display: 'overall' | 'split' | 'all',
+    ): Promise<{
+      success: boolean;
+      size: { width: number; height: number } | null;
+      error?: string;
+    }> => ipcRenderer.invoke('widget:reset-size', display),
 
     /**
      * Checks if the widget window is currently open.

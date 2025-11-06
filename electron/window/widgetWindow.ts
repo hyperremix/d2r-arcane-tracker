@@ -14,12 +14,34 @@ export let widgetWindow: BrowserWindow | null = null;
 
 /**
  * Size mapping for different widget display modes.
+ * These are the default sizes used when no custom size is saved.
  */
 const SIZE_MAP: Record<'overall' | 'split' | 'all', { width: number; height: number }> = {
   overall: { width: 250, height: 250 }, // Single large gauge
   split: { width: 350, height: 250 }, // Two gauges side by side
   all: { width: 300, height: 350 }, // Overall on top, normal+ethereal below
 };
+
+/**
+ * Gets the size for a specific display mode from settings or defaults.
+ *
+ * @param display - The display mode to get size for
+ * @param settings - Application settings containing custom sizes
+ * @returns The size { width, height } for the display mode
+ */
+function getWidgetSize(
+  display: 'overall' | 'split' | 'all',
+  settings: Partial<Settings>,
+): { width: number; height: number } {
+  switch (display) {
+    case 'overall':
+      return settings.widgetSizeOverall || SIZE_MAP.overall;
+    case 'split':
+      return settings.widgetSizeSplit || SIZE_MAP.split;
+    case 'all':
+      return settings.widgetSizeAll || SIZE_MAP.all;
+  }
+}
 
 /**
  * Creates the widget window with the specified settings.
@@ -37,8 +59,13 @@ export function createWidgetWindow(
   viteDevServerUrl?: string,
   rendererDist?: string,
   onPositionChange?: (position: { x: number; y: number }) => void,
+  onSizeChange?: (
+    display: 'overall' | 'split' | 'all',
+    size: { width: number; height: number },
+  ) => void,
 ): BrowserWindow {
-  const size = SIZE_MAP[settings.widgetDisplay || 'overall'];
+  const displayMode = settings.widgetDisplay || 'overall';
+  const size = getWidgetSize(displayMode, settings);
 
   // Get all displays
   const displays = screen.getAllDisplays();
@@ -59,12 +86,14 @@ export function createWidgetWindow(
     height: size.height,
     x: position.x,
     y: position.y,
+    minWidth: 150,
+    minHeight: 150,
     transparent: true,
     frame: false,
     hasShadow: false,
     alwaysOnTop: true,
     skipTaskbar: true,
-    resizable: false,
+    resizable: true,
     minimizable: false,
     maximizable: false,
     fullscreenable: false,
@@ -124,6 +153,15 @@ export function createWidgetWindow(
     }
   });
 
+  // Save size after window is resized
+  widgetWindow.on('resize', () => {
+    if (widgetWindow && onSizeChange) {
+      const bounds = widgetWindow.getBounds();
+      const currentDisplay = settings.widgetDisplay || 'overall';
+      onSizeChange(currentDisplay, { width: bounds.width, height: bounds.height });
+    }
+  });
+
   // Clean up reference when window is closed
   widgetWindow.on('closed', () => {
     widgetWindow = null;
@@ -140,6 +178,7 @@ export function createWidgetWindow(
  * @param viteDevServerUrl - Vite dev server URL (only in development)
  * @param rendererDist - Path to renderer distribution folder (production)
  * @param onPositionChange - Callback when widget position changes (for saving to settings)
+ * @param onSizeChange - Callback when widget size changes (for saving to settings)
  */
 export function showWidgetWindow(
   settings: Partial<Settings>,
@@ -147,11 +186,22 @@ export function showWidgetWindow(
   viteDevServerUrl?: string,
   rendererDist?: string,
   onPositionChange?: (position: { x: number; y: number }) => void,
+  onSizeChange?: (
+    display: 'overall' | 'split' | 'all',
+    size: { width: number; height: number },
+  ) => void,
 ): void {
   if (widgetWindow) {
     widgetWindow.show();
   } else {
-    createWidgetWindow(settings, __dirname, viteDevServerUrl, rendererDist, onPositionChange);
+    createWidgetWindow(
+      settings,
+      __dirname,
+      viteDevServerUrl,
+      rendererDist,
+      onPositionChange,
+      onSizeChange,
+    );
   }
 }
 
@@ -189,12 +239,17 @@ export function getWidgetWindowPosition(): { x: number; y: number } | null {
 
 /**
  * Updates the widget window size based on new display mode.
+ * Uses saved size for the mode if available, otherwise uses default SIZE_MAP.
  *
  * @param display - The new display mode ('overall', 'split', or 'all')
+ * @param settings - Application settings containing custom sizes
  */
-export function updateWidgetWindowSize(display: 'overall' | 'split' | 'all'): void {
+export function updateWidgetWindowSize(
+  display: 'overall' | 'split' | 'all',
+  settings: Partial<Settings>,
+): void {
   if (widgetWindow) {
-    const newSize = SIZE_MAP[display];
+    const newSize = getWidgetSize(display, settings);
     const currentBounds = widgetWindow.getBounds();
     widgetWindow.setBounds({
       x: currentBounds.x,
@@ -203,6 +258,29 @@ export function updateWidgetWindowSize(display: 'overall' | 'split' | 'all'): vo
       height: newSize.height,
     });
   }
+}
+
+/**
+ * Resets the widget window size to default for the current display mode.
+ *
+ * @param display - The display mode to reset size for
+ * @returns The default size for the mode, or null if window doesn't exist
+ */
+export function resetWidgetWindowSize(
+  display: 'overall' | 'split' | 'all',
+): { width: number; height: number } | null {
+  if (widgetWindow) {
+    const defaultSize = SIZE_MAP[display];
+    const currentBounds = widgetWindow.getBounds();
+    widgetWindow.setBounds({
+      x: currentBounds.x,
+      y: currentBounds.y,
+      width: defaultSize.width,
+      height: defaultSize.height,
+    });
+    return defaultSize;
+  }
+  return null;
 }
 
 /**

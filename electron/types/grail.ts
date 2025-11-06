@@ -388,6 +388,9 @@ export type Settings = {
   widgetDisplay?: 'overall' | 'split' | 'all'; // Widget display mode (overall only, normal+ethereal, or all three)
   widgetPosition?: { x: number; y: number }; // Widget position on screen
   widgetOpacity?: number; // Widget opacity (0.0 to 1.0)
+  widgetSizeOverall?: { width: number; height: number }; // Custom size for overall mode
+  widgetSizeSplit?: { width: number; height: number }; // Custom size for split mode
+  widgetSizeAll?: { width: number; height: number }; // Custom size for all mode
   // Wizard settings
   wizardCompleted?: boolean; // Whether the setup wizard has been completed
   wizardSkipped?: boolean; // Whether the user skipped the setup wizard

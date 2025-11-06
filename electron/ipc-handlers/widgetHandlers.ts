@@ -3,6 +3,7 @@ import type { Settings } from '../types/grail';
 import {
   closeWidgetWindow,
   getWidgetWindowPosition,
+  resetWidgetWindowSize,
   showWidgetWindow,
   updateWidgetWindowOpacity,
   updateWidgetWindowSize,
@@ -17,12 +18,17 @@ import {
  * @param viteDevServerUrl - Vite dev server URL (only in development)
  * @param rendererDist - Path to renderer distribution folder (production)
  * @param onPositionChange - Callback when widget position changes (for saving to settings)
+ * @param onSizeChange - Callback when widget size changes (for saving to settings)
  */
 export function initializeWidgetHandlers(
   __dirname: string,
   viteDevServerUrl?: string,
   rendererDist?: string,
   onPositionChange?: (position: { x: number; y: number }) => void,
+  onSizeChange?: (
+    display: 'overall' | 'split' | 'all',
+    size: { width: number; height: number },
+  ) => void,
 ): void {
   /**
    * Toggle widget visibility based on settings.
@@ -30,7 +36,14 @@ export function initializeWidgetHandlers(
   ipcMain.handle('widget:toggle', async (_event, enabled: boolean, settings: Partial<Settings>) => {
     try {
       if (enabled) {
-        showWidgetWindow(settings, __dirname, viteDevServerUrl, rendererDist, onPositionChange);
+        showWidgetWindow(
+          settings,
+          __dirname,
+          viteDevServerUrl,
+          rendererDist,
+          onPositionChange,
+          onSizeChange,
+        );
       } else {
         closeWidgetWindow();
       }
@@ -72,15 +85,18 @@ export function initializeWidgetHandlers(
   /**
    * Update widget display mode.
    */
-  ipcMain.handle('widget:update-display', async (_event, display: 'overall' | 'split' | 'all') => {
-    try {
-      updateWidgetWindowSize(display);
-      return { success: true };
-    } catch (error) {
-      console.error('Failed to update widget display mode:', error);
-      return { success: false, error: String(error) };
-    }
-  });
+  ipcMain.handle(
+    'widget:update-display',
+    async (_event, display: 'overall' | 'split' | 'all', settings: Partial<Settings>) => {
+      try {
+        updateWidgetWindowSize(display, settings);
+        return { success: true };
+      } catch (error) {
+        console.error('Failed to update widget display mode:', error);
+        return { success: false, error: String(error) };
+      }
+    },
+  );
 
   /**
    * Update widget opacity.
@@ -104,6 +120,44 @@ export function initializeWidgetHandlers(
     } catch (error) {
       console.error('Failed to check widget status:', error);
       return { success: false, isOpen: false };
+    }
+  });
+
+  /**
+   * Update widget size (called manually from settings or after resize).
+   */
+  ipcMain.handle(
+    'widget:update-size',
+    async (
+      _event,
+      display: 'overall' | 'split' | 'all',
+      size: { width: number; height: number },
+    ) => {
+      try {
+        if (onSizeChange) {
+          onSizeChange(display, size);
+        }
+        return { success: true };
+      } catch (error) {
+        console.error('Failed to update widget size:', error);
+        return { success: false, error: String(error) };
+      }
+    },
+  );
+
+  /**
+   * Reset widget size to default for current display mode.
+   */
+  ipcMain.handle('widget:reset-size', async (_event, display: 'overall' | 'split' | 'all') => {
+    try {
+      const defaultSize = resetWidgetWindowSize(display);
+      if (defaultSize && onSizeChange) {
+        onSizeChange(display, defaultSize);
+      }
+      return { success: true, size: defaultSize };
+    } catch (error) {
+      console.error('Failed to reset widget size:', error);
+      return { success: false, error: String(error), size: null };
     }
   });
 

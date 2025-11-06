@@ -29,9 +29,9 @@ export function WidgetSettings() {
     async (display: 'overall' | 'split' | 'all') => {
       await setSettings({ widgetDisplay: display });
       // Update widget display mode via IPC
-      await window.electronAPI?.widget.updateDisplay(display);
+      await window.electronAPI?.widget.updateDisplay(display, settings);
     },
-    [setSettings],
+    [setSettings, settings],
   );
 
   const updateOpacity = useCallback(
@@ -54,6 +54,19 @@ export function WidgetSettings() {
   const widgetDisplay = settings.widgetDisplay || 'overall';
   const widgetOpacity = settings.widgetOpacity ?? 0.9;
   const widgetEnabled = settings.widgetEnabled ?? false;
+
+  const resetSize = useCallback(async () => {
+    const result = await window.electronAPI?.widget.resetSize(widgetDisplay);
+    if (result?.success && result.size) {
+      // Clear the custom size for this display mode
+      const sizeKey =
+        `widgetSize${widgetDisplay.charAt(0).toUpperCase()}${widgetDisplay.slice(1)}` as
+          | 'widgetSizeOverall'
+          | 'widgetSizeSplit'
+          | 'widgetSizeAll';
+      await setSettings({ [sizeKey]: undefined });
+    }
+  }, [setSettings, widgetDisplay]);
 
   // Auto-switch to 'overall' mode if ethereal tracking is disabled and user is in split/all mode
   useEffect(() => {
@@ -148,19 +161,31 @@ export function WidgetSettings() {
 
           {/* Reset Position Button */}
           <div className="space-y-2">
-            <Label className="font-medium text-sm">Position</Label>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={resetPosition}
-              disabled={!widgetEnabled}
-              className="w-full"
-            >
-              <RotateCcw className="mr-2 h-4 w-4" />
-              Reset to Center
-            </Button>
+            <Label className="font-medium text-sm">Position & Size</Label>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={resetPosition}
+                disabled={!widgetEnabled}
+                className="flex-1"
+              >
+                <RotateCcw className="mr-2 h-4 w-4" />
+                Reset Position
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={resetSize}
+                disabled={!widgetEnabled}
+                className="flex-1"
+              >
+                <RotateCcw className="mr-2 h-4 w-4" />
+                Reset Size
+              </Button>
+            </div>
             <p className="text-muted-foreground text-xs">
-              The widget can be dragged and snaps to screen edges and corners
+              The widget can be dragged, resized, and snaps to screen edges and corners
             </p>
           </div>
 
@@ -170,8 +195,9 @@ export function WidgetSettings() {
               <strong>Widget Features:</strong>
               <br />• Always on top of other windows
               <br />• Transparent background
-              <br />• Drag to reposition
+              <br />• Drag to reposition, resize by edges/corners
               <br />• Auto-snaps to screen edges and corners
+              <br />• Size persists per display mode
               <br />• Updates in real-time with grail progress
             </p>
           </div>

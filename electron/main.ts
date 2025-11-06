@@ -2,7 +2,7 @@ import { createRequire } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { app, BrowserWindow, type IpcMainEvent, ipcMain, session } from 'electron';
-import { GrailDatabase } from './database/database';
+import { GrailDatabase, grailDatabase } from './database/database';
 import { initializeDialogHandlers } from './ipc-handlers/dialogHandlers';
 import { closeGrailDatabase, initializeGrailHandlers } from './ipc-handlers/grailHandlers';
 import { initializeIconHandlers } from './ipc-handlers/iconHandlers';
@@ -165,18 +165,48 @@ app.whenReady().then(() => {
   initializeTerrorZoneHandlers();
   initializeUpdateHandlers();
 
-  // Initialize widget handlers with callback for position updates
+  // Initialize widget handlers with callbacks for position and size updates
   const onWidgetPositionChange = (position: { x: number; y: number }) => {
     // Save widget position to database
     try {
-      const db = new GrailDatabase();
-      db.setSetting('widgetPosition', JSON.stringify(position));
+      grailDatabase.setSetting('widgetPosition', JSON.stringify(position));
     } catch (error) {
       console.error('Failed to save widget position:', error);
     }
   };
 
-  initializeWidgetHandlers(__dirname, VITE_DEV_SERVER_URL, RENDERER_DIST, onWidgetPositionChange);
+  // Debounce timer for widget size changes
+  let widgetSizeChangeTimeout: NodeJS.Timeout | null = null;
+
+  const onWidgetSizeChange = (
+    display: 'overall' | 'split' | 'all',
+    size: { width: number; height: number },
+  ) => {
+    // Debounce widget size changes to avoid excessive database writes during resize
+    if (widgetSizeChangeTimeout) {
+      clearTimeout(widgetSizeChangeTimeout);
+    }
+
+    widgetSizeChangeTimeout = setTimeout(() => {
+      try {
+        const settingKey = `widgetSize${display.charAt(0).toUpperCase()}${display.slice(1)}` as
+          | 'widgetSizeOverall'
+          | 'widgetSizeSplit'
+          | 'widgetSizeAll';
+        grailDatabase.setSetting(settingKey, JSON.stringify(size));
+      } catch (error) {
+        console.error('Failed to save widget size:', error);
+      }
+    }, 500); // Wait 500ms after resize stops before saving
+  };
+
+  initializeWidgetHandlers(
+    __dirname,
+    VITE_DEV_SERVER_URL,
+    RENDERER_DIST,
+    onWidgetPositionChange,
+    onWidgetSizeChange,
+  );
 
   // Handle titlebar overlay updates (Windows/Linux only)
   ipcMain.handle(
@@ -222,6 +252,7 @@ app.whenReady().then(() => {
         VITE_DEV_SERVER_URL,
         RENDERER_DIST,
         onWidgetPositionChange,
+        onWidgetSizeChange,
       );
     }
   } catch (error) {

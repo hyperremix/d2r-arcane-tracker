@@ -345,9 +345,10 @@ export interface ElectronAPI {
     /**
      * Updates the widget display mode.
      * @param {'overall' | 'split' | 'all'} display - The new display mode for the widget.
+     * @param {Partial<Settings>} settings - Application settings containing custom sizes.
      * @returns {Promise<{ success: boolean; error?: string }>} A promise that resolves with a success indicator.
      */
-    updateDisplay(display: 'overall' | 'split' | 'all'): Promise<{ success: boolean; error?: string }>
+    updateDisplay(display: 'overall' | 'split' | 'all', settings: Partial<Settings>): Promise<{ success: boolean; error?: string }>
 
     /**
      * Updates the widget window opacity.
@@ -355,6 +356,21 @@ export interface ElectronAPI {
      * @returns {Promise<{ success: boolean; error?: string }>} A promise that resolves with a success indicator.
      */
     updateOpacity(opacity: number): Promise<{ success: boolean; error?: string }>
+
+    /**
+     * Updates the widget window size.
+     * @param {'overall' | 'split' | 'all'} display - The display mode for the size.
+     * @param {{ width: number; height: number }} size - The new size for the widget.
+     * @returns {Promise<{ success: boolean; error?: string }>} A promise that resolves with a success indicator.
+     */
+    updateSize(display: 'overall' | 'split' | 'all', size: { width: number; height: number }): Promise<{ success: boolean; error?: string }>
+
+    /**
+     * Resets the widget size to default for the current display mode.
+     * @param {'overall' | 'split' | 'all'} display - The display mode to reset size for.
+     * @returns {Promise<{ success: boolean; size: { width: number; height: number } | null; error?: string }>} A promise that resolves with the default size.
+     */
+    resetSize(display: 'overall' | 'split' | 'all'): Promise<{ success: boolean; size: { width: number; height: number } | null; error?: string }>
 
     /**
      * Checks if the widget window is currently open.
