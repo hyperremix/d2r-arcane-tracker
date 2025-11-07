@@ -58,10 +58,10 @@ interface RunTrackerState {
   // Internal event handlers (called from components)
   handleSessionStarted: (session: Session) => void;
   handleSessionEnded: () => void;
-  handleRunStarted: (run: Run) => void;
-  handleRunEnded: () => void;
-  handleRunPaused: () => void;
-  handleRunResumed: () => void;
+  handleRunStarted: (run: Run, session: Session) => void;
+  handleRunEnded: (run: Run, session: Session) => void;
+  handleRunPaused: (session: Session) => void;
+  handleRunResumed: (session: Session) => void;
 
   // Computed/Helper Methods
   getCurrentRunDuration: () => number;
@@ -96,7 +96,17 @@ export const useRunTrackerStore = create<RunTrackerState>()(
       try {
         const session = await window.electronAPI?.runTracker.startSession();
         if (session) {
-          set({ activeSession: session, isTracking: true, loading: false });
+          // Initialize runs Map entry for this session
+          const { runs } = get();
+          const updatedRuns = new Map(runs);
+          updatedRuns.set(session.id, []);
+
+          set({
+            activeSession: session,
+            isTracking: true,
+            loading: false,
+            runs: updatedRuns,
+          });
           console.log('[RunTrackerStore] Session started:', session.id);
         } else {
           set({
@@ -404,7 +414,18 @@ export const useRunTrackerStore = create<RunTrackerState>()(
 
     // Internal event handlers (called from components)
     handleSessionStarted: (session) => {
-      set({ activeSession: session, isTracking: true });
+      // Initialize runs Map entry for this session
+      const { runs } = get();
+      const updatedRuns = new Map(runs);
+      if (!updatedRuns.has(session.id)) {
+        updatedRuns.set(session.id, []);
+      }
+
+      set({
+        activeSession: session,
+        isTracking: true,
+        runs: updatedRuns,
+      });
       console.log('[RunTrackerStore] Session started event:', session.id);
     },
 
@@ -418,23 +439,72 @@ export const useRunTrackerStore = create<RunTrackerState>()(
       console.log('[RunTrackerStore] Session ended event');
     },
 
-    handleRunStarted: (run) => {
-      set({ activeRun: run, isPaused: false });
-      console.log('[RunTrackerStore] Run started event:', run.id);
+    handleRunStarted: (run, session) => {
+      // Update the runs Map with the new run
+      const { runs, sessionStatsCache: oldCache } = get();
+      const sessionRuns = runs.get(session.id) || [];
+
+      const updatedRuns = new Map(runs);
+      updatedRuns.set(session.id, [...sessionRuns, run]);
+
+      // Invalidate stats cache since run data changed
+      const newCache = new Map(oldCache);
+      newCache.delete(session.id);
+
+      set({
+        activeRun: run,
+        activeSession: session,
+        isPaused: false,
+        runs: updatedRuns,
+        sessionStatsCache: newCache,
+      });
     },
 
-    handleRunEnded: () => {
-      set({ activeRun: null, isPaused: false });
-      console.log('[RunTrackerStore] Run ended event');
+    handleRunEnded: async (run, session) => {
+      // Update the runs Map with the ended run (which includes duration from backend)
+      const { runs, sessionStatsCache: oldCache } = get();
+      const sessionRuns = runs.get(session.id) || [];
+
+      const updatedSessionRuns = sessionRuns.map((r) => (r.id === run.id ? run : r));
+      const updatedRuns = new Map(runs);
+      updatedRuns.set(session.id, updatedSessionRuns);
+
+      // Invalidate stats cache since run data changed
+      const newCache = new Map(oldCache);
+      newCache.delete(session.id);
+
+      set({
+        activeRun: null,
+        activeSession: session,
+        isPaused: false,
+        runs: updatedRuns,
+        sessionStatsCache: newCache,
+      });
+
+      // Reload session runs from database to ensure we have the latest data
+      // This is important because the database is the source of truth
+      try {
+        const freshRuns = await window.electronAPI?.runTracker.getRunsBySession(session.id);
+        if (freshRuns) {
+          const { runs: currentRuns, sessionStatsCache: currentCache } = get();
+          const refreshedRuns = new Map(currentRuns);
+          refreshedRuns.set(session.id, freshRuns);
+          const refreshedCache = new Map(currentCache);
+          refreshedCache.delete(session.id);
+          set({ runs: refreshedRuns, sessionStatsCache: refreshedCache });
+        }
+      } catch (error) {
+        console.error('[RunTrackerStore] Failed to reload runs after run ended:', error);
+      }
     },
 
-    handleRunPaused: () => {
-      set({ isPaused: true });
+    handleRunPaused: (session) => {
+      set({ activeSession: session, isPaused: true });
       console.log('[RunTrackerStore] Run paused event');
     },
 
-    handleRunResumed: () => {
-      set({ isPaused: false });
+    handleRunResumed: (session) => {
+      set({ activeSession: session, isPaused: false });
       console.log('[RunTrackerStore] Run resumed event');
     },
 

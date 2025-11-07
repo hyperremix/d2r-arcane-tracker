@@ -2,7 +2,7 @@ import { createRequire } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { app, BrowserWindow, type IpcMainEvent, ipcMain, screen, session } from 'electron';
-import { GrailDatabase, grailDatabase } from './database/database';
+import { grailDatabase } from './database/database';
 import { initializeDialogHandlers } from './ipc-handlers/dialogHandlers';
 import { closeGrailDatabase, initializeGrailHandlers } from './ipc-handlers/grailHandlers';
 import { initializeIconHandlers } from './ipc-handlers/iconHandlers';
@@ -104,8 +104,7 @@ function createWindow() {
     y: undefined as number | undefined,
   };
   try {
-    const db = new GrailDatabase();
-    const settings = db.getAllSettings();
+    const settings = grailDatabase.getAllSettings();
 
     if (settings.mainWindowBounds) {
       const { x, y, width, height } = settings.mainWindowBounds;
@@ -267,7 +266,7 @@ app.whenReady().then(() => {
 
   // Initialize widget handlers with callbacks for position and size updates
   const onWidgetPositionChange = (position: { x: number; y: number }) => {
-    // Save widget position to database
+    // Save widget position to database using singleton
     try {
       grailDatabase.setSetting('widgetPosition', JSON.stringify(position));
     } catch (error) {
@@ -279,7 +278,7 @@ app.whenReady().then(() => {
   let widgetSizeChangeTimeout: NodeJS.Timeout | null = null;
 
   const onWidgetSizeChange = (
-    display: 'overall' | 'split' | 'all',
+    display: 'overall' | 'split' | 'all' | 'run-only',
     size: { width: number; height: number },
   ) => {
     // Debounce widget size changes to avoid excessive database writes during resize
@@ -289,7 +288,13 @@ app.whenReady().then(() => {
 
     widgetSizeChangeTimeout = setTimeout(() => {
       try {
-        const settingKey = `widgetSize${display.charAt(0).toUpperCase()}${display.slice(1)}` as
+        // 'run-only' mode doesn't have a custom size setting - it always uses the default
+        if (display === 'run-only') {
+          return;
+        }
+        // Convert display type to setting key format
+        const displayKey = display.charAt(0).toUpperCase() + display.slice(1);
+        const settingKey = `widgetSize${displayKey}` as
           | 'widgetSizeOverall'
           | 'widgetSizeSplit'
           | 'widgetSizeAll';
@@ -343,8 +348,7 @@ app.whenReady().then(() => {
 
   // Initialize widget window if enabled in settings
   try {
-    const db = new GrailDatabase();
-    const settings = db.getAllSettings();
+    const settings = grailDatabase.getAllSettings();
     if (settings.widgetEnabled) {
       showWidgetWindow(
         settings,

@@ -85,7 +85,7 @@ export class ProcessMonitor {
       if (processId !== null && this.d2rProcessId === null) {
         // Process just started
         this.d2rProcessId = processId;
-        console.log(`[ProcessMonitor] D2R process detected: PID ${processId}`);
+        console.log(`[ProcessMonitor] D2R.exe detected (PID ${processId})`);
         this.eventBus.emit('d2r-started', {
           processId,
           processName: this.processName,
@@ -94,7 +94,7 @@ export class ProcessMonitor {
         // Process just stopped
         const oldProcessId = this.d2rProcessId;
         this.d2rProcessId = null;
-        console.log(`[ProcessMonitor] D2R process stopped: PID ${oldProcessId}`);
+        console.log(`[ProcessMonitor] D2R.exe stopped (PID ${oldProcessId})`);
         this.eventBus.emit('d2r-stopped', {
           processId: null,
           processName: this.processName,
@@ -114,11 +114,10 @@ export class ProcessMonitor {
     try {
       // Use tasklist command to find D2R.exe process
       // Format: tasklist /FI "IMAGENAME eq D2R.exe" /FO CSV /NH
-      const { stdout } = await execAsync(
-        `tasklist /FI "IMAGENAME eq ${this.processName}" /FO CSV /NH`,
-      );
+      const command = `tasklist /FI "IMAGENAME eq ${this.processName}" /FO CSV /NH`;
+      const { stdout } = await execAsync(command);
 
-      if (!stdout || stdout.trim() === '') {
+      if (!stdout || stdout.trim() === '' || stdout.includes('No tasks')) {
         return null;
       }
 

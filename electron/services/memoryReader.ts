@@ -1,62 +1,66 @@
 import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
 import { ffi, Kernel32 } from 'win32-api';
-import { areOffsetsValid, D2RGameState, getOffsetsForVersion } from '../config/d2rOffsets';
+import { D2R_PATTERNS, D2RGameState, OFFSET_ADJUSTMENTS } from '../config/d2rPatterns';
 import type { EventBus } from './EventBus';
+import { findPatternString, readBytesFromBuffer } from './patternScanner';
 import type { ProcessMonitor } from './processMonitor';
 
 const execAsync = promisify(exec);
 
 /**
- * Detects the version of D2R.exe by reading file version information.
- * @param processId - Process ID of D2R.exe
- * @returns Version string or 'unknown' if detection fails
+ * Checks if a memory region is readable.
+ * @param state - Memory state from MEMORY_BASIC_INFORMATION
+ * @param protect - Memory protection flags from MEMORY_BASIC_INFORMATION
+ * @returns True if the region is readable, false otherwise
  */
-async function detectD2RVersion(processId: number): Promise<string> {
-  if (process.platform !== 'win32') {
-    return 'unknown';
+function isMemoryRegionReadable(state: number, protect: number): boolean {
+  const isCommitted = state === MEM_COMMIT;
+  const isReadable =
+    (protect & PAGE_READONLY) !== 0 ||
+    (protect & PAGE_READWRITE) !== 0 ||
+    (protect & PAGE_WRITECOPY) !== 0 ||
+    (protect & PAGE_EXECUTE_READ) !== 0 ||
+    (protect & PAGE_EXECUTE_READWRITE) !== 0 ||
+    (protect & PAGE_EXECUTE_WRITECOPY) !== 0;
+  const hasGuard = (protect & PAGE_GUARD) !== 0;
+
+  return isCommitted && isReadable && !hasGuard;
+}
+
+/**
+ * Queries a memory region using VirtualQueryEx.
+ * @param k32 - Extended kernel32 API
+ * @param handle - Process handle
+ * @param address - Address to query
+ * @returns Object with region info or null if query failed
+ */
+function queryMemoryRegion(
+  k32: ExtendedKernel32,
+  handle: number,
+  address: number,
+): { regionSize: number; state: number; protect: number } | null {
+  // MEMORY_BASIC_INFORMATION structure (x64):
+  // BaseAddress       0-7   (PVOID - 8 bytes)
+  // AllocationBase    8-15  (PVOID - 8 bytes)
+  // AllocationProtect 16-19 (DWORD - 4 bytes)
+  // <padding>         20-23 (4 bytes alignment)
+  // RegionSize        24-31 (SIZE_T - 8 bytes)
+  // State             32-35 (DWORD - 4 bytes)
+  // Protect           36-39 (DWORD - 4 bytes)
+  // Type              40-43 (DWORD - 4 bytes)
+  const mbiBuffer = Buffer.alloc(48);
+  const bytesReturned = k32.VirtualQueryEx(handle, address, mbiBuffer, 48);
+
+  if (bytesReturned === 0) {
+    return null;
   }
 
-  try {
-    // Get process executable path
-    const { stdout } = await execAsync(
-      `wmic process where "ProcessId=${processId}" get ExecutablePath /format:value`,
-    );
-
-    const match = stdout.match(/ExecutablePath=(.+)/);
-    if (!match || !match[1]) {
-      console.warn('[MemoryReader] Could not find D2R.exe path');
-      return 'unknown';
-    }
-
-    const exePath = match[1].trim();
-    if (!exePath.toLowerCase().endsWith('d2r.exe')) {
-      console.warn('[MemoryReader] Process executable is not D2R.exe');
-      return 'unknown';
-    }
-
-    // Read file version using PowerShell
-    const psScript = `
-      $file = Get-Item '${exePath.replace(/'/g, "''")}'
-      $version = $file.VersionInfo
-      Write-Output "$($version.FileMajorPart).$($version.FileMinorPart).$($version.FileBuildPart).$($version.FilePrivatePart)"
-    `;
-
-    const { stdout: versionOutput } = await execAsync(
-      `powershell -Command "${psScript.replace(/\n/g, '; ')}"`,
-    );
-
-    if (versionOutput?.trim()) {
-      const version = versionOutput.trim();
-      console.log(`[MemoryReader] Detected D2R version: ${version}`);
-      return version;
-    }
-
-    return 'unknown';
-  } catch (error) {
-    console.error('[MemoryReader] Error detecting D2R version:', error);
-    return 'unknown';
-  }
+  return {
+    regionSize: Number(mbiBuffer.readBigUInt64LE(24)), // RegionSize at offset 24
+    state: mbiBuffer.readUInt32LE(32), // State at offset 32
+    protect: mbiBuffer.readUInt32LE(36), // Protect at offset 36
+  };
 }
 
 /**
@@ -64,6 +68,18 @@ async function detectD2RVersion(processId: number): Promise<string> {
  */
 const PROCESS_VM_READ = 0x0010;
 const PROCESS_QUERY_INFORMATION = 0x0400;
+
+// Memory protection constants
+const PAGE_READONLY = 0x02;
+const PAGE_READWRITE = 0x04;
+const PAGE_WRITECOPY = 0x08;
+const PAGE_EXECUTE_READ = 0x20;
+const PAGE_EXECUTE_READWRITE = 0x40;
+const PAGE_EXECUTE_WRITECOPY = 0x80;
+const PAGE_GUARD = 0x100;
+
+// Memory state constants
+const MEM_COMMIT = 0x1000;
 
 // Additional kernel32 functions not in default win32-api set
 interface ExtendedKernel32 extends ReturnType<typeof Kernel32.load> {
@@ -75,6 +91,12 @@ interface ExtendedKernel32 extends ReturnType<typeof Kernel32.load> {
     nSize: number,
     lpNumberOfBytesRead: Buffer,
   ) => number; // Returns BOOL (0 or 1)
+  VirtualQueryEx: (
+    hProcess: number,
+    lpAddress: number,
+    lpBuffer: Buffer,
+    dwLength: number,
+  ) => number; // Returns number of bytes written to buffer
 }
 
 let extendedKernel32: ExtendedKernel32 | null = null;
@@ -92,14 +114,21 @@ function getKernel32(): ExtendedKernel32 | null {
 
       // Load kernel32.dll for additional functions using koffi
       // koffi.load() is used to load DLL and get function pointers
+      // Note: On x64, HANDLE and pointers are 64-bit, so we use int64
       const kernel32Lib = ffi.load('kernel32.dll');
-      const CloseHandleFn = kernel32Lib.func('CloseHandle', 'bool', ['long']);
+      const CloseHandleFn = kernel32Lib.func('CloseHandle', 'bool', ['int64']);
       const ReadProcessMemoryFn = kernel32Lib.func('ReadProcessMemory', 'bool', [
-        'long',
-        'long',
-        'pointer',
-        'ulong',
-        'pointer',
+        'int64', // hProcess (HANDLE)
+        'int64', // lpBaseAddress (LPCVOID)
+        'void*', // lpBuffer
+        'uint64', // nSize (SIZE_T)
+        'void*', // lpNumberOfBytesRead
+      ]);
+      const VirtualQueryExFn = kernel32Lib.func('VirtualQueryEx', 'uint64', [
+        'int64', // hProcess (HANDLE)
+        'int64', // lpAddress (LPCVOID)
+        'void*', // lpBuffer (PMEMORY_BASIC_INFORMATION)
+        'uint64', // dwLength (SIZE_T)
       ]);
 
       // Combine base functions with additional ones
@@ -124,6 +153,14 @@ function getKernel32(): ExtendedKernel32 | null {
             lpNumberOfBytesRead,
           );
           return result ? 1 : 0;
+        },
+        VirtualQueryEx: (
+          hProcess: number,
+          lpAddress: number,
+          lpBuffer: Buffer,
+          dwLength: number,
+        ) => {
+          return VirtualQueryExFn(hProcess, lpAddress, lpBuffer, dwLength);
         },
       } as ExtendedKernel32;
 
@@ -197,6 +234,16 @@ interface WindowsMemoryReader {
    * @returns Number value or null on failure
    */
   readInt64(handle: number, address: number): Promise<number | null>;
+
+  /**
+   * Reads a large region of process memory for pattern scanning.
+   * Reads the .text section (executable code) of the module.
+   * @param handle - Process handle
+   * @param baseAddress - Module base address (as hex string)
+   * @param size - Size of memory region to read (default: 20MB)
+   * @returns Buffer with memory contents or null on failure
+   */
+  readProcessMemory(handle: number, baseAddress: string, size?: number): Promise<Buffer | null>;
 }
 
 /**
@@ -465,64 +512,108 @@ class WindowsMemoryReaderImpl implements WindowsMemoryReader {
     }
     return buffer.subarray(0, nullIndex).toString('utf8');
   }
+
+  /**
+   * Reads a large region of process memory for pattern scanning.
+   * Uses VirtualQueryEx to enumerate readable memory regions.
+   * @param handle - Process handle
+   * @param baseAddress - Module base address (as hex string)
+   * @param maxSize - Maximum size to scan (default: 20MB for D2R .text section)
+   * @returns Buffer with memory contents or null on failure
+   */
+  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Memory enumeration requires multiple checks
+  async readProcessMemory(
+    handle: number,
+    baseAddress: string,
+    maxSize = 20 * 1024 * 1024,
+  ): Promise<Buffer | null> {
+    if (process.platform !== 'win32') {
+      return null;
+    }
+
+    const k32 = getKernel32();
+    if (!k32) {
+      return null;
+    }
+
+    try {
+      const baseAddr = Number.parseInt(baseAddress, 16);
+      if (Number.isNaN(baseAddr)) {
+        console.error('[MemoryReader] Invalid base address for memory reading');
+        return null;
+      }
+
+      const chunks: Buffer[] = [];
+      let currentAddress = baseAddr;
+      const endAddress = baseAddr + maxSize;
+      let totalRead = 0;
+
+      // Enumerate and read committed, readable memory regions
+      while (currentAddress < endAddress) {
+        const regionInfo = queryMemoryRegion(k32, handle, currentAddress);
+
+        if (!regionInfo) {
+          // Failed to query memory, stop scanning
+          break;
+        }
+
+        // Check if region is committed and readable
+        if (isMemoryRegionReadable(regionInfo.state, regionInfo.protect)) {
+          // Read this region
+          const readSize = Math.min(regionInfo.regionSize, endAddress - currentAddress);
+          const chunk = await this.readMemory(handle, currentAddress, readSize);
+
+          if (chunk && chunk.length > 0) {
+            chunks.push(chunk);
+            totalRead += chunk.length;
+          }
+        }
+
+        // Move to next region
+        currentAddress += regionInfo.regionSize;
+
+        // Safety check: don't scan forever
+        if (totalRead > maxSize || chunks.length > 1000) {
+          break;
+        }
+      }
+
+      if (chunks.length === 0) {
+        console.error('[MemoryReader] No readable memory regions found');
+        return null;
+      }
+
+      // Concatenate all chunks into single buffer
+      const result = Buffer.concat(chunks, totalRead);
+      console.log(`[MemoryReader] Read ${totalRead} bytes from ${chunks.length} memory regions`);
+      return result;
+    } catch (error) {
+      console.error('[MemoryReader] Error reading process memory:', error);
+      return null;
+    }
+  }
 }
 
 /**
  * Memory addresses and offsets for D2R game state detection.
- * Uses pointer chain architecture: P_0 + P_1 → read QWORD → A_2 + P_2 + P_3 → read DWORD → Game State
+ * Uses UI offset for simple byte read game state detection.
  *
- * Architecture:
- * - P_0: Base address of D2R.exe module (detected at runtime)
- * - P_1: Volatile RVA (changes with patches) - version-specific
- * - P_2: Structural offset 1 (stable)
- * - P_3: Structural offset 2 (stable)
- *
- * See docs/EXTRACT_D2GO_ADDRESSES.md for instructions on extracting these values.
+ * From d2go game_reader.go line 327:
+ * IsIngame() reads 1 byte at: moduleBase + UI - 0xA
+ * Returns: 1 = in-game, 0 = lobby
  */
 interface D2RMemoryAddresses {
   /**
-   * Base address of D2R.exe module (P_0)
+   * Base address of D2R.exe module
    * This will be determined dynamically by finding the module base address
    */
   baseAddress: string | null;
 
   /**
-   * P_1: Volatile RVA (Relative Virtual Address)
-   * Version-specific offset that changes with D2R patches
+   * UI offset (calculated using pattern matching)
+   * Used to read game state byte at: moduleBase + UI - 0xA
    */
-  p1: number;
-
-  /**
-   * P_2: Structural offset 1 (stable across patches)
-   */
-  p2: number;
-
-  /**
-   * P_3: Structural offset 2 (stable across patches)
-   */
-  p3: number;
-
-  /**
-   * Game version string for validation and offset lookup
-   */
-  gameVersion: string;
-
-  /**
-   * Whether offsets are valid (not placeholder zeros)
-   */
-  offsetsValid: boolean;
-
-  /**
-   * Offset to current game name/ID (for future use)
-   * String containing the game name
-   */
-  gameIdOffset: string;
-
-  /**
-   * Offset to character name (for future use)
-   * String containing the current character name
-   */
-  characterNameOffset: string;
+  uiOffset: number;
 }
 
 /**
@@ -550,16 +641,10 @@ export class MemoryReader {
     _processMonitor: ProcessMonitor, // Reserved for future use
   ) {
     this.memoryReader = new WindowsMemoryReaderImpl();
-    // Initialize with placeholder addresses - will be updated when process starts
+    // Initialize with placeholder - UI offset will be calculated using pattern matching
     this.addresses = {
       baseAddress: null,
-      p1: 0x0, // Will be loaded from offset map based on version
-      p2: 0x0, // Will be loaded from offset map
-      p3: 0x0, // Will be loaded from offset map
-      gameVersion: 'unknown',
-      offsetsValid: false,
-      gameIdOffset: '0x0', // TODO: Extract from d2go's pkg/memory
-      characterNameOffset: '0x0', // TODO: Extract from d2go's pkg/memory
+      uiOffset: 0x0, // Will be calculated using pattern matching
     };
 
     // Listen for process start/stop events
@@ -570,8 +655,6 @@ export class MemoryReader {
     this.eventBus.on('d2r-stopped', () => {
       this.handleProcessStopped();
     });
-
-    console.log('[MemoryReader] Initialized');
   }
 
   /**
@@ -596,17 +679,17 @@ export class MemoryReader {
     }
 
     if (process.platform !== 'win32') {
-      console.log('[MemoryReader] Platform not supported, skipping memory reading');
       return;
     }
 
     if (!this.processId || !this.processHandle) {
-      console.log('[MemoryReader] No process handle available, cannot start polling');
       return;
     }
 
     this.isPolling = true;
-    console.log(`[MemoryReader] Starting memory polling (interval: ${this.pollingIntervalMs}ms)`);
+    console.log(
+      `[MemoryReader] Memory polling started (${this.pollingIntervalMs}ms interval, offsets valid: ${this.offsetsValid})`,
+    );
 
     // Poll immediately
     this.pollMemory();
@@ -640,22 +723,27 @@ export class MemoryReader {
    * @private
    */
   private async handleProcessStarted(processId: number): Promise<void> {
-    console.log(`[MemoryReader] D2R process started: PID ${processId}`);
     this.processId = processId;
 
     // Try to open process handle
     const handle = await this.memoryReader.openProcess(processId);
     if (handle) {
       this.processHandle = handle;
-      console.log('[MemoryReader] Process handle opened successfully');
+      console.log(`[MemoryReader] Process handle opened for PID ${processId}`);
 
       // Find base address and initialize memory addresses
       await this.initializeMemoryAddresses();
 
-      // Start polling if enabled
-      // Note: Will be started by RunTrackerService when memory reading is enabled
+      // Automatically start polling now that we have a process handle
+      // RunTrackerService may have already tried to start polling earlier (when there was no handle)
+      // so we need to start it here now that we're ready
+      if (this.offsetsValid) {
+        this.startPolling();
+      } else {
+        console.warn('[MemoryReader] Invalid offsets - memory polling disabled');
+      }
     } else {
-      console.error('[MemoryReader] Failed to open process handle');
+      console.error(`[MemoryReader] Failed to open process handle for PID ${processId}`);
       this.processHandle = null;
     }
   }
@@ -665,8 +753,6 @@ export class MemoryReader {
    * @private
    */
   private async handleProcessStopped(): Promise<void> {
-    console.log('[MemoryReader] D2R process stopped');
-
     this.stopPolling();
 
     if (this.processHandle) {
@@ -679,12 +765,12 @@ export class MemoryReader {
   }
 
   /**
-   * Initializes memory addresses by finding the base address and loading version-specific offsets.
-   * Based on pointer chain architecture from ResurrectedTrade and d2go.
+   * Initializes memory addresses by finding the base address and calculating offsets using pattern matching.
+   * Based on d2go's dynamic offset calculation approach.
    * @private
    */
   private async initializeMemoryAddresses(): Promise<void> {
-    if (!this.processId) {
+    if (!this.processId || !this.processHandle) {
       return;
     }
 
@@ -699,45 +785,108 @@ export class MemoryReader {
       this.addresses.baseAddress = baseAddress;
       console.log(`[MemoryReader] Found D2R.exe base address: 0x${baseAddress}`);
 
-      // Detect D2R version
-      const version = await detectD2RVersion(this.processId);
-      this.addresses.gameVersion = version;
-
-      // Lookup offsets for this version
-      const offsets = getOffsetsForVersion(version);
-      this.addresses.p1 = offsets.p1;
-      this.addresses.p2 = offsets.p2;
-      this.addresses.p3 = offsets.p3;
-      this.addresses.offsetsValid = areOffsetsValid(offsets);
-      this.offsetsValid = this.addresses.offsetsValid;
-
-      if (!this.addresses.offsetsValid) {
-        console.error(
-          `[MemoryReader] Invalid offsets for version ${version}. Memory reading disabled.`,
-        );
-        console.error(
-          '[MemoryReader] Offsets need to be extracted from d2go or ResurrectedTrade repositories.',
-        );
-        console.error(
-          '[MemoryReader] Falling back to save file monitoring. See docs/MEMORY_OFFSETS.md',
-        );
-        // Disable memory reading - RunTrackerService will handle fallback
+      // Calculate offsets using pattern matching
+      const success = await this.calculateOffsets();
+      if (!success) {
+        console.error('[MemoryReader] Failed to calculate offsets using pattern matching');
+        console.error('[MemoryReader] Memory reading disabled');
+        this.offsetsValid = false;
         return;
       }
 
+      this.offsetsValid = true;
       console.log(
-        `[MemoryReader] Loaded offsets for version ${version}: P_1=0x${offsets.p1.toString(16)}, P_2=0x${offsets.p2.toString(16)}, P_3=0x${offsets.p3.toString(16)}`,
+        `[MemoryReader] Successfully calculated UI offset: 0x${this.addresses.uiOffset.toString(16)}`,
       );
     } catch (error) {
       console.error('[MemoryReader] Error initializing memory addresses:', error);
-      this.addresses.offsetsValid = false;
       this.offsetsValid = false;
     }
   }
 
   /**
+   * Calculates memory offsets dynamically using pattern matching.
+   * Ported from d2go's calculateOffsets function.
+   *
+   * From d2go offset.go lines 41-44:
+   * ```go
+   * pattern = process.FindPattern(memory, "\x40\x84\xed\x0f\x94\x05", "xxxxxx")
+   * uiOffset := process.ReadUInt(pattern+6, Uint32)
+   * uiOffsetPtr := (pattern - process.moduleBaseAddressPtr) + 10 + uintptr(uiOffset)
+   * ```
+   *
+   * @returns True if offsets were successfully calculated, false otherwise
+   * @private
+   */
+  private async calculateOffsets(): Promise<boolean> {
+    if (!this.processHandle || !this.addresses.baseAddress) {
+      return false;
+    }
+
+    try {
+      // Read process memory for pattern scanning
+      console.log('[MemoryReader] Reading process memory for pattern scanning...');
+      const memory = await this.memoryReader.readProcessMemory(
+        this.processHandle,
+        this.addresses.baseAddress,
+      );
+
+      if (!memory) {
+        console.error('[MemoryReader] Failed to read process memory');
+        return false;
+      }
+
+      // Find UI pattern
+      const pattern = D2R_PATTERNS.UI;
+      console.log(`[MemoryReader] Scanning for ${pattern.name} pattern...`);
+
+      const patternOffset = findPatternString(memory, pattern.pattern, pattern.mask);
+
+      if (patternOffset === -1) {
+        console.error(`[MemoryReader] ${pattern.name} pattern not found in memory`);
+        return false;
+      }
+
+      console.log(
+        `[MemoryReader] Found ${pattern.name} pattern at offset 0x${patternOffset.toString(16)}`,
+      );
+
+      // Read uint32 value at pattern + 6 (from d2go line 43)
+      const bytes = readBytesFromBuffer(
+        memory,
+        patternOffset + OFFSET_ADJUSTMENTS.UI_READ_OFFSET,
+        4,
+      );
+
+      if (!bytes) {
+        console.error('[MemoryReader] Failed to read bytes from pattern offset');
+        return false;
+      }
+
+      const offsetInt = bytes.readUInt32LE(0);
+
+      // Calculate UI offset (from d2go line 44)
+      // uiOffsetPtr = (pattern - moduleBase) + 10 + offsetInt
+      // Since our patternOffset is already relative to moduleBase:
+      // uiOffsetPtr = patternOffset + 10 + offsetInt
+      const uiOffset = patternOffset + OFFSET_ADJUSTMENTS.UI_INSTRUCTION_OFFSET + offsetInt;
+
+      this.addresses.uiOffset = uiOffset;
+
+      console.log(
+        `[MemoryReader] Calculated UI offset: 0x${uiOffset.toString(16)} (pattern at 0x${patternOffset.toString(16)} + ${OFFSET_ADJUSTMENTS.UI_INSTRUCTION_OFFSET} + 0x${offsetInt.toString(16)})`,
+      );
+
+      return true;
+    } catch (error) {
+      console.error('[MemoryReader] Error calculating offsets:', error);
+      return false;
+    }
+  }
+
+  /**
    * Polls memory for game state changes and emits events.
-   * Detects state transitions: 0x00 → 0x02 (Run Started), 0x02 → 0x00 (Run Ended)
+   * Detects state transitions: 0 → 1 (Run Started), 1 → 0 (Run Ended)
    * @private
    */
   private async pollMemory(): Promise<void> {
@@ -758,22 +907,12 @@ export class MemoryReader {
 
       if (currentState === D2RGameState.InGame && previousState !== D2RGameState.InGame) {
         // Transition: Lobby → InGame (Run Started)
-        const gameId = await this.getGameId();
-        const characterName = await this.getCharacterName();
-
-        console.log('[MemoryReader] Game entered detected (0x00 → 0x02)');
-        this.eventBus.emit('game-entered', {
-          gameId: gameId || undefined,
-          characterId: characterName || undefined,
-        });
+        console.log(`[MemoryReader] ✓ Game entered (state: 0 → 1)`);
+        this.eventBus.emit('game-entered', {});
       } else if (currentState === D2RGameState.Lobby && previousState === D2RGameState.InGame) {
         // Transition: InGame → Lobby (Run Ended)
-        const characterName = await this.getCharacterName();
-
-        console.log('[MemoryReader] Game exited detected (0x02 → 0x00)');
-        this.eventBus.emit('game-exited', {
-          characterId: characterName || undefined,
-        });
+        console.log(`[MemoryReader] ✓ Game exited (state: 1 → 0)`);
+        this.eventBus.emit('game-exited', {});
       }
 
       this.lastGameState = currentState;
@@ -783,10 +922,15 @@ export class MemoryReader {
   }
 
   /**
-   * Reads the game state from memory using the 3-level pointer chain architecture.
-   * Architecture: P_0 + P_1 → read QWORD → A_2 + P_2 + P_3 → read DWORD → Game State
+   * Reads the game state from memory using UI offset byte read.
+   * From d2go game_reader.go line 327:
+   * ```go
+   * func (gd *GameReader) IsIngame() bool {
+   *     return gd.ReadUInt(gd.Process.moduleBaseAddressPtr+gd.offset.UI-0xA, 1) == 1
+   * }
+   * ```
    *
-   * @returns Game state value (0x00 = Lobby, 0x02 = InGame) or null on error
+   * @returns Game state value (0 = Lobby, 1 = InGame) or null on error
    */
   async readGameState(): Promise<D2RGameState | null> {
     if (!this.processHandle || !this.addresses.baseAddress || !this.offsetsValid) {
@@ -794,27 +938,34 @@ export class MemoryReader {
     }
 
     try {
-      // Resolve pointer chain to get final address
-      const finalAddress = await this.resolvePointerChain();
-      if (finalAddress === 0) {
+      // Calculate address: moduleBase + UI - 0xA
+      const baseAddress = Number.parseInt(this.addresses.baseAddress, 16);
+      if (Number.isNaN(baseAddress)) {
+        console.error('[MemoryReader] Invalid base address');
         return null;
       }
 
-      // Read DWORD (4 bytes) at final address to get game state
-      const stateValue = await this.memoryReader.readInt32(this.processHandle, finalAddress);
-      if (stateValue === null) {
+      const stateAddress =
+        baseAddress + this.addresses.uiOffset - OFFSET_ADJUSTMENTS.UI_STATE_ADJUSTMENT;
+
+      // Read 1 byte at the state address
+      const buffer = await this.memoryReader.readMemory(this.processHandle, stateAddress, 1);
+      if (!buffer || buffer.length === 0) {
         return null;
       }
 
-      // Map state value to enum
-      if (stateValue === D2RGameState.InGame) {
+      const stateValue = buffer[0];
+
+      // Map state value: 1 = in-game, 0 = lobby
+      if (stateValue === 1) {
         return D2RGameState.InGame;
-      } else if (stateValue === D2RGameState.Lobby) {
+      }
+      if (stateValue === 0) {
         return D2RGameState.Lobby;
       }
 
       // Unknown state value - log for debugging
-      console.warn(`[MemoryReader] Unknown game state value: 0x${stateValue.toString(16)}`);
+      console.warn(`[MemoryReader] Unknown game state value: ${stateValue}`);
       return D2RGameState.Lobby; // Default to Lobby for safety
     } catch (error) {
       console.error('[MemoryReader] Error reading game state:', error);
@@ -825,7 +976,7 @@ export class MemoryReader {
   /**
    * Reads the in-game state from memory.
    * Wrapper around readGameState() for backward compatibility.
-   * @returns True if in game (0x02), false if in lobby (0x00), null on error
+   * @returns True if in game (1), false if in lobby (0), null on error
    */
   async isInGame(): Promise<boolean | null> {
     const state = await this.readGameState();
@@ -833,129 +984,6 @@ export class MemoryReader {
       return null;
     }
     return state === D2RGameState.InGame;
-  }
-
-  /**
-   * Gets the current game ID/name from memory.
-   * @returns Game ID string or null on error
-   */
-  async getGameId(): Promise<string | null> {
-    if (!this.processHandle || !this.addresses.baseAddress) {
-      return null;
-    }
-
-    try {
-      const address = this.calculateAddress(this.addresses.gameIdOffset);
-      if (address === 0) {
-        return null;
-      }
-
-      return await this.memoryReader.readString(this.processHandle, address, 64);
-    } catch (error) {
-      console.error('[MemoryReader] Error reading game ID:', error);
-      return null;
-    }
-  }
-
-  /**
-   * Gets the current character name from memory.
-   * @returns Character name string or null on error
-   */
-  async getCharacterName(): Promise<string | null> {
-    if (!this.processHandle || !this.addresses.baseAddress) {
-      return null;
-    }
-
-    try {
-      const address = this.calculateAddress(this.addresses.characterNameOffset);
-      if (address === 0) {
-        return null;
-      }
-
-      return await this.memoryReader.readString(this.processHandle, address, 32);
-    } catch (error) {
-      console.error('[MemoryReader] Error reading character name:', error);
-      return null;
-    }
-  }
-
-  /**
-   * Resolves the 3-level pointer chain to get the final address for game state reading.
-   * Architecture: P_0 + P_1 → read QWORD → A_2 + P_2 + P_3 → final address
-   *
-   * Steps:
-   * 1. Calculate A_1 = P_0 (base address) + P_1 (volatile RVA)
-   * 2. Read QWORD (8 bytes) at A_1 to get A_2 (Global Game Context Pointer)
-   * 3. NULL check: If A_2 is 0x00, return 0 (Game Ended)
-   * 4. Calculate final address = A_2 + P_2 + P_3
-   *
-   * @returns Final memory address for game state reading, or 0 on error/NULL pointer
-   * @private
-   */
-  private async resolvePointerChain(): Promise<number> {
-    if (!this.processHandle || !this.addresses.baseAddress) {
-      return 0;
-    }
-
-    try {
-      // Step 1: Calculate A_1 = P_0 + P_1
-      const baseAddress = Number.parseInt(this.addresses.baseAddress, 16);
-      if (Number.isNaN(baseAddress)) {
-        console.error('[MemoryReader] Invalid base address');
-        return 0;
-      }
-
-      const a1 = baseAddress + this.addresses.p1;
-
-      // Step 2: Read QWORD (8 bytes) at A_1 to get A_2 (Global Game Context Pointer)
-      const a2 = await this.memoryReader.readInt64(this.processHandle, a1);
-      if (a2 === null) {
-        console.warn('[MemoryReader] Failed to read QWORD at A_1');
-        return 0;
-      }
-
-      // Step 3: NULL check - if A_2 is 0x00, Game Ended state
-      if (a2 === 0x00 || a2 === 0) {
-        // Game Context Pointer is NULL - player is not in game
-        return 0;
-      }
-
-      // Step 4: Calculate final address = A_2 + P_2 + P_3
-      const finalAddress = a2 + this.addresses.p2 + this.addresses.p3;
-
-      return finalAddress;
-    } catch (error) {
-      console.error('[MemoryReader] Error resolving pointer chain:', error);
-      return 0;
-    }
-  }
-
-  /**
-   * Calculates full memory address from base address and offset.
-   * @private
-   */
-  private calculateAddress(offset: string): number {
-    if (!this.addresses.baseAddress) {
-      return 0;
-    }
-
-    const base = Number.parseInt(this.addresses.baseAddress, 16);
-    const off = Number.parseInt(offset, 16);
-
-    if (Number.isNaN(base) || Number.isNaN(off)) {
-      return 0;
-    }
-
-    return base + off;
-  }
-
-  /**
-   * Updates memory addresses from external source (e.g., extracted from d2go).
-   * @param addresses - New memory addresses configuration
-   */
-  updateMemoryAddresses(addresses: Partial<D2RMemoryAddresses>): void {
-    this.addresses = { ...this.addresses, ...addresses };
-    console.log('[MemoryReader] Memory addresses updated:', addresses);
   }
 
   /**

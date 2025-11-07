@@ -130,14 +130,20 @@ export function WidgetContainer() {
 
   // Listen for run tracker events for real-time updates
   useEffect(() => {
-    const handleRunStarted = (_event: Electron.IpcRendererEvent, run: Run) => {
-      console.log('[WidgetContainer] Run started:', run.id);
-      storeHandleRunStarted(run);
+    const handleRunStarted = (
+      _event: Electron.IpcRendererEvent,
+      payload: { run: Run; session: Session; manual: boolean },
+    ) => {
+      console.log('[WidgetContainer] Run started:', payload.run.id);
+      storeHandleRunStarted(payload.run, payload.session);
     };
 
-    const handleRunEnded = () => {
+    const handleRunEnded = (
+      _event: Electron.IpcRendererEvent,
+      payload: { run: Run; session: Session; manual: boolean },
+    ) => {
       console.log('[WidgetContainer] Run ended');
-      storeHandleRunEnded();
+      storeHandleRunEnded(payload.run, payload.session);
     };
 
     const handleSessionStarted = (_event: Electron.IpcRendererEvent, session: Session) => {

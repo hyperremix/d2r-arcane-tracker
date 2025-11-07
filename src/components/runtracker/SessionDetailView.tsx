@@ -49,10 +49,11 @@ export function SessionDetailView({ sessionId, onBack }: SessionDetailViewProps)
   }, [activeSession?.id, sessionId]);
 
   // Get session stats
+  // biome-ignore lint/correctness/useExhaustiveDependencies: runs is needed to trigger recalculation when run data changes
   const sessionStats = useMemo(() => {
     if (!session) return null;
     return getSessionStats(session.id);
-  }, [session, getSessionStats]);
+  }, [session?.id, runs, getSessionStats]);
 
   // Get runs for this session
   const sessionRuns = useMemo(() => {

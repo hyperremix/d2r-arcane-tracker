@@ -1229,9 +1229,20 @@ class GrailDatabase {
    * @param session - The session data to insert or update
    */
   upsertSession(session: Session): void {
+    // Use INSERT ... ON CONFLICT DO UPDATE instead of INSERT OR REPLACE
+    // to avoid triggering ON DELETE CASCADE which would delete all runs!
     const stmt = this.db.prepare(`
-      INSERT OR REPLACE INTO sessions (id, start_time, end_time, total_run_time, total_session_time, run_count, archived, notes)
+      INSERT INTO sessions (id, start_time, end_time, total_run_time, total_session_time, run_count, archived, notes)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(id) DO UPDATE SET
+        start_time = excluded.start_time,
+        end_time = excluded.end_time,
+        total_run_time = excluded.total_run_time,
+        total_session_time = excluded.total_session_time,
+        run_count = excluded.run_count,
+        archived = excluded.archived,
+        notes = excluded.notes,
+        updated_at = CURRENT_TIMESTAMP
     `);
     const mapped = mapSessionToDatabase(session);
     stmt.run(
@@ -1505,9 +1516,20 @@ class GrailDatabase {
    * @param run - The run data to insert or update
    */
   upsertRun(run: Run): void {
+    // Use INSERT ... ON CONFLICT DO UPDATE for true UPSERT behavior
     const stmt = this.db.prepare(`
-      INSERT OR REPLACE INTO runs (id, session_id, character_id, run_number, run_type, start_time, end_time, duration, area)
+      INSERT INTO runs (id, session_id, character_id, run_number, run_type, start_time, end_time, duration, area)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(id) DO UPDATE SET
+        session_id = excluded.session_id,
+        character_id = excluded.character_id,
+        run_number = excluded.run_number,
+        run_type = excluded.run_type,
+        start_time = excluded.start_time,
+        end_time = excluded.end_time,
+        duration = excluded.duration,
+        area = excluded.area,
+        updated_at = CURRENT_TIMESTAMP
     `);
     const mapped = mapRunToDatabase(run);
     stmt.run(

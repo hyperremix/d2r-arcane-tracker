@@ -57,6 +57,7 @@ export class RunTrackerService {
   private loadSettings(): void {
     try {
       const settings = this.database.getAllSettings();
+
       // Auto mode is only available on Windows with memory reading
       this.autoModeEnabled =
         settings.runTrackerMemoryReading === true && process.platform === 'win32';
@@ -173,7 +174,7 @@ export class RunTrackerService {
       }
     }
 
-    console.log('[RunTrackerService] Game entered detected, starting run');
+    console.log('[RunTrackerService] Auto-starting run');
     this.startRun(finalCharacterId, false);
   }
 
@@ -302,6 +303,9 @@ export class RunTrackerService {
     };
     this.database.upsertSession(updatedSession);
 
+    // Update the in-memory currentSession to reflect the changes
+    this.currentSession = updatedSession;
+
     this.eventBus.emit('run-started', { run, session: updatedSession, manual });
 
     console.log('[RunTrackerService] Run started:', run.id, 'manual:', manual);
@@ -334,6 +338,9 @@ export class RunTrackerService {
       lastUpdated: now,
     };
     this.database.upsertSession(session);
+
+    // Update the in-memory currentSession to reflect the changes
+    this.currentSession = session;
 
     this.eventBus.emit('run-ended', { run, session, manual });
 

@@ -84,7 +84,7 @@ export function Widget({ statistics, settings, onDragStart, onDragEnd }: WidgetP
   const backgroundColor = `rgba(0, 0, 0, ${opacity})`;
 
   // Run tracker state for run-only mode
-  const { activeRun, activeSession, getSessionStats } = useRunTrackerStore();
+  const { activeRun, activeSession, runs, getSessionStats } = useRunTrackerStore();
   const [runDuration, setRunDuration] = useState<number>(0);
 
   // Real-time timer for run duration updates
@@ -110,12 +110,13 @@ export function Widget({ statistics, settings, onDragStart, onDragEnd }: WidgetP
   }, [activeRun, displayMode]);
 
   // Calculate session statistics for run-only mode
+  // biome-ignore lint/correctness/useExhaustiveDependencies: runs is needed to trigger recalculation when run data changes
   const sessionStats = useMemo(() => {
     if (!activeSession || displayMode !== 'run-only') {
       return null;
     }
     return getSessionStats(activeSession.id);
-  }, [activeSession, displayMode, getSessionStats]);
+  }, [activeSession?.id, displayMode, runs, getSessionStats]);
 
   // Calculate container styles based on display mode
   const containerClasses = useMemo(() => {
