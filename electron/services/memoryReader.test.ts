@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { areOffsetsValid, D2RGameState, getOffsetsForVersion } from '../config/d2rOffsets';
+import { D2RGameState } from '../config/d2rPatterns';
 import { EventBus } from './EventBus';
 import { MemoryReader } from './memoryReader';
 import { ProcessMonitor } from './processMonitor';
@@ -150,26 +150,6 @@ describe('When MemoryReader is instantiated', () => {
     });
   });
 
-  describe('If getGameId is called', () => {
-    it('Then should return null when no process handle', async () => {
-      // Act
-      const result = await memoryReader.getGameId();
-
-      // Assert
-      expect(result).toBeNull();
-    });
-  });
-
-  describe('If getCharacterName is called', () => {
-    it('Then should return null when no process handle', async () => {
-      // Act
-      const result = await memoryReader.getCharacterName();
-
-      // Assert
-      expect(result).toBeNull();
-    });
-  });
-
   describe('If event bus integration works', () => {
     it('Then should listen to d2r-started events', () => {
       // Arrange
@@ -205,76 +185,14 @@ describe('When D2RGameState enum is used', () => {
   describe('If checking Lobby state', () => {
     it('Then should have correct value', () => {
       // Assert
-      expect(D2RGameState.Lobby).toBe(0x00);
+      expect(D2RGameState.Lobby).toBe(0);
     });
   });
 
   describe('If checking InGame state', () => {
     it('Then should have correct value', () => {
       // Assert
-      expect(D2RGameState.InGame).toBe(0x02);
-    });
-  });
-});
-
-describe('When offset helper functions are used', () => {
-  describe('If getOffsetsForVersion is called with known version', () => {
-    it('Then should return version-specific offsets', () => {
-      // Act
-      const offsets = getOffsetsForVersion('2.7');
-
-      // Assert
-      expect(offsets).toBeDefined();
-      expect(offsets.p1).toBe(0x23e6e0);
-      expect(offsets.p2).toBe(0x8);
-      expect(offsets.p3).toBe(0x0);
-    });
-  });
-
-  describe('If getOffsetsForVersion is called with unknown version', () => {
-    it('Then should return default offsets', () => {
-      // Act
-      const offsets = getOffsetsForVersion('99.99.99');
-
-      // Assert
-      expect(offsets).toBeDefined();
-      expect(offsets.version).toBe('2.7+');
-    });
-  });
-
-  describe('If areOffsetsValid is called with valid offsets', () => {
-    it('Then should return true', () => {
-      // Arrange
-      const offsets = {
-        p1: 0x23e6e0,
-        p2: 0x8,
-        p3: 0x0,
-        version: '2.7',
-      };
-
-      // Act
-      const result = areOffsetsValid(offsets);
-
-      // Assert
-      expect(result).toBe(true);
-    });
-  });
-
-  describe('If areOffsetsValid is called with invalid offsets', () => {
-    it('Then should return false', () => {
-      // Arrange
-      const offsets = {
-        p1: 0x0,
-        p2: 0x0,
-        p3: 0x0,
-        version: 'unknown',
-      };
-
-      // Act
-      const result = areOffsetsValid(offsets);
-
-      // Assert
-      expect(result).toBe(false);
+      expect(D2RGameState.InGame).toBe(1);
     });
   });
 });

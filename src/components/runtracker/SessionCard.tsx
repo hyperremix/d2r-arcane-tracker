@@ -26,6 +26,7 @@ export function SessionCard({ session }: SessionCardProps) {
     updateSessionNotes,
     getSessionStats,
     startSession,
+    runs,
   } = useRunTrackerStore();
 
   const [sessionTime, setSessionTime] = useState<number>(0);
@@ -36,10 +37,11 @@ export function SessionCard({ session }: SessionCardProps) {
 
   // Calculate current session time
   const currentSession = activeSession || session;
+  // biome-ignore lint/correctness/useExhaustiveDependencies: runs is needed to trigger recalculation when run data changes
   const sessionStats = useMemo(() => {
     if (!currentSession) return null;
     return getSessionStats(currentSession.id);
-  }, [currentSession, getSessionStats]);
+  }, [currentSession?.id, runs, getSessionStats]);
 
   // Real-time timer updates
   useEffect(() => {

@@ -65,28 +65,46 @@ export function RunTracker() {
   // Set up IPC event listeners for real-time updates
   // biome-ignore lint/correctness/useExhaustiveDependencies: Event listeners should only be set up once
   useEffect(() => {
-    const handleSessionStartedEvent = (_event: Electron.IpcRendererEvent, session: Session) => {
-      handleSessionStarted(session);
+    const handleSessionStartedEvent = (
+      _event: Electron.IpcRendererEvent,
+      payload: { session: Session },
+    ) => {
+      handleSessionStarted(payload.session);
     };
 
-    const handleSessionEndedEvent = (_event: Electron.IpcRendererEvent) => {
+    const handleSessionEndedEvent = (
+      _event: Electron.IpcRendererEvent,
+      _payload: { session: Session },
+    ) => {
       handleSessionEnded();
     };
 
-    const handleRunStartedEvent = (_event: Electron.IpcRendererEvent, run: Run) => {
-      handleRunStarted(run);
+    const handleRunStartedEvent = (
+      _event: Electron.IpcRendererEvent,
+      payload: { run: Run; session: Session; manual: boolean },
+    ) => {
+      handleRunStarted(payload.run, payload.session);
     };
 
-    const handleRunEndedEvent = (_event: Electron.IpcRendererEvent) => {
-      handleRunEnded();
+    const handleRunEndedEvent = (
+      _event: Electron.IpcRendererEvent,
+      payload: { run: Run; session: Session; manual: boolean },
+    ) => {
+      handleRunEnded(payload.run, payload.session);
     };
 
-    const handleRunPausedEvent = (_event: Electron.IpcRendererEvent) => {
-      handleRunPaused();
+    const handleRunPausedEvent = (
+      _event: Electron.IpcRendererEvent,
+      payload: { run: Run; session: Session },
+    ) => {
+      handleRunPaused(payload.session);
     };
 
-    const handleRunResumedEvent = (_event: Electron.IpcRendererEvent) => {
-      handleRunResumed();
+    const handleRunResumedEvent = (
+      _event: Electron.IpcRendererEvent,
+      payload: { run: Run; session: Session },
+    ) => {
+      handleRunResumed(payload.session);
     };
 
     // Register IPC event listeners

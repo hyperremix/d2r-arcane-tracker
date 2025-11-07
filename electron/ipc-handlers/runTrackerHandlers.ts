@@ -347,6 +347,8 @@ export function initializeRunTrackerHandlers(
   const unsubscribeSessionStarted = eventBus.on('session-started', (payload) => {
     const allWebContents = webContents.getAllWebContents();
     for (const wc of allWebContents) {
+      // Only send to window type (not background pages, webviews, etc.)
+      // Dev tools have type 'window' but belong to a parent window, so they'll receive events naturally
       if (!wc.isDestroyed() && wc.getType() === 'window') {
         wc.send('run-tracker:session-started', payload);
       }

@@ -248,7 +248,6 @@ function initializeWindowsServices(): void {
   try {
     processMonitor = new ProcessMonitor(eventBus);
     processMonitor.startMonitoring();
-    console.log('[initializeSaveFileHandlers] Process monitor initialized successfully');
   } catch (error) {
     console.error('[initializeSaveFileHandlers] Failed to initialize process monitor:', error);
     processMonitor = undefined;
@@ -259,7 +258,6 @@ function initializeWindowsServices(): void {
   if (processMonitor) {
     try {
       memoryReader = new MemoryReader(eventBus, processMonitor);
-      console.log('[initializeSaveFileHandlers] Memory reader initialized successfully');
     } catch (error) {
       console.error('[initializeSaveFileHandlers] Failed to initialize memory reader:', error);
       memoryReader = undefined;
@@ -297,7 +295,6 @@ export function initializeSaveFileHandlers(): void {
   // Initialize run tracker service with optional memory reader
   try {
     runTracker = new RunTrackerService(eventBus, grailDatabase, memoryReader || null);
-    console.log('[initializeSaveFileHandlers] Run tracker initialized successfully');
 
     // If memory reader was created after run tracker, set it now
     if (memoryReader && runTracker) {
