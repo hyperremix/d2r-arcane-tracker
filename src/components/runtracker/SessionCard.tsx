@@ -20,6 +20,7 @@ interface SessionCardProps {
 export function SessionCard({ session }: SessionCardProps) {
   const {
     activeSession,
+    activeRun,
     loading,
     endSession,
     archiveSession,
@@ -30,6 +31,7 @@ export function SessionCard({ session }: SessionCardProps) {
   } = useRunTrackerStore();
 
   const [sessionTime, setSessionTime] = useState<number>(0);
+  const [runDuration, setRunDuration] = useState<number>(0);
   const [notes, setNotes] = useState<string>(session?.notes || '');
   const [isSavingNotes, setIsSavingNotes] = useState<boolean>(false);
   const [showExportDialog, setShowExportDialog] = useState<boolean>(false);
@@ -64,6 +66,28 @@ export function SessionCard({ session }: SessionCardProps) {
 
     return () => clearInterval(interval);
   }, [currentSession]);
+
+  // Real-time run duration updates
+  useEffect(() => {
+    if (!activeRun) {
+      setRunDuration(0);
+      return;
+    }
+
+    const updateRunTimer = () => {
+      const now = Date.now();
+      const elapsed = now - activeRun.startTime.getTime();
+      setRunDuration(elapsed);
+    };
+
+    // Update immediately
+    updateRunTimer();
+
+    // Set up interval for updates
+    const interval = setInterval(updateRunTimer, 1000);
+
+    return () => clearInterval(interval);
+  }, [activeRun]);
 
   // Update notes when session changes
   useEffect(() => {
@@ -179,6 +203,12 @@ export function SessionCard({ session }: SessionCardProps) {
             <p className="font-medium text-muted-foreground text-sm">Run Count</p>
             <p className="font-semibold text-lg">{currentSession.runCount}</p>
           </div>
+          {activeRun && (
+            <div className="space-y-1">
+              <p className="font-medium text-muted-foreground text-sm">Current Run</p>
+              <p className="font-mono text-lg">{formatDuration(runDuration)}</p>
+            </div>
+          )}
           <div className="space-y-1">
             <p className="font-medium text-muted-foreground text-sm">Average Run Time</p>
             <p className="font-mono text-lg">{formatDuration(averageRunTime)}</p>
