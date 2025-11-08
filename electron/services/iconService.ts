@@ -518,6 +518,46 @@ export class IconService {
       conversionStatus: this.conversionStatus,
     };
   }
+
+  /**
+   * Validates that the D2R installation path contains the required icon files.
+   * @param d2rInstallPath - Path to D2R installation
+   * @returns Promise resolving to validation result
+   */
+  async validateIconPath(
+    d2rInstallPath: string,
+  ): Promise<{ valid: boolean; path?: string; error?: string }> {
+    try {
+      if (!d2rInstallPath || d2rInstallPath.trim() === '') {
+        return { valid: false, error: 'D2R installation path is not set' };
+      }
+
+      if (!existsSync(d2rInstallPath)) {
+        return { valid: false, error: 'D2R installation directory does not exist' };
+      }
+
+      const iconsPath = path.join(d2rInstallPath, 'Data', 'hd', 'global', 'ui', 'items');
+
+      if (!existsSync(iconsPath)) {
+        return {
+          valid: false,
+          error: 'Icon files not found in D2R installation. Game files must be extracted.',
+        };
+      }
+
+      // Check if directory is readable
+      try {
+        await fs.access(iconsPath);
+      } catch (_accessError) {
+        return { valid: false, error: 'Icon directory exists but is not readable' };
+      }
+
+      return { valid: true, path: iconsPath };
+    } catch (error) {
+      console.error('Failed to validate icon path:', error);
+      return { valid: false, error: error instanceof Error ? error.message : 'Unknown error' };
+    }
+  }
 }
 
 // Singleton instance

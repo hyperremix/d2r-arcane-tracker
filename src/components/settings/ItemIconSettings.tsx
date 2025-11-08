@@ -1,5 +1,6 @@
-import { AlertTriangle, Image, RefreshCw } from 'lucide-react';
+import { AlertCircle, AlertTriangle, CheckCircle, Image, RefreshCw } from 'lucide-react';
 import { useCallback, useEffect, useId, useState } from 'react';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -36,10 +37,25 @@ export function ItemIconSettings() {
     errors: Array<{ file: string; error: string }>;
   } | null>(null);
   const [showWarningDialog, setShowWarningDialog] = useState(false);
+  const [validationStatus, setValidationStatus] = useState<{
+    valid: boolean;
+    path?: string;
+    error?: string;
+  }>({ valid: false });
 
   const toggleItemIcons = async (checked: boolean) => {
     await setSettings({ showItemIcons: checked });
   };
+
+  const loadValidation = useCallback(async () => {
+    const validation = await window.electronAPI.icon.validatePath();
+    setValidationStatus(validation);
+  }, []);
+
+  // Load validation on mount
+  useEffect(() => {
+    loadValidation();
+  }, [loadValidation]);
 
   // Listen for conversion progress updates
   useEffect(() => {
@@ -109,11 +125,85 @@ export function ItemIconSettings() {
             />
           </div>
 
+          {/* Validation Status */}
+          {validationStatus.valid ? (
+            <Alert className="border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950">
+              <CheckCircle className="h-4 w-4 text-green-600" />
+              <AlertDescription className="text-green-800 dark:text-green-200">
+                <strong>✓ D2R installation path is valid</strong>
+                <br />
+                Game files found at: <code className="text-xs">{validationStatus.path}</code>
+              </AlertDescription>
+            </Alert>
+          ) : (
+            <Alert className="border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950">
+              <AlertCircle className="h-4 w-4 text-red-600" />
+              <AlertTitle className="font-bold text-red-800 dark:text-red-200">Error</AlertTitle>
+              <AlertDescription className="space-y-2 text-red-800 dark:text-red-200">
+                <p>{validationStatus.error || 'D2R installation path is not configured'}</p>
+                {validationStatus.error?.includes('not found') && (
+                  <div>
+                    <p className="font-semibold text-sm">Game Files Must Be Extracted</p>
+                    <p className="text-sm">
+                      D2R stores game files in CASC (Content Addressable Storage Container) format.
+                      These files must be extracted before item icons can be converted.
+                    </p>
+                    <div className="mt-2">
+                      <p className="font-semibold text-sm">Extraction Steps:</p>
+                      <ol className="mt-1 ml-4 list-decimal space-y-1 text-sm">
+                        <li>
+                          Download{' '}
+                          <a
+                            href="https://www.zezula.net/en/casc/main.html"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="underline hover:text-red-950 dark:hover:text-red-50"
+                          >
+                            Ladik's CASC Viewer
+                          </a>
+                        </li>
+                        <li>Open the x64 version (or appropriate version for your OS)</li>
+                        <li>In CASC Viewer, click "Open Storage"</li>
+                        <li>
+                          Select your D2R folder (e.g.,{' '}
+                          <code className="text-xs">
+                            C:\Program Files (x86)\Diablo II Resurrected
+                          </code>
+                          )
+                        </li>
+                        <li>Click "data" on the left side of the screen</li>
+                        <li>
+                          Click "data" again from the newly opened options, then click "Extract" at
+                          the top
+                        </li>
+                        <li>
+                          Wait for extraction (extracts ~40GB: global, hd, local folders to CascView
+                          work folder)
+                        </li>
+                        <li>
+                          Move the 3 extracted folders to{' '}
+                          <code className="text-xs">
+                            C:\Program Files (x86)\Diablo II Resurrected\Data
+                          </code>
+                        </li>
+                        <li>After extraction, reload this page to verify</li>
+                      </ol>
+                    </div>
+                    <p className="mt-2 text-xs">
+                      <strong>Note:</strong> Extraction is a one-time process and does not modify
+                      your game installation.
+                    </p>
+                  </div>
+                )}
+              </AlertDescription>
+            </Alert>
+          )}
+
           {/* Convert Button */}
           <div className="space-y-2">
             <Button
               onClick={() => setShowWarningDialog(true)}
-              disabled={isConverting || !settings.d2rInstallPath}
+              disabled={isConverting || !validationStatus.valid}
               className="w-full"
             >
               {isConverting ? (

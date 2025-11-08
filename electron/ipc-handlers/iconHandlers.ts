@@ -179,5 +179,28 @@ export function initializeIconHandlers(): void {
     }
   });
 
+  /**
+   * IPC handler for validating the D2R installation path for icon extraction.
+   * @returns Promise resolving to validation result
+   */
+  ipcMain.handle(
+    'icon:validatePath',
+    async (): Promise<{ valid: boolean; path?: string; error?: string }> => {
+      try {
+        const settings = grailDatabase.getAllSettings();
+        const d2rInstallPath = settings.d2rInstallPath;
+
+        if (!d2rInstallPath) {
+          return { valid: false, error: 'D2R installation path is not configured' };
+        }
+
+        return await iconService.validateIconPath(d2rInstallPath);
+      } catch (error) {
+        console.error('Failed to validate icon path:', error);
+        return { valid: false, error: error instanceof Error ? error.message : 'Unknown error' };
+      }
+    },
+  );
+
   console.log('Icon IPC handlers initialized');
 }

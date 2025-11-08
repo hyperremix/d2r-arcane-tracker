@@ -637,6 +637,39 @@ Customize your interface:
 - **Compact Mode**: Reduce spacing for more items on screen
 - **Color Coding**: Different colors for found/missing/recent
 
+#### Item Icon Management
+
+The tracker can display actual D2R item icons for a more immersive experience. This feature requires extracting game files from your D2R installation.
+
+**CASC File Extraction Required:**
+
+D2R stores item icon files in CASC (Content Addressable Storage Container) format. Before you can use item icons in the tracker, these files must be extracted:
+
+1. Download [Ladik's CASC Viewer](https://www.zezula.net/en/casc/main.html)
+2. Open the x64 version (or appropriate version for your OS)
+3. In CASC Viewer, click "Open Storage"
+4. Select your D2R folder (e.g., `C:\Program Files (x86)\Diablo II Resurrected`)
+5. Click "data" on the left side, then click "data" again and click "Extract"
+6. Wait for extraction to complete (~40GB: global, hd, local folders)
+7. Move the 3 extracted folders to `C:\Program Files (x86)\Diablo II Resurrected\Data`
+8. After extraction, use the "Convert Sprite Files to PNG" button in Settings
+
+**Important Notes:**
+
+- Extraction is a one-time process (unless game updates add new items)
+- The extraction does not modify your game installation
+- Converted PNG images are stored in the app's data directory
+- Item icons are optional - the tracker works perfectly without them
+
+**Converting to PNG:**
+
+After extracting the CASC files:
+
+1. Go to **Settings** > **Item Icon Management**
+2. Click "Convert Sprite Files to PNG"
+3. Wait for the conversion to complete
+4. Enable "Show Item Icons" toggle to display icons in item cards
+
 ### Runeword Calculator
 
 The Runeword Calculator is a powerful tool that helps you determine which runewords you can craft based on your current rune inventory. It works independently of the grailRunewords tracking setting, making it useful for all players regardless of whether they track runewords as part of their Holy Grail.
@@ -743,13 +776,34 @@ Navigate to the Terror Zone Configuration by clicking the **alert triangle icon*
 
 #### How It Works
 
-1. **File Location**: The feature modifies `{D2R Installation}/Data/hd/global/excel/desecratedzones.json`
-2. **Backup Creation**: On first use, creates an immutable backup in the app's data directory
-3. **Configuration Storage**: Your zone preferences are stored in the app's database
-4. **Game File Modification**: The app writes your selected zones to the game's configuration file
-5. **Restart Required**: Changes take effect after restarting Diablo II: Resurrected
+1. **File Extraction**: Extract all game files from CASC archives using Ladik's CASC Viewer
+2. **Launch with `-txt` Flag**: D2R must be launched with the `-txt` flag to use extracted files
+3. **File Location**: The feature modifies `{D2R Installation}/Data/hd/global/excel/desecratedzones.json`
+4. **Backup Creation**: On first use, creates an immutable backup in the app's data directory
+5. **Configuration Storage**: Your zone preferences are stored in the app's database
+6. **Game File Modification**: The app writes your selected zones to the game's configuration file
+7. **Restart Required**: Changes take effect after restarting Diablo II: Resurrected with the `-txt` flag
 
 #### Important Considerations
+
+**Game File Extraction Required:**
+
+D2R stores game files in CASC (Content Addressable Storage Container) format. **All game files must be extracted** for this feature to work.
+
+**Extraction Steps:**
+
+1. Download [Ladik's CASC Viewer](https://www.zezula.net/en/casc/main.html)
+2. Open the x64 version (or appropriate version for your OS)
+3. In CASC Viewer, click "Open Storage"
+4. Select your D2R folder (e.g., `C:\Program Files (x86)\Diablo II Resurrected`)
+5. Click "data" on the left side, then click "data" again and click "Extract"
+6. Wait for ~40GB extraction (global, hd, local folders)
+7. Move the 3 extracted folders to `C:\Program Files (x86)\Diablo II Resurrected\Data` (top-most Data folder)
+8. Create a D2R shortcut and add `-txt` to the target (e.g., `"D2R.exe" -txt`)
+9. Always launch D2R using this shortcut
+
+- See the [Terror Zone Configuration Guide](TERROR_ZONE_CONFIGURATION.md) for complete detailed instructions
+- Reference: [Reddit guide](https://www.reddit.com/r/Diablo/comments/qey05y/d2r_single_player_tips_to_improve_your_load_times/) for additional context
 
 **Game File Modification:**
 

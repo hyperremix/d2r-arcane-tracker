@@ -244,6 +244,12 @@ export interface ElectronAPI {
         progress?: { current: number; total: number }
       }
     }>
+
+    /**
+     * Validates the D2R installation path for icon extraction.
+     * @returns {Promise<{ valid: boolean; path?: string; error?: string }>} A promise that resolves with validation result.
+     */
+    validatePath(): Promise<{ valid: boolean; path?: string; error?: string }>
   }
 
   /**

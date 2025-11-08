@@ -363,6 +363,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
         progress?: { current: number; total: number };
       };
     }> => ipcRenderer.invoke('icon:getCacheStats'),
+
+    /**
+     * Validates the D2R installation path for icon extraction.
+     * @returns {Promise<{ valid: boolean; path?: string; error?: string }>} Validation result.
+     */
+    validatePath: (): Promise<{ valid: boolean; path?: string; error?: string }> =>
+      ipcRenderer.invoke('icon:validatePath'),
   },
 
   /**

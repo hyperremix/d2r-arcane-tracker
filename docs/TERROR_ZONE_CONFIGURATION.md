@@ -83,8 +83,26 @@ Before using the Terror Zone Configuration feature, ensure you have:
 
 1. **Diablo II: Resurrected Installed**: The feature requires a valid D2R installation
 2. **D2R Installation Path Configured**: Set your D2R installation path in the app settings
-3. **Write Permissions**: The app needs to modify files in your D2R installation directory
-4. **D2R Closed**: Always ensure D2R is completely closed before making changes
+3. **All Game Files Extracted**: D2R stores files in CASC (Content Addressable Storage Container) format. **All game files must be extracted** for this feature to work (not just individual folders).
+
+   **Detailed Extraction Steps:**
+   1. Download [Ladik's CASC Viewer](https://www.zezula.net/en/casc/main.html)
+   2. Open the x64 version (or appropriate version for your OS)
+   3. In CASC Viewer, click "Open Storage"
+   4. Select your D2R folder (e.g., `C:\Program Files (x86)\Diablo II Resurrected`)
+   5. Click "data" on the left side of the screen
+   6. Click "data" again from the newly opened options, then click "Extract" at the top
+   7. Wait for extraction to complete (~40GB of data: global, hd, and local folders will be extracted to a work folder in CascView.exe's current location)
+   8. Once finished, move these 3 folders (global, hd, local) to `C:\Program Files (x86)\Diablo II Resurrected\Data`
+   9. **Important**: Place these folders in the top-most Data folder (there's another data folder inside, but use the top-most one)
+4. **Launch D2R with `-txt` Flag**: For D2R to use the extracted files:
+   - Create a shortcut to your D2R executable (`D2R.exe`)
+   - Right-click the shortcut and select "Properties"
+   - In the "Target" field, add `-txt` at the end (e.g., `"C:\Program Files (x86)\Diablo II Resurrected\D2R.exe" -txt`)
+   - Always launch D2R using this shortcut for terror zone modifications to take effect
+   - Without the `-txt` flag, D2R will ignore the extracted files and use CASC archives
+5. **Write Permissions**: The app needs to modify files in your D2R installation directory
+6. **D2R Closed**: Always ensure D2R is completely closed before making changes
 
 ### Accessing the Feature
 
@@ -296,9 +314,27 @@ Burial Grounds, Crypt, and Mausoleum
 
 **"desecratedzones.json not found":**
 
+- The file is stored in CASC format and must be extracted first
+- **Important**: You must extract all game files using the detailed steps in the [Prerequisites](#prerequisites) section
+- After extraction, check that the file exists at `{D2R Path}/Data/hd/global/excel/desecratedzones.json`
 - Verify your D2R installation is complete
-- Check that the file exists at `{D2R Path}/Data/hd/global/excel/desecratedzones.json`
-- Reinstall D2R if the file is missing
+- Reinstall D2R if the file is missing after extraction
+
+**"Game files are in CASC format and not accessible":**
+
+- D2R stores game files in CASC (Content Addressable Storage Container) format by default
+- These files cannot be accessed directly without extraction
+- Use [Ladik's CASC Viewer](https://www.zezula.net/en/casc/main.html) to extract all game files
+- Follow the step-by-step instructions in the [Prerequisites](#prerequisites) section
+- After extraction, the files will be accessible as regular files on disk
+
+**"Changes not taking effect in game":**
+
+- Ensure you've extracted **all game files**, not just individual folders
+- Verify you're launching D2R with the `-txt` flag (see [Prerequisites](#prerequisites))
+- Without the `-txt` flag, D2R ignores extracted files and uses CASC archives
+- Create a shortcut with the `-txt` flag and always launch D2R using that shortcut
+- Restart D2R completely after making changes
 
 **"Invalid desecratedzones.json file structure":**
 
