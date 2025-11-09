@@ -80,6 +80,7 @@ export function createWidgetWindow(
       webSecurity: true,
     },
   });
+  widgetWindow.setAlwaysOnTop(true, 'screen-saver');
 
   // Load the widget page
   if (viteDevServerUrl) {
