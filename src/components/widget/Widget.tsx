@@ -52,7 +52,7 @@ function RunOnlyDisplay({ activeSession, runDuration, sessionStats }: RunOnlyDis
       </div>
 
       {/* Bottom Row: Session Stats */}
-      <div className="grid grid-cols-2 gap-4 border-gray-600 border-t pt-3">
+      <div className="grid grid-cols-2 gap-4 pt-3">
         <div className="text-center">
           <p className="text-gray-300 text-xs">Fastest</p>
           <p className="font-mono text-sm text-white">{formatDuration(sessionStats?.fastestRun)}</p>
