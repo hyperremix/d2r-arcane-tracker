@@ -516,7 +516,7 @@ export const useRunTrackerStore = create<RunTrackerState>()(
     },
 
     getSessionStats: (sessionId) => {
-      const { sessions, runs, runItems, sessionStatsCache } = get();
+      const { sessions, runs, runItems, sessionStatsCache, activeSession } = get();
 
       // Check cache first
       const cachedStats = sessionStatsCache.get(sessionId);
@@ -524,7 +524,9 @@ export const useRunTrackerStore = create<RunTrackerState>()(
         return cachedStats;
       }
 
-      const session = sessions.find((s) => s.id === sessionId);
+      const session =
+        sessions.find((s) => s.id === sessionId) ??
+        (activeSession?.id === sessionId ? activeSession : null);
       if (!session) return null;
 
       const sessionRuns = runs.get(sessionId) || [];

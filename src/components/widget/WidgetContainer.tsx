@@ -25,6 +25,9 @@ export function WidgetContainer() {
     handleSessionEnded: storeHandleSessionEnded,
     handleRunStarted: storeHandleRunStarted,
     handleRunEnded: storeHandleRunEnded,
+    refreshActiveRun,
+    loadSessionRuns,
+    activeSession,
   } = useRunTrackerStore();
 
   // Load initial data and calculate statistics
@@ -52,6 +55,30 @@ export function WidgetContainer() {
 
     loadData();
   }, []);
+
+  // Load run tracker data on mount
+  // biome-ignore lint/correctness/useExhaustiveDependencies: Zustand actions are stable
+  useEffect(() => {
+    const loadRunTrackerData = async () => {
+      try {
+        // Refresh active run state to sync with backend
+        await refreshActiveRun();
+
+        // Get the fresh activeSession from the store after refresh
+        const freshActiveSession = useRunTrackerStore.getState().activeSession;
+
+        // Load runs for active session if it exists
+        if (freshActiveSession?.id) {
+          await loadSessionRuns(freshActiveSession.id);
+          console.log('[WidgetContainer] Loaded runs for active session:', freshActiveSession.id);
+        }
+      } catch (error) {
+        console.error('[WidgetContainer] Error loading run tracker data:', error);
+      }
+    };
+
+    loadRunTrackerData();
+  }, [activeSession?.id]); // Re-run when active session changes
 
   // Listen for grail progress updates
   useEffect(() => {

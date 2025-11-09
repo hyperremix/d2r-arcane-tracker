@@ -232,6 +232,10 @@ export function SessionDetailView({ sessionId, onBack }: SessionDetailViewProps)
               <p className="font-mono text-lg">{formatDuration(averageRunTime)}</p>
             </div>
             <div className="space-y-1">
+              <p className="font-medium text-muted-foreground text-sm">Fastest Run</p>
+              <p className="font-mono text-lg">{formatDuration(sessionStats?.fastestRun || 0)}</p>
+            </div>
+            <div className="space-y-1">
               <p className="font-medium text-muted-foreground text-sm">Efficiency</p>
               <p className="font-semibold text-lg">{efficiencyPercentage.toFixed(1)}%</p>
             </div>

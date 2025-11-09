@@ -203,15 +203,17 @@ export function SessionCard({ session }: SessionCardProps) {
             <p className="font-medium text-muted-foreground text-sm">Run Count</p>
             <p className="font-semibold text-lg">{currentSession.runCount}</p>
           </div>
-          {activeRun && (
-            <div className="space-y-1">
-              <p className="font-medium text-muted-foreground text-sm">Current Run</p>
-              <p className="font-mono text-lg">{formatDuration(runDuration)}</p>
-            </div>
-          )}
           <div className="space-y-1">
             <p className="font-medium text-muted-foreground text-sm">Average Run Time</p>
             <p className="font-mono text-lg">{formatDuration(averageRunTime)}</p>
+          </div>
+          <div className="space-y-1">
+            <p className="font-medium text-muted-foreground text-sm">Current Run</p>
+            <p className="font-mono text-lg">{activeRun ? formatDuration(runDuration) : '0s'}</p>
+          </div>
+          <div className="space-y-1">
+            <p className="font-medium text-muted-foreground text-sm">Fastest Run</p>
+            <p className="font-mono text-lg">{formatDuration(sessionStats?.fastestRun || 0)}</p>
           </div>
           <div className="space-y-1">
             <p className="font-medium text-muted-foreground text-sm">Efficiency</p>
