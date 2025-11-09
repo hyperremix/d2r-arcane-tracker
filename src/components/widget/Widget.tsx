@@ -1,4 +1,4 @@
-import type { GrailStatistics, Run, Session, SessionStats, Settings } from 'electron/types/grail';
+import type { GrailStatistics, Session, SessionStats, Settings } from 'electron/types/grail';
 import { useEffect, useMemo, useState } from 'react';
 import { ProgressGauge } from '@/components/grail/ProgressGauge';
 import { formatDuration } from '@/lib/utils';
@@ -19,7 +19,6 @@ interface WidgetProps {
  */
 interface RunOnlyDisplayProps {
   activeSession: Session | null;
-  activeRun: Run | null;
   runDuration: number;
   sessionStats: SessionStats | null;
 }
@@ -28,12 +27,7 @@ interface RunOnlyDisplayProps {
  * RunOnlyDisplay component that shows run tracking statistics.
  * Displays current run info and session-wide statistics.
  */
-function RunOnlyDisplay({
-  activeSession,
-  activeRun,
-  runDuration,
-  sessionStats,
-}: RunOnlyDisplayProps) {
+function RunOnlyDisplay({ activeSession, runDuration, sessionStats }: RunOnlyDisplayProps) {
   if (!activeSession) {
     return (
       <div className="text-center">
@@ -49,7 +43,7 @@ function RunOnlyDisplay({
       <div className="grid grid-cols-2 gap-4">
         <div className="text-center">
           <p className="text-gray-300 text-xs">Run</p>
-          <p className="font-bold text-white text-xl">#{activeRun?.runNumber ?? 0}</p>
+          <p className="font-bold text-white text-xl">#{activeSession?.runCount ?? 0}</p>
         </div>
         <div className="text-center">
           <p className="text-gray-300 text-xs">Current</p>
@@ -164,7 +158,6 @@ export function Widget({ statistics, settings, onDragStart, onDragEnd }: WidgetP
       >
         <RunOnlyDisplay
           activeSession={activeSession}
-          activeRun={activeRun}
           runDuration={runDuration}
           sessionStats={sessionStats}
         />
