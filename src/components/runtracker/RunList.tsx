@@ -1,17 +1,11 @@
 import { useVirtualizer } from '@tanstack/react-virtual';
 import type { Run, RunItem } from 'electron/types/grail';
-import {
-  ChevronDown,
-  ChevronLeft,
-  ChevronRight,
-  ChevronRight as ChevronRightIcon,
-} from 'lucide-react';
+import { ChevronLeft, ChevronRight as ChevronRightIcon } from 'lucide-react';
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
-import { useDebouncedCallback } from 'use-debounce';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
   Select,
   SelectContent,
@@ -72,114 +66,48 @@ function TableRowSkeleton() {
 interface RunRowProps {
   run: Run;
   itemsCount: number;
-  isExpanded: boolean;
-  runItemsData: RunItem[];
-  loading: boolean;
-  onToggleExpansion: (runId: string) => void;
+  onViewDetails: (run: Run) => void;
   formatTimestamp: (date: Date) => string;
-  getItemInfo: (runItem: RunItem) => { name: string; isNewGrail: boolean };
 }
 
-function RunRow({
-  run,
-  itemsCount,
-  isExpanded,
-  runItemsData,
-  loading,
-  onToggleExpansion,
-  formatTimestamp,
-  getItemInfo,
-}: RunRowProps) {
+function RunRow({ run, itemsCount, onViewDetails, formatTimestamp }: RunRowProps) {
   return (
-    <Collapsible open={isExpanded} onOpenChange={() => onToggleExpansion(run.id)}>
-      <TableRow className="cursor-pointer hover:bg-muted/50">
-        <TableCell className="font-medium">#{run.runNumber}</TableCell>
-        <TableCell>
-          {run.runType ? (
-            <Badge variant="outline" className="text-xs">
-              {run.runType}
-            </Badge>
-          ) : (
-            <span className="text-muted-foreground text-sm">-</span>
-          )}
-        </TableCell>
-        <TableCell className="font-mono text-sm">{formatTimestamp(run.startTime)}</TableCell>
-        <TableCell className="font-mono text-sm">
-          {run.duration ? formatDuration(run.duration) : '-'}
-        </TableCell>
-        <TableCell className="text-center">
-          {itemsCount > 0 ? (
-            <Badge variant="secondary" className="text-xs">
-              {itemsCount}
-            </Badge>
-          ) : (
-            <span className="text-muted-foreground text-sm">-</span>
-          )}
-        </TableCell>
-        <TableCell>
-          <CollapsibleTrigger asChild>
-            <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
-              {isExpanded ? (
-                <ChevronDown className="h-4 w-4" />
-              ) : (
-                <ChevronRight className="h-4 w-4" />
-              )}
-            </Button>
-          </CollapsibleTrigger>
-        </TableCell>
-      </TableRow>
-
-      {/* Expanded Details */}
-      <CollapsibleContent asChild>
-        <TableRow>
-          <TableCell colSpan={6} className="p-0">
-            <div className="border-t bg-muted/20 p-4">
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <h4 className="font-medium text-sm">Items Found</h4>
-                  <Badge variant="outline" className="text-xs">
-                    {itemsCount} items
-                  </Badge>
-                </div>
-
-                {loading ? (
-                  <div className="space-y-2">
-                    {Array.from({ length: 3 }, (_, i) => (
-                      <div
-                        key={`loading-skeleton-${i}-${Date.now()}`}
-                        className="flex items-center gap-2"
-                      >
-                        <Skeleton className="h-4 w-4" />
-                        <Skeleton className="h-4 w-32" />
-                      </div>
-                    ))}
-                  </div>
-                ) : runItemsData.length > 0 ? (
-                  <div className="space-y-2">
-                    {runItemsData.map((item) => {
-                      const itemInfo = getItemInfo(item);
-                      return (
-                        <div key={item.id} className="flex items-center gap-2">
-                          <div className="h-4 w-4 rounded bg-primary/20" />
-                          <span className="text-sm">{itemInfo.name}</span>
-                          {itemInfo.isNewGrail && (
-                            <Badge variant="secondary" className="text-xs">
-                              New
-                            </Badge>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <p className="text-muted-foreground text-sm">No items found in this run.</p>
-                )}
-              </div>
-            </div>
-          </TableCell>
-        </TableRow>
-      </CollapsibleContent>
-    </Collapsible>
+    <TableRow
+      className="cursor-pointer hover:bg-muted/70 focus-visible:bg-muted/70"
+      tabIndex={0}
+      onClick={() => onViewDetails(run)}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          onViewDetails(run);
+        }
+      }}
+      aria-label={`View run #${run.runNumber} details`}
+    >
+      <TableCell className="font-medium">#{run.runNumber}</TableCell>
+      <TableCell>
+        {run.runType ? (
+          <Badge variant="outline" className="text-xs">
+            {run.runType}
+          </Badge>
+        ) : (
+          <span className="text-muted-foreground text-sm">-</span>
+        )}
+      </TableCell>
+      <TableCell className="font-mono text-sm">{formatTimestamp(run.startTime)}</TableCell>
+      <TableCell className="font-mono text-sm">
+        {run.duration ? formatDuration(run.duration) : '-'}
+      </TableCell>
+      <TableCell className="text-center">
+        {itemsCount > 0 ? (
+          <Badge variant="secondary" className="text-xs">
+            {itemsCount}
+          </Badge>
+        ) : (
+          <span className="text-muted-foreground text-sm">-</span>
+        )}
+      </TableCell>
+    </TableRow>
   );
 }
 
@@ -198,9 +126,8 @@ export function RunList({ runs }: RunListProps) {
   const [sortField, setSortField] = useState<SortField>('startTime');
   const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
   const [selectedRunTypes, setSelectedRunTypes] = useState<string[]>([]);
-  const [expandedRunIds, setExpandedRunIds] = useState<Set<string>>(new Set());
-  const [filteredRuns, setFilteredRuns] = useState<Run[]>([]);
-  const [sortedRuns, setSortedRuns] = useState<Run[]>([]);
+  const [selectedRun, setSelectedRun] = useState<Run | null>(null);
+  const [isRunDialogOpen, setIsRunDialogOpen] = useState(false);
 
   // Get unique run types from all runs
   const availableRunTypes = useMemo(() => {
@@ -220,76 +147,45 @@ export function RunList({ runs }: RunListProps) {
     [runItems],
   );
 
-  // Debounced filter and sort operations
-  const debouncedFilterRuns = useDebouncedCallback(
-    (runs: Run[], selectedTypes: string[]): Run[] => {
-      if (!runs || runs.length === 0) return [];
-      if (selectedTypes.length === 0) return runs;
-      return runs.filter((run) => run.runType && selectedTypes.includes(run.runType));
-    },
-    300,
-  );
+  const filteredRuns = useMemo(() => {
+    if (!runs || runs.length === 0) return [];
+    if (selectedRunTypes.length === 0) return runs;
+    return runs.filter((run) => run.runType && selectedRunTypes.includes(run.runType));
+  }, [runs, selectedRunTypes]);
 
-  const debouncedSortRuns = useDebouncedCallback(
-    (runs: Run[], sortField: SortField, sortOrder: SortOrder): Run[] => {
-      if (!runs || runs.length === 0) return [];
-      return [...runs].sort((a, b) => {
-        let comparison = 0;
+  const sortedRuns = useMemo(() => {
+    if (filteredRuns.length === 0) return [];
+    return [...filteredRuns].sort((a, b) => {
+      let comparison = 0;
 
-        switch (sortField) {
-          case 'duration': {
-            const durationA = a.duration || 0;
-            const durationB = b.duration || 0;
-            comparison = durationA - durationB;
-            break;
-          }
-          case 'startTime': {
-            comparison = a.startTime.getTime() - b.startTime.getTime();
-            break;
-          }
-          case 'runType': {
-            const typeA = a.runType || '';
-            const typeB = b.runType || '';
-            comparison = typeA.localeCompare(typeB);
-            break;
-          }
-          case 'itemsFound': {
-            const itemsA = getRunItemsCount(a.id);
-            const itemsB = getRunItemsCount(b.id);
-            comparison = itemsA - itemsB;
-            break;
-          }
+      switch (sortField) {
+        case 'duration': {
+          const durationA = a.duration || 0;
+          const durationB = b.duration || 0;
+          comparison = durationA - durationB;
+          break;
         }
+        case 'startTime': {
+          comparison = a.startTime.getTime() - b.startTime.getTime();
+          break;
+        }
+        case 'runType': {
+          const typeA = a.runType || '';
+          const typeB = b.runType || '';
+          comparison = typeA.localeCompare(typeB);
+          break;
+        }
+        case 'itemsFound': {
+          const itemsA = getRunItemsCount(a.id);
+          const itemsB = getRunItemsCount(b.id);
+          comparison = itemsA - itemsB;
+          break;
+        }
+      }
 
-        return sortOrder === 'asc' ? comparison : -comparison;
-      });
-    },
-    300,
-  );
-
-  // Effect to trigger filtering when runs or selectedRunTypes change
-  useEffect(() => {
-    if (!runs) {
-      setFilteredRuns([]);
-      return;
-    }
-    const filtered = debouncedFilterRuns(runs, selectedRunTypes);
-    if (filtered) {
-      setFilteredRuns(filtered);
-    }
-  }, [runs, selectedRunTypes, debouncedFilterRuns]);
-
-  // Effect to trigger sorting when filteredRuns, sortField, or sortOrder change
-  useEffect(() => {
-    if (filteredRuns.length === 0) {
-      setSortedRuns([]);
-      return;
-    }
-    const sorted = debouncedSortRuns(filteredRuns, sortField, sortOrder);
-    if (sorted) {
-      setSortedRuns(sorted);
-    }
-  }, [filteredRuns, sortField, sortOrder, debouncedSortRuns]);
+      return sortOrder === 'asc' ? comparison : -comparison;
+    });
+  }, [filteredRuns, sortField, sortOrder, getRunItemsCount]);
 
   // Virtual scrolling setup
   const parentRef = useRef<HTMLDivElement>(null);
@@ -344,23 +240,26 @@ export function RunList({ runs }: RunListProps) {
     [totalPages],
   );
 
-  // Handle run expansion
-  const toggleRunExpansion = useCallback(
-    (runId: string) => {
-      setExpandedRunIds((prev) => {
-        const newSet = new Set(prev);
-        if (newSet.has(runId)) {
-          newSet.delete(runId);
-        } else {
-          newSet.add(runId);
-          // Load run items when expanding
-          loadRunItems(runId);
-        }
-        return newSet;
-      });
+  const openRunDetails = useCallback(
+    (run: Run) => {
+      if (selectedRun?.id === run.id && isRunDialogOpen) {
+        return;
+      }
+      setSelectedRun(run);
+      setIsRunDialogOpen(true);
+      if (!runItems.has(run.id)) {
+        loadRunItems(run.id);
+      }
     },
-    [loadRunItems],
+    [isRunDialogOpen, loadRunItems, runItems, selectedRun?.id],
   );
+
+  const handleRunDialogChange = useCallback((open: boolean) => {
+    setIsRunDialogOpen(open);
+    if (!open) {
+      setSelectedRun(null);
+    }
+  }, []);
 
   // Format timestamp helper
   const formatTimestamp = useCallback((date: Date) => {
@@ -420,7 +319,6 @@ export function RunList({ runs }: RunListProps) {
                   <TableHead>Start Time</TableHead>
                   <TableHead>Duration</TableHead>
                   <TableHead className="w-24">Items</TableHead>
-                  <TableHead className="w-16">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -545,15 +443,12 @@ export function RunList({ runs }: RunListProps) {
                           <TableHead>Start Time</TableHead>
                           <TableHead>Duration</TableHead>
                           <TableHead className="w-24">Items</TableHead>
-                          <TableHead className="w-16">Actions</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {virtualizer.getVirtualItems().map((virtualItem) => {
                           const run = sortedRuns[virtualItem.index];
                           const itemsCount = getRunItemsCount(run.id);
-                          const isExpanded = expandedRunIds.has(run.id);
-                          const runItemsData = runItems.get(run.id) || [];
 
                           return (
                             <div
@@ -570,12 +465,8 @@ export function RunList({ runs }: RunListProps) {
                               <RunRow
                                 run={run}
                                 itemsCount={itemsCount}
-                                isExpanded={isExpanded}
-                                runItemsData={runItemsData}
-                                loading={loading}
-                                onToggleExpansion={toggleRunExpansion}
+                                onViewDetails={openRunDetails}
                                 formatTimestamp={formatTimestamp}
-                                getItemInfo={getItemInfo}
                               />
                             </div>
                           );
@@ -596,26 +487,19 @@ export function RunList({ runs }: RunListProps) {
                       <TableHead>Start Time</TableHead>
                       <TableHead>Duration</TableHead>
                       <TableHead className="w-24">Items</TableHead>
-                      <TableHead className="w-16">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {paginatedRuns.map((run) => {
                       const itemsCount = getRunItemsCount(run.id);
-                      const isExpanded = expandedRunIds.has(run.id);
-                      const runItemsData = runItems.get(run.id) || [];
 
                       return (
                         <RunRow
                           key={run.id}
                           run={run}
                           itemsCount={itemsCount}
-                          isExpanded={isExpanded}
-                          runItemsData={runItemsData}
-                          loading={loading}
-                          onToggleExpansion={toggleRunExpansion}
+                          onViewDetails={openRunDetails}
                           formatTimestamp={formatTimestamp}
-                          getItemInfo={getItemInfo}
                         />
                       );
                     })}
@@ -692,7 +576,131 @@ export function RunList({ runs }: RunListProps) {
             </p>
           </div>
         )}
+        <RunDetailsDialog
+          open={isRunDialogOpen}
+          onOpenChange={handleRunDialogChange}
+          run={selectedRun}
+          runItems={selectedRun ? runItems.get(selectedRun.id) || [] : []}
+          loading={loading && selectedRun !== null && !runItems.has(selectedRun.id)}
+          formatTimestamp={formatTimestamp}
+          getItemInfo={getItemInfo}
+        />
       </CardContent>
     </Card>
+  );
+}
+
+interface RunDetailsDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  run: Run | null;
+  runItems: RunItem[];
+  loading: boolean;
+  formatTimestamp: (date: Date) => string;
+  getItemInfo: (runItem: RunItem) => { name: string; isNewGrail: boolean };
+}
+
+function RunDetailsDialog({
+  open,
+  onOpenChange,
+  run,
+  runItems,
+  loading,
+  formatTimestamp,
+  getItemInfo,
+}: RunDetailsDialogProps) {
+  if (!run) {
+    return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="max-w-lg">Select a run to view details.</DialogContent>
+      </Dialog>
+    );
+  }
+
+  const itemsCount = runItems.length;
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>Run #{run.runNumber}</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-6">
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="space-y-1">
+              <p className="font-medium text-muted-foreground text-sm">Run Type</p>
+              <p className="text-sm">{run.runType ?? 'Not set'}</p>
+            </div>
+            <div className="space-y-1">
+              <p className="font-medium text-muted-foreground text-sm">Start Time</p>
+              <p className="font-mono text-sm">{formatTimestamp(run.startTime)}</p>
+            </div>
+            <div className="space-y-1">
+              <p className="font-medium text-muted-foreground text-sm">Duration</p>
+              <p className="font-mono text-sm">
+                {run.duration ? formatDuration(run.duration) : 'In progress'}
+              </p>
+            </div>
+            {run.endTime && (
+              <div className="space-y-1">
+                <p className="font-medium text-muted-foreground text-sm">End Time</p>
+                <p className="font-mono text-sm">{formatTimestamp(run.endTime)}</p>
+              </div>
+            )}
+            <div className="space-y-1">
+              <p className="font-medium text-muted-foreground text-sm">Items Found</p>
+              <Badge variant="secondary" className="text-xs">
+                {itemsCount}
+              </Badge>
+            </div>
+            {run.area && (
+              <div className="space-y-1">
+                <p className="font-medium text-muted-foreground text-sm">Area</p>
+                <p className="text-sm">{run.area}</p>
+              </div>
+            )}
+          </div>
+
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <h4 className="font-medium text-sm">Items Found</h4>
+              <Badge variant="outline" className="text-xs">
+                {itemsCount} items
+              </Badge>
+            </div>
+
+            {loading ? (
+              <div className="space-y-2">
+                {['one', 'two', 'three'].map((placeholder) => (
+                  <div key={`dialog-loading-${placeholder}`} className="flex items-center gap-2">
+                    <Skeleton className="h-4 w-4" />
+                    <Skeleton className="h-4 w-32" />
+                  </div>
+                ))}
+              </div>
+            ) : runItems.length > 0 ? (
+              <div className="space-y-2">
+                {runItems.map((item) => {
+                  const itemInfo = getItemInfo(item);
+                  return (
+                    <div key={item.id} className="flex items-center gap-2">
+                      <div className="h-4 w-4 rounded bg-primary/20" />
+                      <span className="text-sm">{itemInfo.name}</span>
+                      {itemInfo.isNewGrail && (
+                        <Badge variant="secondary" className="text-xs">
+                          New
+                        </Badge>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <p className="text-muted-foreground text-sm">No items found in this run.</p>
+            )}
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
