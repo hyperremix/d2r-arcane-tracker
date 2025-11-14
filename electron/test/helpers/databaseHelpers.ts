@@ -107,7 +107,6 @@ export function initializeDatabaseSchema(db: DatabaseType): void {
       session_id TEXT NOT NULL,
       character_id TEXT NOT NULL,
       run_number INTEGER NOT NULL,
-      run_type TEXT,
       start_time DATETIME NOT NULL,
       end_time DATETIME,
       duration INTEGER,
@@ -129,16 +128,6 @@ export function initializeDatabaseSchema(db: DatabaseType): void {
       FOREIGN KEY (grail_progress_id) REFERENCES grail_progress(id) ON DELETE CASCADE
     );
 
-    -- Recent run types table
-    CREATE TABLE IF NOT EXISTS recent_run_types (
-      id TEXT PRIMARY KEY,
-      run_type TEXT NOT NULL UNIQUE,
-      last_used DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      use_count INTEGER NOT NULL DEFAULT 1,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    );
-
     -- Indexes
     CREATE INDEX IF NOT EXISTS idx_sessions_character ON sessions(character_id);
     CREATE INDEX IF NOT EXISTS idx_sessions_start_time ON sessions(start_time);
@@ -147,10 +136,8 @@ export function initializeDatabaseSchema(db: DatabaseType): void {
     CREATE INDEX IF NOT EXISTS idx_runs_character ON runs(character_id);
     CREATE INDEX IF NOT EXISTS idx_runs_start_time ON runs(start_time);
     CREATE INDEX IF NOT EXISTS idx_runs_session_number ON runs(session_id, run_number);
-    CREATE INDEX IF NOT EXISTS idx_runs_run_type ON runs(run_type);
     CREATE INDEX IF NOT EXISTS idx_run_items_run ON run_items(run_id);
     CREATE INDEX IF NOT EXISTS idx_run_items_progress ON run_items(grail_progress_id);
-    CREATE INDEX IF NOT EXISTS idx_recent_run_types_last_used ON recent_run_types(last_used);
   `;
 
   db.exec(schema);

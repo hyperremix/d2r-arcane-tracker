@@ -359,22 +359,13 @@ function formatSessionAsCSV(
 
   // Runs header
   rows.push(['Runs']);
-  rows.push([
-    'Run ID',
-    'Run Number',
-    'Run Type',
-    'Start Time',
-    'End Time',
-    'Duration (ms)',
-    'Area',
-  ]);
+  rows.push(['Run ID', 'Run Number', 'Start Time', 'End Time', 'Duration (ms)', 'Area']);
 
   // Runs data
   runs.forEach((run) => {
     rows.push([
       run.id,
       run.runNumber.toString(),
-      run.runType || 'N/A',
       run.startTime.toISOString(),
       run.endTime?.toISOString() || 'N/A',
       run.duration?.toString() || 'N/A',
@@ -434,7 +425,6 @@ function formatSessionAsJSON(
       sessionId: run.sessionId,
       characterId: run.characterId,
       runNumber: run.runNumber,
-      runType: run.runType,
       startTime: run.startTime.toISOString(),
       endTime: run.endTime?.toISOString(),
       duration: run.duration,
@@ -514,7 +504,6 @@ function formatSessionAsTextSummary(
     runs.forEach((run, index) => {
       lines.push(`${index + 1}. Run #${run.runNumber}`);
       lines.push(`   ID: ${run.id}`);
-      lines.push(`   Type: ${run.runType || 'N/A'}`);
       lines.push(`   Start: ${run.startTime.toLocaleString()}`);
       lines.push(`   End: ${run.endTime?.toLocaleString() || 'N/A'}`);
       lines.push(`   Duration: ${run.duration ? formatDuration(run.duration) : 'N/A'}`);

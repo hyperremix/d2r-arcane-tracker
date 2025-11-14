@@ -50,7 +50,6 @@ CREATE TABLE IF NOT EXISTS runs (
   session_id TEXT NOT NULL,
   character_id TEXT NOT NULL,
   run_number INTEGER NOT NULL, -- sequential within session
-  run_type TEXT, -- e.g., "Mephisto", "Chaos", "Cows"
   start_time DATETIME NOT NULL,
   end_time DATETIME,
   duration INTEGER, -- milliseconds

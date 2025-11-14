@@ -46,11 +46,10 @@ type RunTrackerState = {
   updateSessionNotes: (sessionId: string, notes: string) => Promise<void>;
   
   // Actions - Run
-  startRun: (characterId: string, runType?: string) => Promise<void>;
+  startRun: (characterId?: string) => Promise<void>;
   endRun: () => Promise<void>;
   pauseRun: () => Promise<void>;
   resumeRun: () => Promise<void>;
-  setRunType: (runType: string) => Promise<void>;
   
   // Actions - Data
   loadSessions: () => Promise<void>;

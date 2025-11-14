@@ -13,8 +13,6 @@ interface RunTrackerState {
   sessions: Session[];
   runs: Map<string, Run[]>; // sessionId -> runs
   runItems: Map<string, RunItem[]>; // runId -> items
-  recentRunTypes: string[];
-  recentRunTypesLoading?: boolean;
   isTracking: boolean;
   isPaused: boolean;
   loading: boolean;
@@ -34,7 +32,6 @@ interface RunTrackerState {
   endRun: () => Promise<void>;
   pauseRun: () => Promise<void>;
   resumeRun: () => Promise<void>;
-  setRunType: (runType: string) => Promise<void>;
 
   // Actions - Data Loading
   loadSessions: (includeArchived?: boolean) => Promise<void>;
@@ -43,8 +40,6 @@ interface RunTrackerState {
   loadSessionRuns: (sessionId: string) => Promise<void>;
   loadRunItems: (runId: string) => Promise<void>;
   refreshActiveRun: () => Promise<void>;
-  loadRecentRunTypes: () => Promise<void>;
-  saveRunType: (runType: string) => Promise<void>;
 
   // Actions - State Management
   setLoading: (loading: boolean) => void;
@@ -80,8 +75,6 @@ export const useRunTrackerStore = create<RunTrackerState>()(
     sessions: [],
     runs: new Map(),
     runItems: new Map(),
-    recentRunTypes: [],
-    recentRunTypesLoading: false,
     isTracking: false,
     isPaused: false,
     loading: false,
@@ -235,19 +228,6 @@ export const useRunTrackerStore = create<RunTrackerState>()(
       }
     },
 
-    setRunType: async (runType) => {
-      set({ loading: true, error: null });
-      try {
-        await window.electronAPI?.runTracker.setRunType(runType);
-        set({ loading: false });
-        console.log('[RunTrackerStore] Run type set:', runType);
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        set({ error: errorMessage, loading: false });
-        console.error('[RunTrackerStore] Error setting run type:', error);
-      }
-    },
-
     // Data loading actions
     loadSessions: async (includeArchived = false) => {
       set({ loading: true, error: null });
@@ -355,57 +335,6 @@ export const useRunTrackerStore = create<RunTrackerState>()(
         const errorMessage = error instanceof Error ? error.message : String(error);
         set({ error: errorMessage, loading: false });
         console.error('[RunTrackerStore] Error refreshing active run:', error);
-      }
-    },
-
-    // Recent run types actions
-    loadRecentRunTypes: async () => {
-      // Skip if already loaded (prevents excessive loading)
-      const { recentRunTypes, recentRunTypesLoading } = get();
-      if (recentRunTypes.length > 0 || recentRunTypesLoading) {
-        return;
-      }
-
-      set({ recentRunTypesLoading: true, error: null });
-      try {
-        const recentTypes = await window.electronAPI?.runTracker.getRecentRunTypes();
-        if (recentTypes) {
-          set({ recentRunTypes: recentTypes, recentRunTypesLoading: false });
-          console.log('[RunTrackerStore] Loaded recent run types:', recentTypes.length);
-        } else {
-          set({ recentRunTypesLoading: false });
-        }
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : String(error);
-
-        // Silently handle "not initialized" errors to prevent spam
-        if (errorMessage.includes('not initialized')) {
-          console.log(
-            '[RunTrackerStore] Run tracker not initialized yet, skipping recent run types load',
-          );
-          set({ recentRunTypesLoading: false });
-          return;
-        }
-
-        set({ error: errorMessage, recentRunTypesLoading: false });
-        console.error('[RunTrackerStore] Error loading recent run types:', error);
-      }
-    },
-
-    saveRunType: async (runType) => {
-      set({ error: null });
-      try {
-        await window.electronAPI?.runTracker.saveRunType(runType);
-        // Reload recent run types to get updated list
-        const recentTypes = await window.electronAPI?.runTracker.getRecentRunTypes();
-        if (recentTypes) {
-          set({ recentRunTypes: recentTypes });
-          console.log('[RunTrackerStore] Saved run type and reloaded recent types');
-        }
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        set({ error: errorMessage });
-        console.error('[RunTrackerStore] Error saving run type:', error);
       }
     },
 

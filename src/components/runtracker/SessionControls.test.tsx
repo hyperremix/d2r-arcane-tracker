@@ -56,15 +56,11 @@ const mockStoreActions = {
   pauseRun: vi.fn(),
   resumeRun: vi.fn(),
   endSession: vi.fn(),
-  setRunType: vi.fn(),
-  loadRecentRunTypes: vi.fn(),
-  saveRunType: vi.fn(),
 };
 
 const defaultStoreState = {
   activeSession: null,
   activeRun: null,
-  recentRunTypes: [],
   isTracking: false,
   isPaused: false,
   loading: false,

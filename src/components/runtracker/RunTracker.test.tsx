@@ -71,7 +71,6 @@ describe('RunTracker', () => {
       sessionId: 'session-1',
       characterId: 'char-1',
       runNumber: 1,
-      runType: 'Mephisto',
       startTime: new Date('2024-01-01T10:00:00Z'),
       endTime: new Date('2024-01-01T10:02:00Z'),
       duration: 120000, // 2 minutes

@@ -47,7 +47,6 @@ class RunTrackerService {
   endRun(manual: boolean = false): void
   pauseRun(): void
   resumeRun(): void
-  setRunType(runType: string): void
   
   // Save file event handling
   handleSaveFileEvent(event: SaveFileEvent): void

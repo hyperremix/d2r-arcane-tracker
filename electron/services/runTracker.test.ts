@@ -369,35 +369,6 @@ describe('When RunTrackerService is instantiated', () => {
     });
   });
 
-  describe('If setRunType is called', () => {
-    it('Then should update the current run type', () => {
-      // Arrange
-      const characterId = 'char-1';
-      service.startSession();
-      service.startRun(characterId);
-      const runType = 'Mephisto';
-      vi.clearAllMocks();
-
-      // Act
-      service.setRunType(runType);
-
-      // Assert
-      expect(mockDatabase.upsertRun).toHaveBeenCalledWith(expect.objectContaining({ runType }));
-    });
-
-    it('Then should do nothing if no active run', () => {
-      // Arrange
-      service.startSession();
-      vi.clearAllMocks();
-
-      // Act
-      service.setRunType('Mephisto');
-
-      // Assert
-      expect(mockDatabase.upsertRun).not.toHaveBeenCalled();
-    });
-  });
-
   // Save file event handling tests removed - auto mode now uses memory reading only
 
   describe('If archiveSession is called', () => {

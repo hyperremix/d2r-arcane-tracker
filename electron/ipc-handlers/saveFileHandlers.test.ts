@@ -111,7 +111,6 @@ vi.mock('../services/runTracker', () => {
     endRun: vi.fn(),
     pauseRun: vi.fn(),
     resumeRun: vi.fn(),
-    setRunType: vi.fn(),
     getState: vi.fn(),
     shutdown: vi.fn(),
   };
@@ -301,7 +300,6 @@ describe('When saveFileHandlers is used', () => {
       endRun: vi.fn(),
       pauseRun: vi.fn(),
       resumeRun: vi.fn(),
-      setRunType: vi.fn(),
       getState: vi.fn(),
       shutdown: vi.fn(),
     };

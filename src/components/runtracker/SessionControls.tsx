@@ -16,7 +16,6 @@ import { Switch } from '@/components/ui/switch';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useGrailStore } from '@/stores/grailStore';
 import { useRunTrackerStore } from '@/stores/runTrackerStore';
-import { RunTypeSelector } from './RunTypeSelector';
 
 // Helper function to parse keyboard shortcut string
 const parseShortcut = (shortcut: string) => {
@@ -392,14 +391,6 @@ export function SessionControls() {
         </CardHeader>
         <CardContent>
           <div className="flex flex-col gap-4">
-            {/* Run Type Selector - only mounted when there's an active run */}
-            {activeRun && (
-              <div className="flex items-center gap-2">
-                <span className="font-medium text-sm">Run Type:</span>
-                <RunTypeSelector />
-              </div>
-            )}
-
             {/* Auto Mode Toggle - Windows only */}
             {isWindows && activeSession && (
               <div className="flex items-center justify-between rounded-md border p-3">

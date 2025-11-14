@@ -228,7 +228,6 @@ export interface Run {
   sessionId: string;
   characterId?: string;
   runNumber: number;
-  runType?: string;
   startTime: Date;
   endTime?: Date;
   duration?: number; // milliseconds
@@ -309,7 +308,6 @@ export type DatabaseRun = {
   session_id: string;
   character_id: string | null;
   run_number: number;
-  run_type: string | null;
   start_time: string;
   end_time: string | null;
   duration: number | null;
@@ -376,18 +374,6 @@ export interface RunStatistics {
   fastestRun: { runId: string; duration: number; timestamp: Date };
   slowestRun: { runId: string; duration: number; timestamp: Date };
   itemsPerRun: number;
-  mostCommonRunType: string;
-}
-
-/**
- * Interface representing statistics grouped by run type.
- */
-export interface RunTypeStats {
-  runType: string;
-  count: number;
-  totalDuration: number;
-  averageDuration: number;
-  itemsFound: number;
 }
 
 /**
@@ -401,7 +387,6 @@ export interface CharacterRunSummary {
   averageSessionDuration: number;
   averageRunsPerSession: number;
   totalItemsFound: number;
-  favoriteRunType: string;
 }
 
 /**
