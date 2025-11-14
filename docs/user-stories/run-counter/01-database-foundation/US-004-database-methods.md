@@ -126,8 +126,17 @@ getActiveRun(sessionId: string): Run | null {
  */
 upsertRun(run: Run): void {
   const stmt = this.db.prepare(`
-    INSERT OR REPLACE INTO runs (id, session_id, character_id, run_number, run_type, start_time, end_time, duration, area)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO runs (id, session_id, character_id, run_number, start_time, end_time, duration, area)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(id) DO UPDATE SET
+      session_id = excluded.session_id,
+      character_id = excluded.character_id,
+      run_number = excluded.run_number,
+      start_time = excluded.start_time,
+      end_time = excluded.end_time,
+      duration = excluded.duration,
+      area = excluded.area,
+      updated_at = CURRENT_TIMESTAMP
   `);
   const mapped = mapRunToDatabase(run);
   stmt.run(
@@ -135,7 +144,6 @@ upsertRun(run: Run): void {
     mapped.session_id,
     mapped.character_id,
     mapped.run_number,
-    mapped.run_type,
     mapped.start_time,
     mapped.end_time,
     mapped.duration,

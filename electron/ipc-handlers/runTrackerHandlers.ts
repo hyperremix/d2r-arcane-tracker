@@ -114,22 +114,6 @@ export function initializeRunTrackerHandlers(
     }
   });
 
-  ipcMain.handle('run-tracker:set-run-type', async (_event, runType: string) => {
-    try {
-      if (!runTracker) {
-        throw new Error('Run tracker not initialized');
-      }
-      if (!runType || typeof runType !== 'string') {
-        throw new Error('Invalid run type');
-      }
-      runTracker.setRunType(runType);
-      return { success: true };
-    } catch (error) {
-      console.error('[runTrackerHandlers] Error setting run type:', error);
-      throw error;
-    }
-  });
-
   // State query handlers
   ipcMain.handle('run-tracker:get-state', async (_event) => {
     try {
@@ -262,57 +246,6 @@ export function initializeRunTrackerHandlers(
     }
   });
 
-  // Recent run types handlers
-  ipcMain.handle('run-tracker:get-recent-run-types', async (_event, limit?: number) => {
-    try {
-      if (!runTracker) {
-        console.warn('[runTrackerHandlers] Run tracker not initialized, returning empty array');
-        return [];
-      }
-      const database = runTracker.getDatabase();
-      return database.getRecentRunTypes(limit);
-    } catch (error) {
-      console.error('[runTrackerHandlers] Error getting recent run types:', error);
-      return [];
-    }
-  });
-
-  ipcMain.handle('run-tracker:save-run-type', async (_event, runType: string) => {
-    try {
-      if (!runTracker) {
-        console.warn('[runTrackerHandlers] Run tracker not initialized, cannot save run type');
-        return { success: false };
-      }
-      if (!runType || typeof runType !== 'string') {
-        throw new Error('Invalid run type');
-      }
-      const database = runTracker.getDatabase();
-      database.saveRunType(runType);
-      return { success: true };
-    } catch (error) {
-      console.error('[runTrackerHandlers] Error saving run type:', error);
-      return { success: false };
-    }
-  });
-
-  ipcMain.handle('run-tracker:delete-run-type', async (_event, runType: string) => {
-    try {
-      if (!runTracker) {
-        console.warn('[runTrackerHandlers] Run tracker not initialized, cannot delete run type');
-        return { success: false };
-      }
-      if (!runType || typeof runType !== 'string') {
-        throw new Error('Invalid run type');
-      }
-      const database = runTracker.getDatabase();
-      database.deleteRunType(runType);
-      return { success: true };
-    } catch (error) {
-      console.error('[runTrackerHandlers] Error deleting run type:', error);
-      return { success: false };
-    }
-  });
-
   // Statistics query handlers
   ipcMain.handle('run-tracker:get-overall-statistics', async (_event) => {
     try {
@@ -324,20 +257,6 @@ export function initializeRunTrackerHandlers(
       return database.getOverallRunStatistics();
     } catch (error) {
       console.error('[runTrackerHandlers] Error getting overall statistics:', error);
-      throw error;
-    }
-  });
-
-  ipcMain.handle('run-tracker:get-statistics-by-type', async (_event) => {
-    try {
-      if (!runTracker) {
-        throw new Error('Run tracker not initialized');
-      }
-
-      const database = runTracker.getDatabase();
-      return database.getRunStatisticsByType();
-    } catch (error) {
-      console.error('[runTrackerHandlers] Error getting statistics by type:', error);
       throw error;
     }
   });

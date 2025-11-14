@@ -390,27 +390,6 @@ export class RunTrackerService {
   }
 
   /**
-   * Sets the run type for the current run.
-   */
-  setRunType(runType: string): void {
-    if (!this.currentRun) {
-      return;
-    }
-
-    const now = new Date();
-    const run = {
-      ...this.currentRun,
-      runType,
-      lastUpdated: now,
-    };
-
-    this.currentRun = run;
-    this.database.upsertRun(run);
-
-    console.log('[RunTrackerService] Run type set:', runType);
-  }
-
-  /**
    * Gets the active session.
    */
   getActiveSession(): Session | null {

@@ -123,7 +123,6 @@ export class RunBuilder {
     sessionId: 'default-session',
     characterId: 'default-character',
     runNumber: 1,
-    runType: undefined,
     startTime: new Date('2024-01-01T10:00:00Z'),
     endTime: undefined,
     duration: undefined,
@@ -168,14 +167,6 @@ export class RunBuilder {
    */
   withRunNumber(runNumber: number): this {
     this.run.runNumber = runNumber;
-    return this;
-  }
-
-  /**
-   * Set the run type
-   */
-  withRunType(runType: string | undefined): this {
-    this.run.runType = runType;
     return this;
   }
 

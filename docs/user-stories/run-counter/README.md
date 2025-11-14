@@ -11,7 +11,7 @@ The Run Counter feature enables users to track their Diablo II: Resurrected gami
 Players need to:
 
 - Track their farming efficiency and session productivity
-- Know which run types are most effective for finding items
+- Identify which sessions and routes are most effective for finding items
 - Understand how much time they spend in-game vs idle
 - Maintain statistics about their farming sessions
 - Export and analyze their run data
@@ -54,7 +54,7 @@ UI Components
 ├── US-011: Session Card (depends on US-009)
 ├── US-012: Run List (depends on US-009)
 ├── US-013: Session Controls (depends on US-009)
-└── US-014: Run Type Selector (depends on US-009)
+└── US-014: (Retired) Run Type Selector (depends on US-009)
 
 Integration
 ├── US-015: Navigation (depends on US-010)
@@ -140,7 +140,7 @@ Testing, polish, and UX improvements.
 - [US-011: Session Card](./05-ui-components/US-011-session-card.md)
 - [US-012: Run List](./05-ui-components/US-012-run-list.md)
 - [US-013: Session Controls](./05-ui-components/US-013-session-controls.md)
-- [US-014: Run Type Selector](./05-ui-components/US-014-run-type-selector.md)
+- [US-014: (Retired) Run Type Selector](./05-ui-components/US-014-run-type-selector.md)
 
 ### Phase 6: Navigation
 

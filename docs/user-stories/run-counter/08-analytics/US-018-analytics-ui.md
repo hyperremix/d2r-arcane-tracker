@@ -10,7 +10,7 @@ Create an Analytics component with charts and visualizations showing run statist
 - [ ] Display session statistics dashboard
 - [ ] Show run duration charts
 - [ ] Display item find rate
-- [ ] Show run type distribution
+- [ ] Highlight fastest and slowest runs
 - [ ] Add date range filtering
 - [ ] Export chart data
 - [ ] Responsive chart layout

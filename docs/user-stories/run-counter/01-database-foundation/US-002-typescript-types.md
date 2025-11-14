@@ -43,7 +43,6 @@ export type Run = {
   sessionId: string;
   characterId: string;
   runNumber: number;
-  runType?: string;
   startTime: Date;
   endTime?: Date;
   duration?: number; // milliseconds
@@ -83,7 +82,6 @@ export type DatabaseRun = {
   session_id: string;
   character_id: string;
   run_number: number;
-  run_type: string | null;
   start_time: string;
   end_time: string | null;
   duration: number | null;
@@ -124,15 +122,6 @@ export type RunStatistics = {
   fastestRun: { runId: string; duration: number; timestamp: Date };
   slowestRun: { runId: string; duration: number; timestamp: Date };
   itemsPerRun: number;
-  mostCommonRunType: string;
-};
-
-export type RunTypeStats = {
-  runType: string;
-  count: number;
-  totalDuration: number;
-  averageDuration: number;
-  itemsFound: number;
 };
 ```
 

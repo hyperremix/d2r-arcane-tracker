@@ -614,14 +614,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
     resumeRun: (): Promise<{ success: boolean }> => ipcRenderer.invoke('run-tracker:resume'),
 
     /**
-     * Sets the run type for the current run.
-     * @param {string} runType - The type of run (e.g., 'boss', 'area', 'cow').
-     * @returns {Promise<{ success: boolean }>} A promise that resolves with a success indicator.
-     */
-    setRunType: (runType: string): Promise<{ success: boolean }> =>
-      ipcRenderer.invoke('run-tracker:set-run-type', runType),
-
-    /**
      * State Queries
      */
     /**
@@ -692,24 +684,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.invoke('run-tracker:get-session-items', sessionId),
 
     /**
-     * Gets recent run types ordered by last used.
-     * @param {number} [limit] - Optional limit on the number of recent run types to return.
-     * @returns {Promise<string[]>} A promise that resolves with an array of run type strings.
-     */
-    getRecentRunTypes: (limit?: number): Promise<string[]> =>
-      ipcRenderer.invoke('run-tracker:get-recent-run-types', limit),
-
-    /**
      * Gets overall run statistics across all sessions.
      * @returns {Promise<RunStatistics>} A promise that resolves with overall run statistics.
      */
     getOverallStatistics: () => ipcRenderer.invoke('run-tracker:get-overall-statistics'),
-
-    /**
-     * Gets run statistics grouped by run type.
-     * @returns {Promise<RunTypeStats[]>} A promise that resolves with run type statistics.
-     */
-    getStatisticsByType: () => ipcRenderer.invoke('run-tracker:get-statistics-by-type'),
   },
 
   /**

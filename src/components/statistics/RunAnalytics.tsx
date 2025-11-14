@@ -1,50 +1,17 @@
-import type { RunStatistics, RunTypeStats } from 'electron/types/grail';
+import type { RunStatistics } from 'electron/types/grail';
 import { Clock, Download, Target, TrendingUp, Trophy } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Cell,
-  Pie,
-  PieChart,
-  Tooltip as RechartsTooltip,
-  ResponsiveContainer,
-  XAxis,
-  YAxis,
-} from 'recharts';
+import { useCallback, useEffect, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 /**
- * Interface for chart data points
- */
-interface ChartDataPoint {
-  name: string;
-  value: number;
-  [key: string]: unknown;
-}
-
-/**
- * Interface for run type chart data
- */
-interface RunTypeChartData {
-  name: string;
-  runs: number;
-  avgDuration: number;
-  totalDuration: number;
-  itemsFound: number;
-}
-
-/**
- * RunAnalytics component that displays comprehensive run statistics and visualizations.
- * Shows session statistics, run duration charts, item find rates, and run type distributions.
- * @returns {JSX.Element} Run analytics dashboard with charts and statistics
+ * RunAnalytics component that displays overall run statistics and highlights.
+ * Shows aggregate metrics, efficiency details, and performance highlights.
+ * @returns {JSX.Element} Run analytics dashboard with statistics
  */
 export function RunAnalytics() {
   const [overallStats, setOverallStats] = useState<RunStatistics | null>(null);
-  const [runTypeStats, setRunTypeStats] = useState<RunTypeStats[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -54,16 +21,9 @@ export function RunAnalytics() {
     setError(null);
 
     try {
-      // Load overall statistics
       const overall = await window.electronAPI?.runTracker.getOverallStatistics();
       if (overall) {
         setOverallStats(overall);
-      }
-
-      // Load run type statistics
-      const byType = await window.electronAPI?.runTracker.getStatisticsByType();
-      if (byType) {
-        setRunTypeStats(byType);
       }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : String(err);
@@ -96,27 +56,6 @@ export function RunAnalytics() {
     return `${minutes}m`;
   }, []);
 
-  // Prepare chart data
-  const runTypeChartData = useMemo((): RunTypeChartData[] => {
-    return runTypeStats.map((stat) => ({
-      name: stat.runType,
-      runs: stat.count,
-      avgDuration: stat.averageDuration,
-      totalDuration: stat.totalDuration,
-      itemsFound: stat.itemsFound,
-    }));
-  }, [runTypeStats]);
-
-  const runTypeDistributionData = useMemo((): ChartDataPoint[] => {
-    return runTypeStats.map((stat) => ({
-      name: stat.runType,
-      value: stat.count,
-    }));
-  }, [runTypeStats]);
-
-  // Colors for charts
-  const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82CA9D'];
-
   // Export functionality
   const exportData = useCallback(async () => {
     try {
@@ -132,16 +71,6 @@ export function RunAnalytics() {
             : '0:00',
         ],
         ['Items Per Run', overallStats?.itemsPerRun.toFixed(2) || '0.00'],
-        ['Most Common Run Type', overallStats?.mostCommonRunType || 'N/A'],
-        [''],
-        ['Run Type', 'Count', 'Avg Duration', 'Total Duration', 'Items Found'],
-        ...runTypeStats.map((stat) => [
-          stat.runType,
-          stat.count,
-          formatDuration(stat.averageDuration),
-          formatTime(stat.totalDuration),
-          stat.itemsFound,
-        ]),
       ];
 
       const csvContent = csvData.map((row) => row.join(',')).join('\n');
@@ -161,7 +90,7 @@ export function RunAnalytics() {
     } catch (err) {
       console.error('[Analytics] Error exporting data:', err);
     }
-  }, [overallStats, runTypeStats, formatDuration, formatTime]);
+  }, [overallStats, formatDuration, formatTime]);
 
   if (loading) {
     return (
@@ -265,141 +194,6 @@ export function RunAnalytics() {
           </CardContent>
         </Card>
       </div>
-
-      {/* Charts Grid */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        {/* Run Type Distribution */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Run Type Distribution</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
-              <PieChart>
-                <Pie
-                  data={runTypeDistributionData}
-                  cx="50%"
-                  cy="50%"
-                  labelLine={false}
-                  label={({ name, percent }) =>
-                    `${name} ${((percent as number) * 100).toFixed(0)}%`
-                  }
-                  outerRadius={80}
-                  fill="#8884d8"
-                  dataKey="value"
-                >
-                  {runTypeDistributionData.map((data, index) => (
-                    <Cell key={`cell-${data.name}-${index}`} fill={COLORS[index % COLORS.length]} />
-                  ))}
-                </Pie>
-                <RechartsTooltip />
-              </PieChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-
-        {/* Run Counts by Type */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Runs by Type</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={runTypeChartData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="name" />
-                <YAxis />
-                <RechartsTooltip />
-                <Bar dataKey="runs" fill="#8884d8" />
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-
-        {/* Average Duration by Type */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Average Duration by Run Type</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={runTypeChartData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="name" />
-                <YAxis />
-                <RechartsTooltip formatter={(value) => formatDuration(value as number)} />
-                <Bar dataKey="avgDuration" fill="#82ca9d" />
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-
-        {/* Items Found by Type */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Items Found by Run Type</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={runTypeChartData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="name" />
-                <YAxis />
-                <RechartsTooltip />
-                <Bar dataKey="itemsFound" fill="#ffc658" />
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Run Statistics Table */}
-      {runTypeStats.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Detailed Run Type Statistics</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b">
-                    <th className="p-2 text-left">Run Type</th>
-                    <th className="p-2 text-right">Count</th>
-                    <th className="p-2 text-right">Avg Duration</th>
-                    <th className="p-2 text-right">Total Duration</th>
-                    <th className="p-2 text-right">Items Found</th>
-                    <th className="p-2 text-right">Items/Run</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {runTypeStats.map((stat, index) => (
-                    <tr key={stat.runType} className="border-b">
-                      <td className="p-2">
-                        <div className="flex items-center gap-2">
-                          <div
-                            className="h-3 w-3 rounded-full"
-                            style={{ backgroundColor: COLORS[index % COLORS.length] }}
-                          />
-                          {stat.runType}
-                        </div>
-                      </td>
-                      <td className="p-2 text-right">{stat.count}</td>
-                      <td className="p-2 text-right">{formatDuration(stat.averageDuration)}</td>
-                      <td className="p-2 text-right">{formatTime(stat.totalDuration)}</td>
-                      <td className="p-2 text-right">{stat.itemsFound}</td>
-                      <td className="p-2 text-right">
-                        {(stat.itemsFound / stat.count).toFixed(2)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
       {/* Performance Highlights */}
       <Card>
         <CardHeader>
@@ -428,10 +222,6 @@ export function RunAnalytics() {
                   {overallStats.slowestRun.timestamp.toLocaleDateString()}
                 </span>
               </div>
-            </div>
-            <div className="space-y-2">
-              <h4 className="font-medium">Most Common Run Type</h4>
-              <Badge variant="outline">{overallStats.mostCommonRunType}</Badge>
             </div>
             <div className="space-y-2">
               <h4 className="font-medium">Overall Efficiency</h4>

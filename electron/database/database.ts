@@ -18,7 +18,6 @@ import type {
   Run,
   RunItem,
   RunStatistics,
-  RunTypeStats,
   SaveFileState,
   Session,
   SessionStats,
@@ -189,7 +188,6 @@ class GrailDatabase {
         session_id TEXT NOT NULL,
         character_id TEXT,
         run_number INTEGER NOT NULL, -- sequential within session
-        run_type TEXT, -- e.g., "Mephisto", "Chaos", "Cows"
         start_time DATETIME NOT NULL,
         end_time DATETIME,
         duration INTEGER, -- milliseconds
@@ -209,16 +207,6 @@ class GrailDatabase {
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (run_id) REFERENCES runs(id) ON DELETE CASCADE,
         FOREIGN KEY (grail_progress_id) REFERENCES grail_progress(id) ON DELETE CASCADE
-      );
-
-      -- Recent run types table - stores recently used run types
-      CREATE TABLE IF NOT EXISTS recent_run_types (
-        id TEXT PRIMARY KEY,
-        run_type TEXT NOT NULL UNIQUE,
-        last_used DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        use_count INTEGER NOT NULL DEFAULT 1,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
       );
 
       -- Indexes for better performance
@@ -242,14 +230,10 @@ class GrailDatabase {
       CREATE INDEX IF NOT EXISTS idx_runs_character ON runs(character_id);
       CREATE INDEX IF NOT EXISTS idx_runs_start_time ON runs(start_time);
       CREATE INDEX IF NOT EXISTS idx_runs_session_number ON runs(session_id, run_number);
-      CREATE INDEX IF NOT EXISTS idx_runs_run_type ON runs(run_type);
 
       -- Run items indexes
       CREATE INDEX IF NOT EXISTS idx_run_items_run ON run_items(run_id);
       CREATE INDEX IF NOT EXISTS idx_run_items_progress ON run_items(grail_progress_id);
-
-      -- Recent run types indexes
-      CREATE INDEX IF NOT EXISTS idx_recent_run_types_last_used ON recent_run_types(last_used);
 
       -- Triggers to update the updated_at timestamp
       CREATE TRIGGER IF NOT EXISTS update_items_timestamp
@@ -292,12 +276,6 @@ class GrailDatabase {
         AFTER UPDATE ON runs
         BEGIN
           UPDATE runs SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
-        END;
-
-      CREATE TRIGGER IF NOT EXISTS update_recent_run_types_timestamp
-        AFTER UPDATE ON recent_run_types
-        BEGIN
-          UPDATE recent_run_types SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
         END;
 
       -- Insert default settings
@@ -404,7 +382,6 @@ class GrailDatabase {
             session_id TEXT NOT NULL,
             character_id TEXT,
             run_number INTEGER NOT NULL,
-            run_type TEXT,
             start_time DATETIME NOT NULL,
             end_time DATETIME,
             duration INTEGER,
@@ -429,7 +406,6 @@ class GrailDatabase {
           CREATE INDEX IF NOT EXISTS idx_runs_character ON runs(character_id);
           CREATE INDEX IF NOT EXISTS idx_runs_start_time ON runs(start_time);
           CREATE INDEX IF NOT EXISTS idx_runs_session_number ON runs(session_id, run_number);
-          CREATE INDEX IF NOT EXISTS idx_runs_run_type ON runs(run_type);
 
           -- Recreate trigger
           CREATE TRIGGER IF NOT EXISTS update_runs_timestamp
@@ -1412,18 +1388,6 @@ class GrailDatabase {
       runsWithItems: number;
     };
 
-    // Get most common run type
-    const mostCommonRunTypeStmt = this.db.prepare(`
-      SELECT r.run_type, COUNT(*) as count
-      FROM runs r
-      INNER JOIN sessions s ON r.session_id = s.id
-      WHERE s.archived = 0 AND r.run_type IS NOT NULL
-      GROUP BY r.run_type
-      ORDER BY count DESC
-      LIMIT 1
-    `);
-    const mostCommonRunType = mostCommonRunTypeStmt.get([]) as { run_type: string } | undefined;
-
     return {
       totalSessions: sessionStats.totalSessions,
       totalRuns: sessionStats.totalRuns,
@@ -1445,45 +1409,7 @@ class GrailDatabase {
         : { runId: '', duration: 0, timestamp: new Date() },
       itemsPerRun:
         itemsPerRun.runsWithItems > 0 ? itemsPerRun.totalItems / itemsPerRun.runsWithItems : 0,
-      mostCommonRunType: mostCommonRunType?.run_type || '',
     };
-  }
-
-  /**
-   * Retrieves statistics grouped by run type.
-   * @returns Array of run type statistics ordered by run count descending
-   */
-  getRunStatisticsByType(): RunTypeStats[] {
-    const stmt = this.db.prepare(`
-      SELECT
-        r.run_type,
-        COUNT(r.id) as count,
-        SUM(CASE WHEN r.duration IS NOT NULL THEN r.duration ELSE 0 END) as totalDuration,
-        AVG(CASE WHEN r.duration IS NOT NULL THEN r.duration ELSE 0 END) as averageDuration,
-        COUNT(ri.id) as itemsFound
-      FROM runs r
-      INNER JOIN sessions s ON r.session_id = s.id
-      LEFT JOIN run_items ri ON r.id = ri.run_id
-      WHERE s.archived = 0 AND r.run_type IS NOT NULL
-      GROUP BY r.run_type
-      ORDER BY count DESC
-    `);
-
-    const results = stmt.all([]) as Array<{
-      run_type: string;
-      count: number;
-      totalDuration: number | null;
-      averageDuration: number | null;
-      itemsFound: number;
-    }>;
-
-    return results.map((row) => ({
-      runType: row.run_type,
-      count: row.count,
-      totalDuration: row.totalDuration || 0,
-      averageDuration: row.averageDuration || 0,
-      itemsFound: row.itemsFound,
-    }));
   }
 
   /**
@@ -1518,13 +1444,12 @@ class GrailDatabase {
   upsertRun(run: Run): void {
     // Use INSERT ... ON CONFLICT DO UPDATE for true UPSERT behavior
     const stmt = this.db.prepare(`
-      INSERT INTO runs (id, session_id, character_id, run_number, run_type, start_time, end_time, duration, area)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO runs (id, session_id, character_id, run_number, start_time, end_time, duration, area)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(id) DO UPDATE SET
         session_id = excluded.session_id,
         character_id = excluded.character_id,
         run_number = excluded.run_number,
-        run_type = excluded.run_type,
         start_time = excluded.start_time,
         end_time = excluded.end_time,
         duration = excluded.duration,
@@ -1537,7 +1462,6 @@ class GrailDatabase {
       mapped.session_id,
       mapped.character_id,
       mapped.run_number,
-      mapped.run_type,
       mapped.start_time,
       mapped.end_time,
       mapped.duration,
@@ -1604,46 +1528,6 @@ class GrailDatabase {
   deleteRunItem(itemId: string): void {
     const stmt = this.db.prepare('DELETE FROM run_items WHERE id = ?');
     stmt.run(itemId);
-  }
-
-  /**
-   * Gets recent run types ordered by last_used.
-   * @param limit - Optional limit on the number of recent run types to return (default: 20)
-   * @returns Array of run type strings
-   */
-  getRecentRunTypes(limit = 20): string[] {
-    const stmt = this.db.prepare(
-      'SELECT run_type FROM recent_run_types ORDER BY last_used DESC LIMIT ?',
-    );
-    const rows = stmt.all(limit) as Array<{ run_type: string }>;
-    return rows.map((row) => row.run_type);
-  }
-
-  /**
-   * Saves a run type to the recent run types table.
-   * If the run type already exists, it updates the last_used timestamp and increments use_count.
-   * @param runType - The run type to save
-   */
-  saveRunType(runType: string): void {
-    const id = runType.toLowerCase().replace(/\s+/g, '-');
-    const stmt = this.db.prepare(`
-      INSERT INTO recent_run_types (id, run_type, last_used, use_count, created_at)
-      VALUES (?, ?, CURRENT_TIMESTAMP, 1, CURRENT_TIMESTAMP)
-      ON CONFLICT(run_type) DO UPDATE SET
-        last_used = CURRENT_TIMESTAMP,
-        use_count = use_count + 1,
-        updated_at = CURRENT_TIMESTAMP
-    `);
-    stmt.run(id, runType);
-  }
-
-  /**
-   * Deletes a run type from the recent run types table.
-   * @param runType - The run type to delete
-   */
-  deleteRunType(runType: string): void {
-    const stmt = this.db.prepare('DELETE FROM recent_run_types WHERE run_type = ?');
-    stmt.run(runType);
   }
 
   /**

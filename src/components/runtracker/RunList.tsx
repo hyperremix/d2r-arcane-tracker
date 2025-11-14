@@ -1,7 +1,7 @@
 import { useVirtualizer } from '@tanstack/react-virtual';
 import type { Run, RunItem } from 'electron/types/grail';
 import { ChevronLeft, ChevronRight as ChevronRightIcon } from 'lucide-react';
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
+import { useCallback, useId, useMemo, useRef, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -31,7 +31,7 @@ interface RunListProps {
   runs: Run[] | undefined;
 }
 
-type SortField = 'duration' | 'startTime' | 'runType' | 'itemsFound';
+type SortField = 'duration' | 'startTime' | 'itemsFound';
 type SortOrder = 'asc' | 'desc';
 
 const ITEMS_PER_PAGE = 10;
@@ -45,16 +45,13 @@ function TableRowSkeleton() {
         <Skeleton className="h-4 w-8" />
       </TableCell>
       <TableCell>
-        <Skeleton className="h-4 w-16" />
+        <Skeleton className="h-4 w-20" />
       </TableCell>
       <TableCell>
         <Skeleton className="h-4 w-20" />
       </TableCell>
       <TableCell>
         <Skeleton className="h-4 w-16" />
-      </TableCell>
-      <TableCell>
-        <Skeleton className="h-4 w-8" />
       </TableCell>
       <TableCell>
         <Skeleton className="h-4 w-8" />
@@ -85,16 +82,10 @@ function RunRow({ run, itemsCount, onViewDetails, formatTimestamp }: RunRowProps
       aria-label={`View run #${run.runNumber} details`}
     >
       <TableCell className="font-medium">#{run.runNumber}</TableCell>
-      <TableCell>
-        {run.runType ? (
-          <Badge variant="outline" className="text-xs">
-            {run.runType}
-          </Badge>
-        ) : (
-          <span className="text-muted-foreground text-sm">-</span>
-        )}
-      </TableCell>
       <TableCell className="font-mono text-sm">{formatTimestamp(run.startTime)}</TableCell>
+      <TableCell className="font-mono text-sm">
+        {run.endTime ? formatTimestamp(run.endTime) : '-'}
+      </TableCell>
       <TableCell className="font-mono text-sm">
         {run.duration ? formatDuration(run.duration) : '-'}
       </TableCell>
@@ -118,25 +109,14 @@ function RunRow({ run, itemsCount, onViewDetails, formatTimestamp }: RunRowProps
 export function RunList({ runs }: RunListProps) {
   const { runItems, loadRunItems, loading } = useRunTrackerStore();
   const { items, progress } = useGrailStore();
-  const runTypeFilterId = useId();
   const sortFieldId = useId();
 
   // State management
   const [currentPage, setCurrentPage] = useState(1);
   const [sortField, setSortField] = useState<SortField>('startTime');
   const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
-  const [selectedRunTypes, setSelectedRunTypes] = useState<string[]>([]);
   const [selectedRun, setSelectedRun] = useState<Run | null>(null);
   const [isRunDialogOpen, setIsRunDialogOpen] = useState(false);
-
-  // Get unique run types from all runs
-  const availableRunTypes = useMemo(() => {
-    if (!runs) return [];
-    const types = runs
-      .map((run) => run.runType)
-      .filter((type): type is string => type !== undefined && type !== null);
-    return Array.from(new Set(types)).sort();
-  }, [runs]);
 
   // Calculate items count for each run (memoized)
   const getRunItemsCount = useCallback(
@@ -149,9 +129,8 @@ export function RunList({ runs }: RunListProps) {
 
   const filteredRuns = useMemo(() => {
     if (!runs || runs.length === 0) return [];
-    if (selectedRunTypes.length === 0) return runs;
-    return runs.filter((run) => run.runType && selectedRunTypes.includes(run.runType));
-  }, [runs, selectedRunTypes]);
+    return runs;
+  }, [runs]);
 
   const sortedRuns = useMemo(() => {
     if (filteredRuns.length === 0) return [];
@@ -167,12 +146,6 @@ export function RunList({ runs }: RunListProps) {
         }
         case 'startTime': {
           comparison = a.startTime.getTime() - b.startTime.getTime();
-          break;
-        }
-        case 'runType': {
-          const typeA = a.runType || '';
-          const typeB = b.runType || '';
-          comparison = typeA.localeCompare(typeB);
           break;
         }
         case 'itemsFound': {
@@ -204,24 +177,10 @@ export function RunList({ runs }: RunListProps) {
   const endIndex = startIndex + ITEMS_PER_PAGE;
   const paginatedRuns = sortedRuns.slice(startIndex, endIndex);
 
-  // Reset to first page when filters change
-  // biome-ignore lint/correctness/useExhaustiveDependencies: Dependencies are necessary to reset page when filters change
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [selectedRunTypes.length, sortField, sortOrder]);
-
-  // Handle run type filter changes
-  const handleRunTypeFilter = useCallback((value: string) => {
-    if (value === 'all') {
-      setSelectedRunTypes([]);
-    } else {
-      setSelectedRunTypes([value]);
-    }
-  }, []);
-
   // Handle sorting
   const handleSort = useCallback(
     (field: SortField) => {
+      setCurrentPage(1);
       if (sortField === field) {
         setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
       } else {
@@ -231,6 +190,11 @@ export function RunList({ runs }: RunListProps) {
     },
     [sortField, sortOrder],
   );
+
+  const handleSortOrderToggle = useCallback(() => {
+    setCurrentPage(1);
+    setSortOrder((prev) => (prev === 'asc' ? 'desc' : 'asc'));
+  }, []);
 
   // Handle pagination
   const goToPage = useCallback(
@@ -315,8 +279,8 @@ export function RunList({ runs }: RunListProps) {
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-16">Run #</TableHead>
-                  <TableHead>Type</TableHead>
                   <TableHead>Start Time</TableHead>
+                  <TableHead>End Time</TableHead>
                   <TableHead>Duration</TableHead>
                   <TableHead className="w-24">Items</TableHead>
                 </TableRow>
@@ -349,38 +313,6 @@ export function RunList({ runs }: RunListProps) {
           <div className="flex items-center gap-2">
             <Tooltip>
               <TooltipTrigger asChild>
-                <label
-                  htmlFor={runTypeFilterId}
-                  className="font-medium text-muted-foreground text-sm"
-                >
-                  Filter by type:
-                </label>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Filter runs by their type (e.g., Mephisto, Chaos, etc.)</p>
-              </TooltipContent>
-            </Tooltip>
-            <Select
-              value={selectedRunTypes.length === 0 ? 'all' : selectedRunTypes[0]}
-              onValueChange={handleRunTypeFilter}
-            >
-              <SelectTrigger id={runTypeFilterId} className="w-40">
-                <SelectValue placeholder="All types" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All types</SelectItem>
-                {availableRunTypes.map((type) => (
-                  <SelectItem key={type} value={type}>
-                    {type}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <Tooltip>
-              <TooltipTrigger asChild>
                 <label htmlFor={sortFieldId} className="font-medium text-muted-foreground text-sm">
                   Sort by:
                 </label>
@@ -396,7 +328,6 @@ export function RunList({ runs }: RunListProps) {
               <SelectContent>
                 <SelectItem value="startTime">Start Time</SelectItem>
                 <SelectItem value="duration">Duration</SelectItem>
-                <SelectItem value="runType">Type</SelectItem>
                 <SelectItem value="itemsFound">Items Found</SelectItem>
               </SelectContent>
             </Select>
@@ -405,7 +336,7 @@ export function RunList({ runs }: RunListProps) {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+                  onClick={handleSortOrderToggle}
                   className="px-2"
                 >
                   {sortOrder === 'asc' ? '↑' : '↓'}
@@ -439,8 +370,8 @@ export function RunList({ runs }: RunListProps) {
                       <TableHeader className="sticky top-0 z-10 bg-background">
                         <TableRow>
                           <TableHead className="w-16">Run #</TableHead>
-                          <TableHead>Type</TableHead>
                           <TableHead>Start Time</TableHead>
+                          <TableHead>End Time</TableHead>
                           <TableHead>Duration</TableHead>
                           <TableHead className="w-24">Items</TableHead>
                         </TableRow>
@@ -483,8 +414,8 @@ export function RunList({ runs }: RunListProps) {
                   <TableHeader>
                     <TableRow>
                       <TableHead className="w-16">Run #</TableHead>
-                      <TableHead>Type</TableHead>
                       <TableHead>Start Time</TableHead>
+                      <TableHead>End Time</TableHead>
                       <TableHead>Duration</TableHead>
                       <TableHead className="w-24">Items</TableHead>
                     </TableRow>
@@ -627,10 +558,6 @@ function RunDetailsDialog({
         </DialogHeader>
         <div className="space-y-6">
           <div className="grid gap-4 md:grid-cols-2">
-            <div className="space-y-1">
-              <p className="font-medium text-muted-foreground text-sm">Run Type</p>
-              <p className="text-sm">{run.runType ?? 'Not set'}</p>
-            </div>
             <div className="space-y-1">
               <p className="font-medium text-muted-foreground text-sm">Start Time</p>
               <p className="font-mono text-sm">{formatTimestamp(run.startTime)}</p>
