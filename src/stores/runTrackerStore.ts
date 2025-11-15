@@ -282,14 +282,24 @@ export const useRunTrackerStore = create<RunTrackerState>()(
     },
 
     loadSessionRuns: async (sessionId) => {
+      // Check if runs are already loaded to avoid unnecessary API calls
+      const { runs: currentRuns } = get();
+      if (currentRuns.has(sessionId)) {
+        console.log(`[RunTrackerStore] Runs already loaded for session:`, sessionId);
+        return;
+      }
+
       set({ loading: true, error: null });
       try {
         const runs = await window.electronAPI?.runTracker.getRunsBySession(sessionId);
         if (runs) {
-          const { runs: currentRuns, runItems: currentRunItems } = get();
+          const { runs: currentRuns, runItems: currentRunItems, sessionStatsCache } = get();
           const newRuns = new Map(currentRuns);
           newRuns.set(sessionId, runs);
-          set({ runs: newRuns, loading: false });
+          // Invalidate session stats cache since runs have changed
+          const newCache = new Map(sessionStatsCache);
+          newCache.delete(sessionId);
+          set({ runs: newRuns, sessionStatsCache: newCache, loading: false });
           console.log(`[RunTrackerStore] Loaded ${runs.length} runs for session:`, sessionId);
 
           // Load run items for all runs that don't have items loaded yet

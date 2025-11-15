@@ -1,6 +1,6 @@
 import type { Session } from 'electron/types/grail';
 import { Archive, Calendar, Clock, Play } from 'lucide-react';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -119,7 +119,7 @@ function SessionCardSkeleton() {
  * and the ability to select a session to view its details.
  */
 export function SessionsList({ onSessionSelect }: SessionsListProps) {
-  const { sessions, loading, getSessionStats } = useRunTrackerStore();
+  const { sessions, loading, getSessionStats, runs, loadSessionRuns } = useRunTrackerStore();
   const [showArchived, setShowArchived] = useState(false);
 
   // Filter sessions based on archived status
@@ -143,6 +143,30 @@ export function SessionsList({ onSessionSelect }: SessionsListProps) {
   const sortedSessions = useMemo(() => {
     return [...filteredSessions].sort((a, b) => b.startTime.getTime() - a.startTime.getTime());
   }, [filteredSessions]);
+
+  // Memoize list of session IDs that need runs loaded
+  // This prevents infinite rerenders by creating a stable reference
+  const sessionsNeedingRuns = useMemo(() => {
+    return sortedSessions
+      .filter((session) => {
+        // Check if runs are already loaded for this session
+        const sessionRuns = runs.get(session.id);
+        return sessionRuns === undefined;
+      })
+      .map((session) => session.id);
+  }, [sortedSessions, runs]);
+
+  // Load runs (and their items) for sessions that don't have runs loaded yet
+  useEffect(() => {
+    if (sessionsNeedingRuns.length === 0 || loading) return;
+
+    // Load runs for all sessions in parallel
+    Promise.all(sessionsNeedingRuns.map((sessionId) => loadSessionRuns(sessionId))).catch(
+      (error) => {
+        console.error('[SessionsList] Error loading session runs:', error);
+      },
+    );
+  }, [sessionsNeedingRuns, loadSessionRuns, loading]);
 
   // Handle session selection
   const handleSessionClick = useCallback(

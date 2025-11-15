@@ -1,7 +1,8 @@
 import { useVirtualizer } from '@tanstack/react-virtual';
-import type { Run, RunItem } from 'electron/types/grail';
+import type { Character, GrailProgress, Item, Run, RunItem } from 'electron/types/grail';
 import { ChevronLeft, ChevronRight as ChevronRightIcon } from 'lucide-react';
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
+import { ItemCard } from '@/components/grail/ItemCard';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -108,7 +109,7 @@ function RunRow({ run, itemsCount, onViewDetails, formatTimestamp }: RunRowProps
  */
 export function RunList({ runs }: RunListProps) {
   const { runItems, loadRunItems, loading } = useRunTrackerStore();
-  const { items, progress } = useGrailStore();
+  const { items, progress, characters } = useGrailStore();
   const sortFieldId = useId();
 
   // State management
@@ -262,6 +263,33 @@ export function RunList({ runs }: RunListProps) {
           progressRecord?.foundDate && progressRecord.foundDate >= runItem.foundTime,
         ),
       };
+    },
+    [items, progress],
+  );
+
+  // Helper function to get ItemCard data from RunItem
+  const getItemCardData = useCallback(
+    (runItem: RunItem) => {
+      // First find the progress record by matching the grailProgressId
+      const progressRecord = progress.find((p) => p.id === runItem.grailProgressId);
+      if (!progressRecord) {
+        return { item: undefined, normalProgress: [], etherealProgress: [] };
+      }
+
+      // Find the actual item using the progress record's itemId
+      const item = items.find((i) => i.id === progressRecord.itemId);
+      if (!item) {
+        return { item: undefined, normalProgress: [], etherealProgress: [] };
+      }
+
+      // Get all progress records for this item
+      const allItemProgress = progress.filter((p) => p.itemId === item.id);
+
+      // Separate into normal and ethereal progress
+      const normalProgress = allItemProgress.filter((p) => !p.isEthereal);
+      const etherealProgress = allItemProgress.filter((p) => p.isEthereal);
+
+      return { item, normalProgress, etherealProgress };
     },
     [items, progress],
   );
@@ -532,6 +560,8 @@ export function RunList({ runs }: RunListProps) {
           loading={loading && selectedRun !== null && !runItems.has(selectedRun.id)}
           formatTimestamp={formatTimestamp}
           getItemInfo={getItemInfo}
+          getItemCardData={getItemCardData}
+          characters={characters}
         />
       </CardContent>
     </Card>
@@ -546,6 +576,12 @@ interface RunDetailsDialogProps {
   loading: boolean;
   formatTimestamp: (date: Date) => string;
   getItemInfo: (runItem: RunItem) => { name: string; isNewGrail: boolean };
+  getItemCardData: (runItem: RunItem) => {
+    item: Item | undefined;
+    normalProgress: GrailProgress[];
+    etherealProgress: GrailProgress[];
+  };
+  characters: Character[];
 }
 
 function RunDetailsDialog({
@@ -556,6 +592,8 @@ function RunDetailsDialog({
   loading,
   formatTimestamp,
   getItemInfo,
+  getItemCardData,
+  characters,
 }: RunDetailsDialogProps) {
   if (!run) {
     return (
@@ -618,18 +656,32 @@ function RunDetailsDialog({
               </div>
             ) : runItems.length > 0 ? (
               <div className="space-y-2">
-                {runItems.map((item) => {
-                  const itemInfo = getItemInfo(item);
+                {runItems.map((runItem) => {
+                  const { item, normalProgress, etherealProgress } = getItemCardData(runItem);
+                  if (!item) {
+                    // Fallback to simple display if item not found
+                    const itemInfo = getItemInfo(runItem);
+                    return (
+                      <div key={runItem.id} className="flex items-center gap-2">
+                        <div className="h-4 w-4 rounded bg-primary/20" />
+                        <span className="text-sm">{itemInfo.name}</span>
+                        {itemInfo.isNewGrail && (
+                          <Badge variant="secondary" className="text-xs">
+                            New
+                          </Badge>
+                        )}
+                      </div>
+                    );
+                  }
                   return (
-                    <div key={item.id} className="flex items-center gap-2">
-                      <div className="h-4 w-4 rounded bg-primary/20" />
-                      <span className="text-sm">{itemInfo.name}</span>
-                      {itemInfo.isNewGrail && (
-                        <Badge variant="secondary" className="text-xs">
-                          New
-                        </Badge>
-                      )}
-                    </div>
+                    <ItemCard
+                      key={runItem.id}
+                      item={item}
+                      normalProgress={normalProgress}
+                      etherealProgress={etherealProgress}
+                      characters={characters}
+                      viewMode="list"
+                    />
                   );
                 })}
               </div>
