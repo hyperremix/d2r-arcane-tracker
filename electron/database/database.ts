@@ -191,7 +191,6 @@ class GrailDatabase {
         start_time DATETIME NOT NULL,
         end_time DATETIME,
         duration INTEGER, -- milliseconds
-        area TEXT, -- last known area/act
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE,
@@ -305,9 +304,6 @@ class GrailDatabase {
     this.db.exec(schema);
     console.log('Database schema created successfully');
 
-    // Run migrations for existing databases
-    this.migrateRunsTableCharacterId();
-
     // Ensure wizard settings exist for existing databases
     this.ensureWizardSettings();
 
@@ -333,95 +329,6 @@ class GrailDatabase {
     });
 
     transaction();
-  }
-
-  /**
-   * Migrates the runs table to make character_id nullable.
-   * This handles existing databases that were created before character_id was made optional.
-   */
-  private migrateRunsTableCharacterId(): void {
-    try {
-      // Check if runs table exists
-      const tableInfo = this.db
-        .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='runs'")
-        .get() as { name: string } | undefined;
-
-      if (!tableInfo) {
-        // Table doesn't exist yet, schema creation will handle it
-        return;
-      }
-
-      // Check if character_id column has NOT NULL constraint by checking table_info
-      const columnInfo = this.db.prepare('PRAGMA table_info(runs)').all() as Array<{
-        cid: number;
-        name: string;
-        type: string;
-        notnull: number;
-        dflt_value: unknown;
-        pk: number;
-      }>;
-
-      const characterIdColumn = columnInfo.find((col) => col.name === 'character_id');
-
-      if (!characterIdColumn) {
-        // Column doesn't exist, schema creation will handle it
-        return;
-      }
-
-      // If column has NOT NULL constraint (notnull = 1), we need to migrate
-      if (characterIdColumn.notnull === 1) {
-        console.log(
-          '[migrateRunsTableCharacterId] Migrating runs table to make character_id nullable',
-        );
-
-        // SQLite doesn't support ALTER TABLE to remove NOT NULL, so we recreate the table
-        this.db.exec(`
-          -- Create temporary table with nullable character_id
-          CREATE TABLE runs_new (
-            id TEXT PRIMARY KEY,
-            session_id TEXT NOT NULL,
-            character_id TEXT,
-            run_number INTEGER NOT NULL,
-            start_time DATETIME NOT NULL,
-            end_time DATETIME,
-            duration INTEGER,
-            area TEXT,
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE,
-            FOREIGN KEY (character_id) REFERENCES characters(id)
-          );
-
-          -- Copy data from old table
-          INSERT INTO runs_new SELECT * FROM runs;
-
-          -- Drop old table
-          DROP TABLE runs;
-
-          -- Rename new table
-          ALTER TABLE runs_new RENAME TO runs;
-
-          -- Recreate indexes
-          CREATE INDEX IF NOT EXISTS idx_runs_session ON runs(session_id);
-          CREATE INDEX IF NOT EXISTS idx_runs_character ON runs(character_id);
-          CREATE INDEX IF NOT EXISTS idx_runs_start_time ON runs(start_time);
-          CREATE INDEX IF NOT EXISTS idx_runs_session_number ON runs(session_id, run_number);
-
-          -- Recreate trigger
-          CREATE TRIGGER IF NOT EXISTS update_runs_timestamp
-            AFTER UPDATE ON runs
-            BEGIN
-              UPDATE runs SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
-            END;
-        `);
-
-        console.log('[migrateRunsTableCharacterId] Migration completed successfully');
-      }
-    } catch (error) {
-      console.error('[migrateRunsTableCharacterId] Migration failed:', error);
-      // Don't throw - allow application to continue even if migration fails
-      // The schema creation will still create the table correctly for new databases
-    }
   }
 
   // Items methods
@@ -1444,8 +1351,8 @@ class GrailDatabase {
   upsertRun(run: Run): void {
     // Use INSERT ... ON CONFLICT DO UPDATE for true UPSERT behavior
     const stmt = this.db.prepare(`
-      INSERT INTO runs (id, session_id, character_id, run_number, start_time, end_time, duration, area)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO runs (id, session_id, character_id, run_number, start_time, end_time, duration)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(id) DO UPDATE SET
         session_id = excluded.session_id,
         character_id = excluded.character_id,
@@ -1453,7 +1360,6 @@ class GrailDatabase {
         start_time = excluded.start_time,
         end_time = excluded.end_time,
         duration = excluded.duration,
-        area = excluded.area,
         updated_at = CURRENT_TIMESTAMP
     `);
     const mapped = mapRunToDatabase(run);
@@ -1465,7 +1371,6 @@ class GrailDatabase {
       mapped.start_time,
       mapped.end_time,
       mapped.duration,
-      mapped.area,
     );
   }
 

@@ -44,7 +44,7 @@ export function formatSessionAsCSV(
 
   // Runs header
   rows.push(['Runs']);
-  rows.push(['Run ID', 'Run Number', 'Start Time', 'End Time', 'Duration (ms)', 'Area']);
+  rows.push(['Run ID', 'Run Number', 'Start Time', 'End Time', 'Duration (ms)']);
 
   // Runs data
   runs.forEach((run) => {
@@ -54,7 +54,6 @@ export function formatSessionAsCSV(
       run.startTime.toISOString(),
       run.endTime?.toISOString() || 'N/A',
       run.duration?.toString() || 'N/A',
-      run.area || 'N/A',
     ]);
   });
 
@@ -116,7 +115,6 @@ export function formatSessionAsJSON(
       startTime: run.startTime.toISOString(),
       endTime: run.endTime?.toISOString(),
       duration: run.duration,
-      area: run.area,
       created: run.created.toISOString(),
       lastUpdated: run.lastUpdated.toISOString(),
     })),
@@ -198,7 +196,6 @@ export function formatSessionAsTextSummary(
       lines.push(`   Start: ${run.startTime.toLocaleString()}`);
       lines.push(`   End: ${run.endTime?.toLocaleString() || 'N/A'}`);
       lines.push(`   Duration: ${run.duration ? formatDuration(run.duration) : 'N/A'}`);
-      lines.push(`   Area: ${run.area || 'N/A'}`);
 
       // Show items for this run (if requested)
       if (includeItems && items) {
