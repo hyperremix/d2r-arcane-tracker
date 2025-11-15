@@ -615,6 +615,123 @@ describe('When saveFileHandlers is used', () => {
       // Assert
       expect(mockBatchWriter.queueProgress).toHaveBeenCalled();
     });
+
+    it('Then should flush progress before associating new finds with active runs', () => {
+      // Arrange
+      const d2sItem = D2SItemBuilder.new()
+        .withId('test-item')
+        .asUniqueBow()
+        .withLevel(75)
+        .withSocketCount(0)
+        .build();
+
+      const mockEvent: ItemDetectionEvent = {
+        type: 'item-found',
+        item: D2ItemBuilder.new()
+          .withId('test-item')
+          .withName(d2sItem.name || 'Test Item')
+          .withType(d2sItem.type || d2sItem.type_name || d2sItem.code || 'bows')
+          .withQuality(d2sItem.quality === 5 ? 'unique' : 'normal')
+          .withLevel(d2sItem.level || 75)
+          .withEthereal(d2sItem.ethereal === 1)
+          .withSockets(d2sItem.socket_count || d2sItem.socketed || 0)
+          .withCharacterName('TestCharacter')
+          .withLocation('inventory')
+          .build(),
+        grailItem: HolyGrailItemBuilder.new()
+          .withId('windforce')
+          .withName('windforce')
+          .withType('unique')
+          .withWeaponSubCategory('bows')
+          .build(),
+      };
+
+      const mockCharacter = CharacterBuilder.new()
+        .withId('char-1')
+        .withName('TestCharacter')
+        .build();
+      const activeRun = { id: 'run-1' } as any;
+
+      vi.mocked(grailDatabase.getCharacterByName).mockReturnValue(mockCharacter as any);
+      vi.mocked(grailDatabase.getProgressByItem).mockReturnValue([]);
+      mockRunTrackerService.getActiveRun.mockReturnValue(activeRun);
+
+      initializeSaveFileHandlers();
+
+      // Act
+      mockEventBus.emit('item-detection', mockEvent);
+
+      // Assert
+      expect(mockBatchWriter.flush).toHaveBeenCalled();
+      const queuedProgress = mockBatchWriter.queueProgress.mock.calls[0][0];
+      expect(grailDatabase.addRunItem).toHaveBeenCalledWith(
+        expect.objectContaining({
+          grailProgressId: queuedProgress.id,
+          runId: activeRun.id,
+        }),
+      );
+    });
+
+    it('Then should reuse existing progress when associating duplicate finds with runs', () => {
+      // Arrange
+      const d2sItem = D2SItemBuilder.new()
+        .withId('test-item')
+        .asUniqueBow()
+        .withLevel(75)
+        .withSocketCount(0)
+        .build();
+
+      const mockEvent: ItemDetectionEvent = {
+        type: 'item-found',
+        item: D2ItemBuilder.new()
+          .withId('test-item')
+          .withName(d2sItem.name || 'Test Item')
+          .withType(d2sItem.type || d2sItem.type_name || d2sItem.code || 'bows')
+          .withQuality(d2sItem.quality === 5 ? 'unique' : 'normal')
+          .withLevel(d2sItem.level || 75)
+          .withEthereal(d2sItem.ethereal === 1)
+          .withSockets(d2sItem.socket_count || d2sItem.socketed || 0)
+          .withCharacterName('TestCharacter')
+          .withLocation('inventory')
+          .build(),
+        grailItem: HolyGrailItemBuilder.new()
+          .withId('windforce')
+          .withName('windforce')
+          .withType('unique')
+          .withWeaponSubCategory('bows')
+          .build(),
+      };
+
+      const mockCharacter = CharacterBuilder.new()
+        .withId('char-1')
+        .withName('TestCharacter')
+        .build();
+      const persistedProgress = GrailProgressBuilder.new()
+        .withId('existing-progress')
+        .withCharacterId(mockCharacter.id)
+        .withItemId(mockEvent.grailItem.id)
+        .asNormal()
+        .build();
+      const activeRun = { id: 'run-1' } as any;
+
+      vi.mocked(grailDatabase.getCharacterByName).mockReturnValue(mockCharacter as any);
+      vi.mocked(grailDatabase.getProgressByItem).mockReturnValue([persistedProgress as any]);
+      mockRunTrackerService.getActiveRun.mockReturnValue(activeRun);
+
+      initializeSaveFileHandlers();
+
+      // Act
+      mockEventBus.emit('item-detection', mockEvent);
+
+      // Assert
+      expect(mockBatchWriter.flush).not.toHaveBeenCalled();
+      expect(grailDatabase.addRunItem).toHaveBeenCalledWith(
+        expect.objectContaining({
+          grailProgressId: persistedProgress.id,
+          runId: activeRun.id,
+        }),
+      );
+    });
   });
 
   describe('If monitoring status events are handled', () => {

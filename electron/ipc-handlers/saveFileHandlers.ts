@@ -95,6 +95,21 @@ function createGrailProgress(character: Character, event: ItemDetectionEvent): G
   };
 }
 
+function findMatchingProgressForCharacter(
+  existingProgress: GrailProgress[] | undefined,
+  targetProgress: GrailProgress,
+): GrailProgress | undefined {
+  if (!existingProgress?.length) {
+    return undefined;
+  }
+
+  return existingProgress.find(
+    (progress) =>
+      progress.characterId === targetProgress.characterId &&
+      Boolean(progress.isEthereal) === Boolean(targetProgress.isEthereal),
+  );
+}
+
 /**
  * Emits grail progress update event to all renderer processes.
  * @param character - Character who found the item
@@ -145,15 +160,23 @@ function handleAutomaticGrailProgress(event: ItemDetectionEvent): void {
     // Create grail progress entry and queue for batch write
     const grailProgress = createGrailProgress(character, event);
     batchWriter.queueProgress(grailProgress);
+    const matchingPersistedProgress = findMatchingProgressForCharacter(
+      existingGlobalProgress,
+      grailProgress,
+    );
 
     // Check for active run and associate item if found
     try {
       const activeRun = runTracker?.getActiveRun();
       if (activeRun && !event.silent) {
+        if (!matchingPersistedProgress) {
+          batchWriter.flush();
+        }
+
         const runItem: RunItem = {
           id: `run_item_${activeRun.id}_${grailProgress.id}`,
           runId: activeRun.id,
-          grailProgressId: grailProgress.id,
+          grailProgressId: matchingPersistedProgress?.id ?? grailProgress.id,
           foundTime: new Date(),
           created: new Date(),
         };

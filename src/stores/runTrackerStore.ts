@@ -286,11 +286,53 @@ export const useRunTrackerStore = create<RunTrackerState>()(
       try {
         const runs = await window.electronAPI?.runTracker.getRunsBySession(sessionId);
         if (runs) {
-          const { runs: currentRuns } = get();
+          const { runs: currentRuns, runItems: currentRunItems } = get();
           const newRuns = new Map(currentRuns);
           newRuns.set(sessionId, runs);
           set({ runs: newRuns, loading: false });
           console.log(`[RunTrackerStore] Loaded ${runs.length} runs for session:`, sessionId);
+
+          // Load run items for all runs that don't have items loaded yet
+          const runsToLoadItems = runs.filter((run) => !currentRunItems.has(run.id));
+          if (runsToLoadItems.length > 0) {
+            // Load items in parallel, but don't set loading state (runs are already loaded)
+            Promise.all(
+              runsToLoadItems.map(async (run) => {
+                try {
+                  const items = await window.electronAPI?.runTracker.getRunItems(run.id);
+                  if (items) {
+                    return { runId: run.id, items };
+                  }
+                  return null;
+                } catch (error) {
+                  // Don't fail the entire operation if one run fails
+                  console.error(`[RunTrackerStore] Error loading items for run ${run.id}:`, error);
+                  return null;
+                }
+              }),
+            )
+              .then((results) => {
+                // Batch update all loaded items at once to avoid race conditions
+                const validResults = results.filter(
+                  (result): result is { runId: string; items: any[] } => result !== null,
+                );
+                if (validResults.length > 0) {
+                  const { runItems: updatedRunItems, sessionStatsCache } = get();
+                  const newRunItems = new Map(updatedRunItems);
+                  for (const { runId, items } of validResults) {
+                    newRunItems.set(runId, items);
+                    console.log(`[RunTrackerStore] Loaded ${items.length} items for run:`, runId);
+                  }
+                  // Invalidate session stats cache since items have changed
+                  const newCache = new Map(sessionStatsCache);
+                  newCache.delete(sessionId);
+                  set({ runItems: newRunItems, sessionStatsCache: newCache });
+                }
+              })
+              .catch((error) => {
+                console.error('[RunTrackerStore] Error loading run items in parallel:', error);
+              });
+          }
         }
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);

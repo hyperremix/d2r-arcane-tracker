@@ -1,7 +1,7 @@
 import { useVirtualizer } from '@tanstack/react-virtual';
 import type { Run, RunItem } from 'electron/types/grail';
 import { ChevronLeft, ChevronRight as ChevronRightIcon } from 'lucide-react';
-import { useCallback, useId, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -132,6 +132,21 @@ export function RunList({ runs }: RunListProps) {
     return runs;
   }, [runs]);
 
+  // Pre-load run items for all runs when runs are displayed
+  useEffect(() => {
+    if (!runs || runs.length === 0) return;
+
+    // Find runs that don't have items loaded yet
+    const runsToLoad = runs.filter((run) => !runItems.has(run.id));
+
+    if (runsToLoad.length === 0) return;
+
+    // Load items for all runs in parallel
+    Promise.all(runsToLoad.map((run) => loadRunItems(run.id))).catch((error) => {
+      console.error('[RunList] Error loading run items:', error);
+    });
+  }, [runs, runItems, loadRunItems]);
+
   const sortedRuns = useMemo(() => {
     if (filteredRuns.length === 0) return [];
     return [...filteredRuns].sort((a, b) => {
@@ -237,8 +252,10 @@ export function RunList({ runs }: RunListProps) {
   // Helper function to get item information
   const getItemInfo = useCallback(
     (runItem: RunItem) => {
-      const item = items.find((i) => i.id === runItem.grailProgressId);
-      const progressRecord = progress.find((p) => p.itemId === runItem.grailProgressId);
+      // First find the progress record by matching the grailProgressId
+      const progressRecord = progress.find((p) => p.id === runItem.grailProgressId);
+      // Then use the progress record's itemId to find the actual item
+      const item = progressRecord ? items.find((i) => i.id === progressRecord.itemId) : undefined;
       return {
         name: item?.name || 'Unknown Item',
         isNewGrail: Boolean(
