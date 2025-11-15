@@ -231,7 +231,6 @@ export interface Run {
   startTime: Date;
   endTime?: Date;
   duration?: number; // milliseconds
-  area?: string;
   created: Date;
   lastUpdated: Date;
 }
@@ -311,7 +310,6 @@ export type DatabaseRun = {
   start_time: string;
   end_time: string | null;
   duration: number | null;
-  area: string | null;
   created_at: string;
   updated_at: string;
 };

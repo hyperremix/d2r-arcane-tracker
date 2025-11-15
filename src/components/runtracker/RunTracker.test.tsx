@@ -74,7 +74,6 @@ describe('RunTracker', () => {
       startTime: new Date('2024-01-01T10:00:00Z'),
       endTime: new Date('2024-01-01T10:02:00Z'),
       duration: 120000, // 2 minutes
-      area: 'Durance of Hate',
       created: new Date('2024-01-01T10:00:00Z'),
       lastUpdated: new Date('2024-01-01T10:02:00Z'),
     },

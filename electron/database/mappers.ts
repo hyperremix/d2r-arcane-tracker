@@ -339,7 +339,6 @@ export function mapRunToDatabase(run: Run): Omit<DatabaseRun, 'created_at' | 'up
     start_time: run.startTime.toISOString(),
     end_time: toSqliteDate(run.endTime),
     duration: toSqliteNull(run.duration),
-    area: toSqliteNull(run.area),
   };
 }
 
@@ -357,7 +356,6 @@ export function mapDatabaseRunToRun(dbRun: DatabaseRun): Run {
     startTime: new Date(dbRun.start_time),
     endTime: fromSqliteDate(dbRun.end_time),
     duration: dbRun.duration || undefined,
-    area: dbRun.area || undefined,
     created: new Date(dbRun.created_at),
     lastUpdated: new Date(dbRun.updated_at),
   };

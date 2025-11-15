@@ -126,7 +126,6 @@ export class RunBuilder {
     startTime: new Date('2024-01-01T10:00:00Z'),
     endTime: undefined,
     duration: undefined,
-    area: undefined,
     created: new Date('2024-01-01T10:00:00Z'),
     lastUpdated: new Date('2024-01-01T10:00:00Z'),
   };
@@ -191,14 +190,6 @@ export class RunBuilder {
    */
   withDuration(duration: number | undefined): this {
     this.run.duration = duration;
-    return this;
-  }
-
-  /**
-   * Set the area
-   */
-  withArea(area: string | undefined): this {
-    this.run.area = area;
     return this;
   }
 

@@ -580,12 +580,6 @@ function RunDetailsDialog({
                 {itemsCount}
               </Badge>
             </div>
-            {run.area && (
-              <div className="space-y-1">
-                <p className="font-medium text-muted-foreground text-sm">Area</p>
-                <p className="text-sm">{run.area}</p>
-              </div>
-            )}
           </div>
 
           <div className="space-y-3">
