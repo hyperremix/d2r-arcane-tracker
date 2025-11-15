@@ -1,19 +1,12 @@
 import { useVirtualizer } from '@tanstack/react-virtual';
 import type { Character, GrailProgress, Item, Run, RunItem } from 'electron/types/grail';
-import { ChevronLeft, ChevronRight as ChevronRightIcon } from 'lucide-react';
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
+import { ArrowDown, ArrowUp, ChevronLeft, ChevronRight as ChevronRightIcon } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ItemCard } from '@/components/grail/ItemCard';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Table,
@@ -23,7 +16,6 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { formatDuration } from '@/lib/utils';
 import { useGrailStore } from '@/stores/grailStore';
 import { useRunTrackerStore } from '@/stores/runTrackerStore';
@@ -110,7 +102,6 @@ function RunRow({ run, itemsCount, onViewDetails, formatTimestamp }: RunRowProps
 export function RunList({ runs }: RunListProps) {
   const { runItems, loadRunItems, loading } = useRunTrackerStore();
   const { items, progress, characters } = useGrailStore();
-  const sortFieldId = useId();
 
   // State management
   const [currentPage, setCurrentPage] = useState(1);
@@ -207,10 +198,18 @@ export function RunList({ runs }: RunListProps) {
     [sortField, sortOrder],
   );
 
-  const handleSortOrderToggle = useCallback(() => {
-    setCurrentPage(1);
-    setSortOrder((prev) => (prev === 'asc' ? 'desc' : 'asc'));
-  }, []);
+  // Helper to render sort icon
+  const renderSortIcon = useCallback(
+    (field: SortField) => {
+      if (sortField !== field) return null;
+      return sortOrder === 'asc' ? (
+        <ArrowUp className="ml-1 h-3 w-3" />
+      ) : (
+        <ArrowDown className="ml-1 h-3 w-3" />
+      );
+    },
+    [sortField, sortOrder],
+  );
 
   // Handle pagination
   const goToPage = useCallback(
@@ -305,19 +304,6 @@ export function RunList({ runs }: RunListProps) {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          {/* Filter and Sort Controls Skeleton */}
-          <div className="flex flex-wrap gap-4">
-            <div className="flex items-center gap-2">
-              <Skeleton className="h-4 w-20" />
-              <Skeleton className="h-8 w-40" />
-            </div>
-            <div className="flex items-center gap-2">
-              <Skeleton className="h-4 w-16" />
-              <Skeleton className="h-8 w-32" />
-              <Skeleton className="h-8 w-8" />
-            </div>
-          </div>
-
           {/* Table Skeleton */}
           <div className="space-y-2">
             <Table>
@@ -353,47 +339,6 @@ export function RunList({ runs }: RunListProps) {
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        {/* Filter and Sort Controls */}
-        <div className="flex flex-wrap gap-4">
-          <div className="flex items-center gap-2">
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <label htmlFor={sortFieldId} className="font-medium text-muted-foreground text-sm">
-                  Sort by:
-                </label>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Choose how to sort the runs list</p>
-              </TooltipContent>
-            </Tooltip>
-            <Select value={sortField} onValueChange={(value) => handleSort(value as SortField)}>
-              <SelectTrigger id={sortFieldId} className="w-32">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="startTime">Start Time</SelectItem>
-                <SelectItem value="duration">Duration</SelectItem>
-                <SelectItem value="itemsFound">Items Found</SelectItem>
-              </SelectContent>
-            </Select>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleSortOrderToggle}
-                  className="px-2"
-                >
-                  {sortOrder === 'asc' ? '↑' : '↓'}
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>{sortOrder === 'asc' ? 'Sort ascending' : 'Sort descending'}</p>
-              </TooltipContent>
-            </Tooltip>
-          </div>
-        </div>
-
         {/* Runs Table */}
         {sortedRuns.length > 0 ? (
           <div className="space-y-2">
@@ -415,10 +360,34 @@ export function RunList({ runs }: RunListProps) {
                       <TableHeader className="sticky top-0 z-10 bg-background">
                         <TableRow>
                           <TableHead className="w-16">Run #</TableHead>
-                          <TableHead>Start Time</TableHead>
+                          <TableHead
+                            className="cursor-pointer select-none hover:bg-muted/50"
+                            onClick={() => handleSort('startTime')}
+                          >
+                            <div className="flex items-center">
+                              Start Time
+                              {renderSortIcon('startTime')}
+                            </div>
+                          </TableHead>
                           <TableHead>End Time</TableHead>
-                          <TableHead>Duration</TableHead>
-                          <TableHead className="w-24">Items</TableHead>
+                          <TableHead
+                            className="cursor-pointer select-none hover:bg-muted/50"
+                            onClick={() => handleSort('duration')}
+                          >
+                            <div className="flex items-center">
+                              Duration
+                              {renderSortIcon('duration')}
+                            </div>
+                          </TableHead>
+                          <TableHead
+                            className="w-24 cursor-pointer select-none text-center hover:bg-muted/50"
+                            onClick={() => handleSort('itemsFound')}
+                          >
+                            <div className="flex items-center justify-center">
+                              Items
+                              {renderSortIcon('itemsFound')}
+                            </div>
+                          </TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -459,10 +428,34 @@ export function RunList({ runs }: RunListProps) {
                   <TableHeader>
                     <TableRow>
                       <TableHead className="w-16">Run #</TableHead>
-                      <TableHead>Start Time</TableHead>
+                      <TableHead
+                        className="cursor-pointer select-none hover:bg-muted/50"
+                        onClick={() => handleSort('startTime')}
+                      >
+                        <div className="flex items-center">
+                          Start Time
+                          {renderSortIcon('startTime')}
+                        </div>
+                      </TableHead>
                       <TableHead>End Time</TableHead>
-                      <TableHead>Duration</TableHead>
-                      <TableHead className="w-24">Items</TableHead>
+                      <TableHead
+                        className="cursor-pointer select-none hover:bg-muted/50"
+                        onClick={() => handleSort('duration')}
+                      >
+                        <div className="flex items-center">
+                          Duration
+                          {renderSortIcon('duration')}
+                        </div>
+                      </TableHead>
+                      <TableHead
+                        className="w-24 cursor-pointer select-none text-center hover:bg-muted/50"
+                        onClick={() => handleSort('itemsFound')}
+                      >
+                        <div className="flex items-center justify-center">
+                          Items
+                          {renderSortIcon('itemsFound')}
+                        </div>
+                      </TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>

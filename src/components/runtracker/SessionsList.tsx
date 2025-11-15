@@ -1,10 +1,18 @@
 import type { Session } from 'electron/types/grail';
-import { Archive, Calendar, Clock, Play } from 'lucide-react';
+import { ArrowDown, ArrowUp, Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import { formatDuration } from '@/lib/utils';
 import { useRunTrackerStore } from '@/stores/runTrackerStore';
 
@@ -12,7 +20,12 @@ interface SessionsListProps {
   onSessionSelect: (sessionId: string) => void;
 }
 
-interface SessionCardProps {
+type SortField = 'startTime' | 'duration' | 'runCount' | 'itemsFound';
+type SortOrder = 'asc' | 'desc';
+
+const ITEMS_PER_PAGE = 10;
+
+interface SessionTableRowProps {
   session: Session;
   onSessionClick: (sessionId: string) => void;
   getSessionStats: (sessionId: string) => { itemsFound: number } | null;
@@ -20,97 +33,76 @@ interface SessionCardProps {
   formatSessionDate: (date: Date) => string;
 }
 
-// Session card component
-function SessionCard({
+// Session table row component
+function SessionTableRow({
   session,
   onSessionClick,
   getSessionStats,
   getSessionDuration,
   formatSessionDate,
-}: SessionCardProps) {
+}: SessionTableRowProps) {
   const sessionStats = getSessionStats(session.id);
   const duration = getSessionDuration(session);
   const sessionDate = formatSessionDate(session.startTime);
 
   return (
-    <Card className="cursor-pointer hover:shadow-md" onClick={() => onSessionClick(session.id)}>
-      <CardContent className="p-4">
-        <div className="flex items-start justify-between">
-          <div className="flex-1 space-y-2">
-            <div className="flex items-center gap-2">
-              <Calendar className="h-4 w-4 text-muted-foreground" />
-              <span className="font-medium text-sm">{sessionDate}</span>
-              {session.archived && (
-                <Badge variant="secondary" className="text-xs">
-                  <Archive className="mr-1 h-3 w-3" />
-                  Archived
-                </Badge>
-              )}
-            </div>
-
-            <div className="flex items-center gap-4 text-muted-foreground text-sm">
-              <div className="flex items-center gap-1">
-                <Clock className="h-4 w-4" />
-                <span>{formatDuration(duration)}</span>
-              </div>
-              <div className="flex items-center gap-1">
-                <Play className="h-4 w-4" />
-                <span>{session.runCount} runs</span>
-              </div>
-              {sessionStats && (
-                <div className="flex items-center gap-1">
-                  <span>{sessionStats.itemsFound} items</span>
-                </div>
-              )}
-            </div>
-
-            {session.notes && (
-              <p className="line-clamp-2 text-muted-foreground text-sm">{session.notes}</p>
-            )}
-          </div>
-
-          <div className="text-right">
-            <div className="text-muted-foreground text-xs">
-              {session.startTime.toLocaleTimeString('en-US', {
-                hour: '2-digit',
-                minute: '2-digit',
-              })}
-            </div>
-            {session.endTime && (
-              <div className="text-muted-foreground text-xs">
-                Ended:{' '}
-                {session.endTime.toLocaleTimeString('en-US', {
-                  hour: '2-digit',
-                  minute: '2-digit',
-                })}
-              </div>
-            )}
-          </div>
-        </div>
-      </CardContent>
-    </Card>
+    <TableRow
+      className="cursor-pointer hover:bg-muted/70 focus-visible:bg-muted/70"
+      tabIndex={0}
+      onClick={() => onSessionClick(session.id)}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          onSessionClick(session.id);
+        }
+      }}
+      aria-label={`View session from ${sessionDate} details`}
+    >
+      <TableCell className="font-medium">{sessionDate}</TableCell>
+      <TableCell className="font-mono text-sm">
+        {session.startTime.toLocaleTimeString('en-US', {
+          hour: '2-digit',
+          minute: '2-digit',
+        })}
+      </TableCell>
+      <TableCell className="font-mono text-sm">
+        {session.endTime
+          ? session.endTime.toLocaleTimeString('en-US', {
+              hour: '2-digit',
+              minute: '2-digit',
+            })
+          : '-'}
+      </TableCell>
+      <TableCell className="font-mono text-sm">{formatDuration(duration)}</TableCell>
+      <TableCell className="text-center">{session.runCount}</TableCell>
+      <TableCell className="text-center">{sessionStats ? sessionStats.itemsFound : 0}</TableCell>
+    </TableRow>
   );
 }
 
-// Loading skeleton
-function SessionCardSkeleton() {
+// Loading skeleton for table rows
+function TableRowSkeleton() {
   return (
-    <Card>
-      <CardContent className="p-4">
-        <div className="space-y-2">
-          <div className="flex items-center gap-2">
-            <Skeleton className="h-4 w-16" />
-            <Skeleton className="h-5 w-20" />
-          </div>
-          <div className="flex items-center gap-4">
-            <Skeleton className="h-4 w-20" />
-            <Skeleton className="h-4 w-16" />
-            <Skeleton className="h-4 w-16" />
-          </div>
-          <Skeleton className="h-4 w-32" />
-        </div>
-      </CardContent>
-    </Card>
+    <TableRow>
+      <TableCell>
+        <Skeleton className="h-4 w-20" />
+      </TableCell>
+      <TableCell>
+        <Skeleton className="h-4 w-16" />
+      </TableCell>
+      <TableCell>
+        <Skeleton className="h-4 w-16" />
+      </TableCell>
+      <TableCell>
+        <Skeleton className="h-4 w-20" />
+      </TableCell>
+      <TableCell>
+        <Skeleton className="h-4 w-12" />
+      </TableCell>
+      <TableCell>
+        <Skeleton className="h-4 w-12" />
+      </TableCell>
+    </TableRow>
   );
 }
 
@@ -121,6 +113,9 @@ function SessionCardSkeleton() {
 export function SessionsList({ onSessionSelect }: SessionsListProps) {
   const { sessions, loading, getSessionStats, runs, loadSessionRuns } = useRunTrackerStore();
   const [showArchived, setShowArchived] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [sortField, setSortField] = useState<SortField>('startTime');
+  const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
 
   // Filter sessions based on archived status
   const filteredSessions = useMemo(() => {
@@ -139,10 +134,75 @@ export function SessionsList({ onSessionSelect }: SessionsListProps) {
     });
   }, [sessions, showArchived]);
 
-  // Sort sessions by start time (most recent first)
+  // Helper functions for sorting
+  const compareStartTime = useCallback((a: Session, b: Session) => {
+    return a.startTime.getTime() - b.startTime.getTime();
+  }, []);
+
+  const compareDuration = useCallback((a: Session, b: Session) => {
+    const durationA = a.endTime
+      ? a.endTime.getTime() - a.startTime.getTime()
+      : Date.now() - a.startTime.getTime();
+    const durationB = b.endTime
+      ? b.endTime.getTime() - b.startTime.getTime()
+      : Date.now() - b.startTime.getTime();
+    return durationA - durationB;
+  }, []);
+
+  const compareRunCount = useCallback((a: Session, b: Session) => {
+    return a.runCount - b.runCount;
+  }, []);
+
+  const compareItemsFound = useCallback(
+    (a: Session, b: Session) => {
+      const statsA = getSessionStats(a.id);
+      const statsB = getSessionStats(b.id);
+      const itemsA = statsA ? statsA.itemsFound : 0;
+      const itemsB = statsB ? statsB.itemsFound : 0;
+      return itemsA - itemsB;
+    },
+    [getSessionStats],
+  );
+
+  // Sort sessions based on sort field and order
   const sortedSessions = useMemo(() => {
-    return [...filteredSessions].sort((a, b) => b.startTime.getTime() - a.startTime.getTime());
-  }, [filteredSessions]);
+    if (filteredSessions.length === 0) return [];
+
+    let compareFn: (a: Session, b: Session) => number;
+    switch (sortField) {
+      case 'startTime':
+        compareFn = compareStartTime;
+        break;
+      case 'duration':
+        compareFn = compareDuration;
+        break;
+      case 'runCount':
+        compareFn = compareRunCount;
+        break;
+      case 'itemsFound':
+        compareFn = compareItemsFound;
+        break;
+    }
+
+    return [...filteredSessions].sort((a, b) => {
+      const comparison = compareFn(a, b);
+      return sortOrder === 'asc' ? comparison : -comparison;
+    });
+  }, [
+    filteredSessions,
+    sortField,
+    sortOrder,
+    compareStartTime,
+    compareDuration,
+    compareRunCount,
+    compareItemsFound,
+  ]);
+
+  // Paginate sessions
+  const totalPages = Math.ceil(sortedSessions.length / ITEMS_PER_PAGE);
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+  const endIndex = startIndex + ITEMS_PER_PAGE;
+  const paginatedSessions = sortedSessions.slice(startIndex, endIndex);
 
   // Memoize list of session IDs that need runs loaded
   // This prevents infinite rerenders by creating a stable reference
@@ -167,6 +227,34 @@ export function SessionsList({ onSessionSelect }: SessionsListProps) {
       },
     );
   }, [sessionsNeedingRuns, loadSessionRuns, loading]);
+
+  // Handle sorting
+  const handleSort = useCallback(
+    (field: SortField) => {
+      setCurrentPage(1);
+      if (sortField === field) {
+        setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+      } else {
+        setSortField(field);
+        setSortOrder('asc');
+      }
+    },
+    [sortField, sortOrder],
+  );
+
+  // Handle pagination
+  const goToPage = useCallback(
+    (page: number) => {
+      setCurrentPage(Math.max(1, Math.min(page, totalPages)));
+    },
+    [totalPages],
+  );
+
+  // Reset to page 1 when filter changes
+  // biome-ignore lint/correctness/useExhaustiveDependencies: We want to reset page when filter changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [showArchived]);
 
   // Handle session selection
   const handleSessionClick = useCallback(
@@ -217,6 +305,16 @@ export function SessionsList({ onSessionSelect }: SessionsListProps) {
 
   const emptyState = getEmptyStateMessage();
 
+  // Helper to render sort icon
+  const renderSortIcon = (field: SortField) => {
+    if (sortField !== field) return null;
+    return sortOrder === 'asc' ? (
+      <ArrowUp className="ml-1 h-3 w-3" />
+    ) : (
+      <ArrowDown className="ml-1 h-3 w-3" />
+    );
+  };
+
   return (
     <Card>
       <CardHeader>
@@ -230,24 +328,150 @@ export function SessionsList({ onSessionSelect }: SessionsListProps) {
       </CardHeader>
       <CardContent className="space-y-4">
         {loading ? (
-          <div className="space-y-3">
-            {Array.from({ length: 3 }, (_, i) => (
-              <SessionCardSkeleton key={`session-skeleton-${Date.now()}-${i}`} />
-            ))}
-          </div>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Date</TableHead>
+                <TableHead>Start Time</TableHead>
+                <TableHead>End Time</TableHead>
+                <TableHead>Duration</TableHead>
+                <TableHead className="text-center">Runs</TableHead>
+                <TableHead className="text-center">Items</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {Array.from({ length: 5 }, (_, i) => (
+                <TableRowSkeleton key={`session-skeleton-${Date.now()}-${i}`} />
+              ))}
+            </TableBody>
+          </Table>
         ) : sortedSessions.length > 0 ? (
-          <div className="space-y-3">
-            {sortedSessions.map((session) => (
-              <SessionCard
-                key={session.id}
-                session={session}
-                onSessionClick={handleSessionClick}
-                getSessionStats={getSessionStats}
-                getSessionDuration={getSessionDuration}
-                formatSessionDate={formatSessionDate}
-              />
-            ))}
-          </div>
+          <>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead
+                    className="cursor-pointer select-none hover:bg-muted/50"
+                    onClick={() => handleSort('startTime')}
+                  >
+                    <div className="flex items-center">
+                      Date
+                      {renderSortIcon('startTime')}
+                    </div>
+                  </TableHead>
+                  <TableHead
+                    className="cursor-pointer select-none hover:bg-muted/50"
+                    onClick={() => handleSort('startTime')}
+                  >
+                    <div className="flex items-center">
+                      Start Time
+                      {renderSortIcon('startTime')}
+                    </div>
+                  </TableHead>
+                  <TableHead>End Time</TableHead>
+                  <TableHead
+                    className="cursor-pointer select-none hover:bg-muted/50"
+                    onClick={() => handleSort('duration')}
+                  >
+                    <div className="flex items-center">
+                      Duration
+                      {renderSortIcon('duration')}
+                    </div>
+                  </TableHead>
+                  <TableHead
+                    className="cursor-pointer select-none text-center hover:bg-muted/50"
+                    onClick={() => handleSort('runCount')}
+                  >
+                    <div className="flex items-center justify-center">
+                      Runs
+                      {renderSortIcon('runCount')}
+                    </div>
+                  </TableHead>
+                  <TableHead
+                    className="cursor-pointer select-none text-center hover:bg-muted/50"
+                    onClick={() => handleSort('itemsFound')}
+                  >
+                    <div className="flex items-center justify-center">
+                      Items
+                      {renderSortIcon('itemsFound')}
+                    </div>
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {paginatedSessions.map((session) => (
+                  <SessionTableRow
+                    key={session.id}
+                    session={session}
+                    onSessionClick={handleSessionClick}
+                    getSessionStats={getSessionStats}
+                    getSessionDuration={getSessionDuration}
+                    formatSessionDate={formatSessionDate}
+                  />
+                ))}
+              </TableBody>
+            </Table>
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between pt-4">
+                <div className="text-muted-foreground text-sm">
+                  Showing {startIndex + 1}-{Math.min(endIndex, sortedSessions.length)} of{' '}
+                  {sortedSessions.length} sessions
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => goToPage(currentPage - 1)}
+                    disabled={currentPage === 1}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                    Previous
+                  </Button>
+                  <div className="flex items-center gap-1">
+                    {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                      const page = i + 1;
+                      const isCurrentPage = page === currentPage;
+                      return (
+                        <Button
+                          key={page}
+                          variant={isCurrentPage ? 'default' : 'outline'}
+                          size="sm"
+                          className="h-8 w-8 p-0"
+                          onClick={() => goToPage(page)}
+                        >
+                          {page}
+                        </Button>
+                      );
+                    })}
+                    {totalPages > 5 && (
+                      <>
+                        <span className="text-muted-foreground text-sm">...</span>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-8 w-8 p-0"
+                          onClick={() => goToPage(totalPages)}
+                        >
+                          {totalPages}
+                        </Button>
+                      </>
+                    )}
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => goToPage(currentPage + 1)}
+                    disabled={currentPage === totalPages}
+                  >
+                    Next
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            )}
+          </>
         ) : (
           <div className="flex flex-col items-center justify-center py-8 text-center">
             <Calendar className="mb-4 h-12 w-12 text-muted-foreground" />
