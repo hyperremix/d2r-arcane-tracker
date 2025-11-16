@@ -674,6 +674,7 @@ function RunDetailsDialog({
                       etherealProgress={etherealProgress}
                       characters={characters}
                       viewMode="list"
+                      withoutStatusIndicators
                     />
                   );
                 })}

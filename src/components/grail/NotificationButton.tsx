@@ -396,6 +396,7 @@ export function NotificationButton() {
                       etherealProgress={notification.etherealProgress}
                       characters={characters}
                       viewMode="list"
+                      withoutStatusIndicators
                     />
                     <Button
                       onClick={() => dismissNotification(notification.id)}
