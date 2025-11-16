@@ -114,6 +114,13 @@ description: Development workflow and best practices
 - **API Documentation**: Document API endpoints and types
 - **Component Documentation**: Document component props and usage
 
+## Internationalization
+
+- **Centralized Translations**: Manage all user-facing strings through `@/i18n` translations (`src/i18n`)
+- **No Inline Text**: Do not render plain text literals in frontend components; always use `t(translations.some.path)` or equivalent helpers
+- **Phrase Ownership**: Add or update entries in `translations.ts` (and locale files) whenever new copy is needed, keeping keys descriptive and organized
+- **Consistency**: Reuse existing translation keys instead of duplicating phrases, and ensure locale files remain in sync
+
 ## Security
 
 - **Input Validation**: Validate all user inputs
