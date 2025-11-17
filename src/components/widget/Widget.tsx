@@ -166,7 +166,7 @@ function RunOnlyDisplay({
   }
 
   return (
-    <div className="flex w-full flex-col gap-3 px-4">
+    <div className="flex w-full flex-col gap-3 overflow-hidden px-4">
       {/* Top Row: Run # and Current Duration */}
       <div className="grid grid-cols-2 gap-4">
         <div className="text-center">
@@ -195,7 +195,7 @@ function RunOnlyDisplay({
 
       {/* Per-run item list */}
       {showItemList && (
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-2 overflow-hidden">
           <p className="font-bold text-gray-300 text-md">Run Items</p>
 
           {/* Manual Item Entry */}
@@ -220,7 +220,13 @@ function RunOnlyDisplay({
           )}
 
           {runItemsByRun.length > 0 && (
-            <div className="mt-2 flex max-h-40 flex-col gap-1 overflow-y-auto text-gray-200 text-xs">
+            <div
+              className="mt-2 flex flex-col gap-1 overflow-y-auto text-gray-200 text-xs"
+              style={{
+                // @ts-expect-error - WebkitAppRegion is an Electron-specific CSS property
+                WebkitAppRegion: 'no-drag',
+              }}
+            >
               {runItemsByRun.map((run) => {
                 if (run.items.length === 0) {
                   return null;
@@ -332,7 +338,7 @@ export function Widget({ statistics, settings, onDragStart, onDragEnd }: WidgetP
 
   // Calculate container styles based on display mode
   const containerClasses = useMemo(() => {
-    const baseClasses = 'flex flex-col items-center justify-center p-2';
+    const baseClasses = 'flex flex-col items-center p-2';
     const gapClasses = {
       overall: 'gap-4',
       split: 'gap-4',
