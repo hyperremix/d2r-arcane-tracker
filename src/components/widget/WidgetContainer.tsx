@@ -8,6 +8,7 @@ import type {
 } from 'electron/types/grail';
 import { useEffect, useState } from 'react';
 import { canItemBeEthereal, canItemBeNormal } from '@/lib/ethereal';
+import { useGrailStore } from '@/stores/grailStore';
 import { useRunTrackerStore } from '@/stores/runTrackerStore';
 import { Widget } from './Widget';
 
@@ -19,6 +20,9 @@ export function WidgetContainer() {
   const [statistics, setStatistics] = useState<GrailStatistics | null>(null);
   const [settings, setSettings] = useState<Partial<Settings>>({});
 
+  // Share grail data with the global store so the widget can resolve run item names
+  const { setItems, setProgress, setSettings: setGrailSettings } = useGrailStore();
+
   // Get run tracker store actions to handle IPC events
   const {
     handleSessionStarted: storeHandleSessionStarted,
@@ -28,9 +32,11 @@ export function WidgetContainer() {
     refreshActiveRun,
     loadSessionRuns,
     activeSession,
+    loadRunItems,
   } = useRunTrackerStore();
 
   // Load initial data and calculate statistics
+  // biome-ignore lint/correctness/useExhaustiveDependencies: Zustand actions are stable
   useEffect(() => {
     const loadData = async () => {
       try {
@@ -38,6 +44,8 @@ export function WidgetContainer() {
         const settingsData = await window.electronAPI?.grail.getSettings();
         if (settingsData) {
           setSettings(settingsData);
+          // Hydrate global grail settings so hooks like useTheme and Widget can use them
+          await setGrailSettings(settingsData);
         }
 
         // Load items and progress to calculate statistics
@@ -47,6 +55,10 @@ export function WidgetContainer() {
         if (items && progress && settingsData) {
           const stats = computeStatistics(items, progress, settingsData);
           setStatistics(stats);
+
+          // Hydrate global grail data so run-only widget mode can resolve item names
+          setItems(items);
+          setProgress(progress);
         }
       } catch (error) {
         console.error('Failed to load widget data:', error);
@@ -93,6 +105,10 @@ export function WidgetContainer() {
         if (items && progress && settingsData) {
           const stats = computeStatistics(items, progress, settingsData);
           setStatistics(stats);
+
+          // Hydrate grail store so run-only widget mode can resolve item names for runs
+          setItems(items);
+          setProgress(progress);
         }
       } catch (error) {
         console.error('Failed to update widget statistics:', error);
@@ -105,7 +121,7 @@ export function WidgetContainer() {
     return () => {
       window.ipcRenderer?.off('grail-progress-updated', handleProgressUpdate);
     };
-  }, []);
+  }, [setItems, setProgress]);
 
   // Listen for settings updates
   useEffect(() => {
@@ -183,23 +199,33 @@ export function WidgetContainer() {
       storeHandleSessionEnded();
     };
 
+    const handleRunItemAdded = (_event: Electron.IpcRendererEvent, payload: { runId: string }) => {
+      console.log('[WidgetContainer] Run item added for run:', payload.runId);
+      loadRunItems(payload.runId).catch((error) => {
+        console.error('[WidgetContainer] Error loading run items for run from event:', error);
+      });
+    };
+
     // Listen for run tracker events (note: events are prefixed with 'run-tracker:')
     window.ipcRenderer?.on('run-tracker:run-started', handleRunStarted);
     window.ipcRenderer?.on('run-tracker:run-ended', handleRunEnded);
     window.ipcRenderer?.on('run-tracker:session-started', handleSessionStarted);
     window.ipcRenderer?.on('run-tracker:session-ended', handleSessionEnded);
+    window.ipcRenderer?.on('run-tracker:run-item-added', handleRunItemAdded);
 
     return () => {
       window.ipcRenderer?.off('run-tracker:run-started', handleRunStarted);
       window.ipcRenderer?.off('run-tracker:run-ended', handleRunEnded);
       window.ipcRenderer?.off('run-tracker:session-started', handleSessionStarted);
       window.ipcRenderer?.off('run-tracker:session-ended', handleSessionEnded);
+      window.ipcRenderer?.off('run-tracker:run-item-added', handleRunItemAdded);
     };
   }, [
     storeHandleRunStarted,
     storeHandleRunEnded,
     storeHandleSessionStarted,
     storeHandleSessionEnded,
+    loadRunItems,
   ]);
 
   const handleDragStart = () => {

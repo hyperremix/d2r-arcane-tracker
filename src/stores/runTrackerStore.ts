@@ -20,6 +20,7 @@ interface RunTrackerState {
   errorType: 'network' | 'validation' | 'permission' | 'unknown' | null;
   retryCount: number;
   sessionStatsCache: Map<string, SessionStats>; // sessionId -> stats
+  loadingSessions: Set<string>; // sessionId -> tracks in-flight loads
 
   // Actions - Session Management
   startSession: () => Promise<void>;
@@ -82,6 +83,7 @@ export const useRunTrackerStore = create<RunTrackerState>()(
     errorType: null,
     retryCount: 0,
     sessionStatsCache: new Map(),
+    loadingSessions: new Set(),
 
     // Session management actions
     startSession: async () => {
@@ -282,24 +284,43 @@ export const useRunTrackerStore = create<RunTrackerState>()(
     },
 
     loadSessionRuns: async (sessionId) => {
-      // Check if runs are already loaded to avoid unnecessary API calls
-      const { runs: currentRuns } = get();
+      // Check if runs are already loaded or currently loading to avoid duplicate API calls
+      const { runs: currentRuns, loadingSessions } = get();
       if (currentRuns.has(sessionId)) {
-        console.log(`[RunTrackerStore] Runs already loaded for session:`, sessionId);
+        return;
+      }
+      if (loadingSessions.has(sessionId)) {
         return;
       }
 
-      set({ loading: true, error: null });
+      // Mark this session as loading
+      const updatedLoadingSessions = new Set(loadingSessions);
+      updatedLoadingSessions.add(sessionId);
+      set({ loading: true, error: null, loadingSessions: updatedLoadingSessions });
+
       try {
         const runs = await window.electronAPI?.runTracker.getRunsBySession(sessionId);
         if (runs) {
-          const { runs: currentRuns, runItems: currentRunItems, sessionStatsCache } = get();
+          const {
+            runs: currentRuns,
+            runItems: currentRunItems,
+            sessionStatsCache,
+            loadingSessions: currentLoadingSessions,
+          } = get();
           const newRuns = new Map(currentRuns);
           newRuns.set(sessionId, runs);
           // Invalidate session stats cache since runs have changed
           const newCache = new Map(sessionStatsCache);
           newCache.delete(sessionId);
-          set({ runs: newRuns, sessionStatsCache: newCache, loading: false });
+          // Remove from loading set
+          const newLoadingSessions = new Set(currentLoadingSessions);
+          newLoadingSessions.delete(sessionId);
+          set({
+            runs: newRuns,
+            sessionStatsCache: newCache,
+            loading: false,
+            loadingSessions: newLoadingSessions,
+          });
           console.log(`[RunTrackerStore] Loaded ${runs.length} runs for session:`, sessionId);
 
           // Load run items for all runs that don't have items loaded yet
@@ -324,7 +345,7 @@ export const useRunTrackerStore = create<RunTrackerState>()(
               .then((results) => {
                 // Batch update all loaded items at once to avoid race conditions
                 const validResults = results.filter(
-                  (result): result is { runId: string; items: any[] } => result !== null,
+                  (result): result is { runId: string; items: RunItem[] } => result !== null,
                 );
                 if (validResults.length > 0) {
                   const { runItems: updatedRunItems, sessionStatsCache } = get();
@@ -343,10 +364,20 @@ export const useRunTrackerStore = create<RunTrackerState>()(
                 console.error('[RunTrackerStore] Error loading run items in parallel:', error);
               });
           }
+        } else {
+          // Remove from loading set even if no runs returned
+          const { loadingSessions: currentLoadingSessions } = get();
+          const newLoadingSessions = new Set(currentLoadingSessions);
+          newLoadingSessions.delete(sessionId);
+          set({ loading: false, loadingSessions: newLoadingSessions });
         }
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
-        set({ error: errorMessage, loading: false });
+        // Remove from loading set on error
+        const { loadingSessions: currentLoadingSessions } = get();
+        const newLoadingSessions = new Set(currentLoadingSessions);
+        newLoadingSessions.delete(sessionId);
+        set({ error: errorMessage, loading: false, loadingSessions: newLoadingSessions });
         console.error('[RunTrackerStore] Error loading session runs:', error);
       }
     },

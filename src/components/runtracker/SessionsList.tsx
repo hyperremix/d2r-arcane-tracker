@@ -1,6 +1,6 @@
 import type { Session } from 'electron/types/grail';
 import { ArrowDown, ArrowUp, Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -111,11 +111,14 @@ function TableRowSkeleton() {
  * and the ability to select a session to view its details.
  */
 export function SessionsList({ onSessionSelect }: SessionsListProps) {
-  const { sessions, loading, getSessionStats, runs, loadSessionRuns } = useRunTrackerStore();
+  const { sessions, loading, getSessionStats, runs, loadSessionRuns, loadingSessions } =
+    useRunTrackerStore();
   const [showArchived, setShowArchived] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [sortField, setSortField] = useState<SortField>('startTime');
   const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
+  // Track which sessions we've already initiated loading for to prevent duplicate triggers
+  const initiatedLoadsRef = useRef<Set<string>>(new Set());
 
   // Filter sessions based on archived status
   const filteredSessions = useMemo(() => {
@@ -211,14 +214,24 @@ export function SessionsList({ onSessionSelect }: SessionsListProps) {
       .filter((session) => {
         // Check if runs are already loaded for this session
         const sessionRuns = runs.get(session.id);
-        return sessionRuns === undefined;
+        if (sessionRuns !== undefined) return false;
+        // Check if runs are currently loading for this session
+        if (loadingSessions.has(session.id)) return false;
+        // Check if we've already initiated loading for this session
+        if (initiatedLoadsRef.current.has(session.id)) return false;
+        return true;
       })
       .map((session) => session.id);
-  }, [sortedSessions, runs]);
+  }, [sortedSessions, runs, loadingSessions]);
 
   // Load runs (and their items) for sessions that don't have runs loaded yet
   useEffect(() => {
     if (sessionsNeedingRuns.length === 0 || loading) return;
+
+    // Mark these sessions as initiated before starting the load
+    sessionsNeedingRuns.forEach((sessionId) => {
+      initiatedLoadsRef.current.add(sessionId);
+    });
 
     // Load runs for all sessions in parallel
     Promise.all(sessionsNeedingRuns.map((sessionId) => loadSessionRuns(sessionId))).catch(
@@ -227,6 +240,20 @@ export function SessionsList({ onSessionSelect }: SessionsListProps) {
       },
     );
   }, [sessionsNeedingRuns, loadSessionRuns, loading]);
+
+  // Clean up initiated loads when runs are actually loaded or loading completes
+  useEffect(() => {
+    // Remove sessions from initiated set once they're loaded or no longer loading
+    const toRemove: string[] = [];
+    initiatedLoadsRef.current.forEach((sessionId) => {
+      if (runs.has(sessionId) || !loadingSessions.has(sessionId)) {
+        toRemove.push(sessionId);
+      }
+    });
+    toRemove.forEach((sessionId) => {
+      initiatedLoadsRef.current.delete(sessionId);
+    });
+  }, [runs, loadingSessions]);
 
   // Handle sorting
   const handleSort = useCallback(

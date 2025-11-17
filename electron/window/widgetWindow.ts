@@ -90,6 +90,8 @@ export function createWidgetWindow(
   widgetWindow = new BrowserWindow({
     width: size.width,
     height: size.height,
+    minWidth: 250,
+    minHeight: 150,
     x: position.x,
     y: position.y,
     minWidth: 150,
@@ -124,7 +126,31 @@ export function createWidgetWindow(
 
   // Handle window move with snapping
   widgetWindow.on('will-move', (event, newBounds) => {
+    if (!widgetWindow) {
+      return;
+    }
+
     const display = screen.getDisplayNearestPoint({ x: newBounds.x, y: newBounds.y });
+    const { workArea } = display;
+    const currentBounds = widgetWindow.getBounds();
+
+    const snappedToLeft = currentBounds.x === workArea.x;
+    const snappedToRight = currentBounds.x === workArea.x + workArea.width - currentBounds.width;
+    const snappedToTop = currentBounds.y === workArea.y;
+    const snappedToBottom = currentBounds.y === workArea.y + workArea.height - currentBounds.height;
+
+    const movingAwayFromLeft = snappedToLeft && newBounds.x > currentBounds.x;
+    const movingAwayFromRight = snappedToRight && newBounds.x < currentBounds.x;
+    const movingAwayFromTop = snappedToTop && newBounds.y > currentBounds.y;
+    const movingAwayFromBottom = snappedToBottom && newBounds.y < currentBounds.y;
+
+    // When the window is currently snapped to an edge and the user drags away from that edge,
+    // allow the move without applying snapping again. This prevents the widget from feeling
+    // \"stuck\" to the edge.
+    if (movingAwayFromLeft || movingAwayFromRight || movingAwayFromTop || movingAwayFromBottom) {
+      return;
+    }
+
     const snappedPosition = calculateSnapPosition(
       newBounds.x,
       newBounds.y,
@@ -135,7 +161,7 @@ export function createWidgetWindow(
     // Apply snapped position if different
     if (snappedPosition.x !== newBounds.x || snappedPosition.y !== newBounds.y) {
       event.preventDefault();
-      widgetWindow?.setBounds({
+      widgetWindow.setBounds({
         x: snappedPosition.x,
         y: snappedPosition.y,
         width: newBounds.width,

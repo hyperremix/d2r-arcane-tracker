@@ -33,6 +33,7 @@ export function RunTracker() {
     setError,
     clearError,
     retryLastAction,
+    loadRunItems,
   } = useRunTrackerStore();
 
   // Navigation state
@@ -107,6 +108,16 @@ export function RunTracker() {
       handleRunResumed(payload.session);
     };
 
+    const handleRunItemAddedEvent = (
+      _event: Electron.IpcRendererEvent,
+      payload: { runId: string },
+    ) => {
+      // Refresh items for the affected run so UI reflects newly found items
+      loadRunItems(payload.runId).catch((error) => {
+        console.error('[RunTracker] Error loading items for run from event:', error);
+      });
+    };
+
     // Register IPC event listeners
     window.ipcRenderer?.on('run-tracker:session-started', handleSessionStartedEvent);
     window.ipcRenderer?.on('run-tracker:session-ended', handleSessionEndedEvent);
@@ -114,6 +125,7 @@ export function RunTracker() {
     window.ipcRenderer?.on('run-tracker:run-ended', handleRunEndedEvent);
     window.ipcRenderer?.on('run-tracker:run-paused', handleRunPausedEvent);
     window.ipcRenderer?.on('run-tracker:run-resumed', handleRunResumedEvent);
+    window.ipcRenderer?.on('run-tracker:run-item-added', handleRunItemAddedEvent);
 
     console.log('[RunTracker] IPC event listeners registered');
 
@@ -125,6 +137,7 @@ export function RunTracker() {
       window.ipcRenderer?.off('run-tracker:run-ended', handleRunEndedEvent);
       window.ipcRenderer?.off('run-tracker:run-paused', handleRunPausedEvent);
       window.ipcRenderer?.off('run-tracker:run-resumed', handleRunResumedEvent);
+      window.ipcRenderer?.off('run-tracker:run-item-added', handleRunItemAddedEvent);
       console.log('[RunTracker] IPC event listeners cleaned up');
     };
   }, []); // Only set up once on mount

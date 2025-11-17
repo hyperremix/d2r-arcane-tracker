@@ -54,6 +54,7 @@ export function WidgetSettings() {
   const widgetDisplay = settings.widgetDisplay || 'overall';
   const widgetOpacity = settings.widgetOpacity ?? 0.9;
   const widgetEnabled = settings.widgetEnabled ?? false;
+  const widgetRunOnlyShowItems = settings.widgetRunOnlyShowItems ?? true;
 
   const resetSize = useCallback(async () => {
     const result = await window.electronAPI?.widget.resetSize(widgetDisplay);
@@ -74,6 +75,13 @@ export function WidgetSettings() {
       updateDisplay('overall');
     }
   }, [settings.grailEthereal, widgetDisplay, updateDisplay]);
+
+  const toggleRunOnlyItems = useCallback(
+    async (checked: boolean) => {
+      await setSettings({ widgetRunOnlyShowItems: checked });
+    },
+    [setSettings],
+  );
 
   return (
     <Card>
@@ -144,6 +152,21 @@ export function WidgetSettings() {
                 <span className="text-yellow-600"> (Split & All require Ethereal tracking)</span>
               )}
             </p>
+          </div>
+
+          {/* Run Only Item List Toggle */}
+          <div className="flex items-center justify-between">
+            <div>
+              <h4 className="font-medium text-sm">Show Run Item List</h4>
+              <p className="text-muted-foreground text-xs">
+                In Run Only mode, show a compact text list of grail-relevant items found each run.
+              </p>
+            </div>
+            <Switch
+              checked={widgetRunOnlyShowItems}
+              onCheckedChange={toggleRunOnlyItems}
+              disabled={!widgetEnabled}
+            />
           </div>
 
           {/* Opacity Slider */}

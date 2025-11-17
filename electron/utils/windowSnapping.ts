@@ -2,8 +2,10 @@ import type { Display, Rectangle } from 'electron';
 
 /**
  * Threshold in pixels for snapping to screen edges and corners.
+ * Lower values make snapping feel less \"sticky\" while still helping
+ * users align the widget to screen edges when desired.
  */
-const SNAP_THRESHOLD = 20;
+const SNAP_THRESHOLD = 10;
 
 /**
  * Calculates the snapped position for a window based on its current position and screen bounds.

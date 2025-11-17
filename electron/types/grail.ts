@@ -539,6 +539,12 @@ export type Settings = {
   widgetSizeOverall?: { width: number; height: number }; // Custom size for overall mode
   widgetSizeSplit?: { width: number; height: number }; // Custom size for split mode
   widgetSizeAll?: { width: number; height: number }; // Custom size for all mode
+  /**
+   * When true (default), the run-only widget variant shows a compact text list
+   * of grail-relevant items found in recent runs for the active session.
+   * When false, only the run/session statistics are shown.
+   */
+  widgetRunOnlyShowItems?: boolean;
   // Main window settings
   mainWindowBounds?: { x: number; y: number; width: number; height: number }; // Main window position and size
   // Wizard settings

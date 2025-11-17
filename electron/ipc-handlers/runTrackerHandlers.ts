@@ -164,7 +164,7 @@ export function initializeRunTrackerHandlers(
     }
   });
 
-  // Statistics query handlers
+  // Statistics and data query handlers
   ipcMain.handle(
     'run-tracker:get-all-sessions',
     async (_event, includeArchived: boolean = false) => {
@@ -246,7 +246,6 @@ export function initializeRunTrackerHandlers(
     }
   });
 
-  // Statistics query handlers
   ipcMain.handle('run-tracker:get-overall-statistics', async (_event) => {
     try {
       if (!runTracker) {
@@ -325,6 +324,16 @@ export function initializeRunTrackerHandlers(
     }
   });
   eventUnsubscribers.push(unsubscribeRunResumed);
+
+  const unsubscribeRunItemAdded = eventBus.on('run-item-added', (payload) => {
+    const allWebContents = webContents.getAllWebContents();
+    for (const wc of allWebContents) {
+      if (!wc.isDestroyed() && wc.getType() === 'window') {
+        wc.send('run-tracker:run-item-added', payload);
+      }
+    }
+  });
+  eventUnsubscribers.push(unsubscribeRunItemAdded);
 
   console.log('[runTrackerHandlers] IPC handlers initialized');
 }
