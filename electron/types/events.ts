@@ -78,8 +78,9 @@ export interface SessionEndedPayload {
  */
 export interface RunItemAddedPayload {
   runId: string;
-  grailProgress: GrailProgress;
-  item: D2Item;
+  grailProgress?: GrailProgress;
+  item?: D2Item;
+  name?: string;
 }
 
 /**

@@ -110,7 +110,7 @@ export function RunTracker() {
 
     const handleRunItemAddedEvent = (
       _event: Electron.IpcRendererEvent,
-      payload: { runId: string },
+      payload: { runId: string; name?: string },
     ) => {
       // Refresh items for the affected run so UI reflects newly found items
       loadRunItems(payload.runId).catch((error) => {

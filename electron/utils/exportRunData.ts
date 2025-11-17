@@ -61,10 +61,16 @@ export function formatSessionAsCSV(
   if (includeItems && items && items.length > 0) {
     rows.push(['']); // Empty row separator
     rows.push(['Items Found']);
-    rows.push(['Item ID', 'Run ID', 'Grail Progress ID', 'Found Time']);
+    rows.push(['Item ID', 'Run ID', 'Grail Progress ID', 'Name', 'Found Time']);
 
     items.forEach((item) => {
-      rows.push([item.id, item.runId, item.grailProgressId, item.foundTime.toISOString()]);
+      rows.push([
+        item.id,
+        item.runId,
+        item.grailProgressId || '',
+        item.name || '',
+        item.foundTime.toISOString(),
+      ]);
     });
   }
 
@@ -124,6 +130,7 @@ export function formatSessionAsJSON(
             id: item.id,
             runId: item.runId,
             grailProgressId: item.grailProgressId,
+            name: item.name,
             foundTime: item.foundTime.toISOString(),
             created: item.created.toISOString(),
           })),

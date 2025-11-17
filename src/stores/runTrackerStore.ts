@@ -42,6 +42,9 @@ interface RunTrackerState {
   loadRunItems: (runId: string) => Promise<void>;
   refreshActiveRun: () => Promise<void>;
 
+  // Actions - Manual Item Entry
+  addManualRunItem: (name: string) => Promise<void>;
+
   // Actions - State Management
   setLoading: (loading: boolean) => void;
   setError: (
@@ -62,6 +65,66 @@ interface RunTrackerState {
   // Computed/Helper Methods
   getCurrentRunDuration: () => number;
   getSessionStats: (sessionId: string) => SessionStats | null;
+}
+
+/**
+ * Helper function to determine which run ID to use for adding a manual item.
+ * Returns the active run ID if available, otherwise the latest finished run ID.
+ */
+function getTargetRunId(state: {
+  activeRun: Run | null;
+  runs: Map<string, Run[]>;
+  sessions: Session[];
+}): string | null {
+  // First, try to use the active run
+  if (state.activeRun) {
+    return state.activeRun.id;
+  }
+
+  // If no active run, find the latest finished run
+  const allRuns: Array<{ run: Run; sessionId: string }> = [];
+  for (const session of state.sessions) {
+    const sessionRuns = state.runs.get(session.id) || [];
+    for (const run of sessionRuns) {
+      if (run.endTime) {
+        // Only consider finished runs
+        allRuns.push({ run, sessionId: session.id });
+      }
+    }
+  }
+
+  // Sort by end time (most recent first)
+  allRuns.sort((a, b) => {
+    const aTime = a.run.endTime?.getTime() || 0;
+    const bTime = b.run.endTime?.getTime() || 0;
+    return bTime - aTime;
+  });
+
+  return allRuns.length > 0 ? allRuns[0].run.id : null;
+}
+
+/**
+ * Helper function to handle post-add operations after successfully adding a manual item.
+ */
+async function handleSuccessfulItemAdd(
+  targetRunId: string,
+  getState: () => {
+    loadRunItems: (runId: string) => Promise<void>;
+    activeSession: Session | null;
+    sessionStatsCache: Map<string, SessionStats>;
+  },
+  setState: (state: { sessionStatsCache: Map<string, SessionStats> }) => void,
+): Promise<void> {
+  const state = getState();
+  // Refresh run items for the target run
+  await state.loadRunItems(targetRunId);
+
+  // Invalidate session stats cache if we have an active session
+  if (state.activeSession) {
+    const newCache = new Map(state.sessionStatsCache);
+    newCache.delete(state.activeSession.id);
+    setState({ sessionStatsCache: newCache });
+  }
 }
 
 /**
@@ -418,6 +481,51 @@ export const useRunTrackerStore = create<RunTrackerState>()(
         const errorMessage = error instanceof Error ? error.message : String(error);
         set({ error: errorMessage, loading: false });
         console.error('[RunTrackerStore] Error refreshing active run:', error);
+      }
+    },
+
+    addManualRunItem: async (name) => {
+      if (!name || name.trim() === '') {
+        set({ error: 'Item name cannot be empty', errorType: 'validation' });
+        return;
+      }
+
+      set({ loading: true, error: null, errorType: null });
+      try {
+        const targetRunId = getTargetRunId(get());
+        if (!targetRunId) {
+          set({
+            error: 'No active run or finished run found. Please start a run first.',
+            errorType: 'validation',
+            loading: false,
+          });
+          return;
+        }
+
+        const result = await window.electronAPI?.runTracker.addRunItem({
+          runId: targetRunId,
+          name: name.trim(),
+        });
+
+        if (result?.success) {
+          await handleSuccessfulItemAdd(targetRunId, get, set);
+          set({ loading: false });
+          console.log('[RunTrackerStore] Manual run item added:', name);
+        } else {
+          set({
+            error: 'Failed to add manual run item',
+            errorType: 'unknown',
+            loading: false,
+          });
+        }
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        set({
+          error: `Failed to add manual run item: ${errorMessage}`,
+          errorType: 'unknown',
+          loading: false,
+        });
+        console.error('[RunTrackerStore] Error adding manual run item:', error);
       }
     },
 

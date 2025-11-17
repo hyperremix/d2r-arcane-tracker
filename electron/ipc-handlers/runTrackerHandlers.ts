@@ -1,6 +1,7 @@
 import { ipcMain, webContents } from 'electron';
 import type { EventBus } from '../services/EventBus';
 import type { RunTrackerService } from '../services/runTracker';
+import type { RunItem } from '../types/grail';
 
 let runTracker: RunTrackerService | null = null;
 const eventUnsubscribers: Array<() => void> = [];
@@ -245,6 +246,64 @@ export function initializeRunTrackerHandlers(
       throw error;
     }
   });
+
+  ipcMain.handle(
+    'run-tracker:add-run-item',
+    async (
+      _event,
+      data: {
+        runId: string;
+        name?: string;
+        grailProgressId?: string;
+        foundTime?: Date;
+      },
+    ) => {
+      try {
+        if (!runTracker) {
+          throw new Error('Run tracker not initialized');
+        }
+        if (!data.runId || typeof data.runId !== 'string') {
+          throw new Error('Invalid run ID');
+        }
+        if (!data.name && !data.grailProgressId) {
+          throw new Error('Either name or grailProgressId must be provided');
+        }
+
+        const database = runTracker.getDatabase();
+
+        // Verify the run exists by checking if we can get run items for it
+        // This is a simple way to verify the run exists
+        try {
+          database.getRunItems(data.runId);
+        } catch {
+          // If getRunItems fails, the run might not exist
+          // But we'll continue anyway as the foreign key constraint will catch it
+        }
+
+        const runItem: RunItem = {
+          id: `run_item_${data.runId}_${Date.now()}`,
+          runId: data.runId,
+          grailProgressId: data.grailProgressId,
+          name: data.name,
+          foundTime: data.foundTime || new Date(),
+          created: new Date(),
+        };
+
+        database.addRunItem(runItem);
+
+        // Emit event for UI updates
+        eventBus.emit('run-item-added', {
+          runId: data.runId,
+          name: data.name,
+        });
+
+        return { success: true, runItem };
+      } catch (error) {
+        console.error('[runTrackerHandlers] Error adding run item:', error);
+        throw error;
+      }
+    },
+  );
 
   ipcMain.handle('run-tracker:get-overall-statistics', async (_event) => {
     try {

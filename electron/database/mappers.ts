@@ -370,7 +370,8 @@ export function mapRunItemToDatabase(runItem: RunItem): Omit<DatabaseRunItem, 'c
   return {
     id: runItem.id,
     run_id: runItem.runId,
-    grail_progress_id: runItem.grailProgressId,
+    grail_progress_id: toSqliteNull(runItem.grailProgressId),
+    name: toSqliteNull(runItem.name),
     found_time: runItem.foundTime.toISOString(),
   };
 }
@@ -384,7 +385,8 @@ export function mapDatabaseRunItemToRunItem(dbRunItem: DatabaseRunItem): RunItem
   return {
     id: dbRunItem.id,
     runId: dbRunItem.run_id,
-    grailProgressId: dbRunItem.grail_progress_id,
+    grailProgressId: dbRunItem.grail_progress_id || undefined,
+    name: dbRunItem.name || undefined,
     foundTime: new Date(dbRunItem.found_time),
     created: new Date(dbRunItem.created_at),
   };

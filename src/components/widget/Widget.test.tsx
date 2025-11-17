@@ -171,8 +171,9 @@ describe('Widget run-only item list', () => {
       />,
     );
 
-    expect(getAllByText('#1').length).toBeGreaterThanOrEqual(1);
-    expect(getAllByText('#2').length).toBeGreaterThanOrEqual(1);
+    // The structure changed - run numbers are now in format "#1 -" or "#2 -"
+    expect(getAllByText(/#1/).length).toBeGreaterThanOrEqual(1);
+    expect(getAllByText(/#2/).length).toBeGreaterThanOrEqual(1);
     expect(getByText('Harlequin Crest')).toBeDefined();
     expect(getByText("Tyrael's Might")).toBeDefined();
   });
@@ -192,7 +193,7 @@ describe('Widget run-only item list', () => {
       />,
     );
 
-    expect(queryByText('#1')).toBeNull();
+    expect(queryByText(/#1/)).toBeNull();
     expect(queryByText('Harlequin Crest')).toBeNull();
   });
 
@@ -213,7 +214,7 @@ describe('Widget run-only item list', () => {
       />,
     );
 
-    expect(queryByText('#1')).toBeNull();
+    expect(queryByText(/#1/)).toBeNull();
     expect(queryByText('Harlequin Crest')).toBeNull();
   });
 

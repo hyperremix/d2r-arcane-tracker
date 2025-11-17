@@ -1,5 +1,5 @@
-import { Loader2, Pause, Play, Square, StopCircle, Timer } from 'lucide-react';
-import { useCallback, useEffect, useState } from 'react';
+import { Loader2, Pause, Play, Plus, Square, StopCircle, Timer } from 'lucide-react';
+import { useCallback, useEffect, useId, useState } from 'react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useGrailStore } from '@/stores/grailStore';
@@ -97,98 +98,115 @@ function ControlButtons({
   onEndSession,
 }: ControlButtonsProps) {
   return (
-    <div className="flex flex-wrap gap-2">
-      {/* Start Run Button */}
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Button
-            variant="default"
-            size="sm"
-            onClick={onStartRun}
-            disabled={!canStartRun || loading}
-            className="flex items-center gap-2"
-          >
-            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
-            Start Run
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent>
-          <p>Start a new run ({shortcuts.startRun})</p>
-        </TooltipContent>
-      </Tooltip>
+    <div className="flex flex-col gap-4">
+      <div className="flex flex-wrap gap-2">
+        {/* Start Run Button */}
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="default"
+              size="sm"
+              onClick={onStartRun}
+              disabled={!canStartRun || loading}
+              className="flex items-center gap-2"
+            >
+              {loading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Play className="h-4 w-4" />
+              )}
+              Start Run
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>Start a new run ({shortcuts.startRun})</p>
+          </TooltipContent>
+        </Tooltip>
 
-      {/* Pause/Resume Button */}
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={isPaused ? onResumeRun : onPauseRun}
-            disabled={!canPauseResume || loading}
-            className="flex items-center gap-2"
-          >
-            {loading ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : isPaused ? (
-              <Play className="h-4 w-4" />
-            ) : (
-              <Pause className="h-4 w-4" />
-            )}
-            {isPaused ? 'Resume' : 'Pause'}
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent>
-          <p>
-            {isPaused ? `Resume run (${shortcuts.pauseRun})` : `Pause run (${shortcuts.pauseRun})`}
-          </p>
-        </TooltipContent>
-      </Tooltip>
+        {/* Pause/Resume Button */}
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={isPaused ? onResumeRun : onPauseRun}
+              disabled={!canPauseResume || loading}
+              className="flex items-center gap-2"
+            >
+              {loading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : isPaused ? (
+                <Play className="h-4 w-4" />
+              ) : (
+                <Pause className="h-4 w-4" />
+              )}
+              {isPaused ? 'Resume' : 'Pause'}
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>
+              {isPaused
+                ? `Resume run (${shortcuts.pauseRun})`
+                : `Pause run (${shortcuts.pauseRun})`}
+            </p>
+          </TooltipContent>
+        </Tooltip>
 
-      {/* End Run Button */}
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={onEndRun}
-            disabled={!canEndRun || loading}
-            className="flex items-center gap-2"
-          >
-            {loading ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Square className="h-4 w-4" />
-            )}
-            End Run
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent>
-          <p>End current run ({shortcuts.endRun})</p>
-        </TooltipContent>
-      </Tooltip>
+        {/* End Run Button */}
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onEndRun}
+              disabled={!canEndRun || loading}
+              className="flex items-center gap-2"
+            >
+              {loading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Square className="h-4 w-4" />
+              )}
+              End Run
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>End current run ({shortcuts.endRun})</p>
+          </TooltipContent>
+        </Tooltip>
 
-      {/* End Session Button */}
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Button
-            variant="destructive"
-            size="sm"
-            onClick={onEndSession}
-            disabled={!canEndSession || loading}
-            className="flex items-center gap-2"
-          >
-            {loading ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <StopCircle className="h-4 w-4" />
-            )}
-            End Session
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent>
-          <p>End current session ({shortcuts.endSession})</p>
-        </TooltipContent>
-      </Tooltip>
+        {/* End Session Button */}
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={onEndSession}
+              disabled={!canEndSession || loading}
+              className="flex items-center gap-2"
+            >
+              {loading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <StopCircle className="h-4 w-4" />
+              )}
+              End Session
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>End current session ({shortcuts.endSession})</p>
+          </TooltipContent>
+        </Tooltip>
+      </div>
+
+      {/* Keyboard Shortcuts Info */}
+      <div className="rounded-md bg-muted p-3">
+        <p className="text-muted-foreground text-xs">
+          <strong>Keyboard Shortcuts:</strong> {shortcuts.startRun} (Start), {shortcuts.pauseRun}{' '}
+          (Pause/Resume),
+          {shortcuts.endRun} (End Run), {shortcuts.endSession} (End Session)
+        </p>
+      </div>
     </div>
   );
 }
@@ -209,6 +227,7 @@ export function SessionControls() {
     pauseRun,
     resumeRun,
     endSession,
+    addManualRunItem,
   } = useRunTrackerStore();
 
   const { settings, setSettings } = useGrailStore();
@@ -224,6 +243,9 @@ export function SessionControls() {
 
   const [showEndRunDialog, setShowEndRunDialog] = useState(false);
   const [showEndSessionDialog, setShowEndSessionDialog] = useState(false);
+  const [manualItemName, setManualItemName] = useState('');
+  const [addingItem, setAddingItem] = useState(false);
+  const manualItemNameId = useId();
 
   const toggleAutoMode = useCallback(
     async (checked: boolean) => {
@@ -275,6 +297,31 @@ export function SessionControls() {
       console.error('Failed to end session:', error);
     }
   }, [endSession]);
+
+  const handleAddManualItem = useCallback(async () => {
+    if (!manualItemName.trim()) {
+      return;
+    }
+
+    setAddingItem(true);
+    try {
+      await addManualRunItem(manualItemName.trim());
+      setManualItemName('');
+    } catch (error) {
+      console.error('Failed to add manual item:', error);
+    } finally {
+      setAddingItem(false);
+    }
+  }, [manualItemName, addManualRunItem]);
+
+  const handleManualItemKeyDown = useCallback(
+    (event: React.KeyboardEvent<HTMLInputElement>) => {
+      if (event.key === 'Enter' && !addingItem && manualItemName.trim()) {
+        handleAddManualItem();
+      }
+    },
+    [addingItem, manualItemName, handleAddManualItem],
+  );
 
   // Keyboard shortcut handlers
   const handleStartRunShortcut = useCallback(
@@ -390,7 +437,7 @@ export function SessionControls() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-8">
             {/* Auto Mode Toggle - Windows only */}
             {isWindows && activeSession && (
               <div className="flex items-center justify-between rounded-md border p-3">
@@ -418,12 +465,42 @@ export function SessionControls() {
               onEndSession={() => setShowEndSessionDialog(true)}
             />
 
-            {/* Keyboard Shortcuts Info */}
-            <div className="mt-4 rounded-md bg-muted p-3">
+            {/* Manual Item Entry */}
+            <div className="flex flex-col gap-2">
+              <label
+                htmlFor={manualItemNameId}
+                className="font-medium text-muted-foreground text-sm"
+              >
+                Add Item Manually
+              </label>
+              <div className="flex gap-2">
+                <Input
+                  id={manualItemNameId}
+                  type="text"
+                  placeholder="Enter item name..."
+                  value={manualItemName}
+                  onChange={(e) => setManualItemName(e.target.value)}
+                  onKeyDown={handleManualItemKeyDown}
+                  disabled={addingItem || loading}
+                  className="flex-1"
+                />
+                <Button
+                  onClick={handleAddManualItem}
+                  disabled={!manualItemName.trim() || addingItem || loading}
+                  variant="outline"
+                  className="flex items-center gap-2"
+                >
+                  {addingItem ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Plus className="h-4 w-4" />
+                  )}
+                  Add
+                </Button>
+              </div>
               <p className="text-muted-foreground text-xs">
-                <strong>Keyboard Shortcuts:</strong> {shortcuts.startRun} (Start),{' '}
-                {shortcuts.pauseRun} (Pause/Resume),
-                {shortcuts.endRun} (End Run), {shortcuts.endSession} (End Session)
+                Items will be added to the current run, or the latest finished run if no run is
+                active.
               </p>
             </div>
           </div>

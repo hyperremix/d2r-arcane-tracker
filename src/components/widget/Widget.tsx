@@ -8,8 +8,9 @@ import type {
   SessionStats,
   Settings,
 } from 'electron/types/grail';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ProgressGauge } from '@/components/grail/ProgressGauge';
+import { Input } from '@/components/ui/input';
 import { formatDuration } from '@/lib/utils';
 import { useGrailStore } from '@/stores/grailStore';
 import { useRunTrackerStore } from '@/stores/runTrackerStore';
@@ -33,6 +34,7 @@ interface RunOnlyDisplayProps {
   sessionStats: SessionStats | null;
   runItemsByRun: RunItemsByRun[];
   showItemList: boolean;
+  onAddManualItem?: (name: string) => Promise<void>;
 }
 
 /**
@@ -76,6 +78,17 @@ function buildRunItemNameLookup(
 
     const names: string[] = [];
     for (const runItem of runItemEntries) {
+      // If this is a manual entry with a name, use it directly
+      if (runItem.name) {
+        names.push(runItem.name);
+        continue;
+      }
+
+      // Otherwise, try to find the item through grail progress
+      if (!runItem.grailProgressId) {
+        continue;
+      }
+
       const progressEntry = progressById.get(runItem.grailProgressId);
       if (!progressEntry) continue;
 
@@ -113,7 +126,36 @@ function RunOnlyDisplay({
   sessionStats,
   runItemsByRun,
   showItemList,
+  onAddManualItem,
 }: RunOnlyDisplayProps) {
+  const [manualItemName, setManualItemName] = useState('');
+  const [addingItem, setAddingItem] = useState(false);
+
+  const handleAddItem = useCallback(async () => {
+    if (!manualItemName.trim() || !onAddManualItem || addingItem) {
+      return;
+    }
+
+    setAddingItem(true);
+    try {
+      await onAddManualItem(manualItemName.trim());
+      setManualItemName('');
+    } catch (error) {
+      console.error('[Widget] Failed to add manual item:', error);
+    } finally {
+      setAddingItem(false);
+    }
+  }, [manualItemName, onAddManualItem, addingItem]);
+
+  const handleKeyDown = useCallback(
+    (event: React.KeyboardEvent<HTMLInputElement>) => {
+      if (event.key === 'Enter' && !addingItem && manualItemName.trim()) {
+        handleAddItem();
+      }
+    },
+    [addingItem, manualItemName, handleAddItem],
+  );
+
   if (!activeSession) {
     return (
       <div className="text-center">
@@ -153,8 +195,30 @@ function RunOnlyDisplay({
 
       {/* Per-run item list */}
       {showItemList && (
-        <>
+        <div className="flex flex-col gap-2">
           <p className="font-bold text-gray-300 text-md">Run Items</p>
+
+          {/* Manual Item Entry */}
+          {onAddManualItem && (
+            <div className="flex flex-col gap-1.5">
+              <div className="flex gap-1.5">
+                <Input
+                  type="text"
+                  placeholder="Add item..."
+                  value={manualItemName}
+                  onChange={(e) => setManualItemName(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  disabled={addingItem}
+                  className="h-7 flex-1 border-gray-600 bg-gray-800/50 text-white text-xs placeholder:text-gray-500"
+                  style={{
+                    // @ts-expect-error - WebkitAppRegion is an Electron-specific CSS property
+                    WebkitAppRegion: 'no-drag',
+                  }}
+                />
+              </div>
+            </div>
+          )}
+
           {runItemsByRun.length > 0 && (
             <div className="mt-2 flex max-h-40 flex-col gap-1 overflow-y-auto text-gray-200 text-xs">
               {runItemsByRun.map((run) => {
@@ -163,16 +227,15 @@ function RunOnlyDisplay({
                 }
 
                 return (
-                  <div key={run.runId} className="flex flex-wrap gap-1">
-                    <span className="font-semibold text-purple-200">#{run.runNumber}</span>
-                    <span>-</span>
-                    <span className="truncate">{run.items.join(', ')}</span>
+                  <div key={run.runId} className="grid grid-cols-[auto_1fr] gap-1">
+                    <span>#{run.runNumber} -</span>
+                    <span className="flex-1 truncate">{run.items.join(', ')}</span>
                   </div>
                 );
               })}
             </div>
           )}
-        </>
+        </div>
       )}
     </div>
   );
@@ -196,6 +259,7 @@ export function Widget({ statistics, settings, onDragStart, onDragEnd }: WidgetP
     getSessionStats,
     loadSessionRuns,
     loadRunItems,
+    addManualRunItem,
   } = useRunTrackerStore();
   const [runDuration, setRunDuration] = useState<number>(0);
 
@@ -316,6 +380,7 @@ export function Widget({ statistics, settings, onDragStart, onDragEnd }: WidgetP
           sessionStats={sessionStats}
           runItemsByRun={runItemsByRun}
           showItemList={settings.widgetRunOnlyShowItems ?? true}
+          onAddManualItem={addManualRunItem}
         />
       </div>
     );

@@ -121,7 +121,8 @@ export function initializeDatabaseSchema(db: DatabaseType): void {
     CREATE TABLE IF NOT EXISTS run_items (
       id TEXT PRIMARY KEY,
       run_id TEXT NOT NULL,
-      grail_progress_id TEXT NOT NULL,
+      grail_progress_id TEXT,
+      name TEXT,
       found_time DATETIME NOT NULL,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (run_id) REFERENCES runs(id) ON DELETE CASCADE,

@@ -1,7 +1,6 @@
 import type { Session } from 'electron/types/grail';
 import { FileDownIcon } from 'lucide-react';
 import { useCallback, useEffect, useId, useMemo, useState } from 'react';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
@@ -185,11 +184,8 @@ export function SessionCard({ session }: SessionCardProps) {
   const sessionCard = (
     <Card className="transition-all duration-300 ease-in-out hover:shadow-md">
       <CardHeader>
-        <CardTitle className="flex items-center justify-between">
-          <span className="transition-colors duration-200">Session Card</span>
-          <Badge variant="secondary" className="text-xs transition-all duration-200">
-            Active
-          </Badge>
+        <CardTitle>
+          <span className="transition-colors duration-200">Active Session</span>
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4 transition-all duration-300">

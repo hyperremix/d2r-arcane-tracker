@@ -252,7 +252,22 @@ export function RunList({ runs }: RunListProps) {
   // Helper function to get item information
   const getItemInfo = useCallback(
     (runItem: RunItem) => {
-      // First find the progress record by matching the grailProgressId
+      // If this is a manual entry with a name, use it directly
+      if (runItem.name) {
+        return {
+          name: runItem.name,
+          isNewGrail: false,
+        };
+      }
+
+      // Otherwise, find the progress record by matching the grailProgressId
+      if (!runItem.grailProgressId) {
+        return {
+          name: 'Unknown Item',
+          isNewGrail: false,
+        };
+      }
+
       const progressRecord = progress.find((p) => p.id === runItem.grailProgressId);
       // Then use the progress record's itemId to find the actual item
       const item = progressRecord ? items.find((i) => i.id === progressRecord.itemId) : undefined;
@@ -269,6 +284,11 @@ export function RunList({ runs }: RunListProps) {
   // Helper function to get ItemCard data from RunItem
   const getItemCardData = useCallback(
     (runItem: RunItem) => {
+      // If this is a manual entry without grail progress, return empty data
+      if (!runItem.grailProgressId) {
+        return { item: undefined, normalProgress: [], etherealProgress: [] };
+      }
+
       // First find the progress record by matching the grailProgressId
       const progressRecord = progress.find((p) => p.id === runItem.grailProgressId);
       if (!progressRecord) {

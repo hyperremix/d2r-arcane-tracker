@@ -603,7 +603,7 @@ describe('SessionControls', () => {
 
       // Check that tooltip triggers are present (they have data-slot="tooltip-trigger")
       const tooltipTriggers = screen.getAllByRole('button');
-      expect(tooltipTriggers).toHaveLength(4); // Start Run, Pause/Resume, End Run, End Session
+      expect(tooltipTriggers).toHaveLength(5); // Start Run, Pause/Resume, End Run, End Session, Add Item
     });
   });
 });

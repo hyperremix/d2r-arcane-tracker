@@ -201,7 +201,8 @@ class GrailDatabase {
       CREATE TABLE IF NOT EXISTS run_items (
         id TEXT PRIMARY KEY,
         run_id TEXT NOT NULL,
-        grail_progress_id TEXT NOT NULL,
+        grail_progress_id TEXT,
+        name TEXT,
         found_time DATETIME NOT NULL,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (run_id) REFERENCES runs(id) ON DELETE CASCADE,
@@ -1196,7 +1197,7 @@ class GrailDatabase {
         COUNT(CASE WHEN gp.from_initial_scan = 0 THEN ri.id END) as newGrailItems
       FROM run_items ri
       INNER JOIN runs r ON ri.run_id = r.id
-      INNER JOIN grail_progress gp ON ri.grail_progress_id = gp.id
+      LEFT JOIN grail_progress gp ON ri.grail_progress_id = gp.id
       WHERE r.session_id = ?
     `);
     const itemStats = itemStatsStmt.get(sessionId) as {
@@ -1419,11 +1420,11 @@ class GrailDatabase {
    */
   addRunItem(runItem: RunItem): void {
     const stmt = this.db.prepare(`
-      INSERT INTO run_items (id, run_id, grail_progress_id, found_time)
-      VALUES (?, ?, ?, ?)
+      INSERT INTO run_items (id, run_id, grail_progress_id, name, found_time)
+      VALUES (?, ?, ?, ?, ?)
     `);
     const mapped = mapRunItemToDatabase(runItem);
-    stmt.run(mapped.id, mapped.run_id, mapped.grail_progress_id, mapped.found_time);
+    stmt.run(mapped.id, mapped.run_id, mapped.grail_progress_id, mapped.name, mapped.found_time);
   }
 
   /**

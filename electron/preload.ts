@@ -688,6 +688,22 @@ contextBridge.exposeInMainWorld('electronAPI', {
      * @returns {Promise<RunStatistics>} A promise that resolves with overall run statistics.
      */
     getOverallStatistics: () => ipcRenderer.invoke('run-tracker:get-overall-statistics'),
+
+    /**
+     * Manually adds a run item to a run.
+     * @param {Object} data - The run item data.
+     * @param {string} data.runId - The run ID to add the item to.
+     * @param {string} [data.name] - Optional name for manual entries.
+     * @param {string} [data.grailProgressId] - Optional grail progress ID.
+     * @param {Date} [data.foundTime] - Optional found time (defaults to now).
+     * @returns {Promise<{ success: boolean; runItem: RunItem }>} A promise that resolves with the result.
+     */
+    addRunItem: (data: {
+      runId: string;
+      name?: string;
+      grailProgressId?: string;
+      foundTime?: Date;
+    }) => ipcRenderer.invoke('run-tracker:add-run-item', data),
   },
 
   /**

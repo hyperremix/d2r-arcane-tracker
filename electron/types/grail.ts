@@ -241,7 +241,8 @@ export interface Run {
 export interface RunItem {
   id: string;
   runId: string;
-  grailProgressId: string;
+  grailProgressId?: string;
+  name?: string;
   foundTime: Date;
   created: Date;
 }
@@ -321,7 +322,8 @@ export type DatabaseRun = {
 export type DatabaseRunItem = {
   id: string;
   run_id: string;
-  grail_progress_id: string;
+  grail_progress_id: string | null;
+  name: string | null;
   found_time: string;
   created_at: string;
 };

@@ -262,6 +262,14 @@ export class RunItemBuilder {
   }
 
   /**
+   * Set the name (for manual entries)
+   */
+  withName(name: string): this {
+    this.runItem.name = name;
+    return this;
+  }
+
+  /**
    * Set the found time
    */
   withFoundTime(foundTime: Date): this {
