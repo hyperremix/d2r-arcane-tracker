@@ -11,7 +11,7 @@ import { useGrailStore } from './stores/grailStore';
 import { useWizardStore } from './stores/wizardStore';
 
 function App(): JSX.Element {
-  const { setSettings } = useGrailStore();
+  const { hydrateSettings } = useGrailStore();
   const { openWizard } = useWizardStore();
   const hasCheckedWizard = useRef(false);
 
@@ -35,7 +35,7 @@ function App(): JSX.Element {
       try {
         const settingsData = await window.electronAPI?.grail.getSettings();
         if (settingsData) {
-          await setSettings(settingsData);
+          hydrateSettings(settingsData);
           console.log('Loaded settings on app startup:', {
             wizardCompleted: settingsData.wizardCompleted,
             wizardSkipped: settingsData.wizardSkipped,
@@ -62,7 +62,7 @@ function App(): JSX.Element {
     };
 
     loadSettingsAndCheckWizard();
-  }, [setSettings, openWizard]);
+  }, [hydrateSettings, openWizard]);
 
   return (
     <>

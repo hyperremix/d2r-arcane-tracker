@@ -21,7 +21,7 @@ export function WidgetContainer() {
   const [settings, setSettings] = useState<Partial<Settings>>({});
 
   // Share grail data with the global store so the widget can resolve run item names
-  const { setItems, setProgress, setSettings: setGrailSettings } = useGrailStore();
+  const { setItems, setProgress, hydrateSettings: hydrateGrailSettings } = useGrailStore();
 
   // Get run tracker store actions to handle IPC events
   const {
@@ -45,7 +45,7 @@ export function WidgetContainer() {
         if (settingsData) {
           setSettings(settingsData);
           // Hydrate global grail settings so hooks like useTheme and Widget can use them
-          await setGrailSettings(settingsData);
+          hydrateGrailSettings(settingsData);
         }
 
         // Load items and progress to calculate statistics

@@ -12,7 +12,7 @@ import { ProgressGauge } from './ProgressGauge';
  * @returns {JSX.Element} The main grail tracker interface with statistics and item grid
  */
 export function GrailTracker() {
-  const { setCharacters, setItems, setProgress, setSettings, settings } = useGrailStore();
+  const { setCharacters, setItems, setProgress, hydrateSettings, settings } = useGrailStore();
 
   const statistics = useGrailStatistics();
 
@@ -23,7 +23,7 @@ export function GrailTracker() {
         // Load settings first
         const settingsData = await window.electronAPI?.grail.getSettings();
         if (settingsData) {
-          await setSettings(settingsData);
+          hydrateSettings(settingsData);
           console.log('Loaded settings from database');
         }
 
@@ -52,7 +52,7 @@ export function GrailTracker() {
     };
 
     loadData();
-  }, [setCharacters, setItems, setProgress, setSettings]);
+  }, [setCharacters, setItems, setProgress, hydrateSettings]);
 
   // Listen for grail progress updates from automatic detection
   useEffect(() => {

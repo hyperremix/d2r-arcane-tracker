@@ -41,6 +41,7 @@ interface GrailState {
   setProgress: (progress: GrailProgress[]) => void;
   setStatistics: (statistics: GrailStatistics) => void;
   setSettings: (settings: Partial<Settings>) => Promise<void>;
+  hydrateSettings: (settings: Partial<Settings>) => void;
   setSelectedCharacterId: (characterId: string | null) => void;
   setFilter: (filter: Partial<GrailFilter>) => void;
   setAdvancedFilter: (filter: Partial<AdvancedGrailFilter>) => void;
@@ -164,6 +165,14 @@ export const useGrailStore = create<GrailState>((set, get) => ({
     } catch (error) {
       console.error('Failed to update settings:', error);
     }
+  },
+  hydrateSettings: (settingsUpdate) => {
+    // Update local state only, without persisting to database
+    // This is used when loading settings from the database to avoid triggering
+    // settings-updated events that would cause unwanted side effects (e.g., widget resize)
+    set((state) => ({
+      settings: { ...state.settings, ...settingsUpdate },
+    }));
   },
   setSelectedCharacterId: (selectedCharacterId) => set({ selectedCharacterId }),
   setFilter: (filterUpdate) =>
