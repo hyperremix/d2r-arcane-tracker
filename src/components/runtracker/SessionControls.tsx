@@ -1,5 +1,5 @@
 import { Loader2, Pause, Play, Plus, Square, StopCircle, Timer } from 'lucide-react';
-import { useCallback, useEffect, useId, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useState } from 'react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -61,6 +61,24 @@ const _isTypingInInput = (target: EventTarget | null) => {
     target instanceof HTMLSelectElement
   );
 };
+
+// Helper function to check if there are any runs in a session
+function _hasRunsInSession(
+  activeSession: { id: string } | null,
+  activeRun: { id: string } | null,
+  runs: Map<string, unknown[]>,
+): boolean {
+  if (!activeSession) {
+    return false;
+  }
+  // Check if there's an active run
+  if (activeRun) {
+    return true;
+  }
+  // Check if there are any runs in the session
+  const sessionRuns = runs.get(activeSession.id);
+  return sessionRuns !== undefined && sessionRuns.length > 0;
+}
 
 // Control buttons component to reduce complexity
 interface ControlButtonsProps {
@@ -215,6 +233,7 @@ function ControlButtons({
  * SessionControls component that provides controls for managing run tracking.
  * Includes buttons for start, pause, resume, end run, and end session with keyboard shortcuts.
  */
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Component handles multiple control states, keyboard shortcuts, and dialogs which requires complexity
 export function SessionControls() {
   const {
     activeSession,
@@ -222,6 +241,7 @@ export function SessionControls() {
     isTracking,
     isPaused,
     loading,
+    runs,
     startRun,
     endRun,
     pauseRun,
@@ -321,6 +341,12 @@ export function SessionControls() {
       }
     },
     [addingItem, manualItemName, handleAddManualItem],
+  );
+
+  // Check if there are any runs in the session (active run or finished runs)
+  const hasRuns = useMemo(
+    () => _hasRunsInSession(activeSession, activeRun, runs),
+    [activeSession, activeRun, runs],
   );
 
   // Keyboard shortcut handlers
@@ -477,16 +503,16 @@ export function SessionControls() {
                 <Input
                   id={manualItemNameId}
                   type="text"
-                  placeholder="Enter item name..."
+                  placeholder={hasRuns ? 'Enter item name...' : 'Start a run first'}
                   value={manualItemName}
                   onChange={(e) => setManualItemName(e.target.value)}
                   onKeyDown={handleManualItemKeyDown}
-                  disabled={addingItem || loading}
+                  disabled={addingItem || loading || !hasRuns}
                   className="flex-1"
                 />
                 <Button
                   onClick={handleAddManualItem}
-                  disabled={!manualItemName.trim() || addingItem || loading}
+                  disabled={!manualItemName.trim() || addingItem || loading || !hasRuns}
                   variant="outline"
                   className="flex items-center gap-2"
                 >
@@ -499,8 +525,9 @@ export function SessionControls() {
                 </Button>
               </div>
               <p className="text-muted-foreground text-xs">
-                Items will be added to the current run, or the latest finished run if no run is
-                active.
+                {hasRuns
+                  ? 'Items will be added to the current run, or the latest finished run if no run is active.'
+                  : 'Start a run to add items manually.'}
               </p>
             </div>
           </div>

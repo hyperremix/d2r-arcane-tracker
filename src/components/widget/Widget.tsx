@@ -35,6 +35,7 @@ interface RunOnlyDisplayProps {
   runItemsByRun: RunItemsByRun[];
   showItemList: boolean;
   onAddManualItem?: (name: string) => Promise<void>;
+  hasRuns: boolean;
 }
 
 /**
@@ -71,7 +72,18 @@ function buildRunItemNameLookup(
     progressById.set(entry.id, entry);
   }
 
-  const sortedRuns = [...sessionRuns].sort((a, b) => b.runNumber - a.runNumber);
+  // Deduplicate runs by ID to prevent duplicate entries in the widget
+  // This is a safety measure in case duplicate runs exist in the store
+  const seenRunIds = new Set<string>();
+  const uniqueRuns = sessionRuns.filter((run) => {
+    if (seenRunIds.has(run.id)) {
+      return false;
+    }
+    seenRunIds.add(run.id);
+    return true;
+  });
+
+  const sortedRuns = [...uniqueRuns].sort((a, b) => b.runNumber - a.runNumber);
 
   return sortedRuns.map((run) => {
     const runItemEntries = runItems.get(run.id) ?? [];
@@ -127,6 +139,7 @@ function RunOnlyDisplay({
   runItemsByRun,
   showItemList,
   onAddManualItem,
+  hasRuns,
 }: RunOnlyDisplayProps) {
   const [manualItemName, setManualItemName] = useState('');
   const [addingItem, setAddingItem] = useState(false);
@@ -204,11 +217,11 @@ function RunOnlyDisplay({
               <div className="flex gap-1.5">
                 <Input
                   type="text"
-                  placeholder="Add item..."
+                  placeholder={hasRuns ? 'Add item...' : 'Start a run first'}
                   value={manualItemName}
                   onChange={(e) => setManualItemName(e.target.value)}
                   onKeyDown={handleKeyDown}
-                  disabled={addingItem}
+                  disabled={addingItem || !hasRuns}
                   className="h-7 flex-1 border-gray-600 bg-gray-800/50 text-white text-xs placeholder:text-gray-500"
                   style={{
                     // @ts-expect-error - WebkitAppRegion is an Electron-specific CSS property
@@ -336,6 +349,20 @@ export function Widget({ statistics, settings, onDragStart, onDragEnd }: WidgetP
     return buildRunItemNameLookup(runs, runItems, items, progress, activeSession.id);
   }, [activeSession, displayMode, items, progress, runItems, runs]);
 
+  // Check if there are any runs in the session (active run or finished runs)
+  const hasRuns = useMemo(() => {
+    if (!activeSession || displayMode !== 'run-only') {
+      return false;
+    }
+    // Check if there's an active run
+    if (activeRun) {
+      return true;
+    }
+    // Check if there are any runs in the session
+    const sessionRuns = runs.get(activeSession.id);
+    return sessionRuns !== undefined && sessionRuns.length > 0;
+  }, [activeSession, activeRun, displayMode, runs]);
+
   // Calculate container styles based on display mode
   const containerClasses = useMemo(() => {
     const baseClasses = 'flex flex-col items-center p-2';
@@ -387,6 +414,7 @@ export function Widget({ statistics, settings, onDragStart, onDragEnd }: WidgetP
           runItemsByRun={runItemsByRun}
           showItemList={settings.widgetRunOnlyShowItems ?? true}
           onAddManualItem={addManualRunItem}
+          hasRuns={hasRuns}
         />
       </div>
     );

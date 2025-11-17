@@ -286,4 +286,61 @@ describe('Widget run-only item list', () => {
       expect(store.loadRunItems).toHaveBeenCalledWith(run.id);
     }
   });
+
+  it('should deduplicate runs even if duplicate runs exist in the store', () => {
+    // Arrange - create a store with duplicate runs
+    const store = useRunTrackerStore() as unknown as {
+      runs: Map<string, Run[]>;
+      runItems: Map<string, RunItem[]>;
+      activeSession: Session;
+    };
+
+    // Create a test run explicitly
+    const run1: Run = {
+      id: 'run-test-1',
+      sessionId: store.activeSession.id,
+      runNumber: 1,
+      startTime: new Date(),
+      created: new Date(),
+      lastUpdated: new Date(),
+    };
+
+    // Add duplicate run to simulate the bug (same ID, same runNumber)
+    const duplicateRun: Run = { ...run1 };
+
+    // Set up runs with duplicates
+    const runsWithDuplicate = [run1, duplicateRun];
+    store.runs.set(store.activeSession.id, runsWithDuplicate);
+
+    // Add a manual item to the run so it shows up in the list
+    const manualItem: RunItem = {
+      id: 'run-item-manual',
+      runId: run1.id,
+      name: 'Test Item',
+      foundTime: new Date(),
+      created: new Date(),
+    };
+    store.runItems.set(run1.id, [manualItem]);
+
+    // Act - render the widget
+    const { getAllByText } = render(
+      <Widget
+        statistics={null}
+        settings={baseSettings}
+        onDragStart={() => ({})}
+        onDragEnd={() => ({})}
+      />,
+    );
+
+    // Assert - should only see one instance of the run number, not duplicates
+    // The run number should appear in the format "#1 - Test Item"
+    const runNumberElements = getAllByText(/#1/);
+    // Should only appear once (in the run number display), not multiple times
+    // We check for <= 2 to allow for the run number in the header and in the list
+    expect(runNumberElements.length).toBeLessThanOrEqual(2);
+
+    // Also verify that "Test Item" appears only once
+    const itemElements = getAllByText('Test Item');
+    expect(itemElements.length).toBe(1);
+  });
 });

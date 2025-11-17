@@ -68,11 +68,29 @@ interface RunTrackerState {
 }
 
 /**
+ * Helper function to collect finished runs from a session's run array.
+ */
+function collectFinishedRuns(
+  sessionRuns: Run[],
+  sessionId: string,
+): Array<{ run: Run; sessionId: string }> {
+  const finishedRuns: Array<{ run: Run; sessionId: string }> = [];
+  for (const run of sessionRuns) {
+    if (run.endTime) {
+      finishedRuns.push({ run, sessionId });
+    }
+  }
+  return finishedRuns;
+}
+
+/**
  * Helper function to determine which run ID to use for adding a manual item.
  * Returns the active run ID if available, otherwise the latest finished run ID.
+ * Works even when sessions array is empty by using the runs map directly.
  */
 function getTargetRunId(state: {
   activeRun: Run | null;
+  activeSession: Session | null;
   runs: Map<string, Run[]>;
   sessions: Session[];
 }): string | null {
@@ -83,24 +101,51 @@ function getTargetRunId(state: {
 
   // If no active run, find the latest finished run
   const allRuns: Array<{ run: Run; sessionId: string }> = [];
-  for (const session of state.sessions) {
-    const sessionRuns = state.runs.get(session.id) || [];
-    for (const run of sessionRuns) {
-      if (run.endTime) {
-        // Only consider finished runs
-        allRuns.push({ run, sessionId: session.id });
-      }
-    }
+
+  // First, check the active session if available (most common case in widget)
+  if (state.activeSession) {
+    const sessionRuns = state.runs.get(state.activeSession.id) || [];
+    allRuns.push(...collectFinishedRuns(sessionRuns, state.activeSession.id));
   }
 
-  // Sort by end time (most recent first)
+  // Also check all other sessions from the runs map
+  // This covers cases where sessions array might be empty but runs map has data
+  for (const [sessionId, sessionRuns] of state.runs.entries()) {
+    // Skip active session as we already processed it
+    if (state.activeSession?.id === sessionId) {
+      continue;
+    }
+    allRuns.push(...collectFinishedRuns(sessionRuns, sessionId));
+  }
+
+  // Sort by end time (most recent first), with fallback to run number for same end time
   allRuns.sort((a, b) => {
     const aTime = a.run.endTime?.getTime() || 0;
     const bTime = b.run.endTime?.getTime() || 0;
-    return bTime - aTime;
+    if (bTime !== aTime) {
+      return bTime - aTime;
+    }
+    // If same end time, prefer higher run number (more recent)
+    return b.run.runNumber - a.run.runNumber;
   });
 
   return allRuns.length > 0 ? allRuns[0].run.id : null;
+}
+
+/**
+ * Helper function to upsert a run in a session's run array.
+ * Prevents duplicates by replacing existing runs with the same ID.
+ * Maintains order by runNumber.
+ */
+function upsertRunEntry(sessionRuns: Run[], run: Run): Run[] {
+  // Remove any existing runs with the same ID to prevent duplicates
+  const filteredRuns = sessionRuns.filter((r) => r.id !== run.id);
+
+  // Add the new/updated run
+  const updatedRuns = [...filteredRuns, run];
+
+  // Sort by runNumber to maintain order
+  return updatedRuns.sort((a, b) => a.runNumber - b.runNumber);
 }
 
 /**
@@ -560,12 +605,12 @@ export const useRunTrackerStore = create<RunTrackerState>()(
     },
 
     handleRunStarted: (run, session) => {
-      // Update the runs Map with the new run
+      // Update the runs Map with the new run (upsert to prevent duplicates)
       const { runs, sessionStatsCache: oldCache } = get();
       const sessionRuns = runs.get(session.id) || [];
 
       const updatedRuns = new Map(runs);
-      updatedRuns.set(session.id, [...sessionRuns, run]);
+      updatedRuns.set(session.id, upsertRunEntry(sessionRuns, run));
 
       // Invalidate stats cache since run data changed
       const newCache = new Map(oldCache);
@@ -582,12 +627,12 @@ export const useRunTrackerStore = create<RunTrackerState>()(
 
     handleRunEnded: async (run, session) => {
       // Update the runs Map with the ended run (which includes duration from backend)
+      // Use upsert to prevent duplicates in case of multiple event firings
       const { runs, sessionStatsCache: oldCache } = get();
       const sessionRuns = runs.get(session.id) || [];
 
-      const updatedSessionRuns = sessionRuns.map((r) => (r.id === run.id ? run : r));
       const updatedRuns = new Map(runs);
-      updatedRuns.set(session.id, updatedSessionRuns);
+      updatedRuns.set(session.id, upsertRunEntry(sessionRuns, run));
 
       // Invalidate stats cache since run data changed
       const newCache = new Map(oldCache);

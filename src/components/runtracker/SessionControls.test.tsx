@@ -56,6 +56,7 @@ const mockStoreActions = {
   pauseRun: vi.fn(),
   resumeRun: vi.fn(),
   endSession: vi.fn(),
+  addManualRunItem: vi.fn(),
 };
 
 const defaultStoreState = {
@@ -64,6 +65,7 @@ const defaultStoreState = {
   isTracking: false,
   isPaused: false,
   loading: false,
+  runs: new Map(),
   ...mockStoreActions,
 };
 
