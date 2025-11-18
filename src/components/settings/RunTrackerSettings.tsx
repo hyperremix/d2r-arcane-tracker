@@ -2,10 +2,11 @@ import { AlertCircle, Keyboard, Timer } from 'lucide-react';
 import { useCallback, useId } from 'react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
+import { normalizeShortcut } from '@/lib/hotkeys';
 import { useGrailStore } from '@/stores/grailStore';
+import { ShortcutRecorder } from './ShortcutRecorder';
 
 /**
  * RunTrackerSettings component that provides controls for configuring run tracking behavior.
@@ -41,10 +42,14 @@ export function RunTrackerSettings() {
 
   const updateShortcut = useCallback(
     async (key: keyof typeof runTrackerShortcuts, value: string) => {
+      const normalized = normalizeShortcut(value);
+      if (!normalized) {
+        return;
+      }
       await setSettings({
         runTrackerShortcuts: {
           ...runTrackerShortcuts,
-          [key]: value,
+          [key]: normalized,
         },
       });
     },
@@ -123,54 +128,38 @@ export function RunTrackerSettings() {
           </p>
 
           <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor={startRunShortcutId} className="text-muted-foreground text-xs">
-                Start Run:
-              </Label>
-              <Input
-                id={startRunShortcutId}
-                value={runTrackerShortcuts.startRun}
-                onChange={(e) => updateShortcut('startRun', e.target.value)}
-                className="h-8 text-xs"
-                placeholder="Ctrl+R"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor={pauseRunShortcutId} className="text-muted-foreground text-xs">
-                Pause/Resume Run:
-              </Label>
-              <Input
-                id={pauseRunShortcutId}
-                value={runTrackerShortcuts.pauseRun}
-                onChange={(e) => updateShortcut('pauseRun', e.target.value)}
-                className="h-8 text-xs"
-                placeholder="Ctrl+Space"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor={endRunShortcutId} className="text-muted-foreground text-xs">
-                End Run:
-              </Label>
-              <Input
-                id={endRunShortcutId}
-                value={runTrackerShortcuts.endRun}
-                onChange={(e) => updateShortcut('endRun', e.target.value)}
-                className="h-8 text-xs"
-                placeholder="Ctrl+E"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor={endSessionShortcutId} className="text-muted-foreground text-xs">
-                End Session:
-              </Label>
-              <Input
-                id={endSessionShortcutId}
-                value={runTrackerShortcuts.endSession}
-                onChange={(e) => updateShortcut('endSession', e.target.value)}
-                className="h-8 text-xs"
-                placeholder="Ctrl+Shift+E"
-              />
-            </div>
+            <ShortcutRecorder
+              id={startRunShortcutId}
+              label="Start Run:"
+              value={runTrackerShortcuts.startRun}
+              placeholder="Ctrl+R"
+              description="Start a new manual run."
+              onChange={(shortcut) => updateShortcut('startRun', shortcut)}
+            />
+            <ShortcutRecorder
+              id={pauseRunShortcutId}
+              label="Pause/Resume Run:"
+              value={runTrackerShortcuts.pauseRun}
+              placeholder="Ctrl+Space"
+              description="Toggle pause state for the current run."
+              onChange={(shortcut) => updateShortcut('pauseRun', shortcut)}
+            />
+            <ShortcutRecorder
+              id={endRunShortcutId}
+              label="End Run:"
+              value={runTrackerShortcuts.endRun}
+              placeholder="Ctrl+E"
+              description="End the current run immediately."
+              onChange={(shortcut) => updateShortcut('endRun', shortcut)}
+            />
+            <ShortcutRecorder
+              id={endSessionShortcutId}
+              label="End Session:"
+              value={runTrackerShortcuts.endSession}
+              placeholder="Ctrl+Shift+E"
+              description="Finish the active session."
+              onChange={(shortcut) => updateShortcut('endSession', shortcut)}
+            />
           </div>
         </div>
 

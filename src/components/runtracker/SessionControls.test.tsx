@@ -537,6 +537,7 @@ describe('SessionControls', () => {
 
     it('handles Mac modifier keys correctly', () => {
       // Mock navigator.platform to simulate Mac
+      const originalPlatform = navigator.platform;
       Object.defineProperty(navigator, 'platform', {
         value: 'MacIntel',
         writable: true,
@@ -558,6 +559,44 @@ describe('SessionControls', () => {
       const event = new KeyboardEvent('keydown', {
         key: 'r',
         metaKey: true, // Mac uses metaKey instead of ctrlKey
+      });
+      Object.defineProperty(event, 'target', { value: document.body });
+
+      keyboardHandler(event);
+
+      expect(mockStoreActions.startRun).toHaveBeenCalledWith();
+
+      Object.defineProperty(navigator, 'platform', {
+        value: originalPlatform,
+        writable: true,
+      });
+    });
+
+    it('respects customized shortcuts with additional modifiers', () => {
+      mockUseRunTrackerStore.mockReturnValue({
+        ...defaultStoreState,
+        activeSession: mockSession,
+        activeRun: null,
+      });
+      mockUseGrailStore.mockReturnValue({
+        settings: {
+          runTrackerShortcuts: {
+            ...defaultGrailStoreState.settings.runTrackerShortcuts,
+            startRun: 'Ctrl+Alt+N',
+          },
+        },
+      });
+
+      render(<SessionControls />);
+
+      const keyboardHandler = vi.mocked(document.addEventListener).mock.calls[0][1] as (
+        event: KeyboardEvent,
+      ) => void;
+
+      const event = new KeyboardEvent('keydown', {
+        key: 'n',
+        ctrlKey: true,
+        altKey: true,
       });
       Object.defineProperty(event, 'target', { value: document.body });
 

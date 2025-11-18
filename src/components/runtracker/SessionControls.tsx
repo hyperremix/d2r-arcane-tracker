@@ -15,42 +15,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { matchesShortcut } from '@/lib/hotkeys';
 import { useGrailStore } from '@/stores/grailStore';
 import { useRunTrackerStore } from '@/stores/runTrackerStore';
-
-// Helper function to parse keyboard shortcut string
-const parseShortcut = (shortcut: string) => {
-  const parts = shortcut
-    .toLowerCase()
-    .split('+')
-    .map((s) => s.trim());
-  let key = parts.find((p) => !['ctrl', 'cmd', 'shift'].includes(p)) || '';
-
-  // Handle special key names
-  if (key === 'space') {
-    key = ' ';
-  }
-
-  return {
-    ctrl: parts.includes('ctrl') || parts.includes('cmd'),
-    shift: parts.includes('shift'),
-    key,
-  };
-};
-
-// Helper function to check if event matches shortcut
-// Used in SessionControls component
-const _matchesShortcut = (event: KeyboardEvent, shortcut: string) => {
-  const parsed = parseShortcut(shortcut);
-  const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
-  const ctrlKey = isMac ? event.metaKey : event.ctrlKey;
-
-  return (
-    ctrlKey === parsed.ctrl &&
-    event.shiftKey === parsed.shift &&
-    event.key.toLowerCase() === parsed.key
-  );
-};
 
 // Helper function to check if user is typing in input fields
 // Used in SessionControls component
@@ -402,22 +369,22 @@ export function SessionControls() {
       }
 
       // Check each configurable shortcut
-      if (_matchesShortcut(event, shortcuts.startRun)) {
+      if (matchesShortcut(event, shortcuts.startRun)) {
         handleStartRunShortcut(event);
         return;
       }
 
-      if (_matchesShortcut(event, shortcuts.pauseRun)) {
+      if (matchesShortcut(event, shortcuts.pauseRun)) {
         handlePauseResumeShortcut(event);
         return;
       }
 
-      if (_matchesShortcut(event, shortcuts.endRun)) {
+      if (matchesShortcut(event, shortcuts.endRun)) {
         handleEndRunShortcut(event);
         return;
       }
 
-      if (_matchesShortcut(event, shortcuts.endSession)) {
+      if (matchesShortcut(event, shortcuts.endSession)) {
         handleEndSessionShortcut(event);
       }
     },
