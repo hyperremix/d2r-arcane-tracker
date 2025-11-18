@@ -468,7 +468,7 @@ export function Widget({ statistics, settings, onDragStart, onDragEnd }: WidgetP
     >
       {/* Display mode: overall - Just overall progress */}
       {displayMode === 'overall' && (
-        <div style={{ transform: `scale(${gaugeScale})` }}>
+        <div style={{ transform: `scale(${gaugeScale})` }} className="mt-8">
           <ProgressGauge
             label="Overall"
             current={statistics.foundItems}
@@ -481,7 +481,7 @@ export function Widget({ statistics, settings, onDragStart, onDragEnd }: WidgetP
 
       {/* Display mode: split - Normal and Ethereal side by side */}
       {displayMode === 'split' && settings.grailEthereal && (
-        <div className="flex justify-center gap-12">
+        <div className="mt-4 flex justify-center gap-12">
           <div style={{ transform: `scale(${gaugeScale})` }}>
             <ProgressGauge
               label="Normal"
@@ -505,8 +505,8 @@ export function Widget({ statistics, settings, onDragStart, onDragEnd }: WidgetP
 
       {/* Display mode: all - Overall on top, Normal and Ethereal below */}
       {displayMode === 'all' && (
-        <>
-          <div style={{ transform: `scale(${gaugeScale})` }} className="mb-6">
+        <div className="mt-4 flex flex-col items-center gap-8">
+          <div style={{ transform: `scale(${gaugeScale})` }}>
             <ProgressGauge
               label="Overall"
               current={statistics.foundItems}
@@ -538,7 +538,7 @@ export function Widget({ statistics, settings, onDragStart, onDragEnd }: WidgetP
               </div>
             </div>
           )}
-        </>
+        </div>
       )}
     </div>
   );
