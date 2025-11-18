@@ -137,9 +137,9 @@ function createWindow() {
       : {
           // Expose window controls on Windows/Linux with custom styling
           titleBarOverlay: {
-            color: '#1f2937', // Dark background matching title bar
-            symbolColor: '#e5e7eb', // Light gray symbols
-            height: 48, // Match title bar height (h-12 = 48px)
+            color: '#09090b', // Dark background matching title bar
+            symbolColor: '#ffffff', // Light gray symbols
+            height: 47, // Match title bar height (h-12 = 48px)
           },
         }),
     webPreferences: {
@@ -321,7 +321,7 @@ app.whenReady().then(() => {
         mainWindow.setTitleBarOverlay({
           color: colors.backgroundColor,
           symbolColor: colors.symbolColor,
-          height: 48,
+          height: 47,
         });
       }
       return { success: true };

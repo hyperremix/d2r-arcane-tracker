@@ -23,7 +23,7 @@ export function useTheme() {
       // Update Windows titlebar overlay colors to match theme
       if (window.electronAPI?.platform === 'win32') {
         window.electronAPI.updateTitleBarOverlay({
-          backgroundColor: theme === 'dark' ? '#1e1f23' : '#ffffff',
+          backgroundColor: theme === 'dark' ? '#09090b' : '#ffffff',
           symbolColor: theme === 'dark' ? '#ffffff' : '#000000',
         });
       }
