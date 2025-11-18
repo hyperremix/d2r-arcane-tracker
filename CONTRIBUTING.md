@@ -60,7 +60,17 @@ This project uses modern web technologies:
    yarn install
    ```
 
-4. **Create a feature branch**
+4. **Rebuild native modules for Electron**
+
+   Before the application can use `better-sqlite3`, you need to rebuild it for the Electron environment:
+
+   ```bash
+   electron-rebuild --force --module-dir . --which-module better-sqlite3
+   ```
+
+   > **Note**: This step is required because `better-sqlite3` is a native module that must be compiled for the specific Electron version. If you encounter database-related errors when running the application, run this command again.
+
+5. **Create a feature branch**
 
    ```bash
    git checkout -b feature/your-feature-name
@@ -68,7 +78,7 @@ This project uses modern web technologies:
    git checkout -b fix/your-bug-description
    ```
 
-5. **Start development server**
+6. **Start development server**
 
    ```bash
    yarn dev
@@ -221,7 +231,7 @@ This project maintains high code quality standards using:
 
 ### Project Structure
 
-```
+```text
 d2r-arcane-tracker/
 ├── src/                    # React renderer process
 │   ├── components/         # UI components
@@ -306,7 +316,7 @@ yarn test --watch
 
 Use conventional commits format:
 
-```
+```text
 type(scope): description
 
 [optional body]
@@ -326,7 +336,7 @@ type(scope): description
 
 **Examples:**
 
-```
+```text
 feat(grail): add advanced search functionality
 fix(database): resolve SQLite connection issue
 docs(readme): update installation instructions
@@ -483,6 +493,22 @@ describe('ComponentName', () => {
 - Use Node.js debugging for main process
 - Check console logs for runtime errors
 - Use React Developer Tools
+
+### Native Module Troubleshooting
+
+If you encounter errors related to `better-sqlite3` or database connectivity:
+
+1. **Rebuild the native module**:
+
+   ```bash
+   electron-rebuild --force --module-dir . --which-module better-sqlite3
+   ```
+
+2. **Verify Electron version compatibility** - Ensure your Electron version matches the project requirements
+
+3. **Check for NODE_MODULE_VERSION errors** - These indicate the module was compiled for a different Node.js/Electron version
+
+For more detailed information about native modules, see `docs/NATIVE_MODULES.md`.
 
 ## 📚 Additional Resources
 
