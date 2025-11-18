@@ -198,6 +198,10 @@ yarn build:win
 - [ ] **Icon Display**: Application icon shows correctly
 - [ ] **Auto-Update**: Update mechanism works (if configured)
 - [ ] **Uninstall**: Clean removal of application
+- [ ] **Run Tracker Auto Mode (Windows)**: Runs start/end automatically when entering/exiting games
+- [ ] **Run Tracker Manual Controls**: Keyboard shortcuts and UI buttons start/pause/end runs
+- [ ] **Run Items Logging**: Items found during runs appear in session detail view
+- [ ] **Run Tracker Export**: CSV / JSON / Text exports save correctly and copy to clipboard
 
 ### Platform-Specific Testing
 
@@ -209,6 +213,7 @@ yarn build:win
 - [ ] No antivirus false positives
 - [ ] Save file monitoring works
 - [ ] Database operations function
+- [ ] Auto-mode run tracking behaves correctly (sessions, runs, pause/resume)
 
 #### macOS Testing
 
@@ -216,6 +221,8 @@ yarn build:win
 - [ ] Application launches from Applications folder
 - [ ] No Gatekeeper warnings (if signed)
 - [ ] Native modules load properly
+- [ ] Manual run tracking works via shortcuts/UI controls
+- [ ] Session export dialog saves files and copies to clipboard
 
 #### Linux Testing
 
@@ -223,6 +230,8 @@ yarn build:win
 - [ ] Application launches correctly
 - [ ] File permissions are correct
 - [ ] Desktop integration works
+- [ ] Manual run tracking works via shortcuts/UI controls
+- [ ] Session export dialog saves files and copies to clipboard
 
 ## Distribution
 
@@ -248,6 +257,7 @@ yarn build:win
    - Initial release
    - Holy Grail tracking
    - Automatic save file monitoring
+   - Integrated Run Tracker (sessions, auto/manual runs, exports)
    
    ### Installation
    - **Windows**: Download and run the `.exe` installer

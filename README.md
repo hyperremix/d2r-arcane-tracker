@@ -38,6 +38,7 @@ The Holy Grail challenge in Diablo 2 Resurrected is a popular endgame goal where
 - **🏆 Holy Grail Tracking**: Comprehensive tracking of unique items, sets, and runes
 - **📁 Save File Monitoring**: Automatic detection and parsing of D2R save files
 - **📊 Progress Analytics**: Visual progress bars, statistics, and completion tracking
+- **⏱️ Run Tracker**: Session-based run logging with auto/manual controls, per-run loot history, and exports
 - **🔮 Runeword Calculator**: Find which runewords you can craft with your available runes
 - **⚡ Terror Zone Configuration**: Customize which terror zones are active in your game
 - **🎮 Multiple Game Modes**: Support for different game versions and modes
@@ -77,11 +78,13 @@ The Holy Grail challenge in Diablo 2 Resurrected is a popular endgame goal where
 2. **Configure Save File Path**: Set your D2R save file directory in settings
 3. **Select Game Mode**: Choose your preferred game version and mode
 4. **Start Tracking**: The app will automatically monitor your save files
-5. **View Progress**: Check your Holy Grail progress in the main dashboard
+5. **Track Runs**: Open the Run Tracker tab to create sessions, log runs, and export loot history
+6. **View Progress**: Check your Holy Grail progress in the main dashboard
 
 ### Key Features Explained
 
 - **Automatic Detection**: The app monitors your save files and automatically updates when new items are found
+- **Run Tracker**: Start sessions, let auto mode log runs when you enter/exit games (Windows) or use keyboard shortcuts everywhere, and review/export per-run loot
 - **Progress Tracking**: Visual progress bars show completion percentages for different item categories
 - **Runeword Calculator**: View all available runewords, see which ones you can craft based on your current rune inventory, and track how many of each you've collected
 - **Terror Zone Configuration**: Customize which terror zones are active in your D2R installation by modifying the game's configuration files
@@ -132,6 +135,7 @@ If you're still having issues:
 ### Comprehensive Guides
 
 - **[Holy Grail Guide](docs/HOLY_GRAIL_GUIDE.md)** - Complete guide to the Holy Grail challenge, tracking strategies, and using D2R Arcane Tracker
+- **[Run Tracker Guide](docs/RUN_TRACKER.md)** - Everything you need to know about sessions, runs, auto/manual logging, loot exports, and troubleshooting
 - **[Terror Zone Configuration Guide](docs/TERROR_ZONE_CONFIGURATION.md)** - Comprehensive guide to customizing terror zones in your D2R installation
 - **[Tracker Comparison](docs/COMPARISON.md)** - Detailed comparison with other Holy Grail tracking solutions to help you choose the right tool
 

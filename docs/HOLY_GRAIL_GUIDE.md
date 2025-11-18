@@ -21,6 +21,11 @@ A comprehensive guide to the Holy Grail challenge in Diablo II: Resurrected and 
   - [Tracking Options](#tracking-options)
   - [Automatic Item Detection](#automatic-item-detection)
   - [Manual Entry Mode](#manual-entry-mode)
+  - [Run Tracker Overview](#run-tracker-overview)
+  - [Sessions and Runs](#sessions-and-runs)
+  - [Automatic vs Manual Tracking](#automatic-vs-manual-tracking)
+  - [Keyboard Shortcuts](#keyboard-shortcuts)
+  - [Linking Runs to Holy Grail Progress](#linking-runs-to-holy-grail-progress)
   - [Progress Tracking Interface](#progress-tracking-interface)
   - [Runeword Calculator](#runeword-calculator)
   - [Terror Zone Configuration](#terror-zone-configuration)
@@ -563,6 +568,64 @@ Manual entries can be:
 - **Edited**: Change details like character or date
 - **Removed**: Delete if added by mistake
 - **Annotated**: Add or update notes
+
+### Run Tracker Overview
+
+The Run Tracker is a dedicated workspace for logging every farming session and the individual runs inside them. While the Holy Grail tracker focuses on *what* you have found, the Run Tracker adds context by capturing *when* and *during which run* the items dropped.
+
+- Start a **session** before you begin farming.
+- Each run (every time you enter a game) records start/end times, character, duration, and loot.
+- Review or export sessions later for progress reports or community posts.
+- Data persists locally, so you can safely delete in-game items after they're detected.
+
+📖 For a deep dive, read the [Run Tracker Guide](RUN_TRACKER.md).
+
+### Sessions and Runs
+
+- **Sessions**: Manual constructs that represent a block of playtime. You decide when to start/end.
+- **Runs**: Automatically or manually created whenever you enter/exit a game. A session can include dozens of runs.
+- **Run Items**: Loot discovered during each run, tied back to Grail progress entries.
+- **Session Notes**: Add quick descriptors (“TZ rotation”, “Key farming”) to help categorize sessions later.
+
+The Run Tracker UI provides a Session Card, Run Controls, sessions list, and a detailed view with per-run breakdowns.
+
+### Automatic vs Manual Tracking
+
+You can track runs in two ways:
+
+1. **Automatic (Memory Reading)**
+   - Windows-only feature powered by the memory reader service.
+   - Enable “Auto Mode” in Settings → Run Tracker.
+   - Requires valid offsets (shipped with the app) and D2R running.
+   - Automatically starts a run when you enter a game and ends it when you exit.
+
+2. **Manual Controls**
+   - Available on all platforms.
+   - Use the Run Tracker tab buttons or the global keyboard shortcuts listed below.
+   - Helpful for correcting auto mode or recording console runs.
+
+You can mix both approaches: keep auto mode enabled for convenience and fall back to manual commands whenever needed.
+
+### Keyboard Shortcuts
+
+Configure shortcuts via Settings → Run Tracker (defaults shown below):
+
+- `Ctrl+R` — Start Run
+- `Ctrl+Space` — Pause/Resume Run
+- `Ctrl+E` — End Run
+- `Ctrl+Shift+E` — End Session
+
+Choose combinations that do not conflict with operating-system hotkeys. Shortcuts trigger even when the Run Tracker tab isn't focused, making it easy to control runs mid-farm.
+
+### Linking Runs to Holy Grail Progress
+
+The Run Tracker listens for new Grail discoveries and attaches them to the active run:
+
+- When the save-file monitor detects a new unique/set/rune, it logs the item in the current run automatically.
+- Manual item entry in the Run Tracker can be used for console drops or historical backfills.
+- Each item record references both the run and the Grail database entry, so you can answer questions like “Which run produced Tyrael's Might?” at any time.
+
+Combining the Grail dashboard with run history gives you richer analytics—overall completion percentages plus run-by-run provenance and efficiency metrics.
 
 ### Progress Tracking Interface
 
