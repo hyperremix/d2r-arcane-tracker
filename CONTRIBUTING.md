@@ -74,6 +74,107 @@ This project uses modern web technologies:
    yarn dev
    ```
 
+## 🗄️ Using the Development Database
+
+The repository includes a `grail.db` file in the root directory that contains pre-populated data for development purposes. This database includes sample characters, grail progress, and other test data that can help you develop and test features without starting from scratch.
+
+### Database Location
+
+By default, the application stores its database in Electron's user data directory, which varies by platform:
+
+- **Windows**: `%APPDATA%\d2r-arcane-tracker\grail.db`
+  - Typically: `C:\Users\[YourUsername]\AppData\Roaming\d2r-arcane-tracker\grail.db`
+- **macOS**: `~/Library/Application Support/d2r-arcane-tracker/grail.db`
+- **Linux**: `~/.config/d2r-arcane-tracker/grail.db`
+
+### Setting Up the Development Database
+
+To use the repository's `grail.db` file for development, you have two options:
+
+#### Option 1: Manual Copy (Recommended for First-Time Setup)
+
+1. **Locate your user data directory**:
+   - The database is created automatically when you first run the application
+   - You can find the exact path by checking the console output when starting the app, or by using the database path getter in the application
+
+2. **Stop the application** if it's running
+
+3. **Backup your existing database** (if you have one):
+
+   ```bash
+   # On Windows (PowerShell)
+   Copy-Item "$env:APPDATA\d2r-arcane-tracker\grail.db" "$env:APPDATA\d2r-arcane-tracker\grail.db.backup"
+
+   # On macOS/Linux
+   cp ~/Library/Application\ Support/d2r-arcane-tracker/grail.db ~/Library/Application\ Support/d2r-arcane-tracker/grail.db.backup
+   # or
+   cp ~/.config/d2r-arcane-tracker/grail.db ~/.config/d2r-arcane-tracker/grail.db.backup
+   ```
+
+4. **Copy the repository's database** to your user data directory:
+
+   ```bash
+   # On Windows (PowerShell)
+   Copy-Item "grail.db" "$env:APPDATA\d2r-arcane-tracker\grail.db" -Force
+
+   # On macOS/Linux
+   cp grail.db ~/Library/Application\ Support/d2r-arcane-tracker/grail.db
+   # or
+   cp grail.db ~/.config/d2r-arcane-tracker/grail.db
+   ```
+
+5. **Start the application**:
+
+   ```bash
+   yarn dev
+   ```
+
+#### Option 2: Using the Application's Restore Feature
+
+1. **Start the application**:
+
+   ```bash
+   yarn dev
+   ```
+
+2. **Use the restore functionality** in the application:
+   - Navigate to Settings → Database
+   - Use the "Restore from Backup" feature
+   - Select the `grail.db` file from the repository root
+
+### Important Notes
+
+- **Backup First**: Always backup your existing database before replacing it, especially if you have personal progress data
+- **Database Schema**: The application will automatically update the database schema if needed when you start it, so the repository's database will be compatible even if the schema has changed
+- **Item Data**: The application automatically seeds item data from code on startup, so item definitions are always up-to-date regardless of which database you use
+- **Development Only**: The repository's `grail.db` is intended for development purposes. Don't commit changes to this file unless you're intentionally updating the development seed data
+
+### Resetting to a Fresh Database
+
+If you want to start with a completely fresh database:
+
+1. **Delete or rename** your existing database:
+
+   ```bash
+   # On Windows (PowerShell)
+   Remove-Item "$env:APPDATA\d2r-arcane-tracker\grail.db"
+
+   # On macOS/Linux
+   rm ~/Library/Application\ Support/d2r-arcane-tracker/grail.db
+   # or
+   rm ~/.config/d2r-arcane-tracker/grail.db
+   ```
+
+2. **Start the application** - it will create a new database with the default schema and seed data
+
+### Finding Your Database Path
+
+If you need to find the exact path to your database:
+
+1. **Check the console output** when starting the application - it logs the database path
+2. **Use the application's database settings** - the path may be displayed in the Settings → Database section
+3. **Check Electron's userData path** programmatically using `app.getPath('userData')` in the main process
+
 ## 📦 Building
 
 ### Development Build
