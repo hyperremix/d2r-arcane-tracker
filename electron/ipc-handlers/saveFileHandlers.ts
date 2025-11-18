@@ -3,6 +3,9 @@ import { grailDatabase } from '../database/database';
 import { DatabaseBatchWriter } from '../services/DatabaseBatchWriter';
 import { EventBus } from '../services/EventBus';
 import { ItemDetectionService } from '../services/itemDetection';
+import { MemoryReader } from '../services/memoryReader';
+import { ProcessMonitor } from '../services/processMonitor';
+import { RunTrackerService } from '../services/runTracker';
 import type { D2SaveFile, SaveFileEvent } from '../services/saveFileMonitor';
 import { SaveFileMonitor } from '../services/saveFileMonitor';
 import type {
@@ -11,12 +14,13 @@ import type {
   GrailProgress,
   Item,
   ItemDetectionEvent,
+  RunItem,
 } from '../types/grail';
 
 /**
  * Global service instances for save file monitoring and item detection.
  */
-const eventBus = new EventBus();
+export const eventBus = new EventBus();
 const batchWriter = new DatabaseBatchWriter(grailDatabase, () => {
   // Emit grail-progress-updated event to all renderer windows after batch flush
   const allWebContents = webContents.getAllWebContents();
@@ -28,6 +32,9 @@ const batchWriter = new DatabaseBatchWriter(grailDatabase, () => {
 });
 let saveFileMonitor: SaveFileMonitor;
 let itemDetectionService: ItemDetectionService;
+let runTracker: RunTrackerService | undefined;
+let processMonitor: ProcessMonitor | undefined;
+let memoryReader: MemoryReader | undefined;
 const eventUnsubscribers: Array<() => void> = [];
 
 /**
@@ -88,6 +95,21 @@ function createGrailProgress(character: Character, event: ItemDetectionEvent): G
   };
 }
 
+function findMatchingProgressForCharacter(
+  existingProgress: GrailProgress[] | undefined,
+  targetProgress: GrailProgress,
+): GrailProgress | undefined {
+  if (!existingProgress?.length) {
+    return undefined;
+  }
+
+  return existingProgress.find(
+    (progress) =>
+      progress.characterId === targetProgress.characterId &&
+      Boolean(progress.isEthereal) === Boolean(targetProgress.isEthereal),
+  );
+}
+
 /**
  * Emits grail progress update event to all renderer processes.
  * @param character - Character who found the item
@@ -138,6 +160,39 @@ function handleAutomaticGrailProgress(event: ItemDetectionEvent): void {
     // Create grail progress entry and queue for batch write
     const grailProgress = createGrailProgress(character, event);
     batchWriter.queueProgress(grailProgress);
+    const matchingPersistedProgress = findMatchingProgressForCharacter(
+      existingGlobalProgress,
+      grailProgress,
+    );
+
+    // Check for active run and associate item if found
+    try {
+      const activeRun = runTracker?.getActiveRun();
+      if (activeRun && !event.silent) {
+        if (!matchingPersistedProgress) {
+          batchWriter.flush();
+        }
+
+        const runItem: RunItem = {
+          id: `run_item_${activeRun.id}_${grailProgress.id}`,
+          runId: activeRun.id,
+          grailProgressId: matchingPersistedProgress?.id ?? grailProgress.id,
+          foundTime: new Date(),
+          created: new Date(),
+        };
+        grailDatabase.addRunItem(runItem);
+
+        // Emit event for UI updates
+        eventBus.emit('run-item-added', {
+          runId: activeRun.id,
+          grailProgress,
+          item: event.item,
+        });
+      }
+    } catch (runAssociationError) {
+      console.error('Error associating item with run:', runAssociationError);
+      // Don't throw - grail progress is already saved, run association is secondary
+    }
 
     // Log and notify about the discovery (synchronous - don't delay user feedback)
     if (isFirstTimeDiscovery) {
@@ -204,6 +259,36 @@ function updateCharacterFromSaveFile(saveFile: D2SaveFile): void {
 }
 
 /**
+ * Initializes Windows-specific services (process monitor and memory reader).
+ * @private
+ */
+function initializeWindowsServices(): void {
+  if (process.platform !== 'win32') {
+    return;
+  }
+
+  // Initialize process monitor
+  try {
+    processMonitor = new ProcessMonitor(eventBus);
+    processMonitor.startMonitoring();
+  } catch (error) {
+    console.error('[initializeSaveFileHandlers] Failed to initialize process monitor:', error);
+    processMonitor = undefined;
+    return;
+  }
+
+  // Initialize memory reader (optional, depends on process monitor)
+  if (processMonitor) {
+    try {
+      memoryReader = new MemoryReader(eventBus, processMonitor);
+    } catch (error) {
+      console.error('[initializeSaveFileHandlers] Failed to initialize memory reader:', error);
+      memoryReader = undefined;
+    }
+  }
+}
+
+/**
  * Initializes IPC handlers for save file monitoring and item detection.
  * Sets up event listeners for save file changes and item detection.
  * Configures automatic grail progress updates and forwards events to renderer processes.
@@ -225,6 +310,22 @@ export function initializeSaveFileHandlers(): void {
       unsubscribe();
     }
     eventUnsubscribers.length = 0;
+  }
+
+  // Initialize Windows-specific services
+  initializeWindowsServices();
+
+  // Initialize run tracker service with optional memory reader
+  try {
+    runTracker = new RunTrackerService(eventBus, grailDatabase, memoryReader || null);
+
+    // If memory reader was created after run tracker, set it now
+    if (memoryReader && runTracker) {
+      runTracker.setMemoryReader(memoryReader);
+    }
+  } catch (error) {
+    console.error('[initializeSaveFileHandlers] Failed to initialize run tracker:', error);
+    runTracker = undefined;
   }
 
   // Initialize monitor and detection service with EventBus and grail database
@@ -461,6 +562,13 @@ export function initializeSaveFileHandlers(): void {
  * Closes the save file monitor and stops monitoring.
  * Should be called when the application is shutting down to properly clean up resources.
  */
+/**
+ * Gets the run tracker instance.
+ */
+export function getRunTracker(): RunTrackerService | undefined {
+  return runTracker;
+}
+
 export function closeSaveFileMonitor(): void {
   // Flush any pending database writes before shutdown
   console.log('[closeSaveFileMonitor] Flushing pending database writes');

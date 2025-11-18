@@ -1,5 +1,5 @@
 import { ipcMain, webContents } from 'electron';
-import { GrailDatabase } from '../database/database';
+import { type GrailDatabase, grailDatabase } from '../database/database';
 import type { GrailProgress, Item, Settings } from '../types/grail';
 
 /**
@@ -34,9 +34,10 @@ function convertSettingValueToString(value: unknown): string | null {
  * Initializes the database connection and registers all IPC event handlers.
  */
 export function initializeGrailHandlers(): void {
-  // Initialize database
+  // Initialize database using singleton
   try {
-    grailDB = new GrailDatabase();
+    // Import the singleton database instance
+    grailDB = grailDatabase;
   } catch (error) {
     console.error('Failed to initialize grail database:', error);
     return;

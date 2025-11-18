@@ -200,6 +200,53 @@ export type DatabaseCharacter = {
   updated_at: string;
 };
 
+// ============================================================================
+// Run Tracking Types
+// ============================================================================
+
+/**
+ * Interface representing a run tracking session.
+ */
+export interface Session {
+  id: string;
+  startTime: Date;
+  endTime?: Date;
+  totalRunTime: number; // milliseconds spent in runs
+  totalSessionTime: number; // total milliseconds
+  runCount: number;
+  archived: boolean;
+  notes?: string;
+  created: Date;
+  lastUpdated: Date;
+}
+
+/**
+ * Interface representing a single run within a session.
+ */
+export interface Run {
+  id: string;
+  sessionId: string;
+  characterId?: string;
+  runNumber: number;
+  startTime: Date;
+  endTime?: Date;
+  duration?: number; // milliseconds
+  created: Date;
+  lastUpdated: Date;
+}
+
+/**
+ * Interface representing an item found during a run.
+ */
+export interface RunItem {
+  id: string;
+  runId: string;
+  grailProgressId?: string;
+  name?: string;
+  foundTime: Date;
+  created: Date;
+}
+
 /**
  * Interface representing the progress of finding a Holy Grail item.
  */
@@ -236,6 +283,52 @@ export type DatabaseGrailProgress = {
 };
 
 /**
+ * Type representing a session as stored in the database.
+ * SQLite-compatible types: booleans as 0/1, undefined as null
+ */
+export type DatabaseSession = {
+  id: string;
+  start_time: string; // ISO datetime string
+  end_time: string | null;
+  total_run_time: number;
+  total_session_time: number;
+  run_count: number;
+  archived: 0 | 1; // SQLite boolean
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+/**
+ * Type representing a run as stored in the database.
+ * SQLite-compatible types: booleans as 0/1, undefined as null
+ */
+export type DatabaseRun = {
+  id: string;
+  session_id: string;
+  character_id: string | null;
+  run_number: number;
+  start_time: string;
+  end_time: string | null;
+  duration: number | null;
+  created_at: string;
+  updated_at: string;
+};
+
+/**
+ * Type representing a run item as stored in the database.
+ * SQLite-compatible types: booleans as 0/1, undefined as null
+ */
+export type DatabaseRunItem = {
+  id: string;
+  run_id: string;
+  grail_progress_id: string | null;
+  name: string | null;
+  found_time: string;
+  created_at: string;
+};
+
+/**
  * Interface representing Holy Grail completion statistics.
  */
 export interface GrailStatistics {
@@ -253,6 +346,47 @@ export interface GrailStatistics {
   };
   currentStreak: number;
   maxStreak: number;
+}
+
+/**
+ * Interface representing statistics for a single session.
+ */
+export interface SessionStats {
+  sessionId: string;
+  totalRuns: number;
+  totalTime: number;
+  totalRunTime: number;
+  averageRunDuration: number;
+  fastestRun: number;
+  slowestRun: number;
+  itemsFound: number;
+  newGrailItems: number;
+}
+
+/**
+ * Interface representing overall run statistics across all sessions.
+ */
+export interface RunStatistics {
+  totalSessions: number;
+  totalRuns: number;
+  totalTime: number;
+  averageRunDuration: number;
+  fastestRun: { runId: string; duration: number; timestamp: Date };
+  slowestRun: { runId: string; duration: number; timestamp: Date };
+  itemsPerRun: number;
+}
+
+/**
+ * Interface representing character run summary statistics.
+ */
+export interface CharacterRunSummary {
+  characterId: string;
+  totalSessions: number;
+  totalRuns: number;
+  totalTimePlayed: number;
+  averageSessionDuration: number;
+  averageRunsPerSession: number;
+  totalItemsFound: number;
 }
 
 /**
@@ -287,6 +421,22 @@ export interface MonitoringStatus {
   isMonitoring: boolean;
   directory: string | null;
 }
+
+/**
+ * Interface representing the current state of run tracking.
+ */
+export interface RunState {
+  isRunning: boolean;
+  isPaused: boolean;
+  activeSession?: Session;
+  activeRun?: Run;
+  lastRunEndTime?: Date;
+}
+
+/**
+ * Type representing the state of the run tracker.
+ */
+export type RunTrackerState = 'idle' | 'running' | 'paused';
 
 /**
  * Type representing statistics for save files, mapping filenames to item counts.
@@ -385,12 +535,18 @@ export type Settings = {
   fileChangeDebounceMs?: number; // Default: 2000
   // Widget settings
   widgetEnabled?: boolean; // Whether the widget is enabled
-  widgetDisplay?: 'overall' | 'split' | 'all'; // Widget display mode (overall only, normal+ethereal, or all three)
+  widgetDisplay?: 'overall' | 'split' | 'all' | 'run-only'; // Widget display mode (overall only, normal+ethereal, all three, or run counter only)
   widgetPosition?: { x: number; y: number }; // Widget position on screen
   widgetOpacity?: number; // Widget opacity (0.0 to 1.0)
   widgetSizeOverall?: { width: number; height: number }; // Custom size for overall mode
   widgetSizeSplit?: { width: number; height: number }; // Custom size for split mode
   widgetSizeAll?: { width: number; height: number }; // Custom size for all mode
+  /**
+   * When true (default), the run-only widget variant shows a compact text list
+   * of grail-relevant items found in recent runs for the active session.
+   * When false, only the run/session statistics are shown.
+   */
+  widgetRunOnlyShowItems?: boolean;
   // Main window settings
   mainWindowBounds?: { x: number; y: number; width: number; height: number }; // Main window position and size
   // Wizard settings
@@ -399,6 +555,17 @@ export type Settings = {
   // Terror zone configuration
   terrorZoneConfig?: Record<number, boolean>; // Zone ID -> enabled state
   terrorZoneBackupCreated?: boolean; // Whether backup has been created
+  // Run tracker settings
+  runTrackerAutoStart?: boolean; // Whether to automatically start runs when save files are modified
+  runTrackerEndThreshold?: number; // Time in seconds before ending a run (default: 10)
+  runTrackerMemoryReading?: boolean; // Whether to use memory reading for game detection (Windows only, default: false)
+  runTrackerMemoryPollingInterval?: number; // How often to poll memory in milliseconds (default: 500)
+  runTrackerShortcuts?: {
+    startRun: string; // default: 'Ctrl+R'
+    pauseRun: string; // default: 'Ctrl+Space'
+    endRun: string; // default: 'Ctrl+E'
+    endSession: string; // default: 'Ctrl+Shift+E'
+  };
 };
 
 /**

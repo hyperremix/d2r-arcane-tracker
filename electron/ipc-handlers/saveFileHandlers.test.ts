@@ -1,6 +1,51 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: This file is testing private methods */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+// Mock process.platform to non-Windows to prevent Windows-specific services from initializing
+Object.defineProperty(process, 'platform', {
+  value: 'darwin',
+  writable: false,
+});
+
+// Mock win32-api (native module that won't work in test environment)
+vi.mock('win32-api', () => ({
+  Kernel32: {
+    load: vi.fn().mockReturnValue({
+      OpenProcess: vi.fn(),
+      GetLastError: vi.fn(),
+    }),
+  },
+  ffi: {
+    load: vi.fn().mockReturnValue({
+      func: vi.fn().mockReturnValue(vi.fn()),
+    }),
+  },
+}));
+
+// Mock ProcessMonitor
+vi.mock('../services/processMonitor', () => ({
+  ProcessMonitor: vi.fn().mockImplementation(() => ({
+    startMonitoring: vi.fn(),
+    stopMonitoring: vi.fn(),
+    getProcessId: vi.fn().mockReturnValue(null),
+    isRunning: vi.fn().mockReturnValue(false),
+    shutdown: vi.fn(),
+  })),
+}));
+
+// Mock MemoryReader
+vi.mock('../services/memoryReader', () => ({
+  MemoryReader: vi.fn().mockImplementation(() => ({
+    startPolling: vi.fn(),
+    stopPolling: vi.fn(),
+    updatePollingInterval: vi.fn(),
+    isInGame: vi.fn().mockResolvedValue(false),
+    readGameState: vi.fn().mockResolvedValue(null),
+    getGameId: vi.fn().mockResolvedValue(null),
+    getCharacterName: vi.fn().mockResolvedValue(null),
+  })),
+}));
+
 // Mock electron modules
 vi.mock('electron', () => ({
   ipcMain: {
@@ -27,6 +72,14 @@ vi.mock('../database/database', () => ({
     getAllProgress: vi.fn(),
     setSetting: vi.fn(),
     truncateUserData: vi.fn(),
+    // Run tracking methods
+    getActiveSession: vi.fn(),
+    getActiveRun: vi.fn(),
+    upsertSession: vi.fn(),
+    archiveSession: vi.fn(),
+    getRunsBySession: vi.fn(),
+    upsertRun: vi.fn(),
+    addRunItem: vi.fn(),
   },
 }));
 
@@ -44,6 +97,26 @@ vi.mock('../services/DatabaseBatchWriter', () => {
 
   return {
     DatabaseBatchWriter: vi.fn().mockImplementation(() => mockInstance),
+  };
+});
+
+// Mock RunTrackerService
+vi.mock('../services/runTracker', () => {
+  const mockInstance = {
+    getActiveRun: vi.fn(),
+    getActiveSession: vi.fn(),
+    startSession: vi.fn(),
+    endSession: vi.fn(),
+    startRun: vi.fn(),
+    endRun: vi.fn(),
+    pauseRun: vi.fn(),
+    resumeRun: vi.fn(),
+    getState: vi.fn(),
+    shutdown: vi.fn(),
+  };
+
+  return {
+    RunTrackerService: vi.fn().mockImplementation(() => mockInstance),
   };
 });
 
@@ -117,6 +190,7 @@ import { grailDatabase } from '../database/database';
 import { DatabaseBatchWriter } from '../services/DatabaseBatchWriter';
 import { EventBus } from '../services/EventBus';
 import { ItemDetectionService } from '../services/itemDetection';
+import { RunTrackerService } from '../services/runTracker';
 import { SaveFileMonitor } from '../services/saveFileMonitor';
 import type { ItemDetectionEvent, SaveFileEvent } from '../types/grail';
 import { closeSaveFileMonitor, initializeSaveFileHandlers } from './saveFileHandlers';
@@ -167,6 +241,7 @@ describe('When saveFileHandlers is used', () => {
   let mockWebContents: MockWebContents[];
   let mockSaveFileMonitor: MockSaveFileMonitor;
   let mockItemDetectionService: MockItemDetectionService;
+  let mockRunTrackerService: any;
   let mockEventBus: MockEventBus;
   let mockBatchWriter: MockDatabaseBatchWriter;
 
@@ -216,9 +291,23 @@ describe('When saveFileHandlers is used', () => {
       analyzeSaveFile: vi.fn(),
     };
 
+    mockRunTrackerService = {
+      getActiveRun: vi.fn().mockReturnValue(null),
+      getActiveSession: vi.fn().mockReturnValue(null),
+      startSession: vi.fn(),
+      endSession: vi.fn(),
+      startRun: vi.fn(),
+      endRun: vi.fn(),
+      pauseRun: vi.fn(),
+      resumeRun: vi.fn(),
+      getState: vi.fn(),
+      shutdown: vi.fn(),
+    };
+
     // Setup service mocks
     vi.mocked(SaveFileMonitor).mockImplementation(() => mockSaveFileMonitor as any);
     vi.mocked(ItemDetectionService).mockImplementation(() => mockItemDetectionService as any);
+    vi.mocked(RunTrackerService).mockImplementation(() => mockRunTrackerService as any);
 
     // Setup default database mocks
     vi.mocked(grailDatabase.getCharacterByName).mockReturnValue(undefined);
@@ -227,6 +316,23 @@ describe('When saveFileHandlers is used', () => {
     vi.mocked(grailDatabase.getCharacterProgress).mockReturnValue(null);
     vi.mocked(grailDatabase.getAllItems).mockReturnValue([]);
     vi.mocked(grailDatabase.getAllProgress).mockReturnValue([]);
+
+    // Setup run tracking database mocks
+    vi.mocked(grailDatabase.getActiveSession).mockReturnValue(null);
+    vi.mocked(grailDatabase.getActiveRun).mockReturnValue(null);
+    vi.mocked(grailDatabase.upsertSession).mockImplementation(() => {
+      // Mock implementation - no-op
+    });
+    vi.mocked(grailDatabase.archiveSession).mockImplementation(() => {
+      // Mock implementation - no-op
+    });
+    vi.mocked(grailDatabase.getRunsBySession).mockReturnValue([]);
+    vi.mocked(grailDatabase.upsertRun).mockImplementation(() => {
+      // Mock implementation - no-op
+    });
+    vi.mocked(grailDatabase.addRunItem).mockImplementation(() => {
+      // Mock implementation - no-op
+    });
   });
 
   describe('If initializeSaveFileHandlers is called', () => {
@@ -236,6 +342,12 @@ describe('When saveFileHandlers is used', () => {
 
       // Assert
       expect(EventBus).toHaveBeenCalled();
+      // RunTrackerService is called with memoryReader (null on non-Windows)
+      expect(RunTrackerService).toHaveBeenCalledWith(
+        mockEventBus,
+        grailDatabase,
+        null, // memoryReader is null on non-Windows platforms (macOS test environment)
+      );
       expect(SaveFileMonitor).toHaveBeenCalledWith(mockEventBus, grailDatabase);
       expect(ItemDetectionService).toHaveBeenCalledWith(mockEventBus);
       expect(mockEventBus.on).toHaveBeenCalledWith('save-file-event', expect.any(Function));
@@ -502,6 +614,123 @@ describe('When saveFileHandlers is used', () => {
 
       // Assert
       expect(mockBatchWriter.queueProgress).toHaveBeenCalled();
+    });
+
+    it('Then should flush progress before associating new finds with active runs', () => {
+      // Arrange
+      const d2sItem = D2SItemBuilder.new()
+        .withId('test-item')
+        .asUniqueBow()
+        .withLevel(75)
+        .withSocketCount(0)
+        .build();
+
+      const mockEvent: ItemDetectionEvent = {
+        type: 'item-found',
+        item: D2ItemBuilder.new()
+          .withId('test-item')
+          .withName(d2sItem.name || 'Test Item')
+          .withType(d2sItem.type || d2sItem.type_name || d2sItem.code || 'bows')
+          .withQuality(d2sItem.quality === 5 ? 'unique' : 'normal')
+          .withLevel(d2sItem.level || 75)
+          .withEthereal(d2sItem.ethereal === 1)
+          .withSockets(d2sItem.socket_count || d2sItem.socketed || 0)
+          .withCharacterName('TestCharacter')
+          .withLocation('inventory')
+          .build(),
+        grailItem: HolyGrailItemBuilder.new()
+          .withId('windforce')
+          .withName('windforce')
+          .withType('unique')
+          .withWeaponSubCategory('bows')
+          .build(),
+      };
+
+      const mockCharacter = CharacterBuilder.new()
+        .withId('char-1')
+        .withName('TestCharacter')
+        .build();
+      const activeRun = { id: 'run-1' } as any;
+
+      vi.mocked(grailDatabase.getCharacterByName).mockReturnValue(mockCharacter as any);
+      vi.mocked(grailDatabase.getProgressByItem).mockReturnValue([]);
+      mockRunTrackerService.getActiveRun.mockReturnValue(activeRun);
+
+      initializeSaveFileHandlers();
+
+      // Act
+      mockEventBus.emit('item-detection', mockEvent);
+
+      // Assert
+      expect(mockBatchWriter.flush).toHaveBeenCalled();
+      const queuedProgress = mockBatchWriter.queueProgress.mock.calls[0][0];
+      expect(grailDatabase.addRunItem).toHaveBeenCalledWith(
+        expect.objectContaining({
+          grailProgressId: queuedProgress.id,
+          runId: activeRun.id,
+        }),
+      );
+    });
+
+    it('Then should reuse existing progress when associating duplicate finds with runs', () => {
+      // Arrange
+      const d2sItem = D2SItemBuilder.new()
+        .withId('test-item')
+        .asUniqueBow()
+        .withLevel(75)
+        .withSocketCount(0)
+        .build();
+
+      const mockEvent: ItemDetectionEvent = {
+        type: 'item-found',
+        item: D2ItemBuilder.new()
+          .withId('test-item')
+          .withName(d2sItem.name || 'Test Item')
+          .withType(d2sItem.type || d2sItem.type_name || d2sItem.code || 'bows')
+          .withQuality(d2sItem.quality === 5 ? 'unique' : 'normal')
+          .withLevel(d2sItem.level || 75)
+          .withEthereal(d2sItem.ethereal === 1)
+          .withSockets(d2sItem.socket_count || d2sItem.socketed || 0)
+          .withCharacterName('TestCharacter')
+          .withLocation('inventory')
+          .build(),
+        grailItem: HolyGrailItemBuilder.new()
+          .withId('windforce')
+          .withName('windforce')
+          .withType('unique')
+          .withWeaponSubCategory('bows')
+          .build(),
+      };
+
+      const mockCharacter = CharacterBuilder.new()
+        .withId('char-1')
+        .withName('TestCharacter')
+        .build();
+      const persistedProgress = GrailProgressBuilder.new()
+        .withId('existing-progress')
+        .withCharacterId(mockCharacter.id)
+        .withItemId(mockEvent.grailItem.id)
+        .asNormal()
+        .build();
+      const activeRun = { id: 'run-1' } as any;
+
+      vi.mocked(grailDatabase.getCharacterByName).mockReturnValue(mockCharacter as any);
+      vi.mocked(grailDatabase.getProgressByItem).mockReturnValue([persistedProgress as any]);
+      mockRunTrackerService.getActiveRun.mockReturnValue(activeRun);
+
+      initializeSaveFileHandlers();
+
+      // Act
+      mockEventBus.emit('item-detection', mockEvent);
+
+      // Assert
+      expect(mockBatchWriter.flush).not.toHaveBeenCalled();
+      expect(grailDatabase.addRunItem).toHaveBeenCalledWith(
+        expect.objectContaining({
+          grailProgressId: persistedProgress.id,
+          runId: activeRun.id,
+        }),
+      );
     });
   });
 

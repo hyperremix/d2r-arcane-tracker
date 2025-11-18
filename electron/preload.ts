@@ -6,6 +6,9 @@ import type {
   GrailProgress,
   Item,
   MonitoringStatus,
+  Run,
+  RunItem,
+  Session,
   Settings,
   TerrorZone,
   UpdateStatus,
@@ -268,6 +271,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
       properties?: string[];
     }): Promise<{ canceled: boolean; filePaths?: string[] }> =>
       ipcRenderer.invoke('dialog:showOpenDialog', options),
+
+    /**
+     * Writes content to a file at the specified path.
+     * @param {string} filePath - The file path to write to.
+     * @param {string} content - The content to write.
+     * @returns {Promise<{ success: boolean }>} A promise that resolves with success status.
+     */
+    writeFile: (filePath: string, content: string): Promise<{ success: boolean }> =>
+      ipcRenderer.invoke('dialog:writeFile', filePath, content),
   },
 
   /**
@@ -411,12 +423,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
     /**
      * Updates the widget display mode.
-     * @param {'overall' | 'split' | 'all'} display - The new display mode for the widget.
+     * @param {'overall' | 'split' | 'all' | 'run-only'} display - The new display mode for the widget.
      * @param {Partial<Settings>} settings - Application settings containing custom sizes.
      * @returns {Promise<{ success: boolean; error?: string }>} Success indicator.
      */
     updateDisplay: (
-      display: 'overall' | 'split' | 'all',
+      display: 'overall' | 'split' | 'all' | 'run-only',
       settings: Partial<Settings>,
     ): Promise<{ success: boolean; error?: string }> =>
       ipcRenderer.invoke('widget:update-display', display, settings),
@@ -431,23 +443,23 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
     /**
      * Updates the widget window size.
-     * @param {'overall' | 'split' | 'all'} display - The display mode for the size.
+     * @param {'overall' | 'split' | 'all' | 'run-only'} display - The display mode for the size.
      * @param {{ width: number; height: number }} size - The new size for the widget.
      * @returns {Promise<{ success: boolean; error?: string }>} Success indicator.
      */
     updateSize: (
-      display: 'overall' | 'split' | 'all',
+      display: 'overall' | 'split' | 'all' | 'run-only',
       size: { width: number; height: number },
     ): Promise<{ success: boolean; error?: string }> =>
       ipcRenderer.invoke('widget:update-size', display, size),
 
     /**
      * Resets the widget size to default for the current display mode.
-     * @param {'overall' | 'split' | 'all'} display - The display mode to reset size for.
+     * @param {'overall' | 'split' | 'all' | 'run-only'} display - The display mode to reset size for.
      * @returns {Promise<{ success: boolean; size: { width: number; height: number } | null; error?: string }>} Default size.
      */
     resetSize: (
-      display: 'overall' | 'split' | 'all',
+      display: 'overall' | 'split' | 'all' | 'run-only',
     ): Promise<{
       success: boolean;
       size: { width: number; height: number } | null;
@@ -541,6 +553,157 @@ contextBridge.exposeInMainWorld('electronAPI', {
      */
     openExternal: (url: string): Promise<{ success: boolean; error?: string }> =>
       ipcRenderer.invoke('shell:openExternal', url),
+  },
+
+  /**
+   * Run tracker API methods for managing run tracking sessions and runs.
+   */
+  runTracker: {
+    /**
+     * Session Management
+     */
+    /**
+     * Starts a new run tracking session.
+     * @param {string} [characterId] - Optional character ID to associate with the session.
+     * @returns {Promise<Session>} A promise that resolves with the created session.
+     */
+    startSession: (characterId?: string): Promise<Session> =>
+      ipcRenderer.invoke('run-tracker:start-session', characterId),
+
+    /**
+     * Ends the current run tracking session.
+     * @returns {Promise<{ success: boolean }>} A promise that resolves with a success indicator.
+     */
+    endSession: (): Promise<{ success: boolean }> => ipcRenderer.invoke('run-tracker:end-session'),
+
+    /**
+     * Archives a session by ID.
+     * @param {string} sessionId - The ID of the session to archive.
+     * @returns {Promise<{ success: boolean }>} A promise that resolves with a success indicator.
+     */
+    archiveSession: (sessionId: string): Promise<{ success: boolean }> =>
+      ipcRenderer.invoke('run-tracker:archive-session', sessionId),
+
+    /**
+     * Run Management
+     */
+    /**
+     * Starts a new run within the current session.
+     * @param {string} [characterId] - Optional character ID for the run.
+     * @returns {Promise<Run>} A promise that resolves with the created run.
+     */
+    startRun: (characterId?: string): Promise<Run> =>
+      ipcRenderer.invoke('run-tracker:start-run', characterId),
+
+    /**
+     * Ends the current run.
+     * @returns {Promise<{ success: boolean }>} A promise that resolves with a success indicator.
+     */
+    endRun: (): Promise<{ success: boolean }> => ipcRenderer.invoke('run-tracker:end-run'),
+
+    /**
+     * Pauses the current run.
+     * @returns {Promise<{ success: boolean }>} A promise that resolves with a success indicator.
+     */
+    pauseRun: (): Promise<{ success: boolean }> => ipcRenderer.invoke('run-tracker:pause'),
+
+    /**
+     * Resumes the current run.
+     * @returns {Promise<{ success: boolean }>} A promise that resolves with a success indicator.
+     */
+    resumeRun: (): Promise<{ success: boolean }> => ipcRenderer.invoke('run-tracker:resume'),
+
+    /**
+     * State Queries
+     */
+    /**
+     * Gets the current state of the run tracker.
+     * @returns {Promise<{ isRunning: boolean; isPaused: boolean; activeSession: Session | null; activeRun: Run | null }>} A promise that resolves with the current state.
+     */
+    getState: (): Promise<{
+      isRunning: boolean;
+      isPaused: boolean;
+      activeSession: Session | null;
+      activeRun: Run | null;
+    }> => ipcRenderer.invoke('run-tracker:get-state'),
+
+    /**
+     * Gets the currently active session.
+     * @returns {Promise<Session | null>} A promise that resolves with the active session or null.
+     */
+    getActiveSession: (): Promise<Session | null> =>
+      ipcRenderer.invoke('run-tracker:get-active-session'),
+
+    /**
+     * Gets the currently active run.
+     * @returns {Promise<Run | null>} A promise that resolves with the active run or null.
+     */
+    getActiveRun: (): Promise<Run | null> => ipcRenderer.invoke('run-tracker:get-active-run'),
+
+    /**
+     * Statistics Queries
+     */
+    /**
+     * Gets all sessions regardless of character.
+     * @param {boolean} includeArchived - Whether to include archived sessions (default: false).
+     * @returns {Promise<Session[]>} A promise that resolves with an array of sessions.
+     */
+    getAllSessions: (includeArchived?: boolean): Promise<Session[]> =>
+      ipcRenderer.invoke('run-tracker:get-all-sessions', includeArchived),
+
+    /**
+     * Gets a specific session by ID.
+     * @param {string} sessionId - The session ID to retrieve.
+     * @returns {Promise<Session | null>} A promise that resolves with the session or null.
+     */
+    getSessionById: (sessionId: string): Promise<Session | null> =>
+      ipcRenderer.invoke('run-tracker:get-session-by-id', sessionId),
+
+    /**
+     * Gets all runs for a specific session.
+     * @param {string} sessionId - The session ID to get runs for.
+     * @returns {Promise<Run[]>} A promise that resolves with an array of runs.
+     */
+    getRunsBySession: (sessionId: string): Promise<Run[]> =>
+      ipcRenderer.invoke('run-tracker:get-runs-by-session', sessionId),
+
+    /**
+     * Gets all items found during a specific run.
+     * @param {string} runId - The run ID to get items for.
+     * @returns {Promise<RunItem[]>} A promise that resolves with an array of run items.
+     */
+    getRunItems: (runId: string): Promise<RunItem[]> =>
+      ipcRenderer.invoke('run-tracker:get-run-items', runId),
+
+    /**
+     * Gets all items found during a specific session (across all runs).
+     * @param {string} sessionId - The session ID to get items for.
+     * @returns {Promise<RunItem[]>} A promise that resolves with an array of run items.
+     */
+    getSessionItems: (sessionId: string): Promise<RunItem[]> =>
+      ipcRenderer.invoke('run-tracker:get-session-items', sessionId),
+
+    /**
+     * Gets overall run statistics across all sessions.
+     * @returns {Promise<RunStatistics>} A promise that resolves with overall run statistics.
+     */
+    getOverallStatistics: () => ipcRenderer.invoke('run-tracker:get-overall-statistics'),
+
+    /**
+     * Manually adds a run item to a run.
+     * @param {Object} data - The run item data.
+     * @param {string} data.runId - The run ID to add the item to.
+     * @param {string} [data.name] - Optional name for manual entries.
+     * @param {string} [data.grailProgressId] - Optional grail progress ID.
+     * @param {Date} [data.foundTime] - Optional found time (defaults to now).
+     * @returns {Promise<{ success: boolean; runItem: RunItem }>} A promise that resolves with the result.
+     */
+    addRunItem: (data: {
+      runId: string;
+      name?: string;
+      grailProgressId?: string;
+      foundTime?: Date;
+    }) => ipcRenderer.invoke('run-tracker:add-run-item', data),
   },
 
   /**

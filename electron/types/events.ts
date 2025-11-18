@@ -1,4 +1,11 @@
-import type { ItemDetectionEvent, SaveFileEvent } from './grail';
+import type {
+  D2Item,
+  GrailProgress,
+  ItemDetectionEvent,
+  Run,
+  SaveFileEvent,
+  Session,
+} from './grail';
 
 /**
  * Payload for monitoring-started event
@@ -19,6 +26,95 @@ export interface MonitoringErrorPayload {
 }
 
 /**
+ * Payload for run-started event
+ */
+export interface RunStartedPayload {
+  run: Run;
+  session: Session;
+  manual: boolean;
+}
+
+/**
+ * Payload for run-ended event
+ */
+export interface RunEndedPayload {
+  run: Run;
+  session: Session;
+  manual: boolean;
+}
+
+/**
+ * Payload for run-paused event
+ */
+export interface RunPausedPayload {
+  run: Run;
+  session: Session;
+}
+
+/**
+ * Payload for run-resumed event
+ */
+export interface RunResumedPayload {
+  run: Run;
+  session: Session;
+}
+
+/**
+ * Payload for session-started event
+ */
+export interface SessionStartedPayload {
+  session: Session;
+}
+
+/**
+ * Payload for session-ended event
+ */
+export interface SessionEndedPayload {
+  session: Session;
+}
+
+/**
+ * Payload for run-item-added event
+ */
+export interface RunItemAddedPayload {
+  runId: string;
+  grailProgress?: GrailProgress;
+  item?: D2Item;
+  name?: string;
+}
+
+/**
+ * Payload for d2r-started event
+ */
+export interface D2RStartedPayload {
+  processId: number;
+  processName: string;
+}
+
+/**
+ * Payload for d2r-stopped event
+ */
+export interface D2RStoppedPayload {
+  processId: null;
+  processName: string;
+}
+
+/**
+ * Payload for game-entered event (from memory reading)
+ */
+export interface GameEnteredPayload {
+  characterId?: string;
+  gameId?: string;
+}
+
+/**
+ * Payload for game-exited event (from memory reading)
+ */
+export interface GameExitedPayload {
+  characterId?: string;
+}
+
+/**
  * Union type of all application events with their payloads
  */
 export type AppEvent =
@@ -26,7 +122,18 @@ export type AppEvent =
   | { type: 'item-detection'; payload: ItemDetectionEvent }
   | { type: 'monitoring-started'; payload: MonitoringStartedPayload }
   | { type: 'monitoring-stopped'; payload: Record<string, never> }
-  | { type: 'monitoring-error'; payload: MonitoringErrorPayload };
+  | { type: 'monitoring-error'; payload: MonitoringErrorPayload }
+  | { type: 'run-started'; payload: RunStartedPayload }
+  | { type: 'run-ended'; payload: RunEndedPayload }
+  | { type: 'run-paused'; payload: RunPausedPayload }
+  | { type: 'run-resumed'; payload: RunResumedPayload }
+  | { type: 'session-started'; payload: SessionStartedPayload }
+  | { type: 'session-ended'; payload: SessionEndedPayload }
+  | { type: 'run-item-added'; payload: RunItemAddedPayload }
+  | { type: 'd2r-started'; payload: D2RStartedPayload }
+  | { type: 'd2r-stopped'; payload: D2RStoppedPayload }
+  | { type: 'game-entered'; payload: GameEnteredPayload }
+  | { type: 'game-exited'; payload: GameExitedPayload };
 
 /**
  * Extract event type names

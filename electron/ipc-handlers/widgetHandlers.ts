@@ -26,7 +26,7 @@ export function initializeWidgetHandlers(
   rendererDist?: string,
   onPositionChange?: (position: { x: number; y: number }) => void,
   onSizeChange?: (
-    display: 'overall' | 'split' | 'all',
+    display: 'overall' | 'split' | 'all' | 'run-only',
     size: { width: number; height: number },
   ) => void,
 ): void {
@@ -87,7 +87,11 @@ export function initializeWidgetHandlers(
    */
   ipcMain.handle(
     'widget:update-display',
-    async (_event, display: 'overall' | 'split' | 'all', settings: Partial<Settings>) => {
+    async (
+      _event,
+      display: 'overall' | 'split' | 'all' | 'run-only',
+      settings: Partial<Settings>,
+    ) => {
       try {
         updateWidgetWindowSize(display, settings);
         return { success: true };
@@ -130,7 +134,7 @@ export function initializeWidgetHandlers(
     'widget:update-size',
     async (
       _event,
-      display: 'overall' | 'split' | 'all',
+      display: 'overall' | 'split' | 'all' | 'run-only',
       size: { width: number; height: number },
     ) => {
       try {
@@ -148,18 +152,21 @@ export function initializeWidgetHandlers(
   /**
    * Reset widget size to default for current display mode.
    */
-  ipcMain.handle('widget:reset-size', async (_event, display: 'overall' | 'split' | 'all') => {
-    try {
-      const defaultSize = resetWidgetWindowSize(display);
-      if (defaultSize && onSizeChange) {
-        onSizeChange(display, defaultSize);
+  ipcMain.handle(
+    'widget:reset-size',
+    async (_event, display: 'overall' | 'split' | 'all' | 'run-only') => {
+      try {
+        const defaultSize = resetWidgetWindowSize(display);
+        if (defaultSize && onSizeChange) {
+          onSizeChange(display, defaultSize);
+        }
+        return { success: true, size: defaultSize };
+      } catch (error) {
+        console.error('Failed to reset widget size:', error);
+        return { success: false, error: String(error), size: null };
       }
-      return { success: true, size: defaultSize };
-    } catch (error) {
-      console.error('Failed to reset widget size:', error);
-      return { success: false, error: String(error), size: null };
-    }
-  });
+    },
+  );
 
   /**
    * Reset widget position to center of screen.

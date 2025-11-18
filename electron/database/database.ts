@@ -8,11 +8,19 @@ import type {
   DatabaseCharacter,
   DatabaseGrailProgress,
   DatabaseItem,
+  DatabaseRun,
+  DatabaseRunItem,
   DatabaseSaveFileState,
+  DatabaseSession,
   DatabaseSetting,
   GrailProgress,
   Item,
+  Run,
+  RunItem,
+  RunStatistics,
   SaveFileState,
+  Session,
+  SessionStats,
   Settings,
 } from '../types/grail';
 import { GameMode, GameVersion } from '../types/grail';
@@ -21,10 +29,16 @@ import {
   mapDatabaseCharacterToCharacter,
   mapDatabaseItemToItem,
   mapDatabaseProgressToProgress,
+  mapDatabaseRunItemToRunItem,
+  mapDatabaseRunToRun,
   mapDatabaseSaveFileStateToSaveFileState,
+  mapDatabaseSessionToSession,
   mapItemToDatabase,
   mapProgressToDatabase,
+  mapRunItemToDatabase,
+  mapRunToDatabase,
   mapSaveFileStateToDatabase,
+  mapSessionToDatabase,
   mapValuesToSqlite,
 } from './mappers';
 
@@ -154,6 +168,47 @@ class GrailDatabase {
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
       );
 
+      -- Sessions table - tracks gaming sessions
+      CREATE TABLE IF NOT EXISTS sessions (
+        id TEXT PRIMARY KEY,
+        start_time DATETIME NOT NULL,
+        end_time DATETIME,
+        total_run_time INTEGER DEFAULT 0, -- milliseconds
+        total_session_time INTEGER DEFAULT 0, -- milliseconds
+        run_count INTEGER DEFAULT 0,
+        archived BOOLEAN DEFAULT FALSE,
+        notes TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+
+      -- Runs table - tracks individual runs within sessions
+      CREATE TABLE IF NOT EXISTS runs (
+        id TEXT PRIMARY KEY,
+        session_id TEXT NOT NULL,
+        character_id TEXT,
+        run_number INTEGER NOT NULL, -- sequential within session
+        start_time DATETIME NOT NULL,
+        end_time DATETIME,
+        duration INTEGER, -- milliseconds
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE,
+        FOREIGN KEY (character_id) REFERENCES characters(id)
+      );
+
+      -- Run items table - associates items with runs
+      CREATE TABLE IF NOT EXISTS run_items (
+        id TEXT PRIMARY KEY,
+        run_id TEXT NOT NULL,
+        grail_progress_id TEXT,
+        name TEXT,
+        found_time DATETIME NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (run_id) REFERENCES runs(id) ON DELETE CASCADE,
+        FOREIGN KEY (grail_progress_id) REFERENCES grail_progress(id) ON DELETE CASCADE
+      );
+
       -- Indexes for better performance
       CREATE INDEX IF NOT EXISTS idx_items_category ON items(category);
       CREATE INDEX IF NOT EXISTS idx_items_type ON items(type);
@@ -165,6 +220,20 @@ class GrailDatabase {
       CREATE INDEX IF NOT EXISTS idx_grail_progress_character_item ON grail_progress(character_id, item_id);
       CREATE INDEX IF NOT EXISTS idx_save_file_states_path ON save_file_states(file_path);
       CREATE INDEX IF NOT EXISTS idx_save_file_states_modified ON save_file_states(last_modified);
+
+      -- Sessions indexes
+      CREATE INDEX IF NOT EXISTS idx_sessions_start_time ON sessions(start_time);
+      CREATE INDEX IF NOT EXISTS idx_sessions_archived ON sessions(archived);
+
+      -- Runs indexes
+      CREATE INDEX IF NOT EXISTS idx_runs_session ON runs(session_id);
+      CREATE INDEX IF NOT EXISTS idx_runs_character ON runs(character_id);
+      CREATE INDEX IF NOT EXISTS idx_runs_start_time ON runs(start_time);
+      CREATE INDEX IF NOT EXISTS idx_runs_session_number ON runs(session_id, run_number);
+
+      -- Run items indexes
+      CREATE INDEX IF NOT EXISTS idx_run_items_run ON run_items(run_id);
+      CREATE INDEX IF NOT EXISTS idx_run_items_progress ON run_items(grail_progress_id);
 
       -- Triggers to update the updated_at timestamp
       CREATE TRIGGER IF NOT EXISTS update_items_timestamp
@@ -197,6 +266,18 @@ class GrailDatabase {
           UPDATE save_file_states SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
         END;
 
+      CREATE TRIGGER IF NOT EXISTS update_sessions_timestamp
+        AFTER UPDATE ON sessions
+        BEGIN
+          UPDATE sessions SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
+        END;
+
+      CREATE TRIGGER IF NOT EXISTS update_runs_timestamp
+        AFTER UPDATE ON runs
+        BEGIN
+          UPDATE runs SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
+        END;
+
       -- Insert default settings
       INSERT OR IGNORE INTO settings (key, value) VALUES
         ('saveDir', ''),
@@ -214,7 +295,11 @@ class GrailDatabase {
         ('theme', 'system'),
         ('showItemIcons', 'false'),
         ('wizardCompleted', 'false'),
-        ('wizardSkipped', 'false');
+        ('wizardSkipped', 'false'),
+        ('runTrackerAutoStart', 'true'),
+        ('runTrackerEndThreshold', '10'),
+        ('runTrackerMemoryReading', 'false'),
+        ('runTrackerMemoryPollingInterval', '500');
     `;
 
     this.db.exec(schema);
@@ -454,6 +539,17 @@ class GrailDatabase {
   }
 
   /**
+   * Retrieves a character by its ID.
+   * @param id - The ID of the character to find
+   * @returns The character if found, undefined otherwise
+   */
+  getCharacterById(id: string): Character | undefined {
+    const stmt = this.db.prepare('SELECT * FROM characters WHERE id = ? AND deleted_at IS NULL');
+    const dbCharacter = stmt.get(id) as DatabaseCharacter | undefined;
+    return dbCharacter ? mapDatabaseCharacterToCharacter(dbCharacter) : undefined;
+  }
+
+  /**
    * Retrieves a character by its save file path.
    * @param saveFilePath - The save file path of the character to find
    * @returns The character if found, undefined otherwise
@@ -688,7 +784,27 @@ class GrailDatabase {
       // Terror zone configuration
       terrorZoneConfig: this.parseJSONSetting<Record<number, boolean>>(settings.terrorZoneConfig),
       terrorZoneBackupCreated: this.parseBooleanSetting(settings.terrorZoneBackupCreated),
+      // Run tracker settings
+      runTrackerAutoStart: this.parseBooleanSetting(settings.runTrackerAutoStart),
+      runTrackerEndThreshold: this.parseIntSetting(settings.runTrackerEndThreshold) ?? 10,
+      runTrackerMemoryReading: this.parseBooleanSetting(settings.runTrackerMemoryReading),
+      runTrackerMemoryPollingInterval:
+        this.parseIntSetting(settings.runTrackerMemoryPollingInterval) ?? 500,
+      runTrackerShortcuts: this.parseJSONSetting<Settings['runTrackerShortcuts']>(
+        settings.runTrackerShortcuts,
+      ),
     };
+
+    // Migration: If runTrackerAutoStart was enabled, enable runTrackerMemoryReading
+    // This migrates users from the old auto-start (save file) mode to new auto mode (memory reading)
+    if (settings.runTrackerAutoStart === 'true' && settings.runTrackerMemoryReading !== 'true') {
+      console.log(
+        '[Database] Migrating runTrackerAutoStart to runTrackerMemoryReading (auto mode)',
+      );
+      typedSettings.runTrackerMemoryReading = true;
+      // Persist the migration
+      this.setSetting('runTrackerMemoryReading', 'true');
+    }
 
     return typedSettings;
   }
@@ -951,6 +1067,373 @@ class GrailDatabase {
    */
   clearAllSaveFileStates(): void {
     this.db.prepare('DELETE FROM save_file_states').run();
+  }
+
+  // Session methods
+  /**
+   * Retrieves all sessions regardless of character.
+   * @param includeArchived - Whether to include archived sessions (default: false)
+   * @returns Array of sessions ordered by start time (most recent first)
+   */
+  getAllSessions(includeArchived: boolean = false): Session[] {
+    const archivedCondition = includeArchived ? '' : 'AND archived = 0';
+    const stmt = this.db.prepare(
+      `SELECT * FROM sessions ${archivedCondition ? `WHERE ${archivedCondition}` : ''} ORDER BY start_time DESC`,
+    );
+    const dbSessions = stmt.all() as DatabaseSession[];
+    return dbSessions.map(mapDatabaseSessionToSession);
+  }
+
+  /**
+   * Retrieves a session by ID.
+   * @param sessionId - The unique identifier of the session
+   * @returns The session if found, null otherwise
+   */
+  getSessionById(sessionId: string): Session | null {
+    const stmt = this.db.prepare('SELECT * FROM sessions WHERE id = ?');
+    const dbSession = stmt.get(sessionId) as DatabaseSession | undefined;
+    return dbSession ? mapDatabaseSessionToSession(dbSession) : null;
+  }
+
+  /**
+   * Retrieves the active session (not archived, no end time).
+   * @returns The active session if found, null otherwise
+   */
+  getActiveSession(): Session | null {
+    const stmt = this.db.prepare(
+      'SELECT * FROM sessions WHERE archived = 0 AND end_time IS NULL ORDER BY start_time DESC LIMIT 1',
+    );
+    const dbSession = stmt.get() as DatabaseSession | undefined;
+    return dbSession ? mapDatabaseSessionToSession(dbSession) : null;
+  }
+
+  /**
+   * Inserts or updates a session.
+   * Uses INSERT OR REPLACE to handle both insert and update operations.
+   * @param session - The session data to insert or update
+   */
+  upsertSession(session: Session): void {
+    // Use INSERT ... ON CONFLICT DO UPDATE instead of INSERT OR REPLACE
+    // to avoid triggering ON DELETE CASCADE which would delete all runs!
+    const stmt = this.db.prepare(`
+      INSERT INTO sessions (id, start_time, end_time, total_run_time, total_session_time, run_count, archived, notes)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(id) DO UPDATE SET
+        start_time = excluded.start_time,
+        end_time = excluded.end_time,
+        total_run_time = excluded.total_run_time,
+        total_session_time = excluded.total_session_time,
+        run_count = excluded.run_count,
+        archived = excluded.archived,
+        notes = excluded.notes,
+        updated_at = CURRENT_TIMESTAMP
+    `);
+    const mapped = mapSessionToDatabase(session);
+    stmt.run(
+      mapped.id,
+      mapped.start_time,
+      mapped.end_time,
+      mapped.total_run_time,
+      mapped.total_session_time,
+      mapped.run_count,
+      mapped.archived,
+      mapped.notes,
+    );
+  }
+
+  /**
+   * Archives a session.
+   * @param sessionId - The unique identifier of the session to archive
+   */
+  archiveSession(sessionId: string): void {
+    const stmt = this.db.prepare('UPDATE sessions SET archived = 1 WHERE id = ?');
+    stmt.run(sessionId);
+  }
+
+  /**
+   * Deletes a session and all related runs (CASCADE).
+   * @param sessionId - The unique identifier of the session to delete
+   */
+  deleteSession(sessionId: string): void {
+    const stmt = this.db.prepare('DELETE FROM sessions WHERE id = ?');
+    stmt.run(sessionId);
+  }
+
+  // Session Statistics methods
+  /**
+   * Retrieves comprehensive statistics for a specific session.
+   * @param sessionId - The unique identifier of the session
+   * @returns Session statistics or null if session not found
+   */
+  getSessionStatistics(sessionId: string): SessionStats | null {
+    const sessionStmt = this.db.prepare('SELECT * FROM sessions WHERE id = ?');
+    const session = sessionStmt.get(sessionId) as DatabaseSession | undefined;
+
+    if (!session) {
+      return null;
+    }
+
+    // Get run statistics for this session
+    const runStatsStmt = this.db.prepare(`
+      SELECT
+        COUNT(*) as totalRuns,
+        AVG(CASE WHEN duration IS NOT NULL THEN duration ELSE 0 END) as averageRunDuration,
+        MIN(CASE WHEN duration IS NOT NULL THEN duration ELSE NULL END) as fastestRun,
+        MAX(CASE WHEN duration IS NOT NULL THEN duration ELSE NULL END) as slowestRun
+      FROM runs
+      WHERE session_id = ?
+    `);
+    const runStats = runStatsStmt.get(sessionId) as {
+      totalRuns: number;
+      averageRunDuration: number | null;
+      fastestRun: number | null;
+      slowestRun: number | null;
+    };
+
+    // Get item statistics for this session
+    const itemStatsStmt = this.db.prepare(`
+      SELECT
+        COUNT(ri.id) as itemsFound,
+        COUNT(CASE WHEN gp.from_initial_scan = 0 THEN ri.id END) as newGrailItems
+      FROM run_items ri
+      INNER JOIN runs r ON ri.run_id = r.id
+      LEFT JOIN grail_progress gp ON ri.grail_progress_id = gp.id
+      WHERE r.session_id = ?
+    `);
+    const itemStats = itemStatsStmt.get(sessionId) as {
+      itemsFound: number;
+      newGrailItems: number;
+    };
+
+    return {
+      sessionId: session.id,
+      totalRuns: runStats.totalRuns,
+      totalTime: session.total_session_time,
+      totalRunTime: session.total_run_time,
+      averageRunDuration: runStats.averageRunDuration || 0,
+      fastestRun: runStats.fastestRun || 0,
+      slowestRun: runStats.slowestRun || 0,
+      itemsFound: itemStats.itemsFound,
+      newGrailItems: itemStats.newGrailItems,
+    };
+  }
+
+  // Run Statistics methods
+  /**
+   * Retrieves overall run statistics across all sessions.
+   * @returns Overall run statistics
+   */
+  getOverallRunStatistics(): RunStatistics {
+    // Get session and run counts
+    const sessionStatsStmt = this.db.prepare(`
+      SELECT
+        COUNT(DISTINCT s.id) as totalSessions,
+        COUNT(r.id) as totalRuns,
+        SUM(s.total_session_time) as totalTime
+      FROM sessions s
+      LEFT JOIN runs r ON s.id = r.session_id
+      WHERE s.archived = 0
+    `);
+    const sessionStats = sessionStatsStmt.get([]) as {
+      totalSessions: number;
+      totalRuns: number;
+      totalTime: number | null;
+    };
+
+    // Get run duration statistics
+    const runDurationStmt = this.db.prepare(`
+      SELECT
+        AVG(CASE WHEN r.duration IS NOT NULL THEN r.duration ELSE 0 END) as averageRunDuration,
+        MIN(CASE WHEN r.duration IS NOT NULL THEN r.duration ELSE NULL END) as minDuration,
+        MAX(CASE WHEN r.duration IS NOT NULL THEN r.duration ELSE NULL END) as maxDuration
+      FROM runs r
+      INNER JOIN sessions s ON r.session_id = s.id
+      WHERE s.archived = 0
+    `);
+    const runDuration = runDurationStmt.get([]) as {
+      averageRunDuration: number | null;
+      minDuration: number | null;
+      maxDuration: number | null;
+    };
+
+    // Get fastest and slowest run details
+    const fastestRunStmt = this.db.prepare(`
+      SELECT r.id, r.duration, r.start_time
+      FROM runs r
+      INNER JOIN sessions s ON r.session_id = s.id
+      WHERE s.archived = 0 AND r.duration IS NOT NULL
+      ORDER BY r.duration ASC
+      LIMIT 1
+    `);
+    const fastestRun = fastestRunStmt.get([]) as
+      | { id: string; duration: number; start_time: string }
+      | undefined;
+
+    const slowestRunStmt = this.db.prepare(`
+      SELECT r.id, r.duration, r.start_time
+      FROM runs r
+      INNER JOIN sessions s ON r.session_id = s.id
+      WHERE s.archived = 0 AND r.duration IS NOT NULL
+      ORDER BY r.duration DESC
+      LIMIT 1
+    `);
+    const slowestRun = slowestRunStmt.get() as
+      | { id: string; duration: number; start_time: string }
+      | undefined;
+
+    // Get items per run average
+    const itemsPerRunStmt = this.db.prepare(`
+      SELECT
+        COUNT(ri.id) as totalItems,
+        COUNT(DISTINCT r.id) as runsWithItems
+      FROM runs r
+      INNER JOIN sessions s ON r.session_id = s.id
+      LEFT JOIN run_items ri ON r.id = ri.run_id
+      WHERE s.archived = 0
+    `);
+    const itemsPerRun = itemsPerRunStmt.get([]) as {
+      totalItems: number;
+      runsWithItems: number;
+    };
+
+    return {
+      totalSessions: sessionStats.totalSessions,
+      totalRuns: sessionStats.totalRuns,
+      totalTime: sessionStats.totalTime || 0,
+      averageRunDuration: runDuration.averageRunDuration || 0,
+      fastestRun: fastestRun
+        ? {
+            runId: fastestRun.id,
+            duration: fastestRun.duration,
+            timestamp: new Date(fastestRun.start_time),
+          }
+        : { runId: '', duration: 0, timestamp: new Date() },
+      slowestRun: slowestRun
+        ? {
+            runId: slowestRun.id,
+            duration: slowestRun.duration,
+            timestamp: new Date(slowestRun.start_time),
+          }
+        : { runId: '', duration: 0, timestamp: new Date() },
+      itemsPerRun:
+        itemsPerRun.runsWithItems > 0 ? itemsPerRun.totalItems / itemsPerRun.runsWithItems : 0,
+    };
+  }
+
+  /**
+   * Retrieves all runs for a session.
+   * @param sessionId - The unique identifier of the session
+   * @returns Array of runs ordered by run number
+   */
+  getRunsBySession(sessionId: string): Run[] {
+    const stmt = this.db.prepare('SELECT * FROM runs WHERE session_id = ? ORDER BY run_number ASC');
+    const dbRuns = stmt.all(sessionId) as DatabaseRun[];
+    return dbRuns.map(mapDatabaseRunToRun);
+  }
+
+  /**
+   * Retrieves the active run for a session (no end time).
+   * @param sessionId - The unique identifier of the session
+   * @returns The active run if found, null otherwise
+   */
+  getActiveRun(sessionId: string): Run | null {
+    const stmt = this.db.prepare(
+      'SELECT * FROM runs WHERE session_id = ? AND end_time IS NULL ORDER BY start_time DESC LIMIT 1',
+    );
+    const dbRun = stmt.get(sessionId) as DatabaseRun | undefined;
+    return dbRun ? mapDatabaseRunToRun(dbRun) : null;
+  }
+
+  /**
+   * Inserts or updates a run.
+   * Uses INSERT OR REPLACE to handle both insert and update operations.
+   * @param run - The run data to insert or update
+   */
+  upsertRun(run: Run): void {
+    // Use INSERT ... ON CONFLICT DO UPDATE for true UPSERT behavior
+    const stmt = this.db.prepare(`
+      INSERT INTO runs (id, session_id, character_id, run_number, start_time, end_time, duration)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(id) DO UPDATE SET
+        session_id = excluded.session_id,
+        character_id = excluded.character_id,
+        run_number = excluded.run_number,
+        start_time = excluded.start_time,
+        end_time = excluded.end_time,
+        duration = excluded.duration,
+        updated_at = CURRENT_TIMESTAMP
+    `);
+    const mapped = mapRunToDatabase(run);
+    stmt.run(
+      mapped.id,
+      mapped.session_id,
+      mapped.character_id,
+      mapped.run_number,
+      mapped.start_time,
+      mapped.end_time,
+      mapped.duration,
+    );
+  }
+
+  /**
+   * Deletes a run and all related items (CASCADE).
+   * @param runId - The unique identifier of the run to delete
+   */
+  deleteRun(runId: string): void {
+    const stmt = this.db.prepare('DELETE FROM runs WHERE id = ?');
+    stmt.run(runId);
+  }
+
+  // RunItem methods
+  /**
+   * Retrieves all items for a run.
+   * @param runId - The unique identifier of the run
+   * @returns Array of run items ordered by found time
+   */
+  getRunItems(runId: string): RunItem[] {
+    const stmt = this.db.prepare(
+      'SELECT * FROM run_items WHERE run_id = ? ORDER BY found_time ASC',
+    );
+    const dbItems = stmt.all(runId) as DatabaseRunItem[];
+    return dbItems.map(mapDatabaseRunItemToRunItem);
+  }
+
+  /**
+   * Retrieves all items for a session (across all runs).
+   * @param sessionId - The unique identifier of the session
+   * @returns Array of run items ordered by found time
+   */
+  getSessionItems(sessionId: string): RunItem[] {
+    const stmt = this.db.prepare(`
+      SELECT ri.* FROM run_items ri
+      INNER JOIN runs r ON ri.run_id = r.id
+      WHERE r.session_id = ?
+      ORDER BY ri.found_time ASC
+    `);
+    const dbItems = stmt.all(sessionId) as DatabaseRunItem[];
+    return dbItems.map(mapDatabaseRunItemToRunItem);
+  }
+
+  /**
+   * Inserts a run item.
+   * @param runItem - The run item to insert
+   */
+  addRunItem(runItem: RunItem): void {
+    const stmt = this.db.prepare(`
+      INSERT INTO run_items (id, run_id, grail_progress_id, name, found_time)
+      VALUES (?, ?, ?, ?, ?)
+    `);
+    const mapped = mapRunItemToDatabase(runItem);
+    stmt.run(mapped.id, mapped.run_id, mapped.grail_progress_id, mapped.name, mapped.found_time);
+  }
+
+  /**
+   * Deletes a run item.
+   * @param itemId - The unique identifier of the run item to delete
+   */
+  deleteRunItem(itemId: string): void {
+    const stmt = this.db.prepare('DELETE FROM run_items WHERE id = ?');
+    stmt.run(itemId);
   }
 
   /**

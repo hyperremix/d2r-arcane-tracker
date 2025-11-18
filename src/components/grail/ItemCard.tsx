@@ -5,7 +5,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useItemIcon } from '@/hooks/useItemIcon';
 import { isEtherealOnly, shouldShowEtherealStatus, shouldShowNormalStatus } from '@/lib/ethereal';
-import { cn, isRecentFind } from '@/lib/utils';
+import { cn, formatShortDate, isRecentFind } from '@/lib/utils';
 import { useGrailStore } from '@/stores/grailStore';
 import { RuneImages } from './RuneImages';
 import { CharacterIcon, ItemTypeIcon, RecentDiscoveryIndicator } from './StatusIcons';
@@ -70,9 +70,7 @@ function DiscoveryInfo({ allProgress, characters }: DiscoveryInfoProps) {
             )}
             <span>{character?.name || 'Unknown'}</span>
             <span className="text-blue-600 text-xs">({isEthProgress ? 'Eth' : 'Normal'})</span>
-            {p.foundDate && (
-              <span className="text-gray-500">• {new Date(p.foundDate).toLocaleDateString()}</span>
-            )}
+            {p.foundDate && <span className="text-gray-500">• {formatShortDate(p.foundDate)}</span>}
           </div>
         );
       })}
@@ -97,6 +95,7 @@ interface ListViewProps {
   className: string | undefined;
   handleKeyDown: (event: React.KeyboardEvent) => void;
   onClick?: () => void;
+  withoutStatusIndicators?: boolean;
 }
 
 /**
@@ -115,6 +114,7 @@ function ListView({
   className,
   handleKeyDown,
   onClick,
+  withoutStatusIndicators = false,
 }: ListViewProps) {
   const { iconUrl, isLoading } = useItemIcon(item);
   const { settings } = useGrailStore();
@@ -125,7 +125,7 @@ function ListView({
       <div
         className={cn(
           'relative flex w-full items-center gap-3 p-3 transition-all duration-200',
-          'rounded-lg border-2 hover:shadow-md',
+          'rounded-lg border-2',
           typeColors[item.type],
           allProgress.length > 0 ? '' : 'bg-gray-50 opacity-60 hover:opacity-80 dark:bg-gray-950',
           className,
@@ -164,13 +164,15 @@ function ListView({
         )}
 
         {/* Status indicators */}
-        <StatusIndicators
-          mostRecentDiscovery={mostRecentDiscovery}
-          item={item}
-          normalProgress={normalProgress}
-          etherealProgress={etherealProgress}
-          settings={settings}
-        />
+        {!withoutStatusIndicators && (
+          <StatusIndicators
+            mostRecentDiscovery={mostRecentDiscovery}
+            item={item}
+            normalProgress={normalProgress}
+            etherealProgress={etherealProgress}
+            settings={settings}
+          />
+        )}
 
         {/* Item Name */}
         <Tooltip>
@@ -418,6 +420,7 @@ interface GridViewProps {
   className: string | undefined;
   handleKeyDown: (event: React.KeyboardEvent) => void;
   onClick?: () => void;
+  withoutStatusIndicators?: boolean;
 }
 
 /**
@@ -436,6 +439,7 @@ function GridView({
   className,
   handleKeyDown,
   onClick,
+  withoutStatusIndicators = false,
 }: GridViewProps) {
   const { iconUrl, isLoading } = useItemIcon(item);
   const { settings } = useGrailStore();
@@ -459,13 +463,15 @@ function GridView({
           )}
         >
           {/* Status indicators overlay */}
-          <StatusIndicators
-            mostRecentDiscovery={mostRecentDiscovery}
-            item={item}
-            normalProgress={normalProgress}
-            etherealProgress={etherealProgress}
-            settings={settings}
-          />
+          {!withoutStatusIndicators && (
+            <StatusIndicators
+              mostRecentDiscovery={mostRecentDiscovery}
+              item={item}
+              normalProgress={normalProgress}
+              etherealProgress={etherealProgress}
+              settings={settings}
+            />
+          )}
 
           <CardContent className="p-3">
             {/* Item Type Badge */}
@@ -559,6 +565,7 @@ interface ItemCardProps {
   onClick?: () => void;
   className?: string;
   viewMode?: 'grid' | 'list';
+  withoutStatusIndicators?: boolean;
 }
 
 /**
@@ -594,6 +601,7 @@ export const ItemCard = memo(function ItemCard({
   onClick,
   className,
   viewMode = 'grid',
+  withoutStatusIndicators = false,
 }: ItemCardProps) {
   // Calculate discovery metadata for both normal and ethereal versions
   const { allProgress, mostRecentDiscovery } = getDiscoveryMetadata(
@@ -626,6 +634,7 @@ export const ItemCard = memo(function ItemCard({
         className={className}
         handleKeyDown={handleKeyDown}
         onClick={onClick}
+        withoutStatusIndicators={withoutStatusIndicators}
       />
     );
   }
@@ -643,6 +652,7 @@ export const ItemCard = memo(function ItemCard({
       className={className}
       handleKeyDown={handleKeyDown}
       onClick={onClick}
+      withoutStatusIndicators={withoutStatusIndicators}
     />
   );
 });

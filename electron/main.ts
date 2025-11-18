@@ -2,11 +2,17 @@ import { createRequire } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { app, BrowserWindow, type IpcMainEvent, ipcMain, screen, session } from 'electron';
-import { GrailDatabase, grailDatabase } from './database/database';
+import { grailDatabase } from './database/database';
 import { initializeDialogHandlers } from './ipc-handlers/dialogHandlers';
 import { closeGrailDatabase, initializeGrailHandlers } from './ipc-handlers/grailHandlers';
 import { initializeIconHandlers } from './ipc-handlers/iconHandlers';
-import { closeSaveFileMonitor, initializeSaveFileHandlers } from './ipc-handlers/saveFileHandlers';
+import { closeRunTracker, initializeRunTrackerHandlers } from './ipc-handlers/runTrackerHandlers';
+import {
+  closeSaveFileMonitor,
+  eventBus,
+  getRunTracker,
+  initializeSaveFileHandlers,
+} from './ipc-handlers/saveFileHandlers';
 import { initializeShellHandlers } from './ipc-handlers/shellHandlers';
 import { initializeTerrorZoneHandlers } from './ipc-handlers/terrorZoneHandlers';
 import { initializeUpdateHandlers } from './ipc-handlers/updateHandlers';
@@ -51,6 +57,12 @@ process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL
   ? path.join(process.env.APP_ROOT, 'public')
   : RENDERER_DIST;
 
+// Enable Chrome DevTools Protocol (CDP) remote debugging in development only
+if (VITE_DEV_SERVER_URL) {
+  // Default to port 9222; change if needed
+  app.commandLine.appendSwitch('remote-debugging-port', '9222');
+}
+
 /**
  * The main application window instance.
  */
@@ -92,8 +104,7 @@ function createWindow() {
     y: undefined as number | undefined,
   };
   try {
-    const db = new GrailDatabase();
-    const settings = db.getAllSettings();
+    const settings = grailDatabase.getAllSettings();
 
     if (settings.mainWindowBounds) {
       const { x, y, width, height } = settings.mainWindowBounds;
@@ -234,6 +245,19 @@ app.whenReady().then(() => {
   // Initialize grail database and IPC handlers
   initializeGrailHandlers();
   initializeSaveFileHandlers();
+
+  // Initialize run tracker handlers after save file handlers
+  const runTracker = getRunTracker();
+  if (runTracker) {
+    console.log('[main] Run tracker instance found, initializing handlers');
+    initializeRunTrackerHandlers(runTracker, eventBus);
+  } else {
+    console.error(
+      '[main] Failed to get run tracker instance - this may indicate an initialization error',
+    );
+    console.error('[main] Check the logs above for any RunTrackerService creation errors');
+  }
+
   initializeDialogHandlers();
   initializeShellHandlers();
   initializeIconHandlers();
@@ -242,7 +266,7 @@ app.whenReady().then(() => {
 
   // Initialize widget handlers with callbacks for position and size updates
   const onWidgetPositionChange = (position: { x: number; y: number }) => {
-    // Save widget position to database
+    // Save widget position to database using singleton
     try {
       grailDatabase.setSetting('widgetPosition', JSON.stringify(position));
     } catch (error) {
@@ -254,7 +278,7 @@ app.whenReady().then(() => {
   let widgetSizeChangeTimeout: NodeJS.Timeout | null = null;
 
   const onWidgetSizeChange = (
-    display: 'overall' | 'split' | 'all',
+    display: 'overall' | 'split' | 'all' | 'run-only',
     size: { width: number; height: number },
   ) => {
     // Debounce widget size changes to avoid excessive database writes during resize
@@ -264,7 +288,13 @@ app.whenReady().then(() => {
 
     widgetSizeChangeTimeout = setTimeout(() => {
       try {
-        const settingKey = `widgetSize${display.charAt(0).toUpperCase()}${display.slice(1)}` as
+        // 'run-only' mode doesn't have a custom size setting - it always uses the default
+        if (display === 'run-only') {
+          return;
+        }
+        // Convert display type to setting key format
+        const displayKey = display.charAt(0).toUpperCase() + display.slice(1);
+        const settingKey = `widgetSize${displayKey}` as
           | 'widgetSizeOverall'
           | 'widgetSizeSplit'
           | 'widgetSizeAll';
@@ -318,8 +348,7 @@ app.whenReady().then(() => {
 
   // Initialize widget window if enabled in settings
   try {
-    const db = new GrailDatabase();
-    const settings = db.getAllSettings();
+    const settings = grailDatabase.getAllSettings();
     if (settings.widgetEnabled) {
       showWidgetWindow(
         settings,
@@ -339,6 +368,7 @@ app.whenReady().then(() => {
 app.on('before-quit', () => {
   closeGrailDatabase();
   closeSaveFileMonitor();
+  closeRunTracker();
   closeWidgetWindow();
 });
 

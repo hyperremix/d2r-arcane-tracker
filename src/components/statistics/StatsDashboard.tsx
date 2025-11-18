@@ -1,29 +1,12 @@
 import { BarChart3, Clock, Target, TrendingUp, Trophy, Users, Zap } from 'lucide-react';
 import { memo, useMemo } from 'react';
+import { ItemCard } from '@/components/grail/ItemCard';
+import { ProgressBar } from '@/components/grail/ProgressBar';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useProgressLookup } from '@/hooks/useProgressLookup';
+import { formatTimeAgo } from '@/lib/utils';
 import { useGrailStatistics, useGrailStore } from '@/stores/grailStore';
-import { ItemCard } from './ItemCard';
-import { ProgressBar } from './ProgressBar';
-
-/**
- * Formats a date as a relative time string (e.g., "2 days ago", "5 hours ago").
- * @param {Date} date - The date to format
- * @returns {string} A human-readable relative time string
- */
-const formatTimeAgo = (date: Date): string => {
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-  const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-  const diffMinutes = Math.floor(diffMs / (1000 * 60));
-
-  if (diffDays > 0) return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
-  if (diffHours > 0) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
-  if (diffMinutes > 0) return `${diffMinutes} minute${diffMinutes > 1 ? 's' : ''} ago`;
-  return 'Just now';
-};
 
 /**
  * StatsDashboard component that displays comprehensive Holy Grail statistics and analytics.

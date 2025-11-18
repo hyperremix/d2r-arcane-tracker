@@ -16,10 +16,14 @@ export let widgetWindow: BrowserWindow | null = null;
  * Size mapping for different widget display modes.
  * These are the default sizes used when no custom size is saved.
  */
-const SIZE_MAP: Record<'overall' | 'split' | 'all', { width: number; height: number }> = {
+const SIZE_MAP: Record<
+  'overall' | 'split' | 'all' | 'run-only',
+  { width: number; height: number }
+> = {
   overall: { width: 250, height: 250 }, // Single large gauge
   split: { width: 350, height: 250 }, // Two gauges side by side
   all: { width: 300, height: 350 }, // Overall on top, normal+ethereal below
+  'run-only': { width: 270, height: 190 }, // Compact run counter display
 };
 
 /**
@@ -30,7 +34,7 @@ const SIZE_MAP: Record<'overall' | 'split' | 'all', { width: number; height: num
  * @returns The size { width, height } for the display mode
  */
 function getWidgetSize(
-  display: 'overall' | 'split' | 'all',
+  display: 'overall' | 'split' | 'all' | 'run-only',
   settings: Partial<Settings>,
 ): { width: number; height: number } {
   switch (display) {
@@ -40,6 +44,8 @@ function getWidgetSize(
       return settings.widgetSizeSplit || SIZE_MAP.split;
     case 'all':
       return settings.widgetSizeAll || SIZE_MAP.all;
+    case 'run-only':
+      return SIZE_MAP['run-only'];
   }
 }
 
@@ -60,7 +66,7 @@ export function createWidgetWindow(
   rendererDist?: string,
   onPositionChange?: (position: { x: number; y: number }) => void,
   onSizeChange?: (
-    display: 'overall' | 'split' | 'all',
+    display: 'overall' | 'split' | 'all' | 'run-only',
     size: { width: number; height: number },
   ) => void,
 ): BrowserWindow {
@@ -84,10 +90,10 @@ export function createWidgetWindow(
   widgetWindow = new BrowserWindow({
     width: size.width,
     height: size.height,
-    x: position.x,
-    y: position.y,
     minWidth: 150,
     minHeight: 150,
+    x: position.x,
+    y: position.y,
     transparent: true,
     frame: false,
     hasShadow: false,
@@ -105,6 +111,7 @@ export function createWidgetWindow(
       webSecurity: true,
     },
   });
+  widgetWindow.setAlwaysOnTop(true, 'screen-saver');
 
   // Load the widget page
   if (viteDevServerUrl) {
@@ -117,7 +124,31 @@ export function createWidgetWindow(
 
   // Handle window move with snapping
   widgetWindow.on('will-move', (event, newBounds) => {
+    if (!widgetWindow) {
+      return;
+    }
+
     const display = screen.getDisplayNearestPoint({ x: newBounds.x, y: newBounds.y });
+    const { workArea } = display;
+    const currentBounds = widgetWindow.getBounds();
+
+    const snappedToLeft = currentBounds.x === workArea.x;
+    const snappedToRight = currentBounds.x === workArea.x + workArea.width - currentBounds.width;
+    const snappedToTop = currentBounds.y === workArea.y;
+    const snappedToBottom = currentBounds.y === workArea.y + workArea.height - currentBounds.height;
+
+    const movingAwayFromLeft = snappedToLeft && newBounds.x > currentBounds.x;
+    const movingAwayFromRight = snappedToRight && newBounds.x < currentBounds.x;
+    const movingAwayFromTop = snappedToTop && newBounds.y > currentBounds.y;
+    const movingAwayFromBottom = snappedToBottom && newBounds.y < currentBounds.y;
+
+    // When the window is currently snapped to an edge and the user drags away from that edge,
+    // allow the move without applying snapping again. This prevents the widget from feeling
+    // \"stuck\" to the edge.
+    if (movingAwayFromLeft || movingAwayFromRight || movingAwayFromTop || movingAwayFromBottom) {
+      return;
+    }
+
     const snappedPosition = calculateSnapPosition(
       newBounds.x,
       newBounds.y,
@@ -128,7 +159,7 @@ export function createWidgetWindow(
     // Apply snapped position if different
     if (snappedPosition.x !== newBounds.x || snappedPosition.y !== newBounds.y) {
       event.preventDefault();
-      widgetWindow?.setBounds({
+      widgetWindow.setBounds({
         x: snappedPosition.x,
         y: snappedPosition.y,
         width: newBounds.width,
@@ -187,7 +218,7 @@ export function showWidgetWindow(
   rendererDist?: string,
   onPositionChange?: (position: { x: number; y: number }) => void,
   onSizeChange?: (
-    display: 'overall' | 'split' | 'all',
+    display: 'overall' | 'split' | 'all' | 'run-only',
     size: { width: number; height: number },
   ) => void,
 ): void {
@@ -241,11 +272,11 @@ export function getWidgetWindowPosition(): { x: number; y: number } | null {
  * Updates the widget window size based on new display mode.
  * Uses saved size for the mode if available, otherwise uses default SIZE_MAP.
  *
- * @param display - The new display mode ('overall', 'split', or 'all')
+ * @param display - The new display mode ('overall', 'split', 'all', or 'run-only')
  * @param settings - Application settings containing custom sizes
  */
 export function updateWidgetWindowSize(
-  display: 'overall' | 'split' | 'all',
+  display: 'overall' | 'split' | 'all' | 'run-only',
   settings: Partial<Settings>,
 ): void {
   if (widgetWindow) {
@@ -267,7 +298,7 @@ export function updateWidgetWindowSize(
  * @returns The default size for the mode, or null if window doesn't exist
  */
 export function resetWidgetWindowSize(
-  display: 'overall' | 'split' | 'all',
+  display: 'overall' | 'split' | 'all' | 'run-only',
 ): { width: number; height: number } | null {
   if (widgetWindow) {
     const defaultSize = SIZE_MAP[display];

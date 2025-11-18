@@ -21,7 +21,7 @@ import {
 } from '@/components/ui/table';
 import { useItemIcon } from '@/hooks/useItemIcon';
 import { useProgressLookup } from '@/hooks/useProgressLookup';
-import { cn } from '@/lib/utils';
+import { cn, formatDate } from '@/lib/utils';
 import { useGrailStore } from '@/stores/grailStore';
 import { runes } from '../../../electron/items/runes';
 import { RuneImages } from './RuneImages';
@@ -30,18 +30,6 @@ interface ItemDetailsDialogProps {
   itemId: string | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-}
-
-// Helper function to format date for display
-function formatDate(date: Date | undefined): string {
-  if (!date) return 'Never';
-  return new Intl.DateTimeFormat('en-US', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(date);
 }
 
 // Component for item information section

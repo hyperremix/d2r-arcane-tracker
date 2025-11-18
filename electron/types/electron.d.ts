@@ -5,7 +5,11 @@ import type {
   GrailProgress,
   Item,
   MonitoringStatus,
+  Run,
+  RunItem,
+  Session,
   Settings,
+  TerrorZone,
   UpdateInfo,
   UpdateStatus,
 } from './grail'
@@ -321,6 +325,14 @@ export interface ElectronAPI {
       filters?: Array<{ name: string; extensions: string[] }>
       properties?: string[]
     }): Promise<{ canceled: boolean; filePaths?: string[] }>
+
+    /**
+     * Writes content to a file at the specified path.
+     * @param {string} filePath - The file path to write to.
+     * @param {string} content - The content to write.
+     * @returns {Promise<{ success: boolean }>} A promise that resolves with success status.
+     */
+    writeFile(filePath: string, content: string): Promise<{ success: boolean }>
   }
 
   /**
@@ -350,11 +362,11 @@ export interface ElectronAPI {
 
     /**
      * Updates the widget display mode.
-     * @param {'overall' | 'split' | 'all'} display - The new display mode for the widget.
+     * @param {'overall' | 'split' | 'all' | 'run-only'} display - The new display mode for the widget.
      * @param {Partial<Settings>} settings - Application settings containing custom sizes.
      * @returns {Promise<{ success: boolean; error?: string }>} A promise that resolves with a success indicator.
      */
-    updateDisplay(display: 'overall' | 'split' | 'all', settings: Partial<Settings>): Promise<{ success: boolean; error?: string }>
+    updateDisplay(display: 'overall' | 'split' | 'all' | 'run-only', settings: Partial<Settings>): Promise<{ success: boolean; error?: string }>
 
     /**
      * Updates the widget window opacity.
@@ -365,18 +377,18 @@ export interface ElectronAPI {
 
     /**
      * Updates the widget window size.
-     * @param {'overall' | 'split' | 'all'} display - The display mode for the size.
+     * @param {'overall' | 'split' | 'all' | 'run-only'} display - The display mode for the size.
      * @param {{ width: number; height: number }} size - The new size for the widget.
      * @returns {Promise<{ success: boolean; error?: string }>} A promise that resolves with a success indicator.
      */
-    updateSize(display: 'overall' | 'split' | 'all', size: { width: number; height: number }): Promise<{ success: boolean; error?: string }>
+    updateSize(display: 'overall' | 'split' | 'all' | 'run-only', size: { width: number; height: number }): Promise<{ success: boolean; error?: string }>
 
     /**
      * Resets the widget size to default for the current display mode.
-     * @param {'overall' | 'split' | 'all'} display - The display mode to reset size for.
+     * @param {'overall' | 'split' | 'all' | 'run-only'} display - The display mode to reset size for.
      * @returns {Promise<{ success: boolean; size: { width: number; height: number } | null; error?: string }>} A promise that resolves with the default size.
      */
-    resetSize(display: 'overall' | 'split' | 'all'): Promise<{ success: boolean; size: { width: number; height: number } | null; error?: string }>
+    resetSize(display: 'overall' | 'split' | 'all' | 'run-only'): Promise<{ success: boolean; size: { width: number; height: number } | null; error?: string }>
 
     /**
      * Checks if the widget window is currently open.
@@ -419,6 +431,162 @@ export interface ElectronAPI {
      * @returns {Promise<{ success: boolean; error?: string }>} A promise that resolves with a success indicator.
      */
     openExternal(url: string): Promise<{ success: boolean; error?: string }>
+  }
+
+  /**
+   * Run tracker API methods for managing run tracking sessions and runs.
+   */
+  runTracker: {
+    /**
+     * Session Management
+     */
+    /**
+     * Starts a new run tracking session.
+     * @returns {Promise<Session>} A promise that resolves with the created session.
+     */
+    startSession(): Promise<Session>
+
+    /**
+     * Ends the current run tracking session.
+     * @returns {Promise<{ success: boolean }>} A promise that resolves with a success indicator.
+     */
+    endSession(): Promise<{ success: boolean }>
+
+    /**
+     * Archives a session by ID.
+     * @param {string} sessionId - The ID of the session to archive.
+     * @returns {Promise<{ success: boolean }>} A promise that resolves with a success indicator.
+     */
+    archiveSession(sessionId: string): Promise<{ success: boolean }>
+
+    /**
+     * Run Management
+     */
+    /**
+     * Starts a new run within the current session.
+     * @param {string} [characterId] - Optional character ID for the run.
+     * @returns {Promise<Run>} A promise that resolves with the created run.
+     */
+    startRun(characterId?: string): Promise<Run>
+
+    /**
+     * Ends the current run.
+     * @returns {Promise<{ success: boolean }>} A promise that resolves with a success indicator.
+     */
+    endRun(): Promise<{ success: boolean }>
+
+    /**
+     * Pauses the current run.
+     * @returns {Promise<{ success: boolean }>} A promise that resolves with a success indicator.
+     */
+    pauseRun(): Promise<{ success: boolean }>
+
+    /**
+     * Resumes the current run.
+     * @returns {Promise<{ success: boolean }>} A promise that resolves with a success indicator.
+     */
+    resumeRun(): Promise<{ success: boolean }>
+
+    /**
+     * State Queries
+     */
+    /**
+     * Gets the current state of the run tracker.
+     * @returns {Promise<{ isRunning: boolean; isPaused: boolean; activeSession: Session | null; activeRun: Run | null }>} A promise that resolves with the current state.
+     */
+    getState(): Promise<{
+      isRunning: boolean;
+      isPaused: boolean;
+      activeSession: Session | null;
+      activeRun: Run | null;
+    }>
+
+    /**
+     * Gets the currently active session.
+     * @returns {Promise<Session | null>} A promise that resolves with the active session or null.
+     */
+    getActiveSession(): Promise<Session | null>
+
+    /**
+     * Gets the currently active run.
+     * @returns {Promise<Run | null>} A promise that resolves with the active run or null.
+     */
+    getActiveRun(): Promise<Run | null>
+
+    /**
+     * Statistics Queries
+     */
+    /**
+     * Gets all sessions regardless of character.
+     * @param {boolean} includeArchived - Whether to include archived sessions (default: false).
+     * @returns {Promise<Session[]>} A promise that resolves with an array of sessions.
+     */
+    getAllSessions(includeArchived?: boolean): Promise<Session[]>
+
+    /**
+     * Gets a specific session by ID.
+     * @param {string} sessionId - The session ID to retrieve.
+     * @returns {Promise<Session | null>} A promise that resolves with the session or null.
+     */
+    getSessionById(sessionId: string): Promise<Session | null>
+
+    /**
+     * Gets all runs for a specific session.
+     * @param {string} sessionId - The session ID to get runs for.
+     * @returns {Promise<Run[]>} A promise that resolves with an array of runs.
+     */
+    getRunsBySession(sessionId: string): Promise<Run[]>
+
+    /**
+     * Gets all items found during a specific run.
+     * @param {string} runId - The run ID to get items for.
+     * @returns {Promise<RunItem[]>} A promise that resolves with an array of run items.
+     */
+    getRunItems(runId: string): Promise<RunItem[]>
+
+    /**
+     * Gets all items found during a specific session (across all runs).
+     * @param {string} sessionId - The session ID to get items for.
+     * @returns {Promise<RunItem[]>} A promise that resolves with an array of run items.
+     */
+    getSessionItems(sessionId: string): Promise<RunItem[]>
+
+    /**
+     * Statistics Queries
+     */
+    /**
+     * Gets overall run statistics across all sessions.
+     * @returns {Promise<RunStatistics>} A promise that resolves with overall run statistics.
+     */
+    getOverallStatistics(): Promise<RunStatistics>
+
+    /**
+     * Manually adds a run item to a run.
+     * @param {Object} data - The run item data.
+     * @param {string} data.runId - The run ID to add the item to.
+     * @param {string} [data.name] - Optional name for manual entries.
+     * @param {string} [data.grailProgressId] - Optional grail progress ID.
+     * @param {Date} [data.foundTime] - Optional found time (defaults to now).
+     * @returns {Promise<{ success: boolean; runItem: RunItem }>} A promise that resolves with the result.
+     */
+    addRunItem(data: {
+      runId: string
+      name?: string
+      grailProgressId?: string
+      foundTime?: Date
+    }): Promise<{ success: boolean; runItem: RunItem }>
+
+    /**
+     * Gets the currently active session.
+     * @returns {Promise<Session | null>} A promise that resolves with the active session or null.
+     */
+    getActiveSession(): Promise<Session | null>
+
+    /**
+     * Gets the currently active run.
+     * @returns {Promise<Run | null>} A promise that resolves with the active run or null.
+     */
+    getActiveRun(): Promise<Run | null>
   }
 
   /**
