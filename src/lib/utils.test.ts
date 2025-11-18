@@ -123,12 +123,13 @@ describe('When cn function is called', () => {
 
 describe('When isRecentFind function is called', () => {
   beforeEach(() => {
-    // Mock Date.now() to return a fixed timestamp
-    vi.spyOn(Date, 'now').mockReturnValue(new Date('2024-01-15T12:00:00Z').getTime());
+    // Mock system time for Day.js
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2024-01-15T12:00:00Z'));
   });
 
   afterEach(() => {
-    vi.restoreAllMocks();
+    vi.useRealTimers();
   });
 
   describe('If foundDate is undefined', () => {

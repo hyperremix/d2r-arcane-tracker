@@ -23,6 +23,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { formatShortDate } from '@/lib/utils';
 import { useGrailStore } from '@/stores/grailStore';
 
 /**
@@ -344,7 +345,7 @@ export function SaveFileMonitor() {
                     </div>
                   </div>
                   <div className="text-gray-500 dark:text-gray-400">
-                    {new Date(file.lastModified).toLocaleDateString()}
+                    {formatShortDate(file.lastModified)}
                   </div>
                 </div>
               ))}

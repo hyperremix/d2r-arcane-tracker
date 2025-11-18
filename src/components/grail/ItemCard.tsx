@@ -5,7 +5,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useItemIcon } from '@/hooks/useItemIcon';
 import { isEtherealOnly, shouldShowEtherealStatus, shouldShowNormalStatus } from '@/lib/ethereal';
-import { cn, isRecentFind } from '@/lib/utils';
+import { cn, formatShortDate, isRecentFind } from '@/lib/utils';
 import { useGrailStore } from '@/stores/grailStore';
 import { RuneImages } from './RuneImages';
 import { CharacterIcon, ItemTypeIcon, RecentDiscoveryIndicator } from './StatusIcons';
@@ -70,9 +70,7 @@ function DiscoveryInfo({ allProgress, characters }: DiscoveryInfoProps) {
             )}
             <span>{character?.name || 'Unknown'}</span>
             <span className="text-blue-600 text-xs">({isEthProgress ? 'Eth' : 'Normal'})</span>
-            {p.foundDate && (
-              <span className="text-gray-500">• {new Date(p.foundDate).toLocaleDateString()}</span>
-            )}
+            {p.foundDate && <span className="text-gray-500">• {formatShortDate(p.foundDate)}</span>}
           </div>
         );
       })}

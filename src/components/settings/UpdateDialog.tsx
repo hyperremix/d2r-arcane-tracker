@@ -10,6 +10,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { formatShortDate } from '@/lib/utils';
 
 interface UpdateDialogProps {
   open: boolean;
@@ -65,7 +66,7 @@ export function UpdateDialog({
                   Version {updateInfo.version}
                   {updateInfo.releaseDate && (
                     <span className="ml-2 font-normal text-gray-600 dark:text-gray-400">
-                      Released: {new Date(updateInfo.releaseDate).toLocaleDateString()}
+                      Released: {formatShortDate(updateInfo.releaseDate)}
                     </span>
                   )}
                 </p>

@@ -16,7 +16,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { formatDuration } from '@/lib/utils';
+import { formatDuration, formatTimestamp } from '@/lib/utils';
 import { useGrailStore } from '@/stores/grailStore';
 import { useRunTrackerStore } from '@/stores/runTrackerStore';
 
@@ -240,14 +240,15 @@ export function RunList({ runs }: RunListProps) {
     }
   }, []);
 
-  // Format timestamp helper
-  const formatTimestamp = useCallback((date: Date) => {
-    return date.toLocaleTimeString('en-US', {
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-    });
-  }, []);
+  // Format timestamp helper (using Day.js from utils)
+  const formatTimestampCallback = useCallback(
+    (date: Date) => {
+      return formatTimestamp(date);
+    },
+    // formatTimestamp is a pure function, no dependencies needed
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
 
   // Helper function to get item information
   const getItemInfo = useCallback(
@@ -431,7 +432,7 @@ export function RunList({ runs }: RunListProps) {
                                 run={run}
                                 itemsCount={itemsCount}
                                 onViewDetails={openRunDetails}
-                                formatTimestamp={formatTimestamp}
+                                formatTimestamp={formatTimestampCallback}
                               />
                             </div>
                           );
@@ -488,7 +489,7 @@ export function RunList({ runs }: RunListProps) {
                           run={run}
                           itemsCount={itemsCount}
                           onViewDetails={openRunDetails}
-                          formatTimestamp={formatTimestamp}
+                          formatTimestamp={formatTimestampCallback}
                         />
                       );
                     })}
@@ -571,7 +572,7 @@ export function RunList({ runs }: RunListProps) {
           run={selectedRun}
           runItems={selectedRun ? runItems.get(selectedRun.id) || [] : []}
           loading={loading && selectedRun !== null && !runItems.has(selectedRun.id)}
-          formatTimestamp={formatTimestamp}
+          formatTimestamp={formatTimestampCallback}
           getItemInfo={getItemInfo}
           getItemCardData={getItemCardData}
           characters={characters}

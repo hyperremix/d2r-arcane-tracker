@@ -1,3 +1,4 @@
+import dayjs from 'dayjs';
 import { AlertTriangle, Database, Download, Upload } from 'lucide-react';
 import { useCallback, useState } from 'react';
 import {
@@ -43,7 +44,7 @@ export function DatabaseCard() {
       // Show save dialog to let user choose backup location
       const result = await window.electronAPI?.dialog.showSaveDialog({
         title: 'Backup Database',
-        defaultPath: `holy-grail-backup-${new Date().toISOString().split('T')[0]}.db`,
+        defaultPath: `holy-grail-backup-${dayjs().format('YYYY-MM-DD')}.db`,
         filters: [
           { name: 'SQLite Database', extensions: ['db'] },
           { name: 'All Files', extensions: ['*'] },

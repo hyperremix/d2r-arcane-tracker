@@ -1,3 +1,4 @@
+import dayjs from 'dayjs';
 import type { Run, RunItem, Session } from 'electron/types/grail';
 import { CopyIcon, DownloadIcon, EyeIcon, EyeOffIcon } from 'lucide-react';
 import { useCallback, useEffect, useId, useState } from 'react';
@@ -20,7 +21,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { formatDuration } from '@/lib/utils';
+import { formatDate, formatDuration } from '@/lib/utils';
 
 interface ExportDialogProps {
   sessionId: string;
@@ -140,7 +141,7 @@ export function ExportDialog({ sessionId, open, onOpenChange }: ExportDialogProp
       // Show save dialog
       const result = await window.electronAPI?.dialog.showSaveDialog({
         title: 'Export Session Data',
-        defaultPath: `session-${sessionId.slice(0, 8)}-${new Date().toISOString().split('T')[0]}.${format}`,
+        defaultPath: `session-${sessionId.slice(0, 8)}-${dayjs().format('YYYY-MM-DD')}.${format}`,
         filters: [
           { name: `${format.toUpperCase()} Files`, extensions: [format] },
           { name: 'All Files', extensions: ['*'] },
@@ -472,8 +473,8 @@ function formatSessionAsTextSummary(
   lines.push('SESSION INFORMATION');
   lines.push('-'.repeat(20));
   lines.push(`Session ID: ${session.id}`);
-  lines.push(`Start Time: ${session.startTime.toLocaleString()}`);
-  lines.push(`End Time: ${session.endTime?.toLocaleString() || 'N/A'}`);
+  lines.push(`Start Time: ${formatDate(session.startTime)}`);
+  lines.push(`End Time: ${session.endTime ? formatDate(session.endTime) : 'N/A'}`);
   lines.push(`Total Run Time: ${formatDuration(session.totalRunTime)}`);
   lines.push(`Total Session Time: ${formatDuration(session.totalSessionTime)}`);
   lines.push(`Run Count: ${session.runCount}`);
@@ -509,8 +510,8 @@ function formatSessionAsTextSummary(
     runs.forEach((run, index) => {
       lines.push(`${index + 1}. Run #${run.runNumber}`);
       lines.push(`   ID: ${run.id}`);
-      lines.push(`   Start: ${run.startTime.toLocaleString()}`);
-      lines.push(`   End: ${run.endTime?.toLocaleString() || 'N/A'}`);
+      lines.push(`   Start: ${formatDate(run.startTime)}`);
+      lines.push(`   End: ${run.endTime ? formatDate(run.endTime) : 'N/A'}`);
       lines.push(`   Duration: ${run.duration ? formatDuration(run.duration) : 'N/A'}`);
 
       // Show items for this run (if requested)
@@ -519,7 +520,7 @@ function formatSessionAsTextSummary(
         if (runItems.length > 0) {
           lines.push(`   Items Found: ${runItems.length}`);
           runItems.forEach((item) => {
-            lines.push(`     - Item found at ${item.foundTime.toLocaleString()}`);
+            lines.push(`     - Item found at ${formatDate(item.foundTime)}`);
           });
         }
       }
@@ -529,7 +530,7 @@ function formatSessionAsTextSummary(
 
   // Footer
   lines.push('='.repeat(60));
-  lines.push(`Export generated on ${new Date().toLocaleString()}`);
+  lines.push(`Export generated on ${formatDate(new Date())}`);
   lines.push('='.repeat(60));
 
   return lines.join('\n');

@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
-import { formatDuration } from '@/lib/utils';
+import { formatDuration, formatSessionDate } from '@/lib/utils';
 import { useRunTrackerStore } from '@/stores/runTrackerStore';
 import { ExportDialog } from './ExportDialog';
 import { RunList } from './RunList';
@@ -137,15 +137,15 @@ export function SessionDetailView({ sessionId, onBack }: SessionDetailViewProps)
     }
   }, [session]);
 
-  // Format session date
-  const formatSessionDate = useCallback((date: Date) => {
-    return date.toLocaleDateString('en-US', {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-    });
-  }, []);
+  // Format session date (using Day.js from utils)
+  const formatSessionDateCallback = useCallback(
+    (date: Date) => {
+      return formatSessionDate(date);
+    },
+    // formatSessionDate is a pure function, no dependencies needed
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
 
   // Loading state
   if (loading && !session) {
@@ -192,7 +192,9 @@ export function SessionDetailView({ sessionId, onBack }: SessionDetailViewProps)
         </Button>
         <div>
           <h2 className="font-semibold text-xl">Session Details</h2>
-          <p className="text-muted-foreground text-sm">{formatSessionDate(session.startTime)}</p>
+          <p className="text-muted-foreground text-sm">
+            {formatSessionDateCallback(session.startTime)}
+          </p>
         </div>
       </div>
 

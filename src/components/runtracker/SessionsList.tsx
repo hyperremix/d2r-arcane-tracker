@@ -13,7 +13,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { formatDuration } from '@/lib/utils';
+import { formatDuration, formatSessionDateRelative, formatTime } from '@/lib/utils';
 import { useRunTrackerStore } from '@/stores/runTrackerStore';
 
 interface SessionsListProps {
@@ -59,20 +59,8 @@ function SessionTableRow({
       aria-label={`View session from ${sessionDate} details`}
     >
       <TableCell className="font-medium">{sessionDate}</TableCell>
-      <TableCell className="font-mono text-sm">
-        {session.startTime.toLocaleTimeString('en-US', {
-          hour: '2-digit',
-          minute: '2-digit',
-        })}
-      </TableCell>
-      <TableCell className="font-mono text-sm">
-        {session.endTime
-          ? session.endTime.toLocaleTimeString('en-US', {
-              hour: '2-digit',
-              minute: '2-digit',
-            })
-          : '-'}
-      </TableCell>
+      <TableCell className="font-mono text-sm">{formatTime(session.startTime)}</TableCell>
+      <TableCell className="font-mono text-sm">{formatTime(session.endTime)}</TableCell>
       <TableCell className="font-mono text-sm">{formatDuration(duration)}</TableCell>
       <TableCell className="text-center">{session.runCount}</TableCell>
       <TableCell className="text-center">{sessionStats ? sessionStats.itemsFound : 0}</TableCell>
@@ -291,23 +279,6 @@ export function SessionsList({ onSessionSelect }: SessionsListProps) {
     [onSessionSelect],
   );
 
-  // Format session date
-  const formatSessionDate = useCallback((date: Date) => {
-    const now = new Date();
-    const diffTime = now.getTime() - date.getTime();
-    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-
-    if (diffDays === 0) {
-      return 'Today';
-    } else if (diffDays === 1) {
-      return 'Yesterday';
-    } else if (diffDays < 7) {
-      return `${diffDays} days ago`;
-    } else {
-      return date.toLocaleDateString();
-    }
-  }, []);
-
   // Calculate session duration
   const getSessionDuration = useCallback((session: Session) => {
     if (session.endTime) {
@@ -433,7 +404,7 @@ export function SessionsList({ onSessionSelect }: SessionsListProps) {
                     onSessionClick={handleSessionClick}
                     getSessionStats={getSessionStats}
                     getSessionDuration={getSessionDuration}
-                    formatSessionDate={formatSessionDate}
+                    formatSessionDate={formatSessionDateRelative}
                   />
                 ))}
               </TableBody>

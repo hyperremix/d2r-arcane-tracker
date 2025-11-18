@@ -65,6 +65,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
+    "dayjs": "^1.11.19",
     "dompurify": "^3.3.0",
     "electron-updater": "^6.6.2",
     "i18next": "^25.4.2",
