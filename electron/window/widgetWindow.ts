@@ -90,12 +90,10 @@ export function createWidgetWindow(
   widgetWindow = new BrowserWindow({
     width: size.width,
     height: size.height,
-    minWidth: 250,
+    minWidth: 150,
     minHeight: 150,
     x: position.x,
     y: position.y,
-    minWidth: 150,
-    minHeight: 150,
     transparent: true,
     frame: false,
     hasShadow: false,

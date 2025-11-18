@@ -26,7 +26,7 @@ export function initializeWidgetHandlers(
   rendererDist?: string,
   onPositionChange?: (position: { x: number; y: number }) => void,
   onSizeChange?: (
-    display: 'overall' | 'split' | 'all',
+    display: 'overall' | 'split' | 'all' | 'run-only',
     size: { width: number; height: number },
   ) => void,
 ): void {
