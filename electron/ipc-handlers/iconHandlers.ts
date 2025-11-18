@@ -5,12 +5,39 @@ import { iconService } from '../services/iconService';
 import type { Settings } from '../types/grail';
 
 /**
+ * Converts a setting value to a string suitable for database storage.
+ * Handles objects (JSON.stringify), undefined (skip), and primitives (String).
+ * @param value - The setting value to convert
+ * @returns String representation or null if value should be skipped
+ */
+function convertSettingValueToString(value: unknown): string | null {
+  // Skip undefined values - don't save them
+  if (value === undefined) {
+    return null;
+  }
+
+  // Convert complex objects to JSON strings
+  if (typeof value === 'object' && value !== null) {
+    return JSON.stringify(value);
+  }
+
+  // Convert primitives to strings
+  return String(value);
+}
+
+/**
  * Updates multiple settings in the database
  */
 function updateSettings(settings: Partial<Settings>): void {
   for (const key in settings) {
     const settingsKey = key as keyof Settings;
-    grailDatabase.setSetting(settingsKey, String(settings[settingsKey]));
+    const value = settings[settingsKey];
+    const stringValue = convertSettingValueToString(value);
+
+    // Skip if value should not be saved (undefined)
+    if (stringValue !== null) {
+      grailDatabase.setSetting(settingsKey, stringValue);
+    }
   }
 }
 

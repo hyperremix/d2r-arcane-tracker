@@ -821,10 +821,18 @@ class GrailDatabase {
       return undefined;
     }
 
+    // Handle corrupted "[object Object]" strings silently - these are unrecoverable
+    if (jsonString === '[object Object]') {
+      return undefined;
+    }
+
     try {
       return JSON.parse(jsonString);
     } catch {
-      console.warn(`Failed to parse JSON setting: "${jsonString}". Using undefined.`);
+      // Only log if it's not the known corrupted value
+      if (jsonString !== '[object Object]') {
+        console.warn(`Failed to parse JSON setting: "${jsonString}". Using undefined.`);
+      }
       return undefined;
     }
   }
