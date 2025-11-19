@@ -86,7 +86,7 @@ Before using the Terror Zone Configuration feature, ensure you have:
 3. **All Game Files Extracted**: D2R stores files in CASC (Content Addressable Storage Container) format. **All game files must be extracted** for this feature to work (not just individual folders).
 
    **Detailed Extraction Steps:**
-   1. Download [Ladik's CASC Viewer](https://www.zezula.net/en/casc/main.html)
+1. Download [Ladik's CASC Viewer](https://www.hiveworkshop.com/threads/ladiks-casc-viewer.331540/)
    2. Open the x64 version (or appropriate version for your OS)
    3. In CASC Viewer, click "Open Storage"
    4. Select your D2R folder (e.g., `C:\Program Files (x86)\Diablo II Resurrected`)
@@ -324,7 +324,7 @@ Burial Grounds, Crypt, and Mausoleum
 
 - D2R stores game files in CASC (Content Addressable Storage Container) format by default
 - These files cannot be accessed directly without extraction
-- Use [Ladik's CASC Viewer](https://www.zezula.net/en/casc/main.html) to extract all game files
+- Use [Ladik's CASC Viewer](https://www.hiveworkshop.com/threads/ladiks-casc-viewer.331540/) to extract all game files
 - Follow the step-by-step instructions in the [Prerequisites](#prerequisites) section
 - After extraction, the files will be accessible as regular files on disk
 

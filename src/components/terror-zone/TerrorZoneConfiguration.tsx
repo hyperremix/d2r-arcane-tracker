@@ -244,7 +244,7 @@ export function TerrorZoneConfiguration() {
                             <li>
                               Download{' '}
                               <a
-                                href="https://www.zezula.net/en/casc/main.html"
+                                href="https://www.hiveworkshop.com/threads/ladiks-casc-viewer.331540/"
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="underline hover:text-red-950 dark:hover:text-red-50"

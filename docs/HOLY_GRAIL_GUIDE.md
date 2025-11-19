@@ -708,7 +708,7 @@ The tracker can display actual D2R item icons for a more immersive experience. T
 
 D2R stores item icon files in CASC (Content Addressable Storage Container) format. Before you can use item icons in the tracker, these files must be extracted:
 
-1. Download [Ladik's CASC Viewer](https://www.zezula.net/en/casc/main.html)
+1. Download [Ladik's CASC Viewer](https://www.hiveworkshop.com/threads/ladiks-casc-viewer.331540/)
 2. Open the x64 version (or appropriate version for your OS)
 3. In CASC Viewer, click "Open Storage"
 4. Select your D2R folder (e.g., `C:\Program Files (x86)\Diablo II Resurrected`)
@@ -855,7 +855,7 @@ D2R stores game files in CASC (Content Addressable Storage Container) format. **
 
 **Extraction Steps:**
 
-1. Download [Ladik's CASC Viewer](https://www.zezula.net/en/casc/main.html)
+1. Download [Ladik's CASC Viewer](https://www.hiveworkshop.com/threads/ladiks-casc-viewer.331540/)
 2. Open the x64 version (or appropriate version for your OS)
 3. In CASC Viewer, click "Open Storage"
 4. Select your D2R folder (e.g., `C:\Program Files (x86)\Diablo II Resurrected`)
