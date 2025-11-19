@@ -235,8 +235,10 @@ export function TerrorZoneConfiguration() {
                           format.
                           <strong> All game files must be extracted</strong> and D2R must be
                           launched with the{' '}
-                          <code className="rounded bg-red-200 px-1 dark:bg-red-800">-txt</code> flag
-                          for this feature to work.
+                          <code className="rounded bg-red-200 px-1 dark:bg-red-800">
+                            -direct -txt
+                          </code>{' '}
+                          flags for this feature to work.
                         </p>
                         <div className="mt-2">
                           <p className="font-semibold text-sm">Extraction Steps:</p>
@@ -279,7 +281,7 @@ export function TerrorZoneConfiguration() {
                             <li>
                               Create a D2R shortcut and add{' '}
                               <code className="rounded bg-red-200 px-1 text-xs dark:bg-red-800">
-                                -txt
+                                -direct -txt
                               </code>{' '}
                               to the target
                             </li>

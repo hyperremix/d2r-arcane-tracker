@@ -840,12 +840,12 @@ Navigate to the Terror Zone Configuration by clicking the **alert triangle icon*
 #### How It Works
 
 1. **File Extraction**: Extract all game files from CASC archives using Ladik's CASC Viewer
-2. **Launch with `-txt` Flag**: D2R must be launched with the `-txt` flag to use extracted files
+2. **Launch with `-direct -txt` Flags**: D2R must be launched with the `-direct -txt` flags to use extracted files
 3. **File Location**: The feature modifies `{D2R Installation}/Data/hd/global/excel/desecratedzones.json`
 4. **Backup Creation**: On first use, creates an immutable backup in the app's data directory
 5. **Configuration Storage**: Your zone preferences are stored in the app's database
 6. **Game File Modification**: The app writes your selected zones to the game's configuration file
-7. **Restart Required**: Changes take effect after restarting Diablo II: Resurrected with the `-txt` flag
+7. **Restart Required**: Changes take effect after restarting Diablo II: Resurrected with the `-direct -txt` flags
 
 #### Important Considerations
 
@@ -862,7 +862,7 @@ D2R stores game files in CASC (Content Addressable Storage Container) format. **
 5. Click "data" on the left side, then click "data" again and click "Extract"
 6. Wait for ~40GB extraction (global, hd, local folders)
 7. Move the 3 extracted folders to `C:\Program Files (x86)\Diablo II Resurrected\Data` (top-most Data folder)
-8. Create a D2R shortcut and add `-txt` to the target (e.g., `"D2R.exe" -txt`)
+8. Create a D2R shortcut and add `-direct -txt` to the target (e.g., `"D2R.exe" -direct -txt`)
 9. Always launch D2R using this shortcut
 
 - See the [Terror Zone Configuration Guide](TERROR_ZONE_CONFIGURATION.md) for complete detailed instructions

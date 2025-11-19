@@ -95,12 +95,12 @@ Before using the Terror Zone Configuration feature, ensure you have:
    7. Wait for extraction to complete (~40GB of data: global, hd, and local folders will be extracted to a work folder in CascView.exe's current location)
    8. Once finished, move these 3 folders (global, hd, local) to `C:\Program Files (x86)\Diablo II Resurrected\Data`
    9. **Important**: Place these folders in the top-most Data folder (there's another data folder inside, but use the top-most one)
-4. **Launch D2R with `-txt` Flag**: For D2R to use the extracted files:
+4. **Launch D2R with `-direct -txt` Flags**: For D2R to use the extracted files:
    - Create a shortcut to your D2R executable (`D2R.exe`)
    - Right-click the shortcut and select "Properties"
-   - In the "Target" field, add `-txt` at the end (e.g., `"C:\Program Files (x86)\Diablo II Resurrected\D2R.exe" -txt`)
+   - In the "Target" field, add `-direct -txt` at the end (e.g., `"C:\Program Files (x86)\Diablo II Resurrected\D2R.exe" -direct -txt`)
    - Always launch D2R using this shortcut for terror zone modifications to take effect
-   - Without the `-txt` flag, D2R will ignore the extracted files and use CASC archives
+   - Without the `-direct -txt` flags, D2R will ignore the extracted files and use CASC archives
 5. **Write Permissions**: The app needs to modify files in your D2R installation directory
 6. **D2R Closed**: Always ensure D2R is completely closed before making changes
 
@@ -331,9 +331,9 @@ Burial Grounds, Crypt, and Mausoleum
 **"Changes not taking effect in game":**
 
 - Ensure you've extracted **all game files**, not just individual folders
-- Verify you're launching D2R with the `-txt` flag (see [Prerequisites](#prerequisites))
-- Without the `-txt` flag, D2R ignores extracted files and uses CASC archives
-- Create a shortcut with the `-txt` flag and always launch D2R using that shortcut
+- Verify you're launching D2R with the `-direct -txt` flags (see [Prerequisites](#prerequisites))
+- Without the `-direct -txt` flags, D2R ignores extracted files and uses CASC archives
+- Create a shortcut with the `-direct -txt` flags and always launch D2R using that shortcut
 - Restart D2R completely after making changes
 
 **"Invalid desecratedzones.json file structure":**
