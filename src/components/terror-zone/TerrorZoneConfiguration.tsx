@@ -1,5 +1,5 @@
 import type { TerrorZone } from 'electron/types/grail';
-import { AlertCircle, AlertTriangle, CheckCircle, RotateCcw, Search, XCircle } from 'lucide-react';
+import { AlertCircle, AlertTriangle, RotateCcw, Search, XCircle } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import {
@@ -14,7 +14,6 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
@@ -167,8 +166,10 @@ export function TerrorZoneConfiguration() {
       zone.id.toString().includes(searchTerm),
   );
 
-  // Count enabled zones
-  const enabledCount = Object.values(config).filter(Boolean).length;
+  // Count enabled zones (default to enabled when config flag is undefined)
+  const enabledCount = zones.reduce((count, zone) => {
+    return (config[zone.id] ?? true) ? count + 1 : count;
+  }, 0);
   const totalCount = zones.length;
 
   if (isLoading) {
@@ -218,14 +219,7 @@ export function TerrorZoneConfiguration() {
               </Alert>
 
               {/* Validation Status */}
-              {validationStatus.valid ? (
-                <Alert className="border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950">
-                  <CheckCircle className="h-4 w-4 text-green-600" />
-                  <AlertDescription className="text-green-800 dark:text-green-200">
-                    D2R installation path is valid. Game file found at: {validationStatus.path}
-                  </AlertDescription>
-                </Alert>
-              ) : (
+              {!validationStatus.valid && (
                 <Alert className="border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950">
                   <AlertCircle className="h-4 w-4 text-red-600" />
                   <AlertTitle className="font-bold text-red-800 dark:text-red-200">
@@ -359,56 +353,19 @@ export function TerrorZoneConfiguration() {
               </div>
 
               {/* Zone List */}
-              <div className="space-y-2">
+              <div className="grid grid-cols-2 gap-4 lg:grid-cols-3 xl:grid-cols-4">
                 {filteredZones.map((zone) => (
-                  <Card key={zone.id} className="border-l-4 border-l-blue-500">
-                    <CardContent className="p-4">
-                      <div className="flex items-center justify-between">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2">
-                            <Label htmlFor={`zone-${zone.id}`} className="font-medium">
-                              {zone.name}
-                            </Label>
-                            <span className="text-muted-foreground text-xs">(ID: {zone.id})</span>
-                          </div>
-                          <div className="mt-1 text-muted-foreground text-xs">
-                            {zone.levels.length} level{zone.levels.length !== 1 ? 's' : ''}
-                          </div>
-                        </div>
-                        <Switch
-                          id={`zone-${zone.id}`}
-                          checked={config[zone.id] ?? true}
-                          onCheckedChange={(checked) => handleZoneToggle(zone.id, checked)}
-                          disabled={isSaving || !validationStatus.valid}
-                        />
-                      </div>
-
-                      {/* Collapsible Level Details */}
-                      {zone.levels.length > 0 && (
-                        <Collapsible>
-                          <CollapsibleTrigger asChild>
-                            <Button variant="ghost" size="sm" className="mt-2 h-6 px-2 text-xs">
-                              Show Levels
-                            </Button>
-                          </CollapsibleTrigger>
-                          <CollapsibleContent className="mt-2">
-                            <div className="space-y-1 text-muted-foreground text-xs">
-                              {zone.levels.map((level) => (
-                                <div key={level.level_id} className="flex items-center gap-2">
-                                  <span>Level {level.level_id}</span>
-                                  {level.waypoint_level_id && (
-                                    <span className="text-blue-600">
-                                      (WP: {level.waypoint_level_id})
-                                    </span>
-                                  )}
-                                </div>
-                              ))}
-                            </div>
-                          </CollapsibleContent>
-                        </Collapsible>
-                      )}
-                    </CardContent>
-                  </Card>
+                  <div key={zone.id} className="flex flex-1 items-center gap-4">
+                    <Switch
+                      id={`zone-${zone.id}`}
+                      checked={config[zone.id] ?? true}
+                      onCheckedChange={(checked) => handleZoneToggle(zone.id, checked)}
+                      disabled={isSaving || !validationStatus.valid}
+                    />
+                    <Label htmlFor={`zone-${zone.id}`} className="font-medium">
+                      {zone.name}
+                    </Label>
+                  </div>
                 ))}
               </div>
 

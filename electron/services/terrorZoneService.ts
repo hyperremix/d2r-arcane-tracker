@@ -2,6 +2,7 @@ import { copyFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { app } from 'electron';
 import { TERROR_ZONE_NAMES } from '../data/terrorZoneNames';
+import { stripJsonComments } from '../lib/jsonUtils';
 import type { TerrorZone } from '../types/grail';
 
 /**
@@ -56,14 +57,26 @@ export class TerrorZoneService {
    * @param filePath - Path to the desecratedzones.json file
    * @returns Promise resolving to array of terror zones
    */
-  async readZonesFromFile(filePath: string): Promise<TerrorZone[]> {
+  async readZonesFromFile(
+    filePath: string,
+    options: { preferBackup?: boolean } = {},
+  ): Promise<TerrorZone[]> {
     try {
       if (!existsSync(filePath)) {
         throw new Error('Game file does not exist');
       }
 
-      const fileContent = readFileSync(filePath, 'utf-8');
-      const data = JSON.parse(fileContent);
+      const preferBackup = options.preferBackup ?? false;
+
+      // Ensure a backup exists before we potentially rely on it
+      if (!this.backupExists()) {
+        await this.createBackup(filePath);
+      }
+
+      const sourcePath = preferBackup && this.backupExists() ? this.getBackupPath() : filePath;
+
+      const fileContent = readFileSync(sourcePath, 'utf-8');
+      const data = JSON.parse(stripJsonComments(fileContent));
 
       if (
         !data.desecrated_zones ||
@@ -111,7 +124,7 @@ export class TerrorZoneService {
       }
 
       const fileContent = readFileSync(filePath, 'utf-8');
-      const data = JSON.parse(fileContent);
+      const data = JSON.parse(stripJsonComments(fileContent));
 
       if (
         !data.desecrated_zones ||
@@ -181,16 +194,28 @@ export class TerrorZoneService {
         return { valid: false, error: 'desecratedzones.json file not found in D2R installation' };
       }
 
+      // Create backup before parsing if it doesn't exist
+      if (!this.backupExists()) {
+        await this.createBackup(gameFilePath);
+      }
+
       // Try to read and parse the file to ensure it's valid
       try {
         const fileContent = readFileSync(gameFilePath, 'utf-8');
-        const data = JSON.parse(fileContent);
+        const strippedContent = stripJsonComments(fileContent);
+        const data = JSON.parse(strippedContent);
 
         if (!data.desecrated_zones || !Array.isArray(data.desecrated_zones)) {
           return { valid: false, error: 'Invalid desecratedzones.json file structure' };
         }
-      } catch (_parseError) {
-        return { valid: false, error: 'desecratedzones.json file is corrupted or invalid' };
+      } catch (parseError) {
+        console.error('Failed to parse desecratedzones.json:', parseError);
+        const errorMessage =
+          parseError instanceof Error ? parseError.message : 'Unknown parsing error';
+        return {
+          valid: false,
+          error: `desecratedzones.json file is corrupted or invalid: ${errorMessage}`,
+        };
       }
 
       return { valid: true, path: gameFilePath };

@@ -29,7 +29,7 @@ export function initializeTerrorZoneHandlers(): void {
       }
 
       const gameFilePath = terrorZoneService.getGameDataPath(d2rInstallPath);
-      return await terrorZoneService.readZonesFromFile(gameFilePath);
+      return await terrorZoneService.readZonesFromFile(gameFilePath, { preferBackup: true });
     } catch (error) {
       console.error('Failed to get terror zones:', error);
       throw error;
@@ -85,7 +85,9 @@ export function initializeTerrorZoneHandlers(): void {
         }
 
         // Read current zones from file
-        const zones = await terrorZoneService.readZonesFromFile(gameFilePath);
+        const zones = await terrorZoneService.readZonesFromFile(gameFilePath, {
+          preferBackup: true,
+        });
 
         // Convert config to Set of enabled zone IDs
         const enabledZoneIds = new Set<number>();
