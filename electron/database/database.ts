@@ -761,7 +761,7 @@ class GrailDatabase {
       widgetEnabled: this.parseBooleanSetting(settings.widgetEnabled),
       widgetDisplay: this.parseEnumSetting(settings.widgetDisplay, 'overall' as const),
       widgetPosition: this.parseJSONSetting<{ x: number; y: number }>(settings.widgetPosition),
-      widgetOpacity: this.parseFloatSetting(settings.widgetOpacity, 0.9) || 0.9,
+      widgetOpacity: this.parseFloatSetting(settings.widgetOpacity, 0.9) ?? 0.9,
       widgetSizeOverall: this.parseJSONSetting<{ width: number; height: number }>(
         settings.widgetSizeOverall,
       ),
