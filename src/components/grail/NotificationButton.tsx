@@ -129,11 +129,11 @@ export function NotificationButton() {
 
   const showBatchNotification = useCallback(
     (events: ItemDetectionEvent[]) => {
-      const itemNames = events.map((e) => e.item.name).join(', ');
+      const itemNames = events.map((e) => e.grailItem.name).join(', ');
       const notification = new Notification(`${events.length} Holy Grail Items Found!`, {
         body:
           itemNames.length > 100
-            ? `${events.length} items including ${events[0].item.name}...`
+            ? `${events.length} items including ${events[0].grailItem.name}...`
             : itemNames,
         icon: iconPath,
         tag: 'grail-batch',
