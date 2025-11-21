@@ -1,4 +1,5 @@
 import { ipcMain, webContents } from 'electron';
+import type { GrailDatabase } from '../database/database';
 import { grailDatabase } from '../database/database';
 import { DatabaseBatchWriter } from '../services/DatabaseBatchWriter';
 import { EventBus } from '../services/EventBus';
@@ -43,8 +44,13 @@ const eventUnsubscribers: Array<() => void> = [];
  * @param level - Level of the character (used when creating new character)
  * @returns Character object or null if creation fails
  */
-function findOrCreateCharacter(characterName: string, level: number) {
-  let character = grailDatabase.getCharacterByName(characterName);
+function findOrCreateCharacter(
+  characterName: string,
+  level: number,
+  database: GrailDatabase,
+  writer: DatabaseBatchWriter,
+) {
+  let character = database.getCharacterByName(characterName);
 
   if (!character) {
     const characterId = `char_${characterName}_${Date.now()}`;
@@ -66,7 +72,7 @@ function findOrCreateCharacter(characterName: string, level: number) {
     };
 
     // Queue character creation for batch write
-    batchWriter.queueCharacter(character);
+    writer.queueCharacter(character);
     console.log(`Queued new character for batch write: ${characterName}`);
   }
 
@@ -135,18 +141,39 @@ function emitGrailProgressUpdate(
   }
 }
 
+export type HandleAutomaticGrailProgressDependencies = {
+  database?: GrailDatabase;
+  batchWriter?: DatabaseBatchWriter;
+  eventBus?: EventBus;
+  runTracker?: RunTrackerService;
+};
+
 /**
  * Handles automatic grail progress updates when items are detected.
  * Creates or updates character information and grail progress entries.
  * Emits events to renderer processes for first-time global discoveries.
  * @param event - Item detection event containing the found item
+ * @param dependencies - Optional dependency overrides (for testing)
  */
-function handleAutomaticGrailProgress(event: ItemDetectionEvent): void {
+export function handleAutomaticGrailProgress(
+  event: ItemDetectionEvent,
+  dependencies: HandleAutomaticGrailProgressDependencies = {},
+): void {
+  const currentDatabase = dependencies.database ?? grailDatabase;
+  const currentBatchWriter = dependencies.batchWriter ?? batchWriter;
+  const currentEventBus = dependencies.eventBus ?? eventBus;
+  const currentRunTracker = dependencies.runTracker ?? runTracker;
+
   try {
     if (!event.item) return;
 
     const characterName = event.item.characterName;
-    const character = findOrCreateCharacter(characterName, event.item.level);
+    const character = findOrCreateCharacter(
+      characterName,
+      event.item.level,
+      currentDatabase,
+      currentBatchWriter,
+    );
 
     if (!character) {
       console.error('Failed to create or find character:', characterName);
@@ -154,12 +181,12 @@ function handleAutomaticGrailProgress(event: ItemDetectionEvent): void {
     }
 
     // Check if this is a first-time global discovery
-    const existingGlobalProgress = grailDatabase.getProgressByItem(event.grailItem.id);
+    const existingGlobalProgress = currentDatabase.getProgressByItem(event.grailItem.id);
     const isFirstTimeDiscovery = !existingGlobalProgress;
 
     // Create grail progress entry and queue for batch write
     const grailProgress = createGrailProgress(character, event);
-    batchWriter.queueProgress(grailProgress);
+    currentBatchWriter.queueProgress(grailProgress);
     const matchingPersistedProgress = findMatchingProgressForCharacter(
       existingGlobalProgress,
       grailProgress,
@@ -167,12 +194,8 @@ function handleAutomaticGrailProgress(event: ItemDetectionEvent): void {
 
     // Check for active run and associate item if found
     try {
-      const activeRun = runTracker?.getActiveRun();
+      const activeRun = currentRunTracker?.getActiveRun();
       if (activeRun && !event.silent) {
-        if (!matchingPersistedProgress) {
-          batchWriter.flush();
-        }
-
         const runItem: RunItem = {
           id: `run_item_${activeRun.id}_${grailProgress.id}`,
           runId: activeRun.id,
@@ -180,10 +203,13 @@ function handleAutomaticGrailProgress(event: ItemDetectionEvent): void {
           foundTime: new Date(),
           created: new Date(),
         };
-        grailDatabase.addRunItem(runItem);
+
+        // Queue run item for batch write (will be flushed with progress)
+        // This ensures correct order: Progress -> RunItem
+        currentBatchWriter.queueRunItem(runItem);
 
         // Emit event for UI updates
-        eventBus.emit('run-item-added', {
+        currentEventBus.emit('run-item-added', {
           runId: activeRun.id,
           grailProgress,
           item: event.item,

@@ -89,6 +89,7 @@ vi.mock('../services/DatabaseBatchWriter', () => {
   const mockInstance = {
     queueCharacter: vi.fn(),
     queueProgress: vi.fn(),
+    queueRunItem: vi.fn(),
     flush: vi.fn(),
     clear: vi.fn(),
     getCharacterQueueSize: vi.fn(),
@@ -213,6 +214,7 @@ interface MockEventBus {
 interface MockDatabaseBatchWriter {
   queueCharacter: ReturnType<typeof vi.fn>;
   queueProgress: ReturnType<typeof vi.fn>;
+  queueRunItem: ReturnType<typeof vi.fn>;
   flush: ReturnType<typeof vi.fn>;
   clear: ReturnType<typeof vi.fn>;
   getCharacterQueueSize: ReturnType<typeof vi.fn>;
@@ -616,7 +618,7 @@ describe('When saveFileHandlers is used', () => {
       expect(mockBatchWriter.queueProgress).toHaveBeenCalled();
     });
 
-    it('Then should flush progress before associating new finds with active runs', () => {
+    it('Then should queue progress and run items for new finds during active runs', () => {
       // Arrange
       const d2sItem = D2SItemBuilder.new()
         .withId('test-item')
@@ -662,17 +664,19 @@ describe('When saveFileHandlers is used', () => {
       mockEventBus.emit('item-detection', mockEvent);
 
       // Assert
-      expect(mockBatchWriter.flush).toHaveBeenCalled();
+      expect(mockBatchWriter.queueProgress).toHaveBeenCalled();
       const queuedProgress = mockBatchWriter.queueProgress.mock.calls[0][0];
-      expect(grailDatabase.addRunItem).toHaveBeenCalledWith(
+      expect(mockBatchWriter.queueRunItem).toHaveBeenCalledWith(
         expect.objectContaining({
           grailProgressId: queuedProgress.id,
           runId: activeRun.id,
         }),
       );
+      expect(mockBatchWriter.flush).not.toHaveBeenCalled();
+      expect(grailDatabase.addRunItem).not.toHaveBeenCalled();
     });
 
-    it('Then should reuse existing progress when associating duplicate finds with runs', () => {
+    it('Then should reuse persisted progress when associating duplicate finds with runs', () => {
       // Arrange
       const d2sItem = D2SItemBuilder.new()
         .withId('test-item')
@@ -725,12 +729,13 @@ describe('When saveFileHandlers is used', () => {
 
       // Assert
       expect(mockBatchWriter.flush).not.toHaveBeenCalled();
-      expect(grailDatabase.addRunItem).toHaveBeenCalledWith(
+      expect(mockBatchWriter.queueRunItem).toHaveBeenCalledWith(
         expect.objectContaining({
           grailProgressId: persistedProgress.id,
           runId: activeRun.id,
         }),
       );
+      expect(grailDatabase.addRunItem).not.toHaveBeenCalled();
     });
   });
 
