@@ -223,6 +223,10 @@ export function handleAutomaticGrailProgress(
       // Don't throw - grail progress is already saved, run association is secondary
     }
 
+    // Flush the batch writer to ensure items are persisted before UI updates
+    // This is critical because the UI will query the database immediately
+    currentBatchWriter.flush();
+
     // Log and notify about the discovery (synchronous - don't delay user feedback)
     if (isFirstTimeDiscovery) {
       console.log(`🎉 NEW GRAIL ITEM: ${event.item.name} found by ${characterName}`);
