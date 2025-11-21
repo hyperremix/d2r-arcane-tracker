@@ -1,17 +1,19 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CharacterBuilder, GrailProgressBuilder } from '@/fixtures';
-import type { Character, GrailProgress } from '../types/grail';
+import type { Character, GrailProgress, RunItem } from '../types/grail';
 import { DatabaseBatchWriter } from './DatabaseBatchWriter';
 
 // Mock database interface
 interface MockGrailDatabase {
   upsertCharactersBatch: ReturnType<typeof vi.fn>;
   upsertProgressBatch: ReturnType<typeof vi.fn>;
+  addRunItemsBatch: ReturnType<typeof vi.fn>;
 }
 
 const createMockDatabase = (): MockGrailDatabase => ({
   upsertCharactersBatch: vi.fn(),
   upsertProgressBatch: vi.fn(),
+  addRunItemsBatch: vi.fn(),
 });
 
 describe('When DatabaseBatchWriter is used', () => {
@@ -119,6 +121,73 @@ describe('When DatabaseBatchWriter is used', () => {
     });
   });
 
+  describe('If queueRunItem is called', () => {
+    it('Then should add run item to queue', () => {
+      // Arrange
+      const runItem: RunItem = {
+        id: 'run-item-1',
+        runId: 'run-1',
+        grailProgressId: 'prog-1',
+        foundTime: new Date(),
+        created: new Date(),
+      };
+
+      // Act
+      batchWriter.queueRunItem(runItem);
+
+      // Assert
+      expect(batchWriter.getRunItemQueueSize()).toBe(1);
+    });
+
+    it('Then should deduplicate run items by ID', () => {
+      // Arrange
+      const runItem1: RunItem = {
+        id: 'run-item-1',
+        runId: 'run-1',
+        grailProgressId: 'prog-1',
+        foundTime: new Date(),
+        created: new Date(),
+      };
+      const runItem2: RunItem = {
+        id: 'run-item-1',
+        runId: 'run-1',
+        grailProgressId: 'prog-1',
+        foundTime: new Date(),
+        created: new Date(),
+      };
+
+      // Act
+      batchWriter.queueRunItem(runItem1);
+      batchWriter.queueRunItem(runItem2);
+
+      // Assert
+      expect(batchWriter.getRunItemQueueSize()).toBe(1);
+    });
+
+    it('Then should schedule flush after delay', () => {
+      // Arrange
+      const runItem: RunItem = {
+        id: 'run-item-1',
+        runId: 'run-1',
+        grailProgressId: 'prog-1',
+        foundTime: new Date(),
+        created: new Date(),
+      };
+
+      // Act
+      batchWriter.queueRunItem(runItem);
+
+      // Assert - flush not called yet
+      expect(mockDatabase.addRunItemsBatch).not.toHaveBeenCalled();
+
+      // Fast-forward time
+      vi.advanceTimersByTime(100);
+
+      // Assert - flush should be called
+      expect(mockDatabase.addRunItemsBatch).toHaveBeenCalledWith([runItem]);
+    });
+  });
+
   describe('If queue size exceeds threshold', () => {
     it('Then should flush immediately', () => {
       // Arrange
@@ -160,6 +229,29 @@ describe('When DatabaseBatchWriter is used', () => {
       expect(mockDatabase.upsertCharactersBatch).toHaveBeenCalled();
       expect(mockDatabase.upsertProgressBatch).toHaveBeenCalled();
     });
+
+    it('Then should flush when run items exceed threshold', () => {
+      // Arrange
+      const runItems: RunItem[] = [];
+      for (let i = 0; i < 51; i++) {
+        runItems.push({
+          id: `run-item-${i}`,
+          runId: 'run-1',
+          grailProgressId: 'prog-1',
+          foundTime: new Date(),
+          created: new Date(),
+        });
+      }
+
+      // Act
+      for (const item of runItems) {
+        batchWriter.queueRunItem(item);
+      }
+
+      // Assert
+      expect(mockDatabase.addRunItemsBatch).toHaveBeenCalled();
+      expect(batchWriter.getRunItemQueueSize()).toBe(1);
+    });
   });
 
   describe('If flush is called manually', () => {
@@ -178,6 +270,7 @@ describe('When DatabaseBatchWriter is used', () => {
       expect(mockDatabase.upsertProgressBatch).toHaveBeenCalledWith([progress]);
       expect(batchWriter.getCharacterQueueSize()).toBe(0);
       expect(batchWriter.getProgressQueueSize()).toBe(0);
+      expect(batchWriter.getRunItemQueueSize()).toBe(0);
     });
 
     it('Then should cancel pending flush timer', () => {
@@ -255,6 +348,7 @@ describe('When DatabaseBatchWriter is used', () => {
       // Assert
       expect(batchWriter.getCharacterQueueSize()).toBe(0);
       expect(batchWriter.getProgressQueueSize()).toBe(0);
+      expect(batchWriter.getRunItemQueueSize()).toBe(0);
 
       // Fast-forward time - no flush should occur
       vi.advanceTimersByTime(200);
@@ -292,6 +386,32 @@ describe('When DatabaseBatchWriter is used', () => {
       expect(mockDatabase.upsertProgressBatch).toHaveBeenCalledTimes(1);
       expect(mockDatabase.upsertProgressBatch).toHaveBeenCalledWith(progressList);
     });
+
+    it('Then should flush run items after progress', () => {
+      // Arrange
+      const progress = GrailProgressBuilder.new().withId('prog-1').build();
+      const runItem: RunItem = {
+        id: 'run-item-1',
+        runId: 'run-1',
+        grailProgressId: 'prog-1',
+        foundTime: new Date(),
+        created: new Date(),
+      };
+
+      // Act
+      batchWriter.queueProgress(progress);
+      batchWriter.queueRunItem(runItem);
+      batchWriter.flush();
+
+      // Assert
+      expect(mockDatabase.upsertProgressBatch).toHaveBeenCalledWith([progress]);
+      expect(mockDatabase.addRunItemsBatch).toHaveBeenCalledWith([runItem]);
+
+      // Verify order: progress must be called before run items
+      const progressCallOrder = mockDatabase.upsertProgressBatch.mock.invocationCallOrder[0];
+      const runItemsCallOrder = mockDatabase.addRunItemsBatch.mock.invocationCallOrder[0];
+      expect(progressCallOrder).toBeLessThan(runItemsCallOrder);
+    });
   });
 
   describe('If flush is called with only characters queued', () => {
@@ -321,6 +441,29 @@ describe('When DatabaseBatchWriter is used', () => {
       // Assert
       expect(mockDatabase.upsertProgressBatch).toHaveBeenCalledWith([progress]);
       expect(mockDatabase.upsertCharactersBatch).not.toHaveBeenCalled();
+      expect(mockDatabase.addRunItemsBatch).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('If flush is called with only run items queued', () => {
+    it('Then should flush only run items', () => {
+      // Arrange
+      const runItem: RunItem = {
+        id: 'run-item-1',
+        runId: 'run-1',
+        grailProgressId: 'prog-1',
+        foundTime: new Date(),
+        created: new Date(),
+      };
+      batchWriter.queueRunItem(runItem);
+
+      // Act
+      batchWriter.flush();
+
+      // Assert
+      expect(mockDatabase.addRunItemsBatch).toHaveBeenCalledWith([runItem]);
+      expect(mockDatabase.upsertCharactersBatch).not.toHaveBeenCalled();
+      expect(mockDatabase.upsertProgressBatch).not.toHaveBeenCalled();
     });
   });
 
@@ -351,6 +494,33 @@ describe('When DatabaseBatchWriter is used', () => {
 
       // Assert
       expect(batchWriter.getProgressQueueSize()).toBe(2);
+    });
+  });
+
+  describe('If getRunItemQueueSize is called', () => {
+    it('Then should return correct queue size', () => {
+      // Arrange
+      const runItem1: RunItem = {
+        id: 'run-item-1',
+        runId: 'run-1',
+        grailProgressId: 'prog-1',
+        foundTime: new Date(),
+        created: new Date(),
+      };
+      const runItem2: RunItem = {
+        id: 'run-item-2',
+        runId: 'run-1',
+        grailProgressId: 'prog-1',
+        foundTime: new Date(),
+        created: new Date(),
+      };
+
+      // Act
+      batchWriter.queueRunItem(runItem1);
+      batchWriter.queueRunItem(runItem2);
+
+      // Assert
+      expect(batchWriter.getRunItemQueueSize()).toBe(2);
     });
   });
 });
