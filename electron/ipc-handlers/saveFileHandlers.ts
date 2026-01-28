@@ -41,9 +41,14 @@ const eventUnsubscribers: Array<() => void> = [];
  * Finds or creates a character by name.
  * @param characterName - Name of the character to find or create
  * @param level - Level of the character (used when creating new character)
+ * @param characterClass - Optional character class to use when creating new character
  * @returns Character object or null if creation fails
  */
-function findOrCreateCharacter(characterName: string, level: number) {
+function findOrCreateCharacter(
+  characterName: string,
+  level: number,
+  characterClass?: CharacterClass,
+) {
   let character = grailDatabase.getCharacterByName(characterName);
 
   if (!character) {
@@ -51,7 +56,7 @@ function findOrCreateCharacter(characterName: string, level: number) {
     // Determine if this is a shared stash based on the character name
     const isSharedStash =
       characterName === 'Shared Stash Softcore' || characterName === 'Shared Stash Hardcore';
-    const defaultCharacterClass = isSharedStash ? 'shared_stash' : 'barbarian';
+    const defaultCharacterClass = isSharedStash ? 'shared_stash' : characterClass || 'barbarian';
 
     character = {
       id: characterId,
@@ -146,7 +151,11 @@ function handleAutomaticGrailProgress(event: ItemDetectionEvent): void {
     if (!event.item) return;
 
     const characterName = event.item.characterName;
-    const character = findOrCreateCharacter(characterName, event.item.level);
+    const character = findOrCreateCharacter(
+      characterName,
+      event.item.level,
+      event.item.characterClass,
+    );
 
     if (!character) {
       console.error('Failed to create or find character:', characterName);
