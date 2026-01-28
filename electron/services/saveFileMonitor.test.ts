@@ -50,6 +50,12 @@ vi.mock('electron', () => ({
 vi.mock('../items/indexes', () => ({
   getItemIdForD2SItem: vi.fn(),
   isRuneId: vi.fn(),
+  runewordsByNameSimple: {
+    lore: { id: 'lore', name: 'Lore' },
+    enigma: { id: 'enigma', name: 'Enigma' },
+    beast: { id: 'beast', name: 'Beast' },
+    infinity: { id: 'infinity', name: 'Infinity' },
+  },
 }));
 
 // Mock utils
@@ -927,6 +933,142 @@ describe('When SaveFileMonitor is used', () => {
         // Assert
         expect(result).toBe('MyCharacter'); // Hardcore parameter only applies to .d2i files
       });
+    });
+  });
+
+  describe('When runeword parsing validates names', () => {
+    let monitor: SaveFileMonitor;
+    let mockDatabase: MockGrailDatabase;
+    let eventBus: EventBus;
+
+    beforeEach(() => {
+      vi.clearAllMocks();
+
+      // Setup simplifyItemName to return lowercase with no spaces
+      vi.mocked(simplifyItemName).mockImplementation((name: string) =>
+        name.toLowerCase().replace(/[^a-z0-9]/gi, ''),
+      );
+
+      eventBus = new EventBus();
+      mockDatabase = createMockDatabase();
+      mockDatabase.getAllSettings.mockReturnValue({
+        gameMode: GameMode.Softcore,
+        saveDir: '/test/saves',
+      });
+      monitor = new SaveFileMonitor(eventBus, mockDatabase as any);
+    });
+
+    it('Then should accept valid runeword names from known runewords', async () => {
+      // Arrange
+      vi.mocked(d2s.read).mockResolvedValue({
+        header: {
+          status: {
+            hardcore: false,
+          },
+        },
+        items: [
+          {
+            runeword_name: 'Enigma',
+            type: 'armor',
+          },
+        ],
+        merc_items: [],
+        corpse_items: [],
+      } as any);
+
+      // Act
+      const items = await (monitor as any).parseSave('TestChar', Buffer.from('test'), '.d2s');
+
+      // Assert - should have the runeword item
+      const runewordItems = items.filter((item: any) => item.type === 'runeword');
+      expect(runewordItems).toHaveLength(1);
+      expect(runewordItems[0].runeword_name).toBe('Enigma');
+    });
+
+    it('Then should reject unknown/invalid runeword names', async () => {
+      // Arrange
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+      vi.mocked(d2s.read).mockResolvedValue({
+        header: {
+          status: {
+            hardcore: false,
+          },
+        },
+        items: [
+          {
+            runeword_name: 'FakeRuneword',
+            type: 'armor',
+          },
+        ],
+        merc_items: [],
+        corpse_items: [],
+      } as any);
+
+      // Act
+      const items = await (monitor as any).parseSave('TestChar', Buffer.from('test'), '.d2s');
+
+      // Assert - should NOT have the invalid runeword item
+      const runewordItems = items.filter((item: any) => item.type === 'runeword');
+      expect(runewordItems).toHaveLength(0);
+      expect(warnSpy).toHaveBeenCalledWith(
+        '[processRunewordItem] Ignoring unknown runeword name: FakeRuneword',
+      );
+
+      warnSpy.mockRestore();
+    });
+
+    it('Then should fix known parser bug Love -> Lore and accept it', async () => {
+      // Arrange
+      vi.mocked(d2s.read).mockResolvedValue({
+        header: {
+          status: {
+            hardcore: false,
+          },
+        },
+        items: [
+          {
+            runeword_name: 'Love', // Parser bug - should be corrected to "Lore"
+            type: 'helm',
+          },
+        ],
+        merc_items: [],
+        corpse_items: [],
+      } as any);
+
+      // Act
+      const items = await (monitor as any).parseSave('TestChar', Buffer.from('test'), '.d2s');
+
+      // Assert - should have corrected and accepted the runeword
+      const runewordItems = items.filter((item: any) => item.type === 'runeword');
+      expect(runewordItems).toHaveLength(1);
+      expect(runewordItems[0].runeword_name).toBe('Lore');
+    });
+
+    it('Then should not add items without runeword_name', async () => {
+      // Arrange
+      vi.mocked(d2s.read).mockResolvedValue({
+        header: {
+          status: {
+            hardcore: false,
+          },
+        },
+        items: [
+          {
+            type: 'armor',
+            // No runeword_name
+          },
+        ],
+        merc_items: [],
+        corpse_items: [],
+      } as any);
+
+      // Act
+      const items = await (monitor as any).parseSave('TestChar', Buffer.from('test'), '.d2s');
+
+      // Assert - should have no runeword items
+      const runewordItems = items.filter((item: any) => item.type === 'runeword');
+      expect(runewordItems).toHaveLength(0);
     });
   });
 });
