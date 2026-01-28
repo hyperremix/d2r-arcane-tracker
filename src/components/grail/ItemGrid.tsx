@@ -9,10 +9,10 @@ import {
   shouldShowEtherealStatus,
   shouldShowNormalStatus,
 } from '@/lib/ethereal';
-import { cn } from '@/lib/utils';
 import { useFilteredItems, useGrailStore } from '@/stores/grailStore';
 import { ItemCard } from './ItemCard';
 import { ItemDetailsDialog } from './ItemDetailsDialog';
+import { GroupedMasonryGrid, MasonryItemGrid } from './MasonryItemGrid';
 
 /**
  * Determines the ethereal grouping key for an item based on its ethereal status and progress.
@@ -163,7 +163,6 @@ export const ItemGrid = memo(function ItemGrid() {
         progressLookup={progressLookup}
         characters={characters}
         handleItemClick={handleItemClick}
-        showItemIcons={settings.showItemIcons}
       />
 
       {/* Item Details Dialog */}
@@ -193,26 +192,6 @@ interface VirtualizedItemsContainerProps {
   progressLookup: ReturnType<typeof useProgressLookup>;
   characters: Character[];
   handleItemClick: (itemId: string) => void;
-  showItemIcons: boolean;
-}
-
-/**
- * Creates item rows for grid view by chunking items into rows based on column count.
- * @param {Item[]} items - Items to chunk into rows
- * @param {number} columnsCount - Number of columns per row
- * @param {number} groupIndex - Index of the group
- * @returns {VirtualRowType[]} Array of virtual row objects
- */
-function createGridRows(items: Item[], columnsCount: number, groupIndex: number): VirtualRowType[] {
-  const rows: VirtualRowType[] = [];
-  for (let i = 0; i < items.length; i += columnsCount) {
-    rows.push({
-      type: 'items',
-      items: items.slice(i, i + columnsCount),
-      groupIndex,
-    });
-  }
-  return rows;
 }
 
 /**
@@ -257,24 +236,20 @@ function calculateGroupFoundCount(
 interface RenderVirtualRowProps {
   virtualRow: ReturnType<ReturnType<typeof useVirtualizer>['getVirtualItems']>[number];
   row: VirtualRowType;
-  viewMode: ViewMode;
   progressLookup: ReturnType<typeof useProgressLookup>;
   characters: Character[];
   handleItemClick: (itemId: string) => void;
-  columnsCount: number;
 }
 
 /**
- * Renders a single virtual row (header, list item, or grid row).
+ * Renders a single virtual row (header or list item).
  */
 function renderVirtualRow({
   virtualRow,
   row,
-  viewMode,
   progressLookup,
   characters,
   handleItemClick,
-  columnsCount,
 }: RenderVirtualRowProps): JSX.Element | null {
   if (row.type === 'header') {
     return (
@@ -299,40 +274,14 @@ function renderVirtualRow({
     );
   }
 
-  // List view
-  if (viewMode === 'list') {
-    const item = row.items[0];
-    if (!item) return null;
+  // List view item
+  const item = row.items[0];
+  if (!item) return null;
 
-    const itemProgressData = progressLookup.get(item.id);
-    const normalProgress = itemProgressData?.normalProgress ?? EMPTY_PROGRESS_ARRAY;
-    const etherealProgress = itemProgressData?.etherealProgress ?? EMPTY_PROGRESS_ARRAY;
+  const itemProgressData = progressLookup.get(item.id);
+  const normalProgress = itemProgressData?.normalProgress ?? EMPTY_PROGRESS_ARRAY;
+  const etherealProgress = itemProgressData?.etherealProgress ?? EMPTY_PROGRESS_ARRAY;
 
-    return (
-      <div
-        key={virtualRow.key}
-        style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          width: '100%',
-          height: `${virtualRow.size}px`,
-          transform: `translateY(${virtualRow.start}px)`,
-        }}
-      >
-        <ItemCard
-          item={item}
-          normalProgress={normalProgress}
-          etherealProgress={etherealProgress}
-          characters={characters}
-          onClick={() => handleItemClick(item.id)}
-          viewMode={viewMode}
-        />
-      </div>
-    );
-  }
-
-  // Grid view
   return (
     <div
       key={virtualRow.key}
@@ -345,86 +294,78 @@ function renderVirtualRow({
         transform: `translateY(${virtualRow.start}px)`,
       }}
     >
-      <div
-        className={cn(
-          'grid gap-4',
-          columnsCount === 2 && 'grid-cols-2',
-          columnsCount === 3 && 'grid-cols-3',
-          columnsCount === 4 && 'grid-cols-4',
-          columnsCount === 5 && 'grid-cols-5',
-          columnsCount === 6 && 'grid-cols-6',
-          columnsCount === 7 && 'grid-cols-7',
-        )}
-      >
-        {row.items.map((item) => {
-          const itemProgressData = progressLookup.get(item.id);
-          const normalProgress = itemProgressData?.normalProgress ?? EMPTY_PROGRESS_ARRAY;
-          const etherealProgress = itemProgressData?.etherealProgress ?? EMPTY_PROGRESS_ARRAY;
-
-          return (
-            <ItemCard
-              key={item.id}
-              item={item}
-              normalProgress={normalProgress}
-              etherealProgress={etherealProgress}
-              characters={characters}
-              onClick={() => handleItemClick(item.id)}
-              viewMode={viewMode}
-            />
-          );
-        })}
-      </div>
+      <ItemCard
+        item={item}
+        normalProgress={normalProgress}
+        etherealProgress={etherealProgress}
+        characters={characters}
+        onClick={() => handleItemClick(item.id)}
+        viewMode="list"
+      />
     </div>
   );
 }
 
 /**
- * VirtualizedItemsContainer component that renders all items with virtual scrolling using window scroll.
- * Flattens grouped items into virtual rows and uses the window as the scroll element for optimal performance.
- * @param {VirtualizedItemsContainerProps} props - Component props
- * @returns {JSX.Element} A virtualized container of all items
+ * Props for the MasonryGridContainer component.
  */
-function VirtualizedItemsContainer({
+interface MasonryGridContainerProps {
+  items: Item[];
+  progressLookup: ReturnType<typeof useProgressLookup>;
+  characters: Character[];
+  handleItemClick: (itemId: string) => void;
+}
+
+/**
+ * MasonryGridContainer component that renders items in a masonry layout.
+ * Used for ungrouped grid view only.
+ */
+function MasonryGridContainer({
+  items,
+  progressLookup,
+  characters,
+  handleItemClick,
+}: MasonryGridContainerProps) {
+  const listRef = useRef<HTMLDivElement>(null);
+
+  return (
+    <div ref={listRef} className="h-full w-full overflow-auto p-4">
+      <MasonryItemGrid
+        items={items}
+        progressLookup={progressLookup}
+        characters={characters}
+        onItemClick={handleItemClick}
+        containerRef={listRef}
+      />
+    </div>
+  );
+}
+
+/**
+ * Props for the ListVirtualizedContainer component.
+ */
+interface ListVirtualizedContainerProps {
+  groupedItems: Array<{ title: string; items: Item[] }>;
+  groupMode: GroupMode;
+  progressLookup: ReturnType<typeof useProgressLookup>;
+  characters: Character[];
+  handleItemClick: (itemId: string) => void;
+}
+
+/**
+ * ListVirtualizedContainer component that renders items in row-based virtualization.
+ * Used for list view only.
+ */
+function ListVirtualizedContainer({
   groupedItems,
-  viewMode,
   groupMode,
   progressLookup,
   characters,
   handleItemClick,
-  showItemIcons,
-}: VirtualizedItemsContainerProps) {
+}: ListVirtualizedContainerProps) {
   const listRef = useRef<HTMLDivElement>(null);
 
-  // Calculate columns for grid view based on viewport width
-  const getColumnsCount = useCallback(() => {
-    if (viewMode === 'list') return 1;
-
-    const width = window.innerWidth;
-    if (width >= 1536) return 6; // 2xl
-    if (width >= 1280) return 5; // xl
-    if (width >= 1024) return 4; // lg
-    if (width >= 768) return 3; // md
-    if (width >= 640) return 2; // sm
-    return 1; // default
-  }, [viewMode]);
-
-  const [columnsCount, setColumnsCount] = useState(getColumnsCount);
-
-  // Update columns count on window resize with debouncing
-  useEffect(() => {
-    let timeoutId: NodeJS.Timeout;
-    const handleResize = () => {
-      clearTimeout(timeoutId);
-      timeoutId = setTimeout(() => setColumnsCount(getColumnsCount()), 150);
-    };
-    window.addEventListener('resize', handleResize);
-    return () => {
-      clearTimeout(timeoutId);
-      window.removeEventListener('resize', handleResize);
-    };
-  }, [getColumnsCount]);
-
-  // Flatten groups into virtual rows (headers + item rows) with cached foundCount
+  // Flatten groups into virtual rows (headers + item rows)
   const virtualRows = useMemo<VirtualRowType[]>(() => {
     const rows: VirtualRowType[] = [];
 
@@ -440,16 +381,11 @@ function VirtualizedItemsContainer({
         });
       }
 
-      // Add item rows based on view mode
-      const itemRows =
-        viewMode === 'grid'
-          ? createGridRows(group.items, columnsCount, groupIndex)
-          : createListRows(group.items, groupIndex);
-      rows.push(...itemRows);
+      rows.push(...createListRows(group.items, groupIndex));
     }
 
     return rows;
-  }, [groupedItems, groupMode, viewMode, columnsCount, progressLookup]);
+  }, [groupedItems, groupMode, progressLookup]);
 
   const rowVirtualizer = useVirtualizer({
     count: virtualRows.length,
@@ -457,9 +393,7 @@ function VirtualizedItemsContainer({
     estimateSize: (index) => {
       const row = virtualRows[index];
       if (row.type === 'header') return 56; // Header height
-      // Adjust grid height based on whether icons are shown
-      const gridHeight = showItemIcons ? 256 : 180;
-      return viewMode === 'grid' ? gridHeight : 80; // Grid row or list item height
+      return 80; // List item height
     },
     overscan: 5, // Render 5 rows above and below viewport
   });
@@ -477,14 +411,67 @@ function VirtualizedItemsContainer({
           renderVirtualRow({
             virtualRow,
             row: virtualRows[virtualRow.index],
-            viewMode,
             progressLookup,
             characters,
             handleItemClick,
-            columnsCount,
           }),
         )}
       </div>
     </div>
+  );
+}
+
+/**
+ * VirtualizedItemsContainer component that renders all items with virtual scrolling.
+ * For grid views, uses masonry layout. For list view, uses row-based virtualization.
+ * @param {VirtualizedItemsContainerProps} props - Component props
+ * @returns {JSX.Element} A virtualized container of all items
+ */
+function VirtualizedItemsContainer({
+  groupedItems,
+  viewMode,
+  groupMode,
+  progressLookup,
+  characters,
+  handleItemClick,
+}: VirtualizedItemsContainerProps) {
+  // For ungrouped grid view, use virtualized masonry layout
+  if (viewMode === 'grid' && groupMode === 'none') {
+    const allItems = groupedItems.flatMap((g) => g.items);
+    return (
+      <MasonryGridContainer
+        items={allItems}
+        progressLookup={progressLookup}
+        characters={characters}
+        handleItemClick={handleItemClick}
+      />
+    );
+  }
+
+  // For grouped grid view, use CSS columns-based masonry with headers
+  if (viewMode === 'grid') {
+    const groupsWithFoundCount = groupedItems.map((group) => ({
+      ...group,
+      foundCount: calculateGroupFoundCount(group.items, progressLookup),
+    }));
+    return (
+      <GroupedMasonryGrid
+        groupedItems={groupsWithFoundCount}
+        progressLookup={progressLookup}
+        characters={characters}
+        onItemClick={handleItemClick}
+      />
+    );
+  }
+
+  // For list view, use row-based virtualization
+  return (
+    <ListVirtualizedContainer
+      groupedItems={groupedItems}
+      groupMode={groupMode}
+      progressLookup={progressLookup}
+      characters={characters}
+      handleItemClick={handleItemClick}
+    />
   );
 }
