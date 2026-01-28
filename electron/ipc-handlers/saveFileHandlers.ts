@@ -166,6 +166,14 @@ export function handleAutomaticGrailProgress(
   const currentEventBus = dependencies.eventBus ?? eventBus;
   const currentRunTracker = dependencies.runTracker ?? runTracker;
 
+  // Store run item payload for emission after flush to avoid race condition
+  // where UI queries database before data is persisted
+  let runItemPayload: {
+    runId: string;
+    grailProgress: GrailProgress;
+    item: ItemDetectionEvent['item'];
+  } | null = null;
+
   try {
     if (!event.item) return;
 
@@ -211,12 +219,13 @@ export function handleAutomaticGrailProgress(
         // This ensures correct order: Progress -> RunItem
         currentBatchWriter.queueRunItem(runItem);
 
-        // Emit event for UI updates
-        currentEventBus.emit('run-item-added', {
+        // Store payload for emission after flush - this fixes the race condition
+        // where UI queries database before data is persisted
+        runItemPayload = {
           runId: activeRun.id,
           grailProgress,
           item: event.item,
-        });
+        };
       }
     } catch (runAssociationError) {
       console.error('Error associating item with run:', runAssociationError);
@@ -226,6 +235,11 @@ export function handleAutomaticGrailProgress(
     // Flush the batch writer to ensure items are persisted before UI updates
     // This is critical because the UI will query the database immediately
     currentBatchWriter.flush();
+
+    // NOW emit the run-item-added event - data is guaranteed to be in database
+    if (runItemPayload) {
+      currentEventBus.emit('run-item-added', runItemPayload);
+    }
 
     // Log and notify about the discovery (synchronous - don't delay user feedback)
     if (isFirstTimeDiscovery) {
