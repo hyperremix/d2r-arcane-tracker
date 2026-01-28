@@ -68,10 +68,14 @@ class ItemDetectionService {
 
       if (preExtractedItems !== undefined) {
         // Use pre-extracted items to avoid duplicate parsing (even if empty)
-        items = this.convertD2SItemsToD2Items(preExtractedItems, saveFile.name);
+        items = this.convertD2SItemsToD2Items(
+          preExtractedItems,
+          saveFile.name,
+          saveFile.characterClass,
+        );
       } else {
         // Fallback to parsing the save file again (only if pre-extracted items not provided)
-        items = await this.extractItemsFromSaveFile(saveFile);
+        items = await this.extractItemsFromSaveFile(saveFile, saveFile.characterClass);
       }
 
       // Track items to prevent duplicate notifications globally
@@ -108,7 +112,11 @@ class ItemDetectionService {
    * @param {string} characterName - Name of the character owning these items.
    * @returns {D2Item[]} Array of converted D2Item objects.
    */
-  private convertD2SItemsToD2Items(d2sItems: d2s.types.IItem[], characterName: string): D2Item[] {
+  private convertD2SItemsToD2Items(
+    d2sItems: d2s.types.IItem[],
+    characterName: string,
+    characterClass?: string,
+  ): D2Item[] {
     const items: D2Item[] = [];
 
     const processItems = (
@@ -124,6 +132,7 @@ class ItemDetectionService {
           quality: this.getItemQuality(item),
           location: defaultLocation,
           characterName,
+          characterClass: characterClass as D2Item['characterClass'],
           level: item.level || 1,
           ethereal: !!item.ethereal,
           sockets: this.getItemSockets(item),
@@ -147,9 +156,13 @@ class ItemDetectionService {
    * Extracts items from a D2 save file using the d2s library.
    * @private
    * @param {D2SaveFile} saveFile - The save file to extract items from.
+   * @param {string} [characterClass] - The character class for the items.
    * @returns {Promise<D2Item[]>} A promise that resolves with an array of extracted items.
    */
-  private async extractItemsFromSaveFile(saveFile: D2SaveFile): Promise<D2Item[]> {
+  private async extractItemsFromSaveFile(
+    saveFile: D2SaveFile,
+    characterClass?: string,
+  ): Promise<D2Item[]> {
     const items: D2Item[] = [];
 
     try {
@@ -185,6 +198,8 @@ class ItemDetectionService {
           items,
           saveFile.name,
           location as D2Item['location'],
+          false,
+          characterClass,
         );
       }
 
@@ -205,6 +220,7 @@ class ItemDetectionService {
    * @param {string} characterName - The name of the character owning these items.
    * @param {D2Item['location']} defaultLocation - The default location for items.
    * @param {boolean} [_isEmbed=false] - Whether these items are embedded in other items.
+   * @param {string} [characterClass] - The character class for the items.
    */
   private extractItemsFromList(
     itemList: D2SItem[],
@@ -212,6 +228,7 @@ class ItemDetectionService {
     characterName: string,
     defaultLocation: D2Item['location'],
     _isEmbed: boolean = false,
+    characterClass?: string,
   ): void {
     for (const item of itemList) {
       try {
@@ -234,6 +251,7 @@ class ItemDetectionService {
             sockets: this.getItemSockets(item),
             timestamp: new Date(),
             characterName,
+            characterClass: characterClass as D2Item['characterClass'],
             location: this.getItemLocation(item) || defaultLocation,
           };
 
@@ -248,6 +266,7 @@ class ItemDetectionService {
             characterName,
             defaultLocation,
             true,
+            characterClass,
           );
         }
       } catch (itemError) {
