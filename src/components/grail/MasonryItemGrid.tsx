@@ -141,10 +141,18 @@ export const MasonryItemGrid = memo(function MasonryItemGrid({
 
   const resizeObserver = useResizeObserver(positioner);
 
-  // Memoize render component
+  // Use refs for stable memoization - avoids recreating MasonryItem on prop changes
+  const progressLookupRef = useRef(progressLookup);
+  const charactersRef = useRef(characters);
+  const onItemClickRef = useRef(onItemClick);
+  progressLookupRef.current = progressLookup;
+  charactersRef.current = characters;
+  onItemClickRef.current = onItemClick;
+
+  // Memoize render component with stable refs
   const MasonryItem = useMemo(() => {
     return function MasonryItemComponent({ data: item, width: itemWidth }: MasonryItemProps) {
-      const itemProgressData = progressLookup.get(item.id);
+      const itemProgressData = progressLookupRef.current.get(item.id);
       const normalProgress = itemProgressData?.normalProgress ?? EMPTY_PROGRESS_ARRAY;
       const etherealProgress = itemProgressData?.etherealProgress ?? EMPTY_PROGRESS_ARRAY;
 
@@ -154,14 +162,14 @@ export const MasonryItemGrid = memo(function MasonryItemGrid({
             item={item}
             normalProgress={normalProgress}
             etherealProgress={etherealProgress}
-            characters={characters}
-            onClick={() => onItemClick(item.id)}
+            characters={charactersRef.current}
+            onClick={() => onItemClickRef.current(item.id)}
             viewMode="grid"
           />
         </div>
       );
     };
-  }, [progressLookup, characters, onItemClick]);
+  }, []);
 
   // Use effective height for masonry (fallback to a default height when not measured)
   const effectiveHeight = containerHeight || 600;
