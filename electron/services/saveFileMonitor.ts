@@ -8,7 +8,7 @@ import { constants as constants99 } from '@dschu012/d2s/lib/data/versions/99_con
 import chokidar, { type FSWatcher } from 'chokidar';
 import { app } from 'electron';
 import type { GrailDatabase } from '../database/database';
-import { getItemIdForD2SItem, isRuneId } from '../items/indexes';
+import { getItemIdForD2SItem, isRuneId, runewordsByNameSimple } from '../items/indexes';
 import {
   type AvailableRunes,
   type D2SaveFile,
@@ -231,15 +231,26 @@ const processRuneItem = (
 
 /**
  * Processes runeword items and adds them to the items array.
+ * Validates runeword names against known runewords to prevent false positives
+ * from D2S parser bugs or corrupted item data.
  * @param {d2s.types.IItem} item - The D2S item to process.
  * @param {d2s.types.IItem[]} items - The array to add the item to.
  */
 const processRunewordItem = (item: d2s.types.IItem, items: d2s.types.IItem[]): void => {
   if (item.runeword_name) {
-    // super funny bug in d2s parser :D
+    // Fix known parser bug: "Love" should be "Lore"
     if (item.runeword_name === 'Love') {
       item.runeword_name = 'Lore';
     }
+
+    // Validate runeword name against known runewords to prevent false positives
+    // from D2S parser bugs or corrupted item data
+    const simplifiedName = simplifyItemName(item.runeword_name);
+    if (!runewordsByNameSimple[simplifiedName]) {
+      console.warn(`[processRunewordItem] Ignoring unknown runeword name: ${item.runeword_name}`);
+      return;
+    }
+
     // we push Runewords as "items" for easier displaying in a list
     const newItem = {
       runeword_name: item.runeword_name,
