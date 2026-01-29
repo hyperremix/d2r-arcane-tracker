@@ -656,6 +656,7 @@ export type D2Item = {
   sockets: number;
   timestamp: Date;
   characterName: string;
+  characterClass?: CharacterClass;
   location: 'inventory' | 'stash' | 'equipment';
 };
 
