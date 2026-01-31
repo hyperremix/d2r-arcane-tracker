@@ -266,11 +266,16 @@ describe('When ItemDetectionService is used', () => {
 
   describe('If extractItemsFromList is called', () => {
     it('Then should extract items with proper names and types', () => {
-      // Arrange
+      // Arrange - rare items are intentionally excluded from Holy Grail tracking
+      // because they have randomly generated names that can match real grail items
       const mockItemList: D2SItem[] = [
         D2SItemBuilder.new().withId(1).asUniqueHelm().build(),
         D2SItemBuilder.new().withId(2).asSetArmor().withLevel(30).asEquipped().build(),
-        D2SItemBuilder.new().withId(3).asRareItem().withLevel(25).build(),
+        D2SItemBuilder.new()
+          .withId(3)
+          .asRareItem()
+          .withLevel(25)
+          .build(), // Should be skipped
         D2SItemBuilder.new()
           .withId(4)
           .asRune('r30') // Ber rune
@@ -284,18 +289,16 @@ describe('When ItemDetectionService is used', () => {
       // Act
       (service as any).extractItemsFromList(mockItemList, items, 'TestCharacter', 'inventory');
 
-      // Assert
-      expect(items).toHaveLength(5);
+      // Assert - rare item is excluded, only 4 items extracted
+      expect(items).toHaveLength(4);
       expect(items[0].name).toBe('shako');
       expect(items[0].quality).toBe('unique');
       expect(items[1].name).toBe('angelicraiment');
       expect(items[1].quality).toBe('set');
-      expect(items[2].name).toBe('raresword');
-      expect(items[2].quality).toBe('rare');
-      expect(items[3].name).toBe('ber');
+      expect(items[2].name).toBe('ber');
+      expect(items[2].quality).toBe('normal');
+      expect(items[3].name).toBe('enigma');
       expect(items[3].quality).toBe('normal');
-      expect(items[4].name).toBe('enigma');
-      expect(items[4].quality).toBe('normal');
     });
 
     it('Then should handle socketed items recursively', () => {
@@ -389,15 +392,16 @@ describe('When ItemDetectionService is used', () => {
       expect(result).toBe('angelicraiment');
     });
 
-    it('Then should return simplified rare item name', () => {
-      // Arrange
+    it('Then should NOT return rare item name (rare items excluded from grail)', () => {
+      // Arrange - rare items are intentionally excluded because their names
+      // can match real grail items (e.g., "Doom Collar" with rare_name "Doom")
       const rareItem: D2SItem = D2SItemBuilder.new().withRareName('Rare Sword').build();
 
       // Act
       const result = (service as any).getItemName(rareItem);
 
-      // Assert
-      expect(result).toBe('raresword');
+      // Assert - rare_name is ignored, falls through to item.name fallback
+      expect(result).toBe('Default Item');
     });
 
     it('Then should return rune name from mapping', () => {

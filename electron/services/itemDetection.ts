@@ -232,15 +232,10 @@ class ItemDetectionService {
   ): void {
     for (const item of itemList) {
       try {
-        // Only extract items that are unique, set, rare, or have specific names
-        if (
-          item.unique_name ||
-          item.set_name ||
-          item.rare_name ||
-          item.rare_name2 ||
-          this.isRune(item) ||
-          item.runeword_name
-        ) {
+        // Only extract items that are unique, set, runes, or runewords
+        // Note: rare items (rare_name/rare_name2) are excluded because they have
+        // randomly generated names that can match real grail items (e.g., "Doom Collar")
+        if (item.unique_name || item.set_name || this.isRune(item) || item.runeword_name) {
           const d2Item: D2Item = {
             id: `${item.id}`,
             name: this.getItemName(item),
@@ -294,7 +289,7 @@ class ItemDetectionService {
    * @returns {string} The normalized item name.
    */
   private getItemName(d2Item: D2SItem): string {
-    let name = d2Item.unique_name || d2Item.set_name || d2Item.rare_name || d2Item.rare_name2 || '';
+    let name = d2Item.unique_name || d2Item.set_name || '';
 
     if (name) {
       name = name.toLowerCase().replace(/[^a-z0-9]/gi, '');

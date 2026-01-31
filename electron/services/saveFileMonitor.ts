@@ -80,7 +80,9 @@ const processItemName = (item: d2s.types.IItem): string => {
   }
 
   // Fallback to simplified name for items not in our list
-  let name = item.unique_name || item.set_name || item.rare_name || item.rare_name2 || '';
+  // Note: rare items (rare_name/rare_name2) are excluded - they have randomly
+  // generated names that can match real grail items (e.g., "Doom Collar")
+  let name = item.unique_name || item.set_name || '';
   name = name.toLowerCase().replace(/[^a-z0-9]/gi, '');
 
   if (name.indexOf('rainbowfacet') !== -1) {
@@ -198,7 +200,9 @@ const addRuneToAvailableRunes = (
  * @returns {boolean} True if the item should be included, false otherwise.
  */
 const shouldIncludeItem = (item: d2s.types.IItem): boolean => {
-  return !!(item.unique_name || item.set_name || item.rare_name || item.rare_name2);
+  // Only include unique and set items - rare items have randomly generated names
+  // that can match real grail items (e.g., "Doom Collar" matching "Doom" runeword)
+  return !!(item.unique_name || item.set_name);
 };
 
 /**
