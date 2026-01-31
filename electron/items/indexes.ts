@@ -31,39 +31,6 @@ for (const item of items) {
 }
 
 /**
- * Gets the item ID for a D2S item by matching against various item properties
- */
-export function getItemIdForD2SItem(d2sItem: unknown): string | null {
-  const item = d2sItem as Record<string, unknown>; // Type assertion for D2S item structure
-
-  // Handle runes by code
-  if (item?.type && typeof item.type === 'string' && item.type.match(/^r[0-3][0-9]$/)) {
-    const rune = runesByCode[item.type];
-    return rune?.id || null;
-  }
-
-  // Handle runewords by name
-  if (item?.runeword_name && typeof item.runeword_name === 'string') {
-    // Fix known D2S parser bug: "Love" should be "Lore"
-    const runewordName = item.runeword_name === 'Love' ? 'Lore' : item.runeword_name;
-    const simpleName = simplifyItemName(runewordName);
-    const runeword = runewordsByNameSimple[simpleName];
-    return runeword?.id || null;
-  }
-
-  // Handle unique/set items by name
-  // NOTE: Do NOT use rare_name/rare_name2 - these are randomly generated names
-  // for rare items that can coincidentally match runeword/unique names (e.g., "Beast")
-  const name = (item?.unique_name || item?.set_name) as string;
-  if (name && typeof name === 'string') {
-    const simpleName = simplifyItemName(name);
-    return itemsByNameSimple[simpleName]?.id || null;
-  }
-
-  return null;
-}
-
-/**
  * Checks if an item ID represents a rune
  */
 export function isRuneId(id: string): boolean {

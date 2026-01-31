@@ -16,8 +16,14 @@ import { readFile } from 'node:fs/promises';
 import { read } from '@dschu012/d2s';
 import { D2SaveFileBuilder, D2SItemBuilder, HolyGrailItemBuilder } from '@/fixtures';
 import type { D2Item, D2SItem, Item } from '../types/grail';
+import { isGrailTrackable } from '../utils/grailItemUtils';
 import { EventBus } from './EventBus';
 import { ItemDetectionService } from './itemDetection';
+
+// Mock utils
+vi.mock('../utils/grailItemUtils', () => ({
+  isGrailTrackable: vi.fn(),
+}));
 
 // Mock data types
 
@@ -29,6 +35,16 @@ describe('When ItemDetectionService is used', () => {
   beforeEach(() => {
     // Create EventBus instance
     eventBus = new EventBus();
+
+    // Mock isGrailTrackable to mimic legacy logic for tests
+    vi.mocked(isGrailTrackable).mockImplementation((item: any) => {
+      return !!(
+        item.unique_name ||
+        item.set_name ||
+        (item.type && item.type.match(/^r[0-3][0-9]$/)) ||
+        item.runeword_name
+      );
+    });
 
     // Create service with EventBus
     service = new ItemDetectionService(eventBus);
@@ -350,22 +366,6 @@ describe('When ItemDetectionService is used', () => {
       // Assert
       expect(items).toHaveLength(1);
       expect(items[0].name).toBe('shako');
-    });
-  });
-
-  describe('If isRune is called', () => {
-    it('Then should identify runes correctly', () => {
-      // Arrange
-      const runeItem: D2SItem = D2SItemBuilder.new().asRune('r30').build(); // Ber rune
-      const nonRuneItem: D2SItem = D2SItemBuilder.new().withType('swor').build(); // Sword
-
-      // Act
-      const isRuneResult = (service as any).isRune(runeItem);
-      const isNotRuneResult = (service as any).isRune(nonRuneItem);
-
-      // Assert
-      expect(isRuneResult).toBe(true);
-      expect(isNotRuneResult).toBe(false);
     });
   });
 
