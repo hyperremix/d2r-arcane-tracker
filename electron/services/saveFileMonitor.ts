@@ -237,27 +237,38 @@ const processRuneItem = (
  * @param {d2s.types.IItem[]} items - The array to add the item to.
  */
 const processRunewordItem = (item: d2s.types.IItem, items: d2s.types.IItem[]): void => {
-  if (item.runeword_name) {
-    // Fix known parser bug: "Love" should be "Lore"
-    if (item.runeword_name === 'Love') {
-      item.runeword_name = 'Lore';
-    }
-
-    // Validate runeword name against known runewords to prevent false positives
-    // from D2S parser bugs or corrupted item data
-    const simplifiedName = simplifyItemName(item.runeword_name);
-    if (!runewordsByNameSimple[simplifiedName]) {
-      console.warn(`[processRunewordItem] Ignoring unknown runeword name: ${item.runeword_name}`);
-      return;
-    }
-
-    // we push Runewords as "items" for easier displaying in a list
-    const newItem = {
-      runeword_name: item.runeword_name,
-      type: 'runeword',
-    } as d2s.types.IItem;
-    items.push(newItem);
+  if (!item.runeword_name) {
+    return;
   }
+
+  // Skip if item has unique or set name - runewords cannot be unique/set items
+  // This catches false positives from corrupted save files or modded games
+  if (item.unique_name || item.set_name) {
+    console.warn(
+      `[processRunewordItem] Skipping "${item.runeword_name}" - has conflicting unique/set: ${item.unique_name || item.set_name}`,
+    );
+    return;
+  }
+
+  // Fix known parser bug: "Love" should be "Lore"
+  if (item.runeword_name === 'Love') {
+    item.runeword_name = 'Lore';
+  }
+
+  // Validate runeword name against known runewords to prevent false positives
+  // from D2S parser bugs or corrupted item data
+  const simplifiedName = simplifyItemName(item.runeword_name);
+  if (!runewordsByNameSimple[simplifiedName]) {
+    console.warn(`[processRunewordItem] Ignoring unknown runeword name: ${item.runeword_name}`);
+    return;
+  }
+
+  // we push Runewords as "items" for easier displaying in a list
+  const newItem = {
+    runeword_name: item.runeword_name,
+    type: 'runeword',
+  } as d2s.types.IItem;
+  items.push(newItem);
 };
 
 /**

@@ -44,16 +44,17 @@ export function getItemIdForD2SItem(d2sItem: unknown): string | null {
 
   // Handle runewords by name
   if (item?.runeword_name && typeof item.runeword_name === 'string') {
-    const simpleName = simplifyItemName(item.runeword_name);
+    // Fix known D2S parser bug: "Love" should be "Lore"
+    const runewordName = item.runeword_name === 'Love' ? 'Lore' : item.runeword_name;
+    const simpleName = simplifyItemName(runewordName);
     const runeword = runewordsByNameSimple[simpleName];
     return runeword?.id || null;
   }
 
   // Handle unique/set items by name
-  const name = (item?.unique_name ||
-    item?.set_name ||
-    item?.rare_name ||
-    item?.rare_name2) as string;
+  // NOTE: Do NOT use rare_name/rare_name2 - these are randomly generated names
+  // for rare items that can coincidentally match runeword/unique names (e.g., "Beast")
+  const name = (item?.unique_name || item?.set_name) as string;
   if (name && typeof name === 'string') {
     const simpleName = simplifyItemName(name);
     return itemsByNameSimple[simpleName]?.id || null;
