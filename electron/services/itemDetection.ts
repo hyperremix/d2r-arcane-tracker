@@ -4,6 +4,7 @@ import { read } from '@dschu012/d2s';
 import { runesByCode } from '../items/indexes';
 import type { D2SaveFile } from '../services/saveFileMonitor';
 import type { D2Item, D2SItem, GrailProgress, Item, ItemDetectionEvent } from '../types/grail';
+import { isGrailTrackable } from '../utils/grailItemUtils';
 import { DEFAULT_RETRY_OPTIONS, retryWithBackoff } from '../utils/retry';
 import type { EventBus } from './EventBus';
 
@@ -232,15 +233,10 @@ class ItemDetectionService {
   ): void {
     for (const item of itemList) {
       try {
-        // Only extract items that are unique, set, rare, or have specific names
-        if (
-          item.unique_name ||
-          item.set_name ||
-          item.rare_name ||
-          item.rare_name2 ||
-          this.isRune(item) ||
-          item.runeword_name
-        ) {
+        // Only extract items that are unique, set, runes, or runewords
+        // Note: rare items (rare_name/rare_name2) are excluded because they have
+        // randomly generated names that can match real grail items (e.g., "Doom Collar")
+        if (isGrailTrackable(item)) {
           const d2Item: D2Item = {
             id: `${item.id}`,
             name: this.getItemName(item),
@@ -276,17 +272,6 @@ class ItemDetectionService {
   }
 
   /**
-   * Determines if a D2S item is a rune based on its type.
-   * @private
-   * @param {D2SItem} item - The D2S item to check.
-   * @returns {boolean} True if the item is a rune, false otherwise.
-   */
-  private isRune(item: D2SItem): boolean {
-    // Improved rune detection based on d2rHolyGrail
-    return Boolean(item.type && runesByCode[item.type]);
-  }
-
-  /**
    * Extracts and normalizes the name of a D2S item.
    * Handles unique items, set items, rare items, runes, runewords, and rainbow facets.
    * @private
@@ -294,7 +279,7 @@ class ItemDetectionService {
    * @returns {string} The normalized item name.
    */
   private getItemName(d2Item: D2SItem): string {
-    let name = d2Item.unique_name || d2Item.set_name || d2Item.rare_name || d2Item.rare_name2 || '';
+    let name = d2Item.unique_name || d2Item.set_name || '';
 
     if (name) {
       name = name.toLowerCase().replace(/[^a-z0-9]/gi, '');
@@ -303,7 +288,7 @@ class ItemDetectionService {
     // Handle rainbow facets with magic attribute processing (from d2rHolyGrail)
     if (name.includes('rainbowfacet')) {
       name = this.processRainbowFacet(d2Item, name);
-    } else if (this.isRune(d2Item)) {
+    } else if (d2Item.type && runesByCode[d2Item.type]) {
       // Proper rune name mapping (from d2rHolyGrail)
       const runeType = d2Item.type;
       if (runeType && runesByCode[runeType]) {

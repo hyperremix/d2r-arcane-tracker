@@ -48,7 +48,6 @@ vi.mock('electron', () => ({
 
 // Mock items indexes
 vi.mock('../items/indexes', () => ({
-  getItemIdForD2SItem: vi.fn(),
   isRuneId: vi.fn(),
   runewordsByNameSimple: {
     lore: { id: 'lore', name: 'Lore' },
@@ -64,14 +63,19 @@ vi.mock('../utils/objects', () => ({
   simplifyItemName: vi.fn(),
 }));
 
+vi.mock('../utils/grailItemUtils', () => ({
+  getGrailItemId: vi.fn(),
+}));
+
 import { existsSync, readdirSync } from 'node:fs';
 import { readFile, stat } from 'node:fs/promises';
 import * as d2s from '@dschu012/d2s';
 import * as d2stash from '@dschu012/d2s/lib/d2/stash';
 import { app } from 'electron';
 import { D2SaveFileBuilder } from '@/fixtures';
-import { getItemIdForD2SItem, isRuneId } from '../items/indexes';
+import { isRuneId } from '../items/indexes';
 import { GameMode } from '../types/grail';
+import { getGrailItemId } from '../utils/grailItemUtils';
 import { isRune, simplifyItemName } from '../utils/objects';
 import { EventBus } from './EventBus';
 import { SaveFileMonitor } from './saveFileMonitor';
@@ -128,7 +132,7 @@ describe('When SaveFileMonitor is used', () => {
       hardcore: false,
       pages: [{ items: [] }],
     } as any);
-    vi.mocked(getItemIdForD2SItem).mockReturnValue('test-item-id');
+    vi.mocked(getGrailItemId).mockReturnValue('test-item-id');
     vi.mocked(isRuneId).mockReturnValue(false);
     vi.mocked(isRune).mockReturnValue(false);
     vi.mocked(simplifyItemName).mockReturnValue('test-item');

@@ -8,64 +8,20 @@ import { constants as constants99 } from '@dschu012/d2s/lib/data/versions/99_con
 import chokidar, { type FSWatcher } from 'chokidar';
 import { app } from 'electron';
 import type { GrailDatabase } from '../database/database';
-import { getItemIdForD2SItem, isRuneId, runewordsByNameSimple } from '../items/indexes';
-import {
-  type AvailableRunes,
-  type D2SaveFile,
-  type FileReaderResponse,
-  GameMode,
-  type ItemDetails,
-  type ItemWithMagicAttributes,
-  type MagicAttribute,
-  type SaveFileEvent,
-  type SaveFileItem,
-  type SaveFileState,
+import { isRuneId, runewordsByNameSimple } from '../items/indexes';
+import type {
+  AvailableRunes,
+  D2SaveFile,
+  FileReaderResponse,
+  ItemDetails,
+  SaveFileEvent,
+  SaveFileItem,
+  SaveFileState,
 } from '../types/grail';
+import { GameMode } from '../types/grail';
+import { getGrailItemId } from '../utils/grailItemUtils';
 import { isRune, simplifyItemName } from '../utils/objects';
 import type { EventBus } from './EventBus';
-
-/**
- * Lookup table for magic attribute types used in rainbow facet processing.
- */
-const MAGIC_ATTRIBUTE_TYPES: { [key: string]: string } = {
-  item_skillondeath: 'death',
-  item_skillonlevelup: 'levelup',
-};
-
-/**
- * Lookup table for magic attribute skills used in rainbow facet processing.
- */
-const MAGIC_ATTRIBUTE_SKILLS: { [key: string]: string } = {
-  passive_cold_mastery: 'cold',
-  passive_pois_mastery: 'poison',
-  passive_fire_mastery: 'fire',
-  passive_ltng_mastery: 'lightning',
-};
-
-/**
- * Processes rainbow facet magic attributes to determine type and skill.
- * @param {MagicAttribute[]} magicAttributes - Array of magic attributes from the item.
- * @returns {Object} Object containing the type and skill of the rainbow facet.
- * @returns {string} returns.type - The type of the rainbow facet (death, levelup).
- * @returns {string} returns.skill - The skill of the rainbow facet (cold, poison, fire, lightning).
- */
-const processRainbowFacetAttributes = (
-  magicAttributes: MagicAttribute[],
-): { type: string; skill: string } => {
-  let type = '';
-  let skill = '';
-
-  for (const attr of magicAttributes) {
-    if (MAGIC_ATTRIBUTE_TYPES[attr.name]) {
-      type = MAGIC_ATTRIBUTE_TYPES[attr.name];
-    }
-    if (MAGIC_ATTRIBUTE_SKILLS[attr.name]) {
-      skill = MAGIC_ATTRIBUTE_SKILLS[attr.name];
-    }
-  }
-
-  return { type, skill };
-};
 
 /**
  * Processes an item to determine its item ID from the flat items list.
@@ -73,21 +29,17 @@ const processRainbowFacetAttributes = (
  * @returns {string} The item ID or simplified name as fallback.
  */
 const processItemName = (item: d2s.types.IItem): string => {
-  // Try to get the item ID from our flat items list
-  const itemId = getItemIdForD2SItem(item);
+  // Try to get the item ID from our centralized logic
+  const itemId = getGrailItemId(item);
   if (itemId) {
     return itemId;
   }
 
   // Fallback to simplified name for items not in our list
-  let name = item.unique_name || item.set_name || item.rare_name || item.rare_name2 || '';
+  // Note: rare items (rare_name/rare_name2) are excluded - they have randomly
+  // generated names that can match real grail items (e.g., "Doom Collar")
+  let name = item.unique_name || item.set_name || '';
   name = name.toLowerCase().replace(/[^a-z0-9]/gi, '');
-
-  if (name.indexOf('rainbowfacet') !== -1) {
-    const magicAttributes = (item as unknown as ItemWithMagicAttributes).magic_attributes || [];
-    const { type, skill } = processRainbowFacetAttributes(magicAttributes);
-    return name + skill + type;
-  }
 
   if (isRune(item)) {
     // For runes, use the simplified name as fallback
@@ -198,7 +150,9 @@ const addRuneToAvailableRunes = (
  * @returns {boolean} True if the item should be included, false otherwise.
  */
 const shouldIncludeItem = (item: d2s.types.IItem): boolean => {
-  return !!(item.unique_name || item.set_name || item.rare_name || item.rare_name2);
+  // Only include unique and set items - rare items have randomly generated names
+  // that can match real grail items (e.g., "Doom Collar" matching "Doom" runeword)
+  return !!((item.unique_name || item.set_name) && getGrailItemId(item));
 };
 
 /**
@@ -237,27 +191,38 @@ const processRuneItem = (
  * @param {d2s.types.IItem[]} items - The array to add the item to.
  */
 const processRunewordItem = (item: d2s.types.IItem, items: d2s.types.IItem[]): void => {
-  if (item.runeword_name) {
-    // Fix known parser bug: "Love" should be "Lore"
-    if (item.runeword_name === 'Love') {
-      item.runeword_name = 'Lore';
-    }
-
-    // Validate runeword name against known runewords to prevent false positives
-    // from D2S parser bugs or corrupted item data
-    const simplifiedName = simplifyItemName(item.runeword_name);
-    if (!runewordsByNameSimple[simplifiedName]) {
-      console.warn(`[processRunewordItem] Ignoring unknown runeword name: ${item.runeword_name}`);
-      return;
-    }
-
-    // we push Runewords as "items" for easier displaying in a list
-    const newItem = {
-      runeword_name: item.runeword_name,
-      type: 'runeword',
-    } as d2s.types.IItem;
-    items.push(newItem);
+  if (!item.runeword_name) {
+    return;
   }
+
+  // Skip if item has unique or set name - runewords cannot be unique/set items
+  // This catches false positives from corrupted save files or modded games
+  if (item.unique_name || item.set_name) {
+    console.warn(
+      `[processRunewordItem] Skipping "${item.runeword_name}" - has conflicting unique/set: ${item.unique_name || item.set_name}`,
+    );
+    return;
+  }
+
+  // Fix known parser bug: "Love" should be "Lore"
+  if (item.runeword_name === 'Love') {
+    item.runeword_name = 'Lore';
+  }
+
+  // Validate runeword name against known runewords to prevent false positives
+  // from D2S parser bugs or corrupted item data
+  const simplifiedName = simplifyItemName(item.runeword_name);
+  if (!runewordsByNameSimple[simplifiedName]) {
+    console.warn(`[processRunewordItem] Ignoring unknown runeword name: ${item.runeword_name}`);
+    return;
+  }
+
+  // we push Runewords as "items" for easier displaying in a list
+  const newItem = {
+    runeword_name: item.runeword_name,
+    type: 'runeword',
+  } as d2s.types.IItem;
+  items.push(newItem);
 };
 
 /**
