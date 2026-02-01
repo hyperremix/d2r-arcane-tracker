@@ -39,9 +39,9 @@
     "prepare": "husky",
     "debug:url": "node scripts/get-cdp-url.js",
     "debug:update": "node scripts/update-cursor-debug.js",
-    "version:major": "npm version major && git push --follow-tags",
-    "version:minor": "npm version minor && git push --follow-tags",
-    "version:patch": "npm version patch && git push --follow-tags"
+    "version:major": "bun pm version major && git push --follow-tags",
+    "version:minor": "bun pm version minor && git push --follow-tags",
+    "version:patch": "bun pm version patch && git push --follow-tags"
   },
   "dependencies": {
     "@dschu012/d2s": "^2.0.36",
