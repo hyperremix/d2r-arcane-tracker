@@ -61,7 +61,7 @@ class GrailDatabase {
     this.dbPath = path.join(userDataPath, 'grail.db');
 
     // Initialize database
-    this.db = new Database(this.dbPath);
+    this.db = new Database(this.dbPath, { timeout: 5000 }); // 5s busy timeout
     this.db.pragma('journal_mode = WAL');
     this.db.pragma('foreign_keys = ON');
 
@@ -1433,6 +1433,34 @@ class GrailDatabase {
     `);
     const mapped = mapRunItemToDatabase(runItem);
     stmt.run(mapped.id, mapped.run_id, mapped.grail_progress_id, mapped.name, mapped.found_time);
+  }
+
+  /**
+   * Inserts multiple run items in a single transaction.
+   * @param runItems - Array of run items to insert
+   */
+  addRunItemsBatch(runItems: RunItem[]): void {
+    if (runItems.length === 0) return;
+
+    const stmt = this.db.prepare(`
+      INSERT INTO run_items (id, run_id, grail_progress_id, name, found_time)
+      VALUES (?, ?, ?, ?, ?)
+    `);
+
+    const insertMany = this.db.transaction((items: RunItem[]) => {
+      for (const item of items) {
+        const mapped = mapRunItemToDatabase(item);
+        stmt.run(
+          mapped.id,
+          mapped.run_id,
+          mapped.grail_progress_id,
+          mapped.name,
+          mapped.found_time,
+        );
+      }
+    });
+
+    insertMany(runItems);
   }
 
   /**

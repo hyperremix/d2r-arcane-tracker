@@ -1,5 +1,5 @@
 import type { GrailDatabase } from '../database/database';
-import type { Character, GrailProgress } from '../types/grail';
+import type { Character, GrailProgress, RunItem } from '../types/grail';
 
 /**
  * Service for batching database writes to improve performance and reduce event loop blocking.
@@ -8,6 +8,7 @@ import type { Character, GrailProgress } from '../types/grail';
 export class DatabaseBatchWriter {
   private characterQueue: Map<string, Character>;
   private progressQueue: Map<string, GrailProgress>;
+  private runItemQueue: Map<string, RunItem>;
   private flushTimer: NodeJS.Timeout | null;
   private readonly database: GrailDatabase;
   private readonly BATCH_DELAY = 100; // ms - delay before auto-flushing
@@ -23,6 +24,7 @@ export class DatabaseBatchWriter {
     this.database = database;
     this.characterQueue = new Map();
     this.progressQueue = new Map();
+    this.runItemQueue = new Map();
     this.flushTimer = null;
     this.onFlushCallback = onFlushCallback;
   }
@@ -50,13 +52,25 @@ export class DatabaseBatchWriter {
   }
 
   /**
+   * Queues a run item for batch writing.
+   * If the queue size exceeds the threshold, flushes immediately.
+   * Otherwise, schedules a flush after the batch delay.
+   * @param runItem - Run item to queue for writing
+   */
+  queueRunItem(runItem: RunItem): void {
+    this.runItemQueue.set(runItem.id, runItem);
+    this.scheduleFlush();
+  }
+
+  /**
    * Schedules a flush operation.
    * If queue size exceeds threshold, flushes immediately.
    * Otherwise, schedules a delayed flush (debounced).
    * @private
    */
   private scheduleFlush(): void {
-    const totalQueueSize = this.characterQueue.size + this.progressQueue.size;
+    const totalQueueSize =
+      this.characterQueue.size + this.progressQueue.size + this.runItemQueue.size;
 
     // Flush immediately if threshold exceeded
     if (totalQueueSize >= this.BATCH_SIZE_THRESHOLD) {
@@ -90,13 +104,14 @@ export class DatabaseBatchWriter {
 
     const characterCount = this.characterQueue.size;
     const progressCount = this.progressQueue.size;
+    const runItemCount = this.runItemQueue.size;
 
-    if (characterCount === 0 && progressCount === 0) {
+    if (characterCount === 0 && progressCount === 0 && runItemCount === 0) {
       return; // Nothing to flush
     }
 
     console.log(
-      `[DatabaseBatchWriter] Flushing ${characterCount} characters and ${progressCount} progress entries`,
+      `[DatabaseBatchWriter] Flushing ${characterCount} characters, ${progressCount} progress entries, and ${runItemCount} run items`,
     );
 
     try {
@@ -114,6 +129,14 @@ export class DatabaseBatchWriter {
         this.database.upsertProgressBatch(progressList);
         this.progressQueue.clear();
         console.log(`[DatabaseBatchWriter] Flushed ${progressCount} progress entries`);
+      }
+
+      // Flush run items in batch
+      if (runItemCount > 0) {
+        const runItems = Array.from(this.runItemQueue.values());
+        this.database.addRunItemsBatch(runItems);
+        this.runItemQueue.clear();
+        console.log(`[DatabaseBatchWriter] Flushed ${runItemCount} run items`);
       }
 
       // Invoke callback after successful flush
@@ -144,6 +167,14 @@ export class DatabaseBatchWriter {
   }
 
   /**
+   * Gets the current size of the run item queue.
+   * @returns Number of queued run items
+   */
+  getRunItemQueueSize(): number {
+    return this.runItemQueue.size;
+  }
+
+  /**
    * Clears all queues and cancels pending flushes.
    * Used for testing and cleanup.
    */
@@ -154,5 +185,6 @@ export class DatabaseBatchWriter {
     }
     this.characterQueue.clear();
     this.progressQueue.clear();
+    this.runItemQueue.clear();
   }
 }

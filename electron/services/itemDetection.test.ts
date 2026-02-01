@@ -41,7 +41,7 @@ describe('When ItemDetectionService is used', () => {
       return !!(
         item.unique_name ||
         item.set_name ||
-        (item.type && item.type.match(/^r[0-3][0-9]$/)) ||
+        item.type?.match(/^r[0-3][0-9]$/) ||
         item.runeword_name
       );
     });

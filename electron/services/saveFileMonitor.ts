@@ -1103,10 +1103,10 @@ class SaveFileMonitor {
     switch (extension) {
       case '.sss':
       case '.d2x':
-        await d2stash.read(content).then(parseStash);
+        await d2stash.read(content, constants96).then(parseStash);
         break;
       case '.d2i':
-        await d2stash.read(content).then(parseStash);
+        await d2stash.read(content, constants99).then(parseStash);
         break;
       default:
         await d2s.read(content).then(parseD2S);
@@ -1132,7 +1132,7 @@ class SaveFileMonitor {
         // Parse the stash file header to extract hardcore status
         let isHardcore = false;
         try {
-          const stashData = await d2stash.read(buffer);
+          const stashData = await d2stash.read(buffer, constants99);
           isHardcore = stashData.hardcore;
           console.log('[parseSaveFile] Parsed .d2i file, hardcore:', isHardcore);
         } catch (parseError) {
