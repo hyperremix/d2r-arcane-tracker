@@ -23,7 +23,7 @@ This is a Diablo 2 Resurrected Arcane Tracker - an Electron application built wi
 - **UI Components**: shadcn/ui components (New York style) using Radix UI primitives and class-variance-authority
 - **Internationalization**: i18next with browser language detection
 - **Code Quality**: Biome for linting, formatting, and static analysis
-- **Package Manager**: Yarn (specified in packageManager field)
+- **Package Manager**: Bun (specified in packageManager field)
 
 ## TypeScript Configuration
 
@@ -35,17 +35,17 @@ This is a Diablo 2 Resurrected Arcane Tracker - an Electron application built wi
 
 ```bash
 # Development
-yarn dev              # Start development server
+bun dev               # Start development server
 
 # Code Quality (must pass before task completion)
-yarn typecheck        # Type check both web and node
-yarn run check        # Run all Biome checks
-yarn lint             # Lint only
-yarn format           # Format check
-yarn test:run         # Run all tests
+bun run typecheck     # Type check both web and node
+bun run check         # Run all Biome checks
+bun run lint          # Lint only
+bun run format        # Format check
+bun run test:run      # Run all tests
 
 # Build
-yarn build            # Full production build
+bun run build         # Full production build
 ```
 
 ## Comprehensive Documentation

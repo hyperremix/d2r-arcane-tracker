@@ -240,7 +240,7 @@ async function main() {
     console.warn(`⚠️  Could not update debug configurations: ${error.message}`);
     console.log('💡 This is expected if the app is not running yet.');
     console.log('💡 Debug configurations will be updated automatically once the app starts.');
-    console.log('💡 You can manually run "yarn debug:update" after starting the app.');
+    console.log('💡 You can manually run "bun run debug:update" after starting the app.');
     // Don't exit with error code - this is a non-critical warning
   }
 }

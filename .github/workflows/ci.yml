@@ -14,13 +14,16 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: "20"
-          cache: "yarn"
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
 
       - name: Install dependencies
-        run: yarn install --frozen-lockfile
+        run: bun install --frozen-lockfile
 
       - name: Run Biome lint
-        run: yarn lint
+        run: bun run lint
 
   format:
     runs-on: ubuntu-latest
@@ -30,13 +33,16 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: "20"
-          cache: "yarn"
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
 
       - name: Install dependencies
-        run: yarn install --frozen-lockfile
+        run: bun install --frozen-lockfile
 
       - name: Run Biome format
-        run: yarn format
+        run: bun run format
 
   type:
     runs-on: ubuntu-latest
@@ -46,13 +52,16 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: "20"
-          cache: "yarn"
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
 
       - name: Install dependencies
-        run: yarn install --frozen-lockfile
+        run: bun install --frozen-lockfile
 
       - name: Run TypeScript type check
-        run: yarn typecheck
+        run: bun run typecheck
 
   test:
     runs-on: ubuntu-latest
@@ -62,13 +71,16 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: "20"
-          cache: "yarn"
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
 
       - name: Install dependencies
-        run: yarn install --frozen-lockfile
+        run: bun install --frozen-lockfile
 
       - name: Run tests with coverage
-        run: yarn test:coverage
+        run: bun run test:coverage
 
       - name: Publish test results
         uses: dorny/test-reporter@v2
