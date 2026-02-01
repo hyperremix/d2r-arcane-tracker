@@ -225,8 +225,8 @@ export function SessionControls() {
     endSession: 'Ctrl+Shift+E',
   };
 
-  const autoModeEnabled = settings.runTrackerMemoryReading ?? false;
   const isWindows = window.electronAPI?.platform === 'win32';
+  const autoModeEnabled = (settings.runTrackerMemoryReading ?? false) && isWindows;
 
   const [showEndRunDialog, setShowEndRunDialog] = useState(false);
   const [showEndSessionDialog, setShowEndSessionDialog] = useState(false);
