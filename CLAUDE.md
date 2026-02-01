@@ -35,7 +35,7 @@ This is a Diablo 2 Resurrected Arcane Tracker - an Electron application built wi
 
 ```bash
 # Development
-bun dev               # Start development server
+bun run dev           # Start development server
 
 # Code Quality (must pass before task completion)
 bun run typecheck     # Type check both web and node
