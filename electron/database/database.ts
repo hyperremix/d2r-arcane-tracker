@@ -1,18 +1,11 @@
 import { copyFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import Database from 'better-sqlite3';
+import { and, asc, desc, eq, isNull } from 'drizzle-orm';
 import { app } from 'electron';
-import { items } from '../items';
+import { items as grailItemsData } from '../items';
 import type {
   Character,
-  DatabaseCharacter,
-  DatabaseGrailProgress,
-  DatabaseItem,
-  DatabaseRun,
-  DatabaseRunItem,
-  DatabaseSaveFileState,
-  DatabaseSession,
-  DatabaseSetting,
   GrailProgress,
   Item,
   Run,
@@ -25,29 +18,170 @@ import type {
 } from '../types/grail';
 import { GameMode, GameVersion } from '../types/grail';
 import {
-  mapCharacterToDatabase,
-  mapDatabaseCharacterToCharacter,
-  mapDatabaseItemToItem,
-  mapDatabaseProgressToProgress,
-  mapDatabaseRunItemToRunItem,
-  mapDatabaseRunToRun,
-  mapDatabaseSaveFileStateToSaveFileState,
-  mapDatabaseSessionToSession,
-  mapItemToDatabase,
-  mapProgressToDatabase,
-  mapRunItemToDatabase,
-  mapRunToDatabase,
-  mapSaveFileStateToDatabase,
-  mapSessionToDatabase,
-  mapValuesToSqlite,
-} from './mappers';
+  createDrizzleDb,
+  type DbCharacter,
+  type DbGrailProgress,
+  type DbItem,
+  type DbRun,
+  type DbRunItem,
+  type DbSaveFileState,
+  type DbSession,
+  type DrizzleDb,
+  schema,
+} from './drizzle';
+
+const { items, characters, grailProgress, settings, saveFileStates, sessions, runs, runItems } =
+  schema;
+
+// ============================================================================
+// Type Conversion Helpers
+// ============================================================================
+
+function toISOString(date: Date | undefined | null): string | null {
+  if (!date) return null;
+  return date.toISOString();
+}
+
+function fromISOString(dateStr: string | null | undefined): Date | undefined {
+  if (!dateStr) return undefined;
+  return new Date(dateStr);
+}
+
+// App to Database type mappers
+function itemToDbValues(item: Item) {
+  return {
+    id: item.id,
+    name: item.name,
+    link: item.link,
+    code: item.code ?? null,
+    itemBase: item.itemBase ?? null,
+    imageFilename: item.imageFilename ?? null,
+    type: item.type,
+    category: item.category,
+    subCategory: item.subCategory,
+    treasureClass: item.treasureClass,
+    setName: item.setName ?? null,
+    runes: item.runes ? JSON.stringify(item.runes) : null,
+    etherealType: item.etherealType,
+  };
+}
+
+// Database to App type mappers
+function dbItemToItem(dbItem: DbItem): Item {
+  let runesArray: string[] | undefined;
+  if (dbItem.runes) {
+    try {
+      runesArray = JSON.parse(dbItem.runes) as string[];
+    } catch {
+      runesArray = undefined;
+    }
+  }
+
+  return {
+    id: dbItem.id,
+    name: dbItem.name,
+    link: dbItem.link ?? '',
+    code: dbItem.code ?? undefined,
+    itemBase: dbItem.itemBase ?? undefined,
+    imageFilename: dbItem.imageFilename ?? undefined,
+    etherealType: dbItem.etherealType,
+    type: dbItem.type,
+    category: dbItem.category,
+    subCategory: dbItem.subCategory,
+    treasureClass: dbItem.treasureClass,
+    setName: dbItem.setName ?? undefined,
+    runes: runesArray,
+  };
+}
+
+function dbCharacterToCharacter(dbChar: DbCharacter): Character {
+  return {
+    id: dbChar.id,
+    name: dbChar.name,
+    characterClass: dbChar.characterClass,
+    level: dbChar.level,
+    hardcore: dbChar.hardcore,
+    expansion: dbChar.expansion,
+    saveFilePath: dbChar.saveFilePath ?? undefined,
+    lastUpdated: new Date(dbChar.updatedAt ?? new Date().toISOString()),
+    created: new Date(dbChar.createdAt ?? new Date().toISOString()),
+    deleted: dbChar.deletedAt ? new Date(dbChar.deletedAt) : undefined,
+  };
+}
+
+function dbProgressToProgress(dbProg: DbGrailProgress): GrailProgress {
+  return {
+    id: dbProg.id,
+    characterId: dbProg.characterId,
+    itemId: dbProg.itemId,
+    foundDate: fromISOString(dbProg.foundDate),
+    foundBy: undefined, // This field is not stored in database
+    manuallyAdded: dbProg.manuallyAdded,
+    difficulty: dbProg.difficulty ?? undefined,
+    notes: dbProg.notes ?? undefined,
+    isEthereal: dbProg.isEthereal,
+    fromInitialScan: dbProg.fromInitialScan,
+  };
+}
+
+function dbSaveFileStateToSaveFileState(dbState: DbSaveFileState): SaveFileState {
+  return {
+    id: dbState.id,
+    filePath: dbState.filePath,
+    lastModified: new Date(dbState.lastModified),
+    lastParsed: new Date(dbState.lastParsed),
+    created: new Date(dbState.createdAt ?? new Date().toISOString()),
+    updated: new Date(dbState.updatedAt ?? new Date().toISOString()),
+  };
+}
+
+function dbSessionToSession(dbSession: DbSession): Session {
+  return {
+    id: dbSession.id,
+    startTime: new Date(dbSession.startTime),
+    endTime: fromISOString(dbSession.endTime),
+    totalRunTime: dbSession.totalRunTime ?? 0,
+    totalSessionTime: dbSession.totalSessionTime ?? 0,
+    runCount: dbSession.runCount ?? 0,
+    archived: dbSession.archived ?? false,
+    notes: dbSession.notes ?? undefined,
+    created: new Date(dbSession.createdAt ?? new Date().toISOString()),
+    lastUpdated: new Date(dbSession.updatedAt ?? new Date().toISOString()),
+  };
+}
+
+function dbRunToRun(dbRun: DbRun): Run {
+  return {
+    id: dbRun.id,
+    sessionId: dbRun.sessionId,
+    characterId: dbRun.characterId ?? undefined,
+    runNumber: dbRun.runNumber,
+    startTime: new Date(dbRun.startTime),
+    endTime: fromISOString(dbRun.endTime),
+    duration: dbRun.duration ?? undefined,
+    created: new Date(dbRun.createdAt ?? new Date().toISOString()),
+    lastUpdated: new Date(dbRun.updatedAt ?? new Date().toISOString()),
+  };
+}
+
+function dbRunItemToRunItem(dbRunItem: DbRunItem): RunItem {
+  return {
+    id: dbRunItem.id,
+    runId: dbRunItem.runId,
+    grailProgressId: dbRunItem.grailProgressId ?? undefined,
+    name: dbRunItem.name ?? undefined,
+    foundTime: new Date(dbRunItem.foundTime),
+    created: new Date(dbRunItem.createdAt ?? new Date().toISOString()),
+  };
+}
 
 /**
  * Main database class for managing Holy Grail tracking data.
  * Handles SQLite database operations for items, characters, progress, and settings.
  */
 class GrailDatabase {
-  private db: Database.Database;
+  private rawDb: Database.Database;
+  private db: DrizzleDb;
   private dbPath: string;
 
   /**
@@ -61,9 +195,12 @@ class GrailDatabase {
     this.dbPath = path.join(userDataPath, 'grail.db');
 
     // Initialize database
-    this.db = new Database(this.dbPath, { timeout: 5000 }); // 5s busy timeout
-    this.db.pragma('journal_mode = WAL');
-    this.db.pragma('foreign_keys = ON');
+    this.rawDb = new Database(this.dbPath, { timeout: 5000 }); // 5s busy timeout
+    this.rawDb.pragma('journal_mode = WAL');
+    this.rawDb.pragma('foreign_keys = ON');
+
+    // Create Drizzle instance
+    this.db = createDrizzleDb(this.rawDb);
 
     this.initializeSchema();
   }
@@ -89,7 +226,7 @@ class GrailDatabase {
    * Also seeds the items table with Holy Grail data if it's empty.
    */
   private createSchema(): void {
-    const schema = `
+    const schemaSQL = `
       -- Items table - stores all Holy Grail items
       CREATE TABLE IF NOT EXISTS items (
         id TEXT PRIMARY KEY,
@@ -302,7 +439,7 @@ class GrailDatabase {
         ('runTrackerMemoryPollingInterval', '500');
     `;
 
-    this.db.exec(schema);
+    this.rawDb.exec(schemaSQL);
     console.log('Database schema created successfully');
 
     // Ensure wizard settings exist for existing databases
@@ -322,25 +459,30 @@ class GrailDatabase {
       { key: 'wizardSkipped', value: 'false' },
     ];
 
-    const stmt = this.db.prepare('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)');
-    const transaction = this.db.transaction(() => {
-      for (const setting of wizardSettings) {
-        stmt.run(setting.key, setting.value);
-      }
-    });
-
-    transaction();
+    for (const setting of wizardSettings) {
+      this.db
+        .insert(settings)
+        .values({ key: setting.key, value: setting.value })
+        .onConflictDoNothing()
+        .run();
+    }
   }
 
+  // ============================================================================
   // Items methods
+  // ============================================================================
+
   /**
    * Retrieves all items from the database.
    * @returns Array of all items, ordered by category, sub_category, and name
    */
   getAllItems(): Item[] {
-    const stmt = this.db.prepare('SELECT * FROM items ORDER BY category, sub_category, name');
-    const dbItems = stmt.all() as DatabaseItem[];
-    return dbItems.map(mapDatabaseItemToItem);
+    const dbItems = this.db
+      .select()
+      .from(items)
+      .orderBy(asc(items.category), asc(items.subCategory), asc(items.name))
+      .all();
+    return dbItems.map(dbItemToItem);
   }
 
   /**
@@ -349,53 +491,49 @@ class GrailDatabase {
    * @returns Array of all runeword items
    */
   getAllRunewords(): Item[] {
-    const stmt = this.db.prepare("SELECT * FROM items WHERE type = 'runeword' ORDER BY name");
-    const dbItems = stmt.all() as DatabaseItem[];
-    return dbItems.map(mapDatabaseItemToItem);
+    const dbItems = this.db
+      .select()
+      .from(items)
+      .where(eq(items.type, 'runeword'))
+      .orderBy(asc(items.name))
+      .all();
+    return dbItems.map(dbItemToItem);
   }
 
   /**
    * Retrieves items filtered by current user settings.
-   * @param settings - Current user settings for filtering items
+   * @param userSettings - Current user settings for filtering items
    * @returns Array of filtered items based on settings
    */
-  getFilteredItems(settings: Settings): Item[] {
+  getFilteredItems(userSettings: Settings): Item[] {
     const allItems = this.getAllItems();
-
-    return allItems.filter((item) => this.shouldIncludeItem(item, settings));
+    return allItems.filter((item) => this.shouldIncludeItem(item, userSettings));
   }
 
   /**
    * Determines if an item should be included based on current settings.
    * Filters items by type (runes, runewords), normal items, and ethereal items.
    * @param item - The item to check
-   * @param settings - Current user settings for filtering
+   * @param userSettings - Current user settings for filtering
    * @returns True if the item should be included, false otherwise
    */
-  private shouldIncludeItem(item: Item, settings: Settings): boolean {
-    // Filter based on item type
-    if (!this.isItemTypeEnabled(item.type, settings)) {
-      return false;
-    }
-
-    return true;
+  private shouldIncludeItem(item: Item, userSettings: Settings): boolean {
+    return this.isItemTypeEnabled(item.type, userSettings);
   }
 
   /**
    * Checks if a specific item type is enabled in the settings.
    * @param itemType - The type of item to check (rune, runeword, etc.)
-   * @param settings - Current user settings
+   * @param userSettings - Current user settings
    * @returns True if the item type is enabled, false otherwise
    */
-  private isItemTypeEnabled(itemType: string, settings: Settings): boolean {
-    if (itemType === 'rune' && !settings.grailRunes) {
+  private isItemTypeEnabled(itemType: string, userSettings: Settings): boolean {
+    if (itemType === 'rune' && !userSettings.grailRunes) {
       return false;
     }
-
-    if (itemType === 'runeword' && !settings.grailRunewords) {
+    if (itemType === 'runeword' && !userSettings.grailRunewords) {
       return false;
     }
-
     return true;
   }
 
@@ -403,62 +541,41 @@ class GrailDatabase {
    * Inserts or updates multiple items in the database using a transaction.
    * Uses INSERT ... ON CONFLICT DO UPDATE (proper UPSERT) to safely handle duplicates
    * without triggering ON DELETE CASCADE, preserving grail_progress foreign key relationships.
-   * @param items - Array of items to insert or update
+   * @param itemsToInsert - Array of items to insert or update
    */
-  insertItems(items: Item[]): void {
-    const stmt = this.db.prepare(`
-      INSERT INTO items (id, name, link, code, type, category, sub_category, set_name, ethereal_type, treasure_class, image_filename, item_base, runes)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      ON CONFLICT(id) DO UPDATE SET
-        name = excluded.name,
-        link = excluded.link,
-        code = excluded.code,
-        type = excluded.type,
-        category = excluded.category,
-        sub_category = excluded.sub_category,
-        set_name = excluded.set_name,
-        ethereal_type = excluded.ethereal_type,
-        treasure_class = excluded.treasure_class,
-        image_filename = excluded.image_filename,
-        item_base = excluded.item_base,
-        runes = excluded.runes
-    `);
-
-    const transaction = this.db.transaction((itemsToInsert: typeof items) => {
+  insertItems(itemsToInsert: Item[]): void {
+    const insertMany = this.rawDb.transaction(() => {
       for (const item of itemsToInsert) {
-        const mappedItem = mapItemToDatabase(item);
-        stmt.run(
-          mappedItem.id,
-          mappedItem.name,
-          mappedItem.link,
-          mappedItem.code,
-          mappedItem.type,
-          mappedItem.category,
-          mappedItem.sub_category,
-          mappedItem.set_name,
-          mappedItem.ethereal_type,
-          mappedItem.treasure_class,
-          mappedItem.image_filename,
-          mappedItem.item_base,
-          mappedItem.runes,
-        );
+        const values = itemToDbValues(item);
+        this.db
+          .insert(items)
+          .values(values)
+          .onConflictDoUpdate({
+            target: items.id,
+            set: values,
+          })
+          .run();
       }
     });
-
-    transaction(items);
+    insertMany();
   }
 
+  // ============================================================================
   // Characters methods
+  // ============================================================================
+
   /**
    * Retrieves all non-deleted characters from the database.
    * @returns Array of all active characters, ordered by most recently updated
    */
   getAllCharacters(): Character[] {
-    const stmt = this.db.prepare(
-      'SELECT * FROM characters WHERE deleted_at IS NULL ORDER BY updated_at DESC',
-    );
-    const dbCharacters = stmt.all() as DatabaseCharacter[];
-    return dbCharacters.map(mapDatabaseCharacterToCharacter);
+    const dbChars = this.db
+      .select()
+      .from(characters)
+      .where(isNull(characters.deletedAt))
+      .orderBy(desc(characters.updatedAt))
+      .all();
+    return dbChars.map(dbCharacterToCharacter);
   }
 
   /**
@@ -467,64 +584,58 @@ class GrailDatabase {
    * @param updates - Partial character data to update (excluding id and timestamps)
    */
   updateCharacter(id: string, updates: Partial<Character>): void {
-    const fields = Object.keys(updates);
-    const values = Object.values(updates);
+    // biome-ignore lint/suspicious/noExplicitAny: Dynamic update object
+    const updateObj: Record<string, any> = {};
 
-    if (fields.length === 0) return;
+    if (updates.name !== undefined) updateObj.name = updates.name;
+    if (updates.characterClass !== undefined) updateObj.characterClass = updates.characterClass;
+    if (updates.level !== undefined) updateObj.level = updates.level;
+    if (updates.hardcore !== undefined) updateObj.hardcore = updates.hardcore;
+    if (updates.expansion !== undefined) updateObj.expansion = updates.expansion;
+    if (updates.saveFilePath !== undefined) updateObj.saveFilePath = updates.saveFilePath;
+    if (updates.deleted !== undefined) updateObj.deletedAt = toISOString(updates.deleted);
 
-    // Map field names from Character to database field names
-    const dbFieldMap: Record<string, string> = {
-      characterClass: 'character_class',
-      saveFilePath: 'save_file_path',
-      lastUpdated: 'updated_at',
-      created: 'created_at',
-      deleted: 'deleted_at',
-    };
+    if (Object.keys(updateObj).length === 0) return;
 
-    const dbFields = fields.map((field) => dbFieldMap[field] || field);
-    const setClause = dbFields.map((field) => `${field} = ?`).join(', ');
-    const stmt = this.db.prepare(`UPDATE characters SET ${setClause} WHERE id = ?`);
-    const mappedValues = mapValuesToSqlite(values);
-    stmt.run(...mappedValues, id);
+    this.db.update(characters).set(updateObj).where(eq(characters.id, id)).run();
   }
 
   /**
    * Inserts or updates multiple characters using a transaction.
    * Much more efficient than calling upsertCharacter() multiple times.
-   * @param characters - Array of characters to upsert
+   * @param chars - Array of characters to upsert
    */
-  upsertCharactersBatch(characters: Character[]): void {
-    if (characters.length === 0) return;
+  upsertCharactersBatch(chars: Character[]): void {
+    if (chars.length === 0) return;
 
-    const stmt = this.db.prepare(`
-      INSERT OR REPLACE INTO characters (id, name, character_class, level, hardcore, expansion, save_file_path)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `);
-
-    const transaction = this.db.transaction((chars: Character[]) => {
-      for (const character of chars) {
-        const mappedCharacter = mapCharacterToDatabase({
-          id: character.id,
-          name: character.name,
-          character_class: character.characterClass,
-          level: character.level,
-          hardcore: character.hardcore,
-          expansion: character.expansion,
-          save_file_path: character.saveFilePath,
-        });
-        stmt.run(
-          mappedCharacter.id,
-          mappedCharacter.name,
-          mappedCharacter.character_class,
-          mappedCharacter.level,
-          mappedCharacter.hardcore,
-          mappedCharacter.expansion,
-          mappedCharacter.save_file_path,
-        );
+    const insertMany = this.rawDb.transaction(() => {
+      for (const char of chars) {
+        this.db
+          .insert(characters)
+          .values({
+            id: char.id,
+            name: char.name,
+            characterClass: char.characterClass,
+            level: char.level,
+            hardcore: char.hardcore,
+            expansion: char.expansion,
+            saveFilePath: char.saveFilePath ?? null,
+          })
+          .onConflictDoUpdate({
+            target: characters.id,
+            set: {
+              name: char.name,
+              characterClass: char.characterClass,
+              level: char.level,
+              hardcore: char.hardcore,
+              expansion: char.expansion,
+              saveFilePath: char.saveFilePath ?? null,
+            },
+          })
+          .run();
       }
     });
-
-    transaction(characters);
+    insertMany();
   }
 
   /**
@@ -533,9 +644,12 @@ class GrailDatabase {
    * @returns The character if found, undefined otherwise
    */
   getCharacterByName(name: string): Character | undefined {
-    const stmt = this.db.prepare('SELECT * FROM characters WHERE name = ? AND deleted_at IS NULL');
-    const dbCharacter = stmt.get(name) as DatabaseCharacter | undefined;
-    return dbCharacter ? mapDatabaseCharacterToCharacter(dbCharacter) : undefined;
+    const dbChar = this.db
+      .select()
+      .from(characters)
+      .where(and(eq(characters.name, name), isNull(characters.deletedAt)))
+      .get();
+    return dbChar ? dbCharacterToCharacter(dbChar) : undefined;
   }
 
   /**
@@ -544,9 +658,12 @@ class GrailDatabase {
    * @returns The character if found, undefined otherwise
    */
   getCharacterById(id: string): Character | undefined {
-    const stmt = this.db.prepare('SELECT * FROM characters WHERE id = ? AND deleted_at IS NULL');
-    const dbCharacter = stmt.get(id) as DatabaseCharacter | undefined;
-    return dbCharacter ? mapDatabaseCharacterToCharacter(dbCharacter) : undefined;
+    const dbChar = this.db
+      .select()
+      .from(characters)
+      .where(and(eq(characters.id, id), isNull(characters.deletedAt)))
+      .get();
+    return dbChar ? dbCharacterToCharacter(dbChar) : undefined;
   }
 
   /**
@@ -555,11 +672,12 @@ class GrailDatabase {
    * @returns The character if found, undefined otherwise
    */
   getCharacterBySaveFilePath(saveFilePath: string): Character | undefined {
-    const stmt = this.db.prepare(
-      'SELECT * FROM characters WHERE save_file_path = ? AND deleted_at IS NULL',
-    );
-    const dbCharacter = stmt.get(saveFilePath) as DatabaseCharacter | undefined;
-    return dbCharacter ? mapDatabaseCharacterToCharacter(dbCharacter) : undefined;
+    const dbChar = this.db
+      .select()
+      .from(characters)
+      .where(and(eq(characters.saveFilePath, saveFilePath), isNull(characters.deletedAt)))
+      .get();
+    return dbChar ? dbCharacterToCharacter(dbChar) : undefined;
   }
 
   /**
@@ -568,49 +686,56 @@ class GrailDatabase {
    * @param character - The character data to insert or update
    */
   upsertCharacter(character: Character): void {
-    const stmt = this.db.prepare(`
-      INSERT OR REPLACE INTO characters (id, name, character_class, level, hardcore, expansion, save_file_path)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `);
-    const mappedCharacter = mapCharacterToDatabase({
-      id: character.id,
-      name: character.name,
-      character_class: character.characterClass,
-      level: character.level,
-      hardcore: character.hardcore,
-      expansion: character.expansion,
-      save_file_path: character.saveFilePath,
-    });
-    stmt.run(
-      mappedCharacter.id,
-      mappedCharacter.name,
-      mappedCharacter.character_class,
-      mappedCharacter.level,
-      mappedCharacter.hardcore,
-      mappedCharacter.expansion,
-      mappedCharacter.save_file_path,
-    );
+    this.db
+      .insert(characters)
+      .values({
+        id: character.id,
+        name: character.name,
+        characterClass: character.characterClass,
+        level: character.level,
+        hardcore: character.hardcore,
+        expansion: character.expansion,
+        saveFilePath: character.saveFilePath ?? null,
+      })
+      .onConflictDoUpdate({
+        target: characters.id,
+        set: {
+          name: character.name,
+          characterClass: character.characterClass,
+          level: character.level,
+          hardcore: character.hardcore,
+          expansion: character.expansion,
+          saveFilePath: character.saveFilePath ?? null,
+        },
+      })
+      .run();
   }
 
+  // ============================================================================
   // Grail Progress methods
+  // ============================================================================
+
   /**
    * Retrieves all grail progress records from the database.
    * @returns Array of all grail progress records, ordered by most recently updated
    */
   getAllProgress(): GrailProgress[] {
-    const stmt = this.db.prepare('SELECT * FROM grail_progress ORDER BY updated_at DESC');
-    const dbProgress = stmt.all() as DatabaseGrailProgress[];
-    return dbProgress.map(mapDatabaseProgressToProgress);
+    const dbProgress = this.db
+      .select()
+      .from(grailProgress)
+      .orderBy(desc(grailProgress.updatedAt))
+      .all();
+    return dbProgress.map(dbProgressToProgress);
   }
 
   /**
    * Retrieves grail progress records filtered by current user settings.
-   * @param settings - Current user settings for filtering progress
+   * @param userSettings - Current user settings for filtering progress
    * @returns Array of filtered grail progress records based on settings
    */
-  getFilteredProgress(settings: Settings): GrailProgress[] {
+  getFilteredProgress(userSettings: Settings): GrailProgress[] {
     const allProgress = this.getAllProgress();
-    const filteredItems = this.getFilteredItems(settings);
+    const filteredItems = this.getFilteredItems(userSettings);
     const filteredItemIds = new Set(filteredItems.map((item) => item.id));
 
     return allProgress.filter((progress) => filteredItemIds.has(progress.itemId));
@@ -622,9 +747,12 @@ class GrailDatabase {
    * @returns Array of grail progress records for the specified character
    */
   getProgressByCharacter(characterId: string): GrailProgress[] {
-    const stmt = this.db.prepare('SELECT * FROM grail_progress WHERE character_id = ?');
-    const dbProgress = stmt.all(characterId) as DatabaseGrailProgress[];
-    return dbProgress.map(mapDatabaseProgressToProgress);
+    const dbProgress = this.db
+      .select()
+      .from(grailProgress)
+      .where(eq(grailProgress.characterId, characterId))
+      .all();
+    return dbProgress.map(dbProgressToProgress);
   }
 
   /**
@@ -633,9 +761,12 @@ class GrailDatabase {
    * @returns Array of grail progress records for the specified item
    */
   getProgressByItem(itemId: string): GrailProgress[] {
-    const stmt = this.db.prepare('SELECT * FROM grail_progress WHERE item_id = ?');
-    const dbProgress = stmt.all(itemId) as DatabaseGrailProgress[];
-    return dbProgress.map(mapDatabaseProgressToProgress);
+    const dbProgress = this.db
+      .select()
+      .from(grailProgress)
+      .where(eq(grailProgress.itemId, itemId))
+      .all();
+    return dbProgress.map(dbProgressToProgress);
   }
 
   /**
@@ -645,11 +776,12 @@ class GrailDatabase {
    * @returns The grail progress record if found, null otherwise
    */
   getCharacterProgress(characterId: string, itemId: string): GrailProgress | null {
-    const stmt = this.db.prepare(
-      'SELECT * FROM grail_progress WHERE character_id = ? AND item_id = ?',
-    );
-    const dbProgress = stmt.get(characterId, itemId) as DatabaseGrailProgress | undefined;
-    return dbProgress ? mapDatabaseProgressToProgress(dbProgress) : null;
+    const dbProg = this.db
+      .select()
+      .from(grailProgress)
+      .where(and(eq(grailProgress.characterId, characterId), eq(grailProgress.itemId, itemId)))
+      .get();
+    return dbProg ? dbProgressToProgress(dbProg) : null;
   }
 
   /**
@@ -658,23 +790,35 @@ class GrailDatabase {
    * @param progress - The grail progress data to insert or update
    */
   upsertProgress(progress: GrailProgress): void {
-    const stmt = this.db.prepare(`
-      INSERT OR REPLACE INTO grail_progress (id, character_id, item_id, found_date, manually_added, auto_detected, difficulty, notes, is_ethereal, from_initial_scan)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `);
-    const mappedProgress = mapProgressToDatabase(progress);
-    stmt.run(
-      mappedProgress.id,
-      mappedProgress.character_id,
-      mappedProgress.item_id,
-      mappedProgress.found_date,
-      mappedProgress.manually_added,
-      mappedProgress.auto_detected,
-      mappedProgress.difficulty,
-      mappedProgress.notes,
-      mappedProgress.is_ethereal,
-      mappedProgress.from_initial_scan,
-    );
+    this.db
+      .insert(grailProgress)
+      .values({
+        id: progress.id,
+        characterId: progress.characterId,
+        itemId: progress.itemId,
+        foundDate: toISOString(progress.foundDate),
+        manuallyAdded: progress.manuallyAdded,
+        autoDetected: true,
+        difficulty: progress.difficulty ?? null,
+        notes: progress.notes ?? null,
+        isEthereal: progress.isEthereal,
+        fromInitialScan: progress.fromInitialScan ?? false,
+      })
+      .onConflictDoUpdate({
+        target: grailProgress.id,
+        set: {
+          characterId: progress.characterId,
+          itemId: progress.itemId,
+          foundDate: toISOString(progress.foundDate),
+          manuallyAdded: progress.manuallyAdded,
+          autoDetected: true,
+          difficulty: progress.difficulty ?? null,
+          notes: progress.notes ?? null,
+          isEthereal: progress.isEthereal,
+          fromInitialScan: progress.fromInitialScan ?? false,
+        },
+      })
+      .run();
   }
 
   /**
@@ -685,91 +829,104 @@ class GrailDatabase {
   upsertProgressBatch(progressList: GrailProgress[]): void {
     if (progressList.length === 0) return;
 
-    const stmt = this.db.prepare(`
-      INSERT OR REPLACE INTO grail_progress (id, character_id, item_id, found_date, manually_added, auto_detected, difficulty, notes, is_ethereal, from_initial_scan)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `);
-
-    const transaction = this.db.transaction((progList: GrailProgress[]) => {
-      for (const progress of progList) {
-        const mappedProgress = mapProgressToDatabase(progress);
-        stmt.run(
-          mappedProgress.id,
-          mappedProgress.character_id,
-          mappedProgress.item_id,
-          mappedProgress.found_date,
-          mappedProgress.manually_added,
-          mappedProgress.auto_detected,
-          mappedProgress.difficulty,
-          mappedProgress.notes,
-          mappedProgress.is_ethereal,
-          mappedProgress.from_initial_scan,
-        );
+    const insertMany = this.rawDb.transaction(() => {
+      for (const progress of progressList) {
+        this.db
+          .insert(grailProgress)
+          .values({
+            id: progress.id,
+            characterId: progress.characterId,
+            itemId: progress.itemId,
+            foundDate: toISOString(progress.foundDate),
+            manuallyAdded: progress.manuallyAdded,
+            autoDetected: true,
+            difficulty: progress.difficulty ?? null,
+            notes: progress.notes ?? null,
+            isEthereal: progress.isEthereal,
+            fromInitialScan: progress.fromInitialScan ?? false,
+          })
+          .onConflictDoUpdate({
+            target: grailProgress.id,
+            set: {
+              characterId: progress.characterId,
+              itemId: progress.itemId,
+              foundDate: toISOString(progress.foundDate),
+              manuallyAdded: progress.manuallyAdded,
+              autoDetected: true,
+              difficulty: progress.difficulty ?? null,
+              notes: progress.notes ?? null,
+              isEthereal: progress.isEthereal,
+              fromInitialScan: progress.fromInitialScan ?? false,
+            },
+          })
+          .run();
       }
     });
-
-    transaction(progressList);
+    insertMany();
   }
 
+  // ============================================================================
   // Settings methods
+  // ============================================================================
+
   /**
    * Retrieves all user settings from the database.
    * Converts string values back to their proper types based on the Settings interface.
    * @returns Complete Settings object with all user preferences
    */
   getAllSettings(): Settings {
-    const stmt = this.db.prepare('SELECT * FROM settings');
-    const settings: Record<string, string> = {};
-    (stmt.all() as DatabaseSetting[]).forEach((setting) => {
-      settings[setting.key] = setting.value || '';
-    });
+    const dbSettings = this.db.select().from(settings).all();
+    const settingsMap: Record<string, string> = {};
+    for (const setting of dbSettings) {
+      settingsMap[setting.key] = setting.value ?? '';
+    }
 
     // Convert string values back to their proper types
     const typedSettings: Settings = {
-      saveDir: settings.saveDir || '',
-      lang: settings.lang || 'en',
-      gameMode: this.parseEnumSetting(settings.gameMode, GameMode.Both),
-      grailNormal: this.parseBooleanSetting(settings.grailNormal),
-      grailEthereal: this.parseBooleanSetting(settings.grailEthereal),
-      grailRunes: this.parseBooleanSetting(settings.grailRunes),
-      grailRunewords: this.parseBooleanSetting(settings.grailRunewords),
-      gameVersion: this.parseEnumSetting(settings.gameVersion, GameVersion.Resurrected),
-      enableSounds: this.parseBooleanSetting(settings.enableSounds),
-      notificationVolume: this.parseFloatSetting(settings.notificationVolume, 0.5) || 0.5,
-      inAppNotifications: this.parseBooleanSetting(settings.inAppNotifications),
-      nativeNotifications: this.parseBooleanSetting(settings.nativeNotifications),
-      needsSeeding: this.parseBooleanSetting(settings.needsSeeding),
-      theme: this.parseEnumSetting(settings.theme, 'system' as const),
-      showItemIcons: settings.showItemIcons !== 'false', // Default to true
+      saveDir: settingsMap.saveDir || '',
+      lang: settingsMap.lang || 'en',
+      gameMode: this.parseEnumSetting(settingsMap.gameMode, GameMode.Both),
+      grailNormal: this.parseBooleanSetting(settingsMap.grailNormal),
+      grailEthereal: this.parseBooleanSetting(settingsMap.grailEthereal),
+      grailRunes: this.parseBooleanSetting(settingsMap.grailRunes),
+      grailRunewords: this.parseBooleanSetting(settingsMap.grailRunewords),
+      gameVersion: this.parseEnumSetting(settingsMap.gameVersion, GameVersion.Resurrected),
+      enableSounds: this.parseBooleanSetting(settingsMap.enableSounds),
+      notificationVolume: this.parseFloatSetting(settingsMap.notificationVolume, 0.5) || 0.5,
+      inAppNotifications: this.parseBooleanSetting(settingsMap.inAppNotifications),
+      nativeNotifications: this.parseBooleanSetting(settingsMap.nativeNotifications),
+      needsSeeding: this.parseBooleanSetting(settingsMap.needsSeeding),
+      theme: this.parseEnumSetting(settingsMap.theme, 'system' as const),
+      showItemIcons: settingsMap.showItemIcons !== 'false', // Default to true
       // D2R installation settings
-      d2rInstallPath: settings.d2rInstallPath || undefined,
-      iconConversionStatus: settings.iconConversionStatus as
+      d2rInstallPath: settingsMap.d2rInstallPath || undefined,
+      iconConversionStatus: settingsMap.iconConversionStatus as
         | 'not_started'
         | 'in_progress'
         | 'completed'
         | 'failed'
         | undefined,
       iconConversionProgress: this.parseJSONSetting<{ current: number; total: number }>(
-        settings.iconConversionProgress,
+        settingsMap.iconConversionProgress,
       ),
       // Advanced monitoring settings
-      tickReaderIntervalMs: this.parseIntSetting(settings.tickReaderIntervalMs),
-      chokidarPollingIntervalMs: this.parseIntSetting(settings.chokidarPollingIntervalMs),
-      fileStabilityThresholdMs: this.parseIntSetting(settings.fileStabilityThresholdMs),
-      fileChangeDebounceMs: this.parseIntSetting(settings.fileChangeDebounceMs),
+      tickReaderIntervalMs: this.parseIntSetting(settingsMap.tickReaderIntervalMs),
+      chokidarPollingIntervalMs: this.parseIntSetting(settingsMap.chokidarPollingIntervalMs),
+      fileStabilityThresholdMs: this.parseIntSetting(settingsMap.fileStabilityThresholdMs),
+      fileChangeDebounceMs: this.parseIntSetting(settingsMap.fileChangeDebounceMs),
       // Widget settings
-      widgetEnabled: this.parseBooleanSetting(settings.widgetEnabled),
-      widgetDisplay: this.parseEnumSetting(settings.widgetDisplay, 'overall' as const),
-      widgetPosition: this.parseJSONSetting<{ x: number; y: number }>(settings.widgetPosition),
-      widgetOpacity: this.parseFloatSetting(settings.widgetOpacity, 0.9) ?? 0.9,
+      widgetEnabled: this.parseBooleanSetting(settingsMap.widgetEnabled),
+      widgetDisplay: this.parseEnumSetting(settingsMap.widgetDisplay, 'overall' as const),
+      widgetPosition: this.parseJSONSetting<{ x: number; y: number }>(settingsMap.widgetPosition),
+      widgetOpacity: this.parseFloatSetting(settingsMap.widgetOpacity, 0.9) ?? 0.9,
       widgetSizeOverall: this.parseJSONSetting<{ width: number; height: number }>(
-        settings.widgetSizeOverall,
+        settingsMap.widgetSizeOverall,
       ),
       widgetSizeSplit: this.parseJSONSetting<{ width: number; height: number }>(
-        settings.widgetSizeSplit,
+        settingsMap.widgetSizeSplit,
       ),
       widgetSizeAll: this.parseJSONSetting<{ width: number; height: number }>(
-        settings.widgetSizeAll,
+        settingsMap.widgetSizeAll,
       ),
       // Main window settings
       mainWindowBounds: this.parseJSONSetting<{
@@ -777,32 +934,35 @@ class GrailDatabase {
         y: number;
         width: number;
         height: number;
-      }>(settings.mainWindowBounds),
+      }>(settingsMap.mainWindowBounds),
       // Wizard settings
-      wizardCompleted: this.parseBooleanSetting(settings.wizardCompleted),
-      wizardSkipped: this.parseBooleanSetting(settings.wizardSkipped),
+      wizardCompleted: this.parseBooleanSetting(settingsMap.wizardCompleted),
+      wizardSkipped: this.parseBooleanSetting(settingsMap.wizardSkipped),
       // Terror zone configuration
-      terrorZoneConfig: this.parseJSONSetting<Record<number, boolean>>(settings.terrorZoneConfig),
-      terrorZoneBackupCreated: this.parseBooleanSetting(settings.terrorZoneBackupCreated),
+      terrorZoneConfig: this.parseJSONSetting<Record<number, boolean>>(
+        settingsMap.terrorZoneConfig,
+      ),
+      terrorZoneBackupCreated: this.parseBooleanSetting(settingsMap.terrorZoneBackupCreated),
       // Run tracker settings
-      runTrackerAutoStart: this.parseBooleanSetting(settings.runTrackerAutoStart),
-      runTrackerEndThreshold: this.parseIntSetting(settings.runTrackerEndThreshold) ?? 10,
-      runTrackerMemoryReading: this.parseBooleanSetting(settings.runTrackerMemoryReading),
+      runTrackerAutoStart: this.parseBooleanSetting(settingsMap.runTrackerAutoStart),
+      runTrackerEndThreshold: this.parseIntSetting(settingsMap.runTrackerEndThreshold) ?? 10,
+      runTrackerMemoryReading: this.parseBooleanSetting(settingsMap.runTrackerMemoryReading),
       runTrackerMemoryPollingInterval:
-        this.parseIntSetting(settings.runTrackerMemoryPollingInterval) ?? 500,
+        this.parseIntSetting(settingsMap.runTrackerMemoryPollingInterval) ?? 500,
       runTrackerShortcuts: this.parseJSONSetting<Settings['runTrackerShortcuts']>(
-        settings.runTrackerShortcuts,
+        settingsMap.runTrackerShortcuts,
       ),
     };
 
     // Migration: If runTrackerAutoStart was enabled, enable runTrackerMemoryReading
-    // This migrates users from the old auto-start (save file) mode to new auto mode (memory reading)
-    if (settings.runTrackerAutoStart === 'true' && settings.runTrackerMemoryReading !== 'true') {
+    if (
+      settingsMap.runTrackerAutoStart === 'true' &&
+      settingsMap.runTrackerMemoryReading !== 'true'
+    ) {
       console.log(
         '[Database] Migrating runTrackerAutoStart to runTrackerMemoryReading (auto mode)',
       );
       typedSettings.runTrackerMemoryReading = true;
-      // Persist the migration
       this.setSetting('runTrackerMemoryReading', 'true');
     }
 
@@ -811,25 +971,17 @@ class GrailDatabase {
 
   /**
    * Safely parses a JSON string, returning undefined if parsing fails.
-   * Handles invalid JSON gracefully (e.g., "[object Object]" strings or "undefined" strings).
-   * @param jsonString - The JSON string to parse
-   * @returns Parsed JSON object or undefined if parsing fails
    */
   private parseJSON(jsonString: string): unknown {
-    // Handle empty or invalid strings
     if (!jsonString || jsonString === 'undefined' || jsonString === 'null') {
       return undefined;
     }
-
-    // Handle corrupted "[object Object]" strings silently - these are unrecoverable
     if (jsonString === '[object Object]') {
       return undefined;
     }
-
     try {
       return JSON.parse(jsonString);
     } catch {
-      // Only log if it's not the known corrupted value
       if (jsonString !== '[object Object]') {
         console.warn(`Failed to parse JSON setting: "${jsonString}". Using undefined.`);
       }
@@ -837,11 +989,6 @@ class GrailDatabase {
     }
   }
 
-  /**
-   * Parses a JSON setting string into a typed object.
-   * @param value - The setting value to parse
-   * @returns Parsed object or undefined
-   */
   private parseJSONSetting<T>(value: string | undefined): T | undefined {
     if (!value || value === '') {
       return undefined;
@@ -849,21 +996,10 @@ class GrailDatabase {
     return this.parseJSON(value) as T | undefined;
   }
 
-  /**
-   * Parses an integer setting string.
-   * @param value - The setting value to parse
-   * @returns Parsed integer or undefined
-   */
   private parseIntSetting(value: string | undefined): number | undefined {
     return value ? Number.parseInt(value, 10) : undefined;
   }
 
-  /**
-   * Parses a float setting string.
-   * @param value - The setting value to parse
-   * @param defaultValue - Optional default value if parsing fails
-   * @returns Parsed float, default value, or undefined
-   */
   private parseFloatSetting(value: string | undefined, defaultValue?: number): number | undefined {
     if (!value) {
       return defaultValue;
@@ -872,21 +1008,10 @@ class GrailDatabase {
     return Number.isNaN(parsed) ? defaultValue : parsed;
   }
 
-  /**
-   * Parses a boolean setting string.
-   * @param value - The setting value to parse
-   * @returns True if value is 'true', false otherwise
-   */
   private parseBooleanSetting(value: string | undefined): boolean {
     return value === 'true';
   }
 
-  /**
-   * Parses an enum setting string with a default value.
-   * @param value - The setting value to parse
-   * @param defaultValue - Default value if not set
-   * @returns The parsed value or default
-   */
   private parseEnumSetting<T>(value: string | undefined, defaultValue: T): T {
     return (value as T) || defaultValue;
   }
@@ -898,18 +1023,24 @@ class GrailDatabase {
    * @param value - The setting value as a string
    */
   setSetting(key: keyof Settings, value: string): void {
-    const stmt = this.db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)');
-    stmt.run(key, value);
+    this.db
+      .insert(settings)
+      .values({ key, value })
+      .onConflictDoUpdate({
+        target: settings.key,
+        set: { value },
+      })
+      .run();
   }
 
   /**
    * Retrieves grail statistics filtered by current user settings.
-   * @param settings - Current user settings for filtering statistics
-   * @param characterId - Optional character ID for character-specific statistics. If not provided, returns global statistics.
+   * @param userSettings - Current user settings for filtering statistics
+   * @param characterId - Optional character ID for character-specific statistics
    * @returns Object containing filtered total items, found items, and breakdown by item type
    */
   getFilteredGrailStatistics(
-    settings: Settings,
+    userSettings: Settings,
     characterId?: string,
   ): {
     totalItems: number;
@@ -921,15 +1052,15 @@ class GrailDatabase {
     foundSet: number;
     foundRunes: number;
   } {
-    const filteredItems = this.getFilteredItems(settings);
-    const filteredProgress = this.getFilteredProgress(settings);
+    const filteredItems = this.getFilteredItems(userSettings);
+    const filteredProgress = this.getFilteredProgress(userSettings);
 
     const totalItems = filteredItems.length;
 
     // Count items by type
     const uniqueItems = filteredItems.filter((item) => item.type === 'unique').length;
     const setItems = filteredItems.filter((item) => item.type === 'set').length;
-    const runes = filteredItems.filter((item) => item.type === 'rune').length;
+    const runeItems = filteredItems.filter((item) => item.type === 'rune').length;
 
     // Count found items
     const foundProgress = characterId
@@ -955,35 +1086,36 @@ class GrailDatabase {
       foundItems,
       uniqueItems,
       setItems,
-      runes,
+      runes: runeItems,
       foundUnique,
       foundSet,
       foundRunes,
     };
   }
 
+  // ============================================================================
   // Seeding methods
+  // ============================================================================
+
   /**
    * Upserts all items from the Holy Grail data into the database.
-   * This ensures the database always has the latest item definitions, including any new fields or corrected data.
-   * Uses INSERT OR REPLACE to update existing items without affecting grail progress.
    */
   upsertItemsFromGrailData(): void {
     console.log('Upserting Holy Grail item data...');
-
-    // Upsert all items (insertItems already uses INSERT OR REPLACE)
-    this.insertItems(items);
-
-    console.log(`Upserted ${items.length} items from Holy Grail data`);
+    this.insertItems(grailItemsData);
+    console.log(`Upserted ${grailItemsData.length} items from Holy Grail data`);
   }
 
+  // ============================================================================
   // Utility methods
+  // ============================================================================
+
   /**
    * Creates a backup of the database to the specified path.
    * @param backupPath - The file path where the backup should be saved
    */
   backup(backupPath: string): void {
-    this.db.backup(backupPath);
+    this.rawDb.backup(backupPath);
   }
 
   /**
@@ -992,44 +1124,41 @@ class GrailDatabase {
    * @param backupPath - The file path of the backup to restore from
    */
   restore(backupPath: string): void {
-    // Close current database connection
-    this.db.close();
-
-    // Copy backup file to current database location
+    this.rawDb.close();
     copyFileSync(backupPath, this.dbPath);
-
-    // Reopen database connection
-    this.db = new Database(this.dbPath);
+    this.rawDb = new Database(this.dbPath);
+    this.db = createDrizzleDb(this.rawDb);
     this.initializeSchema();
   }
 
   /**
    * Restores the database from a backup buffer.
-   * Closes the current connection, writes the buffer to the database file, and reopens the database.
    * @param backupBuffer - The buffer containing the backup data
    */
   restoreFromBuffer(backupBuffer: Buffer): void {
-    // Close current database connection
-    this.db.close();
-
-    // Write backup buffer to current database location
+    this.rawDb.close();
     writeFileSync(this.dbPath, backupBuffer);
-
-    // Reopen database connection
-    this.db = new Database(this.dbPath);
+    this.rawDb = new Database(this.dbPath);
+    this.db = createDrizzleDb(this.rawDb);
     this.initializeSchema();
   }
 
+  // ============================================================================
   // Save file states methods
+  // ============================================================================
+
   /**
    * Retrieves the save file state for a specific file path.
    * @param filePath - The path to the save file
    * @returns The save file state or null if not found
    */
   getSaveFileState(filePath: string): SaveFileState | null {
-    const stmt = this.db.prepare('SELECT * FROM save_file_states WHERE file_path = ?');
-    const dbState = stmt.get(filePath) as DatabaseSaveFileState | undefined;
-    return dbState ? mapDatabaseSaveFileStateToSaveFileState(dbState) : null;
+    const dbState = this.db
+      .select()
+      .from(saveFileStates)
+      .where(eq(saveFileStates.filePath, filePath))
+      .get();
+    return dbState ? dbSaveFileStateToSaveFileState(dbState) : null;
   }
 
   /**
@@ -1037,17 +1166,23 @@ class GrailDatabase {
    * @param state - The save file state to store
    */
   upsertSaveFileState(state: SaveFileState): void {
-    const stmt = this.db.prepare(`
-      INSERT OR REPLACE INTO save_file_states (id, file_path, last_modified, last_parsed)
-      VALUES (?, ?, ?, ?)
-    `);
-    const mappedState = mapSaveFileStateToDatabase(state);
-    stmt.run(
-      mappedState.id,
-      mappedState.file_path,
-      mappedState.last_modified,
-      mappedState.last_parsed,
-    );
+    this.db
+      .insert(saveFileStates)
+      .values({
+        id: state.id,
+        filePath: state.filePath,
+        lastModified: state.lastModified.toISOString(),
+        lastParsed: state.lastParsed.toISOString(),
+      })
+      .onConflictDoUpdate({
+        target: saveFileStates.id,
+        set: {
+          filePath: state.filePath,
+          lastModified: state.lastModified.toISOString(),
+          lastParsed: state.lastParsed.toISOString(),
+        },
+      })
+      .run();
   }
 
   /**
@@ -1055,9 +1190,12 @@ class GrailDatabase {
    * @returns Array of all save file states
    */
   getAllSaveFileStates(): SaveFileState[] {
-    const stmt = this.db.prepare('SELECT * FROM save_file_states ORDER BY file_path');
-    const dbStates = stmt.all() as DatabaseSaveFileState[];
-    return dbStates.map(mapDatabaseSaveFileStateToSaveFileState);
+    const dbStates = this.db
+      .select()
+      .from(saveFileStates)
+      .orderBy(asc(saveFileStates.filePath))
+      .all();
+    return dbStates.map(dbSaveFileStateToSaveFileState);
   }
 
   /**
@@ -1065,8 +1203,7 @@ class GrailDatabase {
    * @param filePath - The path to the save file
    */
   deleteSaveFileState(filePath: string): void {
-    const stmt = this.db.prepare('DELETE FROM save_file_states WHERE file_path = ?');
-    stmt.run(filePath);
+    this.db.delete(saveFileStates).where(eq(saveFileStates.filePath, filePath)).run();
   }
 
   /**
@@ -1074,22 +1211,27 @@ class GrailDatabase {
    * Used when changing save directories.
    */
   clearAllSaveFileStates(): void {
-    this.db.prepare('DELETE FROM save_file_states').run();
+    this.db.delete(saveFileStates).run();
   }
 
+  // ============================================================================
   // Session methods
+  // ============================================================================
+
   /**
    * Retrieves all sessions regardless of character.
    * @param includeArchived - Whether to include archived sessions (default: false)
    * @returns Array of sessions ordered by start time (most recent first)
    */
   getAllSessions(includeArchived: boolean = false): Session[] {
-    const archivedCondition = includeArchived ? '' : 'AND archived = 0';
-    const stmt = this.db.prepare(
-      `SELECT * FROM sessions ${archivedCondition ? `WHERE ${archivedCondition}` : ''} ORDER BY start_time DESC`,
-    );
-    const dbSessions = stmt.all() as DatabaseSession[];
-    return dbSessions.map(mapDatabaseSessionToSession);
+    let query = this.db.select().from(sessions).$dynamic();
+
+    if (!includeArchived) {
+      query = query.where(eq(sessions.archived, false));
+    }
+
+    const dbSessions = query.orderBy(desc(sessions.startTime)).all();
+    return dbSessions.map(dbSessionToSession);
   }
 
   /**
@@ -1098,9 +1240,8 @@ class GrailDatabase {
    * @returns The session if found, null otherwise
    */
   getSessionById(sessionId: string): Session | null {
-    const stmt = this.db.prepare('SELECT * FROM sessions WHERE id = ?');
-    const dbSession = stmt.get(sessionId) as DatabaseSession | undefined;
-    return dbSession ? mapDatabaseSessionToSession(dbSession) : null;
+    const dbSession = this.db.select().from(sessions).where(eq(sessions.id, sessionId)).get();
+    return dbSession ? dbSessionToSession(dbSession) : null;
   }
 
   /**
@@ -1108,45 +1249,46 @@ class GrailDatabase {
    * @returns The active session if found, null otherwise
    */
   getActiveSession(): Session | null {
-    const stmt = this.db.prepare(
-      'SELECT * FROM sessions WHERE archived = 0 AND end_time IS NULL ORDER BY start_time DESC LIMIT 1',
-    );
-    const dbSession = stmt.get() as DatabaseSession | undefined;
-    return dbSession ? mapDatabaseSessionToSession(dbSession) : null;
+    const dbSession = this.db
+      .select()
+      .from(sessions)
+      .where(and(eq(sessions.archived, false), isNull(sessions.endTime)))
+      .orderBy(desc(sessions.startTime))
+      .limit(1)
+      .get();
+    return dbSession ? dbSessionToSession(dbSession) : null;
   }
 
   /**
    * Inserts or updates a session.
-   * Uses INSERT OR REPLACE to handle both insert and update operations.
    * @param session - The session data to insert or update
    */
   upsertSession(session: Session): void {
-    // Use INSERT ... ON CONFLICT DO UPDATE instead of INSERT OR REPLACE
-    // to avoid triggering ON DELETE CASCADE which would delete all runs!
-    const stmt = this.db.prepare(`
-      INSERT INTO sessions (id, start_time, end_time, total_run_time, total_session_time, run_count, archived, notes)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-      ON CONFLICT(id) DO UPDATE SET
-        start_time = excluded.start_time,
-        end_time = excluded.end_time,
-        total_run_time = excluded.total_run_time,
-        total_session_time = excluded.total_session_time,
-        run_count = excluded.run_count,
-        archived = excluded.archived,
-        notes = excluded.notes,
-        updated_at = CURRENT_TIMESTAMP
-    `);
-    const mapped = mapSessionToDatabase(session);
-    stmt.run(
-      mapped.id,
-      mapped.start_time,
-      mapped.end_time,
-      mapped.total_run_time,
-      mapped.total_session_time,
-      mapped.run_count,
-      mapped.archived,
-      mapped.notes,
-    );
+    this.db
+      .insert(sessions)
+      .values({
+        id: session.id,
+        startTime: session.startTime.toISOString(),
+        endTime: toISOString(session.endTime),
+        totalRunTime: session.totalRunTime,
+        totalSessionTime: session.totalSessionTime,
+        runCount: session.runCount,
+        archived: session.archived,
+        notes: session.notes ?? null,
+      })
+      .onConflictDoUpdate({
+        target: sessions.id,
+        set: {
+          startTime: session.startTime.toISOString(),
+          endTime: toISOString(session.endTime),
+          totalRunTime: session.totalRunTime,
+          totalSessionTime: session.totalSessionTime,
+          runCount: session.runCount,
+          archived: session.archived,
+          notes: session.notes ?? null,
+        },
+      })
+      .run();
   }
 
   /**
@@ -1154,8 +1296,7 @@ class GrailDatabase {
    * @param sessionId - The unique identifier of the session to archive
    */
   archiveSession(sessionId: string): void {
-    const stmt = this.db.prepare('UPDATE sessions SET archived = 1 WHERE id = ?');
-    stmt.run(sessionId);
+    this.db.update(sessions).set({ archived: true }).where(eq(sessions.id, sessionId)).run();
   }
 
   /**
@@ -1163,26 +1304,29 @@ class GrailDatabase {
    * @param sessionId - The unique identifier of the session to delete
    */
   deleteSession(sessionId: string): void {
-    const stmt = this.db.prepare('DELETE FROM sessions WHERE id = ?');
-    stmt.run(sessionId);
+    this.db.delete(sessions).where(eq(sessions.id, sessionId)).run();
   }
 
+  // ============================================================================
   // Session Statistics methods
+  // ============================================================================
+
   /**
    * Retrieves comprehensive statistics for a specific session.
    * @param sessionId - The unique identifier of the session
    * @returns Session statistics or null if session not found
    */
   getSessionStatistics(sessionId: string): SessionStats | null {
-    const sessionStmt = this.db.prepare('SELECT * FROM sessions WHERE id = ?');
-    const session = sessionStmt.get(sessionId) as DatabaseSession | undefined;
+    const session = this.db.select().from(sessions).where(eq(sessions.id, sessionId)).get();
 
     if (!session) {
       return null;
     }
 
-    // Get run statistics for this session
-    const runStatsStmt = this.db.prepare(`
+    // Get run statistics for this session using raw SQL for aggregations
+    const runStatsResult = this.rawDb
+      .prepare(
+        `
       SELECT
         COUNT(*) as totalRuns,
         AVG(CASE WHEN duration IS NOT NULL THEN duration ELSE 0 END) as averageRunDuration,
@@ -1190,8 +1334,9 @@ class GrailDatabase {
         MAX(CASE WHEN duration IS NOT NULL THEN duration ELSE NULL END) as slowestRun
       FROM runs
       WHERE session_id = ?
-    `);
-    const runStats = runStatsStmt.get(sessionId) as {
+    `,
+      )
+      .get(sessionId) as {
       totalRuns: number;
       averageRunDuration: number | null;
       fastestRun: number | null;
@@ -1199,7 +1344,9 @@ class GrailDatabase {
     };
 
     // Get item statistics for this session
-    const itemStatsStmt = this.db.prepare(`
+    const itemStatsResult = this.rawDb
+      .prepare(
+        `
       SELECT
         COUNT(ri.id) as itemsFound,
         COUNT(CASE WHEN gp.from_initial_scan = 0 THEN ri.id END) as newGrailItems
@@ -1207,33 +1354,39 @@ class GrailDatabase {
       INNER JOIN runs r ON ri.run_id = r.id
       LEFT JOIN grail_progress gp ON ri.grail_progress_id = gp.id
       WHERE r.session_id = ?
-    `);
-    const itemStats = itemStatsStmt.get(sessionId) as {
+    `,
+      )
+      .get(sessionId) as {
       itemsFound: number;
       newGrailItems: number;
     };
 
     return {
       sessionId: session.id,
-      totalRuns: runStats.totalRuns,
-      totalTime: session.total_session_time,
-      totalRunTime: session.total_run_time,
-      averageRunDuration: runStats.averageRunDuration || 0,
-      fastestRun: runStats.fastestRun || 0,
-      slowestRun: runStats.slowestRun || 0,
-      itemsFound: itemStats.itemsFound,
-      newGrailItems: itemStats.newGrailItems,
+      totalRuns: runStatsResult.totalRuns,
+      totalTime: session.totalSessionTime ?? 0,
+      totalRunTime: session.totalRunTime ?? 0,
+      averageRunDuration: runStatsResult.averageRunDuration || 0,
+      fastestRun: runStatsResult.fastestRun || 0,
+      slowestRun: runStatsResult.slowestRun || 0,
+      itemsFound: itemStatsResult.itemsFound,
+      newGrailItems: itemStatsResult.newGrailItems,
     };
   }
 
+  // ============================================================================
   // Run Statistics methods
+  // ============================================================================
+
   /**
    * Retrieves overall run statistics across all sessions.
    * @returns Overall run statistics
    */
   getOverallRunStatistics(): RunStatistics {
     // Get session and run counts
-    const sessionStatsStmt = this.db.prepare(`
+    const sessionStatsResult = this.rawDb
+      .prepare(
+        `
       SELECT
         COUNT(DISTINCT s.id) as totalSessions,
         COUNT(r.id) as totalRuns,
@@ -1241,15 +1394,18 @@ class GrailDatabase {
       FROM sessions s
       LEFT JOIN runs r ON s.id = r.session_id
       WHERE s.archived = 0
-    `);
-    const sessionStats = sessionStatsStmt.get([]) as {
+    `,
+      )
+      .get() as {
       totalSessions: number;
       totalRuns: number;
       totalTime: number | null;
     };
 
     // Get run duration statistics
-    const runDurationStmt = this.db.prepare(`
+    const runDurationResult = this.rawDb
+      .prepare(
+        `
       SELECT
         AVG(CASE WHEN r.duration IS NOT NULL THEN r.duration ELSE 0 END) as averageRunDuration,
         MIN(CASE WHEN r.duration IS NOT NULL THEN r.duration ELSE NULL END) as minDuration,
@@ -1257,40 +1413,45 @@ class GrailDatabase {
       FROM runs r
       INNER JOIN sessions s ON r.session_id = s.id
       WHERE s.archived = 0
-    `);
-    const runDuration = runDurationStmt.get([]) as {
+    `,
+      )
+      .get() as {
       averageRunDuration: number | null;
       minDuration: number | null;
       maxDuration: number | null;
     };
 
-    // Get fastest and slowest run details
-    const fastestRunStmt = this.db.prepare(`
+    // Get fastest run details
+    const fastestRunResult = this.rawDb
+      .prepare(
+        `
       SELECT r.id, r.duration, r.start_time
       FROM runs r
       INNER JOIN sessions s ON r.session_id = s.id
       WHERE s.archived = 0 AND r.duration IS NOT NULL
       ORDER BY r.duration ASC
       LIMIT 1
-    `);
-    const fastestRun = fastestRunStmt.get([]) as
-      | { id: string; duration: number; start_time: string }
-      | undefined;
+    `,
+      )
+      .get() as { id: string; duration: number; start_time: string } | undefined;
 
-    const slowestRunStmt = this.db.prepare(`
+    const slowestRunResult = this.rawDb
+      .prepare(
+        `
       SELECT r.id, r.duration, r.start_time
       FROM runs r
       INNER JOIN sessions s ON r.session_id = s.id
       WHERE s.archived = 0 AND r.duration IS NOT NULL
       ORDER BY r.duration DESC
       LIMIT 1
-    `);
-    const slowestRun = slowestRunStmt.get() as
-      | { id: string; duration: number; start_time: string }
-      | undefined;
+    `,
+      )
+      .get() as { id: string; duration: number; start_time: string } | undefined;
 
     // Get items per run average
-    const itemsPerRunStmt = this.db.prepare(`
+    const itemsPerRunResult = this.rawDb
+      .prepare(
+        `
       SELECT
         COUNT(ri.id) as totalItems,
         COUNT(DISTINCT r.id) as runsWithItems
@@ -1298,33 +1459,36 @@ class GrailDatabase {
       INNER JOIN sessions s ON r.session_id = s.id
       LEFT JOIN run_items ri ON r.id = ri.run_id
       WHERE s.archived = 0
-    `);
-    const itemsPerRun = itemsPerRunStmt.get([]) as {
+    `,
+      )
+      .get() as {
       totalItems: number;
       runsWithItems: number;
     };
 
     return {
-      totalSessions: sessionStats.totalSessions,
-      totalRuns: sessionStats.totalRuns,
-      totalTime: sessionStats.totalTime || 0,
-      averageRunDuration: runDuration.averageRunDuration || 0,
-      fastestRun: fastestRun
+      totalSessions: sessionStatsResult.totalSessions,
+      totalRuns: sessionStatsResult.totalRuns,
+      totalTime: sessionStatsResult.totalTime || 0,
+      averageRunDuration: runDurationResult.averageRunDuration || 0,
+      fastestRun: fastestRunResult
         ? {
-            runId: fastestRun.id,
-            duration: fastestRun.duration,
-            timestamp: new Date(fastestRun.start_time),
+            runId: fastestRunResult.id,
+            duration: fastestRunResult.duration,
+            timestamp: new Date(fastestRunResult.start_time),
           }
         : { runId: '', duration: 0, timestamp: new Date() },
-      slowestRun: slowestRun
+      slowestRun: slowestRunResult
         ? {
-            runId: slowestRun.id,
-            duration: slowestRun.duration,
-            timestamp: new Date(slowestRun.start_time),
+            runId: slowestRunResult.id,
+            duration: slowestRunResult.duration,
+            timestamp: new Date(slowestRunResult.start_time),
           }
         : { runId: '', duration: 0, timestamp: new Date() },
       itemsPerRun:
-        itemsPerRun.runsWithItems > 0 ? itemsPerRun.totalItems / itemsPerRun.runsWithItems : 0,
+        itemsPerRunResult.runsWithItems > 0
+          ? itemsPerRunResult.totalItems / itemsPerRunResult.runsWithItems
+          : 0,
     };
   }
 
@@ -1334,9 +1498,13 @@ class GrailDatabase {
    * @returns Array of runs ordered by run number
    */
   getRunsBySession(sessionId: string): Run[] {
-    const stmt = this.db.prepare('SELECT * FROM runs WHERE session_id = ? ORDER BY run_number ASC');
-    const dbRuns = stmt.all(sessionId) as DatabaseRun[];
-    return dbRuns.map(mapDatabaseRunToRun);
+    const dbRuns = this.db
+      .select()
+      .from(runs)
+      .where(eq(runs.sessionId, sessionId))
+      .orderBy(asc(runs.runNumber))
+      .all();
+    return dbRuns.map(dbRunToRun);
   }
 
   /**
@@ -1345,42 +1513,44 @@ class GrailDatabase {
    * @returns The active run if found, null otherwise
    */
   getActiveRun(sessionId: string): Run | null {
-    const stmt = this.db.prepare(
-      'SELECT * FROM runs WHERE session_id = ? AND end_time IS NULL ORDER BY start_time DESC LIMIT 1',
-    );
-    const dbRun = stmt.get(sessionId) as DatabaseRun | undefined;
-    return dbRun ? mapDatabaseRunToRun(dbRun) : null;
+    const dbRun = this.db
+      .select()
+      .from(runs)
+      .where(and(eq(runs.sessionId, sessionId), isNull(runs.endTime)))
+      .orderBy(desc(runs.startTime))
+      .limit(1)
+      .get();
+    return dbRun ? dbRunToRun(dbRun) : null;
   }
 
   /**
    * Inserts or updates a run.
-   * Uses INSERT OR REPLACE to handle both insert and update operations.
    * @param run - The run data to insert or update
    */
   upsertRun(run: Run): void {
-    // Use INSERT ... ON CONFLICT DO UPDATE for true UPSERT behavior
-    const stmt = this.db.prepare(`
-      INSERT INTO runs (id, session_id, character_id, run_number, start_time, end_time, duration)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-      ON CONFLICT(id) DO UPDATE SET
-        session_id = excluded.session_id,
-        character_id = excluded.character_id,
-        run_number = excluded.run_number,
-        start_time = excluded.start_time,
-        end_time = excluded.end_time,
-        duration = excluded.duration,
-        updated_at = CURRENT_TIMESTAMP
-    `);
-    const mapped = mapRunToDatabase(run);
-    stmt.run(
-      mapped.id,
-      mapped.session_id,
-      mapped.character_id,
-      mapped.run_number,
-      mapped.start_time,
-      mapped.end_time,
-      mapped.duration,
-    );
+    this.db
+      .insert(runs)
+      .values({
+        id: run.id,
+        sessionId: run.sessionId,
+        characterId: run.characterId ?? null,
+        runNumber: run.runNumber,
+        startTime: run.startTime.toISOString(),
+        endTime: toISOString(run.endTime),
+        duration: run.duration ?? null,
+      })
+      .onConflictDoUpdate({
+        target: runs.id,
+        set: {
+          sessionId: run.sessionId,
+          characterId: run.characterId ?? null,
+          runNumber: run.runNumber,
+          startTime: run.startTime.toISOString(),
+          endTime: toISOString(run.endTime),
+          duration: run.duration ?? null,
+        },
+      })
+      .run();
   }
 
   /**
@@ -1388,22 +1558,26 @@ class GrailDatabase {
    * @param runId - The unique identifier of the run to delete
    */
   deleteRun(runId: string): void {
-    const stmt = this.db.prepare('DELETE FROM runs WHERE id = ?');
-    stmt.run(runId);
+    this.db.delete(runs).where(eq(runs.id, runId)).run();
   }
 
+  // ============================================================================
   // RunItem methods
+  // ============================================================================
+
   /**
    * Retrieves all items for a run.
    * @param runId - The unique identifier of the run
    * @returns Array of run items ordered by found time
    */
   getRunItems(runId: string): RunItem[] {
-    const stmt = this.db.prepare(
-      'SELECT * FROM run_items WHERE run_id = ? ORDER BY found_time ASC',
-    );
-    const dbItems = stmt.all(runId) as DatabaseRunItem[];
-    return dbItems.map(mapDatabaseRunItemToRunItem);
+    const dbItems = this.db
+      .select()
+      .from(runItems)
+      .where(eq(runItems.runId, runId))
+      .orderBy(asc(runItems.foundTime))
+      .all();
+    return dbItems.map(dbRunItemToRunItem);
   }
 
   /**
@@ -1412,14 +1586,24 @@ class GrailDatabase {
    * @returns Array of run items ordered by found time
    */
   getSessionItems(sessionId: string): RunItem[] {
-    const stmt = this.db.prepare(`
+    const dbItems = this.rawDb
+      .prepare(
+        `
       SELECT ri.* FROM run_items ri
       INNER JOIN runs r ON ri.run_id = r.id
       WHERE r.session_id = ?
       ORDER BY ri.found_time ASC
-    `);
-    const dbItems = stmt.all(sessionId) as DatabaseRunItem[];
-    return dbItems.map(mapDatabaseRunItemToRunItem);
+    `,
+      )
+      .all(sessionId) as DbRunItem[];
+    return dbItems.map((item) => ({
+      id: item.id,
+      runId: item.runId,
+      grailProgressId: item.grailProgressId ?? undefined,
+      name: item.name ?? undefined,
+      foundTime: new Date(item.foundTime),
+      created: new Date(item.createdAt ?? new Date().toISOString()),
+    }));
   }
 
   /**
@@ -1427,40 +1611,40 @@ class GrailDatabase {
    * @param runItem - The run item to insert
    */
   addRunItem(runItem: RunItem): void {
-    const stmt = this.db.prepare(`
-      INSERT INTO run_items (id, run_id, grail_progress_id, name, found_time)
-      VALUES (?, ?, ?, ?, ?)
-    `);
-    const mapped = mapRunItemToDatabase(runItem);
-    stmt.run(mapped.id, mapped.run_id, mapped.grail_progress_id, mapped.name, mapped.found_time);
+    this.db
+      .insert(runItems)
+      .values({
+        id: runItem.id,
+        runId: runItem.runId,
+        grailProgressId: runItem.grailProgressId ?? null,
+        name: runItem.name ?? null,
+        foundTime: runItem.foundTime.toISOString(),
+      })
+      .run();
   }
 
   /**
    * Inserts multiple run items in a single transaction.
-   * @param runItems - Array of run items to insert
+   * @param items - Array of run items to insert
    */
-  addRunItemsBatch(runItems: RunItem[]): void {
-    if (runItems.length === 0) return;
+  addRunItemsBatch(items: RunItem[]): void {
+    if (items.length === 0) return;
 
-    const stmt = this.db.prepare(`
-      INSERT INTO run_items (id, run_id, grail_progress_id, name, found_time)
-      VALUES (?, ?, ?, ?, ?)
-    `);
-
-    const insertMany = this.db.transaction((items: RunItem[]) => {
+    const insertMany = this.rawDb.transaction(() => {
       for (const item of items) {
-        const mapped = mapRunItemToDatabase(item);
-        stmt.run(
-          mapped.id,
-          mapped.run_id,
-          mapped.grail_progress_id,
-          mapped.name,
-          mapped.found_time,
-        );
+        this.db
+          .insert(runItems)
+          .values({
+            id: item.id,
+            runId: item.runId,
+            grailProgressId: item.grailProgressId ?? null,
+            name: item.name ?? null,
+            foundTime: item.foundTime.toISOString(),
+          })
+          .run();
       }
     });
-
-    insertMany(runItems);
+    insertMany();
   }
 
   /**
@@ -1468,8 +1652,7 @@ class GrailDatabase {
    * @param itemId - The unique identifier of the run item to delete
    */
   deleteRunItem(itemId: string): void {
-    const stmt = this.db.prepare('DELETE FROM run_items WHERE id = ?');
-    stmt.run(itemId);
+    this.db.delete(runItems).where(eq(runItems.id, itemId)).run();
   }
 
   /**
@@ -1477,7 +1660,7 @@ class GrailDatabase {
    * Should be called when the application is shutting down.
    */
   close(): void {
-    this.db.close();
+    this.rawDb.close();
   }
 
   /**
@@ -1487,13 +1670,8 @@ class GrailDatabase {
    */
   truncateUserData(): void {
     try {
-      // Delete all characters
-      this.db.prepare('DELETE FROM characters').run();
-
-      // Delete all grail progress
-      this.db.prepare('DELETE FROM grail_progress').run();
-
-      // Clear all save file states (when directory changes)
+      this.db.delete(characters).run();
+      this.db.delete(grailProgress).run();
       this.clearAllSaveFileStates();
 
       console.log(
@@ -1517,4 +1695,3 @@ class GrailDatabase {
 const grailDatabase = new GrailDatabase();
 
 export { GrailDatabase, grailDatabase };
-export type { DatabaseCharacter, DatabaseGrailProgress, DatabaseItem, DatabaseSetting };
