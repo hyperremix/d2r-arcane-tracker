@@ -31,7 +31,7 @@ This project uses modern web technologies:
 - **Frontend**: React 18 + TypeScript + Tailwind CSS v4
 - **Desktop**: Electron 30
 - **Build Tool**: Vite + electron-vite
-- **UI Components**: shadcn/ui (Radix UI primitives)
+- **UI Components**: shadcn/ui (Base UI primitives)
 - **State Management**: Zustand
 - **Database**: SQLite with better-sqlite3
 - **Internationalization**: i18next

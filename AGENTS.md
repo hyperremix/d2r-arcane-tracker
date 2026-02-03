@@ -20,7 +20,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Frontend**: React 18 with TypeScript, styled with Tailwind CSS v4
 - **Backend**: Electron main process (Node.js environment)
 - **Build System**: Vite with electron-vite for development and building
-- **UI Components**: shadcn/ui components (New York style) using Radix UI primitives and class-variance-authority
+- **UI Components**: shadcn/ui components (Vega style) using Base UI primitives and class-variance-authority
 - **State Management**: Zustand for global state
 - **Database**: better-sqlite3 with Drizzle ORM
 - **Internationalization**: i18next with browser language detection

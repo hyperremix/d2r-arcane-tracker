@@ -88,21 +88,19 @@ function ControlButtons({
       <div className="flex flex-wrap gap-2">
         {/* Start Run Button */}
         <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="default"
-              size="sm"
-              onClick={onStartRun}
-              disabled={!canStartRun || loading}
-              className="flex items-center gap-2"
-            >
-              {loading ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Play className="h-4 w-4" />
-              )}
-              Start Run
-            </Button>
+          <TooltipTrigger
+            render={
+              <Button
+                variant="default"
+                size="sm"
+                onClick={onStartRun}
+                disabled={!canStartRun || loading}
+                className="flex items-center gap-2"
+              />
+            }
+          >
+            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
+            Start Run
           </TooltipTrigger>
           <TooltipContent>
             <p>Start a new run ({shortcuts.startRun})</p>
@@ -111,23 +109,25 @@ function ControlButtons({
 
         {/* Pause/Resume Button */}
         <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={isPaused ? onResumeRun : onPauseRun}
-              disabled={!canPauseResume || loading}
-              className="flex items-center gap-2"
-            >
-              {loading ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : isPaused ? (
-                <Play className="h-4 w-4" />
-              ) : (
-                <Pause className="h-4 w-4" />
-              )}
-              {isPaused ? 'Resume' : 'Pause'}
-            </Button>
+          <TooltipTrigger
+            render={
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={isPaused ? onResumeRun : onPauseRun}
+                disabled={!canPauseResume || loading}
+                className="flex items-center gap-2"
+              />
+            }
+          >
+            {loading ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : isPaused ? (
+              <Play className="h-4 w-4" />
+            ) : (
+              <Pause className="h-4 w-4" />
+            )}
+            {isPaused ? 'Resume' : 'Pause'}
           </TooltipTrigger>
           <TooltipContent>
             <p>
@@ -140,21 +140,23 @@ function ControlButtons({
 
         {/* End Run Button */}
         <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={onEndRun}
-              disabled={!canEndRun || loading}
-              className="flex items-center gap-2"
-            >
-              {loading ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Square className="h-4 w-4" />
-              )}
-              End Run
-            </Button>
+          <TooltipTrigger
+            render={
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={onEndRun}
+                disabled={!canEndRun || loading}
+                className="flex items-center gap-2"
+              />
+            }
+          >
+            {loading ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Square className="h-4 w-4" />
+            )}
+            End Run
           </TooltipTrigger>
           <TooltipContent>
             <p>End current run ({shortcuts.endRun})</p>
@@ -163,21 +165,23 @@ function ControlButtons({
 
         {/* End Session Button */}
         <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="destructive"
-              size="sm"
-              onClick={onEndSession}
-              disabled={!canEndSession || loading}
-              className="flex items-center gap-2"
-            >
-              {loading ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <StopCircle className="h-4 w-4" />
-              )}
-              End Session
-            </Button>
+          <TooltipTrigger
+            render={
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={onEndSession}
+                disabled={!canEndSession || loading}
+                className="flex items-center gap-2"
+              />
+            }
+          >
+            {loading ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <StopCircle className="h-4 w-4" />
+            )}
+            End Session
           </TooltipTrigger>
           <TooltipContent>
             <p>End current session ({shortcuts.endSession})</p>

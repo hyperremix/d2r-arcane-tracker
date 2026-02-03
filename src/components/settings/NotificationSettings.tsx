@@ -76,7 +76,10 @@ export function NotificationSettings() {
               max={1}
               step={0.01}
               value={[settings.enableSounds ? settings.notificationVolume : 0]}
-              onValueChange={(values) => updateVolume(values[0])}
+              onValueChange={(value) => {
+                const values = Array.isArray(value) ? value : [value];
+                updateVolume(values[0]);
+              }}
               className="w-20"
               disabled={!settings.enableSounds}
             />

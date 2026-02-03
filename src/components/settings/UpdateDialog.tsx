@@ -59,46 +59,47 @@ export function UpdateDialog({
           <AlertDialogTitle>
             {isInstallDialog ? 'Update Ready to Install' : 'Update Available'}
           </AlertDialogTitle>
-          <AlertDialogDescription asChild>
-            <div className="space-y-3">
-              <div>
-                <p className="font-medium text-sm">
-                  Version {updateInfo.version}
-                  {updateInfo.releaseDate && (
-                    <span className="ml-2 font-normal text-gray-600 dark:text-gray-400">
-                      Released: {formatShortDate(updateInfo.releaseDate)}
-                    </span>
-                  )}
-                </p>
-              </div>
-
-              {updateInfo.releaseNotes && (
-                <div className="rounded-lg bg-gray-50 p-3 dark:bg-gray-900">
-                  <p className="mb-2 font-medium text-sm">Release Notes:</p>
-                  <div className="max-h-48 overflow-y-auto text-xs">
-                    <div
-                      className="release-notes"
-                      // biome-ignore lint/security/noDangerouslySetInnerHtml: HTML is sanitized with DOMPurify before rendering
-                      dangerouslySetInnerHTML={{
-                        __html: DOMPurify.sanitize(updateInfo.releaseNotes),
-                      }}
-                    />
-                  </div>
-                </div>
-              )}
-
-              {isInstallDialog ? (
-                <p className="text-sm">
-                  The update has been downloaded and is ready to install. The application will
-                  restart to complete the installation.
-                </p>
-              ) : (
-                <p className="text-sm">
-                  A new version of the application is available. Would you like to download it now?
-                </p>
-              )}
-            </div>
+          <AlertDialogDescription>
+            <span className="sr-only">Update information</span>
           </AlertDialogDescription>
+          <div className="space-y-3">
+            <div>
+              <p className="font-medium text-sm">
+                Version {updateInfo.version}
+                {updateInfo.releaseDate && (
+                  <span className="ml-2 font-normal text-gray-600 dark:text-gray-400">
+                    Released: {formatShortDate(updateInfo.releaseDate)}
+                  </span>
+                )}
+              </p>
+            </div>
+
+            {updateInfo.releaseNotes && (
+              <div className="rounded-lg bg-gray-50 p-3 dark:bg-gray-900">
+                <p className="mb-2 font-medium text-sm">Release Notes:</p>
+                <div className="max-h-48 overflow-y-auto text-xs">
+                  <div
+                    className="release-notes"
+                    // biome-ignore lint/security/noDangerouslySetInnerHtml: HTML is sanitized with DOMPurify before rendering
+                    dangerouslySetInnerHTML={{
+                      __html: DOMPurify.sanitize(updateInfo.releaseNotes),
+                    }}
+                  />
+                </div>
+              </div>
+            )}
+
+            {isInstallDialog ? (
+              <p className="text-sm">
+                The update has been downloaded and is ready to install. The application will restart
+                to complete the installation.
+              </p>
+            ) : (
+              <p className="text-sm">
+                A new version of the application is available. Would you like to download it now?
+              </p>
+            )}
+          </div>
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel onClick={handleCancel}>Later</AlertDialogCancel>

@@ -9,7 +9,7 @@ import {
   Trophy,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router';
+import { useLocation, useNavigate } from 'react-router';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import logoUrl from '/logo.png';
@@ -23,11 +23,13 @@ function NavigationButton({
   title,
   icon: Icon,
   isActive,
+  onClick,
 }: {
   to: string;
   title: string;
   icon: React.ComponentType<{ className?: string }>;
   isActive: boolean;
+  onClick: (to: string) => void;
 }) {
   return (
     <div className="relative">
@@ -38,14 +40,13 @@ function NavigationButton({
         )}
       />
       <Button
-        asChild
         variant="ghost"
         size="sm"
+        onClick={() => onClick(to)}
+        title={title}
         className={cn('relative hover:text-primary-500', isActive && 'text-primary-500')}
       >
-        <Link to={to} title={title}>
-          <Icon className="h-4 w-4" />
-        </Link>
+        <Icon className="h-4 w-4" />
       </Button>
     </div>
   );
@@ -184,36 +185,42 @@ export function TitleBar() {
           title="Holy Grail Tracker"
           icon={Trophy}
           isActive={routeStates.isTrackerActive}
+          onClick={navigate}
         />
         <NavigationButton
           to="/statistics"
           title="Statistics"
           icon={BarChart3}
           isActive={routeStates.isStatisticsActive}
+          onClick={navigate}
         />
         <NavigationButton
           to="/runs"
           title="Run Counter"
           icon={Timer}
           isActive={routeStates.isRunsActive}
+          onClick={navigate}
         />
         <NavigationButton
           to="/runewords"
           title="Runeword Calculator"
           icon={Calculator}
           isActive={routeStates.isRunewordsActive}
+          onClick={navigate}
         />
         <NavigationButton
           to="/terror-zones"
           title="Terror Zone Configuration"
           icon={AlertTriangle}
           isActive={routeStates.isTerrorZonesActive}
+          onClick={navigate}
         />
         <NavigationButton
           to="/settings"
           title="Settings"
           icon={Settings}
           isActive={routeStates.isSettingsActive}
+          onClick={navigate}
         />
       </div>
 

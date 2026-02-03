@@ -73,7 +73,7 @@ export function ProgressGauge({
   const tooltipContent = `${label}: ${current}/${total} (${percentage.toFixed(1)}%)`;
 
   const gaugeElement = (
-    <Tooltip delayDuration={0}>
+    <Tooltip delay={0}>
       <TooltipTrigger
         className={cn('group relative', sizeClasses, showLabel ? '' : className)}
         aria-label={tooltipContent}

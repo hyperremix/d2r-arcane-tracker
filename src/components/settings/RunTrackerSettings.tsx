@@ -43,7 +43,8 @@ export function RunTrackerSettings() {
   }, [isWindows]);
 
   const updatePollingInterval = useCallback(
-    async (values: number[]) => {
+    async (value: number | readonly number[]) => {
+      const values = Array.isArray(value) ? value : [value];
       const interval = Math.max(100, Math.min(5000, values[0])); // Clamp between 100ms and 5s
       await setSettings({ runTrackerMemoryPollingInterval: interval });
     },

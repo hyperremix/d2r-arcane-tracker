@@ -40,7 +40,8 @@ export function WidgetStep() {
   );
 
   const handleOpacityChange = useCallback(
-    async (values: number[]) => {
+    async (value: number | readonly number[]) => {
+      const values = Array.isArray(value) ? value : [value];
       const opacity = values[0];
       await setSettings({ widgetOpacity: opacity });
       // Update widget opacity via IPC

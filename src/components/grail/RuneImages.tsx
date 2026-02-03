@@ -162,33 +162,29 @@ function RuneImage({
 }: RuneImageProps) {
   return (
     <Tooltip>
-      <TooltipTrigger asChild>
-        <div className="relative flex items-center justify-center">
-          {isLoading ? (
-            <div className="absolute inset-0 animate-pulse rounded bg-gray-200 dark:bg-gray-700" />
-          ) : imageUrl ? (
-            <div
-              className={cn('relative', isMissing && 'rounded-lg bg-red-400 p-1 dark:bg-red-900')}
-            >
-              <div className="flex flex-col items-center justify-center">
-                <img
-                  src={imageUrl}
-                  alt={runeName}
-                  className="h-8 w-8 object-contain"
-                  onError={(e) => {
-                    // Fallback to placeholder if image fails to load
-                    e.currentTarget.src = placeholderUrl;
-                  }}
-                />
-                {showRuneName && <div className="text-center text-xs">{runeName}</div>}
-              </div>
+      <TooltipTrigger className="relative flex items-center justify-center">
+        {isLoading ? (
+          <div className="absolute inset-0 animate-pulse rounded bg-gray-200 dark:bg-gray-700" />
+        ) : imageUrl ? (
+          <div className={cn('relative', isMissing && 'rounded-lg bg-red-400 p-1 dark:bg-red-900')}>
+            <div className="flex flex-col items-center justify-center">
+              <img
+                src={imageUrl}
+                alt={runeName}
+                className="h-8 w-8 object-contain"
+                onError={(e) => {
+                  // Fallback to placeholder if image fails to load
+                  e.currentTarget.src = placeholderUrl;
+                }}
+              />
+              {showRuneName && <div className="text-center text-xs">{runeName}</div>}
             </div>
-          ) : (
-            <div className={cn(isMissing && 'rounded-lg bg-red-400 p-1 dark:bg-red-900')}>
-              <div className="text-center text-xs">{runeName}</div>
-            </div>
-          )}
-        </div>
+          </div>
+        ) : (
+          <div className={cn(isMissing && 'rounded-lg bg-red-400 p-1 dark:bg-red-900')}>
+            <div className="text-center text-xs">{runeName}</div>
+          </div>
+        )}
       </TooltipTrigger>
       <TooltipContent>
         <p className="text-xs">{runeName}</p>

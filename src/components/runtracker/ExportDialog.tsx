@@ -248,7 +248,10 @@ export function ExportDialog({ sessionId, open, onOpenChange }: ExportDialogProp
           <div className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor={formatId}>Export Format</Label>
-              <Select value={format} onValueChange={(value: ExportFormat) => setFormat(value)}>
+              <Select
+                value={format}
+                onValueChange={(value) => value && setFormat(value as ExportFormat)}
+              >
                 <SelectTrigger id={formatId}>
                   <SelectValue />
                 </SelectTrigger>
@@ -265,7 +268,7 @@ export function ExportDialog({ sessionId, open, onOpenChange }: ExportDialogProp
                 <Label htmlFor={detailLevelId}>Detail Level</Label>
                 <Select
                   value={textDetailLevel}
-                  onValueChange={(value: TextDetailLevel) => setTextDetailLevel(value)}
+                  onValueChange={(value) => value && setTextDetailLevel(value as TextDetailLevel)}
                 >
                   <SelectTrigger id={detailLevelId}>
                     <SelectValue />

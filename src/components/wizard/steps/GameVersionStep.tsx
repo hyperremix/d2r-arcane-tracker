@@ -51,7 +51,10 @@ export function GameVersionStep() {
       <div className="space-y-4">
         <div className="space-y-2">
           <Label htmlFor={gameVersionId}>Select Game Version</Label>
-          <Select value={gameVersion} onValueChange={handleGameVersionChange}>
+          <Select
+            value={gameVersion}
+            onValueChange={(value) => value && handleGameVersionChange(value as GameVersion)}
+          >
             <SelectTrigger id={gameVersionId}>
               <SelectValue />
             </SelectTrigger>
