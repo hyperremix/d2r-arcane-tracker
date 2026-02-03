@@ -292,7 +292,7 @@ describe('When SaveFileMonitor is used', () => {
   });
 
   describe('If updateSaveDirectory is called', () => {
-    it('Then should not restart monitoring if was not monitoring', async () => {
+    it('Then should always start monitoring regardless of previous state', async () => {
       // Arrange
       const stopSpy = vi.spyOn(monitor, 'stopMonitoring');
       const startSpy = vi.spyOn(monitor, 'startMonitoring');
@@ -300,9 +300,23 @@ describe('When SaveFileMonitor is used', () => {
       // Act
       await monitor.updateSaveDirectory();
 
-      // Assert
+      // Assert - stopMonitoring not called since we weren't monitoring, but startMonitoring always called
       expect(stopSpy).not.toHaveBeenCalled();
-      expect(startSpy).not.toHaveBeenCalled();
+      expect(startSpy).toHaveBeenCalledOnce();
+    });
+
+    it('Then should stop and restart monitoring if already active', async () => {
+      // Arrange
+      const stopSpy = vi.spyOn(monitor, 'stopMonitoring');
+      const startSpy = vi.spyOn(monitor, 'startMonitoring');
+      (monitor as any).isMonitoring = true;
+
+      // Act
+      await monitor.updateSaveDirectory();
+
+      // Assert - both stop and start called when monitoring was active
+      expect(stopSpy).toHaveBeenCalledOnce();
+      expect(startSpy).toHaveBeenCalledOnce();
     });
   });
 

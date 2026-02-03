@@ -1277,10 +1277,8 @@ class SaveFileMonitor {
   async updateSaveDirectory(): Promise<void> {
     console.log('[updateSaveDirectory] Called');
     // Update the save directory and restart monitoring if active
-    const wasMonitoring = this.isMonitoring;
-    console.log('[updateSaveDirectory] Was monitoring:', wasMonitoring);
-
-    if (wasMonitoring) {
+    // Stop any existing monitoring before changing directory
+    if (this.isMonitoring) {
       console.log('[updateSaveDirectory] Stopping current monitoring');
       await this.stopMonitoring();
     }
@@ -1294,10 +1292,9 @@ class SaveFileMonitor {
     console.log('[updateSaveDirectory] Re-initializing save directories');
     await this.initializeSaveDirectories();
 
-    if (wasMonitoring) {
-      console.log('[updateSaveDirectory] Restarting monitoring');
-      await this.startMonitoring();
-    }
+    // Always start monitoring after directory change - user explicitly wants to use this directory
+    console.log('[updateSaveDirectory] Starting monitoring for new directory');
+    await this.startMonitoring();
 
     console.log('[updateSaveDirectory] Complete');
   }
