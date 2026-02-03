@@ -23,6 +23,7 @@
     "dev:debug": "node scripts/dev-with-debug.js",
     "preview": "electron-vite preview",
     "build": "npm run typecheck && vite build && electron-builder --win",
+    "rebuild": "electron-rebuild",
     "typecheck": "concurrently \"tsc -p tsconfig.json --noEmit\" \"tsc -p tsconfig.node.json --noEmit\"",
     "typecheck:web": "tsc -p tsconfig.json --noEmit",
     "typecheck:node": "tsc -p tsconfig.node.json --noEmit",
