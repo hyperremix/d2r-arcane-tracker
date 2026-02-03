@@ -587,6 +587,12 @@ export interface ElectronAPI {
      * @returns {Promise<Run | null>} A promise that resolves with the active run or null.
      */
     getActiveRun(): Promise<Run | null>
+
+    /**
+     * Gets the memory reading status (whether offsets are valid).
+     * @returns {Promise<{ available: boolean; reason: string | null }>} A promise that resolves with memory status.
+     */
+    getMemoryStatus(): Promise<{ available: boolean; reason: string | null }>
   }
 
   /**

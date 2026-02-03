@@ -319,6 +319,17 @@ export function initializeRunTrackerHandlers(
     }
   });
 
+  ipcMain.handle('run-tracker:get-memory-status', async (_event) => {
+    if (!runTracker) {
+      return { available: false, reason: 'not_initialized' };
+    }
+    const available = runTracker.isMemoryReadingAvailable();
+    return {
+      available,
+      reason: available ? null : 'pattern_not_found',
+    };
+  });
+
   // Set up event forwarding to renderer processes
   // Session events
   const unsubscribeSessionStarted = eventBus.on('session-started', (payload) => {

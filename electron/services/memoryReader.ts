@@ -1,4 +1,5 @@
 import { exec } from 'node:child_process';
+import { writeFile } from 'node:fs/promises';
 import { promisify } from 'node:util';
 import { ffi, Kernel32 } from 'win32-api';
 import { D2R_PATTERNS, D2RGameState, OFFSET_ADJUSTMENTS } from '../config/d2rPatterns';
@@ -518,14 +519,14 @@ class WindowsMemoryReaderImpl implements WindowsMemoryReader {
    * Uses VirtualQueryEx to enumerate readable memory regions.
    * @param handle - Process handle
    * @param baseAddress - Module base address (as hex string)
-   * @param maxSize - Maximum size to scan (default: 20MB for D2R .text section)
+   * @param maxSize - Maximum size to scan (default: 100MB to cover full D2R.exe)
    * @returns Buffer with memory contents or null on failure
    */
   // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Memory enumeration requires multiple checks
   async readProcessMemory(
     handle: number,
     baseAddress: string,
-    maxSize = 20 * 1024 * 1024,
+    maxSize = 100 * 1024 * 1024,
   ): Promise<Buffer | null> {
     if (process.platform !== 'win32') {
       return null;
@@ -585,7 +586,6 @@ class WindowsMemoryReaderImpl implements WindowsMemoryReader {
 
       // Concatenate all chunks into single buffer
       const result = Buffer.concat(chunks, totalRead);
-      console.log(`[MemoryReader] Read ${totalRead} bytes from ${chunks.length} memory regions`);
       return result;
     } catch (error) {
       console.error('[MemoryReader] Error reading process memory:', error);
@@ -825,7 +825,6 @@ export class MemoryReader {
 
     try {
       // Read process memory for pattern scanning
-      console.log('[MemoryReader] Reading process memory for pattern scanning...');
       const memory = await this.memoryReader.readProcessMemory(
         this.processHandle,
         this.addresses.baseAddress,
@@ -838,18 +837,12 @@ export class MemoryReader {
 
       // Find UI pattern
       const pattern = D2R_PATTERNS.UI;
-      console.log(`[MemoryReader] Scanning for ${pattern.name} pattern...`);
-
       const patternOffset = findPatternString(memory, pattern.pattern, pattern.mask);
 
       if (patternOffset === -1) {
         console.error(`[MemoryReader] ${pattern.name} pattern not found in memory`);
         return false;
       }
-
-      console.log(
-        `[MemoryReader] Found ${pattern.name} pattern at offset 0x${patternOffset.toString(16)}`,
-      );
 
       // Read uint32 value at pattern + 6 (from d2go line 43)
       const bytes = readBytesFromBuffer(
@@ -872,10 +865,6 @@ export class MemoryReader {
       const uiOffset = patternOffset + OFFSET_ADJUSTMENTS.UI_INSTRUCTION_OFFSET + offsetInt;
 
       this.addresses.uiOffset = uiOffset;
-
-      console.log(
-        `[MemoryReader] Calculated UI offset: 0x${uiOffset.toString(16)} (pattern at 0x${patternOffset.toString(16)} + ${OFFSET_ADJUSTMENTS.UI_INSTRUCTION_OFFSET} + 0x${offsetInt.toString(16)})`,
-      );
 
       return true;
     } catch (error) {
@@ -984,6 +973,48 @@ export class MemoryReader {
       return null;
     }
     return state === D2RGameState.InGame;
+  }
+
+  /**
+   * Dumps process memory to a file for manual pattern analysis.
+   * This is useful when the current pattern is not found and you need to
+   * manually search for alternative patterns in the D2R.exe binary.
+   * @param filePath - Path to save the memory dump
+   * @returns True if dump was successful, false otherwise
+   */
+  async dumpMemoryForAnalysis(filePath: string): Promise<boolean> {
+    if (!this.processHandle || !this.addresses.baseAddress) {
+      console.error('[MemoryReader] Cannot dump memory: no process handle or base address');
+      return false;
+    }
+
+    try {
+      const memory = await this.memoryReader.readProcessMemory(
+        this.processHandle,
+        this.addresses.baseAddress,
+      );
+
+      if (!memory) {
+        console.error('[MemoryReader] Failed to read process memory for dump');
+        return false;
+      }
+
+      await writeFile(filePath, memory);
+      console.log(
+        `[MemoryReader] Dumped ${memory.length} bytes (${(memory.length / 1024 / 1024).toFixed(1)}MB) to ${filePath}`,
+      );
+      return true;
+    } catch (error) {
+      console.error('[MemoryReader] Error dumping memory:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Returns whether memory reading offsets are valid.
+   */
+  isOffsetsValid(): boolean {
+    return this.offsetsValid;
   }
 
   /**
