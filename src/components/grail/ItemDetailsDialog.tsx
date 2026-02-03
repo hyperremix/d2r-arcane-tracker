@@ -23,6 +23,7 @@ import { useItemIcon } from '@/hooks/useItemIcon';
 import { useProgressLookup } from '@/hooks/useProgressLookup';
 import { cn, formatDate } from '@/lib/utils';
 import { useGrailStore } from '@/stores/grailStore';
+import placeholderUrl from '/images/placeholder-item.png';
 import { runes } from '../../../electron/items/runes';
 import { RuneImages } from './RuneImages';
 
@@ -495,11 +496,8 @@ export function ItemDetailsDialog({ itemId, open, onOpenChange }: ItemDetailsDia
                   alt={item.name}
                   className={cn('h-full w-full object-contain', isLoading && 'opacity-0')}
                   onError={(e) => {
-                    if (
-                      e.currentTarget.src !==
-                      `${window.location.origin}/images/placeholder-item.png`
-                    ) {
-                      e.currentTarget.src = '/images/placeholder-item.png';
+                    if (e.currentTarget.src !== `${window.location.origin}${placeholderUrl}`) {
+                      e.currentTarget.src = placeholderUrl;
                     }
                   }}
                 />

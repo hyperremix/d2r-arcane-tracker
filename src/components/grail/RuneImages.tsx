@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import type { RunewordCompletionStatus } from '@/lib/runeword-utils';
 import { cn } from '@/lib/utils';
+import placeholderUrl from '/images/placeholder-item.png';
 import { runes } from '../../../electron/items/runes';
 
 interface RuneImagesProps {
@@ -176,7 +177,7 @@ function RuneImage({
                   className="h-8 w-8 object-contain"
                   onError={(e) => {
                     // Fallback to placeholder if image fails to load
-                    e.currentTarget.src = '/images/placeholder-item.png';
+                    e.currentTarget.src = placeholderUrl;
                   }}
                 />
                 {showRuneName && <div className="text-center text-xs">{runeName}</div>}

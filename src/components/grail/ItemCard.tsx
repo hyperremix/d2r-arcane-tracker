@@ -7,6 +7,7 @@ import { useItemIcon } from '@/hooks/useItemIcon';
 import { isEtherealOnly, shouldShowEtherealStatus, shouldShowNormalStatus } from '@/lib/ethereal';
 import { cn, formatShortDate, isRecentFind } from '@/lib/utils';
 import { useGrailStore } from '@/stores/grailStore';
+import placeholderUrl from '/images/placeholder-item.png';
 import { RuneImages } from './RuneImages';
 import { CharacterIcon, ItemTypeIcon, RecentDiscoveryIndicator } from './StatusIcons';
 
@@ -147,10 +148,8 @@ function ListView({
               className={cn(isLoading && 'opacity-0', 'h-full w-full object-contain')}
               onError={(e) => {
                 // Prevent infinite loops
-                if (
-                  e.currentTarget.src !== `${window.location.origin}/images/placeholder-item.png`
-                ) {
-                  e.currentTarget.src = '/images/placeholder-item.png';
+                if (e.currentTarget.src !== `${window.location.origin}${placeholderUrl}`) {
+                  e.currentTarget.src = placeholderUrl;
                 }
               }}
             />
@@ -490,11 +489,8 @@ function GridView({
                   className={cn('h-full w-full object-contain', isLoading && 'opacity-0')}
                   onError={(e) => {
                     // Prevent infinite loops
-                    if (
-                      e.currentTarget.src !==
-                      `${window.location.origin}/images/placeholder-item.png`
-                    ) {
-                      e.currentTarget.src = '/images/placeholder-item.png';
+                    if (e.currentTarget.src !== `${window.location.origin}${placeholderUrl}`) {
+                      e.currentTarget.src = placeholderUrl;
                     }
                   }}
                 />

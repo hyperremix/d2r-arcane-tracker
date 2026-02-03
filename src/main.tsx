@@ -5,6 +5,7 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import WidgetApp from './WidgetApp';
 import './i18n';
 import './index.css';
+import logoUrl from '/logo.png';
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {
@@ -18,7 +19,7 @@ const AppComponent = isWidget ? WidgetApp : App;
 ReactDOM.createRoot(rootElement).render(
   <React.StrictMode>
     <ErrorBoundary>
-      <Suspense fallback={isWidget ? null : <img src="/logo.png" alt="logo" />}>
+      <Suspense fallback={isWidget ? null : <img src={logoUrl} alt="logo" />}>
         <AppComponent />
       </Suspense>
     </ErrorBoundary>

@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useGrailStore } from '@/stores/grailStore';
 import dingSound from '/ding.mp3';
+import logoUrl from '/logo.png';
 
 /**
  * Module-level flag to prevent duplicate IPC handler registration.
@@ -37,7 +38,7 @@ export function NotificationButton() {
   const [isOpen, setIsOpen] = useState(false);
   const [notificationQueue, setNotificationQueue] = useState<ItemDetectionEvent[]>([]);
   const [characters, setCharacters] = useState<Character[]>([]);
-  const [iconPath, setIconPath] = useState<string>('/logo.png');
+  const [iconPath, setIconPath] = useState<string>(logoUrl);
   const { settings } = useGrailStore();
 
   // Use refs to avoid useEffect re-registration on state/callback changes
