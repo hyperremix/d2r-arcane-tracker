@@ -50,7 +50,7 @@ async function updateCursorSettings() {
     console.log(
       '💡 Debug settings update skipped (app may not be fully started yet - this is normal)',
     );
-    console.log('💡 You can manually run: yarn debug:update after the app is running');
+    console.log('💡 You can manually run: bun run debug:update after the app is running');
   }
 }
 
@@ -59,7 +59,7 @@ async function main() {
     // Start the dev server in the background
     console.log('🎯 Starting D2R Arcane Tracker development server...');
 
-    const devProcess = spawn('yarn', ['dev'], {
+    const devProcess = spawn('bun', ['run', 'dev'], {
       stdio: 'inherit',
       shell: true,
       detached: false,

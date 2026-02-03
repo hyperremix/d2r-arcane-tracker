@@ -1,5 +1,5 @@
 import { AlertCircle, Keyboard, Timer } from 'lucide-react';
-import { useCallback, useId } from 'react';
+import { useCallback, useEffect, useId, useState } from 'react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
@@ -31,6 +31,16 @@ export function RunTrackerSettings() {
   };
 
   const isWindows = window.electronAPI?.platform === 'win32';
+  const [memoryStatus, setMemoryStatus] = useState<{
+    available: boolean;
+    reason: string | null;
+  } | null>(null);
+
+  useEffect(() => {
+    if (isWindows) {
+      window.electronAPI?.runTracker?.getMemoryStatus?.().then(setMemoryStatus);
+    }
+  }, [isWindows]);
 
   const updatePollingInterval = useCallback(
     async (values: number[]) => {
@@ -66,6 +76,18 @@ export function RunTrackerSettings() {
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="space-y-3">
+          {/* Warning when memory reading is unavailable */}
+          {isWindows && memoryStatus && !memoryStatus.available && (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription className="text-xs">
+                <strong>Auto mode temporarily unavailable.</strong> D2R 2.9 changed memory patterns
+                that are required for automatic game detection. Manual run tracking using keyboard
+                shortcuts still works.
+              </AlertDescription>
+            </Alert>
+          )}
+
           {/* Memory Polling Interval - visible when auto mode is enabled */}
           {isWindows && autoModeEnabled && (
             <div className="space-y-2">

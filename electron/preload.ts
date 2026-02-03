@@ -690,6 +690,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
     getOverallStatistics: () => ipcRenderer.invoke('run-tracker:get-overall-statistics'),
 
     /**
+     * Gets the memory reading status (whether offsets are valid).
+     * @returns {Promise<{ available: boolean; reason: string | null }>} A promise that resolves with memory status.
+     */
+    getMemoryStatus: (): Promise<{ available: boolean; reason: string | null }> =>
+      ipcRenderer.invoke('run-tracker:get-memory-status'),
+
+    /**
      * Manually adds a run item to a run.
      * @param {Object} data - The run item data.
      * @param {string} data.runId - The run ID to add the item to.

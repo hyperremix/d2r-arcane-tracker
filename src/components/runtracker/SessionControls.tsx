@@ -1,5 +1,6 @@
-import { Loader2, Pause, Play, Plus, Square, StopCircle, Timer } from 'lucide-react';
+import { AlertCircle, Loader2, Pause, Play, Plus, Square, StopCircle, Timer } from 'lucide-react';
 import { useCallback, useEffect, useId, useMemo, useState } from 'react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -232,7 +233,18 @@ export function SessionControls() {
   const [showEndSessionDialog, setShowEndSessionDialog] = useState(false);
   const [manualItemName, setManualItemName] = useState('');
   const [addingItem, setAddingItem] = useState(false);
+  const [memoryStatus, setMemoryStatus] = useState<{
+    available: boolean;
+    reason: string | null;
+  } | null>(null);
   const manualItemNameId = useId();
+
+  // Fetch memory status on mount
+  useEffect(() => {
+    if (isWindows) {
+      window.electronAPI?.runTracker?.getMemoryStatus?.().then(setMemoryStatus);
+    }
+  }, [isWindows]);
 
   const toggleAutoMode = useCallback(
     async (checked: boolean) => {
@@ -441,6 +453,18 @@ export function SessionControls() {
                 </div>
                 <Switch checked={autoModeEnabled} onCheckedChange={toggleAutoMode} />
               </div>
+            )}
+
+            {/* Warning when memory reading is unavailable */}
+            {isWindows && memoryStatus && !memoryStatus.available && (
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription className="text-xs">
+                  <strong>Auto mode temporarily unavailable.</strong> D2R 2.9 changed memory
+                  patterns that are required for automatic game detection. Manual run tracking using
+                  keyboard shortcuts still works.
+                </AlertDescription>
+              </Alert>
             )}
 
             <ControlButtons

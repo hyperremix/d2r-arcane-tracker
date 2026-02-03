@@ -411,6 +411,13 @@ export class RunTrackerService {
   }
 
   /**
+   * Returns whether memory reading is available (valid offsets found).
+   */
+  isMemoryReadingAvailable(): boolean {
+    return this.memoryReader?.isOffsetsValid() ?? false;
+  }
+
+  /**
    * Gets the current state of the run tracker.
    */
   getState() {
