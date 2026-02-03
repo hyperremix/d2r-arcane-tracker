@@ -304,6 +304,20 @@ describe('When SaveFileMonitor is used', () => {
       expect(stopSpy).not.toHaveBeenCalled();
       expect(startSpy).toHaveBeenCalledOnce();
     });
+
+    it('Then should stop and restart monitoring if already active', async () => {
+      // Arrange
+      const stopSpy = vi.spyOn(monitor, 'stopMonitoring');
+      const startSpy = vi.spyOn(monitor, 'startMonitoring');
+      (monitor as any).isMonitoring = true;
+
+      // Act
+      await monitor.updateSaveDirectory();
+
+      // Assert - both stop and start called when monitoring was active
+      expect(stopSpy).toHaveBeenCalledOnce();
+      expect(startSpy).toHaveBeenCalledOnce();
+    });
   });
 
   describe('If getItems is called', () => {
