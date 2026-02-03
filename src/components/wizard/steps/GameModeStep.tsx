@@ -68,7 +68,10 @@ export function GameModeStep() {
       <div className="space-y-4">
         <div className="space-y-2">
           <Label htmlFor={gameModeId}>Select Game Mode</Label>
-          <Select value={gameMode} onValueChange={handleGameModeChange}>
+          <Select
+            value={gameMode}
+            onValueChange={(value) => value && handleGameModeChange(value as GameMode)}
+          >
             <SelectTrigger id={gameModeId}>
               <SelectValue />
             </SelectTrigger>

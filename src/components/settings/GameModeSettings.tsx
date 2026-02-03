@@ -70,7 +70,10 @@ export function GameModeSettings() {
       <CardContent className="space-y-4">
         <div className="space-y-2">
           <Label htmlFor={gameModeSelectId}>Select Game Mode</Label>
-          <Select value={settings.gameMode} onValueChange={updateGameMode}>
+          <Select
+            value={settings.gameMode}
+            onValueChange={(value) => value && updateGameMode(value as GameMode)}
+          >
             <SelectTrigger id={gameModeSelectId}>
               <SelectValue />
             </SelectTrigger>

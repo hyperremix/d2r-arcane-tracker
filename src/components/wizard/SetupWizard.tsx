@@ -89,11 +89,8 @@ export function SetupWizard() {
   }, []);
 
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => !open && handleSkip()}>
-      <DialogContent
-        className="max-h-[90vh] min-w-3xl"
-        onInteractOutside={(e) => e.preventDefault()}
-      >
+    <Dialog open={isOpen} onOpenChange={(open) => !open && handleSkip()} modal>
+      <DialogContent className="max-h-[90vh] min-w-3xl" showCloseButton={false}>
         <DialogHeader>
           <div className="flex items-center justify-between">
             <DialogTitle>{currentStepTitle}</DialogTitle>

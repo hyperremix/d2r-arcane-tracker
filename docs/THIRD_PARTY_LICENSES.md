@@ -11,7 +11,7 @@ This software includes third-party libraries and components that are subject to 
 ### Dependencies
 
 - **@dschu012/d2s**: [License](https://github.com/dschu012/d2s/blob/main/LICENSE)
-- **@radix-ui/react-***: [License](https://github.com/radix-ui/primitives/blob/main/LICENSE)
+- **@base-ui/react-***: [License](https://github.com/mui/base-ui/blob/master/LICENSE)
 - **better-sqlite3**: [License](https://github.com/WiseLibs/better-sqlite3/blob/master/LICENSE)
 - **chokidar**: [License](https://github.com/paulmillr/chokidar/blob/main/LICENSE)
 - **class-variance-authority**: [License](https://github.com/joe-bell/cva/blob/main/LICENSE)
@@ -123,4 +123,3 @@ This MIT license is compatible with:
 ---
 
 *This document is provided for informational purposes. The MIT License text in the LICENSE file constitutes the legally binding terms for this software.*
-

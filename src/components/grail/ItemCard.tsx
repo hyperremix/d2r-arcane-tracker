@@ -175,8 +175,8 @@ function ListView({
 
         {/* Item Name */}
         <Tooltip>
-          <TooltipTrigger asChild>
-            <h3 className="flex-1 truncate font-semibold text-black text-sm dark:text-white">
+          <TooltipTrigger className="flex-1 truncate text-left">
+            <h3 className="truncate font-semibold text-black text-sm dark:text-white">
               {item.name}
             </h3>
           </TooltipTrigger>
@@ -502,8 +502,8 @@ function GridView({
 
             {/* Item Name */}
             <Tooltip>
-              <TooltipTrigger asChild>
-                <h3 className="truncate text-center font-semibold text-black text-sm leading-tight dark:text-white">
+              <TooltipTrigger className="w-full text-center">
+                <h3 className="truncate font-semibold text-black text-sm leading-tight dark:text-white">
                   {item.name}
                 </h3>
               </TooltipTrigger>

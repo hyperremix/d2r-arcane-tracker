@@ -52,7 +52,10 @@ export function ThemeSettings() {
               </Label>
               <p className="text-gray-600 text-xs">Select the app theme</p>
             </div>
-            <Select value={settings.theme} onValueChange={updateTheme}>
+            <Select
+              value={settings.theme}
+              onValueChange={(value) => value && updateTheme(value as 'light' | 'dark' | 'system')}
+            >
               <SelectTrigger id={themeSelectId} className="w-[180px]">
                 <SelectValue placeholder="Select theme" />
               </SelectTrigger>

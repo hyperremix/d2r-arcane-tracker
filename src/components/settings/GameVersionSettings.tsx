@@ -55,7 +55,10 @@ export function GameVersionSettings() {
       <CardContent className="space-y-4">
         <div className="space-y-2">
           <Label htmlFor={gameVersionSelectId}>Select Game Version</Label>
-          <Select value={settings.gameVersion} onValueChange={updateGameVersion}>
+          <Select
+            value={settings.gameVersion}
+            onValueChange={(value) => value && updateGameVersion(value as GameVersion)}
+          >
             <SelectTrigger id={gameVersionSelectId}>
               <SelectValue />
             </SelectTrigger>

@@ -48,7 +48,12 @@ export function ThemeStep() {
       <div className="space-y-4">
         <div className="space-y-2">
           <Label htmlFor={themeId}>Select Theme</Label>
-          <Select value={theme} onValueChange={handleThemeChange}>
+          <Select
+            value={theme}
+            onValueChange={(value) =>
+              value && handleThemeChange(value as 'light' | 'dark' | 'system')
+            }
+          >
             <SelectTrigger id={themeId}>
               <SelectValue placeholder="Select theme" />
             </SelectTrigger>
