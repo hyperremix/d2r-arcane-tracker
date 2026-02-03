@@ -1,3 +1,5 @@
+import logoUrl from '/logo.png';
+
 /**
  * WelcomeStep component - First step of the setup wizard.
  * Provides a welcome message and overview of what the wizard will configure.
@@ -7,7 +9,7 @@ export function WelcomeStep() {
   return (
     <div className="space-y-6">
       <div className="flex flex-col items-center gap-4 text-center">
-        <img src="/logo.png" alt="D2R Arcane Tracker" className="h-20 w-20" />
+        <img src={logoUrl} alt="D2R Arcane Tracker" className="h-20 w-20" />
         <h2 className="font-bold text-2xl">Welcome to D2R Arcane Tracker!</h2>
         <p className="max-w-lg text-muted-foreground">
           Track your Diablo II: Resurrected Holy Grail progress with automatic save file monitoring
