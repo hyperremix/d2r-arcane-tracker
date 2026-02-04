@@ -67,8 +67,14 @@ type GroupMode = 'none' | 'category' | 'type' | 'ethereal';
  * @returns {JSX.Element} A grid or list of Holy Grail items with view and grouping controls
  */
 export const ItemGrid = memo(function ItemGrid() {
-  const { progress, characters, selectedCharacterId, settings, viewMode, groupMode, setGroupMode } =
-    useGrailStore();
+  // Use individual selectors to prevent unnecessary re-renders
+  const progress = useGrailStore((state) => state.progress);
+  const characters = useGrailStore((state) => state.characters);
+  const selectedCharacterId = useGrailStore((state) => state.selectedCharacterId);
+  const settings = useGrailStore((state) => state.settings);
+  const viewMode = useGrailStore((state) => state.viewMode);
+  const groupMode = useGrailStore((state) => state.groupMode);
+  const setGroupMode = useGrailStore((state) => state.setGroupMode);
   const filteredItems = useFilteredItems(); // This uses DB items as base and applies all filters
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
 
