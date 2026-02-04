@@ -37,8 +37,8 @@ const defaultFilter: AdvancedFilter = {
   categories: [],
   types: [],
   foundStatus: 'all',
-  sortBy: 'name',
-  sortOrder: 'asc',
+  sortBy: 'found_date',
+  sortOrder: 'desc',
   fuzzySearch: false,
 };
 

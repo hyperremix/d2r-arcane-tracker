@@ -276,7 +276,11 @@ function StatusIndicators({
   etherealProgress,
   settings,
 }: StatusIndicatorsProps) {
-  if (mostRecentDiscovery?.foundDate && isRecentFind(mostRecentDiscovery.foundDate)) {
+  if (
+    mostRecentDiscovery?.foundDate &&
+    !mostRecentDiscovery.fromInitialScan &&
+    isRecentFind(mostRecentDiscovery.foundDate)
+  ) {
     return (
       <div className="-top-3 -right-3 absolute z-40">
         <RecentDiscoveryIndicator foundDate={mostRecentDiscovery.foundDate} />

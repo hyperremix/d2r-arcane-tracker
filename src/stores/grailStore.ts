@@ -104,8 +104,8 @@ const defaultAdvancedFilter: AdvancedGrailFilter = {
   difficulties: [],
   levelRange: { min: 1, max: 99 },
   requiredLevelRange: { min: 1, max: 99 },
-  sortBy: 'name',
-  sortOrder: 'asc',
+  sortBy: 'found_date',
+  sortOrder: 'desc',
   fuzzySearch: false,
 };
 

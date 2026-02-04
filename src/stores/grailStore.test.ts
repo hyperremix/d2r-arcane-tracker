@@ -34,8 +34,8 @@ const resetStoreState = () => {
       difficulties: [],
       levelRange: { min: 1, max: 99 },
       requiredLevelRange: { min: 1, max: 99 },
-      sortBy: 'name',
-      sortOrder: 'asc',
+      sortBy: 'found_date',
+      sortOrder: 'desc',
       fuzzySearch: false,
     });
   });
@@ -58,8 +58,8 @@ describe('When useGrailStore is used', () => {
         difficulties: [],
         levelRange: { min: 1, max: 99 },
         requiredLevelRange: { min: 1, max: 99 },
-        sortBy: 'name',
-        sortOrder: 'asc',
+        sortBy: 'found_date',
+        sortOrder: 'desc',
         fuzzySearch: false,
       });
     });
@@ -344,8 +344,8 @@ describe('When useFilteredItems is used', () => {
     });
   });
 
-  describe('If items are provided with default filter', () => {
-    it('Then should return all items sorted by name', () => {
+  describe('If items are provided with name sorting', () => {
+    it('Then should return all items sorted by name ascending', () => {
       // Arrange
       resetStoreState();
       const items = [
@@ -355,6 +355,11 @@ describe('When useFilteredItems is used', () => {
 
       act(() => {
         useGrailStore.getState().setItems(items);
+        useGrailStore.getState().setAdvancedFilter({
+          ...useGrailStore.getState().advancedFilter,
+          sortBy: 'name',
+          sortOrder: 'asc',
+        });
       });
 
       // Act
@@ -541,6 +546,45 @@ describe('When useGrailStatistics is used', () => {
           .withItemId('item1')
           .withFoundDate(new Date('2024-01-01'))
           .withFoundDate(recentDate)
+          .build(),
+      ];
+
+      act(() => {
+        useGrailStore.getState().setItems(items);
+        useGrailStore.getState().setProgress(progress);
+      });
+
+      // Act
+      const { result } = renderHook(() => useGrailStatistics());
+
+      // Assert
+      expect(result.current.recentFinds).toBe(1);
+    });
+  });
+
+  describe('If items are from initial scan', () => {
+    it('Then should exclude them from recent finds count', () => {
+      // Arrange
+      const items = [
+        HolyGrailItemBuilder.new().withId('item1').build(),
+        HolyGrailItemBuilder.new().withId('item2').build(),
+      ];
+      const recentDate = new Date();
+      recentDate.setDate(recentDate.getDate() - 3); // 3 days ago
+      const progress = [
+        GrailProgressBuilder.new()
+          .withId('prog1')
+          .withCharacterId('char1')
+          .withItemId('item1')
+          .withFoundDate(recentDate)
+          .asFromInitialScan()
+          .build(),
+        GrailProgressBuilder.new()
+          .withId('prog2')
+          .withCharacterId('char1')
+          .withItemId('item2')
+          .withFoundDate(recentDate)
+          .withFromInitialScan(false)
           .build(),
       ];
 

@@ -13,6 +13,7 @@ export class GrailProgressBuilder {
     foundBy: 'Default Character',
     manuallyAdded: true,
     isEthereal: false,
+    fromInitialScan: false,
   };
 
   /**
@@ -139,6 +140,22 @@ export class GrailProgressBuilder {
    */
   asNormal(): this {
     this.progress.isEthereal = false;
+    return this;
+  }
+
+  /**
+   * Set the fromInitialScan status
+   */
+  withFromInitialScan(fromInitialScan: boolean): this {
+    this.progress.fromInitialScan = fromInitialScan;
+    return this;
+  }
+
+  /**
+   * Set as from initial scan
+   */
+  asFromInitialScan(): this {
+    this.progress.fromInitialScan = true;
     return this;
   }
 
