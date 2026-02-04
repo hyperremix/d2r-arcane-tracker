@@ -1,6 +1,6 @@
 import type { ItemCategory, ItemType } from 'electron/types/grail';
 import { Grid, List, RotateCcw } from 'lucide-react';
-import { useId, useState } from 'react';
+import { startTransition, useId, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -71,15 +71,15 @@ export function AdvancedSearch() {
   const advancedSearchId = useId();
   const fuzzySearchId = useId();
   const [advancedFilter, setAdvancedFilter] = useState<AdvancedFilter>(defaultFilter);
-  const {
-    setFilter,
-    setAdvancedFilter: setStoreAdvancedFilter,
-    viewMode,
-    setViewMode,
-    groupMode,
-    setGroupMode,
-    settings,
-  } = useGrailStore();
+
+  // Use individual selectors to prevent unnecessary re-renders
+  const setFilter = useGrailStore((state) => state.setFilter);
+  const setStoreAdvancedFilter = useGrailStore((state) => state.setAdvancedFilter);
+  const viewMode = useGrailStore((state) => state.viewMode);
+  const setViewMode = useGrailStore((state) => state.setViewMode);
+  const groupMode = useGrailStore((state) => state.groupMode);
+  const setGroupMode = useGrailStore((state) => state.setGroupMode);
+  const settings = useGrailStore((state) => state.settings);
 
   /**
    * Available item types for filtering, filtered based on grail settings.
@@ -90,16 +90,19 @@ export function AdvancedSearch() {
     ...(settings.grailRunes ? [{ value: 'rune' as ItemType, label: 'Rune' }] : []),
     ...(settings.grailRunewords ? [{ value: 'runeword' as ItemType, label: 'Runeword' }] : []),
   ];
+
   const updateAdvancedFilter = (updates: Partial<AdvancedFilter>) => {
     const newFilter = { ...advancedFilter, ...updates };
-    setAdvancedFilter(newFilter);
+    setAdvancedFilter(newFilter); // Local state - immediate
 
-    // Immediately update the store for real-time filtering
-    setFilter({
-      searchTerm: newFilter.searchTerm,
-      categories: newFilter.categories,
-      types: newFilter.types,
-      foundStatus: newFilter.foundStatus,
+    // Mark filter update as non-urgent so React keeps input responsive
+    startTransition(() => {
+      setFilter({
+        searchTerm: newFilter.searchTerm,
+        categories: newFilter.categories,
+        types: newFilter.types,
+        foundStatus: newFilter.foundStatus,
+      });
     });
 
     setStoreAdvancedFilter({

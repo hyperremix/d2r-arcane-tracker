@@ -313,22 +313,40 @@ const matchesTypes = (item: Item, types?: string[]): boolean => {
 };
 
 /**
+ * Builds a lookup map from progress array for O(1) access by item ID.
+ * @param {GrailProgress[]} progress - Progress records to index
+ * @returns {Map<string, GrailProgress[]>} Map with item IDs as keys and progress arrays as values
+ */
+const buildProgressMap = (progress: GrailProgress[]): Map<string, GrailProgress[]> => {
+  const map = new Map<string, GrailProgress[]>();
+  for (const p of progress) {
+    const existing = map.get(p.itemId);
+    if (existing) {
+      existing.push(p);
+    } else {
+      map.set(p.itemId, [p]);
+    }
+  }
+  return map;
+};
+
+/**
  * Checks if an item matches the specified found status filter.
  * @param {Item} item - The item to check
  * @param {string} [foundStatus] - Optional found status ('all', 'found', 'missing')
- * @param {GrailProgress[]} [progress] - Optional progress records to check against
+ * @param {Map<string, GrailProgress[]>} [progressMap] - Pre-built progress lookup map for O(1) access
  * @returns {boolean} True if item matches the found status, false otherwise
  */
 const matchesFoundStatus = (
   item: Item,
   foundStatus?: string,
-  progress?: GrailProgress[],
+  progressMap?: Map<string, GrailProgress[]>,
 ): boolean => {
   // Always show all items by default, regardless of found status
   if (!foundStatus || foundStatus === 'all') return true;
 
-  const itemProgress = progress?.find((p) => p.itemId === item.id && p.foundDate !== undefined);
-  const isFound = Boolean(itemProgress);
+  const itemProgress = progressMap?.get(item.id);
+  const isFound = itemProgress?.some((p) => p.foundDate !== undefined) ?? false;
 
   if (foundStatus === 'found') return isFound;
   if (foundStatus === 'missing') return !isFound;
@@ -397,18 +415,37 @@ const levenshteinDistance = (str1: string, str2: string): number => {
 };
 
 /**
+ * Builds a map of item ID to latest found date timestamp for efficient sorting.
+ * @param {GrailProgress[]} progress - Progress records to index
+ * @returns {Map<string, number>} Map with item IDs as keys and latest found date timestamps as values
+ */
+const buildFoundDateMap = (progress: GrailProgress[]): Map<string, number> => {
+  const map = new Map<string, number>();
+  for (const p of progress) {
+    if (p.foundDate) {
+      const time = p.foundDate.getTime();
+      const existing = map.get(p.itemId);
+      if (existing === undefined || time > existing) {
+        map.set(p.itemId, time);
+      }
+    }
+  }
+  return map;
+};
+
+/**
  * Sorts items based on the specified criteria and order.
  * @param {Item[]} items - Array of items to sort
  * @param {string} sortBy - Property to sort by ('name', 'category', 'type', 'found_date')
  * @param {string} sortOrder - Sort order ('asc' or 'desc')
- * @param {GrailProgress[]} [progress] - Optional progress records for sorting by found_date
+ * @param {Map<string, number>} [foundDateMap] - Pre-built map of item ID to found date timestamp for found_date sorting
  * @returns {Item[]} Sorted array of items
  */
 const sortItems = (
   items: Item[],
   sortBy: string,
   sortOrder: string,
-  progress?: GrailProgress[],
+  foundDateMap?: Map<string, number>,
 ): Item[] => {
   return [...items].sort((a, b) => {
     let comparison = 0;
@@ -424,14 +461,8 @@ const sortItems = (
         comparison = a.type.localeCompare(b.type);
         break;
       case 'found_date': {
-        if (!progress) {
-          comparison = 0;
-          break;
-        }
-        const aProgress = progress.find((p) => p.itemId === a.id);
-        const bProgress = progress.find((p) => p.itemId === b.id);
-        const aDate = aProgress?.foundDate?.getTime() || 0;
-        const bDate = bProgress?.foundDate?.getTime() || 0;
+        const aDate = foundDateMap?.get(a.id) ?? 0;
+        const bDate = foundDateMap?.get(b.id) ?? 0;
         comparison = aDate - bDate;
         break;
       }
@@ -446,23 +477,29 @@ const sortItems = (
 /**
  * Custom hook that returns filtered and sorted items based on current filter and sort settings.
  * Memoized to avoid recalculating on every render when dependencies haven't changed.
+ * Uses pre-built lookup maps for O(1) access instead of O(N) array searches.
  * @returns {Item[]} Array of filtered and sorted Holy Grail items
  */
 export const useFilteredItems = () => {
   const { items, progress, filter, advancedFilter } = useGrailStore();
 
   return useMemo(() => {
+    // Build lookup maps once for O(1) access during filtering and sorting
+    const progressMap = buildProgressMap(progress);
+    const foundDateMap =
+      advancedFilter.sortBy === 'found_date' ? buildFoundDateMap(progress) : undefined;
+
     const filtered = items.filter((item) => {
       return (
         matchesCategories(item, filter.categories) &&
         matchesSubCategories(item, filter.subCategories) &&
         matchesTypes(item, filter.types) &&
-        matchesFoundStatus(item, filter.foundStatus, progress) &&
+        matchesFoundStatus(item, filter.foundStatus, progressMap) &&
         matchesSearchTerm(item, filter.searchTerm, advancedFilter.fuzzySearch)
       );
     });
 
-    return sortItems(filtered, advancedFilter.sortBy, advancedFilter.sortOrder, progress);
+    return sortItems(filtered, advancedFilter.sortBy, advancedFilter.sortOrder, foundDateMap);
   }, [items, progress, filter, advancedFilter]);
 };
 
