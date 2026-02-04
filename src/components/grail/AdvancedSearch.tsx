@@ -116,12 +116,14 @@ export function AdvancedSearch() {
     const resetFilter = defaultFilter;
     setAdvancedFilter(resetFilter);
 
-    // Immediately update the store
-    setFilter({
-      categories: resetFilter.categories,
-      types: resetFilter.types,
-      foundStatus: resetFilter.foundStatus,
-      searchTerm: resetFilter.searchTerm,
+    // Mark filter update as non-urgent so React keeps input responsive
+    startTransition(() => {
+      setFilter({
+        categories: resetFilter.categories,
+        types: resetFilter.types,
+        foundStatus: resetFilter.foundStatus,
+        searchTerm: resetFilter.searchTerm,
+      });
     });
     setStoreAdvancedFilter({
       sortBy: resetFilter.sortBy,
