@@ -7,3 +7,5 @@ export * from './DatabaseItemBuilder';
 export * from './DatabaseProgressBuilder';
 export * from './GrailProgressBuilder';
 export * from './HolyGrailItemBuilder';
+export * from './RunBuilder';
+export * from './RunItemBuilder';

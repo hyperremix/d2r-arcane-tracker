@@ -77,3 +77,7 @@ coverage
 
 # Biome cache
 .biome-cache
+
+FEATURES.md
+IMPROVEMENTS.md
+BUGS.md
