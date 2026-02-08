@@ -1,4 +1,6 @@
+import { useTranslation } from 'react-i18next';
 import { Progress } from '@/components/ui/progress';
+import { translations } from '@/i18n/translations';
 import { cn } from '@/lib/utils';
 
 /**
@@ -21,6 +23,7 @@ interface ProgressBarProps {
  * @returns {JSX.Element} A progress bar with label and percentage display
  */
 export function ProgressBar({ label, current, total, className }: ProgressBarProps) {
+  const { t } = useTranslation();
   const percentage = total > 0 ? (current / total) * 100 : 0;
 
   return (
@@ -28,7 +31,11 @@ export function ProgressBar({ label, current, total, className }: ProgressBarPro
       <div className="flex items-center justify-between">
         <span className="font-medium text-gray-700 text-sm dark:text-gray-300">{label}</span>
         <span className="text-gray-500 text-sm dark:text-gray-400">
-          {current}/{total} ({percentage.toFixed(1)}%)
+          {t(translations.grail.progressBar.progress, {
+            current,
+            total,
+            percentage: percentage.toFixed(1),
+          })}
         </span>
       </div>
       <Progress value={percentage} className="h-2" />

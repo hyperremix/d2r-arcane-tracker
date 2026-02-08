@@ -1,10 +1,12 @@
 import type { UpdateStatus } from 'electron/types/grail';
 import { Download, RefreshCw } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
+import { translations } from '@/i18n/translations';
 import { UpdateDialog } from './UpdateDialog';
 
 /**
@@ -13,6 +15,7 @@ import { UpdateDialog } from './UpdateDialog';
  * @returns {JSX.Element} A settings card with update management controls
  */
 export function UpdateSettings() {
+  const { t } = useTranslation();
   const [currentVersion, setCurrentVersion] = useState<string>('');
   const [updateStatus, setUpdateStatus] = useState<UpdateStatus>({
     checking: false,
@@ -28,16 +31,16 @@ export function UpdateSettings() {
     setShowUpdateDialog(false);
     try {
       await window.electronAPI.update.downloadUpdate();
-      toast.info('Downloading Update', {
-        description: 'Download started in the background',
+      toast.info(t(translations.settings.update.downloadingUpdate), {
+        description: t(translations.settings.update.downloadStarted),
       });
     } catch (error) {
       console.error('Failed to download update:', error);
-      toast.error('Download Failed', {
-        description: 'Failed to download update',
+      toast.error(t(translations.settings.update.downloadFailed), {
+        description: t(translations.settings.update.downloadFailedDescription),
       });
     }
-  }, []);
+  }, [t]);
 
   const handleInstallUpdate = useCallback(async () => {
     setShowInstallDialog(false);
@@ -45,28 +48,31 @@ export function UpdateSettings() {
       await window.electronAPI.update.quitAndInstall();
     } catch (error) {
       console.error('Failed to install update:', error);
-      toast.error('Install Failed', {
-        description: 'Failed to install update',
+      toast.error(t(translations.settings.update.installFailed), {
+        description: t(translations.settings.update.installFailedDescription),
       });
     }
-  }, []);
+  }, [t]);
 
-  const handleManualUpdateStatus = useCallback((status: UpdateStatus) => {
-    // For manual checks, use dialogs (more prominent)
-    if (status.available && !status.downloaded && !status.downloading) {
-      setShowUpdateDialog(true);
-    }
+  const handleManualUpdateStatus = useCallback(
+    (status: UpdateStatus) => {
+      // For manual checks, use dialogs (more prominent)
+      if (status.available && !status.downloaded && !status.downloading) {
+        setShowUpdateDialog(true);
+      }
 
-    if (status.downloaded) {
-      setShowInstallDialog(true);
-    }
+      if (status.downloaded) {
+        setShowInstallDialog(true);
+      }
 
-    if (status.error) {
-      toast.error('Update Check Failed', {
-        description: status.error,
-      });
-    }
-  }, []);
+      if (status.error) {
+        toast.error(t(translations.settings.update.updateCheckFailed), {
+          description: status.error,
+        });
+      }
+    },
+    [t],
+  );
 
   useEffect(() => {
     const loadUpdateInfo = async () => {
@@ -106,14 +112,14 @@ export function UpdateSettings() {
 
       // Show success toast if no update available
       if (!status.available && !status.error) {
-        toast.success('No Updates Available', {
-          description: 'You are running the latest version',
+        toast.success(t(translations.settings.update.noUpdatesAvailable), {
+          description: t(translations.settings.update.latestVersion),
         });
       }
     } catch (error) {
       console.error('Failed to check for updates:', error);
-      toast.error('Update Check Failed', {
-        description: 'Failed to check for updates',
+      toast.error(t(translations.settings.update.updateCheckFailed), {
+        description: t(translations.settings.update.failedToCheck),
       });
     } finally {
       // Reset the flag after a short delay
@@ -125,21 +131,25 @@ export function UpdateSettings() {
 
   const getStatusText = () => {
     if (updateStatus.error) {
-      return `Error: ${updateStatus.error}`;
+      return t(translations.settings.update.errorPrefix, { error: updateStatus.error });
     }
     if (updateStatus.checking) {
-      return 'Checking for updates...';
+      return t(translations.settings.update.checkingForUpdates);
     }
     if (updateStatus.downloading) {
-      return 'Downloading update...';
+      return t(translations.settings.update.downloadingUpdateStatus);
     }
     if (updateStatus.downloaded) {
-      return `Update ${updateStatus.info?.version} is ready to install`;
+      return t(translations.settings.update.updateReadyToInstall, {
+        version: updateStatus.info?.version,
+      });
     }
     if (updateStatus.available) {
-      return `Update ${updateStatus.info?.version} is available`;
+      return t(translations.settings.update.updateAvailable, {
+        version: updateStatus.info?.version,
+      });
     }
-    return 'You are up to date';
+    return t(translations.settings.update.upToDate);
   };
 
   const getStatusColor = () => {
@@ -158,14 +168,16 @@ export function UpdateSettings() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-lg">
             <RefreshCw className="h-5 w-5" />
-            Application Updates
+            {t(translations.settings.update.title)}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <div>
-                <p className="font-medium text-sm">Current Version</p>
+                <p className="font-medium text-sm">
+                  {t(translations.settings.update.currentVersion)}
+                </p>
                 <p className="text-gray-600 text-xs dark:text-gray-400">{currentVersion}</p>
               </div>
             </div>
@@ -179,7 +191,9 @@ export function UpdateSettings() {
                 <div className="space-y-1">
                   <Progress value={updateStatus.info.downloadedPercent} className="h-2" />
                   <p className="text-gray-600 text-xs dark:text-gray-400">
-                    {updateStatus.info.downloadedPercent.toFixed(1)}% downloaded
+                    {t(translations.settings.update.percentDownloaded, {
+                      percent: updateStatus.info.downloadedPercent.toFixed(1),
+                    })}
                   </p>
                 </div>
               )}
@@ -193,19 +207,19 @@ export function UpdateSettings() {
                 size="sm"
               >
                 <RefreshCw className="mr-2 h-4 w-4" />
-                Check for Updates
+                {t(translations.settings.update.checkForUpdates)}
               </Button>
 
               {updateStatus.available && !updateStatus.downloaded && !updateStatus.downloading && (
                 <Button onClick={handleDownloadUpdate} size="sm">
                   <Download className="mr-2 h-4 w-4" />
-                  Download Update
+                  {t(translations.settings.update.downloadUpdate)}
                 </Button>
               )}
 
               {updateStatus.downloaded && (
                 <Button onClick={handleInstallUpdate} size="sm">
-                  Install & Restart
+                  {t(translations.settings.update.installAndRestart)}
                 </Button>
               )}
             </div>
@@ -213,9 +227,7 @@ export function UpdateSettings() {
 
           <div className="rounded-lg bg-blue-50 p-3 dark:bg-blue-950">
             <p className="text-blue-800 text-xs dark:text-blue-200">
-              <strong>Note:</strong> The app automatically checks for updates on startup. A toast
-              notification will appear in the bottom-left corner if an update is available. Manual
-              checks show a detailed dialog with release notes.
+              <strong>{t(translations.common.note)}</strong> {t(translations.settings.update.note)}
             </p>
           </div>
         </CardContent>

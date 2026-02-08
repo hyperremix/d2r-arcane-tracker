@@ -1,9 +1,11 @@
 import { Bell, Monitor, Smartphone } from 'lucide-react';
 import { useCallback, useId } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
+import { translations } from '@/i18n/translations';
 import { useGrailStore } from '@/stores/grailStore';
 
 /**
@@ -12,6 +14,7 @@ import { useGrailStore } from '@/stores/grailStore';
  * @returns {JSX.Element} A settings card with notification configuration controls
  */
 export function NotificationSettings() {
+  const { t } = useTranslation();
   const { settings, setSettings } = useGrailStore();
   const volumeSliderId = useId();
 
@@ -48,7 +51,7 @@ export function NotificationSettings() {
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-lg">
           <Bell className="h-5 w-5" />
-          Notification Settings
+          {t(translations.settings.notifications.title)}
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -57,10 +60,10 @@ export function NotificationSettings() {
             <div>
               <h4 className="flex items-center gap-2 font-medium text-sm">
                 <Bell className="h-4 w-4" />
-                Sound Notifications
+                {t(translations.settings.notifications.soundNotifications)}
               </h4>
               <p className="text-gray-600 text-xs dark:text-gray-400">
-                Play sound when items are found
+                {t(translations.settings.notifications.soundDescription)}
               </p>
             </div>
             <Switch checked={settings.enableSounds} onCheckedChange={toggleSoundNotifications} />
@@ -68,7 +71,7 @@ export function NotificationSettings() {
 
           <div className="flex items-center gap-2">
             <Label htmlFor={volumeSliderId} className="text-gray-600 text-xs dark:text-gray-400">
-              Volume:
+              {t(translations.settings.notifications.volume)}
             </Label>
             <Slider
               id={volumeSliderId}
@@ -94,10 +97,10 @@ export function NotificationSettings() {
             <div>
               <h4 className="flex items-center gap-2 font-medium text-sm">
                 <Monitor className="h-4 w-4" />
-                In-App Notifications
+                {t(translations.settings.notifications.inAppNotifications)}
               </h4>
               <p className="text-gray-600 text-xs dark:text-gray-400">
-                Show notification cards in the app
+                {t(translations.settings.notifications.inAppDescription)}
               </p>
             </div>
             <Switch
@@ -112,10 +115,10 @@ export function NotificationSettings() {
             <div>
               <h4 className="flex items-center gap-2 font-medium text-sm">
                 <Smartphone className="h-4 w-4" />
-                Native Notifications
+                {t(translations.settings.notifications.nativeNotifications)}
               </h4>
               <p className="text-gray-600 text-xs dark:text-gray-400">
-                Show browser/OS notifications
+                {t(translations.settings.notifications.nativeDescription)}
               </p>
             </div>
             <Switch
@@ -127,8 +130,8 @@ export function NotificationSettings() {
 
         <div className="rounded-lg bg-blue-50 p-3 dark:bg-blue-950">
           <p className="text-blue-800 text-xs dark:text-blue-200">
-            <strong>Note:</strong> Native notifications require browser permission. You'll be
-            prompted to allow notifications when you first enable this setting.
+            <strong>{t(translations.common.note)}</strong>{' '}
+            {t(translations.settings.notifications.nativeNote)}
           </p>
         </div>
       </CardContent>

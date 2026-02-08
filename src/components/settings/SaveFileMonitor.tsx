@@ -10,6 +10,7 @@ import {
   XCircle,
 } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -23,6 +24,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { translations } from '@/i18n/translations';
 import { formatShortDate } from '@/lib/utils';
 import { useGrailStore } from '@/stores/grailStore';
 
@@ -33,6 +35,7 @@ import { useGrailStore } from '@/stores/grailStore';
  * @returns {JSX.Element} A settings card with save file monitoring status and controls
  */
 export function SaveFileMonitor() {
+  const { t } = useTranslation();
   const [monitoringStatus, setMonitoringStatus] = useState<MonitoringStatus>({
     isMonitoring: false,
     directory: null,
@@ -73,7 +76,7 @@ export function SaveFileMonitor() {
       return (
         <Badge variant="destructive" className="flex items-center gap-1">
           <XCircle className="h-3 w-3" />
-          Error
+          {t(translations.settings.saveFileMonitor.error)}
         </Badge>
       );
     }
@@ -82,7 +85,7 @@ export function SaveFileMonitor() {
       return (
         <Badge variant="outline" className="flex items-center gap-1">
           <MonitorOff className="h-3 w-3" />
-          Disabled (Manual Mode)
+          {t(translations.settings.saveFileMonitor.disabledManualMode)}
         </Badge>
       );
     }
@@ -91,7 +94,7 @@ export function SaveFileMonitor() {
       return (
         <Badge variant="default" className="flex items-center gap-1">
           <CheckCircle className="h-3 w-3" />
-          Active ({saveFileCount} files)
+          {t(translations.settings.saveFileMonitor.active, { count: saveFileCount })}
         </Badge>
       );
     }
@@ -99,10 +102,10 @@ export function SaveFileMonitor() {
     return (
       <Badge variant="secondary" className="flex items-center gap-1">
         <MonitorOff className="h-3 w-3" />
-        Inactive
+        {t(translations.settings.saveFileMonitor.inactive)}
       </Badge>
     );
-  }, [error, monitoringStatus.isMonitoring, saveFileCount, settings.gameMode]);
+  }, [error, monitoringStatus.isMonitoring, saveFileCount, settings.gameMode, t]);
 
   const handleChangeDirectory = useCallback(async () => {
     try {
@@ -239,7 +242,7 @@ export function SaveFileMonitor() {
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <FileText className="h-5 w-5" />
-          Save File Monitoring
+          {t(translations.settings.saveFileMonitor.title)}
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -260,8 +263,8 @@ export function SaveFileMonitor() {
         {settings.gameMode === GameMode.Manual && (
           <div className="rounded bg-amber-50 p-3">
             <p className="text-amber-800 text-sm">
-              <strong>Manual Mode Active:</strong> Save file monitoring is disabled because you have
-              selected Manual Entry mode. Items must be entered manually when using this mode.
+              <strong>{t(translations.settings.saveFileMonitor.manualModeActive)}</strong>{' '}
+              {t(translations.settings.saveFileMonitor.manualModeNotice)}
             </p>
           </div>
         )}
@@ -269,7 +272,9 @@ export function SaveFileMonitor() {
         {/* Monitored Directory */}
         <div>
           <div className="mb-2 flex items-center justify-between">
-            <h4 className="font-medium text-sm">Monitored Directory:</h4>
+            <h4 className="font-medium text-sm">
+              {t(translations.settings.saveFileMonitor.monitoredDirectory)}
+            </h4>
             <div className="flex gap-2">
               <Button
                 variant="outline"
@@ -281,7 +286,7 @@ export function SaveFileMonitor() {
                 disabled={isChangingDirectory}
               >
                 <FolderOpen className="h-3 w-3" />
-                Change Directory
+                {t(translations.settings.saveFileMonitor.changeDirectory)}
               </Button>
               <Button
                 variant="outline"
@@ -293,7 +298,7 @@ export function SaveFileMonitor() {
                 disabled={isChangingDirectory}
               >
                 <RotateCcw className="h-3 w-3" />
-                Restore Default
+                {t(translations.settings.saveFileMonitor.restoreDefault)}
               </Button>
             </div>
           </div>
@@ -303,7 +308,7 @@ export function SaveFileMonitor() {
             </div>
           ) : (
             <div className="rounded bg-gray-50 p-2 text-gray-500 text-xs">
-              No directory selected
+              {t(translations.settings.saveFileMonitor.noDirectorySelected)}
             </div>
           )}
         </div>
@@ -311,7 +316,9 @@ export function SaveFileMonitor() {
         {/* Last Event */}
         {lastEvent && (
           <div className="border-t pt-3">
-            <h4 className="mb-2 font-medium text-sm">Latest Activity:</h4>
+            <h4 className="mb-2 font-medium text-sm">
+              {t(translations.settings.saveFileMonitor.latestActivity)}
+            </h4>
             <div className="space-y-1 text-xs">
               <div className="flex items-center gap-2">
                 <Badge variant="outline" className="text-xs">
@@ -320,8 +327,11 @@ export function SaveFileMonitor() {
                 <span className="font-medium">{lastEvent.file.name}</span>
               </div>
               <div className="text-gray-600">
-                Level {lastEvent.file.level} {lastEvent.file.characterClass}
-                {lastEvent.file.hardcore && ' (HC)'}
+                {t(translations.settings.saveFileMonitor.levelClass, {
+                  level: lastEvent.file.level,
+                  characterClass: lastEvent.file.characterClass,
+                })}
+                {lastEvent.file.hardcore && ` ${t(translations.settings.saveFileMonitor.hc)}`}
               </div>
             </div>
           </div>
@@ -330,7 +340,11 @@ export function SaveFileMonitor() {
         {/* Save Files List */}
         {saveFiles.length > 0 && (
           <div className="border-t pt-3">
-            <h4 className="mb-2 font-medium text-sm">Detected Characters ({saveFiles.length}):</h4>
+            <h4 className="mb-2 font-medium text-sm">
+              {t(translations.settings.saveFileMonitor.detectedCharacters, {
+                count: saveFiles.length,
+              })}
+            </h4>
             <div className="max-h-32 space-y-2 overflow-y-auto">
               {saveFiles.map((file, index) => (
                 <div
@@ -340,8 +354,11 @@ export function SaveFileMonitor() {
                   <div>
                     <div className="font-medium">{file.name}</div>
                     <div className="text-gray-600 dark:text-gray-400">
-                      Level {file.level} {file.characterClass}
-                      {file.hardcore && ' (HC)'}
+                      {t(translations.settings.saveFileMonitor.levelClass, {
+                        level: file.level,
+                        characterClass: file.characterClass,
+                      })}
+                      {file.hardcore && ` ${t(translations.settings.saveFileMonitor.hc)}`}
                     </div>
                   </div>
                   <div className="text-gray-500 dark:text-gray-400">
@@ -369,26 +386,27 @@ export function SaveFileMonitor() {
             <AlertDialogTitle className="flex items-center gap-2">
               <AlertCircle className="h-5 w-5 text-orange-500" />
               {dialogAction === 'restore'
-                ? 'Restore Default Directory'
-                : 'Change Save File Directory'}
+                ? t(translations.settings.saveFileMonitor.restoreDefaultDirectory)
+                : t(translations.settings.saveFileMonitor.changeSaveFileDirectory)}
             </AlertDialogTitle>
             <AlertDialogDescription>
               <span className="mb-2 block">
                 {dialogAction === 'restore'
-                  ? 'Are you sure you want to restore the monitored directory to the default location?'
-                  : 'Are you sure you want to change the monitored save file directory?'}
+                  ? t(translations.settings.saveFileMonitor.confirmRestoreDirectory)
+                  : t(translations.settings.saveFileMonitor.confirmChangeDirectory)}
               </span>
               <span className="mb-2 block font-medium text-orange-600">
-                ⚠️ This action will permanently delete all characters and progress data.
+                {t(translations.settings.saveFileMonitor.deleteWarning)}
               </span>
               <span className="block text-sm">
-                Make sure you have created a backup before proceeding if you want to keep your
-                current progress.
+                {t(translations.settings.saveFileMonitor.backupWarning)}
               </span>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={isChangingDirectory}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={isChangingDirectory}>
+              {t(translations.common.cancel)}
+            </AlertDialogCancel>
             <AlertDialogAction
               onClick={
                 dialogAction === 'restore' ? handleRestoreDefaultDirectory : handleChangeDirectory
@@ -398,11 +416,11 @@ export function SaveFileMonitor() {
             >
               {isChangingDirectory
                 ? dialogAction === 'restore'
-                  ? 'Restoring...'
-                  : 'Changing...'
+                  ? t(translations.settings.saveFileMonitor.restoring)
+                  : t(translations.settings.saveFileMonitor.changing)
                 : dialogAction === 'restore'
-                  ? 'Restore Default'
-                  : 'Change Directory'}
+                  ? t(translations.settings.saveFileMonitor.restoreDefault)
+                  : t(translations.settings.saveFileMonitor.changeDirectory)}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

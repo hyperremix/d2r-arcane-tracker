@@ -1,6 +1,7 @@
 import { GameVersion } from 'electron/types/grail';
 import { Gamepad2 } from 'lucide-react';
-import { useCallback, useId } from 'react';
+import { useCallback, useId, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import {
@@ -10,23 +11,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { translations } from '@/i18n/translations';
 import { useGrailStore } from '@/stores/grailStore';
 
 /**
- * Available game versions with their labels and descriptions.
+ * Available game version values.
  */
-const gameVersions: { value: GameVersion; label: string; description: string }[] = [
-  {
-    value: GameVersion.Resurrected,
-    label: 'Diablo II: Resurrected',
-    description: 'Modern remaster with enhanced graphics and quality of life improvements',
-  },
-  {
-    value: GameVersion.Classic,
-    label: 'Diablo II: Classic',
-    description: 'Original Diablo II with Lord of Destruction expansion',
-  },
-];
+const gameVersionValues: GameVersion[] = [GameVersion.Resurrected, GameVersion.Classic];
 
 /**
  * GameVersionSettings component that allows users to select the Diablo II game version.
@@ -34,8 +25,27 @@ const gameVersions: { value: GameVersion; label: string; description: string }[]
  * @returns {JSX.Element} A settings card with game version selection dropdown
  */
 export function GameVersionSettings() {
+  const { t } = useTranslation();
   const gameVersionSelectId = useId();
   const { settings, setSettings } = useGrailStore();
+
+  const gameVersions = useMemo(
+    () =>
+      gameVersionValues.map((value) => ({
+        value,
+        label: t(
+          value === GameVersion.Resurrected
+            ? translations.settings.gameVersion.resurrectedLabel
+            : translations.settings.gameVersion.classicLabel,
+        ),
+        description: t(
+          value === GameVersion.Resurrected
+            ? translations.settings.gameVersion.resurrectedDescription
+            : translations.settings.gameVersion.classicDescription,
+        ),
+      })),
+    [t],
+  );
 
   const updateGameVersion = useCallback(
     (gameVersion: GameVersion) => {
@@ -49,7 +59,7 @@ export function GameVersionSettings() {
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Gamepad2 className="h-5 w-5" />
-          Game Version
+          {t(translations.settings.gameVersion.title)}
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">

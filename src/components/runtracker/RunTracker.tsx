@@ -1,7 +1,9 @@
 import type { Run, Session } from 'electron/types/grail';
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { translations } from '@/i18n/translations';
 import { useRunTrackerStore } from '@/stores/runTrackerStore';
 import { ErrorDisplay } from './ErrorDisplay';
 import { SessionCard } from './SessionCard';
@@ -15,6 +17,7 @@ import { SessionsList } from './SessionsList';
  * and error states, and provides the overall layout for run tracking functionality.
  */
 export function RunTracker() {
+  const { t } = useTranslation();
   const {
     activeSession,
     loading,
@@ -149,7 +152,7 @@ export function RunTracker() {
         <Card className="w-full max-w-md">
           <CardContent className="flex flex-col items-center gap-4 p-6">
             <div className="h-8 w-8 animate-spin rounded-full border-primary border-b-2" />
-            <p className="text-muted-foreground">Loading run tracker data...</p>
+            <p className="text-muted-foreground">{t(translations.runTracker.loadingData)}</p>
           </CardContent>
         </Card>
       </div>
@@ -163,7 +166,7 @@ export function RunTracker() {
         <Card className="w-full max-w-md">
           <CardContent className="flex flex-col items-center gap-4 p-6">
             <div className="text-center text-destructive">
-              <h3 className="mb-2 font-semibold">Error Loading Run Tracker</h3>
+              <h3 className="mb-2 font-semibold">{t(translations.runTracker.errorLoading)}</h3>
               <p className="mb-4 text-muted-foreground text-sm">{error}</p>
               <Button
                 onClick={() => {
@@ -177,7 +180,7 @@ export function RunTracker() {
                 }}
                 variant="outline"
               >
-                Retry
+                {t(translations.common.retry)}
               </Button>
             </div>
           </CardContent>

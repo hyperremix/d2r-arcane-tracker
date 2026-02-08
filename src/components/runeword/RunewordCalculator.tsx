@@ -1,7 +1,9 @@
 import type { Item } from 'electron/types/grail';
 import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { translations } from '@/i18n/translations';
 import { filterRunewordsByName, filterRunewordsByRunes } from '@/lib/runeword-utils';
 import { RuneFilters } from './RuneFilters';
 import { RunewordCard } from './RunewordCard';
@@ -41,6 +43,7 @@ async function loadAvailableRunes(): Promise<Record<string, number>> {
  * Loads runewords directly from the database to work independently of grailRunewords setting.
  */
 export function RunewordCalculator() {
+  const { t } = useTranslation();
   const [allRunewords, setAllRunewords] = useState<Item[]>([]);
   const [availableRunes, setAvailableRunes] = useState<Record<string, number>>({});
   const [searchTerm, setSearchTerm] = useState('');
@@ -96,9 +99,9 @@ export function RunewordCalculator() {
       {/* Left Sidebar - Filters */}
       <div className="flex w-80 shrink-0 flex-col gap-6">
         <div>
-          <h1 className="mb-2 font-bold text-3xl">Runeword Calculator</h1>
+          <h1 className="mb-2 font-bold text-3xl">{t(translations.runeword.calculator.title)}</h1>
           <p className="text-gray-600 dark:text-gray-400">
-            Find which runewords you can craft with your available runes
+            {t(translations.runeword.calculator.subtitle)}
           </p>
         </div>
 
@@ -108,12 +111,15 @@ export function RunewordCalculator() {
             {/* Results Count */}
             {!isLoading && (
               <div className="text-gray-600 text-sm dark:text-gray-400">
-                Showing {filteredRunewords.length} of {allRunewords.length} runewords
+                {t(translations.runeword.calculator.showingResults, {
+                  filtered: filteredRunewords.length,
+                  total: allRunewords.length,
+                })}
               </div>
             )}
             <Input
               type="text"
-              placeholder="Search runewords..."
+              placeholder={t(translations.runeword.calculator.searchPlaceholder)}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
@@ -137,11 +143,13 @@ export function RunewordCalculator() {
             <div className="text-center">
               <div className="mb-4 inline-block h-8 w-8 animate-spin rounded-full border-4 border-gray-300 border-t-blue-600" />
               <p className="font-medium text-gray-600 dark:text-gray-400">
-                {isScanning ? 'Scanning save files...' : 'Loading rune data...'}
+                {isScanning
+                  ? t(translations.runeword.calculator.scanningSaveFiles)
+                  : t(translations.runeword.calculator.loadingRuneData)}
               </p>
               {isScanning && (
                 <p className="mt-2 text-gray-500 text-sm dark:text-gray-500">
-                  This may take a few moments
+                  {t(translations.runeword.calculator.thisMayTake)}
                 </p>
               )}
             </div>
@@ -160,9 +168,11 @@ export function RunewordCalculator() {
         {/* Empty State */}
         {!isLoading && filteredRunewords.length === 0 && (
           <div className="py-12 text-center">
-            <p className="text-gray-600 text-lg dark:text-gray-400">No runewords found</p>
+            <p className="text-gray-600 text-lg dark:text-gray-400">
+              {t(translations.runeword.calculator.noRunewordsFound)}
+            </p>
             <p className="mt-2 text-gray-500 text-sm dark:text-gray-500">
-              Try adjusting your filters or search term
+              {t(translations.runeword.calculator.adjustFilters)}
             </p>
           </div>
         )}

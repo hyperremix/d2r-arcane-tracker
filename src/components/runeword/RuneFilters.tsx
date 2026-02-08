@@ -1,7 +1,9 @@
 import { useEffect, useId, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
+import { translations } from '@/i18n/translations';
 import { cn } from '@/lib/utils';
 import { runes } from '../../../electron/items/runes';
 
@@ -36,6 +38,7 @@ export function RuneFilters({
   onShowPartialChange,
   className,
 }: RuneFiltersProps) {
+  const { t } = useTranslation();
   const showPartialId = useId();
   const [runeImages, setRuneImages] = useState<Map<string, string>>(new Map());
   const [imagesLoading, setImagesLoading] = useState(true);
@@ -88,10 +91,10 @@ export function RuneFilters({
     <div className="space-y-4">
       {/* Header with Show Partial toggle */}
       <div className="flex items-center justify-between border-gray-200 border-b pb-3">
-        <h3 className="font-semibold text-lg">Filter by Runes</h3>
+        <h3 className="font-semibold text-lg">{t(translations.runeword.filters.filterByRunes)}</h3>
         <div className="flex items-center gap-2">
           <Label htmlFor={showPartialId} className="text-sm">
-            Show Partial
+            {t(translations.runeword.filters.showPartial)}
           </Label>
           <Switch id={showPartialId} checked={showPartial} onCheckedChange={onShowPartialChange} />
         </div>
@@ -159,7 +162,10 @@ export function RuneFilters({
       {/* Selection summary */}
       {selectedRunes.length > 0 && (
         <div className="border-gray-200 border-t pt-3 text-gray-600 text-sm dark:text-gray-400">
-          {selectedRunes.length} rune{selectedRunes.length !== 1 ? 's' : ''} selected
+          {t(translations.runeword.filters.runesSelected, {
+            count: selectedRunes.length,
+            plural: selectedRunes.length !== 1 ? 's' : '',
+          })}
         </div>
       )}
     </div>

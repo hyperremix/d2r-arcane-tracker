@@ -1,10 +1,12 @@
 import type { Character, GrailProgress, ItemDetectionEvent } from 'electron/types/grail';
 import { Bell, Trophy, X } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ItemCard } from '@/components/grail/ItemCard';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { translations } from '@/i18n/translations';
 import { useGrailStore } from '@/stores/grailStore';
 import dingSound from '/ding.mp3';
 import logoUrl from '/logo.png';
@@ -34,6 +36,7 @@ interface NotificationItem extends ItemDetectionEvent {
  * @returns {JSX.Element} A notification button with dropdown showing recent item detections
  */
 export function NotificationButton() {
+  const { t } = useTranslation();
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [isOpen, setIsOpen] = useState(false);
   const [notificationQueue, setNotificationQueue] = useState<ItemDetectionEvent[]>([]);
@@ -114,37 +117,49 @@ export function NotificationButton() {
   const showBrowserNotification = useCallback(
     (itemEvent: ItemDetectionEvent) => {
       if (itemEvent.type === 'item-found' && itemEvent.grailItem) {
-        const notification = new Notification('Holy Grail Item Found!', {
-          body: `${itemEvent.grailItem.name} found by ${itemEvent.item.characterName}`,
-          icon: iconPath,
-          tag: 'grail-item',
-          requireInteraction: true,
-        });
+        const notification = new Notification(
+          t(translations.grail.notifications.holyGrailItemFound),
+          {
+            body: t(translations.grail.notifications.itemFoundBy, {
+              itemName: itemEvent.grailItem.name,
+              characterName: itemEvent.item.characterName,
+            }),
+            icon: iconPath,
+            tag: 'grail-item',
+            requireInteraction: true,
+          },
+        );
 
         // Auto-close after 5 seconds
         setTimeout(() => notification.close(), 5000);
       }
     },
-    [iconPath],
+    [iconPath, t],
   );
 
   const showBatchNotification = useCallback(
     (events: ItemDetectionEvent[]) => {
       const itemNames = events.map((e) => e.grailItem.name).join(', ');
-      const notification = new Notification(`${events.length} Holy Grail Items Found!`, {
-        body:
-          itemNames.length > 100
-            ? `${events.length} items including ${events[0].grailItem.name}...`
-            : itemNames,
-        icon: iconPath,
-        tag: 'grail-batch',
-        requireInteraction: true,
-      });
+      const notification = new Notification(
+        t(translations.grail.notifications.multipleItemsFound, { count: events.length }),
+        {
+          body:
+            itemNames.length > 100
+              ? t(translations.grail.notifications.multipleItemsIncluding, {
+                  count: events.length,
+                  firstName: events[0].grailItem.name,
+                })
+              : itemNames,
+          icon: iconPath,
+          tag: 'grail-batch',
+          requireInteraction: true,
+        },
+      );
 
       // Auto-close after 5 seconds
       setTimeout(() => notification.close(), 5000);
     },
-    [iconPath],
+    [iconPath, t],
   );
 
   const processBatch = useCallback(async () => {
@@ -356,7 +371,7 @@ export function NotificationButton() {
                 setIsOpen(false);
               }
             }}
-            aria-label="Close notifications"
+            aria-label={t(translations.grail.notifications.closeNotifications)}
           />
 
           {/* Popover */}
@@ -365,7 +380,7 @@ export function NotificationButton() {
               <CardTitle className="flex items-center justify-between text-sm">
                 <div className="flex items-center gap-2">
                   <Bell className="h-4 w-4" />
-                  Recent Notifications
+                  {t(translations.grail.notifications.recentNotifications)}
                 </div>
                 {activeNotifications.length > 0 && (
                   <Button
@@ -374,7 +389,7 @@ export function NotificationButton() {
                     size="sm"
                     className="h-6 px-2 text-xs"
                   >
-                    Clear All
+                    {t(translations.grail.notifications.clearAll)}
                   </Button>
                 )}
               </CardTitle>
@@ -383,7 +398,9 @@ export function NotificationButton() {
               {activeNotifications.length === 0 ? (
                 <div className="py-4 text-center text-gray-500 dark:text-gray-400">
                   <Trophy className="mx-auto mb-2 h-8 w-8 opacity-50" />
-                  <p className="text-sm">No recent item detections</p>
+                  <p className="text-sm">
+                    {t(translations.grail.notifications.noRecentDetections)}
+                  </p>
                 </div>
               ) : (
                 activeNotifications.map((notification) => (

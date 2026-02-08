@@ -1,6 +1,7 @@
 import type { TerrorZone } from 'electron/types/grail';
 import { AlertCircle, AlertTriangle, RotateCcw, Search, XCircle } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import {
   AlertDialog,
@@ -18,6 +19,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { TooltipProvider } from '@/components/ui/tooltip';
+import { translations } from '@/i18n/translations';
 
 /**
  * TerrorZoneConfiguration component that serves as the main terror zone configuration page.
@@ -25,6 +27,7 @@ import { TooltipProvider } from '@/components/ui/tooltip';
  * @returns {JSX.Element} The main terror zone configuration interface
  */
 export function TerrorZoneConfiguration() {
+  const { t } = useTranslation();
   const [zones, setZones] = useState<TerrorZone[]>([]);
   const [config, setConfig] = useState<Record<number, boolean>>({});
   const [searchTerm, setSearchTerm] = useState('');
@@ -181,12 +184,14 @@ export function TerrorZoneConfiguration() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-lg">
                   <AlertTriangle className="h-5 w-5" />
-                  Terror Zone Configuration
+                  {t(translations.terrorZone.title)}
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="flex items-center justify-center py-8">
-                  <div className="text-muted-foreground">Loading terror zones...</div>
+                  <div className="text-muted-foreground">
+                    {t(translations.terrorZone.loadingTerrorZones)}
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -204,7 +209,7 @@ export function TerrorZoneConfiguration() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-lg">
                 <AlertTriangle className="h-5 w-5" />
-                Terror Zone Configuration
+                {t(translations.terrorZone.title)}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -212,9 +217,8 @@ export function TerrorZoneConfiguration() {
               <Alert>
                 <AlertTriangle className="h-4 w-4" />
                 <AlertDescription>
-                  <strong>Warning:</strong> This feature modifies game files in your D2R
-                  installation. Any issues related to these changes are your own responsibility.
-                  Changes require a game restart to take effect.
+                  <strong>{t(translations.common.warning)}</strong>{' '}
+                  {t(translations.terrorZone.warning)}
                 </AlertDescription>
               </Alert>
 
@@ -223,25 +227,28 @@ export function TerrorZoneConfiguration() {
                 <Alert className="border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950">
                   <AlertCircle className="h-4 w-4 text-red-600" />
                   <AlertTitle className="font-bold text-red-800 dark:text-red-200">
-                    Error
+                    {t(translations.common.error)}
                   </AlertTitle>
                   <AlertDescription className="space-y-2 text-red-800 dark:text-red-200">
-                    <p>{validationStatus.error || 'D2R installation path is not configured'}</p>
+                    <p>{validationStatus.error || t(translations.terrorZone.pathNotConfigured)}</p>
                     {validationStatus.error?.includes('not found') && (
                       <div>
-                        <p className="font-semibold text-sm">Game Files Must Be Extracted</p>
+                        <p className="font-semibold text-sm">
+                          {t(translations.terrorZone.gameFilesMustBeExtracted)}
+                        </p>
                         <p className="text-sm">
-                          D2R stores game files in CASC (Content Addressable Storage Container)
-                          format.
-                          <strong> All game files must be extracted</strong> and D2R must be
-                          launched with the{' '}
+                          {t(translations.terrorZone.cascDescription)}
+                          <strong> {t(translations.terrorZone.allFilesMustBeExtracted)}</strong>{' '}
+                          {t(translations.terrorZone.launchFlags)}{' '}
                           <code className="rounded bg-red-200 px-1 dark:bg-red-800">
-                            -direct -txt
+                            {t(translations.terrorZone.flagsValue)}
                           </code>{' '}
-                          flags for this feature to work.
+                          {t(translations.terrorZone.flagsSuffix)}
                         </p>
                         <div className="mt-2">
-                          <p className="font-semibold text-sm">Extraction Steps:</p>
+                          <p className="font-semibold text-sm">
+                            {t(translations.terrorZone.extractionSteps)}
+                          </p>
                           <ol className="mt-1 ml-4 list-decimal space-y-1 text-sm">
                             <li>
                               Download{' '}
@@ -289,8 +296,8 @@ export function TerrorZoneConfiguration() {
                           </ol>
                         </div>
                         <p className="mt-2 text-xs">
-                          <strong>Note:</strong> Extraction is a one-time process and does not
-                          modify your game installation.
+                          <strong>{t(translations.common.note)}</strong>{' '}
+                          {t(translations.terrorZone.extractionNote)}
                         </p>
                       </div>
                     )}
@@ -313,7 +320,7 @@ export function TerrorZoneConfiguration() {
                 <div className="flex items-center gap-2">
                   <Search className="h-4 w-4 text-muted-foreground" />
                   <Input
-                    placeholder="Search terror zones..."
+                    placeholder={t(translations.terrorZone.searchPlaceholder)}
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     className="flex-1"
@@ -322,7 +329,10 @@ export function TerrorZoneConfiguration() {
 
                 <div className="flex items-center justify-between">
                   <div className="text-muted-foreground text-sm">
-                    {enabledCount} of {totalCount} zones enabled
+                    {t(translations.terrorZone.zonesEnabled, {
+                      enabled: enabledCount,
+                      total: totalCount,
+                    })}
                   </div>
                   <div className="flex gap-2">
                     <Button
@@ -331,7 +341,7 @@ export function TerrorZoneConfiguration() {
                       onClick={handleEnableAll}
                       disabled={isSaving || !validationStatus.valid}
                     >
-                      Enable All
+                      {t(translations.terrorZone.enableAll)}
                     </Button>
                     <Button
                       variant="outline"
@@ -339,7 +349,7 @@ export function TerrorZoneConfiguration() {
                       onClick={handleDisableAll}
                       disabled={isSaving || !validationStatus.valid}
                     >
-                      Disable All
+                      {t(translations.terrorZone.disableAll)}
                     </Button>
                     <Button
                       variant="outline"
@@ -348,7 +358,7 @@ export function TerrorZoneConfiguration() {
                       disabled={isSaving || !validationStatus.valid}
                     >
                       <RotateCcw className="mr-2 h-4 w-4" />
-                      Restore Original
+                      {t(translations.terrorZone.restoreOriginal)}
                     </Button>
                   </div>
                 </div>
@@ -373,15 +383,13 @@ export function TerrorZoneConfiguration() {
 
               {filteredZones.length === 0 && searchTerm && (
                 <div className="py-8 text-center text-muted-foreground">
-                  No zones found matching "{searchTerm}"
+                  {t(translations.terrorZone.noZonesFound, { searchTerm })}
                 </div>
               )}
 
               {/* Info Text */}
               <div className="border-t pt-2 text-muted-foreground text-xs">
-                Changes to terror zone configuration require restarting Diablo II: Resurrected to
-                take effect. The original file is automatically backed up and can be restored at any
-                time.
+                {t(translations.terrorZone.infoText)}
               </div>
             </CardContent>
           </Card>
@@ -391,21 +399,23 @@ export function TerrorZoneConfiguration() {
         <AlertDialog open={showRestoreDialog} onOpenChange={setShowRestoreDialog}>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>Restore Original File</AlertDialogTitle>
+              <AlertDialogTitle>{t(translations.terrorZone.restoreOriginalFile)}</AlertDialogTitle>
               <AlertDialogDescription>
-                This will restore the original desecratedzones.json file from backup and clear your
-                current configuration. This action cannot be undone. Are you sure you want to
-                continue?
+                {t(translations.terrorZone.restoreDescription)}
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel disabled={isSaving}>Cancel</AlertDialogCancel>
+              <AlertDialogCancel disabled={isSaving}>
+                {t(translations.common.cancel)}
+              </AlertDialogCancel>
               <AlertDialogAction
                 onClick={handleRestoreOriginal}
                 disabled={isSaving}
                 className="bg-red-600 hover:bg-red-700"
               >
-                {isSaving ? 'Restoring...' : 'Restore Original'}
+                {isSaving
+                  ? t(translations.terrorZone.restoring)
+                  : t(translations.terrorZone.restoreOriginal)}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>

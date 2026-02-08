@@ -1,9 +1,11 @@
 import type { Character, GrailProgress, Item, Settings } from 'electron/types/grail';
 import { Check, CheckCheck } from 'lucide-react';
 import { memo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useItemIcon } from '@/hooks/useItemIcon';
+import { translations } from '@/i18n/translations';
 import { isEtherealOnly, shouldShowEtherealStatus, shouldShowNormalStatus } from '@/lib/ethereal';
 import { cn, formatShortDate, isRecentFind } from '@/lib/utils';
 import { useGrailStore } from '@/stores/grailStore';
@@ -56,11 +58,12 @@ interface DiscoveryInfoProps {
  * @returns {JSX.Element | null} Discovery information or null if no progress
  */
 function DiscoveryInfo({ allProgress, characters }: DiscoveryInfoProps) {
+  const { t } = useTranslation();
   if (allProgress.length === 0) return null;
 
   return (
     <div className="mt-2 border-gray-200 border-t pt-2">
-      <p className="font-medium text-xs">Discovery Info:</p>
+      <p className="font-medium text-xs">{t(translations.grail.itemCard.discoveryInfo)}</p>
       {allProgress.slice(0, 3).map((p) => {
         const character = characters.find((c) => c.id === p.characterId);
         const isEthProgress = p.isEthereal;
@@ -69,14 +72,22 @@ function DiscoveryInfo({ allProgress, characters }: DiscoveryInfoProps) {
             {character && (
               <CharacterIcon characterClass={character.characterClass} className="h-3 w-3" />
             )}
-            <span>{character?.name || 'Unknown'}</span>
-            <span className="text-blue-600 text-xs">({isEthProgress ? 'Eth' : 'Normal'})</span>
+            <span>{character?.name || t(translations.common.unknown)}</span>
+            <span className="text-blue-600 text-xs">
+              (
+              {isEthProgress
+                ? t(translations.grail.itemCard.eth)
+                : t(translations.grail.itemCard.normal)}
+              )
+            </span>
             {p.foundDate && <span className="text-gray-500">• {formatShortDate(p.foundDate)}</span>}
           </div>
         );
       })}
       {allProgress.length > 3 && (
-        <p className="mt-1 text-gray-500 text-xs">+{allProgress.length - 3} more discoveries</p>
+        <p className="mt-1 text-gray-500 text-xs">
+          {t(translations.grail.itemCard.moreDiscoveries, { count: allProgress.length - 3 })}
+        </p>
       )}
     </div>
   );
@@ -246,11 +257,15 @@ function determineCompletionStatus(
  * @param {Settings} settings - Grail settings
  * @returns {string} Appropriate tooltip text for the completion status
  */
-function getTooltipText(allVersionsFound: boolean, settings: Settings) {
+function getTooltipText(allVersionsFound: boolean, settings: Settings, t: (key: string) => string) {
   if (allVersionsFound) {
-    return settings.grailEthereal ? 'All versions found' : 'Item found';
+    return settings.grailEthereal
+      ? t(translations.grail.itemCard.allVersionsFound)
+      : t(translations.grail.itemCard.itemFound);
   }
-  return settings.grailEthereal ? 'Some versions missing' : 'Item not found';
+  return settings.grailEthereal
+    ? t(translations.grail.itemCard.someVersionsMissing)
+    : t(translations.grail.itemCard.itemNotFound);
 }
 
 /**
@@ -276,6 +291,7 @@ function StatusIndicators({
   etherealProgress,
   settings,
 }: StatusIndicatorsProps) {
+  const { t } = useTranslation();
   if (
     mostRecentDiscovery?.foundDate &&
     !mostRecentDiscovery.fromInitialScan &&
@@ -314,7 +330,7 @@ function StatusIndicators({
           )}
         </TooltipTrigger>
         <TooltipContent>
-          <p className="text-xs">{getTooltipText(allVersionsFound, settings)}</p>
+          <p className="text-xs">{getTooltipText(allVersionsFound, settings, t)}</p>
         </TooltipContent>
       </Tooltip>
     </div>
@@ -337,9 +353,12 @@ interface DiscoveryAttributionProps {
  * @returns {JSX.Element} Character attribution display with tooltips
  */
 function DiscoveryAttribution({ discoveringCharacters, item }: DiscoveryAttributionProps) {
+  const { t } = useTranslation();
   return (
     <div className="flex items-center justify-center gap-1 pt-3">
-      <span className="text-gray-500 text-xs dark:text-gray-400">Found by:</span>
+      <span className="text-gray-500 text-xs dark:text-gray-400">
+        {t(translations.grail.itemCard.foundBy)}
+      </span>
       <div className="flex items-center gap-1">
         {discoveringCharacters.slice(0, 2).map((character, index) =>
           character ? (
@@ -388,6 +407,7 @@ interface VersionCountsProps {
  * @returns {JSX.Element | null} Version count badges or null if no versions found
  */
 function VersionCounts({ item, normalProgress, etherealProgress, settings }: VersionCountsProps) {
+  const { t } = useTranslation();
   const normalCount = normalProgress.length;
   const etherealCount = etherealProgress.length;
 
@@ -397,12 +417,14 @@ function VersionCounts({ item, normalProgress, etherealProgress, settings }: Ver
     <div className="flex items-center justify-center gap-2 pt-2">
       {shouldShowNormalStatus(item, settings) && normalCount > 0 && (
         <span className="rounded bg-green-100 px-2 py-1 font-medium text-green-700 text-xs dark:bg-green-900 dark:text-green-200">
-          Normal: {normalCount}x
+          {t(translations.grail.itemCard.normalCount, { count: normalCount })}
         </span>
       )}
       {shouldShowEtherealStatus(item, settings) && etherealCount > 0 && (
         <span className="rounded bg-blue-100 px-2 py-1 font-medium text-blue-700 text-xs dark:bg-blue-900 dark:text-blue-200">
-          {isEtherealOnly(item) ? 'Ethereal Only' : 'Ethereal'}: {etherealCount}x
+          {isEtherealOnly(item)
+            ? t(translations.grail.itemCard.etherealOnly)
+            : t(translations.grail.itemCard.etherealCount, { count: etherealCount })}
         </span>
       )}
     </div>
@@ -444,6 +466,7 @@ function GridView({
   onClick,
   withoutStatusIndicators = false,
 }: GridViewProps) {
+  const { t } = useTranslation();
   const { iconUrl, isLoading } = useItemIcon(item);
   const { settings } = useGrailStore();
 
@@ -531,7 +554,7 @@ function GridView({
             {/* Set specific info */}
             {item.setName && (
               <p className="truncate text-center font-medium text-green-600 text-xs dark:text-green-400">
-                Set: {item.setName}
+                {t(translations.grail.itemCard.setName, { name: item.setName })}
               </p>
             )}
 

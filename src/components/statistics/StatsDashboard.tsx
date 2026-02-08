@@ -1,10 +1,12 @@
 import { BarChart3, Clock, Target, TrendingUp, Trophy, Users, Zap } from 'lucide-react';
 import { memo, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ItemCard } from '@/components/grail/ItemCard';
 import { ProgressBar } from '@/components/grail/ProgressBar';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useProgressLookup } from '@/hooks/useProgressLookup';
+import { translations } from '@/i18n/translations';
 import { formatTimeAgo } from '@/lib/utils';
 import { useGrailStatistics, useGrailStore } from '@/stores/grailStore';
 
@@ -15,6 +17,7 @@ import { useGrailStatistics, useGrailStore } from '@/stores/grailStore';
  * @returns {JSX.Element} A dashboard with multiple statistical views and progress indicators
  */
 export const StatsDashboard = memo(function StatsDashboard() {
+  const { t } = useTranslation();
   const stats = useGrailStatistics();
   const { items, progress, characters, selectedCharacterId, settings } = useGrailStore();
   const progressLookup = useProgressLookup(items, progress, settings, selectedCharacterId);
@@ -32,12 +35,16 @@ export const StatsDashboard = memo(function StatsDashboard() {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="font-medium text-gray-600 text-sm">Total Progress</p>
+                <p className="font-medium text-gray-600 text-sm">
+                  {t(translations.statistics.dashboard.totalProgress)}
+                </p>
                 <p className="font-bold text-2xl">
                   {stats.foundItems}/{stats.totalItems}
                 </p>
                 <p className="text-gray-500 text-xs">
-                  {stats.completionPercentage.toFixed(1)}% complete
+                  {t(translations.statistics.dashboard.complete, {
+                    percentage: stats.completionPercentage.toFixed(1),
+                  })}
                 </p>
               </div>
               <Trophy className="h-8 w-8 text-yellow-500" />
@@ -49,9 +56,13 @@ export const StatsDashboard = memo(function StatsDashboard() {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="font-medium text-gray-600 text-sm">Recent Finds</p>
+                <p className="font-medium text-gray-600 text-sm">
+                  {t(translations.statistics.dashboard.recentFinds)}
+                </p>
                 <p className="font-bold text-2xl text-green-600">{stats.recentFinds}</p>
-                <p className="text-gray-500 text-xs">Last 7 days</p>
+                <p className="text-gray-500 text-xs">
+                  {t(translations.statistics.dashboard.last7Days)}
+                </p>
               </div>
               <TrendingUp className="h-8 w-8 text-green-500" />
             </div>
@@ -62,9 +73,13 @@ export const StatsDashboard = memo(function StatsDashboard() {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="font-medium text-gray-600 text-sm">Current Streak</p>
+                <p className="font-medium text-gray-600 text-sm">
+                  {t(translations.statistics.dashboard.currentStreak)}
+                </p>
                 <p className="font-bold text-2xl text-blue-600">{stats.currentStreak}</p>
-                <p className="text-gray-500 text-xs">Max: {stats.maxStreak} days</p>
+                <p className="text-gray-500 text-xs">
+                  {t(translations.statistics.dashboard.maxStreak, { count: stats.maxStreak })}
+                </p>
               </div>
               <Zap className="h-8 w-8 text-blue-500" />
             </div>
@@ -75,11 +90,15 @@ export const StatsDashboard = memo(function StatsDashboard() {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="font-medium text-gray-600 text-sm">Avg per Day</p>
+                <p className="font-medium text-gray-600 text-sm">
+                  {t(translations.statistics.dashboard.avgPerDay)}
+                </p>
                 <p className="font-bold text-2xl text-purple-600">
                   {stats.averageItemsPerDay.toFixed(1)}
                 </p>
-                <p className="text-gray-500 text-xs">Recent average</p>
+                <p className="text-gray-500 text-xs">
+                  {t(translations.statistics.dashboard.recentAverage)}
+                </p>
               </div>
               <Target className="h-8 w-8 text-purple-500" />
             </div>
@@ -92,18 +111,20 @@ export const StatsDashboard = memo(function StatsDashboard() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Clock className="h-5 w-5" />
-            Recent Activity
+            {t(translations.statistics.dashboard.recentActivity)}
           </CardTitle>
         </CardHeader>
         <CardContent>
           {stats.lastFind && lastFindItem ? (
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <span className="text-gray-600 text-sm">Last Find:</span>
+                <span className="text-gray-600 text-sm">
+                  {t(translations.statistics.dashboard.lastFind)}
+                </span>
                 <span className="font-medium text-sm">
                   {stats.lastFind.foundDate
                     ? formatTimeAgo(new Date(stats.lastFind.foundDate))
-                    : 'Unknown'}
+                    : t(translations.common.unknown)}
                 </span>
               </div>
               <ItemCard
@@ -115,7 +136,9 @@ export const StatsDashboard = memo(function StatsDashboard() {
               />
             </div>
           ) : (
-            <p className="text-gray-500 text-sm">No items found yet</p>
+            <p className="text-gray-500 text-sm">
+              {t(translations.statistics.dashboard.noItemsFoundYet)}
+            </p>
           )}
         </CardContent>
       </Card>
@@ -126,7 +149,7 @@ export const StatsDashboard = memo(function StatsDashboard() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <BarChart3 className="h-5 w-5" />
-              Progress by Category
+              {t(translations.statistics.dashboard.progressByCategory)}
             </CardTitle>
           </CardHeader>
           <CardContent className="pb-4">
@@ -138,7 +161,9 @@ export const StatsDashboard = memo(function StatsDashboard() {
                       <span className="font-medium capitalize">{category.category}</span>
                       {category.recent > 0 && (
                         <Badge variant="secondary" className="text-xs">
-                          +{category.recent} recent
+                          {t(translations.statistics.dashboard.recentBadge, {
+                            count: category.recent,
+                          })}
                         </Badge>
                       )}
                     </div>
@@ -146,7 +171,9 @@ export const StatsDashboard = memo(function StatsDashboard() {
                   <ProgressBar
                     current={category.found}
                     total={category.total}
-                    label={`${category.category} progress`}
+                    label={t(translations.statistics.dashboard.categoryProgress, {
+                      category: category.category,
+                    })}
                     className="h-4"
                   />
                 </div>
@@ -161,7 +188,7 @@ export const StatsDashboard = memo(function StatsDashboard() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Users className="h-5 w-5" />
-                Character Comparison
+                {t(translations.statistics.dashboard.characterComparison)}
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -182,8 +209,16 @@ export const StatsDashboard = memo(function StatsDashboard() {
                         </div>
                       </div>
                       <div className="text-right">
-                        <div className="font-bold">{charStat.totalFound} items</div>
-                        <div className="text-gray-600 text-sm">{charStat.recentFinds} recent</div>
+                        <div className="font-bold">
+                          {t(translations.statistics.dashboard.items, {
+                            count: charStat.totalFound,
+                          })}
+                        </div>
+                        <div className="text-gray-600 text-sm">
+                          {t(translations.statistics.dashboard.recentLabel, {
+                            count: charStat.recentFinds,
+                          })}
+                        </div>
                       </div>
                     </div>
                   </div>

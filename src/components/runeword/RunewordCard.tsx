@@ -1,5 +1,7 @@
 import type { Item } from 'electron/types/grail';
+import { useTranslation } from 'react-i18next';
 import { Card, CardContent } from '@/components/ui/card';
+import { translations } from '@/i18n/translations';
 import { getRunewordCompletionStatus } from '@/lib/runeword-utils';
 import { cn } from '@/lib/utils';
 import { RuneImages } from '../grail/RuneImages';
@@ -21,6 +23,7 @@ interface RunewordCardProps {
  * Shows visual indicators for complete, partial, or missing runes.
  */
 export function RunewordCard({ runeword, availableRunes, className }: RunewordCardProps) {
+  const { t } = useTranslation();
   const completionStatus = getRunewordCompletionStatus(runeword, availableRunes);
 
   return (
@@ -41,7 +44,7 @@ export function RunewordCard({ runeword, availableRunes, className }: RunewordCa
                   window.electronAPI?.shell.openExternal(runeword.link);
                 }}
               >
-                View details
+                {t(translations.runeword.card.viewDetails)}
               </a>
             )}
           </div>
@@ -61,7 +64,7 @@ export function RunewordCard({ runeword, availableRunes, className }: RunewordCa
         {completionStatus.complete && (
           <div className="border-gray-200 border-t pt-3 dark:border-gray-700">
             <p className="text-center font-medium text-green-600 text-sm dark:text-green-400">
-              ✓ All runes available
+              ✓ {t(translations.runeword.card.allRunesAvailable)}
             </p>
           </div>
         )}

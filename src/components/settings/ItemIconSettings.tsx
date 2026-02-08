@@ -1,5 +1,6 @@
 import { AlertCircle, AlertTriangle, CheckCircle, Image, RefreshCw } from 'lucide-react';
 import { useCallback, useEffect, useId, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import {
   AlertDialog,
@@ -16,6 +17,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Progress } from '@/components/ui/progress';
 import { Switch } from '@/components/ui/switch';
+import { translations } from '@/i18n/translations';
 import { useGrailStore } from '@/stores/grailStore';
 
 /**
@@ -24,6 +26,7 @@ import { useGrailStore } from '@/stores/grailStore';
  * @returns {JSX.Element} A settings card with sprite conversion controls
  */
 export function ItemIconSettings() {
+  const { t } = useTranslation();
   const itemIconsSwitchId = useId();
   const { settings, setSettings } = useGrailStore();
 
@@ -104,7 +107,7 @@ export function ItemIconSettings() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-lg">
             <Image className="h-5 w-5" />
-            Item Icon Management
+            {t(translations.settings.itemIcons.title)}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -112,10 +115,10 @@ export function ItemIconSettings() {
           <div className="flex items-center justify-between">
             <div>
               <Label htmlFor={itemIconsSwitchId} className="font-medium text-sm">
-                Show Item Icons
+                {t(translations.settings.itemIcons.showItemIcons)}
               </Label>
               <p className="text-gray-600 text-xs dark:text-gray-400">
-                Display D2R item icons in cards
+                {t(translations.settings.itemIcons.showItemIconsDescription)}
               </p>
             </div>
             <Switch
@@ -130,68 +133,57 @@ export function ItemIconSettings() {
             <Alert className="border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950">
               <CheckCircle className="h-4 w-4 text-green-600" />
               <AlertDescription className="text-green-800 dark:text-green-200">
-                <strong>✓ D2R installation path is valid</strong>
+                <strong>✓ {t(translations.settings.itemIcons.pathValid)}</strong>
                 <br />
-                Game files found at: <code className="text-xs">{validationStatus.path}</code>
+                {t(translations.settings.itemIcons.gameFilesFoundAt)}{' '}
+                <code className="text-xs">{validationStatus.path}</code>
               </AlertDescription>
             </Alert>
           ) : (
             <Alert className="border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950">
               <AlertCircle className="h-4 w-4 text-red-600" />
-              <AlertTitle className="font-bold text-red-800 dark:text-red-200">Error</AlertTitle>
+              <AlertTitle className="font-bold text-red-800 dark:text-red-200">
+                {t(translations.common.error)}
+              </AlertTitle>
               <AlertDescription className="space-y-2 text-red-800 dark:text-red-200">
-                <p>{validationStatus.error || 'D2R installation path is not configured'}</p>
+                <p>
+                  {validationStatus.error || t(translations.settings.itemIcons.pathNotConfigured)}
+                </p>
                 {validationStatus.error?.includes('not found') && (
                   <div>
-                    <p className="font-semibold text-sm">Game Files Must Be Extracted</p>
-                    <p className="text-sm">
-                      D2R stores game files in CASC (Content Addressable Storage Container) format.
-                      These files must be extracted before item icons can be converted.
+                    <p className="font-semibold text-sm">
+                      {t(translations.settings.itemIcons.gameFilesMustBeExtracted)}
                     </p>
+                    <p className="text-sm">{t(translations.settings.itemIcons.cascDescription)}</p>
                     <div className="mt-2">
-                      <p className="font-semibold text-sm">Extraction Steps:</p>
+                      <p className="font-semibold text-sm">
+                        {t(translations.settings.itemIcons.extractionSteps)}
+                      </p>
                       <ol className="mt-1 ml-4 list-decimal space-y-1 text-sm">
                         <li>
-                          Download{' '}
+                          {t(translations.settings.itemIcons.downloadCascViewer)}{' '}
                           <a
                             href="https://www.hiveworkshop.com/threads/ladiks-casc-viewer.331540/"
                             target="_blank"
                             rel="noopener noreferrer"
                             className="underline hover:text-red-950 dark:hover:text-red-50"
                           >
-                            Ladik's CASC Viewer
+                            {t(translations.settings.itemIcons.ladiksCascViewer)}
                           </a>
                         </li>
-                        <li>Open the x64 version (or appropriate version for your OS)</li>
-                        <li>In CASC Viewer, click "Open Storage"</li>
-                        <li>
-                          Select your D2R folder (e.g.,{' '}
-                          <code className="text-xs">
-                            C:\Program Files (x86)\Diablo II Resurrected
-                          </code>
-                          )
-                        </li>
-                        <li>Click "data" on the left side of the screen</li>
-                        <li>
-                          Click "data" again from the newly opened options, then click "Extract" at
-                          the top
-                        </li>
-                        <li>
-                          Wait for extraction (extracts ~40GB: global, hd, local folders to CascView
-                          work folder)
-                        </li>
-                        <li>
-                          Move the 3 extracted folders to{' '}
-                          <code className="text-xs">
-                            C:\Program Files (x86)\Diablo II Resurrected\Data
-                          </code>
-                        </li>
-                        <li>After extraction, reload this page to verify</li>
+                        <li>{t(translations.settings.itemIcons.openX64Version)}</li>
+                        <li>{t(translations.settings.itemIcons.openStorage)}</li>
+                        <li>{t(translations.settings.itemIcons.selectD2rFolder)}</li>
+                        <li>{t(translations.settings.itemIcons.clickData)}</li>
+                        <li>{t(translations.settings.itemIcons.clickDataExtract)}</li>
+                        <li>{t(translations.settings.itemIcons.waitForExtraction)}</li>
+                        <li>{t(translations.settings.itemIcons.moveFolders)}</li>
+                        <li>{t(translations.settings.itemIcons.reloadToVerify)}</li>
                       </ol>
                     </div>
                     <p className="mt-2 text-xs">
-                      <strong>Note:</strong> Extraction is a one-time process and does not modify
-                      your game installation.
+                      <strong>{t(translations.common.note)}</strong>{' '}
+                      {t(translations.settings.itemIcons.extractionNote)}
                     </p>
                   </div>
                 )}
@@ -209,12 +201,12 @@ export function ItemIconSettings() {
               {isConverting ? (
                 <>
                   <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-                  Converting Sprites...
+                  {t(translations.settings.itemIcons.convertingSprites)}
                 </>
               ) : (
                 <>
                   <Image className="mr-2 h-4 w-4" />
-                  Convert Sprite Files to PNG
+                  {t(translations.settings.itemIcons.convertSpritesToPng)}
                 </>
               )}
             </Button>
@@ -224,7 +216,10 @@ export function ItemIconSettings() {
               <div className="space-y-1">
                 <Progress value={progressPercentage} className="h-2" />
                 <p className="text-center text-gray-600 text-xs dark:text-gray-400">
-                  {conversionProgress.current} / {conversionProgress.total} files
+                  {t(translations.settings.itemIcons.filesProgress, {
+                    current: conversionProgress.current,
+                    total: conversionProgress.total,
+                  })}
                 </p>
               </div>
             )}
@@ -246,7 +241,10 @@ export function ItemIconSettings() {
                     : 'text-red-800 dark:text-red-200'
                 }`}
               >
-                {conversionResult.success ? '✓ Conversion Complete' : '✗ Conversion Failed'}
+                {conversionResult.success ? '✓ ' : '✗ '}
+                {conversionResult.success
+                  ? t(translations.settings.itemIcons.conversionComplete)
+                  : t(translations.settings.itemIcons.conversionFailed)}
               </p>
               <div
                 className={`mt-2 space-y-1 text-xs ${
@@ -255,11 +253,27 @@ export function ItemIconSettings() {
                     : 'text-red-700 dark:text-red-300'
                 }`}
               >
-                <p>Total files: {conversionResult.totalFiles}</p>
-                <p>Converted: {conversionResult.convertedFiles}</p>
-                <p>Skipped (already exists): {conversionResult.skippedFiles}</p>
+                <p>
+                  {t(translations.settings.itemIcons.totalFiles, {
+                    count: conversionResult.totalFiles,
+                  })}
+                </p>
+                <p>
+                  {t(translations.settings.itemIcons.converted, {
+                    count: conversionResult.convertedFiles,
+                  })}
+                </p>
+                <p>
+                  {t(translations.settings.itemIcons.skippedAlreadyExists, {
+                    count: conversionResult.skippedFiles,
+                  })}
+                </p>
                 {conversionResult.errors.length > 0 && (
-                  <p>Errors: {conversionResult.errors.length}</p>
+                  <p>
+                    {t(translations.settings.itemIcons.errors, {
+                      count: conversionResult.errors.length,
+                    })}
+                  </p>
                 )}
               </div>
             </div>
@@ -268,18 +282,14 @@ export function ItemIconSettings() {
           {/* Info Box */}
           <div className="rounded-lg bg-blue-50 p-3 dark:bg-blue-950">
             <p className="text-blue-800 text-xs dark:text-blue-200">
-              <strong>Why Conversion is Needed:</strong>
+              <strong>{t(translations.settings.itemIcons.whyConversionNeeded)}</strong>
               <br />
-              Diablo II: Resurrected stores item icons in a proprietary .sprite format that cannot
-              be directly displayed in web technologies. This tool converts those .sprite files into
-              standard PNG images that can be rendered in the app.
+              {t(translations.settings.itemIcons.whyConversionDescription)}
               <br />
               <br />
-              <strong>About the Process:</strong>
+              <strong>{t(translations.settings.itemIcons.aboutTheProcess)}</strong>
               <br />
-              Converted PNG images are stored in the app's data directory. Your game files will not
-              be modified. The conversion is safe to run multiple times and only needs to be done
-              once (or when game updates add new items).
+              {t(translations.settings.itemIcons.aboutTheProcessDescription)}
             </p>
           </div>
         </CardContent>
@@ -291,36 +301,32 @@ export function ItemIconSettings() {
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
               <AlertTriangle className="h-5 w-5 text-yellow-600" />
-              Convert Sprite Files
+              {t(translations.settings.itemIcons.convertSpriteFilesTitle)}
             </AlertDialogTitle>
             <AlertDialogDescription className="space-y-3">
-              <p>
-                This process will convert sprite files from your D2R installation to PNG format.
-                Please review the following information:
-              </p>
+              <p>{t(translations.settings.itemIcons.convertDescription)}</p>
               <ul className="list-disc space-y-1 pl-5 text-sm">
+                <li>{t(translations.settings.itemIcons.spriteFilesReadFrom)}</li>
+                <li>{t(translations.settings.itemIcons.convertedPngsSaved)}</li>
                 <li>
-                  Sprite files will be read from: <code>Data/hd/global/ui/items</code> (recursively)
+                  <strong>{t(translations.settings.itemIcons.gameFilesNotModified)}</strong>
                 </li>
-                <li>Converted PNGs will be saved to the app's user data directory</li>
-                <li>
-                  <strong>Your game files will NOT be modified</strong>
-                </li>
-                <li>This process is idempotent (safe to run multiple times)</li>
-                <li>Conversion may take a few minutes depending on the number of files</li>
+                <li>{t(translations.settings.itemIcons.idempotent)}</li>
+                <li>{t(translations.settings.itemIcons.conversionMayTake)}</li>
               </ul>
               <div className="rounded-lg bg-yellow-50 p-3 dark:bg-yellow-950">
                 <p className="text-xs text-yellow-800 dark:text-yellow-200">
-                  <strong>Disclaimer:</strong> While this process only reads game files and does not
-                  modify them, you proceed at your own risk. It is recommended to ensure your game
-                  installation is backed up.
+                  <strong>{t(translations.common.warning)}</strong>{' '}
+                  {t(translations.settings.itemIcons.disclaimer)}
                 </p>
               </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleConvertSprites}>Start Conversion</AlertDialogAction>
+            <AlertDialogCancel>{t(translations.common.cancel)}</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConvertSprites}>
+              {t(translations.settings.itemIcons.startConversion)}
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

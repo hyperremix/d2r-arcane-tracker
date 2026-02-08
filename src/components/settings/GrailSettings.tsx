@@ -1,8 +1,10 @@
 import { Trophy } from 'lucide-react';
 import { useCallback, useId } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
+import { translations } from '@/i18n/translations';
 import { useGrailStore } from '@/stores/grailStore';
 
 /**
@@ -11,6 +13,7 @@ import { useGrailStore } from '@/stores/grailStore';
  * @returns {JSX.Element} A settings card with toggle switches for grail configuration
  */
 export function GrailSettings() {
+  const { t } = useTranslation();
   const grailNormalId = useId();
   const grailEtherealId = useId();
   const grailRunesId = useId();
@@ -50,7 +53,7 @@ export function GrailSettings() {
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Trophy className="h-5 w-5" />
-          Holy Grail Configuration
+          {t(translations.settings.grail.title)}
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -59,10 +62,10 @@ export function GrailSettings() {
           <div className="flex items-center justify-between">
             <div className="space-y-0.5">
               <Label htmlFor={grailNormalId} className="text-base">
-                Include Normal Items
+                {t(translations.settings.grail.includeNormal)}
               </Label>
               <p className="text-gray-600 text-sm dark:text-gray-400">
-                Track normal (non-ethereal) versions of items in your grail
+                {t(translations.settings.grail.includeNormalDescription)}
               </p>
             </div>
             <Switch
@@ -75,10 +78,10 @@ export function GrailSettings() {
           <div className="flex items-center justify-between">
             <div className="space-y-0.5">
               <Label htmlFor={grailEtherealId} className="text-base">
-                Include Ethereal Items
+                {t(translations.settings.grail.includeEthereal)}
               </Label>
               <p className="text-gray-600 text-sm dark:text-gray-400">
-                Track ethereal versions of items in your grail
+                {t(translations.settings.grail.includeEtherealDescription)}
               </p>
             </div>
             <Switch
@@ -94,10 +97,10 @@ export function GrailSettings() {
           <div className="flex items-center justify-between">
             <div className="space-y-0.5">
               <Label htmlFor={grailRunesId} className="text-base">
-                Include Runes
+                {t(translations.settings.grail.includeRunes)}
               </Label>
               <p className="text-gray-600 text-sm dark:text-gray-400">
-                Track individual runes (El, Eld, Tir, etc.) in your grail
+                {t(translations.settings.grail.includeRunesDescription)}
               </p>
             </div>
             <Switch
@@ -110,10 +113,10 @@ export function GrailSettings() {
           <div className="flex items-center justify-between">
             <div className="space-y-0.5">
               <Label htmlFor={grailRunewordsId} className="text-base">
-                Include Runewords
+                {t(translations.settings.grail.includeRunewords)}
               </Label>
               <p className="text-gray-600 text-sm dark:text-gray-400">
-                Track completed runewords (Spirit, Insight, etc.) in your grail
+                {t(translations.settings.grail.includeRunewordsDescription)}
               </p>
             </div>
             <Switch
@@ -127,8 +130,7 @@ export function GrailSettings() {
         {/* Information Box */}
         <div className="rounded bg-blue-50 p-3 dark:bg-blue-950">
           <p className="text-blue-800 text-sm dark:text-blue-200">
-            <strong>Note:</strong> These settings affect which items are tracked in your Holy Grail.
-            Changes will apply to new item discoveries and may affect your completion statistics.
+            <strong>{t(translations.common.note)}</strong> {t(translations.settings.grail.note)}
           </p>
         </div>
       </CardContent>

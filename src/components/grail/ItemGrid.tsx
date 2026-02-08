@@ -1,8 +1,10 @@
 import { useVirtualizer } from '@tanstack/react-virtual';
 import type { Character, GrailProgress, Item, Settings } from 'electron/types/grail';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Badge } from '@/components/ui/badge';
 import { useProgressLookup } from '@/hooks/useProgressLookup';
+import { translations } from '@/i18n/translations';
 import {
   canItemBeEthereal,
   canItemBeNormal,
@@ -24,6 +26,7 @@ function getEtherealGroupKey(
   itemData: Item,
   itemProgress: { normalFound: boolean; etherealFound: boolean } | undefined,
   settings: Settings,
+  t: (key: string) => string,
 ) {
   const hasEthereal = itemProgress?.etherealFound;
   const hasNormal = itemProgress?.normalFound;
@@ -31,24 +34,28 @@ function getEtherealGroupKey(
   const canBeNormal = shouldShowNormalStatus(itemData, settings);
 
   if (!canBeEthereal && !canBeNormal) {
-    return 'Not Applicable';
+    return t(translations.grail.itemGrid.notApplicable);
   }
   if (!canBeEthereal) {
-    return hasNormal ? 'Normal Found' : 'Normal Not Found';
+    return hasNormal
+      ? t(translations.grail.itemGrid.normalFound)
+      : t(translations.grail.itemGrid.normalNotFound);
   }
   if (!canBeNormal) {
-    return hasEthereal ? 'Ethereal Found' : 'Ethereal Not Found';
+    return hasEthereal
+      ? t(translations.grail.itemGrid.etherealFound)
+      : t(translations.grail.itemGrid.etherealNotFound);
   }
   if (hasEthereal && hasNormal) {
-    return 'Both Found';
+    return t(translations.grail.itemGrid.bothFound);
   }
   if (hasEthereal) {
-    return 'Ethereal Only';
+    return t(translations.grail.itemGrid.etherealOnly);
   }
   if (hasNormal) {
-    return 'Normal Only';
+    return t(translations.grail.itemGrid.normalOnly);
   }
-  return 'Neither Found';
+  return t(translations.grail.itemGrid.neitherFound);
 }
 
 /**
@@ -67,6 +74,7 @@ type GroupMode = 'none' | 'category' | 'type' | 'ethereal';
  * @returns {JSX.Element} A grid or list of Holy Grail items with view and grouping controls
  */
 export const ItemGrid = memo(function ItemGrid() {
+  const { t } = useTranslation();
   // Use individual selectors to prevent unnecessary re-renders
   const progress = useGrailStore((state) => state.progress);
   const characters = useGrailStore((state) => state.characters);
@@ -115,7 +123,7 @@ export const ItemGrid = memo(function ItemGrid() {
 
   const groupedItems = useMemo(() => {
     if (groupMode === 'none') {
-      return [{ title: 'All Items', items: displayItems }];
+      return [{ title: t(translations.common.allItems), items: displayItems }];
     }
 
     const groups = new Map<string, typeof displayItems>();
@@ -133,11 +141,11 @@ export const ItemGrid = memo(function ItemGrid() {
         case 'ethereal': {
           // For consolidated view, group by whether either version is found
           const itemProgress = progressLookup.get(itemData.id);
-          groupKey = getEtherealGroupKey(itemData, itemProgress, settings);
+          groupKey = getEtherealGroupKey(itemData, itemProgress, settings, t);
           break;
         }
         default:
-          groupKey = 'All Items';
+          groupKey = t(translations.common.allItems);
       }
 
       if (!groups.has(groupKey)) {
@@ -153,7 +161,7 @@ export const ItemGrid = memo(function ItemGrid() {
       title: title.charAt(0).toUpperCase() + title.slice(1),
       items,
     }));
-  }, [displayItems, groupMode, progressLookup, settings]);
+  }, [displayItems, groupMode, progressLookup, settings, t]);
 
   const handleItemClick = useCallback((itemId: string) => {
     setSelectedItemId(itemId);

@@ -9,8 +9,10 @@ import {
   Trophy,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate } from 'react-router';
 import { Button } from '@/components/ui/button';
+import { translations } from '@/i18n/translations';
 import { cn } from '@/lib/utils';
 import logoUrl from '/logo.png';
 import { NotificationButton } from './grail/NotificationButton';
@@ -31,6 +33,7 @@ function NavigationButton({
   isActive: boolean;
   onClick: (to: string) => void;
 }) {
+  const { t } = useTranslation();
   return (
     <div className="relative">
       <div
@@ -43,7 +46,7 @@ function NavigationButton({
         variant="ghost"
         size="sm"
         onClick={() => onClick(to)}
-        title={title}
+        title={t(title)}
         className={cn('relative hover:text-primary-500', isActive && 'text-primary-500')}
       >
         <Icon className="h-4 w-4" />
@@ -73,6 +76,7 @@ function useRouteStates(pathname: string) {
  * @returns {JSX.Element} A custom title bar with app name and platform controls
  */
 export function TitleBar() {
+  const { t } = useTranslation();
   const [platform, setPlatform] = useState<'darwin' | 'win32' | 'linux'>('darwin');
   const [historyIndex, setHistoryIndex] = useState(0);
   const [historyLength, setHistoryLength] = useState(1);
@@ -145,7 +149,7 @@ export function TitleBar() {
           size="sm"
           onClick={handleBack}
           disabled={!canGoBack}
-          title="Go back"
+          title={t(translations.titleBar.goBack)}
           className="h-7 w-7 p-0"
         >
           <ChevronLeft className="h-4 w-4" />
@@ -155,7 +159,7 @@ export function TitleBar() {
           size="sm"
           onClick={handleForward}
           disabled={!canGoForward}
-          title="Go forward"
+          title={t(translations.titleBar.goForward)}
           className="h-7 w-7 p-0"
         >
           <ChevronRight className="h-4 w-4" />
@@ -164,8 +168,8 @@ export function TitleBar() {
 
       {/* Center section - App title */}
       <div className="flex flex-1 items-center justify-center gap-2">
-        <img src={logoUrl} alt="D2R Arcane Tracker" className="h-5 w-5" />
-        <span className="font-semibold text-sm tracking-wide">D2R Arcane Tracker</span>
+        <img src={logoUrl} alt={t(translations.app.title)} className="h-5 w-5" />
+        <span className="font-semibold text-sm tracking-wide">{t(translations.app.title)}</span>
       </div>
 
       {/* Right section - Action buttons */}
@@ -182,42 +186,42 @@ export function TitleBar() {
         <NotificationButton />
         <NavigationButton
           to="/"
-          title="Holy Grail Tracker"
+          title={translations.titleBar.holyGrailTracker}
           icon={Trophy}
           isActive={routeStates.isTrackerActive}
           onClick={navigate}
         />
         <NavigationButton
           to="/statistics"
-          title="Statistics"
+          title={translations.titleBar.statistics}
           icon={BarChart3}
           isActive={routeStates.isStatisticsActive}
           onClick={navigate}
         />
         <NavigationButton
           to="/runs"
-          title="Run Counter"
+          title={translations.titleBar.runCounter}
           icon={Timer}
           isActive={routeStates.isRunsActive}
           onClick={navigate}
         />
         <NavigationButton
           to="/runewords"
-          title="Runeword Calculator"
+          title={translations.titleBar.runewordCalculator}
           icon={Calculator}
           isActive={routeStates.isRunewordsActive}
           onClick={navigate}
         />
         <NavigationButton
           to="/terror-zones"
-          title="Terror Zone Configuration"
+          title={translations.titleBar.terrorZoneConfiguration}
           icon={AlertTriangle}
           isActive={routeStates.isTerrorZonesActive}
           onClick={navigate}
         />
         <NavigationButton
           to="/settings"
-          title="Settings"
+          title={translations.titleBar.settings}
           icon={Settings}
           isActive={routeStates.isSettingsActive}
           onClick={navigate}

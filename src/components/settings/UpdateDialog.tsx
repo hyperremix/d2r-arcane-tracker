@@ -1,5 +1,6 @@
 import DOMPurify from 'dompurify';
 import type { UpdateInfo } from 'electron/types/grail';
+import { useTranslation } from 'react-i18next';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -10,6 +11,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { translations } from '@/i18n/translations';
 import { formatShortDate } from '@/lib/utils';
 
 interface UpdateDialogProps {
@@ -36,6 +38,8 @@ export function UpdateDialog({
   onInstall,
   isInstallDialog = false,
 }: UpdateDialogProps) {
+  const { t } = useTranslation();
+
   const handlePrimaryAction = () => {
     if (isInstallDialog && onInstall) {
       onInstall();
@@ -57,18 +61,24 @@ export function UpdateDialog({
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>
-            {isInstallDialog ? 'Update Ready to Install' : 'Update Available'}
+            {isInstallDialog
+              ? t(translations.settings.updateDialog.updateReadyToInstall)
+              : t(translations.settings.updateDialog.updateAvailable)}
           </AlertDialogTitle>
           <AlertDialogDescription>
-            <span className="sr-only">Update information</span>
+            <span className="sr-only">
+              {t(translations.settings.updateDialog.updateInformation)}
+            </span>
           </AlertDialogDescription>
           <div className="space-y-3">
             <div>
               <p className="font-medium text-sm">
-                Version {updateInfo.version}
+                {t(translations.settings.updateDialog.version, { version: updateInfo.version })}
                 {updateInfo.releaseDate && (
                   <span className="ml-2 font-normal text-gray-600 dark:text-gray-400">
-                    Released: {formatShortDate(updateInfo.releaseDate)}
+                    {t(translations.settings.updateDialog.released, {
+                      date: formatShortDate(updateInfo.releaseDate),
+                    })}
                   </span>
                 )}
               </p>
@@ -76,7 +86,9 @@ export function UpdateDialog({
 
             {updateInfo.releaseNotes && (
               <div className="rounded-lg bg-gray-50 p-3 dark:bg-gray-900">
-                <p className="mb-2 font-medium text-sm">Release Notes:</p>
+                <p className="mb-2 font-medium text-sm">
+                  {t(translations.settings.updateDialog.releaseNotes)}
+                </p>
                 <div className="max-h-48 overflow-y-auto text-xs">
                   <div
                     className="release-notes"
@@ -90,21 +102,20 @@ export function UpdateDialog({
             )}
 
             {isInstallDialog ? (
-              <p className="text-sm">
-                The update has been downloaded and is ready to install. The application will restart
-                to complete the installation.
-              </p>
+              <p className="text-sm">{t(translations.settings.updateDialog.installDescription)}</p>
             ) : (
-              <p className="text-sm">
-                A new version of the application is available. Would you like to download it now?
-              </p>
+              <p className="text-sm">{t(translations.settings.updateDialog.downloadDescription)}</p>
             )}
           </div>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel onClick={handleCancel}>Later</AlertDialogCancel>
+          <AlertDialogCancel onClick={handleCancel}>
+            {t(translations.settings.updateDialog.later)}
+          </AlertDialogCancel>
           <AlertDialogAction onClick={handlePrimaryAction}>
-            {isInstallDialog ? 'Restart Now' : 'Download Now'}
+            {isInstallDialog
+              ? t(translations.settings.updateDialog.restartNow)
+              : t(translations.settings.updateDialog.downloadNow)}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

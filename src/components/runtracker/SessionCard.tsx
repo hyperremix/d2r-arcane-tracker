@@ -1,9 +1,11 @@
 import type { Session } from 'electron/types/grail';
 import { FileDownIcon } from 'lucide-react';
 import { useCallback, useEffect, useId, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
+import { translations } from '@/i18n/translations';
 import { formatDuration } from '@/lib/utils';
 import { useRunTrackerStore } from '@/stores/runTrackerStore';
 import { ExportDialog } from './ExportDialog';
@@ -17,6 +19,7 @@ interface SessionCardProps {
  * run count, items found, efficiency percentage, and provides controls to end or archive the session.
  */
 export function SessionCard({ session }: SessionCardProps) {
+  const { t } = useTranslation();
   const {
     activeSession,
     activeRun,
@@ -155,13 +158,15 @@ export function SessionCard({ session }: SessionCardProps) {
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Session Card</CardTitle>
+          <CardTitle>{t(translations.runTracker.sessionCard.title)}</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="flex flex-col items-center justify-center py-8 text-center">
-            <p className="mb-4 text-muted-foreground">No active session</p>
+            <p className="mb-4 text-muted-foreground">
+              {t(translations.runTracker.sessionCard.noActiveSession)}
+            </p>
             <p className="text-muted-foreground text-sm">
-              Start a session to begin tracking your runs and items.
+              {t(translations.runTracker.sessionCard.startSessionPrompt)}
             </p>
           </div>
           <Button
@@ -174,7 +179,7 @@ export function SessionCard({ session }: SessionCardProps) {
             }}
             className="w-full"
           >
-            Start New Session
+            {t(translations.runTracker.sessionCard.startNewSession)}
           </Button>
         </CardContent>
       </Card>
@@ -185,34 +190,48 @@ export function SessionCard({ session }: SessionCardProps) {
     <Card className="transition-all duration-300 ease-in-out hover:shadow-md">
       <CardHeader>
         <CardTitle>
-          <span className="transition-colors duration-200">Active Session</span>
+          <span className="transition-colors duration-200">
+            {t(translations.runTracker.sessionCard.activeSession)}
+          </span>
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4 transition-all duration-300">
         {/* Session Statistics */}
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-1">
-            <p className="font-medium text-muted-foreground text-sm">Session Time</p>
+            <p className="font-medium text-muted-foreground text-sm">
+              {t(translations.runTracker.sessionCard.sessionTime)}
+            </p>
             <p className="font-mono text-lg">{formatDuration(sessionTime)}</p>
           </div>
           <div className="space-y-1">
-            <p className="font-medium text-muted-foreground text-sm">Run Count</p>
+            <p className="font-medium text-muted-foreground text-sm">
+              {t(translations.runTracker.sessionCard.runCount)}
+            </p>
             <p className="font-semibold text-lg">{currentSession.runCount}</p>
           </div>
           <div className="space-y-1">
-            <p className="font-medium text-muted-foreground text-sm">Average Run Time</p>
+            <p className="font-medium text-muted-foreground text-sm">
+              {t(translations.runTracker.sessionCard.averageRunTime)}
+            </p>
             <p className="font-mono text-lg">{formatDuration(averageRunTime)}</p>
           </div>
           <div className="space-y-1">
-            <p className="font-medium text-muted-foreground text-sm">Current Run</p>
+            <p className="font-medium text-muted-foreground text-sm">
+              {t(translations.runTracker.sessionCard.currentRun)}
+            </p>
             <p className="font-mono text-lg">{activeRun ? formatDuration(runDuration) : '0s'}</p>
           </div>
           <div className="space-y-1">
-            <p className="font-medium text-muted-foreground text-sm">Fastest Run</p>
+            <p className="font-medium text-muted-foreground text-sm">
+              {t(translations.runTracker.sessionCard.fastestRun)}
+            </p>
             <p className="font-mono text-lg">{formatDuration(sessionStats?.fastestRun || 0)}</p>
           </div>
           <div className="space-y-1">
-            <p className="font-medium text-muted-foreground text-sm">Efficiency</p>
+            <p className="font-medium text-muted-foreground text-sm">
+              {t(translations.runTracker.sessionCard.efficiency)}
+            </p>
             <p className="font-semibold text-lg">{efficiencyPercentage.toFixed(1)}%</p>
           </div>
         </div>
@@ -220,7 +239,9 @@ export function SessionCard({ session }: SessionCardProps) {
         {/* Items Found */}
         {sessionStats && (
           <div className="space-y-1">
-            <p className="font-medium text-muted-foreground text-sm">Items Found</p>
+            <p className="font-medium text-muted-foreground text-sm">
+              {t(translations.runTracker.sessionCard.itemsFound)}
+            </p>
             <p className="font-semibold text-lg">{sessionStats.itemsFound}</p>
           </div>
         )}
@@ -228,12 +249,12 @@ export function SessionCard({ session }: SessionCardProps) {
         {/* Notes Editor */}
         <div className="space-y-2">
           <label htmlFor={notesId} className="font-medium text-muted-foreground text-sm">
-            Session Notes
+            {t(translations.runTracker.sessionCard.sessionNotes)}
           </label>
           <div className="relative">
             <Textarea
               id={notesId}
-              placeholder="Add notes about this session..."
+              placeholder={t(translations.runTracker.sessionCard.notesPlaceholder)}
               value={notes}
               onChange={handleNotesChange}
               onBlur={handleNotesBlur}
@@ -256,7 +277,7 @@ export function SessionCard({ session }: SessionCardProps) {
             disabled={loading}
             className="flex-1"
           >
-            End Session
+            {t(translations.runTracker.sessionCard.endSession)}
           </Button>
           <Button
             variant="outline"
@@ -265,14 +286,18 @@ export function SessionCard({ session }: SessionCardProps) {
             disabled={loading}
             className="flex-1"
           >
-            Archive Session
+            {t(translations.runTracker.sessionCard.archiveSession)}
           </Button>
           <Button
             variant="outline"
             size="sm"
             onClick={handleExportClick}
             disabled={loading || currentSession.runCount === 0}
-            title={currentSession.runCount === 0 ? 'No runs to export' : 'Export session data'}
+            title={
+              currentSession.runCount === 0
+                ? t(translations.runTracker.sessionCard.noRunsToExport)
+                : t(translations.runTracker.sessionCard.exportSessionData)
+            }
           >
             <FileDownIcon className="h-4 w-4" />
           </Button>

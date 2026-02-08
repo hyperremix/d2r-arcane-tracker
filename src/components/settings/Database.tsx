@@ -1,6 +1,7 @@
 import dayjs from 'dayjs';
 import { AlertTriangle, Database, Download, Upload } from 'lucide-react';
 import { useCallback, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -13,6 +14,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { translations } from '@/i18n/translations';
 import { useGrailStore } from '@/stores/grailStore';
 
 /**
@@ -22,6 +24,7 @@ import { useGrailStore } from '@/stores/grailStore';
  * @returns {JSX.Element} A settings card with backup and restore controls
  */
 export function DatabaseCard() {
+  const { t } = useTranslation();
   // Backup state
   const [isBackingUp, setIsBackingUp] = useState(false);
   const [lastBackupPath, setLastBackupPath] = useState<string | null>(null);
@@ -43,7 +46,7 @@ export function DatabaseCard() {
 
       // Show save dialog to let user choose backup location
       const result = await window.electronAPI?.dialog.showSaveDialog({
-        title: 'Backup Database',
+        title: t(translations.settings.database.backupDatabase),
         defaultPath: `holy-grail-backup-${dayjs().format('YYYY-MM-DD')}.db`,
         filters: [
           { name: 'SQLite Database', extensions: ['db'] },
@@ -124,7 +127,7 @@ export function DatabaseCard() {
       setShowConfirmDialog(true);
     } catch (error) {
       console.error('Failed to select file:', error);
-      setRestoreError('Failed to select file');
+      setRestoreError(t(translations.common.error));
     }
   };
 
@@ -180,7 +183,7 @@ export function DatabaseCard() {
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-lg">
           <Database className="h-5 w-5" />
-          Database
+          {t(translations.settings.database.title)}
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -188,17 +191,23 @@ export function DatabaseCard() {
         <div className="space-y-3">
           <div className="flex items-center gap-2">
             <Download className="h-4 w-4" />
-            <h3 className="font-medium text-sm">Backup</h3>
+            <h3 className="font-medium text-sm">{t(translations.settings.database.backup)}</h3>
           </div>
           <p className="text-gray-600 text-xs">
-            Create a backup of your database to preserve your progress
+            {t(translations.settings.database.backupDescription)}
           </p>
           <Button onClick={handleBackup} disabled={isBackingUp} size="sm" className="gap-2">
             <Download className="h-3 w-3" />
-            {isBackingUp ? 'Creating Backup...' : 'Backup Database'}
+            {isBackingUp
+              ? t(translations.settings.database.creatingBackup)
+              : t(translations.settings.database.backupDatabase)}
           </Button>
           {lastBackupPath && (
-            <p className="text-green-600 text-xs">Last backup: {lastBackupPath.split('/').pop()}</p>
+            <p className="text-green-600 text-xs">
+              {t(translations.settings.database.lastBackup, {
+                filename: lastBackupPath.split('/').pop(),
+              })}
+            </p>
           )}
         </div>
 
@@ -206,10 +215,10 @@ export function DatabaseCard() {
         <div className="space-y-3">
           <div className="flex items-center gap-2">
             <Upload className="h-4 w-4" />
-            <h3 className="font-medium text-sm">Restore</h3>
+            <h3 className="font-medium text-sm">{t(translations.settings.database.restore)}</h3>
           </div>
           <p className="text-gray-600 text-xs dark:text-gray-400">
-            Restore your database from a backup file
+            {t(translations.settings.database.restoreDescription)}
           </p>
 
           {/* Dropzone */}
@@ -227,12 +236,14 @@ export function DatabaseCard() {
           >
             <Upload className="mx-auto mb-2 h-8 w-8 text-gray-400" />
             <p className="text-gray-600 text-sm dark:text-gray-400">
-              Drag and drop a database file here, or{' '}
+              {t(translations.settings.database.dropzoneText)}{' '}
               <span className="text-blue-600 underline hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-200">
-                click to browse
+                {t(translations.settings.database.clickToBrowse)}
               </span>
             </p>
-            <p className="text-gray-500 text-xs dark:text-gray-400">Supports .db files</p>
+            <p className="text-gray-500 text-xs dark:text-gray-400">
+              {t(translations.settings.database.supportsDbFiles)}
+            </p>
           </button>
 
           {/* Error/Success Messages */}
@@ -245,7 +256,7 @@ export function DatabaseCard() {
           {restoreSuccess && (
             <div className="rounded-lg bg-green-50 p-3">
               <p className="text-green-800 text-xs dark:text-green-200">
-                Database restored successfully! All data has been refreshed and is now up to date.
+                {t(translations.settings.database.restoreSuccess)}
               </p>
             </div>
           )}
@@ -257,31 +268,32 @@ export function DatabaseCard() {
             <AlertDialogHeader>
               <AlertDialogTitle className="flex items-center gap-2">
                 <AlertTriangle className="h-5 w-5 text-orange-500" />
-                Restore Database
+                {t(translations.settings.database.restoreDatabase)}
               </AlertDialogTitle>
               <AlertDialogDescription>
                 <span className="mb-2 block">
-                  Are you sure you want to restore the database from the backup?
+                  {t(translations.settings.database.confirmRestore)}
                 </span>
                 <span className="mb-2 block font-medium text-orange-600">
-                  ⚠️ This action will permanently replace all current data.
+                  ⚠️ {t(translations.settings.database.replaceWarning)}
                 </span>
                 <span className="block text-sm">
-                  Make sure you have created a backup of your current progress if you want to keep
-                  it.
+                  {t(translations.settings.database.keepCurrentWarning)}
                 </span>
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel disabled={isRestoring} onClick={resetState}>
-                Cancel
+                {t(translations.common.cancel)}
               </AlertDialogCancel>
               <AlertDialogAction
                 onClick={handleRestore}
                 disabled={isRestoring}
                 className="bg-orange-600 hover:bg-orange-700"
               >
-                {isRestoring ? 'Restoring...' : 'Restore Database'}
+                {isRestoring
+                  ? t(translations.settings.database.restoring)
+                  : t(translations.settings.database.restoreDatabase)}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>

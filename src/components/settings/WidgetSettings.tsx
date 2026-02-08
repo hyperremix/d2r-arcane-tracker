@@ -1,10 +1,12 @@
 import { Layers, RotateCcw } from 'lucide-react';
 import { useCallback, useEffect, useId } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
+import { translations } from '@/i18n/translations';
 import { useGrailStore } from '@/stores/grailStore';
 
 /**
@@ -13,6 +15,7 @@ import { useGrailStore } from '@/stores/grailStore';
  * @returns {JSX.Element} A settings card with widget configuration controls
  */
 export function WidgetSettings() {
+  const { t } = useTranslation();
   const { settings, setSettings } = useGrailStore();
   const opacitySliderId = useId();
 
@@ -89,7 +92,7 @@ export function WidgetSettings() {
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-lg">
           <Layers className="h-5 w-5" />
-          Widget Settings
+          {t(translations.settings.widget.title)}
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -97,9 +100,11 @@ export function WidgetSettings() {
           {/* Enable Widget Toggle */}
           <div className="flex items-center justify-between">
             <div>
-              <h4 className="font-medium text-sm">Enable Widget</h4>
+              <h4 className="font-medium text-sm">
+                {t(translations.settings.widget.enableWidget)}
+              </h4>
               <p className="text-muted-foreground text-xs">
-                Show an overlay widget with grail progress
+                {t(translations.settings.widget.enableDescription)}
               </p>
             </div>
             <Switch checked={widgetEnabled} onCheckedChange={toggleWidget} />
@@ -107,7 +112,9 @@ export function WidgetSettings() {
 
           {/* Display Mode Selection */}
           <div className="space-y-2">
-            <Label className="font-medium text-sm">Display Mode</Label>
+            <Label className="font-medium text-sm">
+              {t(translations.settings.widget.displayMode)}
+            </Label>
             <div className="grid grid-cols-2 gap-2">
               <Button
                 variant={widgetDisplay === 'overall' ? 'default' : 'outline'}
@@ -116,7 +123,7 @@ export function WidgetSettings() {
                 disabled={!widgetEnabled}
                 className="flex-1"
               >
-                Overall
+                {t(translations.settings.widget.overall)}
               </Button>
               <Button
                 variant={widgetDisplay === 'split' ? 'default' : 'outline'}
@@ -125,7 +132,7 @@ export function WidgetSettings() {
                 disabled={!widgetEnabled || !settings.grailEthereal}
                 className="flex-1"
               >
-                Split
+                {t(translations.settings.widget.split)}
               </Button>
               <Button
                 variant={widgetDisplay === 'all' ? 'default' : 'outline'}
@@ -134,7 +141,7 @@ export function WidgetSettings() {
                 disabled={!widgetEnabled || !settings.grailEthereal}
                 className="flex-1"
               >
-                All
+                {t(translations.settings.widget.all)}
               </Button>
               <Button
                 variant={widgetDisplay === 'run-only' ? 'default' : 'outline'}
@@ -143,14 +150,16 @@ export function WidgetSettings() {
                 disabled={!widgetEnabled}
                 className="flex-1"
               >
-                Run Only
+                {t(translations.settings.widget.runOnly)}
               </Button>
             </div>
             <p className="text-muted-foreground text-xs">
-              Overall: Total progress only | Split: Normal + Ethereal | All: All three gauges | Run
-              Only: Current run counter
+              {t(translations.settings.widget.displayModeDescription)}
               {!settings.grailEthereal && (
-                <span className="text-yellow-600"> (Split & All require Ethereal tracking)</span>
+                <span className="text-yellow-600">
+                  {' '}
+                  {t(translations.settings.widget.splitAllRequireEthereal)}
+                </span>
               )}
             </p>
           </div>
@@ -158,9 +167,11 @@ export function WidgetSettings() {
           {/* Run Only Item List Toggle */}
           <div className="flex items-center justify-between">
             <div>
-              <h4 className="font-medium text-sm">Show Run Item List</h4>
+              <h4 className="font-medium text-sm">
+                {t(translations.settings.widget.showRunItemList)}
+              </h4>
               <p className="text-muted-foreground text-xs">
-                In Run Only mode, show a compact text list of grail-relevant items found each run.
+                {t(translations.settings.widget.showRunItemListDescription)}
               </p>
             </div>
             <Switch
@@ -174,7 +185,7 @@ export function WidgetSettings() {
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <Label htmlFor={opacitySliderId} className="font-medium text-sm">
-                Opacity
+                {t(translations.settings.widget.opacity)}
               </Label>
               <span className="text-muted-foreground text-sm">
                 {Math.round(widgetOpacity * 100)}%
@@ -190,12 +201,16 @@ export function WidgetSettings() {
               disabled={!widgetEnabled}
               className="w-full"
             />
-            <p className="text-muted-foreground text-xs">Adjust widget transparency (0% to 100%)</p>
+            <p className="text-muted-foreground text-xs">
+              {t(translations.settings.widget.opacityDescription)}
+            </p>
           </div>
 
           {/* Reset Position Button */}
           <div className="space-y-2">
-            <Label className="font-medium text-sm">Position & Size</Label>
+            <Label className="font-medium text-sm">
+              {t(translations.settings.widget.positionAndSize)}
+            </Label>
             <div className="flex gap-2">
               <Button
                 variant="outline"
@@ -205,7 +220,7 @@ export function WidgetSettings() {
                 className="flex-1"
               >
                 <RotateCcw className="mr-2 h-4 w-4" />
-                Reset Position
+                {t(translations.settings.widget.resetPosition)}
               </Button>
               <Button
                 variant="outline"
@@ -215,7 +230,7 @@ export function WidgetSettings() {
                 className="flex-1"
               >
                 <RotateCcw className="mr-2 h-4 w-4" />
-                Reset Size
+                {t(translations.settings.widget.resetSize)}
               </Button>
             </div>
             <p className="text-muted-foreground text-xs">

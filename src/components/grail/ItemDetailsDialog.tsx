@@ -1,6 +1,7 @@
 import type { Character, GrailProgress, Item } from 'electron/types/grail';
 import { Calendar, ChevronLeft, ChevronRight, Package, Shield, User } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -21,6 +22,7 @@ import {
 } from '@/components/ui/table';
 import { useItemIcon } from '@/hooks/useItemIcon';
 import { useProgressLookup } from '@/hooks/useProgressLookup';
+import { translations } from '@/i18n/translations';
 import { cn, formatDate } from '@/lib/utils';
 import { useGrailStore } from '@/stores/grailStore';
 import placeholderUrl from '/images/placeholder-item.png';
@@ -35,30 +37,32 @@ interface ItemDetailsDialogProps {
 
 // Component for item information section
 function ItemInfoSection({ item }: { item: Item }) {
+  const { t } = useTranslation();
+
   return (
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Package className="h-5 w-5" />
-          Item Information
+          {t(translations.grail.itemDetails.itemInformation)}
         </CardTitle>
       </CardHeader>
       <CardContent>
         <div className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-3">
           {/* Type */}
-          <span className="font-medium">Type:</span>
+          <span className="font-medium">{t(translations.grail.itemDetails.type)}</span>
           <Badge variant="secondary" className="w-fit capitalize">
             {item.type}
           </Badge>
 
           {/* Category */}
-          <span className="font-medium">Category:</span>
+          <span className="font-medium">{t(translations.grail.itemDetails.category)}</span>
           <Badge variant="secondary" className="w-fit capitalize">
             {item.category}
           </Badge>
 
           {/* Treasure Class */}
-          <span className="font-medium">Treasure Class:</span>
+          <span className="font-medium">{t(translations.grail.itemDetails.treasureClass)}</span>
           <Badge variant="secondary" className="w-fit capitalize">
             {item.treasureClass}
           </Badge>
@@ -66,7 +70,7 @@ function ItemInfoSection({ item }: { item: Item }) {
           {/* Item Base */}
           {item.itemBase && (
             <>
-              <span className="font-medium">Base:</span>
+              <span className="font-medium">{t(translations.grail.itemDetails.base)}</span>
               <Badge variant="secondary" className="w-fit capitalize">
                 {item.itemBase}
               </Badge>
@@ -76,7 +80,7 @@ function ItemInfoSection({ item }: { item: Item }) {
           {/* Set Name */}
           {item.setName && (
             <>
-              <span className="font-medium">Set:</span>
+              <span className="font-medium">{t(translations.grail.itemDetails.set)}</span>
               <Badge variant="secondary" className="w-fit capitalize">
                 {item.setName}
               </Badge>
@@ -86,7 +90,7 @@ function ItemInfoSection({ item }: { item: Item }) {
           {/* Required Runes */}
           {item.type === 'runeword' && item.runes && item.runes.length > 0 && (
             <>
-              <span className="font-medium">Required Runes:</span>
+              <span className="font-medium">{t(translations.grail.itemDetails.requiredRunes)}</span>
               <div className="flex flex-col gap-2">
                 <Badge variant="secondary">
                   {item.runes
@@ -101,7 +105,7 @@ function ItemInfoSection({ item }: { item: Item }) {
           )}
 
           {/* Ethereal Type */}
-          <span className="font-medium">Ethereal Type:</span>
+          <span className="font-medium">{t(translations.grail.itemDetails.etherealType)}</span>
           <Badge
             variant={
               item.etherealType === 'only'
@@ -118,7 +122,7 @@ function ItemInfoSection({ item }: { item: Item }) {
           {/* Code */}
           {item.code && (
             <>
-              <span className="font-medium">Code:</span>
+              <span className="font-medium">{t(translations.grail.itemDetails.code)}</span>
               <code className="w-fit rounded bg-muted px-2 py-1 font-mono text-sm">
                 {item.code}
               </code>
@@ -128,14 +132,16 @@ function ItemInfoSection({ item }: { item: Item }) {
           {/* Link */}
           {item.link && (
             <>
-              <span className="font-medium">Link:</span>
+              <span className="font-medium">{t(translations.grail.itemDetails.link)}</span>
               <a
                 href={item.link}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-blue-600 underline hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
               >
-                {item.link.includes('diablo2.io') ? 'View on diablo2.io' : 'View on d2runewizard'}
+                {item.link.includes('diablo2.io')
+                  ? t(translations.grail.itemDetails.viewOnDiablo2io)
+                  : t(translations.grail.itemDetails.viewOnD2runewizard)}
               </a>
             </>
           )}
@@ -156,6 +162,7 @@ function ProgressStatusSection({
     | null
     | undefined;
 }) {
+  const { t } = useTranslation();
   const isFound = itemProgress?.overallFound || false;
   const normalFound = itemProgress?.normalFound || false;
   const etherealFound = itemProgress?.etherealFound || false;
@@ -165,23 +172,23 @@ function ProgressStatusSection({
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Shield className="h-5 w-5" />
-          Progress Status
+          {t(translations.grail.itemDetails.progressStatus)}
         </CardTitle>
       </CardHeader>
       <CardContent>
         <div className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-3">
           {/* Overall Status */}
-          <span className="font-medium">Overall Status:</span>
+          <span className="font-medium">{t(translations.grail.itemDetails.overallStatus)}</span>
           <Badge variant={isFound ? 'default' : 'secondary'} className="w-fit capitalize">
-            {isFound ? 'Found' : 'Not Found'}
+            {isFound ? t(translations.common.found) : t(translations.common.notFound)}
           </Badge>
 
           {/* Normal Status */}
           {item.etherealType !== 'none' && (
             <>
-              <span className="font-medium">Normal:</span>
+              <span className="font-medium">{t(translations.grail.itemDetails.normalStatus)}</span>
               <Badge variant={normalFound ? 'default' : 'secondary'} className="w-fit capitalize">
-                {normalFound ? 'Found' : 'Not Found'}
+                {normalFound ? t(translations.common.found) : t(translations.common.notFound)}
               </Badge>
             </>
           )}
@@ -189,9 +196,11 @@ function ProgressStatusSection({
           {/* Ethereal Status */}
           {item.etherealType !== 'none' && (
             <>
-              <span className="font-medium">Ethereal:</span>
+              <span className="font-medium">
+                {t(translations.grail.itemDetails.etherealStatus)}
+              </span>
               <Badge variant={etherealFound ? 'default' : 'secondary'} className="w-fit capitalize">
-                {etherealFound ? 'Found' : 'Not Found'}
+                {etherealFound ? t(translations.common.found) : t(translations.common.notFound)}
               </Badge>
             </>
           )}
@@ -209,10 +218,11 @@ function FoundDates({
   normalProgress: GrailProgress | undefined;
   etherealProgress: GrailProgress | undefined;
 }) {
+  const { t } = useTranslation();
   const hasAnyDate = normalProgress?.foundDate || etherealProgress?.foundDate;
 
   if (!hasAnyDate) {
-    return <span className="text-xs">Never</span>;
+    return <span className="text-xs">{t(translations.common.never)}</span>;
   }
 
   return (
@@ -241,13 +251,23 @@ function DetectionMethods({
   normalProgress: GrailProgress | undefined;
   etherealProgress: GrailProgress | undefined;
 }) {
+  const { t } = useTranslation();
+
   return (
     <div className="space-y-1">
       {normalProgress && (
-        <span className="text-xs">{normalProgress.manuallyAdded ? 'Manual' : 'Auto'}</span>
+        <span className="text-xs">
+          {normalProgress.manuallyAdded
+            ? t(translations.common.manual)
+            : t(translations.common.auto)}
+        </span>
       )}
       {etherealProgress && (
-        <span className="text-xs">{etherealProgress.manuallyAdded ? 'Manual' : 'Auto'}</span>
+        <span className="text-xs">
+          {etherealProgress.manuallyAdded
+            ? t(translations.common.manual)
+            : t(translations.common.auto)}
+        </span>
       )}
     </div>
   );
@@ -292,6 +312,7 @@ function CharacterProgressTable({
   progress: GrailProgress[];
   item: Item;
 }) {
+  const { t } = useTranslation();
   const [currentPage, setCurrentPage] = useState(1);
   const charactersPerPage = 5;
 
@@ -361,11 +382,14 @@ function CharacterProgressTable({
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <User className="h-5 w-5" />
-          Character Progress
+          {t(translations.grail.itemDetails.characterProgress)}
           {totalPages > 1 && (
             <span className="ml-auto font-normal text-muted-foreground text-sm">
-              {startIndex + 1}-{Math.min(endIndex, sortedCharacters.length)} of{' '}
-              {sortedCharacters.length}
+              {t(translations.common.paginationRange, {
+                start: startIndex + 1,
+                end: Math.min(endIndex, sortedCharacters.length),
+                total: sortedCharacters.length,
+              })}
             </span>
           )}
         </CardTitle>
@@ -374,9 +398,9 @@ function CharacterProgressTable({
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Character</TableHead>
-              <TableHead>Found Date</TableHead>
-              <TableHead>Method</TableHead>
+              <TableHead>{t(translations.grail.itemDetails.character)}</TableHead>
+              <TableHead>{t(translations.grail.itemDetails.foundDate)}</TableHead>
+              <TableHead>{t(translations.grail.itemDetails.method)}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -402,11 +426,11 @@ function CharacterProgressTable({
               className="gap-2"
             >
               <ChevronLeft className="h-4 w-4" />
-              Previous
+              {t(translations.common.previous)}
             </Button>
 
             <span className="text-muted-foreground text-sm">
-              Page {currentPage} of {totalPages}
+              {t(translations.common.pagination, { current: currentPage, total: totalPages })}
             </span>
 
             <Button
@@ -416,7 +440,7 @@ function CharacterProgressTable({
               disabled={currentPage === totalPages}
               className="gap-2"
             >
-              Next
+              {t(translations.common.next)}
               <ChevronRight className="h-4 w-4" />
             </Button>
           </div>
@@ -432,6 +456,7 @@ function CharacterProgressTable({
  */
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Complex dialog component with many features
 export function ItemDetailsDialog({ itemId, open, onOpenChange }: ItemDetailsDialogProps) {
+  const { t } = useTranslation();
   const { items, progress, characters, selectedCharacterId, toggleItemFound, settings } =
     useGrailStore();
 
@@ -531,11 +556,13 @@ export function ItemDetailsDialog({ itemId, open, onOpenChange }: ItemDetailsDia
         <DialogFooter>
           {selectedCharacterId && (
             <Button onClick={handleToggleFound} variant={isFound ? 'outline' : 'default'}>
-              {isFound ? 'Mark as Not Found' : 'Mark as Found'}
+              {isFound
+                ? t(translations.grail.itemDetails.markAsNotFound)
+                : t(translations.grail.itemDetails.markAsFound)}
             </Button>
           )}
           <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Close
+            {t(translations.common.close)}
           </Button>
         </DialogFooter>
       </DialogContent>

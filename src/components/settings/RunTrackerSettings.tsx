@@ -1,9 +1,11 @@
 import { AlertCircle, Keyboard, Timer } from 'lucide-react';
 import { useCallback, useEffect, useId, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
+import { translations } from '@/i18n/translations';
 import { normalizeShortcut } from '@/lib/hotkeys';
 import { useGrailStore } from '@/stores/grailStore';
 import { ShortcutRecorder } from './ShortcutRecorder';
@@ -14,6 +16,7 @@ import { ShortcutRecorder } from './ShortcutRecorder';
  * @returns {JSX.Element} A settings card with run tracker configuration controls
  */
 export function RunTrackerSettings() {
+  const { t } = useTranslation();
   const { settings, setSettings } = useGrailStore();
   const startRunShortcutId = useId();
   const pauseRunShortcutId = useId();
@@ -72,7 +75,7 @@ export function RunTrackerSettings() {
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-lg">
           <Timer className="h-5 w-5" />
-          Run Tracker Settings
+          {t(translations.settings.runTracker.title)}
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -82,9 +85,8 @@ export function RunTrackerSettings() {
             <Alert variant="destructive">
               <AlertCircle className="h-4 w-4" />
               <AlertDescription className="text-xs">
-                <strong>Auto mode temporarily unavailable.</strong> D2R 2.9 changed memory patterns
-                that are required for automatic game detection. Manual run tracking using keyboard
-                shortcuts still works.
+                <strong>{t(translations.settings.runTracker.autoModeUnavailable)}</strong>{' '}
+                {t(translations.settings.runTracker.autoModeUnavailableDescription)}
               </AlertDescription>
             </Alert>
           )}
@@ -94,20 +96,20 @@ export function RunTrackerSettings() {
             <div className="space-y-2">
               <div className="flex items-center gap-2">
                 <Timer className="h-4 w-4" />
-                <h4 className="font-medium text-sm">Auto Mode Settings</h4>
+                <h4 className="font-medium text-sm">
+                  {t(translations.settings.runTracker.autoModeSettings)}
+                </h4>
               </div>
               <Alert>
                 <AlertCircle className="h-4 w-4" />
                 <AlertDescription className="text-xs">
-                  Auto mode is enabled. Runs will start/end automatically when you enter/exit games
-                  in D2R. If D2R is not running or offsets are invalid, auto detection will not
-                  work.
+                  {t(translations.settings.runTracker.autoModeEnabled)}
                 </AlertDescription>
               </Alert>
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <Label htmlFor={pollingIntervalId} className="font-medium text-sm">
-                    Memory Polling Interval
+                    {t(translations.settings.runTracker.memoryPollingInterval)}
                   </Label>
                   <span className="text-muted-foreground text-sm">
                     {runTrackerMemoryPollingInterval}ms
@@ -122,8 +124,7 @@ export function RunTrackerSettings() {
                   className="w-full"
                 />
                 <p className="text-muted-foreground text-xs">
-                  How often to check memory for game state changes (100-5000ms). Lower values
-                  provide faster detection but use more CPU.
+                  {t(translations.settings.runTracker.pollingIntervalDescription)}
                 </p>
               </div>
             </div>
@@ -133,8 +134,7 @@ export function RunTrackerSettings() {
             <Alert>
               <AlertCircle className="h-4 w-4" />
               <AlertDescription className="text-xs">
-                Auto mode (memory reading) is only available on Windows. Manual run tracking is
-                always available.
+                {t(translations.settings.runTracker.autoModeWindowsOnly)}
               </AlertDescription>
             </Alert>
           )}
@@ -144,43 +144,45 @@ export function RunTrackerSettings() {
         <div className="space-y-3">
           <div className="flex items-center gap-2">
             <Keyboard className="h-4 w-4" />
-            <h4 className="font-medium text-sm">Keyboard Shortcuts</h4>
+            <h4 className="font-medium text-sm">
+              {t(translations.settings.runTracker.keyboardShortcuts)}
+            </h4>
           </div>
           <p className="text-muted-foreground text-xs">
-            Configure keyboard shortcuts for run tracking actions
+            {t(translations.settings.runTracker.keyboardShortcutsDescription)}
           </p>
 
           <div className="grid grid-cols-2 gap-4">
             <ShortcutRecorder
               id={startRunShortcutId}
-              label="Start Run:"
+              label={t(translations.settings.runTracker.startRunLabel)}
               value={runTrackerShortcuts.startRun}
               placeholder="Ctrl+R"
-              description="Start a new manual run."
+              description={t(translations.settings.runTracker.startRunDescription)}
               onChange={(shortcut) => updateShortcut('startRun', shortcut)}
             />
             <ShortcutRecorder
               id={pauseRunShortcutId}
-              label="Pause/Resume Run:"
+              label={t(translations.settings.runTracker.pauseResumeLabel)}
               value={runTrackerShortcuts.pauseRun}
               placeholder="Ctrl+Space"
-              description="Toggle pause state for the current run."
+              description={t(translations.settings.runTracker.pauseRunDescription)}
               onChange={(shortcut) => updateShortcut('pauseRun', shortcut)}
             />
             <ShortcutRecorder
               id={endRunShortcutId}
-              label="End Run:"
+              label={t(translations.settings.runTracker.endRunLabel)}
               value={runTrackerShortcuts.endRun}
               placeholder="Ctrl+E"
-              description="End the current run immediately."
+              description={t(translations.settings.runTracker.endRunDescription)}
               onChange={(shortcut) => updateShortcut('endRun', shortcut)}
             />
             <ShortcutRecorder
               id={endSessionShortcutId}
-              label="End Session:"
+              label={t(translations.settings.runTracker.endSessionLabel)}
               value={runTrackerShortcuts.endSession}
               placeholder="Ctrl+Shift+E"
-              description="Finish the active session."
+              description={t(translations.settings.runTracker.endSessionDescription)}
               onChange={(shortcut) => updateShortcut('endSession', shortcut)}
             />
           </div>
@@ -189,12 +191,11 @@ export function RunTrackerSettings() {
         {/* Information Box */}
         <div className="rounded-lg bg-blue-50 p-3 dark:bg-blue-950">
           <p className="text-blue-800 text-xs dark:text-blue-200">
-            <strong>Run Tracking:</strong>
-            <br />• Auto mode uses memory reading to detect game start/end instantly (Windows only)
-            <br />• Requires D2R.exe to be running and valid memory offsets configured
-            <br />• If auto mode cannot work, you can always use manual run controls (keyboard
-            shortcuts)
-            <br />• Manual controls are available at any time via the keyboard shortcuts above
+            <strong>{t(translations.settings.runTracker.runTracking)}</strong>
+            <br />• {t(translations.settings.runTracker.infoAutoMode)}
+            <br />• {t(translations.settings.runTracker.infoRequires)}
+            <br />• {t(translations.settings.runTracker.infoFallback)}
+            <br />• {t(translations.settings.runTracker.infoManual)}
           </p>
         </div>
       </CardContent>

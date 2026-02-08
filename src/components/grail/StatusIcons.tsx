@@ -15,7 +15,9 @@ import {
   User,
   WandSparkles,
 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { translations } from '@/i18n/translations';
 import { cn, isRecentFind } from '@/lib/utils';
 
 /**
@@ -109,6 +111,7 @@ interface RecentDiscoveryProps {
  * @returns {JSX.Element | null} A flame icon if the find is recent, null otherwise
  */
 export function RecentDiscoveryIndicator({ foundDate, className }: RecentDiscoveryProps) {
+  const { t } = useTranslation();
   if (!isRecentFind(foundDate)) return null;
 
   return (
@@ -122,7 +125,7 @@ export function RecentDiscoveryIndicator({ foundDate, className }: RecentDiscove
         />
       </TooltipTrigger>
       <TooltipContent>
-        <p>Recently Found!</p>
+        <p>{t(translations.grail.statusIcons.recentlyFound)}</p>
       </TooltipContent>
     </Tooltip>
   );

@@ -1,9 +1,11 @@
 import type { RunStatistics } from 'electron/types/grail';
 import { Clock, Download, Target, TrendingUp, Trophy } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { translations } from '@/i18n/translations';
 
 /**
  * RunAnalytics component that displays overall run statistics and highlights.
@@ -11,6 +13,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
  * @returns {JSX.Element} Run analytics dashboard with statistics
  */
 export function RunAnalytics() {
+  const { t } = useTranslation();
   const [overallStats, setOverallStats] = useState<RunStatistics | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -97,7 +100,9 @@ export function RunAnalytics() {
       <div className="flex items-center justify-center p-8">
         <div className="text-center">
           <div className="mb-4 h-8 w-8 animate-spin rounded-full border-4 border-gray-300 border-t-blue-600" />
-          <p className="text-muted-foreground">Loading analytics data...</p>
+          <p className="text-muted-foreground">
+            {t(translations.statistics.runAnalytics.loadingAnalytics)}
+          </p>
         </div>
       </div>
     );
@@ -109,10 +114,12 @@ export function RunAnalytics() {
         <Card className="w-full max-w-md">
           <CardContent className="flex flex-col items-center gap-4 p-6 text-center">
             <div className="text-center text-muted-foreground">
-              <h3 className="mb-2 font-semibold">Error Loading Analytics</h3>
+              <h3 className="mb-2 font-semibold">
+                {t(translations.statistics.runAnalytics.errorLoadingAnalytics)}
+              </h3>
               <p className="mb-4 text-sm">{error}</p>
               <Button onClick={loadAnalyticsData} variant="outline">
-                Retry
+                {t(translations.common.retry)}
               </Button>
             </div>
           </CardContent>
@@ -127,8 +134,12 @@ export function RunAnalytics() {
         <Card className="w-full max-w-md">
           <CardContent className="flex flex-col items-center gap-4 p-6 text-center">
             <div className="text-center text-muted-foreground">
-              <h3 className="mb-2 font-semibold">No Data Available</h3>
-              <p className="mb-4 text-sm">Start tracking runs to see analytics and statistics.</p>
+              <h3 className="mb-2 font-semibold">
+                {t(translations.statistics.runAnalytics.noDataAvailable)}
+              </h3>
+              <p className="mb-4 text-sm">
+                {t(translations.statistics.runAnalytics.startTrackingRuns)}
+              </p>
             </div>
           </CardContent>
         </Card>
@@ -142,7 +153,7 @@ export function RunAnalytics() {
       <div className="flex justify-end gap-2">
         <Button onClick={exportData} variant="outline" size="sm">
           <Download className="h-4 w-4" />
-          Export Data
+          {t(translations.statistics.runAnalytics.exportData)}
         </Button>
       </div>
 
@@ -150,59 +161,75 @@ export function RunAnalytics() {
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="font-medium text-sm">Total Sessions</CardTitle>
+            <CardTitle className="font-medium text-sm">
+              {t(translations.statistics.runAnalytics.totalSessions)}
+            </CardTitle>
             <Trophy className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="font-bold text-2xl">{overallStats.totalSessions}</div>
-            <p className="text-muted-foreground text-xs">{overallStats.totalRuns} total runs</p>
+            <p className="text-muted-foreground text-xs">
+              {t(translations.statistics.runAnalytics.totalRuns, { count: overallStats.totalRuns })}
+            </p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="font-medium text-sm">Total Time</CardTitle>
+            <CardTitle className="font-medium text-sm">
+              {t(translations.statistics.runAnalytics.totalTime)}
+            </CardTitle>
             <Clock className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="font-bold text-2xl">{formatTime(overallStats.totalTime)}</div>
-            <p className="text-muted-foreground text-xs">Across all sessions</p>
+            <p className="text-muted-foreground text-xs">
+              {t(translations.statistics.runAnalytics.acrossAllSessions)}
+            </p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="font-medium text-sm">Avg Run Duration</CardTitle>
+            <CardTitle className="font-medium text-sm">
+              {t(translations.statistics.runAnalytics.avgRunDuration)}
+            </CardTitle>
             <Target className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="font-bold text-2xl">
               {formatDuration(overallStats.averageRunDuration)}
             </div>
-            <p className="text-muted-foreground text-xs">Per run average</p>
+            <p className="text-muted-foreground text-xs">
+              {t(translations.statistics.runAnalytics.perRunAverage)}
+            </p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="font-medium text-sm">Items Per Run</CardTitle>
+            <CardTitle className="font-medium text-sm">
+              {t(translations.statistics.runAnalytics.itemsPerRun)}
+            </CardTitle>
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="font-bold text-2xl">{overallStats.itemsPerRun.toFixed(2)}</div>
-            <p className="text-muted-foreground text-xs">Average efficiency</p>
+            <p className="text-muted-foreground text-xs">
+              {t(translations.statistics.runAnalytics.averageEfficiency)}
+            </p>
           </CardContent>
         </Card>
       </div>
       {/* Performance Highlights */}
       <Card>
         <CardHeader>
-          <CardTitle>Performance Highlights</CardTitle>
+          <CardTitle>{t(translations.statistics.runAnalytics.performanceHighlights)}</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div className="space-y-2">
-              <h4 className="font-medium">Fastest Run</h4>
+              <h4 className="font-medium">{t(translations.statistics.runAnalytics.fastestRun)}</h4>
               <div className="flex items-center gap-2">
                 <Badge variant="secondary">
                   {formatDuration(overallStats.fastestRun.duration)}
@@ -213,7 +240,7 @@ export function RunAnalytics() {
               </div>
             </div>
             <div className="space-y-2">
-              <h4 className="font-medium">Slowest Run</h4>
+              <h4 className="font-medium">{t(translations.statistics.runAnalytics.slowestRun)}</h4>
               <div className="flex items-center gap-2">
                 <Badge variant="secondary">
                   {formatDuration(overallStats.slowestRun.duration)}
@@ -224,8 +251,14 @@ export function RunAnalytics() {
               </div>
             </div>
             <div className="space-y-2">
-              <h4 className="font-medium">Overall Efficiency</h4>
-              <Badge variant="outline">{overallStats.itemsPerRun.toFixed(2)} items/run</Badge>
+              <h4 className="font-medium">
+                {t(translations.statistics.runAnalytics.overallEfficiency)}
+              </h4>
+              <Badge variant="outline">
+                {t(translations.statistics.runAnalytics.itemsPerRunMetric, {
+                  count: Number.parseFloat(overallStats.itemsPerRun.toFixed(2)),
+                })}
+              </Badge>
             </div>
           </div>
         </CardContent>

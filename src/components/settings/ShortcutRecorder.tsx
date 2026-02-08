@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { translations } from '@/i18n/translations';
 import { shortcutFromEvent } from '@/lib/hotkeys';
 import { cn } from '@/lib/utils';
 
@@ -22,6 +24,7 @@ export function ShortcutRecorder({
   description,
   onChange,
 }: ShortcutRecorderProps) {
+  const { t } = useTranslation();
   const [isRecording, setIsRecording] = useState(false);
   const [error, setError] = useState('');
 
@@ -46,7 +49,7 @@ export function ShortcutRecorder({
 
       const nextShortcut = shortcutFromEvent(event);
       if (!nextShortcut) {
-        setError('Include a non-modifier key in the shortcut.');
+        setError(t(translations.settings.shortcutRecorder.includeNonModifier));
         return;
       }
 
@@ -59,7 +62,7 @@ export function ShortcutRecorder({
     return () => {
       window.removeEventListener('keydown', handleKeyDown, { capture: true });
     };
-  }, [isRecording, onChange, stopRecording]);
+  }, [isRecording, onChange, stopRecording, t]);
 
   return (
     <div className="space-y-1.5">
@@ -80,11 +83,13 @@ export function ShortcutRecorder({
           size="sm"
           onClick={() => setIsRecording((prev) => !prev)}
         >
-          {isRecording ? 'Recording…' : 'Edit'}
+          {isRecording ? t(translations.settings.shortcutRecorder.recording) : 'Edit'}
         </Button>
       </div>
       {isRecording ? (
-        <p className="text-[11px] text-primary">Press desired key combination (Esc to cancel)</p>
+        <p className="text-[11px] text-primary">
+          {t(translations.settings.shortcutRecorder.pressKeyCombination)}
+        </p>
       ) : description ? (
         <p className="text-[11px] text-muted-foreground">{description}</p>
       ) : null}

@@ -1,6 +1,7 @@
 import type { ItemCategory, ItemType } from 'electron/types/grail';
 import { Grid, List, RotateCcw } from 'lucide-react';
-import { startTransition, useId, useState } from 'react';
+import { startTransition, useId, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -14,6 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { translations } from '@/i18n/translations';
 import { useGrailStore } from '@/stores/grailStore';
 
 /**
@@ -43,23 +45,18 @@ const defaultFilter: AdvancedFilter = {
 };
 
 /**
- * Available item categories for filtering.
+ * Available item category values for filtering.
  */
-const categories: { value: ItemCategory; label: string }[] = [
-  { value: 'weapons', label: 'Weapons' },
-  { value: 'armor', label: 'Armor' },
-  { value: 'jewelry', label: 'Jewelry' },
-  { value: 'charms', label: 'Charms' },
-];
+const categoryValues: ItemCategory[] = ['weapons', 'armor', 'jewelry', 'charms'];
 
 /**
- * Available sort options for item display.
+ * Available sort option values for item display.
  */
-const sortOptions = [
-  { value: 'name', label: 'Name' },
-  { value: 'category', label: 'Category' },
-  { value: 'type', label: 'Type' },
-  { value: 'found_date', label: 'Found Date' },
+const sortOptionValues: Array<'name' | 'category' | 'type' | 'found_date'> = [
+  'name',
+  'category',
+  'type',
+  'found_date',
 ];
 
 /**
@@ -68,6 +65,7 @@ const sortOptions = [
  * @returns {JSX.Element} An advanced search interface with multiple filter controls
  */
 export function AdvancedSearch() {
+  const { t } = useTranslation();
   const advancedSearchId = useId();
   const fuzzySearchId = useId();
   const [advancedFilter, setAdvancedFilter] = useState<AdvancedFilter>(defaultFilter);
@@ -81,15 +79,57 @@ export function AdvancedSearch() {
   const setGroupMode = useGrailStore((state) => state.setGroupMode);
   const settings = useGrailStore((state) => state.settings);
 
+  const categories = useMemo(
+    () =>
+      categoryValues.map((value) => ({
+        value,
+        label: t(
+          translations.grail.advancedSearch[
+            `category${value.charAt(0).toUpperCase()}${value.slice(1)}` as keyof typeof translations.grail.advancedSearch
+          ],
+        ),
+      })),
+    [t],
+  );
+
+  const sortOptions = useMemo(
+    () =>
+      sortOptionValues.map((value) => ({
+        value,
+        label: t(
+          value === 'name'
+            ? translations.grail.advancedSearch.sortName
+            : value === 'category'
+              ? translations.grail.advancedSearch.sortCategory
+              : value === 'type'
+                ? translations.grail.advancedSearch.sortType
+                : translations.grail.advancedSearch.sortFoundDate,
+        ),
+      })),
+    [t],
+  );
+
   /**
    * Available item types for filtering, filtered based on grail settings.
    */
-  const types: { value: ItemType; label: string }[] = [
-    { value: 'unique', label: 'Unique' },
-    { value: 'set', label: 'Set' },
-    ...(settings.grailRunes ? [{ value: 'rune' as ItemType, label: 'Rune' }] : []),
-    ...(settings.grailRunewords ? [{ value: 'runeword' as ItemType, label: 'Runeword' }] : []),
-  ];
+  const types: { value: ItemType; label: string }[] = useMemo(
+    () => [
+      { value: 'unique', label: t(translations.grail.advancedSearch.typeUnique) },
+      { value: 'set', label: t(translations.grail.advancedSearch.typeSet) },
+      ...(settings.grailRunes
+        ? [{ value: 'rune' as ItemType, label: t(translations.grail.advancedSearch.typeRune) }]
+        : []),
+      ...(settings.grailRunewords
+        ? [
+            {
+              value: 'runeword' as ItemType,
+              label: t(translations.grail.advancedSearch.typeRuneword),
+            },
+          ]
+        : []),
+    ],
+    [t, settings.grailRunes, settings.grailRunewords],
+  );
 
   const updateAdvancedFilter = (updates: Partial<AdvancedFilter>) => {
     const newFilter = { ...advancedFilter, ...updates };
@@ -171,7 +211,7 @@ export function AdvancedSearch() {
             className="h-7 gap-1 px-2 text-xs"
           >
             <RotateCcw className="h-3 w-3" />
-            Reset
+            {t(translations.common.reset)}
           </Button>
         </div>
 
@@ -185,10 +225,18 @@ export function AdvancedSearch() {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="none">No Grouping</SelectItem>
-              <SelectItem value="category">By Category</SelectItem>
-              <SelectItem value="type">By Type</SelectItem>
-              {settings.grailEthereal && <SelectItem value="ethereal">By Ethereal</SelectItem>}
+              <SelectItem value="none">
+                {t(translations.grail.advancedSearch.noGrouping)}
+              </SelectItem>
+              <SelectItem value="category">
+                {t(translations.grail.advancedSearch.byCategory)}
+              </SelectItem>
+              <SelectItem value="type">{t(translations.grail.advancedSearch.byType)}</SelectItem>
+              {settings.grailEthereal && (
+                <SelectItem value="ethereal">
+                  {t(translations.grail.advancedSearch.byEthereal)}
+                </SelectItem>
+              )}
             </SelectContent>
           </Select>
         </div>
@@ -203,7 +251,7 @@ export function AdvancedSearch() {
               className="flex-1"
             >
               <Grid className="mr-2 h-4 w-4" />
-              Grid
+              {t(translations.grail.advancedSearch.grid)}
             </Button>
             <Button
               variant={viewMode === 'list' ? 'default' : 'outline'}
@@ -212,7 +260,7 @@ export function AdvancedSearch() {
               className="flex-1"
             >
               <List className="mr-2 h-4 w-4" />
-              List
+              {t(translations.grail.advancedSearch.list)}
             </Button>
           </div>
         </div>
@@ -221,11 +269,11 @@ export function AdvancedSearch() {
           {/* Search */}
           <div className="space-y-2">
             <Label htmlFor={advancedSearchId} className="text-gray-600 text-xs dark:text-gray-400">
-              Search
+              {t(translations.grail.advancedSearch.searchLabel)}
             </Label>
             <Input
               id={advancedSearchId}
-              placeholder="Search items..."
+              placeholder={t(translations.grail.advancedSearch.searchPlaceholder)}
               value={advancedFilter.searchTerm}
               onChange={(e) => updateAdvancedFilter({ searchTerm: e.target.value })}
               className="h-8 text-sm"
@@ -239,14 +287,16 @@ export function AdvancedSearch() {
                 }
               />
               <Label htmlFor={fuzzySearchId} className="text-xs">
-                Fuzzy Search
+                {t(translations.grail.advancedSearch.fuzzySearch)}
               </Label>
             </div>
           </div>
 
           {/* Status */}
           <div className="space-y-2">
-            <Label className="text-gray-600 text-xs dark:text-gray-400">Status</Label>
+            <Label className="text-gray-600 text-xs dark:text-gray-400">
+              {t(translations.grail.advancedSearch.status)}
+            </Label>
             <Select
               value={advancedFilter.foundStatus}
               onValueChange={(value) =>
@@ -257,9 +307,13 @@ export function AdvancedSearch() {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Items</SelectItem>
-                <SelectItem value="found">Found Only</SelectItem>
-                <SelectItem value="missing">Missing Only</SelectItem>
+                <SelectItem value="all">{t(translations.grail.advancedSearch.allItems)}</SelectItem>
+                <SelectItem value="found">
+                  {t(translations.grail.advancedSearch.foundOnly)}
+                </SelectItem>
+                <SelectItem value="missing">
+                  {t(translations.grail.advancedSearch.missingOnly)}
+                </SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -268,7 +322,9 @@ export function AdvancedSearch() {
         <div className="flex gap-2">
           {/* Categories */}
           <div className="space-y-2">
-            <Label className="text-gray-600 text-xs dark:text-gray-400">Categories</Label>
+            <Label className="text-gray-600 text-xs dark:text-gray-400">
+              {t(translations.grail.advancedSearch.categories)}
+            </Label>
             <div className="space-y-2">
               {categories.map((category) => (
                 <div key={category.value} className="flex items-center space-x-2">
@@ -287,7 +343,9 @@ export function AdvancedSearch() {
 
           {/* Types */}
           <div className="space-y-2">
-            <Label className="text-gray-600 text-xs dark:text-gray-400">Types</Label>
+            <Label className="text-gray-600 text-xs dark:text-gray-400">
+              {t(translations.grail.advancedSearch.types)}
+            </Label>
             <div className="space-y-2">
               {types.map((type) => (
                 <div key={type.value} className="flex items-center space-x-2">
@@ -308,7 +366,9 @@ export function AdvancedSearch() {
         {/* Sorting */}
         <div className="flex items-center gap-2">
           <div className="space-y-2">
-            <Label className="text-gray-600 text-xs dark:text-gray-400">Sort By</Label>
+            <Label className="text-gray-600 text-xs dark:text-gray-400">
+              {t(translations.grail.advancedSearch.sortBy)}
+            </Label>
             <Select
               value={advancedFilter.sortBy}
               onValueChange={(value) =>
@@ -330,7 +390,9 @@ export function AdvancedSearch() {
             </Select>
           </div>
           <div className="space-y-2">
-            <Label className="text-gray-600 text-xs dark:text-gray-400">Sort Order</Label>
+            <Label className="text-gray-600 text-xs dark:text-gray-400">
+              {t(translations.grail.advancedSearch.sortOrder)}
+            </Label>
             <Select
               value={advancedFilter.sortOrder}
               onValueChange={(value) =>

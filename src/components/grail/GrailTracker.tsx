@@ -1,6 +1,8 @@
 import { useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Card, CardContent } from '@/components/ui/card';
 import { TooltipProvider } from '@/components/ui/tooltip';
+import { translations } from '@/i18n/translations';
 import { useGrailStatistics, useGrailStore } from '@/stores/grailStore';
 import { AdvancedSearch } from './AdvancedSearch';
 import { ItemGrid } from './ItemGrid';
@@ -12,6 +14,7 @@ import { ProgressGauge } from './ProgressGauge';
  * @returns {JSX.Element} The main grail tracker interface with statistics and item grid
  */
 export function GrailTracker() {
+  const { t } = useTranslation();
   const { setCharacters, setItems, setProgress, hydrateSettings, settings } = useGrailStore();
 
   const statistics = useGrailStatistics();
@@ -91,7 +94,7 @@ export function GrailTracker() {
             <Card>
               <CardContent className="flex flex-col items-center gap-4">
                 <ProgressGauge
-                  label="Total Progress"
+                  label={t(translations.grail.tracker.totalProgress)}
                   current={statistics.foundItems}
                   total={statistics.totalItems}
                   showLabel
@@ -102,14 +105,14 @@ export function GrailTracker() {
                 {settings.grailEthereal && (
                   <div className="flex gap-4">
                     <ProgressGauge
-                      label="Normal Items"
+                      label={t(translations.grail.tracker.normalItems)}
                       current={statistics.normalItems.found}
                       total={statistics.normalItems.total}
                       showLabel
                       color="orange"
                     />
                     <ProgressGauge
-                      label="Ethereal Items"
+                      label={t(translations.grail.tracker.etherealItems)}
                       current={statistics.etherealItems.found}
                       total={statistics.etherealItems.total}
                       showLabel

@@ -1,5 +1,6 @@
 import { AlertCircle, Loader2, Pause, Play, Plus, Square, StopCircle, Timer } from 'lucide-react';
 import { useCallback, useEffect, useId, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
   AlertDialog,
@@ -16,6 +17,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { translations } from '@/i18n/translations';
 import { matchesShortcut } from '@/lib/hotkeys';
 import { useGrailStore } from '@/stores/grailStore';
 import { useRunTrackerStore } from '@/stores/runTrackerStore';
@@ -83,6 +85,7 @@ function ControlButtons({
   onEndRun,
   onEndSession,
 }: ControlButtonsProps) {
+  const { t } = useTranslation();
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap gap-2">
@@ -100,10 +103,14 @@ function ControlButtons({
             }
           >
             {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
-            Start Run
+            {t(translations.runTracker.controls.startRun)}
           </TooltipTrigger>
           <TooltipContent>
-            <p>Start a new run ({shortcuts.startRun})</p>
+            <p>
+              {t(translations.runTracker.controls.startRunTooltip, {
+                shortcut: shortcuts.startRun,
+              })}
+            </p>
           </TooltipContent>
         </Tooltip>
 
@@ -127,13 +134,19 @@ function ControlButtons({
             ) : (
               <Pause className="h-4 w-4" />
             )}
-            {isPaused ? 'Resume' : 'Pause'}
+            {isPaused
+              ? t(translations.runTracker.controls.resume)
+              : t(translations.runTracker.controls.pause)}
           </TooltipTrigger>
           <TooltipContent>
             <p>
               {isPaused
-                ? `Resume run (${shortcuts.pauseRun})`
-                : `Pause run (${shortcuts.pauseRun})`}
+                ? t(translations.runTracker.controls.resumeRunTooltip, {
+                    shortcut: shortcuts.pauseRun,
+                  })
+                : t(translations.runTracker.controls.pauseRunTooltip, {
+                    shortcut: shortcuts.pauseRun,
+                  })}
             </p>
           </TooltipContent>
         </Tooltip>
@@ -156,10 +169,14 @@ function ControlButtons({
             ) : (
               <Square className="h-4 w-4" />
             )}
-            End Run
+            {t(translations.runTracker.controls.endRun)}
           </TooltipTrigger>
           <TooltipContent>
-            <p>End current run ({shortcuts.endRun})</p>
+            <p>
+              {t(translations.runTracker.controls.endRunTooltip, {
+                shortcut: shortcuts.endRun,
+              })}
+            </p>
           </TooltipContent>
         </Tooltip>
 
@@ -181,10 +198,14 @@ function ControlButtons({
             ) : (
               <StopCircle className="h-4 w-4" />
             )}
-            End Session
+            {t(translations.runTracker.controls.endSession)}
           </TooltipTrigger>
           <TooltipContent>
-            <p>End current session ({shortcuts.endSession})</p>
+            <p>
+              {t(translations.runTracker.controls.endSessionTooltip, {
+                shortcut: shortcuts.endSession,
+              })}
+            </p>
           </TooltipContent>
         </Tooltip>
       </div>
@@ -192,9 +213,13 @@ function ControlButtons({
       {/* Keyboard Shortcuts Info */}
       <div className="rounded-md bg-muted p-3">
         <p className="text-muted-foreground text-xs">
-          <strong>Keyboard Shortcuts:</strong> {shortcuts.startRun} (Start), {shortcuts.pauseRun}{' '}
-          (Pause/Resume),
-          {shortcuts.endRun} (End Run), {shortcuts.endSession} (End Session)
+          <strong>{t(translations.runTracker.controls.shortcutsInfo)}</strong>{' '}
+          {t(translations.runTracker.controls.shortcutsDetail, {
+            startRun: shortcuts.startRun,
+            pauseRun: shortcuts.pauseRun,
+            endRun: shortcuts.endRun,
+            endSession: shortcuts.endSession,
+          })}
         </p>
       </div>
     </div>
@@ -207,6 +232,7 @@ function ControlButtons({
  */
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Component handles multiple control states, keyboard shortcuts, and dialogs which requires complexity
 export function SessionControls() {
+  const { t } = useTranslation();
   const {
     activeSession,
     activeRun,
@@ -432,14 +458,16 @@ export function SessionControls() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            Session Controls
+            {t(translations.runTracker.controls.sessionControls)}
             {isTracking && (
               <div className="flex items-center gap-1">
                 <div
                   className={`h-2 w-2 rounded-full ${isPaused ? 'bg-yellow-500' : 'bg-green-500'}`}
                 />
                 <span className="text-muted-foreground text-sm">
-                  {isPaused ? 'Paused' : 'Running'}
+                  {isPaused
+                    ? t(translations.runTracker.controls.paused)
+                    : t(translations.runTracker.controls.running)}
                 </span>
               </div>
             )}
@@ -452,8 +480,12 @@ export function SessionControls() {
               <div className="flex items-center justify-between rounded-md border p-3">
                 <div className="flex items-center gap-2">
                   <Timer className="h-4 w-4" />
-                  <span className="font-medium text-sm">Auto Mode</span>
-                  <span className="text-muted-foreground text-xs">(Memory Reading)</span>
+                  <span className="font-medium text-sm">
+                    {t(translations.runTracker.controls.autoMode)}
+                  </span>
+                  <span className="text-muted-foreground text-xs">
+                    {t(translations.runTracker.controls.memoryReading)}
+                  </span>
                 </div>
                 <Switch checked={autoModeEnabled} onCheckedChange={toggleAutoMode} />
               </div>
@@ -464,9 +496,8 @@ export function SessionControls() {
               <Alert variant="destructive">
                 <AlertCircle className="h-4 w-4" />
                 <AlertDescription className="text-xs">
-                  <strong>Auto mode temporarily unavailable.</strong> D2R 2.9 changed memory
-                  patterns that are required for automatic game detection. Manual run tracking using
-                  keyboard shortcuts still works.
+                  <strong>{t(translations.settings.runTracker.autoModeUnavailable)}</strong>{' '}
+                  {t(translations.settings.runTracker.autoModeUnavailableDescription)}
                 </AlertDescription>
               </Alert>
             )}
@@ -492,13 +523,17 @@ export function SessionControls() {
                 htmlFor={manualItemNameId}
                 className="font-medium text-muted-foreground text-sm"
               >
-                Add Item Manually
+                {t(translations.runTracker.controls.addItemManually)}
               </label>
               <div className="flex gap-2">
                 <Input
                   id={manualItemNameId}
                   type="text"
-                  placeholder={hasRuns ? 'Enter item name...' : 'Start a run first'}
+                  placeholder={
+                    hasRuns
+                      ? t(translations.runTracker.controls.enterItemName)
+                      : t(translations.runTracker.controls.startRunFirst)
+                  }
                   value={manualItemName}
                   onChange={(e) => setManualItemName(e.target.value)}
                   onKeyDown={handleManualItemKeyDown}
@@ -516,13 +551,13 @@ export function SessionControls() {
                   ) : (
                     <Plus className="h-4 w-4" />
                   )}
-                  Add
+                  {t(translations.common.add)}
                 </Button>
               </div>
               <p className="text-muted-foreground text-xs">
                 {hasRuns
-                  ? 'Items will be added to the current run, or the latest finished run if no run is active.'
-                  : 'Start a run to add items manually.'}
+                  ? t(translations.runTracker.controls.itemsAddedToCurrentRun)
+                  : t(translations.runTracker.controls.startRunToAddItems)}
               </p>
             </div>
           </div>
@@ -533,19 +568,25 @@ export function SessionControls() {
       <AlertDialog open={showEndRunDialog} onOpenChange={setShowEndRunDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>End Current Run</AlertDialogTitle>
+            <AlertDialogTitle>
+              {t(translations.runTracker.controls.endCurrentRunTitle)}
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to end the current run? This action cannot be undone.
+              {t(translations.runTracker.controls.endCurrentRunDescription)}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={loading}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={loading}>
+              {t(translations.common.cancel)}
+            </AlertDialogCancel>
             <AlertDialogAction
               onClick={handleEndRun}
               disabled={loading}
               className="bg-red-600 hover:bg-red-700"
             >
-              {loading ? 'Ending...' : 'End Run'}
+              {loading
+                ? t(translations.runTracker.controls.ending)
+                : t(translations.runTracker.controls.endRun)}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -555,20 +596,25 @@ export function SessionControls() {
       <AlertDialog open={showEndSessionDialog} onOpenChange={setShowEndSessionDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>End Current Session</AlertDialogTitle>
+            <AlertDialogTitle>
+              {t(translations.runTracker.controls.endCurrentSessionTitle)}
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to end the current session? This will end any active run and
-              cannot be undone.
+              {t(translations.runTracker.controls.endCurrentSessionDescription)}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={loading}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={loading}>
+              {t(translations.common.cancel)}
+            </AlertDialogCancel>
             <AlertDialogAction
               onClick={handleEndSession}
               disabled={loading}
               className="bg-red-600 hover:bg-red-700"
             >
-              {loading ? 'Ending...' : 'End Session'}
+              {loading
+                ? t(translations.runTracker.controls.ending)
+                : t(translations.runTracker.controls.endSession)}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -1,9 +1,11 @@
 import { FolderOpen, HardDrive } from 'lucide-react';
 import { useCallback, useEffect, useId, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { translations } from '@/i18n/translations';
 
 /**
  * D2RInstallationSettings component that provides controls for configuring the D2R installation path.
@@ -11,6 +13,7 @@ import { Label } from '@/components/ui/label';
  * @returns {JSX.Element} A settings card with D2R installation path configuration
  */
 export function D2RInstallationSettings() {
+  const { t } = useTranslation();
   const d2rPathInputId = useId();
 
   const [d2rPath, setD2rPath] = useState<string>('');
@@ -41,7 +44,7 @@ export function D2RInstallationSettings() {
   const handleBrowseDirectory = useCallback(async () => {
     try {
       const result = await window.electronAPI?.dialog.showOpenDialog({
-        title: 'Select D2R Installation Directory',
+        title: t(translations.settings.d2rInstallation.title),
         defaultPath: d2rPath,
         properties: ['openDirectory'],
       });
@@ -54,7 +57,7 @@ export function D2RInstallationSettings() {
     } catch (error) {
       console.error('Failed to browse directory:', error);
     }
-  }, [d2rPath]);
+  }, [d2rPath, t]);
 
   const handlePathChange = useCallback(async (newPath: string) => {
     setD2rPath(newPath);
@@ -70,14 +73,14 @@ export function D2RInstallationSettings() {
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-lg">
           <HardDrive className="h-5 w-5" />
-          D2R Installation
+          {t(translations.settings.d2rInstallation.title)}
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         {/* D2R Installation Path */}
         <div className="space-y-2">
           <Label htmlFor={d2rPathInputId} className="font-medium text-sm">
-            Installation Path
+            {t(translations.settings.d2rInstallation.installationPath)}
           </Label>
           <div className="flex gap-2">
             <Input
@@ -96,14 +99,13 @@ export function D2RInstallationSettings() {
               variant="outline"
               size="icon"
               onClick={handleBrowseDirectory}
-              title="Browse for directory"
+              title={t(translations.settings.d2rInstallation.browseForDirectory)}
             >
               <FolderOpen className="h-4 w-4" />
             </Button>
           </div>
           <p className="text-gray-600 text-xs dark:text-gray-400">
-            Path to your Diablo II: Resurrected installation directory. This setting is used by both
-            item icon management and terror zone configuration.
+            {t(translations.settings.d2rInstallation.pathDescription)}
           </p>
         </div>
       </CardContent>
