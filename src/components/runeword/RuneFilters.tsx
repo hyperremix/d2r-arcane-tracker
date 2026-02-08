@@ -1,3 +1,4 @@
+import { runes } from 'electron/items/runes';
 import { useEffect, useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -5,7 +6,6 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { translations } from '@/i18n/translations';
 import { cn } from '@/lib/utils';
-import { runes } from '../../../electron/items/runes';
 
 /**
  * Props for the RuneFilters component

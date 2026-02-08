@@ -1,5 +1,5 @@
-import { AlertCircle, Loader2, Pause, Play, Plus, Square, StopCircle, Timer } from 'lucide-react';
-import { useCallback, useEffect, useId, useMemo, useState } from 'react';
+import { AlertCircle, Timer } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
@@ -12,15 +12,14 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { translations } from '@/i18n/translations';
 import { matchesShortcut } from '@/lib/hotkeys';
 import { useGrailStore } from '@/stores/grailStore';
 import { useRunTrackerStore } from '@/stores/runTrackerStore';
+import { ControlButtons } from './ControlButtons';
+import { ManualItemEntry } from './ManualItemEntry';
 
 // Helper function to check if user is typing in input fields
 // Used in SessionControls component
@@ -50,187 +49,10 @@ function _hasRunsInSession(
   return sessionRuns !== undefined && sessionRuns.length > 0;
 }
 
-// Control buttons component to reduce complexity
-interface ControlButtonsProps {
-  shortcuts: {
-    startRun: string;
-    pauseRun: string;
-    endRun: string;
-    endSession: string;
-  };
-  canStartRun: boolean;
-  canPauseResume: boolean;
-  canEndRun: boolean;
-  canEndSession: boolean;
-  isPaused: boolean;
-  loading: boolean;
-  onStartRun: () => void;
-  onPauseRun: () => void;
-  onResumeRun: () => void;
-  onEndRun: () => void;
-  onEndSession: () => void;
-}
-
-function ControlButtons({
-  shortcuts,
-  canStartRun,
-  canPauseResume,
-  canEndRun,
-  canEndSession,
-  isPaused,
-  loading,
-  onStartRun,
-  onPauseRun,
-  onResumeRun,
-  onEndRun,
-  onEndSession,
-}: ControlButtonsProps) {
-  const { t } = useTranslation();
-  return (
-    <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap gap-2">
-        {/* Start Run Button */}
-        <Tooltip>
-          <TooltipTrigger
-            render={
-              <Button
-                variant="default"
-                size="sm"
-                onClick={onStartRun}
-                disabled={!canStartRun || loading}
-                className="flex items-center gap-2"
-              />
-            }
-          >
-            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
-            {t(translations.runTracker.controls.startRun)}
-          </TooltipTrigger>
-          <TooltipContent>
-            <p>
-              {t(translations.runTracker.controls.startRunTooltip, {
-                shortcut: shortcuts.startRun,
-              })}
-            </p>
-          </TooltipContent>
-        </Tooltip>
-
-        {/* Pause/Resume Button */}
-        <Tooltip>
-          <TooltipTrigger
-            render={
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={isPaused ? onResumeRun : onPauseRun}
-                disabled={!canPauseResume || loading}
-                className="flex items-center gap-2"
-              />
-            }
-          >
-            {loading ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : isPaused ? (
-              <Play className="h-4 w-4" />
-            ) : (
-              <Pause className="h-4 w-4" />
-            )}
-            {isPaused
-              ? t(translations.runTracker.controls.resume)
-              : t(translations.runTracker.controls.pause)}
-          </TooltipTrigger>
-          <TooltipContent>
-            <p>
-              {isPaused
-                ? t(translations.runTracker.controls.resumeRunTooltip, {
-                    shortcut: shortcuts.pauseRun,
-                  })
-                : t(translations.runTracker.controls.pauseRunTooltip, {
-                    shortcut: shortcuts.pauseRun,
-                  })}
-            </p>
-          </TooltipContent>
-        </Tooltip>
-
-        {/* End Run Button */}
-        <Tooltip>
-          <TooltipTrigger
-            render={
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={onEndRun}
-                disabled={!canEndRun || loading}
-                className="flex items-center gap-2"
-              />
-            }
-          >
-            {loading ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Square className="h-4 w-4" />
-            )}
-            {t(translations.runTracker.controls.endRun)}
-          </TooltipTrigger>
-          <TooltipContent>
-            <p>
-              {t(translations.runTracker.controls.endRunTooltip, {
-                shortcut: shortcuts.endRun,
-              })}
-            </p>
-          </TooltipContent>
-        </Tooltip>
-
-        {/* End Session Button */}
-        <Tooltip>
-          <TooltipTrigger
-            render={
-              <Button
-                variant="destructive"
-                size="sm"
-                onClick={onEndSession}
-                disabled={!canEndSession || loading}
-                className="flex items-center gap-2"
-              />
-            }
-          >
-            {loading ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <StopCircle className="h-4 w-4" />
-            )}
-            {t(translations.runTracker.controls.endSession)}
-          </TooltipTrigger>
-          <TooltipContent>
-            <p>
-              {t(translations.runTracker.controls.endSessionTooltip, {
-                shortcut: shortcuts.endSession,
-              })}
-            </p>
-          </TooltipContent>
-        </Tooltip>
-      </div>
-
-      {/* Keyboard Shortcuts Info */}
-      <div className="rounded-md bg-muted p-3">
-        <p className="text-muted-foreground text-xs">
-          <strong>{t(translations.runTracker.controls.shortcutsInfo)}</strong>{' '}
-          {t(translations.runTracker.controls.shortcutsDetail, {
-            startRun: shortcuts.startRun,
-            pauseRun: shortcuts.pauseRun,
-            endRun: shortcuts.endRun,
-            endSession: shortcuts.endSession,
-          })}
-        </p>
-      </div>
-    </div>
-  );
-}
-
 /**
  * SessionControls component that provides controls for managing run tracking.
  * Includes buttons for start, pause, resume, end run, and end session with keyboard shortcuts.
  */
-// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Component handles multiple control states, keyboard shortcuts, and dialogs which requires complexity
 export function SessionControls() {
   const { t } = useTranslation();
   const {
@@ -261,13 +83,10 @@ export function SessionControls() {
 
   const [showEndRunDialog, setShowEndRunDialog] = useState(false);
   const [showEndSessionDialog, setShowEndSessionDialog] = useState(false);
-  const [manualItemName, setManualItemName] = useState('');
-  const [addingItem, setAddingItem] = useState(false);
   const [memoryStatus, setMemoryStatus] = useState<{
     available: boolean;
     reason: string | null;
   } | null>(null);
-  const manualItemNameId = useId();
 
   // Fetch memory status on mount
   useEffect(() => {
@@ -326,31 +145,6 @@ export function SessionControls() {
       console.error('Failed to end session:', error);
     }
   }, [endSession]);
-
-  const handleAddManualItem = useCallback(async () => {
-    if (!manualItemName.trim()) {
-      return;
-    }
-
-    setAddingItem(true);
-    try {
-      await addManualRunItem(manualItemName.trim());
-      setManualItemName('');
-    } catch (error) {
-      console.error('Failed to add manual item:', error);
-    } finally {
-      setAddingItem(false);
-    }
-  }, [manualItemName, addManualRunItem]);
-
-  const handleManualItemKeyDown = useCallback(
-    (event: React.KeyboardEvent<HTMLInputElement>) => {
-      if (event.key === 'Enter' && !addingItem && manualItemName.trim()) {
-        handleAddManualItem();
-      }
-    },
-    [addingItem, manualItemName, handleAddManualItem],
-  );
 
   // Check if there are any runs in the session (active run or finished runs)
   const hasRuns = useMemo(
@@ -518,48 +312,11 @@ export function SessionControls() {
             />
 
             {/* Manual Item Entry */}
-            <div className="flex flex-col gap-2">
-              <label
-                htmlFor={manualItemNameId}
-                className="font-medium text-muted-foreground text-sm"
-              >
-                {t(translations.runTracker.controls.addItemManually)}
-              </label>
-              <div className="flex gap-2">
-                <Input
-                  id={manualItemNameId}
-                  type="text"
-                  placeholder={
-                    hasRuns
-                      ? t(translations.runTracker.controls.enterItemName)
-                      : t(translations.runTracker.controls.startRunFirst)
-                  }
-                  value={manualItemName}
-                  onChange={(e) => setManualItemName(e.target.value)}
-                  onKeyDown={handleManualItemKeyDown}
-                  disabled={addingItem || loading || !hasRuns}
-                  className="flex-1"
-                />
-                <Button
-                  onClick={handleAddManualItem}
-                  disabled={!manualItemName.trim() || addingItem || loading || !hasRuns}
-                  variant="outline"
-                  className="flex items-center gap-2"
-                >
-                  {addingItem ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Plus className="h-4 w-4" />
-                  )}
-                  {t(translations.common.add)}
-                </Button>
-              </div>
-              <p className="text-muted-foreground text-xs">
-                {hasRuns
-                  ? t(translations.runTracker.controls.itemsAddedToCurrentRun)
-                  : t(translations.runTracker.controls.startRunToAddItems)}
-              </p>
-            </div>
+            <ManualItemEntry
+              hasRuns={hasRuns}
+              loading={loading}
+              addManualRunItem={addManualRunItem}
+            />
           </div>
         </CardContent>
       </Card>

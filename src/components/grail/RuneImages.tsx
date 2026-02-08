@@ -1,9 +1,9 @@
+import { runes } from 'electron/items/runes';
 import { useEffect, useMemo, useState } from 'react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import type { RunewordCompletionStatus } from '@/lib/runeword-utils';
 import { cn } from '@/lib/utils';
 import placeholderUrl from '/images/placeholder-item.png';
-import { runes } from '../../../electron/items/runes';
 
 interface RuneImagesProps {
   runeIds: string[];
