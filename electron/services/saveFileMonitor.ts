@@ -928,28 +928,23 @@ class SaveFileMonitor {
     tasks: Array<() => Promise<T>>,
     limit: number,
   ): Promise<T[]> {
-    const results: T[] = [];
-    let currentIndex = 0;
+    const results: T[] = new Array(tasks.length);
+    const queue = tasks.map((task, index) => ({ task, index }));
 
-    // Create worker function that processes tasks sequentially
     const worker = async (): Promise<void> => {
-      while (currentIndex < tasks.length) {
-        const index = currentIndex++;
-        const task = tasks[index];
+      let item = queue.shift();
+      while (item !== undefined) {
         try {
-          results[index] = await task();
+          results[item.index] = await item.task();
         } catch (error) {
-          console.error(`[executeConcurrently] Error executing task ${index}:`, error);
-          // Store error or undefined to maintain result order
-          results[index] = undefined as T;
+          console.error(`[executeConcurrently] Error executing task ${item.index}:`, error);
+          results[item.index] = undefined as T;
         }
+        item = queue.shift();
       }
     };
 
-    // Create array of worker promises (limited by 'limit' parameter)
     const workers = Array.from({ length: Math.min(limit, tasks.length) }, () => worker());
-
-    // Wait for all workers to complete
     await Promise.all(workers);
 
     return results;
