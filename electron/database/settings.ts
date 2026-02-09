@@ -125,16 +125,6 @@ export function getAllSettings(ctx: DatabaseContext): Settings {
     ),
   };
 
-  // Migration: If runTrackerAutoStart was enabled, enable runTrackerMemoryReading
-  if (
-    settingsMap.runTrackerAutoStart === 'true' &&
-    settingsMap.runTrackerMemoryReading !== 'true'
-  ) {
-    console.log('[Database] Migrating runTrackerAutoStart to runTrackerMemoryReading (auto mode)');
-    typedSettings.runTrackerMemoryReading = true;
-    setSetting(ctx, 'runTrackerMemoryReading', 'true');
-  }
-
   return typedSettings;
 }
 
