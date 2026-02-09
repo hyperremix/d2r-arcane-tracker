@@ -3,6 +3,9 @@ import { homedir, platform } from 'node:os';
 import path from 'node:path';
 import { app } from 'electron';
 import { PNG } from 'pngjs';
+import { createServiceLogger } from '../utils/serviceLogger';
+
+const log = createServiceLogger('IconService');
 
 /**
  * Result of sprite conversion operation
@@ -110,7 +113,7 @@ export class IconService {
     // Check each path
     for (const possiblePath of possiblePaths) {
       if (existsSync(possiblePath)) {
-        console.log(`Found D2R installation at: ${possiblePath}`);
+        log.info('findD2RInstallation', `Found D2R installation at: ${possiblePath}`);
         this.d2rPath = possiblePath;
         return possiblePath;
       }
@@ -296,7 +299,7 @@ export class IconService {
         }
       }
     } catch (error) {
-      console.error(`Error reading directory ${directory}:`, error);
+      log.error('findSpriteFiles', error, { directory });
     }
 
     return spriteFiles;
@@ -337,7 +340,7 @@ export class IconService {
       result.totalFiles = spriteFiles.length;
       this.conversionStatus.progress = { current: 0, total: result.totalFiles };
 
-      console.log(`Found ${spriteFiles.length} sprite files to convert`);
+      log.info('convertAllSprites', `Found ${spriteFiles.length} sprite files to convert`);
 
       // Convert each sprite file
       for (let i = 0; i < spriteFiles.length; i++) {
@@ -360,7 +363,7 @@ export class IconService {
             onProgress?.(i + 1, result.totalFiles);
           }
         } catch (error) {
-          console.error(`Failed to convert ${spriteFile}:`, error);
+          log.error('convertSpriteFile', error, { file: spriteFile });
           result.errors.push({
             file: spriteFile,
             error: error instanceof Error ? error.message : String(error),
@@ -374,11 +377,20 @@ export class IconService {
         lastResult: result,
       };
 
-      console.log(
+      log.info(
+        'convertAllSprites',
         `Conversion complete: ${result.convertedFiles} converted, ${result.skippedFiles} skipped, ${result.errors.length} errors`,
       );
     } catch (error) {
-      console.error('Sprite conversion failed:', error);
+      log.error(
+        'convertAllSprites',
+        error,
+        {},
+        {
+          surfaceToUI: true,
+          userMessage: 'Sprite conversion failed',
+        },
+      );
       result.success = false;
       result.errors.push({
         file: 'N/A',
@@ -421,7 +433,7 @@ export class IconService {
 
       return dataUrl;
     } catch (error) {
-      console.error(`Failed to load icon ${filename}:`, error);
+      log.error('getIconByFilename', error, { filename });
       return null;
     }
   }
@@ -442,7 +454,7 @@ export class IconService {
    */
   clearCache(): void {
     this.iconCache.clear();
-    console.log('Icon cache cleared');
+    log.info('clearCache', 'Icon cache cleared');
   }
 
   /**
@@ -476,10 +488,10 @@ export class IconService {
           this.iconCache.set(key, value);
         }
 
-        console.log(`Loaded ${this.iconCache.size} icons from cache`);
+        log.info('loadCacheFromDisk', `Loaded ${this.iconCache.size} icons from cache`);
       }
     } catch (error) {
-      console.error('Failed to load icon cache from disk:', error);
+      log.error('loadCacheFromDisk', error);
     }
   }
 
@@ -497,7 +509,7 @@ export class IconService {
 
       await fs.writeFile(this.cacheFile, JSON.stringify(cache), 'utf-8');
     } catch (error) {
-      console.error('Failed to save icon cache to disk:', error);
+      log.error('saveCacheToDisk', error);
     }
   }
 
@@ -554,7 +566,7 @@ export class IconService {
 
       return { valid: true, path: iconsPath };
     } catch (error) {
-      console.error('Failed to validate icon path:', error);
+      log.error('validateIconPath', error);
       return { valid: false, error: error instanceof Error ? error.message : 'Unknown error' };
     }
   }

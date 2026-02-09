@@ -1,9 +1,13 @@
 import type { JSX } from 'react';
+
 import { useEffect, useRef } from 'react';
 import { RouterProvider } from 'react-router';
+
 import { Toaster } from '@/components/ui/sonner';
 import { SetupWizard } from '@/components/wizard/SetupWizard';
+
 import { useIconPreloader } from './hooks/useItemIcon';
+import { useServiceErrorNotifications } from './hooks/useServiceErrorNotifications';
 import { useTheme } from './hooks/useTheme';
 import { useUpdateNotifications } from './hooks/useUpdateNotifications';
 import { router } from './router';
@@ -23,6 +27,9 @@ function App(): JSX.Element {
 
   // Listen for automatic update notifications
   useUpdateNotifications();
+
+  // Listen for critical service error notifications
+  useServiceErrorNotifications();
 
   // Load settings on app startup and check if wizard should be shown
   useEffect(() => {

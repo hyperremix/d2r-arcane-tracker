@@ -17,6 +17,7 @@ import type {
   ItemDetectionEvent,
   RunItem,
 } from '../types/grail';
+import { setErrorForwarder } from '../utils/serviceLogger';
 
 /**
  * Global service instances for save file monitoring and item detection.
@@ -346,6 +347,22 @@ export function initializeSaveFileHandlers(): void {
   console.log('[initializeSaveFileHandlers] Current EventBus listener counts:', {
     'save-file-event': eventBus.listenerCount('save-file-event'),
     'item-detection': eventBus.listenerCount('item-detection'),
+  });
+
+  // Wire up service error forwarding to renderer processes
+  setErrorForwarder((payload) => {
+    try {
+      const allWebContents = webContents.getAllWebContents();
+      if (Array.isArray(allWebContents)) {
+        for (const wc of allWebContents) {
+          if (!wc.isDestroyed() && wc.getType() === 'window') {
+            wc.send('service-error', payload);
+          }
+        }
+      }
+    } catch {
+      // Silently fail if webContents is not available (e.g., in test environment)
+    }
   });
 
   // Clean up any existing handlers before re-initialization (important for hot-reload scenarios)

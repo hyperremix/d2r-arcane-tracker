@@ -5,7 +5,8 @@ import * as d2s from '@dschu012/d2s';
 import * as d2stash from '@dschu012/d2s/lib/d2/stash';
 import { constants as constants96 } from '@dschu012/d2s/lib/data/versions/96_constant_data';
 import { constants as constants99 } from '@dschu012/d2s/lib/data/versions/99_constant_data';
-import chokidar, { type FSWatcher } from 'chokidar';
+import type { FSWatcher } from 'chokidar';
+import chokidar from 'chokidar';
 import { app } from 'electron';
 import type { GrailDatabase } from '../database/database';
 import { isRuneId, runewordsByNameSimple } from '../items/indexes';
@@ -21,7 +22,10 @@ import type {
 import { GameMode } from '../types/grail';
 import { getGrailItemId } from '../utils/grailItemUtils';
 import { isRune, simplifyItemName } from '../utils/objects';
+import { createServiceLogger } from '../utils/serviceLogger';
 import type { EventBus } from './EventBus';
+
+const log = createServiceLogger('SaveFileMonitor');
 
 /**
  * Processes an item to determine its item ID from the flat items list.
@@ -198,8 +202,9 @@ const processRunewordItem = (item: d2s.types.IItem, items: d2s.types.IItem[]): v
   // Skip if item has unique or set name - runewords cannot be unique/set items
   // This catches false positives from corrupted save files or modded games
   if (item.unique_name || item.set_name) {
-    console.warn(
-      `[processRunewordItem] Skipping "${item.runeword_name}" - has conflicting unique/set: ${item.unique_name || item.set_name}`,
+    log.warn(
+      'processRunewordItem',
+      `Skipping "${item.runeword_name}" - has conflicting unique/set: ${item.unique_name || item.set_name}`,
     );
     return;
   }
@@ -213,7 +218,7 @@ const processRunewordItem = (item: d2s.types.IItem, items: d2s.types.IItem[]): v
   // from D2S parser bugs or corrupted item data
   const simplifiedName = simplifyItemName(item.runeword_name);
   if (!runewordsByNameSimple[simplifiedName]) {
-    console.warn(`[processRunewordItem] Ignoring unknown runeword name: ${item.runeword_name}`);
+    log.warn('processRunewordItem', `Ignoring unknown runeword name: ${item.runeword_name}`);
     return;
   }
 
@@ -259,7 +264,7 @@ class SaveFileMonitor {
    * @param {GrailDatabase} [grailDatabase] - Optional grail database instance for settings and data storage.
    */
   constructor(eventBus: EventBus, grailDatabase?: GrailDatabase) {
-    console.log('[SaveFileMonitor] Constructor called');
+    log.info('constructor', 'Constructor called');
     this.eventBus = eventBus;
     this.grailDatabase = grailDatabase || null;
     this.currentData = {
@@ -276,7 +281,7 @@ class SaveFileMonitor {
 
     // Initialize D2S constants
     this.initializeD2SConstants();
-    console.log('[SaveFileMonitor] D2S constants initialized');
+    log.info('constructor', 'D2S constants initialized');
 
     // Initialize save directories
     this.initializeSaveDirectories();
@@ -284,7 +289,7 @@ class SaveFileMonitor {
     // Start the tick reader for automatic file change detection
     const tickInterval = this.getTickReaderInterval();
     this.tickReaderInterval = setInterval(this.tickReader, tickInterval);
-    console.log(`[SaveFileMonitor] Tick reader started (interval: ${tickInterval}ms)`);
+    log.info('constructor', `Tick reader started (interval: ${tickInterval}ms)`);
   }
 
   /**
@@ -310,38 +315,38 @@ class SaveFileMonitor {
    * @returns {Promise<void>} A promise that resolves when initialization is complete.
    */
   private async initializeSaveDirectories(): Promise<void> {
-    console.log('[initializeSaveDirectories] Starting initialization');
+    log.info('initializeSaveDirectories', 'Starting initialization');
     // First, try to get saveDir from Settings via grail database
     let customSaveDir: string | null = null;
     if (this.grailDatabase) {
       try {
         const settings = this.grailDatabase.getAllSettings();
-        console.log('[initializeSaveDirectories] Settings retrieved:', {
-          saveDir: settings.saveDir,
-          gameMode: settings.gameMode,
-        });
+        log.info(
+          'initializeSaveDirectories',
+          `Settings retrieved: saveDir=${settings.saveDir}, gameMode=${settings.gameMode}`,
+        );
         if (settings.saveDir && settings.saveDir.trim() !== '') {
           customSaveDir = settings.saveDir.trim();
-          console.log('[initializeSaveDirectories] Custom save directory found:', customSaveDir);
+          log.info('initializeSaveDirectories', `Custom save directory found: ${customSaveDir}`);
         } else {
-          console.log('[initializeSaveDirectories] No custom save directory in settings');
+          log.info('initializeSaveDirectories', 'No custom save directory in settings');
         }
       } catch (error) {
-        console.warn('[initializeSaveDirectories] Failed to read saveDir from settings:', error);
+        log.warn('initializeSaveDirectories', `Failed to read saveDir from settings: ${error}`);
       }
     } else {
-      console.log('[initializeSaveDirectories] No grail database available');
+      log.info('initializeSaveDirectories', 'No grail database available');
     }
 
     // Use custom saveDir if available, otherwise fall back to platform default
     if (customSaveDir) {
       this.saveDirectory = customSaveDir;
-      console.log('[initializeSaveDirectories] Using custom directory:', this.saveDirectory);
+      log.info('initializeSaveDirectories', `Using custom directory: ${this.saveDirectory}`);
     } else {
       this.saveDirectory = this.getPlatformDefaultDirectory();
-      console.log(
-        '[initializeSaveDirectories] Using platform default directory:',
-        this.saveDirectory,
+      log.info(
+        'initializeSaveDirectories',
+        `Using platform default directory: ${this.saveDirectory}`,
       );
     }
   }
@@ -380,8 +385,9 @@ class SaveFileMonitor {
   ): number {
     if (value === undefined) return defaultValue;
     if (value < min || value > max) {
-      console.warn(
-        `[SaveFileMonitor] Invalid interval ${value} (valid range: ${min}-${max}ms), using default ${defaultValue}ms`,
+      log.warn(
+        'validateInterval',
+        `Invalid interval ${value} (valid range: ${min}-${max}ms), using default ${defaultValue}ms`,
       );
       return defaultValue;
     }
@@ -413,18 +419,18 @@ class SaveFileMonitor {
    * @returns {Promise<void>} A promise that resolves when monitoring is started.
    */
   async startMonitoring(): Promise<void> {
-    console.log('[startMonitoring] Called');
+    log.info('startMonitoring', 'Called');
     if (this.isMonitoring) {
-      console.log('[startMonitoring] Already monitoring, exiting');
+      log.info('startMonitoring', 'Already monitoring, exiting');
       return;
     }
 
     // Refresh save directory from settings
-    console.log('[startMonitoring] Refreshing save directory from settings');
+    log.info('startMonitoring', 'Refreshing save directory from settings');
     await this.initializeSaveDirectories();
 
     if (!this.saveDirectory) {
-      console.warn('[startMonitoring] No save directory configured');
+      log.warn('startMonitoring', 'No save directory configured');
       this.eventBus.emit('monitoring-error', {
         type: 'no-directory',
         message: 'No save directory configured',
@@ -433,10 +439,10 @@ class SaveFileMonitor {
       return;
     }
 
-    console.log('[startMonitoring] Checking if directory exists:', this.saveDirectory);
+    log.info('startMonitoring', `Checking if directory exists: ${this.saveDirectory}`);
     // Check if directory exists
     if (!existsSync(this.saveDirectory)) {
-      console.warn('[startMonitoring] Save directory does not exist:', this.saveDirectory);
+      log.warn('startMonitoring', `Save directory does not exist: ${this.saveDirectory}`);
       this.eventBus.emit('monitoring-error', {
         type: 'directory-not-found',
         message: `Save directory does not exist: ${this.saveDirectory}`,
@@ -445,24 +451,24 @@ class SaveFileMonitor {
       return;
     }
 
-    console.log('[startMonitoring] Directory exists, starting initial parsing');
+    log.info('startMonitoring', 'Directory exists, starting initial parsing');
     // Start file parsing to get initial data and file count
     this.isInitialParsing = true;
     const parsedSuccessfully = await this.parseSaveDirectory(this.saveDirectory);
     this.isInitialParsing = false;
 
     if (!parsedSuccessfully) {
-      console.warn('[startMonitoring] Initial parsing failed');
+      log.warn('startMonitoring', 'Initial parsing failed');
       return; // Error was already emitted
     }
 
-    console.log('[startMonitoring] Initial parsing successful');
+    log.info('startMonitoring', 'Initial parsing successful');
     this.watchPath = this.saveDirectory;
 
     // Use polling mode for better compatibility with D2R (which uses atomic file writes)
     // Polling checks files periodically instead of relying on file system events
     const usePolling = true;
-    console.log('[startMonitoring] Using polling mode:', usePolling);
+    log.info('startMonitoring', `Using polling mode: ${usePolling}`);
 
     // Get configurable intervals from settings
     const settings = this.grailDatabase?.getAllSettings();
@@ -479,8 +485,9 @@ class SaveFileMonitor {
       this.DEFAULT_STABILITY_THRESHOLD,
     );
 
-    console.log(
-      `[startMonitoring] Using intervals: polling=${pollingInterval}ms, stability=${stabilityThreshold}ms`,
+    log.info(
+      'startMonitoring',
+      `Using intervals: polling=${pollingInterval}ms, stability=${stabilityThreshold}ms`,
     );
 
     this.fileWatcher = chokidar
@@ -500,29 +507,29 @@ class SaveFileMonitor {
         },
       })
       .on('all', (event, path) => {
-        console.log(`[Chokidar] Event: ${event} on ${path}`);
+        log.info('chokidar', `Event: ${event} on ${path}`);
         this.fileChangeCounter++;
         this.lastFileChangeTime = Date.now();
-        console.log(`[Chokidar] fileChangeCounter incremented to ${this.fileChangeCounter}`);
+        log.info('chokidar', `fileChangeCounter incremented to ${this.fileChangeCounter}`);
       })
-      .on('error', (error) => console.error('[Chokidar] Save file watcher error:', error))
+      .on('error', (error) => log.error('chokidar', error))
       .on('ready', () => {
-        console.log('[Chokidar] File watcher ready');
+        log.info('chokidar', 'File watcher ready');
         const watched = this.fileWatcher?.getWatched();
         if (watched) {
-          console.log('[Chokidar] Watching paths:', Object.keys(watched));
-          console.log(
-            '[Chokidar] Total files being watched:',
-            Object.values(watched).reduce((sum, files) => sum + files.length, 0),
+          log.info('chokidar', `Watching paths: ${Object.keys(watched).join(', ')}`);
+          log.info(
+            'chokidar',
+            `Total files being watched: ${Object.values(watched).reduce((sum, files) => sum + files.length, 0)}`,
           );
         }
       })
-      .on('add', (path) => console.log('[Chokidar] File added:', path))
-      .on('change', (path) => console.log('[Chokidar] File changed:', path))
-      .on('unlink', (path) => console.log('[Chokidar] File removed:', path));
+      .on('add', (path) => log.info('chokidar', `File added: ${path}`))
+      .on('change', (path) => log.info('chokidar', `File changed: ${path}`))
+      .on('unlink', (path) => log.info('chokidar', `File removed: ${path}`));
 
     this.isMonitoring = true;
-    console.log('[startMonitoring] Monitoring flag set to true');
+    log.info('startMonitoring', 'Monitoring flag set to true');
 
     // Count save files for status reporting
     const saveFiles = await this.getSaveFiles();
@@ -532,8 +539,9 @@ class SaveFileMonitor {
       saveFileCount: saveFiles.length,
     });
 
-    console.log(
-      `[startMonitoring] Save file monitoring started for directory: ${this.saveDirectory} - Found ${saveFiles.length} save files`,
+    log.info(
+      'startMonitoring',
+      `Save file monitoring started for directory: ${this.saveDirectory} - Found ${saveFiles.length} save files`,
     );
   }
 
@@ -543,16 +551,16 @@ class SaveFileMonitor {
    * @returns {Promise<void>} A promise that resolves when monitoring is stopped.
    */
   async stopMonitoring(): Promise<void> {
-    console.log('[stopMonitoring] Called');
+    log.info('stopMonitoring', 'Called');
     if (this.fileWatcher) {
-      console.log('[stopMonitoring] Closing file watcher');
+      log.info('stopMonitoring', 'Closing file watcher');
       await this.fileWatcher.close();
       this.fileWatcher = null;
-      console.log('[stopMonitoring] File watcher closed');
+      log.info('stopMonitoring', 'File watcher closed');
     }
     this.watchPath = null;
     this.isMonitoring = false;
-    console.log('[stopMonitoring] Monitoring stopped');
+    log.info('stopMonitoring', 'Monitoring stopped');
     this.eventBus.emit('monitoring-stopped', {});
   }
 
@@ -571,7 +579,7 @@ class SaveFileMonitor {
           existingDirs.push(dir);
         }
       } catch (error) {
-        console.error('[findExistingSaveDirectories] Error checking directory:', dir, error);
+        log.error('findExistingSaveDirectories', error, { directory: dir });
       }
     }
 
@@ -596,19 +604,19 @@ class SaveFileMonitor {
         );
         allFiles.push(...files.map((file) => join(dir, file)));
       } catch (error) {
-        console.error('[parseAllSaveDirectories] Error reading save directory', dir, ':', error);
+        log.error('parseAllSaveDirectories', error, { directory: dir });
       }
     }
 
-    console.log('[parseAllSaveDirectories] Found', allFiles.length, 'save files total');
+    log.info('parseAllSaveDirectories', `Found ${allFiles.length} save files total`);
 
     // Clean up save file states for files that no longer exist
     this.cleanupDeletedFileStates(allFiles);
 
     if (allFiles.length === 0) {
-      console.warn(
-        '[parseAllSaveDirectories] No D2R save files found in directories:',
-        directories,
+      log.warn(
+        'parseAllSaveDirectories',
+        `No D2R save files found in directories: ${directories.join(', ')}`,
       );
       this.eventBus.emit('monitoring-error', {
         type: 'no-save-files',
@@ -621,7 +629,7 @@ class SaveFileMonitor {
 
     // Parse all files and update current data
     await this.parseFiles(allFiles, false);
-    console.log('[parseAllSaveDirectories] Parsing complete');
+    log.info('parseAllSaveDirectories', 'Parsing complete');
     return true;
   }
 
@@ -642,7 +650,7 @@ class SaveFileMonitor {
       const allFiles = files.map((file) => join(directory, file));
 
       if (allFiles.length === 0) {
-        console.warn('[parseSaveDirectory] No D2R save files found in directory:', directory);
+        log.warn('parseSaveDirectory', `No D2R save files found in directory: ${directory}`);
         this.eventBus.emit('monitoring-error', {
           type: 'no-save-files',
           message: `No D2R save files found in monitored directory`,
@@ -653,12 +661,12 @@ class SaveFileMonitor {
       }
 
       // Parse all files and update current data
-      console.log('[parseSaveDirectory] Parsing', allFiles.length, 'save files');
+      log.info('parseSaveDirectory', `Parsing ${allFiles.length} save files`);
       await this.parseFiles(allFiles, false);
-      console.log('[parseSaveDirectory] Parsing complete');
+      log.info('parseSaveDirectory', 'Parsing complete');
       return true;
     } catch (error) {
-      console.error('[parseSaveDirectory] Error reading save directory:', directory, error);
+      log.error('parseSaveDirectory', error, { directory });
       this.eventBus.emit('monitoring-error', {
         type: 'directory-read-error',
         message: `Error reading save directory: ${error}`,
@@ -696,7 +704,7 @@ class SaveFileMonitor {
 
       return shouldParse;
     } catch (error) {
-      console.error(`Error checking file modification time for ${filePath}:`, error);
+      log.error('shouldParseSaveFile', error, { filePath });
       return true; // On error, parse the file to be safe
     }
   }
@@ -717,12 +725,9 @@ class SaveFileMonitor {
       }
     }
 
-    console.log(
-      '[filterFilesToParse] Will parse',
-      filesToParse.length,
-      'out of',
-      filePaths.length,
-      'files',
+    log.info(
+      'filterFilesToParse',
+      `Will parse ${filesToParse.length} out of ${filePaths.length} files`,
     );
     return filesToParse;
   }
@@ -825,7 +830,7 @@ class SaveFileMonitor {
 
       return { saveName, success: true };
     } catch (error) {
-      console.error('[processSingleFile] ERROR parsing save file:', filePath, error);
+      log.error('processSingleFile', error, { filePath });
       results.stats[saveName] = null;
       return { saveName, success: false };
     }
@@ -856,12 +861,7 @@ class SaveFileMonitor {
 
       this.grailDatabase?.upsertSaveFileState(saveFileState);
     } catch (error) {
-      console.error(
-        '[updateSaveFileState] Failed to update save file state for',
-        filePath,
-        ':',
-        error,
-      );
+      log.error('updateSaveFileState', error, { filePath });
     }
   }
 
@@ -875,7 +875,7 @@ class SaveFileMonitor {
     filePaths: string[],
     results: FileReaderResponse,
   ): Promise<void> {
-    console.log('[emitSaveFileEvents] Emitting events for', filePaths.length, 'files');
+    log.info('emitSaveFileEvents', `Emitting events for ${filePaths.length} files`);
     for (const filePath of filePaths) {
       try {
         const saveFile = await this.parseSaveFile(filePath);
@@ -909,10 +909,10 @@ class SaveFileMonitor {
           isInitialScan,
         } as SaveFileEvent);
       } catch (error) {
-        console.error('[emitSaveFileEvents] Error creating save file event for:', filePath, error);
+        log.error('emitSaveFileEvents', error, { filePath });
       }
     }
-    console.log('[emitSaveFileEvents] All events emitted');
+    log.info('emitSaveFileEvents', 'All events emitted');
   }
 
   /**
@@ -937,7 +937,7 @@ class SaveFileMonitor {
         try {
           results[item.index] = await item.task();
         } catch (error) {
-          console.error(`[executeConcurrently] Error executing task ${item.index}:`, error);
+          log.error('executeConcurrently', error, { taskIndex: item.index });
           results[item.index] = undefined as T;
         }
         item = queue.shift();
@@ -958,11 +958,9 @@ class SaveFileMonitor {
    * @returns {Promise<void>} A promise that resolves when parsing is complete.
    */
   private async parseFiles(filePaths: string[], userRequested: boolean): Promise<void> {
-    console.log(
-      '[parseFiles] Starting to parse',
-      filePaths.length,
-      'files, userRequested:',
-      userRequested,
+    log.info(
+      'parseFiles',
+      `Starting to parse ${filePaths.length} files, userRequested: ${userRequested}`,
     );
     const results: FileReaderResponse = {
       items: {},
@@ -972,26 +970,27 @@ class SaveFileMonitor {
     };
 
     if (!this.grailDatabase) {
-      console.warn('[parseFiles] No grail database available for parsing');
+      log.warn('parseFiles', 'No grail database available for parsing');
       return;
     }
 
     // Filter files that need parsing based on modification time
     const filesToParse = await this.filterFilesToParse(filePaths);
 
-    console.log(
-      `[parseFiles] Parsing ${filesToParse.length} out of ${filePaths.length} save files (${filePaths.length - filesToParse.length} skipped due to no changes)`,
+    log.info(
+      'parseFiles',
+      `Parsing ${filesToParse.length} out of ${filePaths.length} save files (${filePaths.length - filesToParse.length} skipped due to no changes)`,
     );
 
     if (filesToParse.length === 0) {
-      console.log('[parseFiles] No files to parse, exiting early');
+      log.info('parseFiles', 'No files to parse, exiting early');
       return;
     }
 
     // Parse files with concurrency limit to prevent resource exhaustion
-    console.log(
-      `[parseFiles] Starting concurrent parsing of ${filesToParse.length} files ` +
-        `(max ${this.MAX_CONCURRENT_PARSES} at a time)`,
+    log.info(
+      'parseFiles',
+      `Starting concurrent parsing of ${filesToParse.length} files (max ${this.MAX_CONCURRENT_PARSES} at a time)`,
     );
 
     const tasks = filesToParse.map((filePath) => {
@@ -1002,25 +1001,26 @@ class SaveFileMonitor {
 
     const failedFiles = parseResults.filter((r) => r && !r.success);
     if (failedFiles.length > 0) {
-      console.warn(
-        `[parseFiles] ${failedFiles.length} file(s) failed to parse:`,
-        failedFiles.map((f) => f.saveName),
+      log.warn(
+        'parseFiles',
+        `${failedFiles.length} file(s) failed to parse: ${failedFiles.map((f) => f.saveName).join(', ')}`,
       );
     }
-    console.log(
-      `[parseFiles] Concurrent parsing complete: ${filesToParse.length - failedFiles.length} succeeded, ${failedFiles.length} failed`,
+    log.info(
+      'parseFiles',
+      `Concurrent parsing complete: ${filesToParse.length - failedFiles.length} succeeded, ${failedFiles.length} failed`,
     );
 
     // Reset force parse flag after parsing completes
     if (this.forceParseAll) {
-      console.log('[parseFiles] Resetting forceParseAll flag');
+      log.info('parseFiles', 'Resetting forceParseAll flag');
       this.forceParseAll = false;
     }
 
     // Update save directory if user requested
     if (userRequested && filePaths.length > 0) {
       const firstDir = dirname(filePaths[0]);
-      console.log('[parseFiles] User requested parsing, updating saveDir to:', firstDir);
+      log.info('parseFiles', `User requested parsing, updating saveDir to: ${firstDir}`);
       this.grailDatabase.setSetting('saveDir', firstDir);
     }
 
@@ -1029,7 +1029,7 @@ class SaveFileMonitor {
 
     // Emit save file events for each file that was actually parsed
     await this.emitSaveFileEvents(filesToParse, results);
-    console.log('[parseFiles] Complete - processed', filesToParse.length, 'files');
+    log.info('parseFiles', `Complete - processed ${filesToParse.length} files`);
   }
 
   /**
@@ -1138,12 +1138,9 @@ class SaveFileMonitor {
         try {
           const stashData = await d2stash.read(buffer, constants99);
           isHardcore = stashData.hardcore;
-          console.log('[parseSaveFile] Parsed .d2i file, hardcore:', isHardcore);
-        } catch (parseError) {
-          console.warn(
-            '[parseSaveFile] Failed to parse .d2i file header, falling back to filename:',
-            parseError,
-          );
+          log.info('parseSaveFile', `Parsed .d2i file, hardcore: ${isHardcore}`);
+        } catch (_parseError) {
+          log.warn('parseSaveFile', 'Failed to parse .d2i file header, falling back to filename');
           // Fallback to filename if parsing fails
           isHardcore = basename(filePath).toLowerCase().includes('hardcore');
         }
@@ -1196,7 +1193,7 @@ class SaveFileMonitor {
         expansion,
       };
     } catch (error) {
-      console.error('Error parsing save file:', error);
+      log.error('parseSaveFile', error);
       return null;
     }
   }
@@ -1225,21 +1222,21 @@ class SaveFileMonitor {
    * @returns {Promise<D2SaveFile[]>} A promise that resolves with an array of save file objects.
    */
   async getSaveFiles(): Promise<D2SaveFile[]> {
-    console.log('[getSaveFiles] Called');
+    log.info('getSaveFiles', 'Called');
     const saveFiles: D2SaveFile[] = [];
 
     if (!this.saveDirectory) {
-      console.log('[getSaveFiles] No save directory configured');
+      log.info('getSaveFiles', 'No save directory configured');
       return saveFiles;
     }
 
-    console.log('[getSaveFiles] Reading directory:', this.saveDirectory);
+    log.info('getSaveFiles', `Reading directory: ${this.saveDirectory}`);
     try {
       const files = readdirSync(this.saveDirectory);
-      console.log('[getSaveFiles] Total files in directory:', files.length);
+      log.info('getSaveFiles', `Total files in directory: ${files.length}`);
 
       const d2sFiles = files.filter((file) => file.endsWith('.d2s'));
-      console.log('[getSaveFiles] .d2s files found:', d2sFiles.length);
+      log.info('getSaveFiles', `.d2s files found: ${d2sFiles.length}`);
 
       for (const file of d2sFiles) {
         const filePath = join(this.saveDirectory, file);
@@ -1247,14 +1244,14 @@ class SaveFileMonitor {
         if (saveFile) {
           saveFiles.push(saveFile);
         } else {
-          console.log('[getSaveFiles] Failed to parse save file:', file);
+          log.info('getSaveFiles', `Failed to parse save file: ${file}`);
         }
       }
     } catch (error) {
-      console.error('[getSaveFiles] Error reading save directory', this.saveDirectory, ':', error);
+      log.error('getSaveFiles', error, { directory: this.saveDirectory });
     }
 
-    console.log('[getSaveFiles] Returning', saveFiles.length, 'save files');
+    log.info('getSaveFiles', `Returning ${saveFiles.length} save files`);
     return saveFiles;
   }
 
@@ -1279,28 +1276,28 @@ class SaveFileMonitor {
    * @returns {Promise<void>} A promise that resolves when the update is complete.
    */
   async updateSaveDirectory(): Promise<void> {
-    console.log('[updateSaveDirectory] Called');
+    log.info('updateSaveDirectory', 'Called');
     // Update the save directory and restart monitoring if active
     // Stop any existing monitoring before changing directory
     if (this.isMonitoring) {
-      console.log('[updateSaveDirectory] Stopping current monitoring');
+      log.info('updateSaveDirectory', 'Stopping current monitoring');
       await this.stopMonitoring();
     }
 
     // Force parse all files in new directory
-    console.log('[updateSaveDirectory] Setting forceParseAll flag');
+    log.info('updateSaveDirectory', 'Setting forceParseAll flag');
     this.forceParseAll = true;
     this.lastFileChangeTime = 0; // Bypass debounce for force parse
 
     // Re-initialize directories with the new setting
-    console.log('[updateSaveDirectory] Re-initializing save directories');
+    log.info('updateSaveDirectory', 'Re-initializing save directories');
     await this.initializeSaveDirectories();
 
     // Always start monitoring after directory change - user explicitly wants to use this directory
-    console.log('[updateSaveDirectory] Starting monitoring for new directory');
+    log.info('updateSaveDirectory', 'Starting monitoring for new directory');
     await this.startMonitoring();
 
-    console.log('[updateSaveDirectory] Complete');
+    log.info('updateSaveDirectory', 'Complete');
   }
 
   /**
@@ -1370,10 +1367,10 @@ class SaveFileMonitor {
    * @returns {Promise<void>} A promise that resolves when the refresh is complete.
    */
   async refreshSaveFiles(): Promise<void> {
-    console.log('[refreshSaveFiles] Manual refresh requested');
+    log.info('refreshSaveFiles', 'Manual refresh requested');
 
     if (!this.isMonitoring) {
-      console.log('[refreshSaveFiles] Not monitoring, cannot refresh');
+      log.info('refreshSaveFiles', 'Not monitoring, cannot refresh');
       throw new Error('Save file monitoring is not active');
     }
 
@@ -1384,7 +1381,7 @@ class SaveFileMonitor {
     // Increment file change counter to trigger tick reader
     this.fileChangeCounter++;
 
-    console.log('[refreshSaveFiles] Triggered force parse, waiting for completion...');
+    log.info('refreshSaveFiles', 'Triggered force parse, waiting for completion...');
 
     // Wait for the tick reader to process the changes
     // Poll until forceParseAll is reset (which happens after parsing completes)
@@ -1398,11 +1395,11 @@ class SaveFileMonitor {
     }
 
     if (this.forceParseAll) {
-      console.log('[refreshSaveFiles] Timeout waiting for parse to complete');
+      log.info('refreshSaveFiles', 'Timeout waiting for parse to complete');
       throw new Error('Timeout waiting for save file refresh to complete');
     }
 
-    console.log('[refreshSaveFiles] Refresh completed');
+    log.info('refreshSaveFiles', 'Refresh completed');
   }
 
   /**
@@ -1418,27 +1415,21 @@ class SaveFileMonitor {
     this.tickReaderCount++;
 
     if (this.tickReaderCount % 20 === 0) {
-      console.log(
-        '[tickReader] Heartbeat - watching:',
-        this.watchPath,
-        'changeCounter:',
-        this.fileChangeCounter,
-        'lastProcessed:',
-        this.lastProcessedChangeCounter,
-        'isMonitoring:',
-        this.isMonitoring,
+      log.info(
+        'tickReader',
+        `Heartbeat - watching: ${this.watchPath}, changeCounter: ${this.fileChangeCounter}, lastProcessed: ${this.lastProcessedChangeCounter}, isMonitoring: ${this.isMonitoring}`,
       );
     }
 
     if (!this.grailDatabase) {
-      console.log('[tickReader] Skipping: No grail database');
+      log.info('tickReader', 'Skipping: No grail database');
       return;
     }
 
     const settings = this.grailDatabase.getAllSettings();
 
     if (!this.watchPath) {
-      console.log('[tickReader] Skipping: No watch path');
+      log.info('tickReader', 'Skipping: No watch path');
       return;
     }
 
@@ -1463,29 +1454,31 @@ class SaveFileMonitor {
       // Still within debounce window - don't process yet
       if (this.tickReaderCount % 4 === 0) {
         // Log occasionally to show debouncing is working
-        console.log(
-          `[tickReader] Debouncing: ${timeSinceLastChange}ms since last change ` +
-            `(waiting for ${debounceDelay}ms)`,
+        log.info(
+          'tickReader',
+          `Debouncing: ${timeSinceLastChange}ms since last change (waiting for ${debounceDelay}ms)`,
         );
       }
       return;
     }
 
     if (this.readingFiles) {
-      console.log('[tickReader] Skipping: Already reading files');
+      log.info('tickReader', 'Skipping: Already reading files');
       return;
     }
 
     if (settings.gameMode === GameMode.Manual) {
-      console.log('[tickReader] Skipping: Manual mode active');
+      log.info('tickReader', 'Skipping: Manual mode active');
       return;
     }
 
-    console.log(
-      `[tickReader] Debounce period elapsed (${timeSinceLastChange}ms), processing file changes...`,
+    log.info(
+      'tickReader',
+      `Debounce period elapsed (${timeSinceLastChange}ms), processing file changes...`,
     );
-    console.log(
-      `[tickReader] Processing changes: counter=${this.fileChangeCounter}, lastProcessed=${this.lastProcessedChangeCounter}`,
+    log.info(
+      'tickReader',
+      `Processing changes: counter=${this.fileChangeCounter}, lastProcessed=${this.lastProcessedChangeCounter}`,
     );
     this.readingFiles = true;
 
@@ -1500,14 +1493,16 @@ class SaveFileMonitor {
     this.lastProcessedChangeCounter = counterAtStartOfProcessing;
 
     this.readingFiles = false;
-    console.log(
-      `[tickReader] Done processing file changes (processed up to counter ${counterAtStartOfProcessing})`,
+    log.info(
+      'tickReader',
+      `Done processing file changes (processed up to counter ${counterAtStartOfProcessing})`,
     );
 
     // Check if new changes arrived during processing
     if (this.fileChangeCounter > counterAtStartOfProcessing) {
-      console.log(
-        `[tickReader] New changes detected during processing (counter now ${this.fileChangeCounter}), will process on next tick`,
+      log.info(
+        'tickReader',
+        `New changes detected during processing (counter now ${this.fileChangeCounter}), will process on next tick`,
       );
     }
   };
@@ -1518,34 +1513,32 @@ class SaveFileMonitor {
    * @param {string[]} existingFilePaths - Array of file paths that currently exist
    */
   private cleanupDeletedFileStates(existingFilePaths: string[]): void {
-    console.log('[cleanupDeletedFileStates] Checking for deleted files');
+    log.info('cleanupDeletedFileStates', 'Checking for deleted files');
     if (!this.grailDatabase) {
-      console.log('[cleanupDeletedFileStates] No database available');
+      log.info('cleanupDeletedFileStates', 'No database available');
       return;
     }
 
     const existingPaths = new Set(existingFilePaths);
     const allStates = this.grailDatabase.getAllSaveFileStates();
-    console.log(
-      '[cleanupDeletedFileStates] Existing files:',
-      existingFilePaths.length,
-      'Tracked states:',
-      allStates.length,
+    log.info(
+      'cleanupDeletedFileStates',
+      `Existing files: ${existingFilePaths.length}, Tracked states: ${allStates.length}`,
     );
 
     let deletedCount = 0;
     for (const state of allStates) {
       if (!existingPaths.has(state.filePath)) {
-        console.log(
-          '[cleanupDeletedFileStates] Cleaning up state for deleted file:',
-          state.filePath,
+        log.info(
+          'cleanupDeletedFileStates',
+          `Cleaning up state for deleted file: ${state.filePath}`,
         );
         this.grailDatabase.deleteSaveFileState(state.filePath);
         deletedCount++;
       }
     }
 
-    console.log('[cleanupDeletedFileStates] Cleaned up', deletedCount, 'deleted file states');
+    log.info('cleanupDeletedFileStates', `Cleaned up ${deletedCount} deleted file states`);
   }
 
   /**
@@ -1553,14 +1546,14 @@ class SaveFileMonitor {
    * @returns {Promise<void>} A promise that resolves when shutdown is complete.
    */
   async shutdown(): Promise<void> {
-    console.log('[shutdown] Shutting down save file monitor');
+    log.info('shutdown', 'Shutting down save file monitor');
     if (this.tickReaderInterval) {
-      console.log('[shutdown] Clearing tick reader interval');
+      log.info('shutdown', 'Clearing tick reader interval');
       clearInterval(this.tickReaderInterval);
       this.tickReaderInterval = null;
     }
     await this.stopMonitoring();
-    console.log('[shutdown] Shutdown complete');
+    log.info('shutdown', 'Shutdown complete');
   }
 }
 

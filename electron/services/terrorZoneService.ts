@@ -5,6 +5,10 @@ import { TERROR_ZONE_NAMES } from '../data/terrorZoneNames';
 import { stripJsonComments } from '../lib/jsonUtils';
 import type { TerrorZone } from '../types/grail';
 
+import { createServiceLogger } from '../utils/serviceLogger';
+
+const log = createServiceLogger('TerrorZoneService');
+
 /**
  * Service for managing terror zone configuration by modifying the game's desecratedzones.json file.
  * Handles backup creation, zone reading/writing, and validation.
@@ -47,7 +51,7 @@ export class TerrorZoneService {
       copyFileSync(sourcePath, backupPath);
       return { success: true, backupPath };
     } catch (error) {
-      console.error('Failed to create backup:', error);
+      log.error('createBackup', error);
       return { success: false, backupPath: '' };
     }
   }
@@ -102,7 +106,7 @@ export class TerrorZoneService {
         }),
       );
     } catch (error) {
-      console.error('Failed to read zones from file:', error);
+      log.error('readZonesFromFile', error);
       throw error;
     }
   }
@@ -146,7 +150,10 @@ export class TerrorZoneService {
       // Write back to file with proper formatting
       writeFileSync(filePath, JSON.stringify(data, null, 4), 'utf-8');
     } catch (error) {
-      console.error('Failed to write zones to file:', error);
+      log.error('writeZonesToFile', error, undefined, {
+        surfaceToUI: true,
+        userMessage: 'Failed to update terror zone configuration',
+      });
       throw error;
     }
   }
@@ -166,7 +173,7 @@ export class TerrorZoneService {
       copyFileSync(backupPath, targetPath);
       return { success: true };
     } catch (error) {
-      console.error('Failed to restore from backup:', error);
+      log.error('restoreFromBackup', error);
       return { success: false };
     }
   }
@@ -209,7 +216,7 @@ export class TerrorZoneService {
           return { valid: false, error: 'Invalid desecratedzones.json file structure' };
         }
       } catch (parseError) {
-        console.error('Failed to parse desecratedzones.json:', parseError);
+        log.error('validateGameFile', parseError);
         const errorMessage =
           parseError instanceof Error ? parseError.message : 'Unknown parsing error';
         return {
@@ -220,7 +227,7 @@ export class TerrorZoneService {
 
       return { valid: true, path: gameFilePath };
     } catch (error) {
-      console.error('Failed to validate game file:', error);
+      log.error('validateGameFile', error);
       return { valid: false, error: error instanceof Error ? error.message : 'Unknown error' };
     }
   }

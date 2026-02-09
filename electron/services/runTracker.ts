@@ -1,7 +1,10 @@
 import type { GrailDatabase } from '../database/database';
 import type { Run, Session } from '../types/grail';
+import { createServiceLogger } from '../utils/serviceLogger';
 import type { EventBus } from './EventBus';
 import type { MemoryReader } from './memoryReader';
+
+const log = createServiceLogger('RunTrackerService');
 
 /**
  * Service for tracking gaming sessions and runs using memory reading (auto mode).
@@ -68,7 +71,7 @@ export class RunTrackerService {
         this.memoryReader.updatePollingInterval(pollingInterval);
       }
     } catch (error) {
-      console.error('[RunTrackerService] Failed to load settings:', error);
+      log.error('loadSettings', error);
     }
   }
 
@@ -79,7 +82,7 @@ export class RunTrackerService {
    */
   private cleanupStaleSessions(): void {
     try {
-      console.log('[RunTrackerService] Checking for stale sessions...');
+      log.info('cleanupStaleSessions', 'Checking for stale sessions...');
       // Get the active session from database (sessions with end_time IS NULL)
       const staleSession = this.database.getActiveSession();
 
@@ -95,14 +98,15 @@ export class RunTrackerService {
         };
 
         this.database.upsertSession(closedSession);
-        console.log(
-          `[RunTrackerService] ✓ Cleaned up stale session: ${staleSession.id} (was left open from previous app run)`,
+        log.info(
+          'cleanupStaleSessions',
+          `Cleaned up stale session: ${staleSession.id} (was left open from previous app run)`,
         );
       } else {
-        console.log('[RunTrackerService] ✓ No stale sessions found');
+        log.info('cleanupStaleSessions', 'No stale sessions found');
       }
     } catch (error) {
-      console.error('[RunTrackerService] Failed to cleanup stale sessions:', error);
+      log.error('cleanupStaleSessions', error);
     }
   }
 
@@ -115,13 +119,13 @@ export class RunTrackerService {
 
     // If auto mode was just enabled, start memory reading
     if (this.autoModeEnabled && !wasAutoModeEnabled && this.memoryReader) {
-      console.log('[RunTrackerService] Auto mode enabled, starting memory reader');
+      log.info('updateSettings', 'Auto mode enabled, starting memory reader');
       this.memoryReader.startPolling();
     }
 
     // If auto mode was just disabled, stop memory reading
     if (!this.autoModeEnabled && wasAutoModeEnabled && this.memoryReader) {
-      console.log('[RunTrackerService] Auto mode disabled, stopping memory reader');
+      log.info('updateSettings', 'Auto mode disabled, stopping memory reader');
       this.memoryReader.stopPolling();
     }
   }
@@ -152,8 +156,9 @@ export class RunTrackerService {
 
     // Require an active session for auto mode
     if (!this.currentSession) {
-      console.warn(
-        '[RunTrackerService] No active session - cannot auto-start run. Please start a session manually first.',
+      log.warn(
+        'handleGameEntered',
+        'No active session — cannot auto-start run. Please start a session manually first.',
       );
       return;
     }
@@ -174,7 +179,7 @@ export class RunTrackerService {
       }
     }
 
-    console.log('[RunTrackerService] Auto-starting run');
+    log.info('handleGameEntered', 'Auto-starting run');
     this.startRun(finalCharacterId, false);
   }
 
@@ -190,7 +195,7 @@ export class RunTrackerService {
 
     // End current run if active
     if (this.currentRun) {
-      console.log('[RunTrackerService] Game exited detected, ending run');
+      log.info('handleGameExited', 'Game exited detected, ending run');
       this.endRun(false);
     }
   }
@@ -200,10 +205,10 @@ export class RunTrackerService {
    * Creates a new session if one doesn't exist.
    */
   startSession(): Session {
-    console.log('[RunTrackerService] startSession() called');
+    log.info('startSession', 'Starting session');
 
     if (this.currentSession) {
-      console.log('[RunTrackerService] Returning existing session:', this.currentSession.id);
+      log.info('startSession', `Returning existing session: ${this.currentSession.id}`);
       return this.currentSession;
     }
 
@@ -224,7 +229,7 @@ export class RunTrackerService {
 
     this.eventBus.emit('session-started', { session });
 
-    console.log('[RunTrackerService] ✓ NEW SESSION CREATED:', session.id);
+    log.info('startSession', `✓ NEW SESSION CREATED: ${session.id}`);
     return session;
   }
 
@@ -252,7 +257,7 @@ export class RunTrackerService {
     this.database.upsertSession(session);
     this.eventBus.emit('session-ended', { session });
 
-    console.log('[RunTrackerService] Session ended:', session.id);
+    log.info('endSession', `Session ended: ${session.id}`);
 
     this.currentSession = null;
   }
@@ -262,7 +267,7 @@ export class RunTrackerService {
    */
   archiveSession(sessionId: string): void {
     this.database.archiveSession(sessionId);
-    console.log('[RunTrackerService] Session archived:', sessionId);
+    log.info('archiveSession', `Session archived: ${sessionId}`);
   }
 
   /**
@@ -308,7 +313,7 @@ export class RunTrackerService {
 
     this.eventBus.emit('run-started', { run, session: updatedSession, manual });
 
-    console.log('[RunTrackerService] Run started:', run.id, 'manual:', manual);
+    log.info('startRun', `Run started: ${run.id} (manual: ${manual})`);
     return run;
   }
 
@@ -344,7 +349,7 @@ export class RunTrackerService {
 
     this.eventBus.emit('run-ended', { run, session, manual });
 
-    console.log('[RunTrackerService] Run ended:', run.id, 'duration:', run.duration, 'ms');
+    log.info('endRun', `Run ended: ${run.id} (duration: ${run.duration}ms)`);
 
     this.currentRun = null;
   }
@@ -366,7 +371,7 @@ export class RunTrackerService {
 
     this.eventBus.emit('run-paused', { run: this.currentRun, session: this.currentSession });
 
-    console.log('[RunTrackerService] Run paused');
+    log.info('pauseRun', 'Run paused');
   }
 
   /**
@@ -385,7 +390,7 @@ export class RunTrackerService {
 
     if (this.currentRun) {
       this.eventBus.emit('run-resumed', { run: this.currentRun, session: this.currentSession });
-      console.log('[RunTrackerService] Run resumed');
+      log.info('resumeRun', 'Run resumed');
     }
   }
 
@@ -427,11 +432,10 @@ export class RunTrackerService {
       activeSession: this.currentSession,
       activeRun: this.currentRun,
     };
-    console.log('[RunTrackerService] getState() called:', {
-      hasSession: state.activeSession !== null,
-      hasRun: state.activeRun !== null,
-      sessionId: state.activeSession?.id,
-    });
+    log.info(
+      'getState',
+      `getState() called (session: ${state.activeSession?.id ?? 'none'}, run: ${state.activeRun?.id ?? 'none'})`,
+    );
     return state;
   }
 
@@ -453,6 +457,6 @@ export class RunTrackerService {
       this.endSession();
     }
 
-    console.log('[RunTrackerService] Shutdown complete');
+    log.info('shutdown', 'Shutdown complete');
   }
 }

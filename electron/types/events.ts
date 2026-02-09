@@ -1,3 +1,4 @@
+import type { ServiceErrorPayload } from '../utils/serviceLogger';
 import type {
   D2Item,
   GrailProgress,
@@ -133,7 +134,8 @@ export type AppEvent =
   | { type: 'd2r-started'; payload: D2RStartedPayload }
   | { type: 'd2r-stopped'; payload: D2RStoppedPayload }
   | { type: 'game-entered'; payload: GameEnteredPayload }
-  | { type: 'game-exited'; payload: GameExitedPayload };
+  | { type: 'game-exited'; payload: GameExitedPayload }
+  | { type: 'service-error'; payload: ServiceErrorPayload };
 
 /**
  * Extract event type names

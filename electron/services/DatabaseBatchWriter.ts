@@ -1,5 +1,8 @@
 import type { GrailDatabase } from '../database/database';
 import type { Character, GrailProgress, RunItem } from '../types/grail';
+import { createServiceLogger } from '../utils/serviceLogger';
+
+const log = createServiceLogger('DatabaseBatchWriter');
 
 /**
  * Service for batching database writes to improve performance and reduce event loop blocking.
@@ -76,8 +79,9 @@ export class DatabaseBatchWriter {
 
     // Flush immediately if threshold exceeded
     if (totalQueueSize >= this.BATCH_SIZE_THRESHOLD) {
-      console.log(
-        `[DatabaseBatchWriter] Queue size (${totalQueueSize}) exceeded threshold (${this.BATCH_SIZE_THRESHOLD}), flushing immediately`,
+      log.info(
+        'scheduleFlush',
+        `Queue size (${totalQueueSize}) exceeded threshold (${this.BATCH_SIZE_THRESHOLD}), flushing immediately`,
       );
       this.flush();
       return;
@@ -112,8 +116,9 @@ export class DatabaseBatchWriter {
       return; // Nothing to flush
     }
 
-    console.log(
-      `[DatabaseBatchWriter] Flushing ${characterCount} characters, ${progressCount} progress entries, and ${runItemCount} run items`,
+    log.info(
+      'flush',
+      `Flushing ${characterCount} characters, ${progressCount} progress entries, and ${runItemCount} run items`,
     );
 
     try {
@@ -122,7 +127,7 @@ export class DatabaseBatchWriter {
         const characters = Array.from(this.characterQueue.values());
         this.database.upsertCharactersBatch(characters);
         this.characterQueue.clear();
-        console.log(`[DatabaseBatchWriter] Flushed ${characterCount} characters`);
+        log.info('flush', `Flushed ${characterCount} characters`);
       }
 
       // Flush progress in batch
@@ -130,7 +135,7 @@ export class DatabaseBatchWriter {
         const progressList = Array.from(this.progressQueue.values());
         this.database.upsertProgressBatch(progressList);
         this.progressQueue.clear();
-        console.log(`[DatabaseBatchWriter] Flushed ${progressCount} progress entries`);
+        log.info('flush', `Flushed ${progressCount} progress entries`);
       }
 
       // Flush run items in batch
@@ -138,7 +143,7 @@ export class DatabaseBatchWriter {
         const runItems = Array.from(this.runItemQueue.values());
         this.database.addRunItemsBatch(runItems);
         this.runItemQueue.clear();
-        console.log(`[DatabaseBatchWriter] Flushed ${runItemCount} run items`);
+        log.info('flush', `Flushed ${runItemCount} run items`);
       }
 
       // Invoke callback after successful flush
@@ -148,10 +153,10 @@ export class DatabaseBatchWriter {
       }
     } catch (error) {
       this.consecutiveFailures++;
-      console.error(
-        `[DatabaseBatchWriter] Error flushing batch (attempt ${this.consecutiveFailures}/${this.MAX_FLUSH_RETRIES}):`,
-        error,
-      );
+      log.error('flush', error, {
+        attempt: this.consecutiveFailures,
+        maxRetries: this.MAX_FLUSH_RETRIES,
+      });
 
       if (this.consecutiveFailures >= this.MAX_FLUSH_RETRIES) {
         const remaining = {
@@ -159,10 +164,10 @@ export class DatabaseBatchWriter {
           progress: this.progressQueue.size,
           runItems: this.runItemQueue.size,
         };
-        console.error(
-          `[DatabaseBatchWriter] Max retries exceeded, dropping remaining unflushed items:`,
-          remaining,
-        );
+        log.error('flush', 'Max retries exceeded, dropping remaining unflushed items', remaining, {
+          surfaceToUI: true,
+          userMessage: 'Database write failed — some item data was lost',
+        });
         this.characterQueue.clear();
         this.progressQueue.clear();
         this.runItemQueue.clear();

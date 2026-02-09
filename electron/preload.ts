@@ -293,6 +293,34 @@ contextBridge.exposeInMainWorld('electronAPI', {
      */
     onUpdate: (callback: (data: FileReaderResponse) => void) =>
       ipcRenderer.on('data:onUpdate', (_event, value) => callback(value)),
+
+    /**
+     * Registers a callback for service error events from the main process.
+     * @param callback - Function to call when service errors are received.
+     * @returns Cleanup function to remove the listener.
+     */
+    onServiceError: (
+      callback: (payload: {
+        service: string;
+        operation: string;
+        severity: 'error' | 'warn';
+        message: string;
+        timestamp: number;
+      }) => void,
+    ) => {
+      const listener = (
+        _event: Electron.IpcRendererEvent,
+        value: {
+          service: string;
+          operation: string;
+          severity: 'error' | 'warn';
+          message: string;
+          timestamp: number;
+        },
+      ) => callback(value);
+      ipcRenderer.on('service-error', listener);
+      return () => ipcRenderer.removeListener('service-error', listener);
+    },
   },
 
   /**

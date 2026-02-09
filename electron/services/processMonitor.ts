@@ -1,6 +1,9 @@
 import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
+import { createServiceLogger } from '../utils/serviceLogger';
 import type { EventBus } from './EventBus';
+
+const log = createServiceLogger('ProcessMonitor');
 
 const execAsync = promisify(exec);
 
@@ -16,7 +19,7 @@ export class ProcessMonitor {
   private readonly processName = 'D2R.exe';
 
   constructor(private eventBus: EventBus) {
-    console.log('[ProcessMonitor] Initialized');
+    log.info('constructor', 'Initialized');
   }
 
   /**
@@ -25,18 +28,18 @@ export class ProcessMonitor {
    */
   startMonitoring(): void {
     if (this.isMonitoring) {
-      console.log('[ProcessMonitor] Already monitoring');
+      log.info('startMonitoring', 'Already monitoring');
       return;
     }
 
     // Check platform - only Windows is supported for now
     if (process.platform !== 'win32') {
-      console.log('[ProcessMonitor] Platform not supported, skipping monitoring');
+      log.info('startMonitoring', 'Platform not supported, skipping monitoring');
       return;
     }
 
     this.isMonitoring = true;
-    console.log('[ProcessMonitor] Starting process monitoring');
+    log.info('startMonitoring', 'Starting process monitoring');
 
     // Check immediately
     this.checkProcess();
@@ -71,7 +74,7 @@ export class ProcessMonitor {
       });
     }
 
-    console.log('[ProcessMonitor] Stopped monitoring');
+    log.info('stopMonitoring', 'Stopped monitoring');
   }
 
   /**
@@ -85,7 +88,7 @@ export class ProcessMonitor {
       if (processId !== null && this.d2rProcessId === null) {
         // Process just started
         this.d2rProcessId = processId;
-        console.log(`[ProcessMonitor] D2R.exe detected (PID ${processId})`);
+        log.info('checkProcess', `D2R.exe detected (PID ${processId})`);
         this.eventBus.emit('d2r-started', {
           processId,
           processName: this.processName,
@@ -94,14 +97,14 @@ export class ProcessMonitor {
         // Process just stopped
         const oldProcessId = this.d2rProcessId;
         this.d2rProcessId = null;
-        console.log(`[ProcessMonitor] D2R.exe stopped (PID ${oldProcessId})`);
+        log.info('checkProcess', `D2R.exe stopped (PID ${oldProcessId})`);
         this.eventBus.emit('d2r-stopped', {
           processId: null,
           processName: this.processName,
         });
       }
     } catch (error) {
-      console.error('[ProcessMonitor] Error checking process:', error);
+      log.error('checkProcess', error);
     }
   }
 
@@ -161,6 +164,6 @@ export class ProcessMonitor {
    */
   shutdown(): void {
     this.stopMonitoring();
-    console.log('[ProcessMonitor] Shutdown complete');
+    log.info('shutdown', 'Shutdown complete');
   }
 }

@@ -1,3 +1,7 @@
+import { createServiceLogger } from './serviceLogger';
+
+const log = createServiceLogger('Retry');
+
 /**
  * Retry configuration options for exponential backoff.
  */
@@ -54,9 +58,7 @@ export async function retryWithBackoff<T>(
 
       // Log successful retry (but not first attempt)
       if (attempt > 1) {
-        console.log(
-          `[Retry] ${context || 'Operation'} succeeded on attempt ${attempt}/${options.maxAttempts}`,
-        );
+        log.info(context || 'Operation', `Succeeded on attempt ${attempt}/${options.maxAttempts}`);
       }
 
       return result;
@@ -64,10 +66,9 @@ export async function retryWithBackoff<T>(
       lastError = error as Error;
 
       if (attempt < options.maxAttempts) {
-        console.warn(
-          `[Retry] ${context || 'Operation'} failed (attempt ${attempt}/${options.maxAttempts}), ` +
-            `retrying in ${delay}ms...`,
-          error,
+        log.warn(
+          context || 'Operation',
+          `Failed (attempt ${attempt}/${options.maxAttempts}), retrying in ${delay}ms...`,
         );
 
         // Wait before next attempt
@@ -76,9 +77,9 @@ export async function retryWithBackoff<T>(
         // Exponential backoff: delay *= backoffMultiplier, capped at maxDelay
         delay = Math.min(delay * options.backoffMultiplier, options.maxDelayMs);
       } else {
-        console.error(
-          `[Retry] ${context || 'Operation'} failed after ${options.maxAttempts} attempts`,
-          error,
+        log.error(
+          context || 'Operation',
+          `Failed after ${options.maxAttempts} attempts: ${(error as Error).message || error}`,
         );
       }
     }

@@ -3,6 +3,10 @@ import type { UpdateInfo as ElectronUpdaterInfo } from 'electron-updater';
 import { autoUpdater } from 'electron-updater';
 import type { UpdateInfo, UpdateStatus } from '../types/grail';
 
+import { createServiceLogger } from '../utils/serviceLogger';
+
+const log = createServiceLogger('UpdateService');
+
 /**
  * Service for managing application updates using electron-updater.
  * Handles checking for updates, downloading, and installing new versions.
@@ -28,10 +32,10 @@ class UpdateService {
 
     // Set up logging for debugging
     autoUpdater.logger = {
-      info: (message) => console.log('[Update Service]', message),
-      warn: (message) => console.warn('[Update Service]', message),
-      error: (message) => console.error('[Update Service]', message),
-      debug: (message) => console.debug('[Update Service]', message),
+      info: (message) => log.info('autoUpdater', message),
+      warn: (message) => log.warn('autoUpdater', message),
+      error: (message) => log.error('autoUpdater', message),
+      debug: (message) => log.info('autoUpdater', message),
     };
 
     // Register event handlers
@@ -41,9 +45,9 @@ class UpdateService {
     if (checkOnStartup) {
       // Delay the check slightly to ensure the app is fully initialized
       setTimeout(() => {
-        console.log('[Update Service] Checking for updates on startup...');
+        log.info('initialize', 'Checking for updates on startup...');
         this.checkForUpdates().catch((error) => {
-          console.error('[Update Service] Startup update check failed:', error);
+          log.error('initialize', 'Startup update check failed', error);
         });
       }, 3000); // Wait 3 seconds after app launch
     }
@@ -54,7 +58,7 @@ class UpdateService {
    */
   private registerEventHandlers() {
     autoUpdater.on('checking-for-update', () => {
-      console.log('[Update Service] Checking for updates...');
+      log.info('registerEventHandlers', 'Checking for updates...');
       this.updateStatus = {
         checking: true,
         available: false,
@@ -65,7 +69,7 @@ class UpdateService {
     });
 
     autoUpdater.on('update-available', (info: ElectronUpdaterInfo) => {
-      console.log('[Update Service] Update available:', info.version);
+      log.info('registerEventHandlers', `Update available: ${info.version}`);
       this.updateStatus = {
         checking: false,
         available: true,
@@ -77,7 +81,7 @@ class UpdateService {
     });
 
     autoUpdater.on('update-not-available', (info: ElectronUpdaterInfo) => {
-      console.log('[Update Service] Update not available. Current version:', info.version);
+      log.info('registerEventHandlers', `Update not available. Current version: ${info.version}`);
       this.updateStatus = {
         checking: false,
         available: false,
@@ -89,7 +93,7 @@ class UpdateService {
     });
 
     autoUpdater.on('download-progress', (progressObj) => {
-      console.log(`[Update Service] Download progress: ${progressObj.percent.toFixed(2)}%`);
+      log.info('registerEventHandlers', `Download progress: ${progressObj.percent.toFixed(2)}%`);
       this.updateStatus = {
         ...this.updateStatus,
         downloading: true,
@@ -102,7 +106,7 @@ class UpdateService {
     });
 
     autoUpdater.on('update-downloaded', (info: ElectronUpdaterInfo) => {
-      console.log('[Update Service] Update downloaded:', info.version);
+      log.info('registerEventHandlers', `Update downloaded: ${info.version}`);
       this.updateStatus = {
         checking: false,
         available: true,
@@ -114,7 +118,7 @@ class UpdateService {
     });
 
     autoUpdater.on('error', (error) => {
-      console.error('[Update Service] Error:', error);
+      log.error('registerEventHandlers', error);
       this.updateStatus = {
         checking: false,
         available: false,
@@ -177,7 +181,7 @@ class UpdateService {
       await autoUpdater.checkForUpdates();
       return this.updateStatus;
     } catch (error) {
-      console.error('[Update Service] Error checking for updates:', error);
+      log.error('checkForUpdates', error);
       this.updateStatus = {
         checking: false,
         available: false,
@@ -202,7 +206,7 @@ class UpdateService {
       await autoUpdater.downloadUpdate();
       return { success: true };
     } catch (error) {
-      console.error('[Update Service] Error downloading update:', error);
+      log.error('downloadUpdate', error);
       this.updateStatus.error = error instanceof Error ? error.message : 'Unknown error';
       this.notifyStatusChange();
       return { success: false };

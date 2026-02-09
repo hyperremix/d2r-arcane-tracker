@@ -278,8 +278,9 @@ describe('When ItemDetectionService is used', () => {
       // Assert
       expect(result).toEqual([]);
       expect(consoleSpy).toHaveBeenCalledWith(
-        'Error parsing save file after all retries:',
+        '[ItemDetection.extractItemsFromSaveFile]',
         expect.any(Error),
+        { saveFile: mockSaveFile.name },
       );
       consoleSpy.mockRestore();
     });
@@ -1026,7 +1027,8 @@ describe('When ItemDetectionService is used', () => {
 
         // Assert - should log with summary of initialized items
         expect(consoleSpy).toHaveBeenCalledWith(
-          '[ItemDetection] Initialized with 1 previously found items',
+          '[ItemDetection.initializeFromDatabase]',
+          'Initialized with 1 previously found items',
         );
 
         consoleSpy.mockRestore();
@@ -1044,7 +1046,8 @@ describe('When ItemDetectionService is used', () => {
 
         // Assert
         expect(consoleSpy).toHaveBeenCalledWith(
-          '[ItemDetection] Initialized with 0 previously found items',
+          '[ItemDetection.initializeFromDatabase]',
+          'Initialized with 0 previously found items',
         );
 
         consoleSpy.mockRestore();
@@ -1087,7 +1090,8 @@ describe('When ItemDetectionService is used', () => {
 
         // Assert - should not emit event for item that already exists in database
         expect(consoleSpy).toHaveBeenCalledWith(
-          '[ItemDetection] Initialized with 1 previously found items',
+          '[ItemDetection.initializeFromDatabase]',
+          'Initialized with 1 previously found items',
         );
         expect(eventSpy).not.toHaveBeenCalled();
 

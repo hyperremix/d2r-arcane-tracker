@@ -3,9 +3,12 @@ import { writeFile } from 'node:fs/promises';
 import { promisify } from 'node:util';
 import { ffi, Kernel32 } from 'win32-api';
 import { D2R_PATTERNS, D2RGameState, OFFSET_ADJUSTMENTS } from '../config/d2rPatterns';
+import { createServiceLogger } from '../utils/serviceLogger';
 import type { EventBus } from './EventBus';
 import { findPatternString, readBytesFromBuffer } from './patternScanner';
 import type { ProcessMonitor } from './processMonitor';
+
+const log = createServiceLogger('MemoryReader');
 
 const execAsync = promisify(exec);
 
@@ -166,9 +169,9 @@ function getKernel32(): ExtendedKernel32 | null {
         },
       } as ExtendedKernel32;
 
-      console.log('[MemoryReader] Loaded kernel32.dll bindings with extended functions');
+      log.info('getKernel32', 'Loaded kernel32.dll bindings with extended functions');
     } catch (error) {
-      console.error('[MemoryReader] Failed to load kernel32.dll:', error);
+      log.error('getKernel32', error);
       return null;
     }
   }
@@ -264,13 +267,13 @@ class WindowsMemoryReaderImpl implements WindowsMemoryReader {
    */
   async openProcess(processId: number): Promise<number | null> {
     if (process.platform !== 'win32') {
-      console.warn('[MemoryReader] openProcess only works on Windows');
+      log.warn('openProcess', 'openProcess only works on Windows');
       return null;
     }
 
     const k32 = getKernel32();
     if (!k32) {
-      console.error('[MemoryReader] kernel32.dll not available');
+      log.error('readMemory', 'kernel32.dll not available');
       return null;
     }
 
@@ -278,7 +281,7 @@ class WindowsMemoryReaderImpl implements WindowsMemoryReader {
       // Check if process exists first
       const { stdout } = await execAsync(`tasklist /FI "PID eq ${processId}" /FO CSV /NH`);
       if (!stdout || stdout.trim() === '') {
-        console.warn(`[MemoryReader] Process ${processId} not found`);
+        log.warn('openProcess', `Process ${processId} not found`);
         return null;
       }
 
@@ -292,8 +295,9 @@ class WindowsMemoryReaderImpl implements WindowsMemoryReader {
       const handleValue = typeof handle === 'number' ? handle : Number(handle);
       if (!handleValue || handleValue === 0 || handleValue === -1) {
         const errorCode = k32.GetLastError();
-        console.error(
-          `[MemoryReader] OpenProcess failed for PID ${processId}, error code: ${errorCode}`,
+        log.error(
+          'openProcess',
+          `OpenProcess failed for PID ${processId}, error code: ${errorCode}`,
         );
         return null;
       }
@@ -301,12 +305,13 @@ class WindowsMemoryReaderImpl implements WindowsMemoryReader {
       // Store handle value
       this.handles.set(processId, handleValue);
 
-      console.log(
-        `[MemoryReader] Opened process handle 0x${handleValue.toString(16)} for PID ${processId}`,
+      log.info(
+        'openProcess',
+        `Opened process handle 0x${handleValue.toString(16)} for PID ${processId}`,
       );
       return handleValue;
     } catch (error) {
-      console.error('[MemoryReader] Error opening process:', error);
+      log.error('openProcess', error);
       return null;
     }
   }
@@ -342,15 +347,16 @@ class WindowsMemoryReaderImpl implements WindowsMemoryReader {
         const success = k32.CloseHandle(handle);
         if (success === 0) {
           const errorCode = k32.GetLastError();
-          console.error(
-            `[MemoryReader] CloseHandle failed for handle 0x${handle.toString(16)}, error code: ${errorCode}`,
+          log.error(
+            'closeHandle',
+            `CloseHandle failed for handle 0x${handle.toString(16)}, error code: ${errorCode}`,
           );
         } else {
-          console.log(`[MemoryReader] Closed handle 0x${handle.toString(16)}`);
+          log.info('closeHandle', `Closed handle 0x${handle.toString(16)}`);
         }
       }
     } catch (error) {
-      console.error('[MemoryReader] Error closing handle:', error);
+      log.error('closeHandle', error);
     }
   }
 
@@ -387,13 +393,13 @@ class WindowsMemoryReaderImpl implements WindowsMemoryReader {
 
       if (stdout?.trim()) {
         const baseAddress = stdout.trim();
-        console.log(`[MemoryReader] Found base address for ${moduleName}: 0x${baseAddress}`);
+        log.info('getModuleBaseAddress', `Found base address for ${moduleName}: 0x${baseAddress}`);
         return baseAddress;
       }
 
       return null;
     } catch (error) {
-      console.error('[MemoryReader] Error getting module base address:', error);
+      log.error('getModuleBaseAddress', error);
       return null;
     }
   }
@@ -412,7 +418,7 @@ class WindowsMemoryReaderImpl implements WindowsMemoryReader {
 
     const k32 = getKernel32();
     if (!k32) {
-      console.error('[MemoryReader] kernel32.dll not available');
+      log.error('readMemory', 'kernel32.dll not available');
       return null;
     }
 
@@ -420,7 +426,7 @@ class WindowsMemoryReaderImpl implements WindowsMemoryReader {
       // Verify handle exists in our map
       const handleValue = Array.from(this.handles.values()).find((h) => h === handle);
       if (!handleValue || handleValue === 0 || handleValue === -1) {
-        console.error(`[MemoryReader] Invalid handle: 0x${handle.toString(16)}`);
+        log.error('readMemory', `Invalid handle: 0x${handle.toString(16)}`);
         return null;
       }
 
@@ -440,8 +446,9 @@ class WindowsMemoryReaderImpl implements WindowsMemoryReader {
 
       if (success === 0) {
         const errorCode = k32.GetLastError();
-        console.error(
-          `[MemoryReader] ReadProcessMemory failed at 0x${address.toString(16)}, error code: ${errorCode}`,
+        log.error(
+          'readMemory',
+          `ReadProcessMemory failed at 0x${address.toString(16)}, error code: ${errorCode}`,
         );
         return null;
       }
@@ -449,14 +456,14 @@ class WindowsMemoryReaderImpl implements WindowsMemoryReader {
       // Get actual bytes read
       const bytesReadCount = bytesRead.readUInt32LE(0);
       if (bytesReadCount === 0) {
-        console.warn(`[MemoryReader] No bytes read from address 0x${address.toString(16)}`);
+        log.warn('readMemory', `No bytes read from address 0x${address.toString(16)}`);
         return null;
       }
 
       // Return buffer with actual data read
       return buffer.subarray(0, bytesReadCount);
     } catch (error) {
-      console.error('[MemoryReader] Error reading memory:', error);
+      log.error('readMemory', error);
       return null;
     }
   }
@@ -541,7 +548,7 @@ class WindowsMemoryReaderImpl implements WindowsMemoryReader {
     try {
       const baseAddr = Number.parseInt(baseAddress, 16);
       if (Number.isNaN(baseAddr)) {
-        console.error('[MemoryReader] Invalid base address for memory reading');
+        log.error('readProcessMemory', 'Invalid base address for memory reading');
         return null;
       }
 
@@ -581,7 +588,7 @@ class WindowsMemoryReaderImpl implements WindowsMemoryReader {
       }
 
       if (chunks.length === 0) {
-        console.error('[MemoryReader] No readable memory regions found');
+        log.error('readProcessMemory', 'No readable memory regions found');
         return null;
       }
 
@@ -589,7 +596,7 @@ class WindowsMemoryReaderImpl implements WindowsMemoryReader {
       const result = Buffer.concat(chunks, totalRead);
       return result;
     } catch (error) {
-      console.error('[MemoryReader] Error reading process memory:', error);
+      log.error('readProcessMemory', error);
       return null;
     }
   }
@@ -688,8 +695,9 @@ export class MemoryReader {
     }
 
     this.isPolling = true;
-    console.log(
-      `[MemoryReader] Memory polling started (${this.pollingIntervalMs}ms interval, offsets valid: ${this.offsetsValid})`,
+    log.info(
+      'startPolling',
+      `Memory polling started (${this.pollingIntervalMs}ms interval, offsets valid: ${this.offsetsValid})`,
     );
 
     // Poll immediately
@@ -716,7 +724,7 @@ export class MemoryReader {
       this.pollingInterval = null;
     }
 
-    console.log('[MemoryReader] Stopped memory polling');
+    log.info('stopPolling', 'Stopped memory polling');
   }
 
   /**
@@ -730,7 +738,7 @@ export class MemoryReader {
     const handle = await this.memoryReader.openProcess(processId);
     if (handle) {
       this.processHandle = handle;
-      console.log(`[MemoryReader] Process handle opened for PID ${processId}`);
+      log.info('handleProcessStarted', `Process handle opened for PID ${processId}`);
 
       // Find base address and initialize memory addresses
       await this.initializeMemoryAddresses();
@@ -741,10 +749,10 @@ export class MemoryReader {
       if (this.offsetsValid) {
         this.startPolling();
       } else {
-        console.warn('[MemoryReader] Invalid offsets - memory polling disabled');
+        log.warn('handleProcessStarted', 'Invalid offsets - memory polling disabled');
       }
     } else {
-      console.error(`[MemoryReader] Failed to open process handle for PID ${processId}`);
+      log.error('handleProcessStarted', `Failed to open process handle for PID ${processId}`);
       this.processHandle = null;
     }
   }
@@ -779,28 +787,31 @@ export class MemoryReader {
       // Get D2R.exe module base address (P_0)
       const baseAddress = await this.memoryReader.getModuleBaseAddress(this.processId, 'D2R.exe');
       if (!baseAddress) {
-        console.warn('[MemoryReader] Could not find D2R.exe base address');
+        log.warn('initializeMemoryAddresses', 'Could not find D2R.exe base address');
         return;
       }
 
       this.addresses.baseAddress = baseAddress;
-      console.log(`[MemoryReader] Found D2R.exe base address: 0x${baseAddress}`);
+      log.info('initializeMemoryAddresses', `Found D2R.exe base address: 0x${baseAddress}`);
 
       // Calculate offsets using pattern matching
       const success = await this.calculateOffsets();
       if (!success) {
-        console.error('[MemoryReader] Failed to calculate offsets using pattern matching');
-        console.error('[MemoryReader] Memory reading disabled');
+        log.error(
+          'initializeMemoryAddresses',
+          'Failed to calculate offsets using pattern matching — memory reading disabled',
+        );
         this.offsetsValid = false;
         return;
       }
 
       this.offsetsValid = true;
-      console.log(
-        `[MemoryReader] Successfully calculated UI offset: 0x${this.addresses.uiOffset.toString(16)}`,
+      log.info(
+        'initializeMemoryAddresses',
+        `Successfully calculated UI offset: 0x${this.addresses.uiOffset.toString(16)}`,
       );
     } catch (error) {
-      console.error('[MemoryReader] Error initializing memory addresses:', error);
+      log.error('initializeMemoryAddresses', error);
       this.offsetsValid = false;
     }
   }
@@ -832,7 +843,7 @@ export class MemoryReader {
       );
 
       if (!memory) {
-        console.error('[MemoryReader] Failed to read process memory');
+        log.error('calculateOffsets', 'Failed to read process memory');
         return false;
       }
 
@@ -841,7 +852,7 @@ export class MemoryReader {
       const patternOffset = findPatternString(memory, pattern.pattern, pattern.mask);
 
       if (patternOffset === -1) {
-        console.error(`[MemoryReader] ${pattern.name} pattern not found in memory`);
+        log.error('calculateOffsets', `${pattern.name} pattern not found in memory`);
         return false;
       }
 
@@ -853,7 +864,7 @@ export class MemoryReader {
       );
 
       if (!bytes) {
-        console.error('[MemoryReader] Failed to read bytes from pattern offset');
+        log.error('calculateOffsets', 'Failed to read bytes from pattern offset');
         return false;
       }
 
@@ -869,7 +880,7 @@ export class MemoryReader {
 
       return true;
     } catch (error) {
-      console.error('[MemoryReader] Error calculating offsets:', error);
+      log.error('calculateOffsets', error);
       return false;
     }
   }
@@ -897,17 +908,17 @@ export class MemoryReader {
 
       if (currentState === D2RGameState.InGame && previousState !== D2RGameState.InGame) {
         // Transition: Lobby → InGame (Run Started)
-        console.log(`[MemoryReader] ✓ Game entered (state: 0 → 1)`);
+        log.info('pollMemory', 'Game entered (state: 0 → 1)');
         this.eventBus.emit('game-entered', {});
       } else if (currentState === D2RGameState.Lobby && previousState === D2RGameState.InGame) {
         // Transition: InGame → Lobby (Run Ended)
-        console.log(`[MemoryReader] ✓ Game exited (state: 1 → 0)`);
+        log.info('pollMemory', 'Game exited (state: 1 → 0)');
         this.eventBus.emit('game-exited', {});
       }
 
       this.lastGameState = currentState;
     } catch (error) {
-      console.error('[MemoryReader] Error polling memory:', error);
+      log.error('pollMemory', error);
     }
   }
 
@@ -931,7 +942,7 @@ export class MemoryReader {
       // Calculate address: moduleBase + UI - 0xA
       const baseAddress = Number.parseInt(this.addresses.baseAddress, 16);
       if (Number.isNaN(baseAddress)) {
-        console.error('[MemoryReader] Invalid base address');
+        log.error('readGameState', 'Invalid base address');
         return null;
       }
 
@@ -955,10 +966,10 @@ export class MemoryReader {
       }
 
       // Unknown state value - log for debugging
-      console.warn(`[MemoryReader] Unknown game state value: ${stateValue}`);
+      log.warn('readGameState', `Unknown game state value: ${stateValue}`);
       return D2RGameState.Lobby; // Default to Lobby for safety
     } catch (error) {
-      console.error('[MemoryReader] Error reading game state:', error);
+      log.error('readGameState', error);
       return null;
     }
   }
@@ -985,7 +996,7 @@ export class MemoryReader {
    */
   async dumpMemoryForAnalysis(filePath: string): Promise<boolean> {
     if (!this.processHandle || !this.addresses.baseAddress) {
-      console.error('[MemoryReader] Cannot dump memory: no process handle or base address');
+      log.error('dumpMemoryForAnalysis', 'Cannot dump memory: no process handle or base address');
       return false;
     }
 
@@ -996,17 +1007,18 @@ export class MemoryReader {
       );
 
       if (!memory) {
-        console.error('[MemoryReader] Failed to read process memory for dump');
+        log.error('dumpMemoryForAnalysis', 'Failed to read process memory for dump');
         return false;
       }
 
       await writeFile(filePath, memory);
-      console.log(
-        `[MemoryReader] Dumped ${memory.length} bytes (${(memory.length / 1024 / 1024).toFixed(1)}MB) to ${filePath}`,
+      log.info(
+        'dumpMemoryForAnalysis',
+        `Dumped ${memory.length} bytes (${(memory.length / 1024 / 1024).toFixed(1)}MB) to ${filePath}`,
       );
       return true;
     } catch (error) {
-      console.error('[MemoryReader] Error dumping memory:', error);
+      log.error('dumpMemoryForAnalysis', error);
       return false;
     }
   }
@@ -1029,6 +1041,6 @@ export class MemoryReader {
       this.processHandle = null;
     }
 
-    console.log('[MemoryReader] Shutdown complete');
+    log.info('shutdown', 'Shutdown complete');
   }
 }

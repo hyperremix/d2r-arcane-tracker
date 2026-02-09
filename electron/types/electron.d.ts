@@ -2,6 +2,7 @@ import type {
   Character,
   D2Item,
   D2SaveFile,
+  FileReaderResponse,
   GrailProgress,
   Item,
   MonitoringStatus,
@@ -13,6 +14,8 @@ import type {
   UpdateInfo,
   UpdateStatus,
 } from './grail'
+
+import type { ServiceErrorPayload } from '../utils/serviceLogger'
 
 /**
  * Main interface defining the Electron API available to the renderer process.
@@ -431,6 +434,25 @@ export interface ElectronAPI {
      * @returns {Promise<{ success: boolean; error?: string }>} A promise that resolves with a success indicator.
      */
     openExternal(url: string): Promise<{ success: boolean; error?: string }>
+  }
+
+  /**
+   * Data update API methods for receiving data updates from the main process.
+   */
+  data: {
+    /**
+     * Registers a callback for data update events from the main process.
+     * @param {(data: FileReaderResponse) => void} callback - Function to call when data updates are received.
+     * @returns {Electron.IpcRenderer} The IpcRenderer instance for chaining.
+     */
+    onUpdate(callback: (data: FileReaderResponse) => void): Electron.IpcRenderer
+
+    /**
+     * Registers a callback for service error events from the main process.
+     * @param {(payload: ServiceErrorPayload) => void} callback - Function to call when service errors occur.
+     * @returns {() => void} Cleanup function to remove the listener.
+     */
+    onServiceError(callback: (payload: ServiceErrorPayload) => void): () => void
   }
 
   /**

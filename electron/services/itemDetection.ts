@@ -6,7 +6,10 @@ import type { D2SaveFile } from '../services/saveFileMonitor';
 import type { D2Item, D2SItem, GrailProgress, Item, ItemDetectionEvent } from '../types/grail';
 import { isGrailTrackable } from '../utils/grailItemUtils';
 import { DEFAULT_RETRY_OPTIONS, retryWithBackoff } from '../utils/retry';
+import { createServiceLogger } from '../utils/serviceLogger';
 import type { EventBus } from './EventBus';
+
+const log = createServiceLogger('ItemDetection');
 
 /**
  * Service for detecting and analyzing items from Diablo 2 save files.
@@ -45,8 +48,9 @@ class ItemDetectionService {
       const itemKey = `${progress.itemId}_${progress.isEthereal}`;
       this.previouslySeenItems.add(itemKey);
     }
-    console.log(
-      `[ItemDetection] Initialized with ${this.previouslySeenItems.size} previously found items`,
+    log.info(
+      'initializeFromDatabase',
+      `Initialized with ${this.previouslySeenItems.size} previously found items`,
     );
   }
 
@@ -89,7 +93,7 @@ class ItemDetectionService {
 
           // Only emit event if this is a NEW item globally
           if (!this.previouslySeenItems.has(itemKey)) {
-            console.log(`[ItemDetection] New item detected: ${item.name} in ${saveFile.name}`);
+            log.info('analyzeSaveFile', `New item detected: ${item.name} in ${saveFile.name}`);
             this.eventBus.emit('item-detection', {
               type: 'item-found',
               item,
@@ -102,7 +106,7 @@ class ItemDetectionService {
         }
       }
     } catch (error) {
-      console.error('Error analyzing save file:', error);
+      log.error('analyzeSaveFile', error, { saveFile: saveFile.name });
     }
   }
 
@@ -204,9 +208,17 @@ class ItemDetectionService {
         );
       }
 
-      console.log(`Extracted ${items.length} items from ${saveFile.name}`);
+      log.info('extractItemsFromSaveFile', `Extracted ${items.length} items from ${saveFile.name}`);
     } catch (error) {
-      console.error('Error parsing save file after all retries:', error);
+      log.error(
+        'extractItemsFromSaveFile',
+        error,
+        { saveFile: saveFile.name },
+        {
+          surfaceToUI: true,
+          userMessage: `Failed to parse save file: ${saveFile.name}`,
+        },
+      );
       return []; // Return empty array after exhausting retries
     }
 
@@ -266,7 +278,10 @@ class ItemDetectionService {
           );
         }
       } catch (itemError) {
-        console.warn('Error parsing individual item:', itemError);
+        log.warn(
+          'extractItemsFromList',
+          `Error parsing individual item: ${(itemError as Error).message || itemError}`,
+        );
       }
     }
   }
@@ -433,7 +448,7 @@ class ItemDetectionService {
    */
   clearSeenItems(): void {
     this.previouslySeenItems.clear();
-    console.log('[ItemDetection] Cleared all seen items tracking');
+    log.info('clearSeenItems', 'Cleared all seen items tracking');
   }
 }
 
