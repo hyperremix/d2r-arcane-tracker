@@ -252,7 +252,13 @@ class GrailDatabase {
   // Restore methods stay as full implementations because they mutate this.rawDb/this.db
   restore(backupPath: string): void {
     this.rawDb.close();
-    copyFileSync(backupPath, this.dbPath);
+    try {
+      copyFileSync(backupPath, this.dbPath);
+    } catch (error) {
+      this.rawDb = new Database(this.dbPath);
+      this.db = createDrizzleDb(this.rawDb);
+      throw error;
+    }
     this.rawDb = new Database(this.dbPath);
     this.db = createDrizzleDb(this.rawDb);
     this.initializeSchema();
@@ -260,7 +266,13 @@ class GrailDatabase {
 
   restoreFromBuffer(backupBuffer: Buffer): void {
     this.rawDb.close();
-    writeFileSync(this.dbPath, backupBuffer);
+    try {
+      writeFileSync(this.dbPath, backupBuffer);
+    } catch (error) {
+      this.rawDb = new Database(this.dbPath);
+      this.db = createDrizzleDb(this.rawDb);
+      throw error;
+    }
     this.rawDb = new Database(this.dbPath);
     this.db = createDrizzleDb(this.rawDb);
     this.initializeSchema();
