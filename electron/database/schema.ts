@@ -225,8 +225,34 @@ export function createSchema(ctx: DatabaseContext): void {
   // Ensure wizard settings exist for existing databases
   ensureWizardSettings(ctx);
 
+  // Migrate runTrackerAutoStart to runTrackerMemoryReading for existing databases
+  migrateRunTrackerAutoStart(ctx);
+
   // Always upsert items to ensure latest changes are available
   upsertItemsFromGrailData(ctx);
+}
+
+function migrateRunTrackerAutoStart(ctx: DatabaseContext): void {
+  const rows = ctx.db.select().from(settings).all();
+  const settingsMap: Record<string, string> = {};
+  for (const row of rows) {
+    settingsMap[row.key] = row.value ?? '';
+  }
+
+  if (
+    settingsMap.runTrackerAutoStart === 'true' &&
+    settingsMap.runTrackerMemoryReading !== 'true'
+  ) {
+    console.log('[Database] Migrating runTrackerAutoStart to runTrackerMemoryReading (auto mode)');
+    ctx.db
+      .insert(settings)
+      .values({ key: 'runTrackerMemoryReading', value: 'true' })
+      .onConflictDoUpdate({
+        target: settings.key,
+        set: { value: 'true' },
+      })
+      .run();
+  }
 }
 
 function ensureWizardSettings(ctx: DatabaseContext): void {

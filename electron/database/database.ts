@@ -1,4 +1,4 @@
-import { copyFileSync, writeFileSync } from 'node:fs';
+import { copyFileSync, unlinkSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import Database from 'better-sqlite3';
 import { app } from 'electron';
@@ -251,16 +251,52 @@ class GrailDatabase {
 
   // Restore methods stay as full implementations because they mutate this.rawDb/this.db
   restore(backupPath: string): void {
+    // Save current database so we can recover if the restore fails
+    const tempPath = `${this.dbPath}.pre-restore`;
+    copyFileSync(this.dbPath, tempPath);
+
     this.rawDb.close();
-    copyFileSync(backupPath, this.dbPath);
+    try {
+      copyFileSync(backupPath, this.dbPath);
+    } catch (error) {
+      // Restore original database file from pre-restore backup
+      copyFileSync(tempPath, this.dbPath);
+      this.rawDb = new Database(this.dbPath);
+      this.db = createDrizzleDb(this.rawDb);
+      throw error;
+    } finally {
+      try {
+        unlinkSync(tempPath);
+      } catch {
+        // Ignore cleanup errors
+      }
+    }
     this.rawDb = new Database(this.dbPath);
     this.db = createDrizzleDb(this.rawDb);
     this.initializeSchema();
   }
 
   restoreFromBuffer(backupBuffer: Buffer): void {
+    // Save current database so we can recover if the restore fails
+    const tempPath = `${this.dbPath}.pre-restore`;
+    copyFileSync(this.dbPath, tempPath);
+
     this.rawDb.close();
-    writeFileSync(this.dbPath, backupBuffer);
+    try {
+      writeFileSync(this.dbPath, backupBuffer);
+    } catch (error) {
+      // Restore original database file from pre-restore backup
+      copyFileSync(tempPath, this.dbPath);
+      this.rawDb = new Database(this.dbPath);
+      this.db = createDrizzleDb(this.rawDb);
+      throw error;
+    } finally {
+      try {
+        unlinkSync(tempPath);
+      } catch {
+        // Ignore cleanup errors
+      }
+    }
     this.rawDb = new Database(this.dbPath);
     this.db = createDrizzleDb(this.rawDb);
     this.initializeSchema();

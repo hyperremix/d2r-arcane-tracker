@@ -297,7 +297,7 @@ describe('When DatabaseBatchWriter is used', () => {
   });
 
   describe('If flush encounters database error', () => {
-    it('Then should throw error and keep items in queue', () => {
+    it('Then should keep items in queue for retry on first failure', () => {
       // Arrange
       const character = CharacterBuilder.new().withId('char-1').build();
       batchWriter.queueCharacter(character);
@@ -305,9 +305,28 @@ describe('When DatabaseBatchWriter is used', () => {
         throw new Error('Database error');
       });
 
-      // Act & Assert
-      expect(() => batchWriter.flush()).toThrow('Database error');
-      expect(batchWriter.getCharacterQueueSize()).toBe(1); // Item still in queue for retry
+      // Act
+      batchWriter.flush();
+
+      // Assert - item kept for retry (under max retries)
+      expect(batchWriter.getCharacterQueueSize()).toBe(1);
+    });
+
+    it('Then should drop items after max consecutive failures', () => {
+      // Arrange
+      const character = CharacterBuilder.new().withId('char-1').build();
+      batchWriter.queueCharacter(character);
+      mockDatabase.upsertCharactersBatch.mockImplementation(() => {
+        throw new Error('Database error');
+      });
+
+      // Act - flush 3 times (max retries)
+      batchWriter.flush();
+      batchWriter.flush();
+      batchWriter.flush();
+
+      // Assert - items dropped after max retries
+      expect(batchWriter.getCharacterQueueSize()).toBe(0);
     });
   });
 

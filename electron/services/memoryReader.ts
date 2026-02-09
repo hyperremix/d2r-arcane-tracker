@@ -53,7 +53,8 @@ function queryMemoryRegion(
   const mbiBuffer = Buffer.alloc(48);
   const bytesReturned = k32.VirtualQueryEx(handle, address, mbiBuffer, 48);
 
-  if (bytesReturned === 0) {
+  // Need at least 40 bytes to read Protect at offset 36 (UInt32 = 4 bytes)
+  if (bytesReturned < 40) {
     return null;
   }
 

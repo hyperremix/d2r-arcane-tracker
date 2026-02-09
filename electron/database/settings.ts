@@ -10,14 +10,15 @@ function parseJSON(jsonString: string): unknown {
     return undefined;
   }
   if (jsonString === '[object Object]') {
+    console.warn(
+      '[parseJSON] Detected "[object Object]" string — an object was likely coerced to string before storage.',
+    );
     return undefined;
   }
   try {
     return JSON.parse(jsonString);
   } catch {
-    if (jsonString !== '[object Object]') {
-      console.warn(`Failed to parse JSON setting: "${jsonString}". Using undefined.`);
-    }
+    console.warn(`Failed to parse JSON setting: "${jsonString}". Using undefined.`);
     return undefined;
   }
 }
@@ -124,16 +125,6 @@ export function getAllSettings(ctx: DatabaseContext): Settings {
       settingsMap.runTrackerShortcuts,
     ),
   };
-
-  // Migration: If runTrackerAutoStart was enabled, enable runTrackerMemoryReading
-  if (
-    settingsMap.runTrackerAutoStart === 'true' &&
-    settingsMap.runTrackerMemoryReading !== 'true'
-  ) {
-    console.log('[Database] Migrating runTrackerAutoStart to runTrackerMemoryReading (auto mode)');
-    typedSettings.runTrackerMemoryReading = true;
-    setSetting(ctx, 'runTrackerMemoryReading', 'true');
-  }
 
   return typedSettings;
 }
