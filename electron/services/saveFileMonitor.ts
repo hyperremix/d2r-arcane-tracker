@@ -998,9 +998,18 @@ class SaveFileMonitor {
       return () => this.processSingleFile(filePath, results);
     });
 
-    await this.executeConcurrently(tasks, this.MAX_CONCURRENT_PARSES);
+    const parseResults = await this.executeConcurrently(tasks, this.MAX_CONCURRENT_PARSES);
 
-    console.log('[parseFiles] Concurrent parsing complete');
+    const failedFiles = parseResults.filter((r) => r && !r.success);
+    if (failedFiles.length > 0) {
+      console.warn(
+        `[parseFiles] ${failedFiles.length} file(s) failed to parse:`,
+        failedFiles.map((f) => f.saveName),
+      );
+    }
+    console.log(
+      `[parseFiles] Concurrent parsing complete: ${filesToParse.length - failedFiles.length} succeeded, ${failedFiles.length} failed`,
+    );
 
     // Reset force parse flag after parsing completes
     if (this.forceParseAll) {
