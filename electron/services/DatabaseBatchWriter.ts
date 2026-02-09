@@ -154,12 +154,15 @@ export class DatabaseBatchWriter {
       );
 
       if (this.consecutiveFailures >= this.MAX_FLUSH_RETRIES) {
-        const dropped = {
+        const remaining = {
           characters: this.characterQueue.size,
           progress: this.progressQueue.size,
           runItems: this.runItemQueue.size,
         };
-        console.error(`[DatabaseBatchWriter] Max retries exceeded, dropping items:`, dropped);
+        console.error(
+          `[DatabaseBatchWriter] Max retries exceeded, dropping remaining unflushed items:`,
+          remaining,
+        );
         this.characterQueue.clear();
         this.progressQueue.clear();
         this.runItemQueue.clear();
