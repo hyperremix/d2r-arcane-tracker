@@ -16,6 +16,7 @@ export class RunTrackerService {
   private paused = false;
   private memoryReader: MemoryReader | null = null;
   private autoModeEnabled = false;
+  private eventUnsubscribers: Array<() => void> = [];
 
   constructor(
     private eventBus: EventBus,
@@ -44,14 +45,18 @@ export class RunTrackerService {
    */
   private setupEventListeners(): void {
     // Listen for game-entered events from memory reader
-    this.eventBus.on('game-entered', (payload) => {
-      this.handleGameEntered(payload.characterId);
-    });
+    this.eventUnsubscribers.push(
+      this.eventBus.on('game-entered', (payload) => {
+        this.handleGameEntered(payload.characterId);
+      }),
+    );
 
     // Listen for game-exited events from memory reader
-    this.eventBus.on('game-exited', (payload) => {
-      this.handleGameExited(payload.characterId);
-    });
+    this.eventUnsubscribers.push(
+      this.eventBus.on('game-exited', (payload) => {
+        this.handleGameExited(payload.characterId);
+      }),
+    );
   }
 
   /**
@@ -443,6 +448,12 @@ export class RunTrackerService {
    * Stops monitoring and cleans up resources.
    */
   shutdown(): void {
+    // Unsubscribe EventBus listeners
+    for (const unsub of this.eventUnsubscribers) {
+      unsub();
+    }
+    this.eventUnsubscribers.length = 0;
+
     // Stop memory reading if running
     if (this.memoryReader) {
       this.memoryReader.stopPolling();

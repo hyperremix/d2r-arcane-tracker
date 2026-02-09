@@ -643,6 +643,7 @@ export class MemoryReader {
   private addresses: D2RMemoryAddresses;
   private pollingIntervalMs = 500; // Default 500ms polling interval
   private offsetsValid = false; // Track if offsets are valid (not placeholders)
+  private eventUnsubscribers: Array<() => void> = [];
 
   constructor(
     private eventBus: EventBus,
@@ -656,13 +657,17 @@ export class MemoryReader {
     };
 
     // Listen for process start/stop events
-    this.eventBus.on('d2r-started', (payload) => {
-      this.handleProcessStarted(payload.processId);
-    });
+    this.eventUnsubscribers.push(
+      this.eventBus.on('d2r-started', (payload) => {
+        this.handleProcessStarted(payload.processId);
+      }),
+    );
 
-    this.eventBus.on('d2r-stopped', () => {
-      this.handleProcessStopped();
-    });
+    this.eventUnsubscribers.push(
+      this.eventBus.on('d2r-stopped', () => {
+        this.handleProcessStopped();
+      }),
+    );
   }
 
   /**
@@ -1034,6 +1039,12 @@ export class MemoryReader {
    * Cleans up resources and stops polling.
    */
   async shutdown(): Promise<void> {
+    // Unsubscribe EventBus listeners
+    for (const unsub of this.eventUnsubscribers) {
+      unsub();
+    }
+    this.eventUnsubscribers.length = 0;
+
     this.stopPolling();
 
     if (this.processHandle) {

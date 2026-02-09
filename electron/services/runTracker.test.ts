@@ -18,7 +18,7 @@ const mockDatabase: Partial<GrailDatabase> = {
 // Mock event bus
 const mockEventBus = {
   emit: vi.fn(),
-  on: vi.fn(),
+  on: vi.fn().mockReturnValue(vi.fn()),
   off: vi.fn(),
   listenerCount: vi.fn(() => 0),
   clear: vi.fn(),
