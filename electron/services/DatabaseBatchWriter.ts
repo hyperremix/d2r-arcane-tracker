@@ -13,6 +13,8 @@ export class DatabaseBatchWriter {
   private readonly database: GrailDatabase;
   private readonly BATCH_DELAY = 100; // ms - delay before auto-flushing
   private readonly BATCH_SIZE_THRESHOLD = 50; // items - flush immediately if queue exceeds this
+  private readonly MAX_FLUSH_RETRIES = 3; // max consecutive failures before dropping items
+  private consecutiveFailures = 0;
   private onFlushCallback?: () => void;
 
   /**
@@ -140,13 +142,29 @@ export class DatabaseBatchWriter {
       }
 
       // Invoke callback after successful flush
+      this.consecutiveFailures = 0;
       if (this.onFlushCallback) {
         this.onFlushCallback();
       }
     } catch (error) {
-      console.error('[DatabaseBatchWriter] Error flushing batch:', error);
-      // Don't clear queues on error - retry on next flush
-      throw error;
+      this.consecutiveFailures++;
+      console.error(
+        `[DatabaseBatchWriter] Error flushing batch (attempt ${this.consecutiveFailures}/${this.MAX_FLUSH_RETRIES}):`,
+        error,
+      );
+
+      if (this.consecutiveFailures >= this.MAX_FLUSH_RETRIES) {
+        const dropped = {
+          characters: this.characterQueue.size,
+          progress: this.progressQueue.size,
+          runItems: this.runItemQueue.size,
+        };
+        console.error(`[DatabaseBatchWriter] Max retries exceeded, dropping items:`, dropped);
+        this.characterQueue.clear();
+        this.progressQueue.clear();
+        this.runItemQueue.clear();
+        this.consecutiveFailures = 0;
+      }
     }
   }
 
