@@ -38,9 +38,9 @@ export default defineConfig({
     reporters: ['verbose', 'junit'],
   },
   resolve: {
-    alias: {
-      '@': resolve(__dirname, './src'),
-      'electron/types/grail': resolve(__dirname, './electron/types/grail.ts'),
-    },
+    alias: [
+      { find: '@', replacement: resolve(__dirname, './src') },
+      { find: /^electron\//, replacement: `${resolve(__dirname, './electron')}/` },
+    ],
   },
 });

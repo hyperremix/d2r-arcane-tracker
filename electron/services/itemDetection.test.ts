@@ -6,10 +6,15 @@ vi.mock('@dschu012/d2s', () => ({
   read: vi.fn(),
 }));
 
-// Mock fs/promises
-vi.mock('node:fs/promises', () => ({
-  readFile: vi.fn(),
-}));
+// Mock fs/promises — source uses `import fs from 'node:fs/promises'` (default import),
+// so the mock must provide a `default` export alongside the named export.
+vi.mock('node:fs/promises', () => {
+  const readFile = vi.fn();
+  return {
+    default: { readFile },
+    readFile,
+  };
+});
 
 import { readFile } from 'node:fs/promises';
 // Import mocked modules
