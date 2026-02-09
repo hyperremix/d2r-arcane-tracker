@@ -38,6 +38,7 @@ vi.mock('../services/memoryReader', () => ({
   MemoryReader: vi.fn().mockImplementation(() => ({
     startPolling: vi.fn(),
     stopPolling: vi.fn(),
+    shutdown: vi.fn().mockResolvedValue(undefined),
     updatePollingInterval: vi.fn(),
     isInGame: vi.fn().mockResolvedValue(false),
     readGameState: vi.fn().mockResolvedValue(null),
@@ -170,6 +171,7 @@ vi.mock('../services/saveFileMonitor', () => ({
   SaveFileMonitor: vi.fn().mockImplementation(() => ({
     startMonitoring: vi.fn(),
     stopMonitoring: vi.fn(),
+    shutdown: vi.fn().mockResolvedValue(undefined),
     getSaveFiles: vi.fn(),
     isCurrentlyMonitoring: vi.fn(),
     getSaveDirectory: vi.fn(),
@@ -224,6 +226,7 @@ interface MockDatabaseBatchWriter {
 interface MockSaveFileMonitor {
   startMonitoring: ReturnType<typeof vi.fn>;
   stopMonitoring: ReturnType<typeof vi.fn>;
+  shutdown: ReturnType<typeof vi.fn>;
   getSaveFiles: ReturnType<typeof vi.fn>;
   isCurrentlyMonitoring: ReturnType<typeof vi.fn>;
   getSaveDirectory: ReturnType<typeof vi.fn>;
@@ -278,6 +281,7 @@ describe('When saveFileHandlers is used', () => {
     mockSaveFileMonitor = {
       startMonitoring: vi.fn().mockResolvedValue(undefined),
       stopMonitoring: vi.fn(),
+      shutdown: vi.fn().mockResolvedValue(undefined),
       getSaveFiles: vi.fn().mockResolvedValue([]),
       isCurrentlyMonitoring: vi.fn().mockReturnValue(false),
       getSaveDirectory: vi.fn().mockReturnValue('/test/save/dir'),
@@ -880,7 +884,7 @@ describe('When saveFileHandlers is used', () => {
   });
 
   describe('If closeSaveFileMonitor is called', () => {
-    it('Then should stop monitoring', () => {
+    it('Then should shut down all services', () => {
       // Arrange
       initializeSaveFileHandlers();
 
@@ -889,7 +893,7 @@ describe('When saveFileHandlers is used', () => {
 
       // Assert
       expect(mockBatchWriter.flush).toHaveBeenCalled();
-      expect(mockSaveFileMonitor.stopMonitoring).toHaveBeenCalled();
+      expect(mockSaveFileMonitor.shutdown).toHaveBeenCalled();
     });
 
     it('Then should handle case when monitor is not initialized', () => {

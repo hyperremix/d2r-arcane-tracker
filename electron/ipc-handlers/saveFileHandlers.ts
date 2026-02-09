@@ -638,17 +638,17 @@ export function closeSaveFileMonitor(): void {
   console.log('[closeSaveFileMonitor] Flushing pending database writes');
   batchWriter.flush();
 
-  // Unsubscribe all event listeners
+  // Unsubscribe IPC handler event listeners
   for (const unsubscribe of eventUnsubscribers) {
     unsubscribe();
   }
   eventUnsubscribers.length = 0;
 
-  // Clear all event bus listeners
-  eventBus.clear();
+  // Shut down services (each cleans up its own EventBus listeners)
+  processMonitor?.shutdown();
+  memoryReader?.shutdown();
+  saveFileMonitor?.shutdown();
 
-  // Stop save file monitoring
-  if (saveFileMonitor) {
-    saveFileMonitor.stopMonitoring();
-  }
+  // Final safety net: clear any remaining EventBus listeners
+  eventBus.clear();
 }
