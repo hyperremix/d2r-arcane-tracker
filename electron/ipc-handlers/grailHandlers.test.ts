@@ -16,6 +16,7 @@ vi.mock('../database/database', () => {
   // Create mock database instance inside the factory
   const mockDB = {
     getAllCharacters: vi.fn(),
+    getCharacterMap: vi.fn(() => new Map()),
     insertCharacter: vi.fn(),
     updateCharacter: vi.fn(),
     deleteCharacter: vi.fn(),
@@ -286,6 +287,9 @@ describe('When grailHandlers is used', () => {
       vi.mocked(grailDatabase.getAllSettings).mockReturnValue(mockSettings);
       vi.mocked(grailDatabase.getAllProgress).mockReturnValue(mockProgress);
       vi.mocked(grailDatabase.getAllCharacters).mockReturnValue(mockCharacters);
+      vi.mocked(grailDatabase.getCharacterMap).mockReturnValue(
+        new Map(mockCharacters.map((c) => [c.id, c.name])),
+      );
 
       const handler = vi
         .mocked(ipcMain.handle)
@@ -346,6 +350,9 @@ describe('When grailHandlers is used', () => {
       vi.mocked(grailDatabase.getAllSettings).mockReturnValue(mockSettings);
       vi.mocked(grailDatabase.getProgressByCharacter).mockReturnValue(mockProgress);
       vi.mocked(grailDatabase.getAllCharacters).mockReturnValue(mockCharacters);
+      vi.mocked(grailDatabase.getCharacterMap).mockReturnValue(
+        new Map(mockCharacters.map((c) => [c.id, c.name])),
+      );
 
       const handler = vi
         .mocked(ipcMain.handle)

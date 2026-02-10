@@ -1,11 +1,27 @@
 import { eq } from 'drizzle-orm';
 import type { RunStatistics, SessionStats, Settings } from '../types/grail';
 import { schema } from './drizzle';
-import { getFilteredItems } from './items';
-import { getFilteredProgress } from './progress';
 import type { DatabaseContext } from './types';
 
 const { sessions } = schema;
+
+function buildTypeFilter(
+  userSettings: Settings,
+  tableAlias: string = '',
+): { types: string[]; filter: string } {
+  const types: string[] = [];
+  if (!userSettings.grailRunes) types.push('rune');
+  if (!userSettings.grailRunewords) types.push('runeword');
+  const column = tableAlias ? `${tableAlias}.type` : 'type';
+  const filter =
+    types.length > 0 ? `AND ${column} NOT IN (${types.map(() => '?').join(', ')})` : '';
+  return { types, filter };
+}
+
+function getCounts(ctx: DatabaseContext, query: string, params: string[]): Map<string, number> {
+  const results = ctx.rawDb.prepare(query).all(...params) as { type: string; count: number }[];
+  return new Map(results.map((r) => [r.type, r.count]));
+}
 
 export function getFilteredGrailStatistics(
   ctx: DatabaseContext,
@@ -21,44 +37,42 @@ export function getFilteredGrailStatistics(
   foundSet: number;
   foundRunes: number;
 } {
-  const filteredItems = getFilteredItems(ctx, userSettings);
-  const filteredProgressList = getFilteredProgress(ctx, userSettings);
+  const { types: excludedTypes, filter: itemsTypeFilter } = buildTypeFilter(userSettings, '');
+  const { filter: joinTypeFilter } = buildTypeFilter(userSettings, 'i');
+  const charFilter = characterId ? 'AND gp.character_id = ?' : '';
 
-  const totalItems = filteredItems.length;
+  const typeParams = excludedTypes;
+  const fullParams = [...excludedTypes, ...(characterId ? [characterId] : [])];
 
-  // Count items by type
-  const uniqueItems = filteredItems.filter((item) => item.type === 'unique').length;
-  const setItems = filteredItems.filter((item) => item.type === 'set').length;
-  const runeItems = filteredItems.filter((item) => item.type === 'rune').length;
+  // Query 1: Count items by type
+  const itemCountMap = getCounts(
+    ctx,
+    `SELECT type, COUNT(*) as count FROM items WHERE 1=1 ${itemsTypeFilter} GROUP BY type`,
+    typeParams,
+  );
 
-  // Count found items
-  const foundProgress = characterId
-    ? filteredProgressList.filter((p) => p.characterId === characterId)
-    : filteredProgressList;
+  // Query 2: Count found items (distinct item_id) by type
+  const foundCountMap = getCounts(
+    ctx,
+    `SELECT i.type, COUNT(DISTINCT gp.item_id) as count FROM grail_progress gp INNER JOIN items i ON gp.item_id = i.id WHERE 1=1 ${joinTypeFilter} ${charFilter} GROUP BY i.type`,
+    fullParams,
+  );
 
-  const foundItemIds = new Set(foundProgress.map((p) => p.itemId));
-  const foundItems = foundItemIds.size;
-
-  // Count found items by type
-  const foundUnique = filteredItems.filter(
-    (item) => item.type === 'unique' && foundItemIds.has(item.id),
-  ).length;
-  const foundSet = filteredItems.filter(
-    (item) => item.type === 'set' && foundItemIds.has(item.id),
-  ).length;
-  const foundRunes = filteredItems.filter(
-    (item) => item.type === 'rune' && foundItemIds.has(item.id),
-  ).length;
+  const sumCounts = (map: Map<string, number>) =>
+    (map.get('unique') || 0) +
+    (map.get('set') || 0) +
+    (map.get('rune') || 0) +
+    (map.get('runeword') || 0);
 
   return {
-    totalItems,
-    foundItems,
-    uniqueItems,
-    setItems,
-    runes: runeItems,
-    foundUnique,
-    foundSet,
-    foundRunes,
+    totalItems: sumCounts(itemCountMap),
+    foundItems: sumCounts(foundCountMap),
+    uniqueItems: itemCountMap.get('unique') || 0,
+    setItems: itemCountMap.get('set') || 0,
+    runes: itemCountMap.get('rune') || 0,
+    foundUnique: foundCountMap.get('unique') || 0,
+    foundSet: foundCountMap.get('set') || 0,
+    foundRunes: foundCountMap.get('rune') || 0,
   };
 }
 

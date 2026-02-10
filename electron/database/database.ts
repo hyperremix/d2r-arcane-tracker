@@ -35,6 +35,7 @@ class GrailDatabase {
   rawDb: Database.Database;
   db: DrizzleDb;
   dbPath: string;
+  private characterMapCache: Map<string, string> | null = null;
 
   /**
    * Initializes the GrailDatabase instance.
@@ -89,11 +90,20 @@ class GrailDatabase {
   getAllCharacters(): Character[] {
     return charactersModule.getAllCharacters(this);
   }
+  getCharacterMap(): Map<string, string> {
+    if (!this.characterMapCache) {
+      const characters = this.getAllCharacters();
+      this.characterMapCache = new Map(characters.map((c) => [c.id, c.name]));
+    }
+    return this.characterMapCache;
+  }
   updateCharacter(id: string, updates: Partial<Character>): void {
     charactersModule.updateCharacter(this, id, updates);
+    this.characterMapCache = null;
   }
   upsertCharactersBatch(chars: Character[]): void {
     charactersModule.upsertCharactersBatch(this, chars);
+    this.characterMapCache = null;
   }
   getCharacterByName(name: string): Character | undefined {
     return charactersModule.getCharacterByName(this, name);
@@ -106,6 +116,7 @@ class GrailDatabase {
   }
   upsertCharacter(character: Character): void {
     charactersModule.upsertCharacter(this, character);
+    this.characterMapCache = null;
   }
 
   // Progress
@@ -244,6 +255,7 @@ class GrailDatabase {
   }
   truncateUserData(): void {
     managementModule.truncateUserData(this);
+    this.characterMapCache = null;
   }
   getDatabasePath(): string {
     return managementModule.getDatabasePath(this);
@@ -273,6 +285,7 @@ class GrailDatabase {
     }
     this.rawDb = new Database(this.dbPath);
     this.db = createDrizzleDb(this.rawDb);
+    this.characterMapCache = null;
     this.initializeSchema();
   }
 
@@ -299,6 +312,7 @@ class GrailDatabase {
     }
     this.rawDb = new Database(this.dbPath);
     this.db = createDrizzleDb(this.rawDb);
+    this.characterMapCache = null;
     this.initializeSchema();
   }
 }

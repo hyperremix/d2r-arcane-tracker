@@ -1,8 +1,7 @@
 import { and, desc, eq } from 'drizzle-orm';
-import type { GrailProgress, Settings } from '../types/grail';
+import type { Difficulty, GrailProgress, Settings } from '../types/grail';
 import { dbProgressToProgress, toISOString } from './converters';
-import { schema } from './drizzle';
-import { getFilteredItems } from './items';
+import { type DbGrailProgress, schema } from './drizzle';
 import type { DatabaseContext } from './types';
 
 const { grailProgress } = schema;
@@ -17,11 +16,47 @@ export function getAllProgress(ctx: DatabaseContext): GrailProgress[] {
 }
 
 export function getFilteredProgress(ctx: DatabaseContext, userSettings: Settings): GrailProgress[] {
-  const allProgress = getAllProgress(ctx);
-  const filteredItems = getFilteredItems(ctx, userSettings);
-  const filteredItemIds = new Set(filteredItems.map((item) => item.id));
+  const excludedTypes: string[] = [];
+  if (!userSettings.grailRunes) excludedTypes.push('rune');
+  if (!userSettings.grailRunewords) excludedTypes.push('runeword');
 
-  return allProgress.filter((progress) => filteredItemIds.has(progress.itemId));
+  if (excludedTypes.length === 0) {
+    return getAllProgress(ctx);
+  }
+
+  // Use raw SQL for the JOIN + filter to avoid loading all items and progress
+  const placeholders = excludedTypes.map(() => '?').join(', ');
+  const rawDbProgress = ctx.rawDb
+    .prepare(
+      `
+      SELECT gp.* FROM grail_progress gp
+      INNER JOIN items i ON gp.item_id = i.id
+      WHERE i.type NOT IN (${placeholders})
+      ORDER BY gp.updated_at DESC
+    `,
+    )
+    .all(...excludedTypes) as Record<string, unknown>[];
+
+  // Map snake_case raw SQL columns to camelCase DbGrailProgress shape.
+  // dbProgressToProgress handles the domain conversion (including dropping autoDetected,
+  // which is stored in the DB but not part of the GrailProgress domain type).
+  return rawDbProgress.map((row) => {
+    const dbProg: DbGrailProgress = {
+      id: row.id as string,
+      characterId: row.character_id as string,
+      itemId: row.item_id as string,
+      foundDate: (row.found_date as string | null) ?? null,
+      manuallyAdded: Boolean(row.manually_added),
+      autoDetected: Boolean(row.auto_detected),
+      difficulty: (row.difficulty as Difficulty | null) ?? null,
+      notes: (row.notes as string | null) ?? null,
+      isEthereal: Boolean(row.is_ethereal),
+      fromInitialScan: Boolean(row.from_initial_scan),
+      createdAt: (row.created_at as string | null) ?? null,
+      updatedAt: (row.updated_at as string | null) ?? null,
+    };
+    return dbProgressToProgress(dbProg);
+  });
 }
 
 export function getProgressByCharacter(ctx: DatabaseContext, characterId: string): GrailProgress[] {

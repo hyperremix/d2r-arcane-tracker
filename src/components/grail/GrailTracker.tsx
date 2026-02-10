@@ -8,6 +8,12 @@ import { AdvancedSearch } from './AdvancedSearch';
 import { ItemGrid } from './ItemGrid';
 import { ProgressGauge } from './ProgressGauge';
 
+function getSettledValue<T>(result: PromiseSettledResult<T>, label: string): T | undefined {
+  if (result.status === 'fulfilled') return result.value;
+  console.error(`Failed to load ${label}:`, result.reason);
+  return undefined;
+}
+
 /**
  * GrailTracker component that serves as the main Holy Grail tracking interface.
  * Manages loading of grail data, displays statistics, and provides item tracking interface.
@@ -23,31 +29,34 @@ export function GrailTracker() {
   useEffect(() => {
     const loadData = async () => {
       try {
-        // Load settings first
+        // Load settings first (other UI may depend on it)
         const settingsData = await window.electronAPI?.grail.getSettings();
         if (settingsData) {
           hydrateSettings(settingsData);
           console.log('Loaded settings from database');
         }
 
-        // Load characters
-        const charactersData = await window.electronAPI?.grail.getCharacters();
-        if (charactersData) {
-          setCharacters(charactersData);
-        }
+        // Load characters, items, and progress in parallel.
+        // Use allSettled so a failure in one call doesn't prevent the others from applying.
+        const [charactersResult, itemsResult, progressResult] = await Promise.allSettled([
+          window.electronAPI?.grail.getCharacters(),
+          window.electronAPI?.grail.getItems(),
+          window.electronAPI?.grail.getProgress(),
+        ]);
 
-        // Load items from database
-        const items = await window.electronAPI?.grail.getItems();
+        const characters = getSettledValue(charactersResult, 'characters');
+        if (characters) setCharacters(characters);
+
+        const items = getSettledValue(itemsResult, 'items');
         if (items) {
           setItems(items);
           console.log(`Loaded ${items.length} Holy Grail items from database`);
         }
 
-        // Load progress data
-        const progressData = await window.electronAPI?.grail.getProgress();
-        if (progressData) {
-          setProgress(progressData);
-          console.log(`Loaded ${progressData.length} progress entries from database`);
+        const progress = getSettledValue(progressResult, 'progress');
+        if (progress) {
+          setProgress(progress);
+          console.log(`Loaded ${progress.length} progress entries from database`);
         }
       } catch (error) {
         console.error('Failed to load grail data:', error);

@@ -152,6 +152,10 @@ export function createSchema(ctx: DatabaseContext): void {
       CREATE INDEX IF NOT EXISTS idx_run_items_run ON run_items(run_id);
       CREATE INDEX IF NOT EXISTS idx_run_items_progress ON run_items(grail_progress_id);
 
+      -- Additional indexes for sorting and filtering operations
+      CREATE INDEX IF NOT EXISTS idx_grail_progress_updated_at ON grail_progress(updated_at);
+      CREATE INDEX IF NOT EXISTS idx_characters_updated_at ON characters(updated_at);
+
       -- Triggers to update the updated_at timestamp
       CREATE TRIGGER IF NOT EXISTS update_items_timestamp
         AFTER UPDATE ON items
