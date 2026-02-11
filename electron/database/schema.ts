@@ -126,6 +126,54 @@ export function createSchema(ctx: DatabaseContext): void {
         FOREIGN KEY (grail_progress_id) REFERENCES grail_progress(id) ON DELETE CASCADE
       );
 
+      -- Vault categories table - stores category metadata for vaulted items
+      CREATE TABLE IF NOT EXISTS vault_categories (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        color TEXT,
+        metadata TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+
+      -- Vault items table - stores item snapshots captured from save scans
+      CREATE TABLE IF NOT EXISTS vault_items (
+        id TEXT PRIMARY KEY,
+        fingerprint TEXT NOT NULL,
+        item_name TEXT NOT NULL,
+        item_code TEXT,
+        quality TEXT NOT NULL,
+        ethereal BOOLEAN NOT NULL DEFAULT FALSE,
+        socket_count INTEGER,
+        raw_item_json TEXT NOT NULL,
+        source_character_id TEXT,
+        source_character_name TEXT,
+        source_file_type TEXT NOT NULL CHECK (source_file_type IN ('d2s', 'sss', 'd2x', 'd2i')),
+        location_context TEXT NOT NULL DEFAULT 'unknown' CHECK (
+          location_context IN ('equipped', 'inventory', 'stash', 'mercenary', 'corpse', 'unknown')
+        ),
+        stash_tab INTEGER,
+        grail_item_id TEXT,
+        is_present_in_latest_scan BOOLEAN NOT NULL DEFAULT TRUE,
+        last_seen_at DATETIME,
+        vaulted_at DATETIME,
+        unvaulted_at DATETIME,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (source_character_id) REFERENCES characters(id) ON DELETE SET NULL,
+        FOREIGN KEY (grail_item_id) REFERENCES items(id) ON DELETE SET NULL
+      );
+
+      -- Vault item categories table - many-to-many mapping for item category tags
+      CREATE TABLE IF NOT EXISTS vault_item_categories (
+        vault_item_id TEXT NOT NULL,
+        vault_category_id TEXT NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (vault_item_id, vault_category_id),
+        FOREIGN KEY (vault_item_id) REFERENCES vault_items(id) ON DELETE CASCADE,
+        FOREIGN KEY (vault_category_id) REFERENCES vault_categories(id) ON DELETE CASCADE
+      );
+
       -- Indexes for better performance
       CREATE INDEX IF NOT EXISTS idx_items_category ON items(category);
       CREATE INDEX IF NOT EXISTS idx_items_type ON items(type);
@@ -151,6 +199,25 @@ export function createSchema(ctx: DatabaseContext): void {
       -- Run items indexes
       CREATE INDEX IF NOT EXISTS idx_run_items_run ON run_items(run_id);
       CREATE INDEX IF NOT EXISTS idx_run_items_progress ON run_items(grail_progress_id);
+
+      -- Vault category indexes
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_vault_categories_name ON vault_categories(name);
+
+      -- Vault items indexes
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_vault_items_fingerprint ON vault_items(fingerprint);
+      CREATE INDEX IF NOT EXISTS idx_vault_items_item_name ON vault_items(item_name);
+      CREATE INDEX IF NOT EXISTS idx_vault_items_item_code ON vault_items(item_code);
+      CREATE INDEX IF NOT EXISTS idx_vault_items_quality ON vault_items(quality);
+      CREATE INDEX IF NOT EXISTS idx_vault_items_source_character_id ON vault_items(source_character_id);
+      CREATE INDEX IF NOT EXISTS idx_vault_items_source_file_type ON vault_items(source_file_type);
+      CREATE INDEX IF NOT EXISTS idx_vault_items_location_context ON vault_items(location_context);
+      CREATE INDEX IF NOT EXISTS idx_vault_items_grail_item_id ON vault_items(grail_item_id);
+      CREATE INDEX IF NOT EXISTS idx_vault_items_present_scan ON vault_items(is_present_in_latest_scan);
+      CREATE INDEX IF NOT EXISTS idx_vault_items_last_seen_at ON vault_items(last_seen_at);
+
+      -- Vault item categories indexes
+      CREATE INDEX IF NOT EXISTS idx_vault_item_categories_item ON vault_item_categories(vault_item_id);
+      CREATE INDEX IF NOT EXISTS idx_vault_item_categories_category ON vault_item_categories(vault_category_id);
 
       -- Triggers to update the updated_at timestamp
       CREATE TRIGGER IF NOT EXISTS update_items_timestamp
@@ -193,6 +260,18 @@ export function createSchema(ctx: DatabaseContext): void {
         AFTER UPDATE ON runs
         BEGIN
           UPDATE runs SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
+        END;
+
+      CREATE TRIGGER IF NOT EXISTS update_vault_categories_timestamp
+        AFTER UPDATE ON vault_categories
+        BEGIN
+          UPDATE vault_categories SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
+        END;
+
+      CREATE TRIGGER IF NOT EXISTS update_vault_items_timestamp
+        AFTER UPDATE ON vault_items
+        BEGIN
+          UPDATE vault_items SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
         END;
 
       -- Insert default settings

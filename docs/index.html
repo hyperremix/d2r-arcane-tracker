@@ -1,16 +1,28 @@
 <!DOCTYPE html>
 <html lang="en" class="scroll-smooth">
-<head>
+  <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>D2R Arcane Tracker - Holy Grail Tracker for Diablo 2 Resurrected</title>
-    <meta name="description" content="The ultimate Holy Grail tracker for Diablo 2 Resurrected. Automatically track your unique items, set items, runes, and complete your Holy Grail challenge.">
-    <meta name="keywords" content="Diablo 2 Resurrected tracker, D2R grail tracker, Holy Grail D2R, D2R item tracker, Diablo 2 Holy Grail tracker, D2R unique tracker, D2R set tracker">
+    <meta
+      name="description"
+      content="The ultimate Holy Grail tracker for Diablo 2 Resurrected. Automatically track your unique items, set items, runes, and complete your Holy Grail challenge."
+    >
+    <meta
+      name="keywords"
+      content="Diablo 2 Resurrected tracker, D2R grail tracker, Holy Grail D2R, D2R item tracker, Diablo 2 Holy Grail tracker, D2R unique tracker, D2R set tracker"
+    >
 
     <!-- Open Graph / Social Media -->
     <meta property="og:type" content="website">
-    <meta property="og:title" content="D2R Arcane Tracker - Holy Grail Tracker for Diablo 2 Resurrected">
-    <meta property="og:description" content="The ultimate Holy Grail tracker for Diablo 2 Resurrected. Automatically track your unique items, set items, runes, and complete your Holy Grail challenge.">
+    <meta
+      property="og:title"
+      content="D2R Arcane Tracker - Holy Grail Tracker for Diablo 2 Resurrected"
+    >
+    <meta
+      property="og:description"
+      content="The ultimate Holy Grail tracker for Diablo 2 Resurrected. Automatically track your unique items, set items, runes, and complete your Holy Grail challenge."
+    >
     <meta property="og:url" content="https://hyperremix.github.io/d2r-arcane-tracker/">
 
     <!-- Favicon -->
@@ -20,495 +32,689 @@
     <script src="https://cdn.tailwindcss.com"></script>
 
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
 
-        * {
-            font-family: 'Inter', sans-serif;
-        }
+    * {
+      font-family: 'Inter', sans-serif;
+    }
 
-        body {
-            background: linear-gradient(135deg, #09090b 0%, #18181b 50%, #09090b 100%);
-            background-attachment: fixed;
-        }
+    body {
+      background: linear-gradient(135deg, #09090b 0%, #18181b 50%, #09090b 100%);
+      background-attachment: fixed;
+    }
 
-        .hero-gradient {
-            background: linear-gradient(135deg, rgba(24, 24, 27, 0.5) 0%, rgba(39, 39, 42, 0.3) 100%);
-        }
+    .hero-gradient {
+      background: linear-gradient(135deg, rgba(24, 24, 27, 0.5) 0%, rgba(39, 39, 42, 0.3) 100%);
+    }
 
-        .card-hover {
-            transition: all 0.3s ease;
-        }
+    .card-hover {
+      transition: all 0.3s ease;
+    }
 
-        .card-hover:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
-        }
+    .card-hover:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+    }
 
-        .accent-gradient {
-            background: linear-gradient(135deg, #d4d4d8 0%, #f4f4f5 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-        }
+    .accent-gradient {
+      background: linear-gradient(135deg, #d4d4d8 0%, #f4f4f5 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
 
-        .button-glow {
-            box-shadow: 0 0 20px rgba(212, 212, 216, 0.2);
-        }
+    .button-glow {
+      box-shadow: 0 0 20px rgba(212, 212, 216, 0.2);
+    }
 
-        .nav-link {
-            position: relative;
-            transition: color 0.3s ease;
-        }
+    .nav-link {
+      position: relative;
+      transition: color 0.3s ease;
+    }
 
-        .nav-link::after {
-            content: '';
-            position: absolute;
-            bottom: -4px;
-            left: 0;
-            width: 0;
-            height: 2px;
-            background: linear-gradient(90deg, #d4d4d8, #f4f4f5);
-            transition: width 0.3s ease;
-        }
+    .nav-link::after {
+      content: '';
+      position: absolute;
+      bottom: -4px;
+      left: 0;
+      width: 0;
+      height: 2px;
+      background: linear-gradient(90deg, #d4d4d8, #f4f4f5);
+      transition: width 0.3s ease;
+    }
 
-        .nav-link:hover::after {
-            width: 100%;
-        }
+    .nav-link:hover::after {
+      width: 100%;
+    }
 
-        .fade-in {
-            animation: fadeIn 0.8s ease-in;
-        }
+    .fade-in {
+      animation: fadeIn 0.8s ease-in;
+    }
 
-        @keyframes fadeIn {
-            from {
-                opacity: 0;
-                transform: translateY(20px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
 
-        .screenshot-container {
-            position: relative;
-            overflow: hidden;
-            border-radius: 0.75rem;
-            border: 2px solid rgba(63, 63, 70, 0.4);
-        }
+    .screenshot-container {
+      position: relative;
+      overflow: hidden;
+      border-radius: 0.75rem;
+      border: 2px solid rgba(63, 63, 70, 0.4);
+    }
 
-        .screenshot-container img {
-            transition: transform 0.3s ease;
-        }
+    .screenshot-container img {
+      transition: transform 0.3s ease;
+    }
 
-        .screenshot-container:hover img {
-            transform: scale(1.05);
-        }
+    .screenshot-container:hover img {
+      transform: scale(1.05);
+    }
     </style>
-</head>
-<body class="text-gray-100">
+  </head>
+  <body class="text-gray-100">
     <!-- Navigation -->
-    <nav class="fixed top-0 left-0 right-0 z-50 bg-zinc-950/95 backdrop-blur-md border-b border-zinc-800/80">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="flex justify-between items-center h-16">
-                <div class="flex items-center space-x-3">
-                    <img src="logo.png" alt="D2R Arcane Tracker Logo" class="h-10 w-10">
-                    <span class="text-xl font-bold accent-gradient">D2R Arcane Tracker</span>
-                </div>
-                <div class="hidden md:flex space-x-8">
-                    <a href="#features" class="nav-link text-zinc-300 hover:text-zinc-100">Features</a>
-                    <a href="#screenshots" class="nav-link text-zinc-300 hover:text-zinc-100">Screenshots</a>
-                    <a href="#download" class="nav-link text-zinc-300 hover:text-zinc-100">Download</a>
-                    <a href="#docs" class="nav-link text-zinc-300 hover:text-zinc-100">Documentation</a>
-                    <a href="https://github.com/hyperremix/d2r-arcane-tracker" target="_blank" class="nav-link text-zinc-300 hover:text-zinc-100">GitHub</a>
-                </div>
-            </div>
+    <nav
+      class="fixed top-0 left-0 right-0 z-50 bg-zinc-950/95 backdrop-blur-md border-b border-zinc-800/80"
+    >
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="flex justify-between items-center h-16">
+          <div class="flex items-center space-x-3">
+            <img src="logo.png" alt="D2R Arcane Tracker Logo" class="h-10 w-10">
+            <span class="text-xl font-bold accent-gradient">D2R Arcane Tracker</span>
+          </div>
+          <div class="hidden md:flex space-x-8">
+            <a href="#features" class="nav-link text-zinc-300 hover:text-zinc-100">Features</a>
+            <a href="#screenshots" class="nav-link text-zinc-300 hover:text-zinc-100"
+              >Screenshots</a
+            >
+            <a href="#download" class="nav-link text-zinc-300 hover:text-zinc-100">Download</a>
+            <a href="#docs" class="nav-link text-zinc-300 hover:text-zinc-100">Documentation</a>
+            <a
+              href="https://github.com/hyperremix/d2r-arcane-tracker"
+              target="_blank"
+              class="nav-link text-zinc-300 hover:text-zinc-100"
+              >GitHub</a
+            >
+          </div>
         </div>
+      </div>
     </nav>
 
     <!-- Hero Section -->
     <section class="pt-32 pb-20 px-4 sm:px-6 lg:px-8 hero-gradient fade-in">
-        <div class="max-w-7xl mx-auto text-center">
-            <div class="mb-6 flex justify-center space-x-3">
-                <img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License">
-                <img src="https://img.shields.io/badge/TypeScript-5.2-blue.svg" alt="TypeScript">
-                <img src="https://img.shields.io/badge/React-18.3-blue.svg" alt="React">
-                <img src="https://img.shields.io/badge/Electron-30.0-blue.svg" alt="Electron">
-            </div>
-
-            <h1 class="text-5xl sm:text-6xl lg:text-7xl font-bold mb-6">
-                <span class="accent-gradient">D2R Arcane Tracker</span>
-            </h1>
-
-            <p class="text-2xl sm:text-3xl text-zinc-200 mb-4 font-light">
-                The Ultimate Holy Grail Tracker
-            </p>
-
-            <p class="text-xl text-zinc-300 mb-8 max-w-3xl mx-auto">
-                Automatically track your Holy Grail progress <em>and</em> every farming run with session-based logging,
-                auto/manual timers, and shareable exports.
-            </p>
-
-            <div class="flex flex-col sm:flex-row justify-center items-center space-y-4 sm:space-y-0 sm:space-x-6">
-                <a href="https://github.com/hyperremix/d2r-arcane-tracker/releases" target="_blank"
-                   class="px-8 py-4 bg-gradient-to-r from-zinc-700 to-zinc-600 text-zinc-50 font-bold rounded-lg text-lg hover:from-zinc-600 hover:to-zinc-500 transform hover:scale-105 transition-all button-glow">
-                    Download Now
-                </a>
-                <a href="#features"
-                   class="px-8 py-4 bg-zinc-900/50 border-2 border-zinc-700 text-zinc-100 font-semibold rounded-lg text-lg hover:bg-zinc-800/70 transform hover:scale-105 transition-all">
-                    Learn More
-                </a>
-            </div>
-
-            <div class="mt-12 text-sm text-gray-400">
-                <p>Available for Windows 10 or later</p>
-            </div>
+      <div class="max-w-7xl mx-auto text-center">
+        <div class="mb-6 flex justify-center space-x-3">
+          <img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License">
+          <img src="https://img.shields.io/badge/TypeScript-5.2-blue.svg" alt="TypeScript">
+          <img src="https://img.shields.io/badge/React-18.3-blue.svg" alt="React">
+          <img src="https://img.shields.io/badge/Electron-30.0-blue.svg" alt="Electron">
         </div>
+
+        <h1 class="text-5xl sm:text-6xl lg:text-7xl font-bold mb-6">
+          <span class="accent-gradient">D2R Arcane Tracker</span>
+        </h1>
+
+        <p class="text-2xl sm:text-3xl text-zinc-200 mb-4 font-light">
+          The Ultimate Holy Grail Tracker
+        </p>
+
+        <p class="text-xl text-zinc-300 mb-8 max-w-3xl mx-auto">
+          Automatically track your Holy Grail progress <em>and</em> every farming run with
+          session-based logging, auto/manual timers, and shareable exports.
+        </p>
+
+        <div
+          class="flex flex-col sm:flex-row justify-center items-center space-y-4 sm:space-y-0 sm:space-x-6"
+        >
+          <a
+            href="https://github.com/hyperremix/d2r-arcane-tracker/releases"
+            target="_blank"
+            class="px-8 py-4 bg-gradient-to-r from-zinc-700 to-zinc-600 text-zinc-50 font-bold rounded-lg text-lg hover:from-zinc-600 hover:to-zinc-500 transform hover:scale-105 transition-all button-glow"
+          >
+            Download Now
+          </a>
+          <a
+            href="#features"
+            class="px-8 py-4 bg-zinc-900/50 border-2 border-zinc-700 text-zinc-100 font-semibold rounded-lg text-lg hover:bg-zinc-800/70 transform hover:scale-105 transition-all"
+          >
+            Learn More
+          </a>
+        </div>
+
+        <div class="mt-12 text-sm text-gray-400">
+          <p>Available for Windows 10 or later</p>
+        </div>
+      </div>
     </section>
 
     <!-- What is Holy Grail Section -->
     <section class="py-16 px-4 sm:px-6 lg:px-8">
-        <div class="max-w-4xl mx-auto">
-            <div class="bg-zinc-900/60 border border-zinc-800/60 rounded-xl p-8 backdrop-blur-sm">
-                <h2 class="text-3xl font-bold mb-4 accent-gradient">What is a Holy Grail in D2R?</h2>
-                <p class="text-lg text-zinc-300 leading-relaxed">
-                    The Holy Grail challenge in Diablo 2 Resurrected is a popular endgame goal where players
-                    aim to find every unique and set item in the game. D2R Arcane Tracker makes this challenge
-                    easier by automatically tracking your progress as you play.
-                </p>
-                <a href="HOLY_GRAIL_GUIDE.html" class="inline-block mt-6 text-zinc-200 hover:text-zinc-100 font-semibold">
-                    Read the Complete Holy Grail Guide →
-                </a>
-            </div>
+      <div class="max-w-4xl mx-auto">
+        <div class="bg-zinc-900/60 border border-zinc-800/60 rounded-xl p-8 backdrop-blur-sm">
+          <h2 class="text-3xl font-bold mb-4 accent-gradient">What is a Holy Grail in D2R?</h2>
+          <p class="text-lg text-zinc-300 leading-relaxed">
+            The Holy Grail challenge in Diablo 2 Resurrected is a popular endgame goal where players
+            aim to find every unique and set item in the game. D2R Arcane Tracker makes this
+            challenge easier by automatically tracking your progress as you play.
+          </p>
+          <a
+            href="HOLY_GRAIL_GUIDE.html"
+            class="inline-block mt-6 text-zinc-200 hover:text-zinc-100 font-semibold"
+          >
+            Read the Complete Holy Grail Guide →
+          </a>
         </div>
+      </div>
     </section>
 
     <!-- Features Section -->
     <section id="features" class="py-20 px-4 sm:px-6 lg:px-8">
-        <div class="max-w-7xl mx-auto">
-            <div class="text-center mb-16">
-                <h2 class="text-4xl sm:text-5xl font-bold mb-4 accent-gradient">Features</h2>
-                <p class="text-xl text-gray-400">Everything you need to track your Holy Grail progress</p>
-            </div>
-
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                <!-- Feature 1 -->
-                <div class="bg-gradient-to-br from-zinc-900/80 to-zinc-950/60 border border-zinc-800/60 rounded-xl p-8 card-hover">
-                    <div class="text-5xl mb-4">🏆</div>
-                    <h3 class="text-2xl font-bold mb-3 text-zinc-100">Holy Grail Tracking</h3>
-                    <p class="text-zinc-300">Comprehensive tracking of unique items, sets, and runes with detailed progress metrics.</p>
-                </div>
-
-                <!-- Feature 2 -->
-                <div class="bg-gradient-to-br from-zinc-900/80 to-zinc-950/60 border border-zinc-800/60 rounded-xl p-8 card-hover">
-                    <div class="text-5xl mb-4">📁</div>
-                    <h3 class="text-2xl font-bold mb-3 text-zinc-100">Save File Monitoring</h3>
-                    <p class="text-zinc-300">Automatic detection and parsing of D2R save files. No manual input required.</p>
-                </div>
-
-                <!-- Feature 3 -->
-                <div class="bg-gradient-to-br from-zinc-900/80 to-zinc-950/60 border border-zinc-800/60 rounded-xl p-8 card-hover">
-                    <div class="text-5xl mb-4">📊</div>
-                    <h3 class="text-2xl font-bold mb-3 text-zinc-100">Progress Analytics</h3>
-                    <p class="text-zinc-300">Visual progress bars, statistics, and completion tracking to monitor your journey.</p>
-                </div>
-
-                <!-- Feature 4 -->
-                <div class="bg-gradient-to-br from-zinc-900/80 to-zinc-950/60 border border-zinc-800/60 rounded-xl p-8 card-hover">
-                    <div class="text-5xl mb-4">🎮</div>
-                    <h3 class="text-2xl font-bold mb-3 text-zinc-100">Multiple Game Modes</h3>
-                    <p class="text-zinc-300">Support for different game versions and modes including ladder and non-ladder.</p>
-                </div>
-
-                <!-- Feature 5 -->
-                <div class="bg-gradient-to-br from-zinc-900/80 to-zinc-950/60 border border-zinc-800/60 rounded-xl p-8 card-hover">
-                    <div class="text-5xl mb-4">🔔</div>
-                    <h3 class="text-2xl font-bold mb-3 text-zinc-100">Smart Notifications</h3>
-                    <p class="text-zinc-300">Get notified when new items are found. Never miss an important drop.</p>
-                </div>
-
-                <!-- Feature 6 -->
-                <div class="bg-gradient-to-br from-zinc-900/80 to-zinc-950/60 border border-zinc-800/60 rounded-xl p-8 card-hover">
-                    <div class="text-5xl mb-4">⏱️</div>
-                    <h3 class="text-2xl font-bold mb-3 text-zinc-100">Run Tracker</h3>
-                    <p class="text-zinc-300">Session-based run logging with auto/manual timers, per-run loot, and export tools.</p>
-                </div>
-
-                <!-- Feature 7 -->
-                <div class="bg-gradient-to-br from-zinc-900/80 to-zinc-950/60 border border-zinc-800/60 rounded-xl p-8 card-hover">
-                    <div class="text-5xl mb-4">💾</div>
-                    <h3 class="text-2xl font-bold mb-3 text-zinc-100">Local Database</h3>
-                    <p class="text-zinc-300">SQLite database ensures reliable data persistence. Your progress is always safe.</p>
-                </div>
-            </div>
+      <div class="max-w-7xl mx-auto">
+        <div class="text-center mb-16">
+          <h2 class="text-4xl sm:text-5xl font-bold mb-4 accent-gradient">Features</h2>
+          <p class="text-xl text-gray-400">Everything you need to track your Holy Grail progress</p>
         </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+          <!-- Feature 1 -->
+          <div
+            class="bg-gradient-to-br from-zinc-900/80 to-zinc-950/60 border border-zinc-800/60 rounded-xl p-8 card-hover"
+          >
+            <div class="text-5xl mb-4">🏆</div>
+            <h3 class="text-2xl font-bold mb-3 text-zinc-100">Holy Grail Tracking</h3>
+            <p class="text-zinc-300">
+              Comprehensive tracking of unique items, sets, and runes with detailed progress
+              metrics.
+            </p>
+          </div>
+
+          <!-- Feature 2 -->
+          <div
+            class="bg-gradient-to-br from-zinc-900/80 to-zinc-950/60 border border-zinc-800/60 rounded-xl p-8 card-hover"
+          >
+            <div class="text-5xl mb-4">📁</div>
+            <h3 class="text-2xl font-bold mb-3 text-zinc-100">Save File Monitoring</h3>
+            <p class="text-zinc-300">
+              Automatic detection and parsing of D2R save files. No manual input required.
+            </p>
+          </div>
+
+          <!-- Feature 3 -->
+          <div
+            class="bg-gradient-to-br from-zinc-900/80 to-zinc-950/60 border border-zinc-800/60 rounded-xl p-8 card-hover"
+          >
+            <div class="text-5xl mb-4">📊</div>
+            <h3 class="text-2xl font-bold mb-3 text-zinc-100">Progress Analytics</h3>
+            <p class="text-zinc-300">
+              Visual progress bars, statistics, and completion tracking to monitor your journey.
+            </p>
+          </div>
+
+          <!-- Feature 4 -->
+          <div
+            class="bg-gradient-to-br from-zinc-900/80 to-zinc-950/60 border border-zinc-800/60 rounded-xl p-8 card-hover"
+          >
+            <div class="text-5xl mb-4">🎮</div>
+            <h3 class="text-2xl font-bold mb-3 text-zinc-100">Multiple Game Modes</h3>
+            <p class="text-zinc-300">
+              Support for different game versions and modes including ladder and non-ladder.
+            </p>
+          </div>
+
+          <!-- Feature 5 -->
+          <div
+            class="bg-gradient-to-br from-zinc-900/80 to-zinc-950/60 border border-zinc-800/60 rounded-xl p-8 card-hover"
+          >
+            <div class="text-5xl mb-4">🔔</div>
+            <h3 class="text-2xl font-bold mb-3 text-zinc-100">Smart Notifications</h3>
+            <p class="text-zinc-300">
+              Get notified when new items are found. Never miss an important drop.
+            </p>
+          </div>
+
+          <!-- Feature 6 -->
+          <div
+            class="bg-gradient-to-br from-zinc-900/80 to-zinc-950/60 border border-zinc-800/60 rounded-xl p-8 card-hover"
+          >
+            <div class="text-5xl mb-4">⏱️</div>
+            <h3 class="text-2xl font-bold mb-3 text-zinc-100">Run Tracker</h3>
+            <p class="text-zinc-300">
+              Session-based run logging with auto/manual timers, per-run loot, and export tools.
+            </p>
+          </div>
+
+          <!-- Feature 7 -->
+          <div
+            class="bg-gradient-to-br from-zinc-900/80 to-zinc-950/60 border border-zinc-800/60 rounded-xl p-8 card-hover"
+          >
+            <div class="text-5xl mb-4">💾</div>
+            <h3 class="text-2xl font-bold mb-3 text-zinc-100">Local Database</h3>
+            <p class="text-zinc-300">
+              SQLite database ensures reliable data persistence. Your progress is always safe.
+            </p>
+          </div>
+        </div>
+      </div>
     </section>
 
     <!-- Screenshots Section -->
     <section id="screenshots" class="py-20 px-4 sm:px-6 lg:px-8 bg-black/30">
-        <div class="max-w-7xl mx-auto">
-            <div class="text-center mb-16">
-                <h2 class="text-4xl sm:text-5xl font-bold mb-4 accent-gradient">Screenshots</h2>
-                <p class="text-xl text-gray-400">See D2R Arcane Tracker in action</p>
-            </div>
-
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-                <div class="screenshot-container">
-                    <img src="screenshots/grail-tracker.jpg" alt="Grail Tracker Dashboard" class="w-full h-auto">
-                    <div class="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-zinc-950/95 to-transparent p-6">
-                        <h3 class="text-xl font-bold text-zinc-100 mb-2">Grail Tracker Dashboard</h3>
-                        <p class="text-zinc-300">Track your Holy Grail progress with an intuitive, searchable interface</p>
-                    </div>
-                </div>
-
-                <div class="screenshot-container">
-                    <img src="screenshots/item-dialog.jpg" alt="Item Details Dialog" class="w-full h-auto">
-                    <div class="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-zinc-950/95 to-transparent p-6">
-                        <h3 class="text-xl font-bold text-zinc-100 mb-2">Item Details</h3>
-                        <p class="text-zinc-300">View detailed information about each item and tracking history</p>
-                    </div>
-                </div>
-            </div>
-
-            <div class="screenshot-container max-w-4xl mx-auto">
-                <img src="screenshots/statistics.jpg" alt="Statistics Dashboard" class="w-full h-auto">
-                <div class="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-zinc-950/95 to-transparent p-6">
-                    <h3 class="text-xl font-bold text-zinc-100 mb-2">Statistics Overview</h3>
-                    <p class="text-zinc-300">Comprehensive statistics dashboard showing progress across all item categories</p>
-                </div>
-            </div>
+      <div class="max-w-7xl mx-auto">
+        <div class="text-center mb-16">
+          <h2 class="text-4xl sm:text-5xl font-bold mb-4 accent-gradient">Screenshots</h2>
+          <p class="text-xl text-gray-400">See D2R Arcane Tracker in action</p>
         </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+          <div class="screenshot-container">
+            <img
+              src="screenshots/grail-tracker.jpg"
+              alt="Grail Tracker Dashboard"
+              class="w-full h-auto"
+            >
+            <div
+              class="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-zinc-950/95 to-transparent p-6"
+            >
+              <h3 class="text-xl font-bold text-zinc-100 mb-2">Grail Tracker Dashboard</h3>
+              <p class="text-zinc-300">
+                Track your Holy Grail progress with an intuitive, searchable interface
+              </p>
+            </div>
+          </div>
+
+          <div class="screenshot-container">
+            <img src="screenshots/item-dialog.jpg" alt="Item Details Dialog" class="w-full h-auto">
+            <div
+              class="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-zinc-950/95 to-transparent p-6"
+            >
+              <h3 class="text-xl font-bold text-zinc-100 mb-2">Item Details</h3>
+              <p class="text-zinc-300">
+                View detailed information about each item and tracking history
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div class="screenshot-container max-w-4xl mx-auto">
+          <img src="screenshots/statistics.jpg" alt="Statistics Dashboard" class="w-full h-auto">
+          <div
+            class="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-zinc-950/95 to-transparent p-6"
+          >
+            <h3 class="text-xl font-bold text-zinc-100 mb-2">Statistics Overview</h3>
+            <p class="text-zinc-300">
+              Comprehensive statistics dashboard showing progress across all item categories
+            </p>
+          </div>
+        </div>
+      </div>
     </section>
 
     <!-- Download Section -->
     <section id="download" class="py-20 px-4 sm:px-6 lg:px-8">
-        <div class="max-w-5xl mx-auto">
-            <div class="text-center mb-16">
-                <h2 class="text-4xl sm:text-5xl font-bold mb-4 accent-gradient">Download & Install</h2>
-                <p class="text-xl text-gray-400">Get started in minutes</p>
-            </div>
-
-            <!-- System Requirements -->
-            <div class="bg-zinc-900/60 border border-zinc-800/60 rounded-xl p-8 mb-8">
-                <h3 class="text-2xl font-bold mb-6 text-zinc-100">System Requirements</h3>
-                <div class="flex flex-col space-y-3">
-                    <div class="flex items-center space-x-3">
-                        <div class="text-2xl">💻</div>
-                        <div>
-                            <h4 class="font-bold text-zinc-200">Windows 10 or later (64-bit)</h4>
-                            <p class="text-zinc-400 text-sm">Required operating system</p>
-                        </div>
-                    </div>
-                    <div class="flex items-center space-x-3">
-                        <div class="text-2xl">🎮</div>
-                        <div>
-                            <h4 class="font-bold text-zinc-200">Diablo II: Resurrected</h4>
-                            <p class="text-zinc-400 text-sm">Game must be installed</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Download Button -->
-            <div class="flex justify-center mb-8">
-                <a href="https://github.com/hyperremix/d2r-arcane-tracker/releases" target="_blank"
-                   class="flex flex-col items-center justify-center p-12 bg-gradient-to-br from-zinc-900/80 to-zinc-950/60 border-2 border-zinc-800/60 rounded-xl card-hover text-center max-w-md w-full">
-                    <div class="text-6xl mb-4">🪟</div>
-                    <h4 class="text-2xl font-bold mb-2 text-zinc-100">Download for Windows</h4>
-                    <p class="text-zinc-400 mb-4">Latest version - Setup Installer (.exe)</p>
-                    <div class="px-6 py-2 bg-zinc-700 text-zinc-100 rounded-lg text-sm font-semibold">
-                        Download from GitHub Releases
-                    </div>
-                </a>
-            </div>
-
-            <!-- Installation Steps -->
-            <div class="bg-zinc-900/60 border border-zinc-800/60 rounded-xl p-8">
-                <h3 class="text-2xl font-bold mb-6 text-zinc-100">Installation Guide</h3>
-                <ol class="space-y-4 text-zinc-300">
-                    <li class="flex items-start">
-                        <span class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-zinc-700 text-zinc-100 font-bold mr-4 flex-shrink-0">1</span>
-                        <div>
-                            <strong class="text-zinc-100">Download</strong> the latest Windows installer (.exe) from GitHub Releases
-                        </div>
-                    </li>
-                    <li class="flex items-start">
-                        <span class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-zinc-700 text-zinc-100 font-bold mr-4 flex-shrink-0">2</span>
-                        <div>
-                            <strong class="text-zinc-100">Run the installer</strong> - If Windows shows a "Windows protected your PC" warning, click "More info" then "Run anyway"
-                        </div>
-                    </li>
-                    <li class="flex items-start">
-                        <span class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-zinc-700 text-zinc-100 font-bold mr-4 flex-shrink-0">3</span>
-                        <div>
-                            <strong class="text-zinc-100">Launch</strong> the application from the Start Menu
-                        </div>
-                    </li>
-                    <li class="flex items-start">
-                        <span class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-zinc-700 text-zinc-100 font-bold mr-4 flex-shrink-0">4</span>
-                        <div>
-                            <strong class="text-zinc-100">Configure</strong> your D2R save file path (default: <code class="text-xs bg-zinc-800 px-2 py-1 rounded">%USERPROFILE%\Saved Games\Diablo II Resurrected</code>)
-                        </div>
-                    </li>
-                    <li class="flex items-start">
-                        <span class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-zinc-700 text-zinc-100 font-bold mr-4 flex-shrink-0">5</span>
-                        <div>
-                            <strong class="text-zinc-100">Start tracking</strong> your Holy Grail progress automatically!
-                        </div>
-                    </li>
-                </ol>
-            </div>
+      <div class="max-w-5xl mx-auto">
+        <div class="text-center mb-16">
+          <h2 class="text-4xl sm:text-5xl font-bold mb-4 accent-gradient">Download & Install</h2>
+          <p class="text-xl text-gray-400">Get started in minutes</p>
         </div>
+
+        <!-- System Requirements -->
+        <div class="bg-zinc-900/60 border border-zinc-800/60 rounded-xl p-8 mb-8">
+          <h3 class="text-2xl font-bold mb-6 text-zinc-100">System Requirements</h3>
+          <div class="flex flex-col space-y-3">
+            <div class="flex items-center space-x-3">
+              <div class="text-2xl">💻</div>
+              <div>
+                <h4 class="font-bold text-zinc-200">Windows 10 or later (64-bit)</h4>
+                <p class="text-zinc-400 text-sm">Required operating system</p>
+              </div>
+            </div>
+            <div class="flex items-center space-x-3">
+              <div class="text-2xl">🎮</div>
+              <div>
+                <h4 class="font-bold text-zinc-200">Diablo II: Resurrected</h4>
+                <p class="text-zinc-400 text-sm">Game must be installed</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Download Button -->
+        <div class="flex justify-center mb-8">
+          <a
+            href="https://github.com/hyperremix/d2r-arcane-tracker/releases"
+            target="_blank"
+            class="flex flex-col items-center justify-center p-12 bg-gradient-to-br from-zinc-900/80 to-zinc-950/60 border-2 border-zinc-800/60 rounded-xl card-hover text-center max-w-md w-full"
+          >
+            <div class="text-6xl mb-4">🪟</div>
+            <h4 class="text-2xl font-bold mb-2 text-zinc-100">Download for Windows</h4>
+            <p class="text-zinc-400 mb-4">Latest version - Setup Installer (.exe)</p>
+            <div class="px-6 py-2 bg-zinc-700 text-zinc-100 rounded-lg text-sm font-semibold">
+              Download from GitHub Releases
+            </div>
+          </a>
+        </div>
+
+        <!-- Installation Steps -->
+        <div class="bg-zinc-900/60 border border-zinc-800/60 rounded-xl p-8">
+          <h3 class="text-2xl font-bold mb-6 text-zinc-100">Installation Guide</h3>
+          <ol class="space-y-4 text-zinc-300">
+            <li class="flex items-start">
+              <span
+                class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-zinc-700 text-zinc-100 font-bold mr-4 flex-shrink-0"
+                >1</span
+              >
+              <div>
+                <strong class="text-zinc-100">Download</strong> the latest Windows installer (.exe)
+                from GitHub Releases
+              </div>
+            </li>
+            <li class="flex items-start">
+              <span
+                class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-zinc-700 text-zinc-100 font-bold mr-4 flex-shrink-0"
+                >2</span
+              >
+              <div>
+                <strong class="text-zinc-100">Run the installer</strong> - If Windows shows a
+                "Windows protected your PC" warning, click "More info" then "Run anyway"
+              </div>
+            </li>
+            <li class="flex items-start">
+              <span
+                class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-zinc-700 text-zinc-100 font-bold mr-4 flex-shrink-0"
+                >3</span
+              >
+              <div>
+                <strong class="text-zinc-100">Launch</strong> the application from the Start Menu
+              </div>
+            </li>
+            <li class="flex items-start">
+              <span
+                class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-zinc-700 text-zinc-100 font-bold mr-4 flex-shrink-0"
+                >4</span
+              >
+              <div>
+                <strong class="text-zinc-100">Configure</strong> your D2R save file path (default:
+                <code class="text-xs bg-zinc-800 px-2 py-1 rounded">
+                  %USERPROFILE%\Saved Games\Diablo II Resurrected
+                </code>
+                )
+              </div>
+            </li>
+            <li class="flex items-start">
+              <span
+                class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-zinc-700 text-zinc-100 font-bold mr-4 flex-shrink-0"
+                >5</span
+              >
+              <div>
+                <strong class="text-zinc-100">Start tracking</strong> your Holy Grail progress
+                automatically!
+              </div>
+            </li>
+          </ol>
+        </div>
+      </div>
     </section>
 
     <!-- Documentation Section -->
     <section id="docs" class="py-20 px-4 sm:px-6 lg:px-8 bg-black/30">
-        <div class="max-w-5xl mx-auto">
-            <div class="text-center mb-16">
-                <h2 class="text-4xl sm:text-5xl font-bold mb-4 accent-gradient">Documentation</h2>
-                <p class="text-xl text-gray-400">Learn everything about D2R Arcane Tracker</p>
-            </div>
-
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <a href="HOLY_GRAIL_GUIDE.html" class="bg-gradient-to-br from-zinc-900/80 to-zinc-950/60 border border-zinc-800/60 rounded-xl p-8 card-hover">
-                    <div class="text-4xl mb-4">📖</div>
-                    <h3 class="text-2xl font-bold mb-3 text-zinc-100">Holy Grail Guide</h3>
-                    <p class="text-zinc-300 mb-4">Complete guide to the Holy Grail challenge, tracking strategies, and tips for using D2R Arcane Tracker effectively.</p>
-                    <span class="text-zinc-200 font-semibold">Read Guide →</span>
-                </a>
-
-                <a href="COMPARISON.html" class="bg-gradient-to-br from-zinc-900/80 to-zinc-950/60 border border-zinc-800/60 rounded-xl p-8 card-hover">
-                    <div class="text-4xl mb-4">⚖️</div>
-                    <h3 class="text-2xl font-bold mb-3 text-zinc-100">Tracker Comparison</h3>
-                    <p class="text-zinc-300 mb-4">Detailed comparison with other Holy Grail tracking solutions to help you choose the right tool.</p>
-                    <span class="text-zinc-200 font-semibold">Compare Tools →</span>
-                </a>
-
-                <a href="RUN_TRACKER.md" class="bg-gradient-to-br from-zinc-900/80 to-zinc-950/60 border border-zinc-800/60 rounded-xl p-8 card-hover">
-                    <div class="text-4xl mb-4">⏱️</div>
-                    <h3 class="text-2xl font-bold mb-3 text-zinc-100">Run Tracker Guide</h3>
-                    <p class="text-zinc-300 mb-4">Learn how to start sessions, log runs automatically or manually, capture loot, and export results.</p>
-                    <span class="text-zinc-200 font-semibold">Master Runs →</span>
-                </a>
-
-                <a href="https://github.com/hyperremix/d2r-arcane-tracker/issues" target="_blank" class="bg-gradient-to-br from-zinc-900/80 to-zinc-950/60 border border-zinc-800/60 rounded-xl p-8 card-hover">
-                    <div class="text-4xl mb-4">🐛</div>
-                    <h3 class="text-2xl font-bold mb-3 text-zinc-100">Issues & Support</h3>
-                    <p class="text-zinc-300 mb-4">Found a bug or need help? Check existing issues or create a new one on GitHub.</p>
-                    <span class="text-zinc-200 font-semibold">Get Support →</span>
-                </a>
-
-                <a href="https://github.com/hyperremix/d2r-arcane-tracker/discussions" target="_blank" class="bg-gradient-to-br from-zinc-900/80 to-zinc-950/60 border border-zinc-800/60 rounded-xl p-8 card-hover">
-                    <div class="text-4xl mb-4">💬</div>
-                    <h3 class="text-2xl font-bold mb-3 text-zinc-100">Community Discussions</h3>
-                    <p class="text-zinc-300 mb-4">Join the community, share your progress, and discuss features with other users.</p>
-                    <span class="text-zinc-200 font-semibold">Join Discussion →</span>
-                </a>
-            </div>
+      <div class="max-w-5xl mx-auto">
+        <div class="text-center mb-16">
+          <h2 class="text-4xl sm:text-5xl font-bold mb-4 accent-gradient">Documentation</h2>
+          <p class="text-xl text-gray-400">Learn everything about D2R Arcane Tracker</p>
         </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <a
+            href="HOLY_GRAIL_GUIDE.html"
+            class="bg-gradient-to-br from-zinc-900/80 to-zinc-950/60 border border-zinc-800/60 rounded-xl p-8 card-hover"
+          >
+            <div class="text-4xl mb-4">📖</div>
+            <h3 class="text-2xl font-bold mb-3 text-zinc-100">Holy Grail Guide</h3>
+            <p class="text-zinc-300 mb-4">
+              Complete guide to the Holy Grail challenge, tracking strategies, and tips for using
+              D2R Arcane Tracker effectively.
+            </p>
+            <span class="text-zinc-200 font-semibold">Read Guide →</span>
+          </a>
+
+          <a
+            href="COMPARISON.html"
+            class="bg-gradient-to-br from-zinc-900/80 to-zinc-950/60 border border-zinc-800/60 rounded-xl p-8 card-hover"
+          >
+            <div class="text-4xl mb-4">⚖️</div>
+            <h3 class="text-2xl font-bold mb-3 text-zinc-100">Tracker Comparison</h3>
+            <p class="text-zinc-300 mb-4">
+              Detailed comparison with other Holy Grail tracking solutions to help you choose the
+              right tool.
+            </p>
+            <span class="text-zinc-200 font-semibold">Compare Tools →</span>
+          </a>
+
+          <a
+            href="RUN_TRACKER.md"
+            class="bg-gradient-to-br from-zinc-900/80 to-zinc-950/60 border border-zinc-800/60 rounded-xl p-8 card-hover"
+          >
+            <div class="text-4xl mb-4">⏱️</div>
+            <h3 class="text-2xl font-bold mb-3 text-zinc-100">Run Tracker Guide</h3>
+            <p class="text-zinc-300 mb-4">
+              Learn how to start sessions, log runs automatically or manually, capture loot, and
+              export results.
+            </p>
+            <span class="text-zinc-200 font-semibold">Master Runs →</span>
+          </a>
+
+          <a
+            href="https://github.com/hyperremix/d2r-arcane-tracker/issues"
+            target="_blank"
+            class="bg-gradient-to-br from-zinc-900/80 to-zinc-950/60 border border-zinc-800/60 rounded-xl p-8 card-hover"
+          >
+            <div class="text-4xl mb-4">🐛</div>
+            <h3 class="text-2xl font-bold mb-3 text-zinc-100">Issues & Support</h3>
+            <p class="text-zinc-300 mb-4">
+              Found a bug or need help? Check existing issues or create a new one on GitHub.
+            </p>
+            <span class="text-zinc-200 font-semibold">Get Support →</span>
+          </a>
+
+          <a
+            href="https://github.com/hyperremix/d2r-arcane-tracker/discussions"
+            target="_blank"
+            class="bg-gradient-to-br from-zinc-900/80 to-zinc-950/60 border border-zinc-800/60 rounded-xl p-8 card-hover"
+          >
+            <div class="text-4xl mb-4">💬</div>
+            <h3 class="text-2xl font-bold mb-3 text-zinc-100">Community Discussions</h3>
+            <p class="text-zinc-300 mb-4">
+              Join the community, share your progress, and discuss features with other users.
+            </p>
+            <span class="text-zinc-200 font-semibold">Join Discussion →</span>
+          </a>
+        </div>
+      </div>
     </section>
 
     <!-- Contributing Section -->
     <section class="py-20 px-4 sm:px-6 lg:px-8">
-        <div class="max-w-4xl mx-auto text-center">
-            <h2 class="text-4xl sm:text-5xl font-bold mb-6 accent-gradient">Open Source & Community Driven</h2>
-            <p class="text-xl text-zinc-300 mb-8 leading-relaxed">
-                D2R Arcane Tracker is open source and built by the community. We welcome contributions,
-                bug reports, and feature requests. Join us in making the best Holy Grail tracker for D2R!
-            </p>
+      <div class="max-w-4xl mx-auto text-center">
+        <h2 class="text-4xl sm:text-5xl font-bold mb-6 accent-gradient">
+          Open Source & Community Driven
+        </h2>
+        <p class="text-xl text-zinc-300 mb-8 leading-relaxed">
+          D2R Arcane Tracker is open source and built by the community. We welcome contributions,
+          bug reports, and feature requests. Join us in making the best Holy Grail tracker for D2R!
+        </p>
 
-            <div class="flex flex-col sm:flex-row justify-center items-center space-y-4 sm:space-y-0 sm:space-x-6 mb-12">
-                <a href="https://github.com/hyperremix/d2r-arcane-tracker" target="_blank"
-                   class="px-8 py-4 bg-zinc-800 border-2 border-zinc-700 text-zinc-100 font-semibold rounded-lg text-lg hover:bg-zinc-700 transform hover:scale-105 transition-all">
-                    View on GitHub
-                </a>
-                <a href="https://github.com/hyperremix/d2r-arcane-tracker/blob/main/CONTRIBUTING.md" target="_blank"
-                   class="px-8 py-4 bg-zinc-900/50 border-2 border-zinc-700 text-zinc-100 font-semibold rounded-lg text-lg hover:bg-zinc-800/70 transform hover:scale-105 transition-all">
-                    Contributing Guide
-                </a>
-            </div>
-
-            <div class="flex justify-center space-x-4 flex-wrap gap-y-2">
-                <img src="https://img.shields.io/github/last-commit/hyperremix/d2r-arcane-tracker" alt="Last Commit">
-                <img src="https://img.shields.io/github/issues/hyperremix/d2r-arcane-tracker" alt="Issues">
-                <img src="https://img.shields.io/github/issues-pr/hyperremix/d2r-arcane-tracker" alt="Pull Requests">
-                <img src="https://img.shields.io/github/v/release/hyperremix/d2r-arcane-tracker" alt="Release">
-            </div>
+        <div
+          class="flex flex-col sm:flex-row justify-center items-center space-y-4 sm:space-y-0 sm:space-x-6 mb-12"
+        >
+          <a
+            href="https://github.com/hyperremix/d2r-arcane-tracker"
+            target="_blank"
+            class="px-8 py-4 bg-zinc-800 border-2 border-zinc-700 text-zinc-100 font-semibold rounded-lg text-lg hover:bg-zinc-700 transform hover:scale-105 transition-all"
+          >
+            View on GitHub
+          </a>
+          <a
+            href="https://github.com/hyperremix/d2r-arcane-tracker/blob/main/CONTRIBUTING.md"
+            target="_blank"
+            class="px-8 py-4 bg-zinc-900/50 border-2 border-zinc-700 text-zinc-100 font-semibold rounded-lg text-lg hover:bg-zinc-800/70 transform hover:scale-105 transition-all"
+          >
+            Contributing Guide
+          </a>
         </div>
+
+        <div class="flex justify-center space-x-4 flex-wrap gap-y-2">
+          <img
+            src="https://img.shields.io/github/last-commit/hyperremix/d2r-arcane-tracker"
+            alt="Last Commit"
+          >
+          <img
+            src="https://img.shields.io/github/issues/hyperremix/d2r-arcane-tracker"
+            alt="Issues"
+          >
+          <img
+            src="https://img.shields.io/github/issues-pr/hyperremix/d2r-arcane-tracker"
+            alt="Pull Requests"
+          >
+          <img
+            src="https://img.shields.io/github/v/release/hyperremix/d2r-arcane-tracker"
+            alt="Release"
+          >
+        </div>
+      </div>
     </section>
 
     <!-- Footer -->
     <footer class="py-12 px-4 sm:px-6 lg:px-8 bg-zinc-950/80 border-t border-zinc-900">
-        <div class="max-w-7xl mx-auto">
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
-                <div>
-                    <h3 class="text-xl font-bold mb-4 text-zinc-100">D2R Arcane Tracker</h3>
-                    <p class="text-zinc-400">The ultimate Holy Grail tracker for Diablo 2 Resurrected.</p>
-                </div>
+      <div class="max-w-7xl mx-auto">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
+          <div>
+            <h3 class="text-xl font-bold mb-4 text-zinc-100">D2R Arcane Tracker</h3>
+            <p class="text-zinc-400">The ultimate Holy Grail tracker for Diablo 2 Resurrected.</p>
+          </div>
 
-                <div>
-                    <h3 class="text-xl font-bold mb-4 text-zinc-100">Resources</h3>
-                    <ul class="space-y-2">
-                        <li><a href="https://github.com/hyperremix/d2r-arcane-tracker" target="_blank" class="text-zinc-400 hover:text-zinc-200">GitHub Repository</a></li>
-                        <li><a href="https://github.com/hyperremix/d2r-arcane-tracker/releases" target="_blank" class="text-zinc-400 hover:text-zinc-200">Releases</a></li>
-                        <li><a href="HOLY_GRAIL_GUIDE.html" class="text-zinc-400 hover:text-zinc-200">Holy Grail Guide</a></li>
-                        <li><a href="RUN_TRACKER.md" class="text-zinc-400 hover:text-zinc-200">Run Tracker Guide</a></li>
-                        <li><a href="COMPARISON.html" class="text-zinc-400 hover:text-zinc-200">Tracker Comparison</a></li>
-                    </ul>
-                </div>
+          <div>
+            <h3 class="text-xl font-bold mb-4 text-zinc-100">Resources</h3>
+            <ul class="space-y-2">
+              <li>
+                <a
+                  href="https://github.com/hyperremix/d2r-arcane-tracker"
+                  target="_blank"
+                  class="text-zinc-400 hover:text-zinc-200"
+                  >GitHub Repository</a
+                >
+              </li>
+              <li>
+                <a
+                  href="https://github.com/hyperremix/d2r-arcane-tracker/releases"
+                  target="_blank"
+                  class="text-zinc-400 hover:text-zinc-200"
+                  >Releases</a
+                >
+              </li>
+              <li>
+                <a href="HOLY_GRAIL_GUIDE.html" class="text-zinc-400 hover:text-zinc-200"
+                  >Holy Grail Guide</a
+                >
+              </li>
+              <li>
+                <a href="RUN_TRACKER.md" class="text-zinc-400 hover:text-zinc-200"
+                  >Run Tracker Guide</a
+                >
+              </li>
+              <li>
+                <a href="COMPARISON.html" class="text-zinc-400 hover:text-zinc-200"
+                  >Tracker Comparison</a
+                >
+              </li>
+            </ul>
+          </div>
 
-                <div>
-                    <h3 class="text-xl font-bold mb-4 text-zinc-100">Community</h3>
-                    <ul class="space-y-2">
-                        <li><a href="https://github.com/hyperremix/d2r-arcane-tracker/issues" target="_blank" class="text-zinc-400 hover:text-zinc-200">Report Issues</a></li>
-                        <li><a href="https://github.com/hyperremix/d2r-arcane-tracker/discussions" target="_blank" class="text-zinc-400 hover:text-zinc-200">Discussions</a></li>
-                        <li><a href="https://github.com/hyperremix/d2r-arcane-tracker/blob/main/CONTRIBUTING.md" target="_blank" class="text-zinc-400 hover:text-zinc-200">Contributing</a></li>
-                        <li><a href="https://github.com/hyperremix/d2r-arcane-tracker/blob/main/LICENSE" target="_blank" class="text-zinc-400 hover:text-zinc-200">License (MIT)</a></li>
-                    </ul>
-                </div>
-            </div>
-
-            <div class="border-t border-zinc-900 pt-8 text-center text-zinc-400">
-                <p class="mb-2">Made with ❤️ for the Diablo II: Resurrected community</p>
-                <p class="text-sm">Happy farming! 🏆</p>
-            </div>
+          <div>
+            <h3 class="text-xl font-bold mb-4 text-zinc-100">Community</h3>
+            <ul class="space-y-2">
+              <li>
+                <a
+                  href="https://github.com/hyperremix/d2r-arcane-tracker/issues"
+                  target="_blank"
+                  class="text-zinc-400 hover:text-zinc-200"
+                  >Report Issues</a
+                >
+              </li>
+              <li>
+                <a
+                  href="https://github.com/hyperremix/d2r-arcane-tracker/discussions"
+                  target="_blank"
+                  class="text-zinc-400 hover:text-zinc-200"
+                  >Discussions</a
+                >
+              </li>
+              <li>
+                <a
+                  href="https://github.com/hyperremix/d2r-arcane-tracker/blob/main/CONTRIBUTING.md"
+                  target="_blank"
+                  class="text-zinc-400 hover:text-zinc-200"
+                  >Contributing</a
+                >
+              </li>
+              <li>
+                <a
+                  href="https://github.com/hyperremix/d2r-arcane-tracker/blob/main/LICENSE"
+                  target="_blank"
+                  class="text-zinc-400 hover:text-zinc-200"
+                  >License (MIT)</a
+                >
+              </li>
+            </ul>
+          </div>
         </div>
+
+        <div class="border-t border-zinc-900 pt-8 text-center text-zinc-400">
+          <p class="mb-2">Made with ❤️ for the Diablo II: Resurrected community</p>
+          <p class="text-sm">Happy farming! 🏆</p>
+        </div>
+      </div>
     </footer>
 
     <!-- Smooth Scroll Script -->
     <script>
-        // Smooth scroll for anchor links
-        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
-            anchor.addEventListener('click', function (e) {
-                e.preventDefault();
-                const target = document.querySelector(this.getAttribute('href'));
-                if (target) {
-                    target.scrollIntoView({
-                        behavior: 'smooth',
-                        block: 'start'
-                    });
-                }
-            });
-        });
+    // Smooth scroll for anchor links
+    document.querySelectorAll('a[href^="#"]').forEach((anchor) => {
+      anchor.addEventListener('click', function (e) {
+        e.preventDefault();
+        const target = document.querySelector(this.getAttribute('href'));
+        if (target) {
+          target.scrollIntoView({
+            behavior: 'smooth',
+            block: 'start',
+          });
+        }
+      });
+    });
 
-        // Add fade-in animation on scroll
-        const observerOptions = {
-            threshold: 0.1,
-            rootMargin: '0px 0px -50px 0px'
-        };
+    // Add fade-in animation on scroll
+    const observerOptions = {
+      threshold: 0.1,
+      rootMargin: '0px 0px -50px 0px',
+    };
 
-        const observer = new IntersectionObserver((entries) => {
-            entries.forEach(entry => {
-                if (entry.isIntersecting) {
-                    entry.target.classList.add('fade-in');
-                }
-            });
-        }, observerOptions);
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('fade-in');
+        }
+      });
+    }, observerOptions);
 
-        document.querySelectorAll('section').forEach(section => {
-            observer.observe(section);
-        });
+    document.querySelectorAll('section').forEach((section) => {
+      observer.observe(section);
+    });
     </script>
-</body>
+  </body>
 </html>
-

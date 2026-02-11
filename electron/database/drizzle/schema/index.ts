@@ -6,3 +6,6 @@ export * from './runs';
 export * from './saveFileStates';
 export * from './sessions';
 export * from './settings';
+export * from './vaultCategories';
+export * from './vaultItemCategories';
+export * from './vaultItems';
