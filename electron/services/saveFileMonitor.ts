@@ -787,10 +787,15 @@ class SaveFileMonitor {
       const buffer = await readFile(filePath);
       const extension = extname(filePath).toLowerCase();
       const inventoryItems = await this.parseSave(saveName, filePath, buffer, extension);
+      const characterId = this.grailDatabase?.getCharacterByName(saveName)?.id;
+      const inventoryItemsWithCharacter = inventoryItems.map((inventoryItem) => ({
+        ...inventoryItem,
+        characterId,
+      }));
 
       results.stats[saveName] = 0;
 
-      for (const inventoryItem of inventoryItems) {
+      for (const inventoryItem of inventoryItemsWithCharacter) {
         const item = inventoryItem.rawParsedItem;
         const name = processItemName(item);
 
@@ -818,10 +823,11 @@ class SaveFileMonitor {
         inventorySnapshot: {
           snapshotId: `${saveName}-${Date.now()}`,
           characterName: saveName,
+          characterId,
           sourceFileType: extension.replace('.', '') as VaultSourceFileType,
           sourceFilePath: filePath,
           capturedAt: new Date(),
-          items: inventoryItems,
+          items: inventoryItemsWithCharacter,
         },
       };
     } catch (error) {

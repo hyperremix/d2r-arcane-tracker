@@ -141,6 +141,100 @@ describe('When vault IPC handlers are initialized', () => {
     });
   });
 
+  describe('If inventory:searchAll receives a characterId filter', () => {
+    it('Then it filters inventory items by characterId', async () => {
+      // Arrange
+      const snapshots = [
+        {
+          snapshotId: 's1',
+          characterName: 'Sorc',
+          characterId: 'char-1',
+          sourceFileType: 'd2s',
+          sourceFilePath: '/tmp/sorc.d2s',
+          capturedAt: new Date('2024-01-01T00:00:00.000Z'),
+          items: [
+            {
+              fingerprint: 'fp-1',
+              fingerprintInputs: {
+                sourceFileType: 'd2s',
+                characterName: 'Sorc',
+                locationContext: 'inventory',
+                quality: 'unique',
+                ethereal: false,
+                socketCount: 0,
+                itemName: 'Shako',
+              },
+              characterName: 'Sorc',
+              characterId: 'char-1',
+              sourceFileType: 'd2s',
+              sourceFilePath: '/tmp/sorc.d2s',
+              locationContext: 'inventory',
+              itemName: 'Shako',
+              quality: 'unique',
+              ethereal: false,
+              socketCount: 0,
+              rawItemJson: '{}',
+              rawParsedItem: {} as never,
+              seenAt: new Date('2024-01-01T00:00:00.000Z'),
+            },
+            {
+              fingerprint: 'fp-2',
+              fingerprintInputs: {
+                sourceFileType: 'd2s',
+                characterName: 'Barb',
+                locationContext: 'inventory',
+                quality: 'unique',
+                ethereal: false,
+                socketCount: 0,
+                itemName: 'Arreat',
+              },
+              characterName: 'Barb',
+              characterId: 'char-2',
+              sourceFileType: 'd2s',
+              sourceFilePath: '/tmp/barb.d2s',
+              locationContext: 'inventory',
+              itemName: 'Arreat',
+              quality: 'unique',
+              ethereal: false,
+              socketCount: 0,
+              rawItemJson: '{}',
+              rawParsedItem: {} as never,
+              seenAt: new Date('2024-01-01T00:00:00.000Z'),
+            },
+          ],
+        },
+      ];
+
+      const getSaveFileMonitor = vi.fn(() => ({
+        getInventorySearchResult: vi.fn(() => ({
+          snapshots,
+          totalSnapshots: 1,
+          totalItems: 2,
+        })),
+      }));
+
+      mocks.grailDatabaseMock.searchVaultItems.mockReturnValue({
+        items: [],
+        page: 1,
+        pageSize: 20,
+        total: 0,
+      });
+
+      initializeVaultHandlers(
+        getSaveFileMonitor as unknown as Parameters<typeof initializeVaultHandlers>[0],
+      );
+      const handler = mocks.handleMock.mock.calls.find(
+        (call) => call[0] === 'inventory:searchAll',
+      )?.[1];
+
+      // Act
+      const result = await handler?.(null, { characterId: 'char-1', page: 1, pageSize: 20 });
+
+      // Assert
+      expect(result.inventory.totalItems).toBe(1);
+    });
+  });
+
   describe('If invalid search text is provided', () => {
     it('Then the handler rejects the request via defensive validation', async () => {
       // Arrange
