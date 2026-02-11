@@ -4,12 +4,20 @@ import type {
   D2SaveFile,
   FileReaderResponse,
   GrailProgress,
+  InventorySearchResult,
   Item,
   MonitoringStatus,
   Run,
   RunItem,
   Session,
   Settings,
+  VaultCategory,
+  VaultCategoryCreateInput,
+  VaultCategoryUpdateInput,
+  VaultItem,
+  VaultItemFilter,
+  VaultItemSearchResult,
+  VaultItemUpsertInput,
   TerrorZone,
   UpdateInfo,
   UpdateStatus,
@@ -615,6 +623,33 @@ export interface ElectronAPI {
      * @returns {Promise<{ available: boolean; reason: string | null }>} A promise that resolves with memory status.
      */
     getMemoryStatus(): Promise<{ available: boolean; reason: string | null }>
+  }
+
+
+  /**
+   * Vault API methods.
+   */
+  vault: {
+    addItem(item: VaultItemUpsertInput): Promise<VaultItem>
+    removeItem(itemId: string): Promise<{ success: boolean }>
+    updateItemTags(itemId: string, categoryIds: string[]): Promise<{ success: boolean }>
+    listItems(filter?: VaultItemFilter): Promise<VaultItemSearchResult>
+    search(filter?: VaultItemFilter): Promise<VaultItemSearchResult>
+    createCategory(input: VaultCategoryCreateInput): Promise<{ success: boolean }>
+    updateCategory(categoryId: string, updates: VaultCategoryUpdateInput): Promise<{ success: boolean }>
+    deleteCategory(categoryId: string): Promise<{ success: boolean }>
+    listCategories(): Promise<VaultCategory[]>
+  }
+
+  /**
+   * Inventory API methods.
+   */
+  inventory: {
+    listSnapshots(): Promise<InventorySearchResult>
+    searchAll(filter?: VaultItemFilter): Promise<{
+      inventory: InventorySearchResult
+      vault: VaultItemSearchResult
+    }>
   }
 
   /**

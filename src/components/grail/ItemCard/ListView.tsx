@@ -63,7 +63,7 @@ export function ListView({
         {item.type === 'runeword' && item.runes && item.runes.length > 0 ? (
           <div className="relative flex-shrink-0">
             <RuneImages runeIds={item.runes} viewMode="list" />
-            <ItemTypeIcon type={item.type} className="-right-2 -bottom-1 absolute h-4 w-4" />
+            <ItemTypeIcon type={item.type} className="absolute -right-2 -bottom-1 h-4 w-4" />
           </div>
         ) : settings.showItemIcons && item.type !== 'runeword' ? (
           <div className="relative h-12 w-12 flex-shrink-0">

@@ -112,7 +112,7 @@ export function ProgressGauge({
         </svg>
 
         {/* Centered content */}
-        <div className="-translate-x-1/2 -translate-y-1/2 absolute start-1/2 top-1/2 flex transform flex-col items-center gap-0.5 text-center">
+        <div className="absolute start-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 transform flex-col items-center gap-0.5 text-center">
           <div className={cn('font-bold', colors.text, percentageTextSize)}>
             {percentage.toFixed(1)}%
           </div>

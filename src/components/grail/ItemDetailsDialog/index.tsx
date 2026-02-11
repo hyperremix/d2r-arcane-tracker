@@ -1,6 +1,8 @@
-import type { Item } from 'electron/types/grail';
-import { useCallback, useMemo } from 'react';
+import type { Item, VaultCategory, VaultItem, VaultItemUpsertInput } from 'electron/types/grail';
+import { Archive, ArchiveRestore } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -26,23 +28,44 @@ interface ItemDetailsDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 
-/**
- * ItemDetailsDialog component that displays comprehensive information about a Holy Grail item.
- * Shows item metadata, icon, and per-character progress with toggle actions.
- */
+function toVaultUpsertInput(item: Item): VaultItemUpsertInput {
+  return {
+    fingerprint: `grail:${item.id}`,
+    itemName: item.name,
+    itemCode: item.code,
+    type: item.type,
+    quality: item.type,
+    ethereal: item.etherealType === 'only',
+    rawItemJson: JSON.stringify(item),
+    sourceCharacterName: 'Grail Tracker',
+    sourceFileType: 'd2s',
+    locationContext: 'unknown',
+    grailItemId: item.id,
+    isPresentInLatestScan: false,
+  };
+}
+
+function findLinkedVaultItem(vaultItems: VaultItem[], item: Item): VaultItem | undefined {
+  return vaultItems.find((vaultItem) => vaultItem.grailItemId === item.id);
+}
+
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Complex dialog component with many features
 export function ItemDetailsDialog({ itemId, open, onOpenChange }: ItemDetailsDialogProps) {
   const { t } = useTranslation();
   const { items, progress, characters, selectedCharacterId, toggleItemFound, settings } =
     useGrailStore();
+  const [isVaultActionPending, setIsVaultActionPending] = useState(false);
+  const [vaultCategories, setVaultCategories] = useState<VaultCategory[]>([]);
+  const [linkedVaultItem, setLinkedVaultItem] = useState<VaultItem | null>(null);
 
-  // Find the item by ID
   const item = useMemo(() => {
-    if (!itemId) return null;
+    if (!itemId) {
+      return null;
+    }
+
     return items.find((i) => i.id === itemId) || null;
   }, [items, itemId]);
 
-  // Get progress lookup for this item
   const progressLookup = useProgressLookup(
     item ? [item] : [],
     progress,
@@ -54,8 +77,6 @@ export function ItemDetailsDialog({ itemId, open, onOpenChange }: ItemDetailsDia
     [item, progressLookup],
   );
 
-  // Get icon for the item (must be called before early return)
-  // Create a placeholder item for the hook when item is null
   const placeholderItem: Item = {
     id: '',
     name: '',
@@ -68,24 +89,76 @@ export function ItemDetailsDialog({ itemId, open, onOpenChange }: ItemDetailsDia
   };
   const { iconUrl, isLoading } = useItemIcon(item || placeholderItem);
 
-  // Handle toggle found action
+  const loadVaultMetadata = useCallback(async (): Promise<void> => {
+    if (!item || !open || !window.electronAPI?.vault) {
+      return;
+    }
+
+    const [categories, searchResult] = await Promise.all([
+      window.electronAPI.vault.listCategories(),
+      window.electronAPI.vault.search({
+        text: item.name,
+        presentState: 'all',
+        page: 1,
+        pageSize: 100,
+      }),
+    ]);
+
+    setVaultCategories(categories);
+    setLinkedVaultItem(findLinkedVaultItem(searchResult.items, item) ?? null);
+  }, [item, open]);
+
+  useEffect(() => {
+    void loadVaultMetadata();
+  }, [loadVaultMetadata]);
+
   const handleToggleFound = useCallback(() => {
-    if (!item || !selectedCharacterId) return;
+    if (!item || !selectedCharacterId) {
+      return;
+    }
+
     toggleItemFound(item.id, selectedCharacterId, true);
   }, [item, selectedCharacterId, toggleItemFound]);
+
+  const handleVaultAction = useCallback(async (): Promise<void> => {
+    if (!item || isVaultActionPending || !window.electronAPI?.vault) {
+      return;
+    }
+
+    setIsVaultActionPending(true);
+    const previousVaultItem = linkedVaultItem;
+
+    try {
+      if (linkedVaultItem) {
+        setLinkedVaultItem(null);
+        await window.electronAPI.vault.removeItem(linkedVaultItem.id);
+      } else {
+        const newVaultItem = await window.electronAPI.vault.addItem(toVaultUpsertInput(item));
+        setLinkedVaultItem(newVaultItem);
+      }
+
+      await loadVaultMetadata();
+    } catch {
+      setLinkedVaultItem(previousVaultItem);
+    } finally {
+      setIsVaultActionPending(false);
+    }
+  }, [isVaultActionPending, item, linkedVaultItem, loadVaultMetadata]);
 
   if (!item) {
     return null;
   }
 
   const isFound = itemProgress?.overallFound || false;
+  const assignedCategoryNames = (linkedVaultItem?.categoryIds ?? [])
+    .map((categoryId) => vaultCategories.find((category) => category.id === categoryId)?.name)
+    .filter((name): name is string => Boolean(name));
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
           <div className="flex justify-between gap-4">
-            {/* Item Icon or Rune Images */}
             {item.type === 'runeword' && item.runes && item.runes.length > 0 ? (
               <div className="flex items-center">
                 <RuneImages runeIds={item.runes} viewMode="grid" />
@@ -118,11 +191,35 @@ export function ItemDetailsDialog({ itemId, open, onOpenChange }: ItemDetailsDia
           </div>
         </DialogHeader>
 
-        {/* Item Information and Progress Status */}
         <div className="-mx-6 max-h-[60vh] overflow-y-auto">
           <div className="grid grid-cols-1 gap-4 px-6">
             <ItemInfoSection item={item} />
             <ProgressStatusSection item={item} itemProgress={itemProgress} />
+
+            <div className="rounded-lg border p-3">
+              <div className="mb-2 flex items-center justify-between">
+                <div className="font-medium text-sm">
+                  {t(translations.grail.itemDetails.vaultStatusTitle)}
+                </div>
+                <Badge variant={linkedVaultItem ? 'default' : 'secondary'}>
+                  {linkedVaultItem
+                    ? t(translations.grail.itemDetails.vaulted)
+                    : t(translations.grail.itemDetails.notVaulted)}
+                </Badge>
+              </div>
+              <div className="flex flex-wrap gap-1">
+                {assignedCategoryNames.length > 0 ? (
+                  assignedCategoryNames.map((name) => (
+                    <Badge key={name} variant="outline">
+                      {name}
+                    </Badge>
+                  ))
+                ) : (
+                  <Badge variant="outline">{t(translations.grail.itemDetails.noVaultTags)}</Badge>
+                )}
+              </div>
+            </div>
+
             {characters.length > 0 && (
               <CharacterProgressTable characters={characters} progress={progress} item={item} />
             )}
@@ -130,6 +227,20 @@ export function ItemDetailsDialog({ itemId, open, onOpenChange }: ItemDetailsDia
         </div>
 
         <DialogFooter>
+          <Button
+            variant="outline"
+            disabled={isVaultActionPending}
+            onClick={() => void handleVaultAction()}
+          >
+            {linkedVaultItem ? (
+              <ArchiveRestore className="mr-1 h-4 w-4" />
+            ) : (
+              <Archive className="mr-1 h-4 w-4" />
+            )}
+            {linkedVaultItem
+              ? t(translations.grail.itemDetails.unvaultAction)
+              : t(translations.grail.itemDetails.vaultAction)}
+          </Button>
           {selectedCharacterId && (
             <Button onClick={handleToggleFound} variant={isFound ? 'outline' : 'default'}>
               {isFound

@@ -1084,4 +1084,94 @@ describe('When SaveFileMonitor is used', () => {
       expect(runewordItems).toHaveLength(0);
     });
   });
+
+  describe('If inventory reconciliation helpers are executed', () => {
+    it('Then createFingerprint returns deterministic output for the same inputs', () => {
+      // Arrange
+      const item = {
+        fingerprintInputs: {
+          sourceFileType: 'd2s',
+          characterName: 'Sorc',
+          locationContext: 'inventory',
+          itemCode: 'uap',
+          quality: 'unique',
+          ethereal: false,
+          socketCount: 0,
+          stashTab: 1,
+          itemName: 'Shako',
+        },
+      };
+
+      // Act
+      const first = (monitor as any).createFingerprint(item);
+      const second = (monitor as any).createFingerprint(item);
+
+      // Assert
+      expect(first).toBe(second);
+      expect(first.length).toBeGreaterThan(0);
+    });
+
+    it('Then reconcileVaultFromSnapshots upserts present fingerprints and reconciles scan state', () => {
+      // Arrange
+      const upsertVaultItemByFingerprint = vi.fn();
+      const reconcileVaultItemsForScan = vi.fn();
+      const getCharacterByName = vi.fn().mockReturnValue({ id: 'char-1' });
+      (monitor as any).grailDatabase = {
+        upsertVaultItemByFingerprint,
+        reconcileVaultItemsForScan,
+        getCharacterByName,
+        getAllSettings: vi.fn().mockReturnValue({ gameMode: GameMode.Softcore }),
+      };
+
+      const snapshots = [
+        {
+          snapshotId: 'snap-1',
+          characterName: 'Sorc',
+          sourceFileType: 'd2s',
+          sourceFilePath: '/tmp/sorc.d2s',
+          capturedAt: new Date('2024-01-01T00:00:00.000Z'),
+          items: [
+            {
+              fingerprint: 'fp-1',
+              fingerprintInputs: {
+                sourceFileType: 'd2s',
+                characterName: 'Sorc',
+                locationContext: 'inventory',
+                quality: 'unique',
+                ethereal: false,
+                socketCount: 0,
+                itemName: 'Shako',
+              },
+              characterName: 'Sorc',
+              characterId: 'char-1',
+              sourceFileType: 'd2s',
+              sourceFilePath: '/tmp/sorc.d2s',
+              locationContext: 'inventory',
+              itemName: 'Shako',
+              quality: 'unique',
+              ethereal: false,
+              socketCount: 0,
+              rawItemJson: '{}',
+              rawParsedItem: {},
+              seenAt: new Date('2024-01-01T00:00:00.000Z'),
+            },
+          ],
+        },
+      ];
+
+      // Act
+      (monitor as any).reconcileVaultFromSnapshots(snapshots);
+
+      // Assert
+      expect(upsertVaultItemByFingerprint).toHaveBeenCalledTimes(1);
+      expect(upsertVaultItemByFingerprint.mock.calls[0]?.[0]?.fingerprint).toBe('fp-1');
+      expect(reconcileVaultItemsForScan).toHaveBeenCalledWith({
+        sourceFileType: 'd2s',
+        sourceCharacterId: 'char-1',
+        sourceCharacterName: 'Sorc',
+        presentFingerprints: ['fp-1'],
+        lastSeenAt: new Date('2024-01-01T00:00:00.000Z'),
+      });
+    });
+  });
 });

@@ -633,6 +633,10 @@ export function getRunTracker(): RunTrackerService | undefined {
   return runTracker;
 }
 
+export function getSaveFileMonitor(): SaveFileMonitor | undefined {
+  return saveFileMonitor;
+}
+
 export function closeSaveFileMonitor(): void {
   // Flush any pending database writes before shutdown
   console.log('[closeSaveFileMonitor] Flushing pending database writes');

@@ -1,9 +1,11 @@
 import {
   AlertTriangle,
+  Archive,
   BarChart3,
   Calculator,
   ChevronLeft,
   ChevronRight,
+  PackageSearch,
   Settings,
   Timer,
   Trophy,
@@ -38,7 +40,7 @@ function NavigationButton({
     <div className="relative">
       <div
         className={cn(
-          '-top-1.75 absolute right-0 left-0',
+          'absolute -top-1.75 right-0 left-0',
           isActive && 'border-t-4 border-t-primary-500',
         )}
       />
@@ -64,6 +66,8 @@ function useRouteStates(pathname: string) {
     isStatisticsActive: pathname === '/statistics',
     isRunsActive: pathname === '/runs',
     isRunewordsActive: pathname === '/runewords',
+    isInventoryBrowserActive: pathname === '/inventory-browser',
+    isVaultActive: pathname === '/vault',
     isTerrorZonesActive: pathname === '/terror-zones',
     isSettingsActive: pathname === '/settings',
   };
@@ -210,6 +214,20 @@ export function TitleBar() {
           title={translations.titleBar.runewordCalculator}
           icon={Calculator}
           isActive={routeStates.isRunewordsActive}
+          onClick={navigate}
+        />
+        <NavigationButton
+          to="/inventory-browser"
+          title={translations.titleBar.inventoryBrowser}
+          icon={PackageSearch}
+          isActive={routeStates.isInventoryBrowserActive}
+          onClick={navigate}
+        />
+        <NavigationButton
+          to="/vault"
+          title={translations.titleBar.itemVault}
+          icon={Archive}
+          isActive={routeStates.isVaultActive}
           onClick={navigate}
         />
         <NavigationButton

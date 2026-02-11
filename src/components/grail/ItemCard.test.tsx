@@ -281,7 +281,8 @@ describe('When ItemCard is rendered', () => {
       render(<ItemCard item={item} onClick={onClick} />);
       const card = screen.getByText('Clickable').closest('[class*="rounded-lg"]');
       expect(card).toBeTruthy();
-      fireEvent.click(card as Element);
+      if (!card) throw new Error('Expected card element');
+      fireEvent.click(card);
 
       // Assert
       expect(onClick).toHaveBeenCalledTimes(1);
@@ -296,7 +297,8 @@ describe('When ItemCard is rendered', () => {
       render(<ItemCard item={item} onClick={onClick} />);
       const card = screen.getByText('Pressable').closest('[class*="rounded-lg"]');
       expect(card).toBeTruthy();
-      fireEvent.keyDown(card as Element, { key: 'Enter' });
+      if (!card) throw new Error('Expected card element');
+      fireEvent.keyDown(card, { key: 'Enter' });
 
       // Assert
       expect(onClick).toHaveBeenCalledTimes(1);
@@ -311,7 +313,8 @@ describe('When ItemCard is rendered', () => {
       render(<ItemCard item={item} onClick={onClick} />);
       const card = screen.getByText('Spaceable').closest('[class*="rounded-lg"]');
       expect(card).toBeTruthy();
-      fireEvent.keyDown(card as Element, { key: ' ' });
+      if (!card) throw new Error('Expected card element');
+      fireEvent.keyDown(card, { key: ' ' });
 
       // Assert
       expect(onClick).toHaveBeenCalledTimes(1);
@@ -326,7 +329,8 @@ describe('When ItemCard is rendered', () => {
       render(<ItemCard item={item} onClick={onClick} />);
       const card = screen.getByText('Ignorable').closest('[class*="rounded-lg"]');
       expect(card).toBeTruthy();
-      fireEvent.keyDown(card as Element, { key: 'Tab' });
+      if (!card) throw new Error('Expected card element');
+      fireEvent.keyDown(card, { key: 'Tab' });
 
       // Assert
       expect(onClick).not.toHaveBeenCalled();

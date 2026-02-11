@@ -6,6 +6,8 @@ import type {
   RunItem,
   SaveFileState,
   Session,
+  VaultCategory,
+  VaultItem,
 } from '../types/grail';
 import type {
   DbCharacter,
@@ -15,6 +17,8 @@ import type {
   DbRunItem,
   DbSaveFileState,
   DbSession,
+  DbVaultCategory,
+  DbVaultItem,
 } from './drizzle';
 
 export function toISOString(date: Date | undefined | null): string | null {
@@ -152,5 +156,41 @@ export function dbRunItemToRunItem(dbRunItem: DbRunItem): RunItem {
     name: dbRunItem.name ?? undefined,
     foundTime: new Date(dbRunItem.foundTime),
     created: new Date(dbRunItem.createdAt ?? new Date().toISOString()),
+  };
+}
+
+export function dbVaultCategoryToVaultCategory(dbCategory: DbVaultCategory): VaultCategory {
+  return {
+    id: dbCategory.id,
+    name: dbCategory.name,
+    color: dbCategory.color ?? undefined,
+    metadata: dbCategory.metadata ?? undefined,
+    created: new Date(dbCategory.createdAt ?? new Date().toISOString()),
+    lastUpdated: new Date(dbCategory.updatedAt ?? new Date().toISOString()),
+  };
+}
+
+export function dbVaultItemToVaultItem(dbItem: DbVaultItem): VaultItem {
+  return {
+    id: dbItem.id,
+    fingerprint: dbItem.fingerprint,
+    itemName: dbItem.itemName,
+    itemCode: dbItem.itemCode ?? undefined,
+    quality: dbItem.quality,
+    ethereal: dbItem.ethereal,
+    socketCount: dbItem.socketCount ?? undefined,
+    rawItemJson: dbItem.rawItemJson,
+    sourceCharacterId: dbItem.sourceCharacterId ?? undefined,
+    sourceCharacterName: dbItem.sourceCharacterName ?? undefined,
+    sourceFileType: dbItem.sourceFileType,
+    locationContext: dbItem.locationContext,
+    stashTab: dbItem.stashTab ?? undefined,
+    grailItemId: dbItem.grailItemId ?? undefined,
+    isPresentInLatestScan: dbItem.isPresentInLatestScan,
+    lastSeenAt: fromISOString(dbItem.lastSeenAt),
+    vaultedAt: fromISOString(dbItem.vaultedAt),
+    unvaultedAt: fromISOString(dbItem.unvaultedAt),
+    created: new Date(dbItem.createdAt ?? new Date().toISOString()),
+    lastUpdated: new Date(dbItem.updatedAt ?? new Date().toISOString()),
   };
 }

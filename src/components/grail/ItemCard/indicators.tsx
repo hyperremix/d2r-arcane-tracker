@@ -123,7 +123,7 @@ export function StatusIndicators({
     isRecentFind(mostRecentDiscovery.foundDate)
   ) {
     return (
-      <div className="-top-3 -right-3 absolute z-40">
+      <div className="absolute -top-3 -right-3 z-40">
         <RecentDiscoveryIndicator foundDate={mostRecentDiscovery.foundDate} />
       </div>
     );
@@ -145,7 +145,7 @@ export function StatusIndicators({
   );
 
   return (
-    <div className="-top-3 -right-3 absolute z-40">
+    <div className="absolute -top-3 -right-3 z-40">
       <Tooltip>
         <TooltipTrigger>
           {allVersionsFound ? (
