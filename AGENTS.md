@@ -552,6 +552,7 @@ const testItem = HolyGrailItemBuilder.new()
 - **Commit Messages**: Write clear, descriptive commit messages
 - **Pull Requests**: Create PRs for all changes
 - **Code Review**: Require code review before merging
+- **Rebase Over Merge**: Always use `git rebase` instead of `git merge` to integrate changes from the base branch. This keeps a linear commit history.
 
 ## 13. Security
 
