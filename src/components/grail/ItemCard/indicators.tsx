@@ -155,7 +155,7 @@ export function StatusIndicators({
   );
 
   return (
-    <div className="-top-3 -right-3 absolute z-40">
+    <div className="absolute -top-3 -right-3 z-40">
       <Tooltip>
         {/* Rendered as a span inside an interactive card so it adds no nested tab stop */}
         <TooltipTrigger render={getTooltipTriggerRender(focusableTriggers)} className="inline-flex">

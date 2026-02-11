@@ -4,6 +4,7 @@ import type {
   D2SaveFile,
   FileReaderResponse,
   GrailProgress,
+  InventorySearchResult,
   Item,
   MonitoringStatus,
   Run,
@@ -13,6 +14,13 @@ import type {
   TerrorZone,
   TerrorZoneValidationResult,
   UpdateStatus,
+  VaultCategory,
+  VaultCategoryCreateInput,
+  VaultCategoryUpdateInput,
+  VaultItem,
+  VaultItemFilter,
+  VaultItemSearchResult,
+  VaultItemUpsertInput,
 } from './types/grail';
 
 /**
@@ -246,6 +254,40 @@ contextBridge.exposeInMainWorld('electronAPI', {
      */
     refreshSaveFiles: (): Promise<{ success: boolean }> =>
       ipcRenderer.invoke('saveFile:refreshSaveFiles'),
+  },
+
+  vault: {
+    addItem: (item: VaultItemUpsertInput): Promise<VaultItem> =>
+      ipcRenderer.invoke('vault:addItem', item),
+    removeItem: (itemId: string): Promise<{ success: boolean }> =>
+      ipcRenderer.invoke('vault:removeItem', itemId),
+    updateItemTags: (itemId: string, categoryIds: string[]): Promise<{ success: boolean }> =>
+      ipcRenderer.invoke('vault:updateItemTags', itemId, categoryIds),
+    listItems: (filter?: VaultItemFilter): Promise<VaultItemSearchResult> =>
+      ipcRenderer.invoke('vault:listItems', filter),
+    search: (filter?: VaultItemFilter): Promise<VaultItemSearchResult> =>
+      ipcRenderer.invoke('vault:search', filter),
+    createCategory: (input: VaultCategoryCreateInput): Promise<{ success: boolean }> =>
+      ipcRenderer.invoke('vault:createCategory', input),
+    updateCategory: (
+      categoryId: string,
+      updates: VaultCategoryUpdateInput,
+    ): Promise<{ success: boolean }> =>
+      ipcRenderer.invoke('vault:updateCategory', categoryId, updates),
+    deleteCategory: (categoryId: string): Promise<{ success: boolean }> =>
+      ipcRenderer.invoke('vault:deleteCategory', categoryId),
+    listCategories: (): Promise<VaultCategory[]> => ipcRenderer.invoke('vault:listCategories'),
+  },
+
+  inventory: {
+    listSnapshots: (): Promise<InventorySearchResult> =>
+      ipcRenderer.invoke('inventory:listSnapshots'),
+    searchAll: (
+      filter?: VaultItemFilter,
+    ): Promise<{
+      inventory: InventorySearchResult;
+      vault: VaultItemSearchResult;
+    }> => ipcRenderer.invoke('inventory:searchAll', filter),
   },
 
   /**

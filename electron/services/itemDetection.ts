@@ -3,7 +3,14 @@ import type * as d2s from '@dschu012/d2s';
 import { read } from '@dschu012/d2s';
 import { runesByCode } from '../items/indexes';
 import type { D2SaveFile } from '../services/saveFileMonitor';
-import type { D2Item, D2SItem, GrailProgress, Item, ItemDetectionEvent } from '../types/grail';
+import type {
+  D2Item,
+  D2SItem,
+  GrailProgress,
+  Item,
+  ItemDetectionEvent,
+  VaultLocationContext,
+} from '../types/grail';
 import { isGrailTrackable } from '../utils/grailItemUtils';
 import { DEFAULT_RETRY_OPTIONS, retryWithBackoff } from '../utils/retry';
 import { createServiceLogger } from '../utils/serviceLogger';
@@ -136,6 +143,10 @@ class ItemDetectionService {
           type: this.getItemType(item),
           quality: this.getItemQuality(item),
           location: defaultLocation,
+          locationContext:
+            defaultLocation === 'equipment'
+              ? 'equipped'
+              : (defaultLocation as VaultLocationContext),
           characterName,
           characterClass: characterClass as D2Item['characterClass'],
           level: item.level || 1,
@@ -192,12 +203,24 @@ class ItemDetectionService {
 
       // Extract items from all possible locations
       const allItemLists = [
-        { items: saveData.items || [], location: 'inventory' },
-        { items: saveData.merc_items || [], location: 'equipment' },
-        { items: saveData.corpse_items || [], location: 'inventory' },
+        {
+          items: saveData.items || [],
+          location: 'inventory',
+          context: 'inventory' as VaultLocationContext,
+        },
+        {
+          items: saveData.merc_items || [],
+          location: 'equipment',
+          context: 'mercenary' as VaultLocationContext,
+        },
+        {
+          items: saveData.corpse_items || [],
+          location: 'inventory',
+          context: 'corpse' as VaultLocationContext,
+        },
       ];
 
-      for (const { items: itemList, location } of allItemLists) {
+      for (const { items: itemList, location, context } of allItemLists) {
         this.extractItemsFromList(
           itemList as D2SItem[],
           items,
@@ -205,6 +228,7 @@ class ItemDetectionService {
           location as D2Item['location'],
           false,
           characterClass,
+          context,
         );
       }
 
@@ -242,6 +266,7 @@ class ItemDetectionService {
     defaultLocation: D2Item['location'],
     _isEmbed: boolean = false,
     characterClass?: string,
+    fallbackLocationContext: VaultLocationContext = 'unknown',
   ): void {
     for (const item of itemList) {
       try {
@@ -261,6 +286,7 @@ class ItemDetectionService {
             characterName,
             characterClass: characterClass as D2Item['characterClass'],
             location: this.getItemLocation(item) || defaultLocation,
+            locationContext: this.getItemLocationContext(item, fallbackLocationContext),
           };
 
           items.push(d2Item);
@@ -275,6 +301,7 @@ class ItemDetectionService {
             defaultLocation,
             true,
             characterClass,
+            fallbackLocationContext,
           );
         }
       } catch (itemError) {
@@ -415,6 +442,18 @@ class ItemDetectionService {
     if (d2Item.location === 'equipped' || d2Item.equipped) return 'equipment';
     if (d2Item.location === 'stash') return 'stash';
     return 'inventory';
+  }
+
+  private getItemLocationContext(
+    d2Item: D2SItem,
+    fallbackLocationContext: VaultLocationContext = 'unknown',
+  ): VaultLocationContext {
+    if (d2Item.location === 'equipped' || d2Item.equipped) return 'equipped';
+    if (d2Item.location === 'stash') return 'stash';
+    if (d2Item.location === 'inventory') return 'inventory';
+    if (d2Item.location === 'mercenary') return 'mercenary';
+    if (d2Item.location === 'corpse') return 'corpse';
+    return fallbackLocationContext;
   }
 
   /**

@@ -13,6 +13,9 @@ export type { DbRun, DbRunInsert } from './schema/runs';
 export type { DbSaveFileState, DbSaveFileStateInsert } from './schema/saveFileStates';
 export type { DbSession, DbSessionInsert } from './schema/sessions';
 export type { DbSetting, DbSettingInsert } from './schema/settings';
+export type { DbVaultCategory, DbVaultCategoryInsert } from './schema/vaultCategories';
+export type { DbVaultItemCategory, DbVaultItemCategoryInsert } from './schema/vaultItemCategories';
+export type { DbVaultItem, DbVaultItemInsert } from './schema/vaultItems';
 
 /**
  * Creates a Drizzle ORM instance from an existing better-sqlite3 database connection.

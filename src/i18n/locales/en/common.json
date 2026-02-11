@@ -93,7 +93,13 @@
       "removeRecordLabel": "Remove {{version}} record for {{character}}",
       "removeRecordTitle": "Remove found record?",
       "removeRecordDescription": "This removes the manually added {{version}} record of {{item}} for {{character}}. This cannot be undone.",
-      "removeRecordError": "Could not remove this record. Please try again."
+      "removeRecordError": "Could not remove this record. Please try again.",
+      "vaultStatusTitle": "Vault Status",
+      "vaultAction": "Vault",
+      "unvaultAction": "Unvault",
+      "vaulted": "Vaulted",
+      "notVaulted": "Not Vaulted",
+      "noVaultTags": "No tags assigned"
     },
     "itemGrid": {
       "notApplicable": "Not Applicable",
@@ -518,6 +524,8 @@
     "runs": "Runs",
     "runewords": "Runewords",
     "terrorZones": "Terror Zones",
+    "inventoryBrowser": "Inventory Browser",
+    "itemVault": "Item Vault",
     "settings": "Settings",
     "goBack": "Go back",
     "goForward": "Go forward"
@@ -644,6 +652,90 @@
       "nextStepStatistics": "Check statistics to see your completion percentage",
       "finishHint": "Click Finish to save your settings and start using D2R Arcane Tracker!"
     }
+  },
+  "inventoryBrowser": {
+    "title": "Inventory Browser",
+    "searchPlaceholder": "Search items, codes, or quality...",
+    "filters": "Filters",
+    "character": "Character",
+    "locationFilter": "Location",
+    "type": "Type",
+    "presence": "Presence",
+    "allCharacters": "All Characters",
+    "allLocations": "All Locations",
+    "allTypes": "All Types",
+    "allPresence": "All Presence",
+    "groupHeader": "{{characterName}} \u00b7 {{sourceFileType}}",
+    "capturedAt": "Captured: {{date}}",
+    "itemsCount": "{{count}} items",
+    "empty": "No inventory items match your filters.",
+    "vaultStatus": "Vault Status",
+    "vaultUntracked": "Untracked",
+    "vaultPresent": "Present",
+    "vaultMissing": "Missing",
+    "location": {
+      "equipped": "Equipped",
+      "inventory": "Inventory",
+      "stash": "Stash",
+      "mercenary": "Mercenary",
+      "corpse": "Corpse",
+      "unknown": "Unknown",
+      "stashTab": "Stash Tab {{tab}}"
+    },
+    "presenceOptions": {
+      "all": "All",
+      "present": "Present",
+      "missing": "Missing"
+    },
+    "typeOptions": {
+      "unique": "Unique",
+      "set": "Set",
+      "runeword": "Runeword",
+      "rune": "Rune",
+      "other": "Other"
+    },
+    "vaultAction": "Vault",
+    "vaulted": "Vaulted",
+    "dropToVault": "Drop inventory items here to vault",
+    "dragToVault": "Drag to vault dropzone"
+  },
+  "vault": {
+    "title": "Item Vault",
+    "searchPlaceholder": "Search vaulted items...",
+    "filters": "Filters",
+    "categories": "Categories",
+    "manageCategories": "Manage Categories",
+    "createCategory": "Create Category",
+    "newCategoryName": "New category name",
+    "newCategoryColor": "Color (optional)",
+    "saveCategory": "Save Category",
+    "delete": "Delete",
+    "allLocations": "All Locations",
+    "allPresence": "All Presence",
+    "allCategories": "All Categories",
+    "assignTags": "Assign Tags",
+    "noItems": "No vaulted items match your filters.",
+    "lastSeen": "Last seen on {{character}} at {{date}}",
+    "lastSeenUnknownCharacter": "Unknown character",
+    "missingSince": "Missing from latest scan",
+    "presentInScan": "Present in latest scan",
+    "presenceOptions": {
+      "all": "All",
+      "present": "Present",
+      "missing": "Missing"
+    },
+    "location": {
+      "equipped": "Equipped",
+      "inventory": "Inventory",
+      "stash": "Stash",
+      "mercenary": "Mercenary",
+      "corpse": "Corpse",
+      "unknown": "Unknown",
+      "stashTab": "Stash Tab {{tab}}"
+    },
+    "unvaultAction": "Unvault",
+    "dropToUnvault": "Drop vaulted items here to unvault",
+    "dragToUnvault": "Drag to unvault dropzone"
   },
   "errorBoundary": {
     "title": "Something went wrong",
