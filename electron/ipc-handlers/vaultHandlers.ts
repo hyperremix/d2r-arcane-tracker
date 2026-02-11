@@ -136,7 +136,11 @@ function itemMatchesFilter(
     }
   }
 
-  if (filter.characterId && item.characterId !== filter.characterId) {
+  if (
+    filter.characterId &&
+    item.characterId !== filter.characterId &&
+    item.characterName !== filter.characterId
+  ) {
     return false;
   }
 
