@@ -116,9 +116,8 @@ export function initializeGrailHandlers(): void {
         ? grailDB.getProgressByCharacter(characterId)
         : grailDB.getAllProgress();
 
-      // Get all characters to map character IDs to names
-      const characters = grailDB.getAllCharacters();
-      const characterMap = new Map(characters.map((c) => [c.id, c.name]));
+      // Use cached character map (invalidated by GrailDatabase on character mutations)
+      const characterMap = grailDB.getCharacterMap();
 
       return dbProgress.map((prog) => ({
         ...prog,
