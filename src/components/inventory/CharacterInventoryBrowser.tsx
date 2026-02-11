@@ -288,9 +288,8 @@ export function CharacterInventoryBrowser() {
     const options = new Map<string, string>();
 
     for (const snapshot of inventoryResponse?.inventory.snapshots ?? []) {
-      if (snapshot.characterId) {
-        options.set(snapshot.characterId, snapshot.characterName);
-      }
+      const key = snapshot.characterId ?? snapshot.characterName;
+      options.set(key, snapshot.characterName);
     }
 
     return [...options.entries()];

@@ -976,7 +976,17 @@ class SaveFileMonitor {
     }
 
     // Filter files that need parsing based on modification time
-    const filesToParse = await this.filterFilesToParse(filePaths);
+    let filesToParse = await this.filterFilesToParse(filePaths);
+
+    // If no files changed but snapshots are empty, force-parse all files
+    // so inventory data is available on startup
+    if (filesToParse.length === 0 && this.inventorySnapshots.length === 0 && filePaths.length > 0) {
+      log.info(
+        'parseFiles',
+        'No files changed but inventory snapshots are empty, forcing full parse',
+      );
+      filesToParse = filePaths;
+    }
 
     log.info(
       'parseFiles',
