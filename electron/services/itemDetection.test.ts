@@ -293,11 +293,7 @@ describe('When ItemDetectionService is used', () => {
       const mockItemList: D2SItem[] = [
         D2SItemBuilder.new().withId(1).asUniqueHelm().build(),
         D2SItemBuilder.new().withId(2).asSetArmor().withLevel(30).asEquipped().build(),
-        D2SItemBuilder.new()
-          .withId(3)
-          .asRareItem()
-          .withLevel(25)
-          .build(), // Should be skipped
+        D2SItemBuilder.new().withId(3).asRareItem().withLevel(25).build(), // Should be skipped
         D2SItemBuilder.new()
           .withId(4)
           .asRune('r30') // Ber rune

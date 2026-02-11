@@ -13,6 +13,15 @@ import type {
   Session,
   SessionStats,
   Settings,
+  VaultCategory,
+  VaultCategoryCreateInput,
+  VaultCategoryUpdateInput,
+  VaultItem,
+  VaultItemFilter,
+  VaultItemSearchResult,
+  VaultItemUpdateInput,
+  VaultItemUpsertByFingerprintInput,
+  VaultItemUpsertInput,
 } from '../types/grail';
 import * as charactersModule from './characters';
 import { createDrizzleDb, type DrizzleDb } from './drizzle';
@@ -26,6 +35,8 @@ import * as schemaModule from './schema';
 import * as sessionsModule from './sessions';
 import * as settingsModule from './settings';
 import * as statisticsModule from './statistics';
+import * as vaultCategoriesModule from './vault-categories';
+import * as vaultItemsModule from './vault-items';
 
 /**
  * Main database class for managing Holy Grail tracking data.
@@ -244,6 +255,72 @@ class GrailDatabase {
   }
   deleteRunItem(itemId: string): void {
     runItemsModule.deleteRunItem(this, itemId);
+  }
+
+  // Vault items
+  getVaultItemById(itemId: string): VaultItem | null {
+    return vaultItemsModule.getVaultItemById(this, itemId);
+  }
+  addVaultItem(item: VaultItemUpsertInput): VaultItem {
+    return vaultItemsModule.addVaultItem(this, item);
+  }
+  updateVaultItem(itemId: string, updates: VaultItemUpdateInput): VaultItem | null {
+    return vaultItemsModule.updateVaultItem(this, itemId, updates);
+  }
+  removeVaultItem(itemId: string): void {
+    vaultItemsModule.removeVaultItem(this, itemId);
+  }
+  upsertVaultItemByFingerprint(input: VaultItemUpsertByFingerprintInput): VaultItem {
+    return vaultItemsModule.upsertVaultItemByFingerprint(this, input);
+  }
+  searchVaultItems(filter: VaultItemFilter): VaultItemSearchResult {
+    return vaultItemsModule.searchVaultItems(this, filter);
+  }
+  reconcileVaultItemsForScan(scan: {
+    sourceFileType: 'd2s' | 'sss' | 'd2x' | 'd2i';
+    sourceCharacterId?: string;
+    sourceCharacterName?: string;
+    presentFingerprints: string[];
+    lastSeenAt?: Date;
+  }): void {
+    vaultItemsModule.reconcileVaultItemsForScan(this, scan);
+  }
+  setVaultItemsPresentInLatestScan(
+    fingerprints: string[],
+    present: boolean,
+    lastSeenAt?: Date,
+    sourceCharacterName?: string,
+  ): void {
+    vaultItemsModule.setVaultItemsPresentInLatestScan(
+      this,
+      fingerprints,
+      present,
+      lastSeenAt,
+      sourceCharacterName,
+    );
+  }
+  markVaultItemAsMissing(fingerprint: string, sourceCharacterName?: string): void {
+    vaultItemsModule.markVaultItemAsMissing(this, fingerprint, sourceCharacterName);
+  }
+
+  // Vault categories
+  getAllVaultCategories(): VaultCategory[] {
+    return vaultCategoriesModule.getAllVaultCategories(this);
+  }
+  getVaultCategoryById(categoryId: string): VaultCategory | null {
+    return vaultCategoriesModule.getVaultCategoryById(this, categoryId);
+  }
+  addVaultCategory(input: VaultCategoryCreateInput): void {
+    vaultCategoriesModule.addVaultCategory(this, input);
+  }
+  updateVaultCategory(categoryId: string, updates: VaultCategoryUpdateInput): void {
+    vaultCategoriesModule.updateVaultCategory(this, categoryId, updates);
+  }
+  removeVaultCategory(categoryId: string): void {
+    vaultCategoriesModule.removeVaultCategory(this, categoryId);
+  }
+  setVaultItemCategories(vaultItemId: string, categoryIds: string[]): void {
+    vaultCategoriesModule.setVaultItemCategories(this, vaultItemId, categoryIds);
   }
 
   // Management

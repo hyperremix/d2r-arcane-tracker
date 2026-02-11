@@ -68,7 +68,7 @@ export function SessionDetailView({ sessionId, onBack }: SessionDetailViewProps)
     if (sessionId && !existingRuns) {
       loadSessionRuns(sessionId);
     }
-  }, [sessionId, loadSessionRuns, runs.get]);
+  }, [sessionId, loadSessionRuns, runs]);
 
   // Update notes when session changes
   useEffect(() => {
