@@ -11,11 +11,13 @@ import {
   closeSaveFileMonitor,
   eventBus,
   getRunTracker,
+  getSaveFileMonitor,
   initializeSaveFileHandlers,
 } from './ipc-handlers/saveFileHandlers';
 import { initializeShellHandlers } from './ipc-handlers/shellHandlers';
 import { initializeTerrorZoneHandlers } from './ipc-handlers/terrorZoneHandlers';
 import { initializeUpdateHandlers } from './ipc-handlers/updateHandlers';
+import { initializeVaultHandlers } from './ipc-handlers/vaultHandlers';
 import { initializeWidgetHandlers } from './ipc-handlers/widgetHandlers';
 import { isPositionOnScreen } from './utils/windowSnapping';
 import { closeWidgetWindow, showWidgetWindow } from './window/widgetWindow';
@@ -245,6 +247,7 @@ app.whenReady().then(() => {
   // Initialize grail database and IPC handlers
   initializeGrailHandlers();
   initializeSaveFileHandlers();
+  initializeVaultHandlers(getSaveFileMonitor);
 
   // Initialize run tracker handlers after save file handlers
   const runTracker = getRunTracker();

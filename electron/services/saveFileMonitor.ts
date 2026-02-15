@@ -12,93 +12,64 @@ import type { GrailDatabase } from '../database/database';
 import { isRuneId, runewordsByNameSimple } from '../items/indexes';
 import type {
   AvailableRunes,
+  CharacterInventorySnapshot,
   D2SaveFile,
+  D2SItem,
   FileReaderResponse,
+  InventorySearchResult,
   ItemDetails,
+  ParsedInventoryItem,
   SaveFileEvent,
   SaveFileItem,
   SaveFileState,
+  VaultLocationContext,
+  VaultSourceFileType,
 } from '../types/grail';
 import { GameMode } from '../types/grail';
 import { getGrailItemId } from '../utils/grailItemUtils';
-import { isRune, simplifyItemName } from '../utils/objects';
+import { normalizeIconFilename, resolveCanonicalIconFilename } from '../utils/iconFilenameResolver';
+import { isRune } from '../utils/objects';
 import { createServiceLogger } from '../utils/serviceLogger';
+import { resolveSpatialLocation } from '../utils/spatialLocationResolver';
 import type { EventBus } from './EventBus';
 
 const log = createServiceLogger('SaveFileMonitor');
 
-/**
- * Processes an item to determine its item ID from the flat items list.
- * @param {d2s.types.IItem} item - The D2S item to process.
- * @returns {string} The item ID or simplified name as fallback.
- */
-const processItemName = (item: d2s.types.IItem): string => {
-  // Try to get the item ID from our centralized logic
+const processItemName = (item: D2SItem): string => {
   const itemId = getGrailItemId(item);
   if (itemId) {
     return itemId;
   }
 
-  // Fallback to simplified name for items not in our list
-  // Note: rare items (rare_name/rare_name2) are excluded - they have randomly
-  // generated names that can match real grail items (e.g., "Doom Collar")
   let name = item.unique_name || item.set_name || '';
   name = name.toLowerCase().replace(/[^a-z0-9]/gi, '');
 
-  if (isRune(item)) {
-    // For runes, use the simplified name as fallback
+  if (isRune(item as d2s.types.IItem)) {
     return name;
   }
 
   if (item.type === 'runeword') {
-    return simplifyItemName(item.runeword_name || '');
+    return (item.runeword_name || '').toLowerCase().replace(/[^a-z0-9]/gi, '');
   }
 
   return name;
 };
 
-/**
- * Determines if an item should be skipped during processing.
- * @param {string} name - The item name/ID.
- * @param {d2s.types.IItem} item - The D2S item.
- * @returns {boolean} True if the item should be skipped, false otherwise.
- */
-const shouldSkipItem = (name: string): boolean => {
-  if (name === '') {
-    return true;
-  }
-  return false;
-};
+const shouldSkipItem = (name: string): boolean => name === '';
 
-/**
- * Creates a saved item details object from a D2S item.
- * @param {d2s.types.IItem} item - The D2S item to create details from.
- * @returns {ItemDetails} The created item details object.
- */
-const createSavedItem = (item: d2s.types.IItem): ItemDetails => {
-  return {
-    ethereal: !!item.ethereal,
-    ilevel: item.level,
-    socketed: !!item.socketed,
-    d2sItem: item,
-  };
-};
+const createSavedItem = (item: D2SItem): ItemDetails => ({
+  ethereal: !!item.ethereal,
+  ilevel: item.level ?? null,
+  socketed: !!item.socketed,
+  d2sItem: item as d2s.types.IItem,
+});
 
-/**
- * Adds an item to the results object.
- * @param {FileReaderResponse} results - The results object to add the item to.
- * @param {string} name - The item name/ID.
- * @param {ItemDetails} savedItem - The item details.
- * @param {string} saveName - The save file name.
- * @param {d2s.types.IItem} item - The D2S item.
- * @param {boolean} isEthereal - Whether the item is ethereal.
- */
 const addItemToResults = (
   results: FileReaderResponse,
   name: string,
   savedItem: ItemDetails,
   saveName: string,
-  item: d2s.types.IItem,
+  item: D2SItem,
   isEthereal: boolean,
 ): void => {
   const key: 'items' | 'ethItems' = isEthereal ? 'ethItems' : 'items';
@@ -112,26 +83,18 @@ const addItemToResults = (
     results[key][name] = {
       name,
       inSaves: {},
-      type: item.type,
+      type: item.type ?? 'unknown',
     };
     results[key][name].inSaves[saveName] = [savedItem];
   }
 };
 
-/**
- * Adds a rune to the available runes in the results object.
- * @param {FileReaderResponse} results - The results object to add the rune to.
- * @param {string} name - The rune name.
- * @param {ItemDetails} savedItem - The rune details.
- * @param {string} saveName - The save file name.
- * @param {d2s.types.IItem} item - The D2S item.
- */
 const addRuneToAvailableRunes = (
   results: FileReaderResponse,
   name: string,
   savedItem: ItemDetails,
   saveName: string,
-  item: d2s.types.IItem,
+  item: D2SItem,
 ): void => {
   if (results.availableRunes[name]) {
     if (!results.availableRunes[name].inSaves[saveName]) {
@@ -142,93 +105,137 @@ const addRuneToAvailableRunes = (
     results.availableRunes[name] = {
       name,
       inSaves: {},
-      type: item.type,
+      type: item.type ?? 'unknown',
     };
     results.availableRunes[name].inSaves[saveName] = [savedItem];
   }
 };
 
-/**
- * Determines if an item should be included in parsing based on its properties.
- * @param {d2s.types.IItem} item - The D2S item to check.
- * @returns {boolean} True if the item should be included, false otherwise.
- */
-const shouldIncludeItem = (item: d2s.types.IItem): boolean => {
-  // Only include unique and set items - rare items have randomly generated names
-  // that can match real grail items (e.g., "Doom Collar" matching "Doom" runeword)
-  return !!((item.unique_name || item.set_name) && getGrailItemId(item));
-};
-
-/**
- * Processes unique or set items and adds them to the items array.
- * @param {d2s.types.IItem} item - The D2S item to process.
- * @param {d2s.types.IItem[]} items - The array to add the item to.
- */
-const processUniqueOrSetItem = (item: d2s.types.IItem, items: d2s.types.IItem[]): void => {
-  items.push(item);
-};
-
-/**
- * Processes rune items and adds them to the items array.
- * @param {d2s.types.IItem} item - The D2S item to process.
- * @param {d2s.types.IItem[]} items - The array to add the item to.
- * @param {boolean} isEmbed - Whether the rune is embedded in another item.
- */
-const processRuneItem = (
-  item: d2s.types.IItem,
-  items: d2s.types.IItem[],
-  isEmbed: boolean,
-): void => {
-  if (isRune(item)) {
-    if (isEmbed) {
-      item.socketed = 1; // the "socketed" in Rune item types will indicated that *it* sits inside socket
-    }
-    items.push(item);
-  }
-};
-
-/**
- * Processes runeword items and adds them to the items array.
- * Validates runeword names against known runewords to prevent false positives
- * from D2S parser bugs or corrupted item data.
- * @param {d2s.types.IItem} item - The D2S item to process.
- * @param {d2s.types.IItem[]} items - The array to add the item to.
- */
-const processRunewordItem = (item: d2s.types.IItem, items: d2s.types.IItem[]): void => {
+const getValidatedRunewordName = (item: D2SItem): string | null => {
   if (!item.runeword_name) {
-    return;
+    return null;
   }
 
-  // Skip if item has unique or set name - runewords cannot be unique/set items
-  // This catches false positives from corrupted save files or modded games
-  if (item.unique_name || item.set_name) {
-    log.warn(
-      'processRunewordItem',
-      `Skipping "${item.runeword_name}" - has conflicting unique/set: ${item.unique_name || item.set_name}`,
-    );
-    return;
+  const normalized = item.runeword_name === 'Love' ? 'Lore' : item.runeword_name;
+  const simplified = normalized.toLowerCase().replace(/[^a-z0-9]/gi, '');
+
+  if (!runewordsByNameSimple[simplified]) {
+    return null;
   }
 
-  // Fix known parser bug: "Love" should be "Lore"
-  if (item.runeword_name === 'Love') {
-    item.runeword_name = 'Lore';
-  }
-
-  // Validate runeword name against known runewords to prevent false positives
-  // from D2S parser bugs or corrupted item data
-  const simplifiedName = simplifyItemName(item.runeword_name);
-  if (!runewordsByNameSimple[simplifiedName]) {
-    log.warn('processRunewordItem', `Ignoring unknown runeword name: ${item.runeword_name}`);
-    return;
-  }
-
-  // we push Runewords as "items" for easier displaying in a list
-  const newItem = {
-    runeword_name: item.runeword_name,
-    type: 'runeword',
-  } as d2s.types.IItem;
-  items.push(newItem);
+  return normalized;
 };
+
+const mapQualityValue = (quality: number | undefined): string => {
+  switch (quality) {
+    case 1:
+      return 'normal';
+    case 2:
+      return 'magic';
+    case 3:
+      return 'rare';
+    case 4:
+      return 'set';
+    case 5:
+      return 'unique';
+    case 6:
+      return 'crafted';
+    default:
+      return 'normal';
+  }
+};
+
+function normalizeItemNameForKey(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9]/gi, '');
+}
+
+function resolveFallbackItemName(item: D2SItem): string {
+  const candidates = [
+    item.name,
+    item.unique_name,
+    item.set_name,
+    item.type_name,
+    item.type,
+    item.code,
+    'unknown',
+  ];
+
+  for (const candidate of candidates) {
+    if (typeof candidate === 'string' && candidate.trim()) {
+      return candidate;
+    }
+  }
+
+  return 'unknown';
+}
+
+function resolveParsedItemName(item: D2SItem, runewordName: string | null): string {
+  const grailName = runewordName ? normalizeItemNameForKey(runewordName) : processItemName(item);
+  if (grailName) {
+    return normalizeItemNameForKey(grailName);
+  }
+
+  return normalizeItemNameForKey(resolveFallbackItemName(item));
+}
+
+function resolveSocketCount(item: D2SItem): number {
+  if (Array.isArray(item.gems)) {
+    return item.gems.length;
+  }
+
+  if (typeof item.socket_count === 'number') {
+    return item.socket_count;
+  }
+
+  return typeof item.socketed === 'number' ? item.socketed : 0;
+}
+
+function resolveParsedItemType(
+  item: D2SItem,
+  quality: string,
+  runewordName: string | null,
+): string {
+  if (runewordName) {
+    return 'runeword';
+  }
+
+  if (isRune(item as d2s.types.IItem)) {
+    return 'rune';
+  }
+
+  if (quality === 'unique' || quality === 'set') {
+    return quality;
+  }
+
+  return item.type ?? 'other';
+}
+
+type ParsedItemSpatialMetadata = Pick<
+  ParsedInventoryItem,
+  | 'gridX'
+  | 'gridY'
+  | 'gridWidth'
+  | 'gridHeight'
+  | 'equippedSlotId'
+  | 'iconFileName'
+  | 'isSocketedItem'
+>;
+
+function resolveParsedItemSpatialMetadata(
+  resolvedSpatial: ReturnType<typeof resolveSpatialLocation>,
+  isSocketedItem: boolean,
+  iconFileName: string | undefined,
+): ParsedItemSpatialMetadata {
+  return {
+    gridX: resolvedSpatial.gridX,
+    gridY: resolvedSpatial.gridY,
+    gridWidth: resolvedSpatial.gridWidth,
+    gridHeight: resolvedSpatial.gridHeight,
+    equippedSlotId: resolvedSpatial.equippedSlotId,
+    iconFileName,
+    isSocketedItem,
+  };
+}
 
 /**
  * Service for monitoring Diablo 2 save files and extracting item data.
@@ -237,6 +244,7 @@ const processRunewordItem = (item: d2s.types.IItem, items: d2s.types.IItem[]): v
  */
 class SaveFileMonitor {
   private currentData: FileReaderResponse;
+  private inventorySnapshots: CharacterInventorySnapshot[] = [];
   private fileWatcher: FSWatcher | null;
   private watchPath: string | null;
   private fileChangeCounter: number = 0;
@@ -787,6 +795,134 @@ class SaveFileMonitor {
     return extractedItems;
   }
 
+  private getFingerprintFieldValue<K extends keyof ParsedInventoryItem['fingerprintInputs']>(
+    item: ParsedInventoryItem,
+    key: K,
+  ): ParsedInventoryItem['fingerprintInputs'][K] {
+    const itemValue = item[key as keyof ParsedInventoryItem];
+    if (itemValue !== undefined) {
+      return itemValue as ParsedInventoryItem['fingerprintInputs'][K];
+    }
+
+    return item.fingerprintInputs[key];
+  }
+
+  private createFingerprint(item: ParsedInventoryItem): string {
+    const stashTab = this.getFingerprintFieldValue(item, 'stashTab');
+    const gridX = this.getFingerprintFieldValue(item, 'gridX');
+    const gridY = this.getFingerprintFieldValue(item, 'gridY');
+    const gridWidth = this.getFingerprintFieldValue(item, 'gridWidth');
+    const gridHeight = this.getFingerprintFieldValue(item, 'gridHeight');
+    const equippedSlotId = this.getFingerprintFieldValue(item, 'equippedSlotId');
+    const iconFileName = item.fingerprintInputs.iconFileName ?? item.iconFileName ?? '';
+    const isSocketedItem = this.getFingerprintFieldValue(item, 'isSocketedItem') ?? false;
+    const itemCode = this.getFingerprintFieldValue(item, 'itemCode') ?? '';
+    const itemName = this.getFingerprintFieldValue(item, 'itemName');
+    const stash = stashTab !== undefined ? String(stashTab) : '';
+
+    return [
+      this.getFingerprintFieldValue(item, 'sourceFileType'),
+      this.getFingerprintFieldValue(item, 'characterName'),
+      this.getFingerprintFieldValue(item, 'locationContext'),
+      itemCode,
+      this.getFingerprintFieldValue(item, 'quality'),
+      String(this.getFingerprintFieldValue(item, 'ethereal')),
+      String(this.getFingerprintFieldValue(item, 'socketCount')),
+      stash,
+      gridX ?? '',
+      gridY ?? '',
+      gridWidth ?? '',
+      gridHeight ?? '',
+      equippedSlotId ?? '',
+      iconFileName,
+      String(isSocketedItem),
+      itemName,
+    ].join('|');
+  }
+
+  private createParsedInventoryItem(params: {
+    filePath: string;
+    saveName: string;
+    sourceFileType: VaultSourceFileType;
+    item: D2SItem;
+    fallbackLocation: VaultLocationContext;
+    stashTab?: number;
+    isSocketedItem?: boolean;
+  }): ParsedInventoryItem {
+    const resolvedSpatialLocation = resolveSpatialLocation({
+      item: params.item,
+      sourceFileType: params.sourceFileType,
+      fallbackLocation: params.fallbackLocation,
+      fallbackStashTab: params.stashTab,
+    });
+    const locationContext = resolvedSpatialLocation.locationContext;
+    const stashTab = resolvedSpatialLocation.stashTab;
+    const quality = mapQualityValue(params.item.quality);
+    const runewordName = getValidatedRunewordName(params.item);
+    const isSocketedItem = params.isSocketedItem ?? false;
+    const itemName = resolveParsedItemName(params.item, runewordName);
+    const socketCount = resolveSocketCount(params.item);
+    const parsedType = resolveParsedItemType(params.item, quality, runewordName);
+    const grailItemId = getGrailItemId(params.item as d2s.types.IItem) ?? undefined;
+    const legacyParserIconFileName = normalizeIconFilename(params.item.inv_file);
+    const resolvedIconFileName = resolveCanonicalIconFilename({
+      grailItemId,
+      itemCode: params.item.code ?? params.item.type,
+      itemName,
+      uniqueName: params.item.unique_name,
+      setName: params.item.set_name,
+      parsedName: params.item.name,
+      typeName: params.item.type_name,
+      rawIconFileName: params.item.inv_file,
+    });
+    const spatialMetadata = resolveParsedItemSpatialMetadata(
+      resolvedSpatialLocation,
+      isSocketedItem,
+      resolvedIconFileName,
+    );
+
+    const parsed: ParsedInventoryItem = {
+      fingerprint: '',
+      fingerprintInputs: {
+        sourceFileType: params.sourceFileType,
+        characterName: params.saveName,
+        locationContext,
+        itemCode: params.item.code ?? params.item.type ?? undefined,
+        quality,
+        ethereal: !!params.item.ethereal,
+        socketCount,
+        stashTab,
+        gridX: spatialMetadata.gridX,
+        gridY: spatialMetadata.gridY,
+        gridWidth: spatialMetadata.gridWidth,
+        gridHeight: spatialMetadata.gridHeight,
+        equippedSlotId: spatialMetadata.equippedSlotId,
+        iconFileName: legacyParserIconFileName,
+        isSocketedItem: spatialMetadata.isSocketedItem,
+        itemName,
+      },
+      characterName: params.saveName,
+      sourceFileType: params.sourceFileType,
+      sourceFilePath: params.filePath,
+      locationContext,
+      stashTab,
+      ...spatialMetadata,
+      itemName,
+      itemCode: params.item.code ?? params.item.type ?? undefined,
+      quality,
+      type: parsedType,
+      ethereal: !!params.item.ethereal,
+      socketCount,
+      grailItemId,
+      rawItemJson: JSON.stringify(params.item),
+      rawParsedItem: params.item as d2s.types.IItem,
+      seenAt: new Date(),
+    };
+
+    parsed.fingerprint = this.createFingerprint(parsed);
+    return parsed;
+  }
+
   /**
    * Processes a single save file and updates results.
    * @private
@@ -797,17 +933,28 @@ class SaveFileMonitor {
   private async processSingleFile(
     filePath: string,
     results: FileReaderResponse,
-  ): Promise<{ saveName: string; success: boolean }> {
+  ): Promise<{
+    saveName: string;
+    success: boolean;
+    inventorySnapshot?: CharacterInventorySnapshot;
+  }> {
     const saveName = this.getSaveNameFromPath(filePath);
 
     try {
       const buffer = await readFile(filePath);
       const extension = extname(filePath).toLowerCase();
-      const parsedItems = await this.parseSave(saveName, buffer, extension);
+      const inventoryItems = await this.parseSave(saveName, filePath, buffer, extension);
+      const characterId = this.grailDatabase?.getCharacterByName(saveName)?.id;
+      const inventoryItemsWithCharacter = inventoryItems.map((inventoryItem) => ({
+        ...inventoryItem,
+        characterId,
+      }));
+      const snapshotItems = inventoryItemsWithCharacter.filter((item) => !item.isSocketedItem);
 
       results.stats[saveName] = 0;
 
-      for (const item of parsedItems) {
+      for (const inventoryItem of inventoryItemsWithCharacter) {
+        const item = inventoryItem.rawParsedItem;
         const name = processItemName(item);
 
         if (shouldSkipItem(name)) {
@@ -828,11 +975,23 @@ class SaveFileMonitor {
       // Update save file state after successful parsing
       await this.updateSaveFileState(filePath);
 
-      return { saveName, success: true };
+      return {
+        saveName,
+        success: true,
+        inventorySnapshot: {
+          snapshotId: `${saveName}-${Date.now()}`,
+          characterName: saveName,
+          characterId,
+          sourceFileType: extension.replace('.', '') as VaultSourceFileType,
+          sourceFilePath: filePath,
+          capturedAt: new Date(),
+          items: snapshotItems,
+        },
+      };
     } catch (error) {
       log.error('processSingleFile', error, { filePath });
       results.stats[saveName] = null;
-      return { saveName, success: false };
+      return { saveName, success: false, inventorySnapshot: undefined };
     }
   }
 
@@ -975,7 +1134,17 @@ class SaveFileMonitor {
     }
 
     // Filter files that need parsing based on modification time
-    const filesToParse = await this.filterFilesToParse(filePaths);
+    let filesToParse = await this.filterFilesToParse(filePaths);
+
+    // If no files changed but snapshots are empty, force-parse all files
+    // so inventory data is available on startup
+    if (filesToParse.length === 0 && this.inventorySnapshots.length === 0 && filePaths.length > 0) {
+      log.info(
+        'parseFiles',
+        'No files changed but inventory snapshots are empty, forcing full parse',
+      );
+      filesToParse = filePaths;
+    }
 
     log.info(
       'parseFiles',
@@ -1000,6 +1169,9 @@ class SaveFileMonitor {
     const parseResults = await this.executeConcurrently(tasks, this.MAX_CONCURRENT_PARSES);
 
     const failedFiles = parseResults.filter((r) => r && !r.success);
+    const successfulSnapshots = parseResults
+      .filter((r) => r?.success && r.inventorySnapshot)
+      .map((r) => r.inventorySnapshot as CharacterInventorySnapshot);
     if (failedFiles.length > 0) {
       log.warn(
         'parseFiles',
@@ -1026,6 +1198,11 @@ class SaveFileMonitor {
 
     // Update current data
     this.currentData = results;
+    this.inventorySnapshots = successfulSnapshots;
+
+    if (this.grailDatabase) {
+      this.reconcileVaultFromSnapshots(successfulSnapshots);
+    }
 
     // Emit save file events for each file that was actually parsed
     await this.emitSaveFileEvents(filesToParse, results);
@@ -1041,23 +1218,41 @@ class SaveFileMonitor {
    * @returns {Promise<d2s.types.IItem[]>} A promise that resolves with an array of extracted items.
    */
   private async parseSave(
-    _saveName: string,
-    content: Buffer,
-    extension: string,
-  ): Promise<d2s.types.IItem[]> {
-    const items: d2s.types.IItem[] = [];
+    saveName: string,
+    filePathOrContent: string | Buffer,
+    contentOrExtension: Buffer | string,
+    extensionArg?: string,
+  ): Promise<ParsedInventoryItem[]> {
+    const items: ParsedInventoryItem[] = [];
 
-    const parseItems = (itemList: d2s.types.IItem[], isEmbed: boolean = false) => {
+    const legacyCall = Buffer.isBuffer(filePathOrContent);
+    const filePath = legacyCall ? `${saveName}.d2s` : filePathOrContent;
+    const content = (legacyCall ? filePathOrContent : contentOrExtension) as Buffer;
+    const extension = (legacyCall ? contentOrExtension : extensionArg) as string;
+
+    const sourceFileType = extension.replace('.', '') as VaultSourceFileType;
+
+    const parseItems = (
+      itemList: D2SItem[],
+      fallbackLocation: VaultLocationContext,
+      stashTab?: number,
+      isSocketedItem: boolean = false,
+    ) => {
       itemList.forEach((item) => {
-        if (shouldIncludeItem(item)) {
-          processUniqueOrSetItem(item, items);
-        }
-
-        processRuneItem(item, items, isEmbed);
-        processRunewordItem(item, items);
+        items.push(
+          this.createParsedInventoryItem({
+            filePath,
+            saveName,
+            sourceFileType,
+            item,
+            fallbackLocation,
+            stashTab,
+            isSocketedItem,
+          }),
+        );
 
         if (item.socketed_items?.length) {
-          parseItems(item.socketed_items, true);
+          parseItems(item.socketed_items, fallbackLocation, stashTab, true);
         }
       });
     };
@@ -1076,11 +1271,12 @@ class SaveFileMonitor {
       if (settings.gameMode === GameMode.Hardcore && !isHardcore) {
         return [];
       }
-      const items = response.items || [];
-      const mercItems = response.merc_items || [];
-      const corpseItems = response.corpse_items || [];
-      const itemList = [...items, ...mercItems, ...corpseItems];
-      parseItems(itemList);
+      const inventoryItems = (response.items || []) as D2SItem[];
+      const mercItems = (response.merc_items || []) as D2SItem[];
+      const corpseItems = (response.corpse_items || []) as D2SItem[];
+      parseItems(inventoryItems, 'inventory');
+      parseItems(mercItems, 'mercenary');
+      parseItems(corpseItems, 'corpse');
     };
 
     const parseStash = (response: d2s.types.IStash) => {
@@ -1099,8 +1295,8 @@ class SaveFileMonitor {
         return [];
       }
 
-      response.pages.forEach((page) => {
-        parseItems(page.items);
+      response.pages.forEach((page, pageIndex) => {
+        parseItems(page.items as D2SItem[], 'stash', pageIndex);
       });
     };
 
@@ -1300,12 +1496,70 @@ class SaveFileMonitor {
     log.info('updateSaveDirectory', 'Complete');
   }
 
+  private reconcileVaultFromSnapshots(snapshots: CharacterInventorySnapshot[]): void {
+    const bySource = new Map<string, CharacterInventorySnapshot>();
+
+    for (const snapshot of snapshots) {
+      const key = `${snapshot.sourceFileType}:${snapshot.characterName}`;
+      bySource.set(key, snapshot);
+
+      const characterId = this.grailDatabase?.getCharacterByName(snapshot.characterName)?.id;
+      const now = new Date();
+
+      for (const item of snapshot.items) {
+        this.grailDatabase?.upsertVaultItemByFingerprint({
+          fingerprint: item.fingerprint,
+          itemName: item.itemName,
+          itemCode: item.itemCode,
+          quality: item.quality,
+          ethereal: item.ethereal,
+          socketCount: item.socketCount,
+          rawItemJson: item.rawItemJson,
+          sourceCharacterId: characterId,
+          sourceCharacterName: snapshot.characterName,
+          sourceFileType: snapshot.sourceFileType,
+          locationContext: item.locationContext,
+          stashTab: item.stashTab,
+          gridX: item.gridX,
+          gridY: item.gridY,
+          gridWidth: item.gridWidth,
+          gridHeight: item.gridHeight,
+          equippedSlotId: item.equippedSlotId,
+          iconFileName: item.iconFileName,
+          isSocketedItem: item.isSocketedItem,
+          grailItemId: item.grailItemId,
+          isPresentInLatestScan: true,
+          lastSeenAt: now,
+        });
+      }
+    }
+
+    for (const snapshot of bySource.values()) {
+      const characterId = this.grailDatabase?.getCharacterByName(snapshot.characterName)?.id;
+      this.grailDatabase?.reconcileVaultItemsForScan({
+        sourceFileType: snapshot.sourceFileType,
+        sourceCharacterId: characterId,
+        sourceCharacterName: snapshot.characterName,
+        presentFingerprints: snapshot.items.map((item) => item.fingerprint),
+        lastSeenAt: snapshot.capturedAt,
+      });
+    }
+  }
+
   /**
    * Gets the current parsed item data.
    * @returns {FileReaderResponse} The current item data from all parsed save files.
    */
   getItems(): FileReaderResponse {
     return this.currentData;
+  }
+
+  getInventorySearchResult(): InventorySearchResult {
+    return {
+      snapshots: this.inventorySnapshots,
+      totalSnapshots: this.inventorySnapshots.length,
+      totalItems: this.inventorySnapshots.reduce((sum, snapshot) => sum + snapshot.items.length, 0),
+    };
   }
 
   /**

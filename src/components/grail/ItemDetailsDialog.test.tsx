@@ -49,6 +49,11 @@ const defaultSettings: Settings = {
 
 const mockToggleItemFound = vi.fn();
 
+const mockVaultSearch = vi.fn();
+const mockVaultAddItem = vi.fn();
+const mockVaultRemoveItem = vi.fn();
+const mockVaultListCategories = vi.fn();
+
 function setupStoreMock(
   overrides: {
     items?: ReturnType<typeof HolyGrailItemBuilder.prototype.build>[];
@@ -94,6 +99,19 @@ function setupProgressLookup(
 describe('When ItemDetailsDialog is rendered', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    Object.defineProperty(window, 'electronAPI', {
+      writable: true,
+      value: {
+        vault: {
+          search: mockVaultSearch,
+          addItem: mockVaultAddItem,
+          removeItem: mockVaultRemoveItem,
+          listCategories: mockVaultListCategories,
+        },
+      },
+    });
+    mockVaultSearch.mockResolvedValue({ items: [], total: 0, page: 1, pageSize: 20 });
+    mockVaultListCategories.mockResolvedValue([]);
     setupStoreMock();
     setupProgressLookup();
   });
@@ -431,7 +449,9 @@ describe('When ItemDetailsDialog is rendered', () => {
       // The footer Close button is the one without data-slot="dialog-close"
       const footerClose = closeButtons.find(
         (btn) => btn.getAttribute('data-slot') !== 'dialog-close',
-      )!;
+      );
+      expect(footerClose).toBeTruthy();
+      if (!footerClose) throw new Error('Expected footer close button');
       fireEvent.click(footerClose);
 
       // Assert
@@ -630,6 +650,68 @@ describe('When ItemDetailsDialog is rendered', () => {
 
       // Assert
       expect(screen.getByText('Auto')).toBeInTheDocument();
+    });
+  });
+
+  describe('If vault metadata exists for the item', () => {
+    it('Then it shows vaulted status badge and tags', async () => {
+      // Arrange
+      const item = HolyGrailItemBuilder.new().withId('item-1').withName('Windforce').build();
+      setupStoreMock({ items: [item] });
+      mockVaultSearch.mockResolvedValue({
+        items: [
+          {
+            id: 'vault-1',
+            fingerprint: 'grail:item-1',
+            itemName: 'Windforce',
+            quality: 'unique',
+            ethereal: false,
+            rawItemJson: '{}',
+            sourceFileType: 'd2s',
+            locationContext: 'unknown',
+            grailItemId: 'item-1',
+            categoryIds: ['cat-1'],
+            isPresentInLatestScan: false,
+            created: new Date('2024-01-01T00:00:00.000Z'),
+            lastUpdated: new Date('2024-01-01T00:00:00.000Z'),
+          },
+        ],
+        total: 1,
+        page: 1,
+        pageSize: 20,
+      });
+      mockVaultListCategories.mockResolvedValue([
+        {
+          id: 'cat-1',
+          name: 'Trade',
+          created: new Date('2024-01-01T00:00:00.000Z'),
+          lastUpdated: new Date('2024-01-01T00:00:00.000Z'),
+        },
+      ]);
+
+      // Act
+      render(<ItemDetailsDialog itemId="item-1" open={true} onOpenChange={vi.fn()} />);
+
+      // Assert
+      expect(await screen.findByText('Vaulted')).toBeInTheDocument();
+      expect(screen.getByText('Trade')).toBeInTheDocument();
+    });
+  });
+
+  describe('If the item is not vaulted', () => {
+    it('Then clicking Vault calls vault addItem API', async () => {
+      // Arrange
+      const item = HolyGrailItemBuilder.new().withId('item-1').withName('Windforce').build();
+      setupStoreMock({ items: [item] });
+
+      // Act
+      render(<ItemDetailsDialog itemId="item-1" open={true} onOpenChange={vi.fn()} />);
+      const vaultButton = await screen.findByRole('button', { name: 'Vault' });
+      fireEvent.click(vaultButton);
+
+      // Assert
+      expect(mockVaultAddItem).toHaveBeenCalledTimes(1);
+      expect(mockVaultAddItem.mock.calls[0]?.[0]?.grailItemId).toBe('item-1');
     });
   });
 });

@@ -250,6 +250,165 @@ export interface RunItem {
 /**
  * Interface representing the progress of finding a Holy Grail item.
  */
+
+export type VaultSourceFileType = 'd2s' | 'sss' | 'd2x' | 'd2i';
+
+export type VaultLocationContext =
+  | 'equipped'
+  | 'inventory'
+  | 'stash'
+  | 'mercenary'
+  | 'corpse'
+  | 'unknown';
+
+export interface VaultCategory {
+  id: string;
+  name: string;
+  color?: string;
+  metadata?: string;
+  created: Date;
+  lastUpdated: Date;
+}
+
+export interface VaultCategoryCreateInput {
+  id: string;
+  name: string;
+  color?: string;
+  metadata?: string;
+}
+
+export interface VaultCategoryUpdateInput {
+  name?: string;
+  color?: string;
+  metadata?: string;
+}
+
+export interface VaultItem {
+  id: string;
+  fingerprint: string;
+  itemName: string;
+  itemCode?: string;
+  type?: string;
+  quality: string;
+  ethereal: boolean;
+  socketCount?: number;
+  rawItemJson: string;
+  sourceCharacterId?: string;
+  sourceCharacterName?: string;
+  sourceFileType: VaultSourceFileType;
+  locationContext: VaultLocationContext;
+  stashTab?: number;
+  gridX?: number;
+  gridY?: number;
+  gridWidth?: number;
+  gridHeight?: number;
+  equippedSlotId?: number;
+  iconFileName?: string;
+  isSocketedItem?: boolean;
+  grailItemId?: string;
+  isPresentInLatestScan: boolean;
+  lastSeenAt?: Date;
+  vaultedAt?: Date;
+  unvaultedAt?: Date;
+  categoryIds?: string[];
+  created: Date;
+  lastUpdated: Date;
+}
+
+export interface VaultItemUpsertInput {
+  id?: string;
+  fingerprint: string;
+  itemName: string;
+  itemCode?: string;
+  type?: string;
+  quality: string;
+  ethereal: boolean;
+  socketCount?: number;
+  rawItemJson: string;
+  sourceCharacterId?: string;
+  sourceCharacterName?: string;
+  sourceFileType: VaultSourceFileType;
+  locationContext: VaultLocationContext;
+  stashTab?: number;
+  gridX?: number;
+  gridY?: number;
+  gridWidth?: number;
+  gridHeight?: number;
+  equippedSlotId?: number;
+  iconFileName?: string;
+  isSocketedItem?: boolean;
+  grailItemId?: string;
+  isPresentInLatestScan?: boolean;
+  lastSeenAt?: Date;
+  vaultedAt?: Date;
+  unvaultedAt?: Date;
+  categoryIds?: string[];
+}
+
+export type VaultItemUpsertByFingerprintInput = VaultItemUpsertInput;
+
+export type VaultItemUpdateInput = Partial<Omit<VaultItemUpsertInput, 'fingerprint'>>;
+
+export interface VaultItemFilter {
+  text?: string;
+  categoryIds?: string[];
+  characterId?: string;
+  locationContext?: VaultLocationContext;
+  sourceFileType?: VaultSourceFileType;
+  includeSocketed?: boolean;
+  presentState?: 'all' | 'present' | 'missing';
+  page?: number;
+  pageSize?: number;
+  sortBy?: 'itemName' | 'lastSeenAt' | 'createdAt' | 'updatedAt';
+  sortOrder?: 'asc' | 'desc';
+}
+
+export interface VaultItemSearchResult {
+  items: VaultItem[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+export type DatabaseVaultCategory = {
+  id: string;
+  name: string;
+  color: string | null;
+  metadata: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type DatabaseVaultItem = {
+  id: string;
+  fingerprint: string;
+  item_name: string;
+  item_code: string | null;
+  quality: string;
+  ethereal: 0 | 1;
+  socket_count: number | null;
+  raw_item_json: string;
+  source_character_id: string | null;
+  source_character_name: string | null;
+  source_file_type: VaultSourceFileType;
+  location_context: VaultLocationContext;
+  stash_tab: number | null;
+  grid_x: number | null;
+  grid_y: number | null;
+  grid_width: number | null;
+  grid_height: number | null;
+  equipped_slot_id: number | null;
+  icon_file_name: string | null;
+  is_socketed_item: 0 | 1;
+  grail_item_id: string | null;
+  is_present_in_latest_scan: 0 | 1;
+  last_seen_at: string | null;
+  vaulted_at: string | null;
+  unvaulted_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export interface GrailProgress {
   id: string;
   characterId: string;
@@ -635,13 +794,83 @@ export type D2SItem = {
   ethereal?: number;
   quality?: number;
   location?: string;
+  location_id?: number;
+  equipped_id?: number;
+  position_x?: number;
+  position_y?: number;
+  alt_position_id?: number;
   equipped?: boolean;
   socketed?: number;
   socket_count?: number;
+  inv_width?: number;
+  inv_height?: number;
+  inv_file?: string | number;
+  inv_transform?: number;
   socketed_items?: D2SItem[];
   gems?: unknown[];
   magic_attributes?: Array<{ name: string; value?: unknown }>;
 };
+
+export interface ParsedInventoryItem {
+  fingerprint: string;
+  fingerprintInputs: {
+    sourceFileType: VaultSourceFileType;
+    characterName: string;
+    locationContext: VaultLocationContext;
+    itemCode?: string;
+    quality: string;
+    ethereal: boolean;
+    socketCount: number;
+    stashTab?: number;
+    gridX?: number;
+    gridY?: number;
+    gridWidth?: number;
+    gridHeight?: number;
+    equippedSlotId?: number;
+    iconFileName?: string;
+    isSocketedItem?: boolean;
+    itemName: string;
+  };
+  characterName: string;
+  characterId?: string;
+  sourceFileType: VaultSourceFileType;
+  sourceFilePath: string;
+  locationContext: VaultLocationContext;
+  stashTab?: number;
+  gridX?: number;
+  gridY?: number;
+  gridWidth?: number;
+  gridHeight?: number;
+  equippedSlotId?: number;
+  iconFileName?: string;
+  isSocketedItem?: boolean;
+  itemName: string;
+  itemCode?: string;
+  type?: string;
+  quality: string;
+  ethereal: boolean;
+  socketCount: number;
+  grailItemId?: string;
+  rawItemJson: string;
+  rawParsedItem: d2s.types.IItem;
+  seenAt: Date;
+}
+
+export interface CharacterInventorySnapshot {
+  snapshotId: string;
+  characterName: string;
+  characterId?: string;
+  sourceFileType: VaultSourceFileType;
+  sourceFilePath: string;
+  capturedAt: Date;
+  items: ParsedInventoryItem[];
+}
+
+export interface InventorySearchResult {
+  snapshots: CharacterInventorySnapshot[];
+  totalSnapshots: number;
+  totalItems: number;
+}
 
 /**
  * Type representing a simplified item structure for internal use.
@@ -658,6 +887,9 @@ export type D2Item = {
   characterName: string;
   characterClass?: CharacterClass;
   location: 'inventory' | 'stash' | 'equipment';
+  locationContext?: VaultLocationContext;
+  stashTab?: number;
+  rawParsedItem?: d2s.types.IItem;
 };
 
 /**

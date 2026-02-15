@@ -1,4 +1,7 @@
 import { items as grailItemsData } from '../items';
+import type { D2SItem, VaultLocationContext, VaultSourceFileType } from '../types/grail';
+import { resolveCanonicalIconFilename } from '../utils/iconFilenameResolver';
+import { resolveSpatialLocation } from '../utils/spatialLocationResolver';
 import { schema } from './drizzle';
 import { insertItems } from './items';
 import type { DatabaseContext } from './types';
@@ -126,6 +129,61 @@ export function createSchema(ctx: DatabaseContext): void {
         FOREIGN KEY (grail_progress_id) REFERENCES grail_progress(id) ON DELETE CASCADE
       );
 
+      -- Vault categories table - stores category metadata for vaulted items
+      CREATE TABLE IF NOT EXISTS vault_categories (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        color TEXT,
+        metadata TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+
+      -- Vault items table - stores item snapshots captured from save scans
+      CREATE TABLE IF NOT EXISTS vault_items (
+        id TEXT PRIMARY KEY,
+        fingerprint TEXT NOT NULL,
+        item_name TEXT NOT NULL,
+        item_code TEXT,
+        quality TEXT NOT NULL,
+        ethereal BOOLEAN NOT NULL DEFAULT FALSE,
+        socket_count INTEGER,
+        raw_item_json TEXT NOT NULL,
+        source_character_id TEXT,
+        source_character_name TEXT,
+        source_file_type TEXT NOT NULL CHECK (source_file_type IN ('d2s', 'sss', 'd2x', 'd2i')),
+        location_context TEXT NOT NULL DEFAULT 'unknown' CHECK (
+          location_context IN ('equipped', 'inventory', 'stash', 'mercenary', 'corpse', 'unknown')
+        ),
+        stash_tab INTEGER,
+        grid_x INTEGER,
+        grid_y INTEGER,
+        grid_width INTEGER,
+        grid_height INTEGER,
+        equipped_slot_id INTEGER,
+        icon_file_name TEXT,
+        is_socketed_item BOOLEAN NOT NULL DEFAULT FALSE,
+        grail_item_id TEXT,
+        is_present_in_latest_scan BOOLEAN NOT NULL DEFAULT TRUE,
+        last_seen_at DATETIME,
+        vaulted_at DATETIME,
+        unvaulted_at DATETIME,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (source_character_id) REFERENCES characters(id) ON DELETE SET NULL,
+        FOREIGN KEY (grail_item_id) REFERENCES items(id) ON DELETE SET NULL
+      );
+
+      -- Vault item categories table - many-to-many mapping for item category tags
+      CREATE TABLE IF NOT EXISTS vault_item_categories (
+        vault_item_id TEXT NOT NULL,
+        vault_category_id TEXT NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (vault_item_id, vault_category_id),
+        FOREIGN KEY (vault_item_id) REFERENCES vault_items(id) ON DELETE CASCADE,
+        FOREIGN KEY (vault_category_id) REFERENCES vault_categories(id) ON DELETE CASCADE
+      );
+
       -- Indexes for better performance
       CREATE INDEX IF NOT EXISTS idx_items_category ON items(category);
       CREATE INDEX IF NOT EXISTS idx_items_type ON items(type);
@@ -155,6 +213,25 @@ export function createSchema(ctx: DatabaseContext): void {
       -- Additional indexes for sorting and filtering operations
       CREATE INDEX IF NOT EXISTS idx_grail_progress_updated_at ON grail_progress(updated_at);
       CREATE INDEX IF NOT EXISTS idx_characters_updated_at ON characters(updated_at);
+
+      -- Vault category indexes
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_vault_categories_name ON vault_categories(name);
+
+      -- Vault items indexes
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_vault_items_fingerprint ON vault_items(fingerprint);
+      CREATE INDEX IF NOT EXISTS idx_vault_items_item_name ON vault_items(item_name);
+      CREATE INDEX IF NOT EXISTS idx_vault_items_item_code ON vault_items(item_code);
+      CREATE INDEX IF NOT EXISTS idx_vault_items_quality ON vault_items(quality);
+      CREATE INDEX IF NOT EXISTS idx_vault_items_source_character_id ON vault_items(source_character_id);
+      CREATE INDEX IF NOT EXISTS idx_vault_items_source_file_type ON vault_items(source_file_type);
+      CREATE INDEX IF NOT EXISTS idx_vault_items_location_context ON vault_items(location_context);
+      CREATE INDEX IF NOT EXISTS idx_vault_items_grail_item_id ON vault_items(grail_item_id);
+      CREATE INDEX IF NOT EXISTS idx_vault_items_present_scan ON vault_items(is_present_in_latest_scan);
+      CREATE INDEX IF NOT EXISTS idx_vault_items_last_seen_at ON vault_items(last_seen_at);
+
+      -- Vault item categories indexes
+      CREATE INDEX IF NOT EXISTS idx_vault_item_categories_item ON vault_item_categories(vault_item_id);
+      CREATE INDEX IF NOT EXISTS idx_vault_item_categories_category ON vault_item_categories(vault_category_id);
 
       -- Triggers to update the updated_at timestamp
       CREATE TRIGGER IF NOT EXISTS update_items_timestamp
@@ -199,6 +276,18 @@ export function createSchema(ctx: DatabaseContext): void {
           UPDATE runs SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
         END;
 
+      CREATE TRIGGER IF NOT EXISTS update_vault_categories_timestamp
+        AFTER UPDATE ON vault_categories
+        BEGIN
+          UPDATE vault_categories SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
+        END;
+
+      CREATE TRIGGER IF NOT EXISTS update_vault_items_timestamp
+        AFTER UPDATE ON vault_items
+        BEGIN
+          UPDATE vault_items SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
+        END;
+
       -- Insert default settings
       INSERT OR IGNORE INTO settings (key, value) VALUES
         ('saveDir', ''),
@@ -226,6 +315,8 @@ export function createSchema(ctx: DatabaseContext): void {
   ctx.rawDb.exec(schemaSQL);
   console.log('Database schema created successfully');
 
+  ensureVaultItemSpatialColumns(ctx);
+
   // Ensure wizard settings exist for existing databases
   ensureWizardSettings(ctx);
 
@@ -234,6 +325,236 @@ export function createSchema(ctx: DatabaseContext): void {
 
   // Always upsert items to ensure latest changes are available
   upsertItemsFromGrailData(ctx);
+}
+
+type VaultItemSpatialBackfillRow = {
+  id: string;
+  raw_item_json: string;
+  item_name: string;
+  item_code: string | null;
+  grail_item_id: string | null;
+  source_file_type: VaultSourceFileType;
+  location_context: VaultLocationContext;
+  stash_tab: number | null;
+  grid_x: number | null;
+  grid_y: number | null;
+  grid_width: number | null;
+  grid_height: number | null;
+  equipped_slot_id: number | null;
+  icon_file_name: string | null;
+};
+
+const vaultItemSpatialColumns = [
+  { name: 'grid_x', definition: 'INTEGER' },
+  { name: 'grid_y', definition: 'INTEGER' },
+  { name: 'grid_width', definition: 'INTEGER' },
+  { name: 'grid_height', definition: 'INTEGER' },
+  { name: 'equipped_slot_id', definition: 'INTEGER' },
+  { name: 'icon_file_name', definition: 'TEXT' },
+  { name: 'is_socketed_item', definition: 'BOOLEAN NOT NULL DEFAULT FALSE' },
+] as const;
+
+function parseRawJsonObject(raw: string): Record<string, unknown> | undefined {
+  try {
+    const parsed = JSON.parse(raw);
+    if (typeof parsed === 'object' && parsed) {
+      return parsed as Record<string, unknown>;
+    }
+  } catch {
+    // Ignore invalid json payloads.
+  }
+
+  return undefined;
+}
+
+function getOptionalNumericValue(
+  rowValue: number | null,
+  parsed: Record<string, unknown> | undefined,
+  key: string,
+): number | null {
+  if (rowValue !== null) {
+    return rowValue;
+  }
+
+  const parsedValue = parsed?.[key];
+  return typeof parsedValue === 'number' ? parsedValue : null;
+}
+
+function getOptionalStringValue(
+  parsed: Record<string, unknown> | undefined,
+  key: string,
+): string | undefined {
+  const value = parsed?.[key];
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (trimmed) {
+      return trimmed;
+    }
+  }
+
+  return undefined;
+}
+
+function getVaultItemSpatialBackfillRows(ctx: DatabaseContext): VaultItemSpatialBackfillRow[] {
+  return ctx.rawDb
+    .prepare(
+      `
+        SELECT
+          id,
+          raw_item_json,
+          item_name,
+          item_code,
+          grail_item_id,
+          source_file_type,
+          location_context,
+          stash_tab,
+          grid_x,
+          grid_y,
+          grid_width,
+          grid_height,
+          equipped_slot_id,
+          icon_file_name
+        FROM vault_items
+      `,
+    )
+    .all() as VaultItemSpatialBackfillRow[];
+}
+
+function ensureMissingVaultItemColumns(ctx: DatabaseContext, columnNames: Set<string>): void {
+  const missingColumns = vaultItemSpatialColumns.filter((column) => !columnNames.has(column.name));
+  for (const column of missingColumns) {
+    ctx.rawDb.exec(`ALTER TABLE vault_items ADD COLUMN ${column.name} ${column.definition}`);
+  }
+}
+
+type VaultItemSpatialBackfillValues = {
+  locationContext: VaultLocationContext;
+  stashTab: number | null;
+  gridX: number | null;
+  gridY: number | null;
+  gridWidth: number | null;
+  gridHeight: number | null;
+  equippedSlotId: number | null;
+  iconFileName: string | null;
+};
+
+function buildVaultItemSpatialBackfillValues(
+  row: VaultItemSpatialBackfillRow,
+  parsed: Record<string, unknown> | undefined,
+): VaultItemSpatialBackfillValues {
+  const parsedItem = parsed as D2SItem | undefined;
+  const resolvedSpatial = parsedItem
+    ? resolveSpatialLocation({
+        item: parsedItem,
+        sourceFileType: row.source_file_type,
+        fallbackLocation: row.location_context,
+        fallbackStashTab: row.stash_tab ?? undefined,
+      })
+    : undefined;
+  const iconFileName =
+    resolveCanonicalIconFilename({
+      grailItemId: row.grail_item_id,
+      itemCode: row.item_code,
+      itemName: row.item_name,
+      uniqueName: getOptionalStringValue(parsed, 'unique_name'),
+      setName: getOptionalStringValue(parsed, 'set_name'),
+      parsedName: getOptionalStringValue(parsed, 'name'),
+      typeName: getOptionalStringValue(parsed, 'type_name'),
+      rawIconFileName: parsed?.inv_file,
+      fallbackIconFileName: row.icon_file_name,
+    }) ?? null;
+
+  return {
+    locationContext: resolvedSpatial?.locationContext ?? row.location_context,
+    stashTab:
+      resolvedSpatial?.locationContext === 'stash'
+        ? (resolvedSpatial.stashTab ?? row.stash_tab)
+        : null,
+    gridX: resolvedSpatial?.gridX ?? getOptionalNumericValue(row.grid_x, parsed, 'position_x'),
+    gridY: resolvedSpatial?.gridY ?? getOptionalNumericValue(row.grid_y, parsed, 'position_y'),
+    gridWidth:
+      resolvedSpatial?.gridWidth ?? getOptionalNumericValue(row.grid_width, parsed, 'inv_width'),
+    gridHeight:
+      resolvedSpatial?.gridHeight ?? getOptionalNumericValue(row.grid_height, parsed, 'inv_height'),
+    equippedSlotId:
+      resolvedSpatial?.equippedSlotId ??
+      getOptionalNumericValue(row.equipped_slot_id, parsed, 'equipped_id'),
+    iconFileName,
+  };
+}
+
+function hasVaultItemBackfillChanges(
+  row: VaultItemSpatialBackfillRow,
+  nextValues: VaultItemSpatialBackfillValues,
+): boolean {
+  return (
+    row.location_context !== nextValues.locationContext ||
+    row.stash_tab !== nextValues.stashTab ||
+    row.grid_x !== nextValues.gridX ||
+    row.grid_y !== nextValues.gridY ||
+    row.grid_width !== nextValues.gridWidth ||
+    row.grid_height !== nextValues.gridHeight ||
+    row.equipped_slot_id !== nextValues.equippedSlotId ||
+    row.icon_file_name !== nextValues.iconFileName
+  );
+}
+
+function ensureVaultItemSpatialColumns(ctx: DatabaseContext): void {
+  const rows = ctx.rawDb.prepare('PRAGMA table_info(vault_items)').all() as Array<{ name: string }>;
+  const columnNames = new Set(rows.map((row) => row.name));
+  ensureMissingVaultItemColumns(ctx, columnNames);
+  const updatedRows = ctx.rawDb.prepare('PRAGMA table_info(vault_items)').all() as Array<{
+    name: string;
+  }>;
+  const updatedColumnNames = new Set(updatedRows.map((row) => row.name));
+
+  if (updatedColumnNames.has('is_socketed_item')) {
+    ctx.rawDb.exec(
+      'CREATE INDEX IF NOT EXISTS idx_vault_items_socketed ON vault_items(is_socketed_item)',
+    );
+  }
+
+  // Backfill spatial fields and icon filename from raw item json for pre-existing rows.
+  const backfillRows = getVaultItemSpatialBackfillRows(ctx);
+
+  const updateStmt = ctx.rawDb.prepare(
+    `
+      UPDATE vault_items
+      SET
+        location_context = ?,
+        stash_tab = ?,
+        grid_x = ?,
+        grid_y = ?,
+        grid_width = ?,
+        grid_height = ?,
+        equipped_slot_id = ?,
+        icon_file_name = ?
+      WHERE id = ?
+    `,
+  );
+
+  const tx = ctx.rawDb.transaction(() => {
+    for (const row of backfillRows) {
+      const parsed = parseRawJsonObject(row.raw_item_json);
+      const nextValues = buildVaultItemSpatialBackfillValues(row, parsed);
+      if (!hasVaultItemBackfillChanges(row, nextValues)) {
+        continue;
+      }
+      updateStmt.run(
+        nextValues.locationContext,
+        nextValues.stashTab,
+        nextValues.gridX,
+        nextValues.gridY,
+        nextValues.gridWidth,
+        nextValues.gridHeight,
+        nextValues.equippedSlotId,
+        nextValues.iconFileName,
+        row.id,
+      );
+    }
+  });
+
+  tx();
 }
 
 function migrateRunTrackerAutoStart(ctx: DatabaseContext): void {
