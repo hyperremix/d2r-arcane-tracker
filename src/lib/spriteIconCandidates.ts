@@ -21,6 +21,8 @@ export interface SpriteIconLookupIndex {
   byName: Map<string, string>;
 }
 
+const ambiguousCharmCodeKeys = new Set(['cm1', 'cm2']);
+
 function addCandidate(candidates: Set<string>, value: unknown): void {
   if (typeof value !== 'string') {
     return;
@@ -37,6 +39,10 @@ function normalizeLookupKey(value: string): string {
     .trim()
     .toLowerCase()
     .replace(/[^a-z0-9]/g, '');
+}
+
+function normalizeCodeKey(value: string): string {
+  return value.trim().toLowerCase();
 }
 
 function toSnakeCaseFilename(value: string): string | undefined {
@@ -84,6 +90,39 @@ function addLookupCandidate(
   addCandidate(candidates, lookupMap.get(key));
 }
 
+function hasLookupNameMatch(lookup: SpriteIconLookupIndex, value: unknown): boolean {
+  if (typeof value !== 'string') {
+    return false;
+  }
+
+  const key = normalizeLookupKey(value);
+  if (!key) {
+    return false;
+  }
+
+  return lookup.byName.has(key);
+}
+
+function addCodeLookupCandidate(
+  candidates: Set<string>,
+  lookup: SpriteIconLookupIndex,
+  code: unknown,
+  hasExplicitUniqueSignal: boolean,
+): void {
+  if (typeof code !== 'string') {
+    return;
+  }
+
+  const normalizedCode = normalizeCodeKey(code);
+  const skipAmbiguousCharmCodeLookup =
+    ambiguousCharmCodeKeys.has(normalizedCode) && !hasExplicitUniqueSignal;
+  if (skipAmbiguousCharmCodeLookup) {
+    return;
+  }
+
+  addLookupCandidate(candidates, lookup.byCode, code);
+}
+
 function addNameDerivedCandidates(candidates: Set<string>, value: unknown): void {
   if (typeof value !== 'string') {
     return;
@@ -126,6 +165,8 @@ export function createSpatialIconCandidates(
   lookup: SpriteIconLookupIndex,
 ): string[] {
   const candidates = new Set<string>();
+  const hasItemLevelUniqueSignal =
+    Boolean(item.grailItemId) || hasLookupNameMatch(lookup, item.itemName);
 
   addCandidate(candidates, item.iconFileName);
 
@@ -133,7 +174,7 @@ export function createSpatialIconCandidates(
     addCandidate(candidates, lookup.byItemId.get(item.grailItemId));
   }
 
-  addLookupCandidate(candidates, lookup.byCode, item.itemCode);
+  addCodeLookupCandidate(candidates, lookup, item.itemCode, hasItemLevelUniqueSignal);
   addLookupCandidate(candidates, lookup.byName, item.itemName);
   addNameDerivedCandidates(candidates, item.itemName);
 
@@ -142,8 +183,14 @@ export function createSpatialIconCandidates(
     return [...candidates];
   }
 
+  const hasRawLevelUniqueSignal =
+    hasItemLevelUniqueSignal ||
+    hasLookupNameMatch(lookup, rawItem.unique_name) ||
+    hasLookupNameMatch(lookup, rawItem.set_name) ||
+    hasLookupNameMatch(lookup, rawItem.name);
+
   addCandidate(candidates, rawItem.inv_file);
-  addLookupCandidate(candidates, lookup.byCode, rawItem.code);
+  addCodeLookupCandidate(candidates, lookup, rawItem.code, hasRawLevelUniqueSignal);
   addLookupCandidate(candidates, lookup.byName, rawItem.unique_name);
   addLookupCandidate(candidates, lookup.byName, rawItem.set_name);
   addLookupCandidate(candidates, lookup.byName, rawItem.name);
