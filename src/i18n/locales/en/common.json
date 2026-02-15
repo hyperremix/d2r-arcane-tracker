@@ -565,6 +565,17 @@
     "dropToVault": "Drop inventory items here to vault",
     "dragToVault": "Drag to vault dropzone"
   },
+  "gameItemTooltip": {
+    "oneHandDamageLabel": "One Hand Damage:",
+    "oneHandDamageValue": "{{min}} to {{max}}",
+    "twoHandDamageLabel": "Two Hand Damage:",
+    "twoHandDamageValue": "{{min}} to {{max}}",
+    "durabilityLabel": "Durability:",
+    "durabilityValue": "{{current}} of {{max}}",
+    "requiredStrengthLabel": "Required Strength:",
+    "requiredDexterityLabel": "Required Dexterity:",
+    "requiredLevelLabel": "Required Level:"
+  },
   "vault": {
     "title": "Item Vault",
     "searchPlaceholder": "Search vaulted items...",
