@@ -93,6 +93,10 @@ function sanitizeFilter(filter?: VaultItemFilter): VaultItemFilter {
     );
   }
 
+  if (safeFilter.includeSocketed !== undefined) {
+    assert(typeof safeFilter.includeSocketed === 'boolean', 'includeSocketed must be a boolean');
+  }
+
   return safeFilter;
 }
 
@@ -123,6 +127,10 @@ function itemMatchesFilter(
   item: CharacterInventorySnapshot['items'][number],
   filter: VaultItemFilter,
 ): boolean {
+  if (filter.includeSocketed !== true && item.isSocketedItem) {
+    return false;
+  }
+
   const text = filter.text?.trim().toLowerCase();
 
   if (text) {

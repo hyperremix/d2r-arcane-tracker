@@ -1085,6 +1085,248 @@ describe('When SaveFileMonitor is used', () => {
     });
   });
 
+  describe('If spatial inventory parsing is executed', () => {
+    it('Then createParsedInventoryItem maps spatial metadata and uses grail image filename over parser inv_file', () => {
+      // Arrange
+      vi.mocked(getGrailItemId).mockReturnValue('harlequincrest');
+      const item = {
+        name: 'Battle Hammer',
+        type: 'mace',
+        code: 'uap',
+        quality: 5,
+        ethereal: false,
+        socket_count: 2,
+        position_x: 3,
+        position_y: 1,
+        inv_width: 2,
+        inv_height: 3,
+        equipped_id: 4,
+        location_id: 1,
+        inv_file: 'invhamm',
+      } as any;
+
+      // Act
+      const parsed = (monitor as any).createParsedInventoryItem({
+        filePath: '/tmp/TestChar.d2s',
+        saveName: 'TestChar',
+        sourceFileType: 'd2s',
+        item,
+        fallbackLocation: 'inventory',
+        isSocketedItem: true,
+      });
+
+      // Assert
+      expect(parsed.locationContext).toBe('equipped');
+      expect(parsed.gridX).toBe(3);
+      expect(parsed.gridY).toBe(1);
+      expect(parsed.gridWidth).toBe(2);
+      expect(parsed.gridHeight).toBe(3);
+      expect(parsed.equippedSlotId).toBe(4);
+      expect(parsed.iconFileName).toBe('cap_hat.png');
+      expect(parsed.isSocketedItem).toBe(true);
+    });
+
+    it('Then code-based lookup resolves canonical grail image filename when grail id is missing', () => {
+      // Arrange
+      vi.mocked(getGrailItemId).mockReturnValue(null);
+      const item = {
+        name: 'Shako',
+        type: 'helm',
+        code: 'uap',
+        quality: 5,
+        inv_file: 'invhamm',
+      } as any;
+
+      // Act
+      const parsed = (monitor as any).createParsedInventoryItem({
+        filePath: '/tmp/TestChar.d2s',
+        saveName: 'TestChar',
+        sourceFileType: 'd2s',
+        item,
+        fallbackLocation: 'inventory',
+      });
+
+      // Assert
+      expect(parsed.iconFileName).toBe('cap_hat.png');
+    });
+
+    it('Then location_id 2 maps to unknown belt coordinates in a 4x4 belt board space', () => {
+      // Arrange
+      vi.mocked(getGrailItemId).mockReturnValue(null);
+      const item = {
+        name: 'Super Healing Potion',
+        type: 'potion',
+        code: 'hp5',
+        quality: 1,
+        location_id: 2,
+        position_x: 5,
+        position_y: 0,
+        inv_width: 1,
+        inv_height: 1,
+      } as any;
+
+      // Act
+      const parsed = (monitor as any).createParsedInventoryItem({
+        filePath: '/tmp/TestChar.d2s',
+        saveName: 'TestChar',
+        sourceFileType: 'd2s',
+        item,
+        fallbackLocation: 'inventory',
+      });
+
+      // Assert
+      expect(parsed.locationContext).toBe('unknown');
+      expect(parsed.gridX).toBe(1);
+      expect(parsed.gridY).toBe(1);
+      expect(parsed.gridWidth).toBe(1);
+      expect(parsed.gridHeight).toBe(1);
+    });
+
+    it('Then d2s location_id 0 alt_position_id 5 maps to personal stash tab 0', () => {
+      // Arrange
+      vi.mocked(getGrailItemId).mockReturnValue(null);
+      const item = {
+        name: 'Grand Charm',
+        type: 'charm',
+        code: 'cm3',
+        quality: 1,
+        location_id: 0,
+        alt_position_id: 5,
+        position_x: 12,
+        position_y: 3,
+        inv_width: 1,
+        inv_height: 3,
+      } as any;
+
+      // Act
+      const parsed = (monitor as any).createParsedInventoryItem({
+        filePath: '/tmp/TestChar.d2s',
+        saveName: 'TestChar',
+        sourceFileType: 'd2s',
+        item,
+        fallbackLocation: 'inventory',
+      });
+
+      // Assert
+      expect(parsed.locationContext).toBe('stash');
+      expect(parsed.stashTab).toBe(0);
+    });
+
+    it('Then d2s alt_position_id 1 remains inventory even when outside canonical bounds', () => {
+      // Arrange
+      vi.mocked(getGrailItemId).mockReturnValue(null);
+      const inBoundsItem = {
+        name: 'Tome of Town Portal',
+        type: 'book',
+        code: 'tbk',
+        quality: 1,
+        location_id: 0,
+        alt_position_id: 1,
+        position_x: 0,
+        position_y: 2,
+        inv_width: 1,
+        inv_height: 2,
+      } as any;
+      const outOfBoundsItem = {
+        name: 'Grand Charm',
+        type: 'charm',
+        code: 'cm3',
+        quality: 1,
+        location_id: 0,
+        alt_position_id: 1,
+        position_x: 4,
+        position_y: 6,
+        inv_width: 1,
+        inv_height: 3,
+      } as any;
+
+      // Act
+      const inBoundsParsed = (monitor as any).createParsedInventoryItem({
+        filePath: '/tmp/TestChar.d2s',
+        saveName: 'TestChar',
+        sourceFileType: 'd2s',
+        item: inBoundsItem,
+        fallbackLocation: 'inventory',
+      });
+      const outOfBoundsParsed = (monitor as any).createParsedInventoryItem({
+        filePath: '/tmp/TestChar.d2s',
+        saveName: 'TestChar',
+        sourceFileType: 'd2s',
+        item: outOfBoundsItem,
+        fallbackLocation: 'inventory',
+      });
+
+      // Assert
+      expect(inBoundsParsed.locationContext).toBe('inventory');
+      expect(inBoundsParsed.stashTab).toBeUndefined();
+      expect(outOfBoundsParsed.locationContext).toBe('inventory');
+      expect(outOfBoundsParsed.stashTab).toBeUndefined();
+    });
+
+    it('Then unknown items derive a snake_case filename fallback from type_name', () => {
+      // Arrange
+      vi.mocked(getGrailItemId).mockReturnValue(null);
+      const item = {
+        type: 'misc',
+        quality: 1,
+        type_name: 'Grand Charm',
+        inv_file: 'invgcm',
+      } as any;
+
+      // Act
+      const parsed = (monitor as any).createParsedInventoryItem({
+        filePath: '/tmp/TestChar.d2s',
+        saveName: 'TestChar',
+        sourceFileType: 'd2s',
+        item,
+        fallbackLocation: 'inventory',
+      });
+
+      // Assert
+      expect(parsed.iconFileName).toBe('grand_charm.png');
+    });
+
+    it('Then socketed child items can be excluded from UI snapshot arrays', () => {
+      // Arrange
+      const createParsedInventoryItem = (monitor as any).createParsedInventoryItem.bind(monitor);
+      const parent = createParsedInventoryItem({
+        filePath: '/tmp/TestChar.d2s',
+        saveName: 'TestChar',
+        sourceFileType: 'd2s',
+        item: {
+          name: 'Parent Item',
+          type: 'armor',
+          code: 'uap',
+          quality: 5,
+        },
+        fallbackLocation: 'inventory',
+        isSocketedItem: false,
+      });
+      const socketedChild = createParsedInventoryItem({
+        filePath: '/tmp/TestChar.d2s',
+        saveName: 'TestChar',
+        sourceFileType: 'd2s',
+        item: {
+          name: 'Socketed Child',
+          type: 'jewel',
+          code: 'jew',
+          quality: 1,
+        },
+        fallbackLocation: 'inventory',
+        isSocketedItem: true,
+      });
+      const allItems = [parent, socketedChild];
+
+      // Act
+      const snapshotItems = allItems.filter((item: any) => !item.isSocketedItem);
+
+      // Assert
+      expect(snapshotItems).toHaveLength(1);
+      expect(snapshotItems[0]?.isSocketedItem).toBe(false);
+      expect(allItems.some((item) => item.isSocketedItem)).toBe(true);
+    });
+  });
+
   describe('If inventory reconciliation helpers are executed', () => {
     it('Then createFingerprint returns deterministic output for the same inputs', () => {
       // Arrange
