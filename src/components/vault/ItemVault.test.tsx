@@ -14,7 +14,16 @@ const baseItem = {
   itemName: 'Arachnid Mesh',
   quality: 'unique',
   ethereal: false,
-  rawItemJson: '{}',
+  rawItemJson: JSON.stringify({
+    name: 'Arachnid Mesh',
+    type_name: 'Spiderweb Sash',
+    reqstr: 50,
+    required_level: 80,
+    displayed_combined_magic_attributes: [
+      { description: '+1 To All Skills', visible: true },
+      { description: '+20% Faster Cast Rate', visible: true },
+    ],
+  }),
   sourceCharacterName: 'Sorc',
   sourceFileType: 'd2s' as const,
   locationContext: 'inventory' as const,
@@ -37,6 +46,7 @@ const overlappingInventoryItem = {
   gridY: 0,
   gridWidth: 1,
   gridHeight: 1,
+  rawItemJson: '{}',
 };
 
 const beltItem = {
@@ -168,6 +178,42 @@ describe('When ItemVault is rendered', () => {
       expect(within(equippedBoard).getAllByTestId('vault-equipped-slot-frame')).toHaveLength(10);
 
       expect(within(inventoryBoard).queryByText('Arachnid Mesh')).not.toBeInTheDocument();
+    });
+  });
+
+  describe('If a hovered tile has game tooltip data in raw JSON', () => {
+    it('Then it renders the Diablo-style game attribute lines', async () => {
+      // Arrange
+      render(<ItemVault />);
+      await waitFor(() => {
+        expect(screen.getByText('Arachnid Mesh')).toBeInTheDocument();
+      });
+
+      // Act
+      fireEvent.mouseEnter(screen.getByLabelText('Vault item Arachnid Mesh'));
+
+      // Assert
+      await waitFor(() => {
+        expect(screen.getByText('Spiderweb Sash')).toBeInTheDocument();
+      });
+    });
+  });
+
+  describe('If a hovered tile has sparse raw JSON', () => {
+    it('Then it falls back to the existing metadata tooltip', async () => {
+      // Arrange
+      render(<ItemVault />);
+      await waitFor(() => {
+        expect(screen.getByText('Arachnid Mesh')).toBeInTheDocument();
+      });
+
+      // Act
+      fireEvent.mouseEnter(screen.getByLabelText('Vault item Overlap Item'));
+
+      // Assert
+      await waitFor(() => {
+        expect(screen.getByText('Quality/Type:')).toBeInTheDocument();
+      });
     });
   });
 

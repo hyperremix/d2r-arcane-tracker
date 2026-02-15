@@ -70,7 +70,16 @@ describe('When CharacterInventoryBrowser is rendered', () => {
                 ethereal: false,
                 socketCount: 0,
                 iconFileName: 'shako.png',
-                rawItemJson: '{}',
+                rawItemJson: JSON.stringify({
+                  name: 'Harlequin Crest',
+                  type_name: 'Shako',
+                  reqstr: 50,
+                  required_level: 62,
+                  displayed_combined_magic_attributes: [
+                    { description: '+2 To All Skills', visible: true },
+                    { description: '+2 To Mana After Each Kill', visible: true },
+                  ],
+                }),
                 rawParsedItem: {},
                 seenAt: new Date('2024-01-01T00:00:00.000Z'),
               },
@@ -242,6 +251,42 @@ describe('When CharacterInventoryBrowser is rendered', () => {
       const inventoryBoard = screen.getByTestId('inventory-board-snap-1');
       expect(within(inventoryBoard).queryByText('Shako')).not.toBeInTheDocument();
       expect(within(inventoryBoard).getAllByTestId('inventory-item-tile')).toHaveLength(1);
+    });
+  });
+
+  describe('If a hovered inventory tile has game tooltip data in raw JSON', () => {
+    it('Then it renders the Diablo-style game attribute lines', async () => {
+      // Arrange
+      render(<CharacterInventoryBrowser />);
+      await waitFor(() => {
+        expect(screen.getByText('Shako')).toBeInTheDocument();
+      });
+
+      // Act
+      fireEvent.mouseEnter(screen.getByLabelText('Inventory item Shako'));
+
+      // Assert
+      await waitFor(() => {
+        expect(screen.getByText('+2 To All Skills')).toBeInTheDocument();
+      });
+    });
+  });
+
+  describe('If a hovered inventory tile has sparse raw JSON', () => {
+    it('Then it falls back to the existing metadata tooltip', async () => {
+      // Arrange
+      render(<CharacterInventoryBrowser />);
+      await waitFor(() => {
+        expect(screen.getByText('Shako')).toBeInTheDocument();
+      });
+
+      // Act
+      fireEvent.mouseEnter(screen.getByLabelText('Inventory item Overlap Item'));
+
+      // Assert
+      await waitFor(() => {
+        expect(screen.getByText('Quality/Type:')).toBeInTheDocument();
+      });
     });
   });
 

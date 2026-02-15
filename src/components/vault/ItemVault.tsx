@@ -17,6 +17,7 @@ import {
 } from 'react';
 import { useTranslation } from 'react-i18next';
 import { BoardSurface, getItemGridPlacement } from '@/components/inventory/boardPrimitives';
+import { GameItemTooltipContent } from '@/components/inventory/GameItemTooltipContent';
 import {
   buildEquippedSlotMapForSet,
   buildOverflowBoardLayout,
@@ -51,6 +52,7 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useSpriteIcon } from '@/hooks/useSpriteIcon';
 import { translations } from '@/i18n/translations';
+import { buildGameItemTooltipModel } from '@/lib/gameItemTooltip';
 import { getRawItemLocation, isRawBeltItem } from '@/lib/rawItemLocation';
 import {
   createSpatialIconCandidates,
@@ -336,6 +338,17 @@ function VaultTile({
   onDragStart,
 }: VaultTileProps) {
   const { t } = useTranslation();
+  const gameTooltipModel = useMemo(
+    () =>
+      buildGameItemTooltipModel({
+        rawItemJson: item.rawItemJson,
+        fallbackName: item.itemName,
+        quality: item.quality,
+        type: item.type,
+        t,
+      }),
+    [item.itemName, item.quality, item.rawItemJson, item.type, t],
+  );
   const iconCandidates = useMemo(
     () => createSpatialIconCandidates(item, iconLookup),
     [iconLookup, item],
@@ -368,61 +381,69 @@ function VaultTile({
           loading="lazy"
         />
       </TooltipTrigger>
-      <TooltipContent className="max-w-sm">
-        <div className="space-y-1.5">
-          <div className="font-medium">{item.itemName}</div>
-          <div>
-            <span className="text-background/70">
-              {t(translations.vault.tooltip.qualityTypeLabel)}
-            </span>{' '}
-            {item.quality}
-            {item.type ? ` / ${item.type}` : ''}
-          </div>
-          <div>
-            <span className="text-background/70">{t(translations.vault.tooltip.sourceLabel)}</span>{' '}
-            {t(translations.inventoryBrowser.groupHeader, {
-              characterName:
-                item.sourceCharacterName ?? t(translations.vault.lastSeenUnknownCharacter),
-              sourceFileType: item.sourceFileType.toUpperCase(),
-            })}
-          </div>
-          <div>
-            <span className="text-background/70">
-              {t(translations.vault.tooltip.locationLabel)}
-            </span>{' '}
-            {formatLocation(item, t)}
-          </div>
-          <div>
-            <span className="text-background/70">
-              {t(translations.vault.tooltip.coordinatesLabel)}
-            </span>{' '}
-            {getCoordinatesLabel(item, t)}
-          </div>
-          <div>
-            <span className="text-background/70">
-              {t(translations.vault.tooltip.dimensionsLabel)}
-            </span>{' '}
-            {getDimensionsLabel(item, t)}
-          </div>
-          <div>
-            <span className="text-background/70">{t(translations.vault.tooltip.slotLabel)}</span>{' '}
-            {getSlotLabel(item, t)}
-          </div>
-          <div>
-            <span className="text-background/70">
-              {t(translations.vault.tooltip.presenceLabel)}
-            </span>{' '}
-            {getPresenceLabel(item, t)}
-          </div>
-          {unplacedReason && (
+      <TooltipContent className="max-w-md p-3 text-sm">
+        {gameTooltipModel ? (
+          <GameItemTooltipContent model={gameTooltipModel} />
+        ) : (
+          <div className="space-y-1.5">
+            <div className="font-medium">{item.itemName}</div>
             <div>
-              <span className="text-background/70">
-                {t(translations.vault.tooltip.unplacedReasonLabel)}
+              <span className="text-muted-foreground">
+                {t(translations.vault.tooltip.qualityTypeLabel)}
               </span>{' '}
-              {getUnplacedReasonLabel(unplacedReason, t)}
+              {item.quality}
+              {item.type ? ` / ${item.type}` : ''}
             </div>
-          )}
-        </div>
+            <div>
+              <span className="text-muted-foreground">
+                {t(translations.vault.tooltip.sourceLabel)}
+              </span>{' '}
+              {t(translations.inventoryBrowser.groupHeader, {
+                characterName:
+                  item.sourceCharacterName ?? t(translations.vault.lastSeenUnknownCharacter),
+                sourceFileType: item.sourceFileType.toUpperCase(),
+              })}
+            </div>
+            <div>
+              <span className="text-muted-foreground">
+                {t(translations.vault.tooltip.locationLabel)}
+              </span>{' '}
+              {formatLocation(item, t)}
+            </div>
+            <div>
+              <span className="text-muted-foreground">
+                {t(translations.vault.tooltip.coordinatesLabel)}
+              </span>{' '}
+              {getCoordinatesLabel(item, t)}
+            </div>
+            <div>
+              <span className="text-muted-foreground">
+                {t(translations.vault.tooltip.dimensionsLabel)}
+              </span>{' '}
+              {getDimensionsLabel(item, t)}
+            </div>
+            <div>
+              <span className="text-muted-foreground">
+                {t(translations.vault.tooltip.slotLabel)}
+              </span>{' '}
+              {getSlotLabel(item, t)}
+            </div>
+            <div>
+              <span className="text-muted-foreground">
+                {t(translations.vault.tooltip.presenceLabel)}
+              </span>{' '}
+              {getPresenceLabel(item, t)}
+            </div>
+            {unplacedReason && (
+              <div>
+                <span className="text-muted-foreground">
+                  {t(translations.vault.tooltip.unplacedReasonLabel)}
+                </span>{' '}
+                {getUnplacedReasonLabel(unplacedReason, t)}
+              </div>
+            )}
+          </div>
+        )}
       </TooltipContent>
     </Tooltip>
   );

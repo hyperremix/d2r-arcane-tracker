@@ -61,6 +61,7 @@ export function toSnakeCaseIconFilename(value: unknown): string | undefined {
 const iconByGrailItemId = new Map<string, string>();
 const iconByItemCode = new Map<string, string>();
 const iconByNameKey = new Map<string, string>();
+const ambiguousCharmCodeKeys = new Set(['cm1', 'cm2']);
 
 for (const item of items) {
   const iconFilename = normalizeIconFilename(item.imageFilename);
@@ -110,6 +111,27 @@ function resolveIconByName(candidates: Array<string | null | undefined>): string
   return undefined;
 }
 
+function resolveIconByCode(input: {
+  itemCode?: string | null;
+  grailItemId?: string;
+  nameIcon?: string;
+}): string | undefined {
+  const code = input.itemCode?.trim();
+  if (!code) {
+    return undefined;
+  }
+
+  const normalizedCode = normalizeCodeKey(code);
+  const hasExplicitUniqueSignal = Boolean(input.grailItemId) || Boolean(input.nameIcon);
+  const skipAmbiguousCharmCodeLookup =
+    ambiguousCharmCodeKeys.has(normalizedCode) && !hasExplicitUniqueSignal;
+  if (skipAmbiguousCharmCodeLookup) {
+    return undefined;
+  }
+
+  return iconByItemCode.get(normalizedCode);
+}
+
 export interface CanonicalIconFilenameInput {
   grailItemId?: string | null;
   itemCode?: string | null;
@@ -133,20 +155,22 @@ export function resolveCanonicalIconFilename(
     }
   }
 
-  const code = input.itemCode?.trim();
-  if (code) {
-    const codeIcon = iconByItemCode.get(normalizeCodeKey(code));
-    if (codeIcon) {
-      return codeIcon;
-    }
-  }
-
   const nameIcon = resolveIconByName([
     input.itemName,
     input.uniqueName,
     input.setName,
     input.parsedName,
   ]);
+
+  const codeIcon = resolveIconByCode({
+    itemCode: input.itemCode,
+    grailItemId,
+    nameIcon,
+  });
+  if (codeIcon) {
+    return codeIcon;
+  }
+
   if (nameIcon) {
     return nameIcon;
   }
