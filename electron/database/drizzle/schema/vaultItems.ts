@@ -24,6 +24,13 @@ export const vaultItems = sqliteTable(
       .notNull()
       .default('unknown'),
     stashTab: integer('stash_tab'),
+    gridX: integer('grid_x'),
+    gridY: integer('grid_y'),
+    gridWidth: integer('grid_width'),
+    gridHeight: integer('grid_height'),
+    equippedSlotId: integer('equipped_slot_id'),
+    iconFileName: text('icon_file_name'),
+    isSocketedItem: integer('is_socketed_item', { mode: 'boolean' }).notNull().default(false),
     grailItemId: text('grail_item_id').references(() => items.id, { onDelete: 'set null' }),
     isPresentInLatestScan: integer('is_present_in_latest_scan', { mode: 'boolean' })
       .notNull()
@@ -42,6 +49,7 @@ export const vaultItems = sqliteTable(
     index('idx_vault_items_source_character_id').on(table.sourceCharacterId),
     index('idx_vault_items_source_file_type').on(table.sourceFileType),
     index('idx_vault_items_location_context').on(table.locationContext),
+    index('idx_vault_items_socketed').on(table.isSocketedItem),
     index('idx_vault_items_grail_item_id').on(table.grailItemId),
     index('idx_vault_items_present_scan').on(table.isPresentInLatestScan),
     index('idx_vault_items_last_seen_at').on(table.lastSeenAt),

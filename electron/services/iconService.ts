@@ -47,6 +47,7 @@ interface SpriteHeader {
 export class IconService {
   private d2rPath: string | null = null;
   private iconCache: Map<string, string> = new Map();
+  private iconDirectoryIndex: Map<string, string> | null = null;
   private readonly cacheFile: string;
   private readonly iconDirectory: string;
   private conversionStatus: ConversionStatus = { status: 'not_started' };
@@ -328,6 +329,7 @@ export class IconService {
     try {
       // Ensure icon directory exists
       await fs.mkdir(this.iconDirectory, { recursive: true });
+      this.iconDirectoryIndex = null;
 
       // Find the sprite directory
       const spriteDir = path.join(d2rPath, 'Data', 'hd', 'global', 'ui', 'items');
@@ -399,7 +401,69 @@ export class IconService {
       this.conversionStatus = { status: 'failed', lastResult: result };
     }
 
+    this.iconDirectoryIndex = null;
     return result;
+  }
+
+  private normalizeFilenameCandidates(filename: string): string[] {
+    const trimmed = filename.trim();
+    if (!trimmed) {
+      return [];
+    }
+
+    const base = path.basename(trimmed);
+    const withoutPng = base.toLowerCase().endsWith('.png') ? base.slice(0, -4) : base;
+    const rawValues = [trimmed, base, withoutPng, trimmed.toLowerCase(), base.toLowerCase()];
+    const candidates = rawValues.flatMap((value) =>
+      value.toLowerCase().endsWith('.png') ? [value] : [value, `${value}.png`],
+    );
+
+    return [...new Set(candidates.map((value) => value.trim()).filter(Boolean))];
+  }
+
+  private async getIconDirectoryIndex(): Promise<Map<string, string>> {
+    if (this.iconDirectoryIndex) {
+      return this.iconDirectoryIndex;
+    }
+
+    const index = new Map<string, string>();
+    if (existsSync(this.iconDirectory)) {
+      try {
+        const files = await fs.readdir(this.iconDirectory);
+        for (const file of files) {
+          index.set(file.toLowerCase(), file);
+        }
+      } catch (error) {
+        log.error('getIconDirectoryIndex', error);
+      }
+    }
+
+    this.iconDirectoryIndex = index;
+    return index;
+  }
+
+  private async resolveIconPath(candidates: string[]): Promise<string | null> {
+    for (const candidate of candidates) {
+      const iconPath = path.join(this.iconDirectory, candidate);
+      if (existsSync(iconPath)) {
+        return iconPath;
+      }
+    }
+
+    const directoryIndex = await this.getIconDirectoryIndex();
+    for (const candidate of candidates) {
+      const filename = directoryIndex.get(candidate.toLowerCase());
+      if (!filename) {
+        continue;
+      }
+
+      const iconPath = path.join(this.iconDirectory, filename);
+      if (existsSync(iconPath)) {
+        return iconPath;
+      }
+    }
+
+    return null;
   }
 
   /**
@@ -408,15 +472,20 @@ export class IconService {
    * @returns Base64 data URL or null if not found
    */
   async getIconByFilename(filename: string): Promise<string | null> {
-    // Check memory cache first
-    const cachedIcon = this.iconCache.get(filename);
-    if (cachedIcon !== undefined) {
-      return cachedIcon;
+    const candidates = this.normalizeFilenameCandidates(filename);
+    if (candidates.length === 0) {
+      return null;
     }
 
-    // Try to load from converted PNG directory
-    const iconPath = path.join(this.iconDirectory, filename);
-    if (!existsSync(iconPath)) {
+    for (const candidate of candidates) {
+      const cachedIcon = this.iconCache.get(candidate);
+      if (cachedIcon !== undefined) {
+        return cachedIcon;
+      }
+    }
+
+    const iconPath = await this.resolveIconPath(candidates);
+    if (!iconPath) {
       return null;
     }
 
@@ -426,7 +495,9 @@ export class IconService {
       const dataUrl = `data:image/png;base64,${base64}`;
 
       // Cache the result
-      this.iconCache.set(filename, dataUrl);
+      for (const candidate of candidates) {
+        this.iconCache.set(candidate, dataUrl);
+      }
 
       // Persist cache to disk (async, don't await)
       this.saveCacheToDisk();
@@ -454,6 +525,7 @@ export class IconService {
    */
   clearCache(): void {
     this.iconCache.clear();
+    this.iconDirectoryIndex = null;
     log.info('clearCache', 'Icon cache cleared');
   }
 

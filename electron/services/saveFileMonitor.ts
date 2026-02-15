@@ -27,8 +27,10 @@ import type {
 } from '../types/grail';
 import { GameMode } from '../types/grail';
 import { getGrailItemId } from '../utils/grailItemUtils';
+import { normalizeIconFilename, resolveCanonicalIconFilename } from '../utils/iconFilenameResolver';
 import { isRune } from '../utils/objects';
 import { createServiceLogger } from '../utils/serviceLogger';
+import { resolveSpatialLocation } from '../utils/spatialLocationResolver';
 import type { EventBus } from './EventBus';
 
 const log = createServiceLogger('SaveFileMonitor');
@@ -109,10 +111,6 @@ const addRuneToAvailableRunes = (
   }
 };
 
-const shouldIncludeItem = (item: D2SItem): boolean => {
-  return !!((item.unique_name || item.set_name) && getGrailItemId(item as d2s.types.IItem));
-};
-
 const getValidatedRunewordName = (item: D2SItem): string | null => {
   if (!item.runeword_name) {
     return null;
@@ -127,6 +125,117 @@ const getValidatedRunewordName = (item: D2SItem): string | null => {
 
   return normalized;
 };
+
+const mapQualityValue = (quality: number | undefined): string => {
+  switch (quality) {
+    case 1:
+      return 'normal';
+    case 2:
+      return 'magic';
+    case 3:
+      return 'rare';
+    case 4:
+      return 'set';
+    case 5:
+      return 'unique';
+    case 6:
+      return 'crafted';
+    default:
+      return 'normal';
+  }
+};
+
+function normalizeItemNameForKey(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9]/gi, '');
+}
+
+function resolveFallbackItemName(item: D2SItem): string {
+  const candidates = [
+    item.name,
+    item.unique_name,
+    item.set_name,
+    item.type_name,
+    item.type,
+    item.code,
+    'unknown',
+  ];
+
+  for (const candidate of candidates) {
+    if (typeof candidate === 'string' && candidate.trim()) {
+      return candidate;
+    }
+  }
+
+  return 'unknown';
+}
+
+function resolveParsedItemName(item: D2SItem, runewordName: string | null): string {
+  const grailName = runewordName ? normalizeItemNameForKey(runewordName) : processItemName(item);
+  if (grailName) {
+    return normalizeItemNameForKey(grailName);
+  }
+
+  return normalizeItemNameForKey(resolveFallbackItemName(item));
+}
+
+function resolveSocketCount(item: D2SItem): number {
+  if (Array.isArray(item.gems)) {
+    return item.gems.length;
+  }
+
+  if (typeof item.socket_count === 'number') {
+    return item.socket_count;
+  }
+
+  return typeof item.socketed === 'number' ? item.socketed : 0;
+}
+
+function resolveParsedItemType(
+  item: D2SItem,
+  quality: string,
+  runewordName: string | null,
+): string {
+  if (runewordName) {
+    return 'runeword';
+  }
+
+  if (isRune(item as d2s.types.IItem)) {
+    return 'rune';
+  }
+
+  if (quality === 'unique' || quality === 'set') {
+    return quality;
+  }
+
+  return item.type ?? 'other';
+}
+
+type ParsedItemSpatialMetadata = Pick<
+  ParsedInventoryItem,
+  | 'gridX'
+  | 'gridY'
+  | 'gridWidth'
+  | 'gridHeight'
+  | 'equippedSlotId'
+  | 'iconFileName'
+  | 'isSocketedItem'
+>;
+
+function resolveParsedItemSpatialMetadata(
+  resolvedSpatial: ReturnType<typeof resolveSpatialLocation>,
+  isSocketedItem: boolean,
+  iconFileName: string | undefined,
+): ParsedItemSpatialMetadata {
+  return {
+    gridX: resolvedSpatial.gridX,
+    gridY: resolvedSpatial.gridY,
+    gridWidth: resolvedSpatial.gridWidth,
+    gridHeight: resolvedSpatial.gridHeight,
+    equippedSlotId: resolvedSpatial.equippedSlotId,
+    iconFileName,
+    isSocketedItem,
+  };
+}
 
 /**
  * Service for monitoring Diablo 2 save files and extracting item data.
@@ -686,30 +795,48 @@ class SaveFileMonitor {
     return extractedItems;
   }
 
-  private inferLocationContext(
-    item: D2SItem,
-    fallback: VaultLocationContext,
-  ): VaultLocationContext {
-    if (item.location === 'equipped' || item.equipped) return 'equipped';
-    if (item.location === 'stash') return 'stash';
-    if (item.location === 'inventory') return 'inventory';
-    if (item.location === 'mercenary') return 'mercenary';
-    if (item.location === 'corpse') return 'corpse';
-    return fallback;
+  private getFingerprintFieldValue<K extends keyof ParsedInventoryItem['fingerprintInputs']>(
+    item: ParsedInventoryItem,
+    key: K,
+  ): ParsedInventoryItem['fingerprintInputs'][K] {
+    const itemValue = item[key as keyof ParsedInventoryItem];
+    if (itemValue !== undefined) {
+      return itemValue as ParsedInventoryItem['fingerprintInputs'][K];
+    }
+
+    return item.fingerprintInputs[key];
   }
 
   private createFingerprint(item: ParsedInventoryItem): string {
-    const stash = item.stashTab !== undefined ? String(item.stashTab) : '';
+    const stashTab = this.getFingerprintFieldValue(item, 'stashTab');
+    const gridX = this.getFingerprintFieldValue(item, 'gridX');
+    const gridY = this.getFingerprintFieldValue(item, 'gridY');
+    const gridWidth = this.getFingerprintFieldValue(item, 'gridWidth');
+    const gridHeight = this.getFingerprintFieldValue(item, 'gridHeight');
+    const equippedSlotId = this.getFingerprintFieldValue(item, 'equippedSlotId');
+    const iconFileName = item.fingerprintInputs.iconFileName ?? item.iconFileName ?? '';
+    const isSocketedItem = this.getFingerprintFieldValue(item, 'isSocketedItem') ?? false;
+    const itemCode = this.getFingerprintFieldValue(item, 'itemCode') ?? '';
+    const itemName = this.getFingerprintFieldValue(item, 'itemName');
+    const stash = stashTab !== undefined ? String(stashTab) : '';
+
     return [
-      item.sourceFileType,
-      item.characterName,
-      item.locationContext,
-      item.itemCode ?? '',
-      item.quality,
-      String(item.ethereal),
-      String(item.socketCount),
+      this.getFingerprintFieldValue(item, 'sourceFileType'),
+      this.getFingerprintFieldValue(item, 'characterName'),
+      this.getFingerprintFieldValue(item, 'locationContext'),
+      itemCode,
+      this.getFingerprintFieldValue(item, 'quality'),
+      String(this.getFingerprintFieldValue(item, 'ethereal')),
+      String(this.getFingerprintFieldValue(item, 'socketCount')),
       stash,
-      item.itemName,
+      gridX ?? '',
+      gridY ?? '',
+      gridWidth ?? '',
+      gridHeight ?? '',
+      equippedSlotId ?? '',
+      iconFileName,
+      String(isSocketedItem),
+      itemName,
     ].join('|');
   }
 
@@ -720,17 +847,39 @@ class SaveFileMonitor {
     item: D2SItem;
     fallbackLocation: VaultLocationContext;
     stashTab?: number;
+    isSocketedItem?: boolean;
   }): ParsedInventoryItem {
-    const locationContext = this.inferLocationContext(params.item, params.fallbackLocation);
-    const quality = String(params.item.quality ?? 'normal');
+    const resolvedSpatialLocation = resolveSpatialLocation({
+      item: params.item,
+      sourceFileType: params.sourceFileType,
+      fallbackLocation: params.fallbackLocation,
+      fallbackStashTab: params.stashTab,
+    });
+    const locationContext = resolvedSpatialLocation.locationContext;
+    const stashTab = resolvedSpatialLocation.stashTab;
+    const quality = mapQualityValue(params.item.quality);
     const runewordName = getValidatedRunewordName(params.item);
-    const itemName = runewordName
-      ? runewordName.toLowerCase().replace(/[^a-z0-9]/gi, '')
-      : processItemName(params.item);
-    const socketCount = Array.isArray(params.item.gems)
-      ? params.item.gems.length
-      : (params.item.socket_count ??
-        (typeof params.item.socketed === 'number' ? params.item.socketed : 0));
+    const isSocketedItem = params.isSocketedItem ?? false;
+    const itemName = resolveParsedItemName(params.item, runewordName);
+    const socketCount = resolveSocketCount(params.item);
+    const parsedType = resolveParsedItemType(params.item, quality, runewordName);
+    const grailItemId = getGrailItemId(params.item as d2s.types.IItem) ?? undefined;
+    const legacyParserIconFileName = normalizeIconFilename(params.item.inv_file);
+    const resolvedIconFileName = resolveCanonicalIconFilename({
+      grailItemId,
+      itemCode: params.item.code ?? params.item.type,
+      itemName,
+      uniqueName: params.item.unique_name,
+      setName: params.item.set_name,
+      parsedName: params.item.name,
+      typeName: params.item.type_name,
+      rawIconFileName: params.item.inv_file,
+    });
+    const spatialMetadata = resolveParsedItemSpatialMetadata(
+      resolvedSpatialLocation,
+      isSocketedItem,
+      resolvedIconFileName,
+    );
 
     const parsed: ParsedInventoryItem = {
       fingerprint: '',
@@ -742,21 +891,29 @@ class SaveFileMonitor {
         quality,
         ethereal: !!params.item.ethereal,
         socketCount,
-        stashTab: params.stashTab,
+        stashTab,
+        gridX: spatialMetadata.gridX,
+        gridY: spatialMetadata.gridY,
+        gridWidth: spatialMetadata.gridWidth,
+        gridHeight: spatialMetadata.gridHeight,
+        equippedSlotId: spatialMetadata.equippedSlotId,
+        iconFileName: legacyParserIconFileName,
+        isSocketedItem: spatialMetadata.isSocketedItem,
         itemName,
       },
       characterName: params.saveName,
       sourceFileType: params.sourceFileType,
       sourceFilePath: params.filePath,
       locationContext,
-      stashTab: params.stashTab,
+      stashTab,
+      ...spatialMetadata,
       itemName,
       itemCode: params.item.code ?? params.item.type ?? undefined,
       quality,
-      type: runewordName ? 'runeword' : params.item.type,
+      type: parsedType,
       ethereal: !!params.item.ethereal,
       socketCount,
-      grailItemId: getGrailItemId(params.item as d2s.types.IItem) ?? undefined,
+      grailItemId,
       rawItemJson: JSON.stringify(params.item),
       rawParsedItem: params.item as d2s.types.IItem,
       seenAt: new Date(),
@@ -792,6 +949,7 @@ class SaveFileMonitor {
         ...inventoryItem,
         characterId,
       }));
+      const snapshotItems = inventoryItemsWithCharacter.filter((item) => !item.isSocketedItem);
 
       results.stats[saveName] = 0;
 
@@ -827,7 +985,7 @@ class SaveFileMonitor {
           sourceFileType: extension.replace('.', '') as VaultSourceFileType,
           sourceFilePath: filePath,
           capturedAt: new Date(),
-          items: inventoryItemsWithCharacter,
+          items: snapshotItems,
         },
       };
     } catch (error) {
@@ -1078,25 +1236,20 @@ class SaveFileMonitor {
       itemList: D2SItem[],
       fallbackLocation: VaultLocationContext,
       stashTab?: number,
-      _isEmbed: boolean = false,
+      isSocketedItem: boolean = false,
     ) => {
       itemList.forEach((item) => {
-        const runewordName = getValidatedRunewordName(item);
-        const shouldTrack =
-          shouldIncludeItem(item) || isRune(item as d2s.types.IItem) || !!runewordName;
-
-        if (shouldTrack) {
-          items.push(
-            this.createParsedInventoryItem({
-              filePath,
-              saveName,
-              sourceFileType,
-              item,
-              fallbackLocation,
-              stashTab,
-            }),
-          );
-        }
+        items.push(
+          this.createParsedInventoryItem({
+            filePath,
+            saveName,
+            sourceFileType,
+            item,
+            fallbackLocation,
+            stashTab,
+            isSocketedItem,
+          }),
+        );
 
         if (item.socketed_items?.length) {
           parseItems(item.socketed_items, fallbackLocation, stashTab, true);
@@ -1367,6 +1520,13 @@ class SaveFileMonitor {
           sourceFileType: snapshot.sourceFileType,
           locationContext: item.locationContext,
           stashTab: item.stashTab,
+          gridX: item.gridX,
+          gridY: item.gridY,
+          gridWidth: item.gridWidth,
+          gridHeight: item.gridHeight,
+          equippedSlotId: item.equippedSlotId,
+          iconFileName: item.iconFileName,
+          isSocketedItem: item.isSocketedItem,
           grailItemId: item.grailItemId,
           isPresentInLatestScan: true,
           lastSeenAt: now,

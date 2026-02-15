@@ -1,4 +1,7 @@
 import { items as grailItemsData } from '../items';
+import type { D2SItem, VaultLocationContext, VaultSourceFileType } from '../types/grail';
+import { resolveCanonicalIconFilename } from '../utils/iconFilenameResolver';
+import { resolveSpatialLocation } from '../utils/spatialLocationResolver';
 import { schema } from './drizzle';
 import { insertItems } from './items';
 import type { DatabaseContext } from './types';
@@ -153,6 +156,13 @@ export function createSchema(ctx: DatabaseContext): void {
           location_context IN ('equipped', 'inventory', 'stash', 'mercenary', 'corpse', 'unknown')
         ),
         stash_tab INTEGER,
+        grid_x INTEGER,
+        grid_y INTEGER,
+        grid_width INTEGER,
+        grid_height INTEGER,
+        equipped_slot_id INTEGER,
+        icon_file_name TEXT,
+        is_socketed_item BOOLEAN NOT NULL DEFAULT FALSE,
         grail_item_id TEXT,
         is_present_in_latest_scan BOOLEAN NOT NULL DEFAULT TRUE,
         last_seen_at DATETIME,
@@ -305,6 +315,8 @@ export function createSchema(ctx: DatabaseContext): void {
   ctx.rawDb.exec(schemaSQL);
   console.log('Database schema created successfully');
 
+  ensureVaultItemSpatialColumns(ctx);
+
   // Ensure wizard settings exist for existing databases
   ensureWizardSettings(ctx);
 
@@ -313,6 +325,236 @@ export function createSchema(ctx: DatabaseContext): void {
 
   // Always upsert items to ensure latest changes are available
   upsertItemsFromGrailData(ctx);
+}
+
+type VaultItemSpatialBackfillRow = {
+  id: string;
+  raw_item_json: string;
+  item_name: string;
+  item_code: string | null;
+  grail_item_id: string | null;
+  source_file_type: VaultSourceFileType;
+  location_context: VaultLocationContext;
+  stash_tab: number | null;
+  grid_x: number | null;
+  grid_y: number | null;
+  grid_width: number | null;
+  grid_height: number | null;
+  equipped_slot_id: number | null;
+  icon_file_name: string | null;
+};
+
+const vaultItemSpatialColumns = [
+  { name: 'grid_x', definition: 'INTEGER' },
+  { name: 'grid_y', definition: 'INTEGER' },
+  { name: 'grid_width', definition: 'INTEGER' },
+  { name: 'grid_height', definition: 'INTEGER' },
+  { name: 'equipped_slot_id', definition: 'INTEGER' },
+  { name: 'icon_file_name', definition: 'TEXT' },
+  { name: 'is_socketed_item', definition: 'BOOLEAN NOT NULL DEFAULT FALSE' },
+] as const;
+
+function parseRawJsonObject(raw: string): Record<string, unknown> | undefined {
+  try {
+    const parsed = JSON.parse(raw);
+    if (typeof parsed === 'object' && parsed) {
+      return parsed as Record<string, unknown>;
+    }
+  } catch {
+    // Ignore invalid json payloads.
+  }
+
+  return undefined;
+}
+
+function getOptionalNumericValue(
+  rowValue: number | null,
+  parsed: Record<string, unknown> | undefined,
+  key: string,
+): number | null {
+  if (rowValue !== null) {
+    return rowValue;
+  }
+
+  const parsedValue = parsed?.[key];
+  return typeof parsedValue === 'number' ? parsedValue : null;
+}
+
+function getOptionalStringValue(
+  parsed: Record<string, unknown> | undefined,
+  key: string,
+): string | undefined {
+  const value = parsed?.[key];
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (trimmed) {
+      return trimmed;
+    }
+  }
+
+  return undefined;
+}
+
+function getVaultItemSpatialBackfillRows(ctx: DatabaseContext): VaultItemSpatialBackfillRow[] {
+  return ctx.rawDb
+    .prepare(
+      `
+        SELECT
+          id,
+          raw_item_json,
+          item_name,
+          item_code,
+          grail_item_id,
+          source_file_type,
+          location_context,
+          stash_tab,
+          grid_x,
+          grid_y,
+          grid_width,
+          grid_height,
+          equipped_slot_id,
+          icon_file_name
+        FROM vault_items
+      `,
+    )
+    .all() as VaultItemSpatialBackfillRow[];
+}
+
+function ensureMissingVaultItemColumns(ctx: DatabaseContext, columnNames: Set<string>): void {
+  const missingColumns = vaultItemSpatialColumns.filter((column) => !columnNames.has(column.name));
+  for (const column of missingColumns) {
+    ctx.rawDb.exec(`ALTER TABLE vault_items ADD COLUMN ${column.name} ${column.definition}`);
+  }
+}
+
+type VaultItemSpatialBackfillValues = {
+  locationContext: VaultLocationContext;
+  stashTab: number | null;
+  gridX: number | null;
+  gridY: number | null;
+  gridWidth: number | null;
+  gridHeight: number | null;
+  equippedSlotId: number | null;
+  iconFileName: string | null;
+};
+
+function buildVaultItemSpatialBackfillValues(
+  row: VaultItemSpatialBackfillRow,
+  parsed: Record<string, unknown> | undefined,
+): VaultItemSpatialBackfillValues {
+  const parsedItem = parsed as D2SItem | undefined;
+  const resolvedSpatial = parsedItem
+    ? resolveSpatialLocation({
+        item: parsedItem,
+        sourceFileType: row.source_file_type,
+        fallbackLocation: row.location_context,
+        fallbackStashTab: row.stash_tab ?? undefined,
+      })
+    : undefined;
+  const iconFileName =
+    resolveCanonicalIconFilename({
+      grailItemId: row.grail_item_id,
+      itemCode: row.item_code,
+      itemName: row.item_name,
+      uniqueName: getOptionalStringValue(parsed, 'unique_name'),
+      setName: getOptionalStringValue(parsed, 'set_name'),
+      parsedName: getOptionalStringValue(parsed, 'name'),
+      typeName: getOptionalStringValue(parsed, 'type_name'),
+      rawIconFileName: parsed?.inv_file,
+      fallbackIconFileName: row.icon_file_name,
+    }) ?? null;
+
+  return {
+    locationContext: resolvedSpatial?.locationContext ?? row.location_context,
+    stashTab:
+      resolvedSpatial?.locationContext === 'stash'
+        ? (resolvedSpatial.stashTab ?? row.stash_tab)
+        : null,
+    gridX: resolvedSpatial?.gridX ?? getOptionalNumericValue(row.grid_x, parsed, 'position_x'),
+    gridY: resolvedSpatial?.gridY ?? getOptionalNumericValue(row.grid_y, parsed, 'position_y'),
+    gridWidth:
+      resolvedSpatial?.gridWidth ?? getOptionalNumericValue(row.grid_width, parsed, 'inv_width'),
+    gridHeight:
+      resolvedSpatial?.gridHeight ?? getOptionalNumericValue(row.grid_height, parsed, 'inv_height'),
+    equippedSlotId:
+      resolvedSpatial?.equippedSlotId ??
+      getOptionalNumericValue(row.equipped_slot_id, parsed, 'equipped_id'),
+    iconFileName,
+  };
+}
+
+function hasVaultItemBackfillChanges(
+  row: VaultItemSpatialBackfillRow,
+  nextValues: VaultItemSpatialBackfillValues,
+): boolean {
+  return (
+    row.location_context !== nextValues.locationContext ||
+    row.stash_tab !== nextValues.stashTab ||
+    row.grid_x !== nextValues.gridX ||
+    row.grid_y !== nextValues.gridY ||
+    row.grid_width !== nextValues.gridWidth ||
+    row.grid_height !== nextValues.gridHeight ||
+    row.equipped_slot_id !== nextValues.equippedSlotId ||
+    row.icon_file_name !== nextValues.iconFileName
+  );
+}
+
+function ensureVaultItemSpatialColumns(ctx: DatabaseContext): void {
+  const rows = ctx.rawDb.prepare('PRAGMA table_info(vault_items)').all() as Array<{ name: string }>;
+  const columnNames = new Set(rows.map((row) => row.name));
+  ensureMissingVaultItemColumns(ctx, columnNames);
+  const updatedRows = ctx.rawDb.prepare('PRAGMA table_info(vault_items)').all() as Array<{
+    name: string;
+  }>;
+  const updatedColumnNames = new Set(updatedRows.map((row) => row.name));
+
+  if (updatedColumnNames.has('is_socketed_item')) {
+    ctx.rawDb.exec(
+      'CREATE INDEX IF NOT EXISTS idx_vault_items_socketed ON vault_items(is_socketed_item)',
+    );
+  }
+
+  // Backfill spatial fields and icon filename from raw item json for pre-existing rows.
+  const backfillRows = getVaultItemSpatialBackfillRows(ctx);
+
+  const updateStmt = ctx.rawDb.prepare(
+    `
+      UPDATE vault_items
+      SET
+        location_context = ?,
+        stash_tab = ?,
+        grid_x = ?,
+        grid_y = ?,
+        grid_width = ?,
+        grid_height = ?,
+        equipped_slot_id = ?,
+        icon_file_name = ?
+      WHERE id = ?
+    `,
+  );
+
+  const tx = ctx.rawDb.transaction(() => {
+    for (const row of backfillRows) {
+      const parsed = parseRawJsonObject(row.raw_item_json);
+      const nextValues = buildVaultItemSpatialBackfillValues(row, parsed);
+      if (!hasVaultItemBackfillChanges(row, nextValues)) {
+        continue;
+      }
+      updateStmt.run(
+        nextValues.locationContext,
+        nextValues.stashTab,
+        nextValues.gridX,
+        nextValues.gridY,
+        nextValues.gridWidth,
+        nextValues.gridHeight,
+        nextValues.equippedSlotId,
+        nextValues.iconFileName,
+        row.id,
+      );
+    }
+  });
+
+  tx();
 }
 
 function migrateRunTrackerAutoStart(ctx: DatabaseContext): void {
