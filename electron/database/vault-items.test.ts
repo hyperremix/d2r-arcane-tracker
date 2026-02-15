@@ -138,4 +138,193 @@ describe('When vault item database operations are executed', () => {
       expect(filtered.items[0]?.categoryIds).toEqual(['cat-1']);
     });
   });
+
+  describe('If an existing vault_items table is missing socketed columns', () => {
+    it('Then schema initialization adds missing columns and backfills canonical icon/location fields', () => {
+      // Arrange
+      const rawDb = new Database(':memory:');
+      rawDb.exec(`
+        CREATE TABLE vault_items (
+          id TEXT PRIMARY KEY,
+          fingerprint TEXT NOT NULL,
+          item_name TEXT NOT NULL,
+          item_code TEXT,
+          quality TEXT NOT NULL,
+          ethereal BOOLEAN NOT NULL DEFAULT FALSE,
+          socket_count INTEGER,
+          raw_item_json TEXT NOT NULL,
+          source_character_id TEXT,
+          source_character_name TEXT,
+          source_file_type TEXT NOT NULL CHECK (source_file_type IN ('d2s', 'sss', 'd2x', 'd2i')),
+          location_context TEXT NOT NULL DEFAULT 'unknown' CHECK (
+            location_context IN ('equipped', 'inventory', 'stash', 'mercenary', 'corpse', 'unknown')
+          ),
+          stash_tab INTEGER,
+          icon_file_name TEXT,
+          grail_item_id TEXT,
+          is_present_in_latest_scan BOOLEAN NOT NULL DEFAULT TRUE,
+          last_seen_at DATETIME,
+          vaulted_at DATETIME,
+          unvaulted_at DATETIME,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
+      `);
+      const insertLegacyRow = rawDb.prepare(
+        `
+          INSERT INTO vault_items (
+            id,
+            fingerprint,
+            item_name,
+            item_code,
+            quality,
+            ethereal,
+            socket_count,
+            raw_item_json,
+            source_file_type,
+            location_context,
+            icon_file_name,
+            is_present_in_latest_scan
+          )
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `,
+      );
+      insertLegacyRow.run(
+        'legacy-row-1',
+        'legacy-fingerprint-1',
+        'Harlequin Crest',
+        'uap',
+        'unique',
+        0,
+        0,
+        '{"inv_file":"invhamm","type_name":"Shako","location_id":2,"alt_position_id":0,"position_x":5,"position_y":0,"inv_width":1,"inv_height":1}',
+        'd2s',
+        'inventory',
+        'invhamm.png',
+        1,
+      );
+      insertLegacyRow.run(
+        'legacy-row-2',
+        'legacy-fingerprint-2',
+        'Expanded Inventory Item',
+        'cm3',
+        'magic',
+        0,
+        0,
+        '{"inv_file":"invcm3","type_name":"Grand Charm","location_id":0,"alt_position_id":1,"position_x":12,"position_y":1,"inv_width":1,"inv_height":3}',
+        'd2s',
+        'stash',
+        'invcm3.png',
+        1,
+      );
+
+      const legacyCtx: DatabaseContext = {
+        rawDb,
+        db: createDrizzleDb(rawDb),
+        dbPath: ':memory:',
+      };
+
+      // Act
+      createSchema(legacyCtx);
+      const columns = rawDb.prepare('PRAGMA table_info(vault_items)').all() as Array<{
+        name: string;
+      }>;
+      const firstPassIconName = rawDb
+        .prepare(
+          `
+            SELECT
+              icon_file_name,
+              location_context,
+              stash_tab,
+              grid_x,
+              grid_y,
+              grid_width,
+              grid_height
+            FROM vault_items
+            WHERE id = ?
+          `,
+        )
+        .get('legacy-row-1') as {
+        icon_file_name: string | null;
+        location_context: string;
+        stash_tab: number | null;
+        grid_x: number | null;
+        grid_y: number | null;
+        grid_width: number | null;
+        grid_height: number | null;
+      };
+
+      // Re-run createSchema to verify idempotent behavior.
+      createSchema(legacyCtx);
+      const secondPassIconName = rawDb
+        .prepare(
+          `
+            SELECT
+              icon_file_name,
+              location_context,
+              stash_tab,
+              grid_x,
+              grid_y,
+              grid_width,
+              grid_height
+            FROM vault_items
+            WHERE id = ?
+          `,
+        )
+        .get('legacy-row-1') as {
+        icon_file_name: string | null;
+        location_context: string;
+        stash_tab: number | null;
+        grid_x: number | null;
+        grid_y: number | null;
+        grid_width: number | null;
+        grid_height: number | null;
+      };
+      const expandedInventoryRow = rawDb
+        .prepare(
+          `
+            SELECT
+              location_context,
+              stash_tab,
+              grid_x,
+              grid_y,
+              grid_width,
+              grid_height
+            FROM vault_items
+            WHERE id = ?
+          `,
+        )
+        .get('legacy-row-2') as {
+        location_context: string;
+        stash_tab: number | null;
+        grid_x: number | null;
+        grid_y: number | null;
+        grid_width: number | null;
+        grid_height: number | null;
+      };
+
+      // Assert
+      expect(columns.some((column) => column.name === 'is_socketed_item')).toBe(true);
+      expect(firstPassIconName.icon_file_name).toBe('cap_hat.png');
+      expect(firstPassIconName.location_context).toBe('unknown');
+      expect(firstPassIconName.stash_tab).toBeNull();
+      expect(firstPassIconName.grid_x).toBe(1);
+      expect(firstPassIconName.grid_y).toBe(1);
+      expect(firstPassIconName.grid_width).toBe(1);
+      expect(firstPassIconName.grid_height).toBe(1);
+      expect(secondPassIconName.icon_file_name).toBe('cap_hat.png');
+      expect(secondPassIconName.location_context).toBe('unknown');
+      expect(secondPassIconName.stash_tab).toBeNull();
+      expect(secondPassIconName.grid_x).toBe(1);
+      expect(secondPassIconName.grid_y).toBe(1);
+      expect(secondPassIconName.grid_width).toBe(1);
+      expect(secondPassIconName.grid_height).toBe(1);
+      expect(expandedInventoryRow.location_context).toBe('inventory');
+      expect(expandedInventoryRow.stash_tab).toBeNull();
+      expect(expandedInventoryRow.grid_x).toBe(12);
+      expect(expandedInventoryRow.grid_y).toBe(1);
+      expect(expandedInventoryRow.grid_width).toBe(1);
+      expect(expandedInventoryRow.grid_height).toBe(3);
+    });
+  });
 });

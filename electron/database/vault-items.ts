@@ -14,6 +14,23 @@ import { getCategoryIdsByVaultItemIds, setVaultItemCategories } from './vault-ca
 
 const { vaultItems } = schema;
 
+type SearchClauses = {
+  clauses: string[];
+  params: Array<string | number>;
+};
+
+function toNullable<T>(value: T | undefined): T | null {
+  return value ?? null;
+}
+
+function toOptionalIsoTimestamp(value: Date | string | undefined): string | undefined {
+  if (typeof value === 'string') {
+    return value;
+  }
+
+  return toISOString(value) ?? undefined;
+}
+
 function buildVaultItemValues(input: VaultItemUpsertInput) {
   const nowIso = new Date().toISOString();
 
@@ -21,17 +38,24 @@ function buildVaultItemValues(input: VaultItemUpsertInput) {
     id: input.id ?? input.fingerprint,
     fingerprint: input.fingerprint,
     itemName: input.itemName,
-    itemCode: input.itemCode ?? null,
+    itemCode: toNullable(input.itemCode),
     quality: input.quality,
     ethereal: input.ethereal,
-    socketCount: input.socketCount ?? null,
+    socketCount: toNullable(input.socketCount),
     rawItemJson: input.rawItemJson,
-    sourceCharacterId: input.sourceCharacterId ?? null,
-    sourceCharacterName: input.sourceCharacterName ?? null,
+    sourceCharacterId: toNullable(input.sourceCharacterId),
+    sourceCharacterName: toNullable(input.sourceCharacterName),
     sourceFileType: input.sourceFileType,
     locationContext: input.locationContext,
-    stashTab: input.stashTab ?? null,
-    grailItemId: input.grailItemId ?? null,
+    stashTab: toNullable(input.stashTab),
+    gridX: toNullable(input.gridX),
+    gridY: toNullable(input.gridY),
+    gridWidth: toNullable(input.gridWidth),
+    gridHeight: toNullable(input.gridHeight),
+    equippedSlotId: toNullable(input.equippedSlotId),
+    iconFileName: toNullable(input.iconFileName),
+    isSocketedItem: input.isSocketedItem ?? false,
+    grailItemId: toNullable(input.grailItemId),
     isPresentInLatestScan: input.isPresentInLatestScan ?? true,
     lastSeenAt: toISOString(input.lastSeenAt) ?? nowIso,
     vaultedAt: toISOString(input.vaultedAt),
@@ -39,39 +63,45 @@ function buildVaultItemValues(input: VaultItemUpsertInput) {
   };
 }
 
-function buildVaultItemUpdatePayload(updates: VaultItemUpdateInput) {
-  const payload: Partial<ReturnType<typeof buildVaultItemValues>> = {};
-  const entries: [keyof VaultItemUpdateInput, keyof ReturnType<typeof buildVaultItemValues>][] = [
-    ['itemName', 'itemName'],
-    ['quality', 'quality'],
-    ['ethereal', 'ethereal'],
-    ['rawItemJson', 'rawItemJson'],
-    ['sourceFileType', 'sourceFileType'],
-    ['locationContext', 'locationContext'],
-    ['isPresentInLatestScan', 'isPresentInLatestScan'],
-  ];
+type VaultItemValues = ReturnType<typeof buildVaultItemValues>;
+type VaultItemUpdatePayload = Partial<VaultItemValues>;
 
-  for (const [sourceKey, targetKey] of entries) {
-    const value = updates[sourceKey];
-    if (value !== undefined) {
-      payload[targetKey] = value as never;
-    }
+function setPayloadValue<K extends keyof VaultItemUpdatePayload>(
+  payload: VaultItemUpdatePayload,
+  key: K,
+  value: VaultItemUpdatePayload[K] | undefined,
+): void {
+  if (value !== undefined) {
+    payload[key] = value;
   }
+}
 
-  if (updates.itemCode !== undefined) payload.itemCode = updates.itemCode;
-  if (updates.socketCount !== undefined) payload.socketCount = updates.socketCount;
-  if (updates.sourceCharacterId !== undefined)
-    payload.sourceCharacterId = updates.sourceCharacterId;
-  if (updates.sourceCharacterName !== undefined)
-    payload.sourceCharacterName = updates.sourceCharacterName;
-  if (updates.stashTab !== undefined) payload.stashTab = updates.stashTab;
-  if (updates.grailItemId !== undefined) payload.grailItemId = updates.grailItemId;
-  if (updates.lastSeenAt !== undefined)
-    payload.lastSeenAt = toISOString(updates.lastSeenAt) ?? undefined;
-  if (updates.vaultedAt !== undefined)
-    payload.vaultedAt = toISOString(updates.vaultedAt) ?? undefined;
-  if (updates.unvaultedAt !== undefined)
-    payload.unvaultedAt = toISOString(updates.unvaultedAt) ?? undefined;
+function buildVaultItemUpdatePayload(updates: VaultItemUpdateInput) {
+  const payload: VaultItemUpdatePayload = {};
+
+  setPayloadValue(payload, 'itemName', updates.itemName);
+  setPayloadValue(payload, 'itemCode', updates.itemCode);
+  setPayloadValue(payload, 'quality', updates.quality);
+  setPayloadValue(payload, 'ethereal', updates.ethereal);
+  setPayloadValue(payload, 'socketCount', updates.socketCount);
+  setPayloadValue(payload, 'rawItemJson', updates.rawItemJson);
+  setPayloadValue(payload, 'sourceCharacterId', updates.sourceCharacterId);
+  setPayloadValue(payload, 'sourceCharacterName', updates.sourceCharacterName);
+  setPayloadValue(payload, 'sourceFileType', updates.sourceFileType);
+  setPayloadValue(payload, 'locationContext', updates.locationContext);
+  setPayloadValue(payload, 'stashTab', updates.stashTab);
+  setPayloadValue(payload, 'gridX', updates.gridX);
+  setPayloadValue(payload, 'gridY', updates.gridY);
+  setPayloadValue(payload, 'gridWidth', updates.gridWidth);
+  setPayloadValue(payload, 'gridHeight', updates.gridHeight);
+  setPayloadValue(payload, 'equippedSlotId', updates.equippedSlotId);
+  setPayloadValue(payload, 'iconFileName', updates.iconFileName);
+  setPayloadValue(payload, 'isSocketedItem', updates.isSocketedItem);
+  setPayloadValue(payload, 'grailItemId', updates.grailItemId);
+  setPayloadValue(payload, 'isPresentInLatestScan', updates.isPresentInLatestScan);
+  setPayloadValue(payload, 'lastSeenAt', toOptionalIsoTimestamp(updates.lastSeenAt));
+  setPayloadValue(payload, 'vaultedAt', toOptionalIsoTimestamp(updates.vaultedAt));
+  setPayloadValue(payload, 'unvaultedAt', toOptionalIsoTimestamp(updates.unvaultedAt));
 
   return payload;
 }
@@ -150,6 +180,13 @@ export function upsertVaultItemByFingerprint(
         sourceFileType: values.sourceFileType,
         locationContext: values.locationContext,
         stashTab: values.stashTab,
+        gridX: values.gridX,
+        gridY: values.gridY,
+        gridWidth: values.gridWidth,
+        gridHeight: values.gridHeight,
+        equippedSlotId: values.equippedSlotId,
+        iconFileName: values.iconFileName,
+        isSocketedItem: values.isSocketedItem,
         grailItemId: values.grailItemId,
         isPresentInLatestScan: values.isPresentInLatestScan,
         lastSeenAt: values.lastSeenAt,
@@ -270,54 +307,103 @@ export function getVaultItemById(ctx: DatabaseContext, itemId: string): VaultIte
   return attachCategoryIds(ctx, [dbVaultItemToVaultItem(row)])[0];
 }
 
-export function searchVaultItems(
-  ctx: DatabaseContext,
-  filter: VaultItemFilter,
-): VaultItemSearchResult {
-  const clauses: string[] = [];
-  const params: Array<string | number> = [];
-
-  if (filter.text) {
-    const textQuery = `%${filter.text.trim().toLowerCase()}%`;
-    clauses.push(
-      '(lower(vi.item_name) LIKE ? OR lower(COALESCE(vi.item_code, "")) LIKE ? OR lower(vi.quality) LIKE ?)',
-    );
-    params.push(textQuery, textQuery, textQuery);
+function appendTextClause(query: SearchClauses, text: string | undefined): void {
+  const normalized = text?.trim().toLowerCase();
+  if (!normalized) {
+    return;
   }
 
-  if (filter.characterId) {
-    clauses.push('vi.source_character_id = ?');
-    params.push(filter.characterId);
+  const textQuery = `%${normalized}%`;
+  query.clauses.push(
+    '(lower(vi.item_name) LIKE ? OR lower(COALESCE(vi.item_code, "")) LIKE ? OR lower(vi.quality) LIKE ?)',
+  );
+  query.params.push(textQuery, textQuery, textQuery);
+}
+
+function appendCharacterClause(query: SearchClauses, characterId: string | undefined): void {
+  if (!characterId) {
+    return;
   }
 
-  if (filter.locationContext) {
-    clauses.push('vi.location_context = ?');
-    params.push(filter.locationContext);
+  query.clauses.push('vi.source_character_id = ?');
+  query.params.push(characterId);
+}
+
+function appendLocationClause(
+  query: SearchClauses,
+  locationContext: VaultItemFilter['locationContext'],
+): void {
+  if (!locationContext) {
+    return;
   }
 
-  if (filter.sourceFileType) {
-    clauses.push('vi.source_file_type = ?');
-    params.push(filter.sourceFileType);
+  query.clauses.push('vi.location_context = ?');
+  query.params.push(locationContext);
+}
+
+function appendSourceFileTypeClause(
+  query: SearchClauses,
+  sourceFileType: VaultItemFilter['sourceFileType'],
+): void {
+  if (!sourceFileType) {
+    return;
   }
 
-  if (filter.presentState && filter.presentState !== 'all') {
-    clauses.push('vi.is_present_in_latest_scan = ?');
-    params.push(filter.presentState === 'present' ? 1 : 0);
+  query.clauses.push('vi.source_file_type = ?');
+  query.params.push(sourceFileType);
+}
+
+function appendPresentStateClause(
+  query: SearchClauses,
+  presentState: VaultItemFilter['presentState'],
+): void {
+  if (!presentState || presentState === 'all') {
+    return;
   }
 
-  if (filter.categoryIds && filter.categoryIds.length > 0) {
-    const placeholders = filter.categoryIds.map(() => '?').join(', ');
-    clauses.push(
-      `EXISTS (SELECT 1 FROM vault_item_categories vic WHERE vic.vault_item_id = vi.id AND vic.vault_category_id IN (${placeholders}))`,
-    );
-    params.push(...filter.categoryIds);
+  query.clauses.push('vi.is_present_in_latest_scan = ?');
+  query.params.push(presentState === 'present' ? 1 : 0);
+}
+
+function appendSocketedClause(
+  query: SearchClauses,
+  includeSocketed: VaultItemFilter['includeSocketed'],
+): void {
+  if (includeSocketed === true) {
+    return;
   }
 
-  const whereClause = clauses.length > 0 ? `WHERE ${clauses.join(' AND ')}` : '';
-  const page = filter.page ?? 1;
-  const pageSize = filter.pageSize ?? 50;
-  const offset = (page - 1) * pageSize;
+  query.clauses.push('COALESCE(vi.is_socketed_item, 0) = 0');
+}
 
+function appendCategoryClause(
+  query: SearchClauses,
+  categoryIds: VaultItemFilter['categoryIds'],
+): void {
+  if (!categoryIds || categoryIds.length === 0) {
+    return;
+  }
+
+  const placeholders = categoryIds.map(() => '?').join(', ');
+  query.clauses.push(
+    `EXISTS (SELECT 1 FROM vault_item_categories vic WHERE vic.vault_item_id = vi.id AND vic.vault_category_id IN (${placeholders}))`,
+  );
+  query.params.push(...categoryIds);
+}
+
+function buildSearchQuery(filter: VaultItemFilter): SearchClauses {
+  const query: SearchClauses = { clauses: [], params: [] };
+  appendTextClause(query, filter.text);
+  appendCharacterClause(query, filter.characterId);
+  appendLocationClause(query, filter.locationContext);
+  appendSourceFileTypeClause(query, filter.sourceFileType);
+  appendPresentStateClause(query, filter.presentState);
+  appendSocketedClause(query, filter.includeSocketed);
+  appendCategoryClause(query, filter.categoryIds);
+  return query;
+}
+
+function getSortByColumn(sortBy: VaultItemFilter['sortBy']): string {
   const sortByMap: Record<NonNullable<VaultItemFilter['sortBy']>, string> = {
     itemName: 'vi.item_name',
     lastSeenAt: 'vi.last_seen_at',
@@ -325,18 +411,30 @@ export function searchVaultItems(
     updatedAt: 'vi.updated_at',
   };
 
-  const sortBy = sortByMap[filter.sortBy ?? 'updatedAt'];
+  return sortByMap[sortBy ?? 'updatedAt'];
+}
+
+export function searchVaultItems(
+  ctx: DatabaseContext,
+  filter: VaultItemFilter,
+): VaultItemSearchResult {
+  const query = buildSearchQuery(filter);
+  const whereClause = query.clauses.length > 0 ? `WHERE ${query.clauses.join(' AND ')}` : '';
+  const page = filter.page ?? 1;
+  const pageSize = filter.pageSize ?? 50;
+  const offset = (page - 1) * pageSize;
+  const sortBy = getSortByColumn(filter.sortBy);
   const sortOrder = filter.sortOrder === 'asc' ? 'ASC' : 'DESC';
 
   const countRow = ctx.rawDb
     .prepare(`SELECT COUNT(*) as total FROM vault_items vi ${whereClause}`)
-    .get(...params) as { total: number };
+    .get(...query.params) as { total: number };
 
   const rows = ctx.rawDb
     .prepare(
       `SELECT vi.* FROM vault_items vi ${whereClause} ORDER BY ${sortBy} ${sortOrder} LIMIT ? OFFSET ?`,
     )
-    .all(...params, pageSize, offset) as (typeof vaultItems.$inferSelect)[];
+    .all(...query.params, pageSize, offset) as (typeof vaultItems.$inferSelect)[];
 
   const mappedItems = rows.map(dbVaultItemToVaultItem);
 
