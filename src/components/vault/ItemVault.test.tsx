@@ -150,6 +150,19 @@ describe('When ItemVault is rendered', () => {
       const inventoryBoard = screen.getByTestId(inventoryBoardId);
       expect(within(inventoryBoard).getAllByTestId(`${inventoryBoardId}-cell`)).toHaveLength(40);
       expect(within(inventoryBoard).getAllByTestId('vault-item-tile')).toHaveLength(1);
+      expect(document.querySelector('.max-w-7xl')).not.toBeInTheDocument();
+
+      const sourceSectionsCardContent = inventoryBoard.closest('[data-slot="card-content"]');
+      expect(sourceSectionsCardContent).not.toBeNull();
+      expect(sourceSectionsCardContent?.className).toContain('columns-1');
+      expect(sourceSectionsCardContent?.className).toContain('sm:columns-[28rem]');
+      expect(sourceSectionsCardContent?.className).toContain('[&>*]:mb-4');
+      expect(sourceSectionsCardContent?.className).toContain('[&>*]:break-inside-avoid');
+      expect(sourceSectionsCardContent?.className).not.toContain(
+        'sm:grid-cols-[repeat(auto-fit,minmax(24rem,1fr))]',
+      );
+      expect(sourceSectionsCardContent?.className).not.toContain('space-y-4');
+
       const inventoryRawOverflowBoard = screen.getByTestId(
         'vault-inventory-board-Sorc:d2s-raw-overflow',
       );
@@ -176,6 +189,12 @@ describe('When ItemVault is rendered', () => {
       const equippedBoard = screen.getByTestId('vault-equipped-board');
       expect(within(equippedBoard).queryAllByTestId('vault-equipped-board-cell')).toHaveLength(0);
       expect(within(equippedBoard).getAllByTestId('vault-equipped-slot-frame')).toHaveLength(10);
+      expect(equippedBoard.style.width).toBe('calc(12 * var(--inv-cell-size) + 11px + 16px)');
+      expect(equippedBoard.style.minWidth).toBe('calc(12 * var(--inv-cell-size) + 11px + 16px)');
+      expect(equippedBoard.style.maxWidth).toBe('calc(12 * var(--inv-cell-size) + 11px + 16px)');
+      expect(equippedBoard.style.height).toBe('calc(8 * var(--inv-cell-size) + 7px + 16px)');
+      expect(equippedBoard.style.minHeight).toBe('calc(8 * var(--inv-cell-size) + 7px + 16px)');
+      expect(equippedBoard.style.maxHeight).toBe('calc(8 * var(--inv-cell-size) + 7px + 16px)');
 
       expect(within(inventoryBoard).queryByText('Arachnid Mesh')).not.toBeInTheDocument();
     });

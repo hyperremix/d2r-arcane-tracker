@@ -5,6 +5,8 @@ import {
   classifyBoardItems,
   DEFAULT_INVENTORY_GRID_SIZE,
   DEFAULT_STASH_GRID_SIZE,
+  EQUIPPED_BOARD_SIZE,
+  EQUIPPED_SLOT_LAYOUT,
   type SpatialItemLike,
 } from './spatialLayout';
 
@@ -258,6 +260,69 @@ describe('When spatial layout classifiers are used', () => {
       expect(mapped.slotItems.get('rightHand')?.id).toBe('primary-right');
       expect(mapped.slotItems.get('leftHand')?.id).toBe('primary-left');
       expect(mapped.unplaced.map((item) => item.id)).toEqual(['alias-right', 'alias-left']);
+    });
+  });
+
+  describe('If equipped slot layout is compacted to remove empty lanes', () => {
+    it('Then every equipped slot footprint remains within equipped board bounds', () => {
+      // Arrange
+      const layouts = Object.values(EQUIPPED_SLOT_LAYOUT);
+
+      // Act
+      const allWithinBounds = layouts.every((layout) => {
+        const rightEdge = layout.column + layout.width - 1;
+        const bottomEdge = layout.row + layout.height - 1;
+
+        return (
+          layout.column >= 1 &&
+          layout.row >= 1 &&
+          rightEdge <= EQUIPPED_BOARD_SIZE.columns &&
+          bottomEdge <= EQUIPPED_BOARD_SIZE.rows
+        );
+      });
+
+      // Assert
+      expect(allWithinBounds).toBe(true);
+    });
+
+    it('Then every equipped board column has at least one slot cell', () => {
+      // Arrange
+      const occupiedColumns = new Set<number>();
+
+      // Act
+      for (const layout of Object.values(EQUIPPED_SLOT_LAYOUT)) {
+        for (let column = layout.column; column < layout.column + layout.width; column += 1) {
+          occupiedColumns.add(column);
+        }
+      }
+
+      const hasNoEmptyColumns = Array.from(
+        { length: EQUIPPED_BOARD_SIZE.columns },
+        (_, index) => index + 1,
+      ).every((column) => occupiedColumns.has(column));
+
+      // Assert
+      expect(hasNoEmptyColumns).toBe(true);
+    });
+
+    it('Then every equipped board row has at least one slot cell', () => {
+      // Arrange
+      const occupiedRows = new Set<number>();
+
+      // Act
+      for (const layout of Object.values(EQUIPPED_SLOT_LAYOUT)) {
+        for (let row = layout.row; row < layout.row + layout.height; row += 1) {
+          occupiedRows.add(row);
+        }
+      }
+
+      const hasNoEmptyRows = Array.from(
+        { length: EQUIPPED_BOARD_SIZE.rows },
+        (_, index) => index + 1,
+      ).every((row) => occupiedRows.has(row));
+
+      // Assert
+      expect(hasNoEmptyRows).toBe(true);
     });
   });
 });

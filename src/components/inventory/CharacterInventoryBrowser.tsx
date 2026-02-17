@@ -481,12 +481,11 @@ function InventoryGridSection({
       </BoardSurface>
 
       {overflowLayout.gridSize && (
-        <div className="space-y-2 rounded-md border border-amber-500/30 bg-amber-500/5 p-2">
-          <div className="font-medium text-amber-100/90 text-xs">
+        <div className="space-y-2 p-2">
+          <div className="font-medium text-xs">
             {rawOverflowTitle ?? t(translations.inventoryBrowser.sections.rawStored)}
           </div>
           <BoardSurface
-            className="border-amber-500/40 bg-black/30"
             gridSize={overflowLayout.gridSize}
             showBaseGrid={false}
             testId={`${testId}-raw-overflow`}
@@ -815,7 +814,7 @@ export function CharacterInventoryBrowser() {
 
   return (
     <div className="flex-1 overflow-auto p-4">
-      <div className="mx-auto flex w-full max-w-7xl flex-col gap-4">
+      <div className="flex w-full flex-col gap-4">
         <Card>
           <CardHeader>
             <CardTitle>{t(translations.inventoryBrowser.title)}</CardTitle>
@@ -975,7 +974,7 @@ export function CharacterInventoryBrowser() {
                   })}
                 </div>
               </CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent className="columns-1 gap-4 sm:columns-[28rem] [&>*]:mb-4 [&>*]:break-inside-avoid">
                 {(locationContext === 'all' || locationContext === 'equipped') && (
                   <EquipmentSection
                     items={grouped.equipped}
