@@ -220,6 +220,19 @@ describe('When CharacterInventoryBrowser is rendered', () => {
       const inventoryBoard = screen.getByTestId('inventory-board-snap-1');
       expect(within(inventoryBoard).getAllByTestId('inventory-board-snap-1-cell')).toHaveLength(40);
       expect(within(inventoryBoard).getAllByTestId('inventory-item-tile')).toHaveLength(1);
+      expect(document.querySelector('.max-w-7xl')).not.toBeInTheDocument();
+
+      const snapshotSectionsCardContent = inventoryBoard.closest('[data-slot="card-content"]');
+      expect(snapshotSectionsCardContent).not.toBeNull();
+      expect(snapshotSectionsCardContent?.className).toContain('columns-1');
+      expect(snapshotSectionsCardContent?.className).toContain('sm:columns-[28rem]');
+      expect(snapshotSectionsCardContent?.className).toContain('[&>*]:mb-4');
+      expect(snapshotSectionsCardContent?.className).toContain('[&>*]:break-inside-avoid');
+      expect(snapshotSectionsCardContent?.className).not.toContain(
+        'sm:grid-cols-[repeat(auto-fit,minmax(24rem,1fr))]',
+      );
+      expect(snapshotSectionsCardContent?.className).not.toContain('space-y-4');
+
       const inventoryOverflowBoard = screen.getByTestId('inventory-board-snap-1-raw-overflow');
       expect(
         within(inventoryOverflowBoard).queryAllByTestId('inventory-board-snap-1-raw-overflow-cell'),
@@ -233,6 +246,12 @@ describe('When CharacterInventoryBrowser is rendered', () => {
       const equippedBoard = screen.getByTestId('equipped-board');
       expect(within(equippedBoard).queryAllByTestId('equipped-board-cell')).toHaveLength(0);
       expect(within(equippedBoard).getAllByTestId('equipped-slot-frame')).toHaveLength(10);
+      expect(equippedBoard.style.width).toBe('calc(12 * var(--inv-cell-size) + 11px + 16px)');
+      expect(equippedBoard.style.minWidth).toBe('calc(12 * var(--inv-cell-size) + 11px + 16px)');
+      expect(equippedBoard.style.maxWidth).toBe('calc(12 * var(--inv-cell-size) + 11px + 16px)');
+      expect(equippedBoard.style.height).toBe('calc(8 * var(--inv-cell-size) + 7px + 16px)');
+      expect(equippedBoard.style.minHeight).toBe('calc(8 * var(--inv-cell-size) + 7px + 16px)');
+      expect(equippedBoard.style.maxHeight).toBe('calc(8 * var(--inv-cell-size) + 7px + 16px)');
 
       expect(screen.getByText('Drop inventory items here to vault')).toBeInTheDocument();
     });

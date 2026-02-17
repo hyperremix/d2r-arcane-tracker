@@ -32,8 +32,8 @@ export const DEFAULT_BELT_GRID_SIZE: GridSize = {
 };
 
 export const EQUIPPED_BOARD_SIZE: GridSize = {
-  columns: 14,
-  rows: 10,
+  columns: 12,
+  rows: 8,
 };
 
 export const EQUIPPED_SLOT_IDS = {
@@ -109,16 +109,16 @@ export const PAPER_DOLL_SLOT_ORDER: PaperDollSlotKey[] = [
 ];
 
 export const EQUIPPED_SLOT_LAYOUT: Record<PaperDollSlotKey, EquippedSlotLayout> = {
-  head: { column: 7, row: 1, width: 2, height: 2 },
-  amulet: { column: 9, row: 2, width: 1, height: 1 },
-  armor: { column: 7, row: 3, width: 2, height: 3 },
-  rightHand: { column: 13, row: 1, width: 2, height: 4 },
+  head: { column: 6, row: 1, width: 2, height: 2 },
+  amulet: { column: 8, row: 2, width: 1, height: 1 },
+  armor: { column: 6, row: 3, width: 2, height: 3 },
+  rightHand: { column: 11, row: 1, width: 2, height: 4 },
   leftHand: { column: 1, row: 1, width: 2, height: 4 },
-  rightRing: { column: 9, row: 8, width: 1, height: 1 },
-  leftRing: { column: 6, row: 8, width: 1, height: 1 },
-  belt: { column: 7, row: 8, width: 2, height: 1 },
-  boots: { column: 11, row: 9, width: 2, height: 2 },
-  gloves: { column: 3, row: 9, width: 2, height: 2 },
+  rightRing: { column: 8, row: 6, width: 1, height: 1 },
+  leftRing: { column: 5, row: 6, width: 1, height: 1 },
+  belt: { column: 6, row: 6, width: 2, height: 1 },
+  boots: { column: 9, row: 7, width: 2, height: 2 },
+  gloves: { column: 3, row: 7, width: 2, height: 2 },
 };
 
 export interface GroupedSpatialItems<T extends SpatialItemLike> {
