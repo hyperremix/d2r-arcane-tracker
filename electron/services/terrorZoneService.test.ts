@@ -87,7 +87,7 @@ describe('TerrorZoneService', () => {
   });
 
   it('converts numeric zone IDs to string IDs and assigns proper names', async () => {
-    // Create a file with numeric zone IDs (legacy format)
+    // Create a file with numeric zone IDs (1-based indexing from legacy config)
     writeFileSync(gameFilePath, createZonesJson([1, 2, 3]), 'utf-8');
 
     const zones = await service.readZonesFromFile(gameFilePath, { preferBackup: true });

@@ -43,8 +43,13 @@ export const TERROR_ZONE_NAMES: Record<string, string> = {
 };
 
 /**
- * Mapping from old numeric zone IDs to new string zone IDs.
- * Used for migrating existing configurations.
+ * Mapping from numeric zone indices to string zone IDs.
+ * Uses 1-based indexing following the order of zones in desecratedzones.json.
+ * Used for converting legacy numeric IDs (1-34) to current string IDs.
+ *
+ * The game file has 34 zones in its zones array (zones_0 through zones_33, with gaps).
+ * Old user configurations used 1-based numbering (Zone 1, Zone 2, ... Zone 34).
+ * This mapping preserves that 1-based convention for backward compatibility.
  */
 export const NUMERIC_TO_STRING_ZONE_ID: Record<number, string> = {
   1: 'Act1-BurialGrounds',
@@ -54,33 +59,31 @@ export const NUMERIC_TO_STRING_ZONE_ID: Record<number, string> = {
   5: 'Act1-BloodMoor',
   6: 'Act1-Jail',
   7: 'Act1-MooMooFarm',
-  8: 'Act1-StonyField',
-  9: 'Act1-BlackMarsh',
-  10: 'Act1-Tower',
-  11: 'Act1-Pit',
-  12: 'Act1-Tristram',
-  13: 'Act2-Sewers',
-  14: 'Act2-RockyWaste',
-  15: 'Act2-DryHills',
-  16: 'Act2-FarOasis',
-  17: 'Act2-LostCity',
-  18: 'Act2-AncientTunnels',
-  19: 'Act2-TalRashas',
-  20: 'Act2-ArcaneSanctuary',
-  21: 'Act3-SpiderForest',
-  22: 'Act3-GreatMarsh',
-  23: 'Act3-FlayerJungle',
-  24: 'Act3-Kurast',
-  25: 'Act3-Travincal',
-  26: 'Act3-DuranceOfHate',
-  27: 'Act4_OuterSteppes',
-  28: 'Act4-CityOfTheDamned',
-  29: 'Act4-ChaosSanctuary',
-  30: 'Act5-BloodyFoothils',
-  31: 'Act5-ArreatPlateau',
-  32: 'Act5-CrystallinePassage',
-  33: 'Act5-Halls',
-  34: 'Act5-GlacialTrail',
-  35: 'Act5-AncientsWay',
-  36: 'Act5-WorldstoneKeep',
+  8: 'Act1-Tristram',
+  9: 'Act1-Tower',
+  10: 'Act1-Monastery',
+  11: 'Act2-Sewers',
+  12: 'Act2-RockyWaste',
+  13: 'Act2-DryHills',
+  14: 'Act2-FarOasis',
+  15: 'Act2-LostCity',
+  16: 'Act2-TalRashas',
+  17: 'Act2-ArcaneSanctuary',
+  18: 'Act3-SpiderForest',
+  19: 'Act3-GreatMarsh',
+  20: 'Act3-FlayerJungle',
+  21: 'Act3-Kurast',
+  22: 'Act3-Travincal',
+  23: 'Act3-DuranceOfHate',
+  24: 'Act4_OuterSteppes',
+  25: 'Act4-RiverOfFlame',
+  26: 'Act4-ChaosSanctuary',
+  27: 'Act5-BloodyFoothils',
+  28: 'Act5-ArreatPlateau',
+  29: 'Act5-CrystallinePassage',
+  30: 'Act5-Halls',
+  31: 'Act5-GlacialTrail',
+  32: 'Act5-AncientsWay',
+  33: 'Act5-FrozenTundra',
+  34: 'Act5-WorldstoneKeep',
 };
