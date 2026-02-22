@@ -11,12 +11,14 @@ vi.mock('electron', () => ({
   },
 }));
 
-const createZonesJson = (ids: number[]): string =>
+const createZonesJson = (ids: string[]): string =>
   JSON.stringify(
     {
       desecrated_zones: [
         {
           zones: ids.map((id) => ({
+            type: 'DesecratedZone',
+            name: `zone_${id}`,
             id,
             levels: [],
           })),
@@ -38,7 +40,11 @@ describe('TerrorZoneService', () => {
     mkdirSync(mockUserDataPath, { recursive: true });
 
     gameFilePath = path.join(tempDir, 'desecratedzones.json');
-    writeFileSync(gameFilePath, createZonesJson([1, 2, 3]), 'utf-8');
+    writeFileSync(
+      gameFilePath,
+      createZonesJson(['Act1-BurialGrounds', 'Act1-Catacombs', 'Act1-ColdPlains']),
+      'utf-8',
+    );
 
     service = new TerrorZoneService();
   });
@@ -50,25 +56,33 @@ describe('TerrorZoneService', () => {
   it('prefers the backup file when reading zones', async () => {
     await service.readZonesFromFile(gameFilePath, { preferBackup: true });
 
-    writeFileSync(gameFilePath, createZonesJson([1, 2]), 'utf-8');
+    writeFileSync(gameFilePath, createZonesJson(['Act1-BurialGrounds', 'Act1-Catacombs']), 'utf-8');
 
     const zones = await service.readZonesFromFile(gameFilePath, { preferBackup: true });
 
-    expect(zones.map((zone) => zone.id)).toEqual([1, 2, 3]);
+    expect(zones.map((zone) => zone.id)).toEqual([
+      'Act1-BurialGrounds',
+      'Act1-Catacombs',
+      'Act1-ColdPlains',
+    ]);
   });
 
   it('re-adds previously disabled zones when config enables them again', async () => {
     const zones = await service.readZonesFromFile(gameFilePath, { preferBackup: true });
-    const enabledSet = new Set<number>([1, 2]);
+    const enabledSet = new Set<string>(['Act1-BurialGrounds', 'Act1-Catacombs']);
     await service.writeZonesToFile(gameFilePath, zones, enabledSet);
 
     const restoredZones = await service.readZonesFromFile(gameFilePath, { preferBackup: true });
-    const reEnableSet = new Set<number>([1, 2, 3]);
+    const reEnableSet = new Set<string>([
+      'Act1-BurialGrounds',
+      'Act1-Catacombs',
+      'Act1-ColdPlains',
+    ]);
     await service.writeZonesToFile(gameFilePath, restoredZones, reEnableSet);
 
     const file = JSON.parse(readFileSync(gameFilePath, 'utf-8'));
-    const zoneIds = file.desecrated_zones[0].zones.map((zone: { id: number }) => zone.id);
+    const zoneIds = file.desecrated_zones[0].zones.map((zone: { id: string }) => zone.id);
 
-    expect(zoneIds).toEqual([1, 2, 3]);
+    expect(zoneIds).toEqual(['Act1-BurialGrounds', 'Act1-Catacombs', 'Act1-ColdPlains']);
   });
 });

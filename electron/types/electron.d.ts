@@ -629,16 +629,16 @@ export interface ElectronAPI {
 
     /**
      * Retrieves current terror zone configuration from database.
-     * @returns {Promise<Record<number, boolean>>} A promise that resolves with zone configuration.
+     * @returns {Promise<Record<string, boolean>>} A promise that resolves with zone configuration.
      */
-    getConfig(): Promise<Record<number, boolean>>
+    getConfig(): Promise<Record<string, boolean>>
 
     /**
      * Updates terror zone configuration and applies to game file.
-     * @param {Record<number, boolean>} config - Zone configuration (zone ID -> enabled state).
+     * @param {Record<string, boolean>} config - Zone configuration (zone ID -> enabled state).
      * @returns {Promise<{ success: boolean; requiresRestart: boolean }>} A promise that resolves with update result.
      */
-    updateConfig(config: Record<number, boolean>): Promise<{ success: boolean; requiresRestart: boolean }>
+    updateConfig(config: Record<string, boolean>): Promise<{ success: boolean; requiresRestart: boolean }>
 
     /**
      * Restores the original desecratedzones.json file from backup.

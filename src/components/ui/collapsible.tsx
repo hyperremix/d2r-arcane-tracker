@@ -1,4 +1,4 @@
-import { Collapsible as CollapsiblePrimitive } from '@base-ui/react/collapsible';
+import { Collapsible as CollapsiblePrimitive } from '@base-ui/react';
 
 function Collapsible({ ...props }: CollapsiblePrimitive.Root.Props) {
   return <CollapsiblePrimitive.Root data-slot="collapsible" {...props} />;

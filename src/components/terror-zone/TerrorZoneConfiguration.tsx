@@ -29,7 +29,7 @@ import { translations } from '@/i18n/translations';
 export function TerrorZoneConfiguration() {
   const { t } = useTranslation();
   const [zones, setZones] = useState<TerrorZone[]>([]);
-  const [config, setConfig] = useState<Record<number, boolean>>({});
+  const [config, setConfig] = useState<Record<string, boolean>>({});
   const [searchTerm, setSearchTerm] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -77,7 +77,7 @@ export function TerrorZoneConfiguration() {
   }, [loadData]);
 
   const handleZoneToggle = useCallback(
-    async (zoneId: number, enabled: boolean) => {
+    async (zoneId: string, enabled: boolean) => {
       try {
         setIsSaving(true);
         const newConfig = { ...config, [zoneId]: enabled };
@@ -102,7 +102,7 @@ export function TerrorZoneConfiguration() {
   const handleEnableAll = useCallback(async () => {
     try {
       setIsSaving(true);
-      const newConfig: Record<number, boolean> = {};
+      const newConfig: Record<string, boolean> = {};
       zones.forEach((zone) => {
         newConfig[zone.id] = true;
       });
@@ -124,7 +124,7 @@ export function TerrorZoneConfiguration() {
   const handleDisableAll = useCallback(async () => {
     try {
       setIsSaving(true);
-      const newConfig: Record<number, boolean> = {};
+      const newConfig: Record<string, boolean> = {};
       zones.forEach((zone) => {
         newConfig[zone.id] = false;
       });
@@ -371,7 +371,7 @@ export function TerrorZoneConfiguration() {
                     <Switch
                       id={`zone-${zone.id}`}
                       checked={config[zone.id] ?? true}
-                      onCheckedChange={(checked) => handleZoneToggle(zone.id, checked)}
+                      onCheckedChange={(checked: boolean) => handleZoneToggle(zone.id, checked)}
                       disabled={isSaving || !validationStatus.valid}
                     />
                     <Label htmlFor={`zone-${zone.id}`} className="font-medium">

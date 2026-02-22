@@ -753,17 +753,17 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
     /**
      * Retrieves current terror zone configuration from database.
-     * @returns {Promise<Record<number, boolean>>} A promise that resolves with zone configuration.
+     * @returns {Promise<Record<string, boolean>>} A promise that resolves with zone configuration.
      */
-    getConfig: (): Promise<Record<number, boolean>> => ipcRenderer.invoke('terrorZone:getConfig'),
+    getConfig: (): Promise<Record<string, boolean>> => ipcRenderer.invoke('terrorZone:getConfig'),
 
     /**
      * Updates terror zone configuration and applies to game file.
-     * @param {Record<number, boolean>} config - Zone configuration (zone ID -> enabled state).
+     * @param {Record<string, boolean>} config - Zone configuration (zone ID -> enabled state).
      * @returns {Promise<{ success: boolean; requiresRestart: boolean }>} A promise that resolves with update result.
      */
     updateConfig: (
-      config: Record<number, boolean>,
+      config: Record<string, boolean>,
     ): Promise<{ success: boolean; requiresRestart: boolean }> =>
       ipcRenderer.invoke('terrorZone:updateConfig', config),
 

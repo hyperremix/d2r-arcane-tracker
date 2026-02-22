@@ -97,12 +97,23 @@ export class TerrorZoneService {
 
       return zones.map(
         (zone: {
-          id: number;
-          levels?: Array<{ level_id: number; waypoint_level_id?: number }>;
+          type?: string;
+          name?: string;
+          id: string;
+          levels?: Array<{
+            type?: string;
+            name?: string;
+            level_id: number;
+            waypoint_level_id?: number;
+          }>;
         }) => ({
           id: zone.id,
           name: TERROR_ZONE_NAMES[zone.id] || `Zone ${zone.id}`,
-          levels: zone.levels || [],
+          levels:
+            zone.levels?.map((level) => ({
+              level_id: level.level_id,
+              waypoint_level_id: level.waypoint_level_id,
+            })) || [],
         }),
       );
     } catch (error) {
@@ -120,7 +131,7 @@ export class TerrorZoneService {
   async writeZonesToFile(
     filePath: string,
     zones: TerrorZone[],
-    enabledZoneIds: Set<number>,
+    enabledZoneIds: Set<string>,
   ): Promise<void> {
     try {
       if (!existsSync(filePath)) {
@@ -138,14 +149,35 @@ export class TerrorZoneService {
         throw new Error('Invalid desecratedzones.json structure');
       }
 
+      // Read the original structure to preserve type and name fields
+      const originalZones = data.desecrated_zones[0]?.zones || [];
+      const originalZonesMap = new Map<string, { type?: string; name?: string }>(
+        originalZones.map((zone: { id: string; type?: string; name?: string }) => [
+          zone.id,
+          { type: zone.type, name: zone.name },
+        ]),
+      );
+
       // Filter zones to only include enabled ones
       const enabledZones = zones.filter((zone) => enabledZoneIds.has(zone.id));
 
-      // Update the zones array in the data structure
-      data.desecrated_zones[0].zones = enabledZones.map((zone) => ({
-        id: zone.id,
-        levels: zone.levels,
-      }));
+      // Update the zones array in the data structure, preserving type and name fields
+      data.desecrated_zones[0].zones = enabledZones.map((zone) => {
+        const original = originalZonesMap.get(zone.id) || {};
+        return {
+          ...(original.type && { type: original.type }),
+          ...(original.name && { name: original.name }),
+          id: zone.id,
+          levels: zone.levels.map((level) => ({
+            type: 'DesecratedLevel',
+            name: `desecratedzones_desecrated_zones_0_zones_${zone.id}_levels_${level.level_id}`,
+            level_id: level.level_id,
+            ...(level.waypoint_level_id !== undefined && {
+              waypoint_level_id: level.waypoint_level_id,
+            }),
+          })),
+        };
+      });
 
       // Write back to file with proper formatting
       writeFileSync(filePath, JSON.stringify(data, null, 4), 'utf-8');

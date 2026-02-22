@@ -40,7 +40,7 @@ export function initializeTerrorZoneHandlers(): void {
    * IPC handler for retrieving current terror zone configuration from database.
    * @returns Promise resolving to zone configuration (zone ID -> enabled state)
    */
-  ipcMain.handle('terrorZone:getConfig', async (): Promise<Record<number, boolean>> => {
+  ipcMain.handle('terrorZone:getConfig', async (): Promise<Record<string, boolean>> => {
     try {
       const settings = grailDatabase.getAllSettings();
       return settings.terrorZoneConfig || {};
@@ -61,7 +61,7 @@ export function initializeTerrorZoneHandlers(): void {
     'terrorZone:updateConfig',
     async (
       _,
-      config: Record<number, boolean>,
+      config: Record<string, boolean>,
     ): Promise<{ success: boolean; requiresRestart: boolean }> => {
       try {
         const settings = grailDatabase.getAllSettings();
@@ -90,9 +90,8 @@ export function initializeTerrorZoneHandlers(): void {
         });
 
         // Convert config to Set of enabled zone IDs
-        const enabledZoneIds = new Set<number>();
-        for (const [zoneIdStr, enabled] of Object.entries(config)) {
-          const zoneId = Number.parseInt(zoneIdStr, 10);
+        const enabledZoneIds = new Set<string>();
+        for (const [zoneId, enabled] of Object.entries(config)) {
           if (enabled) {
             enabledZoneIds.add(zoneId);
           }

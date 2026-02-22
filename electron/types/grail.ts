@@ -553,7 +553,7 @@ export type Settings = {
   wizardCompleted?: boolean; // Whether the setup wizard has been completed
   wizardSkipped?: boolean; // Whether the user skipped the setup wizard
   // Terror zone configuration
-  terrorZoneConfig?: Record<number, boolean>; // Zone ID -> enabled state
+  terrorZoneConfig?: Record<string, boolean>; // Zone ID -> enabled state
   terrorZoneBackupCreated?: boolean; // Whether backup has been created
   // Run tracker settings
   runTrackerAutoStart?: boolean; // Whether to automatically start runs when save files are modified
@@ -581,7 +581,7 @@ export type DatabaseSetting = {
  * Interface representing a terror zone configuration.
  */
 export interface TerrorZone {
-  id: number;
+  id: string;
   name: string;
   levels: Array<{ level_id: number; waypoint_level_id?: number }>;
 }

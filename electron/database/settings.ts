@@ -1,3 +1,4 @@
+import { NUMERIC_TO_STRING_ZONE_ID } from '../data/terrorZoneNames';
 import type { Settings } from '../types/grail';
 import { GameMode, GameVersion } from '../types/grail';
 import { schema } from './drizzle';
@@ -48,6 +49,34 @@ function parseBooleanSetting(value: string | undefined): boolean {
 
 function parseEnumSetting<T>(value: string | undefined, defaultValue: T): T {
   return (value as T) || defaultValue;
+}
+
+/**
+ * Migrates terror zone configuration from old numeric IDs to new string IDs.
+ * @param config - The config object that may contain numeric or string keys
+ * @returns Migrated config with only string keys
+ */
+function migrateTerrorZoneConfig(
+  config: Record<string | number, boolean> | undefined,
+): Record<string, boolean> | undefined {
+  if (!config || Object.keys(config).length === 0) {
+    return undefined;
+  }
+
+  const migrated: Record<string, boolean> = {};
+  for (const [key, value] of Object.entries(config)) {
+    const numericKey = Number(key);
+    // Check if the key is a numeric string and can be converted to a number
+    if (!Number.isNaN(numericKey) && NUMERIC_TO_STRING_ZONE_ID[numericKey]) {
+      // Migrate from numeric to string ID
+      migrated[NUMERIC_TO_STRING_ZONE_ID[numericKey]] = value;
+    } else {
+      // Already a string ID, keep as is
+      migrated[key] = value;
+    }
+  }
+
+  return migrated;
 }
 
 export function getAllSettings(ctx: DatabaseContext): Settings {
@@ -112,8 +141,10 @@ export function getAllSettings(ctx: DatabaseContext): Settings {
     // Wizard settings
     wizardCompleted: parseBooleanSetting(settingsMap.wizardCompleted),
     wizardSkipped: parseBooleanSetting(settingsMap.wizardSkipped),
-    // Terror zone configuration
-    terrorZoneConfig: parseJSONSetting<Record<number, boolean>>(settingsMap.terrorZoneConfig),
+    // Terror zone configuration (with migration from numeric to string IDs)
+    terrorZoneConfig: migrateTerrorZoneConfig(
+      parseJSONSetting<Record<string | number, boolean>>(settingsMap.terrorZoneConfig),
+    ),
     terrorZoneBackupCreated: parseBooleanSetting(settingsMap.terrorZoneBackupCreated),
     // Run tracker settings
     runTrackerAutoStart: parseBooleanSetting(settingsMap.runTrackerAutoStart),
