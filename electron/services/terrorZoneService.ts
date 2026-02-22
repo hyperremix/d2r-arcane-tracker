@@ -1,7 +1,7 @@
 import { copyFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { app } from 'electron';
-import { TERROR_ZONE_NAMES } from '../data/terrorZoneNames';
+import { NUMERIC_TO_STRING_ZONE_ID, TERROR_ZONE_NAMES } from '../data/terrorZoneNames';
 import { stripJsonComments } from '../lib/jsonUtils';
 import type { TerrorZone } from '../types/grail';
 
@@ -99,22 +99,41 @@ export class TerrorZoneService {
         (zone: {
           type?: string;
           name?: string;
-          id: string;
+          id: string | number;
           levels?: Array<{
             type?: string;
             name?: string;
             level_id: number;
             waypoint_level_id?: number;
           }>;
-        }) => ({
-          id: zone.id,
-          name: TERROR_ZONE_NAMES[zone.id] || `Zone ${zone.id}`,
-          levels:
-            zone.levels?.map((level) => ({
-              level_id: level.level_id,
-              waypoint_level_id: level.waypoint_level_id,
-            })) || [],
-        }),
+        }) => {
+          // Convert numeric IDs to string IDs if needed
+          let zoneId: string;
+          let zoneName: string;
+
+          if (typeof zone.id === 'number') {
+            // Numeric ID - convert to string ID first, then get name
+            const stringId = NUMERIC_TO_STRING_ZONE_ID[zone.id];
+            zoneId = stringId || String(zone.id);
+            zoneName = stringId
+              ? TERROR_ZONE_NAMES[stringId] || `Zone ${zone.id}`
+              : `Zone ${zone.id}`;
+          } else {
+            // String ID - use directly
+            zoneId = zone.id;
+            zoneName = TERROR_ZONE_NAMES[zone.id] || `Zone ${zone.id}`;
+          }
+
+          return {
+            id: zoneId,
+            name: zoneName,
+            levels:
+              zone.levels?.map((level) => ({
+                level_id: level.level_id,
+                waypoint_level_id: level.waypoint_level_id,
+              })) || [],
+          };
+        },
       );
     } catch (error) {
       log.error('readZonesFromFile', error);
