@@ -1,7 +1,7 @@
 import type { Item } from 'electron/types/grail';
 import { useEffect, useRef, useState } from 'react';
 import { useGrailStore } from '@/stores/grailStore';
-import placeholderUrl from '/images/placeholder-item.png';
+import placeholderUrl from '/images/placeholder-item.svg';
 
 // In-memory cache to prevent re-fetching icons across component instances
 const iconCache = new Map<string, string>();

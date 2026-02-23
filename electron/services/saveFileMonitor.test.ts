@@ -1086,7 +1086,7 @@ describe('When SaveFileMonitor is used', () => {
   });
 
   describe('If spatial inventory parsing is executed', () => {
-    it('Then createParsedInventoryItem maps spatial metadata and uses grail image filename over parser inv_file', () => {
+    it('Then createParsedInventoryItem maps spatial metadata and prefers parser inv_file over canonical grail filename', () => {
       // Arrange
       vi.mocked(getGrailItemId).mockReturnValue('harlequincrest');
       const item = {
@@ -1122,11 +1122,11 @@ describe('When SaveFileMonitor is used', () => {
       expect(parsed.gridWidth).toBe(2);
       expect(parsed.gridHeight).toBe(3);
       expect(parsed.equippedSlotId).toBe(4);
-      expect(parsed.iconFileName).toBe('cap_hat.png');
+      expect(parsed.iconFileName).toBe('invhamm.png');
       expect(parsed.isSocketedItem).toBe(true);
     });
 
-    it('Then code-based lookup resolves canonical grail image filename when grail id is missing', () => {
+    it('Then parser inv_file is preferred over canonical code-based icon when parser icon exists', () => {
       // Arrange
       vi.mocked(getGrailItemId).mockReturnValue(null);
       const item = {
@@ -1147,7 +1147,7 @@ describe('When SaveFileMonitor is used', () => {
       });
 
       // Assert
-      expect(parsed.iconFileName).toBe('cap_hat.png');
+      expect(parsed.iconFileName).toBe('invhamm.png');
     });
 
     it('Then location_id 2 maps to unknown belt coordinates in a 4x4 belt board space', () => {
@@ -1263,14 +1263,13 @@ describe('When SaveFileMonitor is used', () => {
       expect(outOfBoundsParsed.stashTab).toBeUndefined();
     });
 
-    it('Then unknown items derive a snake_case filename fallback from type_name', () => {
+    it('Then unknown items derive a snake_case filename fallback from type_name when parser icon is absent', () => {
       // Arrange
       vi.mocked(getGrailItemId).mockReturnValue(null);
       const item = {
         type: 'misc',
         quality: 1,
         type_name: 'Grand Charm',
-        inv_file: 'invgcm',
       } as any;
 
       // Act

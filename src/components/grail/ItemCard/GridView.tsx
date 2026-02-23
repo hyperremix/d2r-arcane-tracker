@@ -6,7 +6,7 @@ import { useItemIcon } from '@/hooks/useItemIcon';
 import { translations } from '@/i18n/translations';
 import { cn } from '@/lib/utils';
 import { useGrailStore } from '@/stores/grailStore';
-import placeholderUrl from '/images/placeholder-item.png';
+import placeholderUrl from '/images/placeholder-item.svg';
 import { RuneImages } from '../RuneImages';
 import { ItemTypeIcon } from '../StatusIcons';
 import { DiscoveryAttribution, DiscoveryInfo, StatusIndicators, VersionCounts } from './indicators';

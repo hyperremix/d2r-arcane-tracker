@@ -49,7 +49,7 @@ describe('When useSpriteIcon is used', () => {
       // Assert
       expect(result.current.iconsEnabled).toBe(false);
       expect(result.current.isLoading).toBe(false);
-      expect(result.current.iconUrl).toContain('placeholder-item.png');
+      expect(result.current.iconUrl).toMatch(/placeholder-item\.svg|data:image\/svg\+xml/);
       expect(getByFilenameMock).not.toHaveBeenCalled();
     });
   });
@@ -138,7 +138,7 @@ describe('When useSpriteIcon is used', () => {
       await waitFor(() => {
         expect(result.current.isLoading).toBe(false);
       });
-      expect(result.current.iconUrl).toContain('placeholder-item.png');
+      expect(result.current.iconUrl).toMatch(/placeholder-item\.svg|data:image\/svg\+xml/);
     });
   });
 

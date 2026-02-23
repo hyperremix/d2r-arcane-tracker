@@ -1,6 +1,5 @@
 import {
   AlertTriangle,
-  Archive,
   BarChart3,
   Calculator,
   ChevronLeft,
@@ -67,7 +66,6 @@ function useRouteStates(pathname: string) {
     isRunsActive: pathname === '/runs',
     isRunewordsActive: pathname === '/runewords',
     isInventoryBrowserActive: pathname === '/inventory-browser',
-    isVaultActive: pathname === '/vault',
     isTerrorZonesActive: pathname === '/terror-zones',
     isSettingsActive: pathname === '/settings',
   };
@@ -221,13 +219,6 @@ export function TitleBar() {
           title={translations.titleBar.inventoryBrowser}
           icon={PackageSearch}
           isActive={routeStates.isInventoryBrowserActive}
-          onClick={navigate}
-        />
-        <NavigationButton
-          to="/vault"
-          title={translations.titleBar.itemVault}
-          icon={Archive}
-          isActive={routeStates.isVaultActive}
           onClick={navigate}
         />
         <NavigationButton

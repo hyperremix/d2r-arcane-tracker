@@ -16,7 +16,7 @@ import { useProgressLookup } from '@/hooks/useProgressLookup';
 import { translations } from '@/i18n/translations';
 import { cn } from '@/lib/utils';
 import { useGrailStore } from '@/stores/grailStore';
-import placeholderUrl from '/images/placeholder-item.png';
+import placeholderUrl from '/images/placeholder-item.svg';
 import { RuneImages } from '../RuneImages';
 import { CharacterProgressTable } from './CharacterProgressTable';
 import { ItemInfoSection } from './ItemInfoSection';

@@ -10,7 +10,7 @@ vi.mock('@/stores/grailStore');
 vi.mock('@/hooks/useItemIcon', () => ({
   useItemIcon: () => ({ iconUrl: '/mock-icon.png', isLoading: false, error: null }),
 }));
-vi.mock('/images/placeholder-item.png', () => ({ default: '/mock-placeholder.png' }));
+vi.mock('/images/placeholder-item.svg', () => ({ default: '/mock-placeholder.png' }));
 vi.mock('./RuneImages', () => ({
   RuneImages: ({ runeIds }: { runeIds: string[] }) => (
     <div data-testid="rune-images">{runeIds.join(',')}</div>

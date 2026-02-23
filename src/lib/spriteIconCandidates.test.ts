@@ -109,6 +109,67 @@ describe('When sprite icon candidates are generated', () => {
       // Assert
       expect(candidates).toContain('invwhm');
     });
+
+    it('Then parser inv_file candidates are prioritized before item-level iconFileName', () => {
+      // Arrange
+      const lookup = createSpriteIconLookupIndex(grailItems);
+
+      // Act
+      const candidates = createSpatialIconCandidates(
+        {
+          iconFileName: 'harlequin_crest.png',
+          grailItemId: undefined,
+          itemCode: 'uap',
+          itemName: 'Shako',
+          rawItemJson: JSON.stringify({ inv_file: 'invhamm' }),
+        },
+        lookup,
+      );
+
+      // Assert
+      expect(candidates[0]).toBe('invhamm');
+    });
+
+    it('Then it keeps raw string and normalized .png candidates', () => {
+      // Arrange
+      const lookup = createSpriteIconLookupIndex(grailItems);
+
+      // Act
+      const candidates = createSpatialIconCandidates(
+        {
+          iconFileName: undefined,
+          grailItemId: undefined,
+          itemCode: undefined,
+          itemName: 'Any Item',
+          rawItemJson: JSON.stringify({ inv_file: 'INVHAMM.SPRITE' }),
+        },
+        lookup,
+      );
+
+      // Assert
+      expect(candidates).toContain('INVHAMM.SPRITE');
+      expect(candidates).toContain('invhamm.png');
+    });
+
+    it('Then numeric inv_file values are normalized to .png', () => {
+      // Arrange
+      const lookup = createSpriteIconLookupIndex(grailItems);
+
+      // Act
+      const candidates = createSpatialIconCandidates(
+        {
+          iconFileName: undefined,
+          grailItemId: undefined,
+          itemCode: undefined,
+          itemName: 'Any Item',
+          rawItemJson: JSON.stringify({ inv_file: 123 }),
+        },
+        lookup,
+      );
+
+      // Assert
+      expect(candidates).toContain('123.png');
+    });
   });
 
   describe('If name-based image fallback is required', () => {

@@ -878,7 +878,7 @@ class SaveFileMonitor {
     const spatialMetadata = resolveParsedItemSpatialMetadata(
       resolvedSpatialLocation,
       isSocketedItem,
-      resolvedIconFileName,
+      legacyParserIconFileName ?? resolvedIconFileName,
     );
 
     const parsed: ParsedInventoryItem = {

@@ -45,6 +45,46 @@ function normalizeCodeKey(value: string): string {
   return value.trim().toLowerCase();
 }
 
+function basename(input: string): string {
+  const segments = input.split(/[\\/]/);
+  return segments[segments.length - 1] ?? input;
+}
+
+function stripImageExtension(input: string): string {
+  return input.replace(/\.(png|sprite|dc6|dds|jpg|jpeg|webp)$/i, '');
+}
+
+function toParserInvFilePng(value: unknown): string | undefined {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return `${value}.png`;
+  }
+
+  if (typeof value !== 'string') {
+    return undefined;
+  }
+
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return undefined;
+  }
+
+  const base = basename(trimmed);
+  const withoutExtension = stripImageExtension(base).trim().toLowerCase();
+  if (!withoutExtension) {
+    return undefined;
+  }
+
+  return `${withoutExtension}.png`;
+}
+
+function addParserInvFileCandidates(candidates: Set<string>, value: unknown): void {
+  if (typeof value === 'string') {
+    addCandidate(candidates, value);
+  }
+
+  addCandidate(candidates, toParserInvFilePng(value));
+}
+
 function toSnakeCaseFilename(value: string): string | undefined {
   const slug = value
     .trim()
@@ -165,6 +205,9 @@ export function createSpatialIconCandidates(
   lookup: SpriteIconLookupIndex,
 ): string[] {
   const candidates = new Set<string>();
+  const rawItem = parseRawItem(item.rawItemJson);
+  addParserInvFileCandidates(candidates, rawItem?.inv_file);
+
   const hasItemLevelUniqueSignal =
     Boolean(item.grailItemId) || hasLookupNameMatch(lookup, item.itemName);
 
@@ -178,7 +221,6 @@ export function createSpatialIconCandidates(
   addLookupCandidate(candidates, lookup.byName, item.itemName);
   addNameDerivedCandidates(candidates, item.itemName);
 
-  const rawItem = parseRawItem(item.rawItemJson);
   if (!rawItem) {
     return [...candidates];
   }
@@ -189,7 +231,6 @@ export function createSpatialIconCandidates(
     hasLookupNameMatch(lookup, rawItem.set_name) ||
     hasLookupNameMatch(lookup, rawItem.name);
 
-  addCandidate(candidates, rawItem.inv_file);
   addCodeLookupCandidate(candidates, lookup, rawItem.code, hasRawLevelUniqueSignal);
   addLookupCandidate(candidates, lookup.byName, rawItem.unique_name);
   addLookupCandidate(candidates, lookup.byName, rawItem.set_name);

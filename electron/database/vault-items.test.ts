@@ -5,6 +5,7 @@ import { createSchema } from './schema';
 import type { DatabaseContext } from './types';
 import { addVaultCategory, setVaultItemCategories } from './vault-categories';
 import {
+  addVaultItem,
   getVaultItemById,
   reconcileVaultItemsForScan,
   searchVaultItems,
@@ -59,6 +60,38 @@ describe('When vault item database operations are executed', () => {
       // Assert
       expect(second.id).toBe(first.id);
       expect(second.itemName).toBe('Harlequin Crest Updated');
+      expect(second.rawItemJson).toBe('{"roll":2}');
+    });
+  });
+
+  describe('If the same item is manually vaulted multiple times', () => {
+    it('Then add operation behaves idempotently and updates the existing record', () => {
+      // Arrange
+      const fingerprint = 'fp-manual-repeat';
+
+      // Act
+      const first = addVaultItem(ctx, {
+        fingerprint,
+        itemName: 'War Traveler',
+        quality: 'unique',
+        ethereal: false,
+        rawItemJson: '{"roll":1}',
+        sourceFileType: 'd2s',
+        locationContext: 'stash',
+      });
+      const second = addVaultItem(ctx, {
+        fingerprint,
+        itemName: 'War Traveler (Updated)',
+        quality: 'unique',
+        ethereal: false,
+        rawItemJson: '{"roll":2}',
+        sourceFileType: 'd2s',
+        locationContext: 'stash',
+      });
+
+      // Assert
+      expect(second.id).toBe(first.id);
+      expect(second.itemName).toBe('War Traveler (Updated)');
       expect(second.rawItemJson).toBe('{"roll":2}');
     });
   });
@@ -136,6 +169,69 @@ describe('When vault item database operations are executed', () => {
       expect(filtered.total).toBe(1);
       expect(filtered.items[0]?.fingerprint).toBe('fp-tagged');
       expect(filtered.items[0]?.categoryIds).toEqual(['cat-1']);
+    });
+  });
+
+  describe('If character filter is provided as character name', () => {
+    it('Then vault search returns items whose source character name matches', () => {
+      // Arrange
+      const namedItem = upsertVaultItemByFingerprint(ctx, {
+        fingerprint: 'fp-character-name-match',
+        itemName: "Skullder's Ire",
+        quality: 'unique',
+        ethereal: false,
+        rawItemJson: '{}',
+        sourceCharacterName: 'SorcName',
+        sourceFileType: 'd2s',
+        locationContext: 'inventory',
+      });
+
+      // Act
+      const filtered = searchVaultItems(ctx, {
+        characterId: 'SorcName',
+        page: 1,
+        pageSize: 20,
+      });
+
+      // Assert
+      expect(filtered.total).toBe(1);
+      expect(filtered.items[0]?.id).toBe(namedItem.id);
+    });
+  });
+
+  describe('If search returns rows loaded from raw SQL', () => {
+    it('Then mapped vault items keep icon and raw metadata fields', () => {
+      // Arrange
+      upsertVaultItemByFingerprint(ctx, {
+        fingerprint: 'fp-search-metadata',
+        itemName: 'Flail',
+        itemCode: 'fla',
+        quality: 'unique',
+        ethereal: false,
+        socketCount: 0,
+        rawItemJson: '{"inv_file":"invfla","name":"Flail"}',
+        sourceCharacterName: 'Sorc',
+        sourceFileType: 'd2s',
+        locationContext: 'stash',
+        iconFileName: 'flail.png',
+        isSocketedItem: false,
+        isPresentInLatestScan: true,
+      });
+
+      // Act
+      const filtered = searchVaultItems(ctx, {
+        text: 'flail',
+        page: 1,
+        pageSize: 20,
+      });
+
+      // Assert
+      expect(filtered.total).toBe(1);
+      expect(filtered.items[0]?.itemName).toBe('Flail');
+      expect(filtered.items[0]?.iconFileName).toBe('flail.png');
+      expect(filtered.items[0]?.rawItemJson).toBe('{"inv_file":"invfla","name":"Flail"}');
+      expect(filtered.items[0]?.sourceFileType).toBe('d2s');
+      expect(filtered.items[0]?.isPresentInLatestScan).toBe(true);
     });
   });
 
