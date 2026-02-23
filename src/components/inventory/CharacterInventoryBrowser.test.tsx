@@ -356,10 +356,27 @@ describe('When CharacterInventoryBrowser is rendered', () => {
       });
       expect(addItemMock.mock.calls[0]?.[0]?.fingerprint).toBe('fp-1');
     });
+
+    it('Then it passes sourceFilePath from the inventory item to the vault addItem API', async () => {
+      // Arrange
+      render(<CharacterInventoryBrowser />);
+      await waitFor(() => {
+        expect(screen.getByText('Shako')).toBeInTheDocument();
+      });
+
+      // Act
+      fireEvent.click(screen.getByRole('button', { name: 'Vault' }));
+
+      // Assert
+      await waitFor(() => {
+        expect(addItemMock).toHaveBeenCalledTimes(1);
+      });
+      expect(addItemMock.mock.calls[0]?.[0]?.sourceFilePath).toBe('/tmp/sorc.d2s');
+    });
   });
 
   describe('If vault items are returned in the search response', () => {
-    it('Then it renders vault item tiles above the dropzone', async () => {
+    it('Then it renders vault item tiles in the Vaulted Items section', async () => {
       // Arrange
       searchAllMock.mockResolvedValue({
         inventory: { snapshots: [], totalSnapshots: 0, totalItems: 0 },
@@ -377,7 +394,7 @@ describe('When CharacterInventoryBrowser is rendered', () => {
               sourceFileType: 'd2s',
               locationContext: 'stash',
               iconFileName: 'flail.png',
-              isPresentInLatestScan: true,
+              vaultedAt: new Date('2024-01-01T00:00:00.000Z'),
               created: new Date('2024-01-01T00:00:00.000Z'),
               lastUpdated: new Date('2024-01-01T00:00:00.000Z'),
             },
@@ -395,7 +412,6 @@ describe('When CharacterInventoryBrowser is rendered', () => {
       await waitFor(() => {
         expect(screen.getByText('Vaulted Items')).toBeInTheDocument();
       });
-      expect(screen.getByRole('img', { name: 'Inventory item Flail' })).toBeInTheDocument();
       await waitFor(() => {
         expect(iconByFilenameMock).toHaveBeenCalledWith('flail.png');
       });
@@ -426,7 +442,7 @@ describe('When CharacterInventoryBrowser is rendered', () => {
             sourceFileType: 'd2s',
             locationContext: 'stash',
             iconFileName: 'skullder.png',
-            isPresentInLatestScan: true,
+            vaultedAt: new Date('2024-01-01T00:00:00.000Z'),
             created: new Date('2024-01-01T00:00:00.000Z'),
             lastUpdated: new Date('2024-01-02T00:00:00.000Z'),
           },
@@ -448,10 +464,12 @@ describe('When CharacterInventoryBrowser is rendered', () => {
           }),
         );
       });
-      expect(screen.getByRole('img', { name: 'Inventory item Skullder' })).toBeInTheDocument();
+      await waitFor(() => {
+        expect(screen.getByText('Vaulted Items')).toBeInTheDocument();
+      });
     });
 
-    it('Then page-2 vault matches still drive inventory tile present status', async () => {
+    it('Then page-2 vault matches cause the inventory tile to be hidden', async () => {
       // Arrange
       searchAllMock.mockResolvedValueOnce({
         inventory: {
@@ -527,7 +545,7 @@ describe('When CharacterInventoryBrowser is rendered', () => {
             sourceFileType: 'd2s',
             locationContext: 'inventory',
             iconFileName: 'page-two.png',
-            isPresentInLatestScan: true,
+            vaultedAt: new Date('2024-01-01T00:00:00.000Z'),
             created: new Date('2024-01-01T00:00:00.000Z'),
             lastUpdated: new Date('2024-01-03T00:00:00.000Z'),
           },
@@ -548,132 +566,70 @@ describe('When CharacterInventoryBrowser is rendered', () => {
           }),
         );
       });
-      const tile = screen
-        .getAllByLabelText('Inventory item Page Two Match')
-        .find((element) => element.tagName.toLowerCase() === 'button');
       await waitFor(() => {
-        expect(tile?.className).toContain('border-emerald-500/60');
+        expect(screen.queryByLabelText('Inventory item Page Two Match')).not.toBeInTheDocument();
       });
     });
   });
 
-  describe('If vaulting succeeds but backend returns a non-present state', () => {
-    it('Then pending optimistic state is cleared and backend truth is shown', async () => {
+  describe('If vaulting succeeds and the vault search confirms the item is vaulted', () => {
+    it('Then the item is removed from the inventory grid', async () => {
       // Arrange
+      const inventoryItem = {
+        fingerprint: 'fp-success',
+        fingerprintInputs: {
+          sourceFileType: 'd2s',
+          characterName: 'Sorc',
+          locationContext: 'inventory',
+          quality: 'unique',
+          ethereal: false,
+          socketCount: 0,
+          gridX: 1,
+          gridY: 1,
+          gridWidth: 2,
+          gridHeight: 2,
+          isSocketedItem: false,
+          itemName: 'Success Item',
+        },
+        characterName: 'Sorc',
+        characterId: 'char-1',
+        sourceFileType: 'd2s',
+        sourceFilePath: '/tmp/sorc.d2s',
+        locationContext: 'inventory',
+        type: 'unique',
+        gridX: 1,
+        gridY: 1,
+        gridWidth: 2,
+        gridHeight: 2,
+        isSocketedItem: false,
+        itemName: 'Success Item',
+        quality: 'unique',
+        ethereal: false,
+        socketCount: 0,
+        iconFileName: 'success-item.png',
+        rawItemJson: '{}',
+        rawParsedItem: {},
+        seenAt: new Date('2024-01-01T00:00:00.000Z'),
+      };
+      const snapshot = {
+        snapshotId: 'snap-success-1',
+        characterName: 'Sorc',
+        characterId: 'char-1',
+        sourceFileType: 'd2s',
+        sourceFilePath: '/tmp/sorc.d2s',
+        capturedAt: new Date('2024-01-01T00:00:00.000Z'),
+        items: [inventoryItem],
+      };
+      // First response: item in inventory, not yet vaulted
+      // Second response (after vault): item still in inventory snapshots (SaveFileMonitor
+      // hasn't rescanned yet), but now confirmed in vault.items
       searchAllMock
         .mockResolvedValueOnce({
-          inventory: {
-            snapshots: [
-              {
-                snapshotId: 'snap-success-1',
-                characterName: 'Sorc',
-                characterId: 'char-1',
-                sourceFileType: 'd2s',
-                sourceFilePath: '/tmp/sorc.d2s',
-                capturedAt: new Date('2024-01-01T00:00:00.000Z'),
-                items: [
-                  {
-                    fingerprint: 'fp-success',
-                    fingerprintInputs: {
-                      sourceFileType: 'd2s',
-                      characterName: 'Sorc',
-                      locationContext: 'inventory',
-                      quality: 'unique',
-                      ethereal: false,
-                      socketCount: 0,
-                      gridX: 1,
-                      gridY: 1,
-                      gridWidth: 2,
-                      gridHeight: 2,
-                      isSocketedItem: false,
-                      itemName: 'Success Item',
-                    },
-                    characterName: 'Sorc',
-                    characterId: 'char-1',
-                    sourceFileType: 'd2s',
-                    sourceFilePath: '/tmp/sorc.d2s',
-                    locationContext: 'inventory',
-                    type: 'unique',
-                    gridX: 1,
-                    gridY: 1,
-                    gridWidth: 2,
-                    gridHeight: 2,
-                    isSocketedItem: false,
-                    itemName: 'Success Item',
-                    quality: 'unique',
-                    ethereal: false,
-                    socketCount: 0,
-                    iconFileName: 'success-item.png',
-                    rawItemJson: '{}',
-                    rawParsedItem: {},
-                    seenAt: new Date('2024-01-01T00:00:00.000Z'),
-                  },
-                ],
-              },
-            ],
-            totalSnapshots: 1,
-            totalItems: 1,
-          },
-          vault: {
-            items: [],
-            total: 0,
-            page: 1,
-            pageSize: 200,
-          },
+          inventory: { snapshots: [snapshot], totalSnapshots: 1, totalItems: 1 },
+          vault: { items: [], total: 0, page: 1, pageSize: 200 },
         })
         .mockResolvedValueOnce({
-          inventory: {
-            snapshots: [
-              {
-                snapshotId: 'snap-success-2',
-                characterName: 'Sorc',
-                characterId: 'char-1',
-                sourceFileType: 'd2s',
-                sourceFilePath: '/tmp/sorc.d2s',
-                capturedAt: new Date('2024-01-01T00:00:00.000Z'),
-                items: [
-                  {
-                    fingerprint: 'fp-success',
-                    fingerprintInputs: {
-                      sourceFileType: 'd2s',
-                      characterName: 'Sorc',
-                      locationContext: 'inventory',
-                      quality: 'unique',
-                      ethereal: false,
-                      socketCount: 0,
-                      gridX: 1,
-                      gridY: 1,
-                      gridWidth: 2,
-                      gridHeight: 2,
-                      isSocketedItem: false,
-                      itemName: 'Success Item',
-                    },
-                    characterName: 'Sorc',
-                    characterId: 'char-1',
-                    sourceFileType: 'd2s',
-                    sourceFilePath: '/tmp/sorc.d2s',
-                    locationContext: 'inventory',
-                    type: 'unique',
-                    gridX: 1,
-                    gridY: 1,
-                    gridWidth: 2,
-                    gridHeight: 2,
-                    isSocketedItem: false,
-                    itemName: 'Success Item',
-                    quality: 'unique',
-                    ethereal: false,
-                    socketCount: 0,
-                    iconFileName: 'success-item.png',
-                    rawItemJson: '{}',
-                    rawParsedItem: {},
-                    seenAt: new Date('2024-01-01T00:00:00.000Z'),
-                  },
-                ],
-              },
-            ],
-            totalSnapshots: 1,
-            totalItems: 1,
-          },
+          inventory: { snapshots: [snapshot], totalSnapshots: 1, totalItems: 1 },
           vault: {
             items: [
               {
@@ -688,7 +644,7 @@ describe('When CharacterInventoryBrowser is rendered', () => {
                 sourceFileType: 'd2s',
                 locationContext: 'inventory',
                 iconFileName: 'success-item.png',
-                isPresentInLatestScan: false,
+                vaultedAt: new Date('2024-01-03T00:00:00.000Z'),
                 created: new Date('2024-01-01T00:00:00.000Z'),
                 lastUpdated: new Date('2024-01-03T00:00:00.000Z'),
               },
@@ -698,10 +654,7 @@ describe('When CharacterInventoryBrowser is rendered', () => {
             pageSize: 200,
           },
         });
-      addItemMock.mockResolvedValueOnce({
-        id: 'vault-success',
-        fingerprint: 'fp-success',
-      });
+      addItemMock.mockResolvedValueOnce({ id: 'vault-success', fingerprint: 'fp-success' });
 
       render(<CharacterInventoryBrowser />);
       await waitFor(() => {
@@ -713,18 +666,93 @@ describe('When CharacterInventoryBrowser is rendered', () => {
 
       // Assert
       await waitFor(() => {
-        expect(addItemMock).toHaveBeenCalledTimes(1);
-      });
-      await waitFor(() => {
         expect(searchAllMock).toHaveBeenCalledTimes(2);
       });
-      const tile = screen
-        .getAllByLabelText('Inventory item Success Item')
-        .find((element) => element.tagName.toLowerCase() === 'button');
       await waitFor(() => {
-        expect(tile?.className).toContain('border-amber-500/60');
+        expect(screen.queryByLabelText('Inventory item Success Item')).not.toBeInTheDocument();
       });
-      expect(tile?.className).not.toContain('border-emerald-500/60');
+    });
+
+    it('Then the item disappears from the inventory grid immediately while the vault call is in flight', async () => {
+      // Arrange
+      const inventoryItem = {
+        fingerprint: 'fp-optimistic',
+        fingerprintInputs: {
+          sourceFileType: 'd2s',
+          characterName: 'Sorc',
+          locationContext: 'inventory',
+          quality: 'unique',
+          ethereal: false,
+          socketCount: 0,
+          gridX: 1,
+          gridY: 1,
+          gridWidth: 2,
+          gridHeight: 2,
+          isSocketedItem: false,
+          itemName: 'Optimistic Item',
+        },
+        characterName: 'Sorc',
+        characterId: 'char-1',
+        sourceFileType: 'd2s',
+        sourceFilePath: '/tmp/sorc.d2s',
+        locationContext: 'inventory',
+        type: 'unique',
+        gridX: 1,
+        gridY: 1,
+        gridWidth: 2,
+        gridHeight: 2,
+        isSocketedItem: false,
+        itemName: 'Optimistic Item',
+        quality: 'unique',
+        ethereal: false,
+        socketCount: 0,
+        iconFileName: 'opt-item.png',
+        rawItemJson: '{}',
+        rawParsedItem: {},
+        seenAt: new Date('2024-01-01T00:00:00.000Z'),
+      };
+      searchAllMock.mockResolvedValue({
+        inventory: {
+          snapshots: [
+            {
+              snapshotId: 'snap-opt',
+              characterName: 'Sorc',
+              characterId: 'char-1',
+              sourceFileType: 'd2s',
+              sourceFilePath: '/tmp/sorc.d2s',
+              capturedAt: new Date('2024-01-01T00:00:00.000Z'),
+              items: [inventoryItem],
+            },
+          ],
+          totalSnapshots: 1,
+          totalItems: 1,
+        },
+        vault: { items: [], total: 0, page: 1, pageSize: 200 },
+      });
+
+      // Never resolves during this test — keeps the vault call in flight
+      let resolveVault!: () => void;
+      addItemMock.mockReturnValueOnce(
+        new Promise<void>((resolve) => {
+          resolveVault = resolve;
+        }),
+      );
+
+      render(<CharacterInventoryBrowser />);
+      await waitFor(() => {
+        expect(screen.getByText('Optimistic Item')).toBeInTheDocument();
+      });
+
+      // Act — click vault; the API call hangs (pending)
+      fireEvent.click(screen.getByRole('button', { name: 'Vault' }));
+
+      // Assert — item disappears immediately before the API responds
+      await waitFor(() => {
+        expect(screen.queryByLabelText('Inventory item Optimistic Item')).not.toBeInTheDocument();
+      });
+
+      // Cleanup — resolve so pending promises don't leak
+      resolveVault();
     });
   });
 

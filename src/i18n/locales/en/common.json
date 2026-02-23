@@ -447,9 +447,18 @@
     "runewordCalculator": "Runeword Calculator",
     "terrorZoneConfiguration": "Terror Zone Configuration",
     "inventoryBrowser": "Inventory Browser",
+    "vault": "Vault",
     "settings": "Settings",
     "goBack": "Go back",
     "goForward": "Go forward"
+  },
+  "vault": {
+    "title": "Vault",
+    "empty": "No vaulted items. Use the Inventory Browser to vault items.",
+    "unvaultAction": "Unvault",
+    "searchPlaceholder": "Search vaulted items...",
+    "vaultedCount": "{{count}} vaulted",
+    "loadError": "Failed to load vault items."
   },
   "inventoryBrowser": {
     "title": "Inventory Browser",
@@ -470,6 +479,7 @@
     "empty": "No inventory items match your filters.",
     "unplaced": "Unplaced",
     "tileAriaLabel": "Inventory item {{itemName}}",
+    "vaultedTileAriaLabel": "Vaulted item {{itemName}}",
     "tileSummary": "{{itemName}} \u00b7 {{quality}} \u00b7 {{location}} \u00b7 {{coordinates}}",
     "vaultStatus": "Vault Status",
     "vaultUntracked": "Untracked",

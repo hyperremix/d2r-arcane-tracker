@@ -1,5 +1,7 @@
+import type { types as d2sTypes } from '@dschu012/d2s';
 import { ipcMain } from 'electron';
 import { grailDatabase } from '../database/database';
+import { addItemToSaveFile, removeItemFromSaveFile } from '../services/saveFileEditor';
 import type { SaveFileMonitor } from '../services/saveFileMonitor';
 import type {
   CharacterInventorySnapshot,
@@ -11,6 +13,8 @@ import type {
   VaultItemFilter,
   VaultItemSearchResult,
   VaultItemUpsertInput,
+  VaultLocationContext,
+  VaultSourceFileType,
 } from '../types/grail';
 
 const MAX_SEARCH_TEXT_LENGTH = 120;
@@ -19,7 +23,8 @@ const MIN_PAGE = 1;
 const MIN_PAGE_SIZE = 1;
 
 const VALID_PRESENT_STATES = new Set(['all', 'present', 'missing']);
-const VALID_SORT_BY = new Set(['itemName', 'lastSeenAt', 'createdAt', 'updatedAt']);
+const VALID_VAULTED_STATES = new Set(['all', 'vaulted', 'unvaulted']);
+const VALID_SORT_BY = new Set(['itemName', 'lastSeenAt', 'createdAt', 'updatedAt', 'vaultedAt']);
 const VALID_SORT_ORDER = new Set(['asc', 'desc']);
 const VALID_SOURCE_FILE_TYPES = new Set(['d2s', 'sss', 'd2x', 'd2i']);
 const VALID_LOCATION_CONTEXTS = new Set([
@@ -65,6 +70,13 @@ function sanitizeFilter(filter?: VaultItemFilter): VaultItemFilter {
     assert(
       VALID_PRESENT_STATES.has(safeFilter.presentState),
       'presentState must be one of: all, present, missing',
+    );
+  }
+
+  if (safeFilter.vaultedState !== undefined) {
+    assert(
+      VALID_VAULTED_STATES.has(safeFilter.vaultedState),
+      'vaultedState must be one of: all, vaulted, unvaulted',
     );
   }
 
@@ -186,6 +198,14 @@ export function initializeVaultHandlers(
 ): void {
   ipcMain.handle('vault:addItem', async (_, item: VaultItemUpsertInput): Promise<VaultItem> => {
     validateVaultItemInput(item);
+
+    if (item.sourceFilePath && item.rawItemJson) {
+      const parsedItem = JSON.parse(item.rawItemJson) as { id?: number };
+      if (parsedItem.id !== undefined) {
+        await removeItemFromSaveFile(item.sourceFilePath, item.sourceFileType, parsedItem.id);
+      }
+    }
+
     return grailDatabase.addVaultItem(item);
   });
 
@@ -194,6 +214,45 @@ export function initializeVaultHandlers(
     grailDatabase.removeVaultItem(itemId);
     return { success: true };
   });
+
+  ipcMain.handle(
+    'vault:unvaultItem',
+    async (
+      _,
+      itemId: string,
+      targetOptions?: {
+        targetFilePath: string;
+        targetFileType: VaultSourceFileType;
+        targetLocationContext: VaultLocationContext;
+        targetStashTab?: number;
+        targetGridX: number;
+        targetGridY: number;
+      },
+    ): Promise<{ success: boolean }> => {
+      assert(typeof itemId === 'string' && itemId.length > 0, 'itemId is required');
+
+      const vaultItem = grailDatabase.getVaultItemById(itemId);
+      const filePath = targetOptions?.targetFilePath ?? vaultItem?.sourceFilePath;
+      const fileType = targetOptions?.targetFileType ?? vaultItem?.sourceFileType;
+      const locationContext = targetOptions?.targetLocationContext ?? vaultItem?.locationContext;
+      const stashTab = targetOptions?.targetStashTab ?? vaultItem?.stashTab;
+      if (filePath && vaultItem?.rawItemJson && fileType && locationContext) {
+        const parsedItem = JSON.parse(vaultItem.rawItemJson) as d2sTypes.IItem;
+        await addItemToSaveFile(
+          filePath,
+          fileType,
+          parsedItem,
+          locationContext,
+          stashTab,
+          targetOptions?.targetGridX,
+          targetOptions?.targetGridY,
+        );
+      }
+
+      grailDatabase.unvaultVaultItem(itemId);
+      return { success: true };
+    },
+  );
 
   ipcMain.handle(
     'vault:updateItemTags',

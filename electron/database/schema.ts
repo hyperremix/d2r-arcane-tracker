@@ -345,6 +345,7 @@ type VaultItemSpatialBackfillRow = {
 };
 
 const vaultItemSpatialColumns = [
+  { name: 'source_file_path', definition: 'TEXT' },
   { name: 'grid_x', definition: 'INTEGER' },
   { name: 'grid_y', definition: 'INTEGER' },
   { name: 'grid_width', definition: 'INTEGER' },

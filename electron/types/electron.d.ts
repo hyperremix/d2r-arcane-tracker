@@ -14,9 +14,11 @@ import type {
   VaultCategory,
   VaultCategoryCreateInput,
   VaultCategoryUpdateInput,
+  VaultLocationContext,
   VaultItem,
   VaultItemFilter,
   VaultItemSearchResult,
+  VaultSourceFileType,
   VaultItemUpsertInput,
   TerrorZone,
   UpdateInfo,
@@ -639,6 +641,17 @@ export interface ElectronAPI {
     updateCategory(categoryId: string, updates: VaultCategoryUpdateInput): Promise<{ success: boolean }>
     deleteCategory(categoryId: string): Promise<{ success: boolean }>
     listCategories(): Promise<VaultCategory[]>
+    unvaultItem(
+      itemId: string,
+      targetOptions?: {
+        targetFilePath: string
+        targetFileType: VaultSourceFileType
+        targetLocationContext: VaultLocationContext
+        targetStashTab?: number
+        targetGridX: number
+        targetGridY: number
+      },
+    ): Promise<{ success: boolean }>
   }
 
   /**

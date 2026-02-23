@@ -5,8 +5,9 @@ import type {
   VaultItemFilter,
   VaultItemUpsertInput,
   VaultLocationContext,
+  VaultSourceFileType,
 } from 'electron/types/grail';
-import { PackagePlus, Sparkles } from 'lucide-react';
+import { PackagePlus, Sparkles, X } from 'lucide-react';
 import { type DragEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { BoardSurface, getItemGridPlacement } from '@/components/inventory/boardPrimitives';
@@ -27,6 +28,8 @@ import {
   getGridWidth,
   getSortedStashTabs,
   groupSpatialItems,
+  hasGridDimensions,
+  hasGridPosition,
   PAPER_DOLL_SLOT_ORDER,
   resolvePaperDollSlotKey,
   type UnplacedReason,
@@ -69,11 +72,11 @@ type InventorySearchAllResponse = {
   };
 };
 
-type PresenceFilter = 'all' | 'present' | 'missing';
 type TypeFilter = 'all' | 'unique' | 'set' | 'runeword' | 'rune' | 'other';
 type EquipmentUnplacedReason = UnplacedReason | 'unknownEquippedSlot';
 
 const INVENTORY_DRAG_MIME = 'application/x-d2r-arcane-tracker-inventory-item';
+const VAULT_DRAG_MIME = 'application/x-d2r-arcane-tracker-vault-item';
 
 function getVaultItemLastUpdatedMs(item: VaultItem): number {
   const rawValue = item.lastUpdated as unknown;
@@ -160,7 +163,7 @@ function buildInventorySearchFilter(
     characterId: resolveCharacterFilter(characterId),
     locationContext: locationContext === 'all' ? undefined : locationContext,
     includeSocketed: false,
-    presentState: 'all',
+    vaultedState: 'vaulted',
     page: 1,
     pageSize: 200,
   };
@@ -185,6 +188,93 @@ async function loadInventorySearchResponse(
   const response = await window.electronAPI.inventory.searchAll(filter);
   const allVaultItems = await fetchAllVaultItemsForFilter(filter, response.vault);
   return withMergedVaultItems(response, allVaultItems);
+}
+
+interface VaultedItemTileProps {
+  item: VaultItem;
+  iconLookup: SpriteIconLookupIndex;
+  selected: boolean;
+  onSelect: (item: VaultItem) => void;
+  onDragStart?: (item: VaultItem) => void;
+  onDragEnd?: () => void;
+}
+
+function VaultedItemTile({
+  item,
+  iconLookup,
+  selected,
+  onSelect,
+  onDragStart,
+  onDragEnd,
+}: VaultedItemTileProps) {
+  const { t } = useTranslation();
+  const iconCandidates = useMemo(
+    () => createSpatialIconCandidates(item, iconLookup),
+    [iconLookup, item],
+  );
+  const { iconUrl } = useSpriteIcon(iconCandidates, { forceEnabled: true });
+  const gameTooltipModel = useMemo(
+    () =>
+      buildGameItemTooltipModel({
+        rawItemJson: item.rawItemJson,
+        fallbackName: item.itemName,
+        quality: item.quality,
+        type: item.type,
+        t,
+      }),
+    [item.itemName, item.quality, item.rawItemJson, item.type, t],
+  );
+
+  return (
+    <Tooltip>
+      <TooltipTrigger
+        render={
+          <button
+            type="button"
+            draggable={!!onDragStart}
+            aria-label={t(translations.inventoryBrowser.vaultedTileAriaLabel, {
+              itemName: item.itemName,
+            })}
+            className={cn(
+              'relative h-16 w-16 overflow-hidden rounded-[2px] border bg-card/75 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70',
+              selected ? 'border-primary ring-1 ring-primary/70' : 'border-emerald-500/60',
+            )}
+            onClick={() => onSelect(item)}
+            onDragStart={(event) => {
+              event.dataTransfer.effectAllowed = 'move';
+              event.dataTransfer.setData(VAULT_DRAG_MIME, item.id);
+              onDragStart?.(item);
+            }}
+            onDragEnd={onDragEnd}
+          />
+        }
+      >
+        <img
+          src={iconUrl}
+          alt={item.itemName}
+          draggable={false}
+          className="pointer-events-none h-full w-full object-contain"
+          loading="lazy"
+        />
+      </TooltipTrigger>
+      <TooltipContent className="max-w-md p-3 text-sm">
+        {gameTooltipModel ? (
+          <GameItemTooltipContent model={gameTooltipModel} />
+        ) : (
+          <div className="space-y-1.5">
+            <div className="font-medium">{item.itemName}</div>
+            <div>
+              <span className="text-muted-foreground">
+                {t(translations.inventoryBrowser.tooltip.qualityTypeLabel)}
+              </span>{' '}
+              {item.quality}
+              {item.type ? ` / ${item.type}` : ''}
+            </div>
+          </div>
+        )}
+      </TooltipContent>
+    </Tooltip>
+  );
 }
 
 interface InventoryTileProps {
@@ -212,6 +302,20 @@ interface InventoryGridSectionProps {
   onSelect: (item: ParsedInventoryItem) => void;
   onDragStart: (event: DragEvent<HTMLButtonElement>, item: ParsedInventoryItem) => void;
   onDragEnd: () => void;
+  snapshotSourceFilePath?: string;
+  snapshotSourceFileType?: VaultSourceFileType;
+  sectionLocationContext?: VaultLocationContext;
+  sectionStashTab?: number;
+  draggingVaultItem?: VaultItem | null;
+  onDropVaultItem?: (
+    vaultItemId: string,
+    targetFilePath: string,
+    targetFileType: VaultSourceFileType,
+    targetLocationContext: VaultLocationContext,
+    targetStashTab: number | undefined,
+    targetGridX: number,
+    targetGridY: number,
+  ) => Promise<void>;
 }
 
 interface EquipmentSectionProps {
@@ -273,21 +377,6 @@ function getTypeValue(type?: string): TypeFilter {
   return 'other';
 }
 
-function matchesPresenceFilter(
-  presence: PresenceFilter,
-  isVaultPresent: boolean | undefined,
-): boolean {
-  if (presence === 'present') {
-    return isVaultPresent ?? true;
-  }
-
-  if (presence === 'missing') {
-    return isVaultPresent === false;
-  }
-
-  return true;
-}
-
 function toVaultUpsertInput(item: ParsedInventoryItem): VaultItemUpsertInput {
   return {
     fingerprint: item.fingerprint,
@@ -301,6 +390,7 @@ function toVaultUpsertInput(item: ParsedInventoryItem): VaultItemUpsertInput {
     sourceCharacterId: item.characterId,
     sourceCharacterName: item.characterName,
     sourceFileType: item.sourceFileType,
+    sourceFilePath: item.sourceFilePath,
     locationContext: item.locationContext,
     stashTab: item.stashTab,
     gridX: item.gridX,
@@ -316,14 +406,36 @@ function toVaultUpsertInput(item: ParsedInventoryItem): VaultItemUpsertInput {
   };
 }
 
+function isCurrentlyVaulted(vaultItem: VaultItem): boolean {
+  if (!vaultItem.vaultedAt) {
+    return false;
+  }
+
+  const vaultedAtMs =
+    vaultItem.vaultedAt instanceof Date
+      ? vaultItem.vaultedAt.getTime()
+      : Date.parse(vaultItem.vaultedAt as unknown as string);
+
+  if (!vaultItem.unvaultedAt) {
+    return true;
+  }
+
+  const unvaultedAtMs =
+    vaultItem.unvaultedAt instanceof Date
+      ? vaultItem.unvaultedAt.getTime()
+      : Date.parse(vaultItem.unvaultedAt as unknown as string);
+
+  return vaultedAtMs > unvaultedAtMs;
+}
+
 function getEffectiveVaultPresent(
   item: ParsedInventoryItem,
   vaultItemsByFingerprint: Map<string, VaultItem>,
   pendingVaultFingerprints: Set<string>,
 ): boolean | undefined {
-  const persistedValue = vaultItemsByFingerprint.get(item.fingerprint)?.isPresentInLatestScan;
-  if (persistedValue !== undefined) {
-    return persistedValue;
+  const vaultItem = vaultItemsByFingerprint.get(item.fingerprint);
+  if (vaultItem !== undefined) {
+    return isCurrentlyVaulted(vaultItem);
   }
 
   return pendingVaultFingerprints.has(item.fingerprint) ? true : undefined;
@@ -415,6 +527,52 @@ function partitionUnknownItems(items: ParsedInventoryItem[]): {
   }
 
   return { belt, otherUnknown };
+}
+
+function createOccupiedCellSet(
+  startX: number,
+  startY: number,
+  width: number,
+  height: number,
+): Set<string> {
+  const occupiedCells = new Set<string>();
+
+  for (let x = startX; x < startX + width; x += 1) {
+    for (let y = startY; y < startY + height; y += 1) {
+      occupiedCells.add(`${x},${y}`);
+    }
+  }
+
+  return occupiedCells;
+}
+
+function hasBoardOverlap(
+  items: ParsedInventoryItem[],
+  startX: number,
+  startY: number,
+  width: number,
+  height: number,
+): boolean {
+  const droppingCells = createOccupiedCellSet(startX, startY, width, height);
+
+  return items.some((item) => {
+    if (!hasGridPosition(item) || !hasGridDimensions(item)) {
+      return false;
+    }
+
+    const itemGridX = item.gridX as number;
+    const itemGridY = item.gridY as number;
+
+    for (let x = itemGridX; x < itemGridX + getGridWidth(item); x += 1) {
+      for (let y = itemGridY; y < itemGridY + getGridHeight(item); y += 1) {
+        if (droppingCells.has(`${x},${y}`)) {
+          return true;
+        }
+      }
+    }
+
+    return false;
+  });
 }
 
 function InventoryTile({
@@ -522,12 +680,6 @@ function InventoryTile({
               </span>{' '}
               {slotLabel}
             </div>
-            <div>
-              <span className="text-muted-foreground">
-                {t(translations.inventoryBrowser.tooltip.presenceLabel)}
-              </span>{' '}
-              {getPresenceLabel(isVaultPresent, t)}
-            </div>
             {unplacedReason && (
               <div>
                 <span className="text-muted-foreground">
@@ -536,72 +688,6 @@ function InventoryTile({
                 {getUnplacedReasonLabel(unplacedReason, t)}
               </div>
             )}
-          </div>
-        )}
-      </TooltipContent>
-    </Tooltip>
-  );
-}
-
-interface VaultedItemTileProps {
-  item: VaultItem;
-  iconLookup: SpriteIconLookupIndex;
-}
-
-function VaultedItemTile({ item, iconLookup }: VaultedItemTileProps) {
-  const { t } = useTranslation();
-  const gameTooltipModel = useMemo(
-    () =>
-      buildGameItemTooltipModel({
-        rawItemJson: item.rawItemJson,
-        fallbackName: item.itemName,
-        quality: item.quality,
-        type: item.type,
-        t,
-      }),
-    [item.itemName, item.quality, item.rawItemJson, item.type, t],
-  );
-  const iconCandidates = useMemo(
-    () => createSpatialIconCandidates(item, iconLookup),
-    [iconLookup, item],
-  );
-  const { iconUrl } = useSpriteIcon(iconCandidates, { forceEnabled: true });
-
-  return (
-    <Tooltip>
-      <TooltipTrigger
-        render={
-          <div
-            role="img"
-            aria-label={t(translations.inventoryBrowser.tileAriaLabel, { itemName: item.itemName })}
-            className={cn(
-              'relative size-7 overflow-hidden rounded-[2px] border bg-card/75 sm:size-[34px]',
-              item.isPresentInLatestScan ? 'border-emerald-500/60' : 'border-amber-500/60',
-            )}
-          >
-            <img
-              src={iconUrl}
-              alt={item.itemName}
-              draggable={false}
-              className="pointer-events-none h-full w-full object-contain"
-              loading="lazy"
-            />
-          </div>
-        }
-      />
-      <TooltipContent className="max-w-md p-3 text-sm">
-        {gameTooltipModel ? (
-          <GameItemTooltipContent model={gameTooltipModel} />
-        ) : (
-          <div className="space-y-1.5">
-            <div className="font-medium">{item.itemName}</div>
-            <div>
-              <span className="text-muted-foreground">
-                {t(translations.inventoryBrowser.tooltip.qualityTypeLabel)}
-              </span>{' '}
-              {item.quality}
-              {item.type ? ` / ${item.type}` : ''}
-            </div>
           </div>
         )}
       </TooltipContent>
@@ -623,8 +709,15 @@ function InventoryGridSection({
   onSelect,
   onDragStart,
   onDragEnd,
+  snapshotSourceFilePath,
+  snapshotSourceFileType,
+  sectionLocationContext,
+  sectionStashTab,
+  draggingVaultItem,
+  onDropVaultItem,
 }: InventoryGridSectionProps) {
   const { t } = useTranslation();
+  const [dragOverCell, setDragOverCell] = useState<{ x: number; y: number } | null>(null);
   const classified = useMemo(() => classifyBoardItems(items, gridSize), [gridSize, items]);
   const overflowLayout = useMemo(() => {
     if (!showRawOverflowBoard) {
@@ -642,11 +735,75 @@ function InventoryGridSection({
     () => classified.unplaced.filter(({ item }) => !overflowLayout.itemKeys.has(item.fingerprint)),
     [classified.unplaced, overflowLayout.itemKeys],
   );
+  const previewPlacement = useMemo(() => {
+    if (!dragOverCell || !draggingVaultItem) {
+      return null;
+    }
+
+    const { x, y } = dragOverCell;
+    const width = draggingVaultItem.gridWidth ?? 1;
+    const height = draggingVaultItem.gridHeight ?? 1;
+
+    if (x < 0 || y < 0 || x + width > gridSize.columns || y + height > gridSize.rows) {
+      return { x, y, valid: false };
+    }
+
+    const hasOverlap = hasBoardOverlap(items, x, y, width, height);
+
+    return { x, y, valid: !hasOverlap };
+  }, [dragOverCell, draggingVaultItem, items, gridSize]);
+
+  const handleDropOnBoard = useCallback(
+    async (event: DragEvent<HTMLDivElement>, dropX: number, dropY: number) => {
+      if (!previewPlacement?.valid) {
+        setDragOverCell(null);
+        return;
+      }
+
+      const vaultItemId =
+        event.dataTransfer.getData(VAULT_DRAG_MIME).trim() || draggingVaultItem?.id;
+      if (
+        !vaultItemId ||
+        !snapshotSourceFilePath ||
+        !snapshotSourceFileType ||
+        !sectionLocationContext
+      ) {
+        setDragOverCell(null);
+        return;
+      }
+
+      setDragOverCell(null);
+      await onDropVaultItem?.(
+        vaultItemId,
+        snapshotSourceFilePath,
+        snapshotSourceFileType,
+        sectionLocationContext,
+        sectionStashTab,
+        dropX,
+        dropY,
+      );
+    },
+    [
+      previewPlacement,
+      draggingVaultItem,
+      snapshotSourceFilePath,
+      snapshotSourceFileType,
+      sectionLocationContext,
+      sectionStashTab,
+      onDropVaultItem,
+    ],
+  );
 
   return (
     <div className="space-y-2">
       <div className="font-medium text-sm">{title}</div>
-      <BoardSurface gridSize={gridSize} testId={testId}>
+      <BoardSurface
+        gridSize={gridSize}
+        testId={testId}
+        onDragOverCell={draggingVaultItem ? (x, y) => setDragOverCell({ x, y }) : undefined}
+        onDragLeaveBoard={draggingVaultItem ? () => setDragOverCell(null) : undefined}
+        onDropOnBoard={draggingVaultItem ? handleDropOnBoard : undefined}
+      >
         {classified.placed.map((item) => {
           const isVaultPresent = getEffectiveVaultPresent(
             item,
@@ -672,6 +829,26 @@ function InventoryGridSection({
             </div>
           );
         })}
+        {previewPlacement && draggingVaultItem && (
+          <div
+            className={cn(
+              'pointer-events-none z-20 rounded-sm border-2',
+              previewPlacement.valid
+                ? 'border-emerald-400 bg-emerald-400/20'
+                : 'border-red-500 bg-red-500/20',
+            )}
+            style={{
+              gridColumn: `${previewPlacement.x + 1} / span ${draggingVaultItem.gridWidth ?? 1}`,
+              gridRow: `${previewPlacement.y + 1} / span ${draggingVaultItem.gridHeight ?? 1}`,
+            }}
+          >
+            {!previewPlacement.valid && (
+              <div className="flex h-full w-full items-center justify-center">
+                <X className="h-1/2 w-1/2 text-red-500" />
+              </div>
+            )}
+          </div>
+        )}
       </BoardSurface>
 
       {overflowLayout.gridSize && (
@@ -842,12 +1019,14 @@ export function CharacterInventoryBrowser() {
   const grailItems = useGrailStore((state) => state.items);
   const [isLoading, setIsLoading] = useState(true);
   const [isVaulting, setIsVaulting] = useState(false);
+  const [isUnvaulting, setIsUnvaulting] = useState(false);
+  const [selectedVaultItemId, setSelectedVaultItemId] = useState<string | undefined>(undefined);
   const [searchText, setSearchText] = useState('');
   const [characterId, setCharacterId] = useState('all');
   const [locationContext, setLocationContext] = useState<'all' | VaultLocationContext>('all');
-  const [presence, setPresence] = useState<PresenceFilter>('all');
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('all');
   const [dragOverVaultDropzone, setDragOverVaultDropzone] = useState(false);
+  const [draggingVaultItem, setDraggingVaultItem] = useState<VaultItem | null>(null);
   const [pendingVaultFingerprints, setPendingVaultFingerprints] = useState<Set<string>>(new Set());
   const [inventoryResponse, setInventoryResponse] = useState<InventorySearchAllResponse | null>(
     null,
@@ -908,26 +1087,23 @@ export function CharacterInventoryBrowser() {
             return false;
           }
 
-          const matchesType = typeFilter === 'all' || getTypeValue(item.type) === typeFilter;
-          if (!matchesType) {
+          if (
+            getEffectiveVaultPresent(item, vaultItemsByFingerprint, pendingVaultFingerprints) ===
+            true
+          ) {
             return false;
           }
 
-          const isVaultPresent = getEffectiveVaultPresent(
-            item,
-            vaultItemsByFingerprint,
-            pendingVaultFingerprints,
-          );
-          return matchesPresenceFilter(presence, isVaultPresent);
+          const matchesType = typeFilter === 'all' || getTypeValue(item.type) === typeFilter;
+          return matchesType;
         }),
       }))
       .filter((snapshot) => snapshot.items.length > 0);
   }, [
     inventoryResponse?.inventory.snapshots,
-    pendingVaultFingerprints,
-    presence,
     typeFilter,
     vaultItemsByFingerprint,
+    pendingVaultFingerprints,
   ]);
 
   const visibleItems = useMemo(() => snapshots.flatMap((snapshot) => snapshot.items), [snapshots]);
@@ -950,6 +1126,43 @@ export function CharacterInventoryBrowser() {
   const selectedItemVaultPresent = selectedItem
     ? getEffectiveVaultPresent(selectedItem, vaultItemsByFingerprint, pendingVaultFingerprints)
     : undefined;
+
+  const vaultItems = useMemo(
+    () => inventoryResponse?.vault.items ?? [],
+    [inventoryResponse?.vault.items],
+  );
+
+  const selectedVaultItem = useMemo(
+    () => vaultItems.find((item) => item.id === selectedVaultItemId),
+    [selectedVaultItemId, vaultItems],
+  );
+
+  const reloadInventoryAfterSaveWrite = useCallback(async (): Promise<void> => {
+    try {
+      await window.electronAPI.saveFile.refreshSaveFiles();
+    } catch (error) {
+      console.warn('Failed to refresh save files after write', error);
+    }
+
+    await loadInventorySearch();
+  }, [loadInventorySearch]);
+
+  const handleUnvault = useCallback(async (): Promise<void> => {
+    if (!selectedVaultItemId || isUnvaulting) {
+      return;
+    }
+
+    setIsUnvaulting(true);
+    try {
+      await window.electronAPI.vault.unvaultItem(selectedVaultItemId);
+      setSelectedVaultItemId(undefined);
+      await reloadInventoryAfterSaveWrite();
+    } catch (error) {
+      console.error('Failed to unvault item', error);
+    } finally {
+      setIsUnvaulting(false);
+    }
+  }, [selectedVaultItemId, isUnvaulting, reloadInventoryAfterSaveWrite]);
 
   const characterOptions = useMemo(() => {
     const options = new Map<string, string>();
@@ -1008,6 +1221,42 @@ export function CharacterInventoryBrowser() {
     draggingFingerprintRef.current = undefined;
     draggingVaultInputRef.current = undefined;
   };
+
+  const handleVaultItemDragStart = useCallback((item: VaultItem) => {
+    setDraggingVaultItem(item);
+  }, []);
+
+  const handleVaultItemDragEnd = useCallback(() => {
+    setDraggingVaultItem(null);
+  }, []);
+
+  const handleDropVaultItemOnSection = useCallback(
+    async (
+      vaultItemId: string,
+      targetFilePath: string,
+      targetFileType: VaultSourceFileType,
+      targetLocationContext: VaultLocationContext,
+      targetStashTab: number | undefined,
+      targetGridX: number,
+      targetGridY: number,
+    ) => {
+      try {
+        await window.electronAPI.vault.unvaultItem(vaultItemId, {
+          targetFilePath,
+          targetFileType,
+          targetLocationContext,
+          targetStashTab,
+          targetGridX,
+          targetGridY,
+        });
+        setDraggingVaultItem(null);
+        await reloadInventoryAfterSaveWrite();
+      } catch (error) {
+        console.error('Failed to unvault item to target', error);
+      }
+    },
+    [reloadInventoryAfterSaveWrite],
+  );
 
   const handleVaultDrop = async (event: DragEvent<HTMLButtonElement>) => {
     event.preventDefault();
@@ -1090,67 +1339,72 @@ export function CharacterInventoryBrowser() {
                 </SelectItem>
               </SelectContent>
             </Select>
-            <div className="grid grid-cols-2 gap-2">
-              <Select
-                value={typeFilter}
-                onValueChange={(value) => setTypeFilter((value as TypeFilter | null) ?? 'all')}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder={t(translations.inventoryBrowser.type)} />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">{t(translations.inventoryBrowser.allTypes)}</SelectItem>
-                  <SelectItem value="unique">
-                    {t(translations.inventoryBrowser.typeOptions.unique)}
-                  </SelectItem>
-                  <SelectItem value="set">
-                    {t(translations.inventoryBrowser.typeOptions.set)}
-                  </SelectItem>
-                  <SelectItem value="runeword">
-                    {t(translations.inventoryBrowser.typeOptions.runeword)}
-                  </SelectItem>
-                  <SelectItem value="rune">
-                    {t(translations.inventoryBrowser.typeOptions.rune)}
-                  </SelectItem>
-                  <SelectItem value="other">
-                    {t(translations.inventoryBrowser.typeOptions.other)}
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-              <Select
-                value={presence}
-                onValueChange={(value) => setPresence((value as PresenceFilter | null) ?? 'all')}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder={t(translations.inventoryBrowser.presence)} />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">
-                    {t(translations.inventoryBrowser.presenceOptions.all)}
-                  </SelectItem>
-                  <SelectItem value="present">
-                    {t(translations.inventoryBrowser.presenceOptions.present)}
-                  </SelectItem>
-                  <SelectItem value="missing">
-                    {t(translations.inventoryBrowser.presenceOptions.missing)}
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+            <Select
+              value={typeFilter}
+              onValueChange={(value) => setTypeFilter((value as TypeFilter | null) ?? 'all')}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder={t(translations.inventoryBrowser.type)} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{t(translations.inventoryBrowser.allTypes)}</SelectItem>
+                <SelectItem value="unique">
+                  {t(translations.inventoryBrowser.typeOptions.unique)}
+                </SelectItem>
+                <SelectItem value="set">
+                  {t(translations.inventoryBrowser.typeOptions.set)}
+                </SelectItem>
+                <SelectItem value="runeword">
+                  {t(translations.inventoryBrowser.typeOptions.runeword)}
+                </SelectItem>
+                <SelectItem value="rune">
+                  {t(translations.inventoryBrowser.typeOptions.rune)}
+                </SelectItem>
+                <SelectItem value="other">
+                  {t(translations.inventoryBrowser.typeOptions.other)}
+                </SelectItem>
+              </SelectContent>
+            </Select>
           </CardContent>
         </Card>
 
-        {(inventoryResponse?.vault.items.length ?? 0) > 0 && (
+        {vaultItems.length > 0 && (
           <Card>
             <CardHeader>
-              <CardTitle>{t(translations.inventoryBrowser.vaultedItems)}</CardTitle>
+              <CardTitle className="text-base">
+                {t(translations.inventoryBrowser.vaultedItems)}
+              </CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="flex flex-wrap gap-1">
-                {inventoryResponse?.vault.items.map((item) => (
-                  <VaultedItemTile key={item.id} item={item} iconLookup={spriteIconLookup} />
+            <CardContent className="space-y-3">
+              <div className="flex flex-wrap gap-2">
+                {vaultItems.map((item) => (
+                  <VaultedItemTile
+                    key={item.id}
+                    item={item}
+                    iconLookup={spriteIconLookup}
+                    selected={item.id === selectedVaultItemId}
+                    onSelect={(selected) => setSelectedVaultItemId(selected.id)}
+                    onDragStart={handleVaultItemDragStart}
+                    onDragEnd={handleVaultItemDragEnd}
+                  />
                 ))}
               </div>
+              {selectedVaultItem && (
+                <div className="border-t pt-3">
+                  <div className="mb-2 font-medium text-sm">{selectedVaultItem.itemName}</div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full"
+                    disabled={isUnvaulting}
+                    onClick={() => {
+                      void handleUnvault();
+                    }}
+                  >
+                    {t(translations.vault.unvaultAction)}
+                  </Button>
+                </div>
+              )}
             </CardContent>
           </Card>
         )}
@@ -1240,6 +1494,11 @@ export function CharacterInventoryBrowser() {
                     onSelect={(item) => setSelectedItemFingerprint(item.fingerprint)}
                     onDragStart={handleCardDragStart}
                     onDragEnd={handleCardDragEnd}
+                    snapshotSourceFilePath={snapshot.sourceFilePath}
+                    snapshotSourceFileType={snapshot.sourceFileType}
+                    sectionLocationContext="inventory"
+                    draggingVaultItem={draggingVaultItem}
+                    onDropVaultItem={handleDropVaultItemOnSection}
                   />
                 )}
 
@@ -1262,6 +1521,12 @@ export function CharacterInventoryBrowser() {
                       onSelect={(item) => setSelectedItemFingerprint(item.fingerprint)}
                       onDragStart={handleCardDragStart}
                       onDragEnd={handleCardDragEnd}
+                      snapshotSourceFilePath={snapshot.sourceFilePath}
+                      snapshotSourceFileType={snapshot.sourceFileType}
+                      sectionLocationContext="stash"
+                      sectionStashTab={stashTab}
+                      draggingVaultItem={draggingVaultItem}
+                      onDropVaultItem={handleDropVaultItemOnSection}
                     />
                   ))}
 

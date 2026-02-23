@@ -170,6 +170,17 @@ export function dbVaultCategoryToVaultCategory(dbCategory: DbVaultCategory): Vau
   };
 }
 
+function extractVaultItemSpatialFields(dbItem: DbVaultItem) {
+  return {
+    stashTab: dbItem.stashTab ?? undefined,
+    gridX: dbItem.gridX ?? undefined,
+    gridY: dbItem.gridY ?? undefined,
+    gridWidth: dbItem.gridWidth ?? undefined,
+    gridHeight: dbItem.gridHeight ?? undefined,
+    equippedSlotId: dbItem.equippedSlotId ?? undefined,
+  };
+}
+
 export function dbVaultItemToVaultItem(dbItem: DbVaultItem): VaultItem {
   return {
     id: dbItem.id,
@@ -183,13 +194,9 @@ export function dbVaultItemToVaultItem(dbItem: DbVaultItem): VaultItem {
     sourceCharacterId: dbItem.sourceCharacterId ?? undefined,
     sourceCharacterName: dbItem.sourceCharacterName ?? undefined,
     sourceFileType: dbItem.sourceFileType,
+    sourceFilePath: dbItem.sourceFilePath ?? undefined,
     locationContext: dbItem.locationContext,
-    stashTab: dbItem.stashTab ?? undefined,
-    gridX: dbItem.gridX ?? undefined,
-    gridY: dbItem.gridY ?? undefined,
-    gridWidth: dbItem.gridWidth ?? undefined,
-    gridHeight: dbItem.gridHeight ?? undefined,
-    equippedSlotId: dbItem.equippedSlotId ?? undefined,
+    ...extractVaultItemSpatialFields(dbItem),
     iconFileName: dbItem.iconFileName ?? undefined,
     isSocketedItem: dbItem.isSocketedItem ?? false,
     grailItemId: dbItem.grailItemId ?? undefined,

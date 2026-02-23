@@ -184,7 +184,7 @@ export function getGridHeight(item: SpatialItemLike): number {
   return Math.max(1, item.gridHeight ?? 1);
 }
 
-function hasGridDimensions(item: SpatialItemLike): boolean {
+export function hasGridDimensions(item: SpatialItemLike): boolean {
   return (
     typeof item.gridWidth === 'number' &&
     typeof item.gridHeight === 'number' &&
