@@ -7,7 +7,7 @@ import type {
   VaultItemUpsertByFingerprintInput,
   VaultItemUpsertInput,
 } from '../types/grail';
-import { dbVaultItemToVaultItem, toISOString } from './converters';
+import { dbVaultItemToVaultItem, fromISOString, toISOString } from './converters';
 import { schema } from './drizzle';
 import type { DatabaseContext } from './types';
 import { getCategoryIdsByVaultItemIds, setVaultItemCategories } from './vault-categories';
@@ -18,6 +18,76 @@ type SearchClauses = {
   clauses: string[];
   params: Array<string | number>;
 };
+
+type RawVaultSearchRow = {
+  id: string;
+  fingerprint: string;
+  item_name: string;
+  item_code: string | null;
+  quality: string;
+  ethereal: number | boolean;
+  socket_count: number | null;
+  raw_item_json: string;
+  source_character_id: string | null;
+  source_character_name: string | null;
+  source_file_type: VaultItem['sourceFileType'];
+  location_context: VaultItem['locationContext'];
+  stash_tab: number | null;
+  grid_x: number | null;
+  grid_y: number | null;
+  grid_width: number | null;
+  grid_height: number | null;
+  equipped_slot_id: number | null;
+  icon_file_name: string | null;
+  is_socketed_item: number | boolean | null;
+  grail_item_id: string | null;
+  is_present_in_latest_scan: number | boolean;
+  last_seen_at: string | null;
+  vaulted_at: string | null;
+  unvaulted_at: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+};
+
+function toBoolean(value: number | boolean | null | undefined): boolean {
+  if (typeof value === 'boolean') {
+    return value;
+  }
+
+  return value === 1;
+}
+
+function mapRawVaultSearchRowToVaultItem(row: RawVaultSearchRow): VaultItem {
+  return {
+    id: row.id,
+    fingerprint: row.fingerprint,
+    itemName: row.item_name,
+    itemCode: row.item_code ?? undefined,
+    quality: row.quality,
+    ethereal: toBoolean(row.ethereal),
+    socketCount: row.socket_count ?? undefined,
+    rawItemJson: row.raw_item_json,
+    sourceCharacterId: row.source_character_id ?? undefined,
+    sourceCharacterName: row.source_character_name ?? undefined,
+    sourceFileType: row.source_file_type,
+    locationContext: row.location_context,
+    stashTab: row.stash_tab ?? undefined,
+    gridX: row.grid_x ?? undefined,
+    gridY: row.grid_y ?? undefined,
+    gridWidth: row.grid_width ?? undefined,
+    gridHeight: row.grid_height ?? undefined,
+    equippedSlotId: row.equipped_slot_id ?? undefined,
+    iconFileName: row.icon_file_name ?? undefined,
+    isSocketedItem: toBoolean(row.is_socketed_item),
+    grailItemId: row.grail_item_id ?? undefined,
+    isPresentInLatestScan: toBoolean(row.is_present_in_latest_scan),
+    lastSeenAt: fromISOString(row.last_seen_at),
+    vaultedAt: fromISOString(row.vaulted_at),
+    unvaultedAt: fromISOString(row.unvaulted_at),
+    created: new Date(row.created_at ?? new Date().toISOString()),
+    lastUpdated: new Date(row.updated_at ?? new Date().toISOString()),
+  };
+}
 
 function toNullable<T>(value: T | undefined): T | null {
   return value ?? null;
@@ -119,20 +189,7 @@ function attachCategoryIds(ctx: DatabaseContext, items: VaultItem[]): VaultItem[
 }
 
 export function addVaultItem(ctx: DatabaseContext, input: VaultItemUpsertInput): VaultItem {
-  const values = buildVaultItemValues(input);
-
-  ctx.db.insert(vaultItems).values(values).run();
-
-  if (input.categoryIds) {
-    setVaultItemCategories(ctx, values.id, input.categoryIds);
-  }
-
-  const saved = getVaultItemById(ctx, values.id);
-  if (!saved) {
-    throw new Error(`Unable to add vault item: ${values.id}`);
-  }
-
-  return saved;
+  return upsertVaultItemByFingerprint(ctx, input);
 }
 
 export function updateVaultItem(
@@ -315,7 +372,7 @@ function appendTextClause(query: SearchClauses, text: string | undefined): void 
 
   const textQuery = `%${normalized}%`;
   query.clauses.push(
-    '(lower(vi.item_name) LIKE ? OR lower(COALESCE(vi.item_code, "")) LIKE ? OR lower(vi.quality) LIKE ?)',
+    "(lower(vi.item_name) LIKE ? OR lower(COALESCE(vi.item_code, '')) LIKE ? OR lower(vi.quality) LIKE ?)",
   );
   query.params.push(textQuery, textQuery, textQuery);
 }
@@ -325,8 +382,8 @@ function appendCharacterClause(query: SearchClauses, characterId: string | undef
     return;
   }
 
-  query.clauses.push('vi.source_character_id = ?');
-  query.params.push(characterId);
+  query.clauses.push('(vi.source_character_id = ? OR vi.source_character_name = ?)');
+  query.params.push(characterId, characterId);
 }
 
 function appendLocationClause(
@@ -434,9 +491,9 @@ export function searchVaultItems(
     .prepare(
       `SELECT vi.* FROM vault_items vi ${whereClause} ORDER BY ${sortBy} ${sortOrder} LIMIT ? OFFSET ?`,
     )
-    .all(...query.params, pageSize, offset) as (typeof vaultItems.$inferSelect)[];
+    .all(...query.params, pageSize, offset) as RawVaultSearchRow[];
 
-  const mappedItems = rows.map(dbVaultItemToVaultItem);
+  const mappedItems = rows.map(mapRawVaultSearchRowToVaultItem);
 
   return {
     items: attachCategoryIds(ctx, mappedItems),

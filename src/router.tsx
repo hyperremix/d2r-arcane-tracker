@@ -7,7 +7,6 @@ import { Settings } from './components/settings/Settings';
 import { Statistics } from './components/statistics/Statistics';
 import { TitleBar } from './components/TitleBar';
 import { TerrorZoneConfiguration } from './components/terror-zone/TerrorZoneConfiguration';
-import { ItemVault } from './components/vault/ItemVault';
 
 /**
  * Root layout component that wraps all routes with the TitleBar.
@@ -47,10 +46,6 @@ export const router = createHashRouter([
       {
         path: '/inventory-browser',
         Component: CharacterInventoryBrowser,
-      },
-      {
-        path: '/vault',
-        Component: ItemVault,
       },
       {
         path: '/settings',

@@ -7,7 +7,7 @@ import type {
   VaultLocationContext,
 } from 'electron/types/grail';
 import { PackagePlus, Sparkles } from 'lucide-react';
-import { type DragEvent, useCallback, useEffect, useMemo, useState } from 'react';
+import { type DragEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { BoardSurface, getItemGridPlacement } from '@/components/inventory/boardPrimitives';
 import { GameItemTooltipContent } from '@/components/inventory/GameItemTooltipContent';
@@ -73,10 +73,119 @@ type PresenceFilter = 'all' | 'present' | 'missing';
 type TypeFilter = 'all' | 'unique' | 'set' | 'runeword' | 'rune' | 'other';
 type EquipmentUnplacedReason = UnplacedReason | 'unknownEquippedSlot';
 
-type DragInventoryPayload = {
-  type: 'inventory-item';
-  item: ParsedInventoryItem;
-};
+const INVENTORY_DRAG_MIME = 'application/x-d2r-arcane-tracker-inventory-item';
+
+function getVaultItemLastUpdatedMs(item: VaultItem): number {
+  const rawValue = item.lastUpdated as unknown;
+  if (rawValue instanceof Date) {
+    return rawValue.getTime();
+  }
+
+  if (typeof rawValue === 'string') {
+    const parsed = Date.parse(rawValue);
+    return Number.isNaN(parsed) ? 0 : parsed;
+  }
+
+  return 0;
+}
+
+function compareVaultItems(a: VaultItem, b: VaultItem): number {
+  const timeDiff = getVaultItemLastUpdatedMs(b) - getVaultItemLastUpdatedMs(a);
+  if (timeDiff !== 0) {
+    return timeDiff;
+  }
+
+  return a.fingerprint.localeCompare(b.fingerprint);
+}
+
+function mergeAndSortVaultItems(pages: VaultItem[][]): VaultItem[] {
+  const deduped = new Map<string, VaultItem>();
+
+  for (const pageItems of pages) {
+    for (const item of pageItems) {
+      const key = item.id || item.fingerprint;
+      deduped.set(key, item);
+    }
+  }
+
+  return [...deduped.values()].sort(compareVaultItems);
+}
+
+async function fetchAllVaultItemsForFilter(
+  filter: VaultItemFilter,
+  initialVault: InventorySearchAllResponse['vault'],
+): Promise<VaultItem[]> {
+  const initialItems = initialVault.items ?? [];
+  const pageSize = Math.max(initialVault.pageSize, 1);
+  const totalPages = Math.ceil(initialVault.total / pageSize);
+
+  if (totalPages <= 1) {
+    return mergeAndSortVaultItems([initialItems]);
+  }
+
+  const remainingPageRequests: Promise<InventorySearchAllResponse['vault']>[] = [];
+  for (let page = 2; page <= totalPages; page += 1) {
+    remainingPageRequests.push(
+      window.electronAPI.vault.search({
+        ...filter,
+        page,
+        pageSize,
+      }),
+    );
+  }
+
+  const remainingPages = await Promise.all(remainingPageRequests);
+  return mergeAndSortVaultItems([initialItems, ...remainingPages.map((page) => page.items)]);
+}
+
+function resolveCharacterFilter(characterId: string): string | undefined {
+  if (characterId === 'all') {
+    return undefined;
+  }
+
+  if (characterId.startsWith('name:')) {
+    return characterId.slice('name:'.length);
+  }
+
+  return characterId;
+}
+
+function buildInventorySearchFilter(
+  searchText: string,
+  characterId: string,
+  locationContext: 'all' | VaultLocationContext,
+): VaultItemFilter {
+  return {
+    text: searchText.trim() || undefined,
+    characterId: resolveCharacterFilter(characterId),
+    locationContext: locationContext === 'all' ? undefined : locationContext,
+    includeSocketed: false,
+    presentState: 'all',
+    page: 1,
+    pageSize: 200,
+  };
+}
+
+function withMergedVaultItems(
+  response: InventorySearchAllResponse,
+  allVaultItems: VaultItem[],
+): InventorySearchAllResponse {
+  return {
+    ...response,
+    vault: {
+      ...response.vault,
+      items: allVaultItems,
+    },
+  };
+}
+
+async function loadInventorySearchResponse(
+  filter: VaultItemFilter,
+): Promise<InventorySearchAllResponse> {
+  const response = await window.electronAPI.inventory.searchAll(filter);
+  const allVaultItems = await fetchAllVaultItemsForFilter(filter, response.vault);
+  return withMergedVaultItems(response, allVaultItems);
+}
 
 interface InventoryTileProps {
   item: ParsedInventoryItem;
@@ -86,6 +195,7 @@ interface InventoryTileProps {
   unplacedReason?: EquipmentUnplacedReason;
   onSelect: (item: ParsedInventoryItem) => void;
   onDragStart: (event: DragEvent<HTMLButtonElement>, item: ParsedInventoryItem) => void;
+  onDragEnd: () => void;
 }
 
 interface InventoryGridSectionProps {
@@ -97,22 +207,24 @@ interface InventoryGridSectionProps {
   rawOverflowTitle?: string;
   iconLookup: SpriteIconLookupIndex;
   selectedFingerprint?: string;
-  optimisticPresent: Map<string, boolean>;
+  pendingVaultFingerprints: Set<string>;
   vaultItemsByFingerprint: Map<string, VaultItem>;
   onSelect: (item: ParsedInventoryItem) => void;
   onDragStart: (event: DragEvent<HTMLButtonElement>, item: ParsedInventoryItem) => void;
+  onDragEnd: () => void;
 }
 
 interface EquipmentSectionProps {
   items: ParsedInventoryItem[];
   iconLookup: SpriteIconLookupIndex;
   selectedFingerprint?: string;
-  optimisticPresent: Map<string, boolean>;
+  pendingVaultFingerprints: Set<string>;
   vaultItemsByFingerprint: Map<string, VaultItem>;
   weaponSet: EquippedWeaponSet;
   onWeaponSetChange: (weaponSet: EquippedWeaponSet) => void;
   onSelect: (item: ParsedInventoryItem) => void;
   onDragStart: (event: DragEvent<HTMLButtonElement>, item: ParsedInventoryItem) => void;
+  onDragEnd: () => void;
 }
 
 function formatLocation(
@@ -130,6 +242,17 @@ function formatLocation(
   }
 
   return t(translations.inventoryBrowser.location[item.locationContext]);
+}
+
+function formatSourceFileTypeLabel(
+  sourceFileType: string | undefined,
+  t: (key: string, options?: Record<string, unknown>) => string,
+): string {
+  if (!sourceFileType?.trim()) {
+    return t(translations.inventoryBrowser.unknownSourceFileType);
+  }
+
+  return sourceFileType.toUpperCase();
 }
 
 function getTypeValue(type?: string): TypeFilter {
@@ -196,14 +319,14 @@ function toVaultUpsertInput(item: ParsedInventoryItem): VaultItemUpsertInput {
 function getEffectiveVaultPresent(
   item: ParsedInventoryItem,
   vaultItemsByFingerprint: Map<string, VaultItem>,
-  optimisticPresent: Map<string, boolean>,
+  pendingVaultFingerprints: Set<string>,
 ): boolean | undefined {
-  const optimisticValue = optimisticPresent.get(item.fingerprint);
-  if (optimisticValue !== undefined) {
-    return optimisticValue;
+  const persistedValue = vaultItemsByFingerprint.get(item.fingerprint)?.isPresentInLatestScan;
+  if (persistedValue !== undefined) {
+    return persistedValue;
   }
 
-  return vaultItemsByFingerprint.get(item.fingerprint)?.isPresentInLatestScan;
+  return pendingVaultFingerprints.has(item.fingerprint) ? true : undefined;
 }
 
 function getCoordinatesLabel(
@@ -302,6 +425,7 @@ function InventoryTile({
   unplacedReason,
   onSelect,
   onDragStart,
+  onDragEnd,
 }: InventoryTileProps) {
   const { t } = useTranslation();
   const gameTooltipModel = useMemo(
@@ -340,12 +464,14 @@ function InventoryTile({
             )}
             onClick={() => onSelect(item)}
             onDragStart={(event) => onDragStart(event, item)}
+            onDragEnd={onDragEnd}
           />
         }
       >
         <img
           src={iconUrl}
           alt={item.itemName}
+          draggable={false}
           className="pointer-events-none h-full w-full object-contain"
           loading="lazy"
         />
@@ -369,7 +495,7 @@ function InventoryTile({
               </span>{' '}
               {t(translations.inventoryBrowser.groupHeader, {
                 characterName: item.characterName,
-                sourceFileType: item.sourceFileType.toUpperCase(),
+                sourceFileType: formatSourceFileTypeLabel(item.sourceFileType, t),
               })}
             </div>
             <div>
@@ -417,6 +543,72 @@ function InventoryTile({
   );
 }
 
+interface VaultedItemTileProps {
+  item: VaultItem;
+  iconLookup: SpriteIconLookupIndex;
+}
+
+function VaultedItemTile({ item, iconLookup }: VaultedItemTileProps) {
+  const { t } = useTranslation();
+  const gameTooltipModel = useMemo(
+    () =>
+      buildGameItemTooltipModel({
+        rawItemJson: item.rawItemJson,
+        fallbackName: item.itemName,
+        quality: item.quality,
+        type: item.type,
+        t,
+      }),
+    [item.itemName, item.quality, item.rawItemJson, item.type, t],
+  );
+  const iconCandidates = useMemo(
+    () => createSpatialIconCandidates(item, iconLookup),
+    [iconLookup, item],
+  );
+  const { iconUrl } = useSpriteIcon(iconCandidates, { forceEnabled: true });
+
+  return (
+    <Tooltip>
+      <TooltipTrigger
+        render={
+          <div
+            role="img"
+            aria-label={t(translations.inventoryBrowser.tileAriaLabel, { itemName: item.itemName })}
+            className={cn(
+              'relative size-7 overflow-hidden rounded-[2px] border bg-card/75 sm:size-[34px]',
+              item.isPresentInLatestScan ? 'border-emerald-500/60' : 'border-amber-500/60',
+            )}
+          >
+            <img
+              src={iconUrl}
+              alt={item.itemName}
+              draggable={false}
+              className="pointer-events-none h-full w-full object-contain"
+              loading="lazy"
+            />
+          </div>
+        }
+      />
+      <TooltipContent className="max-w-md p-3 text-sm">
+        {gameTooltipModel ? (
+          <GameItemTooltipContent model={gameTooltipModel} />
+        ) : (
+          <div className="space-y-1.5">
+            <div className="font-medium">{item.itemName}</div>
+            <div>
+              <span className="text-muted-foreground">
+                {t(translations.inventoryBrowser.tooltip.qualityTypeLabel)}
+              </span>{' '}
+              {item.quality}
+              {item.type ? ` / ${item.type}` : ''}
+            </div>
+          </div>
+        )}
+      </TooltipContent>
+    </Tooltip>
+  );
+}
+
 function InventoryGridSection({
   title,
   testId,
@@ -426,10 +618,11 @@ function InventoryGridSection({
   rawOverflowTitle,
   iconLookup,
   selectedFingerprint,
-  optimisticPresent,
+  pendingVaultFingerprints,
   vaultItemsByFingerprint,
   onSelect,
   onDragStart,
+  onDragEnd,
 }: InventoryGridSectionProps) {
   const { t } = useTranslation();
   const classified = useMemo(() => classifyBoardItems(items, gridSize), [gridSize, items]);
@@ -458,7 +651,7 @@ function InventoryGridSection({
           const isVaultPresent = getEffectiveVaultPresent(
             item,
             vaultItemsByFingerprint,
-            optimisticPresent,
+            pendingVaultFingerprints,
           );
 
           return (
@@ -474,6 +667,7 @@ function InventoryGridSection({
                 isVaultPresent={isVaultPresent}
                 onSelect={onSelect}
                 onDragStart={onDragStart}
+                onDragEnd={onDragEnd}
               />
             </div>
           );
@@ -494,7 +688,7 @@ function InventoryGridSection({
               const isVaultPresent = getEffectiveVaultPresent(
                 item,
                 vaultItemsByFingerprint,
-                optimisticPresent,
+                pendingVaultFingerprints,
               );
 
               return (
@@ -510,6 +704,7 @@ function InventoryGridSection({
                     isVaultPresent={isVaultPresent}
                     onSelect={onSelect}
                     onDragStart={onDragStart}
+                    onDragEnd={onDragEnd}
                   />
                 </div>
               );
@@ -528,7 +723,7 @@ function InventoryGridSection({
               const isVaultPresent = getEffectiveVaultPresent(
                 item,
                 vaultItemsByFingerprint,
-                optimisticPresent,
+                pendingVaultFingerprints,
               );
 
               return (
@@ -541,6 +736,7 @@ function InventoryGridSection({
                     unplacedReason={reason}
                     onSelect={onSelect}
                     onDragStart={onDragStart}
+                    onDragEnd={onDragEnd}
                   />
                 </div>
               );
@@ -556,12 +752,13 @@ function EquipmentSection({
   items,
   iconLookup,
   selectedFingerprint,
-  optimisticPresent,
+  pendingVaultFingerprints,
   vaultItemsByFingerprint,
   weaponSet,
   onWeaponSetChange,
   onSelect,
   onDragStart,
+  onDragEnd,
 }: EquipmentSectionProps) {
   const { t } = useTranslation();
   const equippedMapping = useMemo(
@@ -622,10 +819,11 @@ function EquipmentSection({
                     isVaultPresent={getEffectiveVaultPresent(
                       slotItem,
                       vaultItemsByFingerprint,
-                      optimisticPresent,
+                      pendingVaultFingerprints,
                     )}
                     onSelect={onSelect}
                     onDragStart={onDragStart}
+                    onDragEnd={onDragEnd}
                   />
                 </div>
               ) : (
@@ -650,7 +848,7 @@ export function CharacterInventoryBrowser() {
   const [presence, setPresence] = useState<PresenceFilter>('all');
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('all');
   const [dragOverVaultDropzone, setDragOverVaultDropzone] = useState(false);
-  const [optimisticPresent, setOptimisticPresent] = useState<Map<string, boolean>>(new Map());
+  const [pendingVaultFingerprints, setPendingVaultFingerprints] = useState<Set<string>>(new Set());
   const [inventoryResponse, setInventoryResponse] = useState<InventorySearchAllResponse | null>(
     null,
   );
@@ -658,30 +856,31 @@ export function CharacterInventoryBrowser() {
     undefined,
   );
   const [equipmentWeaponSet, setEquipmentWeaponSet] = useState<EquippedWeaponSet>('i');
+  const draggingFingerprintRef = useRef<string | undefined>(undefined);
+  const draggingVaultInputRef = useRef<VaultItemUpsertInput | undefined>(undefined);
+  const latestSearchRequestRef = useRef(0);
   const spriteIconLookup = useMemo(() => createSpriteIconLookupIndex(grailItems), [grailItems]);
 
   const loadInventorySearch = useCallback(async (): Promise<void> => {
-    const resolvedCharacterFilter =
-      characterId === 'all'
-        ? undefined
-        : characterId.startsWith('name:')
-          ? characterId.slice('name:'.length)
-          : characterId;
-
-    const filter: VaultItemFilter = {
-      text: searchText.trim() || undefined,
-      characterId: resolvedCharacterFilter,
-      locationContext: locationContext === 'all' ? undefined : locationContext,
-      includeSocketed: false,
-      presentState: 'all',
-      page: 1,
-      pageSize: 200,
-    };
+    const requestId = latestSearchRequestRef.current + 1;
+    latestSearchRequestRef.current = requestId;
+    const filter = buildInventorySearchFilter(searchText, characterId, locationContext);
 
     setIsLoading(true);
-    const response = await window.electronAPI.inventory.searchAll(filter);
-    setInventoryResponse(response);
-    setIsLoading(false);
+    try {
+      const response = await loadInventorySearchResponse(filter);
+      if (requestId === latestSearchRequestRef.current) {
+        setInventoryResponse(response);
+      }
+    } catch (error) {
+      if (requestId === latestSearchRequestRef.current) {
+        console.error('Failed to load inventory search results', error);
+      }
+    } finally {
+      if (requestId === latestSearchRequestRef.current) {
+        setIsLoading(false);
+      }
+    }
   }, [characterId, locationContext, searchText]);
 
   useEffect(() => {
@@ -717,7 +916,7 @@ export function CharacterInventoryBrowser() {
           const isVaultPresent = getEffectiveVaultPresent(
             item,
             vaultItemsByFingerprint,
-            optimisticPresent,
+            pendingVaultFingerprints,
           );
           return matchesPresenceFilter(presence, isVaultPresent);
         }),
@@ -725,7 +924,7 @@ export function CharacterInventoryBrowser() {
       .filter((snapshot) => snapshot.items.length > 0);
   }, [
     inventoryResponse?.inventory.snapshots,
-    optimisticPresent,
+    pendingVaultFingerprints,
     presence,
     typeFilter,
     vaultItemsByFingerprint,
@@ -749,7 +948,7 @@ export function CharacterInventoryBrowser() {
   );
 
   const selectedItemVaultPresent = selectedItem
-    ? getEffectiveVaultPresent(selectedItem, vaultItemsByFingerprint, optimisticPresent)
+    ? getEffectiveVaultPresent(selectedItem, vaultItemsByFingerprint, pendingVaultFingerprints)
     : undefined;
 
   const characterOptions = useMemo(() => {
@@ -764,52 +963,73 @@ export function CharacterInventoryBrowser() {
   }, [inventoryResponse?.inventory.snapshots]);
 
   const vaultItem = useCallback(
-    async (item: ParsedInventoryItem): Promise<void> => {
+    async (itemInput: VaultItemUpsertInput): Promise<void> => {
       if (isVaulting) {
         return;
       }
 
       setIsVaulting(true);
-      const previous = new Map(optimisticPresent);
-      setOptimisticPresent((prev) => new Map(prev).set(item.fingerprint, true));
+      setPendingVaultFingerprints((previous) => {
+        const next = new Set(previous);
+        next.add(itemInput.fingerprint);
+        return next;
+      });
 
       try {
-        await window.electronAPI.vault.addItem(toVaultUpsertInput(item));
+        await window.electronAPI.vault.addItem(itemInput);
         await loadInventorySearch();
-      } catch {
-        setOptimisticPresent(previous);
+      } catch (error) {
+        console.error('Failed to vault inventory item', error);
       } finally {
+        setPendingVaultFingerprints((previous) => {
+          if (!previous.has(itemInput.fingerprint)) {
+            return previous;
+          }
+
+          const next = new Set(previous);
+          next.delete(itemInput.fingerprint);
+          return next;
+        });
         setIsVaulting(false);
       }
     },
-    [isVaulting, loadInventorySearch, optimisticPresent],
+    [isVaulting, loadInventorySearch],
   );
 
   const handleCardDragStart = (event: DragEvent<HTMLButtonElement>, item: ParsedInventoryItem) => {
-    const payload: DragInventoryPayload = {
-      type: 'inventory-item',
-      item,
-    };
-
+    draggingFingerprintRef.current = item.fingerprint;
+    draggingVaultInputRef.current = toVaultUpsertInput(item);
     event.dataTransfer.effectAllowed = 'copy';
-    event.dataTransfer.setData('application/json', JSON.stringify(payload));
+    event.dataTransfer.setData(INVENTORY_DRAG_MIME, item.fingerprint);
+    event.dataTransfer.setData('text/plain', item.fingerprint);
+  };
+
+  const handleCardDragEnd = () => {
+    draggingFingerprintRef.current = undefined;
+    draggingVaultInputRef.current = undefined;
   };
 
   const handleVaultDrop = async (event: DragEvent<HTMLButtonElement>) => {
     event.preventDefault();
     setDragOverVaultDropzone(false);
 
-    const rawPayload = event.dataTransfer.getData('application/json');
-    if (!rawPayload) {
+    const fingerprint =
+      event.dataTransfer.getData(INVENTORY_DRAG_MIME) || event.dataTransfer.getData('text/plain');
+    const normalizedFingerprint = fingerprint.trim() || draggingFingerprintRef.current;
+    const droppedItemInput = normalizedFingerprint
+      ? visibleItems.find((item) => item.fingerprint === normalizedFingerprint)
+      : undefined;
+    const itemInput = droppedItemInput
+      ? toVaultUpsertInput(droppedItemInput)
+      : draggingVaultInputRef.current;
+
+    if (!itemInput) {
       return;
     }
 
-    const payload = JSON.parse(rawPayload) as DragInventoryPayload;
-    if (payload.type !== 'inventory-item') {
-      return;
-    }
-
-    await vaultItem(payload.item);
+    await vaultItem(itemInput);
+    draggingFingerprintRef.current = undefined;
+    draggingVaultInputRef.current = undefined;
   };
 
   return (
@@ -920,6 +1140,21 @@ export function CharacterInventoryBrowser() {
           </CardContent>
         </Card>
 
+        {(inventoryResponse?.vault.items.length ?? 0) > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle>{t(translations.inventoryBrowser.vaultedItems)}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-wrap gap-1">
+                {inventoryResponse?.vault.items.map((item) => (
+                  <VaultedItemTile key={item.id} item={item} iconLookup={spriteIconLookup} />
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         <button
           type="button"
           className={[
@@ -961,7 +1196,7 @@ export function CharacterInventoryBrowser() {
                   <CardTitle className="text-base">
                     {t(translations.inventoryBrowser.groupHeader, {
                       characterName: snapshot.characterName,
-                      sourceFileType: snapshot.sourceFileType.toUpperCase(),
+                      sourceFileType: formatSourceFileTypeLabel(snapshot.sourceFileType, t),
                     })}
                   </CardTitle>
                   <Badge variant="outline">
@@ -980,12 +1215,13 @@ export function CharacterInventoryBrowser() {
                     items={grouped.equipped}
                     iconLookup={spriteIconLookup}
                     selectedFingerprint={selectedItemFingerprint}
-                    optimisticPresent={optimisticPresent}
+                    pendingVaultFingerprints={pendingVaultFingerprints}
                     vaultItemsByFingerprint={vaultItemsByFingerprint}
                     weaponSet={equipmentWeaponSet}
                     onWeaponSetChange={setEquipmentWeaponSet}
                     onSelect={(item) => setSelectedItemFingerprint(item.fingerprint)}
                     onDragStart={handleCardDragStart}
+                    onDragEnd={handleCardDragEnd}
                   />
                 )}
 
@@ -999,10 +1235,11 @@ export function CharacterInventoryBrowser() {
                     rawOverflowTitle={t(translations.inventoryBrowser.sections.expandedInventory)}
                     iconLookup={spriteIconLookup}
                     selectedFingerprint={selectedItemFingerprint}
-                    optimisticPresent={optimisticPresent}
+                    pendingVaultFingerprints={pendingVaultFingerprints}
                     vaultItemsByFingerprint={vaultItemsByFingerprint}
                     onSelect={(item) => setSelectedItemFingerprint(item.fingerprint)}
                     onDragStart={handleCardDragStart}
+                    onDragEnd={handleCardDragEnd}
                   />
                 )}
 
@@ -1020,10 +1257,11 @@ export function CharacterInventoryBrowser() {
                       rawOverflowTitle={t(translations.inventoryBrowser.sections.expandedStash)}
                       iconLookup={spriteIconLookup}
                       selectedFingerprint={selectedItemFingerprint}
-                      optimisticPresent={optimisticPresent}
+                      pendingVaultFingerprints={pendingVaultFingerprints}
                       vaultItemsByFingerprint={vaultItemsByFingerprint}
                       onSelect={(item) => setSelectedItemFingerprint(item.fingerprint)}
                       onDragStart={handleCardDragStart}
+                      onDragEnd={handleCardDragEnd}
                     />
                   ))}
 
@@ -1035,10 +1273,11 @@ export function CharacterInventoryBrowser() {
                     gridSize={DEFAULT_BELT_GRID_SIZE}
                     iconLookup={spriteIconLookup}
                     selectedFingerprint={selectedItemFingerprint}
-                    optimisticPresent={optimisticPresent}
+                    pendingVaultFingerprints={pendingVaultFingerprints}
                     vaultItemsByFingerprint={vaultItemsByFingerprint}
                     onSelect={(item) => setSelectedItemFingerprint(item.fingerprint)}
                     onDragStart={handleCardDragStart}
+                    onDragEnd={handleCardDragEnd}
                   />
                 )}
 
@@ -1050,10 +1289,11 @@ export function CharacterInventoryBrowser() {
                     gridSize={DEFAULT_INVENTORY_GRID_SIZE}
                     iconLookup={spriteIconLookup}
                     selectedFingerprint={selectedItemFingerprint}
-                    optimisticPresent={optimisticPresent}
+                    pendingVaultFingerprints={pendingVaultFingerprints}
                     vaultItemsByFingerprint={vaultItemsByFingerprint}
                     onSelect={(item) => setSelectedItemFingerprint(item.fingerprint)}
                     onDragStart={handleCardDragStart}
+                    onDragEnd={handleCardDragEnd}
                   />
                 )}
 
@@ -1065,10 +1305,11 @@ export function CharacterInventoryBrowser() {
                     gridSize={DEFAULT_INVENTORY_GRID_SIZE}
                     iconLookup={spriteIconLookup}
                     selectedFingerprint={selectedItemFingerprint}
-                    optimisticPresent={optimisticPresent}
+                    pendingVaultFingerprints={pendingVaultFingerprints}
                     vaultItemsByFingerprint={vaultItemsByFingerprint}
                     onSelect={(item) => setSelectedItemFingerprint(item.fingerprint)}
                     onDragStart={handleCardDragStart}
+                    onDragEnd={handleCardDragEnd}
                   />
                 )}
 
@@ -1091,12 +1332,13 @@ export function CharacterInventoryBrowser() {
                             isVaultPresent={getEffectiveVaultPresent(
                               item,
                               vaultItemsByFingerprint,
-                              optimisticPresent,
+                              pendingVaultFingerprints,
                             )}
                             onSelect={(selected) =>
                               setSelectedItemFingerprint(selected.fingerprint)
                             }
                             onDragStart={handleCardDragStart}
+                            onDragEnd={handleCardDragEnd}
                           />
                         </div>
                       ))}
@@ -1130,7 +1372,9 @@ export function CharacterInventoryBrowser() {
                     <Badge variant="outline" className="capitalize">
                       {formatLocation(selectedItem, t)}
                     </Badge>
-                    <Badge variant="outline">{selectedItem.sourceFileType.toUpperCase()}</Badge>
+                    <Badge variant="outline">
+                      {formatSourceFileTypeLabel(selectedItem.sourceFileType, t)}
+                    </Badge>
                     <Badge
                       variant={
                         selectedItemVaultPresent === true
@@ -1179,7 +1423,7 @@ export function CharacterInventoryBrowser() {
                   aria-label={t(translations.inventoryBrowser.vaultAction)}
                   disabled={isVaulting || selectedItemVaultPresent === true}
                   onClick={() => {
-                    void vaultItem(selectedItem);
+                    void vaultItem(toVaultUpsertInput(selectedItem));
                   }}
                 >
                   <PackagePlus className="mr-1 h-4 w-4" />

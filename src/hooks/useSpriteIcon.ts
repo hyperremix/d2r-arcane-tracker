@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useGrailStore } from '@/stores/grailStore';
-import placeholderUrl from '/images/placeholder-item.png';
+import placeholderUrl from '/images/placeholder-item.svg';
 
 const iconCache = new Map<string, string>();
 const PLACEHOLDER_ICON_URL = placeholderUrl;
