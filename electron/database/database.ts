@@ -61,11 +61,14 @@ class GrailDatabase {
   /**
    * Initializes the database schema by creating tables and indexes.
    * This method is called during database construction and handles schema creation errors.
+   * Also runs cleanup operations to fix corrupted settings.
    * @throws {Error} If schema initialization fails
    */
   private initializeSchema(): void {
     try {
       schemaModule.createSchema(this);
+      // Clean up any corrupted settings from previous versions
+      settingsModule.cleanupCorruptedSettings(this);
     } catch (error) {
       console.error('Failed to initialize database schema:', error);
       throw error;

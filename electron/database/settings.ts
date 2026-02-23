@@ -1,3 +1,5 @@
+import { eq } from 'drizzle-orm';
+import { NUMERIC_TO_STRING_ZONE_ID } from '../data/terrorZoneNames';
 import type { Settings } from '../types/grail';
 import { GameMode, GameVersion } from '../types/grail';
 import { schema } from './drizzle';
@@ -5,29 +7,41 @@ import type { DatabaseContext } from './types';
 
 const { settings } = schema;
 
-function parseJSON(jsonString: string): unknown {
+// Track which setting keys have been warned about to avoid log spam
+const warnedKeys = new Set<string>();
+
+function parseJSON(jsonString: string, settingKey?: string): unknown {
   if (!jsonString || jsonString === 'undefined' || jsonString === 'null') {
     return undefined;
   }
   if (jsonString === '[object Object]') {
-    console.warn(
-      '[parseJSON] Detected "[object Object]" string — an object was likely coerced to string before storage.',
-    );
+    // Only warn once per setting key to avoid log spam
+    if (settingKey && !warnedKeys.has(settingKey)) {
+      console.warn(
+        `[parseJSON] Setting "${settingKey}" has corrupted value "[object Object]". This will be ignored.`,
+      );
+      warnedKeys.add(settingKey);
+    }
     return undefined;
   }
   try {
     return JSON.parse(jsonString);
   } catch {
-    console.warn(`Failed to parse JSON setting: "${jsonString}". Using undefined.`);
+    if (settingKey && !warnedKeys.has(settingKey)) {
+      console.warn(
+        `[parseJSON] Failed to parse setting "${settingKey}" value: "${jsonString}". Using undefined.`,
+      );
+      warnedKeys.add(settingKey);
+    }
     return undefined;
   }
 }
 
-function parseJSONSetting<T>(value: string | undefined): T | undefined {
+function parseJSONSetting<T>(value: string | undefined, settingKey?: string): T | undefined {
   if (!value || value === '') {
     return undefined;
   }
-  return parseJSON(value) as T | undefined;
+  return parseJSON(value, settingKey) as T | undefined;
 }
 
 function parseIntSetting(value: string | undefined): number | undefined {
@@ -48,6 +62,34 @@ function parseBooleanSetting(value: string | undefined): boolean {
 
 function parseEnumSetting<T>(value: string | undefined, defaultValue: T): T {
   return (value as T) || defaultValue;
+}
+
+/**
+ * Migrates terror zone configuration from old numeric IDs to new string IDs.
+ * @param config - The config object that may contain numeric or string keys
+ * @returns Migrated config with only string keys
+ */
+function migrateTerrorZoneConfig(
+  config: Record<string | number, boolean> | undefined,
+): Record<string, boolean> | undefined {
+  if (!config || Object.keys(config).length === 0) {
+    return undefined;
+  }
+
+  const migrated: Record<string, boolean> = {};
+  for (const [key, value] of Object.entries(config)) {
+    const numericKey = Number(key);
+    // Check if the key is a numeric string and can be converted to a number
+    if (!Number.isNaN(numericKey) && NUMERIC_TO_STRING_ZONE_ID[numericKey]) {
+      // Migrate from numeric to string ID
+      migrated[NUMERIC_TO_STRING_ZONE_ID[numericKey]] = value;
+    } else {
+      // Already a string ID, keep as is
+      migrated[key] = value;
+    }
+  }
+
+  return migrated;
 }
 
 export function getAllSettings(ctx: DatabaseContext): Settings {
@@ -84,6 +126,7 @@ export function getAllSettings(ctx: DatabaseContext): Settings {
       | undefined,
     iconConversionProgress: parseJSONSetting<{ current: number; total: number }>(
       settingsMap.iconConversionProgress,
+      'iconConversionProgress',
     ),
     // Advanced monitoring settings
     tickReaderIntervalMs: parseIntSetting(settingsMap.tickReaderIntervalMs),
@@ -93,27 +136,40 @@ export function getAllSettings(ctx: DatabaseContext): Settings {
     // Widget settings
     widgetEnabled: parseBooleanSetting(settingsMap.widgetEnabled),
     widgetDisplay: parseEnumSetting(settingsMap.widgetDisplay, 'overall' as const),
-    widgetPosition: parseJSONSetting<{ x: number; y: number }>(settingsMap.widgetPosition),
+    widgetPosition: parseJSONSetting<{ x: number; y: number }>(
+      settingsMap.widgetPosition,
+      'widgetPosition',
+    ),
     widgetOpacity: parseFloatSetting(settingsMap.widgetOpacity, 0.9) ?? 0.9,
     widgetSizeOverall: parseJSONSetting<{ width: number; height: number }>(
       settingsMap.widgetSizeOverall,
+      'widgetSizeOverall',
     ),
     widgetSizeSplit: parseJSONSetting<{ width: number; height: number }>(
       settingsMap.widgetSizeSplit,
+      'widgetSizeSplit',
     ),
-    widgetSizeAll: parseJSONSetting<{ width: number; height: number }>(settingsMap.widgetSizeAll),
+    widgetSizeAll: parseJSONSetting<{ width: number; height: number }>(
+      settingsMap.widgetSizeAll,
+      'widgetSizeAll',
+    ),
     // Main window settings
     mainWindowBounds: parseJSONSetting<{
       x: number;
       y: number;
       width: number;
       height: number;
-    }>(settingsMap.mainWindowBounds),
+    }>(settingsMap.mainWindowBounds, 'mainWindowBounds'),
     // Wizard settings
     wizardCompleted: parseBooleanSetting(settingsMap.wizardCompleted),
     wizardSkipped: parseBooleanSetting(settingsMap.wizardSkipped),
-    // Terror zone configuration
-    terrorZoneConfig: parseJSONSetting<Record<number, boolean>>(settingsMap.terrorZoneConfig),
+    // Terror zone configuration (with migration from numeric to string IDs)
+    terrorZoneConfig: migrateTerrorZoneConfig(
+      parseJSONSetting<Record<string | number, boolean>>(
+        settingsMap.terrorZoneConfig,
+        'terrorZoneConfig',
+      ),
+    ),
     terrorZoneBackupCreated: parseBooleanSetting(settingsMap.terrorZoneBackupCreated),
     // Run tracker settings
     runTrackerAutoStart: parseBooleanSetting(settingsMap.runTrackerAutoStart),
@@ -123,6 +179,7 @@ export function getAllSettings(ctx: DatabaseContext): Settings {
       parseIntSetting(settingsMap.runTrackerMemoryPollingInterval) ?? 500,
     runTrackerShortcuts: parseJSONSetting<Settings['runTrackerShortcuts']>(
       settingsMap.runTrackerShortcuts,
+      'runTrackerShortcuts',
     ),
   };
 
@@ -138,4 +195,20 @@ export function setSetting(ctx: DatabaseContext, key: keyof Settings, value: str
       set: { value },
     })
     .run();
+}
+
+/**
+ * Cleans up corrupted settings that have the value "[object Object]".
+ * This can happen when an object is coerced to a string instead of being JSON.stringify'd.
+ * @param ctx - Database context
+ * @returns Number of corrupted settings cleaned up
+ */
+export function cleanupCorruptedSettings(ctx: DatabaseContext): number {
+  const result = ctx.db.delete(settings).where(eq(settings.value, '[object Object]')).run();
+
+  if (result.changes > 0) {
+    console.log(`[cleanupCorruptedSettings] Cleaned up ${result.changes} corrupted setting(s)`);
+  }
+
+  return result.changes;
 }

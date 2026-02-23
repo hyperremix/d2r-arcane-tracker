@@ -431,8 +431,9 @@ describe('When ItemDetailsDialog is rendered', () => {
       // The footer Close button is the one without data-slot="dialog-close"
       const footerClose = closeButtons.find(
         (btn) => btn.getAttribute('data-slot') !== 'dialog-close',
-      )!;
-      fireEvent.click(footerClose);
+      );
+      expect(footerClose).toBeTruthy();
+      fireEvent.click(footerClose as Element);
 
       // Assert
       expect(onOpenChange).toHaveBeenCalledWith(false);
