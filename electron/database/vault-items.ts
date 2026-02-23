@@ -31,6 +31,7 @@ type RawVaultSearchRow = {
   source_character_id: string | null;
   source_character_name: string | null;
   source_file_type: VaultItem['sourceFileType'];
+  source_file_path: string | null;
   location_context: VaultItem['locationContext'];
   stash_tab: number | null;
   grid_x: number | null;
@@ -70,6 +71,7 @@ function mapRawVaultSearchRowToVaultItem(row: RawVaultSearchRow): VaultItem {
     sourceCharacterId: row.source_character_id ?? undefined,
     sourceCharacterName: row.source_character_name ?? undefined,
     sourceFileType: row.source_file_type,
+    sourceFilePath: row.source_file_path ?? undefined,
     locationContext: row.location_context,
     stashTab: row.stash_tab ?? undefined,
     gridX: row.grid_x ?? undefined,
@@ -116,6 +118,7 @@ function buildVaultItemValues(input: VaultItemUpsertInput) {
     sourceCharacterId: toNullable(input.sourceCharacterId),
     sourceCharacterName: toNullable(input.sourceCharacterName),
     sourceFileType: input.sourceFileType,
+    sourceFilePath: toNullable(input.sourceFilePath),
     locationContext: input.locationContext,
     stashTab: toNullable(input.stashTab),
     gridX: toNullable(input.gridX),
@@ -158,6 +161,7 @@ function buildVaultItemUpdatePayload(updates: VaultItemUpdateInput) {
   setPayloadValue(payload, 'sourceCharacterId', updates.sourceCharacterId);
   setPayloadValue(payload, 'sourceCharacterName', updates.sourceCharacterName);
   setPayloadValue(payload, 'sourceFileType', updates.sourceFileType);
+  setPayloadValue(payload, 'sourceFilePath', updates.sourceFilePath);
   setPayloadValue(payload, 'locationContext', updates.locationContext);
   setPayloadValue(payload, 'stashTab', updates.stashTab);
   setPayloadValue(payload, 'gridX', updates.gridX);
@@ -189,7 +193,28 @@ function attachCategoryIds(ctx: DatabaseContext, items: VaultItem[]): VaultItem[
 }
 
 export function addVaultItem(ctx: DatabaseContext, input: VaultItemUpsertInput): VaultItem {
-  return upsertVaultItemByFingerprint(ctx, input);
+  const nowIso = new Date().toISOString();
+  const inputWithVault: VaultItemUpsertInput = {
+    ...input,
+    vaultedAt: input.vaultedAt ?? new Date(nowIso),
+  };
+  const saved = upsertVaultItemByFingerprint(ctx, inputWithVault);
+
+  // Explicitly null out unvaultedAt to support re-vaulting previously-unvaulted items.
+  // Drizzle skips `undefined` in .set(), so we must issue an explicit update here.
+  ctx.db.update(vaultItems).set({ unvaultedAt: null }).where(eq(vaultItems.id, saved.id)).run();
+
+  const refreshed = getVaultItemById(ctx, saved.id);
+  if (!refreshed) {
+    throw new Error(`Unable to load vault item after add: ${saved.id}`);
+  }
+
+  return refreshed;
+}
+
+export function unvaultVaultItem(ctx: DatabaseContext, itemId: string): void {
+  const nowIso = new Date().toISOString();
+  ctx.db.update(vaultItems).set({ unvaultedAt: nowIso }).where(eq(vaultItems.id, itemId)).run();
 }
 
 export function updateVaultItem(
@@ -235,6 +260,7 @@ export function upsertVaultItemByFingerprint(
         sourceCharacterId: values.sourceCharacterId,
         sourceCharacterName: values.sourceCharacterName,
         sourceFileType: values.sourceFileType,
+        sourceFilePath: values.sourceFilePath,
         locationContext: values.locationContext,
         stashTab: values.stashTab,
         gridX: values.gridX,
@@ -422,6 +448,25 @@ function appendPresentStateClause(
   query.params.push(presentState === 'present' ? 1 : 0);
 }
 
+function appendVaultedStateClause(
+  query: SearchClauses,
+  vaultedState: VaultItemFilter['vaultedState'],
+): void {
+  if (!vaultedState || vaultedState === 'all') {
+    return;
+  }
+
+  if (vaultedState === 'vaulted') {
+    query.clauses.push(
+      '(vi.vaulted_at IS NOT NULL AND (vi.unvaulted_at IS NULL OR vi.unvaulted_at < vi.vaulted_at))',
+    );
+  } else {
+    query.clauses.push(
+      '(vi.vaulted_at IS NOT NULL AND vi.unvaulted_at IS NOT NULL AND vi.unvaulted_at >= vi.vaulted_at)',
+    );
+  }
+}
+
 function appendSocketedClause(
   query: SearchClauses,
   includeSocketed: VaultItemFilter['includeSocketed'],
@@ -455,6 +500,7 @@ function buildSearchQuery(filter: VaultItemFilter): SearchClauses {
   appendLocationClause(query, filter.locationContext);
   appendSourceFileTypeClause(query, filter.sourceFileType);
   appendPresentStateClause(query, filter.presentState);
+  appendVaultedStateClause(query, filter.vaultedState);
   appendSocketedClause(query, filter.includeSocketed);
   appendCategoryClause(query, filter.categoryIds);
   return query;
@@ -466,6 +512,7 @@ function getSortByColumn(sortBy: VaultItemFilter['sortBy']): string {
     lastSeenAt: 'vi.last_seen_at',
     createdAt: 'vi.created_at',
     updatedAt: 'vi.updated_at',
+    vaultedAt: 'vi.vaulted_at',
   };
 
   return sortByMap[sortBy ?? 'updatedAt'];

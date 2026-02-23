@@ -9,6 +9,7 @@ import {
   getVaultItemById,
   reconcileVaultItemsForScan,
   searchVaultItems,
+  unvaultVaultItem,
   upsertVaultItemByFingerprint,
 } from './vault-items';
 
@@ -232,6 +233,217 @@ describe('When vault item database operations are executed', () => {
       expect(filtered.items[0]?.rawItemJson).toBe('{"inv_file":"invfla","name":"Flail"}');
       expect(filtered.items[0]?.sourceFileType).toBe('d2s');
       expect(filtered.items[0]?.isPresentInLatestScan).toBe(true);
+    });
+  });
+
+  describe('If addVaultItem is called without providing vaultedAt', () => {
+    it('Then vaultedAt is automatically stamped on the persisted record', () => {
+      // Arrange
+      const before = new Date();
+
+      // Act
+      const item = addVaultItem(ctx, {
+        fingerprint: 'fp-vault-stamp',
+        itemName: "Mara's Kaleidoscope",
+        quality: 'unique',
+        ethereal: false,
+        rawItemJson: '{}',
+        sourceFileType: 'd2s',
+        locationContext: 'inventory',
+      });
+
+      // Assert
+      expect(item.vaultedAt).toBeTruthy();
+      expect(item.vaultedAt?.getTime()).toBeGreaterThanOrEqual(before.getTime());
+    });
+  });
+
+  describe('If addVaultItem is called for a previously unvaulted item', () => {
+    it('Then unvaultedAt is cleared to mark the item as currently vaulted', () => {
+      // Arrange
+      const fingerprint = 'fp-re-vault';
+      const first = addVaultItem(ctx, {
+        fingerprint,
+        itemName: "Tal Rasha's Wrappings",
+        quality: 'set',
+        ethereal: false,
+        rawItemJson: '{}',
+        sourceFileType: 'd2s',
+        locationContext: 'stash',
+      });
+      unvaultVaultItem(ctx, first.id);
+      const afterUnvault = getVaultItemById(ctx, first.id);
+      expect(afterUnvault?.unvaultedAt).toBeTruthy();
+
+      // Act
+      const revaulted = addVaultItem(ctx, {
+        fingerprint,
+        itemName: "Tal Rasha's Wrappings",
+        quality: 'set',
+        ethereal: false,
+        rawItemJson: '{}',
+        sourceFileType: 'd2s',
+        locationContext: 'stash',
+      });
+
+      // Assert
+      expect(revaulted.unvaultedAt).toBeUndefined();
+    });
+  });
+
+  describe('If addVaultItem is called with a sourceFilePath', () => {
+    it('Then sourceFilePath is stored and returned in the result', () => {
+      // Arrange
+      const fingerprint = 'fp-source-file-path';
+      const sourceFilePath = '/saves/Sorc.d2s';
+
+      // Act
+      const item = addVaultItem(ctx, {
+        fingerprint,
+        itemName: 'Shako',
+        quality: 'unique',
+        ethereal: false,
+        rawItemJson: '{"id":42}',
+        sourceFileType: 'd2s',
+        sourceFilePath,
+        locationContext: 'inventory',
+      });
+
+      // Assert
+      expect(item.sourceFilePath).toBe(sourceFilePath);
+    });
+  });
+
+  describe('If unvaultVaultItem is called for a vaulted item', () => {
+    it('Then unvaultedAt is set to a recent timestamp', () => {
+      // Arrange
+      const item = addVaultItem(ctx, {
+        fingerprint: 'fp-unvault',
+        itemName: 'Windforce',
+        quality: 'unique',
+        ethereal: false,
+        rawItemJson: '{}',
+        sourceFileType: 'd2s',
+        locationContext: 'inventory',
+      });
+      const before = new Date();
+
+      // Act
+      unvaultVaultItem(ctx, item.id);
+
+      // Assert
+      const updated = getVaultItemById(ctx, item.id);
+      expect(updated?.unvaultedAt).toBeTruthy();
+      expect(updated?.unvaultedAt?.getTime()).toBeGreaterThanOrEqual(before.getTime());
+    });
+  });
+
+  describe('If searchVaultItems is called with vaultedState vaulted', () => {
+    it('Then only currently-vaulted items are returned', () => {
+      // Arrange
+      const vaultedAt = new Date('2024-01-01T10:00:00.000Z').toISOString();
+      const laterUnvaulted = new Date('2024-01-01T09:00:00.000Z').toISOString(); // before vaultedAt
+
+      // Item that IS currently vaulted (vaultedAt set, no unvaultedAt)
+      const vaulted = addVaultItem(ctx, {
+        fingerprint: 'fp-currently-vaulted',
+        itemName: 'Vaulted Shako',
+        quality: 'unique',
+        ethereal: false,
+        rawItemJson: '{}',
+        sourceFileType: 'd2s',
+        locationContext: 'stash',
+        vaultedAt: new Date(vaultedAt),
+      });
+
+      // Item with unvaultedAt < vaultedAt — still considered vaulted
+      const revaultedAfterUnvault = addVaultItem(ctx, {
+        fingerprint: 'fp-revaulted',
+        itemName: 'Re-Vaulted Belt',
+        quality: 'unique',
+        ethereal: false,
+        rawItemJson: '{}',
+        sourceFileType: 'd2s',
+        locationContext: 'stash',
+        vaultedAt: new Date(vaultedAt),
+        unvaultedAt: new Date(laterUnvaulted),
+      });
+      expect(revaultedAfterUnvault.id).toBeTruthy();
+
+      // Item with unvaultedAt >= vaultedAt — NOT currently vaulted
+      const unvaultedItem = addVaultItem(ctx, {
+        fingerprint: 'fp-unvaulted-search',
+        itemName: 'Unvaulted Ring',
+        quality: 'unique',
+        ethereal: false,
+        rawItemJson: '{}',
+        sourceFileType: 'd2s',
+        locationContext: 'stash',
+      });
+      unvaultVaultItem(ctx, unvaultedItem.id);
+
+      // Item with no vaultedAt — NOT currently vaulted
+      upsertVaultItemByFingerprint(ctx, {
+        fingerprint: 'fp-never-vaulted',
+        itemName: 'Never Vaulted Amulet',
+        quality: 'magic',
+        ethereal: false,
+        rawItemJson: '{}',
+        sourceFileType: 'd2s',
+        locationContext: 'inventory',
+      });
+
+      // Act
+      const result = searchVaultItems(ctx, {
+        vaultedState: 'vaulted',
+        page: 1,
+        pageSize: 20,
+      });
+
+      // Assert
+      expect(result.total).toBe(2);
+      const ids = result.items.map((i) => i.id);
+      expect(ids).toContain(vaulted.id);
+      expect(ids).toContain(revaultedAfterUnvault.id);
+    });
+  });
+
+  describe('If searchVaultItems is called with vaultedState unvaulted', () => {
+    it('Then only previously-vaulted-then-unvaulted items are returned', () => {
+      // Arrange
+      // Item that IS currently vaulted — should NOT appear
+      addVaultItem(ctx, {
+        fingerprint: 'fp-still-vaulted',
+        itemName: 'Still Vaulted Item',
+        quality: 'unique',
+        ethereal: false,
+        rawItemJson: '{}',
+        sourceFileType: 'd2s',
+        locationContext: 'stash',
+      });
+
+      // Item that was vaulted then unvaulted — SHOULD appear
+      const toUnvault = addVaultItem(ctx, {
+        fingerprint: 'fp-was-vaulted',
+        itemName: 'Was Vaulted Item',
+        quality: 'unique',
+        ethereal: false,
+        rawItemJson: '{}',
+        sourceFileType: 'd2s',
+        locationContext: 'stash',
+      });
+      unvaultVaultItem(ctx, toUnvault.id);
+
+      // Act
+      const result = searchVaultItems(ctx, {
+        vaultedState: 'unvaulted',
+        page: 1,
+        pageSize: 20,
+      });
+
+      // Assert
+      expect(result.total).toBe(1);
+      expect(result.items[0]?.id).toBe(toUnvault.id);
     });
   });
 

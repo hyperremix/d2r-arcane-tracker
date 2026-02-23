@@ -296,6 +296,7 @@ export interface VaultItem {
   sourceCharacterId?: string;
   sourceCharacterName?: string;
   sourceFileType: VaultSourceFileType;
+  sourceFilePath?: string;
   locationContext: VaultLocationContext;
   stashTab?: number;
   gridX?: number;
@@ -328,6 +329,7 @@ export interface VaultItemUpsertInput {
   sourceCharacterId?: string;
   sourceCharacterName?: string;
   sourceFileType: VaultSourceFileType;
+  sourceFilePath?: string;
   locationContext: VaultLocationContext;
   stashTab?: number;
   gridX?: number;
@@ -357,9 +359,10 @@ export interface VaultItemFilter {
   sourceFileType?: VaultSourceFileType;
   includeSocketed?: boolean;
   presentState?: 'all' | 'present' | 'missing';
+  vaultedState?: 'all' | 'vaulted' | 'unvaulted';
   page?: number;
   pageSize?: number;
-  sortBy?: 'itemName' | 'lastSeenAt' | 'createdAt' | 'updatedAt';
+  sortBy?: 'itemName' | 'lastSeenAt' | 'createdAt' | 'updatedAt' | 'vaultedAt';
   sortOrder?: 'asc' | 'desc';
 }
 
@@ -391,6 +394,7 @@ export type DatabaseVaultItem = {
   source_character_id: string | null;
   source_character_name: string | null;
   source_file_type: VaultSourceFileType;
+  source_file_path: string | null;
   location_context: VaultLocationContext;
   stash_tab: number | null;
   grid_x: number | null;

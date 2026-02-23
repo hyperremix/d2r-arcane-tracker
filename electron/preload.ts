@@ -21,6 +21,8 @@ import type {
   VaultItemFilter,
   VaultItemSearchResult,
   VaultItemUpsertInput,
+  VaultLocationContext,
+  VaultSourceFileType,
 } from './types/grail';
 
 /**
@@ -277,6 +279,18 @@ contextBridge.exposeInMainWorld('electronAPI', {
     deleteCategory: (categoryId: string): Promise<{ success: boolean }> =>
       ipcRenderer.invoke('vault:deleteCategory', categoryId),
     listCategories: (): Promise<VaultCategory[]> => ipcRenderer.invoke('vault:listCategories'),
+    unvaultItem: (
+      itemId: string,
+      targetOptions?: {
+        targetFilePath: string;
+        targetFileType: VaultSourceFileType;
+        targetLocationContext: VaultLocationContext;
+        targetStashTab?: number;
+        targetGridX: number;
+        targetGridY: number;
+      },
+    ): Promise<{ success: boolean }> =>
+      ipcRenderer.invoke('vault:unvaultItem', itemId, targetOptions),
   },
 
   inventory: {

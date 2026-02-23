@@ -18,6 +18,7 @@ export const vaultItems = sqliteTable(
     }),
     sourceCharacterName: text('source_character_name'),
     sourceFileType: text('source_file_type', { enum: ['d2s', 'sss', 'd2x', 'd2i'] }).notNull(),
+    sourceFilePath: text('source_file_path'),
     locationContext: text('location_context', {
       enum: ['equipped', 'inventory', 'stash', 'mercenary', 'corpse', 'unknown'],
     })

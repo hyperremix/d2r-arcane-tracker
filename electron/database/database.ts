@@ -311,6 +311,9 @@ class GrailDatabase {
   markVaultItemAsMissing(fingerprint: string, sourceCharacterName?: string): void {
     vaultItemsModule.markVaultItemAsMissing(this, fingerprint, sourceCharacterName);
   }
+  unvaultVaultItem(itemId: string): void {
+    vaultItemsModule.unvaultVaultItem(this, itemId);
+  }
 
   // Vault categories
   getAllVaultCategories(): VaultCategory[] {

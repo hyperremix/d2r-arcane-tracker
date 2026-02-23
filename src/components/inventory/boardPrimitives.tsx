@@ -1,4 +1,4 @@
-import type { CSSProperties, ReactNode } from 'react';
+import { type CSSProperties, type DragEvent, type ReactNode, useRef } from 'react';
 import { cn } from '@/lib/utils';
 import {
   createBoardCellIndexes,
@@ -17,6 +17,9 @@ interface BoardSurfaceProps {
   testId?: string;
   className?: string;
   showBaseGrid?: boolean;
+  onDragOverCell?: (x: number, y: number) => void;
+  onDragLeaveBoard?: () => void;
+  onDropOnBoard?: (event: DragEvent<HTMLDivElement>, x: number, y: number) => void;
 }
 
 interface GridPlacementOrigin {
@@ -37,6 +40,28 @@ function getBoardStyle(gridSize: GridSize): CSSProperties {
     height: boardHeight,
     minHeight: boardHeight,
     maxHeight: boardHeight,
+  };
+}
+
+function getCellCoords(
+  event: DragEvent<HTMLDivElement>,
+  el: HTMLDivElement,
+): {
+  x: number;
+  y: number;
+} {
+  const rect = el.getBoundingClientRect();
+  const cellSize = Number.parseFloat(getComputedStyle(el).getPropertyValue('--inv-cell-size'));
+
+  return {
+    x: Math.max(
+      0,
+      Math.floor((event.clientX - rect.left - BOARD_PADDING_PX) / (cellSize + BOARD_GAP_PX)),
+    ),
+    y: Math.max(
+      0,
+      Math.floor((event.clientY - rect.top - BOARD_PADDING_PX) / (cellSize + BOARD_GAP_PX)),
+    ),
   };
 }
 
@@ -61,18 +86,52 @@ export function BoardSurface({
   testId,
   className,
   showBaseGrid = true,
+  onDragOverCell,
+  onDragLeaveBoard,
+  onDropOnBoard,
 }: BoardSurfaceProps) {
+  const boardRef = useRef<HTMLDivElement>(null);
   const cells = showBaseGrid ? createBoardCellIndexes(gridSize) : [];
 
   return (
     <div className="overflow-x-auto pb-1">
+      {/* biome-ignore lint/a11y/noStaticElementInteractions: board surfaces intentionally handle drag-drop targeting without click/keyboard interaction. */}
       <div
+        ref={boardRef}
         data-testid={testId}
         className={cn(
           'relative inline-grid gap-[1px] overflow-hidden rounded-md border border-border/70 bg-black/40 p-2 [--inv-cell-size:28px] sm:[--inv-cell-size:34px]',
           className,
         )}
         style={getBoardStyle(gridSize)}
+        onDragOver={(event) => {
+          event.preventDefault();
+
+          if (onDragOverCell && boardRef.current) {
+            const { x, y } = getCellCoords(event, boardRef.current);
+            onDragOverCell(x, y);
+          }
+        }}
+        onDragLeave={(event) => {
+          if (!onDragLeaveBoard || !boardRef.current) {
+            return;
+          }
+
+          const relatedTarget = event.relatedTarget;
+          if (relatedTarget instanceof Node && boardRef.current.contains(relatedTarget)) {
+            return;
+          }
+
+          onDragLeaveBoard();
+        }}
+        onDrop={(event) => {
+          event.preventDefault();
+
+          if (onDropOnBoard && boardRef.current) {
+            const { x, y } = getCellCoords(event, boardRef.current);
+            onDropOnBoard(event, x, y);
+          }
+        }}
       >
         {cells.map((cellIndex) => (
           <div

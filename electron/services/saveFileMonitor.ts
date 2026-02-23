@@ -1200,10 +1200,6 @@ class SaveFileMonitor {
     this.currentData = results;
     this.inventorySnapshots = successfulSnapshots;
 
-    if (this.grailDatabase) {
-      this.reconcileVaultFromSnapshots(successfulSnapshots);
-    }
-
     // Emit save file events for each file that was actually parsed
     await this.emitSaveFileEvents(filesToParse, results);
     log.info('parseFiles', `Complete - processed ${filesToParse.length} files`);
@@ -1494,56 +1490,6 @@ class SaveFileMonitor {
     await this.startMonitoring();
 
     log.info('updateSaveDirectory', 'Complete');
-  }
-
-  private reconcileVaultFromSnapshots(snapshots: CharacterInventorySnapshot[]): void {
-    const bySource = new Map<string, CharacterInventorySnapshot>();
-
-    for (const snapshot of snapshots) {
-      const key = `${snapshot.sourceFileType}:${snapshot.characterName}`;
-      bySource.set(key, snapshot);
-
-      const characterId = this.grailDatabase?.getCharacterByName(snapshot.characterName)?.id;
-      const now = new Date();
-
-      for (const item of snapshot.items) {
-        this.grailDatabase?.upsertVaultItemByFingerprint({
-          fingerprint: item.fingerprint,
-          itemName: item.itemName,
-          itemCode: item.itemCode,
-          quality: item.quality,
-          ethereal: item.ethereal,
-          socketCount: item.socketCount,
-          rawItemJson: item.rawItemJson,
-          sourceCharacterId: characterId,
-          sourceCharacterName: snapshot.characterName,
-          sourceFileType: snapshot.sourceFileType,
-          locationContext: item.locationContext,
-          stashTab: item.stashTab,
-          gridX: item.gridX,
-          gridY: item.gridY,
-          gridWidth: item.gridWidth,
-          gridHeight: item.gridHeight,
-          equippedSlotId: item.equippedSlotId,
-          iconFileName: item.iconFileName,
-          isSocketedItem: item.isSocketedItem,
-          grailItemId: item.grailItemId,
-          isPresentInLatestScan: true,
-          lastSeenAt: now,
-        });
-      }
-    }
-
-    for (const snapshot of bySource.values()) {
-      const characterId = this.grailDatabase?.getCharacterByName(snapshot.characterName)?.id;
-      this.grailDatabase?.reconcileVaultItemsForScan({
-        sourceFileType: snapshot.sourceFileType,
-        sourceCharacterId: characterId,
-        sourceCharacterName: snapshot.characterName,
-        presentFingerprints: snapshot.items.map((item) => item.fingerprint),
-        lastSeenAt: snapshot.capturedAt,
-      });
-    }
   }
 
   /**
