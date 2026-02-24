@@ -1118,6 +1118,7 @@ function EquipmentSection({
 export function CharacterInventoryBrowser() {
   const { t } = useTranslation();
   const grailItems = useGrailStore((state) => state.items);
+  const setGrailItems = useGrailStore((state) => state.setItems);
   const [isLoading, setIsLoading] = useState(true);
   const [isVaulting, setIsVaulting] = useState(false);
   const [isUnvaulting, setIsUnvaulting] = useState(false);
@@ -1140,6 +1141,33 @@ export function CharacterInventoryBrowser() {
   const draggingVaultInputRef = useRef<VaultItemUpsertInput | undefined>(undefined);
   const latestSearchRequestRef = useRef(0);
   const spriteIconLookup = useMemo(() => createSpriteIconLookupIndex(grailItems), [grailItems]);
+
+  useEffect(() => {
+    if (grailItems.length > 0 || !window.electronAPI?.grail?.getItems) {
+      return;
+    }
+
+    let cancelled = false;
+
+    void window.electronAPI.grail
+      .getItems()
+      .then((items) => {
+        if (cancelled || !items) {
+          return;
+        }
+
+        setGrailItems(items);
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          console.error('Failed to load grail items for inventory icon lookup', error);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [grailItems.length, setGrailItems]);
 
   const loadInventorySearch = useCallback(async (): Promise<void> => {
     const requestId = latestSearchRequestRef.current + 1;

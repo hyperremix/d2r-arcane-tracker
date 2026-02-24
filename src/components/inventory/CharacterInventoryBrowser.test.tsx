@@ -1,5 +1,7 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import type { Item } from 'electron/types/grail';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { useGrailStore } from '@/stores/grailStore';
 import { CharacterInventoryBrowser } from './CharacterInventoryBrowser';
 
 const searchAllMock = vi.fn();
@@ -32,6 +34,7 @@ function createBlockedDragDataTransfer(): DataTransfer {
 describe('When CharacterInventoryBrowser is rendered', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    useGrailStore.setState({ items: [] });
 
     Object.defineProperty(window, 'electronAPI', {
       writable: true,
@@ -234,6 +237,57 @@ describe('When CharacterInventoryBrowser is rendered', () => {
         page: 1,
         pageSize: 20,
       },
+    });
+  });
+
+  describe('If grail items are not loaded and grail API is available', () => {
+    it('Then it hydrates grail items for inventory icon lookup fallbacks', async () => {
+      // Arrange
+      const grailItems: Item[] = [
+        {
+          id: 'harlequincrest',
+          name: 'Harlequin Crest',
+          link: 'https://example.com/item',
+          code: 'uap',
+          itemBase: 'Shako',
+          imageFilename: 'cap_hat.png',
+          etherealType: 'optional',
+          type: 'unique',
+          category: 'armor',
+          subCategory: 'helms',
+          treasureClass: 'elite',
+        },
+      ];
+      const grailGetItemsMock = vi.fn().mockResolvedValue(grailItems);
+      Object.defineProperty(window, 'electronAPI', {
+        writable: true,
+        value: {
+          inventory: {
+            searchAll: searchAllMock,
+          },
+          vault: {
+            addItem: addItemMock,
+            search: searchVaultMock,
+          },
+          icon: {
+            getByFilename: iconByFilenameMock,
+          },
+          grail: {
+            getItems: grailGetItemsMock,
+          },
+        },
+      });
+
+      // Act
+      render(<CharacterInventoryBrowser />);
+
+      // Assert
+      await waitFor(() => {
+        expect(grailGetItemsMock).toHaveBeenCalledTimes(1);
+      });
+      await waitFor(() => {
+        expect(useGrailStore.getState().items).toEqual(grailItems);
+      });
     });
   });
 

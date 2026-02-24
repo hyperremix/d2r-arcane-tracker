@@ -61,6 +61,10 @@ function getCachedIconForCandidates(candidates: string[]): string | undefined {
   return undefined;
 }
 
+function hasUncachedCandidates(candidates: string[]): boolean {
+  return candidates.some((candidate) => !iconCache.has(candidate));
+}
+
 function cacheIconForCandidates(candidates: string[], iconUrl: string): void {
   for (const candidate of candidates) {
     iconCache.set(candidate, iconUrl);
@@ -86,9 +90,12 @@ export function useSpriteIcon(iconFileName?: IconFilenameInput, options?: UseSpr
   const cacheKey = filenameCandidates[0] ?? '';
 
   const cachedIcon = getCachedIconForCandidates(filenameCandidates);
+  const shouldResolveFromCandidates =
+    cachedIcon === undefined ||
+    (cachedIcon === PLACEHOLDER_ICON_URL && hasUncachedCandidates(filenameCandidates));
   const [iconUrl, setIconUrl] = useState(cachedIcon ?? PLACEHOLDER_ICON_URL);
   const [isLoading, setIsLoading] = useState(
-    Boolean(iconsEnabled && filenameCandidates.length > 0 && cachedIcon === undefined),
+    Boolean(iconsEnabled && filenameCandidates.length > 0 && shouldResolveFromCandidates),
   );
 
   useEffect(() => {
@@ -99,7 +106,10 @@ export function useSpriteIcon(iconFileName?: IconFilenameInput, options?: UseSpr
     }
 
     const cached = getCachedIconForCandidates(filenameCandidates);
-    if (cached) {
+    const canUseCached =
+      cached !== undefined &&
+      (cached !== PLACEHOLDER_ICON_URL || !hasUncachedCandidates(filenameCandidates));
+    if (canUseCached && cached !== undefined) {
       setIconUrl(cached);
       setIsLoading(false);
       return;
