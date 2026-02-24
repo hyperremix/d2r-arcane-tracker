@@ -321,6 +321,98 @@ describe('When CharacterInventoryBrowser is rendered', () => {
     });
   });
 
+  describe('If a hovered inventory tile has filled and open sockets in raw JSON', () => {
+    it('Then it renders socketed item rows and one open-socket row per empty slot', async () => {
+      // Arrange
+      searchAllMock.mockResolvedValueOnce({
+        inventory: {
+          snapshots: [
+            {
+              snapshotId: 'snap-sockets',
+              characterName: 'Sorc',
+              characterId: 'char-1',
+              sourceFileType: 'd2s',
+              sourceFilePath: '/tmp/sorc.d2s',
+              capturedAt: new Date('2024-01-01T00:00:00.000Z'),
+              items: [
+                {
+                  fingerprint: 'fp-sockets',
+                  fingerprintInputs: {
+                    sourceFileType: 'd2s',
+                    characterName: 'Sorc',
+                    locationContext: 'inventory',
+                    quality: 'magic',
+                    ethereal: false,
+                    socketCount: 3,
+                    gridX: 1,
+                    gridY: 1,
+                    gridWidth: 2,
+                    gridHeight: 2,
+                    isSocketedItem: false,
+                    itemName: 'Socketed Circlet',
+                  },
+                  characterName: 'Sorc',
+                  characterId: 'char-1',
+                  sourceFileType: 'd2s',
+                  sourceFilePath: '/tmp/sorc.d2s',
+                  locationContext: 'inventory',
+                  type: 'magic',
+                  gridX: 1,
+                  gridY: 1,
+                  gridWidth: 2,
+                  gridHeight: 2,
+                  isSocketedItem: false,
+                  itemName: 'Socketed Circlet',
+                  quality: 'magic',
+                  ethereal: false,
+                  socketCount: 3,
+                  iconFileName: 'circlet.png',
+                  rawItemJson: JSON.stringify({
+                    name: 'Socketed Circlet',
+                    type_name: 'Circlet',
+                    total_nr_of_sockets: 3,
+                    nr_of_items_in_sockets: 1,
+                    socketed_items: [{ name: 'Jah Rune', code: 'r31', inv_file: 'invjah' }],
+                  }),
+                  rawParsedItem: {},
+                  seenAt: new Date('2024-01-01T00:00:00.000Z'),
+                },
+              ],
+            },
+          ],
+          totalSnapshots: 1,
+          totalItems: 1,
+        },
+        vault: {
+          items: [],
+          total: 0,
+          page: 1,
+          pageSize: 20,
+        },
+      });
+
+      render(<CharacterInventoryBrowser />);
+      await waitFor(() => {
+        expect(screen.getByText('Socketed Circlet')).toBeInTheDocument();
+      });
+      const inventoryTile = screen.getByLabelText('Inventory item Socketed Circlet');
+      expect(within(inventoryTile).queryByTestId('item-socket-overlay')).not.toBeInTheDocument();
+
+      // Act
+      fireEvent.mouseEnter(screen.getByLabelText('Inventory item Socketed Circlet'));
+
+      // Assert
+      await waitFor(() => {
+        expect(screen.getByText('Jah Rune')).toBeInTheDocument();
+      });
+      expect(within(inventoryTile).getAllByTestId('item-socket-overlay-filled-slot')).toHaveLength(
+        1,
+      );
+      expect(within(inventoryTile).getAllByTestId('item-socket-overlay-open-slot')).toHaveLength(2);
+      expect(screen.getAllByText('Open Socket')).toHaveLength(2);
+    });
+  });
+
   describe('If a hovered inventory tile has sparse raw JSON', () => {
     it('Then it falls back to the existing metadata tooltip', async () => {
       // Arrange
@@ -415,6 +507,59 @@ describe('When CharacterInventoryBrowser is rendered', () => {
       await waitFor(() => {
         expect(iconByFilenameMock).toHaveBeenCalledWith('flail.png');
       });
+    });
+
+    it('Then hovering the vault tile renders socketed and open socket rows', async () => {
+      // Arrange
+      searchAllMock.mockResolvedValueOnce({
+        inventory: { snapshots: [], totalSnapshots: 0, totalItems: 0 },
+        vault: {
+          items: [
+            {
+              id: 'vault-item-socketed',
+              fingerprint: 'vfp-socketed',
+              itemName: 'Socketed Shield',
+              itemCode: 'tow',
+              quality: 'normal',
+              ethereal: false,
+              socketCount: 3,
+              rawItemJson: JSON.stringify({
+                name: 'Socketed Shield',
+                total_nr_of_sockets: 3,
+                nr_of_items_in_sockets: 1,
+                socketed_items: [{ name: 'Ist Rune', code: 'r24', inv_file: 'invist' }],
+              }),
+              sourceFileType: 'd2s',
+              locationContext: 'stash',
+              iconFileName: 'shield.png',
+              vaultedAt: new Date('2024-01-01T00:00:00.000Z'),
+              created: new Date('2024-01-01T00:00:00.000Z'),
+              lastUpdated: new Date('2024-01-01T00:00:00.000Z'),
+            },
+          ],
+          total: 1,
+          page: 1,
+          pageSize: 200,
+        },
+      });
+
+      render(<CharacterInventoryBrowser />);
+      await waitFor(() => {
+        expect(screen.getByLabelText('Vaulted item Socketed Shield')).toBeInTheDocument();
+      });
+      const vaultTile = screen.getByLabelText('Vaulted item Socketed Shield');
+      expect(within(vaultTile).queryByTestId('item-socket-overlay')).not.toBeInTheDocument();
+
+      // Act
+      fireEvent.mouseEnter(screen.getByLabelText('Vaulted item Socketed Shield'));
+
+      // Assert
+      await waitFor(() => {
+        expect(screen.getByText('Ist Rune')).toBeInTheDocument();
+      });
+      expect(within(vaultTile).getAllByTestId('item-socket-overlay-filled-slot')).toHaveLength(1);
+      expect(within(vaultTile).getAllByTestId('item-socket-overlay-open-slot')).toHaveLength(2);
+      expect(screen.getAllByText('Open Socket')).toHaveLength(2);
     });
 
     it('Then it fetches remaining vault pages and renders items from later pages', async () => {

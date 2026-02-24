@@ -48,6 +48,7 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useSpriteIcon } from '@/hooks/useSpriteIcon';
 import { translations } from '@/i18n/translations';
+import type { GameItemTooltipSocketEntry } from '@/lib/gameItemTooltip';
 import { buildGameItemTooltipModel } from '@/lib/gameItemTooltip';
 import { getRawItemLocation, isRawBeltItem } from '@/lib/rawItemLocation';
 import {
@@ -199,6 +200,84 @@ interface VaultedItemTileProps {
   onDragEnd?: () => void;
 }
 
+interface ItemSocketOverlayProps {
+  entries: GameItemTooltipSocketEntry[];
+}
+
+interface ItemSocketOverlaySlotProps {
+  entry: GameItemTooltipSocketEntry;
+  compact: boolean;
+}
+
+function ItemSocketOverlaySlot({ entry, compact }: ItemSocketOverlaySlotProps) {
+  const { iconUrl } = useSpriteIcon(entry.iconCandidates, { forceEnabled: true });
+  const sizeClass = compact ? 'h-3 w-3' : 'h-4 w-4';
+
+  if (entry.isOpenSocket) {
+    return (
+      <div
+        data-testid="item-socket-overlay-open-slot"
+        className={cn(
+          'flex items-center justify-center rounded-[2px] border border-amber-500/90 bg-black/30',
+          sizeClass,
+        )}
+      >
+        <div
+          className={cn(
+            'rounded-full border border-amber-300/90',
+            compact ? 'h-1.5 w-1.5' : 'h-2 w-2',
+          )}
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div
+      data-testid="item-socket-overlay-filled-slot"
+      className={cn(
+        'overflow-hidden rounded-[2px] border border-white/45 bg-black/20 shadow-[0_0_0_1px_rgba(0,0,0,0.35)]',
+        sizeClass,
+      )}
+    >
+      <img
+        src={iconUrl}
+        alt=""
+        draggable={false}
+        className="h-full w-full object-contain"
+        loading="lazy"
+      />
+    </div>
+  );
+}
+
+function ItemSocketOverlay({ entries }: ItemSocketOverlayProps) {
+  if (entries.length === 0) {
+    return null;
+  }
+
+  const compact = entries.length >= 5;
+
+  return (
+    <div
+      data-testid="item-socket-overlay"
+      className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center"
+      aria-hidden="true"
+    >
+      <div
+        className={cn(
+          'gap-0.5',
+          entries.length > 3 ? 'grid grid-cols-2' : 'flex flex-col items-center',
+        )}
+      >
+        {entries.map((entry) => (
+          <ItemSocketOverlaySlot key={entry.id} entry={entry} compact={compact} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function VaultedItemTile({
   item,
   iconLookup,
@@ -208,6 +287,7 @@ function VaultedItemTile({
   onDragEnd,
 }: VaultedItemTileProps) {
   const { t } = useTranslation();
+  const [isOverlayVisible, setIsOverlayVisible] = useState(false);
   const iconCandidates = useMemo(
     () => createSpatialIconCandidates(item, iconLookup),
     [iconLookup, item],
@@ -220,9 +300,10 @@ function VaultedItemTile({
         fallbackName: item.itemName,
         quality: item.quality,
         type: item.type,
+        socketCount: item.socketCount,
         t,
       }),
-    [item.itemName, item.quality, item.rawItemJson, item.type, t],
+    [item.itemName, item.quality, item.rawItemJson, item.socketCount, item.type, t],
   );
 
   return (
@@ -246,16 +327,25 @@ function VaultedItemTile({
               onDragStart?.(item);
             }}
             onDragEnd={onDragEnd}
+            onMouseEnter={() => setIsOverlayVisible(true)}
+            onMouseLeave={() => setIsOverlayVisible(false)}
+            onFocus={() => setIsOverlayVisible(true)}
+            onBlur={() => setIsOverlayVisible(false)}
           />
         }
       >
-        <img
-          src={iconUrl}
-          alt={item.itemName}
-          draggable={false}
-          className="pointer-events-none h-full w-full object-contain"
-          loading="lazy"
-        />
+        <div className="relative h-full w-full">
+          <img
+            src={iconUrl}
+            alt={item.itemName}
+            draggable={false}
+            className="pointer-events-none h-full w-full object-contain"
+            loading="lazy"
+          />
+          {isOverlayVisible && (
+            <ItemSocketOverlay entries={gameTooltipModel?.socketEntries ?? []} />
+          )}
+        </div>
       </TooltipTrigger>
       <TooltipContent className="max-w-md p-3 text-sm">
         {gameTooltipModel ? (
@@ -586,6 +676,7 @@ function InventoryTile({
   onDragEnd,
 }: InventoryTileProps) {
   const { t } = useTranslation();
+  const [isOverlayVisible, setIsOverlayVisible] = useState(false);
   const gameTooltipModel = useMemo(
     () =>
       buildGameItemTooltipModel({
@@ -593,9 +684,10 @@ function InventoryTile({
         fallbackName: item.itemName,
         quality: item.quality,
         type: item.type,
+        socketCount: item.socketCount,
         t,
       }),
-    [item.itemName, item.quality, item.rawItemJson, item.type, t],
+    [item.itemName, item.quality, item.rawItemJson, item.socketCount, item.type, t],
   );
   const iconCandidates = useMemo(
     () => createSpatialIconCandidates(item, iconLookup),
@@ -623,16 +715,25 @@ function InventoryTile({
             onClick={() => onSelect(item)}
             onDragStart={(event) => onDragStart(event, item)}
             onDragEnd={onDragEnd}
+            onMouseEnter={() => setIsOverlayVisible(true)}
+            onMouseLeave={() => setIsOverlayVisible(false)}
+            onFocus={() => setIsOverlayVisible(true)}
+            onBlur={() => setIsOverlayVisible(false)}
           />
         }
       >
-        <img
-          src={iconUrl}
-          alt={item.itemName}
-          draggable={false}
-          className="pointer-events-none h-full w-full object-contain"
-          loading="lazy"
-        />
+        <div className="relative h-full w-full">
+          <img
+            src={iconUrl}
+            alt={item.itemName}
+            draggable={false}
+            className="pointer-events-none h-full w-full object-contain"
+            loading="lazy"
+          />
+          {isOverlayVisible && (
+            <ItemSocketOverlay entries={gameTooltipModel?.socketEntries ?? []} />
+          )}
+        </div>
       </TooltipTrigger>
       <TooltipContent className="max-w-md p-3 text-sm">
         {gameTooltipModel ? (

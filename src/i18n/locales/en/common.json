@@ -585,7 +585,8 @@
     "durabilityValue": "{{current}} of {{max}}",
     "requiredStrengthLabel": "Required Strength:",
     "requiredDexterityLabel": "Required Dexterity:",
-    "requiredLevelLabel": "Required Level:"
+    "requiredLevelLabel": "Required Level:",
+    "openSocketLabel": "Open Socket"
   },
   "errorBoundary": {
     "title": "Something went wrong",

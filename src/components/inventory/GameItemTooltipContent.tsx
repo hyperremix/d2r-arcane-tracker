@@ -1,4 +1,5 @@
-import type { GameItemTooltipModel } from '@/lib/gameItemTooltip';
+import { useSpriteIcon } from '@/hooks/useSpriteIcon';
+import type { GameItemTooltipModel, GameItemTooltipSocketEntry } from '@/lib/gameItemTooltip';
 import { cn } from '@/lib/utils';
 
 interface GameItemTooltipContentProps {
@@ -26,6 +27,37 @@ function getNameColorClass(model: GameItemTooltipModel): string {
   }
 }
 
+interface GameItemTooltipSocketRowProps {
+  entry: GameItemTooltipSocketEntry;
+}
+
+function GameItemTooltipSocketRow({ entry }: GameItemTooltipSocketRowProps) {
+  const { iconUrl } = useSpriteIcon(entry.iconCandidates, { forceEnabled: true });
+
+  if (entry.isOpenSocket) {
+    return (
+      <div className="flex items-center gap-2 text-amber-700 dark:text-amber-300">
+        <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-[2px] border border-amber-600/80 bg-black/30 dark:border-amber-300/70">
+          <div className="h-2 w-2 rounded-full border border-amber-500/90 dark:border-amber-200/90" />
+        </div>
+        <span>{entry.name}</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-2 text-popover-foreground">
+      <img
+        src={iconUrl}
+        alt={entry.name}
+        className="h-5 w-5 shrink-0 object-contain"
+        loading="lazy"
+      />
+      <span>{entry.name}</span>
+    </div>
+  );
+}
+
 export function GameItemTooltipContent({ model }: GameItemTooltipContentProps) {
   return (
     <div className="space-y-1.5 text-sm leading-6">
@@ -45,6 +77,10 @@ export function GameItemTooltipContent({ model }: GameItemTooltipContentProps) {
         <div key={line} className="text-sky-600 dark:text-sky-300">
           {line}
         </div>
+      ))}
+
+      {model.socketEntries.map((entry) => (
+        <GameItemTooltipSocketRow key={entry.id} entry={entry} />
       ))}
     </div>
   );
