@@ -50,6 +50,7 @@ describe('When buildGameItemTooltipModel is called', () => {
           'Required Level: 24',
         ],
         affixLines: ['+300% Enhanced Damage', '40% Chance of Crushing Blow'],
+        socketEntries: [],
       });
     });
   });
@@ -137,6 +138,103 @@ describe('When buildGameItemTooltipModel is called', () => {
 
       // Assert
       expect(result).toBeNull();
+    });
+  });
+
+  describe('If raw item JSON contains filled and open sockets', () => {
+    it('Then it returns socket entries for both socketed items and empty sockets', () => {
+      // Arrange
+      const rawItemJson = JSON.stringify({
+        type_name: 'Helm',
+        total_nr_of_sockets: 3,
+        nr_of_items_in_sockets: 2,
+        socketed_items: [
+          {
+            name: 'Jah Rune',
+            code: 'r31',
+            inv_file: 'invjah',
+          },
+          {
+            type_name: 'Ruby Jewel',
+            code: 'jew',
+          },
+        ],
+      });
+
+      // Act
+      const result = buildGameItemTooltipModel({
+        rawItemJson,
+        fallbackName: 'fallback-name',
+        quality: 'magic',
+        type: 'magic',
+        t,
+      });
+
+      // Assert
+      expect(
+        result?.socketEntries.map((entry) => ({
+          name: entry.name,
+          isOpenSocket: entry.isOpenSocket,
+        })),
+      ).toEqual([
+        { name: 'Jah Rune', isOpenSocket: false },
+        { name: 'Ruby Jewel', isOpenSocket: false },
+        { name: 'Open Socket', isOpenSocket: true },
+      ]);
+    });
+  });
+
+  describe('If raw item JSON has only open sockets', () => {
+    it('Then it returns a non-null model with one entry per open socket', () => {
+      // Arrange
+      const rawItemJson = JSON.stringify({
+        total_nr_of_sockets: 2,
+        nr_of_items_in_sockets: 0,
+      });
+
+      // Act
+      const result = buildGameItemTooltipModel({
+        rawItemJson,
+        fallbackName: 'fallback-name',
+        quality: 'normal',
+        type: 'normal',
+        t,
+      });
+
+      // Assert
+      expect(result?.socketEntries).toHaveLength(2);
+      expect(result?.socketEntries.every((entry) => entry.isOpenSocket)).toBe(true);
+    });
+  });
+
+  describe('If raw item JSON has socketed_items but no socket totals', () => {
+    it('Then it still renders the socketed item entries', () => {
+      // Arrange
+      const rawItemJson = JSON.stringify({
+        socketed_items: [
+          {
+            type_name: 'Ber Rune',
+            code: 'r30',
+          },
+        ],
+      });
+
+      // Act
+      const result = buildGameItemTooltipModel({
+        rawItemJson,
+        fallbackName: 'fallback-name',
+        quality: 'normal',
+        type: 'normal',
+        t,
+      });
+
+      // Assert
+      expect(
+        result?.socketEntries.map((entry) => ({
+          name: entry.name,
+          isOpenSocket: entry.isOpenSocket,
+        })),
+      ).toEqual([{ name: 'Ber Rune', isOpenSocket: false }]);
     });
   });
 });

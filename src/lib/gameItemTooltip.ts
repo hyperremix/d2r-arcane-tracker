@@ -14,6 +14,17 @@ type ParsedMagicAttribute = {
   visible?: unknown;
 };
 
+type ParsedSocketedRawItem = {
+  runeword_name?: unknown;
+  unique_name?: unknown;
+  set_name?: unknown;
+  name?: unknown;
+  type_name?: unknown;
+  type?: unknown;
+  code?: unknown;
+  inv_file?: unknown;
+};
+
 type ParsedRawItem = {
   runeword_name?: unknown;
   unique_name?: unknown;
@@ -21,9 +32,15 @@ type ParsedRawItem = {
   name?: unknown;
   type_name?: unknown;
   type?: unknown;
+  code?: unknown;
+  inv_file?: unknown;
   base_damage?: unknown;
   current_durability?: unknown;
   max_durability?: unknown;
+  socket_count?: unknown;
+  total_nr_of_sockets?: unknown;
+  nr_of_items_in_sockets?: unknown;
+  socketed_items?: unknown;
   reqstr?: unknown;
   reqdex?: unknown;
   required_level?: unknown;
@@ -35,6 +52,13 @@ type ParsedRawItem = {
   displayed_combined_magic_attributes?: unknown;
 };
 
+export interface GameItemTooltipSocketEntry {
+  id: string;
+  name: string;
+  isOpenSocket: boolean;
+  iconCandidates?: string[];
+}
+
 export interface GameItemTooltipModel {
   name: string;
   quality: string;
@@ -42,6 +66,7 @@ export interface GameItemTooltipModel {
   baseTypeLine?: string;
   coreLines: string[];
   affixLines: string[];
+  socketEntries: GameItemTooltipSocketEntry[];
 }
 
 interface BuildGameItemTooltipModelArgs {
@@ -49,6 +74,7 @@ interface BuildGameItemTooltipModelArgs {
   fallbackName: string;
   quality: string;
   type?: string;
+  socketCount?: number;
   t: TranslateFn;
 }
 
@@ -74,6 +100,15 @@ function toOptionalNumber(value: unknown): number | undefined {
   }
 
   return undefined;
+}
+
+function toNonNegativeInteger(value: unknown): number | undefined {
+  const parsed = toOptionalNumber(value);
+  if (parsed === undefined) {
+    return undefined;
+  }
+
+  return Math.max(0, Math.trunc(parsed));
 }
 
 function parseRawItem(rawItemJson: string): ParsedRawItem | undefined {
@@ -160,6 +195,189 @@ function getBaseType(raw: ParsedRawItem): string | undefined {
   return toOptionalString(raw.type_name) ?? toOptionalString(raw.type);
 }
 
+function getSocketedItems(raw: ParsedRawItem): ParsedSocketedRawItem[] {
+  if (!Array.isArray(raw.socketed_items)) {
+    return [];
+  }
+
+  return raw.socketed_items
+    .filter((item): item is ParsedSocketedRawItem => Boolean(item) && typeof item === 'object')
+    .map((item) => item as ParsedSocketedRawItem);
+}
+
+function getSocketedItemName(raw: ParsedSocketedRawItem, t: TranslateFn): string {
+  const candidates = [
+    raw.runeword_name,
+    raw.unique_name,
+    raw.set_name,
+    raw.name,
+    raw.type_name,
+    raw.type,
+  ];
+
+  for (const candidate of candidates) {
+    const parsed = toOptionalString(candidate);
+    if (parsed) {
+      return parsed;
+    }
+  }
+
+  return t(translations.common.unknown);
+}
+
+function basename(input: string): string {
+  const parts = input.split(/[\\/]/);
+  return parts[parts.length - 1] ?? input;
+}
+
+function stripImageExtension(input: string): string {
+  return input.replace(/\.(png|sprite|dc6|dds|jpg|jpeg|webp)$/i, '');
+}
+
+function toOptionalInvFilePng(value: unknown): string | undefined {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return `${value}.png`;
+  }
+
+  if (typeof value !== 'string') {
+    return undefined;
+  }
+
+  const normalized = stripImageExtension(basename(value.trim())).toLowerCase();
+  if (!normalized) {
+    return undefined;
+  }
+
+  return `${normalized}.png`;
+}
+
+function toSnakeCaseFilename(value: string): string | undefined {
+  const normalized = value
+    .trim()
+    .toLowerCase()
+    .replace(/['`]/g, '')
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+
+  if (!normalized) {
+    return undefined;
+  }
+
+  return `${normalized}.png`;
+}
+
+function addIconCandidate(candidates: Set<string>, value: unknown): void {
+  if (typeof value !== 'string') {
+    return;
+  }
+
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return;
+  }
+
+  candidates.add(trimmed);
+}
+
+function addCodeIconCandidates(candidates: Set<string>, value: unknown): void {
+  if (typeof value !== 'string') {
+    return;
+  }
+
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return;
+  }
+
+  candidates.add(trimmed);
+  candidates.add(`${trimmed}.png`);
+}
+
+function addNameIconCandidates(candidates: Set<string>, value: unknown): void {
+  if (typeof value !== 'string') {
+    return;
+  }
+
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return;
+  }
+
+  candidates.add(trimmed);
+
+  const snakeFilename = toSnakeCaseFilename(trimmed);
+  if (snakeFilename) {
+    candidates.add(snakeFilename);
+  }
+}
+
+function buildSocketIconCandidates(socketedItem: ParsedSocketedRawItem): string[] | undefined {
+  const candidates = new Set<string>();
+
+  addIconCandidate(candidates, socketedItem.inv_file);
+  addIconCandidate(candidates, toOptionalInvFilePng(socketedItem.inv_file));
+  addCodeIconCandidates(candidates, socketedItem.code);
+  addNameIconCandidates(candidates, socketedItem.runeword_name);
+  addNameIconCandidates(candidates, socketedItem.unique_name);
+  addNameIconCandidates(candidates, socketedItem.set_name);
+  addNameIconCandidates(candidates, socketedItem.name);
+  addNameIconCandidates(candidates, socketedItem.type_name);
+  addNameIconCandidates(candidates, socketedItem.type);
+
+  const resolvedCandidates = [...candidates];
+  return resolvedCandidates.length > 0 ? resolvedCandidates : undefined;
+}
+
+function getTotalSocketCount(raw: ParsedRawItem, fallbackSocketCount?: number): number {
+  const candidates = [raw.total_nr_of_sockets, raw.socket_count, fallbackSocketCount];
+
+  for (const candidate of candidates) {
+    const value = toNonNegativeInteger(candidate);
+    if (value !== undefined) {
+      return value;
+    }
+  }
+
+  return 0;
+}
+
+function getFilledSocketCount(raw: ParsedRawItem, socketedItemsLength: number): number {
+  const fromRaw = toNonNegativeInteger(raw.nr_of_items_in_sockets);
+  if (fromRaw !== undefined) {
+    return fromRaw;
+  }
+
+  return socketedItemsLength;
+}
+
+function buildSocketEntries(
+  raw: ParsedRawItem,
+  fallbackSocketCount: number | undefined,
+  t: TranslateFn,
+): GameItemTooltipSocketEntry[] {
+  const socketedItems = getSocketedItems(raw);
+  const socketEntries: GameItemTooltipSocketEntry[] = socketedItems.map((socketedItem, index) => ({
+    id: `socketed-${index}`,
+    name: getSocketedItemName(socketedItem, t),
+    isOpenSocket: false,
+    iconCandidates: buildSocketIconCandidates(socketedItem),
+  }));
+
+  const totalSockets = getTotalSocketCount(raw, fallbackSocketCount);
+  const filledSockets = getFilledSocketCount(raw, socketedItems.length);
+  const openSockets = Math.max(totalSockets - filledSockets, 0);
+
+  for (let index = 0; index < openSockets; index += 1) {
+    socketEntries.push({
+      id: `open-socket-${index}`,
+      name: t(translations.gameItemTooltip.openSocketLabel),
+      isOpenSocket: true,
+    });
+  }
+
+  return socketEntries;
+}
+
 export function buildGameItemTooltipModel(
   args: BuildGameItemTooltipModelArgs,
 ): GameItemTooltipModel | null {
@@ -235,8 +453,12 @@ export function buildGameItemTooltipModel(
   }
 
   const affixLines = getAffixLines(raw);
+  const socketEntries = buildSocketEntries(raw, args.socketCount, args.t);
   const hasMeaningfulContent =
-    Boolean(baseTypeLine) || coreLines.length > 0 || affixLines.length > 0;
+    Boolean(baseTypeLine) ||
+    coreLines.length > 0 ||
+    affixLines.length > 0 ||
+    socketEntries.length > 0;
   if (!hasMeaningfulContent) {
     return null;
   }
@@ -250,5 +472,6 @@ export function buildGameItemTooltipModel(
     baseTypeLine,
     coreLines,
     affixLines,
+    socketEntries,
   };
 }
