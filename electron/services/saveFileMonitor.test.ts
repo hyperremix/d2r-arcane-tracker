@@ -1086,7 +1086,7 @@ describe('When SaveFileMonitor is used', () => {
   });
 
   describe('If spatial inventory parsing is executed', () => {
-    it('Then createParsedInventoryItem maps spatial metadata and prefers parser inv_file over canonical grail filename', () => {
+    it('Then createParsedInventoryItem maps spatial metadata and prefers canonical grail filename over parser inv_file', () => {
       // Arrange
       vi.mocked(getGrailItemId).mockReturnValue('harlequincrest');
       const item = {
@@ -1122,11 +1122,12 @@ describe('When SaveFileMonitor is used', () => {
       expect(parsed.gridWidth).toBe(2);
       expect(parsed.gridHeight).toBe(3);
       expect(parsed.equippedSlotId).toBe(4);
-      expect(parsed.iconFileName).toBe('invhamm.png');
+      expect(parsed.iconFileName).toBe('cap_hat.png');
+      expect(parsed.fingerprintInputs.iconFileName).toBe('invhamm.png');
       expect(parsed.isSocketedItem).toBe(true);
     });
 
-    it('Then parser inv_file is preferred over canonical code-based icon when parser icon exists', () => {
+    it('Then canonical code-based icon is preferred over parser inv_file when both exist', () => {
       // Arrange
       vi.mocked(getGrailItemId).mockReturnValue(null);
       const item = {
@@ -1147,7 +1148,8 @@ describe('When SaveFileMonitor is used', () => {
       });
 
       // Assert
-      expect(parsed.iconFileName).toBe('invhamm.png');
+      expect(parsed.iconFileName).toBe('cap_hat.png');
+      expect(parsed.fingerprintInputs.iconFileName).toBe('invhamm.png');
     });
 
     it('Then location_id 2 maps to unknown belt coordinates in a 4x4 belt board space', () => {

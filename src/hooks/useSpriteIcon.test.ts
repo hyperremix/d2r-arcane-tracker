@@ -126,6 +126,41 @@ describe('When useSpriteIcon is used', () => {
     });
   });
 
+  describe('If placeholder is cached for an early candidate', () => {
+    it('Then it retries newly added candidates and resolves a real icon', async () => {
+      // Arrange
+      const earlyCandidate = `early-candidate-${Date.now()}.png`;
+      const lateCandidate = `late-candidate-${Date.now()}.png`;
+      const resolvedIcon = 'data:image/png;base64,resolved-after-placeholder';
+      getByFilenameMock.mockImplementation(async (candidate: string) => {
+        if (candidate === lateCandidate) {
+          return resolvedIcon;
+        }
+
+        return undefined;
+      });
+
+      // Act
+      const firstHook = renderHook(() => useSpriteIcon(earlyCandidate, { forceEnabled: true }));
+      await waitFor(() => {
+        expect(firstHook.result.current.isLoading).toBe(false);
+      });
+      firstHook.unmount();
+
+      getByFilenameMock.mockClear();
+
+      const secondHook = renderHook(() =>
+        useSpriteIcon([earlyCandidate, lateCandidate], { forceEnabled: true }),
+      );
+
+      // Assert
+      await waitFor(() => {
+        expect(secondHook.result.current.iconUrl).toBe(resolvedIcon);
+      });
+      expect(getByFilenameMock).toHaveBeenCalledWith(lateCandidate);
+    });
+  });
+
   describe('If the icon API returns no sprite for a filename', () => {
     it('Then it falls back to the placeholder icon', async () => {
       // Arrange
