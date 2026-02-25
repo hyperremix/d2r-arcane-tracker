@@ -54,7 +54,7 @@ function getCellCoords(
   const parsedCellSize = Number.parseFloat(
     getComputedStyle(el).getPropertyValue('--inv-cell-size'),
   );
-  const cellSize = Number.isFinite(parsedCellSize) && parsedCellSize > 0 ? parsedCellSize : 28;
+  const cellSize = Number.isFinite(parsedCellSize) && parsedCellSize > 0 ? parsedCellSize : 22;
   const clientX =
     Number.isFinite(event.clientX) && Number.isFinite(rect.left)
       ? event.clientX
@@ -108,7 +108,7 @@ export function BoardSurface({
         ref={boardRef}
         data-testid={testId}
         className={cn(
-          'relative inline-grid gap-[1px] overflow-hidden rounded-md border border-border/70 bg-black/40 p-2 [--inv-cell-size:28px] sm:[--inv-cell-size:34px]',
+          'relative inline-grid gap-[1px] overflow-hidden rounded-md border border-border/70 bg-black/40 p-2 [--inv-cell-size:22px] sm:[--inv-cell-size:28px]',
           className,
         )}
         style={getBoardStyle(gridSize)}
