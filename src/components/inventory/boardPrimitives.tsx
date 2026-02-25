@@ -17,7 +17,7 @@ interface BoardSurfaceProps {
   testId?: string;
   className?: string;
   showBaseGrid?: boolean;
-  onDragOverCell?: (x: number, y: number) => void;
+  onDragOverCell?: (event: DragEvent<HTMLDivElement>, x: number, y: number) => void;
   onDragLeaveBoard?: () => void;
   onDropOnBoard?: (event: DragEvent<HTMLDivElement>, x: number, y: number) => void;
 }
@@ -51,17 +51,25 @@ function getCellCoords(
   y: number;
 } {
   const rect = el.getBoundingClientRect();
-  const cellSize = Number.parseFloat(getComputedStyle(el).getPropertyValue('--inv-cell-size'));
+  const parsedCellSize = Number.parseFloat(
+    getComputedStyle(el).getPropertyValue('--inv-cell-size'),
+  );
+  const cellSize = Number.isFinite(parsedCellSize) && parsedCellSize > 0 ? parsedCellSize : 28;
+  const clientX =
+    Number.isFinite(event.clientX) && Number.isFinite(rect.left)
+      ? event.clientX
+      : rect.left + BOARD_PADDING_PX;
+  const clientY =
+    Number.isFinite(event.clientY) && Number.isFinite(rect.top)
+      ? event.clientY
+      : rect.top + BOARD_PADDING_PX;
+  const cellSpan = cellSize + BOARD_GAP_PX;
+  const rawX = (clientX - rect.left - BOARD_PADDING_PX) / cellSpan;
+  const rawY = (clientY - rect.top - BOARD_PADDING_PX) / cellSpan;
 
   return {
-    x: Math.max(
-      0,
-      Math.floor((event.clientX - rect.left - BOARD_PADDING_PX) / (cellSize + BOARD_GAP_PX)),
-    ),
-    y: Math.max(
-      0,
-      Math.floor((event.clientY - rect.top - BOARD_PADDING_PX) / (cellSize + BOARD_GAP_PX)),
-    ),
+    x: Number.isFinite(rawX) ? Math.max(0, Math.floor(rawX)) : 0,
+    y: Number.isFinite(rawY) ? Math.max(0, Math.floor(rawY)) : 0,
   };
 }
 
@@ -109,7 +117,7 @@ export function BoardSurface({
 
           if (onDragOverCell && boardRef.current) {
             const { x, y } = getCellCoords(event, boardRef.current);
-            onDragOverCell(x, y);
+            onDragOverCell(event, x, y);
           }
         }}
         onDragLeave={(event) => {

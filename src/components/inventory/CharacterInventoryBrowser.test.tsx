@@ -1,12 +1,16 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import type { Item } from 'electron/types/grail';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { serializeVaultTextPayload, VAULT_DRAG_MIME } from '@/components/inventory/dragPayloads';
 import { useGrailStore } from '@/stores/grailStore';
 import { CharacterInventoryBrowser } from './CharacterInventoryBrowser';
 
 const searchAllMock = vi.fn();
+const moveInventoryItemMock = vi.fn();
 const searchVaultMock = vi.fn();
 const addItemMock = vi.fn();
+const unvaultItemMock = vi.fn();
+const refreshSaveFilesMock = vi.fn();
 const iconByFilenameMock = vi.fn();
 
 function createDragDataTransfer(): DataTransfer {
@@ -41,10 +45,15 @@ describe('When CharacterInventoryBrowser is rendered', () => {
       value: {
         inventory: {
           searchAll: searchAllMock,
+          moveItem: moveInventoryItemMock,
         },
         vault: {
           addItem: addItemMock,
           search: searchVaultMock,
+          unvaultItem: unvaultItemMock,
+        },
+        saveFile: {
+          refreshSaveFiles: refreshSaveFilesMock,
         },
         icon: {
           getByFilename: iconByFilenameMock,
@@ -59,6 +68,8 @@ describe('When CharacterInventoryBrowser is rendered', () => {
       page: 1,
       pageSize: 200,
     });
+    refreshSaveFilesMock.mockResolvedValue({ success: true });
+    moveInventoryItemMock.mockResolvedValue({ success: true });
 
     searchAllMock.mockResolvedValue({
       inventory: {
@@ -1204,6 +1215,550 @@ describe('When CharacterInventoryBrowser is rendered', () => {
       expect(addItemMock.mock.calls[0]?.[0]?.fingerprint).toBe('fp-stash-2');
       expect(addItemMock.mock.calls[0]?.[0]?.locationContext).toBe('stash');
       expect(addItemMock.mock.calls[0]?.[0]?.stashTab).toBe(1);
+    });
+  });
+
+  describe('If a vaulted item payload is dropped on an inventory board without custom MIME data', () => {
+    it('Then it unvaults the item to the board coordinates using text payload fallback', async () => {
+      // Arrange
+      const getComputedStyleSpy = vi
+        .spyOn(window, 'getComputedStyle')
+        .mockReturnValue({ getPropertyValue: () => '28' } as unknown as CSSStyleDeclaration);
+      searchAllMock.mockResolvedValue({
+        inventory: {
+          snapshots: [
+            {
+              snapshotId: 'drop-snap-1',
+              characterName: 'Sorc',
+              characterId: 'char-1',
+              sourceFileType: 'd2s',
+              sourceFilePath: '/tmp/sorc.d2s',
+              capturedAt: new Date('2024-01-01T00:00:00.000Z'),
+              items: [
+                {
+                  fingerprint: 'fp-existing',
+                  fingerprintInputs: {
+                    sourceFileType: 'd2s',
+                    characterName: 'Sorc',
+                    locationContext: 'inventory',
+                    quality: 'unique',
+                    ethereal: false,
+                    socketCount: 0,
+                    gridX: 4,
+                    gridY: 0,
+                    gridWidth: 2,
+                    gridHeight: 2,
+                    isSocketedItem: false,
+                    itemName: 'Existing Item',
+                  },
+                  characterName: 'Sorc',
+                  characterId: 'char-1',
+                  sourceFileType: 'd2s',
+                  sourceFilePath: '/tmp/sorc.d2s',
+                  locationContext: 'inventory',
+                  type: 'unique',
+                  gridX: 4,
+                  gridY: 0,
+                  gridWidth: 2,
+                  gridHeight: 2,
+                  isSocketedItem: false,
+                  itemName: 'Existing Item',
+                  quality: 'unique',
+                  ethereal: false,
+                  socketCount: 0,
+                  iconFileName: 'shako.png',
+                  rawItemJson: '{}',
+                  rawParsedItem: {},
+                  seenAt: new Date('2024-01-01T00:00:00.000Z'),
+                },
+              ],
+            },
+          ],
+          totalSnapshots: 1,
+          totalItems: 1,
+        },
+        vault: {
+          items: [],
+          total: 0,
+          page: 1,
+          pageSize: 20,
+        },
+      });
+
+      render(<CharacterInventoryBrowser />);
+      const inventoryBoard = await screen.findByTestId('inventory-board-drop-snap-1');
+      const payload = serializeVaultTextPayload({
+        id: 'vault-cross-window-1',
+        gridWidth: 1,
+        gridHeight: 1,
+      });
+      const dataTransfer = {
+        getData: (format: string) => (format === 'text/plain' ? payload : ''),
+      };
+
+      // Act
+      fireEvent.dragOver(inventoryBoard, {
+        dataTransfer,
+        clientX: 12,
+        clientY: 12,
+      });
+      fireEvent.drop(inventoryBoard, {
+        dataTransfer,
+        clientX: 12,
+        clientY: 12,
+      });
+
+      // Assert
+      await waitFor(() => {
+        expect(unvaultItemMock).toHaveBeenCalledWith(
+          'vault-cross-window-1',
+          expect.objectContaining({
+            targetFilePath: '/tmp/sorc.d2s',
+            targetFileType: 'd2s',
+            targetLocationContext: 'inventory',
+          }),
+        );
+      });
+      getComputedStyleSpy.mockRestore();
+    });
+  });
+
+  describe('If custom vault MIME data cannot be read during drop', () => {
+    it('Then text payload fallback is still used to unvault to the target board', async () => {
+      // Arrange
+      const getComputedStyleSpy = vi
+        .spyOn(window, 'getComputedStyle')
+        .mockReturnValue({ getPropertyValue: () => '28' } as unknown as CSSStyleDeclaration);
+      searchAllMock.mockResolvedValue({
+        inventory: {
+          snapshots: [
+            {
+              snapshotId: 'drop-snap-throw',
+              characterName: 'Sorc',
+              characterId: 'char-1',
+              sourceFileType: 'd2s',
+              sourceFilePath: '/tmp/sorc.d2s',
+              capturedAt: new Date('2024-01-01T00:00:00.000Z'),
+              items: [
+                {
+                  fingerprint: 'fp-existing-throw',
+                  fingerprintInputs: {
+                    sourceFileType: 'd2s',
+                    characterName: 'Sorc',
+                    locationContext: 'inventory',
+                    quality: 'unique',
+                    ethereal: false,
+                    socketCount: 0,
+                    gridX: 4,
+                    gridY: 0,
+                    gridWidth: 2,
+                    gridHeight: 2,
+                    isSocketedItem: false,
+                    itemName: 'Existing Item',
+                  },
+                  characterName: 'Sorc',
+                  characterId: 'char-1',
+                  sourceFileType: 'd2s',
+                  sourceFilePath: '/tmp/sorc.d2s',
+                  locationContext: 'inventory',
+                  type: 'unique',
+                  gridX: 4,
+                  gridY: 0,
+                  gridWidth: 2,
+                  gridHeight: 2,
+                  isSocketedItem: false,
+                  itemName: 'Existing Item',
+                  quality: 'unique',
+                  ethereal: false,
+                  socketCount: 0,
+                  iconFileName: 'shako.png',
+                  rawItemJson: '{}',
+                  rawParsedItem: {},
+                  seenAt: new Date('2024-01-01T00:00:00.000Z'),
+                },
+              ],
+            },
+          ],
+          totalSnapshots: 1,
+          totalItems: 0,
+        },
+        vault: {
+          items: [],
+          total: 0,
+          page: 1,
+          pageSize: 20,
+        },
+      });
+
+      render(<CharacterInventoryBrowser />);
+      const inventoryBoard = await screen.findByTestId('inventory-board-drop-snap-throw');
+      const payload = serializeVaultTextPayload({
+        id: 'vault-cross-window-throw',
+        gridWidth: 1,
+        gridHeight: 1,
+      });
+      const dataTransfer = {
+        getData: (format: string) => {
+          if (format === VAULT_DRAG_MIME) {
+            throw new Error('Blocked MIME read');
+          }
+
+          return format === 'text/plain' ? payload : '';
+        },
+      };
+
+      // Act
+      fireEvent.dragOver(inventoryBoard, {
+        dataTransfer,
+        clientX: 12,
+        clientY: 12,
+      });
+      fireEvent.drop(inventoryBoard, {
+        dataTransfer,
+        clientX: 12,
+        clientY: 12,
+      });
+
+      // Assert
+      await waitFor(() => {
+        expect(unvaultItemMock).toHaveBeenCalledWith(
+          'vault-cross-window-throw',
+          expect.objectContaining({
+            targetFilePath: '/tmp/sorc.d2s',
+            targetFileType: 'd2s',
+            targetLocationContext: 'inventory',
+          }),
+        );
+      });
+      getComputedStyleSpy.mockRestore();
+    });
+  });
+
+  describe('If an inventory tile is dropped on another inventory board cell', () => {
+    it('Then it calls inventory.moveItem with the target board coordinates', async () => {
+      // Arrange
+      const getComputedStyleSpy = vi
+        .spyOn(window, 'getComputedStyle')
+        .mockReturnValue({ getPropertyValue: () => '28' } as unknown as CSSStyleDeclaration);
+      searchAllMock.mockResolvedValue({
+        inventory: {
+          snapshots: [
+            {
+              snapshotId: 'move-snap-1',
+              characterName: 'Sorc',
+              characterId: 'char-1',
+              sourceFileType: 'd2s',
+              sourceFilePath: '/tmp/sorc.d2s',
+              capturedAt: new Date('2024-01-01T00:00:00.000Z'),
+              items: [
+                {
+                  fingerprint: 'fp-move-1',
+                  fingerprintInputs: {
+                    sourceFileType: 'd2s',
+                    characterName: 'Sorc',
+                    locationContext: 'inventory',
+                    quality: 'unique',
+                    ethereal: false,
+                    socketCount: 0,
+                    gridX: 1,
+                    gridY: 1,
+                    gridWidth: 1,
+                    gridHeight: 1,
+                    isSocketedItem: false,
+                    itemName: 'Move Me',
+                  },
+                  characterName: 'Sorc',
+                  characterId: 'char-1',
+                  sourceFileType: 'd2s',
+                  sourceFilePath: '/tmp/sorc.d2s',
+                  locationContext: 'inventory',
+                  type: 'unique',
+                  itemCode: 'uap',
+                  gridX: 1,
+                  gridY: 1,
+                  gridWidth: 1,
+                  gridHeight: 1,
+                  isSocketedItem: false,
+                  itemName: 'Move Me',
+                  quality: 'unique',
+                  ethereal: false,
+                  socketCount: 0,
+                  iconFileName: 'shako.png',
+                  rawItemJson: '{"id":101,"type_name":"Shako","code":"uap"}',
+                  rawParsedItem: {},
+                  seenAt: new Date('2024-01-01T00:00:00.000Z'),
+                },
+              ],
+            },
+          ],
+          totalSnapshots: 1,
+          totalItems: 1,
+        },
+        vault: {
+          items: [],
+          total: 0,
+          page: 1,
+          pageSize: 20,
+        },
+      });
+
+      render(<CharacterInventoryBrowser />);
+      const draggedTile = await screen.findByLabelText('Inventory item Move Me');
+      const inventoryBoard = await screen.findByTestId('inventory-board-move-snap-1');
+      const dataTransfer = createDragDataTransfer();
+
+      // Act
+      fireEvent.dragStart(draggedTile, { dataTransfer });
+      fireEvent.dragOver(inventoryBoard, { dataTransfer, clientX: 100, clientY: 12 });
+      fireEvent.drop(inventoryBoard, { dataTransfer, clientX: 100, clientY: 12 });
+
+      // Assert
+      await waitFor(() => {
+        expect(moveInventoryItemMock).toHaveBeenCalledWith(
+          expect.objectContaining({
+            sourceFilePath: '/tmp/sorc.d2s',
+            sourceFileType: 'd2s',
+            targetFilePath: '/tmp/sorc.d2s',
+            targetFileType: 'd2s',
+            targetLocationContext: 'inventory',
+          }),
+        );
+      });
+      const movePayload = moveInventoryItemMock.mock.calls[0]?.[0];
+      expect(Number.isFinite(movePayload?.targetGridX)).toBe(true);
+      expect(Number.isFinite(movePayload?.targetGridY)).toBe(true);
+      getComputedStyleSpy.mockRestore();
+    });
+  });
+
+  describe('If an inventory tile is dropped on another character inventory board', () => {
+    it('Then it calls inventory.moveItem with the target character save file', async () => {
+      // Arrange
+      const getComputedStyleSpy = vi
+        .spyOn(window, 'getComputedStyle')
+        .mockReturnValue({ getPropertyValue: () => '28' } as unknown as CSSStyleDeclaration);
+      searchAllMock.mockResolvedValue({
+        inventory: {
+          snapshots: [
+            {
+              snapshotId: 'move-source',
+              characterName: 'Sorc',
+              characterId: 'char-1',
+              sourceFileType: 'd2s',
+              sourceFilePath: '/tmp/sorc.d2s',
+              capturedAt: new Date('2024-01-01T00:00:00.000Z'),
+              items: [
+                {
+                  fingerprint: 'fp-source',
+                  fingerprintInputs: {
+                    sourceFileType: 'd2s',
+                    characterName: 'Sorc',
+                    locationContext: 'inventory',
+                    quality: 'unique',
+                    ethereal: false,
+                    socketCount: 0,
+                    gridX: 0,
+                    gridY: 0,
+                    gridWidth: 1,
+                    gridHeight: 1,
+                    isSocketedItem: false,
+                    itemName: 'Source Item',
+                  },
+                  characterName: 'Sorc',
+                  characterId: 'char-1',
+                  sourceFileType: 'd2s',
+                  sourceFilePath: '/tmp/sorc.d2s',
+                  locationContext: 'inventory',
+                  type: 'unique',
+                  itemCode: 'uap',
+                  gridX: 0,
+                  gridY: 0,
+                  gridWidth: 1,
+                  gridHeight: 1,
+                  isSocketedItem: false,
+                  itemName: 'Source Item',
+                  quality: 'unique',
+                  ethereal: false,
+                  socketCount: 0,
+                  iconFileName: 'shako.png',
+                  rawItemJson: '{"id":201,"type_name":"Shako","code":"uap"}',
+                  rawParsedItem: {},
+                  seenAt: new Date('2024-01-01T00:00:00.000Z'),
+                },
+              ],
+            },
+            {
+              snapshotId: 'move-target',
+              characterName: 'Barb',
+              characterId: 'char-2',
+              sourceFileType: 'd2s',
+              sourceFilePath: '/tmp/barb.d2s',
+              capturedAt: new Date('2024-01-01T00:00:00.000Z'),
+              items: [
+                {
+                  fingerprint: 'fp-target-existing',
+                  fingerprintInputs: {
+                    sourceFileType: 'd2s',
+                    characterName: 'Barb',
+                    locationContext: 'stash',
+                    quality: 'unique',
+                    ethereal: false,
+                    socketCount: 0,
+                    stashTab: 0,
+                    gridX: 0,
+                    gridY: 0,
+                    gridWidth: 1,
+                    gridHeight: 1,
+                    isSocketedItem: false,
+                    itemName: 'Target Existing',
+                  },
+                  characterName: 'Barb',
+                  characterId: 'char-2',
+                  sourceFileType: 'd2s',
+                  sourceFilePath: '/tmp/barb.d2s',
+                  locationContext: 'stash',
+                  stashTab: 0,
+                  type: 'unique',
+                  itemCode: 'uap',
+                  gridX: 0,
+                  gridY: 0,
+                  gridWidth: 1,
+                  gridHeight: 1,
+                  isSocketedItem: false,
+                  itemName: 'Target Existing',
+                  quality: 'unique',
+                  ethereal: false,
+                  socketCount: 0,
+                  iconFileName: 'shako.png',
+                  rawItemJson: '{"id":202,"type_name":"Shako","code":"uap"}',
+                  rawParsedItem: {},
+                  seenAt: new Date('2024-01-01T00:00:00.000Z'),
+                },
+              ],
+            },
+          ],
+          totalSnapshots: 2,
+          totalItems: 2,
+        },
+        vault: {
+          items: [],
+          total: 0,
+          page: 1,
+          pageSize: 20,
+        },
+      });
+
+      render(<CharacterInventoryBrowser />);
+      const draggedTile = await screen.findByLabelText('Inventory item Source Item');
+      const targetBoard = await screen.findByTestId('inventory-board-move-target');
+      const dataTransfer = createDragDataTransfer();
+
+      // Act
+      fireEvent.dragStart(draggedTile, { dataTransfer });
+      fireEvent.dragOver(targetBoard, { dataTransfer, clientX: 100, clientY: 12 });
+      fireEvent.drop(targetBoard, { dataTransfer, clientX: 100, clientY: 12 });
+
+      // Assert
+      await waitFor(() => {
+        expect(moveInventoryItemMock).toHaveBeenCalledWith(
+          expect.objectContaining({
+            sourceFilePath: '/tmp/sorc.d2s',
+            targetFilePath: '/tmp/barb.d2s',
+            targetLocationContext: 'inventory',
+          }),
+        );
+      });
+      getComputedStyleSpy.mockRestore();
+    });
+  });
+
+  describe('If an inventory tile is dropped on an equipment slot', () => {
+    it('Then it calls inventory.moveItem with equipped target metadata', async () => {
+      // Arrange
+      searchAllMock.mockResolvedValue({
+        inventory: {
+          snapshots: [
+            {
+              snapshotId: 'equip-snap',
+              characterName: 'Sorc',
+              characterId: 'char-1',
+              sourceFileType: 'd2s',
+              sourceFilePath: '/tmp/sorc.d2s',
+              capturedAt: new Date('2024-01-01T00:00:00.000Z'),
+              items: [
+                {
+                  fingerprint: 'fp-amulet',
+                  fingerprintInputs: {
+                    sourceFileType: 'd2s',
+                    characterName: 'Sorc',
+                    locationContext: 'inventory',
+                    quality: 'magic',
+                    ethereal: false,
+                    socketCount: 0,
+                    gridX: 1,
+                    gridY: 0,
+                    gridWidth: 1,
+                    gridHeight: 1,
+                    isSocketedItem: false,
+                    itemName: 'Magic Amulet',
+                  },
+                  characterName: 'Sorc',
+                  characterId: 'char-1',
+                  sourceFileType: 'd2s',
+                  sourceFilePath: '/tmp/sorc.d2s',
+                  locationContext: 'inventory',
+                  type: 'other',
+                  itemCode: 'amu',
+                  gridX: 1,
+                  gridY: 0,
+                  gridWidth: 1,
+                  gridHeight: 1,
+                  isSocketedItem: false,
+                  itemName: 'Magic Amulet',
+                  quality: 'magic',
+                  ethereal: false,
+                  socketCount: 0,
+                  iconFileName: 'amulet.png',
+                  rawItemJson: '{"id":301,"type_name":"Amulet","code":"amu"}',
+                  rawParsedItem: {},
+                  seenAt: new Date('2024-01-01T00:00:00.000Z'),
+                },
+              ],
+            },
+          ],
+          totalSnapshots: 1,
+          totalItems: 1,
+        },
+        vault: {
+          items: [],
+          total: 0,
+          page: 1,
+          pageSize: 20,
+        },
+      });
+
+      render(<CharacterInventoryBrowser />);
+      const draggedTile = await screen.findByLabelText('Inventory item Magic Amulet');
+      const equippedSlots = await screen.findAllByTestId('equipped-slot-frame');
+      const amuletSlot = equippedSlots[1];
+      const dataTransfer = createDragDataTransfer();
+
+      // Act
+      fireEvent.dragStart(draggedTile, { dataTransfer });
+      fireEvent.dragOver(amuletSlot, { dataTransfer });
+      fireEvent.drop(amuletSlot, { dataTransfer });
+
+      // Assert
+      await waitFor(() => {
+        expect(moveInventoryItemMock).toHaveBeenCalledWith(
+          expect.objectContaining({
+            sourceFilePath: '/tmp/sorc.d2s',
+            targetFilePath: '/tmp/sorc.d2s',
+            targetLocationContext: 'equipped',
+            targetEquippedSlotId: 2,
+          }),
+        );
+      });
     });
   });
 });

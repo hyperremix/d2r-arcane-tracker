@@ -13,6 +13,11 @@ const mocks = vi.hoisted(() => ({
     removeVaultCategory: vi.fn(),
     getAllVaultCategories: vi.fn(),
   },
+  saveFileEditorMock: {
+    addItemToSaveFile: vi.fn(),
+    removeItemFromSaveFile: vi.fn(),
+    moveItemBetweenSaveFiles: vi.fn(),
+  },
 }));
 
 vi.mock('electron', () => ({
@@ -23,6 +28,12 @@ vi.mock('electron', () => ({
 
 vi.mock('../database/database', () => ({
   grailDatabase: mocks.grailDatabaseMock,
+}));
+
+vi.mock('../services/saveFileEditor', () => ({
+  addItemToSaveFile: mocks.saveFileEditorMock.addItemToSaveFile,
+  removeItemFromSaveFile: mocks.saveFileEditorMock.removeItemFromSaveFile,
+  moveItemBetweenSaveFiles: mocks.saveFileEditorMock.moveItemBetweenSaveFiles,
 }));
 
 import { initializeVaultHandlers } from './vaultHandlers';
@@ -57,6 +68,62 @@ describe('When vault IPC handlers are initialized', () => {
         expect.any(Function),
       );
       expect(mocks.handleMock).toHaveBeenCalledWith('inventory:searchAll', expect.any(Function));
+      expect(mocks.handleMock).toHaveBeenCalledWith('inventory:moveItem', expect.any(Function));
+    });
+  });
+
+  describe('If vault:addItem receives date fields as ISO strings', () => {
+    it('Then the handler normalizes them to Date instances before database writes', async () => {
+      // Arrange
+      initializeVaultHandlers(() => undefined);
+      mocks.grailDatabaseMock.addVaultItem.mockReturnValue({
+        id: 'fp-1',
+      });
+      const handler = mocks.handleMock.mock.calls.find((call) => call[0] === 'vault:addItem')?.[1];
+
+      // Act
+      await handler?.(null, {
+        fingerprint: 'fp-1',
+        itemName: 'Shako',
+        quality: 'unique',
+        ethereal: false,
+        rawItemJson: '{}',
+        sourceFileType: 'd2s',
+        locationContext: 'inventory',
+        lastSeenAt: '2024-01-01T10:00:00.000Z',
+        vaultedAt: '2024-01-01T10:01:00.000Z',
+      });
+
+      // Assert
+      expect(mocks.grailDatabaseMock.addVaultItem).toHaveBeenCalledWith(
+        expect.objectContaining({
+          lastSeenAt: expect.any(Date),
+          vaultedAt: expect.any(Date),
+        }),
+      );
+    });
+  });
+
+  describe('If vault:addItem receives an invalid date string', () => {
+    it('Then the handler rejects the request with a validation error', async () => {
+      // Arrange
+      initializeVaultHandlers(() => undefined);
+      const handler = mocks.handleMock.mock.calls.find((call) => call[0] === 'vault:addItem')?.[1];
+
+      // Act
+      const promise = handler?.(null, {
+        fingerprint: 'fp-1',
+        itemName: 'Shako',
+        quality: 'unique',
+        ethereal: false,
+        rawItemJson: '{}',
+        sourceFileType: 'd2s',
+        locationContext: 'inventory',
+        lastSeenAt: 'invalid-date-value',
+      });
+
+      // Assert
+      await expect(promise).rejects.toThrow('lastSeenAt must be a valid date');
     });
   });
 
@@ -246,6 +313,70 @@ describe('When vault IPC handlers are initialized', () => {
 
       // Assert
       await expect(promise).rejects.toThrow('Search text must be <= 120 characters');
+    });
+  });
+
+  describe('If inventory:moveItem receives a valid move payload', () => {
+    it('Then it delegates to save-file move logic and returns success', async () => {
+      // Arrange
+      initializeVaultHandlers(() => undefined);
+      const handler = mocks.handleMock.mock.calls.find(
+        (call) => call[0] === 'inventory:moveItem',
+      )?.[1];
+      const movePayload = {
+        sourceFilePath: '/tmp/sorc.d2s',
+        sourceFileType: 'd2s',
+        rawItemJson: JSON.stringify({ id: 42, code: 'uap' }),
+        targetFilePath: '/tmp/barb.d2s',
+        targetFileType: 'd2s',
+        targetLocationContext: 'inventory',
+        targetGridX: 3,
+        targetGridY: 1,
+      };
+
+      // Act
+      const result = await handler?.(null, movePayload);
+
+      // Assert
+      expect(mocks.saveFileEditorMock.moveItemBetweenSaveFiles).toHaveBeenCalledWith(
+        expect.objectContaining({
+          sourceFilePath: '/tmp/sorc.d2s',
+          sourceFileType: 'd2s',
+          sourceItemId: 42,
+          targetFilePath: '/tmp/barb.d2s',
+          targetFileType: 'd2s',
+          targetLocationContext: 'inventory',
+          targetGridX: 3,
+          targetGridY: 1,
+        }),
+      );
+      expect(result).toEqual({ success: true });
+    });
+  });
+
+  describe('If inventory:moveItem receives an invalid equipped target', () => {
+    it('Then it rejects the request', async () => {
+      // Arrange
+      initializeVaultHandlers(() => undefined);
+      const handler = mocks.handleMock.mock.calls.find(
+        (call) => call[0] === 'inventory:moveItem',
+      )?.[1];
+      const movePayload = {
+        sourceFilePath: '/tmp/sorc.d2s',
+        sourceFileType: 'd2s',
+        rawItemJson: JSON.stringify({ id: 42, code: 'uap' }),
+        targetFilePath: '/tmp/barb.d2s',
+        targetFileType: 'd2s',
+        targetLocationContext: 'equipped',
+        targetGridX: 0,
+        targetGridY: 0,
+      };
+
+      // Act
+      const promise = handler?.(null, movePayload);
+
+      // Assert
+      await expect(promise).rejects.toThrow('targetEquippedSlotId must be one of: 1-12');
     });
   });
 });

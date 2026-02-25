@@ -1,10 +1,15 @@
 import type { types as d2sTypes } from '@dschu012/d2s';
 import { ipcMain } from 'electron';
 import { grailDatabase } from '../database/database';
-import { addItemToSaveFile, removeItemFromSaveFile } from '../services/saveFileEditor';
+import {
+  addItemToSaveFile,
+  moveItemBetweenSaveFiles,
+  removeItemFromSaveFile,
+} from '../services/saveFileEditor';
 import type { SaveFileMonitor } from '../services/saveFileMonitor';
 import type {
   CharacterInventorySnapshot,
+  InventoryItemMoveInput,
   InventorySearchResult,
   VaultCategory,
   VaultCategoryCreateInput,
@@ -35,6 +40,27 @@ const VALID_LOCATION_CONTEXTS = new Set([
   'corpse',
   'unknown',
 ]);
+const VALID_MOVE_TARGET_CONTEXTS = new Set([
+  'equipped',
+  'inventory',
+  'stash',
+  'mercenary',
+  'corpse',
+]);
+const VALID_EQUIPPED_SLOT_IDS = new Set([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
+
+interface NormalizedInventoryMoveInput {
+  sourceFilePath: string;
+  sourceFileType: VaultSourceFileType;
+  sourceItemId: number;
+  targetFilePath: string;
+  targetFileType: VaultSourceFileType;
+  targetLocationContext: VaultLocationContext;
+  targetStashTab?: number;
+  targetGridX?: number;
+  targetGridY?: number;
+  targetEquippedSlotId?: number;
+}
 
 function assert(condition: boolean, message: string): void {
   if (!condition) {
@@ -126,6 +152,39 @@ function validateVaultItemInput(input: VaultItemUpsertInput): void {
   assert(VALID_LOCATION_CONTEXTS.has(input.locationContext), 'Invalid locationContext');
 }
 
+function normalizeOptionalDate(
+  value: Date | string | undefined,
+  fieldName: 'lastSeenAt' | 'vaultedAt' | 'unvaultedAt',
+): Date | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  if (value instanceof Date) {
+    assert(!Number.isNaN(value.getTime()), `${fieldName} must be a valid date`);
+    return value;
+  }
+
+  const parsed = new Date(value);
+  assert(!Number.isNaN(parsed.getTime()), `${fieldName} must be a valid date`);
+  return parsed;
+}
+
+function normalizeVaultItemInput(input: VaultItemUpsertInput): VaultItemUpsertInput {
+  const unsafeInput = input as VaultItemUpsertInput & {
+    lastSeenAt?: Date | string;
+    vaultedAt?: Date | string;
+    unvaultedAt?: Date | string;
+  };
+
+  return {
+    ...input,
+    lastSeenAt: normalizeOptionalDate(unsafeInput.lastSeenAt, 'lastSeenAt'),
+    vaultedAt: normalizeOptionalDate(unsafeInput.vaultedAt, 'vaultedAt'),
+    unvaultedAt: normalizeOptionalDate(unsafeInput.unvaultedAt, 'unvaultedAt'),
+  };
+}
+
 function validateCategoryInput(input: VaultCategoryCreateInput | VaultCategoryUpdateInput): void {
   if ('name' in input && input.name !== undefined) {
     assert(
@@ -133,6 +192,128 @@ function validateCategoryInput(input: VaultCategoryCreateInput | VaultCategoryUp
       'Category name is required',
     );
   }
+}
+
+function toItemId(value: unknown): number | undefined {
+  if (typeof value === 'number' && Number.isInteger(value)) {
+    return value;
+  }
+
+  if (typeof value === 'string' && value.trim().length > 0) {
+    const parsed = Number.parseInt(value, 10);
+    return Number.isInteger(parsed) ? parsed : undefined;
+  }
+
+  return undefined;
+}
+
+function parseSourceItemId(rawItemJson: string): number {
+  let parsedRawItem: { id?: unknown };
+  try {
+    parsedRawItem = JSON.parse(rawItemJson) as { id?: unknown };
+  } catch {
+    throw new Error('rawItemJson must be valid JSON');
+  }
+
+  const itemId = toItemId(parsedRawItem.id);
+  if (itemId === undefined) {
+    throw new Error('rawItemJson must include a numeric item id');
+  }
+
+  return itemId;
+}
+
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Move-input validation enforces IPC safety for multiple target modes.
+function normalizeInventoryMoveInput(input: InventoryItemMoveInput): NormalizedInventoryMoveInput {
+  assert(input && typeof input === 'object', 'Move input is required');
+
+  const sourceFilePath = input.sourceFilePath?.trim();
+  const targetFilePath = input.targetFilePath?.trim();
+
+  assert(
+    typeof sourceFilePath === 'string' && sourceFilePath.length > 0,
+    'sourceFilePath is required',
+  );
+  assert(
+    typeof targetFilePath === 'string' && targetFilePath.length > 0,
+    'targetFilePath is required',
+  );
+  assert(
+    typeof input.rawItemJson === 'string' && input.rawItemJson.trim().length > 0,
+    'rawItemJson is required',
+  );
+  assert(
+    VALID_SOURCE_FILE_TYPES.has(input.sourceFileType),
+    'sourceFileType must be one of: d2s, sss, d2x, d2i',
+  );
+  assert(
+    VALID_SOURCE_FILE_TYPES.has(input.targetFileType),
+    'targetFileType must be one of: d2s, sss, d2x, d2i',
+  );
+  assert(
+    VALID_MOVE_TARGET_CONTEXTS.has(input.targetLocationContext),
+    'targetLocationContext must be one of: equipped, inventory, stash, mercenary, corpse',
+  );
+
+  const sourceItemId = parseSourceItemId(input.rawItemJson);
+  const targetLocationContext = input.targetLocationContext as VaultLocationContext;
+  const isStashTarget = targetLocationContext === 'stash';
+  const isEquippedTarget = targetLocationContext === 'equipped';
+
+  if (input.targetFileType !== 'd2s') {
+    assert(
+      targetLocationContext === 'stash',
+      'Shared stash targets must use targetLocationContext=stash',
+    );
+  }
+
+  if (isEquippedTarget) {
+    assert(input.targetFileType === 'd2s', 'Equipped target requires targetFileType=d2s');
+    assert(
+      Number.isInteger(input.targetEquippedSlotId) &&
+        VALID_EQUIPPED_SLOT_IDS.has(input.targetEquippedSlotId as number),
+      'targetEquippedSlotId must be one of: 1-12',
+    );
+  } else {
+    assert(
+      input.targetEquippedSlotId === undefined,
+      'targetEquippedSlotId is only allowed when targetLocationContext=equipped',
+    );
+  }
+
+  if (isStashTarget) {
+    if (input.targetStashTab !== undefined) {
+      assert(
+        Number.isInteger(input.targetStashTab) && input.targetStashTab >= 0,
+        'targetStashTab must be a non-negative integer',
+      );
+    }
+  } else {
+    assert(
+      input.targetStashTab === undefined,
+      'targetStashTab is only allowed when targetLocationContext=stash',
+    );
+  }
+
+  if (targetLocationContext !== 'equipped') {
+    assert(Number.isInteger(input.targetGridX), 'targetGridX must be an integer');
+    assert(Number.isInteger(input.targetGridY), 'targetGridY must be an integer');
+    assert((input.targetGridX as number) >= 0, 'targetGridX must be >= 0');
+    assert((input.targetGridY as number) >= 0, 'targetGridY must be >= 0');
+  }
+
+  return {
+    sourceFilePath,
+    sourceFileType: input.sourceFileType,
+    sourceItemId,
+    targetFilePath,
+    targetFileType: input.targetFileType,
+    targetLocationContext,
+    targetStashTab: isStashTarget ? (input.targetStashTab ?? 0) : undefined,
+    targetGridX: targetLocationContext === 'equipped' ? undefined : input.targetGridX,
+    targetGridY: targetLocationContext === 'equipped' ? undefined : input.targetGridY,
+    targetEquippedSlotId: isEquippedTarget ? input.targetEquippedSlotId : undefined,
+  };
 }
 
 function itemMatchesFilter(
@@ -197,16 +378,21 @@ export function initializeVaultHandlers(
   getSaveFileMonitor: () => SaveFileMonitor | undefined,
 ): void {
   ipcMain.handle('vault:addItem', async (_, item: VaultItemUpsertInput): Promise<VaultItem> => {
-    validateVaultItemInput(item);
+    const normalizedItem = normalizeVaultItemInput(item);
+    validateVaultItemInput(normalizedItem);
 
-    if (item.sourceFilePath && item.rawItemJson) {
-      const parsedItem = JSON.parse(item.rawItemJson) as { id?: number };
+    if (normalizedItem.sourceFilePath && normalizedItem.rawItemJson) {
+      const parsedItem = JSON.parse(normalizedItem.rawItemJson) as { id?: number };
       if (parsedItem.id !== undefined) {
-        await removeItemFromSaveFile(item.sourceFilePath, item.sourceFileType, parsedItem.id);
+        await removeItemFromSaveFile(
+          normalizedItem.sourceFilePath,
+          normalizedItem.sourceFileType,
+          parsedItem.id,
+        );
       }
     }
 
-    return grailDatabase.addVaultItem(item);
+    return grailDatabase.addVaultItem(normalizedItem);
   });
 
   ipcMain.handle('vault:removeItem', async (_, itemId: string): Promise<{ success: boolean }> => {
@@ -338,6 +524,15 @@ export function initializeVaultHandlers(
         inventory: buildInventorySearchResult(snapshots, safeFilter),
         vault: grailDatabase.searchVaultItems(safeFilter),
       };
+    },
+  );
+
+  ipcMain.handle(
+    'inventory:moveItem',
+    async (_, input: InventoryItemMoveInput): Promise<{ success: boolean }> => {
+      const normalizedInput = normalizeInventoryMoveInput(input);
+      await moveItemBetweenSaveFiles(normalizedInput);
+      return { success: true };
     },
   );
 }

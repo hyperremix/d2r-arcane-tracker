@@ -2,6 +2,7 @@ import React, { Suspense } from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import InventorySnapshotWindowApp from './InventorySnapshotWindowApp';
 import WidgetApp from './WidgetApp';
 import './i18n';
 import './index.css';
@@ -14,7 +15,12 @@ if (!rootElement) {
 
 // Determine which app to load based on URL hash
 const isWidget = window.location.hash.startsWith('#/widget');
-const AppComponent = isWidget ? WidgetApp : App;
+const isInventorySnapshotWindow = window.location.hash.startsWith('#/inventory-snapshot');
+const AppComponent = isWidget
+  ? WidgetApp
+  : isInventorySnapshotWindow
+    ? InventorySnapshotWindowApp
+    : App;
 
 ReactDOM.createRoot(rootElement).render(
   <React.StrictMode>

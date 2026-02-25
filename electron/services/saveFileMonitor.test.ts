@@ -1329,6 +1329,88 @@ describe('When SaveFileMonitor is used', () => {
   });
 
   describe('If inventory reconciliation helpers are executed', () => {
+    it('Then unchanged inventory snapshots are preserved when only one file is reparsed', async () => {
+      // Arrange
+      const oldSnapshotA = {
+        snapshotId: 'a-old',
+        characterName: 'A',
+        sourceFileType: 'd2s',
+        sourceFilePath: '/test/save/dir/a.d2s',
+        capturedAt: new Date('2024-01-01T00:00:00.000Z'),
+        items: [{ fingerprint: 'fp-a-old', isSocketedItem: false }],
+      };
+      const oldSnapshotB = {
+        snapshotId: 'b-old',
+        characterName: 'B',
+        sourceFileType: 'd2s',
+        sourceFilePath: '/test/save/dir/b.d2s',
+        capturedAt: new Date('2024-01-01T00:00:00.000Z'),
+        items: [{ fingerprint: 'fp-b-old', isSocketedItem: false }],
+      };
+      const newSnapshotA = {
+        snapshotId: 'a-new',
+        characterName: 'A',
+        sourceFileType: 'd2s',
+        sourceFilePath: '/test/save/dir/a.d2s',
+        capturedAt: new Date('2024-01-02T00:00:00.000Z'),
+        items: [{ fingerprint: 'fp-a-new', isSocketedItem: false }],
+      };
+
+      (monitor as any).inventorySnapshots = [oldSnapshotA, oldSnapshotB];
+
+      vi.spyOn(monitor as any, 'filterFilesToParse').mockResolvedValue(['/test/save/dir/a.d2s']);
+      vi.spyOn(monitor as any, 'executeConcurrently').mockResolvedValue([
+        {
+          saveName: 'A',
+          success: true,
+          inventorySnapshot: newSnapshotA,
+        },
+      ]);
+      vi.spyOn(monitor as any, 'emitSaveFileEvents').mockResolvedValue(undefined);
+
+      // Act
+      await (monitor as any).parseFiles(['/test/save/dir/a.d2s', '/test/save/dir/b.d2s'], false);
+      const snapshots = (monitor as any).inventorySnapshots;
+
+      // Assert
+      expect(snapshots).toHaveLength(2);
+      expect(snapshots.some((snapshot: any) => snapshot.snapshotId === 'a-new')).toBe(true);
+      expect(snapshots.some((snapshot: any) => snapshot.snapshotId === 'b-old')).toBe(true);
+    });
+
+    it('Then stale snapshots are pruned when no files need reparsing', async () => {
+      // Arrange
+      const oldSnapshotA = {
+        snapshotId: 'a-old',
+        characterName: 'A',
+        sourceFileType: 'd2s',
+        sourceFilePath: '/test/save/dir/a.d2s',
+        capturedAt: new Date('2024-01-01T00:00:00.000Z'),
+        items: [{ fingerprint: 'fp-a-old', isSocketedItem: false }],
+      };
+      const oldSnapshotB = {
+        snapshotId: 'b-old',
+        characterName: 'B',
+        sourceFileType: 'd2s',
+        sourceFilePath: '/test/save/dir/b.d2s',
+        capturedAt: new Date('2024-01-01T00:00:00.000Z'),
+        items: [{ fingerprint: 'fp-b-old', isSocketedItem: false }],
+      };
+
+      (monitor as any).inventorySnapshots = [oldSnapshotA, oldSnapshotB];
+      vi.spyOn(monitor as any, 'filterFilesToParse').mockResolvedValue([]);
+      const emitSpy = vi.spyOn(monitor as any, 'emitSaveFileEvents').mockResolvedValue(undefined);
+
+      // Act
+      await (monitor as any).parseFiles(['/test/save/dir/a.d2s'], false);
+      const snapshots = (monitor as any).inventorySnapshots;
+
+      // Assert
+      expect(snapshots).toHaveLength(1);
+      expect(snapshots[0]?.snapshotId).toBe('a-old');
+      expect(emitSpy).not.toHaveBeenCalled();
+    });
+
     it('Then createFingerprint returns deterministic output for the same inputs', () => {
       // Arrange
       const item = {
