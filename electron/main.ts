@@ -21,7 +21,10 @@ import { initializeUpdateHandlers } from './ipc-handlers/updateHandlers';
 import { initializeVaultHandlers } from './ipc-handlers/vaultHandlers';
 import { initializeWidgetHandlers } from './ipc-handlers/widgetHandlers';
 import { isPositionOnScreen } from './utils/windowSnapping';
-import { closeInventorySnapshotWindows } from './window/inventorySnapshotWindow';
+import {
+  closeInventorySnapshotWindows,
+  setInventorySnapshotWindowsTitleBarOverlay,
+} from './window/inventorySnapshotWindow';
 import { closeWidgetWindow, showWidgetWindow } from './window/widgetWindow';
 
 createRequire(import.meta.url);
@@ -323,11 +326,16 @@ app.whenReady().then(() => {
   ipcMain.handle(
     'update-titlebar-overlay',
     (_event, colors: { backgroundColor: string; symbolColor: string }) => {
-      if (mainWindow && process.platform !== 'darwin') {
-        mainWindow.setTitleBarOverlay({
+      if (process.platform !== 'darwin') {
+        mainWindow?.setTitleBarOverlay({
           color: colors.backgroundColor,
           symbolColor: colors.symbolColor,
           height: 47,
+        });
+
+        setInventorySnapshotWindowsTitleBarOverlay({
+          color: colors.backgroundColor,
+          symbolColor: colors.symbolColor,
         });
       }
       return { success: true };
