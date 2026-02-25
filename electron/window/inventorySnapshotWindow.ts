@@ -27,6 +27,32 @@ function focusSnapshotWindow(window: BrowserWindow): void {
   window.focus();
 }
 
+function getSnapshotTitleBarOptions():
+  | {
+      titleBarStyle: 'hidden';
+      trafficLightPosition: { x: number; y: number };
+    }
+  | {
+      titleBarStyle: 'hidden';
+      titleBarOverlay: { color: string; symbolColor: string; height: number };
+    } {
+  if (process.platform === 'darwin') {
+    return {
+      titleBarStyle: 'hidden',
+      trafficLightPosition: { x: 10, y: 14 },
+    };
+  }
+
+  return {
+    titleBarStyle: 'hidden',
+    titleBarOverlay: {
+      color: '#09090b',
+      symbolColor: '#ffffff',
+      height: 47,
+    },
+  };
+}
+
 export function openInventorySnapshotWindow(
   target: InventorySnapshotWindowTarget,
   __dirname: string,
@@ -46,8 +72,8 @@ export function openInventorySnapshotWindow(
     height: 900,
     minWidth: 900,
     minHeight: 700,
-    title: `${target.characterName} Inventory`,
-    autoHideMenuBar: true,
+    title: target.characterName,
+    ...getSnapshotTitleBarOptions(),
     webPreferences: {
       preload: path.join(__dirname, 'preload.mjs'),
       contextIsolation: true,
@@ -84,4 +110,25 @@ export function closeInventorySnapshotWindows(): void {
   }
 
   inventorySnapshotWindows.clear();
+}
+
+export function setInventorySnapshotWindowsTitleBarOverlay(colors: {
+  color: string;
+  symbolColor: string;
+}): void {
+  for (const snapshotWindow of inventorySnapshotWindows.values()) {
+    if (snapshotWindow.isDestroyed()) {
+      continue;
+    }
+
+    try {
+      snapshotWindow.setTitleBarOverlay({
+        color: colors.color,
+        symbolColor: colors.symbolColor,
+        height: 47,
+      });
+    } catch (error) {
+      console.warn('Failed to update snapshot window title bar overlay', error);
+    }
+  }
 }

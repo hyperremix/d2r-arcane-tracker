@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
     show: ReturnType<typeof vi.fn>;
     focus: ReturnType<typeof vi.fn>;
     restore: ReturnType<typeof vi.fn>;
+    setTitleBarOverlay: ReturnType<typeof vi.fn>;
     close: ReturnType<typeof vi.fn>;
     on: ReturnType<typeof vi.fn>;
     isDestroyed: ReturnType<typeof vi.fn>;
@@ -23,6 +24,7 @@ vi.mock('electron', () => {
     public show = vi.fn();
     public focus = vi.fn();
     public restore = vi.fn();
+    public setTitleBarOverlay = vi.fn();
     public close = vi.fn(() => {
       this.isDestroyed.mockReturnValue(true);
       const closedListener = this.__events.get('closed');
@@ -51,6 +53,7 @@ vi.mock('electron', () => {
 import {
   closeInventorySnapshotWindows,
   openInventorySnapshotWindow,
+  setInventorySnapshotWindowsTitleBarOverlay,
 } from './inventorySnapshotWindow';
 
 describe('When inventory snapshot windows are managed', () => {
@@ -81,6 +84,20 @@ describe('When inventory snapshot windows are managed', () => {
       // Assert
       expect(window).toBeDefined();
       expect(mocks.browserWindowInstances).toHaveLength(1);
+      expect(mocks.browserWindowInstances[0].options.title).toBe('Sorc');
+      expect(mocks.browserWindowInstances[0].options.titleBarStyle).toBe('hidden');
+      if (process.platform === 'darwin') {
+        expect(mocks.browserWindowInstances[0].options.trafficLightPosition).toEqual({
+          x: 10,
+          y: 14,
+        });
+      } else {
+        expect(mocks.browserWindowInstances[0].options.titleBarOverlay).toEqual({
+          color: '#09090b',
+          symbolColor: '#ffffff',
+          height: 47,
+        });
+      }
       expect(mocks.browserWindowInstances[0].loadURL).toHaveBeenCalledWith(
         'http://localhost:5173#/inventory-snapshot?sourceFilePath=%2Ftmp%2Fsorc.d2s&sourceFileType=d2s&characterName=Sorc',
       );
@@ -182,6 +199,50 @@ describe('When inventory snapshot windows are managed', () => {
       // Assert
       expect(mocks.browserWindowInstances[0].close).toHaveBeenCalledTimes(1);
       expect(mocks.browserWindowInstances[1].close).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('If title bar overlay colors are updated', () => {
+    it('Then each snapshot window receives the same overlay colors', () => {
+      // Arrange
+      openInventorySnapshotWindow(
+        {
+          sourceFilePath: '/tmp/sorc.d2s',
+          sourceFileType: 'd2s',
+          characterName: 'Sorc',
+        },
+        '/tmp/main',
+        'http://localhost:5173',
+        '/tmp/renderer',
+      );
+      openInventorySnapshotWindow(
+        {
+          sourceFilePath: '/tmp/shared.d2i',
+          sourceFileType: 'd2i',
+          characterName: 'Shared Stash Softcore',
+        },
+        '/tmp/main',
+        'http://localhost:5173',
+        '/tmp/renderer',
+      );
+
+      // Act
+      setInventorySnapshotWindowsTitleBarOverlay({
+        color: '#ffffff',
+        symbolColor: '#000000',
+      });
+
+      // Assert
+      expect(mocks.browserWindowInstances[0].setTitleBarOverlay).toHaveBeenCalledWith({
+        color: '#ffffff',
+        symbolColor: '#000000',
+        height: 47,
+      });
+      expect(mocks.browserWindowInstances[1].setTitleBarOverlay).toHaveBeenCalledWith({
+        color: '#ffffff',
+        symbolColor: '#000000',
+        height: 47,
+      });
     });
   });
 });

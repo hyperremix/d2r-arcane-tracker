@@ -264,6 +264,24 @@ describe('When spatial layout classifiers are used', () => {
   });
 
   describe('If equipped slot layout is compacted to remove empty lanes', () => {
+    it('Then weapon slots are vertically aligned with gloves and boots', () => {
+      // Arrange
+      const leftHand = EQUIPPED_SLOT_LAYOUT.leftHand;
+      const rightHand = EQUIPPED_SLOT_LAYOUT.rightHand;
+      const gloves = EQUIPPED_SLOT_LAYOUT.gloves;
+      const boots = EQUIPPED_SLOT_LAYOUT.boots;
+
+      // Act
+      const leftWeaponAlignedWithGloves =
+        leftHand.column === gloves.column && leftHand.width === gloves.width;
+      const rightWeaponAlignedWithBoots =
+        rightHand.column === boots.column && rightHand.width === boots.width;
+
+      // Assert
+      expect(leftWeaponAlignedWithGloves).toBe(true);
+      expect(rightWeaponAlignedWithBoots).toBe(true);
+    });
+
     it('Then every equipped slot footprint remains within equipped board bounds', () => {
       // Arrange
       const layouts = Object.values(EQUIPPED_SLOT_LAYOUT);

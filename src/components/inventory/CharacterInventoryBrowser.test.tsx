@@ -320,7 +320,7 @@ describe('When CharacterInventoryBrowser is rendered', () => {
       const snapshotSectionsCardContent = inventoryBoard.closest('[data-slot="card-content"]');
       expect(snapshotSectionsCardContent).not.toBeNull();
       expect(snapshotSectionsCardContent?.className).toContain('columns-1');
-      expect(snapshotSectionsCardContent?.className).toContain('sm:columns-[28rem]');
+      expect(snapshotSectionsCardContent?.className).toContain('sm:columns-[20rem]');
       expect(snapshotSectionsCardContent?.className).toContain('[&>*]:mb-4');
       expect(snapshotSectionsCardContent?.className).toContain('[&>*]:break-inside-avoid');
       expect(snapshotSectionsCardContent?.className).not.toContain(
@@ -341,9 +341,9 @@ describe('When CharacterInventoryBrowser is rendered', () => {
       const equippedBoard = screen.getByTestId('equipped-board');
       expect(within(equippedBoard).queryAllByTestId('equipped-board-cell')).toHaveLength(0);
       expect(within(equippedBoard).getAllByTestId('equipped-slot-frame')).toHaveLength(10);
-      expect(equippedBoard.style.width).toBe('calc(12 * var(--inv-cell-size) + 11px + 16px)');
-      expect(equippedBoard.style.minWidth).toBe('calc(12 * var(--inv-cell-size) + 11px + 16px)');
-      expect(equippedBoard.style.maxWidth).toBe('calc(12 * var(--inv-cell-size) + 11px + 16px)');
+      expect(equippedBoard.style.width).toBe('calc(8 * var(--inv-cell-size) + 7px + 16px)');
+      expect(equippedBoard.style.minWidth).toBe('calc(8 * var(--inv-cell-size) + 7px + 16px)');
+      expect(equippedBoard.style.maxWidth).toBe('calc(8 * var(--inv-cell-size) + 7px + 16px)');
       expect(equippedBoard.style.height).toBe('calc(8 * var(--inv-cell-size) + 7px + 16px)');
       expect(equippedBoard.style.minHeight).toBe('calc(8 * var(--inv-cell-size) + 7px + 16px)');
       expect(equippedBoard.style.maxHeight).toBe('calc(8 * var(--inv-cell-size) + 7px + 16px)');

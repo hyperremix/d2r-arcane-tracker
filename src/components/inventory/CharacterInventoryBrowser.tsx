@@ -1754,91 +1754,93 @@ function EquipmentSection({
 
   return (
     <div className="space-y-2">
-      <div className="flex items-center justify-between gap-3">
-        <div className="font-medium text-sm">
-          {t(translations.inventoryBrowser.sections.equipped)}
+      <div className="inline-flex w-fit flex-col gap-2">
+        <div className="flex items-center justify-between gap-3">
+          <div className="font-medium text-sm">
+            {t(translations.inventoryBrowser.sections.equipped)}
+          </div>
+          <div className="inline-flex overflow-hidden rounded border border-border/70">
+            {EQUIPPED_WEAPON_SET_ORDER.map((setKey) => (
+              <button
+                key={setKey}
+                type="button"
+                className={cn(
+                  'min-w-10 px-2 py-1 text-xs',
+                  weaponSet === setKey ? 'bg-primary text-primary-foreground' : 'bg-muted/20',
+                )}
+                aria-label={t(translations.inventoryBrowser.weaponSets.ariaLabel, {
+                  set: t(translations.inventoryBrowser.weaponSets[setKey]),
+                })}
+                onClick={() => onWeaponSetChange(setKey)}
+              >
+                {t(translations.inventoryBrowser.weaponSets[setKey])}
+              </button>
+            ))}
+          </div>
         </div>
-        <div className="inline-flex overflow-hidden rounded border border-border/70">
-          {EQUIPPED_WEAPON_SET_ORDER.map((setKey) => (
-            <button
-              key={setKey}
-              type="button"
-              className={cn(
-                'min-w-10 px-2 py-1 text-xs',
-                weaponSet === setKey ? 'bg-primary text-primary-foreground' : 'bg-muted/20',
-              )}
-              aria-label={t(translations.inventoryBrowser.weaponSets.ariaLabel, {
-                set: t(translations.inventoryBrowser.weaponSets[setKey]),
-              })}
-              onClick={() => onWeaponSetChange(setKey)}
-            >
-              {t(translations.inventoryBrowser.weaponSets[setKey])}
-            </button>
-          ))}
-        </div>
+
+        <BoardSurface gridSize={EQUIPPED_BOARD_SIZE} testId="equipped-board" showBaseGrid={false}>
+          {PAPER_DOLL_SLOT_ORDER.map((slotKey) => {
+            const layout = EQUIPPED_SLOT_LAYOUT[slotKey];
+            const slotItem = equippedMapping.slotItems.get(slotKey);
+
+            return (
+              /* biome-ignore lint/a11y/noStaticElementInteractions: equipment slot frames are drag/drop targets by design. */
+              <div
+                key={slotKey}
+                data-testid="equipped-slot-frame"
+                className={cn(
+                  'relative z-[1] rounded border border-border/80 bg-black/10',
+                  slotItem ? 'border-border/80' : '',
+                  dragPreviewSlot?.slotKey === slotKey && dragPreviewSlot.valid
+                    ? 'border-emerald-400 bg-emerald-400/20'
+                    : '',
+                  dragPreviewSlot?.slotKey === slotKey && !dragPreviewSlot.valid
+                    ? 'border-red-500 bg-red-500/20'
+                    : '',
+                )}
+                style={{
+                  gridColumn: `${layout.column} / span ${layout.width}`,
+                  gridRow: `${layout.row} / span ${layout.height}`,
+                }}
+                onDragOver={(event) => {
+                  event.preventDefault();
+                  handleDragOverSlot(event, slotKey);
+                }}
+                onDragLeave={() => clearSlotPreview()}
+                onDrop={(event) => {
+                  void handleDropOnSlot(event, slotKey);
+                }}
+              >
+                {slotItem ? (
+                  <div className="absolute inset-[1px] z-10">
+                    <InventoryTile
+                      item={slotItem}
+                      iconLookup={iconLookup}
+                      selected={slotItem.fingerprint === selectedFingerprint}
+                      isVaultPresent={getEffectiveVaultPresent(
+                        slotItem,
+                        vaultItemsByFingerprint,
+                        pendingVaultFingerprints,
+                      )}
+                      onSelect={onSelect}
+                      onDragStart={onDragStart}
+                      onDragEnd={onDragEnd}
+                    />
+                  </div>
+                ) : (
+                  <div className="pointer-events-none absolute inset-[20%] rounded border border-border/40" />
+                )}
+                {dragPreviewSlot?.slotKey === slotKey && !dragPreviewSlot.valid && (
+                  <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center">
+                    <X className="h-1/2 w-1/2 text-red-500" />
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </BoardSurface>
       </div>
-
-      <BoardSurface gridSize={EQUIPPED_BOARD_SIZE} testId="equipped-board" showBaseGrid={false}>
-        {PAPER_DOLL_SLOT_ORDER.map((slotKey) => {
-          const layout = EQUIPPED_SLOT_LAYOUT[slotKey];
-          const slotItem = equippedMapping.slotItems.get(slotKey);
-
-          return (
-            /* biome-ignore lint/a11y/noStaticElementInteractions: equipment slot frames are drag/drop targets by design. */
-            <div
-              key={slotKey}
-              data-testid="equipped-slot-frame"
-              className={cn(
-                'relative z-[1] rounded border border-border/80 bg-black/10',
-                slotItem ? 'border-border/80' : '',
-                dragPreviewSlot?.slotKey === slotKey && dragPreviewSlot.valid
-                  ? 'border-emerald-400 bg-emerald-400/20'
-                  : '',
-                dragPreviewSlot?.slotKey === slotKey && !dragPreviewSlot.valid
-                  ? 'border-red-500 bg-red-500/20'
-                  : '',
-              )}
-              style={{
-                gridColumn: `${layout.column} / span ${layout.width}`,
-                gridRow: `${layout.row} / span ${layout.height}`,
-              }}
-              onDragOver={(event) => {
-                event.preventDefault();
-                handleDragOverSlot(event, slotKey);
-              }}
-              onDragLeave={() => clearSlotPreview()}
-              onDrop={(event) => {
-                void handleDropOnSlot(event, slotKey);
-              }}
-            >
-              {slotItem ? (
-                <div className="absolute inset-[1px] z-10">
-                  <InventoryTile
-                    item={slotItem}
-                    iconLookup={iconLookup}
-                    selected={slotItem.fingerprint === selectedFingerprint}
-                    isVaultPresent={getEffectiveVaultPresent(
-                      slotItem,
-                      vaultItemsByFingerprint,
-                      pendingVaultFingerprints,
-                    )}
-                    onSelect={onSelect}
-                    onDragStart={onDragStart}
-                    onDragEnd={onDragEnd}
-                  />
-                </div>
-              ) : (
-                <div className="pointer-events-none absolute inset-[20%] rounded border border-border/40" />
-              )}
-              {dragPreviewSlot?.slotKey === slotKey && !dragPreviewSlot.valid && (
-                <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center">
-                  <X className="h-1/2 w-1/2 text-red-500" />
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </BoardSurface>
     </div>
   );
 }
@@ -2562,7 +2564,7 @@ export function CharacterInventoryBrowser({
                   })}
                 </div>
               </CardHeader>
-              <CardContent className="columns-1 gap-4 sm:columns-[28rem] [&>*]:mb-4 [&>*]:break-inside-avoid">
+              <CardContent className="columns-1 gap-4 sm:columns-[20rem] [&>*]:mb-4 [&>*]:break-inside-avoid">
                 {(locationContext === 'all' || locationContext === 'equipped') && (
                   <EquipmentSection
                     items={grouped.equipped}
