@@ -4,7 +4,9 @@ import type {
   D2SaveFile,
   FileReaderResponse,
   GrailProgress,
+  InventoryItemMoveInput,
   InventorySearchResult,
+  InventorySnapshotWindowTarget,
   Item,
   MonitoringStatus,
   Run,
@@ -289,6 +291,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
       inventory: InventorySearchResult;
       vault: VaultItemSearchResult;
     }> => ipcRenderer.invoke('inventory:searchAll', filter),
+    openSnapshotWindow: (target: InventorySnapshotWindowTarget): Promise<{ success: boolean }> =>
+      ipcRenderer.invoke('inventory:openSnapshotWindow', target),
+    moveItem: (input: InventoryItemMoveInput): Promise<{ success: boolean }> =>
+      ipcRenderer.invoke('inventory:moveItem', input),
   },
 
   /**

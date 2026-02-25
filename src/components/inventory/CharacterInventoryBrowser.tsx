@@ -1,5 +1,6 @@
 import type {
   CharacterInventorySnapshot,
+  InventorySnapshotWindowTarget,
   ParsedInventoryItem,
   VaultItem,
   VaultItemFilter,
@@ -11,6 +12,14 @@ import { PackagePlus, Sparkles, X } from 'lucide-react';
 import { type DragEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { BoardSurface, getItemGridPlacement } from '@/components/inventory/boardPrimitives';
+import {
+  INVENTORY_DRAG_MIME,
+  parseInventoryTextPayload,
+  parseVaultTextPayload,
+  serializeInventoryTextPayload,
+  serializeVaultTextPayload,
+  VAULT_DRAG_MIME,
+} from '@/components/inventory/dragPayloads';
 import { GameItemTooltipContent } from '@/components/inventory/GameItemTooltipContent';
 import {
   buildEquippedSlotMapForSet,
@@ -20,6 +29,7 @@ import {
   DEFAULT_INVENTORY_GRID_SIZE,
   DEFAULT_STASH_GRID_SIZE,
   EQUIPPED_BOARD_SIZE,
+  EQUIPPED_SLOT_IDS,
   EQUIPPED_SLOT_LAYOUT,
   EQUIPPED_WEAPON_SET_ORDER,
   type EquippedWeaponSet,
@@ -31,6 +41,7 @@ import {
   hasGridDimensions,
   hasGridPosition,
   PAPER_DOLL_SLOT_ORDER,
+  type PaperDollSlotKey,
   resolvePaperDollSlotKey,
   type UnplacedReason,
 } from '@/components/inventory/spatialLayout';
@@ -75,9 +86,8 @@ type InventorySearchAllResponse = {
 
 type TypeFilter = 'all' | 'unique' | 'set' | 'runeword' | 'rune' | 'other';
 type EquipmentUnplacedReason = UnplacedReason | 'unknownEquippedSlot';
-
-const INVENTORY_DRAG_MIME = 'application/x-d2r-arcane-tracker-inventory-item';
-const VAULT_DRAG_MIME = 'application/x-d2r-arcane-tracker-vault-item';
+const VAULT_DRAG_STATE_CHANNEL = 'inventory:vault-drag-state';
+const INVENTORY_DRAG_STATE_CHANNEL = 'inventory:item-drag-state';
 
 function getVaultItemLastUpdatedMs(item: VaultItem): number {
   const rawValue = item.lastUpdated as unknown;
@@ -324,6 +334,13 @@ function VaultedItemTile({
             onDragStart={(event) => {
               event.dataTransfer.effectAllowed = 'move';
               event.dataTransfer.setData(VAULT_DRAG_MIME, item.id);
+              const textPayload = serializeVaultTextPayload({
+                id: item.id,
+                gridWidth: item.gridWidth ?? 1,
+                gridHeight: item.gridHeight ?? 1,
+              });
+              event.dataTransfer.setData('text/plain', textPayload);
+              event.dataTransfer.setData('text', textPayload);
               onDragStart?.(item);
             }}
             onDragEnd={onDragEnd}
@@ -396,9 +413,19 @@ interface InventoryGridSectionProps {
   snapshotSourceFileType?: VaultSourceFileType;
   sectionLocationContext?: VaultLocationContext;
   sectionStashTab?: number;
-  draggingVaultItem?: VaultItem | null;
+  draggingVaultItem?: ActiveVaultDragItem | null;
+  draggingInventoryItem?: ActiveInventoryDragItem | null;
   onDropVaultItem?: (
     vaultItemId: string,
+    targetFilePath: string,
+    targetFileType: VaultSourceFileType,
+    targetLocationContext: VaultLocationContext,
+    targetStashTab: number | undefined,
+    targetGridX: number,
+    targetGridY: number,
+  ) => Promise<void>;
+  onDropInventoryItem?: (
+    inventoryItem: ActiveInventoryDragItem,
     targetFilePath: string,
     targetFileType: VaultSourceFileType,
     targetLocationContext: VaultLocationContext,
@@ -419,6 +446,281 @@ interface EquipmentSectionProps {
   onSelect: (item: ParsedInventoryItem) => void;
   onDragStart: (event: DragEvent<HTMLButtonElement>, item: ParsedInventoryItem) => void;
   onDragEnd: () => void;
+  snapshotSourceFilePath?: string;
+  snapshotSourceFileType?: VaultSourceFileType;
+  draggingInventoryItem?: ActiveInventoryDragItem | null;
+  onDropInventoryItem?: (
+    inventoryItem: ActiveInventoryDragItem,
+    targetFilePath: string,
+    targetFileType: VaultSourceFileType,
+    targetLocationContext: VaultLocationContext,
+    targetEquippedSlotId: number,
+  ) => Promise<void>;
+}
+
+interface ActiveVaultDragItem {
+  id: string;
+  gridWidth: number;
+  gridHeight: number;
+}
+
+interface ActiveInventoryDragItem {
+  fingerprint: string;
+  sourceFilePath: string;
+  sourceFileType: VaultSourceFileType;
+  sourceLocationContext: VaultLocationContext;
+  sourceStashTab?: number;
+  sourceGridX?: number;
+  sourceGridY?: number;
+  sourceEquippedSlotId?: number;
+  rawItemJson: string;
+  itemCode?: string;
+  gridWidth: number;
+  gridHeight: number;
+}
+
+type VaultDragStatePayload = ActiveVaultDragItem & {
+  active: boolean;
+};
+
+type InventoryDragStatePayload = ActiveInventoryDragItem & {
+  active: boolean;
+};
+
+function toActiveVaultDragItem(input: {
+  id: string;
+  gridWidth?: number;
+  gridHeight?: number;
+}): ActiveVaultDragItem {
+  return {
+    id: input.id,
+    gridWidth:
+      Number.isInteger(input.gridWidth) && input.gridWidth && input.gridWidth > 0
+        ? input.gridWidth
+        : 1,
+    gridHeight:
+      Number.isInteger(input.gridHeight) && input.gridHeight && input.gridHeight > 0
+        ? input.gridHeight
+        : 1,
+  };
+}
+
+function normalizePositiveGridDimension(value: unknown): number {
+  return typeof value === 'number' && Number.isInteger(value) && value > 0 ? value : 1;
+}
+
+function toActiveInventoryDragItem(input: {
+  fingerprint: string;
+  sourceFilePath: string;
+  sourceFileType: VaultSourceFileType;
+  sourceLocationContext: VaultLocationContext;
+  sourceStashTab?: number;
+  sourceGridX?: number;
+  sourceGridY?: number;
+  sourceEquippedSlotId?: number;
+  rawItemJson: string;
+  itemCode?: string;
+  gridWidth?: number;
+  gridHeight?: number;
+}): ActiveInventoryDragItem {
+  return {
+    fingerprint: input.fingerprint,
+    sourceFilePath: input.sourceFilePath,
+    sourceFileType: input.sourceFileType,
+    sourceLocationContext: input.sourceLocationContext,
+    sourceStashTab: input.sourceStashTab,
+    sourceGridX: input.sourceGridX,
+    sourceGridY: input.sourceGridY,
+    sourceEquippedSlotId: input.sourceEquippedSlotId,
+    rawItemJson: input.rawItemJson,
+    itemCode: input.itemCode,
+    gridWidth: normalizePositiveGridDimension(input.gridWidth),
+    gridHeight: normalizePositiveGridDimension(input.gridHeight),
+  };
+}
+
+function toInventoryDragStatePayload(
+  itemInput: VaultItemUpsertInput,
+): InventoryDragStatePayload | undefined {
+  const fingerprint = itemInput.fingerprint?.trim();
+  const sourceFilePath = itemInput.sourceFilePath?.trim();
+  const rawItemJson = itemInput.rawItemJson?.trim();
+
+  if (
+    !fingerprint ||
+    !sourceFilePath ||
+    !rawItemJson ||
+    !itemInput.sourceFileType ||
+    !itemInput.locationContext
+  ) {
+    return undefined;
+  }
+
+  return {
+    active: true,
+    ...toActiveInventoryDragItem({
+      fingerprint,
+      sourceFilePath,
+      sourceFileType: itemInput.sourceFileType,
+      sourceLocationContext: itemInput.locationContext,
+      sourceStashTab: itemInput.stashTab,
+      sourceGridX: itemInput.gridX,
+      sourceGridY: itemInput.gridY,
+      sourceEquippedSlotId: itemInput.equippedSlotId,
+      rawItemJson,
+      itemCode: itemInput.itemCode,
+      gridWidth: itemInput.gridWidth,
+      gridHeight: itemInput.gridHeight,
+    }),
+  };
+}
+
+function parseInventoryDragStatePayload(payload: unknown): InventoryDragStatePayload | undefined {
+  if (!payload || typeof payload !== 'object') {
+    return undefined;
+  }
+
+  const rawPayload = payload as Partial<InventoryDragStatePayload>;
+  if (
+    typeof rawPayload.active !== 'boolean' ||
+    typeof rawPayload.fingerprint !== 'string' ||
+    rawPayload.fingerprint.trim().length === 0 ||
+    typeof rawPayload.sourceFilePath !== 'string' ||
+    rawPayload.sourceFilePath.trim().length === 0 ||
+    typeof rawPayload.sourceFileType !== 'string' ||
+    typeof rawPayload.sourceLocationContext !== 'string' ||
+    rawPayload.sourceLocationContext.trim().length === 0 ||
+    typeof rawPayload.rawItemJson !== 'string' ||
+    rawPayload.rawItemJson.trim().length === 0
+  ) {
+    return undefined;
+  }
+
+  return {
+    active: rawPayload.active,
+    ...toActiveInventoryDragItem({
+      fingerprint: rawPayload.fingerprint.trim(),
+      sourceFilePath: rawPayload.sourceFilePath.trim(),
+      sourceFileType: rawPayload.sourceFileType as VaultSourceFileType,
+      sourceLocationContext: rawPayload.sourceLocationContext as VaultLocationContext,
+      sourceStashTab: Number.isInteger(rawPayload.sourceStashTab)
+        ? rawPayload.sourceStashTab
+        : undefined,
+      sourceGridX: Number.isInteger(rawPayload.sourceGridX) ? rawPayload.sourceGridX : undefined,
+      sourceGridY: Number.isInteger(rawPayload.sourceGridY) ? rawPayload.sourceGridY : undefined,
+      sourceEquippedSlotId: Number.isInteger(rawPayload.sourceEquippedSlotId)
+        ? rawPayload.sourceEquippedSlotId
+        : undefined,
+      rawItemJson: rawPayload.rawItemJson,
+      itemCode:
+        typeof rawPayload.itemCode === 'string' && rawPayload.itemCode.trim().length > 0
+          ? rawPayload.itemCode.trim()
+          : undefined,
+      gridWidth: rawPayload.gridWidth,
+      gridHeight: rawPayload.gridHeight,
+    }),
+  };
+}
+
+function parseVaultDragStatePayload(payload: unknown): VaultDragStatePayload | undefined {
+  if (!payload || typeof payload !== 'object') {
+    return undefined;
+  }
+
+  const rawPayload = payload as Partial<VaultDragStatePayload>;
+  if (
+    typeof rawPayload.active !== 'boolean' ||
+    typeof rawPayload.id !== 'string' ||
+    rawPayload.id.trim().length === 0
+  ) {
+    return undefined;
+  }
+
+  return {
+    active: rawPayload.active,
+    ...toActiveVaultDragItem({
+      id: rawPayload.id.trim(),
+      gridWidth: rawPayload.gridWidth,
+      gridHeight: rawPayload.gridHeight,
+    }),
+  };
+}
+
+function resolveActiveVaultDragItem(
+  event: DragEvent<HTMLElement>,
+  draggingVaultItem?: ActiveVaultDragItem | null,
+): ActiveVaultDragItem | undefined {
+  const getDragData = (format: string): string => {
+    try {
+      return event.dataTransfer.getData(format) ?? '';
+    } catch {
+      return '';
+    }
+  };
+
+  const mimeItemId = getDragData(VAULT_DRAG_MIME).trim();
+  const textPayload = parseVaultTextPayload(
+    getDragData('text/plain') || getDragData('text') || getDragData('Text'),
+  );
+
+  if (textPayload) {
+    return {
+      id: textPayload.id,
+      gridWidth: textPayload.gridWidth,
+      gridHeight: textPayload.gridHeight,
+    };
+  }
+
+  const fallbackItem = draggingVaultItem;
+  const resolvedId = mimeItemId || fallbackItem?.id;
+  if (!resolvedId) {
+    return undefined;
+  }
+
+  return {
+    id: resolvedId,
+    gridWidth: fallbackItem?.gridWidth ?? 1,
+    gridHeight: fallbackItem?.gridHeight ?? 1,
+  };
+}
+
+function resolveActiveInventoryDragItem(
+  event: DragEvent<HTMLElement>,
+  draggingInventoryItem?: ActiveInventoryDragItem | null,
+): ActiveInventoryDragItem | undefined {
+  const getDragData = (format: string): string => {
+    try {
+      return event.dataTransfer.getData(format) ?? '';
+    } catch {
+      return '';
+    }
+  };
+
+  const parsedPayload = parseInventoryTextPayload(
+    getDragData('text/plain') || getDragData('text') || getDragData('Text'),
+  );
+  if (parsedPayload) {
+    const normalizedPayload = toInventoryDragStatePayload(parsedPayload);
+    if (normalizedPayload) {
+      return normalizedPayload;
+    }
+  }
+
+  const mimeFingerprint = getDragData(INVENTORY_DRAG_MIME).trim();
+  const fallbackItem = draggingInventoryItem ?? undefined;
+  if (!mimeFingerprint && !fallbackItem) {
+    return undefined;
+  }
+
+  if (
+    mimeFingerprint &&
+    fallbackItem?.fingerprint &&
+    fallbackItem.fingerprint !== mimeFingerprint
+  ) {
+    return undefined;
+  }
+
+  return fallbackItem;
 }
 
 function formatLocation(
@@ -465,6 +767,148 @@ function getTypeValue(type?: string): TypeFilter {
   }
 
   return 'other';
+}
+
+function resolveTargetEquippedSlotId(
+  slotKey: PaperDollSlotKey,
+  weaponSet: EquippedWeaponSet,
+): number {
+  if (slotKey === 'rightHand') {
+    return weaponSet === 'ii' ? 11 : 4;
+  }
+
+  if (slotKey === 'leftHand') {
+    return weaponSet === 'ii' ? 12 : 5;
+  }
+
+  return EQUIPPED_SLOT_IDS[slotKey];
+}
+
+function parseRawTypeName(rawItemJson: string): string {
+  try {
+    const parsed = JSON.parse(rawItemJson) as {
+      type_name?: unknown;
+      name?: unknown;
+      type?: unknown;
+    };
+
+    if (typeof parsed.type_name === 'string' && parsed.type_name.trim().length > 0) {
+      return parsed.type_name.toLowerCase();
+    }
+
+    if (typeof parsed.name === 'string' && parsed.name.trim().length > 0) {
+      return parsed.name.toLowerCase();
+    }
+
+    if (typeof parsed.type === 'string' && parsed.type.trim().length > 0) {
+      return parsed.type.toLowerCase();
+    }
+  } catch {
+    // Use fallback below.
+  }
+
+  return '';
+}
+
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Equipment-slot inference intentionally combines code, raw tooltip name hints, and equipped-slot fallbacks.
+function resolveEligibleEquipmentSlots(item: ActiveInventoryDragItem): Set<PaperDollSlotKey> {
+  const slots = new Set<PaperDollSlotKey>();
+  const sourceSlot = resolvePaperDollSlotKey(item.sourceEquippedSlotId);
+  const sourceCode = item.itemCode?.toLowerCase();
+  const typeText = parseRawTypeName(item.rawItemJson);
+  const hasKeyword = (keyword: string) => typeText.includes(keyword);
+
+  if (sourceCode === 'rin' || typeText === 'ring' || hasKeyword(' ring')) {
+    slots.add('leftRing');
+    slots.add('rightRing');
+  }
+
+  if (sourceCode === 'amu' || hasKeyword('amulet')) {
+    slots.add('amulet');
+  }
+
+  if (
+    hasKeyword('helm') ||
+    hasKeyword('coronet') ||
+    hasKeyword('circlet') ||
+    hasKeyword('tiara') ||
+    hasKeyword('diadem') ||
+    hasKeyword('mask') ||
+    hasKeyword('crown') ||
+    hasKeyword('pelt')
+  ) {
+    slots.add('head');
+  }
+
+  if (hasKeyword('glove') || hasKeyword('gauntlet') || hasKeyword('bracer') || hasKeyword('mitt')) {
+    slots.add('gloves');
+  }
+
+  if (hasKeyword('boot') || hasKeyword('greaves')) {
+    slots.add('boots');
+  }
+
+  if (hasKeyword('belt') || hasKeyword('sash') || hasKeyword('girdle') || hasKeyword('coil')) {
+    slots.add('belt');
+  }
+
+  if (hasKeyword('shield')) {
+    slots.add('leftHand');
+  }
+
+  const isLikelyWeapon =
+    hasKeyword('sword') ||
+    hasKeyword('axe') ||
+    hasKeyword('mace') ||
+    hasKeyword('staff') ||
+    hasKeyword('wand') ||
+    hasKeyword('spear') ||
+    hasKeyword('polearm') ||
+    hasKeyword('bow') ||
+    hasKeyword('crossbow') ||
+    hasKeyword('orb') ||
+    hasKeyword('javelin') ||
+    hasKeyword('dagger') ||
+    hasKeyword('flail') ||
+    hasKeyword('hammer') ||
+    hasKeyword('claw') ||
+    hasKeyword('knife');
+
+  if (isLikelyWeapon) {
+    slots.add('rightHand');
+    slots.add('leftHand');
+  }
+
+  const isLikelyArmor =
+    hasKeyword('armor') ||
+    hasKeyword('mail') ||
+    hasKeyword('plate') ||
+    hasKeyword('robe') ||
+    hasKeyword('skin') ||
+    hasKeyword('harness') ||
+    hasKeyword('cuirass') ||
+    hasKeyword('shell');
+  if (isLikelyArmor && !slots.has('head') && !slots.has('belt') && !slots.has('boots')) {
+    slots.add('armor');
+  }
+
+  if (sourceSlot) {
+    if (sourceSlot === 'leftRing' || sourceSlot === 'rightRing') {
+      slots.add('leftRing');
+      slots.add('rightRing');
+    } else if (sourceSlot === 'leftHand' || sourceSlot === 'rightHand') {
+      slots.add('leftHand');
+      slots.add('rightHand');
+    } else {
+      slots.add(sourceSlot);
+    }
+  }
+
+  if (slots.size === 0) {
+    return new Set(PAPER_DOLL_SLOT_ORDER);
+  }
+
+  return slots;
 }
 
 function toVaultUpsertInput(item: ParsedInventoryItem): VaultItemUpsertInput {
@@ -642,10 +1086,15 @@ function hasBoardOverlap(
   startY: number,
   width: number,
   height: number,
+  ignoredFingerprint?: string,
 ): boolean {
   const droppingCells = createOccupiedCellSet(startX, startY, width, height);
 
   return items.some((item) => {
+    if (ignoredFingerprint && item.fingerprint === ignoredFingerprint) {
+      return false;
+    }
+
     if (!hasGridPosition(item) || !hasGridDimensions(item)) {
       return false;
     }
@@ -796,6 +1245,7 @@ function InventoryTile({
   );
 }
 
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Inventory board handles shared rendering plus two drag/drop source types.
 function InventoryGridSection({
   title,
   testId,
@@ -815,10 +1265,16 @@ function InventoryGridSection({
   sectionLocationContext,
   sectionStashTab,
   draggingVaultItem,
+  draggingInventoryItem,
   onDropVaultItem,
+  onDropInventoryItem,
 }: InventoryGridSectionProps) {
   const { t } = useTranslation();
   const [dragOverCell, setDragOverCell] = useState<{ x: number; y: number } | null>(null);
+  const [activeVaultDragItem, setActiveVaultDragItem] = useState<ActiveVaultDragItem | null>(null);
+  const [activeInventoryDragItem, setActiveInventoryDragItem] =
+    useState<ActiveInventoryDragItem | null>(null);
+  const [activeDragKind, setActiveDragKind] = useState<'vault' | 'inventory' | null>(null);
   const classified = useMemo(() => classifyBoardItems(items, gridSize), [gridSize, items]);
   const overflowLayout = useMemo(() => {
     if (!showRawOverflowBoard) {
@@ -836,64 +1292,214 @@ function InventoryGridSection({
     () => classified.unplaced.filter(({ item }) => !overflowLayout.itemKeys.has(item.fingerprint)),
     [classified.unplaced, overflowLayout.itemKeys],
   );
+  const canDropOnSection =
+    !!snapshotSourceFilePath && !!snapshotSourceFileType && !!sectionLocationContext;
+  const clearDragPreview = useCallback(() => {
+    setActiveDragKind(null);
+    setActiveVaultDragItem(null);
+    setActiveInventoryDragItem(null);
+    setDragOverCell(null);
+  }, []);
   const previewPlacement = useMemo(() => {
-    if (!dragOverCell || !draggingVaultItem) {
+    if (!dragOverCell) {
+      return null;
+    }
+
+    const activeDimensions =
+      activeDragKind === 'vault' ? activeVaultDragItem : activeInventoryDragItem;
+    if (!activeDimensions) {
       return null;
     }
 
     const { x, y } = dragOverCell;
-    const width = draggingVaultItem.gridWidth ?? 1;
-    const height = draggingVaultItem.gridHeight ?? 1;
+    const width = activeDimensions.gridWidth;
+    const height = activeDimensions.gridHeight;
 
     if (x < 0 || y < 0 || x + width > gridSize.columns || y + height > gridSize.rows) {
       return { x, y, valid: false };
     }
 
-    const hasOverlap = hasBoardOverlap(items, x, y, width, height);
+    const hasOverlap = hasBoardOverlap(
+      items,
+      x,
+      y,
+      width,
+      height,
+      activeDragKind === 'inventory' ? activeInventoryDragItem?.fingerprint : undefined,
+    );
 
     return { x, y, valid: !hasOverlap };
-  }, [dragOverCell, draggingVaultItem, items, gridSize]);
+  }, [activeDragKind, activeInventoryDragItem, activeVaultDragItem, dragOverCell, gridSize, items]);
 
-  const handleDropOnBoard = useCallback(
-    async (event: DragEvent<HTMLDivElement>, dropX: number, dropY: number) => {
-      if (!previewPlacement?.valid) {
-        setDragOverCell(null);
+  const handleDragOverBoard = useCallback(
+    (event: DragEvent<HTMLDivElement>, x: number, y: number) => {
+      if (!canDropOnSection) {
+        clearDragPreview();
         return;
       }
 
-      const vaultItemId =
-        event.dataTransfer.getData(VAULT_DRAG_MIME).trim() || draggingVaultItem?.id;
-      if (
-        !vaultItemId ||
-        !snapshotSourceFilePath ||
-        !snapshotSourceFileType ||
-        !sectionLocationContext
-      ) {
-        setDragOverCell(null);
+      const resolvedVaultItem = resolveActiveVaultDragItem(event, draggingVaultItem);
+      if (resolvedVaultItem && onDropVaultItem) {
+        setActiveDragKind('vault');
+        setActiveInventoryDragItem(null);
+        setActiveVaultDragItem(resolvedVaultItem);
+        setDragOverCell({ x, y });
         return;
       }
 
-      setDragOverCell(null);
-      await onDropVaultItem?.(
-        vaultItemId,
-        snapshotSourceFilePath,
-        snapshotSourceFileType,
-        sectionLocationContext,
+      const resolvedInventoryItem = resolveActiveInventoryDragItem(event, draggingInventoryItem);
+      if (resolvedInventoryItem && onDropInventoryItem) {
+        setActiveDragKind('inventory');
+        setActiveVaultDragItem(null);
+        setActiveInventoryDragItem(resolvedInventoryItem);
+        setDragOverCell({ x, y });
+        return;
+      }
+
+      clearDragPreview();
+    },
+    [
+      canDropOnSection,
+      clearDragPreview,
+      draggingInventoryItem,
+      draggingVaultItem,
+      onDropInventoryItem,
+      onDropVaultItem,
+    ],
+  );
+
+  const isDropOutOfBounds = useCallback(
+    (dropX: number, dropY: number, width: number, height: number): boolean =>
+      dropX < 0 || dropY < 0 || dropX + width > gridSize.columns || dropY + height > gridSize.rows,
+    [gridSize.columns, gridSize.rows],
+  );
+
+  const tryDropVaultItem = useCallback(
+    async (
+      event: DragEvent<HTMLDivElement>,
+      dropX: number,
+      dropY: number,
+      targetFilePath: string,
+      targetFileType: VaultSourceFileType,
+      targetLocationContext: VaultLocationContext,
+    ): Promise<boolean> => {
+      const resolvedVaultItem = resolveActiveVaultDragItem(event, draggingVaultItem);
+      if (!resolvedVaultItem || !onDropVaultItem) {
+        return false;
+      }
+
+      const width = resolvedVaultItem.gridWidth;
+      const height = resolvedVaultItem.gridHeight;
+      const isOutOfBounds = isDropOutOfBounds(dropX, dropY, width, height);
+      const hasOverlap = hasBoardOverlap(items, dropX, dropY, width, height);
+      if (isOutOfBounds || hasOverlap || !resolvedVaultItem.id) {
+        return true;
+      }
+
+      await onDropVaultItem(
+        resolvedVaultItem.id,
+        targetFilePath,
+        targetFileType,
+        targetLocationContext,
+        sectionStashTab,
+        dropX,
+        dropY,
+      );
+      return true;
+    },
+    [draggingVaultItem, isDropOutOfBounds, items, onDropVaultItem, sectionStashTab],
+  );
+
+  const tryDropInventoryItem = useCallback(
+    async (
+      event: DragEvent<HTMLDivElement>,
+      dropX: number,
+      dropY: number,
+      targetFilePath: string,
+      targetFileType: VaultSourceFileType,
+      targetLocationContext: VaultLocationContext,
+    ): Promise<void> => {
+      const resolvedInventoryItem = resolveActiveInventoryDragItem(event, draggingInventoryItem);
+      if (!resolvedInventoryItem || !onDropInventoryItem) {
+        return;
+      }
+
+      const width = resolvedInventoryItem.gridWidth;
+      const height = resolvedInventoryItem.gridHeight;
+      const isOutOfBounds = isDropOutOfBounds(dropX, dropY, width, height);
+      const hasOverlap = hasBoardOverlap(
+        items,
+        dropX,
+        dropY,
+        width,
+        height,
+        resolvedInventoryItem.fingerprint,
+      );
+      if (isOutOfBounds || hasOverlap) {
+        return;
+      }
+
+      await onDropInventoryItem(
+        resolvedInventoryItem,
+        targetFilePath,
+        targetFileType,
+        targetLocationContext,
         sectionStashTab,
         dropX,
         dropY,
       );
     },
+    [draggingInventoryItem, isDropOutOfBounds, items, onDropInventoryItem, sectionStashTab],
+  );
+
+  const handleDropOnBoard = useCallback(
+    async (event: DragEvent<HTMLDivElement>, dropX: number, dropY: number) => {
+      if (
+        !canDropOnSection ||
+        !snapshotSourceFilePath ||
+        !snapshotSourceFileType ||
+        !sectionLocationContext
+      ) {
+        clearDragPreview();
+        return;
+      }
+
+      const handledVaultDrop = await tryDropVaultItem(
+        event,
+        dropX,
+        dropY,
+        snapshotSourceFilePath,
+        snapshotSourceFileType,
+        sectionLocationContext,
+      );
+      if (handledVaultDrop) {
+        clearDragPreview();
+        return;
+      }
+
+      await tryDropInventoryItem(
+        event,
+        dropX,
+        dropY,
+        snapshotSourceFilePath,
+        snapshotSourceFileType,
+        sectionLocationContext,
+      );
+      clearDragPreview();
+    },
     [
-      previewPlacement,
-      draggingVaultItem,
+      canDropOnSection,
+      clearDragPreview,
+      sectionLocationContext,
       snapshotSourceFilePath,
       snapshotSourceFileType,
-      sectionLocationContext,
-      sectionStashTab,
-      onDropVaultItem,
+      tryDropInventoryItem,
+      tryDropVaultItem,
     ],
   );
+
+  const activePreviewDimensions =
+    activeDragKind === 'vault' ? activeVaultDragItem : activeInventoryDragItem;
 
   return (
     <div className="space-y-2">
@@ -901,9 +1507,23 @@ function InventoryGridSection({
       <BoardSurface
         gridSize={gridSize}
         testId={testId}
-        onDragOverCell={draggingVaultItem ? (x, y) => setDragOverCell({ x, y }) : undefined}
-        onDragLeaveBoard={draggingVaultItem ? () => setDragOverCell(null) : undefined}
-        onDropOnBoard={draggingVaultItem ? handleDropOnBoard : undefined}
+        onDragOverCell={
+          canDropOnSection && (onDropVaultItem || onDropInventoryItem)
+            ? handleDragOverBoard
+            : undefined
+        }
+        onDragLeaveBoard={
+          canDropOnSection && (onDropVaultItem || onDropInventoryItem)
+            ? () => {
+                clearDragPreview();
+              }
+            : undefined
+        }
+        onDropOnBoard={
+          canDropOnSection && (onDropVaultItem || onDropInventoryItem)
+            ? handleDropOnBoard
+            : undefined
+        }
       >
         {classified.placed.map((item) => {
           const isVaultPresent = getEffectiveVaultPresent(
@@ -930,7 +1550,7 @@ function InventoryGridSection({
             </div>
           );
         })}
-        {previewPlacement && draggingVaultItem && (
+        {previewPlacement && activePreviewDimensions && (
           <div
             className={cn(
               'pointer-events-none z-20 rounded-sm border-2',
@@ -939,8 +1559,8 @@ function InventoryGridSection({
                 : 'border-red-500 bg-red-500/20',
             )}
             style={{
-              gridColumn: `${previewPlacement.x + 1} / span ${draggingVaultItem.gridWidth ?? 1}`,
-              gridRow: `${previewPlacement.y + 1} / span ${draggingVaultItem.gridHeight ?? 1}`,
+              gridColumn: `${previewPlacement.x + 1} / span ${activePreviewDimensions.gridWidth}`,
+              gridRow: `${previewPlacement.y + 1} / span ${activePreviewDimensions.gridHeight}`,
             }}
           >
             {!previewPlacement.valid && (
@@ -1037,11 +1657,99 @@ function EquipmentSection({
   onSelect,
   onDragStart,
   onDragEnd,
+  snapshotSourceFilePath,
+  snapshotSourceFileType,
+  draggingInventoryItem,
+  onDropInventoryItem,
 }: EquipmentSectionProps) {
   const { t } = useTranslation();
+  const [dragPreviewSlot, setDragPreviewSlot] = useState<{
+    slotKey: PaperDollSlotKey;
+    valid: boolean;
+  } | null>(null);
   const equippedMapping = useMemo(
     () => buildEquippedSlotMapForSet(items, weaponSet),
     [items, weaponSet],
+  );
+  const canDropOnSection = !!snapshotSourceFilePath && !!snapshotSourceFileType;
+  const clearSlotPreview = useCallback(() => {
+    setDragPreviewSlot(null);
+  }, []);
+
+  const evaluateSlotDrop = useCallback(
+    (slotKey: PaperDollSlotKey, inventoryItem: ActiveInventoryDragItem): boolean => {
+      const eligibleSlots = resolveEligibleEquipmentSlots(inventoryItem);
+      const slotItem = equippedMapping.slotItems.get(slotKey);
+      const isOccupiedByOther = !!slotItem && slotItem.fingerprint !== inventoryItem.fingerprint;
+
+      return eligibleSlots.has(slotKey) && !isOccupiedByOther;
+    },
+    [equippedMapping.slotItems],
+  );
+
+  const handleDragOverSlot = useCallback(
+    (event: DragEvent<HTMLDivElement>, slotKey: PaperDollSlotKey) => {
+      if (!canDropOnSection || !onDropInventoryItem) {
+        clearSlotPreview();
+        return;
+      }
+
+      const inventoryItem = resolveActiveInventoryDragItem(event, draggingInventoryItem);
+      if (!inventoryItem) {
+        clearSlotPreview();
+        return;
+      }
+
+      setDragPreviewSlot({
+        slotKey,
+        valid: evaluateSlotDrop(slotKey, inventoryItem),
+      });
+    },
+    [
+      canDropOnSection,
+      clearSlotPreview,
+      draggingInventoryItem,
+      evaluateSlotDrop,
+      onDropInventoryItem,
+    ],
+  );
+
+  const handleDropOnSlot = useCallback(
+    async (event: DragEvent<HTMLDivElement>, slotKey: PaperDollSlotKey) => {
+      if (
+        !canDropOnSection ||
+        !snapshotSourceFilePath ||
+        !snapshotSourceFileType ||
+        !onDropInventoryItem
+      ) {
+        clearSlotPreview();
+        return;
+      }
+
+      const inventoryItem = resolveActiveInventoryDragItem(event, draggingInventoryItem);
+      clearSlotPreview();
+      if (!inventoryItem || !evaluateSlotDrop(slotKey, inventoryItem)) {
+        return;
+      }
+
+      await onDropInventoryItem(
+        inventoryItem,
+        snapshotSourceFilePath,
+        snapshotSourceFileType,
+        'equipped',
+        resolveTargetEquippedSlotId(slotKey, weaponSet),
+      );
+    },
+    [
+      canDropOnSection,
+      clearSlotPreview,
+      draggingInventoryItem,
+      evaluateSlotDrop,
+      onDropInventoryItem,
+      snapshotSourceFilePath,
+      snapshotSourceFileType,
+      weaponSet,
+    ],
   );
 
   return (
@@ -1076,16 +1784,31 @@ function EquipmentSection({
           const slotItem = equippedMapping.slotItems.get(slotKey);
 
           return (
+            /* biome-ignore lint/a11y/noStaticElementInteractions: equipment slot frames are drag/drop targets by design. */
             <div
               key={slotKey}
               data-testid="equipped-slot-frame"
               className={cn(
                 'relative z-[1] rounded border border-border/80 bg-black/10',
                 slotItem ? 'border-border/80' : '',
+                dragPreviewSlot?.slotKey === slotKey && dragPreviewSlot.valid
+                  ? 'border-emerald-400 bg-emerald-400/20'
+                  : '',
+                dragPreviewSlot?.slotKey === slotKey && !dragPreviewSlot.valid
+                  ? 'border-red-500 bg-red-500/20'
+                  : '',
               )}
               style={{
                 gridColumn: `${layout.column} / span ${layout.width}`,
                 gridRow: `${layout.row} / span ${layout.height}`,
+              }}
+              onDragOver={(event) => {
+                event.preventDefault();
+                handleDragOverSlot(event, slotKey);
+              }}
+              onDragLeave={() => clearSlotPreview()}
+              onDrop={(event) => {
+                void handleDropOnSlot(event, slotKey);
               }}
             >
               {slotItem ? (
@@ -1107,6 +1830,11 @@ function EquipmentSection({
               ) : (
                 <div className="pointer-events-none absolute inset-[20%] rounded border border-border/40" />
               )}
+              {dragPreviewSlot?.slotKey === slotKey && !dragPreviewSlot.valid && (
+                <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center">
+                  <X className="h-1/2 w-1/2 text-red-500" />
+                </div>
+              )}
             </div>
           );
         })}
@@ -1115,8 +1843,18 @@ function EquipmentSection({
   );
 }
 
-export function CharacterInventoryBrowser() {
+interface CharacterInventoryBrowserProps {
+  mode?: 'full' | 'snapshot';
+  snapshotTarget?: InventorySnapshotWindowTarget;
+}
+
+/* biome-ignore lint/complexity/noExcessiveCognitiveComplexity: This component intentionally coordinates multiple inventory sections and drag/drop flows in one renderer entrypoint. */
+export function CharacterInventoryBrowser({
+  mode = 'full',
+  snapshotTarget,
+}: CharacterInventoryBrowserProps) {
   const { t } = useTranslation();
+  const isSnapshotMode = mode === 'snapshot';
   const grailItems = useGrailStore((state) => state.items);
   const setGrailItems = useGrailStore((state) => state.setItems);
   const [isLoading, setIsLoading] = useState(true);
@@ -1128,7 +1866,13 @@ export function CharacterInventoryBrowser() {
   const [locationContext, setLocationContext] = useState<'all' | VaultLocationContext>('all');
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('all');
   const [dragOverVaultDropzone, setDragOverVaultDropzone] = useState(false);
-  const [draggingVaultItem, setDraggingVaultItem] = useState<VaultItem | null>(null);
+  const [draggingVaultItem, setDraggingVaultItem] = useState<ActiveVaultDragItem | null>(null);
+  const [crossWindowVaultDragItem, setCrossWindowVaultDragItem] =
+    useState<ActiveVaultDragItem | null>(null);
+  const [draggingInventoryItem, setDraggingInventoryItem] =
+    useState<ActiveInventoryDragItem | null>(null);
+  const [crossWindowInventoryDragItem, setCrossWindowInventoryDragItem] =
+    useState<ActiveInventoryDragItem | null>(null);
   const [pendingVaultFingerprints, setPendingVaultFingerprints] = useState<Set<string>>(new Set());
   const [inventoryResponse, setInventoryResponse] = useState<InventorySearchAllResponse | null>(
     null,
@@ -1169,10 +1913,15 @@ export function CharacterInventoryBrowser() {
     };
   }, [grailItems.length, setGrailItems]);
 
+  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Async loading uses guarded request ids and mode-dependent filters.
   const loadInventorySearch = useCallback(async (): Promise<void> => {
     const requestId = latestSearchRequestRef.current + 1;
     latestSearchRequestRef.current = requestId;
-    const filter = buildInventorySearchFilter(searchText, characterId, locationContext);
+    const filter = buildInventorySearchFilter(
+      isSnapshotMode ? '' : searchText,
+      isSnapshotMode ? 'all' : characterId,
+      isSnapshotMode ? 'all' : locationContext,
+    );
 
     setIsLoading(true);
     try {
@@ -1189,10 +1938,73 @@ export function CharacterInventoryBrowser() {
         setIsLoading(false);
       }
     }
-  }, [characterId, locationContext, searchText]);
+  }, [characterId, isSnapshotMode, locationContext, searchText]);
 
   useEffect(() => {
     void loadInventorySearch();
+  }, [loadInventorySearch]);
+
+  useEffect(() => {
+    const handleVaultDragState = (_event: unknown, payload: unknown) => {
+      const parsedPayload = parseVaultDragStatePayload(payload);
+      if (!parsedPayload) {
+        return;
+      }
+
+      if (parsedPayload.active) {
+        setCrossWindowVaultDragItem(parsedPayload);
+        return;
+      }
+
+      setCrossWindowVaultDragItem((current) => (current?.id === parsedPayload.id ? null : current));
+    };
+
+    const handleInventoryDragState = (_event: unknown, payload: unknown) => {
+      const parsedPayload = parseInventoryDragStatePayload(payload);
+      if (!parsedPayload) {
+        return;
+      }
+
+      if (parsedPayload.active) {
+        setCrossWindowInventoryDragItem(parsedPayload);
+        return;
+      }
+
+      setCrossWindowInventoryDragItem((current) =>
+        current?.fingerprint === parsedPayload.fingerprint ? null : current,
+      );
+    };
+
+    window.ipcRenderer?.on(VAULT_DRAG_STATE_CHANNEL, handleVaultDragState);
+    window.ipcRenderer?.on(INVENTORY_DRAG_STATE_CHANNEL, handleInventoryDragState);
+
+    return () => {
+      window.ipcRenderer?.off(VAULT_DRAG_STATE_CHANNEL, handleVaultDragState);
+      window.ipcRenderer?.off(INVENTORY_DRAG_STATE_CHANNEL, handleInventoryDragState);
+    };
+  }, []);
+
+  useEffect(() => {
+    let reloadTimeout: ReturnType<typeof setTimeout> | undefined;
+
+    const handleSaveFileEvent = () => {
+      if (reloadTimeout) {
+        clearTimeout(reloadTimeout);
+      }
+
+      reloadTimeout = setTimeout(() => {
+        void loadInventorySearch();
+      }, 250);
+    };
+
+    window.ipcRenderer?.on('save-file-event', handleSaveFileEvent);
+
+    return () => {
+      if (reloadTimeout) {
+        clearTimeout(reloadTimeout);
+      }
+      window.ipcRenderer?.off('save-file-event', handleSaveFileEvent);
+    };
   }, [loadInventorySearch]);
 
   const vaultItemsByFingerprint = useMemo(() => {
@@ -1207,8 +2019,16 @@ export function CharacterInventoryBrowser() {
 
   const snapshots = useMemo(() => {
     const sourceSnapshots = inventoryResponse?.inventory.snapshots ?? [];
+    const matchingSnapshots =
+      isSnapshotMode && snapshotTarget
+        ? sourceSnapshots.filter(
+            (snapshot) =>
+              snapshot.sourceFilePath === snapshotTarget.sourceFilePath &&
+              snapshot.sourceFileType === snapshotTarget.sourceFileType,
+          )
+        : sourceSnapshots;
 
-    return sourceSnapshots
+    return matchingSnapshots
       .map((snapshot) => ({
         ...snapshot,
         items: snapshot.items.filter((item) => {
@@ -1223,13 +2043,16 @@ export function CharacterInventoryBrowser() {
             return false;
           }
 
-          const matchesType = typeFilter === 'all' || getTypeValue(item.type) === typeFilter;
+          const matchesType =
+            isSnapshotMode || typeFilter === 'all' || getTypeValue(item.type) === typeFilter;
           return matchesType;
         }),
       }))
       .filter((snapshot) => snapshot.items.length > 0);
   }, [
     inventoryResponse?.inventory.snapshots,
+    isSnapshotMode,
+    snapshotTarget,
     typeFilter,
     vaultItemsByFingerprint,
     pendingVaultFingerprints,
@@ -1340,24 +2163,117 @@ export function CharacterInventoryBrowser() {
 
   const handleCardDragStart = (event: DragEvent<HTMLButtonElement>, item: ParsedInventoryItem) => {
     draggingFingerprintRef.current = item.fingerprint;
-    draggingVaultInputRef.current = toVaultUpsertInput(item);
-    event.dataTransfer.effectAllowed = 'copy';
+    const itemInput = toVaultUpsertInput(item);
+    draggingVaultInputRef.current = itemInput;
+    const dragStatePayload = toInventoryDragStatePayload(itemInput);
+    if (dragStatePayload) {
+      setDraggingInventoryItem(dragStatePayload);
+      window.ipcRenderer?.send(INVENTORY_DRAG_STATE_CHANNEL, dragStatePayload);
+    }
+
+    event.dataTransfer.effectAllowed = 'move';
     event.dataTransfer.setData(INVENTORY_DRAG_MIME, item.fingerprint);
-    event.dataTransfer.setData('text/plain', item.fingerprint);
+    event.dataTransfer.setData('text/plain', serializeInventoryTextPayload(itemInput));
+    event.dataTransfer.setData('text', serializeInventoryTextPayload(itemInput));
   };
 
   const handleCardDragEnd = () => {
     draggingFingerprintRef.current = undefined;
     draggingVaultInputRef.current = undefined;
+    setDraggingInventoryItem((current) => {
+      if (current) {
+        window.ipcRenderer?.send(INVENTORY_DRAG_STATE_CHANNEL, {
+          ...current,
+          active: false,
+        });
+      }
+
+      return null;
+    });
   };
 
   const handleVaultItemDragStart = useCallback((item: VaultItem) => {
-    setDraggingVaultItem(item);
+    const dragItem = toActiveVaultDragItem(item);
+    setDraggingVaultItem(dragItem);
+    window.ipcRenderer?.send(VAULT_DRAG_STATE_CHANNEL, {
+      active: true,
+      ...dragItem,
+    });
   }, []);
 
   const handleVaultItemDragEnd = useCallback(() => {
-    setDraggingVaultItem(null);
+    setDraggingVaultItem((current) => {
+      if (current) {
+        window.ipcRenderer?.send(VAULT_DRAG_STATE_CHANNEL, {
+          active: false,
+          ...current,
+        });
+      }
+
+      return null;
+    });
   }, []);
+
+  const activeVaultDragItem = draggingVaultItem ?? crossWindowVaultDragItem;
+  const activeInventoryDragItem = draggingInventoryItem ?? crossWindowInventoryDragItem;
+
+  const handleMoveInventoryItem = useCallback(
+    async (
+      inventoryItem: ActiveInventoryDragItem,
+      targetFilePath: string,
+      targetFileType: VaultSourceFileType,
+      targetLocationContext: VaultLocationContext,
+      targetStashTab: number | undefined,
+      targetGridX: number | undefined,
+      targetGridY: number | undefined,
+      targetEquippedSlotId?: number,
+    ): Promise<void> => {
+      if (!window.electronAPI?.inventory?.moveItem) {
+        return;
+      }
+
+      const isSameFile =
+        inventoryItem.sourceFilePath === targetFilePath &&
+        inventoryItem.sourceFileType === targetFileType;
+      const isSameLocation = inventoryItem.sourceLocationContext === targetLocationContext;
+      const isSameStashTab =
+        targetLocationContext !== 'stash' ||
+        (inventoryItem.sourceStashTab ?? 0) === (targetStashTab ?? 0);
+      const isSameGridPosition =
+        targetLocationContext === 'equipped'
+          ? inventoryItem.sourceEquippedSlotId === targetEquippedSlotId
+          : inventoryItem.sourceGridX === targetGridX && inventoryItem.sourceGridY === targetGridY;
+
+      if (isSameFile && isSameLocation && isSameStashTab && isSameGridPosition) {
+        return;
+      }
+
+      try {
+        await window.electronAPI.inventory.moveItem({
+          sourceFilePath: inventoryItem.sourceFilePath,
+          sourceFileType: inventoryItem.sourceFileType,
+          rawItemJson: inventoryItem.rawItemJson,
+          targetFilePath,
+          targetFileType,
+          targetLocationContext,
+          targetStashTab,
+          targetGridX,
+          targetGridY,
+          targetEquippedSlotId,
+        });
+        window.ipcRenderer?.send(INVENTORY_DRAG_STATE_CHANNEL, {
+          ...inventoryItem,
+          active: false,
+        });
+        setDraggingInventoryItem(null);
+        setCrossWindowInventoryDragItem(null);
+        await reloadInventoryAfterSaveWrite();
+      } catch (error) {
+        console.error('Failed to move inventory item', error);
+      }
+    },
+    [reloadInventoryAfterSaveWrite],
+  );
 
   const handleDropVaultItemOnSection = useCallback(
     async (
@@ -1379,6 +2295,7 @@ export function CharacterInventoryBrowser() {
           targetGridY,
         });
         setDraggingVaultItem(null);
+        setCrossWindowVaultDragItem(null);
         await reloadInventoryAfterSaveWrite();
       } catch (error) {
         console.error('Failed to unvault item to target', error);
@@ -1391,15 +2308,23 @@ export function CharacterInventoryBrowser() {
     event.preventDefault();
     setDragOverVaultDropzone(false);
 
-    const fingerprint =
-      event.dataTransfer.getData(INVENTORY_DRAG_MIME) || event.dataTransfer.getData('text/plain');
-    const normalizedFingerprint = fingerprint.trim() || draggingFingerprintRef.current;
+    const textPayload =
+      event.dataTransfer.getData('text/plain') ||
+      event.dataTransfer.getData('text') ||
+      event.dataTransfer.getData('Text');
+    const payloadItemInput = parseInventoryTextPayload(textPayload);
+    const fingerprint = event.dataTransfer.getData(INVENTORY_DRAG_MIME) || textPayload;
+    const normalizedFingerprint = payloadItemInput
+      ? undefined
+      : fingerprint.trim() || draggingFingerprintRef.current;
     const droppedItemInput = normalizedFingerprint
       ? visibleItems.find((item) => item.fingerprint === normalizedFingerprint)
       : undefined;
-    const itemInput = droppedItemInput
-      ? toVaultUpsertInput(droppedItemInput)
-      : draggingVaultInputRef.current;
+    const itemInput = payloadItemInput
+      ? payloadItemInput
+      : droppedItemInput
+        ? toVaultUpsertInput(droppedItemInput)
+        : draggingVaultInputRef.current;
 
     if (!itemInput) {
       return;
@@ -1408,96 +2333,109 @@ export function CharacterInventoryBrowser() {
     await vaultItem(itemInput);
     draggingFingerprintRef.current = undefined;
     draggingVaultInputRef.current = undefined;
+    setCrossWindowInventoryDragItem(null);
+    setDraggingInventoryItem(null);
   };
+
+  const emptyStateMessage =
+    isSnapshotMode && snapshotTarget
+      ? t(translations.inventoryBrowser.snapshotWindow.notFound, {
+          characterName: snapshotTarget.characterName,
+        })
+      : t(translations.inventoryBrowser.empty);
 
   return (
     <div className="flex-1 overflow-auto p-4">
       <div className="flex w-full flex-col gap-4">
-        <Card>
-          <CardHeader>
-            <CardTitle>{t(translations.inventoryBrowser.title)}</CardTitle>
-          </CardHeader>
-          <CardContent className="grid grid-cols-1 gap-3 md:grid-cols-5">
-            <Input
-              value={searchText}
-              onChange={(event) => setSearchText(event.target.value)}
-              placeholder={t(translations.inventoryBrowser.searchPlaceholder)}
-              aria-label={t(translations.common.search)}
-              className="md:col-span-2"
-            />
-            <Select value={characterId} onValueChange={(value) => setCharacterId(value ?? 'all')}>
-              <SelectTrigger>
-                <SelectValue placeholder={t(translations.inventoryBrowser.character)} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">
-                  {t(translations.inventoryBrowser.allCharacters)}
-                </SelectItem>
-                {characterOptions.map(([id, name]) => (
-                  <SelectItem key={id} value={id}>
-                    {name}
+        {!isSnapshotMode && (
+          <Card>
+            <CardHeader>
+              <CardTitle>{t(translations.inventoryBrowser.title)}</CardTitle>
+            </CardHeader>
+            <CardContent className="grid grid-cols-1 gap-3 md:grid-cols-5">
+              <Input
+                value={searchText}
+                onChange={(event) => setSearchText(event.target.value)}
+                placeholder={t(translations.inventoryBrowser.searchPlaceholder)}
+                aria-label={t(translations.common.search)}
+                className="md:col-span-2"
+              />
+              <Select value={characterId} onValueChange={(value) => setCharacterId(value ?? 'all')}>
+                <SelectTrigger>
+                  <SelectValue placeholder={t(translations.inventoryBrowser.character)} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">
+                    {t(translations.inventoryBrowser.allCharacters)}
                   </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select
-              value={locationContext}
-              onValueChange={(value) =>
-                setLocationContext((value as 'all' | VaultLocationContext | null) ?? 'all')
-              }
-            >
-              <SelectTrigger>
-                <SelectValue placeholder={t(translations.inventoryBrowser.locationFilter)} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">{t(translations.inventoryBrowser.allLocations)}</SelectItem>
-                <SelectItem value="equipped">
-                  {t(translations.inventoryBrowser.location.equipped)}
-                </SelectItem>
-                <SelectItem value="inventory">
-                  {t(translations.inventoryBrowser.location.inventory)}
-                </SelectItem>
-                <SelectItem value="stash">
-                  {t(translations.inventoryBrowser.location.stash)}
-                </SelectItem>
-                <SelectItem value="mercenary">
-                  {t(translations.inventoryBrowser.location.mercenary)}
-                </SelectItem>
-                <SelectItem value="corpse">
-                  {t(translations.inventoryBrowser.location.corpse)}
-                </SelectItem>
-              </SelectContent>
-            </Select>
-            <Select
-              value={typeFilter}
-              onValueChange={(value) => setTypeFilter((value as TypeFilter | null) ?? 'all')}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder={t(translations.inventoryBrowser.type)} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">{t(translations.inventoryBrowser.allTypes)}</SelectItem>
-                <SelectItem value="unique">
-                  {t(translations.inventoryBrowser.typeOptions.unique)}
-                </SelectItem>
-                <SelectItem value="set">
-                  {t(translations.inventoryBrowser.typeOptions.set)}
-                </SelectItem>
-                <SelectItem value="runeword">
-                  {t(translations.inventoryBrowser.typeOptions.runeword)}
-                </SelectItem>
-                <SelectItem value="rune">
-                  {t(translations.inventoryBrowser.typeOptions.rune)}
-                </SelectItem>
-                <SelectItem value="other">
-                  {t(translations.inventoryBrowser.typeOptions.other)}
-                </SelectItem>
-              </SelectContent>
-            </Select>
-          </CardContent>
-        </Card>
+                  {characterOptions.map(([id, name]) => (
+                    <SelectItem key={id} value={id}>
+                      {name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select
+                value={locationContext}
+                onValueChange={(value) =>
+                  setLocationContext((value as 'all' | VaultLocationContext | null) ?? 'all')
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder={t(translations.inventoryBrowser.locationFilter)} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">
+                    {t(translations.inventoryBrowser.allLocations)}
+                  </SelectItem>
+                  <SelectItem value="equipped">
+                    {t(translations.inventoryBrowser.location.equipped)}
+                  </SelectItem>
+                  <SelectItem value="inventory">
+                    {t(translations.inventoryBrowser.location.inventory)}
+                  </SelectItem>
+                  <SelectItem value="stash">
+                    {t(translations.inventoryBrowser.location.stash)}
+                  </SelectItem>
+                  <SelectItem value="mercenary">
+                    {t(translations.inventoryBrowser.location.mercenary)}
+                  </SelectItem>
+                  <SelectItem value="corpse">
+                    {t(translations.inventoryBrowser.location.corpse)}
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+              <Select
+                value={typeFilter}
+                onValueChange={(value) => setTypeFilter((value as TypeFilter | null) ?? 'all')}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder={t(translations.inventoryBrowser.type)} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">{t(translations.inventoryBrowser.allTypes)}</SelectItem>
+                  <SelectItem value="unique">
+                    {t(translations.inventoryBrowser.typeOptions.unique)}
+                  </SelectItem>
+                  <SelectItem value="set">
+                    {t(translations.inventoryBrowser.typeOptions.set)}
+                  </SelectItem>
+                  <SelectItem value="runeword">
+                    {t(translations.inventoryBrowser.typeOptions.runeword)}
+                  </SelectItem>
+                  <SelectItem value="rune">
+                    {t(translations.inventoryBrowser.typeOptions.rune)}
+                  </SelectItem>
+                  <SelectItem value="other">
+                    {t(translations.inventoryBrowser.typeOptions.other)}
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </CardContent>
+          </Card>
+        )}
 
-        {vaultItems.length > 0 && (
+        {!isSnapshotMode && vaultItems.length > 0 && (
           <Card>
             <CardHeader>
               <CardTitle className="text-base">
@@ -1538,30 +2476,32 @@ export function CharacterInventoryBrowser() {
           </Card>
         )}
 
-        <button
-          type="button"
-          className={[
-            'rounded-lg border border-dashed p-3 text-center text-sm transition-colors',
-            dragOverVaultDropzone
-              ? 'border-primary bg-primary/10'
-              : 'border-border text-muted-foreground',
-          ].join(' ')}
-          onDragOver={(event) => {
-            event.preventDefault();
-            setDragOverVaultDropzone(true);
-          }}
-          onDragLeave={() => setDragOverVaultDropzone(false)}
-          onDrop={(event) => {
-            void handleVaultDrop(event);
-          }}
-        >
-          {t(translations.inventoryBrowser.dropToVault)}
-        </button>
+        {!isSnapshotMode && (
+          <button
+            type="button"
+            className={[
+              'rounded-lg border border-dashed p-3 text-center text-sm transition-colors',
+              dragOverVaultDropzone
+                ? 'border-primary bg-primary/10'
+                : 'border-border text-muted-foreground',
+            ].join(' ')}
+            onDragOver={(event) => {
+              event.preventDefault();
+              setDragOverVaultDropzone(true);
+            }}
+            onDragLeave={() => setDragOverVaultDropzone(false)}
+            onDrop={(event) => {
+              void handleVaultDrop(event);
+            }}
+          >
+            {t(translations.inventoryBrowser.dropToVault)}
+          </button>
+        )}
 
         {!isLoading && snapshots.length === 0 && (
           <Card>
             <CardContent className="pt-6 text-center text-muted-foreground">
-              {t(translations.inventoryBrowser.empty)}
+              {emptyStateMessage}
             </CardContent>
           </Card>
         )}
@@ -1605,6 +2545,27 @@ export function CharacterInventoryBrowser() {
                     onSelect={(item) => setSelectedItemFingerprint(item.fingerprint)}
                     onDragStart={handleCardDragStart}
                     onDragEnd={handleCardDragEnd}
+                    snapshotSourceFilePath={snapshot.sourceFilePath}
+                    snapshotSourceFileType={snapshot.sourceFileType}
+                    draggingInventoryItem={activeInventoryDragItem}
+                    onDropInventoryItem={(
+                      inventoryItem,
+                      targetFilePath,
+                      targetFileType,
+                      targetLocationContext,
+                      targetEquippedSlotId,
+                    ) =>
+                      handleMoveInventoryItem(
+                        inventoryItem,
+                        targetFilePath,
+                        targetFileType,
+                        targetLocationContext,
+                        undefined,
+                        undefined,
+                        undefined,
+                        targetEquippedSlotId,
+                      )
+                    }
                   />
                 )}
 
@@ -1626,8 +2587,10 @@ export function CharacterInventoryBrowser() {
                     snapshotSourceFilePath={snapshot.sourceFilePath}
                     snapshotSourceFileType={snapshot.sourceFileType}
                     sectionLocationContext="inventory"
-                    draggingVaultItem={draggingVaultItem}
+                    draggingVaultItem={activeVaultDragItem}
+                    draggingInventoryItem={activeInventoryDragItem}
                     onDropVaultItem={handleDropVaultItemOnSection}
+                    onDropInventoryItem={handleMoveInventoryItem}
                   />
                 )}
 
@@ -1654,8 +2617,10 @@ export function CharacterInventoryBrowser() {
                       snapshotSourceFileType={snapshot.sourceFileType}
                       sectionLocationContext="stash"
                       sectionStashTab={stashTab}
-                      draggingVaultItem={draggingVaultItem}
+                      draggingVaultItem={activeVaultDragItem}
+                      draggingInventoryItem={activeInventoryDragItem}
                       onDropVaultItem={handleDropVaultItemOnSection}
+                      onDropInventoryItem={handleMoveInventoryItem}
                     />
                   ))}
 

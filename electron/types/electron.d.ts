@@ -4,7 +4,9 @@ import type {
   D2SaveFile,
   FileReaderResponse,
   GrailProgress,
+  InventoryItemMoveInput,
   InventorySearchResult,
+  InventorySnapshotWindowTarget,
   Item,
   MonitoringStatus,
   Run,
@@ -663,6 +665,12 @@ export interface ElectronAPI {
       inventory: InventorySearchResult
       vault: VaultItemSearchResult
     }>
+    openSnapshotWindow(
+      target: InventorySnapshotWindowTarget,
+    ): Promise<{
+      success: boolean
+    }>
+    moveItem(input: InventoryItemMoveInput): Promise<{ success: boolean }>
   }
 
   /**

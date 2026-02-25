@@ -1153,6 +1153,7 @@ class SaveFileMonitor {
 
     if (filesToParse.length === 0) {
       log.info('parseFiles', 'No files to parse, exiting early');
+      this.inventorySnapshots = this.mergeInventorySnapshots(filePaths, [], []);
       return;
     }
 
@@ -1198,7 +1199,11 @@ class SaveFileMonitor {
 
     // Update current data
     this.currentData = results;
-    this.inventorySnapshots = successfulSnapshots;
+    this.inventorySnapshots = this.mergeInventorySnapshots(
+      filePaths,
+      filesToParse,
+      successfulSnapshots,
+    );
 
     // Emit save file events for each file that was actually parsed
     await this.emitSaveFileEvents(filesToParse, results);
@@ -1506,6 +1511,43 @@ class SaveFileMonitor {
       totalSnapshots: this.inventorySnapshots.length,
       totalItems: this.inventorySnapshots.reduce((sum, snapshot) => sum + snapshot.items.length, 0),
     };
+  }
+
+  private mergeInventorySnapshots(
+    allFilePaths: string[],
+    parsedFilePaths: string[],
+    successfulSnapshots: CharacterInventorySnapshot[],
+  ): CharacterInventorySnapshot[] {
+    const knownFilePathSet = new Set(allFilePaths);
+    const parsedFilePathSet = new Set(parsedFilePaths);
+    const successfulSnapshotKeySet = new Set(
+      successfulSnapshots.map(
+        (snapshot) => `${snapshot.sourceFileType}:${snapshot.sourceFilePath}`,
+      ),
+    );
+    const mergedByKey = new Map<string, CharacterInventorySnapshot>();
+
+    for (const snapshot of this.inventorySnapshots) {
+      if (!knownFilePathSet.has(snapshot.sourceFilePath)) {
+        continue;
+      }
+
+      const snapshotKey = `${snapshot.sourceFileType}:${snapshot.sourceFilePath}`;
+      if (
+        parsedFilePathSet.has(snapshot.sourceFilePath) &&
+        successfulSnapshotKeySet.has(snapshotKey)
+      ) {
+        continue;
+      }
+
+      mergedByKey.set(snapshotKey, snapshot);
+    }
+
+    for (const snapshot of successfulSnapshots) {
+      mergedByKey.set(`${snapshot.sourceFileType}:${snapshot.sourceFilePath}`, snapshot);
+    }
+
+    return [...mergedByKey.values()];
   }
 
   /**

@@ -876,6 +876,25 @@ export interface InventorySearchResult {
   totalItems: number;
 }
 
+export interface InventorySnapshotWindowTarget {
+  sourceFilePath: string;
+  sourceFileType: VaultSourceFileType;
+  characterName: string;
+}
+
+export interface InventoryItemMoveInput {
+  sourceFilePath: string;
+  sourceFileType: VaultSourceFileType;
+  rawItemJson: string;
+  targetFilePath: string;
+  targetFileType: VaultSourceFileType;
+  targetLocationContext: VaultLocationContext;
+  targetStashTab?: number;
+  targetGridX?: number;
+  targetGridY?: number;
+  targetEquippedSlotId?: number;
+}
+
 /**
  * Type representing a simplified item structure for internal use.
  */

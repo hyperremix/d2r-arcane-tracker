@@ -6,6 +6,7 @@ import { grailDatabase } from './database/database';
 import { initializeDialogHandlers } from './ipc-handlers/dialogHandlers';
 import { closeGrailDatabase, initializeGrailHandlers } from './ipc-handlers/grailHandlers';
 import { initializeIconHandlers } from './ipc-handlers/iconHandlers';
+import { initializeInventoryWindowHandlers } from './ipc-handlers/inventoryWindowHandlers';
 import { closeRunTracker, initializeRunTrackerHandlers } from './ipc-handlers/runTrackerHandlers';
 import {
   closeSaveFileMonitor,
@@ -20,6 +21,7 @@ import { initializeUpdateHandlers } from './ipc-handlers/updateHandlers';
 import { initializeVaultHandlers } from './ipc-handlers/vaultHandlers';
 import { initializeWidgetHandlers } from './ipc-handlers/widgetHandlers';
 import { isPositionOnScreen } from './utils/windowSnapping';
+import { closeInventorySnapshotWindows } from './window/inventorySnapshotWindow';
 import { closeWidgetWindow, showWidgetWindow } from './window/widgetWindow';
 
 createRequire(import.meta.url);
@@ -264,6 +266,7 @@ app.whenReady().then(() => {
   initializeDialogHandlers();
   initializeShellHandlers();
   initializeIconHandlers();
+  initializeInventoryWindowHandlers(__dirname, VITE_DEV_SERVER_URL, RENDERER_DIST);
   initializeTerrorZoneHandlers();
   initializeUpdateHandlers();
 
@@ -373,6 +376,7 @@ app.on('before-quit', () => {
   closeSaveFileMonitor();
   closeRunTracker();
   closeWidgetWindow();
+  closeInventorySnapshotWindows();
 });
 
 /**

@@ -10,6 +10,7 @@ let mockD2stashRead: ReturnType<typeof vi.fn>;
 let mockD2stashWrite: ReturnType<typeof vi.fn>;
 let removeItemFromSaveFile: SaveFileEditorModule['removeItemFromSaveFile'];
 let addItemToSaveFile: SaveFileEditorModule['addItemToSaveFile'];
+let moveItemBetweenSaveFiles: SaveFileEditorModule['moveItemBetweenSaveFiles'];
 
 const constants96 = { version: 96 };
 const constants99 = { version: 99 };
@@ -51,6 +52,7 @@ beforeAll(async () => {
   const module = await import('./saveFileEditor');
   removeItemFromSaveFile = module.removeItemFromSaveFile;
   addItemToSaveFile = module.addItemToSaveFile;
+  moveItemBetweenSaveFiles = module.moveItemBetweenSaveFiles;
 });
 
 type D2sData = {
@@ -214,7 +216,13 @@ describe('When addItemToSaveFile is called', () => {
 
       // Assert
       expect(d2sData.items).toHaveLength(1);
-      expect(d2sData.items[0]).toBe(testItem);
+      expect(d2sData.items[0]).toEqual(
+        expect.objectContaining({
+          id: 123,
+          location_id: 0,
+          alt_position_id: 1,
+        }),
+      );
       expect(mockD2sWrite).toHaveBeenCalledWith(d2sData);
       expect(mockWriteFile).toHaveBeenCalledWith(
         '/path/to/char.d2s',
@@ -234,8 +242,66 @@ describe('When addItemToSaveFile is called', () => {
 
       // Assert
       expect(d2sData.merc_items).toHaveLength(1);
-      expect(d2sData.merc_items[0]).toBe(testItem);
+      expect(d2sData.merc_items[0]).toEqual(
+        expect.objectContaining({
+          id: 123,
+          location_id: 3,
+          alt_position_id: 0,
+        }),
+      );
       expect(d2sData.items).toHaveLength(0);
+    });
+  });
+
+  describe('If sourceFileType is d2s and target location is inventory with coordinates', () => {
+    it('Then item location metadata and target coordinates are rewritten for inventory placement', async () => {
+      // Arrange
+      const d2sData = makeD2sData([]);
+      mockD2sRead.mockResolvedValue(d2sData);
+      const stashItem = {
+        id: 987,
+        location: 'stash',
+        location_id: 0,
+        alt_position_id: 5,
+        position_x: 6,
+        position_y: 5,
+      } as unknown as import('@dschu012/d2s').types.IItem;
+
+      // Act
+      await addItemToSaveFile('/path/to/char.d2s', 'd2s', stashItem, 'inventory', undefined, 2, 1);
+
+      // Assert
+      expect(d2sData.items[0]).toEqual(
+        expect.objectContaining({
+          id: 987,
+          location_id: 0,
+          alt_position_id: 1,
+          position_x: 2,
+          position_y: 1,
+        }),
+      );
+    });
+  });
+
+  describe('If sourceFileType is d2s and target location is equipped', () => {
+    it('Then the equipped slot id is set for equipped placement', async () => {
+      // Arrange
+      const d2sData = makeD2sData([]);
+      mockD2sRead.mockResolvedValue(d2sData);
+
+      // Act
+      await addItemToSaveFile('/path/to/char.d2s', 'd2s', testItem, 'equipped', undefined, 5, 2, 1);
+
+      // Assert
+      expect(d2sData.items[0]).toEqual(
+        expect.objectContaining({
+          id: 123,
+          location_id: 1,
+          equipped_id: 1,
+          position_x: 0,
+          position_y: 0,
+        }),
+      );
     });
   });
 
@@ -253,6 +319,98 @@ describe('When addItemToSaveFile is called', () => {
       expect(stashData.pages[1]?.items[0]).toBe(testItem);
       expect(stashData.pages[0]?.items).toHaveLength(0);
       expect(mockD2stashWrite).toHaveBeenCalledWith(stashData, constants96, 96);
+    });
+  });
+});
+
+describe('When moveItemBetweenSaveFiles is called', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockReadFile.mockResolvedValue(fakeBuffer);
+    mockWriteFile.mockResolvedValue(undefined);
+    mockD2sWrite.mockResolvedValue(fakeResultBuffer);
+    mockD2stashWrite.mockResolvedValue(fakeResultBuffer);
+  });
+
+  describe('If source and target are the same d2s file', () => {
+    it('Then it rewrites the item position in a single save-file write', async () => {
+      // Arrange
+      const sourceItem = {
+        id: 77,
+        location_id: 0,
+        alt_position_id: 1,
+        position_x: 0,
+        position_y: 0,
+      } as unknown as import('@dschu012/d2s').types.IItem;
+      const d2sData = makeD2sData([sourceItem], [], []);
+      mockD2sRead.mockResolvedValue(d2sData);
+
+      // Act
+      await moveItemBetweenSaveFiles({
+        sourceFilePath: '/path/to/char.d2s',
+        sourceFileType: 'd2s',
+        sourceItemId: 77,
+        targetFilePath: '/path/to/char.d2s',
+        targetFileType: 'd2s',
+        targetLocationContext: 'inventory',
+        targetGridX: 3,
+        targetGridY: 2,
+      });
+
+      // Assert
+      expect(mockD2sWrite).toHaveBeenCalledWith(
+        expect.objectContaining({
+          items: [
+            expect.objectContaining({
+              id: 77,
+              location_id: 0,
+              alt_position_id: 1,
+              position_x: 3,
+              position_y: 2,
+            }),
+          ],
+        }),
+      );
+    });
+  });
+
+  describe('If source and target are different files', () => {
+    it('Then it writes to target before removing from source', async () => {
+      // Arrange
+      const sourceItem = {
+        id: 88,
+        location_id: 0,
+        alt_position_id: 1,
+        position_x: 1,
+        position_y: 1,
+      } as unknown as import('@dschu012/d2s').types.IItem;
+      const sourceData = makeD2sData([sourceItem], [], []);
+      const targetData = makeD2sData([], [], []);
+      mockD2sRead.mockResolvedValueOnce(sourceData).mockResolvedValueOnce(targetData);
+
+      // Act
+      await moveItemBetweenSaveFiles({
+        sourceFilePath: '/path/to/source.d2s',
+        sourceFileType: 'd2s',
+        sourceItemId: 88,
+        targetFilePath: '/path/to/target.d2s',
+        targetFileType: 'd2s',
+        targetLocationContext: 'stash',
+        targetGridX: 7,
+        targetGridY: 4,
+      });
+
+      // Assert
+      expect(mockWriteFile).toHaveBeenNthCalledWith(
+        1,
+        '/path/to/target.d2s',
+        Buffer.from(fakeResultBuffer),
+      );
+      expect(mockWriteFile).toHaveBeenNthCalledWith(
+        2,
+        '/path/to/source.d2s',
+        Buffer.from(fakeResultBuffer),
+      );
     });
   });
 });

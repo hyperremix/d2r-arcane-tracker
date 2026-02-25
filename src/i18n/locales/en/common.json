@@ -574,7 +574,16 @@
     "vaulted": "Vaulted",
     "dropToVault": "Drop inventory items here to vault",
     "dragToVault": "Drag to vault dropzone",
-    "vaultedItems": "Vaulted Items"
+    "vaultedItems": "Vaulted Items",
+    "snapshotList": {
+      "title": "Characters & Stashes",
+      "description": "Open a character or stash in a separate window. Drag and drop between that window and this vault view.",
+      "empty": "No character or stash snapshots match your current filters."
+    },
+    "snapshotWindow": {
+      "invalidTarget": "Unable to open inventory snapshot. Missing or invalid snapshot target.",
+      "notFound": "No snapshot is available for {{characterName}} yet."
+    }
   },
   "gameItemTooltip": {
     "oneHandDamageLabel": "One Hand Damage:",
