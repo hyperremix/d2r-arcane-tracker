@@ -1434,6 +1434,123 @@ describe('When CharacterInventoryBrowser is rendered', () => {
     });
   });
 
+  describe('If the snapshot window opens while a vault drag is already active', () => {
+    it('Then drag-over preview outline is rendered using active drag state snapshot fallback', async () => {
+      // Arrange
+      const getComputedStyleSpy = vi
+        .spyOn(window, 'getComputedStyle')
+        .mockReturnValue({ getPropertyValue: () => '28' } as unknown as CSSStyleDeclaration);
+      const invokeMock = vi.fn().mockResolvedValue({
+        vault: {
+          active: true,
+          id: 'vault-opened-mid-drag',
+          gridWidth: 1,
+          gridHeight: 1,
+        },
+      });
+      const onMock = vi.fn();
+      const offMock = vi.fn();
+      const originalIpcRenderer = window.ipcRenderer;
+      Object.defineProperty(window, 'ipcRenderer', {
+        configurable: true,
+        writable: true,
+        value: {
+          on: onMock,
+          off: offMock,
+          invoke: invokeMock,
+          send: vi.fn(),
+        },
+      });
+
+      searchAllMock.mockResolvedValue({
+        inventory: {
+          snapshots: [
+            {
+              snapshotId: 'drag-open-snap-1',
+              characterName: 'Sorc',
+              characterId: 'char-1',
+              sourceFileType: 'd2s',
+              sourceFilePath: '/tmp/sorc.d2s',
+              capturedAt: new Date('2024-01-01T00:00:00.000Z'),
+              items: [
+                {
+                  fingerprint: 'fp-existing-open',
+                  fingerprintInputs: {
+                    sourceFileType: 'd2s',
+                    characterName: 'Sorc',
+                    locationContext: 'inventory',
+                    quality: 'unique',
+                    ethereal: false,
+                    socketCount: 0,
+                    gridX: 4,
+                    gridY: 0,
+                    gridWidth: 2,
+                    gridHeight: 2,
+                    isSocketedItem: false,
+                    itemName: 'Existing Item',
+                  },
+                  characterName: 'Sorc',
+                  characterId: 'char-1',
+                  sourceFileType: 'd2s',
+                  sourceFilePath: '/tmp/sorc.d2s',
+                  locationContext: 'inventory',
+                  type: 'unique',
+                  gridX: 4,
+                  gridY: 0,
+                  gridWidth: 2,
+                  gridHeight: 2,
+                  isSocketedItem: false,
+                  itemName: 'Existing Item',
+                  quality: 'unique',
+                  ethereal: false,
+                  socketCount: 0,
+                  iconFileName: 'shako.png',
+                  rawItemJson: '{}',
+                  rawParsedItem: {},
+                  seenAt: new Date('2024-01-01T00:00:00.000Z'),
+                },
+              ],
+            },
+          ],
+          totalSnapshots: 1,
+          totalItems: 1,
+        },
+        vault: {
+          items: [],
+          total: 0,
+          page: 1,
+          pageSize: 20,
+        },
+      });
+
+      render(<CharacterInventoryBrowser />);
+      const inventoryBoard = await screen.findByTestId('inventory-board-drag-open-snap-1');
+      await waitFor(() => {
+        expect(invokeMock).toHaveBeenCalledWith('inventory:getActiveDragState');
+      });
+
+      const dataTransfer = createBlockedDragDataTransfer();
+
+      // Act
+      fireEvent.dragOver(inventoryBoard, {
+        dataTransfer,
+        clientX: 12,
+        clientY: 12,
+      });
+
+      // Assert
+      await waitFor(() => {
+        expect(inventoryBoard.querySelector('.border-emerald-400')).not.toBeNull();
+      });
+      getComputedStyleSpy.mockRestore();
+      Object.defineProperty(window, 'ipcRenderer', {
+        configurable: true,
+        writable: true,
+        value: originalIpcRenderer,
+      });
+    });
+  });
+
   describe('If an inventory tile is dropped on another inventory board cell', () => {
     it('Then it calls inventory.moveItem with the target board coordinates', async () => {
       // Arrange

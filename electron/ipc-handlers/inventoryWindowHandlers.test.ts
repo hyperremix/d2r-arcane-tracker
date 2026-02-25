@@ -5,6 +5,10 @@ const mocks = vi.hoisted(() => ({
   onMock: vi.fn(),
   openInventorySnapshotWindowMock: vi.fn(),
   getAllWindowsMock: vi.fn(),
+  snapshotWindowSendMock: vi.fn(),
+  snapshotWindowOnceMock: vi.fn(),
+  snapshotWindowIsDestroyedMock: vi.fn(),
+  snapshotWindowIsLoadingMainFrameMock: vi.fn(),
 }));
 
 vi.mock('electron', () => ({
@@ -26,6 +30,16 @@ import { initializeInventoryWindowHandlers } from './inventoryWindowHandlers';
 describe('When inventory window IPC handlers are initialized', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.snapshotWindowIsDestroyedMock.mockReturnValue(false);
+    mocks.snapshotWindowIsLoadingMainFrameMock.mockReturnValue(false);
+    mocks.openInventorySnapshotWindowMock.mockReturnValue({
+      webContents: {
+        send: mocks.snapshotWindowSendMock,
+        once: mocks.snapshotWindowOnceMock,
+        isDestroyed: mocks.snapshotWindowIsDestroyedMock,
+        isLoadingMainFrame: mocks.snapshotWindowIsLoadingMainFrameMock,
+      },
+    });
   });
 
   describe('If initializeInventoryWindowHandlers is called', () => {
@@ -38,6 +52,10 @@ describe('When inventory window IPC handlers are initialized', () => {
       // Assert
       expect(mocks.handleMock).toHaveBeenCalledWith(
         'inventory:openSnapshotWindow',
+        expect.any(Function),
+      );
+      expect(mocks.handleMock).toHaveBeenCalledWith(
+        'inventory:getActiveDragState',
         expect.any(Function),
       );
       expect(mocks.onMock).toHaveBeenCalledWith('inventory:vault-drag-state', expect.any(Function));
@@ -139,6 +157,82 @@ describe('When inventory window IPC handlers are initialized', () => {
       // Assert
       expect(receiverSend).toHaveBeenCalledWith('inventory:vault-drag-state', payload);
       expect(senderWindow.webContents.send).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('If inventory:getActiveDragState is invoked', () => {
+    it('Then it returns the latest active drag payload', async () => {
+      // Arrange
+      initializeInventoryWindowHandlers('/tmp/main', 'http://localhost:5173', '/tmp/renderer');
+      const vaultDragListener = mocks.onMock.mock.calls.find(
+        (call) => call[0] === 'inventory:vault-drag-state',
+      )?.[1];
+      const getActiveDragStateHandler = mocks.handleMock.mock.calls.find(
+        (call) => call[0] === 'inventory:getActiveDragState',
+      )?.[1];
+      const payload = {
+        active: true,
+        id: 'vault-active-1',
+        gridWidth: 2,
+        gridHeight: 3,
+      };
+
+      // Act
+      vaultDragListener?.(
+        {
+          sender: {
+            id: 101,
+          },
+        },
+        payload,
+      );
+      const result = await getActiveDragStateHandler?.();
+
+      // Assert
+      expect(result).toEqual({
+        vault: payload,
+      });
+    });
+  });
+
+  describe('If inventory:openSnapshotWindow is invoked while drag state is active', () => {
+    it('Then current drag state is sent to the opened snapshot window', async () => {
+      // Arrange
+      initializeInventoryWindowHandlers('/tmp/main', 'http://localhost:5173', '/tmp/renderer');
+      const vaultDragListener = mocks.onMock.mock.calls.find(
+        (call) => call[0] === 'inventory:vault-drag-state',
+      )?.[1];
+      const openSnapshotWindowHandler = mocks.handleMock.mock.calls.find(
+        (call) => call[0] === 'inventory:openSnapshotWindow',
+      )?.[1];
+      const payload = {
+        active: true,
+        id: 'vault-active-2',
+        gridWidth: 2,
+        gridHeight: 2,
+      };
+
+      vaultDragListener?.(
+        {
+          sender: {
+            id: 101,
+          },
+        },
+        payload,
+      );
+
+      // Act
+      await openSnapshotWindowHandler?.(null, {
+        sourceFilePath: '/tmp/sorc.d2s',
+        sourceFileType: 'd2s',
+        characterName: 'Sorc',
+      });
+
+      // Assert
+      expect(mocks.snapshotWindowSendMock).toHaveBeenCalledWith(
+        'inventory:vault-drag-state',
+        payload,
+      );
     });
   });
 

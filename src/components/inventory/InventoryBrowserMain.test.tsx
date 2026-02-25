@@ -144,6 +144,97 @@ describe('When InventoryBrowserMain is rendered', () => {
     });
   });
 
+  describe('If an item is dragged over a snapshot name', () => {
+    it('Then it opens the snapshot popup after a hover delay', async () => {
+      // Arrange
+      render(<InventoryBrowserMain />);
+      const snapshotButton = await screen.findByRole('button', {
+        name: /Sorc · D2S/i,
+      });
+      vi.useFakeTimers();
+
+      const payload = {
+        fingerprint: 'fp-hover',
+        itemName: 'Harlequin Crest',
+        quality: 'unique',
+        ethereal: false,
+        socketCount: 0,
+        rawItemJson: '{"id":321}',
+        sourceFileType: 'd2s' as const,
+        sourceFilePath: '/tmp/sorc.d2s',
+        locationContext: 'inventory' as const,
+      };
+
+      // Act
+      fireEvent.dragOver(snapshotButton, {
+        dataTransfer: {
+          types: ['text/plain'],
+          getData: (format: string) =>
+            format === 'text/plain' ? serializeInventoryTextPayload(payload) : '',
+        },
+      });
+      try {
+        await vi.advanceTimersByTimeAsync(649);
+
+        // Assert
+        expect(openSnapshotWindowMock).not.toHaveBeenCalled();
+
+        // Act
+        await vi.advanceTimersByTimeAsync(1);
+        await Promise.resolve();
+
+        // Assert
+        expect(openSnapshotWindowMock).toHaveBeenCalledWith({
+          sourceFilePath: '/tmp/sorc.d2s',
+          sourceFileType: 'd2s',
+          characterName: 'Sorc',
+        });
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('Then it does not open the snapshot popup if hover ends before delay', async () => {
+      // Arrange
+      render(<InventoryBrowserMain />);
+      const snapshotButton = await screen.findByRole('button', {
+        name: /Sorc · D2S/i,
+      });
+      vi.useFakeTimers();
+
+      const payload = {
+        fingerprint: 'fp-hover-cancel',
+        itemName: 'Harlequin Crest',
+        quality: 'unique',
+        ethereal: false,
+        socketCount: 0,
+        rawItemJson: '{"id":654}',
+        sourceFileType: 'd2s' as const,
+        sourceFilePath: '/tmp/sorc.d2s',
+        locationContext: 'inventory' as const,
+      };
+
+      // Act
+      fireEvent.dragOver(snapshotButton, {
+        dataTransfer: {
+          types: ['text/plain'],
+          getData: (format: string) =>
+            format === 'text/plain' ? serializeInventoryTextPayload(payload) : '',
+        },
+      });
+      try {
+        await vi.advanceTimersByTimeAsync(300);
+        fireEvent.dragLeave(snapshotButton);
+        await vi.advanceTimersByTimeAsync(1000);
+
+        // Assert
+        expect(openSnapshotWindowMock).not.toHaveBeenCalled();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+  });
+
   describe('If vault search includes an item with a matching fingerprint', () => {
     it('Then matching snapshot names still remain visible in the main list', async () => {
       // Arrange

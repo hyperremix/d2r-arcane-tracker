@@ -29,6 +29,14 @@ type InventoryDragStatePayload = {
   gridHeight: number;
 };
 
+type ActiveDragStateSnapshot = {
+  vault?: VaultDragStatePayload;
+  inventory?: InventoryDragStatePayload;
+};
+
+let activeVaultDragState: VaultDragStatePayload | undefined;
+let activeInventoryDragState: InventoryDragStatePayload | undefined;
+
 function assert(condition: boolean, message: string): void {
   if (!condition) {
     throw new Error(message);
@@ -155,6 +163,50 @@ function relayDragState(
   }
 }
 
+function updateActiveVaultDragState(payload: VaultDragStatePayload): void {
+  activeVaultDragState = payload.active ? payload : undefined;
+  if (payload.active) {
+    activeInventoryDragState = undefined;
+  }
+}
+
+function updateActiveInventoryDragState(payload: InventoryDragStatePayload): void {
+  activeInventoryDragState = payload.active ? payload : undefined;
+  if (payload.active) {
+    activeVaultDragState = undefined;
+  }
+}
+
+function getActiveDragStateSnapshot(): ActiveDragStateSnapshot {
+  const snapshot: ActiveDragStateSnapshot = {};
+
+  if (activeVaultDragState?.active) {
+    snapshot.vault = activeVaultDragState;
+  }
+
+  if (activeInventoryDragState?.active) {
+    snapshot.inventory = activeInventoryDragState;
+  }
+
+  return snapshot;
+}
+
+function sendActiveDragStateSnapshot(window: BrowserWindow): void {
+  const { webContents } = window;
+  if (webContents.isDestroyed()) {
+    return;
+  }
+
+  const activeDragState = getActiveDragStateSnapshot();
+  if (activeDragState.vault) {
+    webContents.send(VAULT_DRAG_STATE_CHANNEL, activeDragState.vault);
+  }
+
+  if (activeDragState.inventory) {
+    webContents.send(INVENTORY_DRAG_STATE_CHANNEL, activeDragState.inventory);
+  }
+}
+
 function validateSnapshotTarget(
   target: InventorySnapshotWindowTarget,
 ): InventorySnapshotWindowTarget {
@@ -189,12 +241,16 @@ export function initializeInventoryWindowHandlers(
   viteDevServerUrl?: string,
   rendererDist?: string,
 ): void {
+  activeVaultDragState = undefined;
+  activeInventoryDragState = undefined;
+
   ipcMain.on(VAULT_DRAG_STATE_CHANNEL, (event, payload: unknown) => {
     const normalizedPayload = normalizeVaultDragStatePayload(payload);
     if (!normalizedPayload) {
       return;
     }
 
+    updateActiveVaultDragState(normalizedPayload);
     relayDragState(event, VAULT_DRAG_STATE_CHANNEL, normalizedPayload);
   });
 
@@ -204,14 +260,34 @@ export function initializeInventoryWindowHandlers(
       return;
     }
 
+    updateActiveInventoryDragState(normalizedPayload);
     relayDragState(event, INVENTORY_DRAG_STATE_CHANNEL, normalizedPayload);
   });
+
+  ipcMain.handle(
+    'inventory:getActiveDragState',
+    async (): Promise<ActiveDragStateSnapshot> => getActiveDragStateSnapshot(),
+  );
 
   ipcMain.handle(
     'inventory:openSnapshotWindow',
     async (_, target: InventorySnapshotWindowTarget): Promise<{ success: boolean }> => {
       const validatedTarget = validateSnapshotTarget(target);
-      openInventorySnapshotWindow(validatedTarget, __dirname, viteDevServerUrl, rendererDist);
+      const snapshotWindow = openInventorySnapshotWindow(
+        validatedTarget,
+        __dirname,
+        viteDevServerUrl,
+        rendererDist,
+      );
+
+      if (snapshotWindow.webContents.isLoadingMainFrame()) {
+        snapshotWindow.webContents.once('did-finish-load', () => {
+          sendActiveDragStateSnapshot(snapshotWindow);
+        });
+      } else {
+        sendActiveDragStateSnapshot(snapshotWindow);
+      }
+
       return { success: true };
     },
   );
