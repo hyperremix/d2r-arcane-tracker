@@ -8,7 +8,9 @@ import type {
 import { type DragEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
+  INVENTORY_DRAG_MIME,
   parseInventoryTextPayload,
+  parseVaultTextPayload,
   serializeVaultTextPayload,
   VAULT_DRAG_MIME,
 } from '@/components/inventory/dragPayloads';
@@ -34,6 +36,10 @@ import { cn } from '@/lib/utils';
 import { useGrailStore } from '@/stores/grailStore';
 
 const VAULT_DRAG_STATE_CHANNEL = 'inventory:vault-drag-state';
+const INVENTORY_DRAG_STATE_CHANNEL = 'inventory:item-drag-state';
+const VAULT_TEXT_PAYLOAD_PREFIX = 'd2r-arcane-tracker:vault-item:';
+const SNAPSHOT_HOVER_OPEN_DELAY_MS = 650;
+const SNAPSHOT_DRAG_SESSION_IDLE_RESET_MS = 900;
 
 type InventorySearchAllResponse = {
   inventory: {
@@ -65,6 +71,62 @@ function toVaultDragStatePayload(item: VaultItem): {
         ? item.gridHeight
         : 1,
   };
+}
+
+function getSnapshotWindowTargetKey(snapshot: CharacterInventorySnapshot): string {
+  return `${snapshot.sourceFileType}:${snapshot.sourceFilePath}`;
+}
+
+function parseVaultDragStatePayload(payload: unknown): { active: boolean } | undefined {
+  if (!payload || typeof payload !== 'object') {
+    return undefined;
+  }
+
+  const rawPayload = payload as Partial<{
+    active: boolean;
+    id: string;
+  }>;
+  if (
+    typeof rawPayload.active !== 'boolean' ||
+    typeof rawPayload.id !== 'string' ||
+    rawPayload.id.trim().length === 0
+  ) {
+    return undefined;
+  }
+
+  return { active: rawPayload.active };
+}
+
+function parseInventoryDragStatePayload(payload: unknown): { active: boolean } | undefined {
+  if (!payload || typeof payload !== 'object') {
+    return undefined;
+  }
+
+  const rawPayload = payload as Partial<{
+    active: boolean;
+    fingerprint: string;
+    sourceFilePath: string;
+    sourceFileType: string;
+    sourceLocationContext: string;
+    rawItemJson: string;
+  }>;
+  if (
+    typeof rawPayload.active !== 'boolean' ||
+    typeof rawPayload.fingerprint !== 'string' ||
+    rawPayload.fingerprint.trim().length === 0 ||
+    typeof rawPayload.sourceFilePath !== 'string' ||
+    rawPayload.sourceFilePath.trim().length === 0 ||
+    typeof rawPayload.sourceFileType !== 'string' ||
+    rawPayload.sourceFileType.trim().length === 0 ||
+    typeof rawPayload.sourceLocationContext !== 'string' ||
+    rawPayload.sourceLocationContext.trim().length === 0 ||
+    typeof rawPayload.rawItemJson !== 'string' ||
+    rawPayload.rawItemJson.trim().length === 0
+  ) {
+    return undefined;
+  }
+
+  return { active: rawPayload.active };
 }
 
 interface MainVaultTileProps {
@@ -271,6 +333,12 @@ export function InventoryBrowserMain() {
     null,
   );
   const latestSearchRequestRef = useRef(0);
+  const hasCrossWindowVaultDragRef = useRef(false);
+  const hasCrossWindowInventoryDragRef = useRef(false);
+  const snapshotHoverTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const snapshotHoverKeyRef = useRef<string | undefined>(undefined);
+  const lastSnapshotDragSeenAtRef = useRef(0);
+  const autoOpenedSnapshotKeysRef = useRef<Set<string>>(new Set());
   const spriteIconLookup = useMemo(() => createSpriteIconLookupIndex(grailItems), [grailItems]);
 
   useEffect(() => {
@@ -348,6 +416,78 @@ export function InventoryBrowserMain() {
       window.ipcRenderer?.off('save-file-event', handleSaveFileEvent);
     };
   }, [loadInventorySearch]);
+
+  const clearSnapshotHoverTimer = useCallback((): void => {
+    if (snapshotHoverTimerRef.current) {
+      clearTimeout(snapshotHoverTimerRef.current);
+      snapshotHoverTimerRef.current = undefined;
+    }
+
+    snapshotHoverKeyRef.current = undefined;
+  }, []);
+
+  const resetSnapshotHoverSession = useCallback((): void => {
+    clearSnapshotHoverTimer();
+    autoOpenedSnapshotKeysRef.current.clear();
+    lastSnapshotDragSeenAtRef.current = 0;
+  }, [clearSnapshotHoverTimer]);
+
+  useEffect(() => {
+    const resetIfRemoteDragInactive = () => {
+      if (!hasCrossWindowVaultDragRef.current && !hasCrossWindowInventoryDragRef.current) {
+        resetSnapshotHoverSession();
+      }
+    };
+
+    const handleVaultDragState = (_event: unknown, payload: unknown) => {
+      const parsedPayload = parseVaultDragStatePayload(payload);
+      if (!parsedPayload) {
+        return;
+      }
+
+      hasCrossWindowVaultDragRef.current = parsedPayload.active;
+      if (!parsedPayload.active) {
+        resetIfRemoteDragInactive();
+      }
+    };
+
+    const handleInventoryDragState = (_event: unknown, payload: unknown) => {
+      const parsedPayload = parseInventoryDragStatePayload(payload);
+      if (!parsedPayload) {
+        return;
+      }
+
+      hasCrossWindowInventoryDragRef.current = parsedPayload.active;
+      if (!parsedPayload.active) {
+        resetIfRemoteDragInactive();
+      }
+    };
+
+    window.ipcRenderer?.on(VAULT_DRAG_STATE_CHANNEL, handleVaultDragState);
+    window.ipcRenderer?.on(INVENTORY_DRAG_STATE_CHANNEL, handleInventoryDragState);
+
+    return () => {
+      window.ipcRenderer?.off(VAULT_DRAG_STATE_CHANNEL, handleVaultDragState);
+      window.ipcRenderer?.off(INVENTORY_DRAG_STATE_CHANNEL, handleInventoryDragState);
+    };
+  }, [resetSnapshotHoverSession]);
+
+  useEffect(() => {
+    const resetDragSession = () => {
+      hasCrossWindowVaultDragRef.current = false;
+      hasCrossWindowInventoryDragRef.current = false;
+      resetSnapshotHoverSession();
+    };
+
+    window.addEventListener('dragend', resetDragSession);
+    window.addEventListener('drop', resetDragSession);
+
+    return () => {
+      window.removeEventListener('dragend', resetDragSession);
+      window.removeEventListener('drop', resetDragSession);
+      resetDragSession();
+    };
+  }, [resetSnapshotHoverSession]);
 
   const vaultItems = useMemo(
     () => inventoryResponse?.vault.items ?? [],
@@ -475,6 +615,100 @@ export function InventoryBrowserMain() {
       }
     },
     [],
+  );
+
+  const isSupportedSnapshotHoverDrag = useCallback((event: DragEvent<HTMLElement>): boolean => {
+    if (hasCrossWindowVaultDragRef.current || hasCrossWindowInventoryDragRef.current) {
+      return true;
+    }
+
+    const dataTransferTypes = Array.from(event.dataTransfer?.types ?? []);
+    if (
+      dataTransferTypes.includes(INVENTORY_DRAG_MIME) ||
+      dataTransferTypes.includes(VAULT_DRAG_MIME)
+    ) {
+      return true;
+    }
+
+    const readDragData = (format: string): string => {
+      try {
+        return event.dataTransfer.getData(format) ?? '';
+      } catch {
+        return '';
+      }
+    };
+
+    const textPayload = readDragData('text/plain') || readDragData('text') || readDragData('Text');
+    if (!textPayload) {
+      return false;
+    }
+
+    if (parseInventoryTextPayload(textPayload) !== undefined) {
+      return true;
+    }
+
+    return (
+      textPayload.startsWith(VAULT_TEXT_PAYLOAD_PREFIX) &&
+      parseVaultTextPayload(textPayload) !== undefined
+    );
+  }, []);
+
+  const trackSnapshotDragSession = useCallback((): void => {
+    const now = Date.now();
+    if (now - lastSnapshotDragSeenAtRef.current > SNAPSHOT_DRAG_SESSION_IDLE_RESET_MS) {
+      autoOpenedSnapshotKeysRef.current.clear();
+    }
+
+    lastSnapshotDragSeenAtRef.current = now;
+  }, []);
+
+  const handleSnapshotRowDragOver = useCallback(
+    (event: DragEvent<HTMLButtonElement>, snapshot: CharacterInventorySnapshot): void => {
+      if (!isSupportedSnapshotHoverDrag(event)) {
+        return;
+      }
+
+      event.preventDefault();
+      trackSnapshotDragSession();
+
+      const targetKey = getSnapshotWindowTargetKey(snapshot);
+      if (autoOpenedSnapshotKeysRef.current.has(targetKey)) {
+        return;
+      }
+
+      if (snapshotHoverKeyRef.current === targetKey && snapshotHoverTimerRef.current) {
+        return;
+      }
+
+      clearSnapshotHoverTimer();
+      snapshotHoverKeyRef.current = targetKey;
+      snapshotHoverTimerRef.current = setTimeout(() => {
+        if (snapshotHoverKeyRef.current !== targetKey) {
+          return;
+        }
+
+        autoOpenedSnapshotKeysRef.current.add(targetKey);
+        snapshotHoverTimerRef.current = undefined;
+        void handleOpenSnapshotWindow(snapshot);
+      }, SNAPSHOT_HOVER_OPEN_DELAY_MS);
+    },
+    [
+      clearSnapshotHoverTimer,
+      handleOpenSnapshotWindow,
+      isSupportedSnapshotHoverDrag,
+      trackSnapshotDragSession,
+    ],
+  );
+
+  const handleSnapshotRowDragLeave = useCallback(
+    (snapshot: CharacterInventorySnapshot): void => {
+      if (snapshotHoverKeyRef.current !== getSnapshotWindowTargetKey(snapshot)) {
+        return;
+      }
+
+      clearSnapshotHoverTimer();
+    },
+    [clearSnapshotHoverTimer],
   );
 
   return (
@@ -647,6 +881,15 @@ export function InventoryBrowserMain() {
                   className="flex w-full items-start justify-between gap-3 rounded-md border border-border/60 bg-card/40 px-3 py-2 text-left hover:border-primary/60 hover:bg-primary/5"
                   onClick={() => {
                     void handleOpenSnapshotWindow(snapshot);
+                  }}
+                  onDragOver={(event) => {
+                    handleSnapshotRowDragOver(event, snapshot);
+                  }}
+                  onDragLeave={() => {
+                    handleSnapshotRowDragLeave(snapshot);
+                  }}
+                  onDrop={() => {
+                    resetSnapshotHoverSession();
                   }}
                 >
                   <div className="space-y-1">

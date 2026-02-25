@@ -1945,6 +1945,8 @@ export function CharacterInventoryBrowser({
   }, [loadInventorySearch]);
 
   useEffect(() => {
+    let isDisposed = false;
+
     const handleVaultDragState = (_event: unknown, payload: unknown) => {
       const parsedPayload = parseVaultDragStatePayload(payload);
       if (!parsedPayload) {
@@ -1978,7 +1980,35 @@ export function CharacterInventoryBrowser({
     window.ipcRenderer?.on(VAULT_DRAG_STATE_CHANNEL, handleVaultDragState);
     window.ipcRenderer?.on(INVENTORY_DRAG_STATE_CHANNEL, handleInventoryDragState);
 
+    void window.ipcRenderer
+      ?.invoke('inventory:getActiveDragState')
+      .then((payload) => {
+        if (isDisposed || !payload || typeof payload !== 'object') {
+          return;
+        }
+
+        const rawPayload = payload as {
+          vault?: unknown;
+          inventory?: unknown;
+        };
+        const parsedVaultPayload = parseVaultDragStatePayload(rawPayload.vault);
+        if (parsedVaultPayload?.active) {
+          setCrossWindowVaultDragItem(parsedVaultPayload);
+        }
+
+        const parsedInventoryPayload = parseInventoryDragStatePayload(rawPayload.inventory);
+        if (parsedInventoryPayload?.active) {
+          setCrossWindowInventoryDragItem(parsedInventoryPayload);
+        }
+      })
+      .catch((error) => {
+        if (!isDisposed) {
+          console.warn('Failed to get active inventory drag state', error);
+        }
+      });
+
     return () => {
+      isDisposed = true;
       window.ipcRenderer?.off(VAULT_DRAG_STATE_CHANNEL, handleVaultDragState);
       window.ipcRenderer?.off(INVENTORY_DRAG_STATE_CHANNEL, handleInventoryDragState);
     };
