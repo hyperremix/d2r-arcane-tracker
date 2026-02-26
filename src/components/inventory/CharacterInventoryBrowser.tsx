@@ -90,6 +90,11 @@ const VAULT_DRAG_STATE_CHANNEL = 'inventory:vault-drag-state';
 const INVENTORY_DRAG_STATE_CHANNEL = 'inventory:item-drag-state';
 const DEFAULT_MERCENARY_SLOT_ORDER: PaperDollSlotKey[] = ['head', 'leftHand', 'armor', 'rightHand'];
 const DEFAULT_MERCENARY_SLOT_SET = new Set(DEFAULT_MERCENARY_SLOT_ORDER);
+const STASH_SOURCE_FILE_TYPES = new Set<VaultSourceFileType>(['sss', 'd2x', 'd2i']);
+
+function isStashSourceFileType(sourceFileType: VaultSourceFileType): boolean {
+  return STASH_SOURCE_FILE_TYPES.has(sourceFileType);
+}
 
 function getVaultItemLastUpdatedMs(item: VaultItem): number {
   const rawValue = item.lastUpdated as unknown;
@@ -2680,6 +2685,7 @@ export function CharacterInventoryBrowser({
           const stashTabs = getSortedStashTabs(grouped.stashByTab);
           const stashTabsToRender = stashTabs.length > 0 ? stashTabs : [{ stashTab: 0, items: [] }];
           const { belt: beltItems, otherUnknown } = partitionUnknownItems(grouped.unknown);
+          const stashOnlySnapshot = isStashSourceFileType(snapshot.sourceFileType);
 
           return (
             <Card key={snapshot.snapshotId}>
@@ -2702,65 +2708,67 @@ export function CharacterInventoryBrowser({
                 </div>
               </CardHeader>
               <CardContent className="columns-1 gap-4 sm:columns-[20rem] [&>*]:mb-4 [&>*]:break-inside-avoid">
-                {(locationContext === 'all' || locationContext === 'equipped') && (
-                  <EquipmentSection
-                    items={grouped.equipped}
-                    iconLookup={spriteIconLookup}
-                    selectedFingerprint={selectedItemFingerprint}
-                    pendingVaultFingerprints={pendingVaultFingerprints}
-                    vaultItemsByFingerprint={vaultItemsByFingerprint}
-                    weaponSet={equipmentWeaponSet}
-                    onWeaponSetChange={setEquipmentWeaponSet}
-                    onSelect={(item) => setSelectedItemFingerprint(item.fingerprint)}
-                    onDragStart={handleCardDragStart}
-                    onDragEnd={handleCardDragEnd}
-                    snapshotSourceFilePath={snapshot.sourceFilePath}
-                    snapshotSourceFileType={snapshot.sourceFileType}
-                    draggingInventoryItem={activeInventoryDragItem}
-                    onDropInventoryItem={(
-                      inventoryItem,
-                      targetFilePath,
-                      targetFileType,
-                      targetLocationContext,
-                      targetEquippedSlotId,
-                    ) =>
-                      handleMoveInventoryItem(
+                {!stashOnlySnapshot &&
+                  (locationContext === 'all' || locationContext === 'equipped') && (
+                    <EquipmentSection
+                      items={grouped.equipped}
+                      iconLookup={spriteIconLookup}
+                      selectedFingerprint={selectedItemFingerprint}
+                      pendingVaultFingerprints={pendingVaultFingerprints}
+                      vaultItemsByFingerprint={vaultItemsByFingerprint}
+                      weaponSet={equipmentWeaponSet}
+                      onWeaponSetChange={setEquipmentWeaponSet}
+                      onSelect={(item) => setSelectedItemFingerprint(item.fingerprint)}
+                      onDragStart={handleCardDragStart}
+                      onDragEnd={handleCardDragEnd}
+                      snapshotSourceFilePath={snapshot.sourceFilePath}
+                      snapshotSourceFileType={snapshot.sourceFileType}
+                      draggingInventoryItem={activeInventoryDragItem}
+                      onDropInventoryItem={(
                         inventoryItem,
                         targetFilePath,
                         targetFileType,
                         targetLocationContext,
-                        undefined,
-                        undefined,
-                        undefined,
                         targetEquippedSlotId,
-                      )
-                    }
-                  />
-                )}
+                      ) =>
+                        handleMoveInventoryItem(
+                          inventoryItem,
+                          targetFilePath,
+                          targetFileType,
+                          targetLocationContext,
+                          undefined,
+                          undefined,
+                          undefined,
+                          targetEquippedSlotId,
+                        )
+                      }
+                    />
+                  )}
 
-                {(locationContext === 'all' || locationContext === 'inventory') && (
-                  <InventoryGridSection
-                    title={t(translations.inventoryBrowser.sections.inventory)}
-                    testId={`inventory-board-${snapshot.snapshotId}`}
-                    items={grouped.inventory}
-                    gridSize={DEFAULT_INVENTORY_GRID_SIZE}
-                    showRawOverflowBoard
-                    iconLookup={spriteIconLookup}
-                    selectedFingerprint={selectedItemFingerprint}
-                    pendingVaultFingerprints={pendingVaultFingerprints}
-                    vaultItemsByFingerprint={vaultItemsByFingerprint}
-                    onSelect={(item) => setSelectedItemFingerprint(item.fingerprint)}
-                    onDragStart={handleCardDragStart}
-                    onDragEnd={handleCardDragEnd}
-                    snapshotSourceFilePath={snapshot.sourceFilePath}
-                    snapshotSourceFileType={snapshot.sourceFileType}
-                    sectionLocationContext="inventory"
-                    draggingVaultItem={activeVaultDragItem}
-                    draggingInventoryItem={activeInventoryDragItem}
-                    onDropVaultItem={handleDropVaultItemOnSection}
-                    onDropInventoryItem={handleMoveInventoryItem}
-                  />
-                )}
+                {!stashOnlySnapshot &&
+                  (locationContext === 'all' || locationContext === 'inventory') && (
+                    <InventoryGridSection
+                      title={t(translations.inventoryBrowser.sections.inventory)}
+                      testId={`inventory-board-${snapshot.snapshotId}`}
+                      items={grouped.inventory}
+                      gridSize={DEFAULT_INVENTORY_GRID_SIZE}
+                      showRawOverflowBoard
+                      iconLookup={spriteIconLookup}
+                      selectedFingerprint={selectedItemFingerprint}
+                      pendingVaultFingerprints={pendingVaultFingerprints}
+                      vaultItemsByFingerprint={vaultItemsByFingerprint}
+                      onSelect={(item) => setSelectedItemFingerprint(item.fingerprint)}
+                      onDragStart={handleCardDragStart}
+                      onDragEnd={handleCardDragEnd}
+                      snapshotSourceFilePath={snapshot.sourceFilePath}
+                      snapshotSourceFileType={snapshot.sourceFileType}
+                      sectionLocationContext="inventory"
+                      draggingVaultItem={activeVaultDragItem}
+                      draggingInventoryItem={activeInventoryDragItem}
+                      onDropVaultItem={handleDropVaultItemOnSection}
+                      onDropInventoryItem={handleMoveInventoryItem}
+                    />
+                  )}
 
                 {(locationContext === 'all' || locationContext === 'stash') &&
                   stashTabsToRender.map(({ stashTab, items }) => (
@@ -2807,36 +2815,38 @@ export function CharacterInventoryBrowser({
                   />
                 )}
 
-                {(locationContext === 'all' || locationContext === 'mercenary') && (
-                  <MercenaryEquipmentSection
-                    title={t(translations.inventoryBrowser.sections.mercenary)}
-                    testId={`mercenary-board-${snapshot.snapshotId}`}
-                    items={grouped.mercenary}
-                    iconLookup={spriteIconLookup}
-                    selectedFingerprint={selectedItemFingerprint}
-                    pendingVaultFingerprints={pendingVaultFingerprints}
-                    vaultItemsByFingerprint={vaultItemsByFingerprint}
-                    onSelect={(item) => setSelectedItemFingerprint(item.fingerprint)}
-                    onDragStart={handleCardDragStart}
-                    onDragEnd={handleCardDragEnd}
-                  />
-                )}
+                {!stashOnlySnapshot &&
+                  (locationContext === 'all' || locationContext === 'mercenary') && (
+                    <MercenaryEquipmentSection
+                      title={t(translations.inventoryBrowser.sections.mercenary)}
+                      testId={`mercenary-board-${snapshot.snapshotId}`}
+                      items={grouped.mercenary}
+                      iconLookup={spriteIconLookup}
+                      selectedFingerprint={selectedItemFingerprint}
+                      pendingVaultFingerprints={pendingVaultFingerprints}
+                      vaultItemsByFingerprint={vaultItemsByFingerprint}
+                      onSelect={(item) => setSelectedItemFingerprint(item.fingerprint)}
+                      onDragStart={handleCardDragStart}
+                      onDragEnd={handleCardDragEnd}
+                    />
+                  )}
 
-                {(locationContext === 'all' || locationContext === 'corpse') && (
-                  <InventoryGridSection
-                    title={t(translations.inventoryBrowser.sections.corpse)}
-                    testId={`corpse-board-${snapshot.snapshotId}`}
-                    items={grouped.corpse}
-                    gridSize={DEFAULT_INVENTORY_GRID_SIZE}
-                    iconLookup={spriteIconLookup}
-                    selectedFingerprint={selectedItemFingerprint}
-                    pendingVaultFingerprints={pendingVaultFingerprints}
-                    vaultItemsByFingerprint={vaultItemsByFingerprint}
-                    onSelect={(item) => setSelectedItemFingerprint(item.fingerprint)}
-                    onDragStart={handleCardDragStart}
-                    onDragEnd={handleCardDragEnd}
-                  />
-                )}
+                {!stashOnlySnapshot &&
+                  (locationContext === 'all' || locationContext === 'corpse') && (
+                    <InventoryGridSection
+                      title={t(translations.inventoryBrowser.sections.corpse)}
+                      testId={`corpse-board-${snapshot.snapshotId}`}
+                      items={grouped.corpse}
+                      gridSize={DEFAULT_INVENTORY_GRID_SIZE}
+                      iconLookup={spriteIconLookup}
+                      selectedFingerprint={selectedItemFingerprint}
+                      pendingVaultFingerprints={pendingVaultFingerprints}
+                      vaultItemsByFingerprint={vaultItemsByFingerprint}
+                      onSelect={(item) => setSelectedItemFingerprint(item.fingerprint)}
+                      onDragStart={handleCardDragStart}
+                      onDragEnd={handleCardDragEnd}
+                    />
+                  )}
 
                 {otherUnknown.length > 0 && (
                   <div className="space-y-2 rounded-md border border-border/60 bg-muted/10 p-3">
