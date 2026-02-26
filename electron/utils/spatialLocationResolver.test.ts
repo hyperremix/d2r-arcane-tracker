@@ -128,4 +128,67 @@ describe('When resolveSpatialLocation is called', () => {
       expect(result.gridY).toBe(9);
     });
   });
+
+  describe('If location_id marks item as equipped and fallback location is mercenary', () => {
+    it('Then location context remains mercenary', () => {
+      // Arrange
+      const item: D2SItem = {
+        location_id: 1,
+        equipped_id: 4,
+      };
+
+      // Act
+      const result = resolveSpatialLocation({
+        item,
+        sourceFileType: 'd2s',
+        fallbackLocation: 'mercenary',
+      });
+
+      // Assert
+      expect(result.locationContext).toBe('mercenary');
+      expect(result.equippedSlotId).toBe(4);
+    });
+  });
+
+  describe('If location_id marks item as equipped and fallback location is corpse', () => {
+    it('Then location context remains corpse', () => {
+      // Arrange
+      const item: D2SItem = {
+        location_id: 1,
+        equipped_id: 1,
+      };
+
+      // Act
+      const result = resolveSpatialLocation({
+        item,
+        sourceFileType: 'd2s',
+        fallbackLocation: 'corpse',
+      });
+
+      // Assert
+      expect(result.locationContext).toBe('corpse');
+      expect(result.equippedSlotId).toBe(1);
+    });
+  });
+
+  describe('If location_id marks item as equipped and fallback location is inventory', () => {
+    it('Then location context remains equipped', () => {
+      // Arrange
+      const item: D2SItem = {
+        location_id: 1,
+        equipped_id: 2,
+      };
+
+      // Act
+      const result = resolveSpatialLocation({
+        item,
+        sourceFileType: 'd2s',
+        fallbackLocation: 'inventory',
+      });
+
+      // Assert
+      expect(result.locationContext).toBe('equipped');
+      expect(result.equippedSlotId).toBe(2);
+    });
+  });
 });
