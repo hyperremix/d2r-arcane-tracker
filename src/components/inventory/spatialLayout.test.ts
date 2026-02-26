@@ -264,7 +264,7 @@ describe('When spatial layout classifiers are used', () => {
   });
 
   describe('If equipped slot layout is compacted to remove empty lanes', () => {
-    it('Then weapon slots are vertically aligned with gloves and boots', () => {
+    it('Then weapon slots are vertically aligned with boots and gloves after swapping hands', () => {
       // Arrange
       const leftHand = EQUIPPED_SLOT_LAYOUT.leftHand;
       const rightHand = EQUIPPED_SLOT_LAYOUT.rightHand;
@@ -272,14 +272,14 @@ describe('When spatial layout classifiers are used', () => {
       const boots = EQUIPPED_SLOT_LAYOUT.boots;
 
       // Act
-      const leftWeaponAlignedWithGloves =
-        leftHand.column === gloves.column && leftHand.width === gloves.width;
-      const rightWeaponAlignedWithBoots =
-        rightHand.column === boots.column && rightHand.width === boots.width;
+      const leftWeaponAlignedWithBoots =
+        leftHand.column === boots.column && leftHand.width === boots.width;
+      const rightWeaponAlignedWithGloves =
+        rightHand.column === gloves.column && rightHand.width === gloves.width;
 
       // Assert
-      expect(leftWeaponAlignedWithGloves).toBe(true);
-      expect(rightWeaponAlignedWithBoots).toBe(true);
+      expect(leftWeaponAlignedWithBoots).toBe(true);
+      expect(rightWeaponAlignedWithGloves).toBe(true);
     });
 
     it('Then every equipped slot footprint remains within equipped board bounds', () => {
