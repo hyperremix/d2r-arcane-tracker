@@ -237,7 +237,12 @@ export function resolveSpatialLocation(params: {
   };
 
   if (locationId === 1) {
-    return buildResolvedLocation('equipped', spatial);
+    const equippedLocationContext: VaultLocationContext =
+      fallbackLocation === 'mercenary' || fallbackLocation === 'corpse'
+        ? fallbackLocation
+        : 'equipped';
+
+    return buildResolvedLocation(equippedLocationContext, spatial);
   }
 
   if (locationId === 2) {

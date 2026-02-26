@@ -465,6 +465,201 @@ describe('When CharacterInventoryBrowser is rendered', () => {
     });
   });
 
+  describe('If mercenary items are rendered in inventory snapshots', () => {
+    function createMercenaryItem(params: {
+      fingerprint: string;
+      itemName: string;
+      equippedSlotId: number;
+      type?: string;
+      quality?: string;
+      rawItemJson?: string;
+    }) {
+      const type = params.type ?? 'other';
+      const quality = params.quality ?? type;
+      const rawItemJson =
+        params.rawItemJson ?? JSON.stringify({ equipped_id: params.equippedSlotId });
+
+      return {
+        fingerprint: params.fingerprint,
+        fingerprintInputs: {
+          sourceFileType: 'd2s',
+          characterName: 'Sorc',
+          locationContext: 'mercenary',
+          quality,
+          ethereal: false,
+          socketCount: 0,
+          equippedSlotId: params.equippedSlotId,
+          isSocketedItem: false,
+          itemName: params.itemName,
+        },
+        characterName: 'Sorc',
+        characterId: 'char-1',
+        sourceFileType: 'd2s',
+        sourceFilePath: '/tmp/sorc.d2s',
+        locationContext: 'mercenary',
+        equippedSlotId: params.equippedSlotId,
+        type,
+        isSocketedItem: false,
+        itemName: params.itemName,
+        quality,
+        ethereal: false,
+        socketCount: 0,
+        iconFileName: 'merc-item.png',
+        rawItemJson,
+        rawParsedItem: {},
+        seenAt: new Date('2024-01-01T00:00:00.000Z'),
+      };
+    }
+
+    it('Then it renders four default mercenary slots and displays Insight in a hand slot', async () => {
+      // Arrange
+      searchAllMock.mockResolvedValueOnce({
+        inventory: {
+          snapshots: [
+            {
+              snapshotId: 'merc-snap',
+              characterName: 'Sorc',
+              characterId: 'char-1',
+              sourceFileType: 'd2s',
+              sourceFilePath: '/tmp/sorc.d2s',
+              capturedAt: new Date('2024-01-01T00:00:00.000Z'),
+              items: [
+                createMercenaryItem({
+                  fingerprint: 'merc-insight',
+                  itemName: 'Insight',
+                  equippedSlotId: 4,
+                  type: 'runeword',
+                  quality: 'runeword',
+                }),
+              ],
+            },
+          ],
+          totalSnapshots: 1,
+          totalItems: 1,
+        },
+        vault: {
+          items: [],
+          total: 0,
+          page: 1,
+          pageSize: 20,
+        },
+      });
+
+      // Act
+      render(<CharacterInventoryBrowser />);
+
+      // Assert
+      await waitFor(() => {
+        expect(screen.getByText('Selected Item')).toBeInTheDocument();
+      });
+      const mercenaryBoard = screen.getByTestId('mercenary-board-merc-snap');
+      expect(within(mercenaryBoard).getAllByTestId('mercenary-slot-frame')).toHaveLength(4);
+      expect(screen.getByLabelText('Inventory item Insight')).toBeInTheDocument();
+    });
+
+    it('Then it appends only occupied modded extra slots beyond the default four', async () => {
+      // Arrange
+      searchAllMock.mockResolvedValueOnce({
+        inventory: {
+          snapshots: [
+            {
+              snapshotId: 'merc-modded',
+              characterName: 'Sorc',
+              characterId: 'char-1',
+              sourceFileType: 'd2s',
+              sourceFilePath: '/tmp/sorc.d2s',
+              capturedAt: new Date('2024-01-01T00:00:00.000Z'),
+              items: [
+                createMercenaryItem({
+                  fingerprint: 'merc-weapon',
+                  itemName: 'Polearm',
+                  equippedSlotId: 4,
+                }),
+                createMercenaryItem({
+                  fingerprint: 'merc-mod-amulet',
+                  itemName: 'Modded Amulet',
+                  equippedSlotId: 2,
+                }),
+              ],
+            },
+          ],
+          totalSnapshots: 1,
+          totalItems: 2,
+        },
+        vault: {
+          items: [],
+          total: 0,
+          page: 1,
+          pageSize: 20,
+        },
+      });
+
+      // Act
+      render(<CharacterInventoryBrowser />);
+
+      // Assert
+      await waitFor(() => {
+        expect(screen.getByText('Selected Item')).toBeInTheDocument();
+      });
+      const mercenaryBoard = screen.getByTestId('mercenary-board-merc-modded');
+      expect(within(mercenaryBoard).getAllByTestId('mercenary-slot-frame')).toHaveLength(5);
+      expect(screen.getByLabelText('Inventory item Modded Amulet')).toBeInTheDocument();
+    });
+
+    it('Then items with unknown mercenary slot IDs are shown in mercenary unplaced output', async () => {
+      // Arrange
+      searchAllMock.mockResolvedValueOnce({
+        inventory: {
+          snapshots: [
+            {
+              snapshotId: 'merc-unknown',
+              characterName: 'Sorc',
+              characterId: 'char-1',
+              sourceFileType: 'd2s',
+              sourceFilePath: '/tmp/sorc.d2s',
+              capturedAt: new Date('2024-01-01T00:00:00.000Z'),
+              items: [
+                createMercenaryItem({
+                  fingerprint: 'merc-weapon',
+                  itemName: 'Eth Thresher',
+                  equippedSlotId: 4,
+                }),
+                createMercenaryItem({
+                  fingerprint: 'merc-unknown-slot',
+                  itemName: 'Modded Relic',
+                  equippedSlotId: 15,
+                  rawItemJson: JSON.stringify({ equipped_id: 15 }),
+                }),
+              ],
+            },
+          ],
+          totalSnapshots: 1,
+          totalItems: 2,
+        },
+        vault: {
+          items: [],
+          total: 0,
+          page: 1,
+          pageSize: 20,
+        },
+      });
+
+      // Act
+      render(<CharacterInventoryBrowser />);
+
+      // Assert
+      await waitFor(() => {
+        expect(screen.getByText('Selected Item')).toBeInTheDocument();
+      });
+      const mercenaryBoard = screen.getByTestId('mercenary-board-merc-unknown');
+      expect(within(mercenaryBoard).getAllByTestId('mercenary-slot-frame')).toHaveLength(4);
+      const unplacedMercenaryItems = screen.getByTestId('mercenary-board-merc-unknown-unplaced');
+      expect(
+        within(unplacedMercenaryItems).getByLabelText('Inventory item Modded Relic'),
+      ).toBeInTheDocument();
+    });
+  });
+
   describe('If the board tile is rendered', () => {
     it('Then item text is shown in the selected panel instead of on the grid tile', async () => {
       // Arrange & Act
