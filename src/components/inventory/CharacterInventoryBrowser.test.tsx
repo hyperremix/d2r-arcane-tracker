@@ -303,7 +303,7 @@ describe('When CharacterInventoryBrowser is rendered', () => {
   });
 
   describe('If cross-search returns inventory and vault data', () => {
-    it('Then it renders fixed board sections with canonical cell counts', async () => {
+    it('Then it renders board sections with extended inventory cells merged into the main board', async () => {
       // Arrange & Act
       render(<CharacterInventoryBrowser />);
 
@@ -313,8 +313,8 @@ describe('When CharacterInventoryBrowser is rendered', () => {
       });
 
       const inventoryBoard = screen.getByTestId('inventory-board-snap-1');
-      expect(within(inventoryBoard).getAllByTestId('inventory-board-snap-1-cell')).toHaveLength(40);
-      expect(within(inventoryBoard).getAllByTestId('inventory-item-tile')).toHaveLength(1);
+      expect(within(inventoryBoard).getAllByTestId('inventory-board-snap-1-cell')).toHaveLength(56);
+      expect(within(inventoryBoard).getAllByTestId('inventory-item-tile')).toHaveLength(2);
       expect(document.querySelector('.max-w-7xl')).not.toBeInTheDocument();
 
       const snapshotSectionsCardContent = inventoryBoard.closest('[data-slot="card-content"]');
@@ -328,11 +328,7 @@ describe('When CharacterInventoryBrowser is rendered', () => {
       );
       expect(snapshotSectionsCardContent?.className).not.toContain('space-y-4');
 
-      const inventoryOverflowBoard = screen.getByTestId('inventory-board-snap-1-raw-overflow');
-      expect(
-        within(inventoryOverflowBoard).queryAllByTestId('inventory-board-snap-1-raw-overflow-cell'),
-      ).toHaveLength(0);
-      expect(within(inventoryOverflowBoard).getAllByTestId('inventory-item-tile')).toHaveLength(1);
+      expect(screen.queryByTestId('inventory-board-snap-1-raw-overflow')).not.toBeInTheDocument();
 
       const beltBoard = screen.getByTestId('belt-board-snap-1');
       expect(within(beltBoard).getAllByTestId('belt-board-snap-1-cell')).toHaveLength(16);
@@ -350,6 +346,123 @@ describe('When CharacterInventoryBrowser is rendered', () => {
 
       expect(screen.getByText('Drop inventory items here to vault')).toBeInTheDocument();
     });
+
+    it('Then it renders extended stash cells in the same stash board without a separate overflow board', async () => {
+      // Arrange
+      searchAllMock.mockResolvedValueOnce({
+        inventory: {
+          snapshots: [
+            {
+              snapshotId: 'stash-snap',
+              characterName: 'Sorc',
+              characterId: 'char-1',
+              sourceFileType: 'd2s',
+              sourceFilePath: '/tmp/sorc.d2s',
+              capturedAt: new Date('2024-01-01T00:00:00.000Z'),
+              items: [
+                {
+                  fingerprint: 'fp-stash-normal',
+                  fingerprintInputs: {
+                    sourceFileType: 'd2s',
+                    characterName: 'Sorc',
+                    locationContext: 'stash',
+                    stashTab: 0,
+                    quality: 'magic',
+                    ethereal: false,
+                    socketCount: 0,
+                    gridX: 1,
+                    gridY: 1,
+                    gridWidth: 2,
+                    gridHeight: 2,
+                    isSocketedItem: false,
+                    itemName: 'Stash Normal',
+                  },
+                  characterName: 'Sorc',
+                  characterId: 'char-1',
+                  sourceFileType: 'd2s',
+                  sourceFilePath: '/tmp/sorc.d2s',
+                  locationContext: 'stash',
+                  stashTab: 0,
+                  type: 'other',
+                  gridX: 1,
+                  gridY: 1,
+                  gridWidth: 2,
+                  gridHeight: 2,
+                  isSocketedItem: false,
+                  itemName: 'Stash Normal',
+                  quality: 'magic',
+                  ethereal: false,
+                  socketCount: 0,
+                  iconFileName: 'stashnormal.png',
+                  rawItemJson: '{}',
+                  rawParsedItem: {},
+                  seenAt: new Date('2024-01-01T00:00:00.000Z'),
+                },
+                {
+                  fingerprint: 'fp-stash-expanded',
+                  fingerprintInputs: {
+                    sourceFileType: 'd2s',
+                    characterName: 'Sorc',
+                    locationContext: 'stash',
+                    stashTab: 0,
+                    quality: 'magic',
+                    ethereal: false,
+                    socketCount: 0,
+                    gridX: 12,
+                    gridY: 1,
+                    gridWidth: 2,
+                    gridHeight: 2,
+                    isSocketedItem: false,
+                    itemName: 'Stash Expanded',
+                  },
+                  characterName: 'Sorc',
+                  characterId: 'char-1',
+                  sourceFileType: 'd2s',
+                  sourceFilePath: '/tmp/sorc.d2s',
+                  locationContext: 'stash',
+                  stashTab: 0,
+                  type: 'other',
+                  gridX: 12,
+                  gridY: 1,
+                  gridWidth: 2,
+                  gridHeight: 2,
+                  isSocketedItem: false,
+                  itemName: 'Stash Expanded',
+                  quality: 'magic',
+                  ethereal: false,
+                  socketCount: 0,
+                  iconFileName: 'stashexpanded.png',
+                  rawItemJson: '{}',
+                  rawParsedItem: {},
+                  seenAt: new Date('2024-01-01T00:00:00.000Z'),
+                },
+              ],
+            },
+          ],
+          totalSnapshots: 1,
+          totalItems: 2,
+        },
+        vault: {
+          items: [],
+          total: 0,
+          page: 1,
+          pageSize: 20,
+        },
+      });
+
+      // Act
+      render(<CharacterInventoryBrowser />);
+
+      // Assert
+      await waitFor(() => {
+        expect(screen.getByText('Selected Item')).toBeInTheDocument();
+      });
+
+      const stashBoard = screen.getByTestId('stash-board-stash-snap-0');
+      expect(within(stashBoard).getAllByTestId('stash-board-stash-snap-0-cell')).toHaveLength(140);
+      expect(within(stashBoard).getAllByTestId('inventory-item-tile')).toHaveLength(2);
+      expect(screen.queryByTestId('stash-board-stash-snap-0-raw-overflow')).not.toBeInTheDocument();
+    });
   });
 
   describe('If the board tile is rendered', () => {
@@ -364,7 +477,7 @@ describe('When CharacterInventoryBrowser is rendered', () => {
 
       const inventoryBoard = screen.getByTestId('inventory-board-snap-1');
       expect(within(inventoryBoard).queryByText('Shako')).not.toBeInTheDocument();
-      expect(within(inventoryBoard).getAllByTestId('inventory-item-tile')).toHaveLength(1);
+      expect(within(inventoryBoard).getAllByTestId('inventory-item-tile')).toHaveLength(2);
     });
   });
 

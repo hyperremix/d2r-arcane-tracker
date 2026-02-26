@@ -401,7 +401,6 @@ interface InventoryGridSectionProps {
   items: ParsedInventoryItem[];
   gridSize: GridSize;
   showRawOverflowBoard?: boolean;
-  rawOverflowTitle?: string;
   iconLookup: SpriteIconLookupIndex;
   selectedFingerprint?: string;
   pendingVaultFingerprints: Set<string>;
@@ -1245,14 +1244,12 @@ function InventoryTile({
   );
 }
 
-// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Inventory board handles shared rendering plus two drag/drop source types.
 function InventoryGridSection({
   title,
   testId,
   items,
   gridSize,
   showRawOverflowBoard = false,
-  rawOverflowTitle,
   iconLookup,
   selectedFingerprint,
   pendingVaultFingerprints,
@@ -1288,6 +1285,29 @@ function InventoryGridSection({
 
     return buildOverflowBoardLayout(classified.unplaced, (item) => item.fingerprint);
   }, [classified.unplaced, showRawOverflowBoard]);
+  const renderedGridSize = useMemo(() => {
+    if (!showRawOverflowBoard || overflowLayout.items.length === 0) {
+      return gridSize;
+    }
+
+    const maxColumns = overflowLayout.items.reduce(
+      (max, item) => Math.max(max, (item.gridX ?? 0) + getGridWidth(item)),
+      gridSize.columns,
+    );
+    const maxRows = overflowLayout.items.reduce(
+      (max, item) => Math.max(max, (item.gridY ?? 0) + getGridHeight(item)),
+      gridSize.rows,
+    );
+
+    return {
+      columns: Math.max(1, maxColumns),
+      rows: Math.max(1, maxRows),
+    };
+  }, [gridSize, overflowLayout.items, showRawOverflowBoard]);
+  const renderedItems = useMemo(
+    () => [...classified.placed, ...overflowLayout.items],
+    [classified.placed, overflowLayout.items],
+  );
   const remainingUnplaced = useMemo(
     () => classified.unplaced.filter(({ item }) => !overflowLayout.itemKeys.has(item.fingerprint)),
     [classified.unplaced, overflowLayout.itemKeys],
@@ -1315,7 +1335,12 @@ function InventoryGridSection({
     const width = activeDimensions.gridWidth;
     const height = activeDimensions.gridHeight;
 
-    if (x < 0 || y < 0 || x + width > gridSize.columns || y + height > gridSize.rows) {
+    if (
+      x < 0 ||
+      y < 0 ||
+      x + width > renderedGridSize.columns ||
+      y + height > renderedGridSize.rows
+    ) {
       return { x, y, valid: false };
     }
 
@@ -1329,7 +1354,15 @@ function InventoryGridSection({
     );
 
     return { x, y, valid: !hasOverlap };
-  }, [activeDragKind, activeInventoryDragItem, activeVaultDragItem, dragOverCell, gridSize, items]);
+  }, [
+    activeDragKind,
+    activeInventoryDragItem,
+    activeVaultDragItem,
+    dragOverCell,
+    items,
+    renderedGridSize.columns,
+    renderedGridSize.rows,
+  ]);
 
   const handleDragOverBoard = useCallback(
     (event: DragEvent<HTMLDivElement>, x: number, y: number) => {
@@ -1370,8 +1403,11 @@ function InventoryGridSection({
 
   const isDropOutOfBounds = useCallback(
     (dropX: number, dropY: number, width: number, height: number): boolean =>
-      dropX < 0 || dropY < 0 || dropX + width > gridSize.columns || dropY + height > gridSize.rows,
-    [gridSize.columns, gridSize.rows],
+      dropX < 0 ||
+      dropY < 0 ||
+      dropX + width > renderedGridSize.columns ||
+      dropY + height > renderedGridSize.rows,
+    [renderedGridSize.columns, renderedGridSize.rows],
   );
 
   const tryDropVaultItem = useCallback(
@@ -1505,7 +1541,7 @@ function InventoryGridSection({
     <div className="space-y-2">
       <div className="font-medium text-sm">{title}</div>
       <BoardSurface
-        gridSize={gridSize}
+        gridSize={renderedGridSize}
         testId={testId}
         onDragOverCell={
           canDropOnSection && (onDropVaultItem || onDropInventoryItem)
@@ -1525,7 +1561,7 @@ function InventoryGridSection({
             : undefined
         }
       >
-        {classified.placed.map((item) => {
+        {renderedItems.map((item) => {
           const isVaultPresent = getEffectiveVaultPresent(
             item,
             vaultItemsByFingerprint,
@@ -1571,45 +1607,6 @@ function InventoryGridSection({
           </div>
         )}
       </BoardSurface>
-
-      {overflowLayout.gridSize && (
-        <div className="space-y-2 p-2">
-          <div className="font-medium text-xs">
-            {rawOverflowTitle ?? t(translations.inventoryBrowser.sections.rawStored)}
-          </div>
-          <BoardSurface
-            gridSize={overflowLayout.gridSize}
-            showBaseGrid={false}
-            testId={`${testId}-raw-overflow`}
-          >
-            {overflowLayout.items.map((item) => {
-              const isVaultPresent = getEffectiveVaultPresent(
-                item,
-                vaultItemsByFingerprint,
-                pendingVaultFingerprints,
-              );
-
-              return (
-                <div
-                  key={item.fingerprint}
-                  className="relative z-10"
-                  style={getItemGridPlacement(item, overflowLayout.origin)}
-                >
-                  <InventoryTile
-                    item={item}
-                    iconLookup={iconLookup}
-                    selected={item.fingerprint === selectedFingerprint}
-                    isVaultPresent={isVaultPresent}
-                    onSelect={onSelect}
-                    onDragStart={onDragStart}
-                    onDragEnd={onDragEnd}
-                  />
-                </div>
-              );
-            })}
-          </BoardSurface>
-        </div>
-      )}
 
       {remainingUnplaced.length > 0 && (
         <div className="space-y-2">
@@ -2608,7 +2605,6 @@ export function CharacterInventoryBrowser({
                     items={grouped.inventory}
                     gridSize={DEFAULT_INVENTORY_GRID_SIZE}
                     showRawOverflowBoard
-                    rawOverflowTitle={t(translations.inventoryBrowser.sections.expandedInventory)}
                     iconLookup={spriteIconLookup}
                     selectedFingerprint={selectedItemFingerprint}
                     pendingVaultFingerprints={pendingVaultFingerprints}
@@ -2637,7 +2633,6 @@ export function CharacterInventoryBrowser({
                       items={items}
                       gridSize={DEFAULT_STASH_GRID_SIZE}
                       showRawOverflowBoard
-                      rawOverflowTitle={t(translations.inventoryBrowser.sections.expandedStash)}
                       iconLookup={spriteIconLookup}
                       selectedFingerprint={selectedItemFingerprint}
                       pendingVaultFingerprints={pendingVaultFingerprints}
