@@ -11,6 +11,7 @@ import type {
 import { PackagePlus, Sparkles, X } from 'lucide-react';
 import { type DragEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { toast } from 'sonner';
 import { BoardSurface, getItemGridPlacement } from '@/components/inventory/boardPrimitives';
 import {
   INVENTORY_DRAG_MIME,
@@ -86,11 +87,85 @@ type InventorySearchAllResponse = {
 
 type TypeFilter = 'all' | 'unique' | 'set' | 'runeword' | 'rune' | 'other';
 type EquipmentUnplacedReason = UnplacedReason | 'unknownEquippedSlot';
+type EquipValidationCode =
+  | 'INVALID_SLOT'
+  | 'CLASS_RESTRICTED'
+  | 'OFFHAND_WEAPON_RESTRICTED'
+  | 'TWO_HANDED_REQUIRES_RIGHT_HAND'
+  | 'TWO_HANDED_OFFHAND_OCCUPIED'
+  | 'OFFHAND_BLOCKED_BY_TWO_HANDED'
+  | 'TARGET_SLOT_OCCUPIED';
 const VAULT_DRAG_STATE_CHANNEL = 'inventory:vault-drag-state';
 const INVENTORY_DRAG_STATE_CHANNEL = 'inventory:item-drag-state';
 const DEFAULT_MERCENARY_SLOT_ORDER: PaperDollSlotKey[] = ['head', 'leftHand', 'armor', 'rightHand'];
 const DEFAULT_MERCENARY_SLOT_SET = new Set(DEFAULT_MERCENARY_SLOT_ORDER);
 const STASH_SOURCE_FILE_TYPES = new Set<VaultSourceFileType>(['sss', 'd2x', 'd2i']);
+const EQUIP_VALIDATION_ERROR_PATTERN = /EQUIP_VALIDATION:([A-Z_]+)/;
+const EQUIP_VALIDATION_CODES = new Set<EquipValidationCode>([
+  'INVALID_SLOT',
+  'CLASS_RESTRICTED',
+  'OFFHAND_WEAPON_RESTRICTED',
+  'TWO_HANDED_REQUIRES_RIGHT_HAND',
+  'TWO_HANDED_OFFHAND_OCCUPIED',
+  'OFFHAND_BLOCKED_BY_TWO_HANDED',
+  'TARGET_SLOT_OCCUPIED',
+]);
+
+function resolveEquipValidationReasonTranslationKey(code: EquipValidationCode): string {
+  switch (code) {
+    case 'INVALID_SLOT':
+      return translations.inventoryBrowser.equipValidation.reasons.invalidSlot;
+    case 'CLASS_RESTRICTED':
+      return translations.inventoryBrowser.equipValidation.reasons.classRestricted;
+    case 'OFFHAND_WEAPON_RESTRICTED':
+      return translations.inventoryBrowser.equipValidation.reasons.offhandWeaponRestricted;
+    case 'TWO_HANDED_REQUIRES_RIGHT_HAND':
+      return translations.inventoryBrowser.equipValidation.reasons.twoHandedRequiresRightHand;
+    case 'TWO_HANDED_OFFHAND_OCCUPIED':
+      return translations.inventoryBrowser.equipValidation.reasons.twoHandedOffhandOccupied;
+    case 'OFFHAND_BLOCKED_BY_TWO_HANDED':
+      return translations.inventoryBrowser.equipValidation.reasons.offhandBlockedByTwoHanded;
+    case 'TARGET_SLOT_OCCUPIED':
+      return translations.inventoryBrowser.equipValidation.reasons.targetSlotOccupied;
+    default:
+      return translations.inventoryBrowser.equipValidation.reasons.invalidSlot;
+  }
+}
+
+function parseEquipValidationCode(error: unknown): EquipValidationCode | undefined {
+  const message =
+    typeof error === 'string'
+      ? error
+      : typeof (error as { message?: unknown })?.message === 'string'
+        ? (error as { message: string }).message
+        : undefined;
+  if (!message) {
+    return undefined;
+  }
+
+  const match = EQUIP_VALIDATION_ERROR_PATTERN.exec(message);
+  if (!match?.[1]) {
+    return undefined;
+  }
+
+  const code = match[1] as EquipValidationCode;
+  return EQUIP_VALIDATION_CODES.has(code) ? code : undefined;
+}
+
+function showEquipValidationToastIfPresent(
+  error: unknown,
+  t: (key: string, options?: Record<string, unknown>) => string,
+): boolean {
+  const equipValidationCode = parseEquipValidationCode(error);
+  if (!equipValidationCode) {
+    return false;
+  }
+
+  toast.error(t(translations.inventoryBrowser.equipValidation.title), {
+    description: t(resolveEquipValidationReasonTranslationKey(equipValidationCode)),
+  });
+  return true;
+}
 
 function isStashSourceFileType(sourceFileType: VaultSourceFileType): boolean {
   return STASH_SOURCE_FILE_TYPES.has(sourceFileType);
@@ -496,6 +571,31 @@ interface ActiveInventoryDragItem {
   itemCode?: string;
   gridWidth: number;
   gridHeight: number;
+}
+
+function isSameInventoryMoveTarget(
+  inventoryItem: ActiveInventoryDragItem,
+  targetFilePath: string,
+  targetFileType: VaultSourceFileType,
+  targetLocationContext: VaultLocationContext,
+  targetStashTab: number | undefined,
+  targetGridX: number | undefined,
+  targetGridY: number | undefined,
+  targetEquippedSlotId: number | undefined,
+): boolean {
+  const isSameFile =
+    inventoryItem.sourceFilePath === targetFilePath &&
+    inventoryItem.sourceFileType === targetFileType;
+  const isSameLocation = inventoryItem.sourceLocationContext === targetLocationContext;
+  const isSameStashTab =
+    targetLocationContext !== 'stash' ||
+    (inventoryItem.sourceStashTab ?? 0) === (targetStashTab ?? 0);
+  const isSameGridPosition =
+    targetLocationContext === 'equipped'
+      ? inventoryItem.sourceEquippedSlotId === targetEquippedSlotId
+      : inventoryItem.sourceGridX === targetGridX && inventoryItem.sourceGridY === targetGridY;
+
+  return isSameFile && isSameLocation && isSameStashTab && isSameGridPosition;
 }
 
 type VaultDragStatePayload = ActiveVaultDragItem & {
@@ -2406,19 +2506,18 @@ export function CharacterInventoryBrowser({
         return;
       }
 
-      const isSameFile =
-        inventoryItem.sourceFilePath === targetFilePath &&
-        inventoryItem.sourceFileType === targetFileType;
-      const isSameLocation = inventoryItem.sourceLocationContext === targetLocationContext;
-      const isSameStashTab =
-        targetLocationContext !== 'stash' ||
-        (inventoryItem.sourceStashTab ?? 0) === (targetStashTab ?? 0);
-      const isSameGridPosition =
-        targetLocationContext === 'equipped'
-          ? inventoryItem.sourceEquippedSlotId === targetEquippedSlotId
-          : inventoryItem.sourceGridX === targetGridX && inventoryItem.sourceGridY === targetGridY;
-
-      if (isSameFile && isSameLocation && isSameStashTab && isSameGridPosition) {
+      if (
+        isSameInventoryMoveTarget(
+          inventoryItem,
+          targetFilePath,
+          targetFileType,
+          targetLocationContext,
+          targetStashTab,
+          targetGridX,
+          targetGridY,
+          targetEquippedSlotId,
+        )
+      ) {
         return;
       }
 
@@ -2443,10 +2542,14 @@ export function CharacterInventoryBrowser({
         setCrossWindowInventoryDragItem(null);
         await reloadInventoryAfterSaveWrite();
       } catch (error) {
+        if (showEquipValidationToastIfPresent(error, t)) {
+          return;
+        }
+
         console.error('Failed to move inventory item', error);
       }
     },
-    [reloadInventoryAfterSaveWrite],
+    [reloadInventoryAfterSaveWrite, t],
   );
 
   const handleDropVaultItemOnSection = useCallback(

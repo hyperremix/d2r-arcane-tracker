@@ -12,8 +12,29 @@ let removeItemFromSaveFile: SaveFileEditorModule['removeItemFromSaveFile'];
 let addItemToSaveFile: SaveFileEditorModule['addItemToSaveFile'];
 let moveItemBetweenSaveFiles: SaveFileEditorModule['moveItemBetweenSaveFiles'];
 
-const constants96 = { version: 96 };
-const constants99 = { version: 99 };
+const equipValidationConstantData = {
+  other_items: {
+    amu: { c: ['amulet'] },
+    rin: { c: ['ring'] },
+  },
+  armor_items: {
+    hlm: { c: ['helm'] },
+    glv: { c: ['gloves'] },
+    bts: { c: ['boots'] },
+    blt: { c: ['belt'] },
+    arm: { c: ['armor'] },
+    buc: { c: ['shield'] },
+    ama: { c: ['amazon item', 'helm'] },
+  },
+  weapon_items: {
+    one: { c: ['weapon', 'sword'], mind: 3, maxd: 6 },
+    two: { c: ['weapon', 'sword'], min2d: 8, max2d: 12 },
+    clw: { c: ['weapon', 'hand to hand'], mind: 5, maxd: 11 },
+  },
+};
+
+const constants96 = { version: 96, ...equipValidationConstantData };
+const constants99 = { version: 99, ...equipValidationConstantData };
 
 beforeAll(async () => {
   mockReadFile = vi.fn();
@@ -55,10 +76,17 @@ beforeAll(async () => {
   moveItemBetweenSaveFiles = module.moveItemBetweenSaveFiles;
 });
 
+type D2sItem = {
+  id?: unknown;
+};
+
 type D2sData = {
-  items: { id: number }[];
-  corpse_items: { id: number }[];
-  merc_items: { id: number }[];
+  header?: {
+    class?: string;
+  };
+  items: D2sItem[];
+  corpse_items: D2sItem[];
+  merc_items: D2sItem[];
 };
 
 type StashData = {
@@ -71,14 +99,61 @@ type StashData = {
 };
 
 function makeD2sData(
-  items: { id: number }[] = [],
-  corpseItems: { id: number }[] = [],
-  mercItems: { id: number }[] = [],
+  items: D2sItem[] = [],
+  corpseItems: D2sItem[] = [],
+  mercItems: D2sItem[] = [],
+  characterClass = 'sorceress',
 ): D2sData {
   return {
+    header: {
+      class: characterClass,
+    },
     items: [...items],
     corpse_items: [...corpseItems],
     merc_items: [...mercItems],
+  };
+}
+
+function makeD2sItem(
+  id: number,
+  code: string,
+  overrides: Record<string, unknown> = {},
+): import('@dschu012/d2s').types.IItem {
+  return {
+    id,
+    code,
+    type: code,
+    ...overrides,
+  } as unknown as import('@dschu012/d2s').types.IItem;
+}
+
+function addItemToEquippedSlot(params: {
+  item: import('@dschu012/d2s').types.IItem;
+  targetSlotId: number;
+  characterClass?: string;
+  existingItems?: D2sItem[];
+}) {
+  const d2sData = makeD2sData(
+    params.existingItems ?? [],
+    [],
+    [],
+    params.characterClass ?? 'sorceress',
+  );
+  mockD2sRead.mockResolvedValue(d2sData);
+  const addPromise = addItemToSaveFile(
+    '/path/to/char.d2s',
+    'd2s',
+    params.item,
+    'equipped',
+    undefined,
+    undefined,
+    undefined,
+    params.targetSlotId,
+  );
+
+  return {
+    d2sData,
+    addPromise,
   };
 }
 
@@ -288,20 +363,485 @@ describe('When addItemToSaveFile is called', () => {
       // Arrange
       const d2sData = makeD2sData([]);
       mockD2sRead.mockResolvedValue(d2sData);
+      const equippedHelm = makeD2sItem(700, 'hlm');
 
       // Act
-      await addItemToSaveFile('/path/to/char.d2s', 'd2s', testItem, 'equipped', undefined, 5, 2, 1);
+      await addItemToSaveFile(
+        '/path/to/char.d2s',
+        'd2s',
+        equippedHelm,
+        'equipped',
+        undefined,
+        5,
+        2,
+        1,
+      );
 
       // Assert
       expect(d2sData.items[0]).toEqual(
         expect.objectContaining({
-          id: 123,
+          id: 700,
           location_id: 1,
           equipped_id: 1,
           position_x: 0,
           position_y: 0,
         }),
       );
+    });
+
+    it('Then allows gloves in gloves slot', async () => {
+      // Arrange
+      const gloves = makeD2sItem(711, 'glv');
+      const { d2sData, addPromise } = addItemToEquippedSlot({
+        item: gloves,
+        targetSlotId: 10,
+      });
+
+      // Act
+      await addPromise;
+
+      // Assert
+      expect(d2sData.items[0]).toEqual(
+        expect.objectContaining({
+          id: 711,
+          equipped_id: 10,
+        }),
+      );
+    });
+
+    it('Then rejects gloves outside the gloves slot', async () => {
+      // Arrange
+      const gloves = makeD2sItem(712, 'glv');
+      const { addPromise } = addItemToEquippedSlot({
+        item: gloves,
+        targetSlotId: 1,
+      });
+
+      // Act & Assert
+      await expect(addPromise).rejects.toThrow('EQUIP_VALIDATION:INVALID_SLOT');
+      expect(mockD2sWrite).not.toHaveBeenCalled();
+    });
+
+    it('Then allows helms in helm slot', async () => {
+      // Arrange
+      const helm = makeD2sItem(713, 'hlm');
+      const { d2sData, addPromise } = addItemToEquippedSlot({
+        item: helm,
+        targetSlotId: 1,
+      });
+
+      // Act
+      await addPromise;
+
+      // Assert
+      expect(d2sData.items[0]).toEqual(
+        expect.objectContaining({
+          id: 713,
+          equipped_id: 1,
+        }),
+      );
+    });
+
+    it('Then rejects helms outside the helm slot', async () => {
+      // Arrange
+      const helm = makeD2sItem(714, 'hlm');
+      const { addPromise } = addItemToEquippedSlot({
+        item: helm,
+        targetSlotId: 3,
+      });
+
+      // Act & Assert
+      await expect(addPromise).rejects.toThrow('EQUIP_VALIDATION:INVALID_SLOT');
+      expect(mockD2sWrite).not.toHaveBeenCalled();
+    });
+
+    it('Then allows rings in both ring slots', async () => {
+      // Arrange
+      const leftRing = makeD2sItem(715, 'rin');
+      const rightRing = makeD2sItem(716, 'rin');
+      const leftRingAdd = addItemToEquippedSlot({
+        item: leftRing,
+        targetSlotId: 6,
+      });
+
+      // Act
+      await leftRingAdd.addPromise;
+      const rightRingAdd = addItemToEquippedSlot({
+        item: rightRing,
+        targetSlotId: 7,
+      });
+      await rightRingAdd.addPromise;
+
+      // Assert
+      expect(leftRingAdd.d2sData.items[0]).toEqual(
+        expect.objectContaining({
+          id: 715,
+          equipped_id: 6,
+        }),
+      );
+      expect(rightRingAdd.d2sData.items[0]).toEqual(
+        expect.objectContaining({
+          id: 716,
+          equipped_id: 7,
+        }),
+      );
+    });
+
+    it('Then rejects rings outside ring slots', async () => {
+      // Arrange
+      const ring = makeD2sItem(717, 'rin');
+      const { addPromise } = addItemToEquippedSlot({
+        item: ring,
+        targetSlotId: 2,
+      });
+
+      // Act & Assert
+      await expect(addPromise).rejects.toThrow('EQUIP_VALIDATION:INVALID_SLOT');
+      expect(mockD2sWrite).not.toHaveBeenCalled();
+    });
+
+    it('Then allows amulets in amulet slot', async () => {
+      // Arrange
+      const amulet = makeD2sItem(718, 'amu');
+      const { d2sData, addPromise } = addItemToEquippedSlot({
+        item: amulet,
+        targetSlotId: 2,
+      });
+
+      // Act
+      await addPromise;
+
+      // Assert
+      expect(d2sData.items[0]).toEqual(
+        expect.objectContaining({
+          id: 718,
+          equipped_id: 2,
+        }),
+      );
+    });
+
+    it('Then rejects amulets outside amulet slot', async () => {
+      // Arrange
+      const amulet = makeD2sItem(719, 'amu');
+      const { addPromise } = addItemToEquippedSlot({
+        item: amulet,
+        targetSlotId: 6,
+      });
+
+      // Act & Assert
+      await expect(addPromise).rejects.toThrow('EQUIP_VALIDATION:INVALID_SLOT');
+      expect(mockD2sWrite).not.toHaveBeenCalled();
+    });
+
+    it('Then allows boots in boots slot', async () => {
+      // Arrange
+      const boots = makeD2sItem(720, 'bts');
+      const { d2sData, addPromise } = addItemToEquippedSlot({
+        item: boots,
+        targetSlotId: 9,
+      });
+
+      // Act
+      await addPromise;
+
+      // Assert
+      expect(d2sData.items[0]).toEqual(
+        expect.objectContaining({
+          id: 720,
+          equipped_id: 9,
+        }),
+      );
+    });
+
+    it('Then rejects boots outside boots slot', async () => {
+      // Arrange
+      const boots = makeD2sItem(721, 'bts');
+      const { addPromise } = addItemToEquippedSlot({
+        item: boots,
+        targetSlotId: 8,
+      });
+
+      // Act & Assert
+      await expect(addPromise).rejects.toThrow('EQUIP_VALIDATION:INVALID_SLOT');
+      expect(mockD2sWrite).not.toHaveBeenCalled();
+    });
+
+    it('Then allows belts in belt slot', async () => {
+      // Arrange
+      const belt = makeD2sItem(722, 'blt');
+      const { d2sData, addPromise } = addItemToEquippedSlot({
+        item: belt,
+        targetSlotId: 8,
+      });
+
+      // Act
+      await addPromise;
+
+      // Assert
+      expect(d2sData.items[0]).toEqual(
+        expect.objectContaining({
+          id: 722,
+          equipped_id: 8,
+        }),
+      );
+    });
+
+    it('Then rejects belts outside belt slot', async () => {
+      // Arrange
+      const belt = makeD2sItem(723, 'blt');
+      const { addPromise } = addItemToEquippedSlot({
+        item: belt,
+        targetSlotId: 9,
+      });
+
+      // Act & Assert
+      await expect(addPromise).rejects.toThrow('EQUIP_VALIDATION:INVALID_SLOT');
+      expect(mockD2sWrite).not.toHaveBeenCalled();
+    });
+
+    it('Then allows body armor in armor slot', async () => {
+      // Arrange
+      const armor = makeD2sItem(724, 'arm');
+      const { d2sData, addPromise } = addItemToEquippedSlot({
+        item: armor,
+        targetSlotId: 3,
+      });
+
+      // Act
+      await addPromise;
+
+      // Assert
+      expect(d2sData.items[0]).toEqual(
+        expect.objectContaining({
+          id: 724,
+          equipped_id: 3,
+        }),
+      );
+    });
+
+    it('Then rejects body armor outside armor slot', async () => {
+      // Arrange
+      const armor = makeD2sItem(725, 'arm');
+      const { addPromise } = addItemToEquippedSlot({
+        item: armor,
+        targetSlotId: 1,
+      });
+
+      // Act & Assert
+      await expect(addPromise).rejects.toThrow('EQUIP_VALIDATION:INVALID_SLOT');
+      expect(mockD2sWrite).not.toHaveBeenCalled();
+    });
+
+    it('Then rejects unknown and unclassified items from equipped slots', async () => {
+      // Arrange
+      const unknownItem = makeD2sItem(726, 'zzz');
+      const { addPromise } = addItemToEquippedSlot({
+        item: unknownItem,
+        targetSlotId: 1,
+      });
+
+      // Act & Assert
+      await expect(addPromise).rejects.toThrow('EQUIP_VALIDATION:INVALID_SLOT');
+      expect(mockD2sWrite).not.toHaveBeenCalled();
+    });
+
+    it('Then rejects class-specific items when class does not match', async () => {
+      // Arrange
+      const d2sData = makeD2sData([], [], [], 'sorceress');
+      mockD2sRead.mockResolvedValue(d2sData);
+      const amazonOnlyHelm = makeD2sItem(701, 'ama');
+
+      // Act
+      const addPromise = addItemToSaveFile(
+        '/path/to/char.d2s',
+        'd2s',
+        amazonOnlyHelm,
+        'equipped',
+        undefined,
+        undefined,
+        undefined,
+        1,
+      );
+
+      // Assert
+      await expect(addPromise).rejects.toThrow('EQUIP_VALIDATION:CLASS_RESTRICTED');
+      expect(mockD2sWrite).not.toHaveBeenCalled();
+    });
+
+    it('Then allows class-specific items when class matches', async () => {
+      // Arrange
+      const d2sData = makeD2sData([], [], [], 'amazon');
+      mockD2sRead.mockResolvedValue(d2sData);
+      const amazonOnlyHelm = makeD2sItem(702, 'ama');
+
+      // Act
+      await addItemToSaveFile(
+        '/path/to/char.d2s',
+        'd2s',
+        amazonOnlyHelm,
+        'equipped',
+        undefined,
+        undefined,
+        undefined,
+        1,
+      );
+
+      // Assert
+      expect(d2sData.items[0]).toEqual(
+        expect.objectContaining({
+          id: 702,
+          location_id: 1,
+          equipped_id: 1,
+        }),
+      );
+    });
+
+    it('Then rejects two-handed-required weapon when offhand is occupied', async () => {
+      // Arrange
+      const occupiedOffhand = makeD2sItem(703, 'buc', { equipped_id: 5 });
+      const d2sData = makeD2sData([occupiedOffhand], [], [], 'paladin');
+      mockD2sRead.mockResolvedValue(d2sData);
+      const twoHandedSword = makeD2sItem(704, 'two');
+
+      // Act
+      const addPromise = addItemToSaveFile(
+        '/path/to/char.d2s',
+        'd2s',
+        twoHandedSword,
+        'equipped',
+        undefined,
+        undefined,
+        undefined,
+        4,
+      );
+
+      // Assert
+      await expect(addPromise).rejects.toThrow('EQUIP_VALIDATION:TWO_HANDED_OFFHAND_OCCUPIED');
+      expect(mockD2sWrite).not.toHaveBeenCalled();
+    });
+
+    it('Then rejects two-handed-required weapon when dropping to left hand', async () => {
+      // Arrange
+      const d2sData = makeD2sData([], [], [], 'paladin');
+      mockD2sRead.mockResolvedValue(d2sData);
+      const twoHandedSword = makeD2sItem(705, 'two');
+
+      // Act
+      const addPromise = addItemToSaveFile(
+        '/path/to/char.d2s',
+        'd2s',
+        twoHandedSword,
+        'equipped',
+        undefined,
+        undefined,
+        undefined,
+        5,
+      );
+
+      // Assert
+      await expect(addPromise).rejects.toThrow('EQUIP_VALIDATION:TWO_HANDED_REQUIRES_RIGHT_HAND');
+      expect(mockD2sWrite).not.toHaveBeenCalled();
+    });
+
+    it('Then allows barbarian to equip two-handed swords in offhand', async () => {
+      // Arrange
+      const d2sData = makeD2sData([], [], [], 'barbarian');
+      mockD2sRead.mockResolvedValue(d2sData);
+      const twoHandedSword = makeD2sItem(706, 'two');
+
+      // Act
+      await addItemToSaveFile(
+        '/path/to/char.d2s',
+        'd2s',
+        twoHandedSword,
+        'equipped',
+        undefined,
+        undefined,
+        undefined,
+        5,
+      );
+
+      // Assert
+      expect(d2sData.items[0]).toEqual(
+        expect.objectContaining({
+          id: 706,
+          equipped_id: 5,
+        }),
+      );
+    });
+
+    it('Then allows assassin claws in offhand', async () => {
+      // Arrange
+      const d2sData = makeD2sData([], [], [], 'assassin');
+      mockD2sRead.mockResolvedValue(d2sData);
+      const claw = makeD2sItem(707, 'clw');
+
+      // Act
+      await addItemToSaveFile(
+        '/path/to/char.d2s',
+        'd2s',
+        claw,
+        'equipped',
+        undefined,
+        undefined,
+        undefined,
+        5,
+      );
+
+      // Assert
+      expect(d2sData.items[0]).toEqual(
+        expect.objectContaining({
+          id: 707,
+          equipped_id: 5,
+        }),
+      );
+    });
+
+    it('Then rejects non-barbarian and non-assassin offhand weapon drops', async () => {
+      // Arrange
+      const d2sData = makeD2sData([], [], [], 'sorceress');
+      mockD2sRead.mockResolvedValue(d2sData);
+      const oneHandSword = makeD2sItem(708, 'one');
+
+      // Act
+      const addPromise = addItemToSaveFile(
+        '/path/to/char.d2s',
+        'd2s',
+        oneHandSword,
+        'equipped',
+        undefined,
+        undefined,
+        undefined,
+        5,
+      );
+
+      // Assert
+      await expect(addPromise).rejects.toThrow('EQUIP_VALIDATION:OFFHAND_WEAPON_RESTRICTED');
+      expect(mockD2sWrite).not.toHaveBeenCalled();
+    });
+
+    it('Then rejects equip moves when target slot is already occupied', async () => {
+      // Arrange
+      const occupiedAmulet = makeD2sItem(709, 'amu', { equipped_id: 2 });
+      const d2sData = makeD2sData([occupiedAmulet], [], [], 'sorceress');
+      mockD2sRead.mockResolvedValue(d2sData);
+      const targetAmulet = makeD2sItem(710, 'amu');
+
+      // Act
+      const addPromise = addItemToSaveFile(
+        '/path/to/char.d2s',
+        'd2s',
+        targetAmulet,
+        'equipped',
+        undefined,
+        undefined,
+        undefined,
+        2,
+      );
+
+      // Assert
+      await expect(addPromise).rejects.toThrow('EQUIP_VALIDATION:TARGET_SLOT_OCCUPIED');
+      expect(mockD2sWrite).not.toHaveBeenCalled();
     });
   });
 
