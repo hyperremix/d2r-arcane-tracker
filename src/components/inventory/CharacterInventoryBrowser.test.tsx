@@ -5,6 +5,16 @@ import { serializeVaultTextPayload, VAULT_DRAG_MIME } from '@/components/invento
 import { useGrailStore } from '@/stores/grailStore';
 import { CharacterInventoryBrowser } from './CharacterInventoryBrowser';
 
+const { toastErrorMock } = vi.hoisted(() => ({
+  toastErrorMock: vi.fn(),
+}));
+
+vi.mock('sonner', () => ({
+  toast: {
+    error: toastErrorMock,
+  },
+}));
+
 const searchAllMock = vi.fn();
 const moveInventoryItemMock = vi.fn();
 const searchVaultMock = vi.fn();
@@ -38,6 +48,7 @@ function createBlockedDragDataTransfer(): DataTransfer {
 describe('When CharacterInventoryBrowser is rendered', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    toastErrorMock.mockReset();
     useGrailStore.setState({ items: [] });
 
     Object.defineProperty(window, 'electronAPI', {
@@ -2395,6 +2406,196 @@ describe('When CharacterInventoryBrowser is rendered', () => {
           }),
         );
       });
+    });
+
+    it('Then it shows equip validation toast when backend rejects the move', async () => {
+      // Arrange
+      moveInventoryItemMock.mockRejectedValueOnce(
+        new Error('EQUIP_VALIDATION:TARGET_SLOT_OCCUPIED'),
+      );
+      searchAllMock.mockResolvedValue({
+        inventory: {
+          snapshots: [
+            {
+              snapshotId: 'equip-toast-snap',
+              characterName: 'Sorc',
+              characterId: 'char-1',
+              sourceFileType: 'd2s',
+              sourceFilePath: '/tmp/sorc.d2s',
+              capturedAt: new Date('2024-01-01T00:00:00.000Z'),
+              items: [
+                {
+                  fingerprint: 'fp-amulet-toast',
+                  fingerprintInputs: {
+                    sourceFileType: 'd2s',
+                    characterName: 'Sorc',
+                    locationContext: 'inventory',
+                    quality: 'magic',
+                    ethereal: false,
+                    socketCount: 0,
+                    gridX: 1,
+                    gridY: 0,
+                    gridWidth: 1,
+                    gridHeight: 1,
+                    isSocketedItem: false,
+                    itemName: 'Magic Amulet',
+                  },
+                  characterName: 'Sorc',
+                  characterId: 'char-1',
+                  sourceFileType: 'd2s',
+                  sourceFilePath: '/tmp/sorc.d2s',
+                  locationContext: 'inventory',
+                  type: 'other',
+                  itemCode: 'amu',
+                  gridX: 1,
+                  gridY: 0,
+                  gridWidth: 1,
+                  gridHeight: 1,
+                  isSocketedItem: false,
+                  itemName: 'Magic Amulet',
+                  quality: 'magic',
+                  ethereal: false,
+                  socketCount: 0,
+                  iconFileName: 'amulet.png',
+                  rawItemJson: '{"id":302,"type_name":"Amulet","code":"amu"}',
+                  rawParsedItem: {},
+                  seenAt: new Date('2024-01-01T00:00:00.000Z'),
+                },
+              ],
+            },
+          ],
+          totalSnapshots: 1,
+          totalItems: 1,
+        },
+        vault: {
+          items: [],
+          total: 0,
+          page: 1,
+          pageSize: 20,
+        },
+      });
+
+      render(<CharacterInventoryBrowser />);
+      const draggedTile = await screen.findByLabelText('Inventory item Magic Amulet');
+      const equippedSlots = await screen.findAllByTestId('equipped-slot-frame');
+      const amuletSlot = equippedSlots[1];
+      const dataTransfer = createDragDataTransfer();
+
+      // Act
+      fireEvent.dragStart(draggedTile, { dataTransfer });
+      fireEvent.dragOver(amuletSlot, { dataTransfer });
+      fireEvent.drop(amuletSlot, { dataTransfer });
+
+      // Assert
+      await waitFor(() => {
+        expect(moveInventoryItemMock).toHaveBeenCalledWith(
+          expect.objectContaining({
+            targetLocationContext: 'equipped',
+            targetEquippedSlotId: 2,
+          }),
+        );
+      });
+      await waitFor(() => {
+        expect(toastErrorMock).toHaveBeenCalledWith('Equip blocked', {
+          description: 'That equipment slot is already occupied.',
+        });
+      });
+      expect(refreshSaveFilesMock).not.toHaveBeenCalled();
+      expect(searchAllMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('Then it maps INVALID_SLOT backend errors to the invalid-slot toast reason', async () => {
+      // Arrange
+      moveInventoryItemMock.mockRejectedValueOnce(new Error('EQUIP_VALIDATION:INVALID_SLOT'));
+      searchAllMock.mockResolvedValue({
+        inventory: {
+          snapshots: [
+            {
+              snapshotId: 'equip-toast-invalid-slot-snap',
+              characterName: 'Sorc',
+              characterId: 'char-1',
+              sourceFileType: 'd2s',
+              sourceFilePath: '/tmp/sorc.d2s',
+              capturedAt: new Date('2024-01-01T00:00:00.000Z'),
+              items: [
+                {
+                  fingerprint: 'fp-amulet-toast-invalid-slot',
+                  fingerprintInputs: {
+                    sourceFileType: 'd2s',
+                    characterName: 'Sorc',
+                    locationContext: 'inventory',
+                    quality: 'magic',
+                    ethereal: false,
+                    socketCount: 0,
+                    gridX: 1,
+                    gridY: 0,
+                    gridWidth: 1,
+                    gridHeight: 1,
+                    isSocketedItem: false,
+                    itemName: 'Magic Amulet',
+                  },
+                  characterName: 'Sorc',
+                  characterId: 'char-1',
+                  sourceFileType: 'd2s',
+                  sourceFilePath: '/tmp/sorc.d2s',
+                  locationContext: 'inventory',
+                  type: 'other',
+                  itemCode: 'amu',
+                  gridX: 1,
+                  gridY: 0,
+                  gridWidth: 1,
+                  gridHeight: 1,
+                  isSocketedItem: false,
+                  itemName: 'Magic Amulet',
+                  quality: 'magic',
+                  ethereal: false,
+                  socketCount: 0,
+                  iconFileName: 'amulet.png',
+                  rawItemJson: '{"id":303,"type_name":"Amulet","code":"amu"}',
+                  rawParsedItem: {},
+                  seenAt: new Date('2024-01-01T00:00:00.000Z'),
+                },
+              ],
+            },
+          ],
+          totalSnapshots: 1,
+          totalItems: 1,
+        },
+        vault: {
+          items: [],
+          total: 0,
+          page: 1,
+          pageSize: 20,
+        },
+      });
+
+      render(<CharacterInventoryBrowser />);
+      const draggedTile = await screen.findByLabelText('Inventory item Magic Amulet');
+      const equippedSlots = await screen.findAllByTestId('equipped-slot-frame');
+      const amuletSlot = equippedSlots[1];
+      const dataTransfer = createDragDataTransfer();
+
+      // Act
+      fireEvent.dragStart(draggedTile, { dataTransfer });
+      fireEvent.dragOver(amuletSlot, { dataTransfer });
+      fireEvent.drop(amuletSlot, { dataTransfer });
+
+      // Assert
+      await waitFor(() => {
+        expect(moveInventoryItemMock).toHaveBeenCalledWith(
+          expect.objectContaining({
+            targetLocationContext: 'equipped',
+            targetEquippedSlotId: 2,
+          }),
+        );
+      });
+      await waitFor(() => {
+        expect(toastErrorMock).toHaveBeenCalledWith('Equip blocked', {
+          description: 'This item cannot be equipped in that slot.',
+        });
+      });
+      expect(refreshSaveFilesMock).not.toHaveBeenCalled();
+      expect(searchAllMock).toHaveBeenCalledTimes(1);
     });
   });
 });

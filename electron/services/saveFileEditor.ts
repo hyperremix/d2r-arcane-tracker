@@ -5,7 +5,7 @@ import * as d2s from '@dschu012/d2s';
 import * as d2stash from '@dschu012/d2s/lib/d2/stash';
 import { constants as constants96 } from '@dschu012/d2s/lib/data/versions/96_constant_data';
 import { constants as constants99 } from '@dschu012/d2s/lib/data/versions/99_constant_data';
-import type { VaultLocationContext, VaultSourceFileType } from '../types/grail';
+import type { CharacterClass, VaultLocationContext, VaultSourceFileType } from '../types/grail';
 
 type StashConstants = {
   constants: d2sTypes.IConstantData;
@@ -35,6 +35,10 @@ function getStashConstants(ext: string): StashConstants {
 
 type ConstantItemDefinition = {
   c?: unknown;
+  mind?: unknown;
+  maxd?: unknown;
+  min2d?: unknown;
+  max2d?: unknown;
 };
 
 type ConstantDataWithItems = {
@@ -43,8 +47,50 @@ type ConstantDataWithItems = {
   other_items?: Record<string, ConstantItemDefinition>;
 };
 
-const ITEM_EQUIPMENT_CATEGORIES_BY_CODE = (() => {
-  const map = new Map<string, Set<string>>();
+type ItemEquipMetadata = {
+  categories?: Set<string>;
+  hasOneHandDamage: boolean;
+  hasTwoHandDamage: boolean;
+};
+
+type EquipValidationCode =
+  | 'INVALID_SLOT'
+  | 'CLASS_RESTRICTED'
+  | 'OFFHAND_WEAPON_RESTRICTED'
+  | 'TWO_HANDED_REQUIRES_RIGHT_HAND'
+  | 'TWO_HANDED_OFFHAND_OCCUPIED'
+  | 'OFFHAND_BLOCKED_BY_TWO_HANDED'
+  | 'TARGET_SLOT_OCCUPIED';
+
+const EQUIP_VALIDATION_PREFIX = 'EQUIP_VALIDATION';
+const VALID_EQUIPPED_SLOT_IDS = new Set([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
+const CLASS_SPECIFIC_CATEGORY_TO_CLASS: Record<string, Exclude<CharacterClass, 'shared_stash'>> = {
+  'amazon item': 'amazon',
+  'assassin item': 'assassin',
+  'barbarian item': 'barbarian',
+  'druid item': 'druid',
+  'necromancer item': 'necromancer',
+  'paladin item': 'paladin',
+  'sorceress item': 'sorceress',
+};
+
+function toPositiveNumber(value: unknown): number | undefined {
+  if (typeof value === 'number' && Number.isFinite(value) && value > 0) {
+    return value;
+  }
+
+  if (typeof value === 'string' && value.trim().length > 0) {
+    const parsed = Number.parseFloat(value);
+    if (Number.isFinite(parsed) && parsed > 0) {
+      return parsed;
+    }
+  }
+
+  return undefined;
+}
+
+const ITEM_EQUIP_METADATA_BY_CODE = (() => {
+  const map = new Map<string, ItemEquipMetadata>();
   // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Constant-data normalization covers several table shapes.
   const addConstantData = (constantData: d2sTypes.IConstantData) => {
     const typedConstantData = constantData as unknown as ConstantDataWithItems;
@@ -60,18 +106,50 @@ const ITEM_EQUIPMENT_CATEGORIES_BY_CODE = (() => {
       }
 
       for (const [code, itemDefinition] of Object.entries(record)) {
+        const normalizedCode = code.toLowerCase();
+        const existing = map.get(normalizedCode) ?? {
+          categories: undefined,
+          hasOneHandDamage: false,
+          hasTwoHandDamage: false,
+        };
+        let categories = existing.categories;
+
         if (!Array.isArray(itemDefinition.c)) {
+          map.set(normalizedCode, {
+            categories,
+            hasOneHandDamage:
+              existing.hasOneHandDamage ||
+              toPositiveNumber(itemDefinition.mind) !== undefined ||
+              toPositiveNumber(itemDefinition.maxd) !== undefined,
+            hasTwoHandDamage:
+              existing.hasTwoHandDamage ||
+              toPositiveNumber(itemDefinition.min2d) !== undefined ||
+              toPositiveNumber(itemDefinition.max2d) !== undefined,
+          });
           continue;
         }
 
-        const normalizedCode = code.toLowerCase();
-        const existing = map.get(normalizedCode) ?? new Set<string>();
+        categories = categories ?? new Set<string>();
         for (const category of itemDefinition.c) {
-          if (typeof category === 'string' && category.trim().length > 0) {
-            existing.add(category.trim().toLowerCase());
+          if (typeof category === 'string') {
+            const normalizedCategory = category.trim().toLowerCase();
+            if (normalizedCategory.length > 0) {
+              categories.add(normalizedCategory);
+            }
           }
         }
-        map.set(normalizedCode, existing);
+
+        map.set(normalizedCode, {
+          categories,
+          hasOneHandDamage:
+            existing.hasOneHandDamage ||
+            toPositiveNumber(itemDefinition.mind) !== undefined ||
+            toPositiveNumber(itemDefinition.maxd) !== undefined,
+          hasTwoHandDamage:
+            existing.hasTwoHandDamage ||
+            toPositiveNumber(itemDefinition.min2d) !== undefined ||
+            toPositiveNumber(itemDefinition.max2d) !== undefined,
+        });
       }
     }
   };
@@ -80,6 +158,22 @@ const ITEM_EQUIPMENT_CATEGORIES_BY_CODE = (() => {
   addConstantData(constants96);
   return map;
 })();
+
+function createEquipValidationError(code: EquipValidationCode): Error {
+  return new Error(`${EQUIP_VALIDATION_PREFIX}:${code}`);
+}
+
+function normalizeOccupiedWeaponSetSlotId(slotId: number): number {
+  if (slotId === 13) {
+    return 11;
+  }
+
+  if (slotId === 14) {
+    return 12;
+  }
+
+  return slotId;
+}
 
 function normalizeWeaponSetSlotId(slotId: number): number {
   if (slotId === 11 || slotId === 13) {
@@ -103,86 +197,313 @@ function resolveItemCode(item: d2sTypes.IItem): string | undefined {
   return rawCode.toLowerCase();
 }
 
-// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Equipment eligibility maps several category combinations into slot rules.
-function resolveEligibleEquippedSlots(item: d2sTypes.IItem): Set<number> | undefined {
+function resolveItemEquipMetadata(item: d2sTypes.IItem): ItemEquipMetadata {
   const code = resolveItemCode(item);
-  const categories = code ? ITEM_EQUIPMENT_CATEGORIES_BY_CODE.get(code) : undefined;
-  const slots = new Set<number>();
-
-  if (categories) {
-    if (categories.has('ring')) {
-      slots.add(6);
-      slots.add(7);
-    }
-
-    if (categories.has('amulet')) {
-      slots.add(2);
-    }
-
-    if (categories.has('helm')) {
-      slots.add(1);
-    }
-
-    if (categories.has('gloves')) {
-      slots.add(10);
-    }
-
-    if (categories.has('boots')) {
-      slots.add(9);
-    }
-
-    if (categories.has('belt')) {
-      slots.add(8);
-    }
-
-    if (categories.has('shield') || categories.has('any shield')) {
-      slots.add(5);
-    }
-
-    const isWeaponLike = [...categories].some((category) => category.includes('weapon'));
-    if (isWeaponLike) {
-      slots.add(4);
-      slots.add(5);
-    }
-
-    const isBodyArmor = categories.has('armor') || categories.has('any armor');
-    const hasArmorPieceSlot =
-      slots.has(1) || slots.has(8) || slots.has(9) || slots.has(10) || slots.has(5);
-    if (isBodyArmor && !hasArmorPieceSlot) {
-      slots.add(3);
-    }
+  if (!code) {
+    return {
+      categories: undefined,
+      hasOneHandDamage: false,
+      hasTwoHandDamage: false,
+    };
   }
 
-  if (slots.size > 0) {
-    return slots;
+  return (
+    ITEM_EQUIP_METADATA_BY_CODE.get(code) ?? {
+      categories: undefined,
+      hasOneHandDamage: false,
+      hasTwoHandDamage: false,
+    }
+  );
+}
+
+function isWeaponLikeCategorySet(categories: Set<string> | undefined): boolean {
+  if (!categories) {
+    return false;
   }
 
-  const rawEquippedId = normalizeItemId((item as { equipped_id?: unknown }).equipped_id);
-  if (!rawEquippedId) {
+  return [...categories].some((category) => category.includes('weapon'));
+}
+
+function isShieldCategorySet(categories: Set<string> | undefined): boolean {
+  if (!categories) {
+    return false;
+  }
+
+  return [...categories].some((category) => category.includes('shield'));
+}
+
+function isSwordCategorySet(categories: Set<string> | undefined): boolean {
+  if (!categories) {
+    return false;
+  }
+
+  return [...categories].some((category) => category.includes('sword'));
+}
+
+function isClawCategorySet(categories: Set<string> | undefined): boolean {
+  if (!categories) {
+    return false;
+  }
+
+  return [...categories].some((category) => category.includes('hand to hand'));
+}
+
+function resolveRequiredCharacterClass(
+  categories: Set<string> | undefined,
+): Exclude<CharacterClass, 'shared_stash'> | undefined {
+  if (!categories) {
     return undefined;
   }
 
-  const normalizedSlot = normalizeWeaponSetSlotId(rawEquippedId);
-  if (normalizedSlot === 6 || normalizedSlot === 7) {
-    return new Set([6, 7]);
+  for (const [category, characterClass] of Object.entries(CLASS_SPECIFIC_CATEGORY_TO_CLASS)) {
+    if (categories.has(category)) {
+      return characterClass;
+    }
   }
 
-  if (normalizedSlot === 4 || normalizedSlot === 5) {
-    return new Set([4, 5]);
+  return undefined;
+}
+
+function normalizeCharacterClass(rawClass: unknown): CharacterClass | undefined {
+  if (typeof rawClass !== 'string' || rawClass.trim().length === 0) {
+    return undefined;
   }
 
-  return new Set([normalizedSlot]);
+  const normalized = rawClass.trim().toLowerCase();
+  const compact = normalized.replace(/ /g, '').replace(/_/g, '');
+
+  switch (compact) {
+    case 'amazon':
+    case 'ama':
+      return 'amazon';
+    case 'assassin':
+    case 'ass':
+      return 'assassin';
+    case 'barbarian':
+    case 'barb':
+    case 'bar':
+      return 'barbarian';
+    case 'druid':
+    case 'dru':
+      return 'druid';
+    case 'necromancer':
+    case 'necro':
+    case 'nec':
+      return 'necromancer';
+    case 'paladin':
+    case 'pal':
+      return 'paladin';
+    case 'sorceress':
+    case 'sorc':
+    case 'sor':
+      return 'sorceress';
+    case 'sharedstash':
+      return 'shared_stash';
+    default:
+      return undefined;
+  }
+}
+
+function resolveTargetCharacterClass(data: d2sTypes.ID2S): CharacterClass | undefined {
+  return normalizeCharacterClass((data as { header?: { class?: unknown } }).header?.class);
+}
+
+function resolveWeaponSet(slotId: number): 'i' | 'ii' | undefined {
+  const normalizedSlotId = normalizeOccupiedWeaponSetSlotId(slotId);
+  if (normalizedSlotId === 4 || normalizedSlotId === 5) {
+    return 'i';
+  }
+
+  if (normalizedSlotId === 11 || normalizedSlotId === 12) {
+    return 'ii';
+  }
+
+  return undefined;
+}
+
+function resolveEquippedSlotId(item: d2sTypes.IItem): number | undefined {
+  const slotId = normalizeItemId((item as { equipped_id?: unknown }).equipped_id);
+  if (!slotId) {
+    return undefined;
+  }
+
+  const normalizedSlotId = normalizeOccupiedWeaponSetSlotId(slotId);
+  if (!VALID_EQUIPPED_SLOT_IDS.has(normalizedSlotId)) {
+    return undefined;
+  }
+
+  return normalizedSlotId;
+}
+
+function buildEquippedSlotMap(items: d2sTypes.IItem[]): Map<number, d2sTypes.IItem> {
+  const map = new Map<number, d2sTypes.IItem>();
+  for (const item of items) {
+    const slotId = resolveEquippedSlotId(item);
+    if (!slotId || map.has(slotId)) {
+      continue;
+    }
+
+    map.set(slotId, item);
+  }
+
+  return map;
+}
+
+function isTwoHandedRequiredWeaponForCharacter(
+  item: d2sTypes.IItem,
+  targetCharacterClass: CharacterClass | undefined,
+): boolean {
+  const metadata = resolveItemEquipMetadata(item);
+  const barbarianTwoHandedSwordException =
+    targetCharacterClass === 'barbarian' &&
+    isSwordCategorySet(metadata.categories) &&
+    metadata.hasTwoHandDamage;
+
+  return (
+    isWeaponLikeCategorySet(metadata.categories) &&
+    metadata.hasTwoHandDamage &&
+    !metadata.hasOneHandDamage &&
+    !barbarianTwoHandedSwordException
+  );
+}
+
+function resolveEligibleEquippedSlots(item: d2sTypes.IItem): Set<number> | undefined {
+  const { categories } = resolveItemEquipMetadata(item);
+  const slots = new Set<number>();
+
+  if (!categories || categories.size === 0) {
+    return undefined;
+  }
+
+  const isRing = categories.has('ring');
+  const isAmulet = categories.has('amulet');
+  const isHelm = categories.has('helm');
+  const isGloves = categories.has('gloves');
+  const isBoots = categories.has('boots');
+  const isBelt = categories.has('belt');
+  const isShield = categories.has('shield') || categories.has('any shield');
+  const isWeaponLike = isWeaponLikeCategorySet(categories);
+  const isBodyArmor = categories.has('armor') || categories.has('any armor');
+  const hasSpecificArmorPieceCategory = isHelm || isGloves || isBoots || isBelt || isShield;
+
+  if (isRing) {
+    slots.add(6);
+    slots.add(7);
+  }
+
+  if (isAmulet) {
+    slots.add(2);
+  }
+
+  if (isHelm) {
+    slots.add(1);
+  }
+
+  if (isGloves) {
+    slots.add(10);
+  }
+
+  if (isBoots) {
+    slots.add(9);
+  }
+
+  if (isBelt) {
+    slots.add(8);
+  }
+
+  if (isShield) {
+    slots.add(5);
+  }
+
+  if (isWeaponLike) {
+    slots.add(4);
+    slots.add(5);
+  }
+
+  if (isBodyArmor && !hasSpecificArmorPieceCategory) {
+    slots.add(3);
+  }
+
+  return slots;
 }
 
 function assertEligibleForEquippedSlot(item: d2sTypes.IItem, targetSlotId: number): void {
   const normalizedTargetSlotId = normalizeWeaponSetSlotId(targetSlotId);
   const eligibleSlots = resolveEligibleEquippedSlots(item);
   if (!eligibleSlots || eligibleSlots.size === 0) {
-    return;
+    throw createEquipValidationError('INVALID_SLOT');
   }
 
   if (!eligibleSlots.has(normalizedTargetSlotId)) {
-    throw new Error('Item cannot be equipped in target slot');
+    throw createEquipValidationError('INVALID_SLOT');
+  }
+}
+
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Equip validation intentionally combines slot, class, and handedness rules.
+function assertEquipValidationRules(
+  item: d2sTypes.IItem,
+  targetSlotId: number,
+  equippedItems: d2sTypes.IItem[],
+  targetCharacterClass: CharacterClass | undefined,
+): void {
+  const normalizedTargetSlotId = normalizeWeaponSetSlotId(targetSlotId);
+  const normalizedOccupiedTargetSlotId = normalizeOccupiedWeaponSetSlotId(targetSlotId);
+  const equippedSlots = buildEquippedSlotMap(equippedItems);
+
+  if (equippedSlots.has(normalizedOccupiedTargetSlotId)) {
+    throw createEquipValidationError('TARGET_SLOT_OCCUPIED');
+  }
+
+  assertEligibleForEquippedSlot(item, targetSlotId);
+
+  const metadata = resolveItemEquipMetadata(item);
+  const requiredClass = resolveRequiredCharacterClass(metadata.categories);
+  if (requiredClass && targetCharacterClass !== requiredClass) {
+    throw createEquipValidationError('CLASS_RESTRICTED');
+  }
+
+  const targetWeaponSet = resolveWeaponSet(normalizedOccupiedTargetSlotId);
+  if (!targetWeaponSet) {
+    return;
+  }
+
+  const rightSlotId = targetWeaponSet === 'ii' ? 11 : 4;
+  const leftSlotId = targetWeaponSet === 'ii' ? 12 : 5;
+  const rightHandItem = equippedSlots.get(rightSlotId);
+
+  if (
+    normalizedTargetSlotId === 5 &&
+    rightHandItem &&
+    isTwoHandedRequiredWeaponForCharacter(rightHandItem, targetCharacterClass)
+  ) {
+    throw createEquipValidationError('OFFHAND_BLOCKED_BY_TWO_HANDED');
+  }
+
+  const isWeaponLike = isWeaponLikeCategorySet(metadata.categories);
+  const isShieldLike = isShieldCategorySet(metadata.categories);
+  const isTwoHandedRequired = isTwoHandedRequiredWeaponForCharacter(item, targetCharacterClass);
+
+  if (isTwoHandedRequired) {
+    if (normalizedTargetSlotId !== 4) {
+      throw createEquipValidationError('TWO_HANDED_REQUIRES_RIGHT_HAND');
+    }
+
+    if (equippedSlots.has(leftSlotId)) {
+      throw createEquipValidationError('TWO_HANDED_OFFHAND_OCCUPIED');
+    }
+  }
+
+  if (normalizedTargetSlotId === 5 && isWeaponLike && !isShieldLike) {
+    const barbarianAllowed =
+      targetCharacterClass === 'barbarian' &&
+      (metadata.hasOneHandDamage ||
+        (isSwordCategorySet(metadata.categories) && metadata.hasTwoHandDamage));
+    const assassinAllowed =
+      targetCharacterClass === 'assassin' && isClawCategorySet(metadata.categories);
+
+    if (!barbarianAllowed && !assassinAllowed) {
+      throw createEquipValidationError('OFFHAND_WEAPON_RESTRICTED');
+    }
   }
 }
 
@@ -236,6 +557,8 @@ function withTargetCoordinates(
 function withD2SLocationContext(
   item: d2sTypes.IItem,
   locationContext: VaultLocationContext,
+  equippedItems: d2sTypes.IItem[],
+  targetCharacterClass: CharacterClass | undefined,
   targetEquippedSlotId?: number,
 ): d2sTypes.IItem {
   switch (locationContext) {
@@ -255,7 +578,7 @@ function withD2SLocationContext(
       };
     case 'equipped':
       if (targetEquippedSlotId !== undefined) {
-        assertEligibleForEquippedSlot(item, targetEquippedSlotId);
+        assertEquipValidationRules(item, targetEquippedSlotId, equippedItems, targetCharacterClass);
       }
 
       return {
@@ -333,6 +656,8 @@ async function moveItemWithinSingleSaveFile(options: MoveSaveFileItemOptions): P
     const itemToWrite = withD2SLocationContext(
       withTargetCoordinates(sourceItem, options.targetGridX, options.targetGridY),
       options.targetLocationContext,
+      data.items,
+      resolveTargetCharacterClass(data),
       options.targetEquippedSlotId,
     );
 
@@ -426,6 +751,8 @@ export async function addItemToSaveFile(
     const itemToWrite = withD2SLocationContext(
       withTargetCoordinates(item, targetGridX, targetGridY),
       locationContext,
+      data.items,
+      resolveTargetCharacterClass(data),
       targetEquippedSlotId,
     );
 

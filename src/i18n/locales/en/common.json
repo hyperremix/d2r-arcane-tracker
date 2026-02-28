@@ -575,6 +575,18 @@
     "dropToVault": "Drop inventory items here to vault",
     "dragToVault": "Drag to vault dropzone",
     "vaultedItems": "Vaulted Items",
+    "equipValidation": {
+      "title": "Equip blocked",
+      "reasons": {
+        "invalidSlot": "This item cannot be equipped in that slot.",
+        "classRestricted": "This item is restricted to a different character class.",
+        "offhandWeaponRestricted": "This class cannot equip that weapon in the offhand slot.",
+        "twoHandedRequiresRightHand": "Two-handed weapons must be equipped in the right-hand slot.",
+        "twoHandedOffhandOccupied": "Unequip the offhand item before equipping this two-handed weapon.",
+        "offhandBlockedByTwoHanded": "The right-hand item is two-handed and blocks the offhand slot.",
+        "targetSlotOccupied": "That equipment slot is already occupied."
+      }
+    },
     "snapshotList": {
       "title": "Characters & Stashes",
       "description": "Open a character or stash in a separate window. Drag and drop between that window and this vault view.",
