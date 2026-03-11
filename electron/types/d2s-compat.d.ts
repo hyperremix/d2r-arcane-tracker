@@ -110,6 +110,12 @@ declare module '@dschu012/d2s/lib/d2/items' {
   import type { types } from '@dschu012/d2s';
   import type { BitReader } from '@dschu012/d2s/lib/binary/bitreader';
 
+  export interface IMagicAttribute {
+    id: number;
+    name: string;
+    values: number[];
+  }
+
   export function readItems(
     reader: BitReader,
     version: number,
@@ -117,4 +123,9 @@ declare module '@dschu012/d2s/lib/d2/items' {
     config: Record<string, unknown>,
     char?: types.ID2S,
   ): Promise<types.IItem[]>;
+
+  export function _readMagicProperties(
+    reader: BitReader,
+    constants: types.IConstantData,
+  ): IMagicAttribute[];
 }
