@@ -1,5 +1,9 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import type * as d2sTypes from '@dschu012/d2s';
+import { BitReader } from '@dschu012/d2s/lib/binary/bitreader';
+import { _readMagicProperties } from '@dschu012/d2s/lib/d2/items';
+import { constants as constants105 } from '@dschu012/d2s/lib/data/versions/105_constant_data';
 import { describe, expect, it } from 'vitest';
 import { parseModernStash, resolveStackCount } from './modernStashParser';
 
@@ -27,10 +31,9 @@ describe('When parseModernStash parses v105 fixtures', () => {
     expect(tabKinds.has('gems')).toBe(true);
     expect(tabKinds.has('materials')).toBe(true);
     expect(tabKinds.has('runes')).toBe(true);
-    expect(parsed.items.every((entry) => entry.stackCount >= 1 && entry.stackCount <= 99)).toBe(
+    expect(parsed.items.every((entry) => entry.stackCount >= 1 && entry.stackCount <= 511)).toBe(
       true,
     );
-    expect(parsed.items.every((entry) => entry.stackCount === 1)).toBe(true);
     expect(
       parsed.items.every(
         (entry) => typeof entry.item.code === 'string' && entry.item.code.trim().length > 0,
@@ -77,6 +80,56 @@ describe('When parseModernStash parses v105 fixtures', () => {
   }, 20000);
 });
 
+// Build the same extended constants used in modernStashParser.ts
+const constants105WithAttr381 = {
+  ...constants105,
+  magical_properties: (() => {
+    const arr = [
+      ...(constants105.magical_properties as Array<{ s: string; sB: number; np?: number }>),
+    ];
+    while (arr.length < 381) arr.push({ s: `unknown_${arr.length}`, sB: 0 });
+    arr.push({ s: 'item_quantity_r', sB: 9 });
+    return arr;
+  })(),
+} as unknown as d2sTypes.types.IConstantData;
+
+describe('When _readMagicProperties processes a resource-stash binary stream', () => {
+  it('Then it reads attribute 381 (item_quantity_r) as the stack count value', () => {
+    // Arrange: 4 bytes encoding [attr ID 381 (9 bits)] + [value 5 (9 bits)] + [terminator 0x1FF (9 bits)]
+    // Verified bit-by-bit: 0x7D=125, 0x0B=11, 0xFC=252, 0x07=7
+    const reader = new BitReader(new Uint8Array([0x7d, 0x0b, 0xfc, 0x07]).buffer);
+
+    // Act
+    const attrs = _readMagicProperties(reader, constants105WithAttr381);
+
+    // Assert
+    expect(attrs).toHaveLength(1);
+    expect(attrs[0].id).toBe(381);
+    expect(attrs[0].values[0]).toBe(5);
+    expect(attrs[0].name).toBe('item_quantity_r');
+  });
+});
+
+describe('When resolveStackCount reads a simple_item resource with quantity set by the v105 field', () => {
+  it('Then it returns the item.quantity value as the stack count', () => {
+    // Arrange: simple resource items have simple_item=1, no magic_attributes.
+    // The d2s v105 conditional field populates item.quantity for these items.
+    const simpleRuneWithCount = {
+      type: 'r05',
+      quantity: 7,
+    } as unknown as Parameters<typeof resolveStackCount>[0];
+
+    const simpleRuneWithMaxCount = {
+      type: 'r20',
+      quantity: 255,
+    } as unknown as Parameters<typeof resolveStackCount>[0];
+
+    // Act & Assert
+    expect(resolveStackCount(simpleRuneWithCount)).toBe(7);
+    expect(resolveStackCount(simpleRuneWithMaxCount)).toBe(255);
+  });
+});
+
 describe('When resolveStackCount checks stackable sources', () => {
   it('Then it only accepts explicit quantity values for modern stash', () => {
     // Arrange
@@ -93,9 +146,16 @@ describe('When resolveStackCount checks stackable sources', () => {
       magic_attributes: [{ id: 381, name: 'item_quantity_r', values: [42] }],
     } as unknown as Parameters<typeof resolveStackCount>[0];
 
+    const attr381TakesPriorityOverQuantity = {
+      type: 'key', // 'key' IS in stackables — quantity would normally be used
+      quantity: 3,
+      magic_attributes: [{ id: 381, name: 'item_quantity_r', values: [42] }],
+    } as unknown as Parameters<typeof resolveStackCount>[0];
+
     // Act & Assert
     expect(resolveStackCount(fromQuantity)).toBe(9);
     expect(resolveStackCount(fallbackToOne)).toBe(1);
     expect(resolveStackCount(fromMagicAttr)).toBe(42);
+    expect(resolveStackCount(attr381TakesPriorityOverQuantity)).toBe(42);
   });
 });

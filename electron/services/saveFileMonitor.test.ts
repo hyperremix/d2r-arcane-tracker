@@ -1549,7 +1549,7 @@ describe('When SaveFileMonitor is used', () => {
       expect(parsedItems.some((item: any) => item.stashTab === 5)).toBe(true);
       expect(parsedItems.some((item: any) => item.stashTab === 6)).toBe(true);
       expect(parsedItems.some((item: any) => item.stashTab === 7)).toBe(true);
-      expect(parsedItems.every((item: any) => (item.stackCount ?? 1) === 1)).toBe(true);
+      expect(parsedItems.every((item: any) => (item.stackCount ?? 1) >= 1)).toBe(true);
       expect(
         parsedItems
           .filter((item: any) => !item.isSocketedItem && item.locationContext === 'stash')

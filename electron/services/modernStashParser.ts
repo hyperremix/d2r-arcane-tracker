@@ -6,7 +6,7 @@ import type { D2SItem } from '../types/grail';
 import { type D2iMetadata, readD2iMetadata } from './stashFormat';
 
 // Extend magical_properties to cover D2R resource-stash attribute 381 (stack count).
-// Indices 361–380: stubs (sB: 0) assumed never written for resource-sector items.
+// Indices 359–380: stubs (sB: 0) assumed never written for resource-sector items.
 // Index 381: D2R resource-stash item quantity (9-bit unsigned, no bias).
 const constants105Extended = {
   ...constants105,
@@ -194,20 +194,22 @@ function resolveResourceKind(item: D2SItem): Exclude<StashTabKind, 'shared'> {
 }
 
 export function resolveStackCount(item: D2SItem): number {
-  if (
-    typeof item.quantity === 'number' &&
-    Number.isInteger(item.quantity) &&
-    item.quantity >= 1 &&
-    item.quantity <= 99
-  ) {
-    return item.quantity;
-  }
-
   // D2R resource stash encodes stack count as magic attribute 381.
+  // Check this first — it is authoritative for resource-sector items and
+  // must take priority over the classic stackable quantity field.
   const attrs = item.magic_attributes as Array<{ id: number; values: number[] }> | undefined;
   const attr381 = attrs?.find((a) => a.id === 381);
   if (attr381 && typeof attr381.values[0] === 'number' && attr381.values[0] >= 1) {
     return attr381.values[0];
+  }
+
+  if (
+    typeof item.quantity === 'number' &&
+    Number.isInteger(item.quantity) &&
+    item.quantity >= 1 &&
+    item.quantity <= 511
+  ) {
+    return item.quantity;
   }
 
   return 1;
