@@ -2,6 +2,7 @@ import type {
   CharacterInventorySnapshot,
   InventorySnapshotWindowTarget,
   ParsedInventoryItem,
+  StashTabKind,
   VaultItem,
   VaultItemFilter,
   VaultItemUpsertInput,
@@ -44,6 +45,7 @@ import {
   PAPER_DOLL_SLOT_ORDER,
   type PaperDollSlotKey,
   resolvePaperDollSlotKey,
+  sortByGridPosition,
   type UnplacedReason,
 } from '@/components/inventory/spatialLayout';
 import { Badge } from '@/components/ui/badge';
@@ -101,6 +103,9 @@ const DEFAULT_MERCENARY_SLOT_ORDER: PaperDollSlotKey[] = ['head', 'leftHand', 'a
 const DEFAULT_MERCENARY_SLOT_SET = new Set(DEFAULT_MERCENARY_SLOT_ORDER);
 const STASH_SOURCE_FILE_TYPES = new Set<VaultSourceFileType>(['sss', 'd2x', 'd2i']);
 const EQUIP_VALIDATION_ERROR_PATTERN = /EQUIP_VALIDATION:([A-Z_]+)/;
+const MODERN_STASH_READ_ONLY_ERROR = 'MODERN_STASH_READ_ONLY';
+const MODERN_STASH_MIN_VERSION = 105;
+const MODERN_STASH_TAB_ORDER = [0, 1, 2, 3, 4, 5, 6, 7] as const;
 const EQUIP_VALIDATION_CODES = new Set<EquipValidationCode>([
   'INVALID_SLOT',
   'CLASS_RESTRICTED',
@@ -165,6 +170,29 @@ function showEquipValidationToastIfPresent(
     description: t(resolveEquipValidationReasonTranslationKey(equipValidationCode)),
   });
   return true;
+}
+
+function getErrorMessage(error: unknown): string | undefined {
+  if (typeof error === 'string') {
+    return error;
+  }
+
+  if (typeof (error as { message?: unknown })?.message === 'string') {
+    return (error as { message: string }).message;
+  }
+
+  return undefined;
+}
+
+function isModernStashReadOnlyError(error: unknown): boolean {
+  const message = getErrorMessage(error);
+  return typeof message === 'string' && message.includes(MODERN_STASH_READ_ONLY_ERROR);
+}
+
+function showModernStashReadOnlyToast(
+  t: (key: string, options?: Record<string, unknown>) => string,
+): void {
+  toast.error(t(translations.inventoryBrowser.modernStashReadOnlyError));
 }
 
 function isStashSourceFileType(sourceFileType: VaultSourceFileType): boolean {
@@ -470,11 +498,12 @@ interface InventoryTileProps {
   item: ParsedInventoryItem;
   iconLookup: SpriteIconLookupIndex;
   selected: boolean;
+  disableInteractions?: boolean;
   isVaultPresent?: boolean;
   unplacedReason?: EquipmentUnplacedReason;
   onSelect: (item: ParsedInventoryItem) => void;
-  onDragStart: (event: DragEvent<HTMLButtonElement>, item: ParsedInventoryItem) => void;
-  onDragEnd: () => void;
+  onDragStart?: (event: DragEvent<HTMLButtonElement>, item: ParsedInventoryItem) => void;
+  onDragEnd?: () => void;
 }
 
 interface InventoryGridSectionProps {
@@ -490,6 +519,7 @@ interface InventoryGridSectionProps {
   onSelect: (item: ParsedInventoryItem) => void;
   onDragStart: (event: DragEvent<HTMLButtonElement>, item: ParsedInventoryItem) => void;
   onDragEnd: () => void;
+  disableInteractions?: boolean;
   snapshotSourceFilePath?: string;
   snapshotSourceFileType?: VaultSourceFileType;
   sectionLocationContext?: VaultLocationContext;
@@ -527,6 +557,7 @@ interface EquipmentSectionProps {
   onSelect: (item: ParsedInventoryItem) => void;
   onDragStart: (event: DragEvent<HTMLButtonElement>, item: ParsedInventoryItem) => void;
   onDragEnd: () => void;
+  disableInteractions?: boolean;
   snapshotSourceFilePath?: string;
   snapshotSourceFileType?: VaultSourceFileType;
   draggingInventoryItem?: ActiveInventoryDragItem | null;
@@ -550,6 +581,7 @@ interface MercenaryEquipmentSectionProps {
   onSelect: (item: ParsedInventoryItem) => void;
   onDragStart: (event: DragEvent<HTMLButtonElement>, item: ParsedInventoryItem) => void;
   onDragEnd: () => void;
+  disableInteractions?: boolean;
 }
 
 interface ActiveVaultDragItem {
@@ -857,6 +889,88 @@ function formatLocation(
   }
 
   return t(translations.inventoryBrowser.location[item.locationContext]);
+}
+
+function resolveStashTabKind(items: ParsedInventoryItem[]): StashTabKind | undefined {
+  for (const item of items) {
+    if (item.stashTabKind) {
+      return item.stashTabKind;
+    }
+  }
+
+  return undefined;
+}
+
+function getStashSectionTitle(
+  stashTab: number,
+  items: ParsedInventoryItem[],
+  t: (key: string, options?: Record<string, unknown>) => string,
+  fallbackTabKind?: StashTabKind,
+): string {
+  const tabKind = fallbackTabKind ?? resolveStashTabKind(items);
+
+  if (tabKind === 'gems') {
+    return t(translations.inventoryBrowser.sections.gems);
+  }
+  if (tabKind === 'materials') {
+    return t(translations.inventoryBrowser.sections.materials);
+  }
+  if (tabKind === 'runes') {
+    return t(translations.inventoryBrowser.sections.runes);
+  }
+
+  return t(translations.inventoryBrowser.sections.sharedTab, { tab: stashTab + 1 });
+}
+
+function resolveModernStashTabKindByIndex(stashTab: number): StashTabKind | undefined {
+  if (stashTab >= 0 && stashTab <= 4) {
+    return 'shared';
+  }
+  if (stashTab === 5) {
+    return 'gems';
+  }
+  if (stashTab === 6) {
+    return 'materials';
+  }
+  if (stashTab === 7) {
+    return 'runes';
+  }
+
+  return undefined;
+}
+
+interface StashTabsToRenderEntry {
+  stashTab: number;
+  items: ParsedInventoryItem[];
+  fallbackTabKind?: StashTabKind;
+}
+
+function buildStashTabsToRender(
+  snapshot: CharacterInventorySnapshot,
+  stashByTab: Map<number, ParsedInventoryItem[]>,
+): StashTabsToRenderEntry[] {
+  const isModernStashSnapshot =
+    snapshot.sourceFileType === 'd2i' &&
+    (snapshot.sourceFileVersion ?? 0) >= MODERN_STASH_MIN_VERSION;
+
+  if (isModernStashSnapshot) {
+    return MODERN_STASH_TAB_ORDER.map((stashTab) => ({
+      stashTab,
+      items: sortByGridPosition(stashByTab.get(stashTab) ?? []),
+      fallbackTabKind: resolveModernStashTabKindByIndex(stashTab),
+    }));
+  }
+
+  const stashTabs = getSortedStashTabs(stashByTab);
+  if (stashTabs.length > 0) {
+    return stashTabs.map(({ stashTab, items }) => ({
+      stashTab,
+      items,
+      fallbackTabKind: undefined,
+    }));
+  }
+
+  return [{ stashTab: 0, items: [], fallbackTabKind: undefined }];
 }
 
 function formatSourceFileTypeLabel(
@@ -1237,6 +1351,7 @@ function InventoryTile({
   item,
   iconLookup,
   selected,
+  disableInteractions = false,
   isVaultPresent,
   unplacedReason,
   onSelect,
@@ -1271,7 +1386,7 @@ function InventoryTile({
         render={
           <button
             type="button"
-            draggable
+            draggable={!disableInteractions && !!onDragStart}
             data-testid="inventory-item-tile"
             aria-label={t(translations.inventoryBrowser.tileAriaLabel, { itemName: item.itemName })}
             className={cn(
@@ -1281,7 +1396,11 @@ function InventoryTile({
               isVaultPresent === false ? 'border-amber-500/60' : '',
             )}
             onClick={() => onSelect(item)}
-            onDragStart={(event) => onDragStart(event, item)}
+            onDragStart={(event) => {
+              if (!disableInteractions && onDragStart) {
+                onDragStart(event, item);
+              }
+            }}
             onDragEnd={onDragEnd}
             onMouseEnter={() => setIsOverlayVisible(true)}
             onMouseLeave={() => setIsOverlayVisible(false)}
@@ -1298,6 +1417,15 @@ function InventoryTile({
             className="pointer-events-none h-full w-full object-contain"
             loading="lazy"
           />
+          {(item.stackCount ?? 1) > 1 && (
+            <Badge
+              variant="secondary"
+              data-testid="inventory-item-stack-count"
+              className="absolute right-0.5 bottom-0.5 h-4 min-w-4 justify-center px-1 text-[10px] leading-none"
+            >
+              {item.stackCount}
+            </Badge>
+          )}
           {isOverlayVisible && (
             <ItemSocketOverlay entries={gameTooltipModel?.socketEntries ?? []} />
           )}
@@ -1377,6 +1505,7 @@ function InventoryGridSection({
   onSelect,
   onDragStart,
   onDragEnd,
+  disableInteractions = false,
   snapshotSourceFilePath,
   snapshotSourceFileType,
   sectionLocationContext,
@@ -1433,7 +1562,10 @@ function InventoryGridSection({
     [classified.unplaced, overflowLayout.itemKeys],
   );
   const canDropOnSection =
-    !!snapshotSourceFilePath && !!snapshotSourceFileType && !!sectionLocationContext;
+    !disableInteractions &&
+    !!snapshotSourceFilePath &&
+    !!snapshotSourceFileType &&
+    !!sectionLocationContext;
   const clearDragPreview = useCallback(() => {
     setActiveDragKind(null);
     setActiveVaultDragItem(null);
@@ -1698,6 +1830,7 @@ function InventoryGridSection({
                 item={item}
                 iconLookup={iconLookup}
                 selected={item.fingerprint === selectedFingerprint}
+                disableInteractions={disableInteractions}
                 isVaultPresent={isVaultPresent}
                 onSelect={onSelect}
                 onDragStart={onDragStart}
@@ -1747,6 +1880,7 @@ function InventoryGridSection({
                     item={item}
                     iconLookup={iconLookup}
                     selected={item.fingerprint === selectedFingerprint}
+                    disableInteractions={disableInteractions}
                     isVaultPresent={isVaultPresent}
                     unplacedReason={reason}
                     onSelect={onSelect}
@@ -1774,6 +1908,7 @@ function EquipmentSection({
   onSelect,
   onDragStart,
   onDragEnd,
+  disableInteractions = false,
   snapshotSourceFilePath,
   snapshotSourceFileType,
   draggingInventoryItem,
@@ -1788,7 +1923,8 @@ function EquipmentSection({
     () => buildEquippedSlotMapForSet(items, weaponSet),
     [items, weaponSet],
   );
-  const canDropOnSection = !!snapshotSourceFilePath && !!snapshotSourceFileType;
+  const canDropOnSection =
+    !disableInteractions && !!snapshotSourceFilePath && !!snapshotSourceFileType;
   const clearSlotPreview = useCallback(() => {
     setDragPreviewSlot(null);
   }, []);
@@ -1935,6 +2071,7 @@ function EquipmentSection({
                       item={slotItem}
                       iconLookup={iconLookup}
                       selected={slotItem.fingerprint === selectedFingerprint}
+                      disableInteractions={disableInteractions}
                       isVaultPresent={getEffectiveVaultPresent(
                         slotItem,
                         vaultItemsByFingerprint,
@@ -1973,6 +2110,7 @@ function MercenaryEquipmentSection({
   onSelect,
   onDragStart,
   onDragEnd,
+  disableInteractions = false,
 }: MercenaryEquipmentSectionProps) {
   const { t } = useTranslation();
   const mappedMercenaryItems = useMemo(() => {
@@ -2038,6 +2176,7 @@ function MercenaryEquipmentSection({
                     item={slotItem}
                     iconLookup={iconLookup}
                     selected={slotItem.fingerprint === selectedFingerprint}
+                    disableInteractions={disableInteractions}
                     isVaultPresent={getEffectiveVaultPresent(
                       slotItem,
                       vaultItemsByFingerprint,
@@ -2068,6 +2207,7 @@ function MercenaryEquipmentSection({
                   item={item}
                   iconLookup={iconLookup}
                   selected={item.fingerprint === selectedFingerprint}
+                  disableInteractions={disableInteractions}
                   isVaultPresent={getEffectiveVaultPresent(
                     item,
                     vaultItemsByFingerprint,
@@ -2384,11 +2524,15 @@ export function CharacterInventoryBrowser({
       setSelectedVaultItemId(undefined);
       await reloadInventoryAfterSaveWrite();
     } catch (error) {
+      if (isModernStashReadOnlyError(error)) {
+        showModernStashReadOnlyToast(t);
+        return;
+      }
       console.error('Failed to unvault item', error);
     } finally {
       setIsUnvaulting(false);
     }
-  }, [selectedVaultItemId, isUnvaulting, reloadInventoryAfterSaveWrite]);
+  }, [selectedVaultItemId, isUnvaulting, reloadInventoryAfterSaveWrite, t]);
 
   const characterOptions = useMemo(() => {
     const options = new Map<string, string>();
@@ -2418,6 +2562,10 @@ export function CharacterInventoryBrowser({
         await window.electronAPI.vault.addItem(itemInput);
         await loadInventorySearch();
       } catch (error) {
+        if (isModernStashReadOnlyError(error)) {
+          showModernStashReadOnlyToast(t);
+          return;
+        }
         console.error('Failed to vault inventory item', error);
       } finally {
         setPendingVaultFingerprints((previous) => {
@@ -2432,7 +2580,7 @@ export function CharacterInventoryBrowser({
         setIsVaulting(false);
       }
     },
-    [isVaulting, loadInventorySearch],
+    [isVaulting, loadInventorySearch, t],
   );
 
   const handleCardDragStart = (event: DragEvent<HTMLButtonElement>, item: ParsedInventoryItem) => {
@@ -2542,6 +2690,10 @@ export function CharacterInventoryBrowser({
         setCrossWindowInventoryDragItem(null);
         await reloadInventoryAfterSaveWrite();
       } catch (error) {
+        if (isModernStashReadOnlyError(error)) {
+          showModernStashReadOnlyToast(t);
+          return;
+        }
         if (showEquipValidationToastIfPresent(error, t)) {
           return;
         }
@@ -2575,10 +2727,14 @@ export function CharacterInventoryBrowser({
         setCrossWindowVaultDragItem(null);
         await reloadInventoryAfterSaveWrite();
       } catch (error) {
+        if (isModernStashReadOnlyError(error)) {
+          showModernStashReadOnlyToast(t);
+          return;
+        }
         console.error('Failed to unvault item to target', error);
       }
     },
-    [reloadInventoryAfterSaveWrite],
+    [reloadInventoryAfterSaveWrite, t],
   );
 
   const handleVaultDrop = async (event: DragEvent<HTMLButtonElement>) => {
@@ -2785,10 +2941,10 @@ export function CharacterInventoryBrowser({
 
         {snapshots.map((snapshot) => {
           const grouped = groupSpatialItems(snapshot.items);
-          const stashTabs = getSortedStashTabs(grouped.stashByTab);
-          const stashTabsToRender = stashTabs.length > 0 ? stashTabs : [{ stashTab: 0, items: [] }];
-          const { belt: beltItems, otherUnknown } = partitionUnknownItems(grouped.unknown);
+          const stashTabsToRender = buildStashTabsToRender(snapshot, grouped.stashByTab);
           const stashOnlySnapshot = isStashSourceFileType(snapshot.sourceFileType);
+          const { belt: beltItems, otherUnknown } = partitionUnknownItems(grouped.unknown);
+          const snapshotReadOnly = snapshot.readOnly === true;
 
           return (
             <Card key={snapshot.snapshotId}>
@@ -2824,6 +2980,7 @@ export function CharacterInventoryBrowser({
                       onSelect={(item) => setSelectedItemFingerprint(item.fingerprint)}
                       onDragStart={handleCardDragStart}
                       onDragEnd={handleCardDragEnd}
+                      disableInteractions={snapshotReadOnly}
                       snapshotSourceFilePath={snapshot.sourceFilePath}
                       snapshotSourceFileType={snapshot.sourceFileType}
                       draggingInventoryItem={activeInventoryDragItem}
@@ -2863,6 +3020,7 @@ export function CharacterInventoryBrowser({
                       onSelect={(item) => setSelectedItemFingerprint(item.fingerprint)}
                       onDragStart={handleCardDragStart}
                       onDragEnd={handleCardDragEnd}
+                      disableInteractions={snapshotReadOnly}
                       snapshotSourceFilePath={snapshot.sourceFilePath}
                       snapshotSourceFileType={snapshot.sourceFileType}
                       sectionLocationContext="inventory"
@@ -2874,12 +3032,10 @@ export function CharacterInventoryBrowser({
                   )}
 
                 {(locationContext === 'all' || locationContext === 'stash') &&
-                  stashTabsToRender.map(({ stashTab, items }) => (
+                  stashTabsToRender.map(({ stashTab, items, fallbackTabKind }) => (
                     <InventoryGridSection
                       key={`${snapshot.snapshotId}-stash-${stashTab}`}
-                      title={t(translations.inventoryBrowser.sections.stashTab, {
-                        tab: stashTab + 1,
-                      })}
+                      title={getStashSectionTitle(stashTab, items, t, fallbackTabKind)}
                       testId={`stash-board-${snapshot.snapshotId}-${stashTab}`}
                       items={items}
                       gridSize={DEFAULT_STASH_GRID_SIZE}
@@ -2891,6 +3047,7 @@ export function CharacterInventoryBrowser({
                       onSelect={(item) => setSelectedItemFingerprint(item.fingerprint)}
                       onDragStart={handleCardDragStart}
                       onDragEnd={handleCardDragEnd}
+                      disableInteractions={snapshotReadOnly}
                       snapshotSourceFilePath={snapshot.sourceFilePath}
                       snapshotSourceFileType={snapshot.sourceFileType}
                       sectionLocationContext="stash"
@@ -2915,6 +3072,7 @@ export function CharacterInventoryBrowser({
                     onSelect={(item) => setSelectedItemFingerprint(item.fingerprint)}
                     onDragStart={handleCardDragStart}
                     onDragEnd={handleCardDragEnd}
+                    disableInteractions={snapshotReadOnly}
                   />
                 )}
 
@@ -2931,6 +3089,7 @@ export function CharacterInventoryBrowser({
                       onSelect={(item) => setSelectedItemFingerprint(item.fingerprint)}
                       onDragStart={handleCardDragStart}
                       onDragEnd={handleCardDragEnd}
+                      disableInteractions={snapshotReadOnly}
                     />
                   )}
 
@@ -2948,6 +3107,7 @@ export function CharacterInventoryBrowser({
                       onSelect={(item) => setSelectedItemFingerprint(item.fingerprint)}
                       onDragStart={handleCardDragStart}
                       onDragEnd={handleCardDragEnd}
+                      disableInteractions={snapshotReadOnly}
                     />
                   )}
 
@@ -2967,6 +3127,7 @@ export function CharacterInventoryBrowser({
                             item={item}
                             iconLookup={spriteIconLookup}
                             selected={item.fingerprint === selectedItemFingerprint}
+                            disableInteractions={snapshotReadOnly}
                             isVaultPresent={getEffectiveVaultPresent(
                               item,
                               vaultItemsByFingerprint,

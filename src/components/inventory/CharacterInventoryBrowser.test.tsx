@@ -685,6 +685,418 @@ describe('When CharacterInventoryBrowser is rendered', () => {
       expect(screen.queryByTestId('mercenary-board-shared-stash-snap')).not.toBeInTheDocument();
       expect(screen.queryByTestId('corpse-board-shared-stash-snap')).not.toBeInTheDocument();
     });
+
+    it('Then modern stash snapshots show modern tab labels, stack badges, and disable drag', async () => {
+      // Arrange
+      searchAllMock.mockResolvedValueOnce({
+        inventory: {
+          snapshots: [
+            {
+              snapshotId: 'modern-stash-snap',
+              characterName: 'Shared Stash Softcore',
+              characterId: 'shared-stash',
+              sourceFileType: 'd2i',
+              sourceFilePath: '/tmp/modern-shared.d2i',
+              sourceFileVersion: 105,
+              readOnly: true,
+              capturedAt: new Date('2024-01-01T00:00:00.000Z'),
+              items: [
+                {
+                  fingerprint: 'fp-gems',
+                  fingerprintInputs: {
+                    sourceFileType: 'd2i',
+                    characterName: 'Shared Stash Softcore',
+                    locationContext: 'stash',
+                    stashTab: 5,
+                    quality: 'normal',
+                    ethereal: false,
+                    socketCount: 0,
+                    gridX: 0,
+                    gridY: 0,
+                    gridWidth: 1,
+                    gridHeight: 1,
+                    isSocketedItem: false,
+                    itemName: 'Perfect Ruby',
+                  },
+                  characterName: 'Shared Stash Softcore',
+                  sourceFileType: 'd2i',
+                  sourceFilePath: '/tmp/modern-shared.d2i',
+                  locationContext: 'stash',
+                  stashTab: 5,
+                  stashTabKind: 'gems',
+                  type: 'other',
+                  itemCode: 'gpr',
+                  gridX: 0,
+                  gridY: 0,
+                  gridWidth: 1,
+                  gridHeight: 1,
+                  isSocketedItem: false,
+                  itemName: 'Perfect Ruby',
+                  quality: 'normal',
+                  ethereal: false,
+                  socketCount: 0,
+                  stackCount: 7,
+                  iconFileName: 'gpr.png',
+                  rawItemJson: '{"id":301,"type":"gpr"}',
+                  rawParsedItem: {},
+                  seenAt: new Date('2024-01-01T00:00:00.000Z'),
+                },
+                {
+                  fingerprint: 'fp-material',
+                  fingerprintInputs: {
+                    sourceFileType: 'd2i',
+                    characterName: 'Shared Stash Softcore',
+                    locationContext: 'stash',
+                    stashTab: 6,
+                    quality: 'normal',
+                    ethereal: false,
+                    socketCount: 0,
+                    gridX: 1,
+                    gridY: 0,
+                    gridWidth: 1,
+                    gridHeight: 1,
+                    isSocketedItem: false,
+                    itemName: 'Terror Key',
+                  },
+                  characterName: 'Shared Stash Softcore',
+                  sourceFileType: 'd2i',
+                  sourceFilePath: '/tmp/modern-shared.d2i',
+                  locationContext: 'stash',
+                  stashTab: 6,
+                  stashTabKind: 'materials',
+                  type: 'other',
+                  itemCode: 'pk1',
+                  gridX: 1,
+                  gridY: 0,
+                  gridWidth: 1,
+                  gridHeight: 1,
+                  isSocketedItem: false,
+                  itemName: 'Terror Key',
+                  quality: 'normal',
+                  ethereal: false,
+                  socketCount: 0,
+                  stackCount: 3,
+                  iconFileName: 'pk1.png',
+                  rawItemJson: '{"id":302,"type":"pk1"}',
+                  rawParsedItem: {},
+                  seenAt: new Date('2024-01-01T00:00:00.000Z'),
+                },
+                {
+                  fingerprint: 'fp-rune',
+                  fingerprintInputs: {
+                    sourceFileType: 'd2i',
+                    characterName: 'Shared Stash Softcore',
+                    locationContext: 'stash',
+                    stashTab: 7,
+                    quality: 'normal',
+                    ethereal: false,
+                    socketCount: 0,
+                    gridX: 2,
+                    gridY: 0,
+                    gridWidth: 1,
+                    gridHeight: 1,
+                    isSocketedItem: false,
+                    itemName: 'Fal Rune',
+                  },
+                  characterName: 'Shared Stash Softcore',
+                  sourceFileType: 'd2i',
+                  sourceFilePath: '/tmp/modern-shared.d2i',
+                  locationContext: 'stash',
+                  stashTab: 7,
+                  stashTabKind: 'runes',
+                  type: 'rune',
+                  itemCode: 'r19',
+                  gridX: 2,
+                  gridY: 0,
+                  gridWidth: 1,
+                  gridHeight: 1,
+                  isSocketedItem: false,
+                  itemName: 'Fal Rune',
+                  quality: 'normal',
+                  ethereal: false,
+                  socketCount: 0,
+                  stackCount: 2,
+                  iconFileName: 'r19.png',
+                  rawItemJson: '{"id":303,"type":"r19"}',
+                  rawParsedItem: {},
+                  seenAt: new Date('2024-01-01T00:00:00.000Z'),
+                },
+              ],
+            },
+          ],
+          totalSnapshots: 1,
+          totalItems: 3,
+        },
+        vault: {
+          items: [],
+          total: 0,
+          page: 1,
+          pageSize: 20,
+        },
+      });
+
+      // Act
+      render(<CharacterInventoryBrowser />);
+
+      // Assert
+      await waitFor(() => {
+        expect(screen.getByText('Selected Item')).toBeInTheDocument();
+      });
+      expect(screen.getByText('Gems')).toBeInTheDocument();
+      expect(screen.getByText('Materials')).toBeInTheDocument();
+      expect(screen.getByText('Runes')).toBeInTheDocument();
+      expect(screen.getAllByTestId('inventory-item-stack-count')[0]).toHaveTextContent('7');
+
+      const gemsTile = screen.getByLabelText('Inventory item Perfect Ruby');
+      expect(gemsTile).toHaveAttribute('draggable', 'false');
+    });
+
+    it('Then modern stash snapshots render all modern tabs even when some are empty', async () => {
+      // Arrange
+      searchAllMock.mockResolvedValueOnce({
+        inventory: {
+          snapshots: [
+            {
+              snapshotId: 'modern-empty-tabs-snap',
+              characterName: 'Modern Shared Stash Softcore',
+              characterId: 'modern-shared-stash',
+              sourceFileType: 'd2i',
+              sourceFilePath: '/tmp/modern-empty-tabs.d2i',
+              sourceFileVersion: 105,
+              readOnly: true,
+              capturedAt: new Date('2024-01-01T00:00:00.000Z'),
+              items: [
+                {
+                  fingerprint: 'fp-material',
+                  fingerprintInputs: {
+                    sourceFileType: 'd2i',
+                    characterName: 'Modern Shared Stash Softcore',
+                    locationContext: 'stash',
+                    stashTab: 6,
+                    quality: 'normal',
+                    ethereal: false,
+                    socketCount: 0,
+                    gridX: 1,
+                    gridY: 0,
+                    gridWidth: 1,
+                    gridHeight: 1,
+                    isSocketedItem: false,
+                    itemName: 'Terror Key',
+                  },
+                  characterName: 'Modern Shared Stash Softcore',
+                  sourceFileType: 'd2i',
+                  sourceFilePath: '/tmp/modern-empty-tabs.d2i',
+                  locationContext: 'stash',
+                  stashTab: 6,
+                  stashTabKind: 'materials',
+                  type: 'other',
+                  itemCode: 'pk1',
+                  gridX: 1,
+                  gridY: 0,
+                  gridWidth: 1,
+                  gridHeight: 1,
+                  isSocketedItem: false,
+                  itemName: 'Terror Key',
+                  quality: 'normal',
+                  ethereal: false,
+                  socketCount: 0,
+                  stackCount: 3,
+                  iconFileName: 'pk1.png',
+                  rawItemJson: '{"id":302,"type":"pk1"}',
+                  rawParsedItem: {},
+                  seenAt: new Date('2024-01-01T00:00:00.000Z'),
+                },
+                {
+                  fingerprint: 'fp-rune',
+                  fingerprintInputs: {
+                    sourceFileType: 'd2i',
+                    characterName: 'Modern Shared Stash Softcore',
+                    locationContext: 'stash',
+                    stashTab: 7,
+                    quality: 'normal',
+                    ethereal: false,
+                    socketCount: 0,
+                    gridX: 2,
+                    gridY: 0,
+                    gridWidth: 1,
+                    gridHeight: 1,
+                    isSocketedItem: false,
+                    itemName: 'Fal Rune',
+                  },
+                  characterName: 'Modern Shared Stash Softcore',
+                  sourceFileType: 'd2i',
+                  sourceFilePath: '/tmp/modern-empty-tabs.d2i',
+                  locationContext: 'stash',
+                  stashTab: 7,
+                  stashTabKind: 'runes',
+                  type: 'rune',
+                  itemCode: 'r19',
+                  gridX: 2,
+                  gridY: 0,
+                  gridWidth: 1,
+                  gridHeight: 1,
+                  isSocketedItem: false,
+                  itemName: 'Fal Rune',
+                  quality: 'normal',
+                  ethereal: false,
+                  socketCount: 0,
+                  stackCount: 2,
+                  iconFileName: 'r19.png',
+                  rawItemJson: '{"id":303,"type":"r19"}',
+                  rawParsedItem: {},
+                  seenAt: new Date('2024-01-01T00:00:00.000Z'),
+                },
+              ],
+            },
+          ],
+          totalSnapshots: 1,
+          totalItems: 2,
+        },
+        vault: {
+          items: [],
+          total: 0,
+          page: 1,
+          pageSize: 20,
+        },
+      });
+
+      // Act
+      render(<CharacterInventoryBrowser />);
+
+      // Assert
+      await waitFor(() => {
+        expect(screen.getByText('Selected Item')).toBeInTheDocument();
+      });
+      expect(screen.getByText('Shared Tab 1')).toBeInTheDocument();
+      expect(screen.getByText('Shared Tab 2')).toBeInTheDocument();
+      expect(screen.getByText('Shared Tab 3')).toBeInTheDocument();
+      expect(screen.getByText('Shared Tab 4')).toBeInTheDocument();
+      expect(screen.getByText('Shared Tab 5')).toBeInTheDocument();
+      expect(screen.getByText('Gems')).toBeInTheDocument();
+      expect(screen.getByText('Materials')).toBeInTheDocument();
+      expect(screen.getByText('Runes')).toBeInTheDocument();
+      expect(screen.getByTestId('stash-board-modern-empty-tabs-snap-5')).toBeInTheDocument();
+    });
+
+    it('Then overlapping resource entries are still fully visible in modern stash sections', async () => {
+      // Arrange
+      searchAllMock.mockResolvedValueOnce({
+        inventory: {
+          snapshots: [
+            {
+              snapshotId: 'modern-overlap-snap',
+              characterName: 'Modern Shared Stash Softcore',
+              characterId: 'modern-shared-stash',
+              sourceFileType: 'd2i',
+              sourceFilePath: '/tmp/modern-overlap.d2i',
+              sourceFileVersion: 105,
+              readOnly: true,
+              capturedAt: new Date('2024-01-01T00:00:00.000Z'),
+              items: [
+                {
+                  fingerprint: 'fp-rune-1',
+                  fingerprintInputs: {
+                    sourceFileType: 'd2i',
+                    characterName: 'Modern Shared Stash Softcore',
+                    locationContext: 'stash',
+                    stashTab: 7,
+                    quality: 'normal',
+                    ethereal: false,
+                    socketCount: 0,
+                    gridX: 0,
+                    gridY: 0,
+                    gridWidth: 1,
+                    gridHeight: 1,
+                    isSocketedItem: false,
+                    itemName: 'El Rune',
+                  },
+                  characterName: 'Modern Shared Stash Softcore',
+                  sourceFileType: 'd2i',
+                  sourceFilePath: '/tmp/modern-overlap.d2i',
+                  locationContext: 'stash',
+                  stashTab: 7,
+                  stashTabKind: 'runes',
+                  type: 'rune',
+                  itemCode: 'r01',
+                  gridX: 0,
+                  gridY: 0,
+                  gridWidth: 1,
+                  gridHeight: 1,
+                  isSocketedItem: false,
+                  itemName: 'El Rune',
+                  quality: 'normal',
+                  ethereal: false,
+                  socketCount: 0,
+                  stackCount: 1,
+                  iconFileName: 'r01.png',
+                  rawItemJson: '{"type":"r01"}',
+                  rawParsedItem: {},
+                  seenAt: new Date('2024-01-01T00:00:00.000Z'),
+                },
+                {
+                  fingerprint: 'fp-rune-2',
+                  fingerprintInputs: {
+                    sourceFileType: 'd2i',
+                    characterName: 'Modern Shared Stash Softcore',
+                    locationContext: 'stash',
+                    stashTab: 7,
+                    quality: 'normal',
+                    ethereal: false,
+                    socketCount: 0,
+                    gridX: 0,
+                    gridY: 0,
+                    gridWidth: 1,
+                    gridHeight: 1,
+                    isSocketedItem: false,
+                    itemName: 'Eld Rune',
+                  },
+                  characterName: 'Modern Shared Stash Softcore',
+                  sourceFileType: 'd2i',
+                  sourceFilePath: '/tmp/modern-overlap.d2i',
+                  locationContext: 'stash',
+                  stashTab: 7,
+                  stashTabKind: 'runes',
+                  type: 'rune',
+                  itemCode: 'r02',
+                  gridX: 0,
+                  gridY: 0,
+                  gridWidth: 1,
+                  gridHeight: 1,
+                  isSocketedItem: false,
+                  itemName: 'Eld Rune',
+                  quality: 'normal',
+                  ethereal: false,
+                  socketCount: 0,
+                  stackCount: 1,
+                  iconFileName: 'r02.png',
+                  rawItemJson: '{"type":"r02"}',
+                  rawParsedItem: {},
+                  seenAt: new Date('2024-01-01T00:00:00.000Z'),
+                },
+              ],
+            },
+          ],
+          totalSnapshots: 1,
+          totalItems: 2,
+        },
+        vault: {
+          items: [],
+          total: 0,
+          page: 1,
+          pageSize: 20,
+        },
+      });
+
+      // Act
+      render(<CharacterInventoryBrowser />);
+
+      // Assert
+      await waitFor(() => {
+        expect(screen.getByText('Selected Item')).toBeInTheDocument();
+      });
+      expect(screen.getByLabelText('Inventory item El Rune')).toBeInTheDocument();
+      expect(screen.getByLabelText('Inventory item Eld Rune')).toBeInTheDocument();
+    });
   });
 
   describe('If mercenary items are rendered in inventory snapshots', () => {
@@ -2174,6 +2586,93 @@ describe('When CharacterInventoryBrowser is rendered', () => {
       const movePayload = moveInventoryItemMock.mock.calls[0]?.[0];
       expect(Number.isFinite(movePayload?.targetGridX)).toBe(true);
       expect(Number.isFinite(movePayload?.targetGridY)).toBe(true);
+      getComputedStyleSpy.mockRestore();
+    });
+
+    it('Then it shows a read-only toast when the move API returns MODERN_STASH_READ_ONLY', async () => {
+      // Arrange
+      const getComputedStyleSpy = vi
+        .spyOn(window, 'getComputedStyle')
+        .mockReturnValue({ getPropertyValue: () => '28' } as unknown as CSSStyleDeclaration);
+      moveInventoryItemMock.mockRejectedValueOnce(new Error('MODERN_STASH_READ_ONLY'));
+      searchAllMock.mockResolvedValue({
+        inventory: {
+          snapshots: [
+            {
+              snapshotId: 'move-readonly-toast',
+              characterName: 'Sorc',
+              characterId: 'char-1',
+              sourceFileType: 'd2s',
+              sourceFilePath: '/tmp/sorc.d2s',
+              capturedAt: new Date('2024-01-01T00:00:00.000Z'),
+              items: [
+                {
+                  fingerprint: 'fp-move-readonly-toast',
+                  fingerprintInputs: {
+                    sourceFileType: 'd2s',
+                    characterName: 'Sorc',
+                    locationContext: 'inventory',
+                    quality: 'unique',
+                    ethereal: false,
+                    socketCount: 0,
+                    gridX: 1,
+                    gridY: 1,
+                    gridWidth: 1,
+                    gridHeight: 1,
+                    isSocketedItem: false,
+                    itemName: 'Move Me',
+                  },
+                  characterName: 'Sorc',
+                  characterId: 'char-1',
+                  sourceFileType: 'd2s',
+                  sourceFilePath: '/tmp/sorc.d2s',
+                  locationContext: 'inventory',
+                  type: 'unique',
+                  itemCode: 'uap',
+                  gridX: 1,
+                  gridY: 1,
+                  gridWidth: 1,
+                  gridHeight: 1,
+                  isSocketedItem: false,
+                  itemName: 'Move Me',
+                  quality: 'unique',
+                  ethereal: false,
+                  socketCount: 0,
+                  iconFileName: 'shako.png',
+                  rawItemJson: '{"id":101,"type_name":"Shako","code":"uap"}',
+                  rawParsedItem: {},
+                  seenAt: new Date('2024-01-01T00:00:00.000Z'),
+                },
+              ],
+            },
+          ],
+          totalSnapshots: 1,
+          totalItems: 1,
+        },
+        vault: {
+          items: [],
+          total: 0,
+          page: 1,
+          pageSize: 20,
+        },
+      });
+
+      render(<CharacterInventoryBrowser />);
+      const draggedTile = await screen.findByLabelText('Inventory item Move Me');
+      const inventoryBoard = await screen.findByTestId('inventory-board-move-readonly-toast');
+      const dataTransfer = createDragDataTransfer();
+
+      // Act
+      fireEvent.dragStart(draggedTile, { dataTransfer });
+      fireEvent.dragOver(inventoryBoard, { dataTransfer, clientX: 100, clientY: 12 });
+      fireEvent.drop(inventoryBoard, { dataTransfer, clientX: 100, clientY: 12 });
+
+      // Assert
+      await waitFor(() => {
+        expect(toastErrorMock).toHaveBeenCalledWith(
+          'Modern shared stash is read-only in this version.',
+        );
+      });
       getComputedStyleSpy.mockRestore();
     });
   });

@@ -6,6 +6,7 @@ import * as d2stash from '@dschu012/d2s/lib/d2/stash';
 import { constants as constants96 } from '@dschu012/d2s/lib/data/versions/96_constant_data';
 import { constants as constants99 } from '@dschu012/d2s/lib/data/versions/99_constant_data';
 import type { CharacterClass, VaultLocationContext, VaultSourceFileType } from '../types/grail';
+import { readD2iMetadata } from './stashFormat';
 
 type StashConstants = {
   constants: d2sTypes.IConstantData;
@@ -31,6 +32,29 @@ function getStashConstants(ext: string): StashConstants {
   }
 
   return { constants: constants96, version: 96 };
+}
+
+function assertWritableD2iBuffer(ext: string, buffer: Buffer): void {
+  if (ext !== '.d2i') {
+    return;
+  }
+
+  const metadata = readD2iMetadata(buffer);
+  if (metadata.version >= 105) {
+    throw new Error('MODERN_STASH_READ_ONLY');
+  }
+}
+
+async function assertWritableStashMutationTarget(
+  filePath: string,
+  fileType: VaultSourceFileType,
+): Promise<void> {
+  if (fileType !== 'd2i') {
+    return;
+  }
+
+  const buffer = await readFile(filePath);
+  assertWritableD2iBuffer(extname(filePath), buffer);
 }
 
 type ConstantItemDefinition = {
@@ -675,6 +699,7 @@ async function moveItemWithinSingleSaveFile(options: MoveSaveFileItemOptions): P
   }
 
   const ext = extname(sourceFilePath);
+  assertWritableD2iBuffer(ext, buffer);
   const { constants, version } = getStashConstants(ext);
   const data = await d2stash.read(buffer, constants);
   let sourceItem: d2sTypes.IItem | undefined;
@@ -714,15 +739,20 @@ export async function removeItemFromSaveFile(
 
   if (fileType === 'd2s') {
     const data = await d2s.read(buffer);
-    data.items = data.items.filter((item) => !itemMatchesId(item, itemId));
-    data.corpse_items = data.corpse_items.filter((item) => !itemMatchesId(item, itemId));
-    data.merc_items = data.merc_items.filter((item) => !itemMatchesId(item, itemId));
+    data.items = data.items.filter((item: d2sTypes.IItem) => !itemMatchesId(item, itemId));
+    data.corpse_items = data.corpse_items.filter(
+      (item: d2sTypes.IItem) => !itemMatchesId(item, itemId),
+    );
+    data.merc_items = data.merc_items.filter(
+      (item: d2sTypes.IItem) => !itemMatchesId(item, itemId),
+    );
     const result = await d2s.write(data);
     await writeFile(filePath, Buffer.from(result));
     return;
   }
 
   const ext = extname(filePath);
+  assertWritableD2iBuffer(ext, buffer);
   const { constants, version } = getStashConstants(ext);
   const data = await d2stash.read(buffer, constants);
 
@@ -770,6 +800,7 @@ export async function addItemToSaveFile(
   }
 
   const ext = extname(filePath);
+  assertWritableD2iBuffer(ext, buffer);
   const { constants, version } = getStashConstants(ext);
   const data = await d2stash.read(buffer, constants);
   const itemToWrite = withTargetCoordinates(item, targetGridX, targetGridY);
@@ -796,6 +827,9 @@ export async function moveItemBetweenSaveFiles(options: MoveSaveFileItemOptions)
     await moveItemWithinSingleSaveFile(options);
     return;
   }
+
+  await assertWritableStashMutationTarget(options.sourceFilePath, options.sourceFileType);
+  await assertWritableStashMutationTarget(options.targetFilePath, options.targetFileType);
 
   const sourceItem = await findItemInSaveFile(
     options.sourceFilePath,
