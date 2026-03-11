@@ -196,7 +196,11 @@ import { ItemDetectionService } from '../services/itemDetection';
 import { RunTrackerService } from '../services/runTracker';
 import { SaveFileMonitor } from '../services/saveFileMonitor';
 import type { ItemDetectionEvent, SaveFileEvent } from '../types/grail';
-import { closeSaveFileMonitor, initializeSaveFileHandlers } from './saveFileHandlers';
+import {
+  closeSaveFileMonitor,
+  handleAutomaticGrailProgress,
+  initializeSaveFileHandlers,
+} from './saveFileHandlers';
 
 // Mock data types
 interface MockWebContents {
@@ -1003,6 +1007,86 @@ describe('When saveFileHandlers is used', () => {
           characterId: 'char-1',
           itemId: 'windforce',
           manuallyAdded: false,
+        }),
+      );
+    });
+
+    it('Then it classifies modern shared stash names as shared_stash', () => {
+      // Arrange
+      vi.mocked(grailDatabase.getCharacterByName).mockReturnValue(undefined);
+      vi.mocked(grailDatabase.getProgressByItem).mockReturnValue([]);
+      const event = {
+        type: 'item-found',
+        item: D2ItemBuilder.new()
+          .withId('item-1')
+          .withName('Test Item')
+          .withType('other')
+          .withQuality('normal')
+          .withLevel(1)
+          .withCharacterName('Modern Shared Stash Softcore')
+          .withLocation('stash')
+          .build(),
+        grailItem: HolyGrailItemBuilder.new()
+          .withId('test-item')
+          .withName('Test Item')
+          .withType('unique')
+          .build(),
+      } as ItemDetectionEvent;
+
+      // Act
+      handleAutomaticGrailProgress(event, {
+        database: grailDatabase as any,
+        batchWriter: mockBatchWriter as any,
+        eventBus: mockEventBus as any,
+        runTracker: mockRunTrackerService,
+      });
+
+      // Assert
+      expect(mockBatchWriter.queueCharacter).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: 'Modern Shared Stash Softcore',
+          characterClass: 'shared_stash',
+          hardcore: false,
+        }),
+      );
+    });
+
+    it('Then it infers hardcore from modern shared stash names', () => {
+      // Arrange
+      vi.mocked(grailDatabase.getCharacterByName).mockReturnValue(undefined);
+      vi.mocked(grailDatabase.getProgressByItem).mockReturnValue([]);
+      const event = {
+        type: 'item-found',
+        item: D2ItemBuilder.new()
+          .withId('item-2')
+          .withName('Test Item 2')
+          .withType('other')
+          .withQuality('normal')
+          .withLevel(1)
+          .withCharacterName('Modern Shared Stash Hardcore')
+          .withLocation('stash')
+          .build(),
+        grailItem: HolyGrailItemBuilder.new()
+          .withId('test-item-2')
+          .withName('Test Item 2')
+          .withType('unique')
+          .build(),
+      } as ItemDetectionEvent;
+
+      // Act
+      handleAutomaticGrailProgress(event, {
+        database: grailDatabase as any,
+        batchWriter: mockBatchWriter as any,
+        eventBus: mockEventBus as any,
+        runTracker: mockRunTrackerService,
+      });
+
+      // Assert
+      expect(mockBatchWriter.queueCharacter).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: 'Modern Shared Stash Hardcore',
+          characterClass: 'shared_stash',
+          hardcore: true,
         }),
       );
     });

@@ -523,6 +523,10 @@
       "equipped": "Equipped",
       "inventory": "Inventory",
       "stashTab": "Stash Tab {{tab}}",
+      "sharedTab": "Shared Tab {{tab}}",
+      "gems": "Gems",
+      "materials": "Materials",
+      "runes": "Runes",
       "expandedInventory": "Expanded Inventory Layout",
       "expandedStash": "Expanded Stash Layout",
       "rawStored": "Stored Layout",
@@ -575,6 +579,7 @@
     "dropToVault": "Drop inventory items here to vault",
     "dragToVault": "Drag to vault dropzone",
     "vaultedItems": "Vaulted Items",
+    "modernStashReadOnlyError": "Modern shared stash is read-only in this version.",
     "equipValidation": {
       "title": "Equip blocked",
       "reasons": {

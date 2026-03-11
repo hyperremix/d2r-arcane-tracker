@@ -47,7 +47,7 @@
   },
   "dependencies": {
     "@base-ui/react": "^1.1.0",
-    "@dschu012/d2s": "^2.0.36",
+    "@dschu012/d2s": "https://github.com/viniciusrezende/d2s#feat/support-reign-of-warlock",
     "@fontsource-variable/inter": "^5.2.8",
     "@tanstack/react-virtual": "^3.13.12",
     "better-sqlite3": "^12.4.1",
@@ -102,7 +102,7 @@
     "drizzle-kit": "^0.31.8",
     "electron": "^30.0.1",
     "electron-builder": "^24.13.3",
-    "electron-rebuild": "^3.2.9",
+    "@electron/rebuild": "^3.7.1",
     "husky": "^9.1.7",
     "jsdom": "^27.0.0",
     "lint-staged": "^15.2.10",

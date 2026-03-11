@@ -8,6 +8,7 @@ let mockD2sRead: ReturnType<typeof vi.fn>;
 let mockD2sWrite: ReturnType<typeof vi.fn>;
 let mockD2stashRead: ReturnType<typeof vi.fn>;
 let mockD2stashWrite: ReturnType<typeof vi.fn>;
+let mockReadD2iMetadata: ReturnType<typeof vi.fn>;
 let removeItemFromSaveFile: SaveFileEditorModule['removeItemFromSaveFile'];
 let addItemToSaveFile: SaveFileEditorModule['addItemToSaveFile'];
 let moveItemBetweenSaveFiles: SaveFileEditorModule['moveItemBetweenSaveFiles'];
@@ -43,6 +44,7 @@ beforeAll(async () => {
   mockD2sWrite = vi.fn();
   mockD2stashRead = vi.fn();
   mockD2stashWrite = vi.fn();
+  mockReadD2iMetadata = vi.fn();
 
   vi.resetModules();
 
@@ -68,6 +70,10 @@ beforeAll(async () => {
 
   vi.doMock('@dschu012/d2s/lib/data/versions/99_constant_data', () => ({
     constants: constants99,
+  }));
+
+  vi.doMock('./stashFormat', () => ({
+    readD2iMetadata: mockReadD2iMetadata,
   }));
 
   const module = await import('./saveFileEditor');
@@ -174,6 +180,11 @@ const fakeResultBuffer = new Uint8Array([0x03, 0x04]);
 describe('When removeItemFromSaveFile is called', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockReadD2iMetadata.mockReturnValue({
+      version: 99,
+      hardcore: false,
+      sectors: [],
+    });
     mockReadFile.mockResolvedValue(fakeBuffer);
     mockWriteFile.mockResolvedValue(undefined);
     mockD2sWrite.mockResolvedValue(fakeResultBuffer);
@@ -251,6 +262,22 @@ describe('When removeItemFromSaveFile is called', () => {
       expect(mockD2stashRead).toHaveBeenCalledWith(fakeBuffer, constants99);
       expect(mockD2stashWrite).toHaveBeenCalledWith(stashData, constants99, 99);
     });
+
+    it('Then rejects modern v105 stash writes with MODERN_STASH_READ_ONLY', async () => {
+      // Arrange
+      mockReadD2iMetadata.mockReturnValue({
+        version: 105,
+        hardcore: false,
+        sectors: [],
+      });
+
+      // Act & Assert
+      await expect(removeItemFromSaveFile('/path/to/file.d2i', 'd2i', 11)).rejects.toThrow(
+        'MODERN_STASH_READ_ONLY',
+      );
+      expect(mockD2stashRead).not.toHaveBeenCalled();
+      expect(mockD2stashWrite).not.toHaveBeenCalled();
+    });
   });
 
   describe('If item id is not found in any list', () => {
@@ -274,6 +301,11 @@ describe('When addItemToSaveFile is called', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mockReadD2iMetadata.mockReturnValue({
+      version: 99,
+      hardcore: false,
+      sectors: [],
+    });
     mockReadFile.mockResolvedValue(fakeBuffer);
     mockWriteFile.mockResolvedValue(undefined);
     mockD2sWrite.mockResolvedValue(fakeResultBuffer);
@@ -861,11 +893,34 @@ describe('When addItemToSaveFile is called', () => {
       expect(mockD2stashWrite).toHaveBeenCalledWith(stashData, constants96, 96);
     });
   });
+
+  describe('If sourceFileType is d2i and format is modern v105', () => {
+    it('Then it throws MODERN_STASH_READ_ONLY before mutating', async () => {
+      // Arrange
+      mockReadD2iMetadata.mockReturnValue({
+        version: 105,
+        hardcore: false,
+        sectors: [],
+      });
+
+      // Act & Assert
+      await expect(
+        addItemToSaveFile('/path/to/file.d2i', 'd2i', testItem, 'stash', 0),
+      ).rejects.toThrow('MODERN_STASH_READ_ONLY');
+      expect(mockD2stashRead).not.toHaveBeenCalled();
+      expect(mockD2stashWrite).not.toHaveBeenCalled();
+    });
+  });
 });
 
 describe('When moveItemBetweenSaveFiles is called', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockReadD2iMetadata.mockReturnValue({
+      version: 99,
+      hardcore: false,
+      sectors: [],
+    });
     mockReadFile.mockResolvedValue(fakeBuffer);
     mockWriteFile.mockResolvedValue(undefined);
     mockD2sWrite.mockResolvedValue(fakeResultBuffer);
@@ -951,6 +1006,32 @@ describe('When moveItemBetweenSaveFiles is called', () => {
         '/path/to/source.d2s',
         Buffer.from(fakeResultBuffer),
       );
+    });
+
+    it('Then it rejects modern shared stash moves before writing either file', async () => {
+      // Arrange
+      mockReadD2iMetadata.mockReturnValue({
+        version: 105,
+        hardcore: false,
+        sectors: [],
+      });
+
+      // Act & Assert
+      await expect(
+        moveItemBetweenSaveFiles({
+          sourceFilePath: '/path/to/source.d2i',
+          sourceFileType: 'd2i',
+          sourceItemId: 88,
+          targetFilePath: '/path/to/target.d2s',
+          targetFileType: 'd2s',
+          targetLocationContext: 'inventory',
+          targetGridX: 0,
+          targetGridY: 0,
+        }),
+      ).rejects.toThrow('MODERN_STASH_READ_ONLY');
+      expect(mockD2sWrite).not.toHaveBeenCalled();
+      expect(mockD2stashWrite).not.toHaveBeenCalled();
+      expect(mockWriteFile).not.toHaveBeenCalled();
     });
   });
 });

@@ -261,6 +261,8 @@ export type VaultLocationContext =
   | 'corpse'
   | 'unknown';
 
+export type StashTabKind = 'shared' | 'gems' | 'materials' | 'runes';
+
 export interface VaultCategory {
   id: string;
   name: string;
@@ -624,6 +626,7 @@ export type ItemDetails = {
   ethereal: boolean;
   ilevel: number | null;
   socketed: boolean;
+  quantity?: number;
   d2sItem?: d2s.types.IItem;
 };
 
@@ -806,6 +809,7 @@ export type D2SItem = {
   equipped?: boolean;
   socketed?: number;
   socket_count?: number;
+  quantity?: number;
   inv_width?: number;
   inv_height?: number;
   inv_file?: string | number;
@@ -841,6 +845,7 @@ export interface ParsedInventoryItem {
   sourceFilePath: string;
   locationContext: VaultLocationContext;
   stashTab?: number;
+  stashTabKind?: StashTabKind;
   gridX?: number;
   gridY?: number;
   gridWidth?: number;
@@ -854,6 +859,7 @@ export interface ParsedInventoryItem {
   quality: string;
   ethereal: boolean;
   socketCount: number;
+  stackCount?: number;
   grailItemId?: string;
   rawItemJson: string;
   rawParsedItem: d2s.types.IItem;
@@ -866,6 +872,8 @@ export interface CharacterInventorySnapshot {
   characterId?: string;
   sourceFileType: VaultSourceFileType;
   sourceFilePath: string;
+  sourceFileVersion?: number;
+  readOnly?: boolean;
   capturedAt: Date;
   items: ParsedInventoryItem[];
 }
@@ -965,6 +973,7 @@ export type D2SaveFile = {
   level: number;
   hardcore: boolean;
   expansion: boolean;
+  sourceFileVersion?: number;
 };
 
 /**

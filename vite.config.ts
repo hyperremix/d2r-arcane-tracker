@@ -1,16 +1,27 @@
+import { existsSync } from 'node:fs';
 import path from 'node:path';
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vite';
 import electron from 'vite-plugin-electron/simple';
 
+const d2sRoot = path.resolve(__dirname, './node_modules/@dschu012/d2s');
+const hasD2sLibBuild = existsSync(path.join(d2sRoot, 'lib/index.js'));
+const d2sSourceAliases = hasD2sLibBuild
+  ? []
+  : [
+      { find: /^@dschu012\/d2s\/lib\//, replacement: `${path.join(d2sRoot, 'src')}/` },
+      { find: '@dschu012/d2s', replacement: path.join(d2sRoot, 'src/index.ts') },
+    ];
+
 // https://vitejs.dev/config/
 export default defineConfig({
   resolve: {
-    alias: {
-      '@': path.resolve(__dirname, './src'),
-      electron: path.resolve(__dirname, './electron'),
-    },
+    alias: [
+      { find: '@', replacement: path.resolve(__dirname, './src') },
+      { find: 'electron', replacement: path.resolve(__dirname, './electron') },
+      ...d2sSourceAliases,
+    ],
   },
   plugins: [
     tailwindcss(),
@@ -20,6 +31,12 @@ export default defineConfig({
         // Shortcut of `build.lib.entry`.
         entry: 'electron/main.ts',
         vite: {
+          // vite-plugin-electron does not inherit root resolve.alias — pass d2s
+          // aliases explicitly so the main-process build can resolve the package
+          // source when the compiled lib/ directory is absent.
+          resolve: {
+            alias: d2sSourceAliases,
+          },
           build: {
             rollupOptions: {
               external: ['better-sqlite3', 'koffi'],

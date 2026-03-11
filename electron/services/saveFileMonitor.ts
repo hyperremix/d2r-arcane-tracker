@@ -22,6 +22,7 @@ import type {
   SaveFileEvent,
   SaveFileItem,
   SaveFileState,
+  StashTabKind,
   VaultLocationContext,
   VaultSourceFileType,
 } from '../types/grail';
@@ -32,8 +33,12 @@ import { isRune } from '../utils/objects';
 import { createServiceLogger } from '../utils/serviceLogger';
 import { resolveSpatialLocation } from '../utils/spatialLocationResolver';
 import type { EventBus } from './EventBus';
+import { parseModernStash } from './modernStashParser';
+import { readD2iMetadata } from './stashFormat';
 
 const log = createServiceLogger('SaveFileMonitor');
+const SUPPORTED_SAVE_EXTENSIONS = new Set(['.d2s', '.sss', '.d2x', '.d2i']);
+const MODERN_STASH_MIN_VERSION = 105;
 
 const processItemName = (item: D2SItem): string => {
   const itemId = getGrailItemId(item);
@@ -57,10 +62,11 @@ const processItemName = (item: D2SItem): string => {
 
 const shouldSkipItem = (name: string): boolean => name === '';
 
-const createSavedItem = (item: D2SItem): ItemDetails => ({
+const createSavedItem = (item: D2SItem, quantity?: number): ItemDetails => ({
   ethereal: !!item.ethereal,
   ilevel: item.level ?? null,
   socketed: !!item.socketed,
+  quantity,
   d2sItem: item as d2s.types.IItem,
 });
 
@@ -501,9 +507,7 @@ class SaveFileMonitor {
     this.fileWatcher = chokidar
       .watch(this.saveDirectory, {
         // Only watch files with save file extensions
-        ignored: (path, stats) =>
-          !!stats?.isFile() &&
-          !['.d2s', '.sss', '.d2x', '.d2i'].includes(extname(path).toLowerCase()),
+        ignored: (path, stats) => !!stats?.isFile() && !this.shouldIncludeSaveFile(basename(path)),
         followSymlinks: false,
         ignoreInitial: true,
         depth: 0,
@@ -607,9 +611,7 @@ class SaveFileMonitor {
     for (const dir of directories) {
       try {
         const allFilesInDir = readdirSync(dir);
-        const files = allFilesInDir.filter(
-          (file) => ['.d2s', '.sss', '.d2x', '.d2i'].indexOf(extname(file).toLowerCase()) !== -1,
-        );
+        const files = allFilesInDir.filter((file) => this.shouldIncludeSaveFile(file));
         allFiles.push(...files.map((file) => join(dir, file)));
       } catch (error) {
         log.error('parseAllSaveDirectories', error, { directory: dir });
@@ -651,9 +653,7 @@ class SaveFileMonitor {
     try {
       const allFilesInDir = readdirSync(directory);
 
-      const files = allFilesInDir.filter(
-        (file) => ['.d2s', '.sss', '.d2x', '.d2i'].indexOf(extname(file).toLowerCase()) !== -1,
-      );
+      const files = allFilesInDir.filter((file) => this.shouldIncludeSaveFile(file));
 
       const allFiles = files.map((file) => join(directory, file));
 
@@ -683,6 +683,52 @@ class SaveFileMonitor {
       });
       return false;
     }
+  }
+
+  private shouldIncludeSaveFile(fileName: string): boolean {
+    const extension = extname(fileName).toLowerCase();
+    if (!SUPPORTED_SAVE_EXTENSIONS.has(extension)) {
+      return false;
+    }
+
+    if (extension !== '.d2i') {
+      return true;
+    }
+
+    return !this.isBackupLikeStashFile(fileName);
+  }
+
+  private isBackupLikeStashFile(fileName: string): boolean {
+    const lowerFileName = fileName.toLowerCase();
+    if (!lowerFileName.endsWith('.d2i')) {
+      return false;
+    }
+
+    const stem = lowerFileName.slice(0, -'.d2i'.length);
+    return (
+      stem.includes('_backup') ||
+      stem.endsWith('.bak') ||
+      stem.endsWith('_bak') ||
+      stem.endsWith('-bak')
+    );
+  }
+
+  private resolveSharedStashName(
+    isHardcore: boolean,
+    sourceFileVersion?: number,
+  ):
+    | 'Shared Stash Hardcore'
+    | 'Shared Stash Softcore'
+    | 'Modern Shared Stash Hardcore'
+    | 'Modern Shared Stash Softcore' {
+    const isModern =
+      sourceFileVersion !== undefined && sourceFileVersion >= MODERN_STASH_MIN_VERSION;
+
+    if (isModern) {
+      return isHardcore ? 'Modern Shared Stash Hardcore' : 'Modern Shared Stash Softcore';
+    }
+
+    return isHardcore ? 'Shared Stash Hardcore' : 'Shared Stash Softcore';
   }
 
   /**
@@ -746,9 +792,14 @@ class SaveFileMonitor {
    * @private
    * @param {string} filePath - The file path to extract the name from.
    * @param {boolean} [isHardcore] - Optional hardcore status (for shared stash files). If not provided, falls back to filename detection.
+   * @param {number} [sourceFileVersion] - Optional d2i source file version for modern stash naming.
    * @returns {string} The character/save name.
    */
-  private getSaveNameFromPath(filePath: string, isHardcore?: boolean): string {
+  private getSaveNameFromPath(
+    filePath: string,
+    isHardcore?: boolean,
+    sourceFileVersion?: number,
+  ): string {
     const extension = extname(filePath).toLowerCase();
     let saveName = basename(filePath)
       .replace('.d2s', '')
@@ -761,7 +812,7 @@ class SaveFileMonitor {
       // Use provided hardcore status if available, otherwise fall back to filename
       const hardcore =
         isHardcore !== undefined ? isHardcore : saveName.toLowerCase().includes('hardcore');
-      saveName = hardcore ? 'Shared Stash Hardcore' : 'Shared Stash Softcore';
+      saveName = this.resolveSharedStashName(hardcore, sourceFileVersion);
     }
 
     return saveName;
@@ -847,6 +898,8 @@ class SaveFileMonitor {
     item: D2SItem;
     fallbackLocation: VaultLocationContext;
     stashTab?: number;
+    stashTabKind?: StashTabKind;
+    stackCount?: number;
     isSocketedItem?: boolean;
   }): ParsedInventoryItem {
     const resolvedSpatialLocation = resolveSpatialLocation({
@@ -906,6 +959,7 @@ class SaveFileMonitor {
       sourceFilePath: params.filePath,
       locationContext,
       stashTab,
+      stashTabKind: params.stashTabKind,
       ...spatialMetadata,
       itemName,
       itemCode: params.item.code ?? params.item.type ?? undefined,
@@ -913,6 +967,7 @@ class SaveFileMonitor {
       type: parsedType,
       ethereal: !!params.item.ethereal,
       socketCount,
+      stackCount: params.stackCount,
       grailItemId,
       rawItemJson: JSON.stringify(params.item),
       rawParsedItem: params.item as d2s.types.IItem,
@@ -938,11 +993,25 @@ class SaveFileMonitor {
     success: boolean;
     inventorySnapshot?: CharacterInventorySnapshot;
   }> {
-    const saveName = this.getSaveNameFromPath(filePath);
+    let saveName = this.getSaveNameFromPath(filePath);
 
     try {
       const buffer = await readFile(filePath);
       const extension = extname(filePath).toLowerCase();
+      let sourceFileVersion: number | undefined;
+      let readOnly = false;
+
+      if (extension === '.d2i') {
+        try {
+          const metadata = readD2iMetadata(buffer);
+          sourceFileVersion = metadata.version;
+          readOnly = metadata.version >= MODERN_STASH_MIN_VERSION;
+          saveName = this.getSaveNameFromPath(filePath, metadata.hardcore, metadata.version);
+        } catch (error) {
+          log.warn('processSingleFile', `Failed to read .d2i metadata: ${error}`);
+        }
+      }
+
       const inventoryItems = await this.parseSave(saveName, filePath, buffer, extension);
       const characterId = this.grailDatabase?.getCharacterByName(saveName)?.id;
       const inventoryItemsWithCharacter = inventoryItems.map((inventoryItem) => ({
@@ -961,7 +1030,7 @@ class SaveFileMonitor {
           continue;
         }
 
-        const savedItem = createSavedItem(item);
+        const savedItem = createSavedItem(item, inventoryItem.stackCount);
         const isEthereal = !!item.ethereal;
         addItemToResults(results, name, savedItem, saveName, item, isEthereal);
 
@@ -984,6 +1053,8 @@ class SaveFileMonitor {
           characterId,
           sourceFileType: extension.replace('.', '') as VaultSourceFileType,
           sourceFilePath: filePath,
+          sourceFileVersion,
+          readOnly,
           capturedAt: new Date(),
           items: snapshotItems,
         },
@@ -1031,18 +1102,17 @@ class SaveFileMonitor {
    * @param {FileReaderResponse} results - The parsing results.
    */
   private async emitSaveFileEvents(
-    filePaths: string[],
+    parsedFiles: Array<{ filePath: string; saveName: string }>,
     results: FileReaderResponse,
   ): Promise<void> {
-    log.info('emitSaveFileEvents', `Emitting events for ${filePaths.length} files`);
-    for (const filePath of filePaths) {
+    log.info('emitSaveFileEvents', `Emitting events for ${parsedFiles.length} files`);
+    for (const { filePath, saveName } of parsedFiles) {
       try {
         const saveFile = await this.parseSaveFile(filePath);
         if (!saveFile) {
           continue;
         }
 
-        const saveName = this.getSaveNameFromPath(filePath);
         const extractedItems = this.collectExtractedItems(results, saveName);
 
         // Set silent flag to prevent notification spam during:
@@ -1136,13 +1206,9 @@ class SaveFileMonitor {
     // Filter files that need parsing based on modification time
     let filesToParse = await this.filterFilesToParse(filePaths);
 
-    // If no files changed but snapshots are empty, force-parse all files
-    // so inventory data is available on startup
-    if (filesToParse.length === 0 && this.inventorySnapshots.length === 0 && filePaths.length > 0) {
-      log.info(
-        'parseFiles',
-        'No files changed but inventory snapshots are empty, forcing full parse',
-      );
+    // On startup, snapshots are empty and must be fully rebuilt to avoid a partial inventory view.
+    if (this.inventorySnapshots.length === 0 && filePaths.length > 0) {
+      log.info('parseFiles', 'Inventory snapshots are empty, forcing full parse of all files');
       filesToParse = filePaths;
     }
 
@@ -1168,6 +1234,14 @@ class SaveFileMonitor {
     });
 
     const parseResults = await this.executeConcurrently(tasks, this.MAX_CONCURRENT_PARSES);
+    const successfulParseResults = parseResults
+      .map((result, index) => ({ result, filePath: filesToParse[index] }))
+      .filter(
+        (
+          entry,
+        ): entry is { result: NonNullable<(typeof parseResults)[number]>; filePath: string } =>
+          Boolean(entry.result?.success && entry.result.saveName),
+      );
 
     const failedFiles = parseResults.filter((r) => r && !r.success);
     const successfulSnapshots = parseResults
@@ -1206,7 +1280,13 @@ class SaveFileMonitor {
     );
 
     // Emit save file events for each file that was actually parsed
-    await this.emitSaveFileEvents(filesToParse, results);
+    await this.emitSaveFileEvents(
+      successfulParseResults.map((entry) => ({
+        filePath: entry.filePath,
+        saveName: entry.result.saveName,
+      })),
+      results,
+    );
     log.info('parseFiles', `Complete - processed ${filesToParse.length} files`);
   }
 
@@ -1237,6 +1317,8 @@ class SaveFileMonitor {
       itemList: D2SItem[],
       fallbackLocation: VaultLocationContext,
       stashTab?: number,
+      stashTabKind?: StashTabKind,
+      stackCount?: number,
       isSocketedItem: boolean = false,
     ) => {
       itemList.forEach((item) => {
@@ -1248,12 +1330,21 @@ class SaveFileMonitor {
             item,
             fallbackLocation,
             stashTab,
+            stashTabKind,
+            stackCount,
             isSocketedItem,
           }),
         );
 
         if (item.socketed_items?.length) {
-          parseItems(item.socketed_items, fallbackLocation, stashTab, true);
+          parseItems(
+            item.socketed_items,
+            fallbackLocation,
+            stashTab,
+            stashTabKind,
+            undefined,
+            true,
+          );
         }
       });
     };
@@ -1301,14 +1392,45 @@ class SaveFileMonitor {
       });
     };
 
+    const parseModernD2i = async () => {
+      if (!this.grailDatabase) {
+        return [];
+      }
+
+      const modern = await parseModernStash(content);
+      const settings = this.grailDatabase.getAllSettings();
+      const isHardcore = modern.hardcore;
+
+      if (settings.gameMode === GameMode.Softcore && isHardcore) {
+        return [];
+      }
+      if (settings.gameMode === GameMode.Hardcore && !isHardcore) {
+        return [];
+      }
+
+      modern.items.forEach((entry) => {
+        parseItems([entry.item], 'stash', entry.stashTab, entry.stashTabKind, entry.stackCount);
+      });
+    };
+
     switch (extension) {
       case '.sss':
       case '.d2x':
         await d2stash.read(content, constants96).then(parseStash);
         break;
-      case '.d2i':
-        await d2stash.read(content, constants99).then(parseStash);
+      case '.d2i': {
+        try {
+          const metadata = readD2iMetadata(content);
+          if (metadata.version >= 105) {
+            await parseModernD2i();
+          } else {
+            await d2stash.read(content, constants99).then(parseStash);
+          }
+        } catch {
+          await d2stash.read(content, constants99).then(parseStash);
+        }
         break;
+      }
       default:
         await d2s.read(content).then(parseD2S);
     }
@@ -1330,19 +1452,23 @@ class SaveFileMonitor {
 
       // Handle shared stash files (.d2i)
       if (extension === '.d2i') {
-        // Parse the stash file header to extract hardcore status
         let isHardcore = false;
+        let sourceFileVersion: number | undefined;
         try {
-          const stashData = await d2stash.read(buffer, constants99);
-          isHardcore = stashData.hardcore;
-          log.info('parseSaveFile', `Parsed .d2i file, hardcore: ${isHardcore}`);
+          const metadata = readD2iMetadata(buffer);
+          isHardcore = metadata.hardcore;
+          sourceFileVersion = metadata.version;
+          log.info(
+            'parseSaveFile',
+            `Parsed .d2i metadata, hardcore: ${isHardcore}, version: ${sourceFileVersion}`,
+          );
         } catch (_parseError) {
-          log.warn('parseSaveFile', 'Failed to parse .d2i file header, falling back to filename');
+          log.warn('parseSaveFile', 'Failed to parse .d2i metadata, falling back to filename');
           // Fallback to filename if parsing fails
           isHardcore = basename(filePath).toLowerCase().includes('hardcore');
         }
 
-        const characterName = this.getSaveNameFromPath(filePath, isHardcore);
+        const characterName = this.getSaveNameFromPath(filePath, isHardcore, sourceFileVersion);
 
         return {
           name: characterName,
@@ -1352,6 +1478,7 @@ class SaveFileMonitor {
           level: 1,
           hardcore: isHardcore,
           expansion: true,
+          sourceFileVersion,
         };
       }
 
@@ -1595,7 +1722,7 @@ class SaveFileMonitor {
       let totalCount = 0;
       // Sum up rune counts across all save files
       for (const itemsArray of Object.values(saveFileItem.inSaves)) {
-        totalCount += itemsArray.length;
+        totalCount += itemsArray.reduce((sum, item) => sum + (item.quantity ?? 1), 0);
       }
       runeCounts[runeId] = totalCount;
     }
