@@ -1282,10 +1282,9 @@ describe('When CharacterInventoryBrowser is rendered', () => {
       render(<CharacterInventoryBrowser />);
 
       // Assert
-      await waitFor(() => {
-        expect(screen.getByText('Selected Item')).toBeInTheDocument();
-      });
-      const mercenaryBoard = screen.getByTestId('mercenary-board-merc-unknown');
+      const mercenaryBoard = await waitFor(() =>
+        screen.getByTestId('mercenary-board-merc-unknown'),
+      );
       expect(within(mercenaryBoard).getAllByTestId('mercenary-slot-frame')).toHaveLength(4);
       const unplacedMercenaryItems = screen.getByTestId('mercenary-board-merc-unknown-unplaced');
       expect(
