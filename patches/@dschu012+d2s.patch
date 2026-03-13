@@ -1,0 +1,11 @@
+--- a/src/d2/items.ts
++++ b/src/d2/items.ts
+@@ -327,7 +327,7 @@
+     }
+   }
+   if (version === 105 && reader.ReadBit()) {
+-      reader.SkipBits(8);
++      item.quantity = reader.ReadUInt8(8);
+   }
+   reader.Align();
+ 
