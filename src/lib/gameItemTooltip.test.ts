@@ -150,8 +150,8 @@ describe('When buildGameItemTooltipModel is called', () => {
         nr_of_items_in_sockets: 2,
         socketed_items: [
           {
-            name: 'Jah Rune',
-            code: 'r31',
+            name: 'r31',
+            type: 'r31',
             inv_file: 'invjah',
           },
           {
@@ -207,6 +207,29 @@ describe('When buildGameItemTooltipModel is called', () => {
     });
   });
 
+  describe('If raw item is a gem with a concatenated internal name and a spaced type_name', () => {
+    it('Then the spaced type_name is promoted as the display name with no redundant base type line', () => {
+      // Arrange — d2s stores "flaweddiamond" in raw.name and "Flawed Diamond" in type_name
+      const rawItemJson = JSON.stringify({
+        name: 'flaweddiamond',
+        type_name: 'Flawed Diamond',
+      });
+
+      // Act
+      const result = buildGameItemTooltipModel({
+        rawItemJson,
+        fallbackName: 'flaweddiamond',
+        quality: 'normal',
+        type: 'normal',
+        t,
+      });
+
+      // Assert
+      expect(result?.name).toBe('Flawed Diamond');
+      expect(result?.baseTypeLine).toBeUndefined();
+    });
+  });
+
   describe('If raw item JSON has socketed_items but no socket totals', () => {
     it('Then it still renders the socketed item entries', () => {
       // Arrange
@@ -235,6 +258,46 @@ describe('When buildGameItemTooltipModel is called', () => {
           isOpenSocket: entry.isOpenSocket,
         })),
       ).toEqual([{ name: 'Ber Rune', isOpenSocket: false }]);
+    });
+  });
+
+  describe('If socketed rune item has name equal to its item code (real d2s output)', () => {
+    it('Then the human-readable rune name is resolved via type code lookup', () => {
+      // Arrange — d2s gives socketed runes type="r18" and name="r18" (code), not "Ko Rune"
+      // (d2s IItem has no `code` field; the item code lives in `type`)
+      const rawItemJson = JSON.stringify({
+        type_name: 'Flail',
+        total_nr_of_sockets: 4,
+        nr_of_items_in_sockets: 4,
+        socketed_items: [
+          { name: 'r18', type: 'r18', type_name: 'Ko Rune', inv_file: 'invko' },
+          { name: 'r26', type: 'r26', type_name: 'Vex Rune', inv_file: 'invvex' },
+          { name: 'r21', type: 'r21', type_name: 'Pul Rune', inv_file: 'invpul' },
+          { name: 'r10', type: 'r10', type_name: 'Thul Rune', inv_file: 'invthul' },
+        ],
+      });
+
+      // Act
+      const result = buildGameItemTooltipModel({
+        rawItemJson,
+        fallbackName: 'fallback-name',
+        quality: 'runeword',
+        type: 'runeword',
+        t,
+      });
+
+      // Assert
+      expect(
+        result?.socketEntries.map((entry) => ({
+          name: entry.name,
+          isOpenSocket: entry.isOpenSocket,
+        })),
+      ).toEqual([
+        { name: 'Ko Rune', isOpenSocket: false },
+        { name: 'Vex Rune', isOpenSocket: false },
+        { name: 'Pul Rune', isOpenSocket: false },
+        { name: 'Thul Rune', isOpenSocket: false },
+      ]);
     });
   });
 });

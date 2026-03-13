@@ -1,3 +1,5 @@
+import { materialDisplayNameByCode } from 'electron/items/materials';
+import { runeDisplayNameByCode, runeImageFilenameByCode } from 'electron/items/runes';
 import { translations } from '@/i18n/translations';
 
 type TranslateFn = (key: string, options?: Record<string, unknown>) => string;
@@ -206,6 +208,11 @@ function getSocketedItems(raw: ParsedRawItem): ParsedSocketedRawItem[] {
 }
 
 function getSocketedItemName(raw: ParsedSocketedRawItem, t: TranslateFn): string {
+  const code = toOptionalString(raw.code) ?? toOptionalString(raw.type);
+  if (code && runeDisplayNameByCode[code]) {
+    return runeDisplayNameByCode[code];
+  }
+
   const candidates = [
     raw.runeword_name,
     raw.unique_name,
@@ -314,6 +321,16 @@ function addNameIconCandidates(candidates: Set<string>, value: unknown): void {
 function buildSocketIconCandidates(socketedItem: ParsedSocketedRawItem): string[] | undefined {
   const candidates = new Set<string>();
 
+  // Fast path: if this is a known rune, add its canonical image filename first so the
+  // icon resolves in a single IPC call rather than falling through ~10 misses.
+  const itemCode = toOptionalString(socketedItem.code) ?? toOptionalString(socketedItem.type);
+  if (itemCode) {
+    const runeImageFilename = runeImageFilenameByCode[itemCode];
+    if (runeImageFilename) {
+      candidates.add(runeImageFilename);
+    }
+  }
+
   addIconCandidate(candidates, socketedItem.inv_file);
   addIconCandidate(candidates, toOptionalInvFilePng(socketedItem.inv_file));
   addCodeIconCandidates(candidates, socketedItem.code);
@@ -378,6 +395,31 @@ function buildSocketEntries(
   return socketEntries;
 }
 
+function resolveNameAndBaseType(
+  raw: ParsedRawItem,
+  fallbackName: string,
+): [
+  name: string,
+  baseTypeLine: string | undefined,
+  hasBaseType: boolean,
+  isMaterialOverride: boolean,
+] {
+  const itemCode = toOptionalString(raw.code) ?? toOptionalString(raw.type);
+  if (itemCode && materialDisplayNameByCode[itemCode]) {
+    return [materialDisplayNameByCode[itemCode], undefined, true, true];
+  }
+  const rawName = getName(raw, fallbackName);
+  // When the base type line already contains the raw name (e.g. "vex" + "Vex Rune",
+  // or "flaweddiamond" + "Flawed Diamond"), the raw name is a redundant internal
+  // code — promote baseTypeLine to the title. Compare after stripping spaces so
+  // multi-word type names like "Flawed Diamond" match their concatenated form.
+  const rawBaseTypeLine = getBaseType(raw);
+  const rawNameNormalized = rawName.toLowerCase().replace(/\s+/g, '');
+  return rawBaseTypeLine?.toLowerCase().replace(/\s+/g, '').includes(rawNameNormalized)
+    ? [rawBaseTypeLine, undefined, true, false]
+    : [rawName, rawBaseTypeLine, Boolean(rawBaseTypeLine), false];
+}
+
 export function buildGameItemTooltipModel(
   args: BuildGameItemTooltipModelArgs,
 ): GameItemTooltipModel | null {
@@ -386,8 +428,10 @@ export function buildGameItemTooltipModel(
     return null;
   }
 
-  const name = getName(raw, args.fallbackName);
-  const baseTypeLine = getBaseType(raw);
+  const [name, baseTypeLine, hasBaseType, isMaterialOverride] = resolveNameAndBaseType(
+    raw,
+    args.fallbackName,
+  );
   const coreLines: string[] = [];
 
   const baseDamage = getBaseDamage(raw);
@@ -455,6 +499,7 @@ export function buildGameItemTooltipModel(
   const affixLines = getAffixLines(raw);
   const socketEntries = buildSocketEntries(raw, args.socketCount, args.t);
   const hasMeaningfulContent =
+    hasBaseType ||
     Boolean(baseTypeLine) ||
     coreLines.length > 0 ||
     affixLines.length > 0 ||
@@ -465,7 +510,7 @@ export function buildGameItemTooltipModel(
 
   return {
     name,
-    quality: args.quality,
+    quality: isMaterialOverride ? 'normal' : args.quality,
     isRuneword: Boolean(
       toOptionalString(raw.runeword_name) || args.type?.toLowerCase() === 'runeword',
     ),
