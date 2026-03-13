@@ -431,3 +431,11 @@ export const runes: Item[] = [
     treasureClass: 'normal',
   },
 ];
+
+export const runeDisplayNameByCode: Readonly<Record<string, string>> = Object.fromEntries(
+  runes.map((r) => [r.code, r.itemBase]),
+);
+
+export const runeImageFilenameByCode: Readonly<Record<string, string>> = Object.fromEntries(
+  runes.filter((r) => r.imageFilename).map((r) => [r.code, r.imageFilename]),
+);

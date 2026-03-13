@@ -23,6 +23,9 @@ import {
   VAULT_DRAG_MIME,
 } from '@/components/inventory/dragPayloads';
 import { GameItemTooltipContent } from '@/components/inventory/GameItemTooltipContent';
+import { GemsTabSection } from '@/components/inventory/GemsTabSection';
+import { MaterialsTabSection } from '@/components/inventory/MaterialsTabSection';
+import { RunesTabSection } from '@/components/inventory/RunesTabSection';
 import {
   buildEquippedSlotMapForSet,
   buildOverflowBoardLayout,
@@ -3032,32 +3035,103 @@ export function CharacterInventoryBrowser({
                   )}
 
                 {(locationContext === 'all' || locationContext === 'stash') &&
-                  stashTabsToRender.map(({ stashTab, items, fallbackTabKind }) => (
-                    <InventoryGridSection
-                      key={`${snapshot.snapshotId}-stash-${stashTab}`}
-                      title={getStashSectionTitle(stashTab, items, t, fallbackTabKind)}
-                      testId={`stash-board-${snapshot.snapshotId}-${stashTab}`}
-                      items={items}
-                      gridSize={DEFAULT_STASH_GRID_SIZE}
-                      showRawOverflowBoard
-                      iconLookup={spriteIconLookup}
-                      selectedFingerprint={selectedItemFingerprint}
-                      pendingVaultFingerprints={pendingVaultFingerprints}
-                      vaultItemsByFingerprint={vaultItemsByFingerprint}
-                      onSelect={(item) => setSelectedItemFingerprint(item.fingerprint)}
-                      onDragStart={handleCardDragStart}
-                      onDragEnd={handleCardDragEnd}
-                      disableInteractions={snapshotReadOnly}
-                      snapshotSourceFilePath={snapshot.sourceFilePath}
-                      snapshotSourceFileType={snapshot.sourceFileType}
-                      sectionLocationContext="stash"
-                      sectionStashTab={stashTab}
-                      draggingVaultItem={activeVaultDragItem}
-                      draggingInventoryItem={activeInventoryDragItem}
-                      onDropVaultItem={handleDropVaultItemOnSection}
-                      onDropInventoryItem={handleMoveInventoryItem}
-                    />
-                  ))}
+                  stashTabsToRender.map(({ stashTab, items, fallbackTabKind }) =>
+                    fallbackTabKind === 'runes' ? (
+                      <RunesTabSection
+                        key={`${snapshot.snapshotId}-stash-${stashTab}`}
+                        title={getStashSectionTitle(stashTab, items, t, fallbackTabKind)}
+                        testId={`stash-board-${snapshot.snapshotId}-${stashTab}`}
+                        items={items}
+                        renderOwnedTile={(item) => (
+                          <InventoryTile
+                            item={item}
+                            iconLookup={spriteIconLookup}
+                            selected={item.fingerprint === selectedItemFingerprint}
+                            disableInteractions={snapshotReadOnly}
+                            isVaultPresent={getEffectiveVaultPresent(
+                              item,
+                              vaultItemsByFingerprint,
+                              pendingVaultFingerprints,
+                            )}
+                            onSelect={(i) => setSelectedItemFingerprint(i.fingerprint)}
+                            onDragStart={handleCardDragStart}
+                            onDragEnd={handleCardDragEnd}
+                          />
+                        )}
+                      />
+                    ) : fallbackTabKind === 'gems' ? (
+                      <GemsTabSection
+                        key={`${snapshot.snapshotId}-stash-${stashTab}`}
+                        title={getStashSectionTitle(stashTab, items, t, fallbackTabKind)}
+                        testId={`stash-board-${snapshot.snapshotId}-${stashTab}`}
+                        items={items}
+                        renderOwnedTile={(item) => (
+                          <InventoryTile
+                            item={item}
+                            iconLookup={spriteIconLookup}
+                            selected={item.fingerprint === selectedItemFingerprint}
+                            disableInteractions={snapshotReadOnly}
+                            isVaultPresent={getEffectiveVaultPresent(
+                              item,
+                              vaultItemsByFingerprint,
+                              pendingVaultFingerprints,
+                            )}
+                            onSelect={(i) => setSelectedItemFingerprint(i.fingerprint)}
+                            onDragStart={handleCardDragStart}
+                            onDragEnd={handleCardDragEnd}
+                          />
+                        )}
+                      />
+                    ) : fallbackTabKind === 'materials' ? (
+                      <MaterialsTabSection
+                        key={`${snapshot.snapshotId}-stash-${stashTab}`}
+                        title={getStashSectionTitle(stashTab, items, t, fallbackTabKind)}
+                        testId={`stash-board-${snapshot.snapshotId}-${stashTab}`}
+                        items={items}
+                        renderOwnedTile={(item) => (
+                          <InventoryTile
+                            item={item}
+                            iconLookup={spriteIconLookup}
+                            selected={item.fingerprint === selectedItemFingerprint}
+                            disableInteractions={snapshotReadOnly}
+                            isVaultPresent={getEffectiveVaultPresent(
+                              item,
+                              vaultItemsByFingerprint,
+                              pendingVaultFingerprints,
+                            )}
+                            onSelect={(i) => setSelectedItemFingerprint(i.fingerprint)}
+                            onDragStart={handleCardDragStart}
+                            onDragEnd={handleCardDragEnd}
+                          />
+                        )}
+                      />
+                    ) : (
+                      <InventoryGridSection
+                        key={`${snapshot.snapshotId}-stash-${stashTab}`}
+                        title={getStashSectionTitle(stashTab, items, t, fallbackTabKind)}
+                        testId={`stash-board-${snapshot.snapshotId}-${stashTab}`}
+                        items={items}
+                        gridSize={DEFAULT_STASH_GRID_SIZE}
+                        showRawOverflowBoard
+                        iconLookup={spriteIconLookup}
+                        selectedFingerprint={selectedItemFingerprint}
+                        pendingVaultFingerprints={pendingVaultFingerprints}
+                        vaultItemsByFingerprint={vaultItemsByFingerprint}
+                        onSelect={(item) => setSelectedItemFingerprint(item.fingerprint)}
+                        onDragStart={handleCardDragStart}
+                        onDragEnd={handleCardDragEnd}
+                        disableInteractions={snapshotReadOnly}
+                        snapshotSourceFilePath={snapshot.sourceFilePath}
+                        snapshotSourceFileType={snapshot.sourceFileType}
+                        sectionLocationContext="stash"
+                        sectionStashTab={stashTab}
+                        draggingVaultItem={activeVaultDragItem}
+                        draggingInventoryItem={activeInventoryDragItem}
+                        onDropVaultItem={handleDropVaultItemOnSection}
+                        onDropInventoryItem={handleMoveInventoryItem}
+                      />
+                    ),
+                  )}
 
                 {locationContext === 'all' && beltItems.length > 0 && (
                   <InventoryGridSection
