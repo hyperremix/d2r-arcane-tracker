@@ -151,8 +151,13 @@ const mapQualityValue = (quality: number | undefined): string => {
   }
 };
 
-function normalizeItemNameForKey(value: string): string {
-  return value.toLowerCase().replace(/[^a-z0-9]/gi, '');
+function toDisplayString(value: unknown): string | undefined {
+  if (typeof value !== 'string') {
+    return undefined;
+  }
+
+  const normalized = value.replace(/\0/g, '').trim();
+  return normalized.length > 0 ? normalized : undefined;
 }
 
 function resolveFallbackItemName(item: D2SItem): string {
@@ -175,13 +180,45 @@ function resolveFallbackItemName(item: D2SItem): string {
   return 'unknown';
 }
 
-function resolveParsedItemName(item: D2SItem, runewordName: string | null): string {
-  const grailName = runewordName ? normalizeItemNameForKey(runewordName) : processItemName(item);
-  if (grailName) {
-    return normalizeItemNameForKey(grailName);
+function resolveMagicOrRareDisplayName(item: D2SItem): string | undefined {
+  const rareParts = [toDisplayString(item.rare_name), toDisplayString(item.rare_name2)].filter(
+    (part): part is string => Boolean(part),
+  );
+  if (rareParts.length > 0) {
+    return rareParts.join(' ');
   }
 
-  return normalizeItemNameForKey(resolveFallbackItemName(item));
+  const prefix = toDisplayString(item.magic_prefix_name);
+  const suffix = toDisplayString(item.magic_suffix_name);
+  if (!prefix && !suffix) {
+    return undefined;
+  }
+
+  const baseName =
+    toDisplayString(item.type_name) ??
+    toDisplayString(item.name) ??
+    toDisplayString(item.type) ??
+    toDisplayString(item.code);
+
+  return [prefix, baseName, suffix].filter((part): part is string => Boolean(part)).join(' ');
+}
+
+function resolveParsedItemName(item: D2SItem, runewordName: string | null): string {
+  const candidates = [
+    toDisplayString(runewordName),
+    toDisplayString(item.unique_name),
+    toDisplayString(item.set_name),
+    resolveMagicOrRareDisplayName(item),
+    toDisplayString(resolveFallbackItemName(item)),
+  ];
+
+  for (const candidate of candidates) {
+    if (candidate) {
+      return candidate;
+    }
+  }
+
+  return 'unknown';
 }
 
 function resolveSocketCount(item: D2SItem): number {
@@ -999,13 +1036,12 @@ class SaveFileMonitor {
       const buffer = await readFile(filePath);
       const extension = extname(filePath).toLowerCase();
       let sourceFileVersion: number | undefined;
-      let readOnly = false;
+      const readOnly = false;
 
       if (extension === '.d2i') {
         try {
           const metadata = readD2iMetadata(buffer);
           sourceFileVersion = metadata.version;
-          readOnly = metadata.version >= MODERN_STASH_MIN_VERSION;
           saveName = this.getSaveNameFromPath(filePath, metadata.hardcore, metadata.version);
         } catch (error) {
           log.warn('processSingleFile', `Failed to read .d2i metadata: ${error}`);
@@ -1419,15 +1455,22 @@ class SaveFileMonitor {
         await d2stash.read(content, constants96).then(parseStash);
         break;
       case '.d2i': {
+        let d2iVersion: number | undefined;
         try {
           const metadata = readD2iMetadata(content);
+          d2iVersion = metadata.version;
           if (metadata.version >= 105) {
             await parseModernD2i();
           } else {
             await d2stash.read(content, constants99).then(parseStash);
           }
         } catch {
-          await d2stash.read(content, constants99).then(parseStash);
+          // Only fall back to classic stash parsing for pre-105 format files.
+          // Calling d2stash.read on a v105+ .d2i file would fail or produce
+          // garbage because the formats are incompatible.
+          if (d2iVersion === undefined || d2iVersion < 105) {
+            await d2stash.read(content, constants99).then(parseStash);
+          }
         }
         break;
       }

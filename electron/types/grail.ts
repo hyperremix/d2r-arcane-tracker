@@ -796,6 +796,8 @@ export type D2SItem = {
   set_name?: string;
   rare_name?: string;
   rare_name2?: string;
+  magic_prefix_name?: string;
+  magic_suffix_name?: string;
   runeword_name?: string;
   level?: number;
   ethereal?: number;
@@ -894,6 +896,7 @@ export interface InventoryItemMoveInput {
   sourceFilePath: string;
   sourceFileType: VaultSourceFileType;
   rawItemJson: string;
+  sourceStashTab?: number;
   targetFilePath: string;
   targetFileType: VaultSourceFileType;
   targetLocationContext: VaultLocationContext;
@@ -901,6 +904,26 @@ export interface InventoryItemMoveInput {
   targetGridX?: number;
   targetGridY?: number;
   targetEquippedSlotId?: number;
+}
+
+export interface StackSplitTarget {
+  targetFilePath: string;
+  targetFileType: VaultSourceFileType;
+  targetLocationContext: VaultLocationContext;
+  targetStashTab?: number;
+  targetGridX: number;
+  targetGridY: number;
+}
+
+export interface InventoryStackSplitInput {
+  sourceFilePath: string;
+  sourceFileType: VaultSourceFileType;
+  sourceStashTab: number;
+  sourceItemCode: string;
+  /** Raw JSON of the source IItem. Required when sourceFileType is 'd2i' (modern stash). */
+  sourceRawItemJson?: string;
+  splitCount: number;
+  targets: StackSplitTarget[];
 }
 
 /**

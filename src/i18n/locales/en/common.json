@@ -580,6 +580,12 @@
     "dragToVault": "Drag to vault dropzone",
     "vaultedItems": "Vaulted Items",
     "modernStashReadOnlyError": "Modern shared stash is read-only in this version.",
+    "stackPickup": {
+      "placed": "{{count}} item(s) placed.",
+      "partialPlace": "Only {{placed}} of {{total}} items could be placed.",
+      "cancelled": "Pickup cancelled.",
+      "noSpace": "No available space in this grid."
+    },
     "equipValidation": {
       "title": "Equip blocked",
       "reasons": {

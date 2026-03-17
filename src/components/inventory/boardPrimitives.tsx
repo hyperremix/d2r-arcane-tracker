@@ -1,4 +1,4 @@
-import { type CSSProperties, type DragEvent, type ReactNode, useRef } from 'react';
+import { type CSSProperties, type DragEvent, type MouseEvent, type ReactNode, useRef } from 'react';
 import { cn } from '@/lib/utils';
 import {
   createBoardCellIndexes,
@@ -20,6 +20,7 @@ interface BoardSurfaceProps {
   onDragOverCell?: (event: DragEvent<HTMLDivElement>, x: number, y: number) => void;
   onDragLeaveBoard?: () => void;
   onDropOnBoard?: (event: DragEvent<HTMLDivElement>, x: number, y: number) => void;
+  onClickBoard?: (event: MouseEvent<HTMLDivElement>, x: number, y: number) => void;
 }
 
 interface GridPlacementOrigin {
@@ -43,34 +44,34 @@ function getBoardStyle(gridSize: GridSize): CSSProperties {
   };
 }
 
-function getCellCoords(
-  event: DragEvent<HTMLDivElement>,
+function resolveCellCoords(
+  clientX: number,
+  clientY: number,
   el: HTMLDivElement,
-): {
-  x: number;
-  y: number;
-} {
+): { x: number; y: number } {
   const rect = el.getBoundingClientRect();
   const parsedCellSize = Number.parseFloat(
     getComputedStyle(el).getPropertyValue('--inv-cell-size'),
   );
   const cellSize = Number.isFinite(parsedCellSize) && parsedCellSize > 0 ? parsedCellSize : 22;
-  const clientX =
-    Number.isFinite(event.clientX) && Number.isFinite(rect.left)
-      ? event.clientX
-      : rect.left + BOARD_PADDING_PX;
-  const clientY =
-    Number.isFinite(event.clientY) && Number.isFinite(rect.top)
-      ? event.clientY
-      : rect.top + BOARD_PADDING_PX;
+  const resolvedX =
+    Number.isFinite(clientX) && Number.isFinite(rect.left) ? clientX : rect.left + BOARD_PADDING_PX;
+  const resolvedY =
+    Number.isFinite(clientY) && Number.isFinite(rect.top) ? clientY : rect.top + BOARD_PADDING_PX;
   const cellSpan = cellSize + BOARD_GAP_PX;
-  const rawX = (clientX - rect.left - BOARD_PADDING_PX) / cellSpan;
-  const rawY = (clientY - rect.top - BOARD_PADDING_PX) / cellSpan;
-
+  const rawX = (resolvedX - rect.left - BOARD_PADDING_PX) / cellSpan;
+  const rawY = (resolvedY - rect.top - BOARD_PADDING_PX) / cellSpan;
   return {
     x: Number.isFinite(rawX) ? Math.max(0, Math.floor(rawX)) : 0,
     y: Number.isFinite(rawY) ? Math.max(0, Math.floor(rawY)) : 0,
   };
+}
+
+function getCellCoords(
+  event: DragEvent<HTMLDivElement>,
+  el: HTMLDivElement,
+): { x: number; y: number } {
+  return resolveCellCoords(event.clientX, event.clientY, el);
 }
 
 export function getItemGridPlacement(
@@ -97,13 +98,15 @@ export function BoardSurface({
   onDragOverCell,
   onDragLeaveBoard,
   onDropOnBoard,
+  onClickBoard,
 }: BoardSurfaceProps) {
   const boardRef = useRef<HTMLDivElement>(null);
   const cells = showBaseGrid ? createBoardCellIndexes(gridSize) : [];
 
   return (
     <div className="overflow-x-auto pb-1">
-      {/* biome-ignore lint/a11y/noStaticElementInteractions: board surfaces intentionally handle drag-drop targeting without click/keyboard interaction. */}
+      {/* biome-ignore lint/a11y/noStaticElementInteractions: board surfaces handle drag-drop and pickup click targeting; keyboard navigation is via item buttons inside the board. */}
+      {/* biome-ignore lint/a11y/useKeyWithClickEvents: keyboard navigation provided by item buttons; board click is supplemental pickup placement only. */}
       <div
         ref={boardRef}
         data-testid={testId}
@@ -138,6 +141,12 @@ export function BoardSurface({
           if (onDropOnBoard && boardRef.current) {
             const { x, y } = getCellCoords(event, boardRef.current);
             onDropOnBoard(event, x, y);
+          }
+        }}
+        onClick={(event) => {
+          if (onClickBoard && boardRef.current) {
+            const { x, y } = resolveCellCoords(event.clientX, event.clientY, boardRef.current);
+            onClickBoard(event, x, y);
           }
         }}
       >

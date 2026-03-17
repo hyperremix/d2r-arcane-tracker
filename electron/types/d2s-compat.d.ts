@@ -116,6 +116,14 @@ declare module '@dschu012/d2s/lib/d2/items' {
     values: number[];
   }
 
+  export function readItem(
+    reader: BitReader,
+    version: number,
+    constants: types.IConstantData,
+    config: Record<string, unknown>,
+    parent?: types.IItem,
+  ): Promise<types.IItem>;
+
   export function readItems(
     reader: BitReader,
     version: number,
@@ -123,6 +131,20 @@ declare module '@dschu012/d2s/lib/d2/items' {
     config: Record<string, unknown>,
     char?: types.ID2S,
   ): Promise<types.IItem[]>;
+
+  export function writeItem(
+    item: types.IItem,
+    version: number,
+    constants: types.IConstantData,
+    config: Record<string, unknown>,
+  ): Promise<Uint8Array>;
+
+  export function writeItems(
+    items: types.IItem[],
+    version: number,
+    constants: types.IConstantData,
+    config: Record<string, unknown>,
+  ): Promise<Uint8Array>;
 
   export function _readMagicProperties(
     reader: BitReader,

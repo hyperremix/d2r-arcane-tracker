@@ -27,6 +27,11 @@ type InventoryDragStatePayload = {
   sourceEquippedSlotId?: number;
   gridWidth: number;
   gridHeight: number;
+  stackPickup?: boolean;
+  stackPickupCount?: number;
+  stackPickupMaxCount?: number;
+  stackPickupItemName?: string;
+  stackPickupIconFileName?: string;
 };
 
 type ActiveDragStateSnapshot = {
@@ -128,6 +133,9 @@ function normalizeInventoryDragStatePayload(
   const parseOptionalInteger = (value: unknown): number | undefined =>
     Number.isInteger(value) ? (value as number) : undefined;
 
+  const stackPickupCount = parseOptionalInteger(rawPayload.stackPickupCount);
+  const stackPickupMaxCount = parseOptionalInteger(rawPayload.stackPickupMaxCount);
+
   return {
     active: rawPayload.active,
     fingerprint: rawPayload.fingerprint.trim(),
@@ -145,6 +153,19 @@ function normalizeInventoryDragStatePayload(
     sourceEquippedSlotId: parseOptionalInteger(rawPayload.sourceEquippedSlotId),
     gridWidth,
     gridHeight,
+    stackPickup: rawPayload.stackPickup === true ? true : undefined,
+    stackPickupCount: stackPickupCount && stackPickupCount > 0 ? stackPickupCount : undefined,
+    stackPickupMaxCount:
+      stackPickupMaxCount && stackPickupMaxCount > 0 ? stackPickupMaxCount : undefined,
+    stackPickupItemName:
+      typeof rawPayload.stackPickupItemName === 'string' &&
+      rawPayload.stackPickupItemName.trim().length > 0
+        ? rawPayload.stackPickupItemName.trim()
+        : undefined,
+    stackPickupIconFileName:
+      typeof rawPayload.stackPickupIconFileName === 'string'
+        ? rawPayload.stackPickupIconFileName
+        : undefined,
   };
 }
 

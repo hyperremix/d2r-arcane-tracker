@@ -5,12 +5,14 @@ import {
   addItemToSaveFile,
   moveItemBetweenSaveFiles,
   removeItemFromSaveFile,
+  splitStackInSaveFile,
 } from '../services/saveFileEditor';
 import type { SaveFileMonitor } from '../services/saveFileMonitor';
 import type {
   CharacterInventorySnapshot,
   InventoryItemMoveInput,
   InventorySearchResult,
+  InventoryStackSplitInput,
   VaultCategory,
   VaultCategoryCreateInput,
   VaultCategoryUpdateInput,
@@ -52,7 +54,10 @@ const VALID_EQUIPPED_SLOT_IDS = new Set([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12])
 interface NormalizedInventoryMoveInput {
   sourceFilePath: string;
   sourceFileType: VaultSourceFileType;
-  sourceItemId: number;
+  sourceItemId: number | undefined;
+  sourceStashTab?: number;
+  sourceGridXFromItem?: number;
+  sourceGridYFromItem?: number;
   targetFilePath: string;
   targetFileType: VaultSourceFileType;
   targetLocationContext: VaultLocationContext;
@@ -207,20 +212,29 @@ function toItemId(value: unknown): number | undefined {
   return undefined;
 }
 
-function parseSourceItemId(rawItemJson: string): number {
-  let parsedRawItem: { id?: unknown };
+interface ParsedSourceItem {
+  itemId: number | undefined;
+  gridX: number | undefined;
+  gridY: number | undefined;
+}
+
+function parseSourceItem(rawItemJson: string): ParsedSourceItem {
+  let parsedRawItem: { id?: unknown; position_x?: unknown; position_y?: unknown };
   try {
-    parsedRawItem = JSON.parse(rawItemJson) as { id?: unknown };
+    parsedRawItem = JSON.parse(rawItemJson) as {
+      id?: unknown;
+      position_x?: unknown;
+      position_y?: unknown;
+    };
   } catch {
     throw new Error('rawItemJson must be valid JSON');
   }
 
   const itemId = toItemId(parsedRawItem.id);
-  if (itemId === undefined) {
-    throw new Error('rawItemJson must include a numeric item id');
-  }
+  const gridX = typeof parsedRawItem.position_x === 'number' ? parsedRawItem.position_x : undefined;
+  const gridY = typeof parsedRawItem.position_y === 'number' ? parsedRawItem.position_y : undefined;
 
-  return itemId;
+  return { itemId, gridX, gridY };
 }
 
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Move-input validation enforces IPC safety for multiple target modes.
@@ -255,7 +269,18 @@ function normalizeInventoryMoveInput(input: InventoryItemMoveInput): NormalizedI
     'targetLocationContext must be one of: equipped, inventory, stash, mercenary, corpse',
   );
 
-  const sourceItemId = parseSourceItemId(input.rawItemJson);
+  const {
+    itemId: sourceItemId,
+    gridX: sourceGridXFromItem,
+    gridY: sourceGridYFromItem,
+  } = parseSourceItem(input.rawItemJson);
+
+  // For non-d2i sources, a numeric item id is always required (non-simple items only).
+  // For d2i sources, simple items (runes/gems) have no id — position is used instead.
+  if (input.sourceFileType !== 'd2i' && sourceItemId === undefined) {
+    throw new Error('rawItemJson must include a numeric item id');
+  }
+
   const targetLocationContext = input.targetLocationContext as VaultLocationContext;
   const isStashTarget = targetLocationContext === 'stash';
   const isEquippedTarget = targetLocationContext === 'equipped';
@@ -302,10 +327,18 @@ function normalizeInventoryMoveInput(input: InventoryItemMoveInput): NormalizedI
     assert((input.targetGridY as number) >= 0, 'targetGridY must be >= 0');
   }
 
+  const sourceStashTab =
+    typeof input.sourceStashTab === 'number' && input.sourceStashTab >= 0
+      ? input.sourceStashTab
+      : undefined;
+
   return {
     sourceFilePath,
     sourceFileType: input.sourceFileType,
     sourceItemId,
+    sourceStashTab,
+    sourceGridXFromItem: sourceGridXFromItem,
+    sourceGridYFromItem: sourceGridYFromItem,
     targetFilePath,
     targetFileType: input.targetFileType,
     targetLocationContext,
@@ -532,6 +565,73 @@ export function initializeVaultHandlers(
     async (_, input: InventoryItemMoveInput): Promise<{ success: boolean }> => {
       const normalizedInput = normalizeInventoryMoveInput(input);
       await moveItemBetweenSaveFiles(normalizedInput);
+      return { success: true };
+    },
+  );
+
+  ipcMain.handle(
+    'inventory:splitStack',
+    async (_, input: InventoryStackSplitInput): Promise<{ success: boolean }> => {
+      assert(input && typeof input === 'object', 'Split input is required');
+
+      const sourceFilePath = (input.sourceFilePath ?? '').trim();
+      const sourceItemCode = (input.sourceItemCode ?? '').trim();
+      assert(sourceFilePath.length > 0, 'sourceFilePath is required');
+      assert(
+        VALID_SOURCE_FILE_TYPES.has(input.sourceFileType),
+        'sourceFileType must be one of: d2s, sss, d2x, d2i',
+      );
+      assert(sourceItemCode.length > 0, 'sourceItemCode is required');
+      assert(
+        Number.isInteger(input.sourceStashTab) && input.sourceStashTab >= 0,
+        'sourceStashTab must be a non-negative integer',
+      );
+      assert(
+        Number.isInteger(input.splitCount) && input.splitCount > 0,
+        'splitCount must be a positive integer',
+      );
+      assert(Array.isArray(input.targets) && input.targets.length > 0, 'targets must be non-empty');
+
+      for (const target of input.targets) {
+        assert(
+          typeof (target.targetFilePath ?? '').trim() === 'string' &&
+            (target.targetFilePath ?? '').trim().length > 0,
+          'Each target must have a valid targetFilePath',
+        );
+        assert(
+          VALID_SOURCE_FILE_TYPES.has(target.targetFileType),
+          'Each target targetFileType must be one of: d2s, sss, d2x, d2i',
+        );
+        assert(
+          VALID_MOVE_TARGET_CONTEXTS.has(target.targetLocationContext),
+          'Each target targetLocationContext must be valid',
+        );
+        assert(Number.isInteger(target.targetGridX), 'Each target must have integer targetGridX');
+        assert(Number.isInteger(target.targetGridY), 'Each target must have integer targetGridY');
+      }
+
+      const sourceRawItemJson =
+        typeof input.sourceRawItemJson === 'string' && input.sourceRawItemJson.trim()
+          ? input.sourceRawItemJson.trim()
+          : undefined;
+
+      await splitStackInSaveFile({
+        sourceFilePath,
+        sourceFileType: input.sourceFileType,
+        sourceStashTab: input.sourceStashTab,
+        sourceItemCode,
+        sourceRawItemJson,
+        splitCount: input.splitCount,
+        targets: input.targets.map((t) => ({
+          targetFilePath: (t.targetFilePath ?? '').trim(),
+          targetFileType: t.targetFileType,
+          targetLocationContext: t.targetLocationContext,
+          targetStashTab: t.targetStashTab,
+          targetGridX: t.targetGridX,
+          targetGridY: t.targetGridY,
+        })),
+      });
+
       return { success: true };
     },
   );

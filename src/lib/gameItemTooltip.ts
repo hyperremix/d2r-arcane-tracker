@@ -20,6 +20,10 @@ type ParsedSocketedRawItem = {
   runeword_name?: unknown;
   unique_name?: unknown;
   set_name?: unknown;
+  rare_name?: unknown;
+  rare_name2?: unknown;
+  magic_prefix_name?: unknown;
+  magic_suffix_name?: unknown;
   name?: unknown;
   type_name?: unknown;
   type?: unknown;
@@ -31,6 +35,10 @@ type ParsedRawItem = {
   runeword_name?: unknown;
   unique_name?: unknown;
   set_name?: unknown;
+  rare_name?: unknown;
+  rare_name2?: unknown;
+  magic_prefix_name?: unknown;
+  magic_suffix_name?: unknown;
   name?: unknown;
   type_name?: unknown;
   type?: unknown;
@@ -180,8 +188,40 @@ function getAffixLines(raw: ParsedRawItem): string[] {
     .filter((line, index, all) => all.indexOf(line) === index);
 }
 
+function resolveMagicOrRareName(raw: ParsedRawItem): string | undefined {
+  const rareParts = [toOptionalString(raw.rare_name), toOptionalString(raw.rare_name2)].filter(
+    (value): value is string => Boolean(value),
+  );
+  if (rareParts.length > 0) {
+    return rareParts.join(' ');
+  }
+
+  const prefix = toOptionalString(raw.magic_prefix_name);
+  const suffix = toOptionalString(raw.magic_suffix_name);
+  if (!prefix && !suffix) {
+    return undefined;
+  }
+
+  const baseName =
+    toOptionalString(raw.type_name) ??
+    toOptionalString(raw.name) ??
+    toOptionalString(raw.type) ??
+    toOptionalString(raw.code);
+
+  const resolved = [prefix, baseName, suffix].filter((value): value is string => Boolean(value));
+  return resolved.length > 0 ? resolved.join(' ') : undefined;
+}
+
 function getName(raw: ParsedRawItem, fallbackName: string): string {
-  const candidates = [raw.runeword_name, raw.unique_name, raw.set_name, raw.name];
+  const fallbackDisplayName = toOptionalString(fallbackName);
+  const candidates = [
+    raw.runeword_name,
+    raw.unique_name,
+    raw.set_name,
+    resolveMagicOrRareName(raw),
+    fallbackDisplayName,
+    raw.name,
+  ];
 
   for (const candidate of candidates) {
     const parsed = toOptionalString(candidate);

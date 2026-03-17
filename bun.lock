@@ -6,7 +6,7 @@
       "name": "@hyperremix/d2r-arcane-tracker",
       "dependencies": {
         "@base-ui/react": "^1.1.0",
-        "@dschu012/d2s": "https://github.com/viniciusrezende/d2s#feat/support-reign-of-warlock",
+        "@dschu012/d2s": "https://github.com/hyperremix/d2s#fix/v105-item-writeitem-roundtrip",
         "@fontsource-variable/inter": "^5.2.8",
         "@tanstack/react-virtual": "^3.13.12",
         "better-sqlite3": "^12.4.1",
@@ -75,9 +75,6 @@
         "vitest": "^3.2.4",
       },
     },
-  },
-  "patchedDependencies": {
-    "@dschu012/d2s@github:viniciusrezende/d2s#96adaa2": "patches/@dschu012+d2s.patch",
   },
   "packages": {
     "7zip-bin": ["7zip-bin@5.2.0", "", {}, "sha512-ukTPVhqG4jNzMro2qA9HSCSSVJN3aN7tlb+hfqYCt3ER0yWroeA2VR38MNrOHLQ/cVj+DaIMad0kFCtWWowh/A=="],
@@ -198,7 +195,7 @@
 
     "@drizzle-team/brocli": ["@drizzle-team/brocli@0.10.2", "", {}, "sha512-z33Il7l5dKjUgGULTqBsQBQwckHh5AbIuxhdsIxDDiZAzBOrZO6q9ogcWC65kU382AfynTfgNumVcNIjuIua6w=="],
 
-    "@dschu012/d2s": ["@dschu012/d2s@github:viniciusrezende/d2s#96adaa2", {}, "viniciusrezende-d2s-96adaa2"],
+    "@dschu012/d2s": ["@dschu012/d2s@github:hyperremix/d2s#9ee309c", {}, "hyperremix-d2s-9ee309c", "sha512-wfzru2ZXaMcswcW/cn508RAULVZFBIhYNx/O6/cbPPo9DV06+d7VdoZf+qG5ecDMjSG82vAgeDh9GP4zCGuf8w=="],
 
     "@ecies/ciphers": ["@ecies/ciphers@0.2.5", "", { "peerDependencies": { "@noble/ciphers": "^1.0.0" } }, "sha512-GalEZH4JgOMHYYcYmVqnFirFsjZHeoGMDt9IxEnM9F7GRUUyUksJ7Ou53L83WHJq3RWKD3AcBpo0iQh0oMpf8A=="],
 

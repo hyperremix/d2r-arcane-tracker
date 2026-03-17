@@ -7,6 +7,7 @@ import type {
   InventoryItemMoveInput,
   InventorySearchResult,
   InventorySnapshotWindowTarget,
+  InventoryStackSplitInput,
   Item,
   MonitoringStatus,
   Run,
@@ -671,6 +672,7 @@ export interface ElectronAPI {
       success: boolean
     }>
     moveItem(input: InventoryItemMoveInput): Promise<{ success: boolean }>
+    splitStack(input: InventoryStackSplitInput): Promise<{ success: boolean }>
   }
 
   /**

@@ -7,6 +7,7 @@ import type {
   InventoryItemMoveInput,
   InventorySearchResult,
   InventorySnapshotWindowTarget,
+  InventoryStackSplitInput,
   Item,
   MonitoringStatus,
   Run,
@@ -295,6 +296,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.invoke('inventory:openSnapshotWindow', target),
     moveItem: (input: InventoryItemMoveInput): Promise<{ success: boolean }> =>
       ipcRenderer.invoke('inventory:moveItem', input),
+    splitStack: (input: InventoryStackSplitInput): Promise<{ success: boolean }> =>
+      ipcRenderer.invoke('inventory:splitStack', input),
   },
 
   /**
