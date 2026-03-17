@@ -1,6 +1,6 @@
-import type * as d2s from '@dschu012/d2s';
 import { BitReader } from '@dschu012/d2s/lib/binary/bitreader';
-import { readItems } from '@dschu012/d2s/lib/d2/items';
+import { enhanceItems } from '@dschu012/d2s/lib/d2/attribute_enhancer';
+import { readItem } from '@dschu012/d2s/lib/d2/items';
 import { constants as constants105 } from '@dschu012/d2s/lib/data/versions/105_constant_data';
 import type { D2SItem } from '../types/grail';
 import { type D2iMetadata, readD2iMetadata } from './stashFormat';
@@ -8,7 +8,7 @@ import { type D2iMetadata, readD2iMetadata } from './stashFormat';
 // Extend magical_properties to cover D2R resource-stash attribute 381 (stack count).
 // Indices 359–380: stubs (sB: 0) assumed never written for resource-sector items.
 // Index 381: D2R resource-stash item quantity (9-bit unsigned, no bias).
-const constants105Extended = {
+export const constants105Extended = {
   ...constants105,
   magical_properties: (() => {
     const arr = [
@@ -28,7 +28,7 @@ const constants105Extended = {
 };
 
 const MODERN_STASH_MIN_VERSION = 105;
-const SHARED_TAB_COUNT = 5;
+export const SHARED_TAB_COUNT = 5;
 const STASH_GRID_WIDTH = 10;
 const STASH_GRID_HEIGHT = 10;
 
@@ -215,19 +215,61 @@ export function resolveStackCount(item: D2SItem): number {
   return 1;
 }
 
-async function readSectorItems(payload: Uint8Array, version: number): Promise<D2SItem[]> {
-  const reader = new BitReader(payload);
-  const items = await readItems(
-    reader,
-    version,
-    constants105Extended as unknown as d2s.types.IConstantData,
-    {
-      extendedStash: false,
-      sortProperties: true,
-    },
-  );
+export async function readSectorItems(payload: Uint8Array, version: number): Promise<D2SItem[]> {
+  if (payload.length < 4) {
+    return [];
+  }
 
-  return (items as D2SItem[]).map(normalizeDimensions).filter(isOccupiedModernItem);
+  const header = Buffer.from(payload.subarray(0, 4));
+  if (header.toString('ascii', 0, 2) !== 'JM') {
+    return [];
+  }
+
+  const expectedCount = header.readUInt16LE(2);
+  const reader = new BitReader(payload);
+  // Skip "JM" + count
+  reader.ReadString(2);
+  reader.ReadUInt16();
+
+  const parsed: D2SItem[] = [];
+  const config = {
+    extendedStash: false,
+    sortProperties: true,
+  };
+
+  for (let i = 0; i < expectedCount; i += 1) {
+    try {
+      const item = (await readItem(
+        reader,
+        version,
+        constants105Extended as unknown as Parameters<typeof readItem>[2],
+        config,
+      )) as D2SItem;
+      parsed.push(item);
+    } catch {
+      // Shared tabs can contain unsupported/modded properties. Keep items parsed so far
+      // instead of dropping the whole sector.
+      break;
+    }
+  }
+
+  const normalizedItems = parsed.map(normalizeDimensions).filter(isOccupiedModernItem);
+
+  if (normalizedItems.length > 0) {
+    try {
+      // Ensure tooltip-ready fields like displayed_combined_magic_attributes are present.
+      await enhanceItems(
+        normalizedItems as unknown as Parameters<typeof enhanceItems>[0],
+        constants105Extended as unknown as Parameters<typeof enhanceItems>[1],
+        1,
+        { sortProperties: true },
+      );
+    } catch {
+      // Keep already parsed items even if enhancement fails for unknown/modded stats.
+    }
+  }
+
+  return normalizedItems;
 }
 
 function toFiniteNumber(value: unknown): number | undefined {
@@ -317,12 +359,16 @@ async function parseJmSectors(buffer: Buffer, metadata: D2iMetadata): Promise<Pa
       sector.payloadOffset,
       sector.payloadOffset + sector.payloadSize,
     );
-    const items = await readSectorItems(payload, metadata.version);
-
-    parsedSectors.push({
-      sectorIndex: sector.sectorIndex,
-      items,
-    });
+    try {
+      const items = await readSectorItems(payload, metadata.version);
+      parsedSectors.push({ sectorIndex: sector.sectorIndex, items });
+    } catch {
+      // If a sector fails to parse (e.g. items with stats not in constants105),
+      // emit empty items for this sector rather than aborting all sectors.
+      // Resource stash sectors (runes/gems/materials) contain only simple items
+      // and will succeed; shared stash sectors with complex modded items may fail.
+      parsedSectors.push({ sectorIndex: sector.sectorIndex, items: [] });
+    }
   }
 
   return parsedSectors;

@@ -78,6 +78,62 @@ describe('When buildGameItemTooltipModel is called', () => {
     });
   });
 
+  describe('If raw magic item fields include prefix and suffix names', () => {
+    it('Then the generated magic display name is used instead of raw base name', () => {
+      // Arrange
+      const rawItemJson = JSON.stringify({
+        name: 'Ring',
+        type_name: 'Ring',
+        magic_prefix_name: 'Viper',
+        magic_suffix_name: 'of the Fox',
+        displayed_combined_magic_attributes: [
+          { description: '+80 to Attack Rating', visible: true },
+        ],
+      });
+
+      // Act
+      const result = buildGameItemTooltipModel({
+        rawItemJson,
+        fallbackName: 'Ring',
+        quality: 'magic',
+        type: 'magic',
+        t,
+      });
+
+      // Assert
+      expect(result?.name).toBe('Viper Ring of the Fox');
+      expect(result?.baseTypeLine).toBe('Ring');
+    });
+  });
+
+  describe('If raw rare item fields include rare name parts', () => {
+    it('Then the generated rare display name is used instead of raw base name', () => {
+      // Arrange
+      const rawItemJson = JSON.stringify({
+        name: 'Ring',
+        type_name: 'Ring',
+        rare_name: 'Stone',
+        rare_name2: 'Master',
+        displayed_combined_magic_attributes: [
+          { description: '+24% Better Chance of Magic Items', visible: true },
+        ],
+      });
+
+      // Act
+      const result = buildGameItemTooltipModel({
+        rawItemJson,
+        fallbackName: 'Ring',
+        quality: 'rare',
+        type: 'rare',
+        t,
+      });
+
+      // Assert
+      expect(result?.name).toBe('Stone Master');
+      expect(result?.baseTypeLine).toBe('Ring');
+    });
+  });
+
   describe('If a combined attribute has visible=false', () => {
     it('Then that hidden attribute line is not included', () => {
       // Arrange

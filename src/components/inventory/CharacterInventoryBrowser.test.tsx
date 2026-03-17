@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { runes } from 'electron/items/runes';
 import type { Item } from 'electron/types/grail';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { serializeVaultTextPayload, VAULT_DRAG_MIME } from '@/components/inventory/dragPayloads';
@@ -17,6 +18,7 @@ vi.mock('sonner', () => ({
 
 const searchAllMock = vi.fn();
 const moveInventoryItemMock = vi.fn();
+const splitStackMock = vi.fn();
 const searchVaultMock = vi.fn();
 const addItemMock = vi.fn();
 const unvaultItemMock = vi.fn();
@@ -45,6 +47,22 @@ function createBlockedDragDataTransfer(): DataTransfer {
   } as unknown as DataTransfer;
 }
 
+function getRuneBoardCell(board: HTMLElement, runeCode: string): HTMLElement {
+  const runeIndex = runes.findIndex((rune) => rune.code?.toLowerCase() === runeCode.toLowerCase());
+  if (runeIndex < 0) {
+    throw new Error(`Rune code not found in rune board data: ${runeCode}`);
+  }
+  const gridColumn = (runeIndex % 10) + 1;
+  const gridRow = Math.floor(runeIndex / 10) + 1;
+  const cell = board.querySelector(
+    `div[style*="grid-column: ${gridColumn}"][style*="grid-row: ${gridRow}"]`,
+  );
+  if (!(cell instanceof HTMLElement)) {
+    throw new Error(`Rune board cell not found for ${runeCode} at ${gridColumn},${gridRow}`);
+  }
+  return cell;
+}
+
 describe('When CharacterInventoryBrowser is rendered', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -57,6 +75,7 @@ describe('When CharacterInventoryBrowser is rendered', () => {
         inventory: {
           searchAll: searchAllMock,
           moveItem: moveInventoryItemMock,
+          splitStack: splitStackMock,
         },
         vault: {
           addItem: addItemMock,
@@ -81,6 +100,7 @@ describe('When CharacterInventoryBrowser is rendered', () => {
     });
     refreshSaveFilesMock.mockResolvedValue({ success: true });
     moveInventoryItemMock.mockResolvedValue({ success: true });
+    splitStackMock.mockResolvedValue({ success: true });
 
     searchAllMock.mockResolvedValue({
       inventory: {
@@ -1290,6 +1310,861 @@ describe('When CharacterInventoryBrowser is rendered', () => {
       expect(
         within(unplacedMercenaryItems).getByLabelText('Inventory item Modded Relic'),
       ).toBeInTheDocument();
+    });
+  });
+
+  describe('If stack pickup is used in modern resource tabs', () => {
+    it('Then splitStack targets begin at the clicked stash board coordinates', async () => {
+      // Arrange
+      searchAllMock.mockResolvedValueOnce({
+        inventory: {
+          snapshots: [
+            {
+              snapshotId: 'modern-pickup-snap',
+              characterName: 'Modern Shared Stash Softcore',
+              characterId: 'modern-shared',
+              sourceFileType: 'd2i',
+              sourceFilePath: '/tmp/modern-pickup.d2i',
+              sourceFileVersion: 105,
+              readOnly: false,
+              capturedAt: new Date('2024-01-01T00:00:00.000Z'),
+              items: [
+                {
+                  fingerprint: 'fp-rune-stack',
+                  fingerprintInputs: {
+                    sourceFileType: 'd2i',
+                    characterName: 'Modern Shared Stash Softcore',
+                    locationContext: 'stash',
+                    stashTab: 7,
+                    quality: 'normal',
+                    ethereal: false,
+                    socketCount: 0,
+                    gridX: 2,
+                    gridY: 0,
+                    gridWidth: 1,
+                    gridHeight: 1,
+                    isSocketedItem: false,
+                    itemName: 'Fal Rune',
+                  },
+                  characterName: 'Modern Shared Stash Softcore',
+                  sourceFileType: 'd2i',
+                  sourceFilePath: '/tmp/modern-pickup.d2i',
+                  locationContext: 'stash',
+                  stashTab: 7,
+                  stashTabKind: 'runes',
+                  type: 'rune',
+                  itemCode: 'r19',
+                  gridX: 2,
+                  gridY: 0,
+                  gridWidth: 1,
+                  gridHeight: 1,
+                  isSocketedItem: false,
+                  itemName: 'Fal Rune',
+                  quality: 'normal',
+                  ethereal: false,
+                  socketCount: 0,
+                  stackCount: 4,
+                  iconFileName: 'r19.png',
+                  rawItemJson: JSON.stringify({
+                    type: 'r19',
+                    code: 'r19',
+                    quantity: 4,
+                    position_x: 2,
+                    position_y: 0,
+                  }),
+                  rawParsedItem: {},
+                  seenAt: new Date('2024-01-01T00:00:00.000Z'),
+                },
+              ],
+            },
+          ],
+          totalSnapshots: 1,
+          totalItems: 1,
+        },
+        vault: {
+          items: [],
+          total: 0,
+          page: 1,
+          pageSize: 20,
+        },
+      });
+
+      render(<CharacterInventoryBrowser />);
+      await waitFor(() => {
+        expect(screen.getByText('Runes')).toBeInTheDocument();
+      });
+
+      const runeTile = screen.getByLabelText('Inventory item Fal Rune');
+      fireEvent.click(runeTile);
+      fireEvent.click(runeTile);
+
+      // Click near the center of stash cell x=4, y=4.
+      const targetBoard = screen.getByTestId('stash-board-modern-pickup-snap-0');
+      fireEvent.click(targetBoard, { clientX: 101, clientY: 101 });
+
+      // Assert
+      await waitFor(() => {
+        expect(splitStackMock).toHaveBeenCalledTimes(1);
+      });
+      const payload = splitStackMock.mock.calls[0]?.[0];
+      expect(payload?.sourceItemCode).toBe('r19');
+      expect(payload?.splitCount).toBe(2);
+      expect(payload?.targets?.[0]).toEqual(
+        expect.objectContaining({
+          targetFilePath: '/tmp/modern-pickup.d2i',
+          targetFileType: 'd2i',
+          targetLocationContext: 'stash',
+          targetStashTab: 0,
+          targetGridX: 4,
+          targetGridY: 4,
+        }),
+      );
+      expect(payload?.targets?.[1]).toEqual(
+        expect.objectContaining({
+          targetFilePath: '/tmp/modern-pickup.d2i',
+          targetFileType: 'd2i',
+          targetLocationContext: 'stash',
+          targetStashTab: 0,
+          targetGridX: 5,
+          targetGridY: 4,
+        }),
+      );
+    });
+
+    it('Then a stack pickup that started in another window can be placed into this inventory board', async () => {
+      // Arrange
+      const invokeMock = vi.fn().mockResolvedValue({
+        inventory: {
+          active: true,
+          fingerprint: 'fp-rune-stack-cross-window',
+          sourceFilePath: '/tmp/shared-stash.d2i',
+          sourceFileType: 'd2i',
+          sourceLocationContext: 'stash',
+          sourceStashTab: 7,
+          sourceGridX: 2,
+          sourceGridY: 0,
+          rawItemJson: '{"type":"r19","code":"r19"}',
+          itemCode: 'r19',
+          gridWidth: 1,
+          gridHeight: 1,
+          stackPickup: true,
+          stackPickupCount: 2,
+          stackPickupMaxCount: 4,
+          stackPickupItemName: 'Fal Rune',
+          stackPickupIconFileName: 'r19.png',
+        },
+      });
+      const onMock = vi.fn();
+      const offMock = vi.fn();
+      const sendMock = vi.fn();
+      const originalIpcRenderer = window.ipcRenderer;
+      Object.defineProperty(window, 'ipcRenderer', {
+        configurable: true,
+        writable: true,
+        value: {
+          on: onMock,
+          off: offMock,
+          invoke: invokeMock,
+          send: sendMock,
+        },
+      });
+      try {
+        searchAllMock.mockResolvedValueOnce({
+          inventory: {
+            snapshots: [
+              {
+                snapshotId: 'target-char-snap',
+                characterName: 'Target Sorc',
+                characterId: 'target-char',
+                sourceFileType: 'd2s',
+                sourceFilePath: '/tmp/target-char.d2s',
+                capturedAt: new Date('2024-01-01T00:00:00.000Z'),
+                items: [
+                  {
+                    fingerprint: 'fp-target-existing',
+                    fingerprintInputs: {
+                      sourceFileType: 'd2s',
+                      characterName: 'Target Sorc',
+                      locationContext: 'inventory',
+                      quality: 'normal',
+                      ethereal: false,
+                      socketCount: 0,
+                      gridX: 7,
+                      gridY: 0,
+                      gridWidth: 1,
+                      gridHeight: 1,
+                      isSocketedItem: false,
+                      itemName: 'Town Portal Scroll',
+                    },
+                    characterName: 'Target Sorc',
+                    characterId: 'target-char',
+                    sourceFileType: 'd2s',
+                    sourceFilePath: '/tmp/target-char.d2s',
+                    locationContext: 'inventory',
+                    type: 'other',
+                    itemCode: 'tsc',
+                    gridX: 7,
+                    gridY: 0,
+                    gridWidth: 1,
+                    gridHeight: 1,
+                    isSocketedItem: false,
+                    itemName: 'Town Portal Scroll',
+                    quality: 'normal',
+                    ethereal: false,
+                    socketCount: 0,
+                    iconFileName: 'tsc.png',
+                    rawItemJson: '{}',
+                    rawParsedItem: {},
+                    seenAt: new Date('2024-01-01T00:00:00.000Z'),
+                  },
+                ],
+              },
+            ],
+            totalSnapshots: 1,
+            totalItems: 1,
+          },
+          vault: {
+            items: [],
+            total: 0,
+            page: 1,
+            pageSize: 20,
+          },
+        });
+
+        render(<CharacterInventoryBrowser />);
+        const inventoryBoard = await screen.findByTestId('inventory-board-target-char-snap');
+        await waitFor(() => {
+          expect(invokeMock).toHaveBeenCalledWith('inventory:getActiveDragState');
+        });
+
+        // Act
+        fireEvent.click(inventoryBoard, { clientX: 12, clientY: 12 });
+
+        // Assert
+        await waitFor(() => {
+          expect(splitStackMock).toHaveBeenCalledTimes(1);
+        });
+        const payload = splitStackMock.mock.calls[0]?.[0];
+        expect(payload?.sourceFilePath).toBe('/tmp/shared-stash.d2i');
+        expect(payload?.sourceFileType).toBe('d2i');
+        expect(payload?.sourceStashTab).toBe(7);
+        expect(payload?.sourceItemCode).toBe('r19');
+        expect(payload?.splitCount).toBe(2);
+        expect(payload?.targets?.[0]).toEqual(
+          expect.objectContaining({
+            targetFilePath: '/tmp/target-char.d2s',
+            targetFileType: 'd2s',
+            targetLocationContext: 'inventory',
+          }),
+        );
+      } finally {
+        Object.defineProperty(window, 'ipcRenderer', {
+          configurable: true,
+          writable: true,
+          value: originalIpcRenderer,
+        });
+      }
+    });
+
+    it('Then a stack pickup that started in another window renders the pickup cursor in this window', async () => {
+      // Arrange
+      const invokeMock = vi.fn().mockResolvedValue({
+        inventory: {
+          active: true,
+          fingerprint: 'fp-rune-stack-cross-window-cursor',
+          sourceFilePath: '/tmp/shared-stash.d2i',
+          sourceFileType: 'd2i',
+          sourceLocationContext: 'stash',
+          sourceStashTab: 7,
+          sourceGridX: 2,
+          sourceGridY: 0,
+          rawItemJson: '{"type":"r19","code":"r19"}',
+          itemCode: 'r19',
+          gridWidth: 1,
+          gridHeight: 1,
+          stackPickup: true,
+          stackPickupCount: 2,
+          stackPickupMaxCount: 4,
+          stackPickupItemName: 'Fal Rune',
+          stackPickupIconFileName: 'r19.png',
+        },
+      });
+      const onMock = vi.fn();
+      const offMock = vi.fn();
+      const sendMock = vi.fn();
+      const originalIpcRenderer = window.ipcRenderer;
+      Object.defineProperty(window, 'ipcRenderer', {
+        configurable: true,
+        writable: true,
+        value: {
+          on: onMock,
+          off: offMock,
+          invoke: invokeMock,
+          send: sendMock,
+        },
+      });
+
+      try {
+        searchAllMock.mockResolvedValueOnce({
+          inventory: {
+            snapshots: [
+              {
+                snapshotId: 'target-char-cursor-snap',
+                characterName: 'Target Sorc',
+                characterId: 'target-char',
+                sourceFileType: 'd2s',
+                sourceFilePath: '/tmp/target-char.d2s',
+                capturedAt: new Date('2024-01-01T00:00:00.000Z'),
+                items: [
+                  {
+                    fingerprint: 'fp-target-existing-cursor',
+                    fingerprintInputs: {
+                      sourceFileType: 'd2s',
+                      characterName: 'Target Sorc',
+                      locationContext: 'inventory',
+                      quality: 'normal',
+                      ethereal: false,
+                      socketCount: 0,
+                      gridX: 7,
+                      gridY: 0,
+                      gridWidth: 1,
+                      gridHeight: 1,
+                      isSocketedItem: false,
+                      itemName: 'Town Portal Scroll',
+                    },
+                    characterName: 'Target Sorc',
+                    characterId: 'target-char',
+                    sourceFileType: 'd2s',
+                    sourceFilePath: '/tmp/target-char.d2s',
+                    locationContext: 'inventory',
+                    type: 'other',
+                    itemCode: 'tsc',
+                    gridX: 7,
+                    gridY: 0,
+                    gridWidth: 1,
+                    gridHeight: 1,
+                    isSocketedItem: false,
+                    itemName: 'Town Portal Scroll',
+                    quality: 'normal',
+                    ethereal: false,
+                    socketCount: 0,
+                    iconFileName: 'tsc.png',
+                    rawItemJson: '{}',
+                    rawParsedItem: {},
+                    seenAt: new Date('2024-01-01T00:00:00.000Z'),
+                  },
+                ],
+              },
+            ],
+            totalSnapshots: 1,
+            totalItems: 1,
+          },
+          vault: {
+            items: [],
+            total: 0,
+            page: 1,
+            pageSize: 20,
+          },
+        });
+
+        render(<CharacterInventoryBrowser />);
+        await waitFor(() => {
+          expect(invokeMock).toHaveBeenCalledWith('inventory:getActiveDragState');
+        });
+        expect(screen.queryByLabelText('Inventory item Fal Rune')).not.toBeInTheDocument();
+
+        // Assert
+        await waitFor(() => {
+          expect(screen.getByAltText('Fal Rune')).toBeInTheDocument();
+        });
+      } finally {
+        Object.defineProperty(window, 'ipcRenderer', {
+          configurable: true,
+          writable: true,
+          value: originalIpcRenderer,
+        });
+      }
+    });
+
+    it('Then first-click placement still works when stack pickup state is fetched after mount', async () => {
+      // Arrange
+      const invokeMock = vi
+        .fn()
+        .mockResolvedValueOnce({})
+        .mockResolvedValueOnce({
+          inventory: {
+            active: true,
+            fingerprint: 'fp-rune-stack-cross-window-late-sync',
+            sourceFilePath: '/tmp/shared-stash.d2i',
+            sourceFileType: 'd2i',
+            sourceLocationContext: 'stash',
+            sourceStashTab: 7,
+            sourceGridX: 2,
+            sourceGridY: 0,
+            rawItemJson: '{"type":"r19","code":"r19"}',
+            itemCode: 'r19',
+            gridWidth: 1,
+            gridHeight: 1,
+            stackPickup: true,
+            stackPickupCount: 2,
+            stackPickupMaxCount: 4,
+            stackPickupItemName: 'Fal Rune',
+            stackPickupIconFileName: 'r19.png',
+          },
+        });
+      const onMock = vi.fn();
+      const offMock = vi.fn();
+      const sendMock = vi.fn();
+      const originalIpcRenderer = window.ipcRenderer;
+      Object.defineProperty(window, 'ipcRenderer', {
+        configurable: true,
+        writable: true,
+        value: {
+          on: onMock,
+          off: offMock,
+          invoke: invokeMock,
+          send: sendMock,
+        },
+      });
+
+      try {
+        searchAllMock.mockResolvedValueOnce({
+          inventory: {
+            snapshots: [
+              {
+                snapshotId: 'target-char-late-sync-snap',
+                characterName: 'Target Sorc',
+                characterId: 'target-char',
+                sourceFileType: 'd2s',
+                sourceFilePath: '/tmp/target-char.d2s',
+                capturedAt: new Date('2024-01-01T00:00:00.000Z'),
+                items: [
+                  {
+                    fingerprint: 'fp-target-existing-late-sync',
+                    fingerprintInputs: {
+                      sourceFileType: 'd2s',
+                      characterName: 'Target Sorc',
+                      locationContext: 'inventory',
+                      quality: 'normal',
+                      ethereal: false,
+                      socketCount: 0,
+                      gridX: 7,
+                      gridY: 0,
+                      gridWidth: 1,
+                      gridHeight: 1,
+                      isSocketedItem: false,
+                      itemName: 'Town Portal Scroll',
+                    },
+                    characterName: 'Target Sorc',
+                    characterId: 'target-char',
+                    sourceFileType: 'd2s',
+                    sourceFilePath: '/tmp/target-char.d2s',
+                    locationContext: 'inventory',
+                    type: 'other',
+                    itemCode: 'tsc',
+                    gridX: 7,
+                    gridY: 0,
+                    gridWidth: 1,
+                    gridHeight: 1,
+                    isSocketedItem: false,
+                    itemName: 'Town Portal Scroll',
+                    quality: 'normal',
+                    ethereal: false,
+                    socketCount: 0,
+                    iconFileName: 'tsc.png',
+                    rawItemJson: '{}',
+                    rawParsedItem: {},
+                    seenAt: new Date('2024-01-01T00:00:00.000Z'),
+                  },
+                ],
+              },
+            ],
+            totalSnapshots: 1,
+            totalItems: 0,
+          },
+          vault: {
+            items: [],
+            total: 0,
+            page: 1,
+            pageSize: 20,
+          },
+        });
+
+        render(<CharacterInventoryBrowser />);
+        const inventoryBoard = await screen.findByTestId(
+          'inventory-board-target-char-late-sync-snap',
+        );
+        await waitFor(() => {
+          expect(invokeMock).toHaveBeenCalledWith('inventory:getActiveDragState');
+        });
+
+        // Act
+        fireEvent.click(inventoryBoard, { clientX: 12, clientY: 12 });
+
+        // Assert
+        await waitFor(() => {
+          expect(splitStackMock).toHaveBeenCalledTimes(1);
+        });
+        expect(invokeMock).toHaveBeenCalledTimes(2);
+      } finally {
+        Object.defineProperty(window, 'ipcRenderer', {
+          configurable: true,
+          writable: true,
+          value: originalIpcRenderer,
+        });
+      }
+    });
+
+    it('Then picking up the full stack hides the owned rune tile until placement', async () => {
+      // Arrange
+      searchAllMock.mockResolvedValueOnce({
+        inventory: {
+          snapshots: [
+            {
+              snapshotId: 'modern-pickup-full-stack',
+              characterName: 'Modern Shared Stash Softcore',
+              characterId: 'modern-shared',
+              sourceFileType: 'd2i',
+              sourceFilePath: '/tmp/modern-pickup-full-stack.d2i',
+              sourceFileVersion: 105,
+              readOnly: false,
+              capturedAt: new Date('2024-01-01T00:00:00.000Z'),
+              items: [
+                {
+                  fingerprint: 'fp-rune-stack',
+                  fingerprintInputs: {
+                    sourceFileType: 'd2i',
+                    characterName: 'Modern Shared Stash Softcore',
+                    locationContext: 'stash',
+                    stashTab: 7,
+                    quality: 'normal',
+                    ethereal: false,
+                    socketCount: 0,
+                    gridX: 2,
+                    gridY: 0,
+                    gridWidth: 1,
+                    gridHeight: 1,
+                    isSocketedItem: false,
+                    itemName: 'Fal Rune',
+                  },
+                  characterName: 'Modern Shared Stash Softcore',
+                  sourceFileType: 'd2i',
+                  sourceFilePath: '/tmp/modern-pickup-full-stack.d2i',
+                  locationContext: 'stash',
+                  stashTab: 7,
+                  stashTabKind: 'runes',
+                  type: 'rune',
+                  itemCode: 'r19',
+                  gridX: 2,
+                  gridY: 0,
+                  gridWidth: 1,
+                  gridHeight: 1,
+                  isSocketedItem: false,
+                  itemName: 'Fal Rune',
+                  quality: 'normal',
+                  ethereal: false,
+                  socketCount: 0,
+                  stackCount: 4,
+                  iconFileName: 'r19.png',
+                  rawItemJson: JSON.stringify({
+                    type: 'r19',
+                    code: 'r19',
+                    quantity: 4,
+                    position_x: 2,
+                    position_y: 0,
+                  }),
+                  rawParsedItem: {},
+                  seenAt: new Date('2024-01-01T00:00:00.000Z'),
+                },
+              ],
+            },
+          ],
+          totalSnapshots: 1,
+          totalItems: 1,
+        },
+        vault: {
+          items: [],
+          total: 0,
+          page: 1,
+          pageSize: 20,
+        },
+      });
+
+      render(<CharacterInventoryBrowser />);
+      await waitFor(() => {
+        expect(screen.getByText('Runes')).toBeInTheDocument();
+      });
+
+      const runeTile = screen.getByLabelText('Inventory item Fal Rune');
+      fireEvent.click(runeTile);
+      fireEvent.click(runeTile);
+      fireEvent.click(runeTile);
+      fireEvent.click(runeTile);
+
+      // Assert
+      const runesBoard = screen.getByTestId('stash-board-modern-pickup-full-stack-7');
+      await waitFor(() => {
+        expect(
+          within(runesBoard).queryByLabelText('Inventory item Fal Rune'),
+        ).not.toBeInTheDocument();
+      });
+      expect(splitStackMock).not.toHaveBeenCalled();
+    });
+
+    it('Then right-clicking the empty source rune slot decrements pickup and shows the rune again', async () => {
+      // Arrange
+      searchAllMock.mockResolvedValueOnce({
+        inventory: {
+          snapshots: [
+            {
+              snapshotId: 'modern-pickup-return-to-source',
+              characterName: 'Modern Shared Stash Softcore',
+              characterId: 'modern-shared',
+              sourceFileType: 'd2i',
+              sourceFilePath: '/tmp/modern-pickup-return-to-source.d2i',
+              sourceFileVersion: 105,
+              readOnly: false,
+              capturedAt: new Date('2024-01-01T00:00:00.000Z'),
+              items: [
+                {
+                  fingerprint: 'fp-rune-stack',
+                  fingerprintInputs: {
+                    sourceFileType: 'd2i',
+                    characterName: 'Modern Shared Stash Softcore',
+                    locationContext: 'stash',
+                    stashTab: 7,
+                    quality: 'normal',
+                    ethereal: false,
+                    socketCount: 0,
+                    gridX: 2,
+                    gridY: 0,
+                    gridWidth: 1,
+                    gridHeight: 1,
+                    isSocketedItem: false,
+                    itemName: 'Fal Rune',
+                  },
+                  characterName: 'Modern Shared Stash Softcore',
+                  sourceFileType: 'd2i',
+                  sourceFilePath: '/tmp/modern-pickup-return-to-source.d2i',
+                  locationContext: 'stash',
+                  stashTab: 7,
+                  stashTabKind: 'runes',
+                  type: 'rune',
+                  itemCode: 'r19',
+                  gridX: 2,
+                  gridY: 0,
+                  gridWidth: 1,
+                  gridHeight: 1,
+                  isSocketedItem: false,
+                  itemName: 'Fal Rune',
+                  quality: 'normal',
+                  ethereal: false,
+                  socketCount: 0,
+                  stackCount: 4,
+                  iconFileName: 'r19.png',
+                  rawItemJson: JSON.stringify({
+                    type: 'r19',
+                    code: 'r19',
+                    quantity: 4,
+                    position_x: 2,
+                    position_y: 0,
+                  }),
+                  rawParsedItem: {},
+                  seenAt: new Date('2024-01-01T00:00:00.000Z'),
+                },
+              ],
+            },
+          ],
+          totalSnapshots: 1,
+          totalItems: 1,
+        },
+        vault: {
+          items: [],
+          total: 0,
+          page: 1,
+          pageSize: 20,
+        },
+      });
+
+      render(<CharacterInventoryBrowser />);
+      await waitFor(() => {
+        expect(screen.getByText('Runes')).toBeInTheDocument();
+      });
+
+      const runeTile = screen.getByLabelText('Inventory item Fal Rune');
+      fireEvent.click(runeTile);
+      fireEvent.click(runeTile);
+      fireEvent.click(runeTile);
+      fireEvent.click(runeTile);
+
+      const runesBoard = screen.getByTestId('stash-board-modern-pickup-return-to-source-7');
+      await waitFor(() => {
+        expect(
+          within(runesBoard).queryByLabelText('Inventory item Fal Rune'),
+        ).not.toBeInTheDocument();
+      });
+
+      const emptySourceSlot = getRuneBoardCell(runesBoard, 'r19');
+      const placeholderTile = emptySourceSlot.querySelector('[data-slot="tooltip-trigger"]');
+      expect(placeholderTile).toBeTruthy();
+      fireEvent.contextMenu(placeholderTile as Element);
+
+      // Assert
+      await waitFor(() => {
+        expect(within(runesBoard).getByLabelText('Inventory item Fal Rune')).toBeInTheDocument();
+      });
+      expect(splitStackMock).not.toHaveBeenCalled();
+    });
+
+    it('Then placement scans from the clicked cell when that anchor cell is occupied', async () => {
+      // Arrange
+      searchAllMock.mockResolvedValueOnce({
+        inventory: {
+          snapshots: [
+            {
+              snapshotId: 'modern-pickup-occupied-anchor',
+              characterName: 'Modern Shared Stash Softcore',
+              characterId: 'modern-shared',
+              sourceFileType: 'd2i',
+              sourceFilePath: '/tmp/modern-pickup-occupied-anchor.d2i',
+              sourceFileVersion: 105,
+              readOnly: false,
+              capturedAt: new Date('2024-01-01T00:00:00.000Z'),
+              items: [
+                {
+                  fingerprint: 'fp-rune-stack',
+                  fingerprintInputs: {
+                    sourceFileType: 'd2i',
+                    characterName: 'Modern Shared Stash Softcore',
+                    locationContext: 'stash',
+                    stashTab: 7,
+                    quality: 'normal',
+                    ethereal: false,
+                    socketCount: 0,
+                    gridX: 2,
+                    gridY: 0,
+                    gridWidth: 1,
+                    gridHeight: 1,
+                    isSocketedItem: false,
+                    itemName: 'Fal Rune',
+                  },
+                  characterName: 'Modern Shared Stash Softcore',
+                  sourceFileType: 'd2i',
+                  sourceFilePath: '/tmp/modern-pickup-occupied-anchor.d2i',
+                  locationContext: 'stash',
+                  stashTab: 7,
+                  stashTabKind: 'runes',
+                  type: 'rune',
+                  itemCode: 'r19',
+                  gridX: 2,
+                  gridY: 0,
+                  gridWidth: 1,
+                  gridHeight: 1,
+                  isSocketedItem: false,
+                  itemName: 'Fal Rune',
+                  quality: 'normal',
+                  ethereal: false,
+                  socketCount: 0,
+                  stackCount: 4,
+                  iconFileName: 'r19.png',
+                  rawItemJson: JSON.stringify({
+                    type: 'r19',
+                    code: 'r19',
+                    quantity: 4,
+                    position_x: 2,
+                    position_y: 0,
+                  }),
+                  rawParsedItem: {},
+                  seenAt: new Date('2024-01-01T00:00:00.000Z'),
+                },
+                {
+                  fingerprint: 'fp-anchor-occupied',
+                  fingerprintInputs: {
+                    sourceFileType: 'd2i',
+                    characterName: 'Modern Shared Stash Softcore',
+                    locationContext: 'stash',
+                    stashTab: 0,
+                    quality: 'normal',
+                    ethereal: false,
+                    socketCount: 0,
+                    gridX: 4,
+                    gridY: 4,
+                    gridWidth: 1,
+                    gridHeight: 1,
+                    isSocketedItem: false,
+                    itemName: 'El Rune',
+                  },
+                  characterName: 'Modern Shared Stash Softcore',
+                  sourceFileType: 'd2i',
+                  sourceFilePath: '/tmp/modern-pickup-occupied-anchor.d2i',
+                  locationContext: 'stash',
+                  stashTab: 0,
+                  type: 'rune',
+                  itemCode: 'r01',
+                  gridX: 4,
+                  gridY: 4,
+                  gridWidth: 1,
+                  gridHeight: 1,
+                  isSocketedItem: false,
+                  itemName: 'El Rune',
+                  quality: 'normal',
+                  ethereal: false,
+                  socketCount: 0,
+                  stackCount: 1,
+                  iconFileName: 'r01.png',
+                  rawItemJson: JSON.stringify({
+                    type: 'r01',
+                    code: 'r01',
+                    quantity: 1,
+                    position_x: 4,
+                    position_y: 4,
+                  }),
+                  rawParsedItem: {},
+                  seenAt: new Date('2024-01-01T00:00:00.000Z'),
+                },
+              ],
+            },
+          ],
+          totalSnapshots: 1,
+          totalItems: 2,
+        },
+        vault: {
+          items: [],
+          total: 0,
+          page: 1,
+          pageSize: 20,
+        },
+      });
+
+      render(<CharacterInventoryBrowser />);
+      await waitFor(() => {
+        expect(screen.getByText('Runes')).toBeInTheDocument();
+      });
+
+      const runeTile = screen.getByLabelText('Inventory item Fal Rune');
+      fireEvent.click(runeTile);
+      fireEvent.click(runeTile);
+
+      const targetBoard = screen.getByTestId('stash-board-modern-pickup-occupied-anchor-0');
+      fireEvent.click(targetBoard, { clientX: 101, clientY: 101 });
+
+      // Assert
+      await waitFor(() => {
+        expect(splitStackMock).toHaveBeenCalledTimes(1);
+      });
+      const payload = splitStackMock.mock.calls[0]?.[0];
+      expect(payload?.targets?.[0]).toEqual(
+        expect.objectContaining({
+          targetGridX: 5,
+          targetGridY: 4,
+        }),
+      );
+      expect(payload?.targets?.[1]).toEqual(
+        expect.objectContaining({
+          targetGridX: 6,
+          targetGridY: 4,
+        }),
+      );
     });
   });
 

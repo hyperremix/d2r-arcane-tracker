@@ -47,7 +47,7 @@
   },
   "dependencies": {
     "@base-ui/react": "^1.1.0",
-    "@dschu012/d2s": "https://github.com/viniciusrezende/d2s#feat/support-reign-of-warlock",
+    "@dschu012/d2s": "https://github.com/hyperremix/d2s#fix/v105-item-writeitem-roundtrip",
     "@fontsource-variable/inter": "^5.2.8",
     "@tanstack/react-virtual": "^3.13.12",
     "better-sqlite3": "^12.4.1",
@@ -115,8 +115,5 @@
     "vite-plugin-electron-renderer": "^0.14.5",
     "vitest": "^3.2.4"
   },
-  "packageManager": "bun@1.3.8",
-  "patchedDependencies": {
-    "@dschu012/d2s@github:viniciusrezende/d2s#96adaa2": "patches/@dschu012+d2s.patch"
-  }
+  "packageManager": "bun@1.3.8"
 }

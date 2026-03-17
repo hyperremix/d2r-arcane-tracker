@@ -27,6 +27,10 @@ import { GemsTabSection } from '@/components/inventory/GemsTabSection';
 import { MaterialsTabSection } from '@/components/inventory/MaterialsTabSection';
 import { RunesTabSection } from '@/components/inventory/RunesTabSection';
 import {
+  StackPickupCursor,
+  type StackPickupCursorState,
+} from '@/components/inventory/StackPickupCursor';
+import {
   buildEquippedSlotMapForSet,
   buildOverflowBoardLayout,
   classifyBoardItems,
@@ -51,6 +55,7 @@ import {
   sortByGridPosition,
   type UnplacedReason,
 } from '@/components/inventory/spatialLayout';
+import { type StackPickupState, useStackPickup } from '@/components/inventory/useStackPickup';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -547,6 +552,16 @@ interface InventoryGridSectionProps {
     targetGridX: number,
     targetGridY: number,
   ) => Promise<void>;
+  onPickupClick?: (
+    items: ParsedInventoryItem[],
+    gridSize: GridSize,
+    targetFilePath: string,
+    targetFileType: VaultSourceFileType,
+    targetLocationContext: VaultLocationContext,
+    targetStashTab?: number,
+    preferredGridX?: number,
+    preferredGridY?: number,
+  ) => Promise<void>;
 }
 
 interface EquipmentSectionProps {
@@ -606,6 +621,11 @@ interface ActiveInventoryDragItem {
   itemCode?: string;
   gridWidth: number;
   gridHeight: number;
+  stackPickup?: boolean;
+  stackPickupCount?: number;
+  stackPickupMaxCount?: number;
+  stackPickupItemName?: string;
+  stackPickupIconFileName?: string;
 }
 
 function isSameInventoryMoveTarget(
@@ -676,7 +696,21 @@ function toActiveInventoryDragItem(input: {
   itemCode?: string;
   gridWidth?: number;
   gridHeight?: number;
+  stackPickup?: boolean;
+  stackPickupCount?: number;
+  stackPickupMaxCount?: number;
+  stackPickupItemName?: string;
+  stackPickupIconFileName?: string;
 }): ActiveInventoryDragItem {
+  const stackPickupCount =
+    Number.isInteger(input.stackPickupCount) && (input.stackPickupCount ?? 0) > 0
+      ? input.stackPickupCount
+      : undefined;
+  const stackPickupMaxCount =
+    Number.isInteger(input.stackPickupMaxCount) && (input.stackPickupMaxCount ?? 0) > 0
+      ? input.stackPickupMaxCount
+      : undefined;
+
   return {
     fingerprint: input.fingerprint,
     sourceFilePath: input.sourceFilePath,
@@ -690,6 +724,11 @@ function toActiveInventoryDragItem(input: {
     itemCode: input.itemCode,
     gridWidth: normalizePositiveGridDimension(input.gridWidth),
     gridHeight: normalizePositiveGridDimension(input.gridHeight),
+    stackPickup: input.stackPickup === true ? true : undefined,
+    stackPickupCount,
+    stackPickupMaxCount,
+    stackPickupItemName: input.stackPickupItemName,
+    stackPickupIconFileName: input.stackPickupIconFileName,
   };
 }
 
@@ -725,6 +764,7 @@ function toInventoryDragStatePayload(
       itemCode: itemInput.itemCode,
       gridWidth: itemInput.gridWidth,
       gridHeight: itemInput.gridHeight,
+      stackPickup: false,
     }),
   };
 }
@@ -772,6 +812,22 @@ function parseInventoryDragStatePayload(payload: unknown): InventoryDragStatePay
           : undefined,
       gridWidth: rawPayload.gridWidth,
       gridHeight: rawPayload.gridHeight,
+      stackPickup: rawPayload.stackPickup === true,
+      stackPickupCount: Number.isInteger(rawPayload.stackPickupCount)
+        ? rawPayload.stackPickupCount
+        : undefined,
+      stackPickupMaxCount: Number.isInteger(rawPayload.stackPickupMaxCount)
+        ? rawPayload.stackPickupMaxCount
+        : undefined,
+      stackPickupItemName:
+        typeof rawPayload.stackPickupItemName === 'string' &&
+        rawPayload.stackPickupItemName.trim().length > 0
+          ? rawPayload.stackPickupItemName.trim()
+          : undefined,
+      stackPickupIconFileName:
+        typeof rawPayload.stackPickupIconFileName === 'string'
+          ? rawPayload.stackPickupIconFileName
+          : undefined,
     }),
   };
 }
@@ -797,6 +853,135 @@ function parseVaultDragStatePayload(payload: unknown): VaultDragStatePayload | u
       gridWidth: rawPayload.gridWidth,
       gridHeight: rawPayload.gridHeight,
     }),
+  };
+}
+
+function isStackPickupDragState(
+  item: ActiveInventoryDragItem | null | undefined,
+): item is ActiveInventoryDragItem & {
+  stackPickup: true;
+  stackPickupCount: number;
+  stackPickupMaxCount: number;
+  itemCode: string;
+} {
+  if (!item || item.stackPickup !== true) {
+    return false;
+  }
+
+  return (
+    Number.isInteger(item.stackPickupCount) &&
+    (item.stackPickupCount ?? 0) > 0 &&
+    Number.isInteger(item.stackPickupMaxCount) &&
+    (item.stackPickupMaxCount ?? 0) > 0 &&
+    typeof item.itemCode === 'string' &&
+    item.itemCode.trim().length > 0
+  );
+}
+
+function toStackPickupDragStatePayload(
+  pickupState: StackPickupState,
+): InventoryDragStatePayload | undefined {
+  const source = pickupState.sourceItem;
+  if (
+    !source?.fingerprint ||
+    !source.sourceFilePath ||
+    !source.sourceFileType ||
+    !source.locationContext ||
+    !source.rawItemJson
+  ) {
+    return undefined;
+  }
+
+  return {
+    active: true,
+    ...toActiveInventoryDragItem({
+      fingerprint: source.fingerprint,
+      sourceFilePath: source.sourceFilePath,
+      sourceFileType: source.sourceFileType,
+      sourceLocationContext: source.locationContext,
+      sourceStashTab: source.stashTab,
+      sourceGridX: source.gridX,
+      sourceGridY: source.gridY,
+      sourceEquippedSlotId: source.equippedSlotId,
+      rawItemJson: source.rawItemJson,
+      itemCode: pickupState.itemCode,
+      gridWidth: pickupState.gridWidth,
+      gridHeight: pickupState.gridHeight,
+      stackPickup: true,
+      stackPickupCount: pickupState.count,
+      stackPickupMaxCount: pickupState.maxCount,
+      stackPickupItemName: pickupState.itemName,
+      stackPickupIconFileName: pickupState.iconFileName,
+    }),
+  };
+}
+
+interface ResolvedStackPickupState {
+  fingerprint: string;
+  sourceFilePath: string;
+  sourceFileType: VaultSourceFileType;
+  sourceStashTab: number;
+  sourceRawItemJson: string;
+  itemCode: string;
+  count: number;
+  maxCount: number;
+  itemName: string;
+  iconFileName: string;
+  gridWidth: number;
+  gridHeight: number;
+}
+
+function resolveStackPickupState(
+  localPickupState: StackPickupState | undefined,
+  synchronizedDragState: ActiveInventoryDragItem | null,
+): ResolvedStackPickupState | undefined {
+  if (isStackPickupDragState(synchronizedDragState)) {
+    return {
+      fingerprint: synchronizedDragState.fingerprint,
+      sourceFilePath: synchronizedDragState.sourceFilePath,
+      sourceFileType: synchronizedDragState.sourceFileType,
+      sourceStashTab: synchronizedDragState.sourceStashTab ?? 0,
+      sourceRawItemJson: synchronizedDragState.rawItemJson,
+      itemCode: synchronizedDragState.itemCode ?? '',
+      count: synchronizedDragState.stackPickupCount ?? 0,
+      maxCount: synchronizedDragState.stackPickupMaxCount ?? 0,
+      itemName:
+        synchronizedDragState.stackPickupItemName ??
+        synchronizedDragState.itemCode ??
+        synchronizedDragState.fingerprint,
+      iconFileName: synchronizedDragState.stackPickupIconFileName ?? '',
+      gridWidth: synchronizedDragState.gridWidth,
+      gridHeight: synchronizedDragState.gridHeight,
+    };
+  }
+
+  if (!localPickupState) {
+    return undefined;
+  }
+
+  const source = localPickupState.sourceItem;
+  if (
+    !source?.fingerprint ||
+    !source.sourceFilePath ||
+    !source.sourceFileType ||
+    !source.rawItemJson
+  ) {
+    return undefined;
+  }
+
+  return {
+    fingerprint: source.fingerprint,
+    sourceFilePath: source.sourceFilePath,
+    sourceFileType: source.sourceFileType,
+    sourceStashTab: source.stashTab ?? 0,
+    sourceRawItemJson: source.rawItemJson,
+    itemCode: localPickupState.itemCode,
+    count: localPickupState.count,
+    maxCount: localPickupState.maxCount,
+    itemName: localPickupState.itemName,
+    iconFileName: localPickupState.iconFileName,
+    gridWidth: localPickupState.gridWidth,
+    gridHeight: localPickupState.gridHeight,
   };
 }
 
@@ -1350,6 +1535,124 @@ function hasBoardOverlap(
   });
 }
 
+function collectOccupiedCells(existingItems: ParsedInventoryItem[]): Set<string> {
+  const occupiedCells = new Set<string>();
+  for (const item of existingItems) {
+    if (item.gridX === undefined || item.gridY === undefined) {
+      continue;
+    }
+
+    const x0 = item.gridX;
+    const y0 = item.gridY;
+    const width = getGridWidth(item);
+    const height = getGridHeight(item);
+    for (let x = x0; x < x0 + width; x += 1) {
+      for (let y = y0; y < y0 + height; y += 1) {
+        occupiedCells.add(`${x},${y}`);
+      }
+    }
+  }
+
+  return occupiedCells;
+}
+
+function buildWrappedScanCandidates(
+  maxX: number,
+  maxY: number,
+  startX: number,
+  startY: number,
+): Array<{ x: number; y: number }> {
+  const candidates: Array<{ x: number; y: number }> = [];
+
+  for (let y = startY; y <= maxY; y += 1) {
+    const rowStartX = y === startY ? startX : 0;
+    for (let x = rowStartX; x <= maxX; x += 1) {
+      candidates.push({ x, y });
+    }
+  }
+
+  for (let y = 0; y <= startY; y += 1) {
+    const rowEndX = y === startY ? startX - 1 : maxX;
+    for (let x = 0; x <= rowEndX; x += 1) {
+      candidates.push({ x, y });
+    }
+  }
+
+  return candidates;
+}
+
+function canPlaceAt(
+  occupiedCells: Set<string>,
+  itemWidth: number,
+  itemHeight: number,
+  x: number,
+  y: number,
+): boolean {
+  for (let dy = 0; dy < itemHeight; dy += 1) {
+    for (let dx = 0; dx < itemWidth; dx += 1) {
+      if (occupiedCells.has(`${x + dx},${y + dy}`)) {
+        return false;
+      }
+    }
+  }
+  return true;
+}
+
+function occupyCells(
+  occupiedCells: Set<string>,
+  itemWidth: number,
+  itemHeight: number,
+  x: number,
+  y: number,
+): void {
+  for (let dy = 0; dy < itemHeight; dy += 1) {
+    for (let dx = 0; dx < itemWidth; dx += 1) {
+      occupiedCells.add(`${x + dx},${y + dy}`);
+    }
+  }
+}
+
+function findStackPickupSlots(
+  gridSize: GridSize,
+  existingItems: ParsedInventoryItem[],
+  itemWidth: number,
+  itemHeight: number,
+  count: number,
+  preferredGridX?: number,
+  preferredGridY?: number,
+): Array<{ x: number; y: number }> {
+  if (count <= 0 || itemWidth <= 0 || itemHeight <= 0) {
+    return [];
+  }
+
+  const maxX = gridSize.columns - itemWidth;
+  const maxY = gridSize.rows - itemHeight;
+  if (maxX < 0 || maxY < 0) {
+    return [];
+  }
+
+  const startX = Math.min(maxX, Math.max(0, preferredGridX ?? 0));
+  const startY = Math.min(maxY, Math.max(0, preferredGridY ?? 0));
+  const occupiedCells = collectOccupiedCells(existingItems);
+  const candidates = buildWrappedScanCandidates(maxX, maxY, startX, startY);
+
+  const selected: Array<{ x: number; y: number }> = [];
+  for (const candidate of candidates) {
+    if (!canPlaceAt(occupiedCells, itemWidth, itemHeight, candidate.x, candidate.y)) {
+      continue;
+    }
+
+    selected.push(candidate);
+    occupyCells(occupiedCells, itemWidth, itemHeight, candidate.x, candidate.y);
+
+    if (selected.length >= count) {
+      break;
+    }
+  }
+
+  return selected;
+}
+
 function InventoryTile({
   item,
   iconLookup,
@@ -1495,6 +1798,7 @@ function InventoryTile({
   );
 }
 
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: This component coordinates multiple DnD + pickup interaction paths in a single grid renderer. Splitting would require complex prop threading.
 function InventoryGridSection({
   title,
   testId,
@@ -1517,6 +1821,7 @@ function InventoryGridSection({
   draggingInventoryItem,
   onDropVaultItem,
   onDropInventoryItem,
+  onPickupClick,
 }: InventoryGridSectionProps) {
   const { t } = useTranslation();
   const [dragOverCell, setDragOverCell] = useState<{ x: number; y: number } | null>(null);
@@ -1813,6 +2118,25 @@ function InventoryGridSection({
         onDropOnBoard={
           canDropOnSection && (onDropVaultItem || onDropInventoryItem)
             ? handleDropOnBoard
+            : undefined
+        }
+        onClickBoard={
+          onPickupClick &&
+          snapshotSourceFilePath &&
+          snapshotSourceFileType &&
+          sectionLocationContext
+            ? (_, x, y) => {
+                void onPickupClick(
+                  items,
+                  gridSize,
+                  snapshotSourceFilePath,
+                  snapshotSourceFileType,
+                  sectionLocationContext,
+                  sectionStashTab,
+                  x,
+                  y,
+                );
+              }
             : undefined
         }
       >
@@ -2273,6 +2597,12 @@ export function CharacterInventoryBrowser({
   const latestSearchRequestRef = useRef(0);
   const spriteIconLookup = useMemo(() => createSpriteIconLookupIndex(grailItems), [grailItems]);
 
+  const { pickupState, startPickup, decrementPickup, consumePickup, cancelPickup } =
+    useStackPickup();
+  const pickupStateRef = useRef<StackPickupState | undefined>(undefined);
+  pickupStateRef.current = pickupState;
+  const lastSyncedStackPickupPayloadRef = useRef<InventoryDragStatePayload | undefined>(undefined);
+
   useEffect(() => {
     if (grailItems.length > 0 || !window.electronAPI?.grail?.getItems) {
       return;
@@ -2348,6 +2678,7 @@ export function CharacterInventoryBrowser({
       setCrossWindowVaultDragItem((current) => (current?.id === parsedPayload.id ? null : current));
     };
 
+    // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: inventory drag-state synchronization intentionally handles local/remote pickup reconciliation and cancellation in one guarded callback.
     const handleInventoryDragState = (_event: unknown, payload: unknown) => {
       const parsedPayload = parseInventoryDragStatePayload(payload);
       if (!parsedPayload) {
@@ -2355,8 +2686,28 @@ export function CharacterInventoryBrowser({
       }
 
       if (parsedPayload.active) {
+        if (
+          isStackPickupDragState(parsedPayload) &&
+          pickupStateRef.current?.sourceItem?.fingerprint === parsedPayload.fingerprint
+        ) {
+          const localCount = pickupStateRef.current.count;
+          const remoteCount = parsedPayload.stackPickupCount ?? localCount;
+          if (remoteCount <= 0) {
+            cancelPickup();
+          } else if (remoteCount < localCount) {
+            consumePickup(localCount - remoteCount);
+          }
+        }
+
         setCrossWindowInventoryDragItem(parsedPayload);
         return;
+      }
+
+      if (
+        parsedPayload.stackPickup === true &&
+        pickupStateRef.current?.sourceItem?.fingerprint === parsedPayload.fingerprint
+      ) {
+        cancelPickup();
       }
 
       setCrossWindowInventoryDragItem((current) =>
@@ -2367,39 +2718,41 @@ export function CharacterInventoryBrowser({
     window.ipcRenderer?.on(VAULT_DRAG_STATE_CHANNEL, handleVaultDragState);
     window.ipcRenderer?.on(INVENTORY_DRAG_STATE_CHANNEL, handleInventoryDragState);
 
-    void window.ipcRenderer
-      ?.invoke('inventory:getActiveDragState')
-      .then((payload) => {
-        if (isDisposed || !payload || typeof payload !== 'object') {
-          return;
-        }
+    if (typeof window.ipcRenderer?.invoke === 'function') {
+      void window.ipcRenderer
+        .invoke('inventory:getActiveDragState')
+        .then((payload) => {
+          if (isDisposed || !payload || typeof payload !== 'object') {
+            return;
+          }
 
-        const rawPayload = payload as {
-          vault?: unknown;
-          inventory?: unknown;
-        };
-        const parsedVaultPayload = parseVaultDragStatePayload(rawPayload.vault);
-        if (parsedVaultPayload?.active) {
-          setCrossWindowVaultDragItem(parsedVaultPayload);
-        }
+          const rawPayload = payload as {
+            vault?: unknown;
+            inventory?: unknown;
+          };
+          const parsedVaultPayload = parseVaultDragStatePayload(rawPayload.vault);
+          if (parsedVaultPayload?.active) {
+            setCrossWindowVaultDragItem(parsedVaultPayload);
+          }
 
-        const parsedInventoryPayload = parseInventoryDragStatePayload(rawPayload.inventory);
-        if (parsedInventoryPayload?.active) {
-          setCrossWindowInventoryDragItem(parsedInventoryPayload);
-        }
-      })
-      .catch((error) => {
-        if (!isDisposed) {
-          console.warn('Failed to get active inventory drag state', error);
-        }
-      });
+          const parsedInventoryPayload = parseInventoryDragStatePayload(rawPayload.inventory);
+          if (parsedInventoryPayload?.active) {
+            setCrossWindowInventoryDragItem(parsedInventoryPayload);
+          }
+        })
+        .catch((error) => {
+          if (!isDisposed) {
+            console.warn('Failed to get active inventory drag state', error);
+          }
+        });
+    }
 
     return () => {
       isDisposed = true;
       window.ipcRenderer?.off(VAULT_DRAG_STATE_CHANNEL, handleVaultDragState);
       window.ipcRenderer?.off(INVENTORY_DRAG_STATE_CHANNEL, handleInventoryDragState);
     };
-  }, []);
+  }, [cancelPickup, consumePickup]);
 
   useEffect(() => {
     let reloadTimeout: ReturnType<typeof setTimeout> | undefined;
@@ -2423,6 +2776,32 @@ export function CharacterInventoryBrowser({
       window.ipcRenderer?.off('save-file-event', handleSaveFileEvent);
     };
   }, [loadInventorySearch]);
+
+  useEffect(() => {
+    const payload = pickupState ? toStackPickupDragStatePayload(pickupState) : undefined;
+    if (payload) {
+      lastSyncedStackPickupPayloadRef.current = payload;
+      setCrossWindowInventoryDragItem(payload);
+      window.ipcRenderer?.send(INVENTORY_DRAG_STATE_CHANNEL, payload);
+      return;
+    }
+
+    const lastPayload = lastSyncedStackPickupPayloadRef.current;
+    if (!lastPayload) {
+      return;
+    }
+
+    lastSyncedStackPickupPayloadRef.current = undefined;
+    setCrossWindowInventoryDragItem((current) =>
+      current?.fingerprint === lastPayload.fingerprint && isStackPickupDragState(current)
+        ? null
+        : current,
+    );
+    window.ipcRenderer?.send(INVENTORY_DRAG_STATE_CHANNEL, {
+      ...lastPayload,
+      active: false,
+    });
+  }, [pickupState]);
 
   const vaultItemsByFingerprint = useMemo(() => {
     const map = new Map<string, VaultItem>();
@@ -2641,6 +3020,42 @@ export function CharacterInventoryBrowser({
 
   const activeVaultDragItem = draggingVaultItem ?? crossWindowVaultDragItem;
   const activeInventoryDragItem = draggingInventoryItem ?? crossWindowInventoryDragItem;
+  const resolvedStackPickupState = resolveStackPickupState(
+    pickupState,
+    crossWindowInventoryDragItem,
+  );
+  const cursorPickupState: StackPickupCursorState | undefined =
+    pickupState ?? resolvedStackPickupState;
+  const isStackPickupMode = resolvedStackPickupState !== undefined;
+
+  const getActiveSynchronizedStackPickupDragItem = useCallback(async (): Promise<
+    ActiveInventoryDragItem | undefined
+  > => {
+    if (!window.ipcRenderer?.invoke) {
+      return undefined;
+    }
+
+    try {
+      const payload = await window.ipcRenderer.invoke('inventory:getActiveDragState');
+      if (!payload || typeof payload !== 'object') {
+        return undefined;
+      }
+
+      const rawPayload = payload as {
+        inventory?: unknown;
+      };
+      const parsedInventoryPayload = parseInventoryDragStatePayload(rawPayload.inventory);
+      if (!parsedInventoryPayload?.active || !isStackPickupDragState(parsedInventoryPayload)) {
+        return undefined;
+      }
+
+      setCrossWindowInventoryDragItem(parsedInventoryPayload);
+      return parsedInventoryPayload;
+    } catch (error) {
+      console.warn('Failed to get active inventory drag state', error);
+      return undefined;
+    }
+  }, []);
 
   const handleMoveInventoryItem = useCallback(
     async (
@@ -2677,6 +3092,7 @@ export function CharacterInventoryBrowser({
           sourceFilePath: inventoryItem.sourceFilePath,
           sourceFileType: inventoryItem.sourceFileType,
           rawItemJson: inventoryItem.rawItemJson,
+          sourceStashTab: inventoryItem.sourceStashTab,
           targetFilePath,
           targetFileType,
           targetLocationContext,
@@ -2740,6 +3156,167 @@ export function CharacterInventoryBrowser({
     [reloadInventoryAfterSaveWrite, t],
   );
 
+  const clearSynchronizedStackPickup = useCallback((pickupItem: ActiveInventoryDragItem): void => {
+    const inactivePayload: InventoryDragStatePayload = {
+      ...pickupItem,
+      active: false,
+    };
+    lastSyncedStackPickupPayloadRef.current = undefined;
+    setCrossWindowInventoryDragItem((current) =>
+      current?.fingerprint === pickupItem.fingerprint && isStackPickupDragState(current)
+        ? null
+        : current,
+    );
+    window.ipcRenderer?.send(INVENTORY_DRAG_STATE_CHANNEL, inactivePayload);
+  }, []);
+
+  const consumeSynchronizedStackPickup = useCallback(
+    (pickupItem: ActiveInventoryDragItem, placedCount: number): void => {
+      const remaining = (pickupItem.stackPickupCount ?? 0) - placedCount;
+      if (remaining > 0) {
+        const nextPayload: InventoryDragStatePayload = {
+          ...pickupItem,
+          active: true,
+          stackPickupCount: remaining,
+        };
+        lastSyncedStackPickupPayloadRef.current = nextPayload;
+        setCrossWindowInventoryDragItem(nextPayload);
+        window.ipcRenderer?.send(INVENTORY_DRAG_STATE_CHANNEL, nextPayload);
+        return;
+      }
+
+      clearSynchronizedStackPickup(pickupItem);
+    },
+    [clearSynchronizedStackPickup],
+  );
+
+  // Handles clicking on a grid while pickup mode is active.
+  const handleStackPickupOnGrid = useCallback(
+    async (
+      targetItems: ParsedInventoryItem[],
+      gridSize: GridSize,
+      targetFilePath: string,
+      targetFileType: VaultSourceFileType,
+      targetLocationContext: VaultLocationContext,
+      targetStashTab?: number,
+      preferredGridX?: number,
+      preferredGridY?: number,
+      // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: this callback intentionally keeps split-target calculation, write call, and synchronized/local pickup state reconciliation in one transactional path.
+    ): Promise<void> => {
+      if (!window.electronAPI?.inventory?.splitStack) {
+        return;
+      }
+
+      let effectivePickupState = resolvedStackPickupState;
+      let synchronizedPickupItem = crossWindowInventoryDragItem;
+
+      if (!effectivePickupState) {
+        const fetchedSynchronizedPickupItem = await getActiveSynchronizedStackPickupDragItem();
+        if (fetchedSynchronizedPickupItem) {
+          synchronizedPickupItem = fetchedSynchronizedPickupItem;
+          effectivePickupState = resolveStackPickupState(undefined, fetchedSynchronizedPickupItem);
+        }
+      }
+
+      if (!effectivePickupState) {
+        return;
+      }
+
+      const slots = findStackPickupSlots(
+        gridSize,
+        targetItems,
+        effectivePickupState.gridWidth,
+        effectivePickupState.gridHeight,
+        effectivePickupState.count,
+        preferredGridX,
+        preferredGridY,
+      );
+
+      if (slots.length === 0) {
+        toast.warning(t(translations.inventoryBrowser.stackPickup.noSpace));
+        return;
+      }
+
+      try {
+        await window.electronAPI.inventory.splitStack({
+          sourceFilePath: effectivePickupState.sourceFilePath,
+          sourceFileType: effectivePickupState.sourceFileType,
+          sourceStashTab: effectivePickupState.sourceStashTab,
+          sourceItemCode: effectivePickupState.itemCode,
+          sourceRawItemJson: effectivePickupState.sourceRawItemJson,
+          splitCount: slots.length,
+          targets: slots.map((slot) => ({
+            targetFilePath,
+            targetFileType,
+            targetLocationContext,
+            targetStashTab,
+            targetGridX: slot.x,
+            targetGridY: slot.y,
+          })),
+        });
+
+        if (pickupState) {
+          consumePickup(slots.length);
+        } else if (isStackPickupDragState(synchronizedPickupItem)) {
+          consumeSynchronizedStackPickup(synchronizedPickupItem, slots.length);
+        }
+
+        if (slots.length < effectivePickupState.count) {
+          toast.info(
+            t(translations.inventoryBrowser.stackPickup.partialPlace, {
+              placed: slots.length,
+              total: effectivePickupState.count,
+            }),
+          );
+        } else {
+          toast.success(
+            t(translations.inventoryBrowser.stackPickup.placed, { count: slots.length }),
+          );
+        }
+
+        await reloadInventoryAfterSaveWrite();
+      } catch (error) {
+        if (isModernStashReadOnlyError(error)) {
+          showModernStashReadOnlyToast(t);
+          if (pickupState) {
+            cancelPickup();
+          } else if (isStackPickupDragState(crossWindowInventoryDragItem)) {
+            clearSynchronizedStackPickup(crossWindowInventoryDragItem);
+          }
+          return;
+        }
+        console.error('Failed to split stack', error);
+      }
+    },
+    [
+      cancelPickup,
+      crossWindowInventoryDragItem,
+      clearSynchronizedStackPickup,
+      consumeSynchronizedStackPickup,
+      consumePickup,
+      getActiveSynchronizedStackPickupDragItem,
+      pickupState,
+      reloadInventoryAfterSaveWrite,
+      resolvedStackPickupState,
+      t,
+    ],
+  );
+
+  // Returns an item with stackCount reduced by the current pickup count when that item is the
+  // active pickup source, so tab sections show the remaining (not-yet-picked-up) quantity.
+  const applyPickupAdjustment = useCallback(
+    (item: ParsedInventoryItem): ParsedInventoryItem => {
+      if (!resolvedStackPickupState || resolvedStackPickupState.fingerprint !== item.fingerprint) {
+        return item;
+      }
+      return {
+        ...item,
+        stackCount: Math.max(0, (item.stackCount ?? 1) - resolvedStackPickupState.count),
+      };
+    },
+    [resolvedStackPickupState],
+  );
+
   const handleVaultDrop = async (event: DragEvent<HTMLButtonElement>) => {
     event.preventDefault();
     setDragOverVaultDropzone(false);
@@ -2781,7 +3358,26 @@ export function CharacterInventoryBrowser({
       : t(translations.inventoryBrowser.empty);
 
   return (
-    <div className="flex-1 overflow-auto p-4">
+    // biome-ignore lint/a11y/noStaticElementInteractions: outer scroll container captures click-to-cancel for pickup mode; interactive children handle keyboard accessibility.
+    // biome-ignore lint/a11y/useKeyWithClickEvents: Escape key is handled globally in useStackPickup; this click handler only cancels pickup on empty-space clicks.
+    <div
+      className="flex-1 overflow-auto p-4"
+      onClick={(event) => {
+        if (!isStackPickupMode) return;
+        // If the click landed on a board surface or a tab section tile, let those handlers run.
+        const target = event.target as HTMLElement;
+        const isOnBoard = target.closest('[data-testid]') !== null;
+        if (!isOnBoard) {
+          if (pickupState) {
+            cancelPickup();
+          } else if (isStackPickupDragState(crossWindowInventoryDragItem)) {
+            clearSynchronizedStackPickup(crossWindowInventoryDragItem);
+          }
+          toast.info(t(translations.inventoryBrowser.stackPickup.cancelled));
+        }
+      }}
+    >
+      {cursorPickupState && <StackPickupCursor pickupState={cursorPickupState} />}
       <div className="flex w-full flex-col gap-4">
         {!isSnapshotMode && (
           <Card>
@@ -3031,6 +3627,7 @@ export function CharacterInventoryBrowser({
                       draggingInventoryItem={activeInventoryDragItem}
                       onDropVaultItem={handleDropVaultItemOnSection}
                       onDropInventoryItem={handleMoveInventoryItem}
+                      onPickupClick={handleStackPickupOnGrid}
                     />
                   )}
 
@@ -3041,7 +3638,9 @@ export function CharacterInventoryBrowser({
                         key={`${snapshot.snapshotId}-stash-${stashTab}`}
                         title={getStashSectionTitle(stashTab, items, t, fallbackTabKind)}
                         testId={`stash-board-${snapshot.snapshotId}-${stashTab}`}
-                        items={items}
+                        items={items.map(applyPickupAdjustment)}
+                        onItemClick={startPickup}
+                        onItemContextMenu={decrementPickup}
                         renderOwnedTile={(item) => (
                           <InventoryTile
                             item={item}
@@ -3064,7 +3663,9 @@ export function CharacterInventoryBrowser({
                         key={`${snapshot.snapshotId}-stash-${stashTab}`}
                         title={getStashSectionTitle(stashTab, items, t, fallbackTabKind)}
                         testId={`stash-board-${snapshot.snapshotId}-${stashTab}`}
-                        items={items}
+                        items={items.map(applyPickupAdjustment)}
+                        onItemClick={startPickup}
+                        onItemContextMenu={decrementPickup}
                         renderOwnedTile={(item) => (
                           <InventoryTile
                             item={item}
@@ -3087,7 +3688,9 @@ export function CharacterInventoryBrowser({
                         key={`${snapshot.snapshotId}-stash-${stashTab}`}
                         title={getStashSectionTitle(stashTab, items, t, fallbackTabKind)}
                         testId={`stash-board-${snapshot.snapshotId}-${stashTab}`}
-                        items={items}
+                        items={items.map(applyPickupAdjustment)}
+                        onItemClick={startPickup}
+                        onItemContextMenu={decrementPickup}
                         renderOwnedTile={(item) => (
                           <InventoryTile
                             item={item}
@@ -3129,6 +3732,7 @@ export function CharacterInventoryBrowser({
                         draggingInventoryItem={activeInventoryDragItem}
                         onDropVaultItem={handleDropVaultItemOnSection}
                         onDropInventoryItem={handleMoveInventoryItem}
+                        onPickupClick={handleStackPickupOnGrid}
                       />
                     ),
                   )}

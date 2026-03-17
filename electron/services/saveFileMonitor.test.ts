@@ -1194,6 +1194,58 @@ describe('When SaveFileMonitor is used', () => {
       expect(parsed.fingerprintInputs.iconFileName).toBe('invhamm.png');
     });
 
+    it('Then magic items keep their generated prefix/suffix display name', () => {
+      // Arrange
+      vi.mocked(getGrailItemId).mockReturnValue(null);
+      const item = {
+        name: 'Ring',
+        type_name: 'Ring',
+        type: 'rin',
+        code: 'rin',
+        quality: 2,
+        magic_prefix_name: 'Viper',
+        magic_suffix_name: 'of the Fox',
+      } as any;
+
+      // Act
+      const parsed = (monitor as any).createParsedInventoryItem({
+        filePath: '/tmp/TestChar.d2s',
+        saveName: 'TestChar',
+        sourceFileType: 'd2s',
+        item,
+        fallbackLocation: 'inventory',
+      });
+
+      // Assert
+      expect(parsed.itemName).toBe('Viper Ring of the Fox');
+    });
+
+    it('Then rare items keep their generated rare name parts', () => {
+      // Arrange
+      vi.mocked(getGrailItemId).mockReturnValue(null);
+      const item = {
+        name: 'Ring',
+        type_name: 'Ring',
+        type: 'rin',
+        code: 'rin',
+        quality: 3,
+        rare_name: 'Stone',
+        rare_name2: 'Master',
+      } as any;
+
+      // Act
+      const parsed = (monitor as any).createParsedInventoryItem({
+        filePath: '/tmp/TestChar.d2s',
+        saveName: 'TestChar',
+        sourceFileType: 'd2s',
+        item,
+        fallbackLocation: 'inventory',
+      });
+
+      // Assert
+      expect(parsed.itemName).toBe('Stone Master');
+    });
+
     it('Then location_id 2 maps to unknown belt coordinates in a 4x4 belt board space', () => {
       // Arrange
       vi.mocked(getGrailItemId).mockReturnValue(null);
@@ -1563,7 +1615,7 @@ describe('When SaveFileMonitor is used', () => {
       ).toBe(true);
     }, 20000);
 
-    it('Then processSingleFile marks modern snapshots as read-only and records source file version', async () => {
+    it('Then processSingleFile marks modern snapshots as writable and records source file version', async () => {
       // Arrange
       const fixtureBuffer = readFileSync(MODERN_STASH_FIXTURE_PATH);
       vi.spyOn(monitor as any, 'parseSave').mockResolvedValue([]);
@@ -1580,7 +1632,8 @@ describe('When SaveFileMonitor is used', () => {
 
       // Assert
       expect(parseResult.success).toBe(true);
-      expect(parseResult.inventorySnapshot?.readOnly).toBe(true);
+      // Modern stash shared tabs are now writable — drag-and-drop is enabled
+      expect(parseResult.inventorySnapshot?.readOnly).toBe(false);
       expect(parseResult.inventorySnapshot?.sourceFileVersion).toBe(105);
       expect(parseResult.saveName).toBe('Modern Shared Stash Softcore');
     });

@@ -500,3 +500,74 @@ export function getSortedStashTabs<T extends SpatialItemLike>(
     .sort(([left], [right]) => left - right)
     .map(([stashTab, items]) => ({ stashTab, items: sortByGridPosition(items) }));
 }
+
+/**
+ * Finds up to `count` non-overlapping positions in the given grid where an item
+ * of `itemWidth` x `itemHeight` can be placed without conflicting with existing items.
+ *
+ * Scans cells left-to-right, top-to-bottom. After tentatively placing an item it
+ * marks those cells as occupied before searching for the next slot.
+ *
+ * @returns Array of {x, y} positions (length <= count).
+ */
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: The nested loops for grid scanning + occupancy checking are inherently complex but clearly structured.
+export function findAvailableSlots(
+  gridSize: GridSize,
+  existingItems: SpatialItemLike[],
+  itemWidth: number,
+  itemHeight: number,
+  count: number,
+): Array<{ x: number; y: number }> {
+  if (count <= 0 || itemWidth <= 0 || itemHeight <= 0) {
+    return [];
+  }
+
+  const occupied = new Set<string>();
+
+  for (const item of existingItems) {
+    if (!hasGridPosition(item) || !hasGridDimensions(item)) {
+      continue;
+    }
+    const x0 = item.gridX as number;
+    const y0 = item.gridY as number;
+    const w = getGridWidth(item);
+    const h = getGridHeight(item);
+    for (let x = x0; x < x0 + w; x += 1) {
+      for (let y = y0; y < y0 + h; y += 1) {
+        occupied.add(createCellKey(x, y));
+      }
+    }
+  }
+
+  const result: Array<{ x: number; y: number }> = [];
+
+  outer: for (let y = 0; y <= gridSize.rows - itemHeight; y += 1) {
+    for (let x = 0; x <= gridSize.columns - itemWidth; x += 1) {
+      let fits = true;
+      check: for (let dy = 0; dy < itemHeight; dy += 1) {
+        for (let dx = 0; dx < itemWidth; dx += 1) {
+          if (occupied.has(createCellKey(x + dx, y + dy))) {
+            fits = false;
+            break check;
+          }
+        }
+      }
+
+      if (fits) {
+        result.push({ x, y });
+        // Mark cells as occupied for subsequent slot searches.
+        for (let dy = 0; dy < itemHeight; dy += 1) {
+          for (let dx = 0; dx < itemWidth; dx += 1) {
+            occupied.add(createCellKey(x + dx, y + dy));
+          }
+        }
+
+        if (result.length >= count) {
+          break outer;
+        }
+      }
+    }
+  }
+
+  return result;
+}

@@ -7,6 +7,8 @@ import {
   DEFAULT_STASH_GRID_SIZE,
   EQUIPPED_BOARD_SIZE,
   EQUIPPED_SLOT_LAYOUT,
+  findAvailableSlots,
+  type GridSize,
   type SpatialItemLike,
 } from './spatialLayout';
 
@@ -341,6 +343,110 @@ describe('When spatial layout classifiers are used', () => {
 
       // Assert
       expect(hasNoEmptyRows).toBe(true);
+    });
+  });
+});
+
+describe('When findAvailableSlots is used', () => {
+  const SMALL_GRID: GridSize = { columns: 4, rows: 3 };
+
+  function makeItem(x: number, y: number, w = 1, h = 1): SpatialItemLike {
+    return {
+      locationContext: 'inventory',
+      gridX: x,
+      gridY: y,
+      gridWidth: w,
+      gridHeight: h,
+    };
+  }
+
+  describe('If the grid is empty', () => {
+    it('Then it returns the requested number of top-left slots scanning left-to-right, top-to-bottom', () => {
+      // Arrange / Act
+      const slots = findAvailableSlots(SMALL_GRID, [], 1, 1, 3);
+
+      // Assert
+      expect(slots).toEqual([
+        { x: 0, y: 0 },
+        { x: 1, y: 0 },
+        { x: 2, y: 0 },
+      ]);
+    });
+
+    it('Then it returns fewer slots than requested when the grid is too small', () => {
+      // Arrange / Act
+      const slots = findAvailableSlots({ columns: 2, rows: 1 }, [], 1, 1, 10);
+
+      // Assert
+      expect(slots).toHaveLength(2);
+    });
+  });
+
+  describe('If existing items occupy some cells', () => {
+    it('Then it skips occupied cells when finding 1x1 slots', () => {
+      // Arrange
+      const existing = [makeItem(0, 0), makeItem(1, 0), makeItem(2, 0)];
+
+      // Act
+      const slots = findAvailableSlots(SMALL_GRID, existing, 1, 1, 2);
+
+      // Assert
+      expect(slots).toEqual([
+        { x: 3, y: 0 },
+        { x: 0, y: 1 },
+      ]);
+    });
+
+    it('Then it finds valid positions for 1x2 items', () => {
+      // Arrange — fill entire top row
+      const existing = [makeItem(0, 0, 4, 1)];
+
+      // Act
+      const slots = findAvailableSlots(SMALL_GRID, existing, 1, 2, 2);
+
+      // Assert — must start at y=1 since top row is full
+      expect(slots).toEqual([
+        { x: 0, y: 1 },
+        { x: 1, y: 1 },
+      ]);
+    });
+
+    it('Then placed slots do not overlap each other', () => {
+      // Arrange
+      const slots = findAvailableSlots(SMALL_GRID, [], 2, 2, 2);
+
+      // Assert — two 2x2 items side-by-side within a 4x3 grid
+      expect(slots).toEqual([
+        { x: 0, y: 0 },
+        { x: 2, y: 0 },
+      ]);
+    });
+  });
+
+  describe('If count is 0 or dimensions are invalid', () => {
+    it('Then it returns an empty array for count=0', () => {
+      expect(findAvailableSlots(SMALL_GRID, [], 1, 1, 0)).toEqual([]);
+    });
+
+    it('Then it returns an empty array for zero-width item', () => {
+      expect(findAvailableSlots(SMALL_GRID, [], 0, 1, 3)).toEqual([]);
+    });
+  });
+
+  describe('If items lack grid position or dimensions', () => {
+    it('Then items without valid position are ignored when computing occupancy', () => {
+      // Arrange — item missing gridX/gridY should not block any cell
+      const incomplete: SpatialItemLike = {
+        locationContext: 'inventory',
+        gridWidth: 2,
+        gridHeight: 2,
+      };
+
+      // Act
+      const slots = findAvailableSlots(SMALL_GRID, [incomplete], 1, 1, 1);
+
+      // Assert — top-left is still free
+      expect(slots).toEqual([{ x: 0, y: 0 }]);
     });
   });
 });

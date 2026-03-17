@@ -236,6 +236,58 @@ describe('When inventory window IPC handlers are initialized', () => {
     });
   });
 
+  describe('If inventory:openSnapshotWindow is invoked while stack pickup state is active', () => {
+    it('Then current inventory stack pickup state is sent to the opened snapshot window', async () => {
+      // Arrange
+      initializeInventoryWindowHandlers('/tmp/main', 'http://localhost:5173', '/tmp/renderer');
+      const inventoryDragListener = mocks.onMock.mock.calls.find(
+        (call) => call[0] === 'inventory:item-drag-state',
+      )?.[1];
+      const openSnapshotWindowHandler = mocks.handleMock.mock.calls.find(
+        (call) => call[0] === 'inventory:openSnapshotWindow',
+      )?.[1];
+      const payload = {
+        active: true,
+        fingerprint: 'fp-stack-pickup-1',
+        sourceFilePath: '/tmp/shared.d2i',
+        sourceFileType: 'd2i',
+        sourceLocationContext: 'stash',
+        sourceStashTab: 7,
+        rawItemJson: '{"type":"r19"}',
+        itemCode: 'r19',
+        gridWidth: 1,
+        gridHeight: 1,
+        stackPickup: true,
+        stackPickupCount: 2,
+        stackPickupMaxCount: 4,
+        stackPickupItemName: 'Fal Rune',
+        stackPickupIconFileName: 'r19.png',
+      };
+
+      inventoryDragListener?.(
+        {
+          sender: {
+            id: 101,
+          },
+        },
+        payload,
+      );
+
+      // Act
+      await openSnapshotWindowHandler?.(null, {
+        sourceFilePath: '/tmp/sorc.d2s',
+        sourceFileType: 'd2s',
+        characterName: 'Sorc',
+      });
+
+      // Assert
+      expect(mocks.snapshotWindowSendMock).toHaveBeenCalledWith(
+        'inventory:item-drag-state',
+        payload,
+      );
+    });
+  });
+
   describe('If inventory:vault-drag-state is emitted with an invalid payload', () => {
     it('Then no payload is relayed to renderer windows', () => {
       // Arrange
@@ -308,6 +360,11 @@ describe('When inventory window IPC handlers are initialized', () => {
         sourceGridY: 2,
         gridWidth: 2,
         gridHeight: 3,
+        stackPickup: true,
+        stackPickupCount: 2,
+        stackPickupMaxCount: 4,
+        stackPickupItemName: 'Fal Rune',
+        stackPickupIconFileName: 'r19.png',
       };
 
       // Act

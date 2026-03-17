@@ -2,10 +2,15 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import type * as d2sTypes from '@dschu012/d2s';
 import { BitReader } from '@dschu012/d2s/lib/binary/bitreader';
-import { _readMagicProperties } from '@dschu012/d2s/lib/d2/items';
+import { _readMagicProperties, writeItem } from '@dschu012/d2s/lib/d2/items';
 import { constants as constants105 } from '@dschu012/d2s/lib/data/versions/105_constant_data';
 import { describe, expect, it } from 'vitest';
-import { parseModernStash, resolveStackCount } from './modernStashParser';
+import {
+  constants105Extended,
+  parseModernStash,
+  readSectorItems,
+  resolveStackCount,
+} from './modernStashParser';
 
 const FIXTURE_PATH = resolve(
   process.cwd(),
@@ -53,6 +58,40 @@ describe('When parseModernStash parses v105 fixtures', () => {
     const gemItems = parsed.items.filter((entry) => entry.stashTabKind === 'gems');
     expect(new Set(runeItems.map((entry) => entry.item.code)).size).toBeGreaterThan(10);
     expect(new Set(gemItems.map((entry) => entry.item.code)).size).toBeGreaterThan(10);
+    const sharedItemsWithMagic = parsed.items.filter(
+      (entry) =>
+        entry.stashTabKind === 'shared' &&
+        Array.isArray(entry.item.magic_attributes) &&
+        entry.item.magic_attributes.length > 0,
+    );
+    expect(sharedItemsWithMagic.length).toBeGreaterThan(0);
+    expect(
+      sharedItemsWithMagic.every((entry) =>
+        Array.isArray(
+          (
+            entry.item as {
+              displayed_combined_magic_attributes?: Array<{ description?: unknown }>;
+            }
+          ).displayed_combined_magic_attributes,
+        ),
+      ),
+    ).toBe(true);
+    expect(
+      sharedItemsWithMagic.some((entry) => {
+        const displayed = (
+          entry.item as {
+            displayed_combined_magic_attributes?: Array<{ description?: unknown }>;
+          }
+        ).displayed_combined_magic_attributes;
+        return (
+          Array.isArray(displayed) &&
+          displayed.some(
+            (attribute) =>
+              typeof attribute.description === 'string' && attribute.description.trim().length > 0,
+          )
+        );
+      }),
+    ).toBe(true);
 
     for (const tab of [5, 6, 7]) {
       const tabItems = parsed.items.filter((entry) => entry.stashTab === tab);
@@ -157,5 +196,53 @@ describe('When resolveStackCount checks stackable sources', () => {
     expect(resolveStackCount(fallbackToOne)).toBe(1);
     expect(resolveStackCount(fromMagicAttr)).toBe(42);
     expect(resolveStackCount(attr381TakesPriorityOverQuantity)).toBe(42);
+  });
+});
+
+describe('When readSectorItems parses a JM payload with trailing invalid item bytes', () => {
+  it('Then it returns already-decoded leading items instead of dropping the whole sector', async () => {
+    // Arrange
+    const serializedItem = Buffer.from(
+      await writeItem(
+        {
+          type: 'r01',
+          code: 'r01',
+          identified: true,
+          simple_item: 1,
+          ethereal: 0,
+          socketed: 0,
+          new: 1,
+          personalized: 0,
+          given_runeword: 0,
+          location_id: 0,
+          equipped_id: 0,
+          position_x: 0,
+          position_y: 0,
+          alt_position_id: 5,
+          quality: 1,
+          quantity: 1,
+        } as unknown as d2sTypes.types.IItem,
+        105,
+        constants105Extended as unknown as d2sTypes.types.IConstantData,
+        { extendedStash: false, sortProperties: true },
+      ),
+    );
+    const header = Buffer.alloc(4);
+    header.write('JM', 0, 'ascii');
+    header.writeUInt16LE(2, 2);
+    const payload = Buffer.concat([header, serializedItem, Buffer.from([0x00])]);
+
+    // Act
+    const parsed = await readSectorItems(payload, 105);
+
+    // Assert
+    expect(parsed).toHaveLength(1);
+    expect(parsed[0]).toEqual(
+      expect.objectContaining({
+        type: 'r01',
+        position_x: 0,
+        position_y: 0,
+      }),
+    );
   });
 });

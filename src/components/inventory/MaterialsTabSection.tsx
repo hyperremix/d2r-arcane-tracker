@@ -49,6 +49,8 @@ export interface MaterialsTabSectionProps {
   testId?: string;
   items: ParsedInventoryItem[];
   renderOwnedTile: (item: ParsedInventoryItem) => ReactNode;
+  onItemClick?: (item: ParsedInventoryItem) => void;
+  onItemContextMenu?: (item: ParsedInventoryItem) => void;
 }
 
 export function MaterialsTabSection({
@@ -56,11 +58,20 @@ export function MaterialsTabSection({
   testId,
   items,
   renderOwnedTile,
+  onItemClick,
+  onItemContextMenu,
 }: MaterialsTabSectionProps) {
+  const itemByCode = new Map<string, ParsedInventoryItem>();
   const ownedMap = new Map<string, ParsedInventoryItem>();
   for (const item of items) {
-    if (item.itemCode) {
-      ownedMap.set(item.itemCode.toLowerCase(), item);
+    if (!item.itemCode) {
+      continue;
+    }
+    const normalizedCode = item.itemCode.toLowerCase();
+    itemByCode.set(normalizedCode, item);
+    const availableCount = typeof item.stackCount === 'number' ? item.stackCount : 1;
+    if (availableCount > 0) {
+      ownedMap.set(normalizedCode, item);
     }
   }
 
@@ -68,22 +79,53 @@ export function MaterialsTabSection({
     <div className="space-y-2">
       {title && <div className="font-medium text-sm">{title}</div>}
       <BoardSurface gridSize={MATERIALS_GRID_SIZE} testId={testId} showBaseGrid={false}>
+        {/* biome-ignore lint/complexity/noExcessiveCognitiveComplexity: per-cell tab rendering branches between owned and placeholder states with pickup/context-menu wiring. */}
         {materials.map((material, i) => {
           const gridX = i % 6;
           const gridY = Math.floor(i / 6);
           const style = { gridColumn: gridX + 1, gridRow: gridY + 1 };
-          const ownedItem = material.code ? ownedMap.get(material.code.toLowerCase()) : undefined;
+          const normalizedCode = material.code?.toLowerCase();
+          const ownedItem = normalizedCode ? ownedMap.get(normalizedCode) : undefined;
+          const codeItem = normalizedCode ? itemByCode.get(normalizedCode) : undefined;
 
           if (ownedItem) {
             return (
-              <div key={material.id} className="relative z-10" style={style}>
+              // biome-ignore lint/a11y/noStaticElementInteractions: wrapper div captures pickup click; the child InventoryTile button handles full keyboard accessibility.
+              // biome-ignore lint/a11y/useKeyWithClickEvents: keyboard accessibility provided by the child button (InventoryTile).
+              <div
+                key={material.id}
+                className="relative z-10"
+                style={style}
+                onClick={onItemClick ? () => onItemClick(ownedItem) : undefined}
+                onContextMenu={
+                  onItemContextMenu
+                    ? (e) => {
+                        e.preventDefault();
+                        onItemContextMenu(ownedItem);
+                      }
+                    : undefined
+                }
+              >
                 {renderOwnedTile(ownedItem)}
               </div>
             );
           }
 
           return (
-            <div key={material.id} className="relative z-10" style={style}>
+            // biome-ignore lint/a11y/noStaticElementInteractions: placeholder wrapper captures right-click decrement; this is a pointer-only convenience for stack pickup.
+            <div
+              key={material.id}
+              className="relative z-10"
+              style={style}
+              onContextMenu={
+                codeItem && onItemContextMenu
+                  ? (e) => {
+                      e.preventDefault();
+                      onItemContextMenu(codeItem);
+                    }
+                  : undefined
+              }
+            >
               <MaterialPlaceholderTile
                 imageFilename={material.imageFilename ?? ''}
                 materialName={material.name}

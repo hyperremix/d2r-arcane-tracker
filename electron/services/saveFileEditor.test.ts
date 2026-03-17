@@ -9,9 +9,12 @@ let mockD2sWrite: ReturnType<typeof vi.fn>;
 let mockD2stashRead: ReturnType<typeof vi.fn>;
 let mockD2stashWrite: ReturnType<typeof vi.fn>;
 let mockReadD2iMetadata: ReturnType<typeof vi.fn>;
+let mockReadItem: ReturnType<typeof vi.fn>;
+let mockWriteItem: ReturnType<typeof vi.fn>;
 let removeItemFromSaveFile: SaveFileEditorModule['removeItemFromSaveFile'];
 let addItemToSaveFile: SaveFileEditorModule['addItemToSaveFile'];
 let moveItemBetweenSaveFiles: SaveFileEditorModule['moveItemBetweenSaveFiles'];
+let splitStackInSaveFile: SaveFileEditorModule['splitStackInSaveFile'];
 
 const equipValidationConstantData = {
   other_items: {
@@ -45,6 +48,8 @@ beforeAll(async () => {
   mockD2stashRead = vi.fn();
   mockD2stashWrite = vi.fn();
   mockReadD2iMetadata = vi.fn();
+  mockReadItem = vi.fn();
+  mockWriteItem = vi.fn();
 
   vi.resetModules();
 
@@ -76,10 +81,61 @@ beforeAll(async () => {
     readD2iMetadata: mockReadD2iMetadata,
   }));
 
+  // Mock modernStashParser to prevent it from loading stashFormat transitively.
+  // With isolate:false, the stashFormat mock would otherwise contaminate tests
+  // in other files (modernStashParser.test.ts, saveFileMonitor.test.ts) that
+  // need the real readD2iMetadata implementation.
+  vi.doMock('./modernStashParser', () => ({
+    constants105Extended: {},
+    SHARED_TAB_COUNT: 5,
+    resolveStackCount: (item: {
+      magic_attributes?: Array<{ id?: unknown; values?: number[] }>;
+      quantity?: unknown;
+    }) => {
+      const attr381 = item.magic_attributes?.find((attribute) => attribute?.id === 381);
+      if (attr381 && typeof attr381.values?.[0] === 'number' && attr381.values[0] >= 1) {
+        return attr381.values[0];
+      }
+      if (
+        typeof item.quantity === 'number' &&
+        Number.isInteger(item.quantity) &&
+        item.quantity >= 1
+      ) {
+        return item.quantity;
+      }
+      return 1;
+    },
+  }));
+
+  // Mock BitReader and d2/items so modern stash binary-splice code can be exercised
+  // without requiring real binary d2i payloads.
+  vi.doMock('@dschu012/d2s/lib/binary/bitreader', () => ({
+    BitReader: vi.fn().mockImplementation(function (this: {
+      offset: number;
+      ReadString: ReturnType<typeof vi.fn>;
+      ReadUInt16: ReturnType<typeof vi.fn>;
+    }) {
+      this.offset = 0;
+      this.ReadString = vi.fn((n: number) => {
+        this.offset += n * 8;
+      });
+      this.ReadUInt16 = vi.fn(() => {
+        this.offset += 16;
+        return 0;
+      });
+    }),
+  }));
+
+  vi.doMock('@dschu012/d2s/lib/d2/items', () => ({
+    readItem: mockReadItem,
+    writeItem: mockWriteItem,
+  }));
+
   const module = await import('./saveFileEditor');
   removeItemFromSaveFile = module.removeItemFromSaveFile;
   addItemToSaveFile = module.addItemToSaveFile;
   moveItemBetweenSaveFiles = module.moveItemBetweenSaveFiles;
+  splitStackInSaveFile = module.splitStackInSaveFile;
 });
 
 type D2sItem = {
@@ -176,6 +232,60 @@ function makeStashData(pages: { id: number }[][] = []): StashData {
 
 const fakeBuffer = Buffer.from([0x01, 0x02]);
 const fakeResultBuffer = new Uint8Array([0x03, 0x04]);
+const D2I_SECTOR_HEADER_SIZE = 64;
+
+function createModernSectorPayload(itemCount: number, itemBytes: number[] = []): Buffer {
+  const payload = Buffer.alloc(4 + itemBytes.length);
+  payload.write('JM', 0, 'ascii');
+  payload.writeUInt16LE(itemCount, 2);
+  for (let i = 0; i < itemBytes.length; i += 1) {
+    payload[4 + i] = itemBytes[i];
+  }
+  return payload;
+}
+
+function createModernD2iTestBuffer(jmPayloads: Buffer[]): {
+  buffer: Buffer;
+  sectors: Array<{
+    offset: number;
+    size: number;
+    payloadOffset: number;
+    payloadSize: number;
+    payloadSignature: string;
+  }>;
+} {
+  const parts: Buffer[] = [];
+  const sectors: Array<{
+    offset: number;
+    size: number;
+    payloadOffset: number;
+    payloadSize: number;
+    payloadSignature: string;
+  }> = [];
+
+  let offset = 0;
+  for (const payload of jmPayloads) {
+    const header = Buffer.alloc(D2I_SECTOR_HEADER_SIZE);
+    const size = D2I_SECTOR_HEADER_SIZE + payload.length;
+    header.writeUInt32LE(0xaa55aa55, 0);
+    header.writeUInt32LE(size, 16);
+
+    parts.push(header, payload);
+    sectors.push({
+      offset,
+      size,
+      payloadOffset: offset + D2I_SECTOR_HEADER_SIZE,
+      payloadSize: payload.length,
+      payloadSignature: 'JM',
+    });
+    offset += size;
+  }
+
+  return {
+    buffer: Buffer.concat(parts),
+    sectors,
+  };
+}
 
 describe('When removeItemFromSaveFile is called', () => {
   beforeEach(() => {
@@ -263,17 +373,17 @@ describe('When removeItemFromSaveFile is called', () => {
       expect(mockD2stashWrite).toHaveBeenCalledWith(stashData, constants99, 99);
     });
 
-    it('Then rejects modern v105 stash writes with MODERN_STASH_READ_ONLY', async () => {
-      // Arrange
+    it('Then uses the modern stash removal path for v105 (does not throw MODERN_STASH_READ_ONLY)', async () => {
+      // Arrange — v105 with no sectors: modern path is entered, item not found
       mockReadD2iMetadata.mockReturnValue({
         version: 105,
         hardcore: false,
         sectors: [],
       });
 
-      // Act & Assert
+      // Act & Assert — modern path is taken; throws "not found", never "MODERN_STASH_READ_ONLY"
       await expect(removeItemFromSaveFile('/path/to/file.d2i', 'd2i', 11)).rejects.toThrow(
-        'MODERN_STASH_READ_ONLY',
+        'not found',
       );
       expect(mockD2stashRead).not.toHaveBeenCalled();
       expect(mockD2stashWrite).not.toHaveBeenCalled();
@@ -334,6 +444,72 @@ describe('When addItemToSaveFile is called', () => {
       expect(mockWriteFile).toHaveBeenCalledWith(
         '/path/to/char.d2s',
         Buffer.from(fakeResultBuffer),
+      );
+    });
+
+    it('Then modern resource-stack metadata is stripped before writing into inventory', async () => {
+      // Arrange
+      const d2sData = makeD2sData([]);
+      mockD2sRead.mockResolvedValue(d2sData);
+      const modernResourceItem = {
+        id: 0,
+        type: 'r12',
+        quantity: 42,
+        magic_attributes: [
+          { id: 381, values: [42] },
+          { id: 17, values: [1] },
+        ],
+      } as unknown as import('@dschu012/d2s').types.IItem;
+
+      // Act
+      await addItemToSaveFile('/path/to/char.d2s', 'd2s', modernResourceItem, 'inventory');
+
+      // Assert
+      expect(d2sData.items).toHaveLength(1);
+      expect(d2sData.items[0]).toEqual(
+        expect.objectContaining({
+          id: undefined,
+          quantity: 1,
+          location_id: 0,
+          alt_position_id: 1,
+        }),
+      );
+      expect(
+        (d2sData.items[0] as { magic_attributes?: Array<{ id?: number }> }).magic_attributes,
+      ).toEqual([{ id: 17, values: [1] }]);
+    });
+
+    it('Then string-encoded resource-stack attribute ids are stripped before writing', async () => {
+      // Arrange
+      const d2sData = makeD2sData([]);
+      mockD2sRead.mockResolvedValue(d2sData);
+      const modernResourceItem = {
+        id: 0,
+        type: 'r12',
+        quantity: 42,
+        magic_attributes: [
+          { id: '381', values: [42] },
+          { id: 17, values: [1] },
+        ],
+      } as unknown as import('@dschu012/d2s').types.IItem;
+
+      // Act
+      await addItemToSaveFile('/path/to/char.d2s', 'd2s', modernResourceItem, 'inventory');
+
+      // Assert
+      expect(d2sData.items).toHaveLength(1);
+      expect(
+        (
+          d2sData.items[0] as {
+            magic_attributes?: Array<{ id?: number | string }>;
+          }
+        ).magic_attributes,
+      ).toEqual([{ id: 17, values: [1] }]);
+      expect(d2sData.items[0]).toEqual(
+        expect.objectContaining({
+          id: undefined,
+          quantity: 1,
+        }),
       );
     });
   });
@@ -895,8 +1071,8 @@ describe('When addItemToSaveFile is called', () => {
   });
 
   describe('If sourceFileType is d2i and format is modern v105', () => {
-    it('Then it throws MODERN_STASH_READ_ONLY before mutating', async () => {
-      // Arrange
+    it('Then it throws MODERN_STASH_READ_ONLY for resource stash tabs (>= 5)', async () => {
+      // Arrange — resource tabs (5+) are read-only; shared tabs (0–4) use sector patching
       mockReadD2iMetadata.mockReturnValue({
         version: 105,
         hardcore: false,
@@ -905,10 +1081,95 @@ describe('When addItemToSaveFile is called', () => {
 
       // Act & Assert
       await expect(
-        addItemToSaveFile('/path/to/file.d2i', 'd2i', testItem, 'stash', 0),
+        addItemToSaveFile('/path/to/file.d2i', 'd2i', testItem, 'stash', 5),
       ).rejects.toThrow('MODERN_STASH_READ_ONLY');
       expect(mockD2stashRead).not.toHaveBeenCalled();
       expect(mockD2stashWrite).not.toHaveBeenCalled();
+    });
+
+    it('Then it prepends new item bytes and keeps trailing bytes at payload end', async () => {
+      // Arrange
+      const { buffer, sectors } = createModernD2iTestBuffer([
+        createModernSectorPayload(1, [0x11, 0x99]),
+      ]);
+      mockReadD2iMetadata.mockReturnValue({
+        version: 105,
+        hardcore: false,
+        sectors,
+      });
+      mockReadFile.mockResolvedValue(buffer);
+      mockReadItem.mockImplementation(async (reader: { offset: number }) => {
+        reader.offset += 8;
+        return { type: 'r01', code: 'r01', position_x: 0, position_y: 0 };
+      });
+      mockWriteItem.mockResolvedValue(new Uint8Array([0xaa]));
+
+      // Act
+      await addItemToSaveFile(
+        '/path/to/file.d2i',
+        'd2i',
+        {
+          type: 'r01',
+          code: 'r01',
+        } as unknown as import('@dschu012/d2s').types.IItem,
+        'stash',
+        0,
+        4,
+        4,
+      );
+
+      // Assert
+      expect(mockWriteFile).toHaveBeenCalledTimes(1);
+      const writtenBuffer = mockWriteFile.mock.calls[0]?.[1] as Buffer;
+      const writtenPayload = writtenBuffer.subarray(
+        D2I_SECTOR_HEADER_SIZE,
+        D2I_SECTOR_HEADER_SIZE + 7,
+      );
+      expect(writtenPayload.toString('ascii', 0, 2)).toBe('JM');
+      expect(writtenPayload.readUInt16LE(2)).toBe(2);
+      // New bytes are prepended before existing stream bytes so they remain visible under partial parse.
+      // Trailing tail bytes (0x99) remain at payload end.
+      expect([...writtenPayload.subarray(4)]).toEqual([0xaa, 0x11, 0x99]);
+    });
+
+    it('Then it preserves non-simple ids when adding to shared stash tabs', async () => {
+      // Arrange
+      const { buffer, sectors } = createModernD2iTestBuffer([createModernSectorPayload(0)]);
+      mockReadD2iMetadata.mockReturnValue({
+        version: 105,
+        hardcore: false,
+        sectors,
+      });
+      mockReadFile.mockResolvedValue(buffer);
+      mockWriteItem.mockResolvedValue(new Uint8Array([0xab]));
+
+      // Act
+      await addItemToSaveFile(
+        '/path/to/file.d2i',
+        'd2i',
+        {
+          id: 4242,
+          type: 'amu',
+          code: 'amu',
+          simple_item: 0,
+        } as unknown as import('@dschu012/d2s').types.IItem,
+        'stash',
+        0,
+        1,
+        1,
+      );
+
+      // Assert
+      const serialized = mockWriteItem.mock.calls[0]?.[0] as
+        | {
+            id?: unknown;
+            position_x?: number;
+            position_y?: number;
+          }
+        | undefined;
+      expect(serialized?.id).toBe(4242);
+      expect(serialized?.position_x).toBe(1);
+      expect(serialized?.position_y).toBe(1);
     });
   });
 });
@@ -1008,15 +1269,15 @@ describe('When moveItemBetweenSaveFiles is called', () => {
       );
     });
 
-    it('Then it rejects modern shared stash moves before writing either file', async () => {
-      // Arrange
+    it('Then it attempts modern stash path instead of rejecting with MODERN_STASH_READ_ONLY', async () => {
+      // Arrange — v105 with no sectors: modern path is entered, item not found in empty stash
       mockReadD2iMetadata.mockReturnValue({
         version: 105,
         hardcore: false,
         sectors: [],
       });
 
-      // Act & Assert
+      // Act & Assert — throws "not found" (modern path attempted), never MODERN_STASH_READ_ONLY
       await expect(
         moveItemBetweenSaveFiles({
           sourceFilePath: '/path/to/source.d2i',
@@ -1028,10 +1289,207 @@ describe('When moveItemBetweenSaveFiles is called', () => {
           targetGridX: 0,
           targetGridY: 0,
         }),
-      ).rejects.toThrow('MODERN_STASH_READ_ONLY');
+      ).rejects.toThrow('Source item not found');
       expect(mockD2sWrite).not.toHaveBeenCalled();
+      expect(mockWriteFile).not.toHaveBeenCalled();
+    });
+
+    it('Then it uses the modern stash path for same-file d2i moves', async () => {
+      // Arrange — same-file v105 move: delegates to moveItemWithinSingleSaveFile
+      mockReadD2iMetadata.mockReturnValue({
+        version: 105,
+        hardcore: false,
+        sectors: [],
+      });
+
+      // Act & Assert — modern path is entered; throws "not found" from empty sectors, no legacy writes
+      await expect(
+        moveItemBetweenSaveFiles({
+          sourceFilePath: '/path/to/stash.d2i',
+          sourceFileType: 'd2i',
+          sourceItemId: 55,
+          targetFilePath: '/path/to/stash.d2i',
+          targetFileType: 'd2i',
+          targetLocationContext: 'stash',
+          targetStashTab: 1,
+        }),
+      ).rejects.toThrow('Source item not found in stash file');
+      expect(mockD2stashRead).not.toHaveBeenCalled();
       expect(mockD2stashWrite).not.toHaveBeenCalled();
       expect(mockWriteFile).not.toHaveBeenCalled();
     });
+  });
+
+  describe('If source and target are the same modern d2i shared tab', () => {
+    it('Then it removes the source by coordinates, not the just-added copy with the same id', async () => {
+      // Arrange
+      const { buffer, sectors } = createModernD2iTestBuffer([createModernSectorPayload(1, [0x11])]);
+      let currentBuffer = buffer;
+      mockReadD2iMetadata.mockReturnValue({
+        version: 105,
+        hardcore: false,
+        sectors,
+      });
+      mockReadFile.mockImplementation(async () => currentBuffer);
+      mockWriteFile.mockImplementation(async (_path: string, nextBuffer: Buffer) => {
+        currentBuffer = Buffer.from(nextBuffer);
+      });
+      mockWriteItem.mockResolvedValue(new Uint8Array([0xaa]));
+
+      let readItemCall = 0;
+      mockReadItem.mockImplementation(async (reader: { offset: number }) => {
+        readItemCall += 1;
+        reader.offset += 8;
+        if (readItemCall === 3) {
+          // First parsed item during removal = newly inserted target copy.
+          return {
+            id: 777,
+            type: 'amu',
+            code: 'amu',
+            simple_item: 0,
+            position_x: 2,
+            position_y: 1,
+          };
+        }
+        // Source item in find/add parse and as second parsed item in removal.
+        return {
+          id: 777,
+          type: 'amu',
+          code: 'amu',
+          simple_item: 0,
+          position_x: 1,
+          position_y: 1,
+        };
+      });
+
+      // Act
+      await moveItemBetweenSaveFiles({
+        sourceFilePath: '/path/to/stash.d2i',
+        sourceFileType: 'd2i',
+        sourceItemId: 777,
+        sourceStashTab: 0,
+        sourceGridXFromItem: 1,
+        sourceGridYFromItem: 1,
+        targetFilePath: '/path/to/stash.d2i',
+        targetFileType: 'd2i',
+        targetLocationContext: 'stash',
+        targetStashTab: 0,
+        targetGridX: 2,
+        targetGridY: 1,
+      });
+
+      // Assert
+      // Expected readItem calls:
+      // 1) find source
+      // 2) parse existing items while adding
+      // 3) parse newly inserted item during removal (must NOT match)
+      // 4) parse original source item during removal (must match and be removed)
+      expect(mockReadItem).toHaveBeenCalledTimes(4);
+
+      const serialized = mockWriteItem.mock.calls[0]?.[0] as
+        | {
+            id?: unknown;
+            position_x?: number;
+            position_y?: number;
+          }
+        | undefined;
+      expect(serialized?.id).toBe(777);
+      expect(serialized?.position_x).toBe(2);
+      expect(serialized?.position_y).toBe(1);
+    });
+  });
+});
+
+describe('When splitStackInSaveFile is called for modern resource stacks', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockWriteFile.mockResolvedValue(undefined);
+    mockWriteItem.mockResolvedValue(new Uint8Array([0xaa]));
+    mockReadItem.mockReset();
+  });
+
+  it('Then it updates resource-stack magic attribute 381 when reducing the source stack', async () => {
+    // Arrange
+    const { buffer, sectors } = createModernD2iTestBuffer([
+      createModernSectorPayload(0),
+      createModernSectorPayload(0),
+      createModernSectorPayload(0),
+      createModernSectorPayload(0),
+      createModernSectorPayload(0),
+      createModernSectorPayload(1, [0xff]),
+    ]);
+
+    mockReadD2iMetadata.mockReturnValue({
+      version: 105,
+      hardcore: false,
+      sectors,
+    });
+    mockReadFile.mockResolvedValue(buffer);
+    mockReadItem.mockImplementation(async (reader: { offset: number }) => {
+      reader.offset += 8;
+      return {
+        type: 'r19',
+        code: 'r19',
+        quantity: 1,
+        magic_attributes: [{ id: 381, values: [5] }],
+      };
+    });
+    mockWriteItem
+      .mockResolvedValueOnce(new Uint8Array([0x01]))
+      .mockResolvedValueOnce(new Uint8Array([0x02]))
+      .mockResolvedValueOnce(new Uint8Array([0x03]));
+
+    // Act
+    await splitStackInSaveFile({
+      sourceFilePath: '/path/to/modern.d2i',
+      sourceFileType: 'd2i',
+      sourceStashTab: 7,
+      sourceItemCode: 'r19',
+      sourceRawItemJson: JSON.stringify({
+        type: 'r19',
+        code: 'r19',
+        quantity: 5,
+      }),
+      splitCount: 2,
+      targets: [
+        {
+          targetFilePath: '/path/to/modern.d2i',
+          targetFileType: 'd2i',
+          targetLocationContext: 'stash',
+          targetStashTab: 0,
+          targetGridX: 1,
+          targetGridY: 1,
+        },
+        {
+          targetFilePath: '/path/to/modern.d2i',
+          targetFileType: 'd2i',
+          targetLocationContext: 'stash',
+          targetStashTab: 0,
+          targetGridX: 2,
+          targetGridY: 1,
+        },
+      ],
+    });
+
+    // Assert
+    expect(mockWriteItem).toHaveBeenCalledTimes(3);
+    const reducedSourceItem = mockWriteItem.mock.calls
+      .map((call) => call[0])
+      .find((item) => {
+        const typedItem = item as { magic_attributes?: Array<{ id?: number; values?: number[] }> };
+        return typedItem.magic_attributes?.some((attribute) => attribute.id === 381);
+      }) as
+      | {
+          quantity?: number;
+          magic_attributes?: Array<{ id?: number; values?: number[] }>;
+        }
+      | undefined;
+    expect(reducedSourceItem).toBeDefined();
+    const reducedSourceItemDefined = reducedSourceItem as {
+      quantity?: number;
+      magic_attributes?: Array<{ id?: number; values?: number[] }>;
+    };
+    expect(reducedSourceItemDefined.quantity).toBe(3);
+    expect(reducedSourceItemDefined.magic_attributes).toEqual([{ id: 381, values: [3] }]);
   });
 });

@@ -2,10 +2,13 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { extname } from 'node:path';
 import type { types as d2sTypes } from '@dschu012/d2s';
 import * as d2s from '@dschu012/d2s';
+import { BitReader } from '@dschu012/d2s/lib/binary/bitreader';
+import { readItem, writeItem } from '@dschu012/d2s/lib/d2/items';
 import * as d2stash from '@dschu012/d2s/lib/d2/stash';
 import { constants as constants96 } from '@dschu012/d2s/lib/data/versions/96_constant_data';
 import { constants as constants99 } from '@dschu012/d2s/lib/data/versions/99_constant_data';
 import type { CharacterClass, VaultLocationContext, VaultSourceFileType } from '../types/grail';
+import { constants105Extended, resolveStackCount, SHARED_TAB_COUNT } from './modernStashParser';
 import { readD2iMetadata } from './stashFormat';
 
 type StashConstants = {
@@ -16,7 +19,10 @@ type StashConstants = {
 interface MoveSaveFileItemOptions {
   sourceFilePath: string;
   sourceFileType: VaultSourceFileType;
-  sourceItemId: number;
+  sourceItemId: number | undefined;
+  sourceStashTab?: number;
+  sourceGridXFromItem?: number;
+  sourceGridYFromItem?: number;
   targetFilePath: string;
   targetFileType: VaultSourceFileType;
   targetLocationContext: VaultLocationContext;
@@ -649,6 +655,14 @@ async function findItemInSaveFile(
   }
 
   const ext = extname(filePath);
+
+  if (ext === '.d2i') {
+    const metadata = readD2iMetadata(buffer);
+    if (metadata.version >= 105) {
+      return findItemInModernStashSharedPage(filePath, itemId);
+    }
+  }
+
   const { constants } = getStashConstants(ext);
   const data = await d2stash.read(buffer, constants);
 
@@ -662,16 +676,19 @@ async function findItemInSaveFile(
   return undefined;
 }
 
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Handles d2s, classic stash, and modern d2i move paths in a single coordinated function. Splitting further would require passing complex partial state between helpers.
 async function moveItemWithinSingleSaveFile(options: MoveSaveFileItemOptions): Promise<void> {
   const { sourceFilePath, sourceFileType, sourceItemId } = options;
   const buffer = await readFile(sourceFilePath);
 
   if (sourceFileType === 'd2s') {
+    // Non-d2i paths always receive a numeric item id (non-simple items only).
+    const numericItemId = sourceItemId as number;
     const data = await d2s.read(buffer);
     const sourceItem =
-      extractItemById(data.items, sourceItemId) ??
-      extractItemById(data.corpse_items, sourceItemId) ??
-      extractItemById(data.merc_items, sourceItemId);
+      extractItemById(data.items, numericItemId) ??
+      extractItemById(data.corpse_items, numericItemId) ??
+      extractItemById(data.merc_items, numericItemId);
 
     if (!sourceItem) {
       throw new Error('Source item not found in save file');
@@ -699,13 +716,51 @@ async function moveItemWithinSingleSaveFile(options: MoveSaveFileItemOptions): P
   }
 
   const ext = extname(sourceFilePath);
+
+  if (ext === '.d2i') {
+    const metadata = readD2iMetadata(buffer);
+    if (metadata.version >= 105) {
+      const targetTab = options.targetStashTab ?? 0;
+      if (targetTab >= SHARED_TAB_COUNT) {
+        throw new Error('MODERN_STASH_READ_ONLY');
+      }
+      const sourceItem = await findItemInModernStashSharedPage(
+        sourceFilePath,
+        sourceItemId,
+        options.sourceStashTab,
+        options.sourceGridXFromItem,
+        options.sourceGridYFromItem,
+      );
+      if (!sourceItem) {
+        throw new Error('Source item not found in stash file');
+      }
+      await addItemToModernStashSharedPage(
+        sourceFilePath,
+        sourceItem,
+        targetTab,
+        options.targetGridX ?? 0,
+        options.targetGridY ?? 0,
+      );
+      await removeItemFromModernStashSharedPage(
+        sourceFilePath,
+        sourceItemId,
+        options.sourceStashTab,
+        options.sourceGridXFromItem,
+        options.sourceGridYFromItem,
+      );
+      return;
+    }
+  }
+
   assertWritableD2iBuffer(ext, buffer);
   const { constants, version } = getStashConstants(ext);
   const data = await d2stash.read(buffer, constants);
+  // Classic stash paths always receive a numeric id (non-modern d2i handled above).
+  const classicItemId = sourceItemId as number;
   let sourceItem: d2sTypes.IItem | undefined;
 
   for (const page of data.pages) {
-    const extracted = extractItemById(page.items, sourceItemId);
+    const extracted = extractItemById(page.items, classicItemId);
     if (extracted) {
       sourceItem = extracted;
       break;
@@ -752,6 +807,15 @@ export async function removeItemFromSaveFile(
   }
 
   const ext = extname(filePath);
+
+  if (ext === '.d2i') {
+    const metadata = readD2iMetadata(buffer);
+    if (metadata.version >= 105) {
+      await removeItemFromModernStashSharedPage(filePath, itemId);
+      return;
+    }
+  }
+
   assertWritableD2iBuffer(ext, buffer);
   const { constants, version } = getStashConstants(ext);
   const data = await d2stash.read(buffer, constants);
@@ -762,6 +826,419 @@ export async function removeItemFromSaveFile(
 
   const result = await d2stash.write(data, constants, version);
   await writeFile(filePath, Buffer.from(result));
+}
+
+// Size in bytes of the sector header in a .d2i file.
+const D2I_SECTOR_HEADER_SIZE = 64;
+// Byte offset within the sector header where the total sector size (header + payload) is stored.
+const D2I_SECTOR_SIZE_FIELD_OFFSET = 16;
+// Resource-stash stack-count magic attribute ID (9-bit unsigned, D2R-only).
+const RESOURCE_STASH_ATTR_ID = 381;
+
+/**
+ * Appends one item to a shared stash sector (tabs 0–4) inside a modern .d2i file.
+ * The sector payload is a standard JM item list. We binary-splice: reuse existing
+ * item bytes unchanged and only serialize the new item, then patch the count field
+ * and sector size and rebuild the file buffer.
+ */
+// Byte offsets within a JM item-list header.
+const JM_ITEM_COUNT_OFFSET = 2; // bytes 2-3 = LE uint16 item count
+const JM_ITEM_DATA_OFFSET = 4; // item bytes start at byte 4
+
+/**
+ * Rebuilds a .d2i buffer, replacing one sector's payload with `newPayload`.
+ * All other sectors are kept byte-for-byte identical.
+ */
+function rebuildD2iBuffer(
+  buffer: Buffer,
+  sectors: Array<{ offset: number; size: number }>,
+  targetSectorOffset: number,
+  newPayload: Buffer,
+): Buffer {
+  const parts: Buffer[] = [];
+  for (const sector of sectors) {
+    const header = Buffer.from(
+      buffer.subarray(sector.offset, sector.offset + D2I_SECTOR_HEADER_SIZE),
+    );
+    if (sector.offset === targetSectorOffset) {
+      header.writeUInt32LE(
+        D2I_SECTOR_HEADER_SIZE + newPayload.length,
+        D2I_SECTOR_SIZE_FIELD_OFFSET,
+      );
+      parts.push(header, newPayload);
+    } else {
+      const sectorData = buffer.subarray(
+        sector.offset + D2I_SECTOR_HEADER_SIZE,
+        sector.offset + sector.size,
+      );
+      parts.push(header, Buffer.from(sectorData));
+    }
+  }
+  return Buffer.concat(parts);
+}
+
+/**
+ * Returns true if an item matches the given identifier — by numeric id when
+ * available (non-simple items), or by grid position (simple items like gems/runes).
+ */
+function itemMatchesLocator(
+  item: d2sTypes.IItem,
+  itemId: number | undefined,
+  gridX?: number,
+  gridY?: number,
+): boolean {
+  if (gridX !== undefined && gridY !== undefined) {
+    // When source coordinates are known (modern drag/drop and stack-pickup flows),
+    // treat them as the authoritative locator. Falling back to id here can remove
+    // the just-inserted copy during same-tab moves because both items share id
+    // until the source is removed.
+    return item.position_x === gridX && item.position_y === gridY;
+  }
+  if (itemId !== undefined && itemMatchesId(item, itemId)) {
+    return true;
+  }
+  return false;
+}
+
+function stripResourceStashStackMetadata(item: d2sTypes.IItem): d2sTypes.IItem {
+  const magicAttributes = item.magic_attributes as Array<{ id?: unknown }> | undefined;
+  if (!Array.isArray(magicAttributes)) {
+    return item;
+  }
+
+  const isResourceStackAttributeId = (value: unknown): boolean => {
+    if (value === RESOURCE_STASH_ATTR_ID) {
+      return true;
+    }
+
+    if (typeof value === 'string' && value.trim().length > 0) {
+      const parsed = Number.parseInt(value, 10);
+      return Number.isInteger(parsed) && parsed === RESOURCE_STASH_ATTR_ID;
+    }
+
+    return false;
+  };
+
+  const hasResourceStashStackAttribute = magicAttributes.some((attribute) =>
+    isResourceStackAttributeId(attribute?.id),
+  );
+  if (!hasResourceStashStackAttribute) {
+    return item;
+  }
+
+  return {
+    ...item,
+    quantity: 1,
+    magic_attributes: magicAttributes.filter(
+      (attribute) => !isResourceStackAttributeId(attribute?.id),
+    ),
+    id: undefined,
+  };
+}
+
+function withUpdatedResourceStackCount(item: d2sTypes.IItem, newCount: number): d2sTypes.IItem {
+  const magicAttributes = item.magic_attributes as
+    | Array<{ id?: unknown; values?: unknown; [key: string]: unknown }>
+    | undefined;
+
+  if (!Array.isArray(magicAttributes)) {
+    return { ...item, quantity: newCount };
+  }
+
+  let hasResourceStackAttribute = false;
+  const nextMagicAttributes = magicAttributes.map((attribute) => {
+    const rawId = attribute?.id;
+    const normalizedId =
+      typeof rawId === 'string' && rawId.trim().length > 0 ? Number.parseInt(rawId, 10) : rawId;
+
+    if (normalizedId !== RESOURCE_STASH_ATTR_ID) {
+      return attribute;
+    }
+
+    hasResourceStackAttribute = true;
+    return {
+      ...attribute,
+      values: [newCount],
+    };
+  });
+
+  if (!hasResourceStackAttribute) {
+    return { ...item, quantity: newCount };
+  }
+
+  return {
+    ...item,
+    quantity: newCount,
+    magic_attributes: nextMagicAttributes,
+  };
+}
+
+/**
+ * Finds an item in the shared stash sectors (JM sectors 0–SHARED_TAB_COUNT-1)
+ * of a modern .d2i file. Matches by numeric id when present (non-simple items),
+ * or by grid position (simple items like gems/runes that have no stored id).
+ * Returns undefined if not found.
+ */
+async function findItemInModernStashSharedPage(
+  filePath: string,
+  itemId: number | undefined,
+  stashTab?: number,
+  gridX?: number,
+  gridY?: number,
+): Promise<d2sTypes.IItem | undefined> {
+  const buffer = await readFile(filePath);
+  const metadata = readD2iMetadata(buffer);
+
+  const jmSectors = metadata.sectors
+    .map((sector, index) => ({ sectorIndex: index, ...sector }))
+    .filter((s) => s.payloadSignature === 'JM')
+    .sort((a, b) => a.sectorIndex - b.sectorIndex);
+
+  const config = { extendedStash: false, sortProperties: true };
+  const constants = constants105Extended as unknown as d2sTypes.IConstantData;
+
+  const startIdx = stashTab !== undefined ? stashTab : 0;
+  const endIdx = stashTab !== undefined ? stashTab + 1 : SHARED_TAB_COUNT;
+
+  for (let jmIdx = startIdx; jmIdx < endIdx && jmIdx < jmSectors.length; jmIdx++) {
+    const targetSector = jmSectors[jmIdx];
+    const payload = Buffer.from(
+      buffer.subarray(
+        targetSector.payloadOffset,
+        targetSector.payloadOffset + targetSector.payloadSize,
+      ),
+    );
+
+    if (payload.length < JM_ITEM_DATA_OFFSET || payload.toString('ascii', 0, 2) !== 'JM') {
+      continue;
+    }
+
+    const count = payload.readUInt16LE(JM_ITEM_COUNT_OFFSET);
+    const reader = new BitReader(payload);
+    reader.ReadString(2); // skip "JM"
+    reader.ReadUInt16(); // skip count
+
+    for (let i = 0; i < count; i++) {
+      let item: d2sTypes.IItem;
+      try {
+        item = await readItem(reader, metadata.version, constants, config);
+      } catch {
+        // Cannot parse this item — stop searching this sector (reader offset unknown)
+        break;
+      }
+      if (itemMatchesLocator(item, itemId, gridX, gridY)) {
+        return item;
+      }
+    }
+  }
+
+  return undefined;
+}
+
+/**
+ * Removes an item from the shared stash sectors (JM sectors 0–SHARED_TAB_COUNT-1)
+ * of a modern .d2i file. Matches by numeric id (non-simple items) or by grid
+ * position (simple items like gems/runes that have no stored id).
+ *
+ * Uses binary splice: items are parsed one-by-one and parsing stops as soon as
+ * the target is matched. Items after the target are kept as raw bytes without
+ * further parsing — this prevents failures for items with unsupported attributes.
+ *
+ * Throws if the item is not found in any shared tab.
+ */
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Handles multi-sector search, per-item parsing with early exit, binary splice, and graceful fallback — each branch is necessary.
+async function removeItemFromModernStashSharedPage(
+  filePath: string,
+  itemId: number | undefined,
+  stashTab?: number,
+  gridX?: number,
+  gridY?: number,
+): Promise<void> {
+  const buffer = await readFile(filePath);
+  const metadata = readD2iMetadata(buffer);
+
+  const jmSectors = metadata.sectors
+    .map((sector, index) => ({ sectorIndex: index, ...sector }))
+    .filter((s) => s.payloadSignature === 'JM')
+    .sort((a, b) => a.sectorIndex - b.sectorIndex);
+
+  const config = { extendedStash: false, sortProperties: true };
+  const constants = constants105Extended as unknown as d2sTypes.IConstantData;
+
+  const startIdx = stashTab !== undefined ? stashTab : 0;
+  const endIdx = stashTab !== undefined ? stashTab + 1 : SHARED_TAB_COUNT;
+
+  for (let jmIdx = startIdx; jmIdx < endIdx && jmIdx < jmSectors.length; jmIdx++) {
+    const targetSector = jmSectors[jmIdx];
+    const payload = Buffer.from(
+      buffer.subarray(
+        targetSector.payloadOffset,
+        targetSector.payloadOffset + targetSector.payloadSize,
+      ),
+    );
+
+    if (payload.length < JM_ITEM_DATA_OFFSET || payload.toString('ascii', 0, 2) !== 'JM') {
+      continue;
+    }
+
+    const count = payload.readUInt16LE(JM_ITEM_COUNT_OFFSET);
+    const reader = new BitReader(payload);
+    reader.ReadString(2); // skip "JM"
+    reader.ReadUInt16(); // skip count
+
+    let matchStartByte: number | undefined;
+    let matchEndByte: number | undefined;
+
+    // Parse items one-by-one and stop as soon as the target is found.
+    // Items after the match are NOT parsed — their raw bytes are spliced verbatim.
+    // This prevents "Save Bits is undefined" failures for items with unsupported
+    // magic attributes that happen to sit after the target in the same sector.
+    for (let i = 0; i < count; i++) {
+      const startBit = reader.offset;
+      let item: d2sTypes.IItem;
+      try {
+        item = await readItem(reader, metadata.version, constants, config);
+      } catch {
+        // Cannot parse this item — if we haven't found the target yet, abort
+        break;
+      }
+      const endBit = reader.offset;
+
+      if (itemMatchesLocator(item, itemId, gridX, gridY)) {
+        matchStartByte = startBit / 8;
+        matchEndByte = endBit / 8;
+        break; // Stop here — do not parse any further items
+      }
+    }
+
+    if (matchStartByte === undefined || matchEndByte === undefined) {
+      continue; // Not found in this sector — try next
+    }
+
+    const beforeBytes = payload.subarray(JM_ITEM_DATA_OFFSET, matchStartByte);
+    // afterBytes covers all remaining raw item bytes from the item after the match
+    const afterBytes = payload.subarray(matchEndByte);
+
+    const newHeader = Buffer.alloc(JM_ITEM_DATA_OFFSET);
+    newHeader.write('JM', 0, 'ascii');
+    newHeader.writeUInt16LE(count - 1, JM_ITEM_COUNT_OFFSET);
+    const newPayload = Buffer.concat([newHeader, beforeBytes, afterBytes]);
+
+    await writeFile(
+      filePath,
+      rebuildD2iBuffer(buffer, metadata.sectors, targetSector.offset, newPayload),
+    );
+    return;
+  }
+
+  throw new Error('Item not found in any modern stash shared tab');
+}
+
+async function addItemToModernStashSharedPageBuffer(
+  buffer: Buffer,
+  item: d2sTypes.IItem,
+  stashTab: number,
+  gridX: number,
+  gridY: number,
+): Promise<Buffer> {
+  const metadata = readD2iMetadata(buffer);
+
+  const jmSectors = metadata.sectors
+    .map((sector, index) => ({ sectorIndex: index, ...sector }))
+    .filter((s) => s.payloadSignature === 'JM')
+    .sort((a, b) => a.sectorIndex - b.sectorIndex);
+
+  if (stashTab >= jmSectors.length) {
+    throw new Error(
+      `Stash tab ${stashTab} not found in modern stash (${jmSectors.length} JM sectors)`,
+    );
+  }
+
+  const targetSector = jmSectors[stashTab];
+  const payload = Buffer.from(
+    buffer.subarray(
+      targetSector.payloadOffset,
+      targetSector.payloadOffset + targetSector.payloadSize,
+    ),
+  );
+
+  if (payload.length < JM_ITEM_DATA_OFFSET || payload.toString('ascii', 0, 2) !== 'JM') {
+    throw new Error(`Invalid JM sector payload for stash tab ${stashTab}`);
+  }
+
+  const existingCount = payload.readUInt16LE(JM_ITEM_COUNT_OFFSET);
+
+  // Strip the resource-stash quantity attribute and set correct stash location fields.
+  // We only serialize the NEW item — existing items are kept as raw bytes, avoiding
+  // the need to parse them (which would fail for items with stats that lack sB).
+  const normalizedItem = stripResourceStashStackMetadata(item);
+  const isSimpleItem = (normalizedItem as { simple_item?: unknown }).simple_item === 1;
+  const newItem: d2sTypes.IItem = {
+    ...normalizedItem,
+    location_id: 0,
+    alt_position_id: 5,
+    equipped_id: 0,
+    position_x: gridX,
+    position_y: gridY,
+    quantity: 1,
+    // Keep ids for non-simple items so they remain movable after repeated shared-tab moves.
+    // Simple resource-derived items are intentionally id-less.
+    id: isSimpleItem ? undefined : normalizedItem.id,
+  };
+
+  const config = { extendedStash: false, sortProperties: true };
+  const constants = constants105Extended as unknown as d2sTypes.IConstantData;
+  const newItemBytes = Buffer.from(await writeItem(newItem, metadata.version, constants, config));
+
+  // Some modern sectors may contain trailing bytes after the counted item stream.
+  // If we can parse all existing items, insert new item bytes before that trailing tail.
+  // Otherwise, fall back to appending at the payload end (legacy behavior).
+  let existingItemBytes = payload.subarray(JM_ITEM_DATA_OFFSET);
+  let trailingBytes = Buffer.alloc(0);
+  try {
+    const reader = new BitReader(payload);
+    reader.ReadString(2); // skip "JM"
+    reader.ReadUInt16(); // skip count
+
+    for (let i = 0; i < existingCount; i += 1) {
+      await readItem(reader, metadata.version, constants, config);
+    }
+
+    const itemDataEndByte = reader.offset / 8;
+    existingItemBytes = payload.subarray(JM_ITEM_DATA_OFFSET, itemDataEndByte);
+    trailingBytes = payload.subarray(itemDataEndByte);
+  } catch {
+    // Keep fallback (append at end) if we cannot safely parse all existing items.
+  }
+
+  // Binary splice: reuse the raw existing-item bytes and prepend the serialized new item.
+  // Prepending makes newly placed items visible even when parsing later existing items fails
+  // (for example, unsupported/modded attrs in shared tabs).
+  // If trailing bytes are present, keep them after the item stream.
+  const newHeader = Buffer.alloc(JM_ITEM_DATA_OFFSET);
+  newHeader.write('JM', 0, 'ascii');
+  newHeader.writeUInt16LE(existingCount + 1, JM_ITEM_COUNT_OFFSET);
+  const newPayload = Buffer.concat([newHeader, newItemBytes, existingItemBytes, trailingBytes]);
+
+  return rebuildD2iBuffer(buffer, metadata.sectors, targetSector.offset, newPayload);
+}
+
+async function addItemToModernStashSharedPage(
+  filePath: string,
+  item: d2sTypes.IItem,
+  stashTab: number,
+  gridX: number,
+  gridY: number,
+): Promise<void> {
+  const buffer = await readFile(filePath);
+  const nextBuffer = await addItemToModernStashSharedPageBuffer(
+    buffer,
+    item,
+    stashTab,
+    gridX,
+    gridY,
+  );
+  await writeFile(filePath, nextBuffer);
 }
 
 export async function addItemToSaveFile(
@@ -775,11 +1252,12 @@ export async function addItemToSaveFile(
   targetEquippedSlotId?: number,
 ): Promise<void> {
   const buffer = await readFile(filePath);
+  const normalizedItem = stripResourceStashStackMetadata(item);
 
   if (fileType === 'd2s') {
     const data = await d2s.read(buffer);
     const itemToWrite = withD2SLocationContext(
-      withTargetCoordinates(item, targetGridX, targetGridY),
+      withTargetCoordinates(normalizedItem, targetGridX, targetGridY),
       locationContext,
       data.items,
       resolveTargetCharacterClass(data),
@@ -800,10 +1278,28 @@ export async function addItemToSaveFile(
   }
 
   const ext = extname(filePath);
+
+  // Modern .d2i: shared stash pages (tabs 0–4) are writable via sector patching.
+  if (
+    ext === '.d2i' &&
+    locationContext === 'stash' &&
+    typeof stashTab === 'number' &&
+    stashTab < SHARED_TAB_COUNT
+  ) {
+    await addItemToModernStashSharedPage(
+      filePath,
+      item,
+      stashTab,
+      targetGridX ?? 0,
+      targetGridY ?? 0,
+    );
+    return;
+  }
+
   assertWritableD2iBuffer(ext, buffer);
   const { constants, version } = getStashConstants(ext);
   const data = await d2stash.read(buffer, constants);
-  const itemToWrite = withTargetCoordinates(item, targetGridX, targetGridY);
+  const itemToWrite = withTargetCoordinates(normalizedItem, targetGridX, targetGridY);
 
   const targetTab = stashTab ?? 0;
 
@@ -818,6 +1314,527 @@ export async function addItemToSaveFile(
   await writeFile(filePath, Buffer.from(result));
 }
 
+interface SplitStackTarget {
+  targetFilePath: string;
+  targetFileType: VaultSourceFileType;
+  targetLocationContext: VaultLocationContext;
+  targetStashTab?: number;
+  targetGridX: number;
+  targetGridY: number;
+}
+
+interface SplitStackOptions {
+  sourceFilePath: string;
+  sourceFileType: VaultSourceFileType;
+  sourceStashTab: number;
+  sourceItemCode: string;
+  /** Raw JSON of the source IItem. Required when sourceFileType is 'd2i' (modern stash). */
+  sourceRawItemJson?: string;
+  splitCount: number;
+  targets: SplitStackTarget[];
+}
+
+function normalizeItemCode(value: unknown): string | undefined {
+  if (typeof value !== 'string') {
+    return undefined;
+  }
+  const normalized = value.trim().replace(/\0/g, '').toLowerCase();
+  return normalized.length > 0 ? normalized : undefined;
+}
+
+function findItemByCode(items: d2sTypes.IItem[], code: string): d2sTypes.IItem | undefined {
+  return items.find((item) => {
+    const itemCode = normalizeItemCode(
+      (item as { code?: unknown; type?: unknown }).code ?? (item as { type?: unknown }).type,
+    );
+    return itemCode === code;
+  });
+}
+
+function getItemQuantity(item: d2sTypes.IItem): number {
+  const qty = (item as { quantity?: unknown }).quantity;
+  if (typeof qty === 'number' && Number.isInteger(qty) && qty >= 1) {
+    return qty;
+  }
+  return 1;
+}
+
+function withQuantityOne(item: d2sTypes.IItem): d2sTypes.IItem {
+  return { ...item, quantity: 1 };
+}
+
+function withReducedQuantity(item: d2sTypes.IItem, reduceBy: number): d2sTypes.IItem {
+  const current = getItemQuantity(item);
+  const next = Math.max(0, current - reduceBy);
+  return { ...item, quantity: next };
+}
+
+/**
+ * Reduces the quantity of a stackable item in a modern stash resource sector (runes/gems/materials).
+ * Removes the item entirely if its quantity reaches zero.
+ *
+ * Searches ALL resource sectors (JM sectors at index >= SHARED_TAB_COUNT) for the best matching
+ * source entry by item code and optional source hints. Uses binary splice: only the modified item
+ * is re-serialized; all other items keep their original raw bytes, avoiding round-trip data loss.
+ */
+interface ModernResourceSector {
+  sectorIndex: number;
+  offset: number;
+  size: number;
+  payloadOffset: number;
+  payloadSize: number;
+}
+
+interface ResourceSectorItemEntry {
+  sector: ModernResourceSector;
+  count: number;
+  startByte: number;
+  endByte: number;
+  item: d2sTypes.IItem;
+}
+
+interface ResourceStackMatchHint {
+  positionX?: number;
+  positionY?: number;
+  stackCount?: number;
+}
+
+function resolveModernJmSectors(buffer: Buffer): {
+  metadata: ReturnType<typeof readD2iMetadata>;
+  jmSectors: ModernResourceSector[];
+} {
+  const metadata = readD2iMetadata(buffer);
+  const jmSectors = metadata.sectors
+    .map((sector, index) => ({ sectorIndex: index, ...sector }))
+    .filter((s) => s.payloadSignature === 'JM')
+    .sort((a, b) => a.sectorIndex - b.sectorIndex);
+
+  return { metadata, jmSectors };
+}
+
+async function readResourceSectorEntries(
+  buffer: Buffer,
+  jmSectors: ModernResourceSector[],
+  version: number,
+): Promise<ResourceSectorItemEntry[]> {
+  const config = { extendedStash: false, sortProperties: true };
+  const constants = constants105Extended as unknown as d2sTypes.IConstantData;
+  const entries: ResourceSectorItemEntry[] = [];
+
+  // Resource sectors live at JM indices >= SHARED_TAB_COUNT.
+  for (let jmIdx = SHARED_TAB_COUNT; jmIdx < jmSectors.length; jmIdx++) {
+    const targetSector = jmSectors[jmIdx];
+    const payload = Buffer.from(
+      buffer.subarray(
+        targetSector.payloadOffset,
+        targetSector.payloadOffset + targetSector.payloadSize,
+      ),
+    );
+
+    if (payload.length < JM_ITEM_DATA_OFFSET || payload.toString('ascii', 0, 2) !== 'JM') {
+      continue;
+    }
+
+    const count = payload.readUInt16LE(JM_ITEM_COUNT_OFFSET);
+
+    // Read items one at a time, tracking byte boundaries via reader.offset.
+    const reader = new BitReader(payload);
+    reader.ReadString(2); // skip "JM"
+    reader.ReadUInt16(); // skip count
+
+    for (let i = 0; i < count; i++) {
+      const startBit = reader.offset;
+      const item = await readItem(reader, version, constants, config);
+      const endBit = reader.offset;
+      entries.push({
+        sector: targetSector,
+        count,
+        startByte: startBit / 8,
+        endByte: endBit / 8,
+        item,
+      });
+    }
+  }
+
+  return entries;
+}
+
+function selectResourceStackEntry(
+  entries: ResourceSectorItemEntry[],
+  itemCode: string,
+  hint?: ResourceStackMatchHint,
+): ResourceSectorItemEntry | undefined {
+  const normalizedCode = normalizeItemCode(itemCode);
+  if (!normalizedCode) {
+    return undefined;
+  }
+
+  const matchingEntries = entries.filter((entry) => {
+    const code = normalizeItemCode(
+      (entry.item as { code?: unknown; type?: unknown }).code ??
+        (entry.item as { type?: unknown }).type,
+    );
+    return code === normalizedCode;
+  });
+
+  if (matchingEntries.length === 0) {
+    return undefined;
+  }
+
+  let bestEntry = matchingEntries[0];
+  let bestScore = -1;
+
+  for (const entry of matchingEntries) {
+    let score = 0;
+
+    if (
+      hint?.positionX !== undefined &&
+      hint.positionY !== undefined &&
+      entry.item.position_x === hint.positionX &&
+      entry.item.position_y === hint.positionY
+    ) {
+      score += 2;
+    }
+
+    if (hint?.stackCount !== undefined && resolveStackCount(entry.item) === hint.stackCount) {
+      score += 1;
+    }
+
+    if (score > bestScore) {
+      bestScore = score;
+      bestEntry = entry;
+    }
+  }
+
+  return bestEntry;
+}
+
+async function reduceResourceStackEntryInModernStashBuffer(
+  buffer: Buffer,
+  entry: ResourceSectorItemEntry,
+  reduceBy: number,
+): Promise<Buffer> {
+  const { metadata } = resolveModernJmSectors(buffer);
+  const payload = Buffer.from(
+    buffer.subarray(
+      entry.sector.payloadOffset,
+      entry.sector.payloadOffset + entry.sector.payloadSize,
+    ),
+  );
+  const currentCount = resolveStackCount(entry.item);
+  const newCount = currentCount - reduceBy;
+
+  // Build new item bytes — binary splice: only the matching item is re-serialized.
+  const beforeBytes = payload.subarray(JM_ITEM_DATA_OFFSET, entry.startByte);
+  const afterBytes = payload.subarray(entry.endByte);
+
+  let newPayload: Buffer;
+  if (newCount <= 0) {
+    // Remove the item entirely.
+    const newHeader = Buffer.alloc(JM_ITEM_DATA_OFFSET);
+    newHeader.write('JM', 0, 'ascii');
+    newHeader.writeUInt16LE(entry.count - 1, JM_ITEM_COUNT_OFFSET);
+    newPayload = Buffer.concat([newHeader, beforeBytes, afterBytes]);
+  } else {
+    // Re-serialize only the matching item with reduced quantity.
+    const updatedItem = withUpdatedResourceStackCount(entry.item, newCount);
+    const config = { extendedStash: false, sortProperties: true };
+    const constants = constants105Extended as unknown as d2sTypes.IConstantData;
+    const updatedItemBytes = Buffer.from(
+      await writeItem(updatedItem as d2sTypes.IItem, metadata.version, constants, config),
+    );
+    const newHeader = Buffer.alloc(JM_ITEM_DATA_OFFSET);
+    newHeader.write('JM', 0, 'ascii');
+    newHeader.writeUInt16LE(entry.count, JM_ITEM_COUNT_OFFSET);
+    newPayload = Buffer.concat([newHeader, beforeBytes, updatedItemBytes, afterBytes]);
+  }
+
+  return rebuildD2iBuffer(buffer, metadata.sectors, entry.sector.offset, newPayload);
+}
+
+async function reduceItemInModernStashResourceSector(
+  filePath: string,
+  itemCode: string,
+  reduceBy: number,
+  sourceHint?: ResourceStackMatchHint,
+): Promise<void> {
+  const buffer = await readFile(filePath);
+  const { metadata, jmSectors } = resolveModernJmSectors(buffer);
+  const entries = await readResourceSectorEntries(buffer, jmSectors, metadata.version);
+  const entry = selectResourceStackEntry(entries, itemCode, sourceHint);
+  if (!entry) {
+    throw new Error(`Stack item '${itemCode}' not found in modern resource sectors`);
+  }
+
+  const nextBuffer = await reduceResourceStackEntryInModernStashBuffer(buffer, entry, reduceBy);
+  await writeFile(filePath, nextBuffer);
+}
+
+/**
+ * Splits `splitCount` items off a stack in a classic stash or character save file.
+ *
+ * Modern stash files (d2i v105+) are read-only and will throw MODERN_STASH_READ_ONLY.
+ */
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: This function coordinates d2s, classic stash, and multi-target file writes in a single operation. Splitting further would require passing complex partial state between helpers.
+export async function splitStackInSaveFile(options: SplitStackOptions): Promise<void> {
+  const { sourceFilePath, sourceFileType, sourceStashTab, sourceItemCode } = options;
+  const normalizedCode = normalizeItemCode(sourceItemCode);
+  if (!normalizedCode) {
+    throw new Error('sourceItemCode is required');
+  }
+
+  if (options.splitCount <= 0) {
+    throw new Error('splitCount must be positive');
+  }
+
+  // Modern stash resource tabs (d2i v105+) support stack splitting into shared tabs.
+  // Prefer a single-buffer mutation path when source and targets are in the same modern stash file.
+  if (sourceFileType === 'd2i' && options.sourceRawItemJson) {
+    if (typeof options.sourceRawItemJson !== 'string' || !options.sourceRawItemJson.trim()) {
+      throw new Error('sourceRawItemJson is required for modern stash sources');
+    }
+    let sourceItem: d2sTypes.IItem;
+    try {
+      sourceItem = JSON.parse(options.sourceRawItemJson) as d2sTypes.IItem;
+    } catch {
+      throw new Error('sourceRawItemJson must be valid JSON');
+    }
+
+    const requestedSplitCount = Math.min(options.splitCount, options.targets.length);
+    if (requestedSplitCount <= 0) {
+      return;
+    }
+
+    const sourceHint: ResourceStackMatchHint = {
+      positionX:
+        typeof sourceItem.position_x === 'number' && Number.isFinite(sourceItem.position_x)
+          ? sourceItem.position_x
+          : undefined,
+      positionY:
+        typeof sourceItem.position_y === 'number' && Number.isFinite(sourceItem.position_y)
+          ? sourceItem.position_y
+          : undefined,
+      stackCount:
+        typeof sourceItem.quantity === 'number' && Number.isInteger(sourceItem.quantity)
+          ? sourceItem.quantity
+          : undefined,
+    };
+
+    const splitTargets = options.targets.slice(0, requestedSplitCount);
+    const isSingleModernFileSplit = splitTargets.every(
+      (target) =>
+        target.targetFilePath === sourceFilePath &&
+        target.targetFileType === 'd2i' &&
+        target.targetLocationContext === 'stash' &&
+        typeof target.targetStashTab === 'number' &&
+        target.targetStashTab < SHARED_TAB_COUNT,
+    );
+
+    if (isSingleModernFileSplit) {
+      let workingBuffer = await readFile(sourceFilePath);
+      const { metadata, jmSectors } = resolveModernJmSectors(workingBuffer);
+      const entries = await readResourceSectorEntries(workingBuffer, jmSectors, metadata.version);
+      const sourceEntry = selectResourceStackEntry(entries, normalizedCode, sourceHint);
+      if (!sourceEntry) {
+        throw new Error(`Stack item '${sourceItemCode}' not found in modern resource sectors`);
+      }
+
+      const sourceAvailable = resolveStackCount(sourceEntry.item);
+      const actualSplitCount = Math.min(requestedSplitCount, sourceAvailable);
+      if (actualSplitCount <= 0) {
+        return;
+      }
+
+      // First reduce source in memory, then add placed copies; persist only once.
+      workingBuffer = await reduceResourceStackEntryInModernStashBuffer(
+        workingBuffer,
+        sourceEntry,
+        actualSplitCount,
+      );
+
+      for (let i = 0; i < actualSplitCount; i += 1) {
+        const target = splitTargets[i];
+        const copy = withQuantityOne(
+          withTargetCoordinates(sourceEntry.item, target.targetGridX, target.targetGridY),
+        );
+        (copy as { id?: unknown }).id = undefined;
+        workingBuffer = await addItemToModernStashSharedPageBuffer(
+          workingBuffer,
+          copy,
+          target.targetStashTab as number,
+          target.targetGridX,
+          target.targetGridY,
+        );
+      }
+
+      await writeFile(sourceFilePath, workingBuffer);
+      return;
+    }
+
+    for (const target of splitTargets) {
+      // Modern .d2i shared stash pages (tabs 0–4) are writable via sector patching.
+      const isModernSharedStash =
+        target.targetFileType === 'd2i' &&
+        target.targetLocationContext === 'stash' &&
+        typeof target.targetStashTab === 'number' &&
+        target.targetStashTab < SHARED_TAB_COUNT;
+      if (!isModernSharedStash) {
+        await assertWritableStashMutationTarget(target.targetFilePath, target.targetFileType);
+      }
+
+      const copy = withQuantityOne(
+        withTargetCoordinates(sourceItem, target.targetGridX, target.targetGridY),
+      );
+      (copy as { id?: unknown }).id = undefined;
+      await addItemToSaveFile(
+        target.targetFilePath,
+        target.targetFileType,
+        copy,
+        target.targetLocationContext,
+        target.targetStashTab,
+        target.targetGridX,
+        target.targetGridY,
+      );
+    }
+
+    // Reduce the source resource-stack quantity after placements in multi-file flows.
+    await reduceItemInModernStashResourceSector(
+      sourceFilePath,
+      normalizedCode,
+      requestedSplitCount,
+      sourceHint,
+    );
+    return;
+  }
+
+  // Validate all targets before touching any file.
+  await assertWritableStashMutationTarget(sourceFilePath, sourceFileType);
+  for (const target of options.targets) {
+    await assertWritableStashMutationTarget(target.targetFilePath, target.targetFileType);
+  }
+
+  // Read and parse source file.
+  const sourceBuffer = await readFile(sourceFilePath);
+
+  if (sourceFileType === 'd2s') {
+    const data = await d2s.read(sourceBuffer);
+    const sourceItems = data.items;
+    const sourceItem = findItemByCode(sourceItems, normalizedCode);
+    if (!sourceItem) {
+      throw new Error(`Stack item '${sourceItemCode}' not found in save file`);
+    }
+
+    const currentQty = getItemQuantity(sourceItem);
+    const actualSplitCount = Math.min(options.splitCount, currentQty);
+
+    // Add individual copies to targets.
+    for (let i = 0; i < actualSplitCount && i < options.targets.length; i += 1) {
+      const target = options.targets[i];
+      const copy = withQuantityOne(
+        withTargetCoordinates(
+          withD2SLocationContext(
+            sourceItem,
+            target.targetLocationContext,
+            data.items,
+            resolveTargetCharacterClass(data),
+            undefined,
+          ),
+          target.targetGridX,
+          target.targetGridY,
+        ),
+      );
+      // Remove ID so the library assigns a new one on write.
+      (copy as { id?: unknown }).id = undefined;
+
+      if (target.targetLocationContext === 'mercenary') {
+        data.merc_items.push(copy);
+      } else if (target.targetLocationContext === 'corpse') {
+        data.corpse_items.push(copy);
+      } else {
+        data.items.push(copy);
+      }
+    }
+
+    // Reduce or remove source item.
+    const remaining = currentQty - actualSplitCount;
+    if (remaining <= 0) {
+      const idx = sourceItems.indexOf(sourceItem);
+      if (idx >= 0) sourceItems.splice(idx, 1);
+    } else {
+      sourceItems[sourceItems.indexOf(sourceItem)] = withReducedQuantity(
+        sourceItem,
+        actualSplitCount,
+      );
+    }
+
+    const result = await d2s.write(data);
+    await writeFile(sourceFilePath, Buffer.from(result));
+    return;
+  }
+
+  // Classic stash (sss / d2x / non-modern d2i).
+  const ext = extname(sourceFilePath);
+  assertWritableD2iBuffer(ext, sourceBuffer);
+  const { constants, version } = getStashConstants(ext);
+  const data = await d2stash.read(sourceBuffer, constants);
+
+  const tabIndex = sourceStashTab;
+  if (!data.pages[tabIndex]) {
+    throw new Error(`Stash tab ${tabIndex} not found in source file`);
+  }
+
+  const tabItems = data.pages[tabIndex].items;
+  const sourceItem = findItemByCode(tabItems, normalizedCode);
+  if (!sourceItem) {
+    throw new Error(`Stack item '${sourceItemCode}' not found in stash tab ${tabIndex}`);
+  }
+
+  const currentQty = getItemQuantity(sourceItem);
+  const actualSplitCount = Math.min(options.splitCount, currentQty);
+
+  // Build a map of target files needing writes (source file must be written last or together).
+  // For simplicity, write source file after handling all same-file placements.
+  for (let i = 0; i < actualSplitCount && i < options.targets.length; i += 1) {
+    const target = options.targets[i];
+    const copy = withQuantityOne(
+      withTargetCoordinates(sourceItem, target.targetGridX, target.targetGridY),
+    );
+    // Remove ID so the library can assign a new one.
+    (copy as { id?: unknown }).id = undefined;
+
+    await addItemToSaveFile(
+      target.targetFilePath,
+      target.targetFileType,
+      copy,
+      target.targetLocationContext,
+      target.targetStashTab,
+      target.targetGridX,
+      target.targetGridY,
+    );
+  }
+
+  // Reduce or remove source item and write source file.
+  const remaining = currentQty - actualSplitCount;
+  if (remaining <= 0) {
+    const idx = tabItems.indexOf(sourceItem);
+    if (idx >= 0) tabItems.splice(idx, 1);
+  } else {
+    tabItems[tabItems.indexOf(sourceItem)] = withReducedQuantity(sourceItem, actualSplitCount);
+  }
+
+  const result = await d2stash.write(data, constants, version);
+  await writeFile(sourceFilePath, Buffer.from(result));
+}
+
+async function isModernD2iFile(filePath: string, fileType: VaultSourceFileType): Promise<boolean> {
+  if (fileType !== 'd2i' || extname(filePath) !== '.d2i') {
+    return false;
+  }
+  const buffer = await readFile(filePath);
+  const metadata = readD2iMetadata(buffer);
+  return metadata.version >= 105;
+}
+
 export async function moveItemBetweenSaveFiles(options: MoveSaveFileItemOptions): Promise<void> {
   const isMovingWithinSameFile =
     options.sourceFilePath === options.targetFilePath &&
@@ -828,14 +1845,39 @@ export async function moveItemBetweenSaveFiles(options: MoveSaveFileItemOptions)
     return;
   }
 
-  await assertWritableStashMutationTarget(options.sourceFilePath, options.sourceFileType);
-  await assertWritableStashMutationTarget(options.targetFilePath, options.targetFileType);
+  // Modern .d2i sources can have items removed — skip the blanket assertion.
+  const sourceIsModernD2i = await isModernD2iFile(options.sourceFilePath, options.sourceFileType);
+  if (!sourceIsModernD2i) {
+    await assertWritableStashMutationTarget(options.sourceFilePath, options.sourceFileType);
+  }
 
-  const sourceItem = await findItemInSaveFile(
-    options.sourceFilePath,
-    options.sourceFileType,
-    options.sourceItemId,
-  );
+  // Modern .d2i targets on shared tabs are writable — skip the blanket assertion.
+  const targetStashTab = options.targetStashTab;
+  const targetIsModernD2iSharedTab =
+    typeof targetStashTab === 'number' &&
+    targetStashTab < SHARED_TAB_COUNT &&
+    (await isModernD2iFile(options.targetFilePath, options.targetFileType));
+  if (!targetIsModernD2iSharedTab) {
+    await assertWritableStashMutationTarget(options.targetFilePath, options.targetFileType);
+  }
+
+  let sourceItem: d2sTypes.IItem | undefined;
+  if (sourceIsModernD2i) {
+    sourceItem = await findItemInModernStashSharedPage(
+      options.sourceFilePath,
+      options.sourceItemId,
+      options.sourceStashTab,
+      options.sourceGridXFromItem,
+      options.sourceGridYFromItem,
+    );
+  } else {
+    sourceItem = await findItemInSaveFile(
+      options.sourceFilePath,
+      options.sourceFileType,
+      // Non-modern-d2i paths always have a numeric id (non-simple items from .d2s / classic stash)
+      options.sourceItemId as number,
+    );
+  }
   if (!sourceItem) {
     throw new Error('Source item not found in save file');
   }
@@ -850,9 +1892,21 @@ export async function moveItemBetweenSaveFiles(options: MoveSaveFileItemOptions)
     options.targetGridY,
     options.targetEquippedSlotId,
   );
-  await removeItemFromSaveFile(
-    options.sourceFilePath,
-    options.sourceFileType,
-    options.sourceItemId,
-  );
+
+  if (sourceIsModernD2i) {
+    await removeItemFromModernStashSharedPage(
+      options.sourceFilePath,
+      options.sourceItemId,
+      options.sourceStashTab,
+      options.sourceGridXFromItem,
+      options.sourceGridYFromItem,
+    );
+  } else {
+    await removeItemFromSaveFile(
+      options.sourceFilePath,
+      options.sourceFileType,
+      // Non-modern-d2i paths always have a numeric id
+      options.sourceItemId as number,
+    );
+  }
 }
