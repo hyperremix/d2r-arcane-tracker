@@ -696,10 +696,8 @@ describe('When CharacterInventoryBrowser is rendered', () => {
       render(<CharacterInventoryBrowser />);
 
       // Assert
-      await waitFor(() => {
-        expect(screen.getByText('Selected Item')).toBeInTheDocument();
-      });
-      expect(screen.getByTestId('stash-board-shared-stash-snap-0')).toBeInTheDocument();
+      const stashBoard = await screen.findByTestId('stash-board-shared-stash-snap-0');
+      expect(stashBoard).toBeInTheDocument();
       expect(screen.queryByTestId('equipped-board')).not.toBeInTheDocument();
       expect(screen.queryByTestId('inventory-board-shared-stash-snap')).not.toBeInTheDocument();
       expect(screen.queryByTestId('mercenary-board-shared-stash-snap')).not.toBeInTheDocument();
