@@ -1,3 +1,6 @@
+import { gems } from 'electron/items/gems';
+import { materials } from 'electron/items/materials';
+import { runes } from 'electron/items/runes';
 import type {
   CharacterInventorySnapshot,
   InventorySnapshotWindowTarget,
@@ -114,6 +117,16 @@ const EQUIP_VALIDATION_ERROR_PATTERN = /EQUIP_VALIDATION:([A-Z_]+)/;
 const MODERN_STASH_READ_ONLY_ERROR = 'MODERN_STASH_READ_ONLY';
 const MODERN_STASH_MIN_VERSION = 105;
 const MODERN_STASH_TAB_ORDER = [0, 1, 2, 3, 4, 5, 6, 7] as const;
+const MODERN_GEMS_TAB_INDEX = 5;
+const MODERN_MATERIALS_TAB_INDEX = 6;
+const MODERN_RUNES_TAB_INDEX = 7;
+const GEM_ITEM_CODES = new Set(gems.map((gem) => gem.code.toLowerCase()));
+const MATERIAL_ITEM_CODES = new Set(materials.map((material) => material.code.toLowerCase()));
+const RUNE_ITEM_CODES = new Set(
+  runes
+    .map((rune) => (typeof rune.code === 'string' ? rune.code.toLowerCase() : undefined))
+    .filter((code): code is string => code !== undefined),
+);
 const EQUIP_VALIDATION_CODES = new Set<EquipValidationCode>([
   'INVALID_SLOT',
   'CLASS_RESTRICTED',
@@ -123,6 +136,29 @@ const EQUIP_VALIDATION_CODES = new Set<EquipValidationCode>([
   'OFFHAND_BLOCKED_BY_TWO_HANDED',
   'TARGET_SLOT_OCCUPIED',
 ]);
+
+function normalizeResourceItemCode(value: unknown): string | undefined {
+  if (typeof value !== 'string') {
+    return undefined;
+  }
+
+  const normalized = value.trim().toLowerCase();
+  return normalized.length > 0 ? normalized : undefined;
+}
+
+function canDropItemCodeInModernResourceTab(itemCode: string, stashTab: number): boolean {
+  if (stashTab === MODERN_GEMS_TAB_INDEX) {
+    return GEM_ITEM_CODES.has(itemCode);
+  }
+  if (stashTab === MODERN_MATERIALS_TAB_INDEX) {
+    return MATERIAL_ITEM_CODES.has(itemCode);
+  }
+  if (stashTab === MODERN_RUNES_TAB_INDEX) {
+    return RUNE_ITEM_CODES.has(itemCode);
+  }
+
+  return false;
+}
 
 function resolveEquipValidationReasonTranslationKey(code: EquipValidationCode): string {
   switch (code) {
@@ -3123,6 +3159,41 @@ export function CharacterInventoryBrowser({
     [reloadInventoryAfterSaveWrite, t],
   );
 
+  const handleDropInventoryItemOnResourceTab = useCallback(
+    async (
+      event: DragEvent<HTMLDivElement>,
+      targetFilePath: string,
+      targetFileType: VaultSourceFileType,
+      targetStashTab: number,
+      targetGridX: number,
+      targetGridY: number,
+    ): Promise<void> => {
+      const inventoryItem = resolveActiveInventoryDragItem(event, activeInventoryDragItem);
+      if (!inventoryItem) {
+        return;
+      }
+
+      const normalizedItemCode = normalizeResourceItemCode(inventoryItem.itemCode);
+      if (
+        !normalizedItemCode ||
+        !canDropItemCodeInModernResourceTab(normalizedItemCode, targetStashTab)
+      ) {
+        return;
+      }
+
+      await handleMoveInventoryItem(
+        inventoryItem,
+        targetFilePath,
+        targetFileType,
+        'stash',
+        targetStashTab,
+        targetGridX,
+        targetGridY,
+      );
+    },
+    [activeInventoryDragItem, handleMoveInventoryItem],
+  );
+
   const handleDropVaultItemOnSection = useCallback(
     async (
       vaultItemId: string,
@@ -3639,8 +3710,19 @@ export function CharacterInventoryBrowser({
                         title={getStashSectionTitle(stashTab, items, t, fallbackTabKind)}
                         testId={`stash-board-${snapshot.snapshotId}-${stashTab}`}
                         items={items.map(applyPickupAdjustment)}
+                        disableInteractions={snapshotReadOnly}
                         onItemClick={startPickup}
                         onItemContextMenu={decrementPickup}
+                        onDropInventoryItem={(event, targetGridX, targetGridY) =>
+                          handleDropInventoryItemOnResourceTab(
+                            event,
+                            snapshot.sourceFilePath,
+                            snapshot.sourceFileType,
+                            stashTab,
+                            targetGridX,
+                            targetGridY,
+                          )
+                        }
                         renderOwnedTile={(item) => (
                           <InventoryTile
                             item={item}
@@ -3664,8 +3746,19 @@ export function CharacterInventoryBrowser({
                         title={getStashSectionTitle(stashTab, items, t, fallbackTabKind)}
                         testId={`stash-board-${snapshot.snapshotId}-${stashTab}`}
                         items={items.map(applyPickupAdjustment)}
+                        disableInteractions={snapshotReadOnly}
                         onItemClick={startPickup}
                         onItemContextMenu={decrementPickup}
+                        onDropInventoryItem={(event, targetGridX, targetGridY) =>
+                          handleDropInventoryItemOnResourceTab(
+                            event,
+                            snapshot.sourceFilePath,
+                            snapshot.sourceFileType,
+                            stashTab,
+                            targetGridX,
+                            targetGridY,
+                          )
+                        }
                         renderOwnedTile={(item) => (
                           <InventoryTile
                             item={item}
@@ -3689,8 +3782,19 @@ export function CharacterInventoryBrowser({
                         title={getStashSectionTitle(stashTab, items, t, fallbackTabKind)}
                         testId={`stash-board-${snapshot.snapshotId}-${stashTab}`}
                         items={items.map(applyPickupAdjustment)}
+                        disableInteractions={snapshotReadOnly}
                         onItemClick={startPickup}
                         onItemContextMenu={decrementPickup}
+                        onDropInventoryItem={(event, targetGridX, targetGridY) =>
+                          handleDropInventoryItemOnResourceTab(
+                            event,
+                            snapshot.sourceFilePath,
+                            snapshot.sourceFileType,
+                            stashTab,
+                            targetGridX,
+                            targetGridY,
+                          )
+                        }
                         renderOwnedTile={(item) => (
                           <InventoryTile
                             item={item}

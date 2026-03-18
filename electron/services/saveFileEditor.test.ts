@@ -1381,6 +1381,88 @@ describe('When moveItemBetweenSaveFiles is called', () => {
       expect(serialized?.position_y).toBe(1);
     });
   });
+
+  describe('If a modern d2i item is moved from a shared tab to a modern resource tab', () => {
+    it('Then it increases the target resource stack and removes the source item', async () => {
+      // Arrange
+      const { buffer, sectors } = createModernD2iTestBuffer([
+        createModernSectorPayload(0),
+        createModernSectorPayload(0),
+        createModernSectorPayload(1, [0x11]),
+        createModernSectorPayload(0),
+        createModernSectorPayload(0),
+        createModernSectorPayload(1, [0x22]),
+        createModernSectorPayload(0),
+        createModernSectorPayload(0),
+      ]);
+      let currentBuffer = buffer;
+      mockReadD2iMetadata.mockReturnValue({
+        version: 105,
+        hardcore: false,
+        sectors,
+      });
+      mockReadFile.mockImplementation(async () => currentBuffer);
+      mockWriteFile.mockImplementation(async (_path: string, nextBuffer: Buffer) => {
+        currentBuffer = Buffer.from(nextBuffer);
+      });
+      mockWriteItem.mockResolvedValue(new Uint8Array([0xaa]));
+
+      let readItemCall = 0;
+      mockReadItem.mockImplementation(async (reader: { offset: number }) => {
+        readItemCall += 1;
+        reader.offset += 8;
+        if (readItemCall === 1 || readItemCall === 3) {
+          return {
+            type: 'gcy',
+            code: 'gcy',
+            simple_item: 1,
+            position_x: 1,
+            position_y: 1,
+            quantity: 1,
+          };
+        }
+        return {
+          type: 'gcy',
+          code: 'gcy',
+          simple_item: 1,
+          position_x: 2,
+          position_y: 0,
+          quantity: 1,
+          magic_attributes: [{ id: 381, values: [7] }],
+        };
+      });
+
+      // Act
+      await moveItemBetweenSaveFiles({
+        sourceFilePath: '/path/to/stash.d2i',
+        sourceFileType: 'd2i',
+        sourceItemId: undefined,
+        sourceStashTab: 2,
+        sourceGridXFromItem: 1,
+        sourceGridYFromItem: 1,
+        targetFilePath: '/path/to/stash.d2i',
+        targetFileType: 'd2i',
+        targetLocationContext: 'stash',
+        targetStashTab: 5,
+        targetGridX: 2,
+        targetGridY: 0,
+      });
+
+      // Assert
+      expect(mockReadItem).toHaveBeenCalledTimes(3);
+      expect(mockWriteItem).toHaveBeenCalledTimes(1);
+
+      const serialized = mockWriteItem.mock.calls[0]?.[0] as
+        | {
+            quantity?: number;
+            magic_attributes?: Array<{ id?: number; values?: number[] }>;
+          }
+        | undefined;
+      expect(serialized?.quantity).toBe(8);
+      expect(serialized?.magic_attributes).toEqual([{ id: 381, values: [8] }]);
+      expect(mockWriteFile).toHaveBeenCalledTimes(2);
+    });
+  });
 });
 
 describe('When splitStackInSaveFile is called for modern resource stacks', () => {

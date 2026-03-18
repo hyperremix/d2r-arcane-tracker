@@ -1,6 +1,6 @@
 import { runes } from 'electron/items/runes';
 import type { ParsedInventoryItem } from 'electron/types/grail';
-import type { ReactNode } from 'react';
+import type { DragEvent, ReactNode } from 'react';
 import { BoardSurface } from '@/components/inventory/boardPrimitives';
 import type { GridSize } from '@/components/inventory/spatialLayout';
 import { Badge } from '@/components/ui/badge';
@@ -49,8 +49,14 @@ export interface RunesTabSectionProps {
   testId?: string;
   items: ParsedInventoryItem[];
   renderOwnedTile: (item: ParsedInventoryItem) => ReactNode;
+  disableInteractions?: boolean;
   onItemClick?: (item: ParsedInventoryItem) => void;
   onItemContextMenu?: (item: ParsedInventoryItem) => void;
+  onDropInventoryItem?: (
+    event: DragEvent<HTMLDivElement>,
+    targetGridX: number,
+    targetGridY: number,
+  ) => Promise<void> | void;
 }
 
 export function RunesTabSection({
@@ -58,8 +64,10 @@ export function RunesTabSection({
   testId,
   items,
   renderOwnedTile,
+  disableInteractions = false,
   onItemClick,
   onItemContextMenu,
+  onDropInventoryItem,
 }: RunesTabSectionProps) {
   const itemByCode = new Map<string, ParsedInventoryItem>();
   const ownedMap = new Map<string, ParsedInventoryItem>();
@@ -78,7 +86,18 @@ export function RunesTabSection({
   return (
     <div className="space-y-2">
       {title && <div className="font-medium text-sm">{title}</div>}
-      <BoardSurface gridSize={RUNE_GRID_SIZE} testId={testId} showBaseGrid={false}>
+      <BoardSurface
+        gridSize={RUNE_GRID_SIZE}
+        testId={testId}
+        showBaseGrid={false}
+        onDropOnBoard={
+          !disableInteractions && onDropInventoryItem
+            ? (event, targetGridX, targetGridY) => {
+                void onDropInventoryItem(event, targetGridX, targetGridY);
+              }
+            : undefined
+        }
+      >
         {/* biome-ignore lint/complexity/noExcessiveCognitiveComplexity: per-cell tab rendering branches between owned and placeholder states with pickup/context-menu wiring. */}
         {runes.map((rune, i) => {
           const gridX = i % 10;
