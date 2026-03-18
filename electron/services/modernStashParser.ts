@@ -1,4 +1,4 @@
-import { enhanceItems } from '@dschu012/d2s/lib/d2/attribute_enhancer';
+import { enhanceItems } from '@dschu012/d2s';
 import { readItem } from '@dschu012/d2s/lib/d2/items';
 import { constants as constants105 } from '@dschu012/d2s/lib/data/versions/105_constant_data';
 import type { D2SItem } from '../types/grail';
