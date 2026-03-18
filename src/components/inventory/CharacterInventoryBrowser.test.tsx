@@ -3690,6 +3690,149 @@ describe('When CharacterInventoryBrowser is rendered', () => {
     });
   });
 
+  describe('If a stackable resource item is dropped on a modern resource tab board', () => {
+    it('Then it calls inventory.moveItem targeting that modern resource stash tab', async () => {
+      // Arrange
+      const getComputedStyleSpy = vi
+        .spyOn(window, 'getComputedStyle')
+        .mockReturnValue({ getPropertyValue: () => '28' } as unknown as CSSStyleDeclaration);
+      searchAllMock.mockResolvedValue({
+        inventory: {
+          snapshots: [
+            {
+              snapshotId: 'modern-drop-resource',
+              characterName: 'Shared Stash Softcore',
+              characterId: 'shared-stash',
+              sourceFileType: 'd2i',
+              sourceFilePath: '/tmp/modern-drop-resource.d2i',
+              sourceFileVersion: 105,
+              readOnly: false,
+              capturedAt: new Date('2024-01-01T00:00:00.000Z'),
+              items: [
+                {
+                  fingerprint: 'fp-shared-topaz',
+                  fingerprintInputs: {
+                    sourceFileType: 'd2i',
+                    characterName: 'Shared Stash Softcore',
+                    locationContext: 'stash',
+                    stashTab: 2,
+                    quality: 'normal',
+                    ethereal: false,
+                    socketCount: 0,
+                    gridX: 1,
+                    gridY: 1,
+                    gridWidth: 1,
+                    gridHeight: 1,
+                    isSocketedItem: false,
+                    itemName: 'Shared Chipped Topaz',
+                  },
+                  characterName: 'Shared Stash Softcore',
+                  sourceFileType: 'd2i',
+                  sourceFilePath: '/tmp/modern-drop-resource.d2i',
+                  locationContext: 'stash',
+                  stashTab: 2,
+                  stashTabKind: 'shared',
+                  type: 'other',
+                  itemCode: 'gcy',
+                  gridX: 1,
+                  gridY: 1,
+                  gridWidth: 1,
+                  gridHeight: 1,
+                  isSocketedItem: false,
+                  itemName: 'Shared Chipped Topaz',
+                  quality: 'normal',
+                  ethereal: false,
+                  socketCount: 0,
+                  iconFileName: 'chipped_topaz.png',
+                  rawItemJson: '{"id":501,"type":"gcy","code":"gcy","position_x":1,"position_y":1}',
+                  rawParsedItem: {},
+                  seenAt: new Date('2024-01-01T00:00:00.000Z'),
+                },
+                {
+                  fingerprint: 'fp-gems-topaz',
+                  fingerprintInputs: {
+                    sourceFileType: 'd2i',
+                    characterName: 'Shared Stash Softcore',
+                    locationContext: 'stash',
+                    stashTab: 5,
+                    quality: 'normal',
+                    ethereal: false,
+                    socketCount: 0,
+                    gridX: 2,
+                    gridY: 0,
+                    gridWidth: 1,
+                    gridHeight: 1,
+                    isSocketedItem: false,
+                    itemName: 'Chipped Topaz',
+                  },
+                  characterName: 'Shared Stash Softcore',
+                  sourceFileType: 'd2i',
+                  sourceFilePath: '/tmp/modern-drop-resource.d2i',
+                  locationContext: 'stash',
+                  stashTab: 5,
+                  stashTabKind: 'gems',
+                  type: 'other',
+                  itemCode: 'gcy',
+                  gridX: 2,
+                  gridY: 0,
+                  gridWidth: 1,
+                  gridHeight: 1,
+                  isSocketedItem: false,
+                  itemName: 'Chipped Topaz',
+                  quality: 'normal',
+                  ethereal: false,
+                  socketCount: 0,
+                  stackCount: 8,
+                  iconFileName: 'chipped_topaz.png',
+                  rawItemJson: '{"type":"gcy","code":"gcy","position_x":2,"position_y":0}',
+                  rawParsedItem: {},
+                  seenAt: new Date('2024-01-01T00:00:00.000Z'),
+                },
+              ],
+            },
+          ],
+          totalSnapshots: 1,
+          totalItems: 2,
+        },
+        vault: {
+          items: [],
+          total: 0,
+          page: 1,
+          pageSize: 20,
+        },
+      });
+
+      render(<CharacterInventoryBrowser />);
+      const draggedTile = await screen.findByLabelText('Inventory item Shared Chipped Topaz');
+      const gemsBoard = await screen.findByTestId('stash-board-modern-drop-resource-5');
+      const dataTransfer = createDragDataTransfer();
+
+      // Act
+      fireEvent.dragStart(draggedTile, { dataTransfer });
+      fireEvent.dragOver(gemsBoard, { dataTransfer, clientX: 100, clientY: 12 });
+      fireEvent.drop(gemsBoard, { dataTransfer, clientX: 100, clientY: 12 });
+
+      // Assert
+      await waitFor(() => {
+        expect(moveInventoryItemMock).toHaveBeenCalledWith(
+          expect.objectContaining({
+            sourceFilePath: '/tmp/modern-drop-resource.d2i',
+            sourceFileType: 'd2i',
+            sourceStashTab: 2,
+            targetFilePath: '/tmp/modern-drop-resource.d2i',
+            targetFileType: 'd2i',
+            targetLocationContext: 'stash',
+            targetStashTab: 5,
+          }),
+        );
+      });
+      const movePayload = moveInventoryItemMock.mock.calls[0]?.[0];
+      expect(Number.isFinite(movePayload?.targetGridX)).toBe(true);
+      expect(Number.isFinite(movePayload?.targetGridY)).toBe(true);
+      getComputedStyleSpy.mockRestore();
+    });
+  });
+
   describe('If an inventory tile is dropped on an equipment slot', () => {
     it('Then it calls inventory.moveItem with equipped target metadata', async () => {
       // Arrange

@@ -6,6 +6,9 @@ import { readItem, writeItem } from '@dschu012/d2s/lib/d2/items';
 import * as d2stash from '@dschu012/d2s/lib/d2/stash';
 import { constants as constants96 } from '@dschu012/d2s/lib/data/versions/96_constant_data';
 import { constants as constants99 } from '@dschu012/d2s/lib/data/versions/99_constant_data';
+import { gems } from '../items/gems';
+import { materials } from '../items/materials';
+import { runes } from '../items/runes';
 import type { CharacterClass, VaultLocationContext, VaultSourceFileType } from '../types/grail';
 import { createBoundedBitReader } from './boundedBitReader';
 import { constants105Extended, resolveStackCount, SHARED_TAB_COUNT } from './modernStashParser';
@@ -721,9 +724,6 @@ async function moveItemWithinSingleSaveFile(options: MoveSaveFileItemOptions): P
     const metadata = readD2iMetadata(buffer);
     if (metadata.version >= 105) {
       const targetTab = options.targetStashTab ?? 0;
-      if (targetTab >= SHARED_TAB_COUNT) {
-        throw new Error('MODERN_STASH_READ_ONLY');
-      }
       const sourceItem = await findItemInModernStashSharedPage(
         sourceFilePath,
         sourceItemId,
@@ -734,13 +734,27 @@ async function moveItemWithinSingleSaveFile(options: MoveSaveFileItemOptions): P
       if (!sourceItem) {
         throw new Error('Source item not found in stash file');
       }
-      await addItemToModernStashSharedPage(
-        sourceFilePath,
-        sourceItem,
-        targetTab,
-        options.targetGridX ?? 0,
-        options.targetGridY ?? 0,
-      );
+
+      if (targetTab < SHARED_TAB_COUNT) {
+        await addItemToModernStashSharedPage(
+          sourceFilePath,
+          sourceItem,
+          targetTab,
+          options.targetGridX ?? 0,
+          options.targetGridY ?? 0,
+        );
+      } else if (isModernResourceTab(targetTab)) {
+        await addItemToModernStashResourceSector(
+          sourceFilePath,
+          sourceItem,
+          targetTab,
+          options.targetGridX ?? 0,
+          options.targetGridY ?? 0,
+        );
+      } else {
+        throw new Error('MODERN_STASH_READ_ONLY');
+      }
+
       await removeItemFromModernStashSharedPage(
         sourceFilePath,
         sourceItemId,
@@ -834,6 +848,18 @@ const D2I_SECTOR_HEADER_SIZE = 64;
 const D2I_SECTOR_SIZE_FIELD_OFFSET = 16;
 // Resource-stash stack-count magic attribute ID (9-bit unsigned, D2R-only).
 const RESOURCE_STASH_ATTR_ID = 381;
+const MODERN_GEMS_TAB_INDEX = 5;
+const MODERN_MATERIALS_TAB_INDEX = 6;
+const MODERN_RUNES_TAB_INDEX = 7;
+const GEM_ITEM_CODES = new Set(gems.map((gem) => gem.code.toLowerCase()));
+const MATERIAL_ITEM_CODES = new Set(materials.map((material) => material.code.toLowerCase()));
+const RUNE_ITEM_CODES = new Set(
+  runes
+    .map((rune) => (typeof rune.code === 'string' ? rune.code.toLowerCase() : undefined))
+    .filter((code): code is string => code !== undefined),
+);
+
+type ModernResourceTabKind = 'gems' | 'materials' | 'runes';
 
 /**
  * Appends one item to a shared stash sector (tabs 0–4) inside a modern .d2i file.
@@ -1140,6 +1166,7 @@ async function addItemToModernStashSharedPageBuffer(
   stashTab: number,
   gridX: number,
   gridY: number,
+  stackCount = 1,
 ): Promise<Buffer> {
   const metadata = readD2iMetadata(buffer);
 
@@ -1173,6 +1200,7 @@ async function addItemToModernStashSharedPageBuffer(
   // the need to parse them (which would fail for items with stats that lack sB).
   const normalizedItem = stripResourceStashStackMetadata(item);
   const isSimpleItem = (normalizedItem as { simple_item?: unknown }).simple_item === 1;
+  const normalizedStackCount = Number.isInteger(stackCount) && stackCount > 0 ? stackCount : 1;
   const newItem: d2sTypes.IItem = {
     ...normalizedItem,
     location_id: 0,
@@ -1180,7 +1208,7 @@ async function addItemToModernStashSharedPageBuffer(
     equipped_id: 0,
     position_x: gridX,
     position_y: gridY,
-    quantity: 1,
+    quantity: normalizedStackCount,
     // Keep ids for non-simple items so they remain movable after repeated shared-tab moves.
     // Simple resource-derived items are intentionally id-less.
     id: isSimpleItem ? undefined : normalizedItem.id,
@@ -1340,6 +1368,44 @@ function normalizeItemCode(value: unknown): string | undefined {
   }
   const normalized = value.trim().replace(/\0/g, '').toLowerCase();
   return normalized.length > 0 ? normalized : undefined;
+}
+
+function resolveModernResourceTabKind(stashTab: number): ModernResourceTabKind | undefined {
+  if (stashTab === MODERN_GEMS_TAB_INDEX) {
+    return 'gems';
+  }
+  if (stashTab === MODERN_MATERIALS_TAB_INDEX) {
+    return 'materials';
+  }
+  if (stashTab === MODERN_RUNES_TAB_INDEX) {
+    return 'runes';
+  }
+
+  return undefined;
+}
+
+function isModernResourceTab(stashTab: number | undefined): stashTab is number {
+  return (
+    stashTab === MODERN_GEMS_TAB_INDEX ||
+    stashTab === MODERN_MATERIALS_TAB_INDEX ||
+    stashTab === MODERN_RUNES_TAB_INDEX
+  );
+}
+
+function isResourceCodeAllowedForTab(itemCode: string, stashTab: number): boolean {
+  const tabKind = resolveModernResourceTabKind(stashTab);
+  if (!tabKind) {
+    return false;
+  }
+
+  if (tabKind === 'gems') {
+    return GEM_ITEM_CODES.has(itemCode);
+  }
+  if (tabKind === 'materials') {
+    return MATERIAL_ITEM_CODES.has(itemCode);
+  }
+
+  return RUNE_ITEM_CODES.has(itemCode);
 }
 
 function findItemByCode(items: d2sTypes.IItem[], code: string): d2sTypes.IItem | undefined {
@@ -1550,6 +1616,91 @@ async function reduceResourceStackEntryInModernStashBuffer(
   }
 
   return rebuildD2iBuffer(buffer, metadata.sectors, entry.sector.offset, newPayload);
+}
+
+async function increaseResourceStackEntryInModernStashBuffer(
+  buffer: Buffer,
+  entry: ResourceSectorItemEntry,
+  increaseBy: number,
+): Promise<Buffer> {
+  if (increaseBy <= 0) {
+    return buffer;
+  }
+
+  const { metadata } = resolveModernJmSectors(buffer);
+  const payload = Buffer.from(
+    buffer.subarray(
+      entry.sector.payloadOffset,
+      entry.sector.payloadOffset + entry.sector.payloadSize,
+    ),
+  );
+  const currentCount = resolveStackCount(entry.item);
+  const newCount = currentCount + increaseBy;
+  const beforeBytes = payload.subarray(JM_ITEM_DATA_OFFSET, entry.startByte);
+  const afterBytes = payload.subarray(entry.endByte);
+  const updatedItem = withUpdatedResourceStackCount(entry.item, newCount);
+  const config = { extendedStash: false, sortProperties: true };
+  const constants = constants105Extended as unknown as d2sTypes.IConstantData;
+  const updatedItemBytes = Buffer.from(
+    await writeItem(updatedItem as d2sTypes.IItem, metadata.version, constants, config),
+  );
+  const newHeader = Buffer.alloc(JM_ITEM_DATA_OFFSET);
+  newHeader.write('JM', 0, 'ascii');
+  newHeader.writeUInt16LE(entry.count, JM_ITEM_COUNT_OFFSET);
+  const newPayload = Buffer.concat([newHeader, beforeBytes, updatedItemBytes, afterBytes]);
+
+  return rebuildD2iBuffer(buffer, metadata.sectors, entry.sector.offset, newPayload);
+}
+
+async function addItemToModernStashResourceSectorBuffer(
+  buffer: Buffer,
+  item: d2sTypes.IItem,
+  stashTab: number,
+  gridX: number,
+  gridY: number,
+): Promise<Buffer> {
+  if (!isModernResourceTab(stashTab)) {
+    throw new Error('MODERN_STASH_READ_ONLY');
+  }
+
+  const itemCode = normalizeItemCode(resolveItemCode(item));
+  if (!itemCode) {
+    throw new Error('Source item code is required for modern resource tab moves');
+  }
+  if (!isResourceCodeAllowedForTab(itemCode, stashTab)) {
+    throw new Error(`Item code '${itemCode}' cannot be moved to modern stash tab ${stashTab}`);
+  }
+
+  const countToAdd = Math.max(
+    1,
+    resolveStackCount(item as unknown as Parameters<typeof resolveStackCount>[0]),
+  );
+  const { metadata, jmSectors } = resolveModernJmSectors(buffer);
+  const entries = await readResourceSectorEntries(buffer, jmSectors, metadata.version);
+  const existingEntry = selectResourceStackEntry(entries, itemCode);
+  if (existingEntry) {
+    return increaseResourceStackEntryInModernStashBuffer(buffer, existingEntry, countToAdd);
+  }
+
+  return addItemToModernStashSharedPageBuffer(buffer, item, stashTab, gridX, gridY, countToAdd);
+}
+
+async function addItemToModernStashResourceSector(
+  filePath: string,
+  item: d2sTypes.IItem,
+  stashTab: number,
+  gridX: number,
+  gridY: number,
+): Promise<void> {
+  const buffer = await readFile(filePath);
+  const nextBuffer = await addItemToModernStashResourceSectorBuffer(
+    buffer,
+    item,
+    stashTab,
+    gridX,
+    gridY,
+  );
+  await writeFile(filePath, nextBuffer);
 }
 
 async function reduceItemInModernStashResourceSector(
@@ -1835,6 +1986,7 @@ async function isModernD2iFile(filePath: string, fileType: VaultSourceFileType):
   return metadata.version >= 105;
 }
 
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: This move flow intentionally handles same-file vs cross-file logic and modern d2i shared/resource branches in one transactional path.
 export async function moveItemBetweenSaveFiles(options: MoveSaveFileItemOptions): Promise<void> {
   const isMovingWithinSameFile =
     options.sourceFilePath === options.targetFilePath &&
@@ -1853,11 +2005,12 @@ export async function moveItemBetweenSaveFiles(options: MoveSaveFileItemOptions)
 
   // Modern .d2i targets on shared tabs are writable — skip the blanket assertion.
   const targetStashTab = options.targetStashTab;
+  const targetIsModernD2i = await isModernD2iFile(options.targetFilePath, options.targetFileType);
   const targetIsModernD2iSharedTab =
-    typeof targetStashTab === 'number' &&
-    targetStashTab < SHARED_TAB_COUNT &&
-    (await isModernD2iFile(options.targetFilePath, options.targetFileType));
-  if (!targetIsModernD2iSharedTab) {
+    typeof targetStashTab === 'number' && targetStashTab < SHARED_TAB_COUNT && targetIsModernD2i;
+  const targetIsModernD2iResourceTab =
+    typeof targetStashTab === 'number' && isModernResourceTab(targetStashTab) && targetIsModernD2i;
+  if (!targetIsModernD2iSharedTab && !targetIsModernD2iResourceTab) {
     await assertWritableStashMutationTarget(options.targetFilePath, options.targetFileType);
   }
 
@@ -1882,16 +2035,30 @@ export async function moveItemBetweenSaveFiles(options: MoveSaveFileItemOptions)
     throw new Error('Source item not found in save file');
   }
 
-  await addItemToSaveFile(
-    options.targetFilePath,
-    options.targetFileType,
-    sourceItem,
-    options.targetLocationContext,
-    options.targetStashTab,
-    options.targetGridX,
-    options.targetGridY,
-    options.targetEquippedSlotId,
-  );
+  if (
+    targetIsModernD2iResourceTab &&
+    options.targetLocationContext === 'stash' &&
+    typeof options.targetStashTab === 'number'
+  ) {
+    await addItemToModernStashResourceSector(
+      options.targetFilePath,
+      sourceItem,
+      options.targetStashTab,
+      options.targetGridX ?? 0,
+      options.targetGridY ?? 0,
+    );
+  } else {
+    await addItemToSaveFile(
+      options.targetFilePath,
+      options.targetFileType,
+      sourceItem,
+      options.targetLocationContext,
+      options.targetStashTab,
+      options.targetGridX,
+      options.targetGridY,
+      options.targetEquippedSlotId,
+    );
+  }
 
   if (sourceIsModernD2i) {
     await removeItemFromModernStashSharedPage(
