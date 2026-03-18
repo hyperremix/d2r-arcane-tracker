@@ -246,3 +246,51 @@ describe('When readSectorItems parses a JM payload with trailing invalid item by
     );
   });
 });
+
+describe('When readSectorItems reaches EOF while decoding a truncated trailing item', () => {
+  it('Then it keeps the already-decoded leading items and exits without OOM', async () => {
+    // Arrange
+    const serializedItem = Buffer.from(
+      await writeItem(
+        {
+          type: 'r01',
+          code: 'r01',
+          identified: true,
+          simple_item: 1,
+          ethereal: 0,
+          socketed: 0,
+          new: 1,
+          personalized: 0,
+          given_runeword: 0,
+          location_id: 0,
+          equipped_id: 0,
+          position_x: 0,
+          position_y: 0,
+          alt_position_id: 5,
+          quality: 1,
+          quantity: 1,
+        } as unknown as d2sTypes.types.IItem,
+        105,
+        constants105Extended as unknown as d2sTypes.types.IConstantData,
+        { extendedStash: false, sortProperties: true },
+      ),
+    );
+    const header = Buffer.alloc(4);
+    header.write('JM', 0, 'ascii');
+    header.writeUInt16LE(2, 2);
+    const payload = Buffer.concat([header, serializedItem, Buffer.from([0x00, 0x00])]);
+
+    // Act
+    const parsed = await readSectorItems(payload, 105);
+
+    // Assert
+    expect(parsed).toHaveLength(1);
+    expect(parsed[0]).toEqual(
+      expect.objectContaining({
+        type: 'r01',
+        position_x: 0,
+        position_y: 0,
+      }),
+    );
+  });
+});
