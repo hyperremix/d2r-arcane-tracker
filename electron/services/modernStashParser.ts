@@ -1,8 +1,8 @@
-import { BitReader } from '@dschu012/d2s/lib/binary/bitreader';
 import { enhanceItems } from '@dschu012/d2s/lib/d2/attribute_enhancer';
 import { readItem } from '@dschu012/d2s/lib/d2/items';
 import { constants as constants105 } from '@dschu012/d2s/lib/data/versions/105_constant_data';
 import type { D2SItem } from '../types/grail';
+import { createBoundedBitReader } from './boundedBitReader';
 import { type D2iMetadata, readD2iMetadata } from './stashFormat';
 
 // Extend magical_properties to cover D2R resource-stash attribute 381 (stack count).
@@ -226,7 +226,7 @@ export async function readSectorItems(payload: Uint8Array, version: number): Pro
   }
 
   const expectedCount = header.readUInt16LE(2);
-  const reader = new BitReader(payload);
+  const reader = createBoundedBitReader(payload, 'readSectorItems');
   // Skip "JM" + count
   reader.ReadString(2);
   reader.ReadUInt16();

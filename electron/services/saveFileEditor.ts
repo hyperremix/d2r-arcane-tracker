@@ -2,12 +2,12 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { extname } from 'node:path';
 import type { types as d2sTypes } from '@dschu012/d2s';
 import * as d2s from '@dschu012/d2s';
-import { BitReader } from '@dschu012/d2s/lib/binary/bitreader';
 import { readItem, writeItem } from '@dschu012/d2s/lib/d2/items';
 import * as d2stash from '@dschu012/d2s/lib/d2/stash';
 import { constants as constants96 } from '@dschu012/d2s/lib/data/versions/96_constant_data';
 import { constants as constants99 } from '@dschu012/d2s/lib/data/versions/99_constant_data';
 import type { CharacterClass, VaultLocationContext, VaultSourceFileType } from '../types/grail';
+import { createBoundedBitReader } from './boundedBitReader';
 import { constants105Extended, resolveStackCount, SHARED_TAB_COUNT } from './modernStashParser';
 import { readD2iMetadata } from './stashFormat';
 
@@ -1014,7 +1014,7 @@ async function findItemInModernStashSharedPage(
     }
 
     const count = payload.readUInt16LE(JM_ITEM_COUNT_OFFSET);
-    const reader = new BitReader(payload);
+    const reader = createBoundedBitReader(payload, 'findItemInModernStashSharedPage');
     reader.ReadString(2); // skip "JM"
     reader.ReadUInt16(); // skip count
 
@@ -1082,7 +1082,7 @@ async function removeItemFromModernStashSharedPage(
     }
 
     const count = payload.readUInt16LE(JM_ITEM_COUNT_OFFSET);
-    const reader = new BitReader(payload);
+    const reader = createBoundedBitReader(payload, 'removeItemFromModernStashSharedPage');
     reader.ReadString(2); // skip "JM"
     reader.ReadUInt16(); // skip count
 
@@ -1196,7 +1196,7 @@ async function addItemToModernStashSharedPageBuffer(
   let existingItemBytes = payload.subarray(JM_ITEM_DATA_OFFSET);
   let trailingBytes = Buffer.alloc(0);
   try {
-    const reader = new BitReader(payload);
+    const reader = createBoundedBitReader(payload, 'addItemToModernStashSharedPageBuffer');
     reader.ReadString(2); // skip "JM"
     reader.ReadUInt16(); // skip count
 
@@ -1438,7 +1438,7 @@ async function readResourceSectorEntries(
     const count = payload.readUInt16LE(JM_ITEM_COUNT_OFFSET);
 
     // Read items one at a time, tracking byte boundaries via reader.offset.
-    const reader = new BitReader(payload);
+    const reader = createBoundedBitReader(payload, 'readResourceSectorEntries');
     reader.ReadString(2); // skip "JM"
     reader.ReadUInt16(); // skip count
 
