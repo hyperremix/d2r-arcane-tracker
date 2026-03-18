@@ -107,25 +107,8 @@ beforeAll(async () => {
     },
   }));
 
-  // Mock BitReader and d2/items so modern stash binary-splice code can be exercised
-  // without requiring real binary d2i payloads.
-  vi.doMock('@dschu012/d2s/lib/binary/bitreader', () => ({
-    BitReader: vi.fn().mockImplementation(function (this: {
-      offset: number;
-      ReadString: ReturnType<typeof vi.fn>;
-      ReadUInt16: ReturnType<typeof vi.fn>;
-    }) {
-      this.offset = 0;
-      this.ReadString = vi.fn((n: number) => {
-        this.offset += n * 8;
-      });
-      this.ReadUInt16 = vi.fn(() => {
-        this.offset += 16;
-        return 0;
-      });
-    }),
-  }));
-
+  // Mock d2/items so modern stash binary-splice code can be exercised without
+  // requiring real item payload decoding.
   vi.doMock('@dschu012/d2s/lib/d2/items', () => ({
     readItem: mockReadItem,
     writeItem: mockWriteItem,

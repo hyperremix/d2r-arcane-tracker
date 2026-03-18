@@ -52,6 +52,13 @@ declare module '@dschu012/d2s' {
 
   export function getConstantData(version: number): types.IConstantData;
   export function setConstantData(version: number, constants: types.IConstantData): void;
+  export function enhanceItems(
+    items: types.IItem[],
+    constants: types.IConstantData,
+    level?: number,
+    userConfig?: Record<string, unknown>,
+    parent?: types.IItem,
+  ): Promise<void>;
 }
 
 declare module '@dschu012/d2s/lib/d2/types' {
