@@ -1897,25 +1897,28 @@ class SaveFileMonitor {
     // Capture current counter before processing (in case new changes arrive during processing)
     const counterAtStartOfProcessing = this.fileChangeCounter;
 
-    const directories = await this.findExistingSaveDirectories();
-    await this.parseAllSaveDirectories(directories);
+    try {
+      const directories = await this.findExistingSaveDirectories();
+      await this.parseAllSaveDirectories(directories);
 
-    // Update last processed counter to what we started processing
-    // If new changes arrived during processing, they'll be caught on next tick
-    this.lastProcessedChangeCounter = counterAtStartOfProcessing;
+      // Update last processed counter to what we started processing
+      // If new changes arrived during processing, they'll be caught on next tick
+      this.lastProcessedChangeCounter = counterAtStartOfProcessing;
 
-    this.readingFiles = false;
-    log.info(
-      'tickReader',
-      `Done processing file changes (processed up to counter ${counterAtStartOfProcessing})`,
-    );
-
-    // Check if new changes arrived during processing
-    if (this.fileChangeCounter > counterAtStartOfProcessing) {
       log.info(
         'tickReader',
-        `New changes detected during processing (counter now ${this.fileChangeCounter}), will process on next tick`,
+        `Done processing file changes (processed up to counter ${counterAtStartOfProcessing})`,
       );
+
+      // Check if new changes arrived during processing
+      if (this.fileChangeCounter > counterAtStartOfProcessing) {
+        log.info(
+          'tickReader',
+          `New changes detected during processing (counter now ${this.fileChangeCounter}), will process on next tick`,
+        );
+      }
+    } finally {
+      this.readingFiles = false;
     }
   };
 

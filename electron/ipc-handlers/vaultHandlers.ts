@@ -26,6 +26,7 @@ import type {
 } from '../types/grail';
 
 const MAX_SEARCH_TEXT_LENGTH = 120;
+const MAX_PAGE = 10000;
 const MAX_PAGE_SIZE = 200;
 const MIN_PAGE = 1;
 const MIN_PAGE_SIZE = 1;
@@ -107,6 +108,7 @@ function sanitizeFilter(filter?: VaultItemFilter): VaultItemFilter {
   if (safeFilter.page !== undefined) {
     assert(Number.isInteger(safeFilter.page), 'Page must be an integer');
     assert(safeFilter.page >= MIN_PAGE, `Page must be >= ${MIN_PAGE}`);
+    assert(safeFilter.page <= MAX_PAGE, `Page must be <= ${MAX_PAGE}`);
   }
 
   if (safeFilter.pageSize !== undefined) {
@@ -160,6 +162,21 @@ function sanitizeFilter(filter?: VaultItemFilter): VaultItemFilter {
     assert(typeof safeFilter.includeSocketed === 'boolean', 'includeSocketed must be a boolean');
   }
 
+  if (safeFilter.categoryIds !== undefined) {
+    assert(Array.isArray(safeFilter.categoryIds), 'categoryIds must be an array');
+    assert(
+      safeFilter.categoryIds.every((id) => typeof id === 'string' && id.length > 0),
+      'Each categoryId must be a non-empty string',
+    );
+  }
+
+  if (safeFilter.characterId !== undefined) {
+    assert(
+      typeof safeFilter.characterId === 'string' && safeFilter.characterId.length > 0,
+      'characterId must be a non-empty string',
+    );
+  }
+
   return safeFilter;
 }
 
@@ -175,6 +192,7 @@ function validateVaultItemInput(input: VaultItemUpsertInput): void {
   );
   assert(VALID_SOURCE_FILE_TYPES.has(input.sourceFileType), 'Invalid sourceFileType');
   assert(VALID_LOCATION_CONTEXTS.has(input.locationContext), 'Invalid locationContext');
+  assert(typeof input.quality === 'string' && input.quality.length > 0, 'Missing quality');
 }
 
 function normalizeOptionalDate(
@@ -211,6 +229,9 @@ function normalizeVaultItemInput(input: VaultItemUpsertInput): VaultItemUpsertIn
 }
 
 function validateCategoryInput(input: VaultCategoryCreateInput | VaultCategoryUpdateInput): void {
+  if ('id' in input) {
+    assert(typeof input.id === 'string' && input.id.length > 0, 'Category id is required');
+  }
   if ('name' in input && input.name !== undefined) {
     assert(
       typeof input.name === 'string' && input.name.trim().length > 0,
@@ -593,6 +614,68 @@ function buildInventorySearchResult(
   };
 }
 
+interface UnvaultTargetOptions {
+  targetFilePath: string;
+  targetFileType: VaultSourceFileType;
+  targetLocationContext: VaultLocationContext;
+  targetStashTab?: number;
+  targetGridX: number;
+  targetGridY: number;
+}
+
+async function writeVaultItemToSaveFile(
+  rawItemJson: string,
+  filePath: string,
+  fileType: VaultSourceFileType,
+  locationContext: VaultLocationContext,
+  stashTab: number | undefined,
+  targetGridX: number | undefined,
+  targetGridY: number | undefined,
+): Promise<void> {
+  let parsedItem: d2sTypes.IItem;
+  try {
+    parsedItem = JSON.parse(rawItemJson) as d2sTypes.IItem;
+  } catch {
+    throw new Error('Stored rawItemJson is not valid JSON');
+  }
+  await addItemToSaveFile(
+    filePath,
+    fileType,
+    parsedItem,
+    locationContext,
+    stashTab,
+    targetGridX,
+    targetGridY,
+  );
+}
+
+function validateUnvaultTargetOptions(targetOptions: UnvaultTargetOptions): void {
+  const targetFilePath = (targetOptions.targetFilePath ?? '').trim();
+  assert(targetFilePath.length > 0, 'targetOptions.targetFilePath must be a non-empty string');
+  assert(
+    VALID_SOURCE_FILE_TYPES.has(targetOptions.targetFileType),
+    'targetOptions.targetFileType must be one of: d2s, sss, d2x, d2i',
+  );
+  assert(
+    VALID_LOCATION_CONTEXTS.has(targetOptions.targetLocationContext),
+    'targetOptions.targetLocationContext must be one of: equipped, inventory, stash, mercenary, corpse, unknown',
+  );
+  if (targetOptions.targetStashTab !== undefined) {
+    assert(
+      Number.isInteger(targetOptions.targetStashTab) && targetOptions.targetStashTab >= 0,
+      'targetOptions.targetStashTab must be a non-negative integer',
+    );
+  }
+  assert(
+    Number.isInteger(targetOptions.targetGridX) && targetOptions.targetGridX >= 0,
+    'targetOptions.targetGridX must be a non-negative integer',
+  );
+  assert(
+    Number.isInteger(targetOptions.targetGridY) && targetOptions.targetGridY >= 0,
+    'targetOptions.targetGridY must be a non-negative integer',
+  );
+}
+
 export function initializeVaultHandlers(
   getSaveFileMonitor: () => SaveFileMonitor | undefined,
 ): void {
@@ -613,28 +696,32 @@ export function initializeVaultHandlers(
     async (
       _,
       itemId: string,
-      targetOptions?: {
-        targetFilePath: string;
-        targetFileType: VaultSourceFileType;
-        targetLocationContext: VaultLocationContext;
-        targetStashTab?: number;
-        targetGridX: number;
-        targetGridY: number;
-      },
+      targetOptions?: UnvaultTargetOptions,
     ): Promise<{ success: boolean }> => {
       assert(typeof itemId === 'string' && itemId.length > 0, 'itemId is required');
 
+      if (targetOptions !== undefined) {
+        validateUnvaultTargetOptions(targetOptions);
+      }
+
       const vaultItem = grailDatabase.getVaultItemById(itemId);
-      const filePath = targetOptions?.targetFilePath ?? vaultItem?.sourceFilePath;
+      const filePath = (targetOptions?.targetFilePath ?? vaultItem?.sourceFilePath)?.trim();
       const fileType = targetOptions?.targetFileType ?? vaultItem?.sourceFileType;
       const locationContext = targetOptions?.targetLocationContext ?? vaultItem?.locationContext;
       const stashTab = targetOptions?.targetStashTab ?? vaultItem?.stashTab;
+
+      if (targetOptions !== undefined) {
+        assert(
+          vaultItem != null && Boolean(vaultItem.rawItemJson),
+          'Cannot unvault: vault item not found or has no item data',
+        );
+      }
+
       if (filePath && vaultItem?.rawItemJson && fileType && locationContext) {
-        const parsedItem = JSON.parse(vaultItem.rawItemJson) as d2sTypes.IItem;
-        await addItemToSaveFile(
+        await writeVaultItemToSaveFile(
+          vaultItem.rawItemJson,
           filePath,
           fileType,
-          parsedItem,
           locationContext,
           stashTab,
           targetOptions?.targetGridX,
@@ -652,6 +739,10 @@ export function initializeVaultHandlers(
     async (_, itemId: string, categoryIds: string[]): Promise<{ success: boolean }> => {
       assert(typeof itemId === 'string' && itemId.length > 0, 'itemId is required');
       assert(Array.isArray(categoryIds), 'categoryIds must be an array');
+      assert(
+        categoryIds.every((id) => typeof id === 'string' && id.length > 0),
+        'Each categoryId must be a non-empty string',
+      );
       grailDatabase.setVaultItemCategories(itemId, categoryIds);
       return { success: true };
     },

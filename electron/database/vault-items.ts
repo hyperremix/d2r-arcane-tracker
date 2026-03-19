@@ -374,7 +374,7 @@ export function setVaultItemsPresentInLatestScan(
       .set({
         isPresentInLatestScan: present,
         lastSeenAt: present ? seenAt : undefined,
-        sourceCharacterName: sourceCharacterName ?? null,
+        ...(sourceCharacterName !== undefined && { sourceCharacterName }),
       })
       .where(eq(vaultItems.fingerprint, fingerprint))
       .run();
