@@ -303,6 +303,17 @@ describe('When removeItemFromSaveFile is called', () => {
         Buffer.from(fakeResultBuffer),
       );
     });
+
+    it('Then rejects locator-only removal without a numeric item id', async () => {
+      // Act & Assert
+      await expect(
+        removeItemFromSaveFile('/path/to/char.d2s', 'd2s', {
+          gridX: 1,
+          gridY: 1,
+        }),
+      ).rejects.toThrow('itemId is required for d2s removal');
+      expect(mockD2sRead).not.toHaveBeenCalled();
+    });
   });
 
   describe('If sourceFileType is d2s and item is in corpse_items', () => {
@@ -368,6 +379,26 @@ describe('When removeItemFromSaveFile is called', () => {
       await expect(removeItemFromSaveFile('/path/to/file.d2i', 'd2i', 11)).rejects.toThrow(
         'not found',
       );
+      expect(mockD2stashRead).not.toHaveBeenCalled();
+      expect(mockD2stashWrite).not.toHaveBeenCalled();
+    });
+
+    it('Then supports coordinate-based locators for modern v105 removals', async () => {
+      // Arrange — v105 with no sectors: modern locator path is entered, item not found
+      mockReadD2iMetadata.mockReturnValue({
+        version: 105,
+        hardcore: false,
+        sectors: [],
+      });
+
+      // Act & Assert — modern path is taken using stash/grid locator; never hits legacy stash parser
+      await expect(
+        removeItemFromSaveFile('/path/to/file.d2i', 'd2i', {
+          stashTab: 7,
+          gridX: 2,
+          gridY: 1,
+        }),
+      ).rejects.toThrow('not found');
       expect(mockD2stashRead).not.toHaveBeenCalled();
       expect(mockD2stashWrite).not.toHaveBeenCalled();
     });
