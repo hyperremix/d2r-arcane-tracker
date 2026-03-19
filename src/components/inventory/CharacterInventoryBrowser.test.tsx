@@ -6,13 +6,19 @@ import { serializeVaultTextPayload, VAULT_DRAG_MIME } from '@/components/invento
 import { useGrailStore } from '@/stores/grailStore';
 import { CharacterInventoryBrowser } from './CharacterInventoryBrowser';
 
-const { toastErrorMock } = vi.hoisted(() => ({
+const { toastErrorMock, toastInfoMock, toastSuccessMock, toastWarningMock } = vi.hoisted(() => ({
   toastErrorMock: vi.fn(),
+  toastInfoMock: vi.fn(),
+  toastSuccessMock: vi.fn(),
+  toastWarningMock: vi.fn(),
 }));
 
 vi.mock('sonner', () => ({
   toast: {
     error: toastErrorMock,
+    info: toastInfoMock,
+    success: toastSuccessMock,
+    warning: toastWarningMock,
   },
 }));
 
@@ -67,6 +73,9 @@ describe('When CharacterInventoryBrowser is rendered', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     toastErrorMock.mockReset();
+    toastInfoMock.mockReset();
+    toastSuccessMock.mockReset();
+    toastWarningMock.mockReset();
     useGrailStore.setState({ items: [] });
 
     Object.defineProperty(window, 'electronAPI', {

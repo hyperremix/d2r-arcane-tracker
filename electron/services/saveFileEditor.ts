@@ -35,6 +35,13 @@ interface MoveSaveFileItemOptions {
   targetEquippedSlotId?: number;
 }
 
+export interface SaveFileItemLocator {
+  itemId?: number;
+  stashTab?: number;
+  gridX?: number;
+  gridY?: number;
+}
+
 function getStashConstants(ext: string): StashConstants {
   if (ext === '.d2i') {
     return { constants: constants99, version: 99 };
@@ -553,6 +560,56 @@ function normalizeItemId(rawId: unknown): number | undefined {
   return undefined;
 }
 
+function normalizeOptionalNonNegativeInteger(
+  value: unknown,
+  fieldName: 'stashTab' | 'gridX' | 'gridY',
+): number | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  if (typeof value === 'number' && Number.isInteger(value) && value >= 0) {
+    return value;
+  }
+
+  if (typeof value === 'string' && value.trim().length > 0) {
+    const parsed = Number.parseInt(value, 10);
+    if (Number.isInteger(parsed) && parsed >= 0) {
+      return parsed;
+    }
+  }
+
+  throw new Error(`${fieldName} must be a non-negative integer`);
+}
+
+function normalizeSaveFileItemLocator(
+  itemLocator: number | SaveFileItemLocator,
+): SaveFileItemLocator {
+  if (typeof itemLocator === 'number') {
+    if (!Number.isInteger(itemLocator)) {
+      throw new Error('itemId must be an integer');
+    }
+
+    return { itemId: itemLocator };
+  }
+
+  if (!itemLocator || typeof itemLocator !== 'object') {
+    throw new Error('itemLocator must be a number or an object');
+  }
+
+  const itemId = normalizeItemId(itemLocator.itemId);
+  const stashTab = normalizeOptionalNonNegativeInteger(itemLocator.stashTab, 'stashTab');
+  const gridX = normalizeOptionalNonNegativeInteger(itemLocator.gridX, 'gridX');
+  const gridY = normalizeOptionalNonNegativeInteger(itemLocator.gridY, 'gridY');
+  const hasGridCoordinates = gridX !== undefined && gridY !== undefined;
+
+  if (itemId === undefined && !hasGridCoordinates) {
+    throw new Error('itemLocator must include itemId or both gridX and gridY');
+  }
+
+  return { itemId, stashTab, gridX, gridY };
+}
+
 function itemMatchesId(item: d2sTypes.IItem, itemId: number): boolean {
   return normalizeItemId((item as { id?: unknown }).id) === itemId;
 }
@@ -802,11 +859,16 @@ async function moveItemWithinSingleSaveFile(options: MoveSaveFileItemOptions): P
 export async function removeItemFromSaveFile(
   filePath: string,
   fileType: VaultSourceFileType,
-  itemId: number,
+  itemLocator: number | SaveFileItemLocator,
 ): Promise<void> {
+  const { itemId, stashTab, gridX, gridY } = normalizeSaveFileItemLocator(itemLocator);
   const buffer = await readFile(filePath);
 
   if (fileType === 'd2s') {
+    if (itemId === undefined) {
+      throw new Error('itemId is required for d2s removal');
+    }
+
     const data = await d2s.read(buffer);
     data.items = data.items.filter((item: d2sTypes.IItem) => !itemMatchesId(item, itemId));
     data.corpse_items = data.corpse_items.filter(
@@ -825,9 +887,13 @@ export async function removeItemFromSaveFile(
   if (ext === '.d2i') {
     const metadata = readD2iMetadata(buffer);
     if (metadata.version >= 105) {
-      await removeItemFromModernStashSharedPage(filePath, itemId);
+      await removeItemFromModernStashSharedPage(filePath, itemId, stashTab, gridX, gridY);
       return;
     }
+  }
+
+  if (itemId === undefined) {
+    throw new Error('itemId is required for classic stash removal');
   }
 
   assertWritableD2iBuffer(ext, buffer);

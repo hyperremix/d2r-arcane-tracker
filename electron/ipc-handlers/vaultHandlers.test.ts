@@ -5,7 +5,9 @@ const mocks = vi.hoisted(() => ({
   handleMock: vi.fn(),
   grailDatabaseMock: {
     addVaultItem: vi.fn(),
+    unvaultVaultItem: vi.fn(),
     removeVaultItem: vi.fn(),
+    getVaultItemById: vi.fn(),
     setVaultItemCategories: vi.fn(),
     searchVaultItems: vi.fn(),
     addVaultCategory: vi.fn(),
@@ -17,6 +19,7 @@ const mocks = vi.hoisted(() => ({
     addItemToSaveFile: vi.fn(),
     removeItemFromSaveFile: vi.fn(),
     moveItemBetweenSaveFiles: vi.fn(),
+    splitStackInSaveFile: vi.fn(),
   },
 }));
 
@@ -34,6 +37,7 @@ vi.mock('../services/saveFileEditor', () => ({
   addItemToSaveFile: mocks.saveFileEditorMock.addItemToSaveFile,
   removeItemFromSaveFile: mocks.saveFileEditorMock.removeItemFromSaveFile,
   moveItemBetweenSaveFiles: mocks.saveFileEditorMock.moveItemBetweenSaveFiles,
+  splitStackInSaveFile: mocks.saveFileEditorMock.splitStackInSaveFile,
 }));
 
 import { initializeVaultHandlers } from './vaultHandlers';
@@ -124,6 +128,102 @@ describe('When vault IPC handlers are initialized', () => {
 
       // Assert
       await expect(promise).rejects.toThrow('lastSeenAt must be a valid date');
+    });
+  });
+
+  describe('If vault:addItem receives a modern d2i source with coordinate locator', () => {
+    it('Then it writes to vault first and removes from source by coordinates', async () => {
+      // Arrange
+      initializeVaultHandlers(() => undefined);
+      mocks.grailDatabaseMock.addVaultItem.mockReturnValue({
+        id: 'vault-item-1',
+      });
+      const handler = mocks.handleMock.mock.calls.find((call) => call[0] === 'vault:addItem')?.[1];
+
+      // Act
+      await handler?.(null, {
+        fingerprint: 'fp-rune',
+        itemName: 'Fal Rune',
+        quality: 'normal',
+        ethereal: false,
+        rawItemJson: '{"type":"r19","position_x":2,"position_y":1}',
+        sourceFileType: 'd2i',
+        sourceFilePath: '/tmp/shared-stash.d2i',
+        locationContext: 'stash',
+        stashTab: 7,
+        gridX: 2,
+        gridY: 1,
+      });
+
+      // Assert
+      expect(mocks.saveFileEditorMock.removeItemFromSaveFile).toHaveBeenCalledWith(
+        '/tmp/shared-stash.d2i',
+        'd2i',
+        expect.objectContaining({
+          itemId: undefined,
+          stashTab: 7,
+          gridX: 2,
+          gridY: 1,
+        }),
+      );
+      const addOrder = mocks.grailDatabaseMock.addVaultItem.mock.invocationCallOrder[0];
+      const removeOrder =
+        mocks.saveFileEditorMock.removeItemFromSaveFile.mock.invocationCallOrder[0];
+      expect(addOrder).toBeLessThan(removeOrder);
+    });
+  });
+
+  describe('If vault:addItem source removal fails after vault row is written', () => {
+    it('Then it reverts vaulted state and returns a clear error', async () => {
+      // Arrange
+      initializeVaultHandlers(() => undefined);
+      mocks.grailDatabaseMock.addVaultItem.mockReturnValue({
+        id: 'vault-item-2',
+      });
+      mocks.saveFileEditorMock.removeItemFromSaveFile.mockRejectedValue(
+        new Error('disk write failed'),
+      );
+      const handler = mocks.handleMock.mock.calls.find((call) => call[0] === 'vault:addItem')?.[1];
+
+      // Act
+      const promise = handler?.(null, {
+        fingerprint: 'fp-shako',
+        itemName: 'Shako',
+        quality: 'unique',
+        ethereal: false,
+        rawItemJson: '{"id":42}',
+        sourceFileType: 'd2s',
+        sourceFilePath: '/tmp/sorc.d2s',
+        locationContext: 'inventory',
+      });
+
+      // Assert
+      await expect(promise).rejects.toThrow('Vault add persisted but source item removal failed');
+      expect(mocks.grailDatabaseMock.unvaultVaultItem).toHaveBeenCalledWith('vault-item-2');
+    });
+  });
+
+  describe('If vault:addItem receives invalid raw item JSON for a source-backed item', () => {
+    it('Then it rejects before writing to the vault database', async () => {
+      // Arrange
+      initializeVaultHandlers(() => undefined);
+      const handler = mocks.handleMock.mock.calls.find((call) => call[0] === 'vault:addItem')?.[1];
+
+      // Act
+      const promise = handler?.(null, {
+        fingerprint: 'fp-invalid-json',
+        itemName: 'Malformed Item',
+        quality: 'normal',
+        ethereal: false,
+        rawItemJson: '{"id": 42',
+        sourceFileType: 'd2s',
+        sourceFilePath: '/tmp/sorc.d2s',
+        locationContext: 'inventory',
+      });
+
+      // Assert
+      await expect(promise).rejects.toThrow('rawItemJson must be valid JSON');
+      expect(mocks.grailDatabaseMock.addVaultItem).not.toHaveBeenCalled();
     });
   });
 
@@ -377,6 +477,110 @@ describe('When vault IPC handlers are initialized', () => {
 
       // Assert
       await expect(promise).rejects.toThrow('targetEquippedSlotId must be one of: 1-12');
+    });
+  });
+
+  describe('If inventory:splitStack receives a valid payload', () => {
+    it('Then it delegates to splitStackInSaveFile and returns success', async () => {
+      // Arrange
+      initializeVaultHandlers(() => undefined);
+      const handler = mocks.handleMock.mock.calls.find(
+        (call) => call[0] === 'inventory:splitStack',
+      )?.[1];
+
+      // Act
+      const result = await handler?.(null, {
+        sourceFilePath: '/tmp/shared.d2i',
+        sourceFileType: 'd2i',
+        sourceStashTab: 7,
+        sourceItemCode: 'r19',
+        splitCount: 1,
+        targets: [
+          {
+            targetFilePath: '/tmp/sorc.d2s',
+            targetFileType: 'd2s',
+            targetLocationContext: 'inventory',
+            targetGridX: 3,
+            targetGridY: 2,
+          },
+        ],
+      });
+
+      // Assert
+      expect(mocks.saveFileEditorMock.splitStackInSaveFile).toHaveBeenCalledWith(
+        expect.objectContaining({
+          sourceFilePath: '/tmp/shared.d2i',
+          sourceFileType: 'd2i',
+          sourceStashTab: 7,
+          sourceItemCode: 'r19',
+          splitCount: 1,
+        }),
+      );
+      expect(result).toEqual({ success: true });
+    });
+  });
+
+  describe('If inventory:splitStack has a negative target grid coordinate', () => {
+    it('Then it rejects the request at IPC validation', async () => {
+      // Arrange
+      initializeVaultHandlers(() => undefined);
+      const handler = mocks.handleMock.mock.calls.find(
+        (call) => call[0] === 'inventory:splitStack',
+      )?.[1];
+
+      // Act
+      const promise = handler?.(null, {
+        sourceFilePath: '/tmp/shared.d2i',
+        sourceFileType: 'd2i',
+        sourceStashTab: 7,
+        sourceItemCode: 'r19',
+        splitCount: 1,
+        targets: [
+          {
+            targetFilePath: '/tmp/sorc.d2s',
+            targetFileType: 'd2s',
+            targetLocationContext: 'inventory',
+            targetGridX: -1,
+            targetGridY: 2,
+          },
+        ],
+      });
+
+      // Assert
+      await expect(promise).rejects.toThrow('Each target targetGridX must be >= 0');
+    });
+  });
+
+  describe('If inventory:splitStack targets a non-d2s file with non-stash context', () => {
+    it('Then it rejects the request due to unsafe target context pairing', async () => {
+      // Arrange
+      initializeVaultHandlers(() => undefined);
+      const handler = mocks.handleMock.mock.calls.find(
+        (call) => call[0] === 'inventory:splitStack',
+      )?.[1];
+
+      // Act
+      const promise = handler?.(null, {
+        sourceFilePath: '/tmp/shared.d2i',
+        sourceFileType: 'd2i',
+        sourceStashTab: 7,
+        sourceItemCode: 'r19',
+        splitCount: 1,
+        targets: [
+          {
+            targetFilePath: '/tmp/shared-target.d2i',
+            targetFileType: 'd2i',
+            targetLocationContext: 'inventory',
+            targetGridX: 1,
+            targetGridY: 2,
+          },
+        ],
+      });
+
+      // Assert
+      await expect(promise).rejects.toThrow(
+        'Shared stash targets must use targetLocationContext=stash',
+      );
     });
   });
 });
