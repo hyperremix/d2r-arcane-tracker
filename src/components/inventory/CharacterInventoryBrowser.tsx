@@ -513,6 +513,17 @@ function VaultedItemTile({
             className="pointer-events-none h-full w-full object-contain"
             loading="lazy"
           />
+          {(item.stackCount ?? 1) > 1 && (
+            <Badge
+              variant="secondary"
+              aria-label={t(translations.inventoryBrowser.vaultedTileStackCountLabel, {
+                count: item.stackCount,
+              })}
+              className="absolute right-0.5 bottom-0.5 h-4 min-w-4 justify-center px-1 text-[10px] leading-none"
+            >
+              {item.stackCount}
+            </Badge>
+          )}
           {isOverlayVisible && (
             <ItemSocketOverlay entries={gameTooltipModel?.socketEntries ?? []} />
           )}
@@ -1377,6 +1388,7 @@ function toVaultUpsertInput(item: ParsedInventoryItem): VaultItemUpsertInput {
     quality: item.quality,
     ethereal: item.ethereal,
     socketCount: item.socketCount,
+    stackCount: item.stackCount,
     rawItemJson: item.rawItemJson,
     sourceCharacterId: item.characterId,
     sourceCharacterName: item.characterName,

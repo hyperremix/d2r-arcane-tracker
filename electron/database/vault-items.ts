@@ -7,6 +7,7 @@ import type {
   VaultItemUpsertByFingerprintInput,
   VaultItemUpsertInput,
 } from '../types/grail';
+import { isStackableFromRawJson, resolveStackCountFromRawJson } from '../utils/stackableItems';
 import { dbVaultItemToVaultItem, fromISOString, toISOString } from './converters';
 import { schema } from './drizzle';
 import type { DatabaseContext } from './types';
@@ -27,6 +28,7 @@ type RawVaultSearchRow = {
   quality: string;
   ethereal: number | boolean;
   socket_count: number | null;
+  stack_count: number;
   raw_item_json: string;
   source_character_id: string | null;
   source_character_name: string | null;
@@ -58,6 +60,17 @@ function toBoolean(value: number | boolean | null | undefined): boolean {
   return value === 1;
 }
 
+function extractRawRowSpatialFields(row: RawVaultSearchRow) {
+  return {
+    stashTab: row.stash_tab ?? undefined,
+    gridX: row.grid_x ?? undefined,
+    gridY: row.grid_y ?? undefined,
+    gridWidth: row.grid_width ?? undefined,
+    gridHeight: row.grid_height ?? undefined,
+    equippedSlotId: row.equipped_slot_id ?? undefined,
+  };
+}
+
 function mapRawVaultSearchRowToVaultItem(row: RawVaultSearchRow): VaultItem {
   return {
     id: row.id,
@@ -67,18 +80,14 @@ function mapRawVaultSearchRowToVaultItem(row: RawVaultSearchRow): VaultItem {
     quality: row.quality,
     ethereal: toBoolean(row.ethereal),
     socketCount: row.socket_count ?? undefined,
+    stackCount: row.stack_count ?? 1,
     rawItemJson: row.raw_item_json,
     sourceCharacterId: row.source_character_id ?? undefined,
     sourceCharacterName: row.source_character_name ?? undefined,
     sourceFileType: row.source_file_type,
     sourceFilePath: row.source_file_path ?? undefined,
     locationContext: row.location_context,
-    stashTab: row.stash_tab ?? undefined,
-    gridX: row.grid_x ?? undefined,
-    gridY: row.grid_y ?? undefined,
-    gridWidth: row.grid_width ?? undefined,
-    gridHeight: row.grid_height ?? undefined,
-    equippedSlotId: row.equipped_slot_id ?? undefined,
+    ...extractRawRowSpatialFields(row),
     iconFileName: row.icon_file_name ?? undefined,
     isSocketedItem: toBoolean(row.is_socketed_item),
     grailItemId: row.grail_item_id ?? undefined,
@@ -114,6 +123,7 @@ function buildVaultItemValues(input: VaultItemUpsertInput) {
     quality: input.quality,
     ethereal: input.ethereal,
     socketCount: toNullable(input.socketCount),
+    stackCount: input.stackCount ?? 1,
     rawItemJson: input.rawItemJson,
     sourceCharacterId: toNullable(input.sourceCharacterId),
     sourceCharacterName: toNullable(input.sourceCharacterName),
@@ -157,6 +167,7 @@ function buildVaultItemUpdatePayload(updates: VaultItemUpdateInput) {
   setPayloadValue(payload, 'quality', updates.quality);
   setPayloadValue(payload, 'ethereal', updates.ethereal);
   setPayloadValue(payload, 'socketCount', updates.socketCount);
+  setPayloadValue(payload, 'stackCount', updates.stackCount);
   setPayloadValue(payload, 'rawItemJson', updates.rawItemJson);
   setPayloadValue(payload, 'sourceCharacterId', updates.sourceCharacterId);
   setPayloadValue(payload, 'sourceCharacterName', updates.sourceCharacterName);
@@ -192,11 +203,59 @@ function attachCategoryIds(ctx: DatabaseContext, items: VaultItem[]): VaultItem[
   }));
 }
 
+function findExistingStackableVaultItem(
+  ctx: DatabaseContext,
+  itemCode: string,
+): VaultItem | undefined {
+  const row = ctx.rawDb
+    .prepare(
+      `
+        SELECT vi.*
+        FROM vault_items vi
+        WHERE vi.item_code = ?
+          AND vi.vaulted_at IS NOT NULL
+          AND (vi.unvaulted_at IS NULL OR vi.unvaulted_at < vi.vaulted_at)
+        LIMIT 1
+      `,
+    )
+    .get(itemCode) as RawVaultSearchRow | undefined;
+
+  if (!row) {
+    return undefined;
+  }
+
+  return attachCategoryIds(ctx, [mapRawVaultSearchRowToVaultItem(row)])[0];
+}
+
 export function addVaultItem(ctx: DatabaseContext, input: VaultItemUpsertInput): VaultItem {
   const nowIso = new Date().toISOString();
+
+  // Stack merge: if incoming item is stackable and one already exists in the vault
+  // under the same item code, increment its count instead of creating a duplicate.
+  if (input.itemCode && isStackableFromRawJson(input.rawItemJson, input.itemCode)) {
+    const incomingCount = resolveStackCountFromRawJson(input.rawItemJson);
+    const existing = findExistingStackableVaultItem(ctx, input.itemCode);
+
+    if (existing) {
+      const mergedCount = (existing.stackCount ?? 1) + incomingCount;
+      ctx.db
+        .update(vaultItems)
+        .set({ stackCount: mergedCount, unvaultedAt: null, vaultedAt: nowIso })
+        .where(eq(vaultItems.id, existing.id))
+        .run();
+
+      const refreshed = getVaultItemById(ctx, existing.id);
+      if (!refreshed) {
+        throw new Error(`Unable to load vault item after stack merge: ${existing.id}`);
+      }
+      return refreshed;
+    }
+  }
+
   const inputWithVault: VaultItemUpsertInput = {
     ...input,
     vaultedAt: input.vaultedAt ?? new Date(nowIso),
+    stackCount: input.stackCount ?? resolveStackCountFromRawJson(input.rawItemJson),
   };
   const saved = upsertVaultItemByFingerprint(ctx, inputWithVault);
 
@@ -212,7 +271,23 @@ export function addVaultItem(ctx: DatabaseContext, input: VaultItemUpsertInput):
   return refreshed;
 }
 
-export function unvaultVaultItem(ctx: DatabaseContext, itemId: string): void {
+export function unvaultVaultItem(
+  ctx: DatabaseContext,
+  itemId: string,
+  withdrawCount?: number,
+): void {
+  if (withdrawCount !== undefined) {
+    const item = getVaultItemById(ctx, itemId);
+    if (item && (item.stackCount ?? 1) > withdrawCount) {
+      ctx.db
+        .update(vaultItems)
+        .set({ stackCount: (item.stackCount ?? 1) - withdrawCount })
+        .where(eq(vaultItems.id, itemId))
+        .run();
+      return;
+    }
+  }
+
   const nowIso = new Date().toISOString();
   ctx.db.update(vaultItems).set({ unvaultedAt: nowIso }).where(eq(vaultItems.id, itemId)).run();
 }
@@ -256,6 +331,7 @@ export function upsertVaultItemByFingerprint(
         quality: values.quality,
         ethereal: values.ethereal,
         socketCount: values.socketCount,
+        stackCount: values.stackCount,
         rawItemJson: values.rawItemJson,
         sourceCharacterId: values.sourceCharacterId,
         sourceCharacterName: values.sourceCharacterName,

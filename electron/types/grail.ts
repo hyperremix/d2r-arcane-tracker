@@ -294,6 +294,7 @@ export interface VaultItem {
   quality: string;
   ethereal: boolean;
   socketCount?: number;
+  stackCount?: number;
   rawItemJson: string;
   sourceCharacterId?: string;
   sourceCharacterName?: string;
@@ -327,6 +328,7 @@ export interface VaultItemUpsertInput {
   quality: string;
   ethereal: boolean;
   socketCount?: number;
+  stackCount?: number;
   rawItemJson: string;
   sourceCharacterId?: string;
   sourceCharacterName?: string;
@@ -392,6 +394,7 @@ export type DatabaseVaultItem = {
   quality: string;
   ethereal: 0 | 1;
   socket_count: number | null;
+  stack_count: number;
   raw_item_json: string;
   source_character_id: string | null;
   source_character_name: string | null;

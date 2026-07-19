@@ -148,6 +148,7 @@ export function createSchema(ctx: DatabaseContext): void {
         quality TEXT NOT NULL,
         ethereal BOOLEAN NOT NULL DEFAULT FALSE,
         socket_count INTEGER,
+        stack_count INTEGER NOT NULL DEFAULT 1,
         raw_item_json TEXT NOT NULL,
         source_character_id TEXT,
         source_character_name TEXT,
@@ -316,6 +317,7 @@ export function createSchema(ctx: DatabaseContext): void {
   console.log('Database schema created successfully');
 
   ensureVaultItemSpatialColumns(ctx);
+  ensureVaultItemStackCountColumn(ctx);
 
   // Ensure wizard settings exist for existing databases
   ensureWizardSettings(ctx);
@@ -556,6 +558,14 @@ function ensureVaultItemSpatialColumns(ctx: DatabaseContext): void {
   });
 
   tx();
+}
+
+function ensureVaultItemStackCountColumn(ctx: DatabaseContext): void {
+  const rows = ctx.rawDb.prepare('PRAGMA table_info(vault_items)').all() as Array<{ name: string }>;
+  const columnNames = new Set(rows.map((row) => row.name));
+  if (!columnNames.has('stack_count')) {
+    ctx.rawDb.exec('ALTER TABLE vault_items ADD COLUMN stack_count INTEGER NOT NULL DEFAULT 1');
+  }
 }
 
 function migrateRunTrackerAutoStart(ctx: DatabaseContext): void {

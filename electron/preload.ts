@@ -279,8 +279,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
         targetGridX: number;
         targetGridY: number;
       },
+      withdrawCount?: number,
     ): Promise<{ success: boolean }> =>
-      ipcRenderer.invoke('vault:unvaultItem', itemId, targetOptions),
+      ipcRenderer.invoke('vault:unvaultItem', itemId, targetOptions, withdrawCount),
   },
 
   inventory: {

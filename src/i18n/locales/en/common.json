@@ -480,6 +480,7 @@
     "unplaced": "Unplaced",
     "tileAriaLabel": "Inventory item {{itemName}}",
     "vaultedTileAriaLabel": "Vaulted item {{itemName}}",
+    "vaultedTileStackCountLabel": "Stack count: {{count}}",
     "tileSummary": "{{itemName}} \u00b7 {{quality}} \u00b7 {{location}} \u00b7 {{coordinates}}",
     "vaultStatus": "Vault Status",
     "vaultUntracked": "Untracked",

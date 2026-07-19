@@ -12,6 +12,7 @@ export const vaultItems = sqliteTable(
     quality: text('quality').notNull(),
     ethereal: integer('ethereal', { mode: 'boolean' }).notNull().default(false),
     socketCount: integer('socket_count'),
+    stackCount: integer('stack_count').notNull().default(1),
     rawItemJson: text('raw_item_json').notNull(),
     sourceCharacterId: text('source_character_id').references(() => characters.id, {
       onDelete: 'set null',
