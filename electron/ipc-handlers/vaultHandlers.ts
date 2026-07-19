@@ -623,6 +623,17 @@ interface UnvaultTargetOptions {
   targetGridY: number;
 }
 
+function resolveWithdrawCount(withdrawCount: unknown): number | undefined {
+  if (withdrawCount === undefined) {
+    return undefined;
+  }
+  assert(
+    typeof withdrawCount === 'number' && Number.isInteger(withdrawCount) && withdrawCount > 0,
+    'withdrawCount must be a positive integer',
+  );
+  return withdrawCount as number;
+}
+
 async function writeVaultItemToSaveFile(
   rawItemJson: string,
   filePath: string,
@@ -697,12 +708,15 @@ export function initializeVaultHandlers(
       _,
       itemId: string,
       targetOptions?: UnvaultTargetOptions,
+      withdrawCount?: unknown,
     ): Promise<{ success: boolean }> => {
       assert(typeof itemId === 'string' && itemId.length > 0, 'itemId is required');
 
       if (targetOptions !== undefined) {
         validateUnvaultTargetOptions(targetOptions);
       }
+
+      const resolvedWithdrawCount = resolveWithdrawCount(withdrawCount);
 
       const vaultItem = grailDatabase.getVaultItemById(itemId);
       const filePath = (targetOptions?.targetFilePath ?? vaultItem?.sourceFilePath)?.trim();
@@ -729,7 +743,7 @@ export function initializeVaultHandlers(
         );
       }
 
-      grailDatabase.unvaultVaultItem(itemId);
+      grailDatabase.unvaultVaultItem(itemId, resolvedWithdrawCount);
       return { success: true };
     },
   );

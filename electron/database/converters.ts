@@ -190,6 +190,7 @@ export function dbVaultItemToVaultItem(dbItem: DbVaultItem): VaultItem {
     quality: dbItem.quality,
     ethereal: dbItem.ethereal,
     socketCount: dbItem.socketCount ?? undefined,
+    stackCount: dbItem.stackCount ?? 1,
     rawItemJson: dbItem.rawItemJson,
     sourceCharacterId: dbItem.sourceCharacterId ?? undefined,
     sourceCharacterName: dbItem.sourceCharacterName ?? undefined,

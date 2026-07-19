@@ -408,6 +408,101 @@ describe('When vault item database operations are executed', () => {
     });
   });
 
+  describe('If addVaultItem is called twice for the same stackable rune item code', () => {
+    it('Then the second vault merges count instead of creating a duplicate', () => {
+      // Arrange
+      const runeJson = JSON.stringify({
+        code: 'r07',
+        magic_attributes: [{ id: 381, values: [3] }],
+      });
+
+      // Act
+      const first = addVaultItem(ctx, {
+        fingerprint: 'fp-rune-first',
+        itemName: 'Vex Rune',
+        itemCode: 'r07',
+        quality: 'normal',
+        ethereal: false,
+        rawItemJson: runeJson,
+        sourceFileType: 'd2i',
+        locationContext: 'stash',
+      });
+
+      const second = addVaultItem(ctx, {
+        fingerprint: 'fp-rune-second',
+        itemName: 'Vex Rune',
+        itemCode: 'r07',
+        quality: 'normal',
+        ethereal: false,
+        rawItemJson: JSON.stringify({
+          code: 'r07',
+          magic_attributes: [{ id: 381, values: [2] }],
+        }),
+        sourceFileType: 'd2i',
+        locationContext: 'stash',
+      });
+
+      // Assert — should be merged into first entry
+      expect(second.id).toBe(first.id);
+      expect(second.stackCount).toBe(5); // 3 + 2
+    });
+  });
+
+  describe('If unvaultVaultItem is called with withdrawCount less than current stackCount', () => {
+    it('Then only decrements the count without marking item as unvaulted', () => {
+      // Arrange
+      const runeJson = JSON.stringify({
+        code: 'r07',
+        magic_attributes: [{ id: 381, values: [5] }],
+      });
+      const item = addVaultItem(ctx, {
+        fingerprint: 'fp-rune-partial',
+        itemName: 'Vex Rune',
+        itemCode: 'r07',
+        quality: 'normal',
+        ethereal: false,
+        rawItemJson: runeJson,
+        sourceFileType: 'd2i',
+        locationContext: 'stash',
+      });
+
+      // Act
+      unvaultVaultItem(ctx, item.id, 2);
+
+      // Assert
+      const updated = getVaultItemById(ctx, item.id);
+      expect(updated?.stackCount).toBe(3); // 5 - 2
+      expect(updated?.unvaultedAt).toBeUndefined();
+    });
+  });
+
+  describe('If unvaultVaultItem is called with withdrawCount equal to current stackCount', () => {
+    it('Then fully unvaults the item', () => {
+      // Arrange
+      const runeJson = JSON.stringify({
+        code: 'r07',
+        magic_attributes: [{ id: 381, values: [3] }],
+      });
+      const item = addVaultItem(ctx, {
+        fingerprint: 'fp-rune-full-unvault',
+        itemName: 'Vex Rune',
+        itemCode: 'r07',
+        quality: 'normal',
+        ethereal: false,
+        rawItemJson: runeJson,
+        sourceFileType: 'd2i',
+        locationContext: 'stash',
+      });
+
+      // Act
+      unvaultVaultItem(ctx, item.id, 3);
+
+      // Assert
+      const updated = getVaultItemById(ctx, item.id);
+      expect(updated?.unvaultedAt).toBeTruthy();
+    });
+  });
+
   describe('If searchVaultItems is called with vaultedState unvaulted', () => {
     it('Then only previously-vaulted-then-unvaulted items are returned', () => {
       // Arrange
