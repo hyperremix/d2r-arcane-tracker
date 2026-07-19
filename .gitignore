@@ -67,6 +67,8 @@ pids
 *.pid
 *.seed
 *.pid.lock
+grail.db-shm
+grail.db-wal
 
 # Coverage directory used by tools like istanbul
 coverage

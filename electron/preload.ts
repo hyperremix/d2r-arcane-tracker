@@ -4,6 +4,10 @@ import type {
   D2SaveFile,
   FileReaderResponse,
   GrailProgress,
+  InventoryItemMoveInput,
+  InventorySearchResult,
+  InventorySnapshotWindowTarget,
+  InventoryStackSplitInput,
   Item,
   MonitoringStatus,
   Run,
@@ -12,6 +16,15 @@ import type {
   Settings,
   TerrorZone,
   UpdateStatus,
+  VaultCategory,
+  VaultCategoryCreateInput,
+  VaultCategoryUpdateInput,
+  VaultItem,
+  VaultItemFilter,
+  VaultItemSearchResult,
+  VaultItemUpsertInput,
+  VaultLocationContext,
+  VaultSourceFileType,
 } from './types/grail';
 
 /**
@@ -233,6 +246,59 @@ contextBridge.exposeInMainWorld('electronAPI', {
      */
     refreshSaveFiles: (): Promise<{ success: boolean }> =>
       ipcRenderer.invoke('saveFile:refreshSaveFiles'),
+  },
+
+  vault: {
+    addItem: (item: VaultItemUpsertInput): Promise<VaultItem> =>
+      ipcRenderer.invoke('vault:addItem', item),
+    removeItem: (itemId: string): Promise<{ success: boolean }> =>
+      ipcRenderer.invoke('vault:removeItem', itemId),
+    updateItemTags: (itemId: string, categoryIds: string[]): Promise<{ success: boolean }> =>
+      ipcRenderer.invoke('vault:updateItemTags', itemId, categoryIds),
+    listItems: (filter?: VaultItemFilter): Promise<VaultItemSearchResult> =>
+      ipcRenderer.invoke('vault:listItems', filter),
+    search: (filter?: VaultItemFilter): Promise<VaultItemSearchResult> =>
+      ipcRenderer.invoke('vault:search', filter),
+    createCategory: (input: VaultCategoryCreateInput): Promise<{ success: boolean }> =>
+      ipcRenderer.invoke('vault:createCategory', input),
+    updateCategory: (
+      categoryId: string,
+      updates: VaultCategoryUpdateInput,
+    ): Promise<{ success: boolean }> =>
+      ipcRenderer.invoke('vault:updateCategory', categoryId, updates),
+    deleteCategory: (categoryId: string): Promise<{ success: boolean }> =>
+      ipcRenderer.invoke('vault:deleteCategory', categoryId),
+    listCategories: (): Promise<VaultCategory[]> => ipcRenderer.invoke('vault:listCategories'),
+    unvaultItem: (
+      itemId: string,
+      targetOptions?: {
+        targetFilePath: string;
+        targetFileType: VaultSourceFileType;
+        targetLocationContext: VaultLocationContext;
+        targetStashTab?: number;
+        targetGridX: number;
+        targetGridY: number;
+      },
+      withdrawCount?: number,
+    ): Promise<{ success: boolean }> =>
+      ipcRenderer.invoke('vault:unvaultItem', itemId, targetOptions, withdrawCount),
+  },
+
+  inventory: {
+    listSnapshots: (): Promise<InventorySearchResult> =>
+      ipcRenderer.invoke('inventory:listSnapshots'),
+    searchAll: (
+      filter?: VaultItemFilter,
+    ): Promise<{
+      inventory: InventorySearchResult;
+      vault: VaultItemSearchResult;
+    }> => ipcRenderer.invoke('inventory:searchAll', filter),
+    openSnapshotWindow: (target: InventorySnapshotWindowTarget): Promise<{ success: boolean }> =>
+      ipcRenderer.invoke('inventory:openSnapshotWindow', target),
+    moveItem: (input: InventoryItemMoveInput): Promise<{ success: boolean }> =>
+      ipcRenderer.invoke('inventory:moveItem', input),
+    splitStack: (input: InventoryStackSplitInput): Promise<{ success: boolean }> =>
+      ipcRenderer.invoke('inventory:splitStack', input),
   },
 
   /**

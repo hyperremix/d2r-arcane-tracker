@@ -67,8 +67,9 @@ vi.mock('../utils/grailItemUtils', () => ({
   getGrailItemId: vi.fn(),
 }));
 
-import { existsSync, readdirSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { readFile, stat } from 'node:fs/promises';
+import { resolve } from 'node:path';
 import * as d2s from '@dschu012/d2s';
 import * as d2stash from '@dschu012/d2s/lib/d2/stash';
 import { app } from 'electron';
@@ -80,15 +81,30 @@ import { isRune, simplifyItemName } from '../utils/objects';
 import { EventBus } from './EventBus';
 import { SaveFileMonitor } from './saveFileMonitor';
 
+const MODERN_STASH_FIXTURE_PATH = resolve(
+  process.cwd(),
+  'electron/services/fixtures/ModernSharedStashSoftCoreV2.d2i',
+);
+
 // Mock database interface
 interface MockGrailDatabase {
   getAllSettings: ReturnType<typeof vi.fn>;
   setSetting: ReturnType<typeof vi.fn>;
+  getSaveFileState: ReturnType<typeof vi.fn>;
+  upsertSaveFileState: ReturnType<typeof vi.fn>;
+  getCharacterByName: ReturnType<typeof vi.fn>;
+  getAllSaveFileStates: ReturnType<typeof vi.fn>;
+  deleteSaveFileState: ReturnType<typeof vi.fn>;
 }
 
 const createMockDatabase = (): MockGrailDatabase => ({
   getAllSettings: vi.fn(),
   setSetting: vi.fn(),
+  getSaveFileState: vi.fn(),
+  upsertSaveFileState: vi.fn(),
+  getCharacterByName: vi.fn(),
+  getAllSaveFileStates: vi.fn(),
+  deleteSaveFileState: vi.fn(),
 });
 
 describe('When SaveFileMonitor is used', () => {
@@ -876,28 +892,41 @@ describe('When SaveFileMonitor is used', () => {
 
   describe('When stash header parsing is used', () => {
     describe('If getSaveNameFromPath is called with hardcore=true parameter', () => {
-      it('Then should return Shared Stash Hardcore regardless of filename', () => {
+      it('Then should return legacy Shared Stash Hardcore for legacy file versions', () => {
         // Arrange
         const filePath = '/test/SharedStashSoftcoreV2.d2i';
 
         // Act
-        const result = (monitor as any).getSaveNameFromPath(filePath, true);
+        const result = (monitor as any).getSaveNameFromPath(filePath, true, 99);
 
         // Assert
-        expect(result).toBe('Shared Stash Hardcore'); // Uses parameter, not filename
+        expect(result).toBe('Shared Stash Hardcore');
       });
     });
 
     describe('If getSaveNameFromPath is called with hardcore=false parameter', () => {
-      it('Then should return Shared Stash Softcore regardless of filename', () => {
+      it('Then should return modern Shared Stash Softcore for modern file versions', () => {
         // Arrange
         const filePath = '/test/SharedStashHardcoreV2.d2i';
 
         // Act
-        const result = (monitor as any).getSaveNameFromPath(filePath, false);
+        const result = (monitor as any).getSaveNameFromPath(filePath, false, 105);
 
         // Assert
-        expect(result).toBe('Shared Stash Softcore'); // Uses parameter, not filename
+        expect(result).toBe('Modern Shared Stash Softcore');
+      });
+    });
+
+    describe('If getSaveNameFromPath is called with hardcore=true and modern version', () => {
+      it('Then should return modern Shared Stash Hardcore', () => {
+        // Arrange
+        const filePath = '/test/SharedStashSoftcoreV2.d2i';
+
+        // Act
+        const result = (monitor as any).getSaveNameFromPath(filePath, true, 105);
+
+        // Assert
+        expect(result).toBe('Modern Shared Stash Hardcore');
       });
     });
 
@@ -950,6 +979,19 @@ describe('When SaveFileMonitor is used', () => {
 
         // Assert
         expect(result).toBe('MyCharacter'); // Hardcore parameter only applies to .d2i files
+      });
+    });
+
+    describe('If backup-like stash filenames are evaluated', () => {
+      it('Then backup-like .d2i files should be excluded from parsing', () => {
+        // Act & Assert
+        expect((monitor as any).shouldIncludeSaveFile('Barb.d2s')).toBe(true);
+        expect((monitor as any).shouldIncludeSaveFile('SharedStashSoftCoreV2.d2i')).toBe(true);
+        expect((monitor as any).shouldIncludeSaveFile('SharedStashSoftCoreV2_Backup.d2i')).toBe(
+          false,
+        );
+        expect((monitor as any).shouldIncludeSaveFile('SharedStashSoftCoreV2.bak.d2i')).toBe(false);
+        expect((monitor as any).shouldIncludeSaveFile('notes.txt')).toBe(false);
       });
     });
   });
@@ -1082,6 +1124,537 @@ describe('When SaveFileMonitor is used', () => {
       // Assert - should have no runeword items
       const runewordItems = items.filter((item: any) => item.type === 'runeword');
       expect(runewordItems).toHaveLength(0);
+    });
+  });
+
+  describe('If spatial inventory parsing is executed', () => {
+    it('Then createParsedInventoryItem maps spatial metadata and prefers canonical grail filename over parser inv_file', () => {
+      // Arrange
+      vi.mocked(getGrailItemId).mockReturnValue('harlequincrest');
+      const item = {
+        name: 'Battle Hammer',
+        type: 'mace',
+        code: 'uap',
+        quality: 5,
+        ethereal: false,
+        socket_count: 2,
+        position_x: 3,
+        position_y: 1,
+        inv_width: 2,
+        inv_height: 3,
+        equipped_id: 4,
+        location_id: 1,
+        inv_file: 'invhamm',
+      } as any;
+
+      // Act
+      const parsed = (monitor as any).createParsedInventoryItem({
+        filePath: '/tmp/TestChar.d2s',
+        saveName: 'TestChar',
+        sourceFileType: 'd2s',
+        item,
+        fallbackLocation: 'inventory',
+        isSocketedItem: true,
+      });
+
+      // Assert
+      expect(parsed.locationContext).toBe('equipped');
+      expect(parsed.gridX).toBe(3);
+      expect(parsed.gridY).toBe(1);
+      expect(parsed.gridWidth).toBe(2);
+      expect(parsed.gridHeight).toBe(3);
+      expect(parsed.equippedSlotId).toBe(4);
+      expect(parsed.iconFileName).toBe('cap_hat.png');
+      expect(parsed.fingerprintInputs.iconFileName).toBe('invhamm.png');
+      expect(parsed.isSocketedItem).toBe(true);
+    });
+
+    it('Then canonical code-based icon is preferred over parser inv_file when both exist', () => {
+      // Arrange
+      vi.mocked(getGrailItemId).mockReturnValue(null);
+      const item = {
+        name: 'Shako',
+        type: 'helm',
+        code: 'uap',
+        quality: 5,
+        inv_file: 'invhamm',
+      } as any;
+
+      // Act
+      const parsed = (monitor as any).createParsedInventoryItem({
+        filePath: '/tmp/TestChar.d2s',
+        saveName: 'TestChar',
+        sourceFileType: 'd2s',
+        item,
+        fallbackLocation: 'inventory',
+      });
+
+      // Assert
+      expect(parsed.iconFileName).toBe('cap_hat.png');
+      expect(parsed.fingerprintInputs.iconFileName).toBe('invhamm.png');
+    });
+
+    it('Then magic items keep their generated prefix/suffix display name', () => {
+      // Arrange
+      vi.mocked(getGrailItemId).mockReturnValue(null);
+      const item = {
+        name: 'Ring',
+        type_name: 'Ring',
+        type: 'rin',
+        code: 'rin',
+        quality: 2,
+        magic_prefix_name: 'Viper',
+        magic_suffix_name: 'of the Fox',
+      } as any;
+
+      // Act
+      const parsed = (monitor as any).createParsedInventoryItem({
+        filePath: '/tmp/TestChar.d2s',
+        saveName: 'TestChar',
+        sourceFileType: 'd2s',
+        item,
+        fallbackLocation: 'inventory',
+      });
+
+      // Assert
+      expect(parsed.itemName).toBe('Viper Ring of the Fox');
+    });
+
+    it('Then rare items keep their generated rare name parts', () => {
+      // Arrange
+      vi.mocked(getGrailItemId).mockReturnValue(null);
+      const item = {
+        name: 'Ring',
+        type_name: 'Ring',
+        type: 'rin',
+        code: 'rin',
+        quality: 3,
+        rare_name: 'Stone',
+        rare_name2: 'Master',
+      } as any;
+
+      // Act
+      const parsed = (monitor as any).createParsedInventoryItem({
+        filePath: '/tmp/TestChar.d2s',
+        saveName: 'TestChar',
+        sourceFileType: 'd2s',
+        item,
+        fallbackLocation: 'inventory',
+      });
+
+      // Assert
+      expect(parsed.itemName).toBe('Stone Master');
+    });
+
+    it('Then location_id 2 maps to unknown belt coordinates in a 4x4 belt board space', () => {
+      // Arrange
+      vi.mocked(getGrailItemId).mockReturnValue(null);
+      const item = {
+        name: 'Super Healing Potion',
+        type: 'potion',
+        code: 'hp5',
+        quality: 1,
+        location_id: 2,
+        position_x: 5,
+        position_y: 0,
+        inv_width: 1,
+        inv_height: 1,
+      } as any;
+
+      // Act
+      const parsed = (monitor as any).createParsedInventoryItem({
+        filePath: '/tmp/TestChar.d2s',
+        saveName: 'TestChar',
+        sourceFileType: 'd2s',
+        item,
+        fallbackLocation: 'inventory',
+      });
+
+      // Assert
+      expect(parsed.locationContext).toBe('unknown');
+      expect(parsed.gridX).toBe(1);
+      expect(parsed.gridY).toBe(1);
+      expect(parsed.gridWidth).toBe(1);
+      expect(parsed.gridHeight).toBe(1);
+    });
+
+    it('Then d2s location_id 0 alt_position_id 5 maps to personal stash tab 0', () => {
+      // Arrange
+      vi.mocked(getGrailItemId).mockReturnValue(null);
+      const item = {
+        name: 'Grand Charm',
+        type: 'charm',
+        code: 'cm3',
+        quality: 1,
+        location_id: 0,
+        alt_position_id: 5,
+        position_x: 12,
+        position_y: 3,
+        inv_width: 1,
+        inv_height: 3,
+      } as any;
+
+      // Act
+      const parsed = (monitor as any).createParsedInventoryItem({
+        filePath: '/tmp/TestChar.d2s',
+        saveName: 'TestChar',
+        sourceFileType: 'd2s',
+        item,
+        fallbackLocation: 'inventory',
+      });
+
+      // Assert
+      expect(parsed.locationContext).toBe('stash');
+      expect(parsed.stashTab).toBe(0);
+    });
+
+    it('Then d2s alt_position_id 1 remains inventory even when outside canonical bounds', () => {
+      // Arrange
+      vi.mocked(getGrailItemId).mockReturnValue(null);
+      const inBoundsItem = {
+        name: 'Tome of Town Portal',
+        type: 'book',
+        code: 'tbk',
+        quality: 1,
+        location_id: 0,
+        alt_position_id: 1,
+        position_x: 0,
+        position_y: 2,
+        inv_width: 1,
+        inv_height: 2,
+      } as any;
+      const outOfBoundsItem = {
+        name: 'Grand Charm',
+        type: 'charm',
+        code: 'cm3',
+        quality: 1,
+        location_id: 0,
+        alt_position_id: 1,
+        position_x: 4,
+        position_y: 6,
+        inv_width: 1,
+        inv_height: 3,
+      } as any;
+
+      // Act
+      const inBoundsParsed = (monitor as any).createParsedInventoryItem({
+        filePath: '/tmp/TestChar.d2s',
+        saveName: 'TestChar',
+        sourceFileType: 'd2s',
+        item: inBoundsItem,
+        fallbackLocation: 'inventory',
+      });
+      const outOfBoundsParsed = (monitor as any).createParsedInventoryItem({
+        filePath: '/tmp/TestChar.d2s',
+        saveName: 'TestChar',
+        sourceFileType: 'd2s',
+        item: outOfBoundsItem,
+        fallbackLocation: 'inventory',
+      });
+
+      // Assert
+      expect(inBoundsParsed.locationContext).toBe('inventory');
+      expect(inBoundsParsed.stashTab).toBeUndefined();
+      expect(outOfBoundsParsed.locationContext).toBe('inventory');
+      expect(outOfBoundsParsed.stashTab).toBeUndefined();
+    });
+
+    it('Then unknown items derive a snake_case filename fallback from type_name when parser icon is absent', () => {
+      // Arrange
+      vi.mocked(getGrailItemId).mockReturnValue(null);
+      const item = {
+        type: 'misc',
+        quality: 1,
+        type_name: 'Grand Charm',
+      } as any;
+
+      // Act
+      const parsed = (monitor as any).createParsedInventoryItem({
+        filePath: '/tmp/TestChar.d2s',
+        saveName: 'TestChar',
+        sourceFileType: 'd2s',
+        item,
+        fallbackLocation: 'inventory',
+      });
+
+      // Assert
+      expect(parsed.iconFileName).toBe('grand_charm.png');
+    });
+
+    it('Then socketed child items can be excluded from UI snapshot arrays', () => {
+      // Arrange
+      const createParsedInventoryItem = (monitor as any).createParsedInventoryItem.bind(monitor);
+      const parent = createParsedInventoryItem({
+        filePath: '/tmp/TestChar.d2s',
+        saveName: 'TestChar',
+        sourceFileType: 'd2s',
+        item: {
+          name: 'Parent Item',
+          type: 'armor',
+          code: 'uap',
+          quality: 5,
+        },
+        fallbackLocation: 'inventory',
+        isSocketedItem: false,
+      });
+      const socketedChild = createParsedInventoryItem({
+        filePath: '/tmp/TestChar.d2s',
+        saveName: 'TestChar',
+        sourceFileType: 'd2s',
+        item: {
+          name: 'Socketed Child',
+          type: 'jewel',
+          code: 'jew',
+          quality: 1,
+        },
+        fallbackLocation: 'inventory',
+        isSocketedItem: true,
+      });
+      const allItems = [parent, socketedChild];
+
+      // Act
+      const snapshotItems = allItems.filter((item: any) => !item.isSocketedItem);
+
+      // Assert
+      expect(snapshotItems).toHaveLength(1);
+      expect(snapshotItems[0]?.isSocketedItem).toBe(false);
+      expect(allItems.some((item) => item.isSocketedItem)).toBe(true);
+    });
+  });
+
+  describe('If inventory reconciliation helpers are executed', () => {
+    it('Then unchanged inventory snapshots are preserved when only one file is reparsed', async () => {
+      // Arrange
+      const oldSnapshotA = {
+        snapshotId: 'a-old',
+        characterName: 'A',
+        sourceFileType: 'd2s',
+        sourceFilePath: '/test/save/dir/a.d2s',
+        capturedAt: new Date('2024-01-01T00:00:00.000Z'),
+        items: [{ fingerprint: 'fp-a-old', isSocketedItem: false }],
+      };
+      const oldSnapshotB = {
+        snapshotId: 'b-old',
+        characterName: 'B',
+        sourceFileType: 'd2s',
+        sourceFilePath: '/test/save/dir/b.d2s',
+        capturedAt: new Date('2024-01-01T00:00:00.000Z'),
+        items: [{ fingerprint: 'fp-b-old', isSocketedItem: false }],
+      };
+      const newSnapshotA = {
+        snapshotId: 'a-new',
+        characterName: 'A',
+        sourceFileType: 'd2s',
+        sourceFilePath: '/test/save/dir/a.d2s',
+        capturedAt: new Date('2024-01-02T00:00:00.000Z'),
+        items: [{ fingerprint: 'fp-a-new', isSocketedItem: false }],
+      };
+
+      (monitor as any).inventorySnapshots = [oldSnapshotA, oldSnapshotB];
+
+      vi.spyOn(monitor as any, 'filterFilesToParse').mockResolvedValue(['/test/save/dir/a.d2s']);
+      vi.spyOn(monitor as any, 'executeConcurrently').mockResolvedValue([
+        {
+          saveName: 'A',
+          success: true,
+          inventorySnapshot: newSnapshotA,
+        },
+      ]);
+      vi.spyOn(monitor as any, 'emitSaveFileEvents').mockResolvedValue(undefined);
+
+      // Act
+      await (monitor as any).parseFiles(['/test/save/dir/a.d2s', '/test/save/dir/b.d2s'], false);
+      const snapshots = (monitor as any).inventorySnapshots;
+
+      // Assert
+      expect(snapshots).toHaveLength(2);
+      expect(snapshots.some((snapshot: any) => snapshot.snapshotId === 'a-new')).toBe(true);
+      expect(snapshots.some((snapshot: any) => snapshot.snapshotId === 'b-old')).toBe(true);
+    });
+
+    it('Then stale snapshots are pruned when no files need reparsing', async () => {
+      // Arrange
+      const oldSnapshotA = {
+        snapshotId: 'a-old',
+        characterName: 'A',
+        sourceFileType: 'd2s',
+        sourceFilePath: '/test/save/dir/a.d2s',
+        capturedAt: new Date('2024-01-01T00:00:00.000Z'),
+        items: [{ fingerprint: 'fp-a-old', isSocketedItem: false }],
+      };
+      const oldSnapshotB = {
+        snapshotId: 'b-old',
+        characterName: 'B',
+        sourceFileType: 'd2s',
+        sourceFilePath: '/test/save/dir/b.d2s',
+        capturedAt: new Date('2024-01-01T00:00:00.000Z'),
+        items: [{ fingerprint: 'fp-b-old', isSocketedItem: false }],
+      };
+
+      (monitor as any).inventorySnapshots = [oldSnapshotA, oldSnapshotB];
+      vi.spyOn(monitor as any, 'filterFilesToParse').mockResolvedValue([]);
+      const emitSpy = vi.spyOn(monitor as any, 'emitSaveFileEvents').mockResolvedValue(undefined);
+
+      // Act
+      await (monitor as any).parseFiles(['/test/save/dir/a.d2s'], false);
+      const snapshots = (monitor as any).inventorySnapshots;
+
+      // Assert
+      expect(snapshots).toHaveLength(1);
+      expect(snapshots[0]?.snapshotId).toBe('a-old');
+      expect(emitSpy).not.toHaveBeenCalled();
+    });
+
+    it('Then all files are parsed when snapshots are empty even if only one file changed', async () => {
+      // Arrange
+      const snapshotA = {
+        snapshotId: 'a-new',
+        characterName: 'A',
+        sourceFileType: 'd2s',
+        sourceFilePath: '/test/save/dir/a.d2s',
+        capturedAt: new Date('2024-01-02T00:00:00.000Z'),
+        items: [{ fingerprint: 'fp-a-new', isSocketedItem: false }],
+      };
+      const snapshotB = {
+        snapshotId: 'b-new',
+        characterName: 'B',
+        sourceFileType: 'd2s',
+        sourceFilePath: '/test/save/dir/b.d2s',
+        capturedAt: new Date('2024-01-02T00:00:00.000Z'),
+        items: [{ fingerprint: 'fp-b-new', isSocketedItem: false }],
+      };
+
+      (monitor as any).inventorySnapshots = [];
+      vi.spyOn(monitor as any, 'filterFilesToParse').mockResolvedValue(['/test/save/dir/a.d2s']);
+      const executeSpy = vi.spyOn(monitor as any, 'executeConcurrently').mockResolvedValue([
+        {
+          saveName: 'A',
+          success: true,
+          inventorySnapshot: snapshotA,
+        },
+        {
+          saveName: 'B',
+          success: true,
+          inventorySnapshot: snapshotB,
+        },
+      ]);
+      const emitSpy = vi.spyOn(monitor as any, 'emitSaveFileEvents').mockResolvedValue(undefined);
+
+      // Act
+      await (monitor as any).parseFiles(['/test/save/dir/a.d2s', '/test/save/dir/b.d2s'], false);
+
+      // Assert
+      expect((executeSpy.mock.calls[0]?.[0] as unknown[]).length).toBe(2);
+      expect(emitSpy).toHaveBeenCalledWith(
+        [
+          { filePath: '/test/save/dir/a.d2s', saveName: 'A' },
+          { filePath: '/test/save/dir/b.d2s', saveName: 'B' },
+        ],
+        expect.any(Object),
+      );
+      expect((monitor as any).inventorySnapshots).toHaveLength(2);
+    });
+
+    it('Then createFingerprint returns deterministic output for the same inputs', () => {
+      // Arrange
+      const item = {
+        fingerprintInputs: {
+          sourceFileType: 'd2s',
+          characterName: 'Sorc',
+          locationContext: 'inventory',
+          itemCode: 'uap',
+          quality: 'unique',
+          ethereal: false,
+          socketCount: 0,
+          stashTab: 1,
+          itemName: 'Shako',
+        },
+      };
+
+      // Act
+      const first = (monitor as any).createFingerprint(item);
+      const second = (monitor as any).createFingerprint(item);
+
+      // Assert
+      expect(first).toBe(second);
+      expect(first.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe('When modern v105 shared stash files are parsed', () => {
+    it('Then parseSave returns modern shared and resource tabs with strict stack counts', async () => {
+      // Arrange
+      const fixtureBuffer = readFileSync(MODERN_STASH_FIXTURE_PATH);
+
+      // Act
+      const parsedItems = await (monitor as any).parseSave(
+        'Shared Stash Softcore',
+        MODERN_STASH_FIXTURE_PATH,
+        fixtureBuffer,
+        '.d2i',
+      );
+
+      // Assert
+      expect(parsedItems.length).toBeGreaterThan(0);
+      expect(parsedItems.some((item: any) => item.locationContext === 'stash')).toBe(true);
+      expect(parsedItems.some((item: any) => item.stashTabKind !== undefined)).toBe(true);
+      expect(parsedItems.some((item: any) => item.stashTab === 5)).toBe(true);
+      expect(parsedItems.some((item: any) => item.stashTab === 6)).toBe(true);
+      expect(parsedItems.some((item: any) => item.stashTab === 7)).toBe(true);
+      expect(parsedItems.every((item: any) => (item.stackCount ?? 1) >= 1)).toBe(true);
+      expect(
+        parsedItems
+          .filter((item: any) => !item.isSocketedItem && item.locationContext === 'stash')
+          .every(
+            (item: any) =>
+              typeof item.gridWidth === 'number' &&
+              item.gridWidth > 0 &&
+              typeof item.gridHeight === 'number' &&
+              item.gridHeight > 0,
+          ),
+      ).toBe(true);
+    }, 20000);
+
+    it('Then processSingleFile marks modern snapshots as writable and records source file version', async () => {
+      // Arrange
+      const fixtureBuffer = readFileSync(MODERN_STASH_FIXTURE_PATH);
+      vi.spyOn(monitor as any, 'parseSave').mockResolvedValue([]);
+      vi.spyOn(monitor as any, 'updateSaveFileState').mockResolvedValue(undefined);
+      vi.mocked(readFile).mockResolvedValue(fixtureBuffer);
+
+      // Act
+      const parseResult = await (monitor as any).processSingleFile(MODERN_STASH_FIXTURE_PATH, {
+        items: {},
+        ethItems: {},
+        stats: {},
+        availableRunes: {},
+      });
+
+      // Assert
+      expect(parseResult.success).toBe(true);
+      // Modern stash shared tabs are now writable — drag-and-drop is enabled
+      expect(parseResult.inventorySnapshot?.readOnly).toBe(false);
+      expect(parseResult.inventorySnapshot?.sourceFileVersion).toBe(105);
+      expect(parseResult.saveName).toBe('Modern Shared Stash Softcore');
+    });
+
+    it('Then getAvailableRunesCount sums rune quantities instead of entry counts', () => {
+      // Arrange
+      (monitor as any).currentData.availableRunes = {
+        elrune: {
+          name: 'elrune',
+          type: 'rune',
+          inSaves: {
+            'Shared Stash Softcore': [{ quantity: 3 }, { quantity: 2 }, {}],
+          },
+        },
+      };
+
+      // Act
+      const counts = monitor.getAvailableRunesCount();
+
+      // Assert
+      expect(counts.elrune).toBe(6);
     });
   });
 });

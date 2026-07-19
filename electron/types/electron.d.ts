@@ -4,12 +4,25 @@ import type {
   D2SaveFile,
   FileReaderResponse,
   GrailProgress,
+  InventoryItemMoveInput,
+  InventorySearchResult,
+  InventorySnapshotWindowTarget,
+  InventoryStackSplitInput,
   Item,
   MonitoringStatus,
   Run,
   RunItem,
   Session,
   Settings,
+  VaultCategory,
+  VaultCategoryCreateInput,
+  VaultCategoryUpdateInput,
+  VaultLocationContext,
+  VaultItem,
+  VaultItemFilter,
+  VaultItemSearchResult,
+  VaultSourceFileType,
+  VaultItemUpsertInput,
   TerrorZone,
   UpdateInfo,
   UpdateStatus,
@@ -615,6 +628,51 @@ export interface ElectronAPI {
      * @returns {Promise<{ available: boolean; reason: string | null }>} A promise that resolves with memory status.
      */
     getMemoryStatus(): Promise<{ available: boolean; reason: string | null }>
+  }
+
+
+  /**
+   * Vault API methods.
+   */
+  vault: {
+    addItem(item: VaultItemUpsertInput): Promise<VaultItem>
+    removeItem(itemId: string): Promise<{ success: boolean }>
+    updateItemTags(itemId: string, categoryIds: string[]): Promise<{ success: boolean }>
+    listItems(filter?: VaultItemFilter): Promise<VaultItemSearchResult>
+    search(filter?: VaultItemFilter): Promise<VaultItemSearchResult>
+    createCategory(input: VaultCategoryCreateInput): Promise<{ success: boolean }>
+    updateCategory(categoryId: string, updates: VaultCategoryUpdateInput): Promise<{ success: boolean }>
+    deleteCategory(categoryId: string): Promise<{ success: boolean }>
+    listCategories(): Promise<VaultCategory[]>
+    unvaultItem(
+      itemId: string,
+      targetOptions?: {
+        targetFilePath: string
+        targetFileType: VaultSourceFileType
+        targetLocationContext: VaultLocationContext
+        targetStashTab?: number
+        targetGridX: number
+        targetGridY: number
+      },
+    ): Promise<{ success: boolean }>
+  }
+
+  /**
+   * Inventory API methods.
+   */
+  inventory: {
+    listSnapshots(): Promise<InventorySearchResult>
+    searchAll(filter?: VaultItemFilter): Promise<{
+      inventory: InventorySearchResult
+      vault: VaultItemSearchResult
+    }>
+    openSnapshotWindow(
+      target: InventorySnapshotWindowTarget,
+    ): Promise<{
+      success: boolean
+    }>
+    moveItem(input: InventoryItemMoveInput): Promise<{ success: boolean }>
+    splitStack(input: InventoryStackSplitInput): Promise<{ success: boolean }>
   }
 
   /**

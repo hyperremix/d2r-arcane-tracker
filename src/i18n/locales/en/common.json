@@ -76,7 +76,13 @@
       "foundDate": "Found Date",
       "method": "Method",
       "markAsNotFound": "Mark as Not Found",
-      "markAsFound": "Mark as Found"
+      "markAsFound": "Mark as Found",
+      "vaultStatusTitle": "Vault Status",
+      "vaultAction": "Vault",
+      "unvaultAction": "Unvault",
+      "vaulted": "Vaulted",
+      "notVaulted": "Not Vaulted",
+      "noVaultTags": "No tags assigned"
     },
     "itemGrid": {
       "notApplicable": "Not Applicable",
@@ -440,9 +446,180 @@
     "runCounter": "Run Counter",
     "runewordCalculator": "Runeword Calculator",
     "terrorZoneConfiguration": "Terror Zone Configuration",
+    "inventoryBrowser": "Inventory Browser",
+    "vault": "Vault",
     "settings": "Settings",
     "goBack": "Go back",
     "goForward": "Go forward"
+  },
+  "vault": {
+    "title": "Vault",
+    "empty": "No vaulted items. Use the Inventory Browser to vault items.",
+    "unvaultAction": "Unvault",
+    "searchPlaceholder": "Search vaulted items...",
+    "vaultedCount": "{{count}} vaulted",
+    "loadError": "Failed to load vault items."
+  },
+  "inventoryBrowser": {
+    "title": "Inventory Browser",
+    "searchPlaceholder": "Search items, codes, or quality...",
+    "filters": "Filters",
+    "character": "Character",
+    "locationFilter": "Location",
+    "type": "Type",
+    "presence": "Presence",
+    "allCharacters": "All Characters",
+    "allLocations": "All Locations",
+    "allTypes": "All Types",
+    "allPresence": "All Presence",
+    "groupHeader": "{{characterName}} \u00b7 {{sourceFileType}}",
+    "unknownSourceFileType": "Unknown source file",
+    "capturedAt": "Captured: {{date}}",
+    "itemsCount": "{{count}} items",
+    "empty": "No inventory items match your filters.",
+    "unplaced": "Unplaced",
+    "tileAriaLabel": "Inventory item {{itemName}}",
+    "vaultedTileAriaLabel": "Vaulted item {{itemName}}",
+    "vaultedTileStackCountLabel": "Stack count: {{count}}",
+    "tileSummary": "{{itemName}} \u00b7 {{quality}} \u00b7 {{location}} \u00b7 {{coordinates}}",
+    "vaultStatus": "Vault Status",
+    "vaultUntracked": "Untracked",
+    "vaultPresent": "Present",
+    "vaultMissing": "Missing",
+    "selectedItemTitle": "Selected Item",
+    "noSelectedItem": "Select an item tile to view details and vault it.",
+    "weaponSets": {
+      "ariaLabel": "Switch to weapon set {{set}}",
+      "i": "I",
+      "ii": "II"
+    },
+    "details": {
+      "coordinatesLabel": "Coordinates:",
+      "dimensionsLabel": "Dimensions:",
+      "slotLabel": "Slot:",
+      "notEquipped": "Not equipped",
+      "characterLabel": "Character:"
+    },
+    "tooltip": {
+      "qualityTypeLabel": "Quality/Type:",
+      "sourceLabel": "Source:",
+      "locationLabel": "Location:",
+      "coordinatesLabel": "Coordinates:",
+      "coordinatesValue": "{{x}},{{y}}",
+      "noCoordinates": "Unplaced",
+      "dimensionsLabel": "Dimensions:",
+      "dimensionsValue": "{{width}}x{{height}}",
+      "slotLabel": "Slot:",
+      "presenceLabel": "Presence:",
+      "unplacedReasonLabel": "Unplaced reason:"
+    },
+    "unplacedReasons": {
+      "missingPosition": "Missing grid position",
+      "missingDimensions": "Missing item dimensions",
+      "outOfBounds": "Out of bounds",
+      "overlap": "Overlapping placement",
+      "unknownEquippedSlot": "Unknown equipment slot"
+    },
+    "sections": {
+      "equipped": "Equipped",
+      "inventory": "Inventory",
+      "stashTab": "Stash Tab {{tab}}",
+      "sharedTab": "Shared Tab {{tab}}",
+      "gems": "Gems",
+      "materials": "Materials",
+      "runes": "Runes",
+      "expandedInventory": "Expanded Inventory Layout",
+      "expandedStash": "Expanded Stash Layout",
+      "rawStored": "Stored Layout",
+      "belt": "Belt",
+      "mercenary": "Mercenary",
+      "corpse": "Corpse",
+      "unknown": "Unknown Location"
+    },
+    "equippedSlots": {
+      "head": "Head",
+      "amulet": "Amulet",
+      "armor": "Armor",
+      "rightHand": "Right Hand",
+      "leftHand": "Left Hand",
+      "rightRing": "Right Ring",
+      "leftRing": "Left Ring",
+      "belt": "Belt",
+      "boots": "Boots",
+      "gloves": "Gloves",
+      "switchRight": "Swap Right",
+      "switchLeft": "Swap Left",
+      "altRight": "Alt Right",
+      "altLeft": "Alt Left",
+      "unknown": "Slot {{slotId}}"
+    },
+    "location": {
+      "equipped": "Equipped",
+      "inventory": "Inventory",
+      "stash": "Stash",
+      "belt": "Belt",
+      "mercenary": "Mercenary",
+      "corpse": "Corpse",
+      "unknown": "Unknown",
+      "stashTab": "Stash Tab {{tab}}"
+    },
+    "presenceOptions": {
+      "all": "All",
+      "present": "Present",
+      "missing": "Missing"
+    },
+    "typeOptions": {
+      "unique": "Unique",
+      "set": "Set",
+      "runeword": "Runeword",
+      "rune": "Rune",
+      "other": "Other"
+    },
+    "vaultAction": "Vault",
+    "vaulted": "Vaulted",
+    "dropToVault": "Drop inventory items here to vault",
+    "dragToVault": "Drag to vault dropzone",
+    "vaultedItems": "Vaulted Items",
+    "modernStashReadOnlyError": "Modern shared stash is read-only in this version.",
+    "stackPickup": {
+      "placed": "{{count}} item(s) placed.",
+      "partialPlace": "Only {{placed}} of {{total}} items could be placed.",
+      "cancelled": "Pickup cancelled.",
+      "noSpace": "No available space in this grid."
+    },
+    "equipValidation": {
+      "title": "Equip blocked",
+      "reasons": {
+        "invalidSlot": "This item cannot be equipped in that slot.",
+        "classRestricted": "This item is restricted to a different character class.",
+        "offhandWeaponRestricted": "This class cannot equip that weapon in the offhand slot.",
+        "twoHandedRequiresRightHand": "Two-handed weapons must be equipped in the right-hand slot.",
+        "twoHandedOffhandOccupied": "Unequip the offhand item before equipping this two-handed weapon.",
+        "offhandBlockedByTwoHanded": "The right-hand item is two-handed and blocks the offhand slot.",
+        "targetSlotOccupied": "That equipment slot is already occupied."
+      }
+    },
+    "snapshotList": {
+      "title": "Characters & Stashes",
+      "description": "Open a character or stash in a separate window. Drag and drop between that window and this vault view.",
+      "empty": "No character or stash snapshots match your current filters."
+    },
+    "snapshotWindow": {
+      "invalidTarget": "Unable to open inventory snapshot. Missing or invalid snapshot target.",
+      "notFound": "No snapshot is available for {{characterName}} yet."
+    }
+  },
+  "gameItemTooltip": {
+    "oneHandDamageLabel": "One Hand Damage:",
+    "oneHandDamageValue": "{{min}} to {{max}}",
+    "twoHandDamageLabel": "Two Hand Damage:",
+    "twoHandDamageValue": "{{min}} to {{max}}",
+    "durabilityLabel": "Durability:",
+    "durabilityValue": "{{current}} of {{max}}",
+    "requiredStrengthLabel": "Required Strength:",
+    "requiredDexterityLabel": "Required Dexterity:",
+    "requiredLevelLabel": "Required Level:",
+    "openSocketLabel": "Open Socket"
   },
   "errorBoundary": {
     "title": "Something went wrong",

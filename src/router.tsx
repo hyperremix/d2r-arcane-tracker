@@ -1,5 +1,6 @@
 import { createHashRouter, Outlet } from 'react-router';
 import { GrailTracker } from './components/grail/GrailTracker';
+import { InventoryBrowserMain } from './components/inventory/InventoryBrowserMain';
 import { RunewordCalculator } from './components/runeword/RunewordCalculator';
 import { RunTracker } from './components/runtracker/RunTracker';
 import { Settings } from './components/settings/Settings';
@@ -41,6 +42,10 @@ export const router = createHashRouter([
       {
         path: '/runewords',
         Component: RunewordCalculator,
+      },
+      {
+        path: '/inventory-browser',
+        Component: InventoryBrowserMain,
       },
       {
         path: '/settings',

@@ -3,7 +3,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { useItemIcon } from '@/hooks/useItemIcon';
 import { cn } from '@/lib/utils';
 import { useGrailStore } from '@/stores/grailStore';
-import placeholderUrl from '/images/placeholder-item.png';
+import placeholderUrl from '/images/placeholder-item.svg';
 import { RuneImages } from '../RuneImages';
 import { ItemTypeIcon } from '../StatusIcons';
 import { DiscoveryAttribution, DiscoveryInfo, StatusIndicators, VersionCounts } from './indicators';
@@ -63,7 +63,7 @@ export function ListView({
         {item.type === 'runeword' && item.runes && item.runes.length > 0 ? (
           <div className="relative flex-shrink-0">
             <RuneImages runeIds={item.runes} viewMode="list" />
-            <ItemTypeIcon type={item.type} className="-right-2 -bottom-1 absolute h-4 w-4" />
+            <ItemTypeIcon type={item.type} className="absolute -right-2 -bottom-1 h-4 w-4" />
           </div>
         ) : settings.showItemIcons && item.type !== 'runeword' ? (
           <div className="relative h-12 w-12 flex-shrink-0">

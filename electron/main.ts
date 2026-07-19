@@ -6,18 +6,25 @@ import { grailDatabase } from './database/database';
 import { initializeDialogHandlers } from './ipc-handlers/dialogHandlers';
 import { closeGrailDatabase, initializeGrailHandlers } from './ipc-handlers/grailHandlers';
 import { initializeIconHandlers } from './ipc-handlers/iconHandlers';
+import { initializeInventoryWindowHandlers } from './ipc-handlers/inventoryWindowHandlers';
 import { closeRunTracker, initializeRunTrackerHandlers } from './ipc-handlers/runTrackerHandlers';
 import {
   closeSaveFileMonitor,
   eventBus,
   getRunTracker,
+  getSaveFileMonitor,
   initializeSaveFileHandlers,
 } from './ipc-handlers/saveFileHandlers';
 import { initializeShellHandlers } from './ipc-handlers/shellHandlers';
 import { initializeTerrorZoneHandlers } from './ipc-handlers/terrorZoneHandlers';
 import { initializeUpdateHandlers } from './ipc-handlers/updateHandlers';
+import { initializeVaultHandlers } from './ipc-handlers/vaultHandlers';
 import { initializeWidgetHandlers } from './ipc-handlers/widgetHandlers';
 import { isPositionOnScreen } from './utils/windowSnapping';
+import {
+  closeInventorySnapshotWindows,
+  setInventorySnapshotWindowsTitleBarOverlay,
+} from './window/inventorySnapshotWindow';
 import { closeWidgetWindow, showWidgetWindow } from './window/widgetWindow';
 
 createRequire(import.meta.url);
@@ -245,6 +252,7 @@ app.whenReady().then(() => {
   // Initialize grail database and IPC handlers
   initializeGrailHandlers();
   initializeSaveFileHandlers();
+  initializeVaultHandlers(getSaveFileMonitor);
 
   // Initialize run tracker handlers after save file handlers
   const runTracker = getRunTracker();
@@ -261,6 +269,7 @@ app.whenReady().then(() => {
   initializeDialogHandlers();
   initializeShellHandlers();
   initializeIconHandlers();
+  initializeInventoryWindowHandlers(__dirname, VITE_DEV_SERVER_URL, RENDERER_DIST);
   initializeTerrorZoneHandlers();
   initializeUpdateHandlers();
 
@@ -317,11 +326,16 @@ app.whenReady().then(() => {
   ipcMain.handle(
     'update-titlebar-overlay',
     (_event, colors: { backgroundColor: string; symbolColor: string }) => {
-      if (mainWindow && process.platform !== 'darwin') {
-        mainWindow.setTitleBarOverlay({
+      if (process.platform !== 'darwin') {
+        mainWindow?.setTitleBarOverlay({
           color: colors.backgroundColor,
           symbolColor: colors.symbolColor,
           height: 47,
+        });
+
+        setInventorySnapshotWindowsTitleBarOverlay({
+          color: colors.backgroundColor,
+          symbolColor: colors.symbolColor,
         });
       }
       return { success: true };
@@ -370,6 +384,7 @@ app.on('before-quit', () => {
   closeSaveFileMonitor();
   closeRunTracker();
   closeWidgetWindow();
+  closeInventorySnapshotWindows();
 });
 
 /**
