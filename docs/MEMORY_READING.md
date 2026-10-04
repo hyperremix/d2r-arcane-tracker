@@ -234,6 +234,21 @@ D2R receives regular updates that may change memory layouts:
 - Users must use manual run controls (keyboard shortcuts) when auto mode cannot operate
 - Save file monitoring continues to run for **item detection only** (via SaveFileMonitor)
 
+## Offset Resolution (UI pattern scan)
+
+The in-game flag is located at runtime by scanning the `D2R.exe` image for the d2go UI signature
+(`40 84 ed 0f 94 05`). A few details matter for this to keep working across game patches:
+
+- The module image is read into a **position-preserving** buffer (buffer index === RVA). Pages that
+  cannot be read stay zero-filled instead of being skipped; skipping them would shift every offset
+  found after the gap.
+- The read is bounded by the module's real image size (`ModuleMemorySize`), not a fixed 100 MB.
+- The RIP-relative displacement is a **signed** 32-bit value.
+- Every pattern match is validated (flag address inside the image, flag byte reads 0 or 1) rather
+  than trusting the first hit. See `electron/services/uiOffsetResolver.ts`.
+- D2R is often still starting when the process is detected, so resolving offsets is **retried every
+  5 seconds** (up to 10 minutes) until it succeeds or D2R exits.
+
 ## Safety Considerations
 
 1. **Single-Player Only**: Memory reading should only be used for single-player mode

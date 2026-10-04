@@ -35,6 +35,7 @@ export function parsePattern(pattern: string): Buffer {
  * @param memory - Memory buffer to search in
  * @param pattern - Pattern bytes to search for
  * @param mask - Mask string where 'x' = exact match, '?' = wildcard
+ * @param startOffset - Offset to start searching from (default: 0)
  * @returns Offset of pattern in memory, or -1 if not found
  *
  * @example
@@ -44,7 +45,12 @@ export function parsePattern(pattern: string): Buffer {
  * const offset = findPattern(memory, pattern, mask);
  * // Returns 1 (pattern found at offset 1)
  */
-export function findPattern(memory: Buffer, pattern: Buffer, mask: string): number {
+export function findPattern(
+  memory: Buffer,
+  pattern: Buffer,
+  mask: string,
+  startOffset = 0,
+): number {
   if (pattern.length !== mask.length) {
     throw new Error(`Pattern length (${pattern.length}) must match mask length (${mask.length})`);
   }
@@ -54,7 +60,7 @@ export function findPattern(memory: Buffer, pattern: Buffer, mask: string): numb
   }
 
   // Search through memory for pattern
-  for (let i = 0; i <= memory.length - pattern.length; i++) {
+  for (let i = Math.max(0, startOffset); i <= memory.length - pattern.length; i++) {
     let found = true;
 
     // Check each byte in pattern against memory
@@ -86,6 +92,7 @@ export function findPattern(memory: Buffer, pattern: Buffer, mask: string): numb
  * @param memory - Memory buffer to search in
  * @param patternStr - Hex pattern string (e.g., "\x44\x88\x25\x00")
  * @param mask - Mask string where 'x' = exact match, '?' = wildcard
+ * @param startOffset - Offset to start searching from (default: 0)
  * @returns Offset of pattern in memory, or -1 if not found
  *
  * @example
@@ -96,9 +103,14 @@ export function findPattern(memory: Buffer, pattern: Buffer, mask: string): numb
  *   "xxx????"
  * );
  */
-export function findPatternString(memory: Buffer, patternStr: string, mask: string): number {
+export function findPatternString(
+  memory: Buffer,
+  patternStr: string,
+  mask: string,
+  startOffset = 0,
+): number {
   const pattern = parsePattern(patternStr);
-  return findPattern(memory, pattern, mask);
+  return findPattern(memory, pattern, mask, startOffset);
 }
 
 /**

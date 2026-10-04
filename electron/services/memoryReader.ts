@@ -2,11 +2,11 @@ import { exec } from 'node:child_process';
 import { writeFile } from 'node:fs/promises';
 import { promisify } from 'node:util';
 import { ffi, Kernel32 } from 'win32-api';
-import { D2R_PATTERNS, D2RGameState, OFFSET_ADJUSTMENTS } from '../config/d2rPatterns';
+import { D2RGameState, OFFSET_ADJUSTMENTS } from '../config/d2rPatterns';
 import { createServiceLogger } from '../utils/serviceLogger';
 import type { EventBus } from './EventBus';
-import { findPatternString, readBytesFromBuffer } from './patternScanner';
 import type { ProcessMonitor } from './processMonitor';
+import { resolveUiOffset } from './uiOffsetResolver';
 
 const log = createServiceLogger('MemoryReader');
 
@@ -85,6 +85,16 @@ const PAGE_GUARD = 0x100;
 
 // Memory state constants
 const MEM_COMMIT = 0x1000;
+
+// Module image reading: size of a normal read, and the page size used when a larger read fails
+const IMAGE_READ_CHUNK_SIZE = 256 * 1024;
+const PAGE_SIZE = 4096;
+// Used when the module size cannot be determined
+const FALLBACK_MODULE_IMAGE_SIZE = 100 * 1024 * 1024;
+
+// Offset calculation can fail while D2R is still starting up, so it is retried
+const OFFSET_RETRY_INTERVAL_MS = 5000;
+const OFFSET_MAX_ATTEMPTS = 120;
 
 // Additional kernel32 functions not in default win32-api set
 interface ExtendedKernel32 extends ReturnType<typeof Kernel32.load> {
@@ -198,21 +208,27 @@ interface WindowsMemoryReader {
   closeHandle(handle: number): Promise<void>;
 
   /**
-   * Gets the base address of a module in the process.
+   * Gets the base address and image size of a module in the process.
    * @param processId - Process ID
    * @param moduleName - Name of the module (e.g., 'D2R.exe')
-   * @returns Base address as hex string or null
+   * @returns Base address (hex string) and image size in bytes, or null
    */
-  getModuleBaseAddress(processId: number, moduleName: string): Promise<string | null>;
+  getModuleInfo(processId: number, moduleName: string): Promise<ModuleInfo | null>;
 
   /**
    * Reads memory from a process at the given address.
    * @param handle - Process handle
    * @param address - Memory address to read (as number)
    * @param size - Number of bytes to read
+   * @param quiet - Suppress failure logging (for expected failures such as unreadable pages)
    * @returns Buffer with read data or null on failure
    */
-  readMemory(handle: number, address: number, size: number): Promise<Buffer | null>;
+  readMemory(
+    handle: number,
+    address: number,
+    size: number,
+    quiet?: boolean,
+  ): Promise<Buffer | null>;
 
   /**
    * Reads a 32-bit integer from memory.
@@ -241,14 +257,25 @@ interface WindowsMemoryReader {
   readInt64(handle: number, address: number): Promise<number | null>;
 
   /**
-   * Reads a large region of process memory for pattern scanning.
-   * Reads the .text section (executable code) of the module.
+   * Reads the module image for pattern scanning.
+   * The returned buffer is position-preserving (buffer index === RVA): pages that cannot be read
+   * are left zero-filled instead of being skipped, so offsets found in the buffer stay valid.
    * @param handle - Process handle
    * @param baseAddress - Module base address (as hex string)
-   * @param size - Size of memory region to read (default: 20MB)
-   * @returns Buffer with memory contents or null on failure
+   * @param size - Size of the module image in bytes
+   * @returns Buffer with the module image or null on failure
    */
-  readProcessMemory(handle: number, baseAddress: string, size?: number): Promise<Buffer | null>;
+  readModuleImage(handle: number, baseAddress: string, size: number): Promise<Buffer | null>;
+}
+
+/**
+ * Base address and image size of a loaded module.
+ */
+interface ModuleInfo {
+  /** Base address as a hex string (no 0x prefix) */
+  baseAddress: string;
+  /** Size of the module image in bytes (undefined if it could not be determined) */
+  size: number | undefined;
 }
 
 /**
@@ -361,22 +388,17 @@ class WindowsMemoryReaderImpl implements WindowsMemoryReader {
   }
 
   /**
-   * Gets the base address of a module using Windows API EnumProcessModules.
-   * Falls back to PowerShell if EnumProcessModules is not available.
+   * Gets the base address and image size of a module.
+   * Uses PowerShell, which is simpler than EnumProcessModules and works reliably.
    * @param processId - Process ID
    * @param moduleName - Name of the module
-   * @returns Base address as hex string or null
+   * @returns Module base address and image size, or null
    */
-  async getModuleBaseAddress(processId: number, moduleName: string): Promise<string | null> {
+  async getModuleInfo(processId: number, moduleName: string): Promise<ModuleInfo | null> {
     if (process.platform !== 'win32') {
       return null;
     }
 
-    // Note: EnumProcessModules requires more complex handling with HMODULE arrays
-    // For now, use PowerShell which is simpler and works reliably
-    // TODO: Implement EnumProcessModules properly if needed for better performance
-
-    // Use PowerShell method (works reliably)
     try {
       const psScript = `
         $process = Get-Process -Id ${processId} -ErrorAction SilentlyContinue
@@ -384,22 +406,30 @@ class WindowsMemoryReaderImpl implements WindowsMemoryReader {
           $modules = $process.Modules
           $module = $modules | Where-Object { $_.ModuleName -eq '${moduleName}' }
           if ($module) {
-            Write-Output $module.BaseAddress.ToString('X')
+            Write-Output ($module.BaseAddress.ToString('X') + ',' + $module.ModuleMemorySize)
           }
         }
       `;
 
       const { stdout } = await execAsync(`powershell -Command "${psScript.replace(/\n/g, '; ')}"`);
 
-      if (stdout?.trim()) {
-        const baseAddress = stdout.trim();
-        log.info('getModuleBaseAddress', `Found base address for ${moduleName}: 0x${baseAddress}`);
-        return baseAddress;
+      const output = stdout?.trim();
+      if (!output) {
+        return null;
       }
 
-      return null;
+      const [baseAddress, sizeText] = output.split(',');
+      const size = Number.parseInt(sizeText ?? '', 10);
+      log.info(
+        'getModuleInfo',
+        `Found ${moduleName}: base address 0x${baseAddress}, image size ${sizeText ?? 'unknown'}`,
+      );
+      return {
+        baseAddress,
+        size: Number.isFinite(size) && size > 0 ? size : undefined,
+      };
     } catch (error) {
-      log.error('getModuleBaseAddress', error);
+      log.error('getModuleInfo', error);
       return null;
     }
   }
@@ -409,9 +439,15 @@ class WindowsMemoryReaderImpl implements WindowsMemoryReader {
    * @param handle - Process handle (as number)
    * @param address - Memory address to read
    * @param size - Number of bytes to read
+   * @param quiet - Suppress failure logging (for expected failures such as unreadable pages)
    * @returns Buffer with read data or null on failure
    */
-  async readMemory(handle: number, address: number, size: number): Promise<Buffer | null> {
+  async readMemory(
+    handle: number,
+    address: number,
+    size: number,
+    quiet = false,
+  ): Promise<Buffer | null> {
     if (process.platform !== 'win32') {
       return null;
     }
@@ -432,7 +468,7 @@ class WindowsMemoryReaderImpl implements WindowsMemoryReader {
 
       // Allocate buffer for reading
       const buffer = Buffer.alloc(size);
-      const bytesRead = Buffer.alloc(4); // SIZE_T for bytes read (32-bit on 32-bit, 64-bit on 64-bit)
+      const bytesRead = Buffer.alloc(8); // SIZE_T is 64-bit on x64; a smaller buffer would be overrun
 
       // ReadProcessMemory: BOOL ReadProcessMemory(
       //   HANDLE hProcess,
@@ -445,18 +481,22 @@ class WindowsMemoryReaderImpl implements WindowsMemoryReader {
       const success = k32.ReadProcessMemory(handleValue, address, buffer, size, bytesRead);
 
       if (success === 0) {
-        const errorCode = k32.GetLastError();
-        log.error(
-          'readMemory',
-          `ReadProcessMemory failed at 0x${address.toString(16)}, error code: ${errorCode}`,
-        );
+        if (!quiet) {
+          const errorCode = k32.GetLastError();
+          log.error(
+            'readMemory',
+            `ReadProcessMemory failed at 0x${address.toString(16)}, error code: ${errorCode}`,
+          );
+        }
         return null;
       }
 
       // Get actual bytes read
-      const bytesReadCount = bytesRead.readUInt32LE(0);
+      const bytesReadCount = Number(bytesRead.readBigUInt64LE(0));
       if (bytesReadCount === 0) {
-        log.warn('readMemory', `No bytes read from address 0x${address.toString(16)}`);
+        if (!quiet) {
+          log.warn('readMemory', `No bytes read from address 0x${address.toString(16)}`);
+        }
         return null;
       }
 
@@ -523,19 +563,16 @@ class WindowsMemoryReaderImpl implements WindowsMemoryReader {
   }
 
   /**
-   * Reads a large region of process memory for pattern scanning.
-   * Uses VirtualQueryEx to enumerate readable memory regions.
+   * Reads the module image for pattern scanning.
+   * Uses VirtualQueryEx to find readable regions and copies them to their RVA in the result, so
+   * unreadable regions leave zero-filled gaps instead of shifting everything after them.
+   * Reads that fail are retried page by page so one bad page does not discard its neighbours.
    * @param handle - Process handle
    * @param baseAddress - Module base address (as hex string)
-   * @param maxSize - Maximum size to scan (default: 100MB to cover full D2R.exe)
-   * @returns Buffer with memory contents or null on failure
+   * @param size - Size of the module image in bytes
+   * @returns Buffer where index === RVA, or null if nothing could be read
    */
-  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Memory enumeration requires multiple checks
-  async readProcessMemory(
-    handle: number,
-    baseAddress: string,
-    maxSize = 100 * 1024 * 1024,
-  ): Promise<Buffer | null> {
+  async readModuleImage(handle: number, baseAddress: string, size: number): Promise<Buffer | null> {
     if (process.platform !== 'win32') {
       return null;
     }
@@ -548,57 +585,82 @@ class WindowsMemoryReaderImpl implements WindowsMemoryReader {
     try {
       const baseAddr = Number.parseInt(baseAddress, 16);
       if (Number.isNaN(baseAddr)) {
-        log.error('readProcessMemory', 'Invalid base address for memory reading');
+        log.error('readModuleImage', 'Invalid base address for memory reading');
         return null;
       }
 
-      const chunks: Buffer[] = [];
-      let currentAddress = baseAddr;
-      const endAddress = baseAddr + maxSize;
+      const image = Buffer.alloc(size);
       let totalRead = 0;
+      let rva = 0;
 
-      // Enumerate and read committed, readable memory regions
-      while (currentAddress < endAddress) {
-        const regionInfo = queryMemoryRegion(k32, handle, currentAddress);
-
-        if (!regionInfo) {
+      while (rva < size) {
+        const regionInfo = queryMemoryRegion(k32, handle, baseAddr + rva);
+        if (!regionInfo || regionInfo.regionSize <= 0) {
           // Failed to query memory, stop scanning
           break;
         }
 
-        // Check if region is committed and readable
+        const regionEnd = Math.min(rva + regionInfo.regionSize, size);
+
         if (isMemoryRegionReadable(regionInfo.state, regionInfo.protect)) {
-          // Read this region
-          const readSize = Math.min(regionInfo.regionSize, endAddress - currentAddress);
-          const chunk = await this.readMemory(handle, currentAddress, readSize);
-
-          if (chunk && chunk.length > 0) {
-            chunks.push(chunk);
-            totalRead += chunk.length;
-          }
+          totalRead += await this.copyRegionIntoImage(handle, baseAddr, image, rva, regionEnd);
         }
 
-        // Move to next region
-        currentAddress += regionInfo.regionSize;
-
-        // Safety check: don't scan forever
-        if (totalRead > maxSize || chunks.length > 1000) {
-          break;
-        }
+        rva = regionEnd;
       }
 
-      if (chunks.length === 0) {
-        log.error('readProcessMemory', 'No readable memory regions found');
+      if (totalRead === 0) {
+        log.error('readModuleImage', 'No readable memory regions found');
         return null;
       }
 
-      // Concatenate all chunks into single buffer
-      const result = Buffer.concat(chunks, totalRead);
-      return result;
+      return image;
     } catch (error) {
-      log.error('readProcessMemory', error);
+      log.error('readModuleImage', error);
       return null;
     }
+  }
+
+  /**
+   * Copies the bytes of [startRva, endRva) into the image buffer at their RVA.
+   * Falls back to page-sized reads for chunks that fail as a whole.
+   * @returns Number of bytes successfully copied
+   */
+  private async copyRegionIntoImage(
+    handle: number,
+    baseAddr: number,
+    image: Buffer,
+    startRva: number,
+    endRva: number,
+  ): Promise<number> {
+    let copied = 0;
+
+    for (let chunkStart = startRva; chunkStart < endRva; chunkStart += IMAGE_READ_CHUNK_SIZE) {
+      const chunkEnd = Math.min(chunkStart + IMAGE_READ_CHUNK_SIZE, endRva);
+      const chunk = await this.readMemory(
+        handle,
+        baseAddr + chunkStart,
+        chunkEnd - chunkStart,
+        true,
+      );
+
+      if (chunk && chunk.length > 0) {
+        chunk.copy(image, chunkStart);
+        copied += chunk.length;
+        continue;
+      }
+
+      for (let pageStart = chunkStart; pageStart < chunkEnd; pageStart += PAGE_SIZE) {
+        const pageEnd = Math.min(pageStart + PAGE_SIZE, chunkEnd);
+        const page = await this.readMemory(handle, baseAddr + pageStart, pageEnd - pageStart, true);
+        if (page && page.length > 0) {
+          page.copy(image, pageStart);
+          copied += page.length;
+        }
+      }
+    }
+
+    return copied;
   }
 }
 
@@ -616,6 +678,11 @@ interface D2RMemoryAddresses {
    * This will be determined dynamically by finding the module base address
    */
   baseAddress: string | null;
+
+  /**
+   * Size of the D2R.exe module image in bytes (bounds the pattern scan)
+   */
+  moduleSize: number;
 
   /**
    * UI offset (calculated using pattern matching)
@@ -644,6 +711,7 @@ export class MemoryReader {
   private pollingIntervalMs = 500; // Default 500ms polling interval
   private offsetsValid = false; // Track if offsets are valid (not placeholders)
   private eventUnsubscribers: Array<() => void> = [];
+  private offsetRetryTimeout: NodeJS.Timeout | null = null;
 
   constructor(
     private eventBus: EventBus,
@@ -653,6 +721,7 @@ export class MemoryReader {
     // Initialize with placeholder - UI offset will be calculated using pattern matching
     this.addresses = {
       baseAddress: null,
+      moduleSize: FALLBACK_MODULE_IMAGE_SIZE,
       uiOffset: 0x0, // Will be calculated using pattern matching
     };
 
@@ -737,6 +806,7 @@ export class MemoryReader {
    * @private
    */
   private async handleProcessStarted(processId: number): Promise<void> {
+    this.cancelOffsetRetry();
     this.processId = processId;
 
     // Try to open process handle
@@ -745,20 +815,65 @@ export class MemoryReader {
       this.processHandle = handle;
       log.info('handleProcessStarted', `Process handle opened for PID ${processId}`);
 
-      // Find base address and initialize memory addresses
-      await this.initializeMemoryAddresses();
-
-      // Automatically start polling now that we have a process handle
-      // RunTrackerService may have already tried to start polling earlier (when there was no handle)
-      // so we need to start it here now that we're ready
-      if (this.offsetsValid) {
-        this.startPolling();
-      } else {
-        log.warn('handleProcessStarted', 'Invalid offsets - memory polling disabled');
-      }
+      await this.initializeWithRetry(processId, 1);
     } else {
       log.error('handleProcessStarted', `Failed to open process handle for PID ${processId}`);
       this.processHandle = null;
+    }
+  }
+
+  /**
+   * Initializes memory offsets, retrying until they resolve or the process goes away.
+   * D2R is usually still starting up when the process is detected, and a scan can also fail on a
+   * transient read error, so a single attempt is not enough.
+   * @private
+   */
+  private async initializeWithRetry(processId: number, attempt: number): Promise<void> {
+    if (this.processId !== processId || !this.processHandle) {
+      return;
+    }
+
+    await this.initializeMemoryAddresses();
+
+    // The process may have stopped while the scan was running
+    if (this.processId !== processId || !this.processHandle) {
+      return;
+    }
+
+    if (this.offsetsValid) {
+      log.info('initializeWithRetry', `Memory offsets resolved on attempt ${attempt}`);
+      // RunTrackerService may have already tried to start polling earlier (when there was no
+      // handle), so we need to start it here now that we're ready
+      this.startPolling();
+      return;
+    }
+
+    if (attempt >= OFFSET_MAX_ATTEMPTS) {
+      log.error(
+        'initializeWithRetry',
+        `Giving up on memory offsets after ${attempt} attempts — memory polling disabled`,
+      );
+      return;
+    }
+
+    log.warn(
+      'initializeWithRetry',
+      `Invalid offsets (attempt ${attempt}) - retrying in ${OFFSET_RETRY_INTERVAL_MS}ms`,
+    );
+    this.offsetRetryTimeout = setTimeout(() => {
+      this.offsetRetryTimeout = null;
+      void this.initializeWithRetry(processId, attempt + 1);
+    }, OFFSET_RETRY_INTERVAL_MS);
+  }
+
+  /**
+   * Cancels a pending offset retry.
+   * @private
+   */
+  private cancelOffsetRetry(): void {
+    if (this.offsetRetryTimeout) {
+      clearTimeout(this.offsetRetryTimeout);
+      this.offsetRetryTimeout = null;
     }
   }
 
@@ -767,6 +882,7 @@ export class MemoryReader {
    * @private
    */
   private async handleProcessStopped(): Promise<void> {
+    this.cancelOffsetRetry();
     this.stopPolling();
 
     if (this.processHandle) {
@@ -776,6 +892,8 @@ export class MemoryReader {
 
     this.processId = null;
     this.lastGameState = null;
+    this.offsetsValid = false;
+    this.addresses.baseAddress = null;
   }
 
   /**
@@ -789,15 +907,19 @@ export class MemoryReader {
     }
 
     try {
-      // Get D2R.exe module base address (P_0)
-      const baseAddress = await this.memoryReader.getModuleBaseAddress(this.processId, 'D2R.exe');
-      if (!baseAddress) {
+      // Get D2R.exe module base address (P_0) and image size
+      const moduleInfo = await this.memoryReader.getModuleInfo(this.processId, 'D2R.exe');
+      if (!moduleInfo) {
         log.warn('initializeMemoryAddresses', 'Could not find D2R.exe base address');
         return;
       }
 
-      this.addresses.baseAddress = baseAddress;
-      log.info('initializeMemoryAddresses', `Found D2R.exe base address: 0x${baseAddress}`);
+      this.addresses.baseAddress = moduleInfo.baseAddress;
+      this.addresses.moduleSize = moduleInfo.size ?? FALLBACK_MODULE_IMAGE_SIZE;
+      log.info(
+        'initializeMemoryAddresses',
+        `Found D2R.exe base address: 0x${moduleInfo.baseAddress} (image size: ${this.addresses.moduleSize} bytes)`,
+      );
 
       // Calculate offsets using pattern matching
       const success = await this.calculateOffsets();
@@ -841,45 +963,27 @@ export class MemoryReader {
     }
 
     try {
-      // Read process memory for pattern scanning
-      const memory = await this.memoryReader.readProcessMemory(
+      // Read the module image for pattern scanning (buffer index === RVA)
+      const image = await this.memoryReader.readModuleImage(
         this.processHandle,
         this.addresses.baseAddress,
+        this.addresses.moduleSize,
       );
 
-      if (!memory) {
+      if (!image) {
         log.error('calculateOffsets', 'Failed to read process memory');
         return false;
       }
 
-      // Find UI pattern
-      const pattern = D2R_PATTERNS.UI;
-      const patternOffset = findPatternString(memory, pattern.pattern, pattern.mask);
-
-      if (patternOffset === -1) {
-        log.error('calculateOffsets', `${pattern.name} pattern not found in memory`);
+      // Find the UI pattern and resolve the UI offset from it (see resolveUiOffset)
+      const uiOffset = resolveUiOffset(image);
+      if (uiOffset === undefined) {
+        log.error(
+          'calculateOffsets',
+          `UI pattern not found or invalid in ${image.length} bytes of module image`,
+        );
         return false;
       }
-
-      // Read uint32 value at pattern + 6 (from d2go line 43)
-      const bytes = readBytesFromBuffer(
-        memory,
-        patternOffset + OFFSET_ADJUSTMENTS.UI_READ_OFFSET,
-        4,
-      );
-
-      if (!bytes) {
-        log.error('calculateOffsets', 'Failed to read bytes from pattern offset');
-        return false;
-      }
-
-      const offsetInt = bytes.readUInt32LE(0);
-
-      // Calculate UI offset (from d2go line 44)
-      // uiOffsetPtr = (pattern - moduleBase) + 10 + offsetInt
-      // Since our patternOffset is already relative to moduleBase:
-      // uiOffsetPtr = patternOffset + 10 + offsetInt
-      const uiOffset = patternOffset + OFFSET_ADJUSTMENTS.UI_INSTRUCTION_OFFSET + offsetInt;
 
       this.addresses.uiOffset = uiOffset;
 
@@ -1006,9 +1110,10 @@ export class MemoryReader {
     }
 
     try {
-      const memory = await this.memoryReader.readProcessMemory(
+      const memory = await this.memoryReader.readModuleImage(
         this.processHandle,
         this.addresses.baseAddress,
+        this.addresses.moduleSize,
       );
 
       if (!memory) {
@@ -1045,6 +1150,7 @@ export class MemoryReader {
     }
     this.eventUnsubscribers.length = 0;
 
+    this.cancelOffsetRetry();
     this.stopPolling();
 
     if (this.processHandle) {

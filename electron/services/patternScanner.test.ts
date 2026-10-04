@@ -94,6 +94,21 @@ describe('When findPattern is called', () => {
     });
   });
 
+  describe('If a start offset is provided', () => {
+    it('Then should skip matches before the start offset', () => {
+      // Arrange
+      const memory = Buffer.from([0x44, 0x88, 0x00, 0x44, 0x88, 0x00]);
+      const pattern = Buffer.from([0x44, 0x88]);
+      const mask = 'xx';
+
+      // Act
+      const result = findPattern(memory, pattern, mask, 1);
+
+      // Assert
+      expect(result).toBe(3);
+    });
+  });
+
   describe('If pattern has wildcard bytes', () => {
     it('Then should match regardless of wildcard values', () => {
       // Arrange
