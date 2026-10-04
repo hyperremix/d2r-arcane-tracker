@@ -2,6 +2,7 @@ import { exec } from 'node:child_process';
 import { writeFile } from 'node:fs/promises';
 import { promisify } from 'node:util';
 import { ffi, Kernel32 } from 'win32-api';
+import { findKnownBuild, PE_HEADER_READ_SIZE, parsePeIdentity } from '../config/d2rBuilds';
 import { D2RGameState, OFFSET_ADJUSTMENTS } from '../config/d2rPatterns';
 import { createServiceLogger } from '../utils/serviceLogger';
 import type { EventBus } from './EventBus';
@@ -685,10 +686,10 @@ interface D2RMemoryAddresses {
   moduleSize: number;
 
   /**
-   * UI offset (calculated using pattern matching)
-   * Used to read game state byte at: moduleBase + UI - 0xA
+   * RVA of the in-game flag byte (0 = lobby, 1 = in game).
+   * Taken from the known-builds table, or derived from the UI signature for unknown builds.
    */
-  uiOffset: number;
+  inGameFlagOffset: number;
 }
 
 /**
@@ -718,11 +719,11 @@ export class MemoryReader {
     _processMonitor: ProcessMonitor, // Reserved for future use
   ) {
     this.memoryReader = new WindowsMemoryReaderImpl();
-    // Initialize with placeholder - UI offset will be calculated using pattern matching
+    // Initialize with placeholder - resolved once D2R is running
     this.addresses = {
       baseAddress: null,
       moduleSize: FALLBACK_MODULE_IMAGE_SIZE,
-      uiOffset: 0x0, // Will be calculated using pattern matching
+      inGameFlagOffset: 0x0,
     };
 
     // Listen for process start/stop events
@@ -897,8 +898,7 @@ export class MemoryReader {
   }
 
   /**
-   * Initializes memory addresses by finding the base address and calculating offsets using pattern matching.
-   * Based on d2go's dynamic offset calculation approach.
+   * Initializes memory addresses by finding the base address and resolving the in-game flag offset.
    * @private
    */
   private async initializeMemoryAddresses(): Promise<void> {
@@ -921,12 +921,11 @@ export class MemoryReader {
         `Found D2R.exe base address: 0x${moduleInfo.baseAddress} (image size: ${this.addresses.moduleSize} bytes)`,
       );
 
-      // Calculate offsets using pattern matching
-      const success = await this.calculateOffsets();
+      const success = await this.resolveInGameFlagOffset();
       if (!success) {
         log.error(
           'initializeMemoryAddresses',
-          'Failed to calculate offsets using pattern matching — memory reading disabled',
+          'Failed to resolve the in-game flag offset — memory reading disabled',
         );
         this.offsetsValid = false;
         return;
@@ -935,7 +934,7 @@ export class MemoryReader {
       this.offsetsValid = true;
       log.info(
         'initializeMemoryAddresses',
-        `Successfully calculated UI offset: 0x${this.addresses.uiOffset.toString(16)}`,
+        `In-game flag offset: 0x${this.addresses.inGameFlagOffset.toString(16)}`,
       );
     } catch (error) {
       log.error('initializeMemoryAddresses', error);
@@ -944,8 +943,67 @@ export class MemoryReader {
   }
 
   /**
-   * Calculates memory offsets dynamically using pattern matching.
-   * Ported from d2go's calculateOffsets function.
+   * Resolves the in-game flag offset.
+   *
+   * Known builds (identified from the PE header) use a verified offset directly. The header is
+   * always readable, unlike the code a signature scan needs, a large part of which is
+   * PAGE_NOACCESS. Unknown builds fall back to the d2go UI signature, which is unverified: it no
+   * longer resolves to the in-game flag in current builds, so a new build needs an entry in
+   * KNOWN_D2R_BUILDS (see docs/MEMORY_OFFSETS.md).
+   *
+   * @returns True if an offset was resolved, false otherwise
+   * @private
+   */
+  private async resolveInGameFlagOffset(): Promise<boolean> {
+    if (!this.processHandle || !this.addresses.baseAddress) {
+      return false;
+    }
+
+    const baseAddress = Number.parseInt(this.addresses.baseAddress, 16);
+    const header = await this.memoryReader.readMemory(
+      this.processHandle,
+      baseAddress,
+      PE_HEADER_READ_SIZE,
+      true,
+    );
+    const identity = header ? parsePeIdentity(header) : undefined;
+
+    if (identity) {
+      const knownBuild = findKnownBuild(identity);
+      if (knownBuild) {
+        const flag = await this.memoryReader.readMemory(
+          this.processHandle,
+          baseAddress + knownBuild.inGameFlagRva,
+          1,
+        );
+        if (flag && (flag[0] === D2RGameState.Lobby || flag[0] === D2RGameState.InGame)) {
+          this.addresses.inGameFlagOffset = knownBuild.inGameFlagRva;
+          log.info(
+            'resolveInGameFlagOffset',
+            `Known D2R build ${knownBuild.fileVersion} - using verified in-game flag offset`,
+          );
+          return true;
+        }
+        log.warn(
+          'resolveInGameFlagOffset',
+          `Known D2R build ${knownBuild.fileVersion} but the flag byte is not readable as 0/1 (got ${flag?.[0]}); falling back to signature scan`,
+        );
+      } else {
+        log.warn(
+          'resolveInGameFlagOffset',
+          `Unknown D2R build (PE timestamp ${identity.timeDateStamp}, image size ${identity.sizeOfImage}). ` +
+            'Falling back to the unverified signature scan; run detection may not work until this build is added to KNOWN_D2R_BUILDS',
+        );
+      }
+    } else {
+      log.warn('resolveInGameFlagOffset', 'Could not read the D2R.exe PE header');
+    }
+
+    return this.scanForInGameFlag();
+  }
+
+  /**
+   * Finds the in-game flag using the d2go UI signature (legacy; unverified on current builds).
    *
    * From d2go offset.go lines 41-44:
    * ```go
@@ -953,11 +1011,12 @@ export class MemoryReader {
    * uiOffset := process.ReadUInt(pattern+6, Uint32)
    * uiOffsetPtr := (pattern - process.moduleBaseAddressPtr) + 10 + uintptr(uiOffset)
    * ```
+   * and the flag is at `UI - 0xA`.
    *
-   * @returns True if offsets were successfully calculated, false otherwise
+   * @returns True if a candidate was found, false otherwise
    * @private
    */
-  private async calculateOffsets(): Promise<boolean> {
+  private async scanForInGameFlag(): Promise<boolean> {
     if (!this.processHandle || !this.addresses.baseAddress) {
       return false;
     }
@@ -971,7 +1030,7 @@ export class MemoryReader {
       );
 
       if (!image) {
-        log.error('calculateOffsets', 'Failed to read process memory');
+        log.error('scanForInGameFlag', 'Failed to read process memory');
         return false;
       }
 
@@ -979,17 +1038,17 @@ export class MemoryReader {
       const uiOffset = resolveUiOffset(image);
       if (uiOffset === undefined) {
         log.error(
-          'calculateOffsets',
+          'scanForInGameFlag',
           `UI pattern not found or invalid in ${image.length} bytes of module image`,
         );
         return false;
       }
 
-      this.addresses.uiOffset = uiOffset;
+      this.addresses.inGameFlagOffset = uiOffset - OFFSET_ADJUSTMENTS.UI_STATE_ADJUSTMENT;
 
       return true;
     } catch (error) {
-      log.error('calculateOffsets', error);
+      log.error('scanForInGameFlag', error);
       return false;
     }
   }
@@ -1032,13 +1091,8 @@ export class MemoryReader {
   }
 
   /**
-   * Reads the game state from memory using UI offset byte read.
-   * From d2go game_reader.go line 327:
-   * ```go
-   * func (gd *GameReader) IsIngame() bool {
-   *     return gd.ReadUInt(gd.Process.moduleBaseAddressPtr+gd.offset.UI-0xA, 1) == 1
-   * }
-   * ```
+   * Reads the game state from memory (one byte at the in-game flag offset).
+   * Equivalent to d2go's IsIngame(), which reads `moduleBase + UI - 0xA`.
    *
    * @returns Game state value (0 = Lobby, 1 = InGame) or null on error
    */
@@ -1048,15 +1102,13 @@ export class MemoryReader {
     }
 
     try {
-      // Calculate address: moduleBase + UI - 0xA
       const baseAddress = Number.parseInt(this.addresses.baseAddress, 16);
       if (Number.isNaN(baseAddress)) {
         log.error('readGameState', 'Invalid base address');
         return null;
       }
 
-      const stateAddress =
-        baseAddress + this.addresses.uiOffset - OFFSET_ADJUSTMENTS.UI_STATE_ADJUSTMENT;
+      const stateAddress = baseAddress + this.addresses.inGameFlagOffset;
 
       // Read 1 byte at the state address
       const buffer = await this.memoryReader.readMemory(this.processHandle, stateAddress, 1);

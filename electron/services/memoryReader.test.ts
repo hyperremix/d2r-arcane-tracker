@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
+import { KNOWN_D2R_BUILDS, PE_HEADER_READ_SIZE } from '../config/d2rBuilds';
 import { D2RGameState } from '../config/d2rPatterns';
 import { EventBus } from './EventBus';
 import { MemoryReader } from './memoryReader';
@@ -200,6 +201,19 @@ const MODULE_BASE = 0x7ff600000000;
 const IMAGE_SIZE = 0x2000;
 const UI_OFFSET = 0x1800;
 const GAME_STATE_ADDRESS = MODULE_BASE + UI_OFFSET - 0xa;
+const [KNOWN_BUILD] = KNOWN_D2R_BUILDS;
+const KNOWN_BUILD_FLAG_ADDRESS = MODULE_BASE + KNOWN_BUILD.inGameFlagRva;
+
+/** Builds a minimal PE header with the given identity. */
+function createPeHeader(timeDateStamp: number, sizeOfImage: number): Buffer {
+  const peOffset = 0x150;
+  const header = Buffer.alloc(PE_HEADER_READ_SIZE);
+  header.writeUInt32LE(peOffset, 0x3c);
+  header.writeUInt32LE(0x00004550, peOffset);
+  header.writeUInt32LE(timeDateStamp, peOffset + 8);
+  header.writeUInt32LE(sizeOfImage, peOffset + 24 + 56);
+  return header;
+}
 
 /** Builds a module image whose UI pattern resolves to UI_OFFSET. */
 function createModuleImageWithUiPattern(): Buffer {
@@ -215,6 +229,7 @@ describe('When D2R starts and the memory offsets are resolved', () => {
   let memoryReader: MemoryReader;
   let fakeReader: FakeWindowsMemoryReader;
   let gameStateByte: number;
+  let peHeader: Buffer | null;
   const originalPlatform = process.platform;
 
   // Lets the chain of awaited calls in the d2r-started handler run to completion
@@ -229,15 +244,21 @@ describe('When D2R starts and the memory offsets are resolved', () => {
     Object.defineProperty(process, 'platform', { value: 'win32', configurable: true });
 
     gameStateByte = 0;
+    peHeader = null; // unreadable header => unknown build => signature scan
     fakeReader = {
       openProcess: vi.fn().mockResolvedValue(1234),
       closeHandle: vi.fn().mockResolvedValue(undefined),
       getModuleInfo: vi
         .fn()
         .mockResolvedValue({ baseAddress: MODULE_BASE.toString(16), size: IMAGE_SIZE }),
-      readMemory: vi.fn(async (_handle: number, address: number) =>
-        address === GAME_STATE_ADDRESS ? Buffer.from([gameStateByte]) : null,
-      ),
+      readMemory: vi.fn(async (_handle: number, address: number) => {
+        if (address === MODULE_BASE) {
+          return peHeader;
+        }
+        const isFlagAddress =
+          address === GAME_STATE_ADDRESS || address === KNOWN_BUILD_FLAG_ADDRESS;
+        return isFlagAddress ? Buffer.from([gameStateByte]) : null;
+      }),
       readModuleImage: vi.fn().mockResolvedValue(createModuleImageWithUiPattern()),
     };
 
@@ -272,6 +293,61 @@ describe('When D2R starts and the memory offsets are resolved', () => {
       expect(memoryReader.isOffsetsValid()).toBe(true);
       expect(entered).toHaveBeenCalledTimes(1);
       expect(exited).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('If the D2R build is known', () => {
+    it('Then should use the verified flag offset without scanning the image', async () => {
+      // Arrange
+      peHeader = createPeHeader(KNOWN_BUILD.timeDateStamp, KNOWN_BUILD.sizeOfImage);
+      const entered = vi.fn();
+      const exited = vi.fn();
+      eventBus.on('game-entered', entered);
+      eventBus.on('game-exited', exited);
+
+      // Act
+      eventBus.emit('d2r-started', { processId: 1234, processName: 'D2R.exe' });
+      await flushPromises();
+      gameStateByte = 1;
+      await vi.advanceTimersByTimeAsync(500);
+      gameStateByte = 0;
+      await vi.advanceTimersByTimeAsync(500);
+
+      // Assert
+      expect(fakeReader.readModuleImage).not.toHaveBeenCalled();
+      expect(memoryReader.isOffsetsValid()).toBe(true);
+      expect(entered).toHaveBeenCalledTimes(1);
+      expect(exited).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('If the D2R build is unknown', () => {
+    it('Then should fall back to the signature scan', async () => {
+      // Arrange
+      peHeader = createPeHeader(KNOWN_BUILD.timeDateStamp + 1, KNOWN_BUILD.sizeOfImage);
+
+      // Act
+      eventBus.emit('d2r-started', { processId: 1234, processName: 'D2R.exe' });
+      await flushPromises();
+
+      // Assert
+      expect(fakeReader.readModuleImage).toHaveBeenCalledTimes(1);
+      expect(memoryReader.isOffsetsValid()).toBe(true);
+    });
+  });
+
+  describe('If a known build does not expose a 0/1 flag at the known offset', () => {
+    it('Then should fall back to the signature scan', async () => {
+      // Arrange
+      peHeader = createPeHeader(KNOWN_BUILD.timeDateStamp, KNOWN_BUILD.sizeOfImage);
+      gameStateByte = 0x7f;
+
+      // Act
+      eventBus.emit('d2r-started', { processId: 1234, processName: 'D2R.exe' });
+      await flushPromises();
+
+      // Assert
+      expect(fakeReader.readModuleImage).toHaveBeenCalledTimes(1);
     });
   });
 
