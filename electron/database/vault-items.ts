@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { and, eq } from 'drizzle-orm';
 import type {
   VaultItem,
@@ -7,7 +8,7 @@ import type {
   VaultItemUpsertByFingerprintInput,
   VaultItemUpsertInput,
 } from '../types/grail';
-import { isStackableFromRawJson, resolveStackCountFromRawJson } from '../utils/stackableItems';
+import { isResourceStackFromRawJson, resolveStackCountFromRawJson } from '../utils/stackableItems';
 import { dbVaultItemToVaultItem, fromISOString, toISOString } from './converters';
 import { schema } from './drizzle';
 import type { DatabaseContext } from './types';
@@ -213,6 +214,7 @@ function findExistingStackableVaultItem(
         SELECT vi.*
         FROM vault_items vi
         WHERE vi.item_code = ?
+          AND vi.fingerprint NOT LIKE 'grail:%'
           AND vi.vaulted_at IS NOT NULL
           AND (vi.unvaulted_at IS NULL OR vi.unvaulted_at < vi.vaulted_at)
         LIMIT 1
@@ -227,13 +229,101 @@ function findExistingStackableVaultItem(
   return attachCategoryIds(ctx, [mapRawVaultSearchRowToVaultItem(row)])[0];
 }
 
-export function addVaultItem(ctx: DatabaseContext, input: VaultItemUpsertInput): VaultItem {
+export interface VaultAddResult {
+  item: VaultItem;
+  /** Puts the vault back into the state it had before this add (used when removing the source item fails). */
+  undo: () => void;
+}
+
+function isCurrentlyVaulted(item: Pick<VaultItem, 'vaultedAt' | 'unvaultedAt'>): boolean {
+  if (!item.vaultedAt) {
+    return false;
+  }
+
+  return !item.unvaultedAt || item.unvaultedAt < item.vaultedAt;
+}
+
+function findVaultItemByFingerprint(ctx: DatabaseContext, fingerprint: string): VaultItem | null {
+  const row = ctx.db.select().from(vaultItems).where(eq(vaultItems.fingerprint, fingerprint)).get();
+  return row ? getVaultItemById(ctx, row.id) : null;
+}
+
+/**
+ * Restores every persisted column of a vault row (and its categories) to a previously read state.
+ */
+function restoreVaultItemRow(ctx: DatabaseContext, previous: VaultItem): void {
+  const values = buildVaultItemValues({
+    ...previous,
+    id: previous.id,
+    ethereal: previous.ethereal,
+    quality: previous.quality,
+    rawItemJson: previous.rawItemJson,
+  });
+
+  ctx.db
+    .update(vaultItems)
+    .set({
+      ...values,
+      id: undefined,
+      lastSeenAt: toISOString(previous.lastSeenAt) ?? values.lastSeenAt,
+      vaultedAt: toISOString(previous.vaultedAt) ?? null,
+      unvaultedAt: toISOString(previous.unvaultedAt) ?? null,
+    })
+    .where(eq(vaultItems.id, previous.id))
+    .run();
+
+  setVaultItemCategories(ctx, previous.id, previous.categoryIds ?? []);
+}
+
+/**
+ * Undoes a stack merge by taking the merged units out again. Restoring a snapshot would also wipe
+ * units that another add merged into the same row in the meantime.
+ */
+function createMergeUndo(ctx: DatabaseContext, rowId: string, mergedCount: number) {
+  return () => {
+    const row = getVaultItemById(ctx, rowId);
+    if (!row) {
+      return;
+    }
+
+    const remaining = (row.stackCount ?? 1) - mergedCount;
+    if (remaining >= 1) {
+      ctx.db
+        .update(vaultItems)
+        .set({ stackCount: remaining })
+        .where(eq(vaultItems.id, rowId))
+        .run();
+      return;
+    }
+
+    unvaultVaultItem(ctx, rowId);
+  };
+}
+
+function createUndo(ctx: DatabaseContext, savedId: string, previous: VaultItem | null) {
+  return () => {
+    if (previous) {
+      restoreVaultItemRow(ctx, previous);
+      return;
+    }
+
+    // The row did not exist before this add. Keep its item data (the source item could not be
+    // removed, but never throw away data that might be the only record) and just un-vault it.
+    unvaultVaultItem(ctx, savedId);
+  };
+}
+
+export function addVaultItemWithUndo(
+  ctx: DatabaseContext,
+  input: VaultItemUpsertInput,
+): VaultAddResult {
   const nowIso = new Date().toISOString();
 
-  // Stack merge: if incoming item is stackable and one already exists in the vault
-  // under the same item code, increment its count instead of creating a duplicate.
-  if (input.itemCode && isStackableFromRawJson(input.rawItemJson, input.itemCode)) {
-    const incomingCount = resolveStackCountFromRawJson(input.rawItemJson);
+  // Stack merge: if incoming item is a resource stack (runes / resource-stash stacks) and one
+  // already exists in the vault under the same item code, increment its count instead of creating
+  // a duplicate row.
+  if (input.itemCode && isResourceStackFromRawJson(input.rawItemJson, input.itemCode)) {
+    const incomingCount = input.stackCount ?? resolveStackCountFromRawJson(input.rawItemJson);
     const existing = findExistingStackableVaultItem(ctx, input.itemCode);
 
     if (existing) {
@@ -248,14 +338,34 @@ export function addVaultItem(ctx: DatabaseContext, input: VaultItemUpsertInput):
       if (!refreshed) {
         throw new Error(`Unable to load vault item after stack merge: ${existing.id}`);
       }
-      return refreshed;
+      return { item: refreshed, undo: createMergeUndo(ctx, existing.id, incomingCount) };
     }
   }
 
+  // Fingerprints describe an item by name/quality/position, so two different items can share one.
+  // Upserting over a row that is still vaulted would overwrite (and lose) the vaulted item, so the
+  // incoming item gets its own row instead.
+  let normalizedInput = input;
+  const rowWithSameFingerprint = findVaultItemByFingerprint(ctx, input.fingerprint);
+  // (Entries without a source file are plain tags/bookmarks; adding those again stays idempotent.)
+  if (
+    input.sourceFilePath &&
+    rowWithSameFingerprint &&
+    isCurrentlyVaulted(rowWithSameFingerprint)
+  ) {
+    normalizedInput = {
+      ...input,
+      id: undefined,
+      fingerprint: `${input.fingerprint}#${randomUUID()}`,
+    };
+  }
+
+  const previous = normalizedInput === input ? rowWithSameFingerprint : null;
   const inputWithVault: VaultItemUpsertInput = {
-    ...input,
-    vaultedAt: input.vaultedAt ?? new Date(nowIso),
-    stackCount: input.stackCount ?? resolveStackCountFromRawJson(input.rawItemJson),
+    ...normalizedInput,
+    vaultedAt: normalizedInput.vaultedAt ?? new Date(nowIso),
+    stackCount:
+      normalizedInput.stackCount ?? resolveStackCountFromRawJson(normalizedInput.rawItemJson),
   };
   const saved = upsertVaultItemByFingerprint(ctx, inputWithVault);
 
@@ -268,7 +378,11 @@ export function addVaultItem(ctx: DatabaseContext, input: VaultItemUpsertInput):
     throw new Error(`Unable to load vault item after add: ${saved.id}`);
   }
 
-  return refreshed;
+  return { item: refreshed, undo: createUndo(ctx, saved.id, previous) };
+}
+
+export function addVaultItem(ctx: DatabaseContext, input: VaultItemUpsertInput): VaultItem {
+  return addVaultItemWithUndo(ctx, input).item;
 }
 
 export function unvaultVaultItem(
@@ -277,6 +391,10 @@ export function unvaultVaultItem(
   withdrawCount?: number,
 ): void {
   if (withdrawCount !== undefined) {
+    if (!Number.isInteger(withdrawCount) || withdrawCount < 1) {
+      throw new Error('withdrawCount must be a positive integer');
+    }
+
     const item = getVaultItemById(ctx, itemId);
     if (item && (item.stackCount ?? 1) > withdrawCount) {
       ctx.db

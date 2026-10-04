@@ -59,6 +59,14 @@ beforeAll(async () => {
     writeFile: mockWriteFile,
   }));
 
+  vi.doMock('./saveFileBackup', () => ({
+    backupSaveFile: vi.fn().mockResolvedValue(undefined),
+  }));
+
+  vi.doMock('../utils/atomicWrite', () => ({
+    writeFileAtomic: (filePath: string, data: Buffer) => mockWriteFile(filePath, data),
+  }));
+
   vi.doMock('@dschu012/d2s', () => ({
     read: mockD2sRead,
     write: mockD2sWrite,
@@ -405,17 +413,53 @@ describe('When removeItemFromSaveFile is called', () => {
   });
 
   describe('If item id is not found in any list', () => {
-    it('Then writes file unchanged without throwing', async () => {
+    it('Then it throws and leaves the file untouched', async () => {
       // Arrange
       const d2sData = makeD2sData([{ id: 10 }]);
       mockD2sRead.mockResolvedValue(d2sData);
 
       // Act
-      await removeItemFromSaveFile('/path/to/char.d2s', 'd2s', 999);
+      const act = removeItemFromSaveFile('/path/to/char.d2s', 'd2s', 999);
 
       // Assert
+      await expect(act).rejects.toThrow('Source item not found in save file');
       expect(d2sData.items).toHaveLength(1);
-      expect(mockD2sWrite).toHaveBeenCalledWith(d2sData);
+      expect(mockD2sWrite).not.toHaveBeenCalled();
+      expect(mockWriteFile).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('If several items share the same id', () => {
+    it('Then it removes only the first match and keeps the others', async () => {
+      // Arrange
+      const d2sData = makeD2sData([{ id: 10 }], [{ id: 10 }], [{ id: 10 }]);
+      mockD2sRead.mockResolvedValue(d2sData);
+
+      // Act
+      await removeItemFromSaveFile('/path/to/char.d2s', 'd2s', 10);
+
+      // Assert
+      expect(d2sData.items).toHaveLength(0);
+      expect(d2sData.corpse_items).toHaveLength(1);
+      expect(d2sData.merc_items).toHaveLength(1);
+      expect(mockWriteFile).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('If the serialized save would contain a different number of items', () => {
+    it('Then it refuses to write the file', async () => {
+      // Arrange
+      const d2sData = makeD2sData([{ id: 10 }, { id: 11 }]);
+      mockD2sRead
+        .mockResolvedValueOnce(d2sData)
+        .mockResolvedValueOnce(makeD2sData([{ id: 11 }, { id: 12 }, { id: 13 }]));
+
+      // Act
+      const act = removeItemFromSaveFile('/path/to/char.d2s', 'd2s', 10);
+
+      // Assert
+      await expect(act).rejects.toThrow('Refusing to write save file');
+      expect(mockWriteFile).not.toHaveBeenCalled();
     });
   });
 });
@@ -1085,8 +1129,8 @@ describe('When addItemToSaveFile is called', () => {
   });
 
   describe('If sourceFileType is d2i and format is modern v105', () => {
-    it('Then it throws MODERN_STASH_READ_ONLY for resource stash tabs (>= 5)', async () => {
-      // Arrange — resource tabs (5+) are read-only; shared tabs (0–4) use sector patching
+    it('Then it refuses items that do not belong in a resource stash tab (>= 5)', async () => {
+      // Arrange — resource tabs only accept their own item kinds; shared tabs (0–4) use sector patching
       mockReadD2iMetadata.mockReturnValue({
         version: 105,
         hardcore: false,
@@ -1096,7 +1140,7 @@ describe('When addItemToSaveFile is called', () => {
       // Act & Assert
       await expect(
         addItemToSaveFile('/path/to/file.d2i', 'd2i', testItem, 'stash', 5),
-      ).rejects.toThrow('MODERN_STASH_READ_ONLY');
+      ).rejects.toThrow("Item code 'uap' cannot be moved to modern stash tab 5");
       expect(mockD2stashRead).not.toHaveBeenCalled();
       expect(mockD2stashWrite).not.toHaveBeenCalled();
     });
@@ -1144,6 +1188,34 @@ describe('When addItemToSaveFile is called', () => {
       // New bytes are prepended before existing stream bytes so they remain visible under partial parse.
       // Trailing tail bytes (0x99) remain at payload end.
       expect([...writtenPayload.subarray(4)]).toEqual([0xaa, 0x11, 0x99]);
+    });
+
+    it('Then natively stackable items keep their quantity in shared stash tabs', async () => {
+      // Arrange
+      const { buffer, sectors } = createModernD2iTestBuffer([createModernSectorPayload(0)]);
+      mockReadD2iMetadata.mockReturnValue({ version: 105, hardcore: false, sectors });
+      mockReadFile.mockResolvedValue(buffer);
+      mockWriteItem.mockResolvedValue(new Uint8Array([0xab]));
+
+      // Act
+      await addItemToSaveFile(
+        '/path/to/file.d2i',
+        'd2i',
+        {
+          id: 77,
+          type: 'tbk',
+          code: 'tbk',
+          quantity: 12,
+        } as unknown as import('@dschu012/d2s').types.IItem,
+        'stash',
+        0,
+        1,
+        1,
+      );
+
+      // Assert
+      const serialized = mockWriteItem.mock.calls[0]?.[0] as { quantity?: number } | undefined;
+      expect(serialized?.quantity).toBe(12);
     });
 
     it('Then it preserves non-simple ids when adding to shared stash tabs', async () => {
@@ -1256,7 +1328,13 @@ describe('When moveItemBetweenSaveFiles is called', () => {
       } as unknown as import('@dschu012/d2s').types.IItem;
       const sourceData = makeD2sData([sourceItem], [], []);
       const targetData = makeD2sData([], [], []);
-      mockD2sRead.mockResolvedValueOnce(sourceData).mockResolvedValueOnce(targetData);
+      // Reads: find source, read target, verify target write, read source, verify source write.
+      mockD2sRead
+        .mockResolvedValueOnce(sourceData)
+        .mockResolvedValueOnce(targetData)
+        .mockResolvedValueOnce(targetData)
+        .mockResolvedValueOnce(sourceData)
+        .mockResolvedValueOnce(sourceData);
 
       // Act
       await moveItemBetweenSaveFiles({
@@ -1491,7 +1569,8 @@ describe('When moveItemBetweenSaveFiles is called', () => {
         | undefined;
       expect(serialized?.quantity).toBe(8);
       expect(serialized?.magic_attributes).toEqual([{ id: 381, values: [8] }]);
-      expect(mockWriteFile).toHaveBeenCalledTimes(2);
+      // Add and removal are written together so a failure in between cannot leave a copy behind.
+      expect(mockWriteFile).toHaveBeenCalledTimes(1);
     });
   });
 });
@@ -1587,5 +1666,227 @@ describe('When splitStackInSaveFile is called for modern resource stacks', () =>
     };
     expect(reducedSourceItemDefined.quantity).toBe(3);
     expect(reducedSourceItemDefined.magic_attributes).toEqual([{ id: 381, values: [3] }]);
+  });
+});
+
+describe('When items could be lost by a move or split', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockReadFile.mockResolvedValue(fakeBuffer);
+    mockD2sWrite.mockResolvedValue(fakeResultBuffer);
+    mockD2stashWrite.mockResolvedValue(fakeResultBuffer);
+    mockReadD2iMetadata.mockReturnValue({ version: 99, hardcore: false, sectors: [] });
+  });
+
+  describe('If source and target paths differ only by path notation', () => {
+    it('Then the move is treated as a single-file move and writes the file once', async () => {
+      // Arrange
+      const sourceItem = makeD2sItem(5, 'amu', { position_x: 0, position_y: 0 });
+      const d2sData = makeD2sData([sourceItem]);
+      mockD2sRead.mockResolvedValue(d2sData);
+
+      // Act
+      await moveItemBetweenSaveFiles({
+        sourceFilePath: '/saves/Hero.d2s',
+        sourceFileType: 'd2s',
+        sourceItemId: 5,
+        targetFilePath: '/saves/extra/../Hero.d2s',
+        targetFileType: 'd2s',
+        targetLocationContext: 'inventory',
+        targetGridX: 3,
+        targetGridY: 2,
+      });
+
+      // Assert
+      expect(mockWriteFile).toHaveBeenCalledTimes(1);
+      expect(d2sData.items).toHaveLength(1);
+      expect(d2sData.items[0]).toMatchObject({ id: 5, position_x: 3, position_y: 2 });
+    });
+  });
+
+  describe('If a resource stack with several units is moved out of its resource tab', () => {
+    function arrangeResourceStack(): void {
+      const { buffer, sectors } = createModernD2iTestBuffer([
+        createModernSectorPayload(0),
+        createModernSectorPayload(0),
+        createModernSectorPayload(0),
+        createModernSectorPayload(0),
+        createModernSectorPayload(0),
+        createModernSectorPayload(0),
+        createModernSectorPayload(0),
+        createModernSectorPayload(1, [0x22]),
+      ]);
+      mockReadD2iMetadata.mockReturnValue({ version: 105, hardcore: false, sectors });
+      mockReadFile.mockResolvedValue(buffer);
+      mockReadItem.mockImplementation(async (reader: { offset: number }) => {
+        reader.offset += 8;
+        return {
+          type: 'r19',
+          code: 'r19',
+          simple_item: 1,
+          position_x: 0,
+          position_y: 0,
+          quantity: 1,
+          magic_attributes: [{ id: 381, values: [50] }],
+        };
+      });
+      mockWriteItem.mockResolvedValue(new Uint8Array([0xaa]));
+    }
+
+    it('Then moving it into a shared tab is rejected instead of keeping one rune of fifty', async () => {
+      // Arrange
+      arrangeResourceStack();
+
+      // Act
+      const act = moveItemBetweenSaveFiles({
+        sourceFilePath: '/path/to/stash.d2i',
+        sourceFileType: 'd2i',
+        sourceItemId: undefined,
+        sourceStashTab: 7,
+        sourceGridXFromItem: 0,
+        sourceGridYFromItem: 0,
+        targetFilePath: '/path/to/stash.d2i',
+        targetFileType: 'd2i',
+        targetLocationContext: 'stash',
+        targetStashTab: 0,
+        targetGridX: 4,
+        targetGridY: 4,
+      });
+
+      // Assert
+      await expect(act).rejects.toThrow('STACK_MOVE_REQUIRES_SPLIT');
+      expect(mockWriteFile).not.toHaveBeenCalled();
+    });
+
+    it('Then moving it onto a character in another file is rejected as well', async () => {
+      // Arrange
+      arrangeResourceStack();
+
+      // Act
+      const act = moveItemBetweenSaveFiles({
+        sourceFilePath: '/path/to/stash.d2i',
+        sourceFileType: 'd2i',
+        sourceItemId: undefined,
+        sourceStashTab: 7,
+        sourceGridXFromItem: 0,
+        sourceGridYFromItem: 0,
+        targetFilePath: '/path/to/Hero.d2s',
+        targetFileType: 'd2s',
+        targetLocationContext: 'inventory',
+        targetGridX: 0,
+        targetGridY: 0,
+      });
+
+      // Assert
+      await expect(act).rejects.toThrow('STACK_MOVE_REQUIRES_SPLIT');
+      expect(mockWriteFile).not.toHaveBeenCalled();
+    });
+
+    it('Then "moving" it within the same resource tab leaves the file untouched', async () => {
+      // Arrange
+      arrangeResourceStack();
+
+      // Act
+      await moveItemBetweenSaveFiles({
+        sourceFilePath: '/path/to/stash.d2i',
+        sourceFileType: 'd2i',
+        sourceItemId: undefined,
+        sourceStashTab: 7,
+        sourceGridXFromItem: 0,
+        sourceGridYFromItem: 0,
+        targetFilePath: '/path/to/stash.d2i',
+        targetFileType: 'd2i',
+        targetLocationContext: 'stash',
+        targetStashTab: 7,
+        targetGridX: 1,
+        targetGridY: 0,
+      });
+
+      // Assert
+      expect(mockWriteFile).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('If more units are requested than there are split targets (d2s)', () => {
+    it('Then only as many units are taken from the source as copies are placed', async () => {
+      // Arrange
+      const keys = makeD2sItem(9, 'key', { quantity: 10, position_x: 0, position_y: 0 });
+      const d2sData = makeD2sData([keys]);
+      mockD2sRead.mockResolvedValue(d2sData);
+
+      // Act
+      await splitStackInSaveFile({
+        sourceFilePath: '/saves/Hero.d2s',
+        sourceFileType: 'd2s',
+        sourceStashTab: 0,
+        sourceItemCode: 'key',
+        splitCount: 5,
+        targets: [
+          {
+            targetFilePath: '/saves/Hero.d2s',
+            targetFileType: 'd2s',
+            targetLocationContext: 'inventory',
+            targetGridX: 1,
+            targetGridY: 0,
+          },
+          {
+            targetFilePath: '/saves/Hero.d2s',
+            targetFileType: 'd2s',
+            targetLocationContext: 'inventory',
+            targetGridX: 2,
+            targetGridY: 0,
+          },
+        ],
+      });
+
+      // Assert: 10 units = 8 left in the source + 2 placed copies
+      const quantities = d2sData.items.map((item) => (item as { quantity?: number }).quantity ?? 0);
+      expect(quantities.reduce((sum, quantity) => sum + quantity, 0)).toBe(10);
+      expect(d2sData.items).toHaveLength(3);
+    });
+  });
+
+  describe('If a classic stash stack is split into the same stash file', () => {
+    it('Then the placed copies are part of the single final write', async () => {
+      // Arrange
+      const stash = makeStashData([[]]);
+      stash.pages[0].items.push(
+        makeD2sItem(1, 'key', { quantity: 4, position_x: 0, position_y: 0 }) as unknown as {
+          id: number;
+        },
+      );
+      mockD2stashRead.mockResolvedValue(stash);
+
+      // Act
+      await splitStackInSaveFile({
+        sourceFilePath: '/saves/stash.sss',
+        sourceFileType: 'sss',
+        sourceStashTab: 0,
+        sourceItemCode: 'key',
+        splitCount: 2,
+        targets: [
+          {
+            targetFilePath: '/saves/stash.sss',
+            targetFileType: 'sss',
+            targetLocationContext: 'stash',
+            targetStashTab: 0,
+            targetGridX: 3,
+            targetGridY: 3,
+          },
+          {
+            targetFilePath: '/saves/stash.sss',
+            targetFileType: 'sss',
+            targetLocationContext: 'stash',
+            targetStashTab: 0,
+            targetGridX: 4,
+            targetGridY: 3,
+          },
+        ],
+      });
+
+      // Assert
+      expect(mockWriteFile).toHaveBeenCalledTimes(1);
+      expect(stash.pages[0].items).toHaveLength(3);
+    });
   });
 });

@@ -3,7 +3,13 @@
  * These work on raw JSON strings as stored in vault_items.raw_item_json.
  */
 
+import { gems } from '../items/gems';
+import { materials } from '../items/materials';
+
 const RUNE_CODE_PATTERN = /^r[0-3][0-9]$/i;
+const GEM_AND_MATERIAL_CODES = new Set(
+  [...gems, ...materials].map((entry) => entry.code.trim().toLowerCase()),
+);
 
 type RawItemJson = {
   code?: unknown;
@@ -72,6 +78,41 @@ export function isStackableFromRawJson(rawItemJson: string, itemCode?: string): 
   }
 
   return false;
+}
+
+/**
+ * True for items that live as a counted stack in the vault: runes, gems, materials and anything
+ * carrying the D2R resource-stash count attribute. Only these may be merged into one vault row,
+ * because only their count can be restored exactly when withdrawing. Natively stackable items
+ * (keys, arrows, tomes) keep their own row so a withdrawn item never exceeds the game's per-item
+ * stack limit.
+ */
+export function isResourceStackFromRawJson(rawItemJson: string, itemCode?: string): boolean {
+  const isResourceCode = (code: string | undefined): boolean =>
+    code !== undefined &&
+    (RUNE_CODE_PATTERN.test(code) || GEM_AND_MATERIAL_CODES.has(code.trim().toLowerCase()));
+
+  if (isResourceCode(itemCode)) {
+    return true;
+  }
+
+  const parsed = parseRawItem(rawItemJson);
+  if (!parsed) {
+    return false;
+  }
+
+  const code =
+    typeof parsed.code === 'string'
+      ? parsed.code
+      : typeof parsed.type === 'string'
+        ? parsed.type
+        : undefined;
+  if (isResourceCode(code)) {
+    return true;
+  }
+
+  const attr381 = getAttr381Value(parsed);
+  return attr381 !== undefined && attr381 >= 1;
 }
 
 export function resolveStackCountFromRawJson(rawItemJson: string): number {

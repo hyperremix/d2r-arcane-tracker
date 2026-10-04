@@ -620,6 +620,48 @@ describe('When ItemDetailsDialog is rendered', () => {
     });
   });
 
+  describe('If a real vaulted item shares the grail item id', () => {
+    it('Then the dialog never links or deletes that vault row', async () => {
+      // Arrange
+      const item = HolyGrailItemBuilder.new().withId('item-1').withName('Windforce').build();
+      setupStoreMock({ items: [item] });
+      mockVaultSearch.mockResolvedValue({
+        items: [
+          {
+            id: 'real-vault-row',
+            fingerprint: 'd2s|Sorc|stash|unique|Windforce|0,0',
+            itemName: 'Windforce',
+            quality: 'unique',
+            ethereal: false,
+            rawItemJson: '{"id":42}',
+            sourceFileType: 'd2s',
+            sourceFilePath: '/saves/Sorc.d2s',
+            locationContext: 'stash',
+            grailItemId: 'item-1',
+            categoryIds: [],
+            isPresentInLatestScan: true,
+            vaultedAt: new Date('2024-01-01T00:00:00.000Z'),
+            created: new Date('2024-01-01T00:00:00.000Z'),
+            lastUpdated: new Date('2024-01-01T00:00:00.000Z'),
+          },
+        ],
+        total: 1,
+        page: 1,
+        pageSize: 20,
+      });
+
+      // Act
+      render(<ItemDetailsDialog itemId="item-1" open={true} onOpenChange={vi.fn()} />);
+      const vaultButton = await screen.findByRole('button', { name: 'Vault' });
+      fireEvent.click(vaultButton);
+
+      // Assert
+      expect(screen.queryByText('Vaulted')).not.toBeInTheDocument();
+      expect(mockVaultRemoveItem).not.toHaveBeenCalled();
+      expect(mockVaultAddItem).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe('If the item is shown without any found records', () => {
     it('Then the Mark as Found action is always available', () => {
       // Arrange

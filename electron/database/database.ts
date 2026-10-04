@@ -273,6 +273,9 @@ class GrailDatabase {
   addVaultItem(item: VaultItemUpsertInput): VaultItem {
     return vaultItemsModule.addVaultItem(this, item);
   }
+  addVaultItemWithUndo(item: VaultItemUpsertInput): vaultItemsModule.VaultAddResult {
+    return vaultItemsModule.addVaultItemWithUndo(this, item);
+  }
   updateVaultItem(itemId: string, updates: VaultItemUpdateInput): VaultItem | null {
     return vaultItemsModule.updateVaultItem(this, itemId, updates);
   }

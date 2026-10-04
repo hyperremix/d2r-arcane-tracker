@@ -20,6 +20,7 @@ import { initializeTerrorZoneHandlers } from './ipc-handlers/terrorZoneHandlers'
 import { initializeUpdateHandlers } from './ipc-handlers/updateHandlers';
 import { initializeVaultHandlers } from './ipc-handlers/vaultHandlers';
 import { initializeWidgetHandlers } from './ipc-handlers/widgetHandlers';
+import { configureSaveFileBackups } from './services/saveFileBackup';
 import { isPositionOnScreen } from './utils/windowSnapping';
 import {
   closeInventorySnapshotWindows,
@@ -250,6 +251,9 @@ app.whenReady().then(() => {
     headers['Content-Security-Policy'] = [isDev ? devCsp : prodCsp];
     callback({ responseHeaders: headers });
   });
+
+  // Keep a copy of every save file before the vault/inventory editor modifies it
+  configureSaveFileBackups(path.join(app.getPath('userData'), 'save-file-backups'));
 
   // Initialize grail database and IPC handlers
   initializeGrailHandlers();

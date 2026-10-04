@@ -1,9 +1,11 @@
 import type { types as d2sTypes } from '@dschu012/d2s';
 import { ipcMain } from 'electron';
 import { grailDatabase } from '../database/database';
+import { assertGameNotRunning } from '../services/gameProcessGuard';
 import {
   addItemToSaveFile,
   moveItemBetweenSaveFiles,
+  readSaveFileItem,
   removeItemFromSaveFile,
   type SaveFileItemLocator,
   splitStackInSaveFile,
@@ -24,7 +26,9 @@ import type {
   VaultLocationContext,
   VaultSourceFileType,
 } from '../types/grail';
+import { isResourceStackFromRawJson, resolveStackCountFromRawJson } from '../utils/stackableItems';
 
+const GRAIL_BOOKMARK_FINGERPRINT_PREFIX = 'grail:';
 const MAX_SEARCH_TEXT_LENGTH = 120;
 const MAX_PAGE = 10000;
 const MAX_PAGE_SIZE = 200;
@@ -60,6 +64,7 @@ interface NormalizedInventoryMoveInput {
   sourceStashTab?: number;
   sourceGridXFromItem?: number;
   sourceGridYFromItem?: number;
+  sourceItemCode?: string;
   targetFilePath: string;
   targetFileType: VaultSourceFileType;
   targetLocationContext: VaultLocationContext;
@@ -88,7 +93,7 @@ interface NormalizedSplitStackInput {
   targets: NormalizedSplitStackTarget[];
 }
 
-function assert(condition: boolean, message: string): void {
+function assert(condition: boolean, message: string): asserts condition {
   if (!condition) {
     throw new Error(message);
   }
@@ -268,6 +273,7 @@ function toNonNegativeInteger(value: unknown): number | undefined {
 
 interface ParsedSourceItem {
   itemId: number | undefined;
+  itemCode: string | undefined;
   gridX: number | undefined;
   gridY: number | undefined;
   stashTab: number | undefined;
@@ -276,6 +282,8 @@ interface ParsedSourceItem {
 function parseSourceItem(rawItemJson: string): ParsedSourceItem {
   let parsedRawItem: {
     id?: unknown;
+    code?: unknown;
+    type?: unknown;
     position_x?: unknown;
     position_y?: unknown;
     alt_position_id?: unknown;
@@ -283,6 +291,8 @@ function parseSourceItem(rawItemJson: string): ParsedSourceItem {
   try {
     parsedRawItem = JSON.parse(rawItemJson) as {
       id?: unknown;
+      code?: unknown;
+      type?: unknown;
       position_x?: unknown;
       position_y?: unknown;
       alt_position_id?: unknown;
@@ -296,7 +306,9 @@ function parseSourceItem(rawItemJson: string): ParsedSourceItem {
   const gridY = toNonNegativeInteger(parsedRawItem.position_y);
   const stashTab = toNonNegativeInteger(parsedRawItem.alt_position_id);
 
-  return { itemId, gridX, gridY, stashTab };
+  const itemCode = normalizeCode(parsedRawItem.code ?? parsedRawItem.type);
+
+  return { itemId, itemCode, gridX, gridY, stashTab };
 }
 
 function resolveVaultSourceItemLocator(input: VaultItemUpsertInput): SaveFileItemLocator {
@@ -306,6 +318,7 @@ function resolveVaultSourceItemLocator(input: VaultItemUpsertInput): SaveFileIte
   const gridY = toNonNegativeInteger(input.gridY) ?? parsedSourceItem.gridY;
   const locator: SaveFileItemLocator = {
     itemId: parsedSourceItem.itemId,
+    itemCode: normalizeCode(input.itemCode) ?? parsedSourceItem.itemCode,
     stashTab,
     gridX,
     gridY,
@@ -324,8 +337,57 @@ function resolveVaultSourceItemLocator(input: VaultItemUpsertInput): SaveFileIte
   return locator;
 }
 
+function isGrailBookmark(vaultItem: Pick<VaultItem, 'fingerprint'>): boolean {
+  return vaultItem.fingerprint.startsWith(GRAIL_BOOKMARK_FINGERPRINT_PREFIX);
+}
+
+function isCurrentlyVaulted(vaultItem: Pick<VaultItem, 'vaultedAt' | 'unvaultedAt'>): boolean {
+  if (!vaultItem.vaultedAt) {
+    return false;
+  }
+
+  return !vaultItem.unvaultedAt || vaultItem.unvaultedAt < vaultItem.vaultedAt;
+}
+
+function normalizeCode(value: unknown): string | undefined {
+  return typeof value === 'string' && value.trim() ? value.trim().toLowerCase() : undefined;
+}
+
+/**
+ * The scan snapshot the UI works from can be stale (the game may have moved or changed the item
+ * since). Verify the item really is in the save file, and still the same, before it is vaulted and
+ * removed from there: otherwise the vault would store one thing while another is deleted.
+ */
+async function assertSourceItemMatchesVaultInput(
+  item: VaultItemUpsertInput,
+  sourceFilePath: string,
+  sourceLocator: SaveFileItemLocator,
+): Promise<void> {
+  const actualItem = await readSaveFileItem(sourceFilePath, item.sourceFileType, sourceLocator);
+  assert(
+    actualItem !== undefined,
+    'The item is no longer in the save file. Refresh the inventory and try again.',
+  );
+
+  const actualCode = normalizeCode((actualItem as { code?: unknown }).code ?? actualItem?.type);
+  const expectedCode = normalizeCode(item.itemCode);
+  assert(
+    expectedCode === undefined || actualCode === undefined || expectedCode === actualCode,
+    'The item in the save file changed. Refresh the inventory and try again.',
+  );
+
+  if (isResourceStackFromRawJson(item.rawItemJson, item.itemCode)) {
+    const expectedCount = item.stackCount ?? resolveStackCountFromRawJson(item.rawItemJson);
+    const actualCount = resolveStackCountFromRawJson(JSON.stringify(actualItem));
+    assert(
+      expectedCount === actualCount,
+      'The stack size in the save file changed. Refresh the inventory and try again.',
+    );
+  }
+}
+
 async function removeSourceItemAfterVaultAdd(
-  savedVaultItem: VaultItem,
+  undoVaultAdd: () => void,
   sourceFilePath: string,
   sourceFileType: VaultSourceFileType,
   sourceLocator: SaveFileItemLocator,
@@ -334,7 +396,7 @@ async function removeSourceItemAfterVaultAdd(
     await removeItemFromSaveFile(sourceFilePath, sourceFileType, sourceLocator);
   } catch (error) {
     try {
-      grailDatabase.unvaultVaultItem(savedVaultItem.id);
+      undoVaultAdd();
     } catch (rollbackError) {
       console.error('Failed to revert vault state after source removal error', rollbackError);
     }
@@ -347,15 +409,17 @@ async function removeSourceItemAfterVaultAdd(
 async function addVaultItemWithSafeSourceRemoval(item: VaultItemUpsertInput): Promise<VaultItem> {
   const sourceFilePath = item.sourceFilePath?.trim();
   const sourceLocator = sourceFilePath ? resolveVaultSourceItemLocator(item) : undefined;
-  const savedVaultItem = grailDatabase.addVaultItem(item);
 
   if (sourceFilePath && sourceLocator) {
-    await removeSourceItemAfterVaultAdd(
-      savedVaultItem,
-      sourceFilePath,
-      item.sourceFileType,
-      sourceLocator,
-    );
+    await assertGameNotRunning();
+    await assertSourceItemMatchesVaultInput(item, sourceFilePath, sourceLocator);
+  }
+
+  // The vault copy is written first: if anything fails afterwards the item exists twice, never zero times.
+  const { item: savedVaultItem, undo } = grailDatabase.addVaultItemWithUndo(item);
+
+  if (sourceFilePath && sourceLocator) {
+    await removeSourceItemAfterVaultAdd(undo, sourceFilePath, item.sourceFileType, sourceLocator);
   }
 
   return savedVaultItem;
@@ -373,7 +437,8 @@ function normalizeSplitStackTarget(
     'Each target targetFileType must be one of: d2s, sss, d2x, d2i',
   );
   assert(
-    VALID_MOVE_TARGET_CONTEXTS.has(target.targetLocationContext),
+    VALID_MOVE_TARGET_CONTEXTS.has(target.targetLocationContext) &&
+      target.targetLocationContext !== 'equipped',
     'Each target targetLocationContext must be valid',
   );
   if (target.targetFileType !== 'd2s') {
@@ -478,6 +543,7 @@ function normalizeInventoryMoveInput(input: InventoryItemMoveInput): NormalizedI
 
   const {
     itemId: sourceItemId,
+    itemCode: sourceItemCode,
     gridX: sourceGridXFromItem,
     gridY: sourceGridYFromItem,
   } = parseSourceItem(input.rawItemJson);
@@ -487,6 +553,12 @@ function normalizeInventoryMoveInput(input: InventoryItemMoveInput): NormalizedI
   if (input.sourceFileType !== 'd2i' && sourceItemId === undefined) {
     throw new Error('rawItemJson must include a numeric item id');
   }
+  assert(
+    input.sourceFileType !== 'd2i' ||
+      sourceItemId !== undefined ||
+      (sourceGridXFromItem !== undefined && sourceGridYFromItem !== undefined),
+    'rawItemJson must include a numeric item id or grid coordinates for d2i source items',
+  );
 
   const targetLocationContext = input.targetLocationContext as VaultLocationContext;
   const isStashTarget = targetLocationContext === 'stash';
@@ -544,8 +616,9 @@ function normalizeInventoryMoveInput(input: InventoryItemMoveInput): NormalizedI
     sourceFileType: input.sourceFileType,
     sourceItemId,
     sourceStashTab,
-    sourceGridXFromItem: sourceGridXFromItem,
-    sourceGridYFromItem: sourceGridYFromItem,
+    sourceGridXFromItem,
+    sourceGridYFromItem,
+    sourceItemCode,
     targetFilePath,
     targetFileType: input.targetFileType,
     targetLocationContext,
@@ -621,6 +694,7 @@ interface UnvaultTargetOptions {
   targetStashTab?: number;
   targetGridX: number;
   targetGridY: number;
+  targetEquippedSlotId?: number;
 }
 
 function resolveWithdrawCount(withdrawCount: unknown): number | undefined {
@@ -636,12 +710,9 @@ function resolveWithdrawCount(withdrawCount: unknown): number | undefined {
 
 async function writeVaultItemToSaveFile(
   rawItemJson: string,
-  filePath: string,
-  fileType: VaultSourceFileType,
-  locationContext: VaultLocationContext,
+  target: UnvaultTargetOptions,
   stashTab: number | undefined,
-  targetGridX: number | undefined,
-  targetGridY: number | undefined,
+  quantity: number | undefined,
 ): Promise<void> {
   let parsedItem: d2sTypes.IItem;
   try {
@@ -650,17 +721,23 @@ async function writeVaultItemToSaveFile(
     throw new Error('Stored rawItemJson is not valid JSON');
   }
   await addItemToSaveFile(
-    filePath,
-    fileType,
+    target.targetFilePath.trim(),
+    target.targetFileType,
     parsedItem,
-    locationContext,
+    target.targetLocationContext,
     stashTab,
-    targetGridX,
-    targetGridY,
+    target.targetGridX,
+    target.targetGridY,
+    target.targetEquippedSlotId,
+    quantity,
   );
 }
 
 function validateUnvaultTargetOptions(targetOptions: UnvaultTargetOptions): void {
+  assert(
+    targetOptions !== null && typeof targetOptions === 'object',
+    'targetOptions must be an object',
+  );
   const targetFilePath = (targetOptions.targetFilePath ?? '').trim();
   assert(targetFilePath.length > 0, 'targetOptions.targetFilePath must be a non-empty string');
   assert(
@@ -668,13 +745,35 @@ function validateUnvaultTargetOptions(targetOptions: UnvaultTargetOptions): void
     'targetOptions.targetFileType must be one of: d2s, sss, d2x, d2i',
   );
   assert(
-    VALID_LOCATION_CONTEXTS.has(targetOptions.targetLocationContext),
-    'targetOptions.targetLocationContext must be one of: equipped, inventory, stash, mercenary, corpse, unknown',
+    VALID_MOVE_TARGET_CONTEXTS.has(targetOptions.targetLocationContext),
+    'targetOptions.targetLocationContext must be one of: equipped, inventory, stash, mercenary, corpse',
   );
+  if (targetOptions.targetFileType !== 'd2s') {
+    assert(
+      targetOptions.targetLocationContext === 'stash',
+      'Shared stash targets must use targetLocationContext=stash',
+    );
+  }
   if (targetOptions.targetStashTab !== undefined) {
+    assert(
+      targetOptions.targetLocationContext === 'stash',
+      'targetOptions.targetStashTab is only allowed when targetLocationContext=stash',
+    );
     assert(
       Number.isInteger(targetOptions.targetStashTab) && targetOptions.targetStashTab >= 0,
       'targetOptions.targetStashTab must be a non-negative integer',
+    );
+  }
+  if (targetOptions.targetLocationContext === 'equipped') {
+    assert(
+      Number.isInteger(targetOptions.targetEquippedSlotId) &&
+        VALID_EQUIPPED_SLOT_IDS.has(targetOptions.targetEquippedSlotId as number),
+      'targetOptions.targetEquippedSlotId must be one of: 1-12',
+    );
+  } else {
+    assert(
+      targetOptions.targetEquippedSlotId === undefined,
+      'targetOptions.targetEquippedSlotId is only allowed when targetLocationContext=equipped',
     );
   }
   assert(
@@ -685,6 +784,65 @@ function validateUnvaultTargetOptions(targetOptions: UnvaultTargetOptions): void
     Number.isInteger(targetOptions.targetGridY) && targetOptions.targetGridY >= 0,
     'targetOptions.targetGridY must be a non-negative integer',
   );
+}
+
+// Vault items that are being written to a save file right now. A second unvault of the same row
+// (double drop, second window) must not write the item a second time.
+const unvaultsInFlight = new Set<string>();
+
+async function unvaultVaultItemSafely(
+  itemId: string,
+  targetOptions: UnvaultTargetOptions | undefined,
+  withdrawCount: number | undefined,
+): Promise<void> {
+  const vaultItem = grailDatabase.getVaultItemById(itemId);
+  assert(vaultItem != null, 'Vault item not found');
+  assert(isCurrentlyVaulted(vaultItem), 'Vault item is not currently vaulted');
+  assert(
+    !isGrailBookmark(vaultItem),
+    'A grail bookmark holds no item data and cannot be unvaulted into a save file',
+  );
+
+  if (targetOptions === undefined) {
+    // Items that were taken out of a save file can only come back to an explicit position;
+    // flagging them as unvaulted without writing them anywhere would make them disappear.
+    assert(
+      !vaultItem.sourceFilePath?.trim(),
+      'A target position is required to unvault an item that was removed from a save file',
+    );
+    grailDatabase.unvaultVaultItem(itemId, withdrawCount);
+    return;
+  }
+
+  assert(Boolean(vaultItem.rawItemJson), 'Cannot unvault: vault item has no item data');
+
+  const stackCount = vaultItem.stackCount ?? 1;
+  const isResourceStack = isResourceStackFromRawJson(vaultItem.rawItemJson, vaultItem.itemCode);
+  const unitsToWithdraw = withdrawCount ?? stackCount;
+  assert(unitsToWithdraw <= stackCount, 'withdrawCount exceeds the number of items in the stack');
+  assert(
+    isResourceStack || unitsToWithdraw === stackCount,
+    'Only rune and resource-stash stacks can be withdrawn partially',
+  );
+
+  assert(!unvaultsInFlight.has(itemId), 'This vault item is already being unvaulted');
+  unvaultsInFlight.add(itemId);
+  try {
+    await assertGameNotRunning();
+
+    // Write the item first, then update the vault: a failure in between leaves the item in both
+    // places (recoverable) instead of in neither.
+    await writeVaultItemToSaveFile(
+      vaultItem.rawItemJson,
+      targetOptions,
+      targetOptions.targetStashTab ??
+        (targetOptions.targetLocationContext === 'stash' ? 0 : undefined),
+      isResourceStack ? unitsToWithdraw : undefined,
+    );
+    grailDatabase.unvaultVaultItem(itemId, unitsToWithdraw);
+  } finally {
+    unvaultsInFlight.delete(itemId);
+  }
 }
 
 export function initializeVaultHandlers(
@@ -698,6 +856,17 @@ export function initializeVaultHandlers(
 
   ipcMain.handle('vault:removeItem', async (_, itemId: string): Promise<{ success: boolean }> => {
     assert(typeof itemId === 'string' && itemId.length > 0, 'itemId is required');
+
+    // A row that is still vaulted and was taken out of a save file is the only copy of that item.
+    const vaultItem = grailDatabase.getVaultItemById(itemId);
+    assert(
+      vaultItem == null ||
+        isGrailBookmark(vaultItem) ||
+        !vaultItem.sourceFilePath?.trim() ||
+        !isCurrentlyVaulted(vaultItem),
+      'Unvault this item before removing it from the vault',
+    );
+
     grailDatabase.removeVaultItem(itemId);
     return { success: true };
   });
@@ -716,34 +885,7 @@ export function initializeVaultHandlers(
         validateUnvaultTargetOptions(targetOptions);
       }
 
-      const resolvedWithdrawCount = resolveWithdrawCount(withdrawCount);
-
-      const vaultItem = grailDatabase.getVaultItemById(itemId);
-      const filePath = (targetOptions?.targetFilePath ?? vaultItem?.sourceFilePath)?.trim();
-      const fileType = targetOptions?.targetFileType ?? vaultItem?.sourceFileType;
-      const locationContext = targetOptions?.targetLocationContext ?? vaultItem?.locationContext;
-      const stashTab = targetOptions?.targetStashTab ?? vaultItem?.stashTab;
-
-      if (targetOptions !== undefined) {
-        assert(
-          vaultItem != null && Boolean(vaultItem.rawItemJson),
-          'Cannot unvault: vault item not found or has no item data',
-        );
-      }
-
-      if (filePath && vaultItem?.rawItemJson && fileType && locationContext) {
-        await writeVaultItemToSaveFile(
-          vaultItem.rawItemJson,
-          filePath,
-          fileType,
-          locationContext,
-          stashTab,
-          targetOptions?.targetGridX,
-          targetOptions?.targetGridY,
-        );
-      }
-
-      grailDatabase.unvaultVaultItem(itemId, resolvedWithdrawCount);
+      await unvaultVaultItemSafely(itemId, targetOptions, resolveWithdrawCount(withdrawCount));
       return { success: true };
     },
   );
@@ -843,6 +985,7 @@ export function initializeVaultHandlers(
     'inventory:moveItem',
     async (_, input: InventoryItemMoveInput): Promise<{ success: boolean }> => {
       const normalizedInput = normalizeInventoryMoveInput(input);
+      await assertGameNotRunning();
       await moveItemBetweenSaveFiles(normalizedInput);
       return { success: true };
     },
@@ -852,6 +995,7 @@ export function initializeVaultHandlers(
     'inventory:splitStack',
     async (_, input: InventoryStackSplitInput): Promise<{ success: boolean }> => {
       const normalizedInput = normalizeSplitStackInput(input);
+      await assertGameNotRunning();
       await splitStackInSaveFile(normalizedInput);
 
       return { success: true };

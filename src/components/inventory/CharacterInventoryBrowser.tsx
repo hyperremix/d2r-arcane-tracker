@@ -83,6 +83,7 @@ import {
 } from '@/lib/spriteIconCandidates';
 import { cn } from '@/lib/utils';
 import { useGrailStore } from '@/stores/grailStore';
+import { showInventoryOperationErrorToast } from './operationErrors';
 
 type InventorySearchAllResponse = {
   inventory: {
@@ -158,6 +159,29 @@ function canDropItemCodeInModernResourceTab(itemCode: string, stashTab: number):
   }
 
   return false;
+}
+
+function isResourceStackItemCode(itemCode: unknown): boolean {
+  const normalizedCode = normalizeResourceItemCode(itemCode);
+  return (
+    normalizedCode !== undefined &&
+    [MODERN_GEMS_TAB_INDEX, MODERN_MATERIALS_TAB_INDEX, MODERN_RUNES_TAB_INDEX].some((stashTab) =>
+      canDropItemCodeInModernResourceTab(normalizedCode, stashTab),
+    )
+  );
+}
+
+/**
+ * A grid cell holds a single rune/gem/material, so dropping a vaulted stack on a grid takes exactly
+ * one unit out of it (the rest stays vaulted). Withdrawing the whole stack into one cell would keep
+ * one unit and lose the others, so the backend refuses that.
+ */
+function resolveWithdrawCountForGridDrop(vaultItem: VaultItem | undefined): number | undefined {
+  if (!vaultItem || (vaultItem.stackCount ?? 1) <= 1) {
+    return undefined;
+  }
+
+  return isResourceStackItemCode(vaultItem.itemCode) ? 1 : undefined;
 }
 
 function resolveEquipValidationReasonTranslationKey(code: EquipValidationCode): string {
@@ -237,6 +261,10 @@ function showModernStashReadOnlyToast(
   t: (key: string, options?: Record<string, unknown>) => string,
 ): void {
   toast.error(t(translations.inventoryBrowser.modernStashReadOnlyError));
+}
+
+function isGrailBookmark(item: VaultItem): boolean {
+  return item.fingerprint.startsWith('grail:');
 }
 
 function isStashSourceFileType(sourceFileType: VaultSourceFileType): boolean {
@@ -1943,12 +1971,7 @@ function InventoryGridSection({
     const width = activeDimensions.gridWidth;
     const height = activeDimensions.gridHeight;
 
-    if (
-      x < 0 ||
-      y < 0 ||
-      x + width > renderedGridSize.columns ||
-      y + height > renderedGridSize.rows
-    ) {
+    if (x < 0 || y < 0 || x + width > gridSize.columns || y + height > gridSize.rows) {
       return { x, y, valid: false };
     }
 
@@ -1967,9 +1990,9 @@ function InventoryGridSection({
     activeInventoryDragItem,
     activeVaultDragItem,
     dragOverCell,
+    gridSize.columns,
+    gridSize.rows,
     items,
-    renderedGridSize.columns,
-    renderedGridSize.rows,
   ]);
 
   const handleDragOverBoard = useCallback(
@@ -2011,11 +2034,8 @@ function InventoryGridSection({
 
   const isDropOutOfBounds = useCallback(
     (dropX: number, dropY: number, width: number, height: number): boolean =>
-      dropX < 0 ||
-      dropY < 0 ||
-      dropX + width > renderedGridSize.columns ||
-      dropY + height > renderedGridSize.rows,
-    [renderedGridSize.columns, renderedGridSize.rows],
+      dropX < 0 || dropY < 0 || dropX + width > gridSize.columns || dropY + height > gridSize.rows,
+    [gridSize.columns, gridSize.rows],
   );
 
   const tryDropVaultItem = useCallback(
@@ -2640,6 +2660,9 @@ export function CharacterInventoryBrowser({
     undefined,
   );
   const [equipmentWeaponSet, setEquipmentWeaponSet] = useState<EquippedWeaponSet>('i');
+  // Only one save-file write may be in flight: a second drop/click while the first is still being
+  // written would act on stale positions and could place an item twice.
+  const isWriteInFlightRef = useRef(false);
   const draggingFingerprintRef = useRef<string | undefined>(undefined);
   const draggingVaultInputRef = useRef<VaultItemUpsertInput | undefined>(undefined);
   const latestSearchRequestRef = useRef(0);
@@ -2923,8 +2946,9 @@ export function CharacterInventoryBrowser({
     ? getEffectiveVaultPresent(selectedItem, vaultItemsByFingerprint, pendingVaultFingerprints)
     : undefined;
 
+  // Grail bookmarks are tracker bookmarks, not items: they must not show up as draggable vault tiles.
   const vaultItems = useMemo(
-    () => inventoryResponse?.vault.items ?? [],
+    () => (inventoryResponse?.vault.items ?? []).filter((item) => !isGrailBookmark(item)),
     [inventoryResponse?.vault.items],
   );
 
@@ -2959,10 +2983,12 @@ export function CharacterInventoryBrowser({
         return;
       }
       console.error('Failed to unvault item', error);
+      showInventoryOperationErrorToast(error, t);
+      await loadInventorySearch();
     } finally {
       setIsUnvaulting(false);
     }
-  }, [selectedVaultItemId, isUnvaulting, reloadInventoryAfterSaveWrite, t]);
+  }, [selectedVaultItemId, isUnvaulting, loadInventorySearch, reloadInventoryAfterSaveWrite, t]);
 
   const characterOptions = useMemo(() => {
     const options = new Map<string, string>();
@@ -2997,6 +3023,8 @@ export function CharacterInventoryBrowser({
           return;
         }
         console.error('Failed to vault inventory item', error);
+        showInventoryOperationErrorToast(error, t);
+        await reloadInventoryAfterSaveWrite();
       } finally {
         setPendingVaultFingerprints((previous) => {
           if (!previous.has(itemInput.fingerprint)) {
@@ -3010,7 +3038,7 @@ export function CharacterInventoryBrowser({
         setIsVaulting(false);
       }
     },
-    [isVaulting, loadInventorySearch, t],
+    [isVaulting, loadInventorySearch, reloadInventoryAfterSaveWrite, t],
   );
 
   const handleCardDragStart = (event: DragEvent<HTMLButtonElement>, item: ParsedInventoryItem) => {
@@ -3135,6 +3163,11 @@ export function CharacterInventoryBrowser({
         return;
       }
 
+      if (isWriteInFlightRef.current) {
+        return;
+      }
+      isWriteInFlightRef.current = true;
+
       try {
         await window.electronAPI.inventory.moveItem({
           sourceFilePath: inventoryItem.sourceFilePath,
@@ -3166,6 +3199,10 @@ export function CharacterInventoryBrowser({
         }
 
         console.error('Failed to move inventory item', error);
+        showInventoryOperationErrorToast(error, t);
+        await reloadInventoryAfterSaveWrite();
+      } finally {
+        isWriteInFlightRef.current = false;
       }
     },
     [reloadInventoryAfterSaveWrite, t],
@@ -3216,15 +3253,28 @@ export function CharacterInventoryBrowser({
       targetGridX: number,
       targetGridY: number,
     ) => {
+      if (isWriteInFlightRef.current) {
+        return;
+      }
+      isWriteInFlightRef.current = true;
+
       try {
-        await window.electronAPI.vault.unvaultItem(vaultItemId, {
+        const withdrawCount = resolveWithdrawCountForGridDrop(
+          vaultItems.find((item) => item.id === vaultItemId),
+        );
+        const target = {
           targetFilePath,
           targetFileType,
           targetLocationContext,
           targetStashTab,
           targetGridX,
           targetGridY,
-        });
+        };
+        if (withdrawCount === undefined) {
+          await window.electronAPI.vault.unvaultItem(vaultItemId, target);
+        } else {
+          await window.electronAPI.vault.unvaultItem(vaultItemId, target, withdrawCount);
+        }
         setDraggingVaultItem(null);
         setCrossWindowVaultDragItem(null);
         await reloadInventoryAfterSaveWrite();
@@ -3234,9 +3284,13 @@ export function CharacterInventoryBrowser({
           return;
         }
         console.error('Failed to unvault item to target', error);
+        showInventoryOperationErrorToast(error, t);
+        await reloadInventoryAfterSaveWrite();
+      } finally {
+        isWriteInFlightRef.current = false;
       }
     },
-    [reloadInventoryAfterSaveWrite, t],
+    [reloadInventoryAfterSaveWrite, t, vaultItems],
   );
 
   const clearSynchronizedStackPickup = useCallback((pickupItem: ActiveInventoryDragItem): void => {
@@ -3320,6 +3374,11 @@ export function CharacterInventoryBrowser({
         return;
       }
 
+      if (isWriteInFlightRef.current) {
+        return;
+      }
+      isWriteInFlightRef.current = true;
+
       try {
         await window.electronAPI.inventory.splitStack({
           sourceFilePath: effectivePickupState.sourceFilePath,
@@ -3369,6 +3428,10 @@ export function CharacterInventoryBrowser({
           return;
         }
         console.error('Failed to split stack', error);
+        showInventoryOperationErrorToast(error, t);
+        await reloadInventoryAfterSaveWrite();
+      } finally {
+        isWriteInFlightRef.current = false;
       }
     },
     [

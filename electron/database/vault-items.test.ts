@@ -6,6 +6,7 @@ import type { DatabaseContext } from './types';
 import { addVaultCategory, setVaultItemCategories } from './vault-categories';
 import {
   addVaultItem,
+  addVaultItemWithUndo,
   getVaultItemById,
   reconcileVaultItemsForScan,
   searchVaultItems,
@@ -729,5 +730,236 @@ describe('When vault item database operations are executed', () => {
       expect(expandedInventoryRow.grid_width).toBe(1);
       expect(expandedInventoryRow.grid_height).toBe(3);
     });
+  });
+});
+
+describe('When vault adds could overwrite or lose already vaulted items', () => {
+  let ctx: DatabaseContext;
+
+  beforeEach(() => {
+    ctx = createTestContext();
+  });
+
+  const baseInput = {
+    itemName: 'Harlequin Crest',
+    quality: 'unique',
+    ethereal: false,
+    sourceFileType: 'd2s' as const,
+    sourceFilePath: '/saves/Sorc.d2s',
+    locationContext: 'inventory' as const,
+  };
+
+  describe('If a different item with the same fingerprint is vaulted while the first is still vaulted', () => {
+    it('Then both items are kept in separate rows', () => {
+      // Arrange
+      const first = addVaultItem(ctx, {
+        ...baseInput,
+        fingerprint: 'fp-shared',
+        rawItemJson: '{"id":1,"roll":"first"}',
+      });
+
+      // Act
+      const second = addVaultItem(ctx, {
+        ...baseInput,
+        fingerprint: 'fp-shared',
+        rawItemJson: '{"id":2,"roll":"second"}',
+      });
+
+      // Assert
+      expect(second.id).not.toBe(first.id);
+      expect(getVaultItemById(ctx, first.id)?.rawItemJson).toBe('{"id":1,"roll":"first"}');
+      expect(second.rawItemJson).toBe('{"id":2,"roll":"second"}');
+      expect(searchVaultItems(ctx, { vaultedState: 'vaulted' }).total).toBe(2);
+    });
+  });
+
+  describe('If a stack merge is undone after the source removal failed', () => {
+    it('Then the previously vaulted stack keeps its count and stays vaulted', () => {
+      // Arrange
+      const existing = addVaultItem(ctx, {
+        ...baseInput,
+        fingerprint: 'fp-runes-1',
+        itemName: 'Fal Rune',
+        itemCode: 'r19',
+        rawItemJson: JSON.stringify({ code: 'r19', magic_attributes: [{ id: 381, values: [10] }] }),
+      });
+      const result = addVaultItemWithUndo(ctx, {
+        ...baseInput,
+        fingerprint: 'fp-runes-2',
+        itemName: 'Fal Rune',
+        itemCode: 'r19',
+        rawItemJson: JSON.stringify({ code: 'r19', magic_attributes: [{ id: 381, values: [4] }] }),
+      });
+      expect(result.item.stackCount).toBe(14);
+
+      // Act
+      result.undo();
+
+      // Assert
+      const restored = getVaultItemById(ctx, existing.id);
+      expect(restored?.stackCount).toBe(10);
+      expect(restored?.unvaultedAt).toBeUndefined();
+      expect(searchVaultItems(ctx, { vaultedState: 'vaulted' }).total).toBe(1);
+    });
+  });
+
+  describe('If an add that replaced a previously unvaulted row is undone', () => {
+    it('Then the old row data is restored', () => {
+      // Arrange
+      const first = addVaultItem(ctx, {
+        ...baseInput,
+        fingerprint: 'fp-reused',
+        rawItemJson: '{"id":1,"roll":"old"}',
+      });
+      unvaultVaultItem(ctx, first.id);
+      const result = addVaultItemWithUndo(ctx, {
+        ...baseInput,
+        fingerprint: 'fp-reused',
+        rawItemJson: '{"id":1,"roll":"new"}',
+      });
+
+      // Act
+      result.undo();
+
+      // Assert
+      const restored = getVaultItemById(ctx, first.id);
+      expect(restored?.rawItemJson).toBe('{"id":1,"roll":"old"}');
+      expect(searchVaultItems(ctx, { vaultedState: 'vaulted' }).total).toBe(0);
+    });
+  });
+
+  describe('If a brand-new add is undone', () => {
+    it('Then the row keeps its item data but is no longer vaulted', () => {
+      // Arrange
+      const result = addVaultItemWithUndo(ctx, {
+        ...baseInput,
+        fingerprint: 'fp-new',
+        rawItemJson: '{"id":7}',
+      });
+
+      // Act
+      result.undo();
+
+      // Assert
+      const row = getVaultItemById(ctx, result.item.id);
+      expect(row?.rawItemJson).toBe('{"id":7}');
+      expect(searchVaultItems(ctx, { vaultedState: 'vaulted' }).total).toBe(0);
+    });
+  });
+
+  describe('If natively stackable items with a quantity are vaulted', () => {
+    it('Then they get their own rows instead of merging beyond the game stack limit', () => {
+      // Arrange
+      const keys = (fingerprint: string) => ({
+        ...baseInput,
+        fingerprint,
+        itemName: 'Key',
+        itemCode: 'key',
+        rawItemJson: JSON.stringify({ code: 'key', quantity: 12 }),
+      });
+
+      // Act
+      const first = addVaultItem(ctx, keys('fp-key-1'));
+      const second = addVaultItem(ctx, keys('fp-key-2'));
+
+      // Assert
+      expect(second.id).not.toBe(first.id);
+      expect(first.stackCount).toBe(12);
+      expect(second.stackCount).toBe(12);
+    });
+  });
+
+  describe('If a rune is vaulted while a grail bookmark exists for the same code', () => {
+    it('Then the rune is not merged into the bookmark', () => {
+      // Arrange
+      const bookmark = addVaultItem(ctx, {
+        fingerprint: 'grail:fal',
+        itemName: 'Fal Rune',
+        itemCode: 'r19',
+        quality: 'normal',
+        ethereal: false,
+        rawItemJson: '{"id":"fal"}',
+        sourceFileType: 'd2s',
+        locationContext: 'unknown',
+      });
+
+      // Act
+      const rune = addVaultItem(ctx, {
+        ...baseInput,
+        fingerprint: 'fp-fal',
+        itemName: 'Fal Rune',
+        itemCode: 'r19',
+        rawItemJson: JSON.stringify({ code: 'r19' }),
+      });
+
+      // Assert
+      expect(rune.id).not.toBe(bookmark.id);
+      expect(getVaultItemById(ctx, bookmark.id)?.stackCount).toBe(1);
+    });
+  });
+
+  describe('If a gem stack and a gem of the same code are vaulted', () => {
+    it('Then their counts are summed in a single row', () => {
+      // Arrange
+      const gem = (fingerprint: string, quantity: number) => ({
+        ...baseInput,
+        fingerprint,
+        itemName: 'Perfect Skull',
+        itemCode: 'skz',
+        rawItemJson: JSON.stringify({ code: 'skz', quantity }),
+      });
+
+      // Act
+      const first = addVaultItem(ctx, gem('fp-skz-1', 6));
+      const second = addVaultItem(ctx, gem('fp-skz-2', 1));
+
+      // Assert
+      expect(second.id).toBe(first.id);
+      expect(second.stackCount).toBe(7);
+    });
+  });
+
+  describe('If unvaultVaultItem receives an invalid withdraw count', () => {
+    it('Then it throws instead of growing or ignoring the stack', () => {
+      // Arrange
+      const saved = addVaultItem(ctx, {
+        ...baseInput,
+        fingerprint: 'fp-rune-withdraw',
+        itemCode: 'r07',
+        rawItemJson: JSON.stringify({ code: 'r07', magic_attributes: [{ id: 381, values: [5] }] }),
+      });
+
+      // Act & Assert
+      expect(() => unvaultVaultItem(ctx, saved.id, -2)).toThrow('positive integer');
+      expect(() => unvaultVaultItem(ctx, saved.id, 0)).toThrow('positive integer');
+      expect(getVaultItemById(ctx, saved.id)?.stackCount).toBe(5);
+    });
+  });
+});
+
+describe('When a stack merge is undone after another merge landed in the same row', () => {
+  it('Then only the undone units are taken out and the other merge survives', () => {
+    // Arrange
+    const ctx = createTestContext();
+    const base = {
+      itemName: 'Fal Rune',
+      itemCode: 'r19',
+      quality: 'normal',
+      ethereal: false,
+      sourceFileType: 'd2i' as const,
+      sourceFilePath: '/saves/shared.d2i',
+      locationContext: 'stash' as const,
+    };
+    const rune = (count: number) =>
+      JSON.stringify({ code: 'r19', magic_attributes: [{ id: 381, values: [count] }] });
+    const row = addVaultItem(ctx, { ...base, fingerprint: 'fp-a', rawItemJson: rune(10) });
+    const first = addVaultItemWithUndo(ctx, { ...base, fingerprint: 'fp-b', rawItemJson: rune(4) });
+    addVaultItemWithUndo(ctx, { ...base, fingerprint: 'fp-c', rawItemJson: rune(3) });
+
+    // Act
+    first.undo();
+
+    // Assert
+    expect(getVaultItemById(ctx, row.id)?.stackCount).toBe(13);
   });
 });

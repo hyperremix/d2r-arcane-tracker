@@ -34,6 +34,7 @@ import {
 } from '@/lib/spriteIconCandidates';
 import { cn } from '@/lib/utils';
 import { useGrailStore } from '@/stores/grailStore';
+import { showInventoryOperationErrorToast } from './operationErrors';
 
 const VAULT_DRAG_STATE_CHANNEL = 'inventory:vault-drag-state';
 const INVENTORY_DRAG_STATE_CHANNEL = 'inventory:item-drag-state';
@@ -489,8 +490,12 @@ export function InventoryBrowserMain() {
     };
   }, [resetSnapshotHoverSession]);
 
+  // Grail bookmarks are tracker bookmarks, not items: they must not show up as vault tiles.
   const vaultItems = useMemo(
-    () => inventoryResponse?.vault.items ?? [],
+    () =>
+      (inventoryResponse?.vault.items ?? []).filter(
+        (item) => !item.fingerprint.startsWith('grail:'),
+      ),
     [inventoryResponse?.vault.items],
   );
 
@@ -560,10 +565,12 @@ export function InventoryBrowserMain() {
       await reloadInventoryAfterSaveWrite();
     } catch (error) {
       console.error('Failed to unvault item', error);
+      showInventoryOperationErrorToast(error, t);
+      await loadInventorySearch();
     } finally {
       setIsUnvaulting(false);
     }
-  }, [isUnvaulting, reloadInventoryAfterSaveWrite, selectedVaultItemId]);
+  }, [isUnvaulting, loadInventorySearch, reloadInventoryAfterSaveWrite, selectedVaultItemId, t]);
 
   const vaultItem = useCallback(
     async (itemInput: VaultItemUpsertInput): Promise<void> => {
@@ -578,12 +585,13 @@ export function InventoryBrowserMain() {
         await loadInventorySearch();
       } catch (error) {
         console.error('Failed to vault inventory item', error);
+        showInventoryOperationErrorToast(error, t);
         await loadInventorySearch();
       } finally {
         setIsVaulting(false);
       }
     },
-    [isVaulting, loadInventorySearch],
+    [isVaulting, loadInventorySearch, t],
   );
 
   const handleVaultDrop = useCallback(

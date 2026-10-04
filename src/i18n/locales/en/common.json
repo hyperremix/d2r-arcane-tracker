@@ -782,6 +782,14 @@
     "dragToVault": "Drag to vault dropzone",
     "vaultedItems": "Vaulted Items",
     "modernStashReadOnlyError": "Modern shared stash is read-only in this version.",
+    "operationErrors": {
+      "gameRunning": "Close Diablo II: Resurrected first. The game would overwrite the change and the item could be lost. Nothing was changed.",
+      "targetOccupied": "That spot is occupied by another item. Nothing was changed.",
+      "stackNeedsSplit": "A stack can only be moved with its tab. Pick the stack up and place the items one by one. Nothing was changed.",
+      "unvaultNeedsPosition": "Drag the vaulted item onto a free spot in the inventory or stash to take it out of the vault.",
+      "itemChanged": "The save file changed since the last scan. The view was refreshed, please try again. Nothing was changed.",
+      "failed": "The operation failed. Nothing was lost; the view was refreshed."
+    },
     "stackPickup": {
       "placed": "{{count}} item(s) placed.",
       "partialPlace": "Only {{placed}} of {{total}} items could be placed.",

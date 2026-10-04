@@ -665,7 +665,9 @@ export interface ElectronAPI {
         targetStashTab?: number
         targetGridX: number
         targetGridY: number
+        targetEquippedSlotId?: number
       },
+      withdrawCount?: number,
     ): Promise<{ success: boolean }>
   }
 

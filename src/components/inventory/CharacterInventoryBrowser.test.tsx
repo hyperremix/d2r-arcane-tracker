@@ -498,7 +498,7 @@ describe('When CharacterInventoryBrowser is rendered', () => {
         expect(screen.getByText('Selected Item')).toBeInTheDocument();
       });
 
-      const stashBoard = screen.getByTestId('stash-board-stash-snap-0');
+      const stashBoard = await screen.findByTestId('stash-board-stash-snap-0');
       expect(within(stashBoard).getAllByTestId('stash-board-stash-snap-0-cell')).toHaveLength(140);
       expect(within(stashBoard).getAllByTestId('inventory-item-tile')).toHaveLength(2);
       expect(screen.queryByTestId('stash-board-stash-snap-0-raw-overflow')).not.toBeInTheDocument();
@@ -4119,6 +4119,117 @@ describe('When CharacterInventoryBrowser is rendered', () => {
       });
       expect(refreshSaveFilesMock).not.toHaveBeenCalled();
       expect(searchAllMock).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('If a vaulted rune stack is dropped on an inventory board', () => {
+    it('Then exactly one rune is withdrawn so the rest of the stack stays vaulted', async () => {
+      // Arrange
+      const getComputedStyleSpy = vi
+        .spyOn(window, 'getComputedStyle')
+        .mockReturnValue({ getPropertyValue: () => '28' } as unknown as CSSStyleDeclaration);
+      searchAllMock.mockResolvedValue({
+        inventory: {
+          snapshots: [
+            {
+              snapshotId: 'rune-drop-snap',
+              characterName: 'Sorc',
+              characterId: 'char-1',
+              sourceFileType: 'd2s',
+              sourceFilePath: '/tmp/sorc.d2s',
+              capturedAt: new Date('2024-01-01T00:00:00.000Z'),
+              items: [
+                {
+                  fingerprint: 'fp-anchor',
+                  fingerprintInputs: {
+                    sourceFileType: 'd2s',
+                    characterName: 'Sorc',
+                    locationContext: 'inventory',
+                    quality: 'unique',
+                    ethereal: false,
+                    socketCount: 0,
+                    gridX: 8,
+                    gridY: 0,
+                    gridWidth: 1,
+                    gridHeight: 1,
+                    isSocketedItem: false,
+                    itemName: 'Anchor Item',
+                  },
+                  characterName: 'Sorc',
+                  characterId: 'char-1',
+                  sourceFileType: 'd2s',
+                  sourceFilePath: '/tmp/sorc.d2s',
+                  locationContext: 'inventory',
+                  type: 'unique',
+                  gridX: 8,
+                  gridY: 0,
+                  gridWidth: 1,
+                  gridHeight: 1,
+                  isSocketedItem: false,
+                  itemName: 'Anchor Item',
+                  quality: 'unique',
+                  ethereal: false,
+                  socketCount: 0,
+                  rawItemJson: '{}',
+                  rawParsedItem: {},
+                  seenAt: new Date('2024-01-01T00:00:00.000Z'),
+                },
+              ],
+            },
+          ],
+          totalSnapshots: 1,
+          totalItems: 1,
+        },
+        vault: {
+          items: [
+            {
+              id: 'vault-rune-stack',
+              fingerprint: 'fp-vault-rune-stack',
+              itemName: 'Fal Rune',
+              itemCode: 'r19',
+              quality: 'normal',
+              ethereal: false,
+              stackCount: 5,
+              rawItemJson: '{"code":"r19"}',
+              sourceFileType: 'd2i',
+              sourceFilePath: '/tmp/shared.d2i',
+              locationContext: 'stash',
+              isSocketedItem: false,
+              isPresentInLatestScan: false,
+              vaultedAt: new Date('2024-01-01T00:00:00.000Z'),
+              created: new Date('2024-01-01T00:00:00.000Z'),
+              lastUpdated: new Date('2024-01-01T00:00:00.000Z'),
+            },
+          ],
+          total: 1,
+          page: 1,
+          pageSize: 20,
+        },
+      });
+      unvaultItemMock.mockResolvedValue({ success: true });
+
+      render(<CharacterInventoryBrowser />);
+      const inventoryBoard = await screen.findByTestId('inventory-board-rune-drop-snap');
+      const dataTransfer = {
+        getData: (format: string) =>
+          format === 'text/plain'
+            ? serializeVaultTextPayload({ id: 'vault-rune-stack', gridWidth: 1, gridHeight: 1 })
+            : '',
+      };
+
+      // Act
+      fireEvent.dragOver(inventoryBoard, { dataTransfer, clientX: 12, clientY: 12 });
+      fireEvent.drop(inventoryBoard, { dataTransfer, clientX: 12, clientY: 12 });
+
+      // Assert
+      await waitFor(() => {
+        expect(unvaultItemMock).toHaveBeenCalledWith(
+          'vault-rune-stack',
+          expect.objectContaining({ targetFilePath: '/tmp/sorc.d2s' }),
+          1,
+        );
+      });
+      getComputedStyleSpy.mockRestore();
     });
   });
 });

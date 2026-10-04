@@ -29,9 +29,15 @@ interface ItemDetailsDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 
+const GRAIL_BOOKMARK_PREFIX = 'grail:';
+
+function toGrailBookmarkFingerprint(item: Item): string {
+  return `${GRAIL_BOOKMARK_PREFIX}${item.id}`;
+}
+
 function toVaultUpsertInput(item: Item): VaultItemUpsertInput {
   return {
-    fingerprint: `grail:${item.id}`,
+    fingerprint: toGrailBookmarkFingerprint(item),
     itemName: item.name,
     itemCode: item.code,
     type: item.type,
@@ -46,8 +52,10 @@ function toVaultUpsertInput(item: Item): VaultItemUpsertInput {
   };
 }
 
+// Only the bookmark created by this dialog may be linked (and later deleted). Real vaulted items
+// carry the same grailItemId, but their vault row is the only copy of that item.
 function findLinkedVaultItem(vaultItems: VaultItem[], item: Item): VaultItem | undefined {
-  return vaultItems.find((vaultItem) => vaultItem.grailItemId === item.id);
+  return vaultItems.find((vaultItem) => vaultItem.fingerprint === toGrailBookmarkFingerprint(item));
 }
 
 /**
