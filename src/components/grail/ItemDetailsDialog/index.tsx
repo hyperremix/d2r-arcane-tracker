@@ -102,9 +102,7 @@ export function ItemDetailsDialog({ itemId, open, onOpenChange }: ItemDetailsDia
                     }
                   }}
                 />
-                {isLoading && (
-                  <div className="absolute inset-0 animate-pulse rounded bg-gray-200 dark:bg-gray-700" />
-                )}
+                {isLoading && <div className="absolute inset-0 animate-pulse rounded bg-muted" />}
               </div>
             ) : null}
 

@@ -2,6 +2,7 @@ import dayjs from 'dayjs';
 import { AlertTriangle, Database, Download, Upload } from 'lucide-react';
 import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -193,7 +194,7 @@ export function DatabaseCard() {
             <Download className="h-4 w-4" />
             <h3 className="font-medium text-sm">{t(translations.settings.database.backup)}</h3>
           </div>
-          <p className="text-gray-600 text-xs">
+          <p className="text-muted-foreground text-xs">
             {t(translations.settings.database.backupDescription)}
           </p>
           <Button onClick={handleBackup} disabled={isBackingUp} size="sm" className="gap-2">
@@ -203,7 +204,7 @@ export function DatabaseCard() {
               : t(translations.settings.database.backupDatabase)}
           </Button>
           {lastBackupPath && (
-            <p className="text-green-600 text-xs">
+            <p className="text-success text-xs">
               {t(translations.settings.database.lastBackup, {
                 filename: lastBackupPath.split('/').pop(),
               })}
@@ -217,7 +218,7 @@ export function DatabaseCard() {
             <Upload className="h-4 w-4" />
             <h3 className="font-medium text-sm">{t(translations.settings.database.restore)}</h3>
           </div>
-          <p className="text-gray-600 text-xs dark:text-gray-400">
+          <p className="text-muted-foreground text-xs">
             {t(translations.settings.database.restoreDescription)}
           </p>
 
@@ -226,39 +227,39 @@ export function DatabaseCard() {
             type="button"
             className={`w-full rounded-lg border-2 border-dashed p-4 text-center transition-colors ${
               isDragOver
-                ? 'border-blue-400 bg-blue-50'
-                : 'border-gray-300 hover:border-gray-400 dark:border-gray-700 dark:hover:border-gray-500'
+                ? 'border-primary bg-primary/10'
+                : 'border-border hover:border-muted-foreground'
             }`}
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}
             onClick={handleFileSelect}
           >
-            <Upload className="mx-auto mb-2 h-8 w-8 text-gray-400" />
-            <p className="text-gray-600 text-sm dark:text-gray-400">
+            <Upload className="mx-auto mb-2 h-8 w-8 text-muted-foreground" />
+            <p className="text-muted-foreground text-sm">
               {t(translations.settings.database.dropzoneText)}{' '}
-              <span className="text-blue-600 underline hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-200">
+              <span className="text-primary underline hover:text-primary/80">
                 {t(translations.settings.database.clickToBrowse)}
               </span>
             </p>
-            <p className="text-gray-500 text-xs dark:text-gray-400">
+            <p className="text-muted-foreground text-xs">
               {t(translations.settings.database.supportsDbFiles)}
             </p>
           </button>
 
           {/* Error/Success Messages */}
           {restoreError && (
-            <div className="rounded-lg bg-red-50 p-3">
-              <p className="text-red-800 text-xs dark:text-red-200">{restoreError}</p>
-            </div>
+            <Alert variant="destructive" className="border-destructive/30 bg-destructive/10">
+              <AlertDescription className="text-xs">{restoreError}</AlertDescription>
+            </Alert>
           )}
 
           {restoreSuccess && (
-            <div className="rounded-lg bg-green-50 p-3">
-              <p className="text-green-800 text-xs dark:text-green-200">
+            <Alert className="border-success/30 bg-success/10">
+              <AlertDescription className="text-success text-xs">
                 {t(translations.settings.database.restoreSuccess)}
-              </p>
-            </div>
+              </AlertDescription>
+            </Alert>
           )}
         </div>
 
@@ -267,14 +268,14 @@ export function DatabaseCard() {
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle className="flex items-center gap-2">
-                <AlertTriangle className="h-5 w-5 text-orange-500" />
+                <AlertTriangle className="h-5 w-5 text-warning" />
                 {t(translations.settings.database.restoreDatabase)}
               </AlertDialogTitle>
               <AlertDialogDescription>
                 <span className="mb-2 block">
                   {t(translations.settings.database.confirmRestore)}
                 </span>
-                <span className="mb-2 block font-medium text-orange-600">
+                <span className="mb-2 block font-medium text-warning">
                   ⚠️ {t(translations.settings.database.replaceWarning)}
                 </span>
                 <span className="block text-sm">
@@ -289,7 +290,7 @@ export function DatabaseCard() {
               <AlertDialogAction
                 onClick={handleRestore}
                 disabled={isRestoring}
-                className="bg-orange-600 hover:bg-orange-700"
+                variant="destructive"
               >
                 {isRestoring
                   ? t(translations.settings.database.restoring)

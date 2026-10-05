@@ -74,8 +74,8 @@ export function GameVersionStep() {
           </Select>
         </div>
 
-        <div className="rounded-lg bg-blue-50 p-4 dark:bg-blue-950">
-          <p className="text-blue-800 text-sm dark:text-blue-200">
+        <div className="rounded-lg bg-info/10 p-4">
+          <p className="text-info text-sm">
             <strong>Note:</strong> The game version setting affects item detection compatibility and
             may influence which save file formats are supported. Make sure to select the version
             that matches your Diablo II installation.

@@ -29,7 +29,7 @@ export function ReportIssues() {
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="space-y-3">
-          <p className="text-gray-600 text-sm dark:text-gray-400">
+          <p className="text-muted-foreground text-sm">
             {t(translations.settings.reportIssues.description)}
           </p>
           <Button onClick={handleOpenIssues} size="sm" className="gap-2">

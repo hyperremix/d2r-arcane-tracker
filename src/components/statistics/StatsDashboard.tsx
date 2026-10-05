@@ -35,19 +35,19 @@ export const StatsDashboard = memo(function StatsDashboard() {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="font-medium text-gray-600 text-sm">
+                <p className="font-medium text-muted-foreground text-sm">
                   {t(translations.statistics.dashboard.totalProgress)}
                 </p>
                 <p className="font-bold text-2xl">
                   {stats.foundItems}/{stats.totalItems}
                 </p>
-                <p className="text-gray-500 text-xs">
+                <p className="text-muted-foreground text-xs">
                   {t(translations.statistics.dashboard.complete, {
                     percentage: stats.completionPercentage.toFixed(1),
                   })}
                 </p>
               </div>
-              <Trophy className="h-8 w-8 text-yellow-500" />
+              <Trophy className="h-8 w-8 text-item-unique" />
             </div>
           </CardContent>
         </Card>
@@ -56,15 +56,15 @@ export const StatsDashboard = memo(function StatsDashboard() {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="font-medium text-gray-600 text-sm">
+                <p className="font-medium text-muted-foreground text-sm">
                   {t(translations.statistics.dashboard.recentFinds)}
                 </p>
-                <p className="font-bold text-2xl text-green-600">{stats.recentFinds}</p>
-                <p className="text-gray-500 text-xs">
+                <p className="font-bold text-2xl text-success">{stats.recentFinds}</p>
+                <p className="text-muted-foreground text-xs">
                   {t(translations.statistics.dashboard.last7Days)}
                 </p>
               </div>
-              <TrendingUp className="h-8 w-8 text-green-500" />
+              <TrendingUp className="h-8 w-8 text-success" />
             </div>
           </CardContent>
         </Card>
@@ -73,15 +73,15 @@ export const StatsDashboard = memo(function StatsDashboard() {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="font-medium text-gray-600 text-sm">
+                <p className="font-medium text-muted-foreground text-sm">
                   {t(translations.statistics.dashboard.currentStreak)}
                 </p>
-                <p className="font-bold text-2xl text-blue-600">{stats.currentStreak}</p>
-                <p className="text-gray-500 text-xs">
+                <p className="font-bold text-2xl text-info">{stats.currentStreak}</p>
+                <p className="text-muted-foreground text-xs">
                   {t(translations.statistics.dashboard.maxStreak, { count: stats.maxStreak })}
                 </p>
               </div>
-              <Zap className="h-8 w-8 text-blue-500" />
+              <Zap className="h-8 w-8 text-info" />
             </div>
           </CardContent>
         </Card>
@@ -90,17 +90,17 @@ export const StatsDashboard = memo(function StatsDashboard() {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="font-medium text-gray-600 text-sm">
+                <p className="font-medium text-muted-foreground text-sm">
                   {t(translations.statistics.dashboard.avgPerDay)}
                 </p>
-                <p className="font-bold text-2xl text-purple-600">
+                <p className="font-bold text-2xl text-chart-4">
                   {stats.averageItemsPerDay.toFixed(1)}
                 </p>
-                <p className="text-gray-500 text-xs">
+                <p className="text-muted-foreground text-xs">
                   {t(translations.statistics.dashboard.recentAverage)}
                 </p>
               </div>
-              <Target className="h-8 w-8 text-purple-500" />
+              <Target className="h-8 w-8 text-chart-4" />
             </div>
           </CardContent>
         </Card>
@@ -118,7 +118,7 @@ export const StatsDashboard = memo(function StatsDashboard() {
           {stats.lastFind && lastFindItem ? (
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <span className="text-gray-600 text-sm">
+                <span className="text-muted-foreground text-sm">
                   {t(translations.statistics.dashboard.lastFind)}
                 </span>
                 <span className="font-medium text-sm">
@@ -136,7 +136,7 @@ export const StatsDashboard = memo(function StatsDashboard() {
               />
             </div>
           ) : (
-            <p className="text-gray-500 text-sm">
+            <p className="text-muted-foreground text-sm">
               {t(translations.statistics.dashboard.noItemsFoundYet)}
             </p>
           )}
@@ -194,16 +194,15 @@ export const StatsDashboard = memo(function StatsDashboard() {
             <CardContent>
               <div className="space-y-3">
                 {stats.characterStats.map((charStat, index) => (
-                  <div
-                    key={charStat.character.id}
-                    className="rounded-lg border border-gray-200 p-3"
-                  >
+                  <div key={charStat.character.id} className="rounded-lg border border-border p-3">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
-                        <span className="font-bold text-gray-400 text-lg">#{index + 1}</span>
+                        <span className="font-bold text-lg text-muted-foreground">
+                          #{index + 1}
+                        </span>
                         <div>
                           <div className="font-medium">{charStat.character.name}</div>
-                          <div className="text-gray-600 text-sm">
+                          <div className="text-muted-foreground text-sm">
                             {charStat.character.characterClass} • Level {charStat.character.level}
                           </div>
                         </div>
@@ -214,7 +213,7 @@ export const StatsDashboard = memo(function StatsDashboard() {
                             count: charStat.totalFound,
                           })}
                         </div>
-                        <div className="text-gray-600 text-sm">
+                        <div className="text-muted-foreground text-sm">
                           {t(translations.statistics.dashboard.recentLabel, {
                             count: charStat.recentFinds,
                           })}

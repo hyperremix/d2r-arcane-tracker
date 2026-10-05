@@ -189,8 +189,8 @@ export function RunTrackerSettings() {
         </div>
 
         {/* Information Box */}
-        <div className="rounded-lg bg-blue-50 p-3 dark:bg-blue-950">
-          <p className="text-blue-800 text-xs dark:text-blue-200">
+        <div className="rounded-lg bg-info/10 p-3">
+          <p className="text-info text-xs">
             <strong>{t(translations.settings.runTracker.runTracking)}</strong>
             <br />• {t(translations.settings.runTracker.infoAutoMode)}
             <br />• {t(translations.settings.runTracker.infoRequires)}

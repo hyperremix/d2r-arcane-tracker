@@ -117,7 +117,7 @@ export function ItemIconSettings() {
               <Label htmlFor={itemIconsSwitchId} className="font-medium text-sm">
                 {t(translations.settings.itemIcons.showItemIcons)}
               </Label>
-              <p className="text-gray-600 text-xs dark:text-gray-400">
+              <p className="text-muted-foreground text-xs">
                 {t(translations.settings.itemIcons.showItemIconsDescription)}
               </p>
             </div>
@@ -130,9 +130,9 @@ export function ItemIconSettings() {
 
           {/* Validation Status */}
           {validationStatus.valid ? (
-            <Alert className="border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950">
-              <CheckCircle className="h-4 w-4 text-green-600" />
-              <AlertDescription className="text-green-800 dark:text-green-200">
+            <Alert className="border-success/30 bg-success/10">
+              <CheckCircle className="h-4 w-4 text-success" />
+              <AlertDescription className="text-success">
                 <strong>✓ {t(translations.settings.itemIcons.pathValid)}</strong>
                 <br />
                 {t(translations.settings.itemIcons.gameFilesFoundAt)}{' '}
@@ -140,12 +140,12 @@ export function ItemIconSettings() {
               </AlertDescription>
             </Alert>
           ) : (
-            <Alert className="border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950">
-              <AlertCircle className="h-4 w-4 text-red-600" />
-              <AlertTitle className="font-bold text-red-800 dark:text-red-200">
+            <Alert className="border-destructive/30 bg-destructive/10">
+              <AlertCircle className="h-4 w-4 text-destructive" />
+              <AlertTitle className="font-bold text-destructive">
                 {t(translations.common.error)}
               </AlertTitle>
-              <AlertDescription className="space-y-2 text-red-800 dark:text-red-200">
+              <AlertDescription className="space-y-2 text-destructive">
                 <p>
                   {validationStatus.error || t(translations.settings.itemIcons.pathNotConfigured)}
                 </p>
@@ -166,7 +166,7 @@ export function ItemIconSettings() {
                             href="https://www.hiveworkshop.com/threads/ladiks-casc-viewer.331540/"
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="underline hover:text-red-950 dark:hover:text-red-50"
+                            className="underline hover:text-destructive/80"
                           >
                             {t(translations.settings.itemIcons.ladiksCascViewer)}
                           </a>
@@ -215,7 +215,7 @@ export function ItemIconSettings() {
             {isConverting && (
               <div className="space-y-1">
                 <Progress value={progressPercentage} className="h-2" />
-                <p className="text-center text-gray-600 text-xs dark:text-gray-400">
+                <p className="text-center text-muted-foreground text-xs">
                   {t(translations.settings.itemIcons.filesProgress, {
                     current: conversionProgress.current,
                     total: conversionProgress.total,
@@ -229,16 +229,12 @@ export function ItemIconSettings() {
           {conversionResult && (
             <div
               className={`rounded-lg p-3 ${
-                conversionResult.success
-                  ? 'bg-green-50 dark:bg-green-950'
-                  : 'bg-red-50 dark:bg-red-950'
+                conversionResult.success ? 'bg-success/10' : 'bg-destructive/10'
               }`}
             >
               <p
                 className={`font-medium text-sm ${
-                  conversionResult.success
-                    ? 'text-green-800 dark:text-green-200'
-                    : 'text-red-800 dark:text-red-200'
+                  conversionResult.success ? 'text-success' : 'text-destructive'
                 }`}
               >
                 {conversionResult.success ? '✓ ' : '✗ '}
@@ -248,9 +244,7 @@ export function ItemIconSettings() {
               </p>
               <div
                 className={`mt-2 space-y-1 text-xs ${
-                  conversionResult.success
-                    ? 'text-green-700 dark:text-green-300'
-                    : 'text-red-700 dark:text-red-300'
+                  conversionResult.success ? 'text-success' : 'text-destructive'
                 }`}
               >
                 <p>
@@ -280,8 +274,8 @@ export function ItemIconSettings() {
           )}
 
           {/* Info Box */}
-          <div className="rounded-lg bg-blue-50 p-3 dark:bg-blue-950">
-            <p className="text-blue-800 text-xs dark:text-blue-200">
+          <div className="rounded-lg bg-info/10 p-3">
+            <p className="text-info text-xs">
               <strong>{t(translations.settings.itemIcons.whyConversionNeeded)}</strong>
               <br />
               {t(translations.settings.itemIcons.whyConversionDescription)}
@@ -300,7 +294,7 @@ export function ItemIconSettings() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-yellow-600" />
+              <AlertTriangle className="h-5 w-5 text-warning" />
               {t(translations.settings.itemIcons.convertSpriteFilesTitle)}
             </AlertDialogTitle>
             <AlertDialogDescription className="space-y-3">
@@ -314,8 +308,8 @@ export function ItemIconSettings() {
                 <li>{t(translations.settings.itemIcons.idempotent)}</li>
                 <li>{t(translations.settings.itemIcons.conversionMayTake)}</li>
               </ul>
-              <div className="rounded-lg bg-yellow-50 p-3 dark:bg-yellow-950">
-                <p className="text-xs text-yellow-800 dark:text-yellow-200">
+              <div className="rounded-lg bg-warning/10 p-3">
+                <p className="text-warning text-xs">
                   <strong>{t(translations.common.warning)}</strong>{' '}
                   {t(translations.settings.itemIcons.disclaimer)}
                 </p>

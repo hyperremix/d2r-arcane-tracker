@@ -396,7 +396,7 @@ export function NotificationButton() {
             </CardHeader>
             <CardContent className="space-y-3">
               {activeNotifications.length === 0 ? (
-                <div className="py-4 text-center text-gray-500 dark:text-gray-400">
+                <div className="py-4 text-center text-muted-foreground">
                   <Trophy className="mx-auto mb-2 h-8 w-8 opacity-50" />
                   <p className="text-sm">
                     {t(translations.grail.notifications.noRecentDetections)}
@@ -406,7 +406,7 @@ export function NotificationButton() {
                 activeNotifications.map((notification) => (
                   <div
                     key={notification.id}
-                    className={`relative ${!notification.seen ? 'rounded-lg ring-2 ring-blue-200 dark:ring-blue-800' : ''}`}
+                    className={`relative ${!notification.seen ? 'rounded-lg ring-2 ring-primary/40' : ''}`}
                   >
                     <ItemCard
                       item={notification.grailItem}
@@ -420,7 +420,7 @@ export function NotificationButton() {
                       onClick={() => dismissNotification(notification.id)}
                       variant="ghost"
                       size="sm"
-                      className="absolute top-2 right-2 z-10 h-6 w-6 rounded-full bg-white p-0 shadow-sm hover:bg-gray-100 dark:bg-gray-950 dark:hover:bg-gray-900"
+                      className="absolute top-2 right-2 z-10 h-6 w-6 rounded-full bg-background p-0 shadow-sm hover:bg-muted"
                     >
                       <X className="h-3 w-3" />
                     </Button>

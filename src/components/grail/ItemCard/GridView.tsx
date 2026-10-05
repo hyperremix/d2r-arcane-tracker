@@ -64,7 +64,7 @@ export function GridView({
           className={cn(
             'relative border-2',
             typeColors[item.type],
-            allProgress.length > 0 ? '' : 'bg-gray-50 opacity-60 hover:opacity-80 dark:bg-gray-950',
+            allProgress.length > 0 ? '' : 'bg-muted/50 opacity-60 hover:opacity-80',
           )}
         >
           {/* Status indicators overlay */}
@@ -100,16 +100,14 @@ export function GridView({
                     }
                   }}
                 />
-                {isLoading && (
-                  <div className="absolute inset-0 animate-pulse rounded bg-gray-200 dark:bg-gray-700" />
-                )}
+                {isLoading && <div className="absolute inset-0 animate-pulse rounded bg-muted" />}
               </div>
             ) : null}
 
             {/* Item Name */}
             <Tooltip>
               <TooltipTrigger className="w-full text-center">
-                <h3 className="truncate font-semibold text-black text-sm leading-tight dark:text-white">
+                <h3 className="truncate font-semibold text-foreground text-sm leading-tight">
                   {item.name}
                 </h3>
               </TooltipTrigger>
@@ -119,7 +117,7 @@ export function GridView({
                     {item.name}
                     {item.itemBase && ` • ${item.itemBase}`}
                   </p>
-                  <p className="text-gray-500 text-xs">
+                  <p className="text-muted-foreground text-xs">
                     {item.category} • {item.subCategory.replace('_', ' ')}
                   </p>
 
@@ -132,7 +130,7 @@ export function GridView({
 
             {/* Set specific info */}
             {item.setName && (
-              <p className="truncate text-center font-medium text-green-600 text-xs dark:text-green-400">
+              <p className="truncate text-center font-medium text-found text-xs">
                 {t(translations.grail.itemCard.setName, { name: item.setName })}
               </p>
             )}

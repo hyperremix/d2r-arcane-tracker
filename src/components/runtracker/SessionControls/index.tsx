@@ -255,9 +255,7 @@ export function SessionControls() {
             {t(translations.runTracker.controls.sessionControls)}
             {isTracking && (
               <div className="flex items-center gap-1">
-                <div
-                  className={`h-2 w-2 rounded-full ${isPaused ? 'bg-yellow-500' : 'bg-green-500'}`}
-                />
+                <div className={`h-2 w-2 rounded-full ${isPaused ? 'bg-warning' : 'bg-success'}`} />
                 <span className="text-muted-foreground text-sm">
                   {isPaused
                     ? t(translations.runTracker.controls.paused)
@@ -336,11 +334,7 @@ export function SessionControls() {
             <AlertDialogCancel disabled={loading}>
               {t(translations.common.cancel)}
             </AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleEndRun}
-              disabled={loading}
-              className="bg-red-600 hover:bg-red-700"
-            >
+            <AlertDialogAction onClick={handleEndRun} disabled={loading} variant="destructive">
               {loading
                 ? t(translations.runTracker.controls.ending)
                 : t(translations.runTracker.controls.endRun)}
@@ -364,11 +358,7 @@ export function SessionControls() {
             <AlertDialogCancel disabled={loading}>
               {t(translations.common.cancel)}
             </AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleEndSession}
-              disabled={loading}
-              className="bg-red-600 hover:bg-red-700"
-            >
+            <AlertDialogAction onClick={handleEndSession} disabled={loading} variant="destructive">
               {loading
                 ? t(translations.runTracker.controls.ending)
                 : t(translations.runTracker.controls.endSession)}

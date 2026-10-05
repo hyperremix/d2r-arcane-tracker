@@ -38,7 +38,7 @@ export function RunewordCard({ runeword, availableRunes, className }: RunewordCa
                 href={runeword.link}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-blue-600 text-xs hover:underline dark:text-blue-400"
+                className="text-primary text-xs hover:underline"
                 onClick={(e) => {
                   e.preventDefault();
                   window.electronAPI?.shell.openExternal(runeword.link);
@@ -62,8 +62,8 @@ export function RunewordCard({ runeword, availableRunes, className }: RunewordCa
 
         {/* Complete status message */}
         {completionStatus.complete && (
-          <div className="border-gray-200 border-t pt-3 dark:border-gray-700">
-            <p className="text-center font-medium text-green-600 text-sm dark:text-green-400">
+          <div className="border-border border-t pt-3">
+            <p className="text-center font-medium text-sm text-success">
               ✓ {t(translations.runeword.card.allRunesAvailable)}
             </p>
           </div>

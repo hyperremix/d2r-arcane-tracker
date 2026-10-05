@@ -108,7 +108,7 @@ export function ItemInfoSection({ item }: { item: Item }) {
                 href={item.link}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-blue-600 underline hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+                className="text-primary underline hover:text-primary/80"
               >
                 {item.link.includes('diablo2.io')
                   ? t(translations.grail.itemDetails.viewOnDiablo2io)

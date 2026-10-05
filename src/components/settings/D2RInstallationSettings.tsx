@@ -104,7 +104,7 @@ export function D2RInstallationSettings() {
               <FolderOpen className="h-4 w-4" />
             </Button>
           </div>
-          <p className="text-gray-600 text-xs dark:text-gray-400">
+          <p className="text-muted-foreground text-xs">
             {t(translations.settings.d2rInstallation.pathDescription)}
           </p>
         </div>

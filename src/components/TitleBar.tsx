@@ -39,7 +39,7 @@ function NavigationButton({
       <div
         className={cn(
           '-top-1.75 absolute right-0 left-0',
-          isActive && 'border-t-4 border-t-primary-500',
+          isActive && 'border-t-4 border-t-primary',
         )}
       />
       <Button
@@ -47,7 +47,7 @@ function NavigationButton({
         size="sm"
         onClick={() => onClick(to)}
         title={t(title)}
-        className={cn('relative hover:text-primary-500', isActive && 'text-primary-500')}
+        className={cn('relative hover:text-primary', isActive && 'text-primary')}
       >
         <Icon className="h-4 w-4" />
       </Button>
@@ -119,7 +119,7 @@ export function TitleBar() {
   return (
     <div
       className={cn(
-        'flex h-12 min-h-12 w-full select-none items-center border-gray-200 border-b px-4 dark:border-gray-800',
+        'flex h-12 min-h-12 w-full select-none items-center border-border border-b px-4',
         'titlebar', // Custom class for Electron dragging
       )}
       style={

@@ -20,24 +20,20 @@ interface ProgressGaugeProps {
  */
 const colorConfig = {
   blue: {
-    stroke:
-      'text-blue-600 group-hover:text-blue-700 dark:text-blue-500 dark:group-hover:text-blue-400',
-    text: 'text-blue-600 dark:text-blue-500',
+    stroke: 'text-ethereal group-hover:text-ethereal/80',
+    text: 'text-ethereal',
   },
   green: {
-    stroke:
-      'text-green-600 group-hover:text-green-700 dark:text-green-500 dark:group-hover:text-green-400',
-    text: 'text-green-600 dark:text-green-500',
+    stroke: 'text-chart-3 group-hover:text-chart-3/80',
+    text: 'text-chart-3',
   },
   purple: {
-    stroke:
-      'text-purple-600 group-hover:text-purple-700 dark:text-purple-500 dark:group-hover:text-purple-400',
-    text: 'text-purple-600 dark:text-purple-500',
+    stroke: 'text-chart-4 group-hover:text-chart-4/80',
+    text: 'text-chart-4',
   },
   orange: {
-    stroke:
-      'text-orange-600 group-hover:text-orange-700 dark:text-orange-500 dark:group-hover:text-orange-400',
-    text: 'text-orange-600 dark:text-orange-500',
+    stroke: 'text-chart-5 group-hover:text-chart-5/80',
+    text: 'text-chart-5',
   },
 };
 
@@ -90,7 +86,7 @@ export function ProgressGauge({
             cy="18"
             r="16"
             fill="none"
-            className="stroke-current text-zinc-300 dark:text-zinc-800"
+            className="stroke-current text-muted-foreground/30"
             strokeWidth="2"
             strokeDasharray="75 100"
             strokeLinecap="round"
@@ -116,7 +112,7 @@ export function ProgressGauge({
           <div className={cn('font-bold', colors.text, percentageTextSize)}>
             {percentage.toFixed(1)}%
           </div>
-          <div className={cn('text-gray-500 dark:text-gray-400', ratioTextSize)}>
+          <div className={cn('text-muted-foreground', ratioTextSize)}>
             {current}/{total}
           </div>
         </div>
@@ -131,9 +127,7 @@ export function ProgressGauge({
     return (
       <div className={cn('flex flex-col items-center', className)}>
         {gaugeElement}
-        <div className={cn('-mt-2 text-center text-gray-500 dark:text-gray-400', labelTextSize)}>
-          {label}
-        </div>
+        <div className={cn('-mt-2 text-center text-muted-foreground', labelTextSize)}>{label}</div>
       </div>
     );
   }

@@ -224,12 +224,12 @@ export function TerrorZoneConfiguration() {
 
               {/* Validation Status */}
               {!validationStatus.valid && (
-                <Alert className="border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950">
-                  <AlertCircle className="h-4 w-4 text-red-600" />
-                  <AlertTitle className="font-bold text-red-800 dark:text-red-200">
+                <Alert className="border-destructive/30 bg-destructive/10">
+                  <AlertCircle className="h-4 w-4 text-destructive" />
+                  <AlertTitle className="font-bold text-destructive">
                     {t(translations.common.error)}
                   </AlertTitle>
-                  <AlertDescription className="space-y-2 text-red-800 dark:text-red-200">
+                  <AlertDescription className="space-y-2 text-destructive">
                     <p>{validationStatus.error || t(translations.terrorZone.pathNotConfigured)}</p>
                     {validationStatus.error?.includes('not found') && (
                       <div>
@@ -240,7 +240,7 @@ export function TerrorZoneConfiguration() {
                           {t(translations.terrorZone.cascDescription)}
                           <strong> {t(translations.terrorZone.allFilesMustBeExtracted)}</strong>{' '}
                           {t(translations.terrorZone.launchFlags)}{' '}
-                          <code className="rounded bg-red-200 px-1 dark:bg-red-800">
+                          <code className="rounded bg-destructive/15 px-1">
                             {t(translations.terrorZone.flagsValue)}
                           </code>{' '}
                           {t(translations.terrorZone.flagsSuffix)}
@@ -256,7 +256,7 @@ export function TerrorZoneConfiguration() {
                                 href="https://www.hiveworkshop.com/threads/ladiks-casc-viewer.331540/"
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="underline hover:text-red-950 dark:hover:text-red-50"
+                                className="underline hover:text-destructive/80"
                               >
                                 Ladik's CASC Viewer
                               </a>
@@ -287,7 +287,7 @@ export function TerrorZoneConfiguration() {
                             </li>
                             <li>
                               Create a D2R shortcut and add{' '}
-                              <code className="rounded bg-red-200 px-1 text-xs dark:bg-red-800">
+                              <code className="rounded bg-destructive/15 px-1 text-xs">
                                 -direct -txt
                               </code>{' '}
                               to the target
@@ -307,11 +307,9 @@ export function TerrorZoneConfiguration() {
 
               {/* Error Display */}
               {error && (
-                <Alert className="border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950">
-                  <XCircle className="h-4 w-4 text-red-600" />
-                  <AlertDescription className="text-red-800 dark:text-red-200">
-                    {error}
-                  </AlertDescription>
+                <Alert className="border-destructive/30 bg-destructive/10">
+                  <XCircle className="h-4 w-4 text-destructive" />
+                  <AlertDescription className="text-destructive">{error}</AlertDescription>
                 </Alert>
               )}
 
@@ -411,7 +409,7 @@ export function TerrorZoneConfiguration() {
               <AlertDialogAction
                 onClick={handleRestoreOriginal}
                 disabled={isSaving}
-                className="bg-red-600 hover:bg-red-700"
+                variant="destructive"
               >
                 {isSaving
                   ? t(translations.terrorZone.restoring)

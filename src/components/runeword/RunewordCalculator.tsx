@@ -100,9 +100,7 @@ export function RunewordCalculator() {
       <div className="flex w-80 shrink-0 flex-col gap-6">
         <div>
           <h1 className="mb-2 font-bold text-3xl">{t(translations.runeword.calculator.title)}</h1>
-          <p className="text-gray-600 dark:text-gray-400">
-            {t(translations.runeword.calculator.subtitle)}
-          </p>
+          <p className="text-muted-foreground">{t(translations.runeword.calculator.subtitle)}</p>
         </div>
 
         {/* Search Bar */}
@@ -110,7 +108,7 @@ export function RunewordCalculator() {
           <CardContent className="flex flex-1 flex-col gap-4 overflow-hidden">
             {/* Results Count */}
             {!isLoading && (
-              <div className="text-gray-600 text-sm dark:text-gray-400">
+              <div className="text-muted-foreground text-sm">
                 {t(translations.runeword.calculator.showingResults, {
                   filtered: filteredRunewords.length,
                   total: allRunewords.length,
@@ -141,14 +139,14 @@ export function RunewordCalculator() {
         {isLoading && (
           <div className="flex items-center justify-center py-12">
             <div className="text-center">
-              <div className="mb-4 inline-block h-8 w-8 animate-spin rounded-full border-4 border-gray-300 border-t-blue-600" />
-              <p className="font-medium text-gray-600 dark:text-gray-400">
+              <div className="mb-4 inline-block h-8 w-8 animate-spin rounded-full border-4 border-muted border-t-primary" />
+              <p className="font-medium text-muted-foreground">
                 {isScanning
                   ? t(translations.runeword.calculator.scanningSaveFiles)
                   : t(translations.runeword.calculator.loadingRuneData)}
               </p>
               {isScanning && (
-                <p className="mt-2 text-gray-500 text-sm dark:text-gray-500">
+                <p className="mt-2 text-muted-foreground text-sm">
                   {t(translations.runeword.calculator.thisMayTake)}
                 </p>
               )}
@@ -168,10 +166,10 @@ export function RunewordCalculator() {
         {/* Empty State */}
         {!isLoading && filteredRunewords.length === 0 && (
           <div className="py-12 text-center">
-            <p className="text-gray-600 text-lg dark:text-gray-400">
+            <p className="text-lg text-muted-foreground">
               {t(translations.runeword.calculator.noRunewordsFound)}
             </p>
-            <p className="mt-2 text-gray-500 text-sm dark:text-gray-500">
+            <p className="mt-2 text-muted-foreground text-sm">
               {t(translations.runeword.calculator.adjustFilters)}
             </p>
           </div>

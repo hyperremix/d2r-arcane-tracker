@@ -90,7 +90,7 @@ export function RuneFilters({
   return (
     <div className="space-y-4">
       {/* Header with Show Partial toggle */}
-      <div className="flex items-center justify-between border-gray-200 border-b pb-3">
+      <div className="flex items-center justify-between border-border border-b pb-3">
         <h3 className="font-semibold text-lg">{t(translations.runeword.filters.filterByRunes)}</h3>
         <div className="flex items-center gap-2">
           <Label htmlFor={showPartialId} className="text-sm">
@@ -112,8 +112,8 @@ export function RuneFilters({
             <div
               key={rune.id}
               className={cn(
-                'flex items-center gap-2 rounded p-2 transition-colors hover:bg-gray-100 dark:hover:bg-gray-800',
-                isSelected && 'bg-gray-50 dark:bg-gray-800',
+                'flex items-center gap-2 rounded p-2 transition-colors hover:bg-muted',
+                isSelected && 'bg-muted',
               )}
             >
               <Checkbox
@@ -125,11 +125,11 @@ export function RuneFilters({
               {/* Rune image */}
               <div className="flex h-6 w-6 shrink-0 items-center justify-center">
                 {imagesLoading ? (
-                  <div className="h-full w-full animate-pulse rounded bg-gray-200 dark:bg-gray-700" />
+                  <div className="h-full w-full animate-pulse rounded bg-muted" />
                 ) : imageUrl ? (
                   <img src={imageUrl} alt={rune.name} className="h-full w-full object-contain" />
                 ) : (
-                  <div className="text-center text-gray-400 text-xs dark:text-gray-600">
+                  <div className="text-center text-muted-foreground/60 text-xs">
                     {rune.id.charAt(0).toUpperCase()}
                   </div>
                 )}
@@ -139,16 +139,14 @@ export function RuneFilters({
                 htmlFor={`rune-${rune.id}`}
                 className={cn(
                   'flex flex-1 cursor-pointer items-center justify-between',
-                  hasNone && 'text-gray-400 dark:text-gray-600',
+                  hasNone && 'text-muted-foreground/60',
                 )}
               >
                 <span className="font-medium">{rune.name}</span>
                 <span
                   className={cn(
                     'rounded-full px-2 py-0.5 font-mono text-xs',
-                    hasNone
-                      ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
-                      : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
+                    hasNone ? 'bg-missing/15 text-missing' : 'bg-info/15 text-info',
                   )}
                 >
                   {count}
@@ -161,7 +159,7 @@ export function RuneFilters({
 
       {/* Selection summary */}
       {selectedRunes.length > 0 && (
-        <div className="border-gray-200 border-t pt-3 text-gray-600 text-sm dark:text-gray-400">
+        <div className="border-border border-t pt-3 text-muted-foreground text-sm">
           {t(translations.runeword.filters.runesSelected, {
             count: selectedRunes.length,
             plural: selectedRunes.length !== 1 ? 's' : '',
