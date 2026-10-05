@@ -11,6 +11,7 @@ import type {
   Session,
   Settings,
   TerrorZone,
+  TerrorZoneValidationResult,
   UpdateInfo,
   UpdateStatus,
 } from './grail'
@@ -659,9 +660,9 @@ export interface ElectronAPI {
 
     /**
      * Validates the D2R installation path for terror zone configuration.
-     * @returns {Promise<{ valid: boolean; path?: string; error?: string }>} A promise that resolves with validation result.
+     * @returns {Promise<TerrorZoneValidationResult>} A promise that resolves with validation result.
      */
-    validatePath(): Promise<{ valid: boolean; path?: string; error?: string }>
+    validatePath(): Promise<TerrorZoneValidationResult>
   }
 }
 

@@ -1,7 +1,7 @@
 import { ipcMain } from 'electron';
 import { grailDatabase } from '../database/database';
 import { TerrorZoneService } from '../services/terrorZoneService';
-import type { TerrorZone } from '../types/grail';
+import type { TerrorZone, TerrorZoneValidationResult } from '../types/grail';
 
 /**
  * Global terror zone service instance.
@@ -149,24 +149,29 @@ export function initializeTerrorZoneHandlers(): void {
    * IPC handler for validating the D2R installation path.
    * @returns Promise resolving to validation result
    */
-  ipcMain.handle(
-    'terrorZone:validatePath',
-    async (): Promise<{ valid: boolean; path?: string; error?: string }> => {
-      try {
-        const settings = grailDatabase.getAllSettings();
-        const d2rInstallPath = settings.d2rInstallPath;
+  ipcMain.handle('terrorZone:validatePath', async (): Promise<TerrorZoneValidationResult> => {
+    try {
+      const settings = grailDatabase.getAllSettings();
+      const d2rInstallPath = settings.d2rInstallPath;
 
-        if (!d2rInstallPath) {
-          return { valid: false, error: 'D2R installation path is not configured' };
-        }
-
-        return await terrorZoneService.validateGameFile(d2rInstallPath);
-      } catch (error) {
-        console.error('Failed to validate path:', error);
-        return { valid: false, error: error instanceof Error ? error.message : 'Unknown error' };
+      if (!d2rInstallPath) {
+        return {
+          valid: false,
+          error: 'D2R installation path is not configured',
+          errorCode: 'pathNotConfigured',
+        };
       }
-    },
-  );
+
+      return await terrorZoneService.validateGameFile(d2rInstallPath);
+    } catch (error) {
+      console.error('Failed to validate path:', error);
+      return {
+        valid: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+        errorCode: 'unknown',
+      };
+    }
+  });
 
   console.log('[initializeTerrorZoneHandlers] Initialization complete');
 }

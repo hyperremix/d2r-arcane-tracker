@@ -16,7 +16,13 @@ import { useGrailStore } from '@/stores/grailStore';
 export function NotificationSettings() {
   const { t } = useTranslation();
   const { settings, setSettings } = useGrailStore();
-  const volumeSliderId = useId();
+  const volumeLabelId = useId();
+  const soundLabelId = useId();
+  const soundDescriptionId = useId();
+  const inAppLabelId = useId();
+  const inAppDescriptionId = useId();
+  const nativeLabelId = useId();
+  const nativeDescriptionId = useId();
 
   const requestNotificationPermission = useCallback(async () => {
     if ('Notification' in window) {
@@ -58,23 +64,28 @@ export function NotificationSettings() {
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <div>
-              <h4 className="flex items-center gap-2 font-medium text-sm">
-                <Bell className="h-4 w-4" />
+              <h4 id={soundLabelId} className="flex items-center gap-2 font-medium text-sm">
+                <Bell className="h-4 w-4" aria-hidden="true" />
                 {t(translations.settings.notifications.soundNotifications)}
               </h4>
-              <p className="text-muted-foreground text-xs">
+              <p id={soundDescriptionId} className="text-muted-foreground text-xs">
                 {t(translations.settings.notifications.soundDescription)}
               </p>
             </div>
-            <Switch checked={settings.enableSounds} onCheckedChange={toggleSoundNotifications} />
+            <Switch
+              checked={settings.enableSounds}
+              onCheckedChange={toggleSoundNotifications}
+              aria-labelledby={soundLabelId}
+              aria-describedby={soundDescriptionId}
+            />
           </div>
 
           <div className="flex items-center gap-2">
-            <Label htmlFor={volumeSliderId} className="text-muted-foreground text-xs">
+            <Label id={volumeLabelId} className="text-muted-foreground text-xs">
               {t(translations.settings.notifications.volume)}
             </Label>
             <Slider
-              id={volumeSliderId}
+              aria-labelledby={volumeLabelId}
               min={0}
               max={1}
               step={0.01}
@@ -95,17 +106,19 @@ export function NotificationSettings() {
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <div>
-              <h4 className="flex items-center gap-2 font-medium text-sm">
-                <Monitor className="h-4 w-4" />
+              <h4 id={inAppLabelId} className="flex items-center gap-2 font-medium text-sm">
+                <Monitor className="h-4 w-4" aria-hidden="true" />
                 {t(translations.settings.notifications.inAppNotifications)}
               </h4>
-              <p className="text-muted-foreground text-xs">
+              <p id={inAppDescriptionId} className="text-muted-foreground text-xs">
                 {t(translations.settings.notifications.inAppDescription)}
               </p>
             </div>
             <Switch
               checked={settings.inAppNotifications}
               onCheckedChange={toggleInAppNotifications}
+              aria-labelledby={inAppLabelId}
+              aria-describedby={inAppDescriptionId}
             />
           </div>
         </div>
@@ -113,17 +126,19 @@ export function NotificationSettings() {
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <div>
-              <h4 className="flex items-center gap-2 font-medium text-sm">
-                <Smartphone className="h-4 w-4" />
+              <h4 id={nativeLabelId} className="flex items-center gap-2 font-medium text-sm">
+                <Smartphone className="h-4 w-4" aria-hidden="true" />
                 {t(translations.settings.notifications.nativeNotifications)}
               </h4>
-              <p className="text-muted-foreground text-xs">
+              <p id={nativeDescriptionId} className="text-muted-foreground text-xs">
                 {t(translations.settings.notifications.nativeDescription)}
               </p>
             </div>
             <Switch
               checked={settings.nativeNotifications}
               onCheckedChange={toggleNativeNotifications}
+              aria-labelledby={nativeLabelId}
+              aria-describedby={nativeDescriptionId}
             />
           </div>
         </div>

@@ -1,11 +1,13 @@
 import type { Session } from 'electron/types/grail';
 import { Archive, ArrowLeft, FileDown, Loader2 } from 'lucide-react';
 import { useCallback, useEffect, useId, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
+import { translations } from '@/i18n/translations';
 import { formatDuration, formatSessionDate } from '@/lib/utils';
 import { useRunTrackerStore } from '@/stores/runTrackerStore';
 import { ArchiveSessionDialog } from './ArchiveSessionDialog';
@@ -22,7 +24,14 @@ interface SessionDetailViewProps {
  * SessionDetailView component that displays detailed information about a specific session
  * including session stats, notes, controls (if active), and the list of runs.
  */
+const TIME_FORMAT_OPTIONS: Intl.DateTimeFormatOptions = {
+  hour: '2-digit',
+  minute: '2-digit',
+  second: '2-digit',
+};
+
 export function SessionDetailView({ sessionId, onBack }: SessionDetailViewProps) {
+  const { t, i18n } = useTranslation();
   const {
     sessions,
     activeSession,
@@ -173,12 +182,14 @@ export function SessionDetailView({ sessionId, onBack }: SessionDetailViewProps)
       <div className="flex items-center justify-center p-8">
         <Card className="w-full max-w-md">
           <CardContent className="flex flex-col items-center gap-4 p-6">
-            <h3 className="font-semibold">Session Not Found</h3>
+            <h3 className="font-semibold">
+              {t(translations.runTracker.sessionDetail.sessionNotFound)}
+            </h3>
             <p className="text-muted-foreground text-sm">
-              The requested session could not be found.
+              {t(translations.runTracker.sessionDetail.sessionNotFoundDescription)}
             </p>
             <Button onClick={onBack} variant="outline">
-              Go Back
+              {t(translations.runTracker.sessionDetail.goBack)}
             </Button>
           </CardContent>
         </Card>
@@ -194,10 +205,12 @@ export function SessionDetailView({ sessionId, onBack }: SessionDetailViewProps)
       <div className="flex items-center gap-4">
         <Button variant="outline" size="sm" onClick={onBack}>
           <ArrowLeft className="h-4 w-4" />
-          Back
+          {t(translations.runTracker.sessionDetail.back)}
         </Button>
         <div>
-          <h2 className="font-semibold text-xl">Session Details</h2>
+          <h2 className="font-semibold text-xl">
+            {t(translations.runTracker.sessionDetail.title)}
+          </h2>
           <p className="text-muted-foreground text-sm">
             {formatSessionDateCallback(session.startTime)}
           </p>
@@ -208,17 +221,17 @@ export function SessionDetailView({ sessionId, onBack }: SessionDetailViewProps)
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center justify-between">
-            <span>Session Information</span>
+            <span>{t(translations.runTracker.sessionDetail.sessionInformation)}</span>
             <div className="flex items-center gap-2">
               {isActiveSession && (
                 <Badge variant="secondary" className="text-xs">
-                  Active
+                  {t(translations.runTracker.sessionDetail.active)}
                 </Badge>
               )}
               {session.archived && (
                 <Badge variant="outline" className="text-xs">
                   <Archive className="mr-1 h-3 w-3" />
-                  Archived
+                  {t(translations.runTracker.sessionDetail.archived)}
                 </Badge>
               )}
             </div>
@@ -228,23 +241,33 @@ export function SessionDetailView({ sessionId, onBack }: SessionDetailViewProps)
           {/* Session Statistics */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1">
-              <p className="font-medium text-muted-foreground text-sm">Session Duration</p>
+              <p className="font-medium text-muted-foreground text-sm">
+                {t(translations.runTracker.sessionDetail.sessionDuration)}
+              </p>
               <p className="font-mono text-lg">{formatDuration(sessionDuration)}</p>
             </div>
             <div className="space-y-1">
-              <p className="font-medium text-muted-foreground text-sm">Run Count</p>
+              <p className="font-medium text-muted-foreground text-sm">
+                {t(translations.runTracker.sessionCard.runCount)}
+              </p>
               <p className="font-semibold text-lg">{session.runCount}</p>
             </div>
             <div className="space-y-1">
-              <p className="font-medium text-muted-foreground text-sm">Average Run Time</p>
+              <p className="font-medium text-muted-foreground text-sm">
+                {t(translations.runTracker.sessionCard.averageRunTime)}
+              </p>
               <p className="font-mono text-lg">{formatDuration(averageRunTime)}</p>
             </div>
             <div className="space-y-1">
-              <p className="font-medium text-muted-foreground text-sm">Fastest Run</p>
+              <p className="font-medium text-muted-foreground text-sm">
+                {t(translations.runTracker.sessionCard.fastestRun)}
+              </p>
               <p className="font-mono text-lg">{formatDuration(sessionStats?.fastestRun || 0)}</p>
             </div>
             <div className="space-y-1">
-              <p className="font-medium text-muted-foreground text-sm">Efficiency</p>
+              <p className="font-medium text-muted-foreground text-sm">
+                {t(translations.runTracker.sessionCard.efficiency)}
+              </p>
               <p className="font-semibold text-lg">{efficiencyPercentage.toFixed(1)}%</p>
             </div>
           </div>
@@ -252,7 +275,9 @@ export function SessionDetailView({ sessionId, onBack }: SessionDetailViewProps)
           {/* Items Found */}
           {sessionStats && (
             <div className="space-y-1">
-              <p className="font-medium text-muted-foreground text-sm">Items Found</p>
+              <p className="font-medium text-muted-foreground text-sm">
+                {t(translations.runTracker.sessionCard.itemsFound)}
+              </p>
               <p className="font-semibold text-lg">{sessionStats.itemsFound}</p>
             </div>
           )}
@@ -260,24 +285,20 @@ export function SessionDetailView({ sessionId, onBack }: SessionDetailViewProps)
           {/* Session Times */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1">
-              <p className="font-medium text-muted-foreground text-sm">Start Time</p>
+              <p className="font-medium text-muted-foreground text-sm">
+                {t(translations.runTracker.table.startTime)}
+              </p>
               <p className="font-mono text-sm">
-                {session.startTime.toLocaleTimeString('en-US', {
-                  hour: '2-digit',
-                  minute: '2-digit',
-                  second: '2-digit',
-                })}
+                {session.startTime.toLocaleTimeString(i18n.language, TIME_FORMAT_OPTIONS)}
               </p>
             </div>
             {session.endTime && (
               <div className="space-y-1">
-                <p className="font-medium text-muted-foreground text-sm">End Time</p>
+                <p className="font-medium text-muted-foreground text-sm">
+                  {t(translations.runTracker.table.endTime)}
+                </p>
                 <p className="font-mono text-sm">
-                  {session.endTime.toLocaleTimeString('en-US', {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                    second: '2-digit',
-                  })}
+                  {session.endTime.toLocaleTimeString(i18n.language, TIME_FORMAT_OPTIONS)}
                 </p>
               </div>
             )}
@@ -286,12 +307,12 @@ export function SessionDetailView({ sessionId, onBack }: SessionDetailViewProps)
           {/* Notes Editor */}
           <div className="space-y-2">
             <label htmlFor={notesId} className="font-medium text-muted-foreground text-sm">
-              Session Notes
+              {t(translations.runTracker.sessionCard.sessionNotes)}
             </label>
             <div className="relative">
               <Textarea
                 id={notesId}
-                placeholder="Add notes about this session..."
+                placeholder={t(translations.runTracker.sessionCard.notesPlaceholder)}
                 value={notes}
                 onChange={handleNotesChange}
                 onBlur={handleNotesBlur}
@@ -322,7 +343,7 @@ export function SessionDetailView({ sessionId, onBack }: SessionDetailViewProps)
                 ) : (
                   <Archive className="mr-2 h-4 w-4" />
                 )}
-                Archive Session
+                {t(translations.runTracker.sessionCard.archiveSession)}
               </Button>
             )}
             <Button
@@ -330,11 +351,15 @@ export function SessionDetailView({ sessionId, onBack }: SessionDetailViewProps)
               size="sm"
               onClick={handleExportClick}
               disabled={session.runCount === 0}
-              title={session.runCount === 0 ? 'No runs to export' : 'Export session data'}
+              title={
+                session.runCount === 0
+                  ? t(translations.runTracker.sessionCard.noRunsToExport)
+                  : t(translations.runTracker.sessionCard.exportSessionData)
+              }
               className="flex-1"
             >
               <FileDown className="mr-2 h-4 w-4" />
-              Export
+              {t(translations.runTracker.sessionDetail.export)}
             </Button>
           </div>
         </CardContent>

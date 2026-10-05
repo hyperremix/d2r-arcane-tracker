@@ -292,8 +292,9 @@ export function SessionCard({ session }: SessionCardProps) {
                 ? t(translations.runTracker.sessionCard.noRunsToExport)
                 : t(translations.runTracker.sessionCard.exportSessionData)
             }
+            aria-label={t(translations.runTracker.sessionCard.exportSessionData)}
           >
-            <FileDownIcon className="h-4 w-4" />
+            <FileDownIcon className="h-4 w-4" aria-hidden="true" />
           </Button>
         </div>
       </CardContent>

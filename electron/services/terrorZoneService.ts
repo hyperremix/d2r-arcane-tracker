@@ -3,7 +3,7 @@ import path from 'node:path';
 import { app } from 'electron';
 import { NUMERIC_TO_STRING_ZONE_ID, TERROR_ZONE_NAMES } from '../data/terrorZoneNames';
 import { stripJsonComments } from '../lib/jsonUtils';
-import type { TerrorZone } from '../types/grail';
+import type { TerrorZone, TerrorZoneValidationResult } from '../types/grail';
 
 import { createServiceLogger } from '../utils/serviceLogger';
 
@@ -234,22 +234,32 @@ export class TerrorZoneService {
    * @param d2rInstallPath - Path to D2R installation
    * @returns Promise resolving to validation result
    */
-  async validateGameFile(
-    d2rInstallPath: string,
-  ): Promise<{ valid: boolean; path?: string; error?: string }> {
+  async validateGameFile(d2rInstallPath: string): Promise<TerrorZoneValidationResult> {
     try {
       if (!d2rInstallPath || d2rInstallPath.trim() === '') {
-        return { valid: false, error: 'D2R installation path is not set' };
+        return {
+          valid: false,
+          error: 'D2R installation path is not set',
+          errorCode: 'pathNotConfigured',
+        };
       }
 
       if (!existsSync(d2rInstallPath)) {
-        return { valid: false, error: 'D2R installation directory does not exist' };
+        return {
+          valid: false,
+          error: 'D2R installation directory does not exist',
+          errorCode: 'directoryNotFound',
+        };
       }
 
       const gameFilePath = this.getGameDataPath(d2rInstallPath);
 
       if (!existsSync(gameFilePath)) {
-        return { valid: false, error: 'desecratedzones.json file not found in D2R installation' };
+        return {
+          valid: false,
+          error: 'desecratedzones.json file not found in D2R installation',
+          errorCode: 'gameFileNotFound',
+        };
       }
 
       // Create backup before parsing if it doesn't exist
@@ -264,7 +274,11 @@ export class TerrorZoneService {
         const data = JSON.parse(strippedContent);
 
         if (!data.desecrated_zones || !Array.isArray(data.desecrated_zones)) {
-          return { valid: false, error: 'Invalid desecratedzones.json file structure' };
+          return {
+            valid: false,
+            error: 'Invalid desecratedzones.json file structure',
+            errorCode: 'invalidStructure',
+          };
         }
       } catch (parseError) {
         log.error('validateGameFile', parseError);
@@ -273,13 +287,18 @@ export class TerrorZoneService {
         return {
           valid: false,
           error: `desecratedzones.json file is corrupted or invalid: ${errorMessage}`,
+          errorCode: 'corruptedFile',
         };
       }
 
       return { valid: true, path: gameFilePath };
     } catch (error) {
       log.error('validateGameFile', error);
-      return { valid: false, error: error instanceof Error ? error.message : 'Unknown error' };
+      return {
+        valid: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+        errorCode: 'unknown',
+      };
     }
   }
 

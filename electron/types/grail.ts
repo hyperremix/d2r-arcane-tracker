@@ -587,6 +587,28 @@ export interface TerrorZone {
 }
 
 /**
+ * Machine-readable reasons why terror zone game file validation can fail.
+ * The renderer uses these codes to pick translated messages and setup guidance.
+ */
+export type TerrorZoneValidationErrorCode =
+  | 'pathNotConfigured'
+  | 'directoryNotFound'
+  | 'gameFileNotFound'
+  | 'invalidStructure'
+  | 'corruptedFile'
+  | 'unknown';
+
+/**
+ * Result of validating the D2R installation for terror zone configuration.
+ */
+export interface TerrorZoneValidationResult {
+  valid: boolean;
+  path?: string;
+  error?: string;
+  errorCode?: TerrorZoneValidationErrorCode;
+}
+
+/**
  * Type representing comprehensive Holy Grail statistics.
  */
 export type HolyGrailStats = {

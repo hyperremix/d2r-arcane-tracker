@@ -134,4 +134,14 @@ describe('SessionCard', () => {
       expect(screen.getByRole('button', { name: 'Start New Session' })).toBeDisabled();
     });
   });
+
+  describe('When the icon-only export button is shown', () => {
+    it('Then it has an accessible name', () => {
+      // Arrange & Act
+      render(<SessionCard session={mockSession} />);
+
+      // Assert
+      expect(screen.getByRole('button', { name: 'Export session data' })).toBeEnabled();
+    });
+  });
 });

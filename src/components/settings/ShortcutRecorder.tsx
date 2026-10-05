@@ -83,7 +83,9 @@ export function ShortcutRecorder({
           size="sm"
           onClick={() => setIsRecording((prev) => !prev)}
         >
-          {isRecording ? t(translations.settings.shortcutRecorder.recording) : 'Edit'}
+          {isRecording
+            ? t(translations.settings.shortcutRecorder.recording)
+            : t(translations.common.edit)}
         </Button>
       </div>
       {isRecording ? (

@@ -108,7 +108,7 @@ export function RunTrackerSettings() {
               </Alert>
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <Label htmlFor={pollingIntervalId} className="font-medium text-sm">
+                  <Label id={pollingIntervalId} className="font-medium text-sm">
                     {t(translations.settings.runTracker.memoryPollingInterval)}
                   </Label>
                   <span className="text-muted-foreground text-sm">
@@ -116,6 +116,7 @@ export function RunTrackerSettings() {
                   </span>
                 </div>
                 <Slider
+                  aria-labelledby={pollingIntervalId}
                   min={100}
                   max={5000}
                   step={100}

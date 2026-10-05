@@ -115,4 +115,37 @@ describe('TerrorZoneService', () => {
     expect(zones[0].id).toBe('999');
     expect(zones[0].name).toBe('Zone 999');
   });
+
+  describe('When validating the game file', () => {
+    it('If the install path is empty, Then returns the pathNotConfigured error code', async () => {
+      // Arrange & Act
+      const result = await service.validateGameFile('');
+
+      // Assert
+      expect(result).toMatchObject({ valid: false, errorCode: 'pathNotConfigured' });
+    });
+
+    it('If the install directory does not exist, Then returns the directoryNotFound error code', async () => {
+      // Arrange
+      const missingDir = path.join(tempDir, 'does-not-exist');
+
+      // Act
+      const result = await service.validateGameFile(missingDir);
+
+      // Assert
+      expect(result).toMatchObject({ valid: false, errorCode: 'directoryNotFound' });
+    });
+
+    it('If the game file is missing, Then returns the gameFileNotFound error code', async () => {
+      // Arrange
+      const installDir = path.join(tempDir, 'empty-install');
+      mkdirSync(installDir, { recursive: true });
+
+      // Act
+      const result = await service.validateGameFile(installDir);
+
+      // Assert
+      expect(result).toMatchObject({ valid: false, errorCode: 'gameFileNotFound' });
+    });
+  });
 });

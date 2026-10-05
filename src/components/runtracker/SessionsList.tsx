@@ -1,6 +1,7 @@
 import type { Session } from 'electron/types/grail';
-import { ArrowDown, ArrowUp, Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -13,15 +14,16 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { translations } from '@/i18n/translations';
 import { formatDuration, formatSessionDateRelative, formatTime } from '@/lib/utils';
 import { useRunTrackerStore } from '@/stores/runTrackerStore';
+import { SortableTableHead, type SortOrder } from './SortableTableHead';
 
 interface SessionsListProps {
   onSessionSelect: (sessionId: string) => void;
 }
 
 type SortField = 'startTime' | 'duration' | 'runCount' | 'itemsFound';
-type SortOrder = 'asc' | 'desc';
 
 const ITEMS_PER_PAGE = 10;
 
@@ -41,6 +43,7 @@ function SessionTableRow({
   getSessionDuration,
   formatSessionDate,
 }: SessionTableRowProps) {
+  const { t } = useTranslation();
   const sessionStats = getSessionStats(session.id);
   const duration = getSessionDuration(session);
   const sessionDate = formatSessionDate(session.startTime);
@@ -56,7 +59,7 @@ function SessionTableRow({
           onSessionClick(session.id);
         }
       }}
-      aria-label={`View session from ${sessionDate} details`}
+      aria-label={t(translations.runTracker.sessionsList.viewSessionDetails, { date: sessionDate })}
     >
       <TableCell className="font-medium">{sessionDate}</TableCell>
       <TableCell className="font-mono text-sm">{formatTime(session.startTime)}</TableCell>
@@ -99,6 +102,8 @@ function TableRowSkeleton() {
  * and the ability to select a session to view its details.
  */
 export function SessionsList({ onSessionSelect }: SessionsListProps) {
+  const { t } = useTranslation();
+  const showArchivedLabelId = useId();
   const { sessions, sessionsLoading, getSessionStats, runs, loadSessionRuns, loadingSessions } =
     useRunTrackerStore();
   // Only show the skeleton when there is nothing to display yet; background refreshes keep the list visible
@@ -290,42 +295,30 @@ export function SessionsList({ onSessionSelect }: SessionsListProps) {
   }, []);
 
   // Get empty state message
-  const getEmptyStateMessage = useCallback(() => {
-    if (showArchived) {
-      return {
-        title: 'No archived sessions',
-        description: 'Archived sessions will appear here when you archive them.',
+  const emptyState = showArchived
+    ? {
+        title: t(translations.runTracker.sessionsList.noArchivedSessions),
+        description: t(translations.runTracker.sessionsList.noArchivedSessionsDescription),
+      }
+    : {
+        title: t(translations.runTracker.sessionsList.noPreviousSessions),
+        description: t(translations.runTracker.sessionsList.noPreviousSessionsDescription),
       };
-    }
-    return {
-      title: 'No previous sessions',
-      description: 'Start a session to begin tracking your runs.',
-    };
-  }, [showArchived]);
-
-  const emptyState = getEmptyStateMessage();
-
-  // Helper to render sort icon
-  const renderSortIcon = (field: SortField) => {
-    if (sortField !== field) return null;
-    return sortOrder === 'asc' ? (
-      <ArrowUp className="ml-1 h-3 w-3" />
-    ) : (
-      <ArrowDown className="ml-1 h-3 w-3" />
-    );
-  };
 
   return (
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center justify-between">
-          <span>Previous Sessions</span>
+          <span>{t(translations.runTracker.sessionsList.title)}</span>
           <div className="flex items-center gap-2">
-            <span className="text-muted-foreground text-sm">Show archived</span>
+            <span id={showArchivedLabelId} className="text-muted-foreground text-sm">
+              {t(translations.runTracker.sessionsList.showArchived)}
+            </span>
             <Switch
               checked={showArchived}
               onCheckedChange={setShowArchived}
               disabled={showSkeleton}
+              aria-labelledby={showArchivedLabelId}
             />
           </div>
         </CardTitle>
@@ -335,12 +328,16 @@ export function SessionsList({ onSessionSelect }: SessionsListProps) {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Date</TableHead>
-                <TableHead>Start Time</TableHead>
-                <TableHead>End Time</TableHead>
-                <TableHead>Duration</TableHead>
-                <TableHead className="text-center">Runs</TableHead>
-                <TableHead className="text-center">Items</TableHead>
+                <TableHead>{t(translations.runTracker.table.date)}</TableHead>
+                <TableHead>{t(translations.runTracker.table.startTime)}</TableHead>
+                <TableHead>{t(translations.runTracker.table.endTime)}</TableHead>
+                <TableHead>{t(translations.runTracker.table.duration)}</TableHead>
+                <TableHead className="text-center">
+                  {t(translations.runTracker.table.runs)}
+                </TableHead>
+                <TableHead className="text-center">
+                  {t(translations.runTracker.table.items)}
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -354,52 +351,39 @@ export function SessionsList({ onSessionSelect }: SessionsListProps) {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead
-                    className="cursor-pointer select-none hover:bg-muted/50"
-                    onClick={() => handleSort('startTime')}
-                  >
-                    <div className="flex items-center">
-                      Date
-                      {renderSortIcon('startTime')}
-                    </div>
-                  </TableHead>
-                  <TableHead
-                    className="cursor-pointer select-none hover:bg-muted/50"
-                    onClick={() => handleSort('startTime')}
-                  >
-                    <div className="flex items-center">
-                      Start Time
-                      {renderSortIcon('startTime')}
-                    </div>
-                  </TableHead>
-                  <TableHead>End Time</TableHead>
-                  <TableHead
-                    className="cursor-pointer select-none hover:bg-muted/50"
-                    onClick={() => handleSort('duration')}
-                  >
-                    <div className="flex items-center">
-                      Duration
-                      {renderSortIcon('duration')}
-                    </div>
-                  </TableHead>
-                  <TableHead
-                    className="cursor-pointer select-none text-center hover:bg-muted/50"
-                    onClick={() => handleSort('runCount')}
-                  >
-                    <div className="flex items-center justify-center">
-                      Runs
-                      {renderSortIcon('runCount')}
-                    </div>
-                  </TableHead>
-                  <TableHead
-                    className="cursor-pointer select-none text-center hover:bg-muted/50"
-                    onClick={() => handleSort('itemsFound')}
-                  >
-                    <div className="flex items-center justify-center">
-                      Items
-                      {renderSortIcon('itemsFound')}
-                    </div>
-                  </TableHead>
+                  {/* Date and start time share the same timestamp, so only Date is sortable */}
+                  <SortableTableHead
+                    field="startTime"
+                    label={t(translations.runTracker.table.date)}
+                    activeField={sortField}
+                    sortOrder={sortOrder}
+                    onSort={handleSort}
+                  />
+                  <TableHead>{t(translations.runTracker.table.startTime)}</TableHead>
+                  <TableHead>{t(translations.runTracker.table.endTime)}</TableHead>
+                  <SortableTableHead
+                    field="duration"
+                    label={t(translations.runTracker.table.duration)}
+                    activeField={sortField}
+                    sortOrder={sortOrder}
+                    onSort={handleSort}
+                  />
+                  <SortableTableHead
+                    field="runCount"
+                    label={t(translations.runTracker.table.runs)}
+                    activeField={sortField}
+                    sortOrder={sortOrder}
+                    onSort={handleSort}
+                    align="center"
+                  />
+                  <SortableTableHead
+                    field="itemsFound"
+                    label={t(translations.runTracker.table.items)}
+                    activeField={sortField}
+                    sortOrder={sortOrder}
+                    onSort={handleSort}
+                    align="center"
+                  />
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -420,8 +404,11 @@ export function SessionsList({ onSessionSelect }: SessionsListProps) {
             {totalPages > 1 && (
               <div className="flex items-center justify-between pt-4">
                 <div className="text-muted-foreground text-sm">
-                  Showing {startIndex + 1}-{Math.min(endIndex, sortedSessions.length)} of{' '}
-                  {sortedSessions.length} sessions
+                  {t(translations.runTracker.sessionsList.showingRange, {
+                    start: startIndex + 1,
+                    end: Math.min(endIndex, sortedSessions.length),
+                    total: sortedSessions.length,
+                  })}
                 </div>
                 <div className="flex items-center gap-2">
                   <Button
@@ -431,7 +418,7 @@ export function SessionsList({ onSessionSelect }: SessionsListProps) {
                     disabled={currentPage === 1}
                   >
                     <ChevronLeft className="h-4 w-4" />
-                    Previous
+                    {t(translations.common.previous)}
                   </Button>
                   <div className="flex items-center gap-1">
                     {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
@@ -469,7 +456,7 @@ export function SessionsList({ onSessionSelect }: SessionsListProps) {
                     onClick={() => goToPage(currentPage + 1)}
                     disabled={currentPage === totalPages}
                   >
-                    Next
+                    {t(translations.common.next)}
                     <ChevronRight className="h-4 w-4" />
                   </Button>
                 </div>

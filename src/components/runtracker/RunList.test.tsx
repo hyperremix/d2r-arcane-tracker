@@ -129,7 +129,8 @@ describe('When RunList is rendered', () => {
       render(<RunList runs={[]} />);
 
       // Assert
-      expect(screen.getByText('No runs match your filters')).toBeInTheDocument();
+      expect(screen.getByText('No runs recorded')).toBeInTheDocument();
+      expect(screen.queryByText(/match your filters/)).not.toBeInTheDocument();
     });
 
     it('Then shows 0 runs badge', () => {
@@ -259,6 +260,74 @@ describe('When RunList is rendered', () => {
       // Assert — should be back to descending
       const rows = screen.getAllByText(/#\d+/);
       expect(rows[0].textContent).toBe('#3');
+    });
+  });
+
+  describe('If sortable headers are rendered', () => {
+    it('Then each sortable header contains a focusable sort button', () => {
+      // Arrange
+      const runs = createRuns(3);
+      render(<RunList runs={runs} />);
+
+      // Act
+      const durationHeader = screen.getByRole('columnheader', { name: 'Duration' });
+      const sortButton = within(durationHeader).getByRole('button', { name: 'Duration' });
+      sortButton.focus();
+
+      // Assert
+      expect(sortButton).toHaveFocus();
+      expect(sortButton).toHaveAttribute('type', 'button');
+    });
+
+    it('Then the active sort column exposes aria-sort and others are none', () => {
+      // Arrange
+      const runs = createRuns(3);
+
+      // Act
+      render(<RunList runs={runs} />);
+
+      // Assert
+      expect(screen.getByRole('columnheader', { name: 'Start Time' })).toHaveAttribute(
+        'aria-sort',
+        'descending',
+      );
+      expect(screen.getByRole('columnheader', { name: 'Duration' })).toHaveAttribute(
+        'aria-sort',
+        'none',
+      );
+      expect(screen.getByRole('columnheader', { name: 'End Time' })).not.toHaveAttribute(
+        'aria-sort',
+      );
+    });
+
+    it('Then activating a sort button updates aria-sort', () => {
+      // Arrange
+      const runs = createRuns(3);
+      render(<RunList runs={runs} />);
+      const durationHeader = screen.getByRole('columnheader', { name: 'Duration' });
+
+      // Act
+      fireEvent.click(within(durationHeader).getByRole('button'));
+
+      // Assert
+      expect(durationHeader).toHaveAttribute('aria-sort', 'ascending');
+      expect(screen.getByRole('columnheader', { name: 'Start Time' })).toHaveAttribute(
+        'aria-sort',
+        'none',
+      );
+    });
+  });
+
+  describe('If a run row is rendered', () => {
+    it('Then the row has a translated accessible name', () => {
+      // Arrange
+      const runs = createRuns(1);
+
+      // Act
+      render(<RunList runs={runs} />);
+
+      // Assert
+      expect(screen.getByRole('row', { name: 'View run #1 details' })).toBeInTheDocument();
     });
   });
 

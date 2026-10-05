@@ -100,8 +100,9 @@ export function D2RInstallationSettings() {
               size="icon"
               onClick={handleBrowseDirectory}
               title={t(translations.settings.d2rInstallation.browseForDirectory)}
+              aria-label={t(translations.settings.d2rInstallation.browseForDirectory)}
             >
-              <FolderOpen className="h-4 w-4" />
+              <FolderOpen className="h-4 w-4" aria-hidden="true" />
             </Button>
           </div>
           <p className="text-muted-foreground text-xs">

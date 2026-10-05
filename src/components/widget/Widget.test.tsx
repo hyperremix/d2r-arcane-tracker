@@ -1,4 +1,4 @@
-import { render } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import type {
   GrailProgress,
   GrailStatistics,
@@ -489,7 +489,7 @@ describe('Widget display and legibility', () => {
     expect(getByText('Overall', { selector: 'div' }).className).not.toContain('text-gray');
   });
 
-  it('When the focusable widget root is hovered or focused, Then the drag grip brightens', () => {
+  it('When the widget root is hovered, Then the drag grip brightens', () => {
     // Arrange
     const settings: Partial<Settings> = { widgetDisplay: 'overall' };
 
@@ -505,13 +505,10 @@ describe('Widget display and legibility', () => {
 
     // Assert
     const root = container.firstElementChild as HTMLElement;
-    expect(root).toHaveAttribute('role', 'button');
-    expect(root).toHaveAttribute('tabindex', '0');
     expect(root.className).toContain('group');
     const gripClasses = getByTestId('widget-drag-grip').getAttribute('class') ?? '';
     expect(gripClasses).toContain('opacity-30');
     expect(gripClasses).toContain('group-hover:opacity-80');
-    expect(gripClasses).toContain('group-focus-visible:opacity-80');
   });
 
   it('When the widget renders, Then it shows a decorative drag grip that ignores pointer events', () => {
@@ -713,5 +710,45 @@ describe('Widget localization', () => {
     // Assert
     expect(split.getAllByText('tr:normal').length).toBeGreaterThan(0);
     expect(split.getAllByText('tr:ethereal').length).toBeGreaterThan(0);
+  });
+});
+
+describe('When the Widget is rendered', () => {
+  describe('If the display mode is run-only', () => {
+    it('Then the root is a named region instead of a no-op button', () => {
+      // Arrange & Act
+      render(
+        <Widget
+          statistics={null}
+          settings={{ widgetDisplay: 'run-only', widgetRunOnlyShowItems: true }}
+          onDragStart={() => ({})}
+          onDragEnd={() => ({})}
+        />,
+      );
+
+      // Assert
+      const region = screen.getByRole('region', { name: 'Grail progress widget' });
+      expect(region).not.toHaveAttribute('tabindex');
+      expect(region).not.toHaveAttribute('role', 'button');
+    });
+  });
+
+  describe('If statistics are still loading', () => {
+    it('Then a translated loading message is shown inside the region', () => {
+      // Arrange & Act
+      render(
+        <Widget
+          statistics={null}
+          settings={{ widgetDisplay: 'overall' }}
+          onDragStart={() => ({})}
+          onDragEnd={() => ({})}
+        />,
+      );
+
+      // Assert
+      const region = screen.getByRole('region', { name: 'Grail progress widget' });
+      expect(region).toHaveTextContent('Loading...');
+      expect(screen.queryByRole('button')).not.toBeInTheDocument();
+    });
   });
 });
