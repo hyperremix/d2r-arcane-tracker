@@ -2,6 +2,8 @@ import dayjs from 'dayjs';
 import type { Run, RunItem, Session } from 'electron/types/grail';
 import { CopyIcon, DownloadIcon, EyeIcon, EyeOffIcon } from 'lucide-react';
 import { useCallback, useEffect, useId, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
@@ -21,6 +23,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { translations } from '@/i18n/translations';
+import { getFileName } from '@/lib/path';
 import { formatSessionAsCSV, formatSessionAsJSON, formatSessionAsTextSummary } from './formatters';
 
 interface ExportDialogProps {
@@ -32,10 +36,30 @@ interface ExportDialogProps {
 type ExportFormat = 'csv' | 'json' | 'text';
 type TextDetailLevel = 'basic' | 'detailed';
 
+const exportT = translations.runTracker.exportDialog;
+
+interface ExportError {
+  message: string;
+  detail?: string;
+}
+
+/**
+ * Extracts a human-readable detail message from an unknown error value.
+ * @param {unknown} err - The caught error
+ * @returns {string | undefined} The error detail, if any
+ */
+function getErrorDetail(err: unknown): string | undefined {
+  if (err instanceof Error) return err.message;
+  if (typeof err === 'string' && err.length > 0) return err;
+  return undefined;
+}
+
 /**
  * ExportDialog component for exporting session data in multiple formats
  */
 export function ExportDialog({ sessionId, open, onOpenChange }: ExportDialogProps) {
+  const { t } = useTranslation();
+
   // Generate unique IDs
   const formatId = useId();
   const detailLevelId = useId();
@@ -46,7 +70,7 @@ export function ExportDialog({ sessionId, open, onOpenChange }: ExportDialogProp
   const [runs, setRuns] = useState<Run[]>([]);
   const [items, setItems] = useState<RunItem[]>([]);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<ExportError | undefined>(undefined);
 
   // Export options
   const [format, setFormat] = useState<ExportFormat>('csv');
@@ -60,13 +84,14 @@ export function ExportDialog({ sessionId, open, onOpenChange }: ExportDialogProp
 
   const loadSessionData = useCallback(async () => {
     setLoading(true);
-    setError(null);
+    setError(undefined);
 
     try {
       // Load session
       const sessionData = await window.electronAPI?.runTracker.getSessionById(sessionId);
       if (!sessionData) {
-        throw new Error('Session not found');
+        setError({ message: t(exportT.loadFailed) });
+        return;
       }
       setSession(sessionData);
 
@@ -82,13 +107,12 @@ export function ExportDialog({ sessionId, open, onOpenChange }: ExportDialogProp
         setItems([]);
       }
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to load session data';
-      setError(errorMessage);
+      setError({ message: t(exportT.loadFailed), detail: getErrorDetail(err) });
       console.error('[ExportDialog] Error loading session data:', err);
     } finally {
       setLoading(false);
     }
-  }, [sessionId, includeItems]);
+  }, [sessionId, includeItems, t]);
 
   const generateExportContent = useCallback(async () => {
     if (!session || runs.length === 0) return;
@@ -113,9 +137,9 @@ export function ExportDialog({ sessionId, open, onOpenChange }: ExportDialogProp
       setExportContent(content);
     } catch (err) {
       console.error('[ExportDialog] Error generating export content:', err);
-      setError('Failed to generate export content');
+      setError({ message: t(exportT.generateFailed), detail: getErrorDetail(err) });
     }
-  }, [session, runs, items, format, textDetailLevel, includeItems]);
+  }, [session, runs, items, format, textDetailLevel, includeItems, t]);
 
   // Load session data when dialog opens
   useEffect(() => {
@@ -135,16 +159,16 @@ export function ExportDialog({ sessionId, open, onOpenChange }: ExportDialogProp
     if (!exportContent) return;
 
     setIsExporting(true);
-    setError(null);
+    setError(undefined);
 
     try {
       // Show save dialog
       const result = await window.electronAPI?.dialog.showSaveDialog({
-        title: 'Export Session Data',
+        title: t(exportT.title),
         defaultPath: `session-${sessionId.slice(0, 8)}-${dayjs().format('YYYY-MM-DD')}.${format}`,
         filters: [
-          { name: `${format.toUpperCase()} Files`, extensions: [format] },
-          { name: 'All Files', extensions: ['*'] },
+          { name: t(exportT.fileFilter, { format: format.toUpperCase() }), extensions: [format] },
+          { name: t(translations.common.allFiles), extensions: ['*'] },
         ],
       });
 
@@ -153,35 +177,38 @@ export function ExportDialog({ sessionId, open, onOpenChange }: ExportDialogProp
       }
 
       // Write file
-      await window.electronAPI?.dialog.writeFile(result.filePath, exportContent);
+      await window.electronAPI.dialog.writeFile(result.filePath, exportContent);
 
-      console.log('Export saved successfully to:', result.filePath);
+      toast.success(t(exportT.saveSuccess), {
+        description: t(exportT.saveSuccessDescription, {
+          filename: getFileName(result.filePath),
+        }),
+      });
+      onOpenChange(false);
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to save file';
-      setError(errorMessage);
+      setError({ message: t(exportT.saveFailed), detail: getErrorDetail(err) });
       console.error('[ExportDialog] Error saving file:', err);
     } finally {
       setIsExporting(false);
     }
-  }, [exportContent, sessionId, format]);
+  }, [exportContent, sessionId, format, onOpenChange, t]);
 
   const handleCopyToClipboard = useCallback(async () => {
     if (!exportContent) return;
 
     setIsExporting(true);
-    setError(null);
+    setError(undefined);
 
     try {
       await navigator.clipboard.writeText(exportContent);
-      console.log('Export copied to clipboard');
+      toast.success(t(exportT.copySuccess));
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to copy to clipboard';
-      setError(errorMessage);
+      setError({ message: t(exportT.copyFailed), detail: getErrorDetail(err) });
       console.error('[ExportDialog] Error copying to clipboard:', err);
     } finally {
       setIsExporting(false);
     }
-  }, [exportContent]);
+  }, [exportContent, t]);
 
   const handleIncludeItemsChange = useCallback(
     (checked: boolean) => {
@@ -201,8 +228,8 @@ export function ExportDialog({ sessionId, open, onOpenChange }: ExportDialogProp
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Export Session Data</DialogTitle>
-            <DialogDescription>Loading session data...</DialogDescription>
+            <DialogTitle>{t(exportT.title)}</DialogTitle>
+            <DialogDescription>{t(exportT.loadingDescription)}</DialogDescription>
           </DialogHeader>
           <div className="flex items-center justify-center py-8">
             <div className="h-8 w-8 animate-spin rounded-full border-4 border-muted border-t-primary" />
@@ -212,42 +239,19 @@ export function ExportDialog({ sessionId, open, onOpenChange }: ExportDialogProp
     );
   }
 
-  if (error) {
-    return (
-      <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Export Session Data</DialogTitle>
-            <DialogDescription>Error loading session data</DialogDescription>
-          </DialogHeader>
-          <div className="py-4">
-            <p className="text-destructive text-sm">{error}</p>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => onOpenChange(false)}>
-              Close
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    );
-  }
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Export Session Data</DialogTitle>
-          <DialogDescription>
-            Export session data in your preferred format. Session has {runs.length} runs.
-          </DialogDescription>
+          <DialogTitle>{t(exportT.title)}</DialogTitle>
+          <DialogDescription>{t(exportT.description, { count: runs.length })}</DialogDescription>
         </DialogHeader>
 
         <div className="space-y-6">
           {/* Export Options */}
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor={formatId}>Export Format</Label>
+              <Label htmlFor={formatId}>{t(exportT.format)}</Label>
               <Select
                 value={format}
                 onValueChange={(value) => value && setFormat(value as ExportFormat)}
@@ -256,16 +260,16 @@ export function ExportDialog({ sessionId, open, onOpenChange }: ExportDialogProp
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="csv">CSV (Spreadsheet)</SelectItem>
-                  <SelectItem value="json">JSON (Structured Data)</SelectItem>
-                  <SelectItem value="text">Text Summary</SelectItem>
+                  <SelectItem value="csv">{t(exportT.formatCsv)}</SelectItem>
+                  <SelectItem value="json">{t(exportT.formatJson)}</SelectItem>
+                  <SelectItem value="text">{t(exportT.formatText)}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
             {format === 'text' && (
               <div className="space-y-2">
-                <Label htmlFor={detailLevelId}>Detail Level</Label>
+                <Label htmlFor={detailLevelId}>{t(exportT.detailLevel)}</Label>
                 <Select
                   value={textDetailLevel}
                   onValueChange={(value) => value && setTextDetailLevel(value as TextDetailLevel)}
@@ -274,8 +278,8 @@ export function ExportDialog({ sessionId, open, onOpenChange }: ExportDialogProp
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="basic">Basic Summary</SelectItem>
-                    <SelectItem value="detailed">Detailed Summary</SelectItem>
+                    <SelectItem value="basic">{t(exportT.detailBasic)}</SelectItem>
+                    <SelectItem value="detailed">{t(exportT.detailDetailed)}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -287,17 +291,17 @@ export function ExportDialog({ sessionId, open, onOpenChange }: ExportDialogProp
                 checked={includeItems}
                 onCheckedChange={handleIncludeItemsChange}
               />
-              <Label htmlFor={includeItemsId}>Include items found during runs</Label>
+              <Label htmlFor={includeItemsId}>{t(exportT.includeItems)}</Label>
             </div>
           </div>
 
           {/* Preview */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <Label>Preview</Label>
+              <Label>{t(exportT.preview)}</Label>
               <Button variant="ghost" size="sm" onClick={() => setShowPreview(!showPreview)}>
                 {showPreview ? <EyeOffIcon className="h-4 w-4" /> : <EyeIcon className="h-4 w-4" />}
-                {showPreview ? 'Hide' : 'Show'} Preview
+                {showPreview ? t(exportT.hidePreview) : t(exportT.showPreview)}
               </Button>
             </div>
             {showPreview && (
@@ -305,22 +309,23 @@ export function ExportDialog({ sessionId, open, onOpenChange }: ExportDialogProp
                 value={exportContent}
                 readOnly
                 className="min-h-[200px] font-mono text-xs"
-                placeholder="Export content will appear here..."
+                placeholder={t(exportT.previewPlaceholder)}
               />
             )}
           </div>
 
           {/* Error Display */}
           {error && (
-            <div className="rounded-md bg-destructive/10 p-3">
-              <p className="text-destructive text-sm">{error}</p>
+            <div role="alert" className="rounded-md bg-destructive/10 p-3">
+              <p className="text-destructive text-sm">{error.message}</p>
+              {error.detail && <p className="mt-1 text-destructive/80 text-xs">{error.detail}</p>}
             </div>
           )}
         </div>
 
         <DialogFooter className="gap-2">
           <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Cancel
+            {t(translations.common.cancel)}
           </Button>
           <Button
             variant="outline"
@@ -328,11 +333,11 @@ export function ExportDialog({ sessionId, open, onOpenChange }: ExportDialogProp
             disabled={!exportContent || isExporting}
           >
             <CopyIcon className="h-4 w-4" />
-            Copy to Clipboard
+            {t(exportT.copyToClipboard)}
           </Button>
           <Button onClick={handleSaveToFile} disabled={!exportContent || isExporting}>
             <DownloadIcon className="h-4 w-4" />
-            Save to File
+            {t(exportT.saveToFile)}
           </Button>
         </DialogFooter>
       </DialogContent>

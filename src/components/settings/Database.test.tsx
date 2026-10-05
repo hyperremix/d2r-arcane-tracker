@@ -1,0 +1,196 @@
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { toast } from 'sonner';
+import {
+  afterAll,
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  type MockInstance,
+  vi,
+} from 'vitest';
+import { useGrailStore } from '@/stores/grailStore';
+import { DatabaseCard } from './Database';
+
+vi.mock('sonner', () => ({
+  toast: {
+    success: vi.fn(),
+    error: vi.fn(),
+  },
+}));
+
+vi.mock('@/stores/grailStore');
+
+const mockReloadData = vi.fn();
+
+const mockElectronAPI = {
+  dialog: {
+    showSaveDialog: vi.fn(),
+    showOpenDialog: vi.fn(),
+  },
+  grail: {
+    backup: vi.fn(),
+    restore: vi.fn(),
+    restoreFromBuffer: vi.fn(),
+  },
+};
+
+const originalElectronAPI: unknown = window.electronAPI;
+
+// Assign rather than redefine: other suites define `window.electronAPI` as non-configurable.
+function setElectronAPI(value: unknown) {
+  (window as unknown as { electronAPI: unknown }).electronAPI = value;
+}
+
+async function openRestoreConfirmation() {
+  mockElectronAPI.dialog.showOpenDialog.mockResolvedValue({
+    canceled: false,
+    filePaths: ['/backups/holy-grail-backup.db'],
+  });
+  fireEvent.click(screen.getByRole('button', { name: /click to browse/i }));
+  return screen.findByRole('button', { name: 'Back up first' });
+}
+
+describe('When managing database backups', () => {
+  let consoleErrorSpy: MockInstance;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    vi.mocked(useGrailStore).mockReturnValue({ reloadData: mockReloadData });
+    mockReloadData.mockResolvedValue(undefined);
+    setElectronAPI(mockElectronAPI);
+  });
+
+  afterEach(() => {
+    consoleErrorSpy.mockRestore();
+  });
+
+  afterAll(() => {
+    setElectronAPI(originalElectronAPI);
+  });
+
+  it('If the backup succeeds on Windows, Then a success toast and the file name are shown', async () => {
+    // Arrange
+    mockElectronAPI.dialog.showSaveDialog.mockResolvedValue({
+      canceled: false,
+      filePath: 'C:\\Users\\me\\Documents\\holy-grail-backup.db',
+    });
+    mockElectronAPI.grail.backup.mockResolvedValue({ success: true });
+    render(<DatabaseCard />);
+
+    // Act
+    fireEvent.click(screen.getByRole('button', { name: 'Backup Database' }));
+
+    // Assert
+    expect(await screen.findByText('Last backup: holy-grail-backup.db')).toBeInTheDocument();
+    expect(mockElectronAPI.grail.backup).toHaveBeenCalledWith(
+      'C:\\Users\\me\\Documents\\holy-grail-backup.db',
+    );
+    expect(toast.success).toHaveBeenCalledWith('Database backed up', {
+      description: 'Saved to holy-grail-backup.db',
+    });
+    expect(toast.error).not.toHaveBeenCalled();
+  });
+
+  it('If the backup throws, Then an error toast is shown', async () => {
+    // Arrange
+    mockElectronAPI.dialog.showSaveDialog.mockResolvedValue({
+      canceled: false,
+      filePath: '/backups/holy-grail-backup.db',
+    });
+    mockElectronAPI.grail.backup.mockRejectedValue(new Error('Disk full'));
+    render(<DatabaseCard />);
+
+    // Act
+    fireEvent.click(screen.getByRole('button', { name: 'Backup Database' }));
+
+    // Assert
+    await waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith('Failed to back up database', {
+        description: 'Disk full',
+      }),
+    );
+    expect(toast.success).not.toHaveBeenCalled();
+    expect(screen.queryByText(/Last backup:/)).not.toBeInTheDocument();
+  });
+
+  it('If the backup reports failure, Then an error toast is shown', async () => {
+    // Arrange
+    mockElectronAPI.dialog.showSaveDialog.mockResolvedValue({
+      canceled: false,
+      filePath: '/backups/holy-grail-backup.db',
+    });
+    mockElectronAPI.grail.backup.mockResolvedValue({ success: false });
+    render(<DatabaseCard />);
+
+    // Act
+    fireEvent.click(screen.getByRole('button', { name: 'Backup Database' }));
+
+    // Assert
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith('Failed to back up database'));
+    expect(toast.success).not.toHaveBeenCalled();
+  });
+
+  it('If "Back up first" is clicked in the restore confirmation, Then the backup runs and the user can continue restoring', async () => {
+    // Arrange
+    mockElectronAPI.dialog.showSaveDialog.mockResolvedValue({
+      canceled: false,
+      filePath: '/backups/pre-restore.db',
+    });
+    mockElectronAPI.grail.backup.mockResolvedValue({ success: true });
+    mockElectronAPI.grail.restore.mockResolvedValue({ success: true });
+    render(<DatabaseCard />);
+    const backupFirstButton = await openRestoreConfirmation();
+
+    // Act
+    fireEvent.click(backupFirstButton);
+
+    // Assert
+    expect(
+      await screen.findByText('Backup created. You can now continue with the restore.'),
+    ).toBeInTheDocument();
+    expect(mockElectronAPI.grail.backup).toHaveBeenCalledWith('/backups/pre-restore.db');
+    expect(mockElectronAPI.grail.restore).not.toHaveBeenCalled();
+
+    // Act
+    fireEvent.click(screen.getByRole('button', { name: 'Restore Database' }));
+
+    // Assert
+    await waitFor(() =>
+      expect(mockElectronAPI.grail.restore).toHaveBeenCalledWith('/backups/holy-grail-backup.db'),
+    );
+  });
+
+  it('If "Back up first" is canceled, Then the restore confirmation stays open without a continue message', async () => {
+    // Arrange
+    mockElectronAPI.dialog.showSaveDialog.mockResolvedValue({ canceled: true });
+    render(<DatabaseCard />);
+    const backupFirstButton = await openRestoreConfirmation();
+
+    // Act
+    fireEvent.click(backupFirstButton);
+
+    // Assert
+    await waitFor(() => expect(mockElectronAPI.dialog.showSaveDialog).toHaveBeenCalled());
+    expect(mockElectronAPI.grail.backup).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: 'Back up first' })).toBeEnabled();
+    expect(
+      screen.queryByText('Backup created. You can now continue with the restore.'),
+    ).not.toBeInTheDocument();
+  });
+
+  it('If a restore fails, Then a translated error is shown', async () => {
+    // Arrange
+    mockElectronAPI.grail.restore.mockResolvedValue({ success: false });
+    render(<DatabaseCard />);
+    await openRestoreConfirmation();
+
+    // Act
+    fireEvent.click(screen.getByRole('button', { name: 'Restore Database' }));
+
+    // Assert
+    expect(await screen.findByText('Failed to restore database')).toBeInTheDocument();
+  });
+});

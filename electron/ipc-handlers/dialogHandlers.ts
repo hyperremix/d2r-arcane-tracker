@@ -29,7 +29,14 @@ export function initializeDialogHandlers(): void {
   });
 
   // Write file handler
-  ipcMain.handle('dialog:writeFile', async (_, filePath: string, content: string) => {
+  ipcMain.handle('dialog:writeFile', async (_, filePath: unknown, content: unknown) => {
+    if (typeof filePath !== 'string' || filePath.trim().length === 0) {
+      throw new Error('Invalid file path');
+    }
+    if (typeof content !== 'string') {
+      throw new Error('Invalid file content');
+    }
+
     try {
       await writeFile(filePath, content, 'utf-8');
       return { success: true };
