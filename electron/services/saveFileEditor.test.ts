@@ -1,4 +1,4 @@
-import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 type SaveFileEditorModule = typeof import('./saveFileEditor');
 
@@ -127,6 +127,28 @@ beforeAll(async () => {
   addItemToSaveFile = module.addItemToSaveFile;
   moveItemBetweenSaveFiles = module.moveItemBetweenSaveFiles;
   splitStackInSaveFile = module.splitStackInSaveFile;
+});
+
+// With isolate:false, doMock registrations and the module cache are shared across test files.
+// Remove them so later files (e.g. saveFileEditor.integration.test.ts) load the real modules.
+const doMockedModules = [
+  'node:fs/promises',
+  './saveFileBackup',
+  '../utils/atomicWrite',
+  '@dschu012/d2s',
+  '@dschu012/d2s/lib/d2/stash',
+  '@dschu012/d2s/lib/data/versions/96_constant_data',
+  '@dschu012/d2s/lib/data/versions/99_constant_data',
+  './stashFormat',
+  './modernStashParser',
+  '@dschu012/d2s/lib/d2/items',
+];
+
+afterAll(() => {
+  for (const modulePath of doMockedModules) {
+    vi.doUnmock(modulePath);
+  }
+  vi.resetModules();
 });
 
 type D2sItem = {

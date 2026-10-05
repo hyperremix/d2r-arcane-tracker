@@ -5,6 +5,8 @@ import { basename, join, resolve } from 'node:path';
 const MAX_BACKUPS_PER_FILE = 20;
 
 let backupDirectory: string | undefined;
+// Disambiguates backups taken within the same millisecond, which would otherwise overwrite each other.
+let backupSequence = 0;
 
 /**
  * Sets the directory that receives a copy of every save file right before the app modifies it.
@@ -39,11 +41,13 @@ export async function backupSaveFile(filePath: string): Promise<void> {
 
   const prefix = buildBackupPrefix(filePath);
   const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+  backupSequence = (backupSequence + 1) % 1_000_000;
+  const sequence = String(backupSequence).padStart(6, '0');
 
   await mkdir(backupDirectory, { recursive: true });
 
   try {
-    await copyFile(filePath, join(backupDirectory, `${prefix}${stamp}.bak`));
+    await copyFile(filePath, join(backupDirectory, `${prefix}${stamp}-${sequence}.bak`));
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
       return;
