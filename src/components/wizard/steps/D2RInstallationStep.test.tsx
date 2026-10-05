@@ -148,4 +148,72 @@ describe('D2RInstallationStep', () => {
     expect(api.icon.setD2RPath).not.toHaveBeenCalled();
     expect(screen.queryByRole('button', { name: 'Use this' })).not.toBeInTheDocument();
   });
+
+  it('If the path changes while a validation is in flight, Then the stale result is ignored', async () => {
+    // Arrange
+    const api = createElectronApiMock('E:\\Diablo II Resurrected');
+    const resolvers: Array<(value: { valid: boolean }) => void> = [];
+    api.icon.validatePath.mockImplementation(
+      () =>
+        new Promise<{ valid: boolean }>((resolve) => {
+          resolvers.push(resolve);
+        }),
+    );
+    installElectronApi(api);
+    render(<D2RInstallationStep />);
+    const input = await screen.findByDisplayValue('E:\\Diablo II Resurrected');
+    await waitFor(() => {
+      expect(api.icon.validatePath).toHaveBeenCalledTimes(1);
+    });
+
+    // Act
+    fireEvent.change(input, { target: { value: 'E:\\Diablo II Resurrected\\Other' } });
+    await act(async () => {
+      resolvers[0]({ valid: true });
+    });
+
+    // Assert
+    expect(screen.queryByText('Game files found at this location')).not.toBeInTheDocument();
+    expect(screen.queryByText('Checking installation path...')).not.toBeInTheDocument();
+    expect(input).not.toHaveAttribute('aria-invalid');
+  });
+
+  it('If a newer validation starts before an older one resolves, Then only the newest result is shown', async () => {
+    // Arrange
+    const api = createElectronApiMock('E:\\Diablo II Resurrected');
+    const resolvers: Array<(value: { valid: boolean }) => void> = [];
+    api.icon.validatePath.mockImplementation(
+      () =>
+        new Promise<{ valid: boolean }>((resolve) => {
+          resolvers.push(resolve);
+        }),
+    );
+    installElectronApi(api);
+    render(<D2RInstallationStep />);
+    const input = await screen.findByDisplayValue('E:\\Diablo II Resurrected');
+    await waitFor(() => {
+      expect(resolvers).toHaveLength(1);
+    });
+    fireEvent.change(input, { target: { value: 'D:\\D2R' } });
+    await act(async () => {
+      fireEvent.blur(input);
+    });
+    await waitFor(() => {
+      expect(resolvers).toHaveLength(2);
+    });
+
+    // Act
+    await act(async () => {
+      resolvers[1]({ valid: false });
+    });
+    await act(async () => {
+      resolvers[0]({ valid: true });
+    });
+
+    // Assert
+    expect(
+      screen.getByText('Extracted game files were not found at this location'),
+    ).toBeInTheDocument();
+    expect(screen.queryByText('Game files found at this location')).not.toBeInTheDocument();
+  });
 });

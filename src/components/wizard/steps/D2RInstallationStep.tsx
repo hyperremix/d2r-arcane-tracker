@@ -40,16 +40,24 @@ export function D2RInstallationStep() {
   const [hasLoaded, setHasLoaded] = useState(false);
   const [validation, setValidation] = useState<PathValidationState>('idle');
   const savedPathRef = useRef<string>(settings.d2rInstallPath || '');
+  // Incremented whenever a validation starts or the path changes, so older results can be discarded
+  const validationRequestRef = useRef(0);
   const suggestedPath = getSuggestedD2RPath();
 
   const validatePath = useCallback(async () => {
+    validationRequestRef.current += 1;
+    const requestId = validationRequestRef.current;
     setValidation('validating');
     try {
       const result = await window.electronAPI?.icon.validatePath();
-      setValidation(result?.valid ? 'valid' : 'invalid');
+      if (requestId === validationRequestRef.current) {
+        setValidation(result?.valid ? 'valid' : 'invalid');
+      }
     } catch (error) {
       console.error('Failed to validate D2R path:', error);
-      setValidation('invalid');
+      if (requestId === validationRequestRef.current) {
+        setValidation('invalid');
+      }
     }
   }, []);
 
@@ -62,13 +70,23 @@ export function D2RInstallationStep() {
         return;
       }
 
+      // The path is changing, so any validation still in flight is for the old path
+      validationRequestRef.current += 1;
+      const requestId = validationRequestRef.current;
+
       try {
         await window.electronAPI?.icon.setD2RPath(trimmedPath);
         await setSettings({ d2rInstallPath: trimmedPath });
         savedPathRef.current = trimmedPath;
       } catch (error) {
         console.error('Failed to save D2R path:', error);
-        setValidation('error');
+        if (requestId === validationRequestRef.current) {
+          setValidation('error');
+        }
+        return;
+      }
+
+      if (requestId !== validationRequestRef.current) {
         return;
       }
 
@@ -119,6 +137,7 @@ export function D2RInstallationStep() {
 
   const handlePathChange = useCallback((newPath: string) => {
     // Only update local state while typing; the path is persisted and validated on blur
+    validationRequestRef.current += 1;
     setD2rPath(newPath);
     setValidation('idle');
   }, []);
