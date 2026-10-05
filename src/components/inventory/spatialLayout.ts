@@ -159,15 +159,6 @@ export interface EquippedSlotMapping<T extends SpatialItemLike> {
   unplaced: T[];
 }
 
-export function resolveEquippedSlotKey(slotId: number | undefined): EquippedSlotKey | undefined {
-  if (slotId === undefined) {
-    return undefined;
-  }
-
-  const entry = Object.entries(EQUIPPED_SLOT_IDS).find(([, value]) => value === slotId);
-  return entry?.[0] as EquippedSlotKey | undefined;
-}
-
 export function resolvePaperDollSlotKey(slotId: number | undefined): PaperDollSlotKey | undefined {
   if (slotId === undefined) {
     return undefined;
@@ -345,10 +336,6 @@ function occupyItemCells(item: SpatialItemLike, occupiedCells: Set<string>): voi
       occupiedCells.add(createCellKey(x, y));
     }
   }
-}
-
-export function getUnplacedGridItems<T extends SpatialItemLike>(items: T[]): T[] {
-  return items.filter((item) => !hasGridPosition(item));
 }
 
 function resolveStaticPaperDollSlotKey(slotId: number): PaperDollSlotKey | undefined {

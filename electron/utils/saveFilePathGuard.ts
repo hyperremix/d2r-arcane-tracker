@@ -36,7 +36,7 @@ function resolveRealPath(filePath: string): string {
  */
 export function assertSaveFilePathAllowed(
   filePath: string,
-  saveDirectory: string | null | undefined,
+  saveDirectory: string | undefined,
   fieldName: string,
 ): void {
   if (typeof filePath !== 'string' || filePath.length === 0 || filePath.includes('\0')) {

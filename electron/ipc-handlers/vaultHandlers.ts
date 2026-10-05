@@ -29,9 +29,12 @@ import type {
 import { assert } from '../utils/assert';
 import { assertSaveFilePathAllowed } from '../utils/saveFilePathGuard';
 import { isResourceStackFromRawJson, resolveStackCountFromRawJson } from '../utils/stackableItems';
-import { isCurrentlyVaulted, VALID_SOURCE_FILE_TYPES } from '../utils/vaultState';
+import {
+  GRAIL_BOOKMARK_FINGERPRINT_PREFIX,
+  isCurrentlyVaulted,
+  VALID_SOURCE_FILE_TYPES,
+} from '../utils/vaultState';
 
-const GRAIL_BOOKMARK_FINGERPRINT_PREFIX = 'grail:';
 const MAX_SEARCH_TEXT_LENGTH = 120;
 const MAX_PAGE = 10000;
 const MAX_PAGE_SIZE = 200;

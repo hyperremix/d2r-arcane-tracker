@@ -8,9 +8,10 @@ export const VALID_SOURCE_FILE_TYPES: ReadonlySet<string> = new Set<VaultSourceF
   'd2i',
 ]);
 
-type VaultStateTimestamp = Date | string | undefined | null;
+/** Fingerprint prefix of the bookmark rows created from the Grail Tracker item details dialog. */
+export const GRAIL_BOOKMARK_FINGERPRINT_PREFIX = 'grail:';
 
-function toTimestampMs(value: Exclude<VaultStateTimestamp, undefined | null>): number {
+function toTimestampMs(value: Date | string): number {
   return value instanceof Date ? value.getTime() : Date.parse(value);
 }
 
@@ -19,8 +20,8 @@ function toTimestampMs(value: Exclude<VaultStateTimestamp, undefined | null>): n
  * unvaulted timestamp. Accepts dates or ISO strings because rows cross the IPC boundary.
  */
 export function isCurrentlyVaulted(item: {
-  vaultedAt?: VaultItem['vaultedAt'] | string | null;
-  unvaultedAt?: VaultItem['unvaultedAt'] | string | null;
+  vaultedAt?: VaultItem['vaultedAt'] | string;
+  unvaultedAt?: VaultItem['unvaultedAt'] | string;
 }): boolean {
   if (!item.vaultedAt) {
     return false;

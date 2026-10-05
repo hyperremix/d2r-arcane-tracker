@@ -1,4 +1,5 @@
 import type { Item, VaultCategory, VaultItem, VaultItemUpsertInput } from 'electron/types/grail';
+import { GRAIL_BOOKMARK_FINGERPRINT_PREFIX } from 'electron/utils/vaultState';
 import { Archive, ArchiveRestore } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -30,10 +31,8 @@ interface ItemDetailsDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 
-const GRAIL_BOOKMARK_PREFIX = 'grail:';
-
 function toGrailBookmarkFingerprint(item: Item): string {
-  return `${GRAIL_BOOKMARK_PREFIX}${item.id}`;
+  return `${GRAIL_BOOKMARK_FINGERPRINT_PREFIX}${item.id}`;
 }
 
 function toVaultUpsertInput(item: Item): VaultItemUpsertInput {
