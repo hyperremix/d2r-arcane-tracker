@@ -4,9 +4,10 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ItemCard } from '@/components/grail/ItemCard';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button, buttonVariants } from '@/components/ui/button';
+import { Popover, PopoverContent, PopoverTitle, PopoverTrigger } from '@/components/ui/popover';
 import { translations } from '@/i18n/translations';
+import { cn } from '@/lib/utils';
 import { useGrailStore } from '@/stores/grailStore';
 import dingSound from '/ding.mp3';
 import logoUrl from '/logo.png';
@@ -340,97 +341,87 @@ export function NotificationButton() {
   const activeNotifications = notifications.filter((n) => !n.dismissed);
   const unseenCount = activeNotifications.filter((n) => !n.seen).length;
 
+  const bellLabel =
+    unseenCount > 0
+      ? t(translations.grail.notifications.notificationsLabelWithUnread, { count: unseenCount })
+      : t(translations.grail.notifications.notificationsLabel);
+
   return (
-    <div className="relative">
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={() => setIsOpen(!isOpen)}
-        className="relative gap-2"
+    <Popover open={isOpen} onOpenChange={setIsOpen}>
+      <PopoverTrigger
+        aria-label={bellLabel}
+        className={cn(buttonVariants({ variant: 'ghost', size: 'icon-sm' }), 'relative')}
       >
-        <Bell className="h-4 w-4" />
+        <Bell className="h-4 w-4" aria-hidden="true" />
         {unseenCount > 0 && (
           <Badge
             variant="destructive"
+            aria-hidden="true"
             className="-right-2 -top-2 absolute h-5 w-5 rounded-full p-0 text-xs"
           >
             {unseenCount}
           </Badge>
         )}
-      </Button>
-
-      {isOpen && (
-        <>
-          {/* Backdrop */}
-          <button
-            type="button"
-            className="fixed inset-0 z-40"
-            onClick={() => setIsOpen(false)}
-            onKeyDown={(e) => {
-              if (e.key === 'Escape') {
-                setIsOpen(false);
-              }
-            }}
-            aria-label={t(translations.grail.notifications.closeNotifications)}
-          />
-
-          {/* Popover */}
-          <Card className="absolute top-full right-0 z-50 mt-2 w-80 shadow-lg">
-            <CardHeader className="pb-3">
-              <CardTitle className="flex items-center justify-between text-sm">
-                <div className="flex items-center gap-2">
-                  <Bell className="h-4 w-4" />
-                  {t(translations.grail.notifications.recentNotifications)}
-                </div>
-                {activeNotifications.length > 0 && (
+      </PopoverTrigger>
+      <PopoverContent
+        align="end"
+        sideOffset={8}
+        className="max-h-[min(32rem,var(--available-height))] w-80 gap-0 p-0"
+      >
+        <div className="flex items-center justify-between gap-2 border-border border-b px-4 py-3">
+          <PopoverTitle className="flex items-center gap-2 text-sm">
+            <Bell className="h-4 w-4" aria-hidden="true" />
+            {t(translations.grail.notifications.recentNotifications)}
+          </PopoverTitle>
+          {activeNotifications.length > 0 && (
+            <Button
+              onClick={clearAllNotifications}
+              variant="ghost"
+              size="sm"
+              className="h-6 px-2 text-xs"
+            >
+              {t(translations.grail.notifications.clearAll)}
+            </Button>
+          )}
+        </div>
+        <div className="min-h-0 flex-1 overflow-y-auto p-4">
+          {activeNotifications.length === 0 ? (
+            <div className="py-4 text-center text-muted-foreground">
+              <Trophy className="mx-auto mb-2 h-8 w-8 opacity-50" aria-hidden="true" />
+              <p className="text-sm">{t(translations.grail.notifications.noRecentDetections)}</p>
+            </div>
+          ) : (
+            <ul className="space-y-3">
+              {activeNotifications.map((notification) => (
+                <li
+                  key={notification.id}
+                  className={`relative ${!notification.seen ? 'rounded-lg ring-2 ring-blue-200 dark:ring-blue-800' : ''}`}
+                >
+                  <ItemCard
+                    item={notification.grailItem}
+                    normalProgress={notification.normalProgress}
+                    etherealProgress={notification.etherealProgress}
+                    characters={characters}
+                    viewMode="list"
+                    withoutStatusIndicators
+                  />
                   <Button
-                    onClick={clearAllNotifications}
+                    onClick={() => dismissNotification(notification.id)}
                     variant="ghost"
                     size="sm"
-                    className="h-6 px-2 text-xs"
+                    aria-label={t(translations.grail.notifications.dismissNotification, {
+                      itemName: notification.grailItem.name,
+                    })}
+                    className="absolute top-2 right-2 z-10 h-6 w-6 rounded-full bg-background p-0 shadow-sm hover:bg-accent"
                   >
-                    {t(translations.grail.notifications.clearAll)}
+                    <X className="h-3 w-3" aria-hidden="true" />
                   </Button>
-                )}
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {activeNotifications.length === 0 ? (
-                <div className="py-4 text-center text-muted-foreground">
-                  <Trophy className="mx-auto mb-2 h-8 w-8 opacity-50" />
-                  <p className="text-sm">
-                    {t(translations.grail.notifications.noRecentDetections)}
-                  </p>
-                </div>
-              ) : (
-                activeNotifications.map((notification) => (
-                  <div
-                    key={notification.id}
-                    className={`relative ${!notification.seen ? 'rounded-lg ring-2 ring-primary/40' : ''}`}
-                  >
-                    <ItemCard
-                      item={notification.grailItem}
-                      normalProgress={notification.normalProgress}
-                      etherealProgress={notification.etherealProgress}
-                      characters={characters}
-                      viewMode="list"
-                      withoutStatusIndicators
-                    />
-                    <Button
-                      onClick={() => dismissNotification(notification.id)}
-                      variant="ghost"
-                      size="sm"
-                      className="absolute top-2 right-2 z-10 h-6 w-6 rounded-full bg-background p-0 shadow-sm hover:bg-muted"
-                    >
-                      <X className="h-3 w-3" />
-                    </Button>
-                  </div>
-                ))
-              )}
-            </CardContent>
-          </Card>
-        </>
-      )}
-    </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </PopoverContent>
+    </Popover>
   );
 }

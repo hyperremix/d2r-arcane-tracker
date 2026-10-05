@@ -126,7 +126,9 @@
       "recentNotifications": "Recent Notifications",
       "clearAll": "Clear All",
       "noRecentDetections": "No recent item detections",
-      "closeNotifications": "Close notifications",
+      "notificationsLabel": "Notifications",
+      "notificationsLabelWithUnread": "Notifications, {{count}} unread",
+      "dismissNotification": "Dismiss notification for {{itemName}}",
       "holyGrailItemFound": "Holy Grail Item Found!",
       "itemFoundBy": "{{itemName}} found by {{characterName}}",
       "multipleItemsFound": "{{count}} Holy Grail Items Found!",
@@ -448,11 +450,12 @@
     }
   },
   "titleBar": {
-    "holyGrailTracker": "Holy Grail Tracker",
+    "mainNavigation": "Main navigation",
+    "grail": "Grail",
     "statistics": "Statistics",
-    "runCounter": "Run Counter",
-    "runewordCalculator": "Runeword Calculator",
-    "terrorZoneConfiguration": "Terror Zone Configuration",
+    "runs": "Runs",
+    "runewords": "Runewords",
+    "terrorZones": "Terror Zones",
     "settings": "Settings",
     "goBack": "Go back",
     "goForward": "Go forward"
