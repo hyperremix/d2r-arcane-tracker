@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
 import { translations } from '@/i18n/translations';
+import { clampWidgetOpacity, MAX_WIDGET_OPACITY, MIN_WIDGET_OPACITY } from '@/lib/widget';
 import { useGrailStore } from '@/stores/grailStore';
 
 /**
@@ -40,7 +41,7 @@ export function WidgetSettings() {
   const updateOpacity = useCallback(
     async (value: number | readonly number[]) => {
       const values = Array.isArray(value) ? value : [value];
-      const opacity = values[0];
+      const opacity = clampWidgetOpacity(values[0]);
       await setSettings({ widgetOpacity: opacity });
       // Update widget opacity via IPC
       await window.electronAPI?.widget.updateOpacity(opacity);
@@ -56,7 +57,7 @@ export function WidgetSettings() {
   }, [setSettings]);
 
   const widgetDisplay = settings.widgetDisplay || 'overall';
-  const widgetOpacity = settings.widgetOpacity ?? 0.9;
+  const widgetOpacity = clampWidgetOpacity(settings.widgetOpacity);
   const widgetEnabled = settings.widgetEnabled ?? false;
   const widgetRunOnlyShowItems = settings.widgetRunOnlyShowItems ?? true;
 
@@ -193,8 +194,8 @@ export function WidgetSettings() {
             </div>
             <Slider
               id={opacitySliderId}
-              min={0}
-              max={1.0}
+              min={MIN_WIDGET_OPACITY}
+              max={MAX_WIDGET_OPACITY}
               step={0.05}
               value={[widgetOpacity]}
               onValueChange={updateOpacity}
@@ -202,7 +203,9 @@ export function WidgetSettings() {
               className="w-full"
             />
             <p className="text-muted-foreground text-xs">
-              {t(translations.settings.widget.opacityDescription)}
+              {t(translations.settings.widget.opacityDescription, {
+                min: Math.round(MIN_WIDGET_OPACITY * 100),
+              })}
             </p>
           </div>
 

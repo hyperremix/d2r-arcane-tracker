@@ -1,7 +1,9 @@
 import { Trophy } from 'lucide-react';
 import { useId } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
+import { translations } from '@/i18n/translations';
 import { useGrailStore } from '@/stores/grailStore';
 
 /**
@@ -10,6 +12,7 @@ import { useGrailStore } from '@/stores/grailStore';
  * @returns {JSX.Element} Grail settings configuration step content
  */
 export function GrailSettingsStep() {
+  const { t } = useTranslation();
   const grailNormalId = useId();
   const grailEtherealId = useId();
   const grailRunesId = useId();
@@ -26,11 +29,9 @@ export function GrailSettingsStep() {
       <div className="space-y-2">
         <div className="flex items-center gap-2">
           <Trophy className="h-6 w-6" />
-          <h2 className="font-bold text-2xl">Holy Grail Configuration</h2>
+          <h2 className="font-bold text-2xl">{t(translations.settings.grail.title)}</h2>
         </div>
-        <p className="text-muted-foreground">
-          Choose what items you want to track in your Holy Grail collection.
-        </p>
+        <p className="text-muted-foreground">{t(translations.wizard.grail.description)}</p>
       </div>
 
       <div className="space-y-6">
@@ -39,10 +40,10 @@ export function GrailSettingsStep() {
           <div className="flex items-center justify-between">
             <div className="space-y-0.5">
               <Label htmlFor={grailNormalId} className="text-base">
-                Include Normal Items
+                {t(translations.settings.grail.includeNormal)}
               </Label>
               <p className="text-muted-foreground text-sm">
-                Track normal (non-ethereal) versions of items in your grail
+                {t(translations.settings.grail.includeNormalDescription)}
               </p>
             </div>
             <Switch
@@ -55,10 +56,10 @@ export function GrailSettingsStep() {
           <div className="flex items-center justify-between">
             <div className="space-y-0.5">
               <Label htmlFor={grailEtherealId} className="text-base">
-                Include Ethereal Items
+                {t(translations.settings.grail.includeEthereal)}
               </Label>
               <p className="text-muted-foreground text-sm">
-                Track ethereal versions of items in your grail
+                {t(translations.settings.grail.includeEtherealDescription)}
               </p>
             </div>
             <Switch
@@ -74,10 +75,10 @@ export function GrailSettingsStep() {
           <div className="flex items-center justify-between">
             <div className="space-y-0.5">
               <Label htmlFor={grailRunesId} className="text-base">
-                Include Runes
+                {t(translations.settings.grail.includeRunes)}
               </Label>
               <p className="text-muted-foreground text-sm">
-                Track individual runes (El, Eld, Tir, etc.) in your grail
+                {t(translations.settings.grail.includeRunesDescription)}
               </p>
             </div>
             <Switch
@@ -90,10 +91,10 @@ export function GrailSettingsStep() {
           <div className="flex items-center justify-between">
             <div className="space-y-0.5">
               <Label htmlFor={grailRunewordsId} className="text-base">
-                Include Runewords
+                {t(translations.settings.grail.includeRunewords)}
               </Label>
               <p className="text-muted-foreground text-sm">
-                Track completed runewords (Spirit, Insight, etc.) in your grail
+                {t(translations.settings.grail.includeRunewordsDescription)}
               </p>
             </div>
             <Switch
@@ -107,8 +108,7 @@ export function GrailSettingsStep() {
         {/* Information Box */}
         <div className="rounded-lg bg-blue-50 p-4 dark:bg-blue-950">
           <p className="text-blue-800 text-sm dark:text-blue-200">
-            <strong>Tip:</strong> Most players start by tracking normal items only. You can always
-            enable ethereal items, runes, and runewords later for additional challenge!
+            <strong>{t(translations.wizard.tip)}</strong> {t(translations.wizard.grail.tip)}
           </p>
         </div>
       </div>

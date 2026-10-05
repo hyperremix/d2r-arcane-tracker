@@ -1,6 +1,7 @@
 import { render } from '@testing-library/react';
 import type {
   GrailProgress,
+  GrailStatistics,
   Item,
   Run,
   RunItem,
@@ -8,7 +9,7 @@ import type {
   SessionStats,
   Settings,
 } from 'electron/types/grail';
-import { describe, expect, it, vi } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { useRunTrackerStore } from '@/stores/runTrackerStore';
 import { Widget } from './Widget';
 
@@ -342,5 +343,117 @@ describe('Widget run-only item list', () => {
     // Also verify that "Test Item" appears only once
     const itemElements = getAllByText('Test Item');
     expect(itemElements.length).toBe(1);
+  });
+});
+
+describe('Widget display and legibility', () => {
+  beforeAll(() => {
+    // ProgressGauge animations rely on IntersectionObserver, which jsdom does not provide
+    vi.stubGlobal(
+      'IntersectionObserver',
+      class {
+        observe = vi.fn();
+        unobserve = vi.fn();
+        disconnect = vi.fn();
+        takeRecords = vi.fn(() => []);
+      },
+    );
+  });
+
+  afterAll(() => {
+    vi.unstubAllGlobals();
+  });
+
+  const statistics: GrailStatistics = {
+    totalItems: 100,
+    foundItems: 40,
+    completionPercentage: 40,
+    recentFinds: 0,
+    normalItems: { total: 60, found: 30 },
+    etherealItems: { total: 40, found: 10 },
+    currentStreak: 0,
+    maxStreak: 0,
+  };
+
+  it('If split mode is stored but ethereal tracking is off, Then the widget falls back to overall', () => {
+    // Arrange
+    const settings: Partial<Settings> = { widgetDisplay: 'split', grailEthereal: false };
+
+    // Act
+    const { getAllByText, queryAllByText } = render(
+      <Widget
+        statistics={statistics}
+        settings={settings}
+        onDragStart={() => ({})}
+        onDragEnd={() => ({})}
+      />,
+    );
+
+    // Assert
+    expect(getAllByText('Overall').length).toBeGreaterThan(0);
+    expect(queryAllByText('Normal')).toHaveLength(0);
+    expect(queryAllByText('Ethereal')).toHaveLength(0);
+  });
+
+  it('If split mode is stored and ethereal tracking is on, Then normal and ethereal gauges render', () => {
+    // Arrange
+    const settings: Partial<Settings> = { widgetDisplay: 'split', grailEthereal: true };
+
+    // Act
+    const { getAllByText, queryAllByText } = render(
+      <Widget
+        statistics={statistics}
+        settings={settings}
+        onDragStart={() => ({})}
+        onDragEnd={() => ({})}
+      />,
+    );
+
+    // Assert
+    expect(getAllByText('Normal').length).toBeGreaterThan(0);
+    expect(getAllByText('Ethereal').length).toBeGreaterThan(0);
+    expect(queryAllByText('Overall')).toHaveLength(0);
+  });
+
+  it('If the stored opacity is below the minimum, Then the background uses the clamped opacity', () => {
+    // Arrange
+    const settings: Partial<Settings> = { widgetDisplay: 'overall', widgetOpacity: 0 };
+
+    // Act
+    const { container } = render(
+      <Widget
+        statistics={statistics}
+        settings={settings}
+        onDragStart={() => ({})}
+        onDragEnd={() => ({})}
+      />,
+    );
+
+    // Assert
+    const root = container.firstElementChild as HTMLElement;
+    expect(root.style.backgroundColor).toBe('rgba(0, 0, 0, 0.3)');
+  });
+
+  it('When the widget renders, Then it shows a decorative drag grip that ignores pointer events', () => {
+    // Arrange
+    const settings: Partial<Settings> = { widgetDisplay: 'overall' };
+
+    // Act
+    const { getByTestId, container } = render(
+      <Widget
+        statistics={statistics}
+        settings={settings}
+        onDragStart={() => ({})}
+        onDragEnd={() => ({})}
+      />,
+    );
+
+    // Assert
+    const grip = getByTestId('widget-drag-grip');
+    expect(grip).toHaveAttribute('aria-hidden', 'true');
+    expect(grip.getAttribute('class')).toContain('pointer-events-none');
+    const root = container.firstElementChild as HTMLElement;
+    expect(root.style.cursor).toBe('move');
+    expect(root).toContainElement(grip);
   });
 });

@@ -1,23 +1,28 @@
 import { Layers } from 'lucide-react';
 import { useCallback, useId } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
+import { translations } from '@/i18n/translations';
+import { clampWidgetOpacity, MAX_WIDGET_OPACITY, MIN_WIDGET_OPACITY } from '@/lib/widget';
 import { useGrailStore } from '@/stores/grailStore';
 
 /**
- * WidgetStep component - Step for configuring the overlay widget.
+ * WidgetStep component - Overlay widget section of the wizard Preferences step.
  * Allows users to enable/disable widget, adjust display mode and opacity.
- * @returns {JSX.Element} Widget configuration step content
+ * @returns {JSX.Element} Widget configuration section content
  */
 export function WidgetStep() {
+  const { t } = useTranslation();
   const opacitySliderId = useId();
+  const headingId = useId();
   const { settings, setSettings } = useGrailStore();
 
   const widgetEnabled = settings.widgetEnabled ?? false;
   const widgetDisplay = settings.widgetDisplay || 'overall';
-  const widgetOpacity = settings.widgetOpacity ?? 0.9;
+  const widgetOpacity = clampWidgetOpacity(settings.widgetOpacity);
   const grailEthereal = settings.grailEthereal ?? false;
   const widgetRunOnlyShowItems = settings.widgetRunOnlyShowItems ?? true;
 
@@ -42,7 +47,7 @@ export function WidgetStep() {
   const handleOpacityChange = useCallback(
     async (value: number | readonly number[]) => {
       const values = Array.isArray(value) ? value : [value];
-      const opacity = values[0];
+      const opacity = clampWidgetOpacity(values[0]);
       await setSettings({ widgetOpacity: opacity });
       // Update widget opacity via IPC
       await window.electronAPI?.widget.updateOpacity(opacity);
@@ -58,32 +63,38 @@ export function WidgetStep() {
   );
 
   return (
-    <div className="space-y-6">
-      <div className="space-y-2">
+    <section aria-labelledby={headingId} className="space-y-4">
+      <div className="space-y-1">
         <div className="flex items-center gap-2">
           <Layers className="h-6 w-6" />
-          <h2 className="font-bold text-2xl">Widget Settings</h2>
+          <h3 id={headingId} className="font-semibold text-lg">
+            {t(translations.settings.widget.title)}
+          </h3>
         </div>
-        <p className="text-muted-foreground">
-          Configure the optional overlay widget that displays your grail progress.
-        </p>
+        <p className="text-muted-foreground text-sm">{t(translations.wizard.widget.description)}</p>
       </div>
 
       <div className="space-y-6">
         {/* Enable Widget Toggle */}
         <div className="flex items-center justify-between">
           <div>
-            <h4 className="font-medium text-sm">Enable Widget</h4>
+            <h4 className="font-medium text-sm">{t(translations.settings.widget.enableWidget)}</h4>
             <p className="text-muted-foreground text-xs">
-              Show an overlay widget with grail progress
+              {t(translations.settings.widget.enableDescription)}
             </p>
           </div>
-          <Switch checked={widgetEnabled} onCheckedChange={toggleWidget} />
+          <Switch
+            aria-label={t(translations.settings.widget.enableWidget)}
+            checked={widgetEnabled}
+            onCheckedChange={toggleWidget}
+          />
         </div>
 
         {/* Display Mode Selection */}
         <div className="space-y-2">
-          <Label className="font-medium text-sm">Display Mode</Label>
+          <Label className="font-medium text-sm">
+            {t(translations.settings.widget.displayMode)}
+          </Label>
           <div className="grid grid-cols-2 gap-2">
             <Button
               variant={widgetDisplay === 'overall' ? 'default' : 'outline'}
@@ -92,7 +103,7 @@ export function WidgetStep() {
               disabled={!widgetEnabled}
               className="flex-1"
             >
-              Overall
+              {t(translations.settings.widget.overall)}
             </Button>
             <Button
               variant={widgetDisplay === 'split' ? 'default' : 'outline'}
@@ -101,7 +112,7 @@ export function WidgetStep() {
               disabled={!widgetEnabled || !grailEthereal}
               className="flex-1"
             >
-              Split
+              {t(translations.settings.widget.split)}
             </Button>
             <Button
               variant={widgetDisplay === 'all' ? 'default' : 'outline'}
@@ -110,7 +121,7 @@ export function WidgetStep() {
               disabled={!widgetEnabled || !grailEthereal}
               className="flex-1"
             >
-              All
+              {t(translations.settings.widget.all)}
             </Button>
             <Button
               variant={widgetDisplay === 'run-only' ? 'default' : 'outline'}
@@ -119,14 +130,16 @@ export function WidgetStep() {
               disabled={!widgetEnabled}
               className="flex-1"
             >
-              Run Only
+              {t(translations.settings.widget.runOnly)}
             </Button>
           </div>
           <p className="text-muted-foreground text-xs">
-            Overall: Total progress only | Split: Normal + Ethereal | All: All three gauges | Run
-            Only: Current run counter
+            {t(translations.settings.widget.displayModeDescription)}
             {!grailEthereal && (
-              <span className="text-yellow-600"> (Split & All require Ethereal tracking)</span>
+              <span className="text-yellow-600">
+                {' '}
+                {t(translations.settings.widget.splitAllRequireEthereal)}
+              </span>
             )}
           </p>
         </div>
@@ -134,12 +147,15 @@ export function WidgetStep() {
         {/* Run Only Item List Toggle */}
         <div className="flex items-center justify-between">
           <div>
-            <h4 className="font-medium text-sm">Show Run Item List</h4>
+            <h4 className="font-medium text-sm">
+              {t(translations.settings.widget.showRunItemList)}
+            </h4>
             <p className="text-muted-foreground text-xs">
-              In Run Only mode, show a compact text list of grail-relevant items found each run.
+              {t(translations.settings.widget.showRunItemListDescription)}
             </p>
           </div>
           <Switch
+            aria-label={t(translations.settings.widget.showRunItemList)}
             checked={widgetRunOnlyShowItems}
             onCheckedChange={handleRunOnlyItemsChange}
             disabled={!widgetEnabled}
@@ -150,7 +166,7 @@ export function WidgetStep() {
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <Label htmlFor={opacitySliderId} className="font-medium text-sm">
-              Opacity
+              {t(translations.settings.widget.opacity)}
             </Label>
             <span className="text-muted-foreground text-sm">
               {Math.round(widgetOpacity * 100)}%
@@ -158,33 +174,36 @@ export function WidgetStep() {
           </div>
           <Slider
             id={opacitySliderId}
-            min={0}
-            max={1.0}
+            min={MIN_WIDGET_OPACITY}
+            max={MAX_WIDGET_OPACITY}
             step={0.05}
             value={[widgetOpacity]}
             onValueChange={handleOpacityChange}
             disabled={!widgetEnabled}
             className="w-full"
           />
-          <p className="text-muted-foreground text-xs">Adjust widget transparency (0% to 100%)</p>
+          <p className="text-muted-foreground text-xs">
+            {t(translations.settings.widget.opacityDescription, {
+              min: Math.round(MIN_WIDGET_OPACITY * 100),
+            })}
+          </p>
         </div>
 
         {/* Widget Preview Description */}
         <div className="rounded-lg bg-blue-50 p-3 dark:bg-blue-950">
           <p className="text-blue-800 text-xs dark:text-blue-200">
-            <strong>Widget Features:</strong>
-            <br />• Always on top of other windows
-            <br />• Transparent background
-            <br />• Drag to reposition
-            <br />• Auto-snaps to screen edges and corners
-            <br />• Updates in real-time with grail progress
+            <strong>{t(translations.settings.widget.features)}</strong>
+            <br />• {t(translations.settings.widget.featureAlwaysOnTop)}
+            <br />• {t(translations.settings.widget.featureTransparent)}
+            <br />• {t(translations.settings.widget.featureDrag)}
+            <br />• {t(translations.settings.widget.featureSnap)}
+            <br />• {t(translations.settings.widget.featureRealtime)}
             <br />
             <br />
-            <strong>Tip:</strong> The widget is great for monitoring progress while playing in
-            fullscreen mode. You can always enable it later from settings!
+            <strong>{t(translations.wizard.tip)}</strong> {t(translations.wizard.widget.tip)}
           </p>
         </div>
       </div>
-    </div>
+    </section>
   );
 }

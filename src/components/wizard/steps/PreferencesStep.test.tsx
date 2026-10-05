@@ -1,0 +1,38 @@
+import { render, screen } from '@testing-library/react';
+import { beforeEach, describe, expect, it } from 'vitest';
+import { useGrailStore } from '@/stores/grailStore';
+import { PreferencesStep } from './PreferencesStep';
+
+describe('PreferencesStep', () => {
+  beforeEach(() => {
+    useGrailStore.setState((state) => ({
+      settings: { ...state.settings, widgetEnabled: true, widgetOpacity: 0.1 },
+    }));
+  });
+
+  it('When rendered, Then it combines the theme, notification and widget preferences', () => {
+    // Arrange & Act
+    render(<PreferencesStep />);
+
+    // Assert
+    expect(screen.getByRole('heading', { level: 2, name: 'Preferences' })).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Appearance' })).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Notification Settings' })).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Widget Settings' })).toBeInTheDocument();
+    expect(screen.getByRole('switch', { name: 'Sound Notifications' })).toBeInTheDocument();
+    expect(screen.getByRole('switch', { name: 'Enable Widget' })).toBeInTheDocument();
+  });
+
+  it('If a stored widget opacity is below the minimum, Then the slider is clamped to 30%', () => {
+    // Arrange & Act
+    render(<PreferencesStep />);
+
+    // Assert
+    const opacityLabel = screen.getByText('Opacity', { selector: 'label' }) as HTMLLabelElement;
+    const opacitySliderRoot = document.getElementById(opacityLabel.htmlFor);
+    const opacityInput = opacitySliderRoot?.querySelector('input[type="range"]');
+    expect(opacityInput).toHaveAttribute('min', '0.3');
+    expect(screen.getByText('30%')).toBeInTheDocument();
+    expect(screen.getByText('Adjust widget background opacity (30% to 100%)')).toBeInTheDocument();
+  });
+});

@@ -1,6 +1,7 @@
 import { GameMode } from 'electron/types/grail';
 import { Shield, Sword, Users, Wrench } from 'lucide-react';
 import { useId } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Label } from '@/components/ui/label';
 import {
   Select,
@@ -9,38 +10,43 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { translations } from '@/i18n/translations';
 import { useGrailStore } from '@/stores/grailStore';
 
 /**
- * Available game modes with their labels, descriptions, and icons.
+ * Available game modes with their label/description translation keys and icons.
  */
-const gameModes: { value: GameMode; label: string; description: string; icon: React.ReactNode }[] =
-  [
-    {
-      value: GameMode.Both,
-      label: 'Both Softcore & Hardcore',
-      description: 'Track items from both softcore and hardcore characters',
-      icon: <Users className="h-4 w-4" />,
-    },
-    {
-      value: GameMode.Softcore,
-      label: 'Softcore Only',
-      description: 'Track items only from softcore characters',
-      icon: <Shield className="h-4 w-4" />,
-    },
-    {
-      value: GameMode.Hardcore,
-      label: 'Hardcore Only',
-      description: 'Track items only from hardcore characters',
-      icon: <Sword className="h-4 w-4" />,
-    },
-    {
-      value: GameMode.Manual,
-      label: 'Manual Entry',
-      description: 'Manually enter items without automatic save file monitoring',
-      icon: <Wrench className="h-4 w-4" />,
-    },
-  ];
+const gameModes: {
+  value: GameMode;
+  labelKey: string;
+  descriptionKey: string;
+  icon: React.ReactNode;
+}[] = [
+  {
+    value: GameMode.Both,
+    labelKey: translations.settings.gameMode.bothLabel,
+    descriptionKey: translations.settings.gameMode.bothDescription,
+    icon: <Users className="h-4 w-4" />,
+  },
+  {
+    value: GameMode.Softcore,
+    labelKey: translations.settings.gameMode.softcoreLabel,
+    descriptionKey: translations.settings.gameMode.softcoreDescription,
+    icon: <Shield className="h-4 w-4" />,
+  },
+  {
+    value: GameMode.Hardcore,
+    labelKey: translations.settings.gameMode.hardcoreLabel,
+    descriptionKey: translations.settings.gameMode.hardcoreDescription,
+    icon: <Sword className="h-4 w-4" />,
+  },
+  {
+    value: GameMode.Manual,
+    labelKey: translations.settings.gameMode.manualLabel,
+    descriptionKey: translations.settings.gameMode.manualDescription,
+    icon: <Wrench className="h-4 w-4" />,
+  },
+];
 
 /**
  * GameModeStep component - Step for selecting the game mode.
@@ -48,9 +54,11 @@ const gameModes: { value: GameMode; label: string; description: string; icon: Re
  * @returns {JSX.Element} Game mode selection step content
  */
 export function GameModeStep() {
+  const { t } = useTranslation();
   const gameModeId = useId();
   const { settings, setSettings } = useGrailStore();
   const gameMode = settings.gameMode || GameMode.Both;
+  const selectedMode = gameModes.find((mode) => mode.value === gameMode);
 
   const handleGameModeChange = (value: GameMode) => {
     setSettings({ gameMode: value });
@@ -59,21 +67,19 @@ export function GameModeStep() {
   return (
     <div className="space-y-6">
       <div className="space-y-2">
-        <h2 className="font-bold text-2xl">Game Mode</h2>
-        <p className="text-muted-foreground">
-          Choose which character types you want to track in your Holy Grail.
-        </p>
+        <h2 className="font-bold text-2xl">{t(translations.settings.gameMode.title)}</h2>
+        <p className="text-muted-foreground">{t(translations.wizard.gameMode.description)}</p>
       </div>
 
       <div className="space-y-4">
         <div className="space-y-2">
-          <Label htmlFor={gameModeId}>Select Game Mode</Label>
+          <Label htmlFor={gameModeId}>{t(translations.settings.gameMode.selectGameMode)}</Label>
           <Select
             value={gameMode}
             onValueChange={(value) => value && handleGameModeChange(value as GameMode)}
           >
             <SelectTrigger id={gameModeId}>
-              <SelectValue />
+              <SelectValue>{selectedMode ? t(selectedMode.labelKey) : null}</SelectValue>
             </SelectTrigger>
             <SelectContent>
               {gameModes.map((mode) => (
@@ -81,8 +87,10 @@ export function GameModeStep() {
                   <div className="flex items-center gap-2">
                     {mode.icon}
                     <div className="flex flex-col">
-                      <span className="font-medium">{mode.label}</span>
-                      <span className="text-muted-foreground text-xs">{mode.description}</span>
+                      <span className="font-medium">{t(mode.labelKey)}</span>
+                      <span className="text-muted-foreground text-xs">
+                        {t(mode.descriptionKey)}
+                      </span>
                     </div>
                   </div>
                 </SelectItem>
@@ -93,9 +101,7 @@ export function GameModeStep() {
 
         <div className="rounded-lg bg-blue-50 p-4 dark:bg-blue-950">
           <p className="text-blue-800 text-sm dark:text-blue-200">
-            <strong>Note:</strong> The game mode setting determines which characters' items are
-            tracked. This affects item detection from save files and may influence your completion
-            statistics.
+            <strong>{t(translations.common.note)}</strong> {t(translations.settings.gameMode.note)}
           </p>
         </div>
       </div>

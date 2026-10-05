@@ -1,6 +1,7 @@
 import { GameVersion } from 'electron/types/grail';
 import { Gamepad2 } from 'lucide-react';
 import { useId } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Label } from '@/components/ui/label';
 import {
   Select,
@@ -9,21 +10,22 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { translations } from '@/i18n/translations';
 import { useGrailStore } from '@/stores/grailStore';
 
 /**
- * Available game versions with their labels and descriptions.
+ * Available game versions with their label and description translation keys.
  */
-const gameVersions: { value: GameVersion; label: string; description: string }[] = [
+const gameVersions: { value: GameVersion; labelKey: string; descriptionKey: string }[] = [
   {
     value: GameVersion.Resurrected,
-    label: 'Diablo II: Resurrected',
-    description: 'Modern remaster with enhanced graphics and quality of life improvements',
+    labelKey: translations.settings.gameVersion.resurrectedLabel,
+    descriptionKey: translations.settings.gameVersion.resurrectedDescription,
   },
   {
     value: GameVersion.Classic,
-    label: 'Diablo II: Classic',
-    description: 'Original Diablo II with Lord of Destruction expansion',
+    labelKey: translations.settings.gameVersion.classicLabel,
+    descriptionKey: translations.settings.gameVersion.classicDescription,
   },
 ];
 
@@ -33,9 +35,11 @@ const gameVersions: { value: GameVersion; label: string; description: string }[]
  * @returns {JSX.Element} Game version selection step content
  */
 export function GameVersionStep() {
+  const { t } = useTranslation();
   const gameVersionId = useId();
   const { settings, setSettings } = useGrailStore();
   const gameVersion = settings.gameVersion || GameVersion.Resurrected;
+  const selectedVersion = gameVersions.find((version) => version.value === gameVersion);
 
   const handleGameVersionChange = (value: GameVersion) => {
     setSettings({ gameVersion: value });
@@ -44,19 +48,21 @@ export function GameVersionStep() {
   return (
     <div className="space-y-6">
       <div className="space-y-2">
-        <h2 className="font-bold text-2xl">Game Version</h2>
-        <p className="text-muted-foreground">Select which version of Diablo II you're playing.</p>
+        <h2 className="font-bold text-2xl">{t(translations.settings.gameVersion.title)}</h2>
+        <p className="text-muted-foreground">{t(translations.wizard.gameVersion.description)}</p>
       </div>
 
       <div className="space-y-4">
         <div className="space-y-2">
-          <Label htmlFor={gameVersionId}>Select Game Version</Label>
+          <Label htmlFor={gameVersionId}>
+            {t(translations.settings.gameVersion.selectGameVersion)}
+          </Label>
           <Select
             value={gameVersion}
             onValueChange={(value) => value && handleGameVersionChange(value as GameVersion)}
           >
             <SelectTrigger id={gameVersionId}>
-              <SelectValue />
+              <SelectValue>{selectedVersion ? t(selectedVersion.labelKey) : null}</SelectValue>
             </SelectTrigger>
             <SelectContent>
               {gameVersions.map((version) => (
@@ -64,8 +70,10 @@ export function GameVersionStep() {
                   <div className="flex items-center gap-2">
                     <Gamepad2 className="h-4 w-4" />
                     <div className="flex flex-col">
-                      <span className="font-medium">{version.label}</span>
-                      <span className="text-muted-foreground text-xs">{version.description}</span>
+                      <span className="font-medium">{t(version.labelKey)}</span>
+                      <span className="text-muted-foreground text-xs">
+                        {t(version.descriptionKey)}
+                      </span>
                     </div>
                   </div>
                 </SelectItem>
@@ -76,9 +84,8 @@ export function GameVersionStep() {
 
         <div className="rounded-lg bg-blue-50 p-4 dark:bg-blue-950">
           <p className="text-blue-800 text-sm dark:text-blue-200">
-            <strong>Note:</strong> The game version setting affects item detection compatibility and
-            may influence which save file formats are supported. Make sure to select the version
-            that matches your Diablo II installation.
+            <strong>{t(translations.common.note)}</strong>{' '}
+            {t(translations.settings.gameVersion.note)}
           </p>
         </div>
       </div>

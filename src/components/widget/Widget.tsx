@@ -8,10 +8,12 @@ import type {
   SessionStats,
   Settings,
 } from 'electron/types/grail';
+import { GripHorizontal } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ProgressGauge } from '@/components/grail/ProgressGauge';
 import { Input } from '@/components/ui/input';
 import { formatDuration } from '@/lib/utils';
+import { clampWidgetOpacity, resolveWidgetDisplayMode } from '@/lib/widget';
 import { useGrailStore } from '@/stores/grailStore';
 import { useRunTrackerStore } from '@/stores/runTrackerStore';
 
@@ -129,6 +131,21 @@ function buildRunItemNameLookup(
 }
 
 /**
+ * Subtle grip icon hinting that the widget can be dragged.
+ * It is purely decorative and ignores pointer events so the native drag region keeps working.
+ * It stays faint by default because Electron drag regions do not reliably report hover.
+ */
+function WidgetDragGrip() {
+  return (
+    <GripHorizontal
+      aria-hidden="true"
+      data-testid="widget-drag-grip"
+      className="-translate-x-1/2 pointer-events-none absolute top-1 left-1/2 h-4 w-4 text-white opacity-30 transition-opacity duration-200 group-hover:opacity-80 group-focus-visible:opacity-80"
+    />
+  );
+}
+
+/**
  * RunOnlyDisplay component that shows run tracking statistics.
  * Displays current run info and session-wide statistics.
  */
@@ -172,8 +189,8 @@ function RunOnlyDisplay({
   if (!activeSession) {
     return (
       <div className="text-center">
-        <p className="text-gray-200 text-sm">No Active Session</p>
-        <p className="text-gray-400 text-xs">Start a session to track runs</p>
+        <p className="text-sm text-white">No Active Session</p>
+        <p className="text-white/80 text-xs">Start a session to track runs</p>
       </div>
     );
   }
@@ -183,11 +200,11 @@ function RunOnlyDisplay({
       {/* Top Row: Run # and Current Duration */}
       <div className="grid grid-cols-2 gap-4">
         <div className="text-center">
-          <p className="text-gray-300 text-xs">Run</p>
+          <p className="text-white/85 text-xs">Run</p>
           <p className="font-bold text-white text-xl">#{activeSession?.runCount ?? 0}</p>
         </div>
         <div className="text-center">
-          <p className="text-gray-300 text-xs">Current</p>
+          <p className="text-white/85 text-xs">Current</p>
           <p className="font-mono text-lg text-white">{formatDuration(runDuration)}</p>
         </div>
       </div>
@@ -195,11 +212,11 @@ function RunOnlyDisplay({
       {/* Bottom Row: Session Stats */}
       <div className="grid grid-cols-2 gap-4 pt-3">
         <div className="text-center">
-          <p className="text-gray-300 text-xs">Fastest</p>
+          <p className="text-white/85 text-xs">Fastest</p>
           <p className="font-mono text-sm text-white">{formatDuration(sessionStats?.fastestRun)}</p>
         </div>
         <div className="text-center">
-          <p className="text-gray-300 text-xs">Avg</p>
+          <p className="text-white/85 text-xs">Avg</p>
           <p className="font-mono text-sm text-white">
             {formatDuration(sessionStats?.averageRunDuration)}
           </p>
@@ -209,7 +226,7 @@ function RunOnlyDisplay({
       {/* Per-run item list */}
       {showItemList && (
         <div className="flex flex-col gap-2 overflow-hidden">
-          <p className="font-bold text-gray-300 text-md">Run Items</p>
+          <p className="font-bold text-md text-white/85">Run Items</p>
 
           {/* Manual Item Entry */}
           {onAddManualItem && (
@@ -222,7 +239,7 @@ function RunOnlyDisplay({
                   onChange={(e) => setManualItemName(e.target.value)}
                   onKeyDown={handleKeyDown}
                   disabled={addingItem || !hasRuns}
-                  className="h-7 flex-1 border-gray-600 bg-gray-800/50 text-white text-xs placeholder:text-gray-500"
+                  className="h-7 flex-1 border-white/30 bg-black/40 text-white text-xs placeholder:text-white/60"
                   style={{
                     // @ts-expect-error - WebkitAppRegion is an Electron-specific CSS property
                     WebkitAppRegion: 'no-drag',
@@ -234,7 +251,7 @@ function RunOnlyDisplay({
 
           {runItemsByRun.length > 0 && (
             <div
-              className="mt-2 flex flex-col gap-1 overflow-y-auto text-gray-200 text-xs"
+              className="mt-2 flex flex-col gap-1 overflow-y-auto text-white/95 text-xs"
               style={{
                 // @ts-expect-error - WebkitAppRegion is an Electron-specific CSS property
                 WebkitAppRegion: 'no-drag',
@@ -265,8 +282,9 @@ function RunOnlyDisplay({
  * Supports multiple size configurations and dynamic opacity.
  */
 export function Widget({ statistics, settings, onDragStart, onDragEnd }: WidgetProps) {
-  const displayMode = settings.widgetDisplay || 'overall';
-  const opacity = settings.widgetOpacity ?? 0.9;
+  // Split/all modes need ethereal tracking; fall back to overall here so the widget never renders empty
+  const displayMode = resolveWidgetDisplayMode(settings.widgetDisplay, settings.grailEthereal);
+  const opacity = clampWidgetOpacity(settings.widgetOpacity);
   const backgroundColor = `rgba(0, 0, 0, ${opacity})`;
 
   // Run tracker state for run-only mode
@@ -365,7 +383,9 @@ export function Widget({ statistics, settings, onDragStart, onDragEnd }: WidgetP
 
   // Calculate container styles based on display mode
   const containerClasses = useMemo(() => {
-    const baseClasses = 'flex flex-col items-center p-2';
+    // Text shadow keeps the overlay legible over bright game scenes
+    const baseClasses =
+      'group relative flex flex-col items-center p-2 text-white [text-shadow:0_1px_2px_rgb(0_0_0/0.9),0_0_1px_rgb(0_0_0/0.9)]';
     const gapClasses = {
       overall: 'gap-4',
       split: 'gap-4',
@@ -407,6 +427,7 @@ export function Widget({ statistics, settings, onDragStart, onDragEnd }: WidgetP
         // biome-ignore lint/suspicious/noEmptyBlockStatements: No keyboard interaction needed for drag-only widget
         onKeyDown={() => {}}
       >
+        <WidgetDragGrip />
         <RunOnlyDisplay
           activeSession={activeSession}
           runDuration={runDuration}
@@ -441,7 +462,8 @@ export function Widget({ statistics, settings, onDragStart, onDragEnd }: WidgetP
         // biome-ignore lint/suspicious/noEmptyBlockStatements: No keyboard interaction needed for drag-only widget
         onKeyDown={() => {}}
       >
-        <p className="text-gray-200 text-sm">Loading...</p>
+        <WidgetDragGrip />
+        <p className="text-sm text-white">Loading...</p>
       </div>
     );
   }
@@ -466,6 +488,7 @@ export function Widget({ statistics, settings, onDragStart, onDragEnd }: WidgetP
       // biome-ignore lint/suspicious/noEmptyBlockStatements: No keyboard interaction needed for drag-only widget
       onKeyDown={() => {}}
     >
+      <WidgetDragGrip />
       {/* Display mode: overall - Just overall progress */}
       {displayMode === 'overall' && (
         <div style={{ transform: `scale(${gaugeScale})` }} className="mt-8">
@@ -480,7 +503,7 @@ export function Widget({ statistics, settings, onDragStart, onDragEnd }: WidgetP
       )}
 
       {/* Display mode: split - Normal and Ethereal side by side */}
-      {displayMode === 'split' && settings.grailEthereal && (
+      {displayMode === 'split' && (
         <div className="mt-4 flex justify-center gap-12">
           <div style={{ transform: `scale(${gaugeScale})` }}>
             <ProgressGauge
