@@ -136,8 +136,8 @@ export function ItemDetailsDialog({ itemId, open, onOpenChange }: ItemDetailsDia
 
   useEffect(() => {
     loadVaultMetadata().catch((error: unknown) => {
-      console.error('Failed to load vault metadata', error);
-      toast.error(t(translations.vault.loadError));
+      console.error('Failed to load bookmark metadata', error);
+      toast.error(t(translations.grail.itemDetails.bookmarkLoadError));
     });
   }, [loadVaultMetadata, t]);
 
@@ -160,12 +160,12 @@ export function ItemDetailsDialog({ itemId, open, onOpenChange }: ItemDetailsDia
 
       // The write already succeeded: a failed refresh must not roll the optimistic state back.
       await loadVaultMetadata().catch((error: unknown) => {
-        console.error('Failed to refresh vault metadata', error);
-        toast.error(t(translations.vault.loadError));
+        console.error('Failed to refresh bookmark metadata', error);
+        toast.error(t(translations.grail.itemDetails.bookmarkLoadError));
       });
     } catch (error) {
-      console.error('Failed to update vault item', error);
-      toast.error(t(translations.grail.itemDetails.vaultActionFailed));
+      console.error('Failed to update bookmark', error);
+      toast.error(t(translations.grail.itemDetails.bookmarkActionFailed));
       setLinkedVaultItem(previousVaultItem);
     } finally {
       setIsVaultActionPending(false);
@@ -223,12 +223,12 @@ export function ItemDetailsDialog({ itemId, open, onOpenChange }: ItemDetailsDia
             <div className="rounded-lg border p-3">
               <div className="mb-2 flex items-center justify-between">
                 <div className="font-medium text-sm">
-                  {t(translations.grail.itemDetails.vaultStatusTitle)}
+                  {t(translations.grail.itemDetails.bookmarkStatusTitle)}
                 </div>
                 <Badge variant={linkedVaultItem ? 'default' : 'secondary'}>
                   {linkedVaultItem
-                    ? t(translations.grail.itemDetails.vaulted)
-                    : t(translations.grail.itemDetails.notVaulted)}
+                    ? t(translations.grail.itemDetails.bookmarked)
+                    : t(translations.grail.itemDetails.notBookmarked)}
                 </Badge>
               </div>
               <div className="flex flex-wrap gap-1">
@@ -239,7 +239,7 @@ export function ItemDetailsDialog({ itemId, open, onOpenChange }: ItemDetailsDia
                     </Badge>
                   ))
                 ) : (
-                  <Badge variant="outline">{t(translations.grail.itemDetails.noVaultTags)}</Badge>
+                  <Badge variant="outline">{t(translations.grail.itemDetails.noTags)}</Badge>
                 )}
               </div>
             </div>
@@ -267,8 +267,8 @@ export function ItemDetailsDialog({ itemId, open, onOpenChange }: ItemDetailsDia
               <Archive className="mr-1 h-4 w-4" />
             )}
             {linkedVaultItem
-              ? t(translations.grail.itemDetails.unvaultAction)
-              : t(translations.grail.itemDetails.vaultAction)}
+              ? t(translations.grail.itemDetails.unbookmarkAction)
+              : t(translations.grail.itemDetails.bookmarkAction)}
           </Button>
           <MarkAsFoundAction key={item.id} item={item} />
           <Button variant="outline" onClick={() => onOpenChange(false)}>

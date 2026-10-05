@@ -81,6 +81,14 @@
       "method": "Method",
       "actions": "Actions",
       "markAsFound": "Mark as Found",
+      "bookmarkStatusTitle": "Bookmark Status",
+      "bookmarkAction": "Bookmark",
+      "unbookmarkAction": "Remove Bookmark",
+      "bookmarked": "Bookmarked",
+      "notBookmarked": "Not Bookmarked",
+      "noTags": "No tags assigned",
+      "bookmarkActionFailed": "Failed to update the bookmark. Nothing was changed.",
+      "bookmarkLoadError": "Failed to load bookmark status.",
       "markAsFoundDescription": "Record which character found {{item}}.",
       "selectCharacter": "Select a character",
       "noCharactersAvailable": "No characters available yet. Characters are added automatically once your save files are detected, so configure your save directory in Settings first.",
@@ -93,14 +101,7 @@
       "removeRecordLabel": "Remove {{version}} record for {{character}}",
       "removeRecordTitle": "Remove found record?",
       "removeRecordDescription": "This removes the manually added {{version}} record of {{item}} for {{character}}. This cannot be undone.",
-      "removeRecordError": "Could not remove this record. Please try again.",
-      "vaultStatusTitle": "Vault Status",
-      "vaultAction": "Vault",
-      "unvaultAction": "Unvault",
-      "vaulted": "Vaulted",
-      "notVaulted": "Not Vaulted",
-      "noVaultTags": "No tags assigned",
-      "vaultActionFailed": "Failed to update the vault. Nothing was changed."
+      "removeRecordError": "Could not remove this record. Please try again."
     },
     "itemGrid": {
       "notApplicable": "Not Applicable",
@@ -526,18 +527,12 @@
     "runewords": "Runewords",
     "terrorZones": "Terror Zones",
     "inventoryBrowser": "Inventory Browser",
-    "vault": "Vault",
     "settings": "Settings",
     "goBack": "Go back",
     "goForward": "Go forward"
   },
   "vault": {
-    "title": "Vault",
-    "empty": "No vaulted items. Use the Inventory Browser to vault items.",
-    "unvaultAction": "Unvault",
-    "searchPlaceholder": "Search vaulted items...",
-    "vaultedCount": "{{count}} vaulted",
-    "loadError": "Failed to load vault items."
+    "unvaultAction": "Unvault"
   },
   "wizard": {
     "steps": {
@@ -665,15 +660,12 @@
   "inventoryBrowser": {
     "title": "Inventory Browser",
     "searchPlaceholder": "Search items, codes, or quality...",
-    "filters": "Filters",
     "character": "Character",
     "locationFilter": "Location",
     "type": "Type",
-    "presence": "Presence",
     "allCharacters": "All Characters",
     "allLocations": "All Locations",
     "allTypes": "All Types",
-    "allPresence": "All Presence",
     "groupHeader": "{{characterName}} \u00b7 {{sourceFileType}}",
     "unknownSourceFileType": "Unknown source file",
     "capturedAt": "Captured: {{date}}",
@@ -683,8 +675,6 @@
     "tileAriaLabel": "Inventory item {{itemName}}",
     "vaultedTileAriaLabel": "Vaulted item {{itemName}}",
     "vaultedTileStackCountLabel": "Stack count: {{count}}",
-    "tileSummary": "{{itemName}} \u00b7 {{quality}} \u00b7 {{location}} \u00b7 {{coordinates}}",
-    "vaultStatus": "Vault Status",
     "vaultUntracked": "Untracked",
     "vaultPresent": "Present",
     "vaultMissing": "Missing",
@@ -712,7 +702,6 @@
       "dimensionsLabel": "Dimensions:",
       "dimensionsValue": "{{width}}x{{height}}",
       "slotLabel": "Slot:",
-      "presenceLabel": "Presence:",
       "unplacedReasonLabel": "Unplaced reason:",
       "runeName": "{{name}} Rune"
     },
@@ -726,14 +715,10 @@
     "sections": {
       "equipped": "Equipped",
       "inventory": "Inventory",
-      "stashTab": "Stash Tab {{tab}}",
       "sharedTab": "Shared Tab {{tab}}",
       "gems": "Gems",
       "materials": "Materials",
       "runes": "Runes",
-      "expandedInventory": "Expanded Inventory Layout",
-      "expandedStash": "Expanded Stash Layout",
-      "rawStored": "Stored Layout",
       "belt": "Belt",
       "mercenary": "Mercenary",
       "corpse": "Corpse",
@@ -766,11 +751,6 @@
       "unknown": "Unknown",
       "stashTab": "Stash Tab {{tab}}"
     },
-    "presenceOptions": {
-      "all": "All",
-      "present": "Present",
-      "missing": "Missing"
-    },
     "typeOptions": {
       "unique": "Unique",
       "set": "Set",
@@ -781,7 +761,6 @@
     "vaultAction": "Vault",
     "vaulted": "Vaulted",
     "dropToVault": "Drop inventory items here to vault",
-    "dragToVault": "Drag to vault dropzone",
     "vaultedItems": "Vaulted Items",
     "modernStashReadOnlyError": "Modern shared stash is read-only in this version.",
     "operationErrors": {

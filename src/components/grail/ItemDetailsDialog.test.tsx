@@ -561,8 +561,8 @@ describe('When ItemDetailsDialog is rendered', () => {
     });
   });
 
-  describe('If vault metadata exists for the item', () => {
-    it('Then it shows vaulted status badge and tags', async () => {
+  describe('If a bookmark exists for the item', () => {
+    it('Then it shows the bookmarked status badge and tags', async () => {
       // Arrange
       const item = HolyGrailItemBuilder.new().withId('item-1').withName('Windforce').build();
       setupStoreMock({ items: [item] });
@@ -601,25 +601,65 @@ describe('When ItemDetailsDialog is rendered', () => {
       render(<ItemDetailsDialog itemId="item-1" open={true} onOpenChange={vi.fn()} />);
 
       // Assert
-      expect(await screen.findByText('Vaulted')).toBeInTheDocument();
+      expect(await screen.findByText('Bookmarked')).toBeInTheDocument();
       expect(screen.getByText('Trade')).toBeInTheDocument();
     });
   });
 
-  describe('If the item is not vaulted', () => {
-    it('Then clicking Vault calls vault addItem API', async () => {
+  describe('If the item is not bookmarked', () => {
+    it('Then clicking Bookmark calls vault addItem API', async () => {
       // Arrange
       const item = HolyGrailItemBuilder.new().withId('item-1').withName('Windforce').build();
       setupStoreMock({ items: [item] });
 
       // Act
       render(<ItemDetailsDialog itemId="item-1" open={true} onOpenChange={vi.fn()} />);
-      const vaultButton = await screen.findByRole('button', { name: 'Vault' });
+      const vaultButton = await screen.findByRole('button', { name: 'Bookmark' });
       fireEvent.click(vaultButton);
 
       // Assert
       expect(mockVaultAddItem).toHaveBeenCalledTimes(1);
       expect(mockVaultAddItem.mock.calls[0]?.[0]?.grailItemId).toBe('item-1');
+    });
+  });
+
+  describe('If the item is bookmarked', () => {
+    it('Then clicking Remove Bookmark calls vault removeItem API for the bookmark row', async () => {
+      // Arrange
+      const item = HolyGrailItemBuilder.new().withId('item-1').withName('Windforce').build();
+      setupStoreMock({ items: [item] });
+      mockVaultSearch.mockResolvedValue({
+        items: [
+          {
+            id: 'bookmark-1',
+            fingerprint: 'grail:item-1',
+            itemName: 'Windforce',
+            quality: 'unique',
+            ethereal: false,
+            rawItemJson: '{}',
+            sourceFileType: 'd2s',
+            locationContext: 'unknown',
+            grailItemId: 'item-1',
+            categoryIds: [],
+            isPresentInLatestScan: false,
+            created: new Date('2024-01-01T00:00:00.000Z'),
+            lastUpdated: new Date('2024-01-01T00:00:00.000Z'),
+          },
+        ],
+        total: 1,
+        page: 1,
+        pageSize: 20,
+      });
+      mockVaultRemoveItem.mockResolvedValue(undefined);
+      render(<ItemDetailsDialog itemId="item-1" open={true} onOpenChange={vi.fn()} />);
+      const removeButton = await screen.findByRole('button', { name: 'Remove Bookmark' });
+
+      // Act
+      fireEvent.click(removeButton);
+
+      // Assert
+      await waitFor(() => expect(mockVaultRemoveItem).toHaveBeenCalledWith('bookmark-1'));
+      expect(mockVaultAddItem).not.toHaveBeenCalled();
     });
   });
 
@@ -655,17 +695,17 @@ describe('When ItemDetailsDialog is rendered', () => {
 
       // Act
       render(<ItemDetailsDialog itemId="item-1" open={true} onOpenChange={vi.fn()} />);
-      const vaultButton = await screen.findByRole('button', { name: 'Vault' });
+      const vaultButton = await screen.findByRole('button', { name: 'Bookmark' });
       fireEvent.click(vaultButton);
 
       // Assert
-      expect(screen.queryByText('Vaulted')).not.toBeInTheDocument();
+      expect(screen.queryByText('Bookmarked')).not.toBeInTheDocument();
       expect(mockVaultRemoveItem).not.toHaveBeenCalled();
       expect(mockVaultAddItem).toHaveBeenCalledTimes(1);
     });
   });
 
-  describe('If loading the vault metadata rejects', () => {
+  describe('If loading the bookmark metadata rejects', () => {
     it('Then the rejection is handled, logged and surfaced as an error toast', async () => {
       // Arrange
       const item = HolyGrailItemBuilder.new().withId('item-1').withName('Windforce').build();
@@ -682,19 +722,19 @@ describe('When ItemDetailsDialog is rendered', () => {
       // Act
       render(<ItemDetailsDialog itemId="item-1" open={true} onOpenChange={vi.fn()} />);
       await waitFor(() =>
-        expect(toastErrorMock).toHaveBeenCalledWith('Failed to load vault items.'),
+        expect(toastErrorMock).toHaveBeenCalledWith('Failed to load bookmark status.'),
       );
       await new Promise((resolve) => setTimeout(resolve, 0));
       process.off('unhandledRejection', onUnhandledRejection);
 
       // Assert
-      expect(consoleErrorSpy).toHaveBeenCalledWith('Failed to load vault metadata', failure);
+      expect(consoleErrorSpy).toHaveBeenCalledWith('Failed to load bookmark metadata', failure);
       expect(unhandledRejections).toEqual([]);
       consoleErrorSpy.mockRestore();
     });
   });
 
-  describe('If the vault action fails', () => {
+  describe('If the bookmark action fails', () => {
     it('Then the error is logged and surfaced as an error toast', async () => {
       // Arrange
       const item = HolyGrailItemBuilder.new().withId('item-1').withName('Windforce').build();
@@ -703,7 +743,7 @@ describe('When ItemDetailsDialog is rendered', () => {
       mockVaultAddItem.mockRejectedValue(failure);
       const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
       render(<ItemDetailsDialog itemId="item-1" open={true} onOpenChange={vi.fn()} />);
-      const vaultButton = await screen.findByRole('button', { name: 'Vault' });
+      const vaultButton = await screen.findByRole('button', { name: 'Bookmark' });
 
       // Act
       fireEvent.click(vaultButton);
@@ -711,16 +751,16 @@ describe('When ItemDetailsDialog is rendered', () => {
       // Assert
       await waitFor(() =>
         expect(toastErrorMock).toHaveBeenCalledWith(
-          'Failed to update the vault. Nothing was changed.',
+          'Failed to update the bookmark. Nothing was changed.',
         ),
       );
-      expect(consoleErrorSpy).toHaveBeenCalledWith('Failed to update vault item', failure);
-      expect(screen.queryByText('Vaulted')).not.toBeInTheDocument();
+      expect(consoleErrorSpy).toHaveBeenCalledWith('Failed to update bookmark', failure);
+      expect(screen.queryByText('Bookmarked')).not.toBeInTheDocument();
       consoleErrorSpy.mockRestore();
     });
   });
-  describe('If the vault write succeeds but refreshing the vault metadata fails', () => {
-    it('Then the item stays vaulted and only the load error is shown', async () => {
+  describe('If the bookmark write succeeds but refreshing the bookmark metadata fails', () => {
+    it('Then the item stays bookmarked and only the load error is shown', async () => {
       // Arrange
       const item = HolyGrailItemBuilder.new().withId('item-1').withName('Windforce').build();
       setupStoreMock({ items: [item] });
@@ -733,7 +773,7 @@ describe('When ItemDetailsDialog is rendered', () => {
       mockVaultAddItem.mockResolvedValue(vaulted);
       const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
       render(<ItemDetailsDialog itemId="item-1" open={true} onOpenChange={vi.fn()} />);
-      const vaultButton = await screen.findByRole('button', { name: 'Vault' });
+      const vaultButton = await screen.findByRole('button', { name: 'Bookmark' });
       mockVaultListCategories.mockRejectedValue(new Error('refresh failed'));
 
       // Act
@@ -741,13 +781,13 @@ describe('When ItemDetailsDialog is rendered', () => {
 
       // Assert
       await waitFor(() =>
-        expect(toastErrorMock).toHaveBeenCalledWith('Failed to load vault items.'),
+        expect(toastErrorMock).toHaveBeenCalledWith('Failed to load bookmark status.'),
       );
       expect(toastErrorMock).not.toHaveBeenCalledWith(
-        'Failed to update the vault. Nothing was changed.',
+        'Failed to update the bookmark. Nothing was changed.',
       );
       expect(consoleErrorSpy).toHaveBeenCalledWith(
-        'Failed to refresh vault metadata',
+        'Failed to refresh bookmark metadata',
         expect.any(Error),
       );
       consoleErrorSpy.mockRestore();
