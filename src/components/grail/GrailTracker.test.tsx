@@ -1,11 +1,14 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import type { GrailStatistics, Settings } from 'electron/types/grail';
 import { GameMode, GameVersion } from 'electron/types/grail';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useGrailStatistics, useGrailStore } from '@/stores/grailStore';
 import { GrailTracker } from './GrailTracker';
 
-vi.mock('@/stores/grailStore');
+vi.mock('@/stores/grailStore', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/stores/grailStore')>()),
+  useGrailStatistics: vi.fn(),
+}));
 vi.mock('./AdvancedSearch', () => ({
   AdvancedSearch: () => <div data-testid="advanced-search" />,
 }));
@@ -57,32 +60,69 @@ const defaultSettings: Settings = {
   showItemIcons: false,
 };
 
-function setupStoreMock(settingsOverrides: Partial<Settings> = {}) {
-  const storeState = {
-    settings: { ...defaultSettings, ...settingsOverrides },
-    setCharacters: vi.fn(),
-    setItems: vi.fn(),
-    setProgress: vi.fn(),
-    setLoading: vi.fn(),
-    hydrateSettings: vi.fn(),
-  };
-  vi.mocked(useGrailStore).mockReturnValue(
-    storeState as unknown as ReturnType<typeof useGrailStore>,
-  );
+const initialStoreState = useGrailStore.getState();
+
+interface Deferred<T> {
+  promise: Promise<T>;
+  resolve: (value: T) => void;
+  reject: (reason: unknown) => void;
+}
+
+function createDeferred<T>(): Deferred<T> {
+  let resolve!: (value: T) => void;
+  let reject!: (reason: unknown) => void;
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, resolve, reject };
+}
+
+interface WindowWithApis {
+  electronAPI?: unknown;
+  ipcRenderer?: unknown;
+}
+
+const testWindow = window as unknown as WindowWithApis;
+const originalElectronAPI = testWindow.electronAPI;
+const originalIpcRenderer = testWindow.ipcRenderer;
+const getSettings = vi.fn();
+const getCharacters = vi.fn();
+const getItems = vi.fn();
+const getProgress = vi.fn();
+
+beforeEach(() => {
+  vi.spyOn(console, 'log').mockImplementation(() => undefined);
+  vi.spyOn(console, 'error').mockImplementation(() => undefined);
+  getSettings.mockReset().mockResolvedValue(undefined);
+  getCharacters.mockReset().mockResolvedValue([]);
+  getItems.mockReset().mockResolvedValue([]);
+  getProgress.mockReset().mockResolvedValue([]);
+  testWindow.electronAPI = { grail: { getSettings, getCharacters, getItems, getProgress } };
+  testWindow.ipcRenderer = { on: vi.fn(), off: vi.fn() };
+  vi.mocked(useGrailStatistics).mockReset();
+  useGrailStore.setState(initialStoreState, true);
+});
+
+afterEach(() => {
+  testWindow.electronAPI = originalElectronAPI;
+  testWindow.ipcRenderer = originalIpcRenderer;
+  useGrailStore.setState(initialStoreState, true);
+  vi.restoreAllMocks();
+});
+
+function setupStatistics(settingsOverrides: Partial<Settings> = {}) {
+  useGrailStore.setState({ settings: { ...defaultSettings, ...settingsOverrides } });
   vi.mocked(useGrailStatistics).mockReturnValue(
     statistics as unknown as ReturnType<typeof useGrailStatistics>,
   );
 }
 
 describe('When GrailTracker is rendered', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
   describe('If ethereal tracking is enabled in settings', () => {
     it('Then passes showEtherealBreakdown=true to ProgressSummary', () => {
       // Arrange
-      setupStoreMock({ grailEthereal: true });
+      setupStatistics({ grailEthereal: true });
 
       // Act
       render(<GrailTracker />);
@@ -97,7 +137,7 @@ describe('When GrailTracker is rendered', () => {
   describe('If ethereal tracking is disabled in settings', () => {
     it('Then passes showEtherealBreakdown=false to ProgressSummary', () => {
       // Arrange
-      setupStoreMock({ grailEthereal: false });
+      setupStatistics({ grailEthereal: false });
 
       // Act
       render(<GrailTracker />);
@@ -107,6 +147,67 @@ describe('When GrailTracker is rendered', () => {
         'data-show-ethereal-breakdown',
         'false',
       );
+    });
+  });
+});
+
+describe('When GrailTracker mounts', () => {
+  describe('If the initial data load is pending and then resolves', () => {
+    it('Then the store loading flag is true during the load and false afterwards', async () => {
+      // Arrange
+      const settingsDeferred = createDeferred<undefined>();
+      getSettings.mockReturnValue(settingsDeferred.promise);
+
+      // Act
+      render(<GrailTracker />);
+
+      // Assert
+      expect(useGrailStore.getState().loading).toBe(true);
+
+      // Act
+      settingsDeferred.resolve(undefined);
+
+      // Assert
+      await waitFor(() => expect(useGrailStore.getState().loading).toBe(false));
+      expect(getItems).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('If the initial data load rejects', () => {
+    it('Then the store loading flag is reset to false', async () => {
+      // Arrange
+      const settingsDeferred = createDeferred<undefined>();
+      getSettings.mockReturnValue(settingsDeferred.promise);
+
+      // Act
+      render(<GrailTracker />);
+
+      // Assert
+      expect(useGrailStore.getState().loading).toBe(true);
+
+      // Act
+      settingsDeferred.reject(new Error('settings failed'));
+
+      // Assert
+      await waitFor(() => expect(useGrailStore.getState().loading).toBe(false));
+      expect(console.error).toHaveBeenCalledWith('Failed to load grail data:', expect.any(Error));
+    });
+  });
+
+  describe('If one of the parallel data calls rejects', () => {
+    it('Then the remaining data is applied and the loading flag is reset to false', async () => {
+      // Arrange
+      getItems.mockRejectedValue(new Error('items failed'));
+      getCharacters.mockResolvedValue([]);
+      getProgress.mockResolvedValue([]);
+
+      // Act
+      render(<GrailTracker />);
+
+      // Assert
+      await waitFor(() => expect(useGrailStore.getState().loading).toBe(false));
+      expect(console.error).toHaveBeenCalledWith('Failed to load items:', expect.any(Error));
+      expect(getProgress).toHaveBeenCalledTimes(1);
     });
   });
 });
