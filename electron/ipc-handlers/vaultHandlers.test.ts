@@ -782,62 +782,68 @@ describe('When vault IPC handlers are initialized', () => {
     });
   });
 
-  describe('If vault:removeItem targets a vaulted item that was taken out of a save file', () => {
-    it('Then it refuses, because that row is the only copy of the item', async () => {
-      // Arrange
-      initializeVaultHandlers(() => undefined);
-      mocks.grailDatabaseMock.getVaultItemById.mockReturnValue(
-        makeVaultItem({ id: 'row-1', fingerprint: 'fp-real', sourceFilePath: '/tmp/sorc.d2s' }),
-      );
-      const handler = mocks.handleMock.mock.calls.find(
-        (call) => call[0] === 'vault:removeItem',
-      )?.[1];
+  describe('When vault:removeItem is invoked', () => {
+    describe('If it targets a vaulted item that was taken out of a save file', () => {
+      it('Then it refuses, because that row is the only copy of the item', async () => {
+        // Arrange
+        initializeVaultHandlers(() => undefined);
+        mocks.grailDatabaseMock.getVaultItemById.mockReturnValue(
+          makeVaultItem({ id: 'row-1', fingerprint: 'fp-real', sourceFilePath: '/tmp/sorc.d2s' }),
+        );
+        const handler = mocks.handleMock.mock.calls.find(
+          (call) => call[0] === 'vault:removeItem',
+        )?.[1];
 
-      // Act
-      const promise = handler?.(null, 'row-1');
+        // Act
+        const promise = handler?.(null, 'row-1');
 
-      // Assert
-      await expect(promise).rejects.toThrow('Unvault this item before removing');
-      expect(mocks.grailDatabaseMock.removeVaultItem).not.toHaveBeenCalled();
+        // Assert
+        await expect(promise).rejects.toThrow('Unvault this item before removing');
+        expect(mocks.grailDatabaseMock.removeVaultItem).not.toHaveBeenCalled();
+      });
     });
 
-    it('Then it still deletes grail bookmarks that hold no item', async () => {
-      // Arrange
-      initializeVaultHandlers(() => undefined);
-      mocks.grailDatabaseMock.getVaultItemById.mockReturnValue(
-        makeVaultItem({ id: 'grail:shako', fingerprint: 'grail:shako' }),
-      );
-      const handler = mocks.handleMock.mock.calls.find(
-        (call) => call[0] === 'vault:removeItem',
-      )?.[1];
+    describe('If it targets a grail bookmark that holds no item', () => {
+      it('Then it still deletes the bookmark', async () => {
+        // Arrange
+        initializeVaultHandlers(() => undefined);
+        mocks.grailDatabaseMock.getVaultItemById.mockReturnValue(
+          makeVaultItem({ id: 'grail:shako', fingerprint: 'grail:shako' }),
+        );
+        const handler = mocks.handleMock.mock.calls.find(
+          (call) => call[0] === 'vault:removeItem',
+        )?.[1];
 
-      // Act
-      await handler?.(null, 'grail:shako');
+        // Act
+        await handler?.(null, 'grail:shako');
 
-      // Assert
-      expect(mocks.grailDatabaseMock.removeVaultItem).toHaveBeenCalledWith('grail:shako');
+        // Assert
+        expect(mocks.grailDatabaseMock.removeVaultItem).toHaveBeenCalledWith('grail:shako');
+      });
     });
 
-    it('Then it deletes rows that are no longer vaulted', async () => {
-      // Arrange
-      initializeVaultHandlers(() => undefined);
-      mocks.grailDatabaseMock.getVaultItemById.mockReturnValue(
-        makeVaultItem({
-          id: 'row-2',
-          fingerprint: 'fp-old',
-          sourceFilePath: '/tmp/sorc.d2s',
-          unvaultedAt: new Date('2024-03-01T00:00:00.000Z'),
-        }),
-      );
-      const handler = mocks.handleMock.mock.calls.find(
-        (call) => call[0] === 'vault:removeItem',
-      )?.[1];
+    describe('If it targets a row that is no longer vaulted', () => {
+      it('Then it deletes the row', async () => {
+        // Arrange
+        initializeVaultHandlers(() => undefined);
+        mocks.grailDatabaseMock.getVaultItemById.mockReturnValue(
+          makeVaultItem({
+            id: 'row-2',
+            fingerprint: 'fp-old',
+            sourceFilePath: '/tmp/sorc.d2s',
+            unvaultedAt: new Date('2024-03-01T00:00:00.000Z'),
+          }),
+        );
+        const handler = mocks.handleMock.mock.calls.find(
+          (call) => call[0] === 'vault:removeItem',
+        )?.[1];
 
-      // Act
-      await handler?.(null, 'row-2');
+        // Act
+        await handler?.(null, 'row-2');
 
-      // Assert
-      expect(mocks.grailDatabaseMock.removeVaultItem).toHaveBeenCalledWith('row-2');
+        // Assert
+        expect(mocks.grailDatabaseMock.removeVaultItem).toHaveBeenCalledWith('row-2');
+      });
     });
   });
 
@@ -855,257 +861,279 @@ describe('When vault IPC handlers are initialized', () => {
       return mocks.handleMock.mock.calls.find((call) => call[0] === 'vault:unvaultItem')?.[1];
     }
 
-    it('If the row came from a save file and no target is given, Then it refuses instead of marking it unvaulted without writing it', async () => {
-      // Arrange
-      mocks.grailDatabaseMock.getVaultItemById.mockReturnValue(
-        makeVaultItem({ id: 'row-1', fingerprint: 'fp-real', sourceFilePath: '/tmp/sorc.d2s' }),
-      );
-      const handler = getUnvaultHandler();
+    describe('If the row came from a save file and no target is given', () => {
+      it('Then it refuses instead of marking it unvaulted without writing it', async () => {
+        // Arrange
+        mocks.grailDatabaseMock.getVaultItemById.mockReturnValue(
+          makeVaultItem({ id: 'row-1', fingerprint: 'fp-real', sourceFilePath: '/tmp/sorc.d2s' }),
+        );
+        const handler = getUnvaultHandler();
 
-      // Act
-      const promise = handler?.(null, 'row-1');
+        // Act
+        const promise = handler?.(null, 'row-1');
 
-      // Assert
-      await expect(promise).rejects.toThrow('target position is required');
-      expect(mocks.grailDatabaseMock.unvaultVaultItem).not.toHaveBeenCalled();
-    });
-
-    it('If the row is not vaulted anymore, Then it does not write the item a second time', async () => {
-      // Arrange
-      mocks.grailDatabaseMock.getVaultItemById.mockReturnValue(
-        makeVaultItem({
-          id: 'row-1',
-          fingerprint: 'fp-real',
-          sourceFilePath: '/tmp/sorc.d2s',
-          unvaultedAt: new Date('2024-03-01T00:00:00.000Z'),
-        }),
-      );
-      const handler = getUnvaultHandler();
-
-      // Act
-      const promise = handler?.(null, 'row-1', inventoryTarget);
-
-      // Assert
-      await expect(promise).rejects.toThrow('not currently vaulted');
-      expect(mocks.saveFileEditorMock.addItemToSaveFile).not.toHaveBeenCalled();
-    });
-
-    it('If the row is a grail bookmark, Then it never writes catalog data into a save file', async () => {
-      // Arrange
-      mocks.grailDatabaseMock.getVaultItemById.mockReturnValue(
-        makeVaultItem({ id: 'grail:shako', fingerprint: 'grail:shako' }),
-      );
-      const handler = getUnvaultHandler();
-
-      // Act
-      const promise = handler?.(null, 'grail:shako', inventoryTarget);
-
-      // Assert
-      await expect(promise).rejects.toThrow('grail bookmark');
-      expect(mocks.saveFileEditorMock.addItemToSaveFile).not.toHaveBeenCalled();
-    });
-
-    it('If a rune stack is unvaulted completely, Then the whole stack count is written before the vault row is cleared', async () => {
-      // Arrange
-      mocks.grailDatabaseMock.getVaultItemById.mockReturnValue(
-        makeVaultItem({
-          id: 'row-runes',
-          fingerprint: 'fp-runes',
-          itemCode: 'r19',
-          stackCount: 12,
-          rawItemJson: JSON.stringify({ code: 'r19', quantity: 3 }),
-          sourceFilePath: '/tmp/shared.d2i',
-        }),
-      );
-      const handler = getUnvaultHandler();
-
-      // Act
-      await handler?.(null, 'row-runes', {
-        targetFilePath: '/tmp/shared.d2i',
-        targetFileType: 'd2i',
-        targetLocationContext: 'stash',
-        targetStashTab: 7,
-        targetGridX: 0,
-        targetGridY: 0,
+        // Assert
+        await expect(promise).rejects.toThrow('target position is required');
+        expect(mocks.grailDatabaseMock.unvaultVaultItem).not.toHaveBeenCalled();
       });
-
-      // Assert
-      expect(mocks.saveFileEditorMock.addItemToSaveFile).toHaveBeenCalledWith(
-        '/tmp/shared.d2i',
-        'd2i',
-        expect.objectContaining({ code: 'r19' }),
-        'stash',
-        7,
-        0,
-        0,
-        undefined,
-        12,
-      );
-      expect(mocks.grailDatabaseMock.unvaultVaultItem).toHaveBeenCalledWith('row-runes', 12);
-      expect(mocks.saveFileEditorMock.addItemToSaveFile.mock.invocationCallOrder[0]).toBeLessThan(
-        mocks.grailDatabaseMock.unvaultVaultItem.mock.invocationCallOrder[0],
-      );
     });
 
-    it('If part of a rune stack is withdrawn, Then exactly that many units are written and deducted', async () => {
-      // Arrange
-      mocks.grailDatabaseMock.getVaultItemById.mockReturnValue(
-        makeVaultItem({
-          id: 'row-runes',
-          fingerprint: 'fp-runes',
-          itemCode: 'r19',
-          stackCount: 12,
-          rawItemJson: JSON.stringify({ code: 'r19', quantity: 3 }),
-          sourceFilePath: '/tmp/shared.d2i',
-        }),
-      );
-      const handler = getUnvaultHandler();
+    describe('If the row is not vaulted anymore', () => {
+      it('Then it does not write the item a second time', async () => {
+        // Arrange
+        mocks.grailDatabaseMock.getVaultItemById.mockReturnValue(
+          makeVaultItem({
+            id: 'row-1',
+            fingerprint: 'fp-real',
+            sourceFilePath: '/tmp/sorc.d2s',
+            unvaultedAt: new Date('2024-03-01T00:00:00.000Z'),
+          }),
+        );
+        const handler = getUnvaultHandler();
 
-      // Act
-      await handler?.(
-        null,
-        'row-runes',
-        {
+        // Act
+        const promise = handler?.(null, 'row-1', inventoryTarget);
+
+        // Assert
+        await expect(promise).rejects.toThrow('not currently vaulted');
+        expect(mocks.saveFileEditorMock.addItemToSaveFile).not.toHaveBeenCalled();
+      });
+    });
+
+    describe('If the row is a grail bookmark', () => {
+      it('Then it never writes catalog data into a save file', async () => {
+        // Arrange
+        mocks.grailDatabaseMock.getVaultItemById.mockReturnValue(
+          makeVaultItem({ id: 'grail:shako', fingerprint: 'grail:shako' }),
+        );
+        const handler = getUnvaultHandler();
+
+        // Act
+        const promise = handler?.(null, 'grail:shako', inventoryTarget);
+
+        // Assert
+        await expect(promise).rejects.toThrow('grail bookmark');
+        expect(mocks.saveFileEditorMock.addItemToSaveFile).not.toHaveBeenCalled();
+      });
+    });
+
+    describe('If a rune stack is unvaulted completely', () => {
+      it('Then the whole stack count is written before the vault row is cleared', async () => {
+        // Arrange
+        mocks.grailDatabaseMock.getVaultItemById.mockReturnValue(
+          makeVaultItem({
+            id: 'row-runes',
+            fingerprint: 'fp-runes',
+            itemCode: 'r19',
+            stackCount: 12,
+            rawItemJson: JSON.stringify({ code: 'r19', quantity: 3 }),
+            sourceFilePath: '/tmp/shared.d2i',
+          }),
+        );
+        const handler = getUnvaultHandler();
+
+        // Act
+        await handler?.(null, 'row-runes', {
           targetFilePath: '/tmp/shared.d2i',
           targetFileType: 'd2i',
           targetLocationContext: 'stash',
           targetStashTab: 7,
           targetGridX: 0,
           targetGridY: 0,
-        },
-        5,
-      );
+        });
 
-      // Assert
-      expect(mocks.saveFileEditorMock.addItemToSaveFile.mock.calls[0]?.[8]).toBe(5);
-      expect(mocks.grailDatabaseMock.unvaultVaultItem).toHaveBeenCalledWith('row-runes', 5);
-    });
-
-    it('If more units are withdrawn than the stack holds, Then it refuses before touching any file', async () => {
-      // Arrange
-      mocks.grailDatabaseMock.getVaultItemById.mockReturnValue(
-        makeVaultItem({
-          id: 'row-runes',
-          fingerprint: 'fp-runes',
-          itemCode: 'r19',
-          stackCount: 2,
-          rawItemJson: JSON.stringify({ code: 'r19' }),
-          sourceFilePath: '/tmp/shared.d2i',
-        }),
-      );
-      const handler = getUnvaultHandler();
-
-      // Act
-      const promise = handler?.(null, 'row-runes', inventoryTarget, 3);
-
-      // Assert
-      await expect(promise).rejects.toThrow('exceeds the number of items');
-      expect(mocks.saveFileEditorMock.addItemToSaveFile).not.toHaveBeenCalled();
-    });
-
-    it('If a non-stack item is withdrawn partially, Then it refuses', async () => {
-      // Arrange
-      mocks.grailDatabaseMock.getVaultItemById.mockReturnValue(
-        makeVaultItem({
-          id: 'row-arrows',
-          fingerprint: 'fp-arrows',
-          itemCode: 'aqv',
-          stackCount: 80,
-          rawItemJson: JSON.stringify({ code: 'aqv', quantity: 80 }),
-          sourceFilePath: '/tmp/sorc.d2s',
-        }),
-      );
-      const handler = getUnvaultHandler();
-
-      // Act
-      const promise = handler?.(null, 'row-arrows', inventoryTarget, 10);
-
-      // Assert
-      await expect(promise).rejects.toThrow('partially');
-      expect(mocks.saveFileEditorMock.addItemToSaveFile).not.toHaveBeenCalled();
-    });
-
-    it('If writing the item to the save file fails, Then the vault row stays vaulted', async () => {
-      // Arrange
-      mocks.grailDatabaseMock.getVaultItemById.mockReturnValue(
-        makeVaultItem({
-          id: 'row-1',
-          fingerprint: 'fp-real',
-          rawItemJson: '{"id":42,"code":"uap"}',
-          sourceFilePath: '/tmp/sorc.d2s',
-        }),
-      );
-      mocks.saveFileEditorMock.addItemToSaveFile.mockRejectedValue(
-        new Error('TARGET_CELL_OCCUPIED'),
-      );
-      const handler = getUnvaultHandler();
-
-      // Act
-      const promise = handler?.(null, 'row-1', inventoryTarget);
-
-      // Assert
-      await expect(promise).rejects.toThrow('TARGET_CELL_OCCUPIED');
-      expect(mocks.grailDatabaseMock.unvaultVaultItem).not.toHaveBeenCalled();
-    });
-
-    it('If the same row is unvaulted twice at once, Then the item is written only once', async () => {
-      // Arrange
-      mocks.grailDatabaseMock.getVaultItemById.mockReturnValue(
-        makeVaultItem({
-          id: 'row-1',
-          fingerprint: 'fp-real',
-          rawItemJson: '{"id":42,"code":"uap"}',
-          sourceFilePath: '/tmp/sorc.d2s',
-        }),
-      );
-      let finishWrite: () => void = () => undefined;
-      mocks.saveFileEditorMock.addItemToSaveFile.mockImplementation(
-        () =>
-          new Promise<void>((resolve) => {
-            finishWrite = resolve;
-          }),
-      );
-      const handler = getUnvaultHandler();
-
-      // Act
-      const first = handler?.(null, 'row-1', inventoryTarget);
-      const second = handler?.(null, 'row-1', inventoryTarget);
-      await expect(second).rejects.toThrow('already being unvaulted');
-      finishWrite();
-      await first;
-
-      // Assert
-      expect(mocks.saveFileEditorMock.addItemToSaveFile).toHaveBeenCalledTimes(1);
-      expect(mocks.grailDatabaseMock.unvaultVaultItem).toHaveBeenCalledTimes(1);
-    });
-
-    it('If an equipped target has no slot, Then it is rejected at IPC validation', async () => {
-      // Arrange
-      const handler = getUnvaultHandler();
-
-      // Act
-      const promise = handler?.(null, 'row-1', {
-        ...inventoryTarget,
-        targetLocationContext: 'equipped',
+        // Assert
+        expect(mocks.saveFileEditorMock.addItemToSaveFile).toHaveBeenCalledWith(
+          '/tmp/shared.d2i',
+          'd2i',
+          expect.objectContaining({ code: 'r19' }),
+          'stash',
+          7,
+          0,
+          0,
+          undefined,
+          12,
+        );
+        expect(mocks.grailDatabaseMock.unvaultVaultItem).toHaveBeenCalledWith('row-runes', 12);
+        expect(mocks.saveFileEditorMock.addItemToSaveFile.mock.invocationCallOrder[0]).toBeLessThan(
+          mocks.grailDatabaseMock.unvaultVaultItem.mock.invocationCallOrder[0],
+        );
       });
-
-      // Assert
-      await expect(promise).rejects.toThrow('targetEquippedSlotId must be one of: 1-12');
     });
 
-    it('If a tag-only row without a source file is unvaulted, Then only the vault state changes', async () => {
-      // Arrange
-      mocks.grailDatabaseMock.getVaultItemById.mockReturnValue(
-        makeVaultItem({ id: 'row-tag', fingerprint: 'fp-tag' }),
-      );
-      const handler = getUnvaultHandler();
+    describe('If part of a rune stack is withdrawn', () => {
+      it('Then exactly that many units are written and deducted', async () => {
+        // Arrange
+        mocks.grailDatabaseMock.getVaultItemById.mockReturnValue(
+          makeVaultItem({
+            id: 'row-runes',
+            fingerprint: 'fp-runes',
+            itemCode: 'r19',
+            stackCount: 12,
+            rawItemJson: JSON.stringify({ code: 'r19', quantity: 3 }),
+            sourceFilePath: '/tmp/shared.d2i',
+          }),
+        );
+        const handler = getUnvaultHandler();
 
-      // Act
-      await handler?.(null, 'row-tag');
+        // Act
+        await handler?.(
+          null,
+          'row-runes',
+          {
+            targetFilePath: '/tmp/shared.d2i',
+            targetFileType: 'd2i',
+            targetLocationContext: 'stash',
+            targetStashTab: 7,
+            targetGridX: 0,
+            targetGridY: 0,
+          },
+          5,
+        );
 
-      // Assert
-      expect(mocks.grailDatabaseMock.unvaultVaultItem).toHaveBeenCalledWith('row-tag', undefined);
-      expect(mocks.saveFileEditorMock.addItemToSaveFile).not.toHaveBeenCalled();
+        // Assert
+        expect(mocks.saveFileEditorMock.addItemToSaveFile.mock.calls[0]?.[8]).toBe(5);
+        expect(mocks.grailDatabaseMock.unvaultVaultItem).toHaveBeenCalledWith('row-runes', 5);
+      });
+    });
+
+    describe('If more units are withdrawn than the stack holds', () => {
+      it('Then it refuses before touching any file', async () => {
+        // Arrange
+        mocks.grailDatabaseMock.getVaultItemById.mockReturnValue(
+          makeVaultItem({
+            id: 'row-runes',
+            fingerprint: 'fp-runes',
+            itemCode: 'r19',
+            stackCount: 2,
+            rawItemJson: JSON.stringify({ code: 'r19' }),
+            sourceFilePath: '/tmp/shared.d2i',
+          }),
+        );
+        const handler = getUnvaultHandler();
+
+        // Act
+        const promise = handler?.(null, 'row-runes', inventoryTarget, 3);
+
+        // Assert
+        await expect(promise).rejects.toThrow('exceeds the number of items');
+        expect(mocks.saveFileEditorMock.addItemToSaveFile).not.toHaveBeenCalled();
+      });
+    });
+
+    describe('If a non-stack item is withdrawn partially', () => {
+      it('Then it refuses', async () => {
+        // Arrange
+        mocks.grailDatabaseMock.getVaultItemById.mockReturnValue(
+          makeVaultItem({
+            id: 'row-arrows',
+            fingerprint: 'fp-arrows',
+            itemCode: 'aqv',
+            stackCount: 80,
+            rawItemJson: JSON.stringify({ code: 'aqv', quantity: 80 }),
+            sourceFilePath: '/tmp/sorc.d2s',
+          }),
+        );
+        const handler = getUnvaultHandler();
+
+        // Act
+        const promise = handler?.(null, 'row-arrows', inventoryTarget, 10);
+
+        // Assert
+        await expect(promise).rejects.toThrow('partially');
+        expect(mocks.saveFileEditorMock.addItemToSaveFile).not.toHaveBeenCalled();
+      });
+    });
+
+    describe('If writing the item to the save file fails', () => {
+      it('Then the vault row stays vaulted', async () => {
+        // Arrange
+        mocks.grailDatabaseMock.getVaultItemById.mockReturnValue(
+          makeVaultItem({
+            id: 'row-1',
+            fingerprint: 'fp-real',
+            rawItemJson: '{"id":42,"code":"uap"}',
+            sourceFilePath: '/tmp/sorc.d2s',
+          }),
+        );
+        mocks.saveFileEditorMock.addItemToSaveFile.mockRejectedValue(
+          new Error('TARGET_CELL_OCCUPIED'),
+        );
+        const handler = getUnvaultHandler();
+
+        // Act
+        const promise = handler?.(null, 'row-1', inventoryTarget);
+
+        // Assert
+        await expect(promise).rejects.toThrow('TARGET_CELL_OCCUPIED');
+        expect(mocks.grailDatabaseMock.unvaultVaultItem).not.toHaveBeenCalled();
+      });
+    });
+
+    describe('If the same row is unvaulted twice at once', () => {
+      it('Then the item is written only once', async () => {
+        // Arrange
+        mocks.grailDatabaseMock.getVaultItemById.mockReturnValue(
+          makeVaultItem({
+            id: 'row-1',
+            fingerprint: 'fp-real',
+            rawItemJson: '{"id":42,"code":"uap"}',
+            sourceFilePath: '/tmp/sorc.d2s',
+          }),
+        );
+        let finishWrite: () => void = () => undefined;
+        mocks.saveFileEditorMock.addItemToSaveFile.mockImplementation(
+          () =>
+            new Promise<void>((resolve) => {
+              finishWrite = resolve;
+            }),
+        );
+        const handler = getUnvaultHandler();
+
+        // Act
+        const first = handler?.(null, 'row-1', inventoryTarget);
+        const second = handler?.(null, 'row-1', inventoryTarget);
+        await expect(second).rejects.toThrow('already being unvaulted');
+        finishWrite();
+        await first;
+
+        // Assert
+        expect(mocks.saveFileEditorMock.addItemToSaveFile).toHaveBeenCalledTimes(1);
+        expect(mocks.grailDatabaseMock.unvaultVaultItem).toHaveBeenCalledTimes(1);
+      });
+    });
+
+    describe('If an equipped target has no slot', () => {
+      it('Then it is rejected at IPC validation', async () => {
+        // Arrange
+        const handler = getUnvaultHandler();
+
+        // Act
+        const promise = handler?.(null, 'row-1', {
+          ...inventoryTarget,
+          targetLocationContext: 'equipped',
+        });
+
+        // Assert
+        await expect(promise).rejects.toThrow('targetEquippedSlotId must be one of: 1-12');
+      });
+    });
+
+    describe('If a tag-only row without a source file is unvaulted', () => {
+      it('Then only the vault state changes', async () => {
+        // Arrange
+        mocks.grailDatabaseMock.getVaultItemById.mockReturnValue(
+          makeVaultItem({ id: 'row-tag', fingerprint: 'fp-tag' }),
+        );
+        const handler = getUnvaultHandler();
+
+        // Act
+        await handler?.(null, 'row-tag');
+
+        // Assert
+        expect(mocks.grailDatabaseMock.unvaultVaultItem).toHaveBeenCalledWith('row-tag', undefined);
+        expect(mocks.saveFileEditorMock.addItemToSaveFile).not.toHaveBeenCalled();
+      });
     });
   });
 
