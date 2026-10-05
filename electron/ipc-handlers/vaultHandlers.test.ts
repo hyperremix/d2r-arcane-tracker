@@ -1241,236 +1241,260 @@ describe('When vault IPC handlers are initialized', () => {
       };
     }
 
-    it.each([
+    describe.each([
       ['a path outside the save directory', outsidePath],
       ['a ".." traversal path', traversalPath],
       ['a non-save extension', '/tmp/notes.txt'],
-    ])('If inventory:moveItem receives %s as source, Then it rejects before any write', async (_label, badPath) => {
-      // Arrange
-      const handler = getHandler('inventory:moveItem');
+    ])('If inventory:moveItem receives %s as source', (_label, badPath) => {
+      it('Then it rejects before any write', async () => {
+        // Arrange
+        const handler = getHandler('inventory:moveItem');
 
-      // Act
-      const promise = handler?.(null, makeMovePayload({ sourceFilePath: badPath }));
+        // Act
+        const promise = handler?.(null, makeMovePayload({ sourceFilePath: badPath }));
 
-      // Assert
-      await expect(promise).rejects.toThrow('sourceFilePath');
-      expect(mocks.saveFileEditorMock.moveItemBetweenSaveFiles).not.toHaveBeenCalled();
-    });
-
-    it('If inventory:moveItem receives a target outside the save directory, Then it rejects before any write', async () => {
-      // Arrange
-      const handler = getHandler('inventory:moveItem');
-
-      // Act
-      const promise = handler?.(null, makeMovePayload({ targetFilePath: traversalPath }));
-
-      // Assert
-      await expect(promise).rejects.toThrow('targetFilePath must be a save file inside');
-      expect(mocks.saveFileEditorMock.moveItemBetweenSaveFiles).not.toHaveBeenCalled();
-    });
-
-    it('If inventory:splitStack receives a source or target outside the save directory, Then it rejects before any write', async () => {
-      // Arrange
-      const handler = getHandler('inventory:splitStack');
-      const basePayload = {
-        sourceFilePath: '/tmp/shared.d2i',
-        sourceFileType: 'd2i',
-        sourceStashTab: 7,
-        sourceItemCode: 'r19',
-        splitCount: 1,
-        targets: [
-          {
-            targetFilePath: '/tmp/sorc.d2s',
-            targetFileType: 'd2s',
-            targetLocationContext: 'inventory',
-            targetGridX: 3,
-            targetGridY: 2,
-          },
-        ],
-      };
-
-      // Act
-      const badSource = handler?.(null, { ...basePayload, sourceFilePath: outsidePath });
-      const badTarget = handler?.(null, {
-        ...basePayload,
-        targets: [{ ...basePayload.targets[0], targetFilePath: traversalPath }],
+        // Assert
+        await expect(promise).rejects.toThrow('sourceFilePath');
+        expect(mocks.saveFileEditorMock.moveItemBetweenSaveFiles).not.toHaveBeenCalled();
       });
-
-      // Assert
-      await expect(badSource).rejects.toThrow('sourceFilePath must be a save file inside');
-      await expect(badTarget).rejects.toThrow('targetFilePath must be a save file inside');
-      expect(mocks.saveFileEditorMock.splitStackInSaveFile).not.toHaveBeenCalled();
     });
 
-    it('If vault:addItem receives a source file outside the save directory, Then it rejects before reading or writing anything', async () => {
-      // Arrange
-      const handler = getHandler('vault:addItem');
+    describe('If inventory:moveItem receives a target outside the save directory', () => {
+      it('Then it rejects before any write', async () => {
+        // Arrange
+        const handler = getHandler('inventory:moveItem');
 
-      // Act
-      const promise = handler?.(null, {
-        fingerprint: 'fp-evil',
-        itemName: 'Shako',
-        quality: 'unique',
-        ethereal: false,
-        rawItemJson: '{"id":42}',
-        sourceFileType: 'd2s',
-        sourceFilePath: traversalPath,
-        locationContext: 'inventory',
+        // Act
+        const promise = handler?.(null, makeMovePayload({ targetFilePath: traversalPath }));
+
+        // Assert
+        await expect(promise).rejects.toThrow('targetFilePath must be a save file inside');
+        expect(mocks.saveFileEditorMock.moveItemBetweenSaveFiles).not.toHaveBeenCalled();
       });
-
-      // Assert
-      await expect(promise).rejects.toThrow('sourceFilePath must be a save file inside');
-      expect(mocks.saveFileEditorMock.readSaveFileItem).not.toHaveBeenCalled();
-      expect(mocks.grailDatabaseMock.addVaultItemWithUndo).not.toHaveBeenCalled();
-      expect(mocks.saveFileEditorMock.removeItemFromSaveFile).not.toHaveBeenCalled();
     });
 
-    it('If vault:unvaultItem receives a target outside the save directory, Then it rejects before writing the item', async () => {
-      // Arrange
-      mocks.grailDatabaseMock.getVaultItemById.mockReturnValue(
-        makeVaultItem({ id: 'row-1', rawItemJson: '{"id":42,"code":"uap"}' }),
-      );
-      const handler = getHandler('vault:unvaultItem');
+    describe('If inventory:splitStack receives a source or target outside the save directory', () => {
+      it('Then it rejects before any write', async () => {
+        // Arrange
+        const handler = getHandler('inventory:splitStack');
+        const basePayload = {
+          sourceFilePath: '/tmp/shared.d2i',
+          sourceFileType: 'd2i',
+          sourceStashTab: 7,
+          sourceItemCode: 'r19',
+          splitCount: 1,
+          targets: [
+            {
+              targetFilePath: '/tmp/sorc.d2s',
+              targetFileType: 'd2s',
+              targetLocationContext: 'inventory',
+              targetGridX: 3,
+              targetGridY: 2,
+            },
+          ],
+        };
 
-      // Act
-      const promise = handler?.(null, 'row-1', {
-        targetFilePath: outsidePath,
-        targetFileType: 'd2s',
-        targetLocationContext: 'inventory',
-        targetGridX: 0,
-        targetGridY: 0,
+        // Act
+        const badSource = handler?.(null, { ...basePayload, sourceFilePath: outsidePath });
+        const badTarget = handler?.(null, {
+          ...basePayload,
+          targets: [{ ...basePayload.targets[0], targetFilePath: traversalPath }],
+        });
+
+        // Assert
+        await expect(badSource).rejects.toThrow('sourceFilePath must be a save file inside');
+        await expect(badTarget).rejects.toThrow('targetFilePath must be a save file inside');
+        expect(mocks.saveFileEditorMock.splitStackInSaveFile).not.toHaveBeenCalled();
       });
-
-      // Assert
-      await expect(promise).rejects.toThrow(
-        'targetOptions.targetFilePath must be a save file inside',
-      );
-      expect(mocks.saveFileEditorMock.addItemToSaveFile).not.toHaveBeenCalled();
-      expect(mocks.grailDatabaseMock.unvaultVaultItem).not.toHaveBeenCalled();
     });
 
-    it('If the save file monitor reports a save directory, Then that directory is used instead of the stored setting', async () => {
-      // Arrange
-      mocks.grailDatabaseMock.getAllSettings.mockReturnValue({ saveDir: '/somewhere/else' });
-      initializeVaultHandlers(
-        () => ({ getSaveDirectory: () => '/tmp' }) as unknown as SaveFileMonitor,
-      );
-      const handler = mocks.handleMock.mock.calls.find(
-        (call) => call[0] === 'inventory:moveItem',
-      )?.[1];
+    describe('If vault:addItem receives a source file outside the save directory', () => {
+      it('Then it rejects before reading or writing anything', async () => {
+        // Arrange
+        const handler = getHandler('vault:addItem');
 
-      // Act
-      const result = await handler?.(null, makeMovePayload({}));
+        // Act
+        const promise = handler?.(null, {
+          fingerprint: 'fp-evil',
+          itemName: 'Shako',
+          quality: 'unique',
+          ethereal: false,
+          rawItemJson: '{"id":42}',
+          sourceFileType: 'd2s',
+          sourceFilePath: traversalPath,
+          locationContext: 'inventory',
+        });
 
-      // Assert
-      expect(result).toEqual({ success: true });
-      expect(mocks.saveFileEditorMock.moveItemBetweenSaveFiles).toHaveBeenCalled();
+        // Assert
+        await expect(promise).rejects.toThrow('sourceFilePath must be a save file inside');
+        expect(mocks.saveFileEditorMock.readSaveFileItem).not.toHaveBeenCalled();
+        expect(mocks.grailDatabaseMock.addVaultItemWithUndo).not.toHaveBeenCalled();
+        expect(mocks.saveFileEditorMock.removeItemFromSaveFile).not.toHaveBeenCalled();
+      });
     });
 
-    it('If no save directory is configured anywhere, Then writes are refused', async () => {
-      // Arrange
-      mocks.grailDatabaseMock.getAllSettings.mockReturnValue({ saveDir: '' });
-      const handler = getHandler('inventory:moveItem');
+    describe('If vault:unvaultItem receives a target outside the save directory', () => {
+      it('Then it rejects before writing the item', async () => {
+        // Arrange
+        mocks.grailDatabaseMock.getVaultItemById.mockReturnValue(
+          makeVaultItem({ id: 'row-1', rawItemJson: '{"id":42,"code":"uap"}' }),
+        );
+        const handler = getHandler('vault:unvaultItem');
 
-      // Act
-      const promise = handler?.(null, makeMovePayload({}));
+        // Act
+        const promise = handler?.(null, 'row-1', {
+          targetFilePath: outsidePath,
+          targetFileType: 'd2s',
+          targetLocationContext: 'inventory',
+          targetGridX: 0,
+          targetGridY: 0,
+        });
 
-      // Assert
-      await expect(promise).rejects.toThrow('The save directory is not configured');
-      expect(mocks.saveFileEditorMock.moveItemBetweenSaveFiles).not.toHaveBeenCalled();
+        // Assert
+        await expect(promise).rejects.toThrow(
+          'targetOptions.targetFilePath must be a save file inside',
+        );
+        expect(mocks.saveFileEditorMock.addItemToSaveFile).not.toHaveBeenCalled();
+        expect(mocks.grailDatabaseMock.unvaultVaultItem).not.toHaveBeenCalled();
+      });
+    });
+
+    describe('If the save file monitor reports a save directory', () => {
+      it('Then that directory is used instead of the stored setting', async () => {
+        // Arrange
+        mocks.grailDatabaseMock.getAllSettings.mockReturnValue({ saveDir: '/somewhere/else' });
+        initializeVaultHandlers(
+          () => ({ getSaveDirectory: () => '/tmp' }) as unknown as SaveFileMonitor,
+        );
+        const handler = mocks.handleMock.mock.calls.find(
+          (call) => call[0] === 'inventory:moveItem',
+        )?.[1];
+
+        // Act
+        const result = await handler?.(null, makeMovePayload({}));
+
+        // Assert
+        expect(result).toEqual({ success: true });
+        expect(mocks.saveFileEditorMock.moveItemBetweenSaveFiles).toHaveBeenCalled();
+      });
+    });
+
+    describe('If no save directory is configured anywhere', () => {
+      it('Then writes are refused', async () => {
+        // Arrange
+        mocks.grailDatabaseMock.getAllSettings.mockReturnValue({ saveDir: '' });
+        const handler = getHandler('inventory:moveItem');
+
+        // Act
+        const promise = handler?.(null, makeMovePayload({}));
+
+        // Assert
+        await expect(promise).rejects.toThrow('The save directory is not configured');
+        expect(mocks.saveFileEditorMock.moveItemBetweenSaveFiles).not.toHaveBeenCalled();
+      });
     });
   });
 
   describe('When vault:updateItemTags validates its references', () => {
-    it('If the vault item does not exist, Then it rejects without writing', async () => {
-      // Arrange
-      mocks.grailDatabaseMock.getVaultItemById.mockReturnValue(null);
-      mocks.grailDatabaseMock.getAllVaultCategories.mockReturnValue([{ id: 'cat-1' }]);
-      initializeVaultHandlers(() => undefined);
-      const handler = mocks.handleMock.mock.calls.find(
-        (call) => call[0] === 'vault:updateItemTags',
-      )?.[1];
+    describe('If the vault item does not exist', () => {
+      it('Then it rejects without writing', async () => {
+        // Arrange
+        mocks.grailDatabaseMock.getVaultItemById.mockReturnValue(null);
+        mocks.grailDatabaseMock.getAllVaultCategories.mockReturnValue([{ id: 'cat-1' }]);
+        initializeVaultHandlers(() => undefined);
+        const handler = mocks.handleMock.mock.calls.find(
+          (call) => call[0] === 'vault:updateItemTags',
+        )?.[1];
 
-      // Act
-      const promise = handler?.(null, 'missing-row', ['cat-1']);
+        // Act
+        const promise = handler?.(null, 'missing-row', ['cat-1']);
 
-      // Assert
-      await expect(promise).rejects.toThrow('Vault item not found');
-      expect(mocks.grailDatabaseMock.setVaultItemCategories).not.toHaveBeenCalled();
+        // Assert
+        await expect(promise).rejects.toThrow('Vault item not found');
+        expect(mocks.grailDatabaseMock.setVaultItemCategories).not.toHaveBeenCalled();
+      });
     });
 
-    it('If a category does not exist, Then it rejects without writing', async () => {
-      // Arrange
-      mocks.grailDatabaseMock.getVaultItemById.mockReturnValue(makeVaultItem({ id: 'row-1' }));
-      mocks.grailDatabaseMock.getAllVaultCategories.mockReturnValue([{ id: 'cat-1' }]);
-      initializeVaultHandlers(() => undefined);
-      const handler = mocks.handleMock.mock.calls.find(
-        (call) => call[0] === 'vault:updateItemTags',
-      )?.[1];
+    describe('If a category does not exist', () => {
+      it('Then it rejects without writing', async () => {
+        // Arrange
+        mocks.grailDatabaseMock.getVaultItemById.mockReturnValue(makeVaultItem({ id: 'row-1' }));
+        mocks.grailDatabaseMock.getAllVaultCategories.mockReturnValue([{ id: 'cat-1' }]);
+        initializeVaultHandlers(() => undefined);
+        const handler = mocks.handleMock.mock.calls.find(
+          (call) => call[0] === 'vault:updateItemTags',
+        )?.[1];
 
-      // Act
-      const promise = handler?.(null, 'row-1', ['cat-1', 'cat-ghost']);
+        // Act
+        const promise = handler?.(null, 'row-1', ['cat-1', 'cat-ghost']);
 
-      // Assert
-      await expect(promise).rejects.toThrow('Vault category not found: cat-ghost');
-      expect(mocks.grailDatabaseMock.setVaultItemCategories).not.toHaveBeenCalled();
+        // Assert
+        await expect(promise).rejects.toThrow('Vault category not found: cat-ghost');
+        expect(mocks.grailDatabaseMock.setVaultItemCategories).not.toHaveBeenCalled();
+      });
     });
 
-    it('If the item and categories exist, Then the tags are written', async () => {
-      // Arrange
-      mocks.grailDatabaseMock.getVaultItemById.mockReturnValue(makeVaultItem({ id: 'row-1' }));
-      mocks.grailDatabaseMock.getAllVaultCategories.mockReturnValue([{ id: 'cat-1' }]);
-      initializeVaultHandlers(() => undefined);
-      const handler = mocks.handleMock.mock.calls.find(
-        (call) => call[0] === 'vault:updateItemTags',
-      )?.[1];
+    describe('If the item and categories exist', () => {
+      it('Then the tags are written', async () => {
+        // Arrange
+        mocks.grailDatabaseMock.getVaultItemById.mockReturnValue(makeVaultItem({ id: 'row-1' }));
+        mocks.grailDatabaseMock.getAllVaultCategories.mockReturnValue([{ id: 'cat-1' }]);
+        initializeVaultHandlers(() => undefined);
+        const handler = mocks.handleMock.mock.calls.find(
+          (call) => call[0] === 'vault:updateItemTags',
+        )?.[1];
 
-      // Act
-      const result = await handler?.(null, 'row-1', ['cat-1']);
+        // Act
+        const result = await handler?.(null, 'row-1', ['cat-1']);
 
-      // Assert
-      expect(result).toEqual({ success: true });
-      expect(mocks.grailDatabaseMock.setVaultItemCategories).toHaveBeenCalledWith('row-1', [
-        'cat-1',
-      ]);
+        // Assert
+        expect(result).toEqual({ success: true });
+        expect(mocks.grailDatabaseMock.setVaultItemCategories).toHaveBeenCalledWith('row-1', [
+          'cat-1',
+        ]);
+      });
     });
   });
 
   describe('When vault:listItems and vault:search are invoked', () => {
-    it('If an invalid sortBy is supplied, Then the error lists every valid sort key including vaultedAt', async () => {
-      // Arrange
-      initializeVaultHandlers(() => undefined);
-      const handler = mocks.handleMock.mock.calls.find((call) => call[0] === 'vault:search')?.[1];
+    describe('If an invalid sortBy is supplied', () => {
+      it('Then the error lists every valid sort key including vaultedAt', async () => {
+        // Arrange
+        initializeVaultHandlers(() => undefined);
+        const handler = mocks.handleMock.mock.calls.find((call) => call[0] === 'vault:search')?.[1];
 
-      // Act
-      const promise = handler?.(null, { sortBy: 'bogus' });
+        // Act
+        const promise = handler?.(null, { sortBy: 'bogus' });
 
-      // Assert
-      await expect(promise).rejects.toThrow(
-        'sortBy must be one of: itemName, lastSeenAt, createdAt, updatedAt, vaultedAt',
-      );
+        // Assert
+        await expect(promise).rejects.toThrow(
+          'sortBy must be one of: itemName, lastSeenAt, createdAt, updatedAt, vaultedAt',
+        );
+      });
     });
 
-    it('If both channels receive the same filter, Then they return the same search result', async () => {
-      // Arrange
-      const result = { items: [], total: 0, page: 1, pageSize: 50 };
-      mocks.grailDatabaseMock.searchVaultItems.mockReturnValue(result);
-      initializeVaultHandlers(() => undefined);
-      const listHandler = mocks.handleMock.mock.calls.find(
-        (call) => call[0] === 'vault:listItems',
-      )?.[1];
-      const searchHandler = mocks.handleMock.mock.calls.find(
-        (call) => call[0] === 'vault:search',
-      )?.[1];
+    describe('If both channels receive the same filter', () => {
+      it('Then they return the same search result', async () => {
+        // Arrange
+        const result = { items: [], total: 0, page: 1, pageSize: 50 };
+        mocks.grailDatabaseMock.searchVaultItems.mockReturnValue(result);
+        initializeVaultHandlers(() => undefined);
+        const listHandler = mocks.handleMock.mock.calls.find(
+          (call) => call[0] === 'vault:listItems',
+        )?.[1];
+        const searchHandler = mocks.handleMock.mock.calls.find(
+          (call) => call[0] === 'vault:search',
+        )?.[1];
 
-      // Act
-      const listed = await listHandler?.(null, { text: 'shako' });
-      const searched = await searchHandler?.(null, { text: 'shako' });
+        // Act
+        const listed = await listHandler?.(null, { text: 'shako' });
+        const searched = await searchHandler?.(null, { text: 'shako' });
 
-      // Assert
-      expect(listed).toBe(result);
-      expect(searched).toBe(result);
-      expect(mocks.grailDatabaseMock.searchVaultItems).toHaveBeenCalledTimes(2);
+        // Assert
+        expect(listed).toBe(result);
+        expect(searched).toBe(result);
+        expect(mocks.grailDatabaseMock.searchVaultItems).toHaveBeenCalledTimes(2);
+      });
     });
   });
 });

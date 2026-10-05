@@ -85,6 +85,7 @@ import { GameMode } from '../types/grail';
 import { getGrailItemId } from '../utils/grailItemUtils';
 import { isRune, simplifyItemName } from '../utils/objects';
 import { EventBus } from './EventBus';
+import * as modernStashParser from './modernStashParser';
 import { SaveFileMonitor } from './saveFileMonitor';
 
 const MODERN_STASH_FIXTURE_PATH = resolve(
@@ -1088,7 +1089,7 @@ describe('When SaveFileMonitor is used', () => {
       } as any);
 
       // Act
-      const items = await (monitor as any).parseSave('TestChar', Buffer.from('test'), '.d2s');
+      const { items } = await (monitor as any).parseSave('TestChar', Buffer.from('test'), '.d2s');
 
       // Assert
       const runewordItems = items.filter((item: any) => item.type === 'runeword');
@@ -1116,7 +1117,7 @@ describe('When SaveFileMonitor is used', () => {
       } as any);
 
       // Act
-      const items = await (monitor as any).parseSave('TestChar', Buffer.from('test'), '.d2s');
+      const { items } = await (monitor as any).parseSave('TestChar', Buffer.from('test'), '.d2s');
 
       // Assert
       const runewordItems = items.filter((item: any) => item.type === 'runeword');
@@ -1144,7 +1145,7 @@ describe('When SaveFileMonitor is used', () => {
       } as any);
 
       // Act
-      const items = await (monitor as any).parseSave('TestChar', Buffer.from('test'), '.d2s');
+      const { items } = await (monitor as any).parseSave('TestChar', Buffer.from('test'), '.d2s');
 
       // Assert
       const runewordItems = items.filter((item: any) => item.type === 'runeword');
@@ -1170,7 +1171,7 @@ describe('When SaveFileMonitor is used', () => {
       } as any);
 
       // Act
-      const items = await (monitor as any).parseSave('TestChar', Buffer.from('test'), '.d2s');
+      const { items } = await (monitor as any).parseSave('TestChar', Buffer.from('test'), '.d2s');
 
       // Assert - should have no runeword items
       const runewordItems = items.filter((item: any) => item.type === 'runeword');
@@ -1622,6 +1623,7 @@ describe('When SaveFileMonitor is used', () => {
           saveName: 'A',
           success: true,
           inventorySnapshot: snapshotA,
+          parseStatus: 'parsed',
           presentFingerprints: ['fp-a-visible', 'fp-a-socketed'],
         },
       ]);
@@ -1691,7 +1693,7 @@ describe('When SaveFileMonitor is used', () => {
       });
       vi.spyOn(monitor as any, 'filterFilesToParse').mockResolvedValue(['/test/save/dir/a.d2s']);
       vi.spyOn(monitor as any, 'executeConcurrently').mockResolvedValue([
-        { saveName: 'A', success: true, inventorySnapshot: snapshotA },
+        { saveName: 'A', success: true, parseStatus: 'parsed', inventorySnapshot: snapshotA },
       ]);
       const emitSpy = vi.spyOn(monitor as any, 'emitSaveFileEvents').mockResolvedValue(undefined);
 
@@ -1708,22 +1710,25 @@ describe('When SaveFileMonitor is used', () => {
       const saveDir = mkdtempSync(join(tmpdir(), 'save-monitor-'));
       const savePath = join(saveDir, 'Hero.d2s');
       writeFileSync(savePath, Buffer.from('mock file content'));
-      vi.spyOn(monitor as any, 'parseSave').mockResolvedValue([
-        {
-          fingerprint: 'fp-parent',
-          itemName: 'Shako',
-          characterName: 'Hero',
-          isSocketedItem: false,
-          rawParsedItem: { name: 'Shako' },
-        },
-        {
-          fingerprint: 'fp-socketed',
-          itemName: 'Ist Rune',
-          characterName: 'Hero',
-          isSocketedItem: true,
-          rawParsedItem: { name: 'Ist Rune' },
-        },
-      ]);
+      vi.spyOn(monitor as any, 'parseSave').mockResolvedValue({
+        status: 'parsed',
+        items: [
+          {
+            fingerprint: 'fp-parent',
+            itemName: 'Shako',
+            characterName: 'Hero',
+            isSocketedItem: false,
+            rawParsedItem: { name: 'Shako' },
+          },
+          {
+            fingerprint: 'fp-socketed',
+            itemName: 'Ist Rune',
+            characterName: 'Hero',
+            isSocketedItem: true,
+            rawParsedItem: { name: 'Ist Rune' },
+          },
+        ],
+      });
       vi.spyOn(monitor as any, 'updateSaveFileState').mockResolvedValue(undefined);
 
       // Act
@@ -1772,7 +1777,7 @@ describe('When SaveFileMonitor is used', () => {
       const fixtureBuffer = readFileSync(MODERN_STASH_FIXTURE_PATH);
 
       // Act
-      const parsedItems = await (monitor as any).parseSave(
+      const { items: parsedItems } = await (monitor as any).parseSave(
         'Shared Stash Softcore',
         MODERN_STASH_FIXTURE_PATH,
         fixtureBuffer,
@@ -1803,7 +1808,7 @@ describe('When SaveFileMonitor is used', () => {
     it('Then processSingleFile marks modern snapshots as writable and records source file version', async () => {
       // Arrange
       const fixtureBuffer = readFileSync(MODERN_STASH_FIXTURE_PATH);
-      vi.spyOn(monitor as any, 'parseSave').mockResolvedValue([]);
+      vi.spyOn(monitor as any, 'parseSave').mockResolvedValue({ items: [], status: 'parsed' });
       vi.spyOn(monitor as any, 'updateSaveFileState').mockResolvedValue(undefined);
       vi.mocked(readFile).mockResolvedValue(fixtureBuffer);
 
@@ -1829,14 +1834,17 @@ describe('When SaveFileMonitor is used', () => {
       const savePath = join(saveDir, 'Hero.d2s');
       writeFileSync(savePath, Buffer.from('mock file content'));
       mockDatabase.getCharacterByName.mockReturnValue({ id: 'char-1', name: 'Hero' });
-      vi.spyOn(monitor as any, 'parseSave').mockResolvedValue([
-        {
-          itemName: 'Shako',
-          characterName: 'Hero',
-          isSocketedItem: false,
-          rawParsedItem: { name: 'Shako' },
-        },
-      ]);
+      vi.spyOn(monitor as any, 'parseSave').mockResolvedValue({
+        status: 'parsed',
+        items: [
+          {
+            itemName: 'Shako',
+            characterName: 'Hero',
+            isSocketedItem: false,
+            rawParsedItem: { name: 'Shako' },
+          },
+        ],
+      });
       vi.spyOn(monitor as any, 'updateSaveFileState').mockResolvedValue(undefined);
 
       // Act
@@ -1854,7 +1862,153 @@ describe('When SaveFileMonitor is used', () => {
         'char-1',
       ]);
     });
+  });
 
+  describe('When a scan produces no items for a save file', () => {
+    let saveDir: string;
+
+    beforeEach(() => {
+      saveDir = mkdtempSync(join(tmpdir(), 'save-monitor-scan-'));
+    });
+
+    afterEach(() => {
+      rmSync(saveDir, { recursive: true, force: true });
+    });
+
+    async function scanFile(fileName: string, buffer: Buffer): Promise<string> {
+      const filePath = join(saveDir, fileName);
+      writeFileSync(filePath, buffer);
+      vi.spyOn(monitor as any, 'filterFilesToParse').mockResolvedValue([filePath]);
+      vi.spyOn(monitor as any, 'updateSaveFileState').mockResolvedValue(undefined);
+      vi.spyOn(monitor as any, 'emitSaveFileEvents').mockResolvedValue(undefined);
+      await (monitor as any).parseFiles([filePath], false);
+      return filePath;
+    }
+
+    describe('If a character is skipped because of a game mode mismatch', () => {
+      it('Then its vault rows are not reconciled', async () => {
+        // Arrange
+        mockDatabase.getAllSettings.mockReturnValue({
+          saveDir: '/test/save/dir',
+          gameMode: GameMode.Softcore,
+        });
+        vi.mocked(d2s.read).mockResolvedValue({
+          header: { status: { hardcore: true } },
+          items: [{ id: 1 }],
+          merc_items: [],
+          corpse_items: [],
+        } as any);
+
+        // Act
+        await scanFile('Hero.d2s', Buffer.from('mock'));
+
+        // Assert
+        expect(mockDatabase.reconcileVaultItemsForScan).not.toHaveBeenCalled();
+      });
+    });
+
+    describe('If a classic shared stash is skipped because of a game mode mismatch', () => {
+      it('Then its vault rows are not reconciled', async () => {
+        // Arrange
+        mockDatabase.getAllSettings.mockReturnValue({
+          saveDir: '/test/save/dir',
+          gameMode: GameMode.Hardcore,
+        });
+        vi.mocked(d2stash.read).mockResolvedValue({
+          hardcore: false,
+          pages: [{ items: [{ id: 1 }] }],
+        } as any);
+
+        // Act
+        await scanFile('shared.sss', Buffer.from('mock'));
+
+        // Assert
+        expect(mockDatabase.reconcileVaultItemsForScan).not.toHaveBeenCalled();
+      });
+    });
+
+    describe('If a modern shared stash is skipped because of a game mode mismatch', () => {
+      it('Then its vault rows are not reconciled', async () => {
+        // Arrange
+        mockDatabase.getAllSettings.mockReturnValue({
+          saveDir: '/test/save/dir',
+          gameMode: GameMode.Hardcore,
+        });
+
+        // Act
+        await scanFile('ModernSharedStashSoftCoreV2.d2i', readFileSync(MODERN_STASH_FIXTURE_PATH));
+
+        // Assert
+        expect(mockDatabase.reconcileVaultItemsForScan).not.toHaveBeenCalled();
+      });
+    });
+
+    describe('If a v105+ shared stash parse error is swallowed', () => {
+      it('Then its vault rows are not reconciled', async () => {
+        // Arrange
+        mockDatabase.getAllSettings.mockReturnValue({
+          saveDir: '/test/save/dir',
+          gameMode: GameMode.Both,
+        });
+        // The header is valid (version 105 is read), but parsing the items throws.
+        const modernParseSpy = vi
+          .spyOn(modernStashParser, 'parseModernStash')
+          .mockRejectedValueOnce(new Error('corrupt sector'));
+        const processSpy = vi.spyOn(monitor as any, 'parseSave');
+
+        // Act
+        await scanFile('ModernSharedStashSoftCoreV2.d2i', readFileSync(MODERN_STASH_FIXTURE_PATH));
+
+        // Assert
+        const outcome = await processSpy.mock.results[0]?.value;
+        expect(modernParseSpy).toHaveBeenCalledTimes(1);
+        expect(outcome.status).toBe('errored');
+        expect(outcome.items).toEqual([]);
+        expect(mockDatabase.reconcileVaultItemsForScan).not.toHaveBeenCalled();
+      });
+    });
+
+    describe('If the file is parsed successfully but really contains no items', () => {
+      it('Then its vault rows are reconciled against an empty item list', async () => {
+        // Arrange
+        mockDatabase.getAllSettings.mockReturnValue({
+          saveDir: '/test/save/dir',
+          gameMode: GameMode.Both,
+        });
+
+        // Act
+        const filePath = await scanFile('Hero.d2s', Buffer.from('mock'));
+
+        // Assert
+        expect(mockDatabase.reconcileVaultItemsForScan).toHaveBeenCalledWith(
+          expect.objectContaining({
+            sourceFileType: 'd2s',
+            sourceFilePath: filePath,
+            presentFingerprints: [],
+          }),
+        );
+      });
+    });
+
+    describe('If a modern shared stash is parsed successfully', () => {
+      it('Then its vault rows are reconciled with the fingerprints of the parsed items', async () => {
+        // Arrange
+        mockDatabase.getAllSettings.mockReturnValue({
+          saveDir: '/test/save/dir',
+          gameMode: GameMode.Both,
+        });
+
+        // Act
+        await scanFile('ModernSharedStashSoftCoreV2.d2i', readFileSync(MODERN_STASH_FIXTURE_PATH));
+
+        // Assert
+        const scan = mockDatabase.reconcileVaultItemsForScan.mock.calls[0]?.[0];
+        expect(scan.presentFingerprints.length).toBeGreaterThan(0);
+      });
+    });
+  });
+
+  describe('When item counts are read from parsed saves', () => {
     it('Then getAvailableRunesCount sums rune quantities instead of entry counts', () => {
       // Arrange
       (monitor as any).currentData.availableRunes = {

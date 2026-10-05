@@ -37,6 +37,9 @@ import { parseModernStash } from './modernStashParser';
 import { readD2iMetadata } from './stashFormat';
 
 const log = createServiceLogger('SaveFileMonitor');
+/** 'parsed' = the whole file was read; 'skipped' = filtered out by game mode; 'errored' = parse error swallowed. */
+type SaveParseStatus = 'parsed' | 'skipped' | 'errored';
+
 const SUPPORTED_SAVE_EXTENSIONS = new Set(['.d2s', '.sss', '.d2x', '.d2i']);
 const MODERN_STASH_MIN_VERSION = 105;
 
@@ -1030,6 +1033,7 @@ class SaveFileMonitor {
     success: boolean;
     inventorySnapshot?: CharacterInventorySnapshot;
     presentFingerprints?: string[];
+    parseStatus?: SaveParseStatus;
   }> {
     let saveName = this.getSaveNameFromPath(filePath);
 
@@ -1049,7 +1053,12 @@ class SaveFileMonitor {
         }
       }
 
-      const inventoryItems = await this.parseSave(saveName, filePath, buffer, extension);
+      const { items: inventoryItems, status: parseStatus } = await this.parseSave(
+        saveName,
+        filePath,
+        buffer,
+        extension,
+      );
       const characterId = this.grailDatabase?.getCharacterByName(saveName)?.id;
       const inventoryItemsWithCharacter = inventoryItems.map((inventoryItem) => ({
         ...inventoryItem,
@@ -1084,6 +1093,7 @@ class SaveFileMonitor {
       return {
         saveName,
         success: true,
+        parseStatus,
         // Includes socketed items, which the snapshot omits, so vault reconciliation sees every item.
         presentFingerprints: inventoryItemsWithCharacter.map((item) => item.fingerprint),
         inventorySnapshot: {
@@ -1349,13 +1359,16 @@ class SaveFileMonitor {
           success: boolean;
           inventorySnapshot?: CharacterInventorySnapshot;
           presentFingerprints?: string[];
+          parseStatus?: SaveParseStatus;
         }
       | undefined
     >,
   ): void {
     for (const result of parseResults) {
       const snapshot = result?.inventorySnapshot;
-      if (!result?.success || !snapshot) {
+      // Only a completed parse proves which items are gone. A skipped (game mode) or errored
+      // parse also yields no items, and must not mark every vault row of the file as missing.
+      if (!result?.success || !snapshot || result.parseStatus !== 'parsed') {
         continue;
       }
 
@@ -1379,15 +1392,18 @@ class SaveFileMonitor {
    * @param {string} saveName - The name of the save file.
    * @param {Buffer} content - The binary content of the save file.
    * @param {string} extension - The file extension (.d2s, .sss, .d2x, .d2i).
-   * @returns {Promise<d2s.types.IItem[]>} A promise that resolves with an array of extracted items.
+   * @returns A promise that resolves with the extracted items and whether the file was really parsed.
+   * A game-mode mismatch or a swallowed parse error yields no items without being a successful
+   * scan, so callers (vault reconciliation) must not read "no items" as "every item left the file".
    */
   private async parseSave(
     saveName: string,
     filePathOrContent: string | Buffer,
     contentOrExtension: Buffer | string,
     extensionArg?: string,
-  ): Promise<ParsedInventoryItem[]> {
+  ): Promise<{ items: ParsedInventoryItem[]; status: SaveParseStatus }> {
     const items: ParsedInventoryItem[] = [];
+    let status: SaveParseStatus = 'parsed';
 
     const legacyCall = Buffer.isBuffer(filePathOrContent);
     const filePath = legacyCall ? `${saveName}.d2s` : filePathOrContent;
@@ -1434,17 +1450,19 @@ class SaveFileMonitor {
 
     const parseD2S = (response: d2s.types.ID2S) => {
       if (!this.grailDatabase) {
-        return [];
+        status = 'skipped';
+        return;
       }
 
       const settings = this.grailDatabase.getAllSettings();
       const isHardcore = response.header.status.hardcore;
 
-      if (settings.gameMode === GameMode.Softcore && isHardcore) {
-        return [];
-      }
-      if (settings.gameMode === GameMode.Hardcore && !isHardcore) {
-        return [];
+      if (
+        (settings.gameMode === GameMode.Softcore && isHardcore) ||
+        (settings.gameMode === GameMode.Hardcore && !isHardcore)
+      ) {
+        status = 'skipped';
+        return;
       }
       const inventoryItems = (response.items || []) as D2SItem[];
       const mercItems = (response.merc_items || []) as D2SItem[];
@@ -1456,18 +1474,20 @@ class SaveFileMonitor {
 
     const parseStash = (response: d2s.types.IStash) => {
       if (!this.grailDatabase) {
-        return [];
+        status = 'skipped';
+        return;
       }
 
       const settings = this.grailDatabase.getAllSettings();
       // Use hardcore flag from parsed stash header instead of filename
       const isHardcore = response.hardcore;
 
-      if (settings.gameMode === GameMode.Softcore && isHardcore) {
-        return [];
-      }
-      if (settings.gameMode === GameMode.Hardcore && !isHardcore) {
-        return [];
+      if (
+        (settings.gameMode === GameMode.Softcore && isHardcore) ||
+        (settings.gameMode === GameMode.Hardcore && !isHardcore)
+      ) {
+        status = 'skipped';
+        return;
       }
 
       response.pages.forEach((page, pageIndex) => {
@@ -1477,18 +1497,20 @@ class SaveFileMonitor {
 
     const parseModernD2i = async () => {
       if (!this.grailDatabase) {
-        return [];
+        status = 'skipped';
+        return;
       }
 
       const modern = await parseModernStash(content);
       const settings = this.grailDatabase.getAllSettings();
       const isHardcore = modern.hardcore;
 
-      if (settings.gameMode === GameMode.Softcore && isHardcore) {
-        return [];
-      }
-      if (settings.gameMode === GameMode.Hardcore && !isHardcore) {
-        return [];
+      if (
+        (settings.gameMode === GameMode.Softcore && isHardcore) ||
+        (settings.gameMode === GameMode.Hardcore && !isHardcore)
+      ) {
+        status = 'skipped';
+        return;
       }
 
       modern.items.forEach((entry) => {
@@ -1517,6 +1539,9 @@ class SaveFileMonitor {
           // garbage because the formats are incompatible.
           if (d2iVersion === undefined || d2iVersion < 105) {
             await d2stash.read(content, constants99).then(parseStash);
+          } else {
+            // The swallowed error leaves the item list empty or partial: not a complete scan.
+            status = 'errored';
           }
         }
         break;
@@ -1525,7 +1550,7 @@ class SaveFileMonitor {
         await d2s.read(content).then(parseD2S);
     }
 
-    return items;
+    return { items, status };
   }
 
   /**
