@@ -276,42 +276,59 @@ describe('When ItemCard is rendered', () => {
       // Arrange
       const onClick = vi.fn();
       const item = HolyGrailItemBuilder.new().withName('Clickable').build();
+      render(<ItemCard item={item} onClick={onClick} />);
 
       // Act
-      render(<ItemCard item={item} onClick={onClick} />);
-      const card = screen.getByText('Clickable').closest('[class*="rounded-lg"]');
-      expect(card).toBeTruthy();
-      fireEvent.click(card as Element);
+      fireEvent.click(screen.getByRole('button', { name: 'Clickable, Not Found' }));
 
       // Assert
       expect(onClick).toHaveBeenCalledTimes(1);
     });
 
-    it('Then calls onClick on Enter key', () => {
+    it.each(['grid', 'list'] as const)(
+      'Then the %s card is a focusable button labeled with name and found status',
+      (viewMode) => {
+        // Arrange
+        const item = HolyGrailItemBuilder.new().withId('item-1').withName('Focusable').build();
+        const normalProgress = GrailProgressBuilder.new()
+          .withCharacterId('char-1')
+          .withItemId('item-1')
+          .asNormal()
+          .build();
+        render(
+          <ItemCard
+            item={item}
+            normalProgress={[normalProgress]}
+            onClick={vi.fn()}
+            viewMode={viewMode}
+          />,
+        );
+        const card = screen.getByRole('button', { name: 'Focusable, Found' });
+
+        // Act
+        card.focus();
+
+        // Assert
+        expect(card).toHaveAttribute('tabindex', '0');
+        expect(card).toHaveFocus();
+        expect(card.className).toContain('focus-visible:ring-[3px]');
+      },
+    );
+
+    it.each([
+      ['grid', 'Enter'],
+      ['grid', ' '],
+      ['list', 'Enter'],
+      ['list', ' '],
+    ] as const)('Then the %s card calls onClick on "%s" key', (viewMode, key) => {
       // Arrange
       const onClick = vi.fn();
       const item = HolyGrailItemBuilder.new().withName('Pressable').build();
+      render(<ItemCard item={item} onClick={onClick} viewMode={viewMode} />);
+      const card = screen.getByRole('button', { name: 'Pressable, Not Found' });
 
       // Act
-      render(<ItemCard item={item} onClick={onClick} />);
-      const card = screen.getByText('Pressable').closest('[class*="rounded-lg"]');
-      expect(card).toBeTruthy();
-      fireEvent.keyDown(card as Element, { key: 'Enter' });
-
-      // Assert
-      expect(onClick).toHaveBeenCalledTimes(1);
-    });
-
-    it('Then calls onClick on Space key', () => {
-      // Arrange
-      const onClick = vi.fn();
-      const item = HolyGrailItemBuilder.new().withName('Spaceable').build();
-
-      // Act
-      render(<ItemCard item={item} onClick={onClick} />);
-      const card = screen.getByText('Spaceable').closest('[class*="rounded-lg"]');
-      expect(card).toBeTruthy();
-      fireEvent.keyDown(card as Element, { key: ' ' });
+      fireEvent.keyDown(card, { key });
 
       // Assert
       expect(onClick).toHaveBeenCalledTimes(1);
@@ -321,15 +338,134 @@ describe('When ItemCard is rendered', () => {
       // Arrange
       const onClick = vi.fn();
       const item = HolyGrailItemBuilder.new().withName('Ignorable').build();
+      render(<ItemCard item={item} onClick={onClick} />);
 
       // Act
-      render(<ItemCard item={item} onClick={onClick} />);
-      const card = screen.getByText('Ignorable').closest('[class*="rounded-lg"]');
-      expect(card).toBeTruthy();
-      fireEvent.keyDown(card as Element, { key: 'Tab' });
+      fireEvent.keyDown(screen.getByRole('button', { name: 'Ignorable, Not Found' }), {
+        key: 'Tab',
+      });
 
       // Assert
       expect(onClick).not.toHaveBeenCalled();
+    });
+
+    it('Then contains no nested focusable elements', () => {
+      // Arrange
+      const item = HolyGrailItemBuilder.new().withId('item-1').withName('Nested').build();
+      const normalProgress = GrailProgressBuilder.new()
+        .withCharacterId('char-1')
+        .withItemId('item-1')
+        .asNormal()
+        .build();
+      const characters = [CharacterBuilder.new().withId('char-1').withName('Char').build()];
+
+      // Act
+      render(
+        <ItemCard
+          item={item}
+          normalProgress={[normalProgress]}
+          characters={characters}
+          onClick={vi.fn()}
+        />,
+      );
+
+      // Assert
+      const card = screen.getByRole('button', { name: 'Nested, Found' });
+      expect(card.querySelectorAll('button, [tabindex]:not([tabindex="-1"])')).toHaveLength(0);
+    });
+  });
+
+  describe('If onClick is not provided', () => {
+    it('Then the card is not exposed as a focusable button', () => {
+      // Arrange
+      const item = HolyGrailItemBuilder.new().withName('Static').build();
+
+      // Act
+      render(<ItemCard item={item} />);
+
+      // Assert
+      expect(screen.queryByRole('button', { name: /Static/ })).not.toBeInTheDocument();
+    });
+  });
+
+  describe('If item is missing', () => {
+    it.each(['grid', 'list'] as const)(
+      'Then the %s card does not dim the item name with opacity',
+      (viewMode) => {
+        // Arrange
+        const item = HolyGrailItemBuilder.new().withName('Missing Item').build();
+
+        // Act
+        render(<ItemCard item={item} viewMode={viewMode} onClick={vi.fn()} />);
+
+        // Assert
+        const name = screen.getByText('Missing Item');
+        let element: HTMLElement | null = name;
+        while (element) {
+          expect(element.className).not.toMatch(/(^|\s)opacity-\d+/);
+          element = element.parentElement;
+        }
+        expect(name).toHaveClass('text-foreground');
+      },
+    );
+
+    it.each(['grid', 'list'] as const)(
+      'Then the %s card shows grayscale, dimmed artwork',
+      (viewMode) => {
+        // Arrange
+        setupStoreMock({ showItemIcons: true });
+        const item = HolyGrailItemBuilder.new().withType('unique').build();
+
+        // Act
+        render(<ItemCard item={item} viewMode={viewMode} />);
+
+        // Assert
+        expect(screen.getByTestId('item-artwork')).toHaveClass('grayscale', 'opacity-50');
+      },
+    );
+
+    it('Then the card uses a neutral muted surface with a dashed type border', () => {
+      // Arrange
+      const item = HolyGrailItemBuilder.new().withType('unique').withName('Dashed').build();
+
+      // Act
+      render(<ItemCard item={item} onClick={vi.fn()} />);
+
+      // Assert
+      const surface = screen
+        .getByRole('button', { name: 'Dashed, Not Found' })
+        .querySelector('[data-found]');
+      expect(surface).toHaveAttribute('data-found', 'false');
+      expect(surface).toHaveClass('border-dashed', 'bg-muted/40');
+      expect(surface?.className).not.toMatch(/bg-yellow/);
+    });
+  });
+
+  describe('If item is found', () => {
+    it('Then the card uses a solid type border on a neutral card surface with colored artwork', () => {
+      // Arrange
+      setupStoreMock({ showItemIcons: true });
+      const item = HolyGrailItemBuilder.new()
+        .withId('item-1')
+        .withType('unique')
+        .withName('Found Item')
+        .build();
+      const normalProgress = GrailProgressBuilder.new()
+        .withCharacterId('char-1')
+        .withItemId('item-1')
+        .asNormal()
+        .build();
+
+      // Act
+      render(<ItemCard item={item} normalProgress={[normalProgress]} onClick={vi.fn()} />);
+
+      // Assert
+      const surface = screen
+        .getByRole('button', { name: 'Found Item, Found' })
+        .querySelector('[data-found]');
+      expect(surface).toHaveAttribute('data-found', 'true');
+      expect(surface).toHaveClass('border-solid', 'bg-card', 'border-item-unique');
+      expect(screen.getByTestId('item-artwork')).not.toHaveClass('grayscale');
     });
   });
 

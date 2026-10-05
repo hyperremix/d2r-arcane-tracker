@@ -116,7 +116,7 @@ export function RecentDiscoveryIndicator({ foundDate, className }: RecentDiscove
 
   return (
     <Tooltip>
-      <TooltipTrigger>
+      <TooltipTrigger render={<span />} className="inline-flex">
         <Flame
           className={cn('h-6 w-6 rounded-full bg-background pb-0.5 text-item-rune', className)}
         />

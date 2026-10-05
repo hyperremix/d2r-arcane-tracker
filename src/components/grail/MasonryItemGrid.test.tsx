@@ -1,7 +1,13 @@
 import { render, screen } from '@testing-library/react';
 import type { Character, GrailProgress, Item } from 'electron/types/grail';
 import { describe, expect, it, vi } from 'vitest';
-import { calculateColumnWidth, GroupedMasonryGrid, getColumnCount } from './MasonryItemGrid';
+import {
+  COLUMN_GUTTER,
+  calculateColumnWidth,
+  GroupedMasonryGrid,
+  getColumnCount,
+  MIN_COLUMN_WIDTH,
+} from './MasonryItemGrid';
 
 // Mock the ItemCard component to simplify testing
 vi.mock('./ItemCard', () => ({
@@ -91,57 +97,72 @@ function createMockProgressLookup(
 
 describe('MasonryItemGrid Column Count Calculation', () => {
   describe('When getColumnCount is called', () => {
-    describe('If viewport width is >= 1536px (2xl breakpoint)', () => {
-      it('Then should return 6 columns', () => {
-        // Arrange & Act & Assert
-        expect(getColumnCount(1536)).toBe(6);
-        expect(getColumnCount(1920)).toBe(6);
-        expect(getColumnCount(2560)).toBe(6);
-      });
-    });
-
-    describe('If viewport width is >= 1280px but < 1536px (xl breakpoint)', () => {
-      it('Then should return 5 columns', () => {
-        // Arrange & Act & Assert
-        expect(getColumnCount(1280)).toBe(5);
-        expect(getColumnCount(1400)).toBe(5);
-        expect(getColumnCount(1535)).toBe(5);
-      });
-    });
-
-    describe('If viewport width is >= 1024px but < 1280px (lg breakpoint)', () => {
-      it('Then should return 4 columns', () => {
-        // Arrange & Act & Assert
-        expect(getColumnCount(1024)).toBe(4);
-        expect(getColumnCount(1100)).toBe(4);
-        expect(getColumnCount(1279)).toBe(4);
-      });
-    });
-
-    describe('If viewport width is >= 768px but < 1024px (md breakpoint)', () => {
-      it('Then should return 3 columns', () => {
-        // Arrange & Act & Assert
-        expect(getColumnCount(768)).toBe(3);
-        expect(getColumnCount(900)).toBe(3);
-        expect(getColumnCount(1023)).toBe(3);
-      });
-    });
-
-    describe('If viewport width is >= 640px but < 768px (sm breakpoint)', () => {
-      it('Then should return 2 columns', () => {
-        // Arrange & Act & Assert
-        expect(getColumnCount(640)).toBe(2);
-        expect(getColumnCount(700)).toBe(2);
-        expect(getColumnCount(767)).toBe(2);
-      });
-    });
-
-    describe('If viewport width is < 640px (default)', () => {
+    describe('If the container is narrower than two minimum-width columns', () => {
       it('Then should return 1 column', () => {
-        // Arrange & Act & Assert
-        expect(getColumnCount(639)).toBe(1);
-        expect(getColumnCount(500)).toBe(1);
+        // Arrange
+        const twoColumnThreshold = 2 * MIN_COLUMN_WIDTH + COLUMN_GUTTER;
+
+        // Act & Assert
         expect(getColumnCount(320)).toBe(1);
+        expect(getColumnCount(twoColumnThreshold - 1)).toBe(1);
+      });
+    });
+
+    describe('If the container width is zero, negative or not a number', () => {
+      it('Then should fall back to 1 column', () => {
+        // Arrange & Act & Assert
+        expect(getColumnCount(0)).toBe(1);
+        expect(getColumnCount(-100)).toBe(1);
+        expect(getColumnCount(Number.NaN)).toBe(1);
+      });
+    });
+
+    describe('If the container fits exactly N minimum-width columns', () => {
+      it('Then should return N columns', () => {
+        // Arrange
+        const widthFor = (columns: number) =>
+          columns * MIN_COLUMN_WIDTH + (columns - 1) * COLUMN_GUTTER;
+
+        // Act & Assert
+        expect(getColumnCount(widthFor(2))).toBe(2);
+        expect(getColumnCount(widthFor(3))).toBe(3);
+        expect(getColumnCount(widthFor(6))).toBe(6);
+        expect(getColumnCount(widthFor(6) - 1)).toBe(5);
+      });
+    });
+
+    describe('If the grid spans the full content width of typical windows', () => {
+      it('Then should keep card widths between the minimum and roughly 230px', () => {
+        // Arrange
+        const containerWidths = [];
+        for (let width = 768; width <= 2560; width += 16) {
+          containerWidths.push(width);
+        }
+
+        // Act
+        const columnWidths = containerWidths.map((width) =>
+          calculateColumnWidth(width, getColumnCount(width)),
+        );
+
+        // Assert
+        for (const columnWidth of columnWidths) {
+          expect(columnWidth).toBeGreaterThanOrEqual(MIN_COLUMN_WIDTH);
+          expect(columnWidth).toBeLessThanOrEqual(230);
+        }
+      });
+    });
+
+    describe('If the container grows', () => {
+      it('Then should never decrease the column count', () => {
+        // Arrange
+        let previous = getColumnCount(300);
+
+        // Act & Assert
+        for (let width = 300; width <= 2560; width += 10) {
+          const current = getColumnCount(width);
+          expect(current).toBeGreaterThanOrEqual(previous);
+          previous = current;
+        }
       });
     });
   });
@@ -505,6 +526,36 @@ describe('GroupedMasonryGrid Component', () => {
         // Assert - ItemCard is still rendered with empty progress
         expect(screen.getByTestId('item-card-item-1')).toBeDefined();
       });
+    });
+  });
+});
+
+describe('GroupedMasonryGrid Column Sizing', () => {
+  describe('When GroupedMasonryGrid renders a group', () => {
+    it('Then the CSS columns use the same minimum width and gutter as the masonry grid', () => {
+      // Arrange
+      const groupedItems = [
+        {
+          title: 'Unique Armor',
+          items: [createMockItem({ id: 'item-1', name: 'Harlequin Crest' })],
+          foundCount: 0,
+        },
+      ];
+
+      // Act
+      render(
+        <GroupedMasonryGrid
+          groupedItems={groupedItems}
+          progressLookup={createMockProgressLookup()}
+          characters={[]}
+          onItemClick={vi.fn()}
+        />,
+      );
+
+      // Assert
+      const columns = screen.getByTestId('grouped-masonry-columns');
+      expect(columns.style.columnWidth).toBe(`${MIN_COLUMN_WIDTH}px`);
+      expect(columns.style.columnGap).toBe(`${COLUMN_GUTTER}px`);
     });
   });
 });

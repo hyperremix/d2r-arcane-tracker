@@ -6,8 +6,9 @@ import { useGrailStore } from '@/stores/grailStore';
 import placeholderUrl from '/images/placeholder-item.png';
 import { RuneImages } from '../RuneImages';
 import { ItemTypeIcon } from '../StatusIcons';
+import type { InteractiveCardProps } from './GridView';
 import { DiscoveryAttribution, DiscoveryInfo, StatusIndicators, VersionCounts } from './indicators';
-import { typeColors } from './styles';
+import { getCardStateClasses, interactiveCardStyles, missingArtworkStyles } from './styles';
 
 /**
  * Props interface for the ListView component.
@@ -21,13 +22,69 @@ export interface ListViewProps {
   discoveringCharacters: Character[];
   mostRecentDiscovery: GrailProgress | undefined;
   className: string | undefined;
-  handleKeyDown: (event: React.KeyboardEvent) => void;
-  onClick?: () => void;
+  interactiveProps?: InteractiveCardProps;
   withoutStatusIndicators?: boolean;
 }
 
 /**
+ * Props interface for the ListArtwork component.
+ */
+interface ListArtworkProps {
+  item: Item;
+  isFound: boolean;
+  showItemIcons: boolean;
+}
+
+/**
+ * Renders the item icon, rune images or type icon for a list row.
+ * Artwork is dimmed and grayscale while the item is missing.
+ */
+function ListArtwork({ item, isFound, showItemIcons }: ListArtworkProps) {
+  const { iconUrl, isLoading } = useItemIcon(item);
+
+  if (item.type === 'runeword' && item.runes && item.runes.length > 0) {
+    return (
+      <div className="relative flex-shrink-0">
+        <div data-testid="item-artwork" className={cn(!isFound && missingArtworkStyles)}>
+          <RuneImages runeIds={item.runes} viewMode="list" focusableTriggers={false} />
+        </div>
+        <ItemTypeIcon type={item.type} className="-right-2 -bottom-1 absolute h-4 w-4" />
+      </div>
+    );
+  }
+
+  if (!showItemIcons || item.type === 'runeword') {
+    return <ItemTypeIcon type={item.type} className="h-6 w-6 flex-shrink-0" />;
+  }
+
+  return (
+    <div className="relative h-12 w-12 flex-shrink-0">
+      <div
+        data-testid="item-artwork"
+        className={cn('h-full w-full', !isFound && missingArtworkStyles)}
+      >
+        <img
+          src={iconUrl}
+          alt={item.name}
+          className={cn(isLoading && 'opacity-0', 'h-full w-full object-contain')}
+          onError={(e) => {
+            // Prevent infinite loops
+            if (e.currentTarget.src !== `${window.location.origin}${placeholderUrl}`) {
+              e.currentTarget.src = placeholderUrl;
+            }
+          }}
+        />
+      </div>
+      {isLoading && <div className="absolute inset-0 animate-pulse rounded bg-muted" />}
+      <ItemTypeIcon type={item.type} className="absolute right-0 bottom-0 h-4 w-4" />
+    </div>
+  );
+}
+
+/**
  * ListView component that renders an item in list view mode.
+ * When interactive props are provided the row is a focusable button-like element
+ * that can be activated with Enter or Space.
  */
 export function ListView({
   item,
@@ -38,52 +95,27 @@ export function ListView({
   discoveringCharacters,
   mostRecentDiscovery,
   className,
-  handleKeyDown,
-  onClick,
+  interactiveProps,
   withoutStatusIndicators = false,
 }: ListViewProps) {
-  const { iconUrl, isLoading } = useItemIcon(item);
   const { settings } = useGrailStore();
+  const isFound = allProgress.length > 0;
 
   return (
     <TooltipProvider>
-      {/** biome-ignore lint/a11y/noStaticElementInteractions: explanation */}
       <div
+        {...interactiveProps}
+        data-found={isFound}
         className={cn(
           'relative flex w-full items-center gap-3 p-3 transition-all duration-200',
           'rounded-lg border-2',
-          typeColors[item.type],
-          allProgress.length > 0 ? '' : 'bg-muted/50 opacity-60 hover:opacity-80',
+          getCardStateClasses(item.type, isFound),
+          interactiveProps && interactiveCardStyles,
           className,
         )}
-        onClick={onClick}
-        onKeyDown={handleKeyDown}
       >
         {/* Item Icon, Rune Images, or Type Icon */}
-        {item.type === 'runeword' && item.runes && item.runes.length > 0 ? (
-          <div className="relative flex-shrink-0">
-            <RuneImages runeIds={item.runes} viewMode="list" />
-            <ItemTypeIcon type={item.type} className="-right-2 -bottom-1 absolute h-4 w-4" />
-          </div>
-        ) : settings.showItemIcons && item.type !== 'runeword' ? (
-          <div className="relative h-12 w-12 flex-shrink-0">
-            <img
-              src={iconUrl}
-              alt={item.name}
-              className={cn(isLoading && 'opacity-0', 'h-full w-full object-contain')}
-              onError={(e) => {
-                // Prevent infinite loops
-                if (e.currentTarget.src !== `${window.location.origin}${placeholderUrl}`) {
-                  e.currentTarget.src = placeholderUrl;
-                }
-              }}
-            />
-            {isLoading && <div className="absolute inset-0 animate-pulse rounded bg-muted" />}
-            <ItemTypeIcon type={item.type} className="absolute right-0 bottom-0 h-4 w-4" />
-          </div>
-        ) : (
-          <ItemTypeIcon type={item.type} className="h-6 w-6 flex-shrink-0" />
-        )}
+        <ListArtwork item={item} isFound={isFound} showItemIcons={settings.showItemIcons} />
 
         {/* Status indicators */}
         {!withoutStatusIndicators && (
@@ -96,9 +128,9 @@ export function ListView({
           />
         )}
 
-        {/* Item Name */}
+        {/* Item Name (always full contrast, regardless of found state) */}
         <Tooltip>
-          <TooltipTrigger className="flex-1 truncate text-left">
+          <TooltipTrigger render={<span />} className="block flex-1 truncate text-left">
             <h3 className="truncate font-semibold text-foreground text-sm">{item.name}</h3>
           </TooltipTrigger>
           <TooltipContent side="top" className="max-w-sm">

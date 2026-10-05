@@ -31,7 +31,8 @@
     "tracker": {
       "totalProgress": "Total Progress",
       "normalItems": "Normal Items",
-      "etherealItems": "Ethereal Items"
+      "etherealItems": "Ethereal Items",
+      "progressSummary": "Grail progress"
     },
     "itemCard": {
       "discoveryInfo": "Discovery Info:",
@@ -46,7 +47,8 @@
       "normalCount": "Normal: {{count}}x",
       "etherealOnly": "Ethereal Only",
       "etherealCount": "Ethereal: {{count}}x",
-      "setName": "Set: {{name}}"
+      "setName": "Set: {{name}}",
+      "cardLabel": "{{name}}, {{status}}"
     },
     "statusIcons": {
       "recentlyFound": "Recently Found!"
@@ -120,7 +122,20 @@
       "sortFoundDate": "Found Date",
       "sortOrder": "Sort Order",
       "ascending": "Ascending",
-      "descending": "Descending"
+      "descending": "Descending",
+      "toolbarLabel": "Item filters",
+      "statusAll": "All",
+      "statusFound": "Found",
+      "statusMissing": "Missing",
+      "filters": "Filters",
+      "filtersWithCount": "Filters ({{count}} active)",
+      "activeFilters": "Active filters",
+      "searchChip": "Search: {{term}}",
+      "removeFilter": "Remove filter: {{label}}",
+      "clearAll": "Clear all",
+      "groupBy": "Group By",
+      "viewMode": "View Mode",
+      "sortOrderValue": "Sort order: {{order}}"
     },
     "notifications": {
       "recentNotifications": "Recent Notifications",

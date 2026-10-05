@@ -27,19 +27,27 @@ interface MasonryItemProps {
  * Uses the masonic library for virtualized masonry rendering with dynamic item heights.
  */
 // Column gutter constant (gap between columns)
-const COLUMN_GUTTER = 16;
+export const COLUMN_GUTTER = 16;
 
 /**
- * Gets the desired column count based on viewport width breakpoints.
- * Matches the CSS columns breakpoints used in GroupedMasonryGrid.
+ * Minimum width of a single masonry column in pixels.
+ * Columns stretch to fill the remaining space, which keeps cards roughly 180-230px wide
+ * once a few columns fit. Shared with the CSS columns used by GroupedMasonryGrid.
  */
-export function getColumnCount(viewportWidth: number): number {
-  if (viewportWidth >= 1536) return 6; // 2xl
-  if (viewportWidth >= 1280) return 5; // xl
-  if (viewportWidth >= 1024) return 4; // lg
-  if (viewportWidth >= 768) return 3; // md
-  if (viewportWidth >= 640) return 2; // sm
-  return 1; // default
+export const MIN_COLUMN_WIDTH = 180;
+
+/**
+ * Gets the number of columns that fit into the given container width.
+ * Mirrors the CSS `column-width` algorithm so the virtualized masonry grid and the
+ * CSS columns-based GroupedMasonryGrid always produce the same column count.
+ * Formula: count = floor((containerWidth + gutter) / (minColumnWidth + gutter))
+ */
+export function getColumnCount(containerWidth: number): number {
+  if (!Number.isFinite(containerWidth) || containerWidth <= 0) return 1;
+  return Math.max(
+    1,
+    Math.floor((containerWidth + COLUMN_GUTTER) / (MIN_COLUMN_WIDTH + COLUMN_GUTTER)),
+  );
 }
 
 /**
@@ -65,18 +73,17 @@ export const MasonryItemGrid = memo(function MasonryItemGrid({
   const [scrollTop, setScrollTop] = useState(0);
   const [isScrolling, setIsScrolling] = useState(false);
   const [containerHeight, setContainerHeight] = useState(0);
+  // Width of the scroll container; the grid is re-measured whenever it changes
+  const [containerWidth, setContainerWidth] = useState(0);
 
-  // Track viewport-based column count (matches CSS columns breakpoints)
-  const [columnCount, setColumnCount] = useState(() => getColumnCount(window.innerWidth));
+  // Track grid dimensions
+  const { width, offset } = useContainerPosition(gridRef, [containerWidth]);
 
-  // Track container dimensions
-  const { width, offset } = useContainerPosition(gridRef, [columnCount]);
-
-  // Calculate column width based on actual container width and desired column count
+  // Calculate column count and width based on the actual grid width
   const columnWidth = useMemo(() => {
     if (!width || width <= 0) return 200; // fallback for initial render
-    return calculateColumnWidth(width, columnCount);
-  }, [width, columnCount]);
+    return calculateColumnWidth(width, getColumnCount(width));
+  }, [width]);
 
   // Handle scroll events on the container
   useEffect(() => {
@@ -84,6 +91,7 @@ export const MasonryItemGrid = memo(function MasonryItemGrid({
     if (!container) return;
 
     let scrollTimeout: NodeJS.Timeout;
+    let widthTimeout: NodeJS.Timeout;
     const handleScroll = () => {
       setScrollTop(container.scrollTop);
       setIsScrolling(true);
@@ -91,43 +99,31 @@ export const MasonryItemGrid = memo(function MasonryItemGrid({
       scrollTimeout = setTimeout(() => setIsScrolling(false), 150);
     };
 
-    const updateContainerHeight = () => {
+    const updateContainerSize = () => {
       setContainerHeight(container.clientHeight);
+      // Debounce width changes so the masonry layout isn't recalculated on every resize frame
+      clearTimeout(widthTimeout);
+      widthTimeout = setTimeout(() => setContainerWidth(container.clientWidth), 150);
     };
 
     // Initial measurements
-    updateContainerHeight();
+    setContainerHeight(container.clientHeight);
+    setContainerWidth(container.clientWidth);
     setScrollTop(container.scrollTop);
 
     container.addEventListener('scroll', handleScroll, { passive: true });
 
-    // Use ResizeObserver to track container height changes
-    const resizeObserver = new ResizeObserver(updateContainerHeight);
+    // Use ResizeObserver to track container size changes (window resizes, layout changes)
+    const resizeObserver = new ResizeObserver(updateContainerSize);
     resizeObserver.observe(container);
 
     return () => {
       clearTimeout(scrollTimeout);
+      clearTimeout(widthTimeout);
       container.removeEventListener('scroll', handleScroll);
       resizeObserver.disconnect();
     };
   }, [containerRef]);
-
-  // Update column count on window resize with debouncing
-  useEffect(() => {
-    let timeoutId: NodeJS.Timeout;
-    const handleResize = () => {
-      clearTimeout(timeoutId);
-      timeoutId = setTimeout(() => {
-        setColumnCount(getColumnCount(window.innerWidth));
-      }, 150);
-    };
-
-    window.addEventListener('resize', handleResize);
-    return () => {
-      clearTimeout(timeoutId);
-      window.removeEventListener('resize', handleResize);
-    };
-  }, []);
 
   // Create positioner with column configuration
   const positioner = usePositioner(
@@ -225,8 +221,11 @@ export const GroupedMasonryGrid = memo(function GroupedMasonryGrid({
             </Badge>
           </div>
 
-          {/* Masonry grid using CSS columns */}
-          <div className="columns-1 gap-4 sm:columns-2 md:columns-3 lg:columns-4 xl:columns-5 2xl:columns-6">
+          {/* Masonry grid using CSS columns, sized like the virtualized masonry grid */}
+          <div
+            data-testid="grouped-masonry-columns"
+            style={{ columnWidth: MIN_COLUMN_WIDTH, columnGap: COLUMN_GUTTER }}
+          >
             {group.items.map((item) => {
               const itemProgressData = progressLookup.get(item.id);
               const normalProgress = itemProgressData?.normalProgress ?? EMPTY_PROGRESS_ARRAY;

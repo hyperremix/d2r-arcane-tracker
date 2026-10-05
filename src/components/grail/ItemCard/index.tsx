@@ -1,6 +1,8 @@
 import type { Character, GrailProgress, Item } from 'electron/types/grail';
 import { memo } from 'react';
-import { GridView } from './GridView';
+import { useTranslation } from 'react-i18next';
+import { translations } from '@/i18n/translations';
+import { GridView, type InteractiveCardProps } from './GridView';
 import { ListView } from './ListView';
 
 /**
@@ -40,7 +42,7 @@ interface ItemCardProps {
   withoutStatusIndicators?: boolean;
 }
 
-export { typeColors } from './styles';
+export { typeBorderColors } from './styles';
 
 /**
  * ItemCard component that displays a Holy Grail item with its discovery status and information.
@@ -56,6 +58,8 @@ export const ItemCard = memo(function ItemCard({
   viewMode = 'grid',
   withoutStatusIndicators = false,
 }: ItemCardProps) {
+  const { t } = useTranslation();
+
   // Calculate discovery metadata for both normal and ethereal versions
   const { allProgress, mostRecentDiscovery } = getDiscoveryMetadata(
     normalProgress,
@@ -67,11 +71,29 @@ export const ItemCard = memo(function ItemCard({
 
   // Handle keyboard events for accessibility
   const handleKeyDown = (event: React.KeyboardEvent) => {
+    // Only react to keys pressed on the card itself, not bubbling from nested elements
+    if (event.target !== event.currentTarget) return;
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault();
       onClick?.();
     }
   };
+
+  // Clickable cards are focusable buttons named after the item and its found status
+  const interactiveProps: InteractiveCardProps | undefined = onClick
+    ? {
+        role: 'button',
+        tabIndex: 0,
+        'aria-label': t(translations.grail.itemCard.cardLabel, {
+          name: item.name,
+          status: t(
+            allProgress.length > 0 ? translations.common.found : translations.common.notFound,
+          ),
+        }),
+        onClick,
+        onKeyDown: handleKeyDown,
+      }
+    : undefined;
 
   // Render list view if viewMode is 'list'
   if (viewMode === 'list') {
@@ -85,8 +107,7 @@ export const ItemCard = memo(function ItemCard({
         discoveringCharacters={discoveringCharacters}
         mostRecentDiscovery={mostRecentDiscovery}
         className={className}
-        handleKeyDown={handleKeyDown}
-        onClick={onClick}
+        interactiveProps={interactiveProps}
         withoutStatusIndicators={withoutStatusIndicators}
       />
     );
@@ -103,8 +124,7 @@ export const ItemCard = memo(function ItemCard({
       etherealProgress={etherealProgress}
       mostRecentDiscovery={mostRecentDiscovery}
       className={className}
-      handleKeyDown={handleKeyDown}
-      onClick={onClick}
+      interactiveProps={interactiveProps}
       withoutStatusIndicators={withoutStatusIndicators}
     />
   );

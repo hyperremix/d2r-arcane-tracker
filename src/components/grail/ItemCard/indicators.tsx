@@ -151,7 +151,8 @@ export function StatusIndicators({
   return (
     <div className="-top-3 -right-3 absolute z-40">
       <Tooltip>
-        <TooltipTrigger>
+        {/* Rendered as a span: tooltips inside the interactive card must not add extra tab stops */}
+        <TooltipTrigger render={<span />} className="inline-flex">
           {allVersionsFound ? (
             <CheckCheck className="h-5 w-5 rounded-full bg-background text-found" />
           ) : (
@@ -188,7 +189,7 @@ export function DiscoveryAttribution({ discoveringCharacters, item }: DiscoveryA
         {discoveringCharacters.slice(0, 2).map((character, index) =>
           character ? (
             <Tooltip key={`${character.id}-${item.id}-${index}`}>
-              <TooltipTrigger>
+              <TooltipTrigger render={<span />} className="inline-flex">
                 <CharacterIcon
                   characterClass={character.characterClass}
                   className="text-muted-foreground"
