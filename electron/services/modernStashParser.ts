@@ -56,17 +56,17 @@ export interface ModernStashParseResult {
   items: ModernStashParsedItem[];
   metadata: D2iMetadata;
   /**
-   * True when at least one sector could not be decoded completely (an item failed to decode, or a
-   * sector read failed). `items` then holds only what could be read, so the result must not be
-   * treated as a full inventory of the file (for example to decide that an item has left it).
+   * True when the file could not be read completely: an item or sector failed to decode, a sector
+   * is neither an item list nor the known extra-data block, or bytes follow the last sector (a
+   * truncated tail or a sector with a bad signature). `items` then holds only what could be read,
+   * so the result must not be treated as a full inventory of the file (for example to decide that
+   * an item has left it).
    */
   partial: boolean;
-  /** Indexes (into `metadata.sectors`) of the sectors that were not decoded completely. */
-  incompleteSectorIndexes: number[];
 }
 
 /** The items decoded from one JM sector and whether every item the sector declares was read. */
-export interface SectorItemsResult {
+interface SectorItemsResult {
   items: D2SItem[];
   complete: boolean;
 }
@@ -230,10 +230,7 @@ export function resolveStackCount(item: D2SItem): number {
   return 1;
 }
 
-export async function readSectorItems(
-  payload: Uint8Array,
-  version: number,
-): Promise<SectorItemsResult> {
+async function readSectorItems(payload: Uint8Array, version: number): Promise<SectorItemsResult> {
   // A sector announced as JM that has no readable JM header is damaged, not empty.
   if (payload.length < 4) {
     return { items: [], complete: false };
@@ -364,6 +361,19 @@ function applyDeterministicResourcePlacement(items: PendingResourceItem[]): void
   });
 }
 
+/**
+ * Payload signature (first two bytes, hex) of the extra-data sector every real v105 stash ends
+ * with (payload marker 0xC0EDEAC0). It holds no JM item list, so it is skipped without counting as
+ * damage.
+ */
+const EXTRA_DATA_SECTOR_SIGNATURE = 'c0ed';
+
+function isRecognizedSector(sector: D2iMetadata['sectors'][number]): boolean {
+  return (
+    sector.payloadSignature === 'JM' || sector.payloadSignature === EXTRA_DATA_SECTOR_SIGNATURE
+  );
+}
+
 async function parseJmSectors(buffer: Buffer, metadata: D2iMetadata): Promise<ParsedSector[]> {
   const jmSectors = metadata.sectors
     .map((sector, index) => ({
@@ -483,16 +493,16 @@ export async function parseModernStash(buffer: Buffer): Promise<ModernStashParse
   const parsedSectors = await parseJmSectors(buffer, metadata);
   const items = [...buildSharedItems(parsedSectors), ...buildResourceItems(parsedSectors)];
 
-  const incompleteSectorIndexes = parsedSectors
-    .filter((sector) => !sector.complete)
-    .map((sector) => sector.sectorIndex);
+  const partial =
+    parsedSectors.some((sector) => !sector.complete) ||
+    metadata.sectors.some((sector) => !isRecognizedSector(sector)) ||
+    metadata.trailingBytes > 0;
 
   return {
     version: metadata.version,
     hardcore: metadata.hardcore,
     items,
     metadata,
-    partial: incompleteSectorIndexes.length > 0,
-    incompleteSectorIndexes,
+    partial,
   };
 }

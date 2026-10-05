@@ -14,6 +14,12 @@ export interface D2iMetadata {
   version: number;
   hardcore: boolean;
   sectors: D2iSectorDescriptor[];
+  /**
+   * Bytes after the last readable sector. A well-formed file is the exact concatenation of its
+   * sectors, so anything left over (a truncated tail, or a sector with a bad signature) means the
+   * file was damaged or cut off and `sectors` does not describe all of it.
+   */
+  trailingBytes: number;
 }
 
 function readPayloadSignature(buffer: Buffer, payloadOffset: number, payloadSize: number): string {
@@ -22,10 +28,11 @@ function readPayloadSignature(buffer: Buffer, payloadOffset: number, payloadSize
   }
 
   const signatureBytes = buffer.subarray(payloadOffset, payloadOffset + 2);
-  const asciiSignature = signatureBytes.toString('ascii');
 
-  if (/^[\x20-\x7e]{2}$/.test(asciiSignature)) {
-    return asciiSignature;
+  // Check the raw bytes: Node's 'ascii' decoding drops the high bit, so 0xC0 0xED would read as
+  // the printable "@m".
+  if (signatureBytes.every((byte) => byte >= 0x20 && byte <= 0x7e)) {
+    return signatureBytes.toString('latin1');
   }
 
   return signatureBytes.toString('hex');
@@ -46,6 +53,7 @@ export function readD2iMetadata(buffer: Buffer): D2iMetadata {
 
   for (let i = 0; i < MAX_SECTORS && offset + D2I_SECTOR_HEADER_SIZE <= buffer.length; i += 1) {
     const signature = buffer.readUInt32LE(offset);
+    // A bad signature ends the sector list; the rest is reported through `trailingBytes`.
     if (signature !== D2I_SECTOR_SIGNATURE) {
       break;
     }
@@ -86,5 +94,6 @@ export function readD2iMetadata(buffer: Buffer): D2iMetadata {
     version,
     hardcore,
     sectors,
+    trailingBytes: buffer.length - offset,
   };
 }

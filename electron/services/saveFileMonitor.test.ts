@@ -2226,7 +2226,6 @@ describe('When SaveFileMonitor is used', () => {
         vi.spyOn(modernStashParser, 'parseModernStash').mockResolvedValueOnce({
           ...complete,
           partial: true,
-          incompleteSectorIndexes: [0],
         });
         const parseSaveSpy = vi.spyOn(monitor as any, 'parseSave');
 

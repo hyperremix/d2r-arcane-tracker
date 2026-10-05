@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import type {
   VaultItem,
   VaultItemFilter,
@@ -511,8 +511,8 @@ function resolveRowPresence(
  * that were taken from one scanned save file.
  *
  * Safety properties:
- * - Only the presence flag and `last_seen_at` are written. Vaulted/unvaulted state, stack counts,
- *   item data are never modified, and no row is ever deleted.
+ * - Only the presence flag and `last_seen_at` are written. Vaulted/unvaulted state, stack counts
+ *   and item data are never modified, and no row is ever deleted.
  * - The scope is the specific source file, so a scan of one stash/character can never mark rows
  *   that came from another file as missing. Rows without a source file (bookmarks / tags) are
  *   never touched.
@@ -590,8 +590,8 @@ const MAX_SQL_PARAMETERS_PER_STATEMENT = 500;
  * files that no longer exist, so their rows cannot stay "present in the latest scan" forever.
  *
  * Only `is_present_in_latest_scan` is written (and only on rows that were flagged present). Vault
- * state, item data and `last_seen_at` are untouched and no row is deleted, so a file
- * that comes back is reconciled by the next scan. The caller decides which files are truly gone.
+ * state, item data and `last_seen_at` are untouched and no row is deleted, so a file that comes
+ * back is reconciled by the next scan. The caller decides which files are truly gone.
  */
 export function markVaultItemsMissingForSourceFiles(
   ctx: DatabaseContext,
@@ -605,12 +605,16 @@ export function markVaultItemsMissingForSourceFiles(
   const tx = ctx.rawDb.transaction(() => {
     for (let start = 0; start < uniquePaths.length; start += MAX_SQL_PARAMETERS_PER_STATEMENT) {
       const chunk = uniquePaths.slice(start, start + MAX_SQL_PARAMETERS_PER_STATEMENT);
-      const placeholders = chunk.map(() => '?').join(', ');
-      ctx.rawDb
-        .prepare(
-          `UPDATE vault_items SET is_present_in_latest_scan = 0 WHERE is_present_in_latest_scan = 1 AND source_file_path IN (${placeholders})`,
+      ctx.db
+        .update(vaultItems)
+        .set({ isPresentInLatestScan: false })
+        .where(
+          and(
+            eq(vaultItems.isPresentInLatestScan, true),
+            inArray(vaultItems.sourceFilePath, chunk),
+          ),
         )
-        .run(...chunk);
+        .run();
     }
   });
 

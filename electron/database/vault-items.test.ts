@@ -1,5 +1,5 @@
 import Database from 'better-sqlite3';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createVaultPresenceKey } from '../utils/vaultPresence';
 import { createDrizzleDb } from './drizzle';
 import { createSchema } from './schema';
@@ -477,6 +477,35 @@ describe('When vault item database operations are executed', () => {
 
       // Assert
       expect(getVaultItemById(ctx, row.id)?.isPresentInLatestScan).toBe(true);
+    });
+
+    it('Then more than 500 deleted files are cleared in statements of at most 500 paths each', () => {
+      // Arrange
+      const paths = Array.from({ length: 1201 }, (_unused, index) => `/saves/Deleted${index}.d2s`);
+      const rows = paths.map((sourceFilePath, index) =>
+        upsertVaultItemByFingerprint(ctx, {
+          ...baseRow,
+          fingerprint: `fp-bulk-${index}`,
+          sourceFilePath,
+        }),
+      );
+      const kept = upsertVaultItemByFingerprint(ctx, {
+        ...baseRow,
+        fingerprint: 'fp-bulk-kept',
+        sourceFilePath: '/saves/Kept.d2s',
+      });
+      const updateSpy = vi.spyOn(ctx.db, 'update');
+
+      // Act
+      markVaultItemsMissingForSourceFiles(ctx, paths);
+
+      // Assert
+      expect(updateSpy).toHaveBeenCalledTimes(3);
+      expect(
+        rows.every((row) => getVaultItemById(ctx, row.id)?.isPresentInLatestScan === false),
+      ).toBe(true);
+      expect(getVaultItemById(ctx, kept.id)?.isPresentInLatestScan).toBe(true);
+      updateSpy.mockRestore();
     });
 
     it('Then rows come back as present when the file is scanned again', () => {

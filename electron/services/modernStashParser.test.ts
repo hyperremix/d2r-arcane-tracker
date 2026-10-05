@@ -5,18 +5,25 @@ import { BitReader } from '@dschu012/d2s/lib/binary/bitreader';
 import { _readMagicProperties, writeItem } from '@dschu012/d2s/lib/d2/items';
 import { constants as constants105 } from '@dschu012/d2s/lib/data/versions/105_constant_data';
 import { describe, expect, it } from 'vitest';
-import {
-  constants105Extended,
-  parseModernStash,
-  readSectorItems,
-  resolveStackCount,
-} from './modernStashParser';
+import { constants105Extended, parseModernStash, resolveStackCount } from './modernStashParser';
 import { readD2iMetadata } from './stashFormat';
 
 const FIXTURE_PATH = resolve(
   process.cwd(),
   'electron/services/fixtures/ModernSharedStashSoftCoreV2.d2i',
 );
+
+const D2I_SECTOR_HEADER_SIZE = 64;
+
+/** Wraps one JM payload into a minimal v105 .d2i file with a single (shared tab 0) sector. */
+function buildSingleSectorD2i(payload: Buffer): Buffer {
+  const header = Buffer.alloc(D2I_SECTOR_HEADER_SIZE);
+  header.writeUInt32LE(0xaa55aa55, 0);
+  header.writeUInt32LE(2, 4);
+  header.writeUInt32LE(105, 8);
+  header.writeUInt32LE(D2I_SECTOR_HEADER_SIZE + payload.length, 16);
+  return Buffer.concat([header, payload]);
+}
 
 describe('When parseModernStash parses v105 fixtures', () => {
   it('Then it emits normalized stash tabs with placeable resource entries', async () => {
@@ -200,7 +207,7 @@ describe('When resolveStackCount checks stackable sources', () => {
   });
 });
 
-describe('When readSectorItems parses a JM payload with trailing invalid item bytes', () => {
+describe('When parseModernStash reads a JM sector with trailing invalid item bytes', () => {
   it('Then it returns already-decoded leading items instead of dropping the whole sector', async () => {
     // Arrange
     const serializedItem = Buffer.from(
@@ -234,22 +241,22 @@ describe('When readSectorItems parses a JM payload with trailing invalid item by
     const payload = Buffer.concat([header, serializedItem, Buffer.from([0x00])]);
 
     // Act
-    const { items: parsed, complete } = await readSectorItems(payload, 105);
+    const result = await parseModernStash(buildSingleSectorD2i(payload));
 
     // Assert
-    expect(parsed).toHaveLength(1);
-    expect(parsed[0]).toEqual(
+    expect(result.items).toHaveLength(1);
+    expect(result.items[0].item).toEqual(
       expect.objectContaining({
         type: 'r01',
         position_x: 0,
         position_y: 0,
       }),
     );
-    expect(complete).toBe(false);
+    expect(result.partial).toBe(true);
   });
 });
 
-describe('When readSectorItems reaches EOF while decoding a truncated trailing item', () => {
+describe('When parseModernStash reaches EOF while decoding a truncated trailing item', () => {
   it('Then it keeps the already-decoded leading items and exits without OOM', async () => {
     // Arrange
     const serializedItem = Buffer.from(
@@ -283,23 +290,23 @@ describe('When readSectorItems reaches EOF while decoding a truncated trailing i
     const payload = Buffer.concat([header, serializedItem, Buffer.from([0x00, 0x00])]);
 
     // Act
-    const { items: parsed, complete } = await readSectorItems(payload, 105);
+    const result = await parseModernStash(buildSingleSectorD2i(payload));
 
     // Assert
-    expect(parsed).toHaveLength(1);
-    expect(parsed[0]).toEqual(
+    expect(result.items).toHaveLength(1);
+    expect(result.items[0].item).toEqual(
       expect.objectContaining({
         type: 'r01',
         position_x: 0,
         position_y: 0,
       }),
     );
-    expect(complete).toBe(false);
+    expect(result.partial).toBe(true);
   });
 });
 
-describe('When readSectorItems decodes every item the sector header declares', () => {
-  it('Then the sector is reported as complete', async () => {
+describe('When parseModernStash decodes every item the sector header declares', () => {
+  it('Then the file is not partial', async () => {
     // Arrange
     const serializedItem = Buffer.from(
       await writeItem(
@@ -332,27 +339,28 @@ describe('When readSectorItems decodes every item the sector header declares', (
     const payload = Buffer.concat([header, serializedItem]);
 
     // Act
-    const { items, complete } = await readSectorItems(payload, 105);
+    const result = await parseModernStash(buildSingleSectorD2i(payload));
 
     // Assert
-    expect(items).toHaveLength(1);
-    expect(complete).toBe(true);
+    expect(result.items).toHaveLength(1);
+    expect(result.partial).toBe(false);
   });
 });
 
-describe('When readSectorItems receives a payload that is not a readable JM sector', () => {
+describe('When parseModernStash receives a sector that is not a readable JM item list', () => {
   it.each([
-    ['shorter than a sector header', Buffer.from([0x4a, 0x4d])],
+    ['shorter than a JM header', Buffer.from([0x4a, 0x4d])],
     ['missing the JM signature', Buffer.from([0x00, 0x00, 0x01, 0x00])],
-  ])('Then a payload %s is reported as incomplete with no items', async (_scenario, payload) => {
+  ])('Then a payload %s is reported as partial with no items', async (_scenario, payload) => {
     // Arrange
-    const version = 105;
+    const buffer = buildSingleSectorD2i(payload);
 
     // Act
-    const result = await readSectorItems(payload, version);
+    const result = await parseModernStash(buffer);
 
     // Assert
-    expect(result).toEqual({ items: [], complete: false });
+    expect(result.items).toEqual([]);
+    expect(result.partial).toBe(true);
   });
 });
 
@@ -371,10 +379,9 @@ describe('When parseModernStash reads a shared stash whose sector declares more 
 
     // Assert
     expect(parsed.partial).toBe(false);
-    expect(parsed.incompleteSectorIndexes).toEqual([]);
   }, 20000);
 
-  it('Then the file is flagged partial and names the damaged sector', async () => {
+  it('Then the file is flagged partial when a sector is damaged', async () => {
     // Arrange
     const buffer = Buffer.from(readFileSync(FIXTURE));
     const firstJmSector = readD2iMetadata(buffer).sectors.findIndex(
@@ -389,6 +396,48 @@ describe('When parseModernStash reads a shared stash whose sector declares more 
 
     // Assert
     expect(parsed.partial).toBe(true);
-    expect(parsed.incompleteSectorIndexes).toContain(firstJmSector);
+  }, 20000);
+});
+
+describe('When parseModernStash reads a stash whose sector stream is damaged outside the item data', () => {
+  const FIXTURE = resolve(
+    process.cwd(),
+    'electron/services/fixtures/ModernSharedStashSoftCoreV2.d2i',
+  );
+
+  it('Then a truncated tail after the last sector is flagged partial', async () => {
+    // Arrange
+    const buffer = Buffer.concat([readFileSync(FIXTURE), Buffer.alloc(10)]);
+
+    // Act
+    const parsed = await parseModernStash(buffer);
+
+    // Assert
+    expect(parsed.partial).toBe(true);
+  }, 20000);
+
+  it('Then a trailing sector with a bad signature is flagged partial', async () => {
+    // Arrange
+    const buffer = Buffer.concat([readFileSync(FIXTURE), Buffer.alloc(80, 0x11)]);
+
+    // Act
+    const parsed = await parseModernStash(buffer);
+
+    // Assert
+    expect(parsed.partial).toBe(true);
+  }, 20000);
+
+  it('Then a sector whose payload is neither an item list nor the known extra-data block is flagged partial', async () => {
+    // Arrange
+    const buffer = Buffer.from(readFileSync(FIXTURE));
+    const sectors = readD2iMetadata(buffer).sectors;
+    const lastSector = sectors[sectors.length - 1];
+    buffer.write('XX', lastSector.payloadOffset, 'ascii');
+
+    // Act
+    const parsed = await parseModernStash(buffer);
+
+    // Assert
+    expect(parsed.partial).toBe(true);
   }, 20000);
 });
