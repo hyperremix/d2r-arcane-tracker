@@ -10,8 +10,10 @@ import type {
 } from 'electron/types/grail';
 import { GripHorizontal } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ProgressGauge } from '@/components/grail/ProgressGauge';
 import { Input } from '@/components/ui/input';
+import { translations } from '@/i18n/translations';
 import { formatDuration } from '@/lib/utils';
 import { clampWidgetOpacity, resolveWidgetDisplayMode } from '@/lib/widget';
 import { useGrailStore } from '@/stores/grailStore';
@@ -158,6 +160,7 @@ function RunOnlyDisplay({
   onAddManualItem,
   hasRuns,
 }: RunOnlyDisplayProps) {
+  const { t } = useTranslation();
   const [manualItemName, setManualItemName] = useState('');
   const [addingItem, setAddingItem] = useState(false);
 
@@ -189,8 +192,8 @@ function RunOnlyDisplay({
   if (!activeSession) {
     return (
       <div className="text-center">
-        <p className="text-sm text-white">No Active Session</p>
-        <p className="text-white/80 text-xs">Start a session to track runs</p>
+        <p className="text-sm text-white">{t(translations.widget.noActiveSession)}</p>
+        <p className="text-white/80 text-xs">{t(translations.widget.startSessionPrompt)}</p>
       </div>
     );
   }
@@ -200,11 +203,11 @@ function RunOnlyDisplay({
       {/* Top Row: Run # and Current Duration */}
       <div className="grid grid-cols-2 gap-4">
         <div className="text-center">
-          <p className="text-white/85 text-xs">Run</p>
+          <p className="text-white/85 text-xs">{t(translations.widget.run)}</p>
           <p className="font-bold text-white text-xl">#{activeSession?.runCount ?? 0}</p>
         </div>
         <div className="text-center">
-          <p className="text-white/85 text-xs">Current</p>
+          <p className="text-white/85 text-xs">{t(translations.widget.current)}</p>
           <p className="font-mono text-lg text-white">{formatDuration(runDuration)}</p>
         </div>
       </div>
@@ -212,11 +215,11 @@ function RunOnlyDisplay({
       {/* Bottom Row: Session Stats */}
       <div className="grid grid-cols-2 gap-4 pt-3">
         <div className="text-center">
-          <p className="text-white/85 text-xs">Fastest</p>
+          <p className="text-white/85 text-xs">{t(translations.widget.fastest)}</p>
           <p className="font-mono text-sm text-white">{formatDuration(sessionStats?.fastestRun)}</p>
         </div>
         <div className="text-center">
-          <p className="text-white/85 text-xs">Avg</p>
+          <p className="text-white/85 text-xs">{t(translations.widget.average)}</p>
           <p className="font-mono text-sm text-white">
             {formatDuration(sessionStats?.averageRunDuration)}
           </p>
@@ -226,7 +229,7 @@ function RunOnlyDisplay({
       {/* Per-run item list */}
       {showItemList && (
         <div className="flex flex-col gap-2 overflow-hidden">
-          <p className="font-bold text-md text-white/85">Run Items</p>
+          <p className="font-bold text-md text-white/85">{t(translations.widget.runItems)}</p>
 
           {/* Manual Item Entry */}
           {onAddManualItem && (
@@ -234,7 +237,11 @@ function RunOnlyDisplay({
               <div className="flex gap-1.5">
                 <Input
                   type="text"
-                  placeholder={hasRuns ? 'Add item...' : 'Start a run first'}
+                  placeholder={
+                    hasRuns
+                      ? t(translations.widget.addItemPlaceholder)
+                      : t(translations.runTracker.controls.startRunFirst)
+                  }
                   value={manualItemName}
                   onChange={(e) => setManualItemName(e.target.value)}
                   onKeyDown={handleKeyDown}
@@ -282,6 +289,7 @@ function RunOnlyDisplay({
  * Supports multiple size configurations and dynamic opacity.
  */
 export function Widget({ statistics, settings, onDragStart, onDragEnd }: WidgetProps) {
+  const { t } = useTranslation();
   // Split/all modes need ethereal tracking; fall back to overall here so the widget never renders empty
   const displayMode = resolveWidgetDisplayMode(settings.widgetDisplay, settings.grailEthereal);
   const opacity = clampWidgetOpacity(settings.widgetOpacity);
@@ -463,7 +471,7 @@ export function Widget({ statistics, settings, onDragStart, onDragEnd }: WidgetP
         onKeyDown={() => {}}
       >
         <WidgetDragGrip />
-        <p className="text-sm text-white">Loading...</p>
+        <p className="text-sm text-white">{t(translations.common.loading)}</p>
       </div>
     );
   }
@@ -493,7 +501,7 @@ export function Widget({ statistics, settings, onDragStart, onDragEnd }: WidgetP
       {displayMode === 'overall' && (
         <div style={{ transform: `scale(${gaugeScale})` }} className="mt-8">
           <ProgressGauge
-            label="Overall"
+            label={t(translations.settings.widget.overall)}
             current={statistics.foundItems}
             total={statistics.totalItems}
             showLabel
@@ -507,7 +515,7 @@ export function Widget({ statistics, settings, onDragStart, onDragEnd }: WidgetP
         <div className="mt-4 flex justify-center gap-12">
           <div style={{ transform: `scale(${gaugeScale})` }}>
             <ProgressGauge
-              label="Normal"
+              label={t(translations.grail.itemCard.normal)}
               current={statistics.normalItems.found}
               total={statistics.normalItems.total}
               showLabel
@@ -516,7 +524,7 @@ export function Widget({ statistics, settings, onDragStart, onDragEnd }: WidgetP
           </div>
           <div style={{ transform: `scale(${gaugeScale})` }}>
             <ProgressGauge
-              label="Ethereal"
+              label={t(translations.widget.ethereal)}
               current={statistics.etherealItems.found}
               total={statistics.etherealItems.total}
               showLabel
@@ -531,7 +539,7 @@ export function Widget({ statistics, settings, onDragStart, onDragEnd }: WidgetP
         <div className="mt-4 flex flex-col items-center gap-8">
           <div style={{ transform: `scale(${gaugeScale})` }}>
             <ProgressGauge
-              label="Overall"
+              label={t(translations.settings.widget.overall)}
               current={statistics.foundItems}
               total={statistics.totalItems}
               showLabel
@@ -543,7 +551,7 @@ export function Widget({ statistics, settings, onDragStart, onDragEnd }: WidgetP
             <div className="flex justify-center gap-6">
               <div style={{ transform: `scale(${gaugeScale * 0.85})` }}>
                 <ProgressGauge
-                  label="Normal"
+                  label={t(translations.grail.itemCard.normal)}
                   current={statistics.normalItems.found}
                   total={statistics.normalItems.total}
                   showLabel
@@ -552,7 +560,7 @@ export function Widget({ statistics, settings, onDragStart, onDragEnd }: WidgetP
               </div>
               <div style={{ transform: `scale(${gaugeScale * 0.85})` }}>
                 <ProgressGauge
-                  label="Ethereal"
+                  label={t(translations.widget.ethereal)}
                   current={statistics.etherealItems.found}
                   total={statistics.etherealItems.total}
                   showLabel

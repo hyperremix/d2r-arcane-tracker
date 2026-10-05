@@ -685,5 +685,16 @@
       "endCurrentSessionTitle": "End Current Session",
       "endCurrentSessionDescription": "Are you sure you want to end the current session? This will end any active run and cannot be undone."
     }
+  },
+  "widget": {
+    "ethereal": "Ethereal",
+    "noActiveSession": "No Active Session",
+    "startSessionPrompt": "Start a session to track runs",
+    "run": "Run",
+    "current": "Current",
+    "fastest": "Fastest",
+    "average": "Avg",
+    "runItems": "Run Items",
+    "addItemPlaceholder": "Add item..."
   }
 }

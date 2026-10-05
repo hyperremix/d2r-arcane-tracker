@@ -9,9 +9,12 @@ import type {
   SessionStats,
   Settings,
 } from 'electron/types/grail';
-import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import i18n from 'i18next';
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { useRunTrackerStore } from '@/stores/runTrackerStore';
 import { Widget } from './Widget';
+
+const widgetTestState = vi.hoisted(() => ({ hideSession: false }));
 
 // Minimal mocks for zustand stores used by Widget
 vi.mock('@/stores/runTrackerStore', () => {
@@ -86,12 +89,13 @@ vi.mock('@/stores/runTrackerStore', () => {
   const mockStore = {
     useRunTrackerStore: () => ({
       activeRun: null,
-      activeSession: session,
+      activeSession: widgetTestState.hideSession ? null : session,
       runs,
       runItems,
       getSessionStats: () => sessionStats,
       loadSessionRuns,
       loadRunItems,
+      addManualRunItem: vi.fn().mockResolvedValue(undefined),
       refreshActiveRun: vi.fn().mockResolvedValue(undefined),
       handleSessionStarted: vi.fn(),
       handleSessionEnded: vi.fn(),
@@ -464,5 +468,181 @@ describe('Widget display and legibility', () => {
     const root = container.firstElementChild as HTMLElement;
     expect(root.style.cursor).toBe('move');
     expect(root).toContainElement(grip);
+  });
+});
+
+describe('Widget localization', () => {
+  const originalBundle = structuredClone(i18n.getResourceBundle('en', 'common'));
+
+  beforeAll(() => {
+    vi.stubGlobal(
+      'IntersectionObserver',
+      class {
+        observe = vi.fn();
+        unobserve = vi.fn();
+        disconnect = vi.fn();
+        takeRecords = vi.fn(() => []);
+      },
+    );
+    vi.stubGlobal(
+      'matchMedia',
+      vi.fn().mockReturnValue({
+        matches: false,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      }),
+    );
+  });
+
+  afterEach(() => {
+    widgetTestState.hideSession = false;
+    i18n.addResourceBundle('en', 'common', originalBundle, true, true);
+  });
+
+  afterAll(() => {
+    vi.unstubAllGlobals();
+  });
+
+  /**
+   * Replaces the English strings the widget uses with marked values so untranslated literals stand out.
+   */
+  function markTranslations() {
+    i18n.addResourceBundle(
+      'en',
+      'common',
+      {
+        common: { loading: 'tr:loading' },
+        grail: { itemCard: { normal: 'tr:normal' } },
+        settings: { widget: { overall: 'tr:overall' } },
+        runTracker: { controls: { startRunFirst: 'tr:startRunFirst' } },
+        widget: {
+          ethereal: 'tr:ethereal',
+          noActiveSession: 'tr:noActiveSession',
+          startSessionPrompt: 'tr:startSessionPrompt',
+          run: 'tr:run',
+          current: 'tr:current',
+          fastest: 'tr:fastest',
+          average: 'tr:average',
+          runItems: 'tr:runItems',
+          addItemPlaceholder: 'tr:addItemPlaceholder',
+        },
+      },
+      true,
+      true,
+    );
+  }
+
+  const renderWidget = (settings: Partial<Settings>, statistics: GrailStatistics | null) =>
+    render(
+      <Widget
+        statistics={statistics}
+        settings={settings}
+        onDragStart={() => ({})}
+        onDragEnd={() => ({})}
+      />,
+    );
+
+  it('If there is no active session in run-only mode, Then the status copy is translated', () => {
+    // Arrange
+    markTranslations();
+    widgetTestState.hideSession = true;
+
+    // Act
+    const { getByText } = renderWidget({ widgetDisplay: 'run-only' }, null);
+
+    // Assert
+    expect(getByText('tr:noActiveSession')).toBeDefined();
+    expect(getByText('tr:startSessionPrompt')).toBeDefined();
+  });
+
+  it('If a session is active in run-only mode, Then the labels and placeholder are translated', () => {
+    // Arrange
+    markTranslations();
+    const store = useRunTrackerStore() as unknown as {
+      runs: Map<string, Run[]>;
+      activeSession: Session;
+    };
+    store.runs.set(store.activeSession.id, [
+      {
+        id: 'run-l10n',
+        sessionId: store.activeSession.id,
+        runNumber: 1,
+        startTime: new Date(),
+        created: new Date(),
+        lastUpdated: new Date(),
+      },
+    ]);
+
+    // Act
+    const { getByText, getByPlaceholderText } = renderWidget(
+      { widgetDisplay: 'run-only', widgetRunOnlyShowItems: true },
+      null,
+    );
+
+    // Assert
+    expect(getByText('tr:run')).toBeDefined();
+    expect(getByText('tr:current')).toBeDefined();
+    expect(getByText('tr:fastest')).toBeDefined();
+    expect(getByText('tr:average')).toBeDefined();
+    expect(getByText('tr:runItems')).toBeDefined();
+    expect(getByPlaceholderText('tr:addItemPlaceholder')).toBeDefined();
+  });
+
+  it('If a session has no runs yet, Then the add item placeholder asks to start a run in translated copy', () => {
+    // Arrange
+    markTranslations();
+    const store = useRunTrackerStore() as unknown as {
+      runs: Map<string, Run[]>;
+    };
+    store.runs.clear();
+
+    // Act
+    const { getByPlaceholderText } = renderWidget(
+      { widgetDisplay: 'run-only', widgetRunOnlyShowItems: true },
+      null,
+    );
+
+    // Assert
+    expect(getByPlaceholderText('tr:startRunFirst')).toBeDefined();
+  });
+
+  it('If statistics are not loaded yet, Then the loading message is translated', () => {
+    // Arrange
+    markTranslations();
+
+    // Act
+    const { getByText } = renderWidget({ widgetDisplay: 'overall' }, null);
+
+    // Assert
+    expect(getByText('tr:loading')).toBeDefined();
+  });
+
+  it('If gauges are shown, Then their labels are translated', () => {
+    // Arrange
+    markTranslations();
+    const statistics: GrailStatistics = {
+      totalItems: 100,
+      foundItems: 40,
+      completionPercentage: 40,
+      recentFinds: 0,
+      normalItems: { total: 60, found: 30 },
+      etherealItems: { total: 40, found: 10 },
+      currentStreak: 0,
+      maxStreak: 0,
+    };
+
+    // Act
+    const overall = renderWidget({ widgetDisplay: 'overall' }, statistics);
+
+    // Assert
+    expect(overall.getAllByText('tr:overall').length).toBeGreaterThan(0);
+    overall.unmount();
+
+    // Act
+    const split = renderWidget({ widgetDisplay: 'split', grailEthereal: true }, statistics);
+
+    // Assert
+    expect(split.getAllByText('tr:normal').length).toBeGreaterThan(0);
+    expect(split.getAllByText('tr:ethereal').length).toBeGreaterThan(0);
   });
 });
