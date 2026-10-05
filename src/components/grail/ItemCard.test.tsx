@@ -376,6 +376,83 @@ describe('When ItemCard is rendered', () => {
       },
     );
 
+    it.each(['grid', 'list'] as const)(
+      'Then the %s card does not call onClick when Enter or Space bubble from a nested element',
+      (viewMode) => {
+        // Arrange
+        const onClick = vi.fn();
+        const item = HolyGrailItemBuilder.new().withName('Nested Key').build();
+        render(<ItemCard item={item} onClick={onClick} viewMode={viewMode} />);
+        const card = screen.getByRole('button', { name: 'Nested Key, Not Found' });
+        const nested = screen.getByText('Nested Key');
+        expect(card).not.toBe(nested);
+        expect(card).toContainElement(nested);
+
+        // Act
+        fireEvent.keyDown(nested, { key: 'Enter' });
+        fireEvent.keyDown(nested, { key: ' ' });
+        fireEvent.keyUp(nested, { key: ' ' });
+
+        // Assert
+        expect(onClick).not.toHaveBeenCalled();
+      },
+    );
+
+    it.each(['grid', 'list'] as const)(
+      'Then the %s card ignores a stray Space keyup without a prior keydown on the card',
+      (viewMode) => {
+        // Arrange
+        const onClick = vi.fn();
+        const item = HolyGrailItemBuilder.new().withName('Stray Key').build();
+        render(<ItemCard item={item} onClick={onClick} viewMode={viewMode} />);
+        const card = screen.getByRole('button', { name: 'Stray Key, Not Found' });
+
+        // Act
+        fireEvent.keyUp(card, { key: ' ' });
+
+        // Assert
+        expect(onClick).not.toHaveBeenCalled();
+      },
+    );
+
+    it.each(['grid', 'list'] as const)(
+      'Then the %s card activates only once per Space press and ignores a second keyup',
+      (viewMode) => {
+        // Arrange
+        const onClick = vi.fn();
+        const item = HolyGrailItemBuilder.new().withName('Once Key').build();
+        render(<ItemCard item={item} onClick={onClick} viewMode={viewMode} />);
+        const card = screen.getByRole('button', { name: 'Once Key, Not Found' });
+
+        // Act
+        fireEvent.keyDown(card, { key: ' ' });
+        fireEvent.keyUp(card, { key: ' ' });
+        fireEvent.keyUp(card, { key: ' ' });
+
+        // Assert
+        expect(onClick).toHaveBeenCalledTimes(1);
+      },
+    );
+
+    it.each(['grid', 'list'] as const)(
+      'Then the %s card ignores a Space keyup after focus left the card mid-press',
+      (viewMode) => {
+        // Arrange
+        const onClick = vi.fn();
+        const item = HolyGrailItemBuilder.new().withName('Blur Key').build();
+        render(<ItemCard item={item} onClick={onClick} viewMode={viewMode} />);
+        const card = screen.getByRole('button', { name: 'Blur Key, Not Found' });
+        fireEvent.keyDown(card, { key: ' ' });
+
+        // Act
+        fireEvent.blur(card);
+        fireEvent.keyUp(card, { key: ' ' });
+
+        // Assert
+        expect(onClick).not.toHaveBeenCalled();
+      },
+    );
+
     it('Then does not call onClick when Enter is released', () => {
       // Arrange
       const onClick = vi.fn();

@@ -19,7 +19,7 @@ import { getCardStateClasses, interactiveCardStyles, missingArtworkStyles } from
  */
 export type InteractiveCardProps = Pick<
   HTMLAttributes<HTMLDivElement>,
-  'role' | 'tabIndex' | 'aria-label' | 'onClick' | 'onKeyDown' | 'onKeyUp'
+  'role' | 'tabIndex' | 'aria-label' | 'onClick' | 'onKeyDown' | 'onKeyUp' | 'onBlur'
 >;
 
 /**

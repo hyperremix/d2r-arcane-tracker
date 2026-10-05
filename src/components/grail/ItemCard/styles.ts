@@ -5,7 +5,7 @@ import type { ItemType } from 'electron/types/grail';
  * Item type is conveyed by the border color and the type icon only; the card background
  * stays neutral so that text keeps full contrast.
  */
-export const typeBorderColors: Record<ItemType, { found: string; missing: string }> = {
+const typeBorderColors: Record<ItemType, { found: string; missing: string }> = {
   unique: {
     found: 'border-item-unique',
     missing: 'border-item-unique/60',
@@ -30,7 +30,7 @@ export const typeBorderColors: Record<ItemType, { found: string; missing: string
  * - Missing: muted neutral surface with a dashed, softened type border.
  * Opacity is never applied to the whole card so the item name keeps full text contrast.
  */
-export const foundStateStyles = {
+const foundStateStyles = {
   found: 'border-solid bg-card shadow-sm',
   missing: 'border-dashed bg-muted/40 shadow-none dark:bg-muted/20',
 } as const;

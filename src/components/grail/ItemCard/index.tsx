@@ -1,5 +1,5 @@
 import type { Character, GrailProgress, Item } from 'electron/types/grail';
-import { memo } from 'react';
+import { memo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { translations } from '@/i18n/translations';
 import { GridView, type InteractiveCardProps } from './GridView';
@@ -67,6 +67,9 @@ export const ItemCard = memo(function ItemCard({
   // Get character info for discoveries from both versions
   const discoveringCharacters = getDiscoveringCharacters(allProgress, characters);
 
+  // Tracks a Space keydown that started on the card so a stray keyup does not activate it
+  const spacePressedRef = useRef(false);
+
   // Mirror native button activation: Enter activates on keydown, Space on keyup.
   // Only react to keys pressed on the card itself, not bubbling from nested elements.
   const handleKeyDown = (event: React.KeyboardEvent) => {
@@ -77,6 +80,7 @@ export const ItemCard = memo(function ItemCard({
     } else if (event.key === ' ') {
       // Prevent page scroll; activation happens on keyup
       event.preventDefault();
+      spacePressedRef.current = true;
     }
   };
 
@@ -84,8 +88,14 @@ export const ItemCard = memo(function ItemCard({
     if (event.target !== event.currentTarget) return;
     if (event.key === ' ') {
       event.preventDefault();
+      if (!spacePressedRef.current) return;
+      spacePressedRef.current = false;
       onClick?.();
     }
+  };
+
+  const handleBlur = () => {
+    spacePressedRef.current = false;
   };
 
   // Clickable cards are focusable buttons named after the item and its found status
@@ -102,6 +112,7 @@ export const ItemCard = memo(function ItemCard({
         onClick,
         onKeyDown: handleKeyDown,
         onKeyUp: handleKeyUp,
+        onBlur: handleBlur,
       }
     : undefined;
 
