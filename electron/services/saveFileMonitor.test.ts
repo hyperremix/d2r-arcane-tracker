@@ -1048,14 +1048,20 @@ describe('When SaveFileMonitor is used', () => {
 
     describe('If backup-like stash filenames are evaluated', () => {
       it('Then backup-like .d2i files should be excluded from parsing', () => {
-        // Act & Assert
-        expect((monitor as any).shouldIncludeSaveFile('Barb.d2s')).toBe(true);
-        expect((monitor as any).shouldIncludeSaveFile('SharedStashSoftCoreV2.d2i')).toBe(true);
-        expect((monitor as any).shouldIncludeSaveFile('SharedStashSoftCoreV2_Backup.d2i')).toBe(
-          false,
-        );
-        expect((monitor as any).shouldIncludeSaveFile('SharedStashSoftCoreV2.bak.d2i')).toBe(false);
-        expect((monitor as any).shouldIncludeSaveFile('notes.txt')).toBe(false);
+        // Arrange
+        const fileNames = [
+          'Barb.d2s',
+          'SharedStashSoftCoreV2.d2i',
+          'SharedStashSoftCoreV2_Backup.d2i',
+          'SharedStashSoftCoreV2.bak.d2i',
+          'notes.txt',
+        ];
+
+        // Act
+        const included = fileNames.map((name) => (monitor as any).shouldIncludeSaveFile(name));
+
+        // Assert
+        expect(included).toEqual([true, true, false, false, false]);
       });
     });
   });
@@ -2036,17 +2042,29 @@ describe('When SaveFileMonitor is used', () => {
       expect(mockDatabase.markVaultItemsMissingForSourceFiles).not.toHaveBeenCalled();
     });
 
-    it('Then a file that cannot be inspected right now does not count as deleted', async () => {
-      // Arrange
-      writeFileSync(goneFile, 'save');
-      chmodSync(saveDir, 0o000);
+    // chmod 000 only blocks stat() for unprivileged POSIX users: root ignores the mode and Windows
+    // has no POSIX permission bits, so the test would pass without checking anything there.
+    const canRestrictDirectoryAccess =
+      process.platform !== 'win32' && (process.getuid?.() ?? 0) !== 0;
 
-      // Act
-      await (monitor as any).markOrphanedVaultRowsMissing([]);
+    it.skipIf(!canRestrictDirectoryAccess)(
+      'Then a file that cannot be inspected right now does not count as deleted',
+      async () => {
+        // Arrange
+        writeFileSync(goneFile, 'save');
+        chmodSync(saveDir, 0o000);
 
-      // Assert
-      expect(mockDatabase.markVaultItemsMissingForSourceFiles).not.toHaveBeenCalled();
-    });
+        try {
+          // Act
+          await (monitor as any).markOrphanedVaultRowsMissing([]);
+
+          // Assert
+          expect(mockDatabase.markVaultItemsMissingForSourceFiles).not.toHaveBeenCalled();
+        } finally {
+          chmodSync(saveDir, 0o700);
+        }
+      },
+    );
 
     it('Then an unavailable save directory does not count as deleted files', async () => {
       // Arrange

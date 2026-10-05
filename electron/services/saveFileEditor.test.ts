@@ -232,6 +232,16 @@ function addItemToEquippedSlot(params: {
   };
 }
 
+/** Awaits a promise that is expected to reject and returns the rejection message (if any). */
+async function rejectionMessage(promise: Promise<unknown>): Promise<string | undefined> {
+  try {
+    await promise;
+    return undefined;
+  } catch (error) {
+    return error instanceof Error ? error.message : String(error);
+  }
+}
+
 function makeStashData(pages: { id: number }[][] = []): StashData {
   return {
     pages: pages.map((items) => ({ name: '', type: 0, items: [...items] })),
@@ -335,13 +345,16 @@ describe('When removeItemFromSaveFile is called', () => {
     });
 
     it('Then rejects locator-only removal without a numeric item id', async () => {
-      // Act & Assert
-      await expect(
+      // Act
+      const message = await rejectionMessage(
         removeItemFromSaveFile('/path/to/char.d2s', 'd2s', {
           gridX: 1,
           gridY: 1,
         }),
-      ).rejects.toThrow('itemId is required for d2s removal');
+      );
+
+      // Assert
+      expect(message).toContain('itemId is required for d2s removal');
       expect(mockD2sRead).not.toHaveBeenCalled();
     });
   });
@@ -405,10 +418,13 @@ describe('When removeItemFromSaveFile is called', () => {
         sectors: [],
       });
 
-      // Act & Assert — modern path is taken; throws "not found", never "MODERN_STASH_READ_ONLY"
-      await expect(removeItemFromSaveFile('/path/to/file.d2i', 'd2i', 11)).rejects.toThrow(
-        'not found',
+      // Act
+      const message = await rejectionMessage(
+        removeItemFromSaveFile('/path/to/file.d2i', 'd2i', 11),
       );
+
+      // Assert
+      expect(message).toContain('not found');
       expect(mockD2stashRead).not.toHaveBeenCalled();
       expect(mockD2stashWrite).not.toHaveBeenCalled();
     });
@@ -421,14 +437,17 @@ describe('When removeItemFromSaveFile is called', () => {
         sectors: [],
       });
 
-      // Act & Assert — modern path is taken using stash/grid locator; never hits legacy stash parser
-      await expect(
+      // Act
+      const message = await rejectionMessage(
         removeItemFromSaveFile('/path/to/file.d2i', 'd2i', {
           stashTab: 7,
           gridX: 2,
           gridY: 1,
         }),
-      ).rejects.toThrow('not found');
+      );
+
+      // Assert
+      expect(message).toContain('not found');
       expect(mockD2stashRead).not.toHaveBeenCalled();
       expect(mockD2stashWrite).not.toHaveBeenCalled();
     });
@@ -705,8 +724,11 @@ describe('When addItemToSaveFile is called', () => {
         targetSlotId: 1,
       });
 
-      // Act & Assert
-      await expect(addPromise).rejects.toThrow('EQUIP_VALIDATION:INVALID_SLOT');
+      // Act
+      const message = await rejectionMessage(addPromise);
+
+      // Assert
+      expect(message).toContain('EQUIP_VALIDATION:INVALID_SLOT');
       expect(mockD2sWrite).not.toHaveBeenCalled();
     });
 
@@ -738,8 +760,11 @@ describe('When addItemToSaveFile is called', () => {
         targetSlotId: 3,
       });
 
-      // Act & Assert
-      await expect(addPromise).rejects.toThrow('EQUIP_VALIDATION:INVALID_SLOT');
+      // Act
+      const message = await rejectionMessage(addPromise);
+
+      // Assert
+      expect(message).toContain('EQUIP_VALIDATION:INVALID_SLOT');
       expect(mockD2sWrite).not.toHaveBeenCalled();
     });
 
@@ -783,8 +808,11 @@ describe('When addItemToSaveFile is called', () => {
         targetSlotId: 2,
       });
 
-      // Act & Assert
-      await expect(addPromise).rejects.toThrow('EQUIP_VALIDATION:INVALID_SLOT');
+      // Act
+      const message = await rejectionMessage(addPromise);
+
+      // Assert
+      expect(message).toContain('EQUIP_VALIDATION:INVALID_SLOT');
       expect(mockD2sWrite).not.toHaveBeenCalled();
     });
 
@@ -816,8 +844,11 @@ describe('When addItemToSaveFile is called', () => {
         targetSlotId: 6,
       });
 
-      // Act & Assert
-      await expect(addPromise).rejects.toThrow('EQUIP_VALIDATION:INVALID_SLOT');
+      // Act
+      const message = await rejectionMessage(addPromise);
+
+      // Assert
+      expect(message).toContain('EQUIP_VALIDATION:INVALID_SLOT');
       expect(mockD2sWrite).not.toHaveBeenCalled();
     });
 
@@ -849,8 +880,11 @@ describe('When addItemToSaveFile is called', () => {
         targetSlotId: 8,
       });
 
-      // Act & Assert
-      await expect(addPromise).rejects.toThrow('EQUIP_VALIDATION:INVALID_SLOT');
+      // Act
+      const message = await rejectionMessage(addPromise);
+
+      // Assert
+      expect(message).toContain('EQUIP_VALIDATION:INVALID_SLOT');
       expect(mockD2sWrite).not.toHaveBeenCalled();
     });
 
@@ -882,8 +916,11 @@ describe('When addItemToSaveFile is called', () => {
         targetSlotId: 9,
       });
 
-      // Act & Assert
-      await expect(addPromise).rejects.toThrow('EQUIP_VALIDATION:INVALID_SLOT');
+      // Act
+      const message = await rejectionMessage(addPromise);
+
+      // Assert
+      expect(message).toContain('EQUIP_VALIDATION:INVALID_SLOT');
       expect(mockD2sWrite).not.toHaveBeenCalled();
     });
 
@@ -915,8 +952,11 @@ describe('When addItemToSaveFile is called', () => {
         targetSlotId: 1,
       });
 
-      // Act & Assert
-      await expect(addPromise).rejects.toThrow('EQUIP_VALIDATION:INVALID_SLOT');
+      // Act
+      const message = await rejectionMessage(addPromise);
+
+      // Assert
+      expect(message).toContain('EQUIP_VALIDATION:INVALID_SLOT');
       expect(mockD2sWrite).not.toHaveBeenCalled();
     });
 
@@ -928,8 +968,11 @@ describe('When addItemToSaveFile is called', () => {
         targetSlotId: 1,
       });
 
-      // Act & Assert
-      await expect(addPromise).rejects.toThrow('EQUIP_VALIDATION:INVALID_SLOT');
+      // Act
+      const message = await rejectionMessage(addPromise);
+
+      // Assert
+      expect(message).toContain('EQUIP_VALIDATION:INVALID_SLOT');
       expect(mockD2sWrite).not.toHaveBeenCalled();
     });
 
@@ -1159,10 +1202,13 @@ describe('When addItemToSaveFile is called', () => {
         sectors: [],
       });
 
-      // Act & Assert
-      await expect(
+      // Act
+      const message = await rejectionMessage(
         addItemToSaveFile('/path/to/file.d2i', 'd2i', testItem, 'stash', 5),
-      ).rejects.toThrow("Item code 'uap' cannot be moved to modern stash tab 5");
+      );
+
+      // Assert
+      expect(message).toContain("Item code 'uap' cannot be moved to modern stash tab 5");
       expect(mockD2stashRead).not.toHaveBeenCalled();
       expect(mockD2stashWrite).not.toHaveBeenCalled();
     });
@@ -1391,8 +1437,8 @@ describe('When moveItemBetweenSaveFiles is called', () => {
         sectors: [],
       });
 
-      // Act & Assert — throws "not found" (modern path attempted), never MODERN_STASH_READ_ONLY
-      await expect(
+      // Act
+      const message = await rejectionMessage(
         moveItemBetweenSaveFiles({
           sourceFilePath: '/path/to/source.d2i',
           sourceFileType: 'd2i',
@@ -1403,7 +1449,10 @@ describe('When moveItemBetweenSaveFiles is called', () => {
           targetGridX: 0,
           targetGridY: 0,
         }),
-      ).rejects.toThrow('Source item not found');
+      );
+
+      // Assert
+      expect(message).toContain('Source item not found');
       expect(mockD2sWrite).not.toHaveBeenCalled();
       expect(mockWriteFile).not.toHaveBeenCalled();
     });
@@ -1416,8 +1465,8 @@ describe('When moveItemBetweenSaveFiles is called', () => {
         sectors: [],
       });
 
-      // Act & Assert — modern path is entered; throws "not found" from empty sectors, no legacy writes
-      await expect(
+      // Act
+      const message = await rejectionMessage(
         moveItemBetweenSaveFiles({
           sourceFilePath: '/path/to/stash.d2i',
           sourceFileType: 'd2i',
@@ -1427,7 +1476,10 @@ describe('When moveItemBetweenSaveFiles is called', () => {
           targetLocationContext: 'stash',
           targetStashTab: 1,
         }),
-      ).rejects.toThrow('Source item not found in stash file');
+      );
+
+      // Assert
+      expect(message).toContain('Source item not found in stash file');
       expect(mockD2stashRead).not.toHaveBeenCalled();
       expect(mockD2stashWrite).not.toHaveBeenCalled();
       expect(mockWriteFile).not.toHaveBeenCalled();

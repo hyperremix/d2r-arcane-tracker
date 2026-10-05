@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   execFile: vi.fn(),
@@ -9,7 +9,7 @@ vi.mock('node:child_process', () => ({
   execFile: mocks.execFile,
 }));
 
-import { assertGameNotRunning, isGameRunning } from './gameProcessGuard';
+import { assertGameNotRunning } from './gameProcessGuard';
 
 function mockTasklist(result: { stdout: string } | Error): void {
   mocks.execFile.mockImplementation(
@@ -29,21 +29,30 @@ function mockTasklist(result: { stdout: string } | Error): void {
 
 describe('When the game process guard checks for D2R', () => {
   const originalPlatform = process.platform;
+  let warnSpy: ReturnType<typeof vi.spyOn> | undefined;
 
   beforeEach(() => {
     vi.clearAllMocks();
     Object.defineProperty(process, 'platform', { value: 'win32' });
   });
 
+  afterEach(() => {
+    // Vitest runs with isolate: false, so a failing assertion must not leak the faked platform.
+    Object.defineProperty(process, 'platform', { value: originalPlatform });
+    warnSpy?.mockRestore();
+    warnSpy = undefined;
+  });
+
   describe('If tasklist lists D2R.exe', () => {
-    it('Then the game counts as running and writes are refused', async () => {
+    it('Then writes are refused with GAME_RUNNING', async () => {
       // Arrange
       mockTasklist({ stdout: '"D2R.exe","1234","Console","1","1,000 K"\r\n' });
 
-      // Act & Assert
-      expect(await isGameRunning()).toBe(true);
-      await expect(assertGameNotRunning()).rejects.toThrow('GAME_RUNNING');
-      Object.defineProperty(process, 'platform', { value: originalPlatform });
+      // Act
+      const check = assertGameNotRunning();
+
+      // Assert
+      await expect(check).rejects.toThrow('GAME_RUNNING');
     });
   });
 
@@ -54,10 +63,11 @@ describe('When the game process guard checks for D2R', () => {
         stdout: 'INFO: No tasks are running which match the specified criteria.\r\n',
       });
 
-      // Act & Assert
-      expect(await isGameRunning()).toBe(false);
-      await expect(assertGameNotRunning()).resolves.toBeUndefined();
-      Object.defineProperty(process, 'platform', { value: originalPlatform });
+      // Act
+      const check = assertGameNotRunning();
+
+      // Assert
+      await expect(check).resolves.toBeUndefined();
     });
   });
 
@@ -65,12 +75,14 @@ describe('When the game process guard checks for D2R', () => {
     it('Then the guard does not block the user', async () => {
       // Arrange
       mockTasklist(new Error('tasklist not found'));
-      const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+      warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
 
-      // Act & Assert
-      expect(await isGameRunning()).toBe(false);
-      warn.mockRestore();
-      Object.defineProperty(process, 'platform', { value: originalPlatform });
+      // Act
+      const check = assertGameNotRunning();
+
+      // Assert
+      await expect(check).resolves.toBeUndefined();
+      expect(warnSpy).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -79,10 +91,12 @@ describe('When the game process guard checks for D2R', () => {
       // Arrange
       Object.defineProperty(process, 'platform', { value: 'linux' });
 
-      // Act & Assert
-      expect(await isGameRunning()).toBe(false);
+      // Act
+      const check = assertGameNotRunning();
+
+      // Assert
+      await expect(check).resolves.toBeUndefined();
       expect(mocks.execFile).not.toHaveBeenCalled();
-      Object.defineProperty(process, 'platform', { value: originalPlatform });
     });
   });
 });

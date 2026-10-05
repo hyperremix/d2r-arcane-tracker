@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createVaultPresenceKey, normalizeItemUid, readItemUidFromRawJson } from './vaultPresence';
+import { createVaultPresenceKey, readItemUidFromRawJson } from './vaultPresence';
 
 const baseFields = {
   sourceFileType: 'd2i',
@@ -89,15 +89,36 @@ describe('When readItemUidFromRawJson reads a stored item', () => {
   });
 });
 
-describe('When normalizeItemUid receives an unsupported value', () => {
-  it('Then it returns undefined', () => {
+describe('When createVaultPresenceKey receives an unsupported item id', () => {
+  it('Then the key is the same as for an item without an id', () => {
     // Arrange
-    const values = [undefined, null, '', '  ', Number.NaN, {}];
+    const unsupportedIds = [undefined, null, '', '  ', Number.NaN, {}] as unknown as Array<
+      number | string | null | undefined
+    >;
+    const withoutId = createVaultPresenceKey(baseFields);
 
     // Act
-    const results = values.map(normalizeItemUid);
+    const keys = unsupportedIds.map((itemUid) =>
+      createVaultPresenceKey({ ...baseFields, itemUid }),
+    );
 
     // Assert
-    expect(results.every((result) => result === undefined)).toBe(true);
+    expect(keys.every((key) => key === withoutId)).toBe(true);
+  });
+});
+
+describe('When createVaultPresenceKey receives a numeric or padded string item id', () => {
+  it('Then both spellings produce the same key, which differs from an item without an id', () => {
+    // Arrange
+    const fromNumber = { ...baseFields, itemUid: 7 };
+    const fromPaddedString = { ...baseFields, itemUid: ' 7 ' };
+
+    // Act
+    const numberKey = createVaultPresenceKey(fromNumber);
+    const stringKey = createVaultPresenceKey(fromPaddedString);
+
+    // Assert
+    expect(numberKey).toBe(stringKey);
+    expect(numberKey).not.toBe(createVaultPresenceKey(baseFields));
   });
 });

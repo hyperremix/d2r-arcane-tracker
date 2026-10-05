@@ -39,7 +39,7 @@ export function readItemUidFromRawJson(rawItemJson: string | null | undefined): 
   }
 }
 
-export function normalizeItemUid(value: unknown): string | undefined {
+function normalizeItemUid(value: unknown): string | undefined {
   if (typeof value === 'number' && Number.isFinite(value)) {
     return String(value);
   }

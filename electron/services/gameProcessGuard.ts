@@ -13,7 +13,7 @@ export const GAME_RUNNING_ERROR = 'GAME_RUNNING';
  * edit made to the file in the meantime. Detection is only available on Windows; if it cannot be
  * performed the answer is `false` so a broken `tasklist` never blocks the user for good.
  */
-export async function isGameRunning(): Promise<boolean> {
+async function isGameRunning(): Promise<boolean> {
   if (process.platform !== 'win32') {
     return false;
   }

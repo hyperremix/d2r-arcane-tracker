@@ -1402,9 +1402,13 @@ describe('When vault adds could overwrite or lose already vaulted items', () => 
         rawItemJson: JSON.stringify({ code: 'r07', magic_attributes: [{ id: 381, values: [5] }] }),
       });
 
-      // Act & Assert
-      expect(() => unvaultVaultItem(ctx, saved.id, -2)).toThrow('positive integer');
-      expect(() => unvaultVaultItem(ctx, saved.id, 0)).toThrow('positive integer');
+      // Act
+      const withdrawNegative = () => unvaultVaultItem(ctx, saved.id, -2);
+      const withdrawZero = () => unvaultVaultItem(ctx, saved.id, 0);
+
+      // Assert
+      expect(withdrawNegative).toThrow('positive integer');
+      expect(withdrawZero).toThrow('positive integer');
       expect(getVaultItemById(ctx, saved.id)?.stackCount).toBe(5);
     });
   });

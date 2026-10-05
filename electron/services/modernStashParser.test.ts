@@ -171,9 +171,13 @@ describe('When resolveStackCount reads a simple_item resource with quantity set 
       quantity: 255,
     } as unknown as Parameters<typeof resolveStackCount>[0];
 
-    // Act & Assert
-    expect(resolveStackCount(simpleRuneWithCount)).toBe(7);
-    expect(resolveStackCount(simpleRuneWithMaxCount)).toBe(255);
+    // Act
+    const countFromQuantity = resolveStackCount(simpleRuneWithCount);
+    const countFromMaxQuantity = resolveStackCount(simpleRuneWithMaxCount);
+
+    // Assert
+    expect(countFromQuantity).toBe(7);
+    expect(countFromMaxQuantity).toBe(255);
   });
 });
 
@@ -199,11 +203,17 @@ describe('When resolveStackCount checks stackable sources', () => {
       magic_attributes: [{ id: 381, name: 'item_quantity_r', values: [42] }],
     } as unknown as Parameters<typeof resolveStackCount>[0];
 
-    // Act & Assert
-    expect(resolveStackCount(fromQuantity)).toBe(9);
-    expect(resolveStackCount(fallbackToOne)).toBe(1);
-    expect(resolveStackCount(fromMagicAttr)).toBe(42);
-    expect(resolveStackCount(attr381TakesPriorityOverQuantity)).toBe(42);
+    // Act
+    const quantityCount = resolveStackCount(fromQuantity);
+    const fallbackCount = resolveStackCount(fallbackToOne);
+    const magicAttrCount = resolveStackCount(fromMagicAttr);
+    const priorityCount = resolveStackCount(attr381TakesPriorityOverQuantity);
+
+    // Assert
+    expect(quantityCount).toBe(9);
+    expect(fallbackCount).toBe(1);
+    expect(magicAttrCount).toBe(42);
+    expect(priorityCount).toBe(42);
   });
 });
 
