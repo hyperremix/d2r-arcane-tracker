@@ -80,7 +80,7 @@ Things to know:
 
 ### Manual entry
 
-In **Manual Entry** mode, or for finds the app can't see (another PC, older finds), open an item and use **Mark as found**. **Mark as not found** undoes it.
+In **Manual Entry** mode, or for finds the app can't see (another PC, older finds), open an item and use **Mark as Found**. **Mark as Not Found** undoes it.
 
 ## Browsing your grail
 
