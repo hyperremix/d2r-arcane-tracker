@@ -72,7 +72,15 @@ vi.mock('../utils/grailItemUtils', () => ({
   getGrailItemId: vi.fn(),
 }));
 
-import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  chmodSync,
+  existsSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { readFile, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
@@ -103,6 +111,8 @@ interface MockGrailDatabase {
   getAllSaveFileStates: ReturnType<typeof vi.fn>;
   deleteSaveFileState: ReturnType<typeof vi.fn>;
   reconcileVaultItemsForScan: ReturnType<typeof vi.fn>;
+  getVaultSourceFilePathsPresentInLatestScan: ReturnType<typeof vi.fn>;
+  markVaultItemsMissingForSourceFiles: ReturnType<typeof vi.fn>;
 }
 
 const createMockDatabase = (): MockGrailDatabase => ({
@@ -114,6 +124,8 @@ const createMockDatabase = (): MockGrailDatabase => ({
   getAllSaveFileStates: vi.fn(),
   deleteSaveFileState: vi.fn(),
   reconcileVaultItemsForScan: vi.fn(),
+  getVaultSourceFilePathsPresentInLatestScan: vi.fn(() => []),
+  markVaultItemsMissingForSourceFiles: vi.fn(),
 });
 
 describe('When SaveFileMonitor is used', () => {
@@ -1983,6 +1995,117 @@ describe('When SaveFileMonitor is used', () => {
       expect(parseResult.inventorySnapshot?.items.map((item: any) => item.characterId)).toEqual([
         'char-1',
       ]);
+    });
+  });
+
+  describe('When vault rows reference save files that no longer exist', () => {
+    // These tests use real files: the monitor reads file metadata through node:fs/promises directly.
+    let saveDir: string;
+    let goneFile: string;
+
+    beforeEach(() => {
+      saveDir = mkdtempSync(join(tmpdir(), 'save-monitor-orphans-'));
+      goneFile = join(saveDir, 'Gone.d2s');
+      mockDatabase.getVaultSourceFilePathsPresentInLatestScan.mockReturnValue([goneFile]);
+    });
+
+    afterEach(() => {
+      chmodSync(saveDir, 0o700);
+      rmSync(saveDir, { recursive: true, force: true });
+    });
+
+    it('Then rows of a file that is truly absent are marked missing', async () => {
+      // Arrange
+      const scannedFiles = [join(saveDir, 'Other.d2s')];
+
+      // Act
+      await (monitor as any).markOrphanedVaultRowsMissing(scannedFiles);
+
+      // Assert
+      expect(mockDatabase.markVaultItemsMissingForSourceFiles).toHaveBeenCalledWith([goneFile]);
+    });
+
+    it('Then a file that still exists is left alone', async () => {
+      // Arrange
+      writeFileSync(goneFile, 'save');
+
+      // Act
+      await (monitor as any).markOrphanedVaultRowsMissing([]);
+
+      // Assert
+      expect(mockDatabase.markVaultItemsMissingForSourceFiles).not.toHaveBeenCalled();
+    });
+
+    it('Then a file that cannot be inspected right now does not count as deleted', async () => {
+      // Arrange
+      writeFileSync(goneFile, 'save');
+      chmodSync(saveDir, 0o000);
+
+      // Act
+      await (monitor as any).markOrphanedVaultRowsMissing([]);
+
+      // Assert
+      expect(mockDatabase.markVaultItemsMissingForSourceFiles).not.toHaveBeenCalled();
+    });
+
+    it('Then an unavailable save directory does not count as deleted files', async () => {
+      // Arrange
+      const missingDirectoryFile = join(saveDir, 'unmounted', 'Gone.d2s');
+      mockDatabase.getVaultSourceFilePathsPresentInLatestScan.mockReturnValue([
+        missingDirectoryFile,
+      ]);
+
+      // Act
+      await (monitor as any).markOrphanedVaultRowsMissing([]);
+
+      // Assert
+      expect(mockDatabase.markVaultItemsMissingForSourceFiles).not.toHaveBeenCalled();
+    });
+
+    it('Then a file that was just scanned is never marked missing', async () => {
+      // Arrange
+      const scannedFiles = [goneFile];
+
+      // Act
+      await (monitor as any).markOrphanedVaultRowsMissing(scannedFiles);
+
+      // Assert
+      expect(mockDatabase.markVaultItemsMissingForSourceFiles).not.toHaveBeenCalled();
+    });
+
+    it('Then a database error does not break the scan', async () => {
+      // Arrange
+      mockDatabase.markVaultItemsMissingForSourceFiles.mockImplementation(() => {
+        throw new Error('database is locked');
+      });
+
+      // Act
+      const run = (monitor as any).markOrphanedVaultRowsMissing([]);
+
+      // Assert
+      await expect(run).resolves.toBeUndefined();
+    });
+
+    it('Then every scan checks for deleted files, even when no file needs reparsing', async () => {
+      // Arrange
+      const otherFile = join(saveDir, 'Other.d2s');
+      vi.spyOn(monitor as any, 'filterFilesToParse').mockResolvedValue([]);
+      (monitor as any).inventorySnapshots = [
+        {
+          snapshotId: 'o-old',
+          characterName: 'Other',
+          sourceFileType: 'd2s',
+          sourceFilePath: otherFile,
+          capturedAt: new Date('2024-01-01T00:00:00.000Z'),
+          items: [],
+        },
+      ];
+
+      // Act
+      await (monitor as any).parseFiles([otherFile], false);
+
+      // Assert
+      expect(mockDatabase.markVaultItemsMissingForSourceFiles).toHaveBeenCalledWith([goneFile]);
     });
   });
 

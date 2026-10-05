@@ -658,6 +658,57 @@ export function reconcileVaultItemsForScan(
   tx();
 }
 
+/** Source file paths of the vault rows that are still flagged present in the latest scan. */
+export function getVaultSourceFilePathsPresentInLatestScan(ctx: DatabaseContext): string[] {
+  const rows = ctx.rawDb
+    .prepare(
+      `
+        SELECT DISTINCT source_file_path
+        FROM vault_items
+        WHERE is_present_in_latest_scan = 1
+          AND source_file_path IS NOT NULL
+          AND source_file_path <> ''
+      `,
+    )
+    .all() as Array<{ source_file_path: string }>;
+
+  return rows.map((row) => row.source_file_path);
+}
+
+const MAX_SQL_PARAMETERS_PER_STATEMENT = 500;
+
+/**
+ * Clears the presence flag of every vault row that came from one of the given source files. For
+ * files that no longer exist, so their rows cannot stay "present in the latest scan" forever.
+ *
+ * Only `is_present_in_latest_scan` is written (and only on rows that were flagged present). Vault
+ * state, item data, categories and `last_seen_at` are untouched and no row is deleted, so a file
+ * that comes back is reconciled by the next scan. The caller decides which files are truly gone.
+ */
+export function markVaultItemsMissingForSourceFiles(
+  ctx: DatabaseContext,
+  sourceFilePaths: string[],
+): void {
+  const uniquePaths = [...new Set(sourceFilePaths.filter((path) => path.length > 0))];
+  if (uniquePaths.length === 0) {
+    return;
+  }
+
+  const tx = ctx.rawDb.transaction(() => {
+    for (let start = 0; start < uniquePaths.length; start += MAX_SQL_PARAMETERS_PER_STATEMENT) {
+      const chunk = uniquePaths.slice(start, start + MAX_SQL_PARAMETERS_PER_STATEMENT);
+      const placeholders = chunk.map(() => '?').join(', ');
+      ctx.rawDb
+        .prepare(
+          `UPDATE vault_items SET is_present_in_latest_scan = 0 WHERE is_present_in_latest_scan = 1 AND source_file_path IN (${placeholders})`,
+        )
+        .run(...chunk);
+    }
+  });
+
+  tx();
+}
+
 export function getVaultItemById(ctx: DatabaseContext, itemId: string): VaultItem | undefined {
   const row = ctx.db.select().from(vaultItems).where(eq(vaultItems.id, itemId)).get();
   if (!row) {

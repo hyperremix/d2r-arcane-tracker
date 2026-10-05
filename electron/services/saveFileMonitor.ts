@@ -1,5 +1,5 @@
 import { existsSync, readdirSync } from 'node:fs';
-import { readFile } from 'node:fs/promises';
+import { readFile, stat } from 'node:fs/promises';
 import { basename, dirname, extname, join } from 'node:path';
 import * as d2s from '@dschu012/d2s';
 import * as d2stash from '@dschu012/d2s/lib/d2/stash';
@@ -1315,6 +1315,8 @@ class SaveFileMonitor {
       return;
     }
 
+    await this.markOrphanedVaultRowsMissing(filePaths);
+
     // Filter files that need parsing based on modification time
     let filesToParse = await this.filterFilesToParse(filePaths);
 
@@ -1401,6 +1403,68 @@ class SaveFileMonitor {
       results,
     );
     log.info('parseFiles', `Complete - processed ${filesToParse.length} files`);
+  }
+
+  /**
+   * Clears the "present in latest scan" flag of vault rows whose source save file was deleted or
+   * renamed. Without this, such rows would stay present forever because only files that are still
+   * scanned get reconciled.
+   *
+   * Only presence flags change (see `markVaultItemsMissingForSourceFiles`). A file counts as gone
+   * only when it is not part of this scan and `stat` reports it missing (ENOENT/ENOTDIR) while its
+   * directory is still readable; any other error, or an unavailable directory (an unmounted drive,
+   * a moved save folder), is treated as unknown and leaves the rows alone. When no save file is
+   * found at all the scan aborts earlier and nothing is changed, because that is more likely a
+   * misconfigured directory than every file being deleted.
+   *
+   * Rows that were vaulted out of their file or that share a `#uuid` fingerprint with another row
+   * are not special-cased: they are handled like every other row of their file.
+   * @private
+   */
+  private async markOrphanedVaultRowsMissing(scannedFilePaths: string[]): Promise<void> {
+    if (!this.grailDatabase) {
+      return;
+    }
+
+    try {
+      const scanned = new Set(scannedFilePaths);
+      const candidates = this.grailDatabase
+        .getVaultSourceFilePathsPresentInLatestScan()
+        .filter((path) => !scanned.has(path));
+      const deletedFiles: string[] = [];
+
+      for (const path of candidates) {
+        if (await this.isSaveFileDeleted(path)) {
+          deletedFiles.push(path);
+        }
+      }
+
+      if (deletedFiles.length > 0) {
+        log.info('markOrphanedVaultRowsMissing', `Source files deleted: ${deletedFiles.length}`);
+        this.grailDatabase.markVaultItemsMissingForSourceFiles(deletedFiles);
+      }
+    } catch (error) {
+      log.error('markOrphanedVaultRowsMissing', error);
+    }
+  }
+
+  /** True only when the file is verifiably absent while its directory can still be read. */
+  private async isSaveFileDeleted(filePath: string): Promise<boolean> {
+    try {
+      await stat(filePath);
+      return false;
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException | undefined)?.code;
+      if (code !== 'ENOENT' && code !== 'ENOTDIR') {
+        return false;
+      }
+    }
+
+    try {
+      return (await stat(dirname(filePath))).isDirectory();
+    } catch {
+      return false;
+    }
   }
 
   /**

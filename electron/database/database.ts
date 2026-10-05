@@ -289,6 +289,12 @@ class GrailDatabase {
   reconcileVaultItemsForScan(scan: vaultItemsModule.VaultScanReconciliationInput): void {
     vaultItemsModule.reconcileVaultItemsForScan(this, scan);
   }
+  getVaultSourceFilePathsPresentInLatestScan(): string[] {
+    return vaultItemsModule.getVaultSourceFilePathsPresentInLatestScan(this);
+  }
+  markVaultItemsMissingForSourceFiles(sourceFilePaths: string[]): void {
+    vaultItemsModule.markVaultItemsMissingForSourceFiles(this, sourceFilePaths);
+  }
   unvaultVaultItem(itemId: string, withdrawCount?: number): void {
     vaultItemsModule.unvaultVaultItem(this, itemId, withdrawCount);
   }

@@ -9,6 +9,8 @@ import {
   addVaultItem,
   addVaultItemWithUndo,
   getVaultItemById,
+  getVaultSourceFilePathsPresentInLatestScan,
+  markVaultItemsMissingForSourceFiles,
   reconcileVaultItemsForScan,
   searchVaultItems,
   unvaultVaultItem,
@@ -372,6 +374,136 @@ describe('When vault item database operations are executed', () => {
 
       // Assert
       expect(getVaultItemById(ctx, row.id)?.isPresentInLatestScan).toBe(false);
+    });
+  });
+
+  describe('If vault rows from several source files are flagged present', () => {
+    it('Then only distinct source paths of present rows are returned', () => {
+      // Arrange
+      const baseRow = {
+        itemName: 'Item',
+        quality: 'unique',
+        ethereal: false,
+        rawItemJson: '{}',
+        sourceFileType: 'd2s' as const,
+        locationContext: 'inventory' as const,
+      };
+      upsertVaultItemByFingerprint(ctx, {
+        ...baseRow,
+        fingerprint: 'fp-1',
+        sourceFilePath: '/saves/A.d2s',
+        isPresentInLatestScan: true,
+      });
+      upsertVaultItemByFingerprint(ctx, {
+        ...baseRow,
+        fingerprint: 'fp-2',
+        sourceFilePath: '/saves/A.d2s',
+        isPresentInLatestScan: true,
+      });
+      upsertVaultItemByFingerprint(ctx, {
+        ...baseRow,
+        fingerprint: 'fp-3',
+        sourceFilePath: '/saves/B.d2s',
+        isPresentInLatestScan: false,
+      });
+      upsertVaultItemByFingerprint(ctx, {
+        ...baseRow,
+        fingerprint: 'grail:bookmark',
+        isPresentInLatestScan: true,
+      });
+
+      // Act
+      const paths = getVaultSourceFilePathsPresentInLatestScan(ctx);
+
+      // Assert
+      expect(paths).toEqual(['/saves/A.d2s']);
+    });
+  });
+
+  describe('If the source files of vault rows were deleted', () => {
+    const baseRow = {
+      itemName: 'Item',
+      quality: 'unique',
+      ethereal: false,
+      rawItemJson: '{"id":7}',
+      sourceFileType: 'd2s' as const,
+      locationContext: 'inventory' as const,
+      isPresentInLatestScan: true,
+    };
+
+    it('Then only the presence flag of rows from those files is cleared', () => {
+      // Arrange
+      const lastSeenAt = new Date('2024-01-01T00:00:00.000Z');
+      const orphan = addVaultItem(ctx, {
+        ...baseRow,
+        fingerprint: 'fp-orphan-vaulted',
+        sourceFilePath: '/saves/Deleted.d2s',
+        lastSeenAt,
+      });
+      const plain = upsertVaultItemByFingerprint(ctx, {
+        ...baseRow,
+        fingerprint: 'fp-orphan-plain',
+        sourceFilePath: '/saves/Deleted.d2s',
+        lastSeenAt,
+      });
+      const otherFile = upsertVaultItemByFingerprint(ctx, {
+        ...baseRow,
+        fingerprint: 'fp-other',
+        sourceFilePath: '/saves/Kept.d2s',
+      });
+      const bookmark = upsertVaultItemByFingerprint(ctx, {
+        ...baseRow,
+        fingerprint: 'grail:bookmark',
+      });
+
+      // Act
+      markVaultItemsMissingForSourceFiles(ctx, ['/saves/Deleted.d2s']);
+
+      // Assert
+      const flagged = getVaultItemById(ctx, orphan.id);
+      expect(flagged?.isPresentInLatestScan).toBe(false);
+      expect(flagged?.vaultedAt?.toISOString()).toBe(orphan.vaultedAt?.toISOString());
+      expect(flagged?.unvaultedAt).toBeUndefined();
+      expect(flagged?.rawItemJson).toBe('{"id":7}');
+      expect(flagged?.lastSeenAt?.toISOString()).toBe(lastSeenAt.toISOString());
+      expect(getVaultItemById(ctx, plain.id)?.isPresentInLatestScan).toBe(false);
+      expect(getVaultItemById(ctx, otherFile.id)?.isPresentInLatestScan).toBe(true);
+      expect(getVaultItemById(ctx, bookmark.id)?.isPresentInLatestScan).toBe(true);
+    });
+
+    it('Then an empty path list changes nothing', () => {
+      // Arrange
+      const row = upsertVaultItemByFingerprint(ctx, {
+        ...baseRow,
+        fingerprint: 'fp-untouched',
+        sourceFilePath: '/saves/A.d2s',
+      });
+
+      // Act
+      markVaultItemsMissingForSourceFiles(ctx, []);
+
+      // Assert
+      expect(getVaultItemById(ctx, row.id)?.isPresentInLatestScan).toBe(true);
+    });
+
+    it('Then rows come back as present when the file is scanned again', () => {
+      // Arrange
+      const row = upsertVaultItemByFingerprint(ctx, {
+        ...baseRow,
+        fingerprint: 'fp-restored',
+        sourceFilePath: '/saves/Restored.d2s',
+      });
+      markVaultItemsMissingForSourceFiles(ctx, ['/saves/Restored.d2s']);
+
+      // Act
+      reconcileVaultItemsForScan(ctx, {
+        sourceFileType: 'd2s',
+        sourceFilePath: '/saves/Restored.d2s',
+        presentFingerprints: ['fp-restored'],
+      });
+
+      // Assert
+      expect(getVaultItemById(ctx, row.id)?.isPresentInLatestScan).toBe(true);
     });
   });
 
