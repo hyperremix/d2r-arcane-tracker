@@ -18,8 +18,6 @@ import type {
   TerrorZoneValidationResult,
   UpdateStatus,
   VaultCategory,
-  VaultCategoryCreateInput,
-  VaultCategoryUpdateInput,
   VaultItem,
   VaultItemFilter,
   VaultItemSearchResult,
@@ -266,21 +264,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.invoke('vault:addItem', item),
     removeItem: (itemId: string): Promise<{ success: boolean }> =>
       ipcRenderer.invoke('vault:removeItem', itemId),
-    updateItemTags: (itemId: string, categoryIds: string[]): Promise<{ success: boolean }> =>
-      ipcRenderer.invoke('vault:updateItemTags', itemId, categoryIds),
-    listItems: (filter?: VaultItemFilter): Promise<VaultItemSearchResult> =>
-      ipcRenderer.invoke('vault:listItems', filter),
     search: (filter?: VaultItemFilter): Promise<VaultItemSearchResult> =>
       ipcRenderer.invoke('vault:search', filter),
-    createCategory: (input: VaultCategoryCreateInput): Promise<{ success: boolean }> =>
-      ipcRenderer.invoke('vault:createCategory', input),
-    updateCategory: (
-      categoryId: string,
-      updates: VaultCategoryUpdateInput,
-    ): Promise<{ success: boolean }> =>
-      ipcRenderer.invoke('vault:updateCategory', categoryId, updates),
-    deleteCategory: (categoryId: string): Promise<{ success: boolean }> =>
-      ipcRenderer.invoke('vault:deleteCategory', categoryId),
     listCategories: (): Promise<VaultCategory[]> => ipcRenderer.invoke('vault:listCategories'),
     unvaultItem: (
       itemId: string,
@@ -299,8 +284,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
 
   inventory: {
-    listSnapshots: (): Promise<InventorySearchResult> =>
-      ipcRenderer.invoke('inventory:listSnapshots'),
     searchAll: (
       filter?: VaultItemFilter,
     ): Promise<{

@@ -491,21 +491,6 @@ export function upsertVaultItemByFingerprint(
   return saved;
 }
 
-export function markVaultItemAsMissing(
-  ctx: DatabaseContext,
-  fingerprint: string,
-  sourceCharacterName?: string,
-): void {
-  ctx.db
-    .update(vaultItems)
-    .set({
-      isPresentInLatestScan: false,
-      sourceCharacterName: sourceCharacterName ?? null,
-    })
-    .where(eq(vaultItems.fingerprint, fingerprint))
-    .run();
-}
-
 export interface VaultScanReconciliationInput {
   sourceFileType: VaultItem['sourceFileType'];
   /** The exact save file that was scanned. Only rows that came from this file are reconciled. */
@@ -570,32 +555,6 @@ export function reconcileVaultItemsForScan(
   });
 
   tx();
-}
-
-export function setVaultItemsPresentInLatestScan(
-  ctx: DatabaseContext,
-  fingerprints: string[],
-  present: boolean,
-  lastSeenAt?: Date,
-  sourceCharacterName?: string,
-): void {
-  if (fingerprints.length === 0) {
-    return;
-  }
-
-  const seenAt = toISOString(lastSeenAt) ?? new Date().toISOString();
-
-  for (const fingerprint of fingerprints) {
-    ctx.db
-      .update(vaultItems)
-      .set({
-        isPresentInLatestScan: present,
-        lastSeenAt: present ? seenAt : undefined,
-        ...(sourceCharacterName !== undefined && { sourceCharacterName }),
-      })
-      .where(eq(vaultItems.fingerprint, fingerprint))
-      .run();
-  }
 }
 
 export function getVaultItemById(ctx: DatabaseContext, itemId: string): VaultItem | undefined {

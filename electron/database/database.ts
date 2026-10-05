@@ -14,8 +14,6 @@ import type {
   SessionStats,
   Settings,
   VaultCategory,
-  VaultCategoryCreateInput,
-  VaultCategoryUpdateInput,
   VaultItem,
   VaultItemFilter,
   VaultItemSearchResult,
@@ -291,23 +289,6 @@ class GrailDatabase {
   reconcileVaultItemsForScan(scan: vaultItemsModule.VaultScanReconciliationInput): void {
     vaultItemsModule.reconcileVaultItemsForScan(this, scan);
   }
-  setVaultItemsPresentInLatestScan(
-    fingerprints: string[],
-    present: boolean,
-    lastSeenAt?: Date,
-    sourceCharacterName?: string,
-  ): void {
-    vaultItemsModule.setVaultItemsPresentInLatestScan(
-      this,
-      fingerprints,
-      present,
-      lastSeenAt,
-      sourceCharacterName,
-    );
-  }
-  markVaultItemAsMissing(fingerprint: string, sourceCharacterName?: string): void {
-    vaultItemsModule.markVaultItemAsMissing(this, fingerprint, sourceCharacterName);
-  }
   unvaultVaultItem(itemId: string, withdrawCount?: number): void {
     vaultItemsModule.unvaultVaultItem(this, itemId, withdrawCount);
   }
@@ -318,18 +299,6 @@ class GrailDatabase {
   }
   getVaultCategoryById(categoryId: string): VaultCategory | null {
     return vaultCategoriesModule.getVaultCategoryById(this, categoryId);
-  }
-  addVaultCategory(input: VaultCategoryCreateInput): void {
-    vaultCategoriesModule.addVaultCategory(this, input);
-  }
-  updateVaultCategory(categoryId: string, updates: VaultCategoryUpdateInput): void {
-    vaultCategoriesModule.updateVaultCategory(this, categoryId, updates);
-  }
-  removeVaultCategory(categoryId: string): void {
-    vaultCategoriesModule.removeVaultCategory(this, categoryId);
-  }
-  setVaultItemCategories(vaultItemId: string, categoryIds: string[]): void {
-    vaultCategoriesModule.setVaultItemCategories(this, vaultItemId, categoryIds);
   }
 
   // Management

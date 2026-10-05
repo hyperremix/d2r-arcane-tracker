@@ -272,19 +272,6 @@ export interface VaultCategory {
   lastUpdated: Date;
 }
 
-export interface VaultCategoryCreateInput {
-  id: string;
-  name: string;
-  color?: string;
-  metadata?: string;
-}
-
-export interface VaultCategoryUpdateInput {
-  name?: string;
-  color?: string;
-  metadata?: string;
-}
-
 export interface VaultItem {
   id: string;
   fingerprint: string;

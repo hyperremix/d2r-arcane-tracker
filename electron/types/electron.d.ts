@@ -15,8 +15,6 @@ import type {
   Session,
   Settings,
   VaultCategory,
-  VaultCategoryCreateInput,
-  VaultCategoryUpdateInput,
   VaultLocationContext,
   VaultItem,
   VaultItemFilter,
@@ -649,12 +647,7 @@ export interface ElectronAPI {
   vault: {
     addItem(item: VaultItemUpsertInput): Promise<VaultItem>
     removeItem(itemId: string): Promise<{ success: boolean }>
-    updateItemTags(itemId: string, categoryIds: string[]): Promise<{ success: boolean }>
-    listItems(filter?: VaultItemFilter): Promise<VaultItemSearchResult>
     search(filter?: VaultItemFilter): Promise<VaultItemSearchResult>
-    createCategory(input: VaultCategoryCreateInput): Promise<{ success: boolean }>
-    updateCategory(categoryId: string, updates: VaultCategoryUpdateInput): Promise<{ success: boolean }>
-    deleteCategory(categoryId: string): Promise<{ success: boolean }>
     listCategories(): Promise<VaultCategory[]>
     unvaultItem(
       itemId: string,
@@ -675,7 +668,6 @@ export interface ElectronAPI {
    * Inventory API methods.
    */
   inventory: {
-    listSnapshots(): Promise<InventorySearchResult>
     searchAll(filter?: VaultItemFilter): Promise<{
       inventory: InventorySearchResult
       vault: VaultItemSearchResult

@@ -41,45 +41,6 @@ function getAttr381Value(parsed: RawItemJson): number | undefined {
   return undefined;
 }
 
-export function isStackableFromRawJson(rawItemJson: string, itemCode?: string): boolean {
-  // Rune codes match r01–r39
-  if (itemCode && RUNE_CODE_PATTERN.test(itemCode)) {
-    return true;
-  }
-
-  const parsed = parseRawItem(rawItemJson);
-  if (!parsed) {
-    return false;
-  }
-
-  const code =
-    typeof parsed.code === 'string'
-      ? parsed.code
-      : typeof parsed.type === 'string'
-        ? parsed.type
-        : '';
-  if (code && RUNE_CODE_PATTERN.test(code)) {
-    return true;
-  }
-
-  // Has magic attribute 381 (stack count attribute used by D2R resource stash)
-  const attr381 = getAttr381Value(parsed);
-  if (attr381 !== undefined && attr381 >= 1) {
-    return true;
-  }
-
-  // Classic quantity field > 1
-  if (
-    typeof parsed.quantity === 'number' &&
-    Number.isInteger(parsed.quantity) &&
-    parsed.quantity > 1
-  ) {
-    return true;
-  }
-
-  return false;
-}
-
 /**
  * True for items that live as a counted stack in the vault: runes, gems, materials and anything
  * carrying the D2R resource-stash count attribute. Only these may be merged into one vault row,

@@ -17,8 +17,6 @@ import type {
   InventorySearchResult,
   InventoryStackSplitInput,
   VaultCategory,
-  VaultCategoryCreateInput,
-  VaultCategoryUpdateInput,
   VaultItem,
   VaultItemFilter,
   VaultItemSearchResult,
@@ -230,18 +228,6 @@ function normalizeVaultItemInput(input: VaultItemUpsertInput): VaultItemUpsertIn
     vaultedAt: normalizeOptionalDate(unsafeInput.vaultedAt, 'vaultedAt'),
     unvaultedAt: normalizeOptionalDate(unsafeInput.unvaultedAt, 'unvaultedAt'),
   };
-}
-
-function validateCategoryInput(input: VaultCategoryCreateInput | VaultCategoryUpdateInput): void {
-  if ('id' in input) {
-    assert(typeof input.id === 'string' && input.id.length > 0, 'Category id is required');
-  }
-  if ('name' in input && input.name !== undefined) {
-    assert(
-      typeof input.name === 'string' && input.name.trim().length > 0,
-      'Category name is required',
-    );
-  }
 }
 
 function toItemId(value: unknown): number | undefined {
@@ -916,73 +902,13 @@ export function initializeVaultHandlers(
   );
 
   ipcMain.handle(
-    'vault:updateItemTags',
-    async (_, itemId: string, categoryIds: string[]): Promise<{ success: boolean }> => {
-      assert(typeof itemId === 'string' && itemId.length > 0, 'itemId is required');
-      assert(Array.isArray(categoryIds), 'categoryIds must be an array');
-      assert(
-        categoryIds.every((id) => typeof id === 'string' && id.length > 0),
-        'Each categoryId must be a non-empty string',
-      );
-      assert(grailDatabase.getVaultItemById(itemId) !== undefined, 'Vault item not found');
-      const knownCategoryIds = new Set(grailDatabase.getAllVaultCategories().map(({ id }) => id));
-      const unknownCategoryId = categoryIds.find((id) => !knownCategoryIds.has(id));
-      assert(unknownCategoryId === undefined, `Vault category not found: ${unknownCategoryId}`);
-      grailDatabase.setVaultItemCategories(itemId, categoryIds);
-      return { success: true };
-    },
-  );
-
-  const searchVaultItems = async (
-    _: unknown,
-    filter?: VaultItemFilter,
-  ): Promise<VaultItemSearchResult> => grailDatabase.searchVaultItems(sanitizeFilter(filter));
-
-  // `vault:listItems` and `vault:search` are public API names that share one implementation.
-  ipcMain.handle('vault:listItems', searchVaultItems);
-  ipcMain.handle('vault:search', searchVaultItems);
-
-  ipcMain.handle(
-    'vault:createCategory',
-    async (_, input: VaultCategoryCreateInput): Promise<{ success: boolean }> => {
-      validateCategoryInput(input);
-      grailDatabase.addVaultCategory(input);
-      return { success: true };
-    },
-  );
-
-  ipcMain.handle(
-    'vault:updateCategory',
-    async (
-      _,
-      categoryId: string,
-      updates: VaultCategoryUpdateInput,
-    ): Promise<{ success: boolean }> => {
-      assert(typeof categoryId === 'string' && categoryId.length > 0, 'categoryId is required');
-      validateCategoryInput(updates);
-      grailDatabase.updateVaultCategory(categoryId, updates);
-      return { success: true };
-    },
-  );
-
-  ipcMain.handle(
-    'vault:deleteCategory',
-    async (_, categoryId: string): Promise<{ success: boolean }> => {
-      assert(typeof categoryId === 'string' && categoryId.length > 0, 'categoryId is required');
-      grailDatabase.removeVaultCategory(categoryId);
-      return { success: true };
-    },
+    'vault:search',
+    async (_, filter?: VaultItemFilter): Promise<VaultItemSearchResult> =>
+      grailDatabase.searchVaultItems(sanitizeFilter(filter)),
   );
 
   ipcMain.handle('vault:listCategories', async (): Promise<VaultCategory[]> => {
     return grailDatabase.getAllVaultCategories();
-  });
-
-  ipcMain.handle('inventory:listSnapshots', async (): Promise<InventorySearchResult> => {
-    const monitor = getSaveFileMonitor();
-    return (
-      monitor?.getInventorySearchResult() ?? { snapshots: [], totalSnapshots: 0, totalItems: 0 }
-    );
   });
 
   ipcMain.handle(

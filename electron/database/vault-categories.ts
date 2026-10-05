@@ -1,9 +1,5 @@
 import { desc, eq, inArray } from 'drizzle-orm';
-import type {
-  VaultCategory,
-  VaultCategoryCreateInput,
-  VaultCategoryUpdateInput,
-} from '../types/grail';
+import type { VaultCategory } from '../types/grail';
 import { dbVaultCategoryToVaultCategory } from './converters';
 import { schema } from './drizzle';
 import type { DatabaseContext } from './types';
@@ -21,52 +17,6 @@ export function getVaultCategoryById(
 ): VaultCategory | null {
   const row = ctx.db.select().from(vaultCategories).where(eq(vaultCategories.id, categoryId)).get();
   return row ? dbVaultCategoryToVaultCategory(row) : null;
-}
-
-export function addVaultCategory(ctx: DatabaseContext, input: VaultCategoryCreateInput): void {
-  ctx.db
-    .insert(vaultCategories)
-    .values({
-      id: input.id,
-      name: input.name,
-      color: input.color ?? null,
-      metadata: input.metadata ?? null,
-    })
-    .run();
-}
-
-export function updateVaultCategory(
-  ctx: DatabaseContext,
-  categoryId: string,
-  updates: VaultCategoryUpdateInput,
-): void {
-  const updatePayload: Partial<{
-    name: string;
-    color: string | null;
-    metadata: string | null;
-  }> = {};
-
-  if (updates.name !== undefined) {
-    updatePayload.name = updates.name;
-  }
-
-  if (updates.color !== undefined) {
-    updatePayload.color = updates.color;
-  }
-
-  if (updates.metadata !== undefined) {
-    updatePayload.metadata = updates.metadata;
-  }
-
-  if (Object.keys(updatePayload).length === 0) {
-    return;
-  }
-
-  ctx.db.update(vaultCategories).set(updatePayload).where(eq(vaultCategories.id, categoryId)).run();
-}
-
-export function removeVaultCategory(ctx: DatabaseContext, categoryId: string): void {
-  ctx.db.delete(vaultCategories).where(eq(vaultCategories.id, categoryId)).run();
 }
 
 export function setVaultItemCategories(

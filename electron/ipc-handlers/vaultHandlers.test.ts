@@ -8,11 +8,7 @@ const mocks = vi.hoisted(() => ({
     unvaultVaultItem: vi.fn(),
     removeVaultItem: vi.fn(),
     getVaultItemById: vi.fn(),
-    setVaultItemCategories: vi.fn(),
     searchVaultItems: vi.fn(),
-    addVaultCategory: vi.fn(),
-    updateVaultCategory: vi.fn(),
-    removeVaultCategory: vi.fn(),
     getAllVaultCategories: vi.fn(),
     getAllSettings: vi.fn(),
   },
@@ -94,19 +90,31 @@ describe('When vault IPC handlers are initialized', () => {
       // Assert
       expect(mocks.handleMock).toHaveBeenCalledWith('vault:addItem', expect.any(Function));
       expect(mocks.handleMock).toHaveBeenCalledWith('vault:removeItem', expect.any(Function));
-      expect(mocks.handleMock).toHaveBeenCalledWith('vault:updateItemTags', expect.any(Function));
-      expect(mocks.handleMock).toHaveBeenCalledWith('vault:listItems', expect.any(Function));
       expect(mocks.handleMock).toHaveBeenCalledWith('vault:search', expect.any(Function));
-      expect(mocks.handleMock).toHaveBeenCalledWith('vault:createCategory', expect.any(Function));
-      expect(mocks.handleMock).toHaveBeenCalledWith('vault:updateCategory', expect.any(Function));
-      expect(mocks.handleMock).toHaveBeenCalledWith('vault:deleteCategory', expect.any(Function));
       expect(mocks.handleMock).toHaveBeenCalledWith('vault:listCategories', expect.any(Function));
-      expect(mocks.handleMock).toHaveBeenCalledWith(
-        'inventory:listSnapshots',
-        expect.any(Function),
-      );
       expect(mocks.handleMock).toHaveBeenCalledWith('inventory:searchAll', expect.any(Function));
       expect(mocks.handleMock).toHaveBeenCalledWith('inventory:moveItem', expect.any(Function));
+    });
+
+    it('Then channels without a renderer caller are not registered', () => {
+      // Arrange
+      const removedChannels = [
+        'vault:listItems',
+        'vault:updateItemTags',
+        'vault:createCategory',
+        'vault:updateCategory',
+        'vault:deleteCategory',
+        'inventory:listSnapshots',
+      ];
+
+      // Act
+      initializeVaultHandlers(() => undefined);
+
+      // Assert
+      const registeredChannels = mocks.handleMock.mock.calls.map((call) => call[0]);
+      for (const channel of removedChannels) {
+        expect(registeredChannels).not.toContain(channel);
+      }
     });
   });
 
@@ -1423,68 +1431,24 @@ describe('When vault IPC handlers are initialized', () => {
     });
   });
 
-  describe('When vault:updateItemTags validates its references', () => {
-    describe('If the vault item does not exist', () => {
-      it('Then it rejects without writing', async () => {
+  describe('When vault:search is invoked', () => {
+    describe('If a valid filter is supplied', () => {
+      it('Then it returns the database search result', async () => {
         // Arrange
-        mocks.grailDatabaseMock.getVaultItemById.mockReturnValue(undefined);
-        mocks.grailDatabaseMock.getAllVaultCategories.mockReturnValue([{ id: 'cat-1' }]);
+        const result = { items: [], total: 0, page: 1, pageSize: 50 };
+        mocks.grailDatabaseMock.searchVaultItems.mockReturnValue(result);
         initializeVaultHandlers(() => undefined);
-        const handler = mocks.handleMock.mock.calls.find(
-          (call) => call[0] === 'vault:updateItemTags',
-        )?.[1];
+        const handler = mocks.handleMock.mock.calls.find((call) => call[0] === 'vault:search')?.[1];
 
         // Act
-        const promise = handler?.(null, 'missing-row', ['cat-1']);
+        const searched = await handler?.(null, { text: 'shako' });
 
         // Assert
-        await expect(promise).rejects.toThrow('Vault item not found');
-        expect(mocks.grailDatabaseMock.setVaultItemCategories).not.toHaveBeenCalled();
+        expect(searched).toBe(result);
+        expect(mocks.grailDatabaseMock.searchVaultItems).toHaveBeenCalledTimes(1);
       });
     });
 
-    describe('If a category does not exist', () => {
-      it('Then it rejects without writing', async () => {
-        // Arrange
-        mocks.grailDatabaseMock.getVaultItemById.mockReturnValue(makeVaultItem({ id: 'row-1' }));
-        mocks.grailDatabaseMock.getAllVaultCategories.mockReturnValue([{ id: 'cat-1' }]);
-        initializeVaultHandlers(() => undefined);
-        const handler = mocks.handleMock.mock.calls.find(
-          (call) => call[0] === 'vault:updateItemTags',
-        )?.[1];
-
-        // Act
-        const promise = handler?.(null, 'row-1', ['cat-1', 'cat-ghost']);
-
-        // Assert
-        await expect(promise).rejects.toThrow('Vault category not found: cat-ghost');
-        expect(mocks.grailDatabaseMock.setVaultItemCategories).not.toHaveBeenCalled();
-      });
-    });
-
-    describe('If the item and categories exist', () => {
-      it('Then the tags are written', async () => {
-        // Arrange
-        mocks.grailDatabaseMock.getVaultItemById.mockReturnValue(makeVaultItem({ id: 'row-1' }));
-        mocks.grailDatabaseMock.getAllVaultCategories.mockReturnValue([{ id: 'cat-1' }]);
-        initializeVaultHandlers(() => undefined);
-        const handler = mocks.handleMock.mock.calls.find(
-          (call) => call[0] === 'vault:updateItemTags',
-        )?.[1];
-
-        // Act
-        const result = await handler?.(null, 'row-1', ['cat-1']);
-
-        // Assert
-        expect(result).toEqual({ success: true });
-        expect(mocks.grailDatabaseMock.setVaultItemCategories).toHaveBeenCalledWith('row-1', [
-          'cat-1',
-        ]);
-      });
-    });
-  });
-
-  describe('When vault:listItems and vault:search are invoked', () => {
     describe('If an invalid sortBy is supplied', () => {
       it('Then the error lists every valid sort key including vaultedAt', async () => {
         // Arrange
@@ -1498,30 +1462,6 @@ describe('When vault IPC handlers are initialized', () => {
         await expect(promise).rejects.toThrow(
           'sortBy must be one of: itemName, lastSeenAt, createdAt, updatedAt, vaultedAt',
         );
-      });
-    });
-
-    describe('If both channels receive the same filter', () => {
-      it('Then they return the same search result', async () => {
-        // Arrange
-        const result = { items: [], total: 0, page: 1, pageSize: 50 };
-        mocks.grailDatabaseMock.searchVaultItems.mockReturnValue(result);
-        initializeVaultHandlers(() => undefined);
-        const listHandler = mocks.handleMock.mock.calls.find(
-          (call) => call[0] === 'vault:listItems',
-        )?.[1];
-        const searchHandler = mocks.handleMock.mock.calls.find(
-          (call) => call[0] === 'vault:search',
-        )?.[1];
-
-        // Act
-        const listed = await listHandler?.(null, { text: 'shako' });
-        const searched = await searchHandler?.(null, { text: 'shako' });
-
-        // Assert
-        expect(listed).toBe(result);
-        expect(searched).toBe(result);
-        expect(mocks.grailDatabaseMock.searchVaultItems).toHaveBeenCalledTimes(2);
       });
     });
   });

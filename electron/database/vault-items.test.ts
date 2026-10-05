@@ -1,9 +1,9 @@
 import Database from 'better-sqlite3';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { createDrizzleDb } from './drizzle';
+import { createDrizzleDb, schema } from './drizzle';
 import { createSchema } from './schema';
 import type { DatabaseContext } from './types';
-import { addVaultCategory, setVaultItemCategories } from './vault-categories';
+import { setVaultItemCategories } from './vault-categories';
 import {
   addVaultItem,
   addVaultItemWithUndo,
@@ -24,6 +24,12 @@ function createTestContext(): DatabaseContext {
   };
   createSchema(ctx);
   return ctx;
+}
+
+// Categories have no production writer anymore (their table is kept for stored data), so tests
+// insert them directly.
+function insertCategory(ctx: DatabaseContext, id: string, name: string): void {
+  ctx.db.insert(schema.vaultCategories).values({ id, name }).run();
 }
 
 describe('When vault item database operations are executed', () => {
@@ -220,7 +226,7 @@ describe('When vault item database operations are executed', () => {
         sourceFilePath: '/saves/SorcOne.d2s',
         locationContext: 'inventory',
       });
-      addVaultCategory(ctx, { id: 'cat-keep', name: 'Keep' });
+      insertCategory(ctx, 'cat-keep', 'Keep');
       setVaultItemCategories(ctx, vaulted.id, ['cat-keep']);
 
       // Act
@@ -271,8 +277,8 @@ describe('When vault item database operations are executed', () => {
   describe('If categories are created and assigned to a vault item', () => {
     it('Then category filtering returns only tagged items', () => {
       // Arrange
-      addVaultCategory(ctx, { id: 'cat-1', name: 'Trade' });
-      addVaultCategory(ctx, { id: 'cat-2', name: 'Keep' });
+      insertCategory(ctx, 'cat-1', 'Trade');
+      insertCategory(ctx, 'cat-2', 'Keep');
 
       const tagged = upsertVaultItemByFingerprint(ctx, {
         fingerprint: 'fp-tagged',
