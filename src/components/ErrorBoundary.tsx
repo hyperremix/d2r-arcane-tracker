@@ -105,7 +105,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
                   {/* Error Details (collapsed by default) */}
                   {this.state.error && (
                     <details className="rounded-lg border border-destructive/30 bg-muted/50 p-4">
-                      <summary className="cursor-pointer font-semibold text-destructive hover:text-destructive/80">
+                      <summary className="cursor-pointer font-semibold text-destructive hover:underline">
                         {t(translations.errorBoundary.errorDetails)}
                       </summary>
                       <div className="mt-4 space-y-2">

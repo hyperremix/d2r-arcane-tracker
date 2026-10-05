@@ -100,7 +100,7 @@ export function RunTrackerSettings() {
                   {t(translations.settings.runTracker.autoModeSettings)}
                 </h4>
               </div>
-              <Alert>
+              <Alert live="polite">
                 <AlertCircle className="h-4 w-4" />
                 <AlertDescription className="text-xs">
                   {t(translations.settings.runTracker.autoModeEnabled)}
@@ -131,7 +131,7 @@ export function RunTrackerSettings() {
           )}
 
           {!isWindows && (
-            <Alert>
+            <Alert live="polite">
               <AlertCircle className="h-4 w-4" />
               <AlertDescription className="text-xs">
                 {t(translations.settings.runTracker.autoModeWindowsOnly)}
