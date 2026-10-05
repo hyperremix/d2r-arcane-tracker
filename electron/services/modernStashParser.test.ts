@@ -11,6 +11,7 @@ import {
   readSectorItems,
   resolveStackCount,
 } from './modernStashParser';
+import { readD2iMetadata } from './stashFormat';
 
 const FIXTURE_PATH = resolve(
   process.cwd(),
@@ -233,7 +234,7 @@ describe('When readSectorItems parses a JM payload with trailing invalid item by
     const payload = Buffer.concat([header, serializedItem, Buffer.from([0x00])]);
 
     // Act
-    const parsed = await readSectorItems(payload, 105);
+    const { items: parsed, complete } = await readSectorItems(payload, 105);
 
     // Assert
     expect(parsed).toHaveLength(1);
@@ -244,6 +245,7 @@ describe('When readSectorItems parses a JM payload with trailing invalid item by
         position_y: 0,
       }),
     );
+    expect(complete).toBe(false);
   });
 });
 
@@ -281,7 +283,7 @@ describe('When readSectorItems reaches EOF while decoding a truncated trailing i
     const payload = Buffer.concat([header, serializedItem, Buffer.from([0x00, 0x00])]);
 
     // Act
-    const parsed = await readSectorItems(payload, 105);
+    const { items: parsed, complete } = await readSectorItems(payload, 105);
 
     // Assert
     expect(parsed).toHaveLength(1);
@@ -292,5 +294,101 @@ describe('When readSectorItems reaches EOF while decoding a truncated trailing i
         position_y: 0,
       }),
     );
+    expect(complete).toBe(false);
   });
+});
+
+describe('When readSectorItems decodes every item the sector header declares', () => {
+  it('Then the sector is reported as complete', async () => {
+    // Arrange
+    const serializedItem = Buffer.from(
+      await writeItem(
+        {
+          type: 'r01',
+          code: 'r01',
+          identified: true,
+          simple_item: 1,
+          ethereal: 0,
+          socketed: 0,
+          new: 1,
+          personalized: 0,
+          given_runeword: 0,
+          location_id: 0,
+          equipped_id: 0,
+          position_x: 0,
+          position_y: 0,
+          alt_position_id: 5,
+          quality: 1,
+          quantity: 1,
+        } as unknown as d2sTypes.types.IItem,
+        105,
+        constants105Extended as unknown as d2sTypes.types.IConstantData,
+        { extendedStash: false, sortProperties: true },
+      ),
+    );
+    const header = Buffer.alloc(4);
+    header.write('JM', 0, 'ascii');
+    header.writeUInt16LE(1, 2);
+    const payload = Buffer.concat([header, serializedItem]);
+
+    // Act
+    const { items, complete } = await readSectorItems(payload, 105);
+
+    // Assert
+    expect(items).toHaveLength(1);
+    expect(complete).toBe(true);
+  });
+});
+
+describe('When readSectorItems receives a payload that is not a readable JM sector', () => {
+  it.each([
+    ['shorter than a sector header', Buffer.from([0x4a, 0x4d])],
+    ['missing the JM signature', Buffer.from([0x00, 0x00, 0x01, 0x00])],
+  ])('Then a payload %s is reported as incomplete with no items', async (_scenario, payload) => {
+    // Arrange
+    const version = 105;
+
+    // Act
+    const result = await readSectorItems(payload, version);
+
+    // Assert
+    expect(result).toEqual({ items: [], complete: false });
+  });
+});
+
+describe('When parseModernStash reads a shared stash whose sector declares more items than it holds', () => {
+  const FIXTURE = resolve(
+    process.cwd(),
+    'electron/services/fixtures/ModernSharedStashSoftCoreV2.d2i',
+  );
+
+  it('Then an intact file is not partial', async () => {
+    // Arrange
+    const buffer = readFileSync(FIXTURE);
+
+    // Act
+    const parsed = await parseModernStash(buffer);
+
+    // Assert
+    expect(parsed.partial).toBe(false);
+    expect(parsed.incompleteSectorIndexes).toEqual([]);
+  }, 20000);
+
+  it('Then the file is flagged partial and names the damaged sector', async () => {
+    // Arrange
+    const buffer = Buffer.from(readFileSync(FIXTURE));
+    const firstJmSector = readD2iMetadata(buffer).sectors.findIndex(
+      (sector) => sector.payloadSignature === 'JM',
+    );
+    const damaged = readD2iMetadata(buffer).sectors[firstJmSector];
+    // Declaring far more items than the sector holds forces the decoder to run past the data.
+    buffer.writeUInt16LE(0xffff, damaged.payloadOffset + 2);
+
+    // Act
+    const parsed = await parseModernStash(buffer);
+
+    // Assert
+    expect(parsed.partial).toBe(true);
+    expect(parsed.incompleteSectorIndexes).toContain(firstJmSector);
+  }, 20000);
 });

@@ -55,11 +55,26 @@ export interface ModernStashParseResult {
   hardcore: boolean;
   items: ModernStashParsedItem[];
   metadata: D2iMetadata;
+  /**
+   * True when at least one sector could not be decoded completely (an item failed to decode, or a
+   * sector read failed). `items` then holds only what could be read, so the result must not be
+   * treated as a full inventory of the file (for example to decide that an item has left it).
+   */
+  partial: boolean;
+  /** Indexes (into `metadata.sectors`) of the sectors that were not decoded completely. */
+  incompleteSectorIndexes: number[];
+}
+
+/** The items decoded from one JM sector and whether every item the sector declares was read. */
+export interface SectorItemsResult {
+  items: D2SItem[];
+  complete: boolean;
 }
 
 interface ParsedSector {
   sectorIndex: number;
   items: D2SItem[];
+  complete: boolean;
 }
 
 interface PendingResourceItem {
@@ -215,14 +230,18 @@ export function resolveStackCount(item: D2SItem): number {
   return 1;
 }
 
-export async function readSectorItems(payload: Uint8Array, version: number): Promise<D2SItem[]> {
+export async function readSectorItems(
+  payload: Uint8Array,
+  version: number,
+): Promise<SectorItemsResult> {
+  // A sector announced as JM that has no readable JM header is damaged, not empty.
   if (payload.length < 4) {
-    return [];
+    return { items: [], complete: false };
   }
 
   const header = Buffer.from(payload.subarray(0, 4));
   if (header.toString('ascii', 0, 2) !== 'JM') {
-    return [];
+    return { items: [], complete: false };
   }
 
   const expectedCount = header.readUInt16LE(2);
@@ -232,6 +251,7 @@ export async function readSectorItems(payload: Uint8Array, version: number): Pro
   reader.ReadUInt16();
 
   const parsed: D2SItem[] = [];
+  let complete = true;
   const config = {
     extendedStash: false,
     sortProperties: true,
@@ -248,7 +268,8 @@ export async function readSectorItems(payload: Uint8Array, version: number): Pro
       parsed.push(item);
     } catch {
       // Shared tabs can contain unsupported/modded properties. Keep items parsed so far
-      // instead of dropping the whole sector.
+      // instead of dropping the whole sector, but report the sector as incomplete.
+      complete = false;
       break;
     }
   }
@@ -269,7 +290,7 @@ export async function readSectorItems(payload: Uint8Array, version: number): Pro
     }
   }
 
-  return normalizedItems;
+  return { items: normalizedItems, complete };
 }
 
 function toFiniteNumber(value: unknown): number | undefined {
@@ -360,14 +381,15 @@ async function parseJmSectors(buffer: Buffer, metadata: D2iMetadata): Promise<Pa
       sector.payloadOffset + sector.payloadSize,
     );
     try {
-      const items = await readSectorItems(payload, metadata.version);
-      parsedSectors.push({ sectorIndex: sector.sectorIndex, items });
+      const { items, complete } = await readSectorItems(payload, metadata.version);
+      parsedSectors.push({ sectorIndex: sector.sectorIndex, items, complete });
     } catch {
       // If a sector fails to parse (e.g. items with stats not in constants105),
       // emit empty items for this sector rather than aborting all sectors.
       // Resource stash sectors (runes/gems/materials) contain only simple items
       // and will succeed; shared stash sectors with complex modded items may fail.
-      parsedSectors.push({ sectorIndex: sector.sectorIndex, items: [] });
+      // The sector is flagged incomplete so callers do not read its empty item list as "no items".
+      parsedSectors.push({ sectorIndex: sector.sectorIndex, items: [], complete: false });
     }
   }
 
@@ -461,10 +483,16 @@ export async function parseModernStash(buffer: Buffer): Promise<ModernStashParse
   const parsedSectors = await parseJmSectors(buffer, metadata);
   const items = [...buildSharedItems(parsedSectors), ...buildResourceItems(parsedSectors)];
 
+  const incompleteSectorIndexes = parsedSectors
+    .filter((sector) => !sector.complete)
+    .map((sector) => sector.sectorIndex);
+
   return {
     version: metadata.version,
     hardcore: metadata.hardcore,
     items,
     metadata,
+    partial: incompleteSectorIndexes.length > 0,
+    incompleteSectorIndexes,
   };
 }

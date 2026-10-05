@@ -37,16 +37,44 @@ import { parseModernStash } from './modernStashParser';
 import { readD2iMetadata } from './stashFormat';
 
 const log = createServiceLogger('SaveFileMonitor');
-/** 'parsed' = the whole file was read; 'skipped' = filtered out by game mode; 'errored' = parse error swallowed. */
-type SaveParseStatus = 'parsed' | 'skipped' | 'errored';
+/**
+ * How much of a save file a parse really read.
+ * - 'parsed': the whole file was read.
+ * - 'partial': only some of the file could be read (a damaged .d2i sector); the items found so far are kept.
+ * - 'skipped': filtered out by the configured game mode.
+ * - 'errored': a parse error was swallowed.
+ * Only 'parsed' proves which items are gone from a file; every other status yields no or only some items.
+ */
+type SaveParseStatus = 'parsed' | 'partial' | 'skipped' | 'errored';
 
-interface SingleFileParseResult {
+interface FileParseSuccess {
   saveName: string;
-  success: boolean;
-  inventorySnapshot?: CharacterInventorySnapshot;
-  presentFingerprints?: string[];
-  parseStatus?: SaveParseStatus;
+  success: true;
+  inventorySnapshot: CharacterInventorySnapshot;
 }
+
+/** A complete parse: the only result vault reconciliation may act on. */
+interface CompleteFileParseResult extends FileParseSuccess {
+  parseStatus: 'parsed';
+  /** Fingerprints of every item in the file, including socketed ones the snapshot omits. */
+  presentFingerprints: string[];
+}
+
+/** A parse that read no items or only some of them; it must never mark vault rows as missing. */
+interface IncompleteFileParseResult extends FileParseSuccess {
+  parseStatus: Exclude<SaveParseStatus, 'parsed'>;
+}
+
+interface FailedFileParseResult {
+  saveName: string;
+  success: false;
+  inventorySnapshot?: undefined;
+}
+
+type SingleFileParseResult =
+  | CompleteFileParseResult
+  | IncompleteFileParseResult
+  | FailedFileParseResult;
 
 const SUPPORTED_SAVE_EXTENSIONS = new Set(['.d2s', '.sss', '.d2x', '.d2i']);
 const MODERN_STASH_MIN_VERSION = 105;
@@ -1096,23 +1124,29 @@ class SaveFileMonitor {
       // Update save file state after successful parsing
       await this.updateSaveFileState(filePath);
 
+      const inventorySnapshot: CharacterInventorySnapshot = {
+        snapshotId: `${saveName}-${Date.now()}`,
+        characterName: saveName,
+        characterId,
+        sourceFileType: extension.replace('.', '') as VaultSourceFileType,
+        sourceFilePath: filePath,
+        sourceFileVersion,
+        readOnly: false,
+        capturedAt: new Date(),
+        items: snapshotItems,
+      };
+
+      if (parseStatus !== 'parsed') {
+        return { saveName, success: true, parseStatus, inventorySnapshot };
+      }
+
       return {
         saveName,
         success: true,
         parseStatus,
         // Includes socketed items, which the snapshot omits, so vault reconciliation sees every item.
         presentFingerprints: inventoryItemsWithCharacter.map((item) => item.fingerprint),
-        inventorySnapshot: {
-          snapshotId: `${saveName}-${Date.now()}`,
-          characterName: saveName,
-          characterId,
-          sourceFileType: extension.replace('.', '') as VaultSourceFileType,
-          sourceFilePath: filePath,
-          sourceFileVersion,
-          readOnly: false,
-          capturedAt: new Date(),
-          items: snapshotItems,
-        },
+        inventorySnapshot,
       };
     } catch (error) {
       log.error('processSingleFile', error, { filePath });
@@ -1299,9 +1333,9 @@ class SaveFileMonitor {
       );
 
     const failedFiles = parseResults.filter((r) => r && !r.success);
-    const successfulSnapshots = parseResults
-      .filter((r) => r?.success && r.inventorySnapshot)
-      .map((r) => r.inventorySnapshot as CharacterInventorySnapshot);
+    const successfulSnapshots = parseResults.flatMap((r) =>
+      r?.success ? [r.inventorySnapshot] : [],
+    );
     this.reconcileVaultPresence(parseResults);
     if (failedFiles.length > 0) {
       log.warn(
@@ -1361,19 +1395,18 @@ class SaveFileMonitor {
    */
   private reconcileVaultPresence(parseResults: Array<SingleFileParseResult | undefined>): void {
     for (const result of parseResults) {
-      const snapshot = result?.inventorySnapshot;
-      // Only a completed parse proves which items are gone. A skipped (game mode) or errored
-      // parse also yields no items, and must not mark every vault row of the file as missing.
-      if (!result?.success || !snapshot || result.parseStatus !== 'parsed') {
+      // Only a completed parse proves which items are gone. A skipped (game mode), errored or
+      // partial parse yields no or only some items, and must not mark vault rows of the file as missing.
+      if (result?.success !== true || result.parseStatus !== 'parsed') {
         continue;
       }
 
+      const snapshot = result.inventorySnapshot;
       try {
         this.grailDatabase?.reconcileVaultItemsForScan({
           sourceFileType: snapshot.sourceFileType,
           sourceFilePath: snapshot.sourceFilePath,
-          presentFingerprints:
-            result.presentFingerprints ?? snapshot.items.map((item) => item.fingerprint),
+          presentFingerprints: result.presentFingerprints,
           lastSeenAt: snapshot.capturedAt,
         });
       } catch (error) {
@@ -1399,7 +1432,6 @@ class SaveFileMonitor {
     extensionArg?: string,
   ): Promise<{ items: ParsedInventoryItem[]; status: SaveParseStatus }> {
     const items: ParsedInventoryItem[] = [];
-    let status: SaveParseStatus = 'parsed';
 
     const legacyCall = Buffer.isBuffer(filePathOrContent);
     const filePath = legacyCall ? `${saveName}.d2s` : filePathOrContent;
@@ -1444,18 +1476,17 @@ class SaveFileMonitor {
       });
     };
 
-    const parseD2S = (response: d2s.types.ID2S) => {
+    // Each parser reports how much of the file it really read, so no shared mutable status is needed.
+    const parseD2S = (response: d2s.types.ID2S): SaveParseStatus => {
       if (!this.grailDatabase) {
-        status = 'skipped';
-        return;
+        return 'skipped';
       }
 
       const settings = this.grailDatabase.getAllSettings();
       const isHardcore = response.header.status.hardcore;
 
       if (isGameModeMismatch(settings.gameMode, isHardcore)) {
-        status = 'skipped';
-        return;
+        return 'skipped';
       }
       const inventoryItems = (response.items || []) as D2SItem[];
       const mercItems = (response.merc_items || []) as D2SItem[];
@@ -1463,12 +1494,12 @@ class SaveFileMonitor {
       parseItems(inventoryItems, 'inventory');
       parseItems(mercItems, 'mercenary');
       parseItems(corpseItems, 'corpse');
+      return 'parsed';
     };
 
-    const parseStash = (response: d2s.types.IStash) => {
+    const parseStash = (response: d2s.types.IStash): SaveParseStatus => {
       if (!this.grailDatabase) {
-        status = 'skipped';
-        return;
+        return 'skipped';
       }
 
       const settings = this.grailDatabase.getAllSettings();
@@ -1476,19 +1507,18 @@ class SaveFileMonitor {
       const isHardcore = response.hardcore;
 
       if (isGameModeMismatch(settings.gameMode, isHardcore)) {
-        status = 'skipped';
-        return;
+        return 'skipped';
       }
 
       response.pages.forEach((page, pageIndex) => {
         parseItems(page.items as D2SItem[], 'stash', pageIndex);
       });
+      return 'parsed';
     };
 
-    const parseModernD2i = async () => {
+    const parseModernD2i = async (): Promise<SaveParseStatus> => {
       if (!this.grailDatabase) {
-        status = 'skipped';
-        return;
+        return 'skipped';
       }
 
       const modern = await parseModernStash(content);
@@ -1496,47 +1526,50 @@ class SaveFileMonitor {
       const isHardcore = modern.hardcore;
 
       if (isGameModeMismatch(settings.gameMode, isHardcore)) {
-        status = 'skipped';
-        return;
+        return 'skipped';
       }
 
       modern.items.forEach((entry) => {
         parseItems([entry.item], 'stash', entry.stashTab, entry.stashTabKind, entry.stackCount);
       });
+      // A damaged sector leaves its items out: keep what was read, but do not call it a full scan.
+      return modern.partial ? 'partial' : 'parsed';
     };
 
-    switch (extension) {
-      case '.sss':
-      case '.d2x':
-        await d2stash.read(content, constants96).then(parseStash);
-        break;
-      case '.d2i': {
-        let d2iVersion: number | undefined;
-        try {
-          const metadata = readD2iMetadata(content);
-          d2iVersion = metadata.version;
-          if (metadata.version >= 105) {
-            await parseModernD2i();
-          } else {
-            await d2stash.read(content, constants99).then(parseStash);
-          }
-        } catch {
-          // Only fall back to classic stash parsing for pre-105 format files.
-          // Calling d2stash.read on a v105+ .d2i file would fail or produce
-          // garbage because the formats are incompatible.
-          if (d2iVersion === undefined || d2iVersion < 105) {
-            await d2stash.read(content, constants99).then(parseStash);
-          } else {
-            // The swallowed error leaves the item list empty or partial: not a complete scan.
-            status = 'errored';
-          }
+    const parseD2i = async (): Promise<SaveParseStatus> => {
+      let d2iVersion: number | undefined;
+      try {
+        const metadata = readD2iMetadata(content);
+        d2iVersion = metadata.version;
+        if (metadata.version >= 105) {
+          return await parseModernD2i();
         }
-        break;
+        return await d2stash.read(content, constants99).then(parseStash);
+      } catch {
+        // Only fall back to classic stash parsing for pre-105 format files.
+        // Calling d2stash.read on a v105+ .d2i file would fail or produce
+        // garbage because the formats are incompatible.
+        if (d2iVersion === undefined || d2iVersion < 105) {
+          return await d2stash.read(content, constants99).then(parseStash);
+        }
+        // The swallowed error leaves the item list empty or partial: not a complete scan.
+        return 'errored';
       }
-      default:
-        await d2s.read(content).then(parseD2S);
-    }
+    };
 
+    const parseByExtension = (): Promise<SaveParseStatus> => {
+      switch (extension) {
+        case '.sss':
+        case '.d2x':
+          return d2stash.read(content, constants96).then(parseStash);
+        case '.d2i':
+          return parseD2i();
+        default:
+          return d2s.read(content).then(parseD2S);
+      }
+    };
+
+    const status = await parseByExtension();
     return { items, status };
   }
 

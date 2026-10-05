@@ -1968,6 +1968,35 @@ describe('When SaveFileMonitor is used', () => {
       });
     });
 
+    describe('If a v105+ shared stash is only partially parsed', () => {
+      it('Then its vault rows are not reconciled but the items read so far stay visible', async () => {
+        // Arrange
+        mockDatabase.getAllSettings.mockReturnValue({
+          saveDir: '/test/save/dir',
+          gameMode: GameMode.Both,
+        });
+        const complete = await modernStashParser.parseModernStash(
+          readFileSync(MODERN_STASH_FIXTURE_PATH),
+        );
+        vi.spyOn(modernStashParser, 'parseModernStash').mockResolvedValueOnce({
+          ...complete,
+          partial: true,
+          incompleteSectorIndexes: [0],
+        });
+        const parseSaveSpy = vi.spyOn(monitor as any, 'parseSave');
+
+        // Act
+        await scanFile('ModernSharedStashSoftCoreV2.d2i', readFileSync(MODERN_STASH_FIXTURE_PATH));
+
+        // Assert
+        const outcome = await parseSaveSpy.mock.results[0]?.value;
+        expect(outcome.status).toBe('partial');
+        expect(outcome.items.length).toBeGreaterThanOrEqual(complete.items.length);
+        expect(mockDatabase.reconcileVaultItemsForScan).not.toHaveBeenCalled();
+        expect((monitor as any).inventorySnapshots[0].items.length).toBeGreaterThan(0);
+      });
+    });
+
     describe('If the file is parsed successfully but really contains no items', () => {
       it('Then its vault rows are reconciled against an empty item list', async () => {
         // Arrange
