@@ -93,7 +93,7 @@ export const StatsDashboard = memo(function StatsDashboard() {
                 <p className="font-medium text-muted-foreground text-sm">
                   {t(translations.statistics.dashboard.avgPerDay)}
                 </p>
-                <p className="font-bold text-2xl text-chart-4">
+                <p className="font-bold text-2xl text-item-runeword">
                   {stats.averageItemsPerDay.toFixed(1)}
                 </p>
                 <p className="text-muted-foreground text-xs">

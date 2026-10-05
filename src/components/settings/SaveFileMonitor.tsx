@@ -262,7 +262,7 @@ export function SaveFileMonitor() {
 
         {/* Manual Mode Notice */}
         {settings.gameMode === GameMode.Manual && (
-          <Alert className="border-warning/30 bg-warning/10">
+          <Alert live="polite" className="border-warning/30 bg-warning/10">
             <AlertDescription className="text-sm text-warning">
               <strong>{t(translations.settings.saveFileMonitor.manualModeActive)}</strong>{' '}
               {t(translations.settings.saveFileMonitor.manualModeNotice)}

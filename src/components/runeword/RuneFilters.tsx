@@ -129,7 +129,7 @@ export function RuneFilters({
                 ) : imageUrl ? (
                   <img src={imageUrl} alt={rune.name} className="h-full w-full object-contain" />
                 ) : (
-                  <div className="text-center text-muted-foreground/60 text-xs">
+                  <div className="text-center text-muted-foreground text-xs">
                     {rune.id.charAt(0).toUpperCase()}
                   </div>
                 )}
@@ -139,7 +139,7 @@ export function RuneFilters({
                 htmlFor={`rune-${rune.id}`}
                 className={cn(
                   'flex flex-1 cursor-pointer items-center justify-between',
-                  hasNone && 'text-muted-foreground/60',
+                  hasNone && 'text-muted-foreground',
                 )}
               >
                 <span className="font-medium">{rune.name}</span>

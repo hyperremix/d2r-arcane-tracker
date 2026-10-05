@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { translations } from '@/i18n/translations';
 import { isEtherealOnly, shouldShowEtherealStatus, shouldShowNormalStatus } from '@/lib/ethereal';
-import { formatShortDate, isRecentFind } from '@/lib/utils';
+import { cn, formatShortDate, isRecentFind } from '@/lib/utils';
 import { CharacterIcon, RecentDiscoveryIndicator } from '../StatusIcons';
 
 /**
@@ -34,7 +34,9 @@ export function DiscoveryInfo({ allProgress, characters }: DiscoveryInfoProps) {
               <CharacterIcon characterClass={character.characterClass} className="h-3 w-3" />
             )}
             <span>{character?.name || t(translations.common.unknown)}</span>
-            <span className="text-ethereal text-xs">
+            <span
+              className={cn('text-xs', isEthProgress ? 'text-ethereal' : 'text-muted-foreground')}
+            >
               (
               {isEthProgress
                 ? t(translations.grail.itemCard.eth)

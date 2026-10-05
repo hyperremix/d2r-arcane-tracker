@@ -255,7 +255,7 @@ export function DatabaseCard() {
           )}
 
           {restoreSuccess && (
-            <Alert className="border-success/30 bg-success/10">
+            <Alert live="polite" className="border-success/30 bg-success/10">
               <AlertDescription className="text-success text-xs">
                 {t(translations.settings.database.restoreSuccess)}
               </AlertDescription>

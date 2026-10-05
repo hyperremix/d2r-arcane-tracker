@@ -25,15 +25,15 @@ const colorConfig = {
   },
   green: {
     stroke: 'text-chart-3 group-hover:text-chart-3/80',
-    text: 'text-chart-3',
+    text: 'text-item-set',
   },
   purple: {
     stroke: 'text-chart-4 group-hover:text-chart-4/80',
-    text: 'text-chart-4',
+    text: 'text-item-runeword',
   },
   orange: {
     stroke: 'text-chart-5 group-hover:text-chart-5/80',
-    text: 'text-chart-5',
+    text: 'text-item-rune',
   },
 };
 

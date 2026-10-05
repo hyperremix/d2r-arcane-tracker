@@ -130,7 +130,7 @@ export function ItemIconSettings() {
 
           {/* Validation Status */}
           {validationStatus.valid ? (
-            <Alert className="border-success/30 bg-success/10">
+            <Alert live="polite" className="border-success/30 bg-success/10">
               <CheckCircle className="h-4 w-4 text-success" />
               <AlertDescription className="text-success">
                 <strong>✓ {t(translations.settings.itemIcons.pathValid)}</strong>
@@ -166,7 +166,7 @@ export function ItemIconSettings() {
                             href="https://www.hiveworkshop.com/threads/ladiks-casc-viewer.331540/"
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="underline hover:text-destructive/80"
+                            className="underline hover:decoration-2"
                           >
                             {t(translations.settings.itemIcons.ladiksCascViewer)}
                           </a>

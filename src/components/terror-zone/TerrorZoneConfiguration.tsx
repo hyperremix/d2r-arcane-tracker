@@ -240,7 +240,7 @@ export function TerrorZoneConfiguration() {
                           {t(translations.terrorZone.cascDescription)}
                           <strong> {t(translations.terrorZone.allFilesMustBeExtracted)}</strong>{' '}
                           {t(translations.terrorZone.launchFlags)}{' '}
-                          <code className="rounded bg-destructive/15 px-1">
+                          <code className="rounded bg-background/60 px-1">
                             {t(translations.terrorZone.flagsValue)}
                           </code>{' '}
                           {t(translations.terrorZone.flagsSuffix)}
@@ -256,7 +256,7 @@ export function TerrorZoneConfiguration() {
                                 href="https://www.hiveworkshop.com/threads/ladiks-casc-viewer.331540/"
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="underline hover:text-destructive/80"
+                                className="underline hover:decoration-2"
                               >
                                 Ladik's CASC Viewer
                               </a>
@@ -287,7 +287,7 @@ export function TerrorZoneConfiguration() {
                             </li>
                             <li>
                               Create a D2R shortcut and add{' '}
-                              <code className="rounded bg-destructive/15 px-1 text-xs">
+                              <code className="rounded bg-background/60 px-1 text-xs">
                                 -direct -txt
                               </code>{' '}
                               to the target
