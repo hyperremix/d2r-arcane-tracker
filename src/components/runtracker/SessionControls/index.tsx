@@ -283,7 +283,8 @@ export function SessionControls() {
   const canStartRun = Boolean(activeSession && !activeRun && !controlsBusy && !autoModeEnabled);
   const canPauseResume = Boolean(activeRun && !controlsBusy && !autoModeEnabled);
   const canEndRun = Boolean(activeRun && !controlsBusy && !autoModeEnabled);
-  const canEndSession = Boolean(activeSession && !controlsBusy && !autoModeEnabled);
+  // End Session stays available in auto mode so tracked sessions can still be stopped by mouse
+  const canEndSession = Boolean(activeSession && !controlsBusy);
 
   return (
     <>

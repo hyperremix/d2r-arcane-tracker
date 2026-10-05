@@ -545,6 +545,36 @@ describe('runTrackerStore loading and error state', () => {
     });
   });
 
+  describe('When the initial load is requested again while it is still in flight', () => {
+    it('Then the in-flight load is reused instead of querying the backend twice', async () => {
+      // Arrange
+      let resolveSessions: (sessions: Session[]) => void = () => undefined;
+      mockElectronAPI.runTracker.getAllSessions.mockReturnValue(
+        new Promise<Session[]>((resolve) => {
+          resolveSessions = resolve;
+        }),
+      );
+      mockElectronAPI.runTracker.getState.mockResolvedValue(null);
+
+      // Act
+      let firstLoad: Promise<void> = Promise.resolve();
+      let secondLoad: Promise<void> = Promise.resolve();
+      act(() => {
+        firstLoad = useRunTrackerStore.getState().loadInitialData();
+        secondLoad = useRunTrackerStore.getState().loadInitialData();
+      });
+      await act(async () => {
+        resolveSessions([session]);
+        await Promise.all([firstLoad, secondLoad]);
+      });
+
+      // Assert
+      expect(mockElectronAPI.runTracker.getAllSessions).toHaveBeenCalledTimes(1);
+      expect(mockElectronAPI.runTracker.getState).toHaveBeenCalledTimes(1);
+      expect(useRunTrackerStore.getState().initialLoadStatus).toBe('success');
+    });
+  });
+
   describe('If the initial load fails', () => {
     it('Then the failure is stored as a fatal initial-load error', async () => {
       // Arrange

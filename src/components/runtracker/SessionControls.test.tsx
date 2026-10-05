@@ -399,7 +399,7 @@ describe('SessionControls', () => {
       expect(within(dialog).getByRole('button', { name: 'Cancel' })).toBeDisabled();
     });
 
-    it('If auto mode is enabled, Then End Session is disabled', () => {
+    it('If auto mode is enabled, Then End Session stays enabled while manual run controls are disabled', async () => {
       // Arrange
       const originalElectronAPI = window.electronAPI;
       Object.defineProperty(window, 'electronAPI', {
@@ -425,7 +425,11 @@ describe('SessionControls', () => {
       render(<SessionControls />);
 
       // Assert
-      expect(screen.getByRole('button', { name: 'End Session' })).toBeDisabled();
+      expect(screen.getByRole('button', { name: 'Start Run' })).toBeDisabled();
+      const endSessionButton = screen.getByRole('button', { name: 'End Session' });
+      expect(endSessionButton).toBeEnabled();
+      fireEvent.click(endSessionButton);
+      expect(await screen.findByRole('alertdialog')).toBeInTheDocument();
 
       Object.defineProperty(window, 'electronAPI', {
         value: originalElectronAPI,

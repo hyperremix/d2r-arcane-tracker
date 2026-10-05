@@ -238,6 +238,9 @@ function setActionPending(action: RunTrackerAction, pending: boolean) {
   });
 }
 
+// Tracks the first (blocking) initial load so overlapping calls share one request
+let initialLoadInFlight: Promise<void> | undefined;
+
 /**
  * Zustand store for managing run tracking state including sessions, runs, and items.
  * Provides actions for data manipulation and real-time updates from the Electron backend.
@@ -425,39 +428,22 @@ export const useRunTrackerStore = create<RunTrackerState>()(
     },
 
     // Data loading actions
-    loadInitialData: async () => {
+    loadInitialData: () => {
       // Only the very first load (or a retry after it failed) blocks the page.
       // Later calls refresh in the background and report failures inline.
       const isFirstLoad = get().initialLoadStatus !== 'success';
+      if (isFirstLoad && initialLoadInFlight) {
+        return initialLoadInFlight;
+      }
+
+      const load = runInitialLoad(isFirstLoad);
       if (isFirstLoad) {
-        set({ initialLoadStatus: 'loading', initialLoadError: undefined });
+        initialLoadInFlight = load.finally(() => {
+          initialLoadInFlight = undefined;
+        });
+        return initialLoadInFlight;
       }
-      set({ sessionsLoading: true });
-
-      try {
-        const [sessions, trackerState] = await Promise.all([
-          window.electronAPI?.runTracker.getAllSessions(true), // Include archived
-          window.electronAPI?.runTracker.getState(),
-        ]);
-        set({ ...buildInitialDataUpdate(sessions, trackerState), sessionsLoading: false });
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        console.error('[RunTrackerStore] Error loading initial data:', error);
-        set(
-          isFirstLoad
-            ? { initialLoadStatus: 'error', initialLoadError: errorMessage, sessionsLoading: false }
-            : { error: errorMessage, errorType: 'unknown', sessionsLoading: false },
-        );
-        return;
-      }
-
-      // Load runs for the active session; failures here are reported inline
-      const activeSessionId = get().activeSession?.id;
-      if (activeSessionId) {
-        await get().loadSessionRuns(activeSessionId);
-      }
-
-      set({ initialLoadStatus: 'success', initialLoadError: undefined });
+      return load;
     },
 
     loadSessions: async (includeArchived = false) => {
@@ -889,3 +875,44 @@ export const useRunTrackerStore = create<RunTrackerState>()(
     },
   })),
 );
+
+/**
+ * Fetches sessions and tracker state, then the active session's runs.
+ * Only a first load reports failures as a fatal initial-load error; refreshes report them inline.
+ */
+async function runInitialLoad(isFirstLoad: boolean): Promise<void> {
+  const { setState: set, getState: get } = useRunTrackerStore;
+  if (isFirstLoad) {
+    set({ initialLoadStatus: 'loading', initialLoadError: undefined });
+  }
+  set({ sessionsLoading: true });
+
+  try {
+    const [sessions, trackerState] = await Promise.all([
+      window.electronAPI?.runTracker.getAllSessions(true), // Include archived
+      window.electronAPI?.runTracker.getState(),
+    ]);
+    set({ ...buildInitialDataUpdate(sessions, trackerState), sessionsLoading: false });
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error('[RunTrackerStore] Error loading initial data:', error);
+    set(
+      isFirstLoad
+        ? {
+            initialLoadStatus: 'error',
+            initialLoadError: errorMessage,
+            sessionsLoading: false,
+          }
+        : { error: errorMessage, errorType: 'unknown', sessionsLoading: false },
+    );
+    return;
+  }
+
+  // Load runs for the active session; failures here are reported inline
+  const activeSessionId = get().activeSession?.id;
+  if (activeSessionId) {
+    await get().loadSessionRuns(activeSessionId);
+  }
+
+  set({ initialLoadStatus: 'success', initialLoadError: undefined });
+}
