@@ -7,12 +7,21 @@ vi.mock('./grail/NotificationButton', () => ({
   NotificationButton: () => <button type="button">notifications</button>,
 }));
 
+const browserRouters: ReturnType<typeof createBrowserRouter>[] = [];
+
 function LocationProbe() {
   const location = useLocation();
   return <div data-testid="location">{location.pathname}</div>;
 }
 
+/**
+ * Memory routers never touch `window.history`, but TitleBar reads
+ * `window.history.length`. Because the test environment is shared (isolate: false)
+ * and jsdom cannot shrink the real history stack, pin the length so memory-router
+ * tests do not depend on entries left behind by other tests or files.
+ */
 function renderTitleBar(initialPath = '/') {
+  vi.spyOn(window.history, 'length', 'get').mockReturnValue(1);
   const layout = (
     <>
       <TitleBar />
@@ -36,6 +45,8 @@ function renderTitleBar(initialPath = '/') {
  * back/forward buttons read) reflects real navigation.
  */
 function renderTitleBarWithBrowserHistory(initialPath: string) {
+  // Real history is required here, so make sure no length stub is active.
+  vi.restoreAllMocks();
   window.history.replaceState(undefined, '', initialPath);
   const layout = (
     <>
@@ -46,6 +57,7 @@ function renderTitleBarWithBrowserHistory(initialPath: string) {
   const router = createBrowserRouter(
     ['/', '/statistics', '/runs'].map((path) => ({ path, element: layout })),
   );
+  browserRouters.push(router);
   return render(<RouterProvider router={router} />);
 }
 
@@ -55,6 +67,10 @@ function getNavigation() {
 
 describe('When TitleBar is rendered', () => {
   afterEach(() => {
+    vi.restoreAllMocks();
+    for (const router of browserRouters.splice(0)) {
+      router.dispose();
+    }
     window.history.replaceState(undefined, '', '/');
   });
 
