@@ -204,4 +204,21 @@ describe('When using the session export dialog', () => {
     expect(alert).toHaveTextContent('DB locked');
     expect(screen.getByText('Export Format')).toBeInTheDocument();
   });
+
+  it('If a reload fails after a successful load, Then export actions are disabled and the error is shown', async () => {
+    // Arrange
+    renderDialog();
+    await waitForExportReady(/Save to File/i);
+    mockElectronAPI.runTracker.getSessionById.mockRejectedValue(new Error('DB locked'));
+
+    // Act
+    fireEvent.click(screen.getByLabelText(/Include items found during runs/i));
+
+    // Assert
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('Failed to load session data');
+    expect(screen.getByRole('button', { name: /Save to File/i })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /Copy to Clipboard/i })).toBeDisabled();
+    expect(mockElectronAPI.dialog.showSaveDialog).not.toHaveBeenCalled();
+  });
 });

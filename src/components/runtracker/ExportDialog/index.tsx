@@ -85,6 +85,11 @@ export function ExportDialog({ sessionId, open, onOpenChange }: ExportDialogProp
   const loadSessionData = useCallback(async () => {
     setLoading(true);
     setError(undefined);
+    // Drop any previously loaded data so a failed reload cannot export stale content
+    setSession(null);
+    setRuns([]);
+    setItems([]);
+    setExportContent('');
 
     try {
       // Load session

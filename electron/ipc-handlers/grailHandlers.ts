@@ -360,7 +360,7 @@ export function initializeGrailHandlers(): void {
    */
   ipcMain.handle('grail:backup', async (_, backupPath: string) => {
     try {
-      grailDB.backup(backupPath);
+      await grailDB.backup(backupPath);
       return { success: true };
     } catch (error) {
       console.error('Failed to backup database:', error);
