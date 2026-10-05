@@ -358,6 +358,15 @@ describe('Widget display and legibility', () => {
         takeRecords = vi.fn(() => []);
       },
     );
+    // framer-motion reads matchMedia for reduced-motion, which jsdom does not provide
+    vi.stubGlobal(
+      'matchMedia',
+      vi.fn().mockReturnValue({
+        matches: false,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      }),
+    );
   });
 
   afterAll(() => {

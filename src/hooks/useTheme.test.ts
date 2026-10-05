@@ -12,6 +12,7 @@ import { useTheme } from './useTheme';
 describe('When useTheme hook is used', () => {
   let mockUseGrailStore: ReturnType<typeof vi.fn>;
   let mockMatchMedia: ReturnType<typeof vi.fn>;
+  const originalMatchMedia = window.matchMedia;
   let mockAddEventListener: ReturnType<typeof vi.fn>;
   let mockRemoveEventListener: ReturnType<typeof vi.fn>;
 
@@ -33,6 +34,8 @@ describe('When useTheme hook is used', () => {
 
   afterEach(() => {
     vi.clearAllMocks();
+    // Tests share one window (isolate: false), so don't leak the mock to other files
+    window.matchMedia = originalMatchMedia;
   });
 
   describe('If theme is set to light', () => {

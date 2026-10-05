@@ -41,10 +41,19 @@ describe('Settings', () => {
   beforeEach(() => {
     scrollIntoViewMock.mockClear();
     Element.prototype.scrollIntoView = scrollIntoViewMock;
+    vi.stubGlobal(
+      'matchMedia',
+      vi.fn().mockReturnValue({
+        matches: false,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      }),
+    );
   });
 
   afterEach(() => {
     Element.prototype.scrollIntoView = originalScrollIntoView;
+    vi.unstubAllGlobals();
     vi.restoreAllMocks();
     vi.useRealTimers();
   });

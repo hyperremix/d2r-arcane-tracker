@@ -24,6 +24,7 @@ const mockElectronAPI = {
 // Mock window.electronAPI
 Object.defineProperty(window, 'electronAPI', {
   value: mockElectronAPI,
+  configurable: true,
   writable: true,
 });
 
