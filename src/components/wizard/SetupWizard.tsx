@@ -1,7 +1,17 @@
 import { ArrowLeft, ArrowRight, Check } from 'lucide-react';
 import type { ComponentType } from 'react';
-import { useCallback, useId, useMemo } from 'react';
+import { useCallback, useId, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -89,6 +99,7 @@ export function SetupWizard() {
     closeWizard,
   } = useWizardStore();
   const { setSettings } = useGrailStore();
+  const [showSkipConfirm, setShowSkipConfirm] = useState(false);
 
   const step = wizardSteps[currentStep];
   const CurrentStepComponent = step?.component;
@@ -120,11 +131,24 @@ export function SetupWizard() {
     }
   }, [isFirstStep, previousStep]);
 
-  const handleSkip = useCallback(async () => {
+  const handleRequestSkip = useCallback(() => {
+    setShowSkipConfirm(true);
+  }, []);
+
+  const handleConfirmSkip = useCallback(async () => {
+    setShowSkipConfirm(false);
     // Mark wizard as skipped (preserving any settings already made)
     await setSettings({ wizardSkipped: true, wizardCompleted: false });
     skip();
   }, [setSettings, skip]);
+
+  // Escape must never silently skip the wizard; route it through the skip confirmation.
+  // Outside clicks are ignored entirely via disablePointerDismissal.
+  const handleWizardOpenChange = useCallback((open: boolean) => {
+    if (!open) {
+      setShowSkipConfirm(true);
+    }
+  }, []);
 
   const handleFinish = useCallback(async () => {
     try {
@@ -142,7 +166,7 @@ export function SetupWizard() {
   }, [setSettings, closeWizard]);
 
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => !open && handleSkip()} modal>
+    <Dialog open={isOpen} onOpenChange={handleWizardOpenChange} modal disablePointerDismissal>
       <DialogContent className="max-h-[90vh] min-w-3xl" showCloseButton={false}>
         <DialogHeader>
           <div className="flex items-center justify-between">
@@ -198,7 +222,7 @@ export function SetupWizard() {
 
           <div className="flex gap-2">
             {!isLastStep && (
-              <Button variant="ghost" onClick={handleSkip}>
+              <Button variant="ghost" onClick={handleRequestSkip}>
                 {t(translations.wizard.skipSetup)}
               </Button>
             )}
@@ -220,6 +244,24 @@ export function SetupWizard() {
             )}
           </div>
         </div>
+
+        {/* Skip Confirmation Dialog */}
+        <AlertDialog open={showSkipConfirm} onOpenChange={setShowSkipConfirm}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>{t(translations.wizard.skipConfirm.title)}</AlertDialogTitle>
+              <AlertDialogDescription>
+                {t(translations.wizard.skipConfirm.description)}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>{t(translations.wizard.skipConfirm.continue)}</AlertDialogCancel>
+              <AlertDialogAction onClick={handleConfirmSkip}>
+                {t(translations.wizard.skipConfirm.confirm)}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </DialogContent>
     </Dialog>
   );

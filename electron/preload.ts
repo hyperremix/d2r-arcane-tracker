@@ -209,6 +209,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
     getMonitoringStatus: (): Promise<MonitoringStatus> =>
       ipcRenderer.invoke('saveFile:getMonitoringStatus'),
     /**
+     * Gets the platform-specific default save directory.
+     * @returns {Promise<string>} A promise that resolves with the default directory path.
+     */
+    getDefaultDirectory: (): Promise<string> => ipcRenderer.invoke('saveFile:getDefaultDirectory'),
+    /**
      * Updates the save directory being monitored.
      * @param {string} saveDir - The new save directory path.
      * @returns {Promise<{ success: boolean }>} A promise that resolves with a success indicator.

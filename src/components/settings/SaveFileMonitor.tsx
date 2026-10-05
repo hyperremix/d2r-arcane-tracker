@@ -12,22 +12,14 @@ import {
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { translations } from '@/i18n/translations';
 import { formatShortDate } from '@/lib/utils';
 import { useGrailStore } from '@/stores/grailStore';
+import type { SaveDirectoryChangeAction } from './SaveDirectoryChangeDialog';
+import { SaveDirectoryChangeDialog } from './SaveDirectoryChangeDialog';
 
 /**
  * SaveFileMonitor component that displays and manages save file monitoring status.
@@ -47,7 +39,7 @@ export function SaveFileMonitor() {
   const [saveFileCount, setSaveFileCount] = useState<number>(0);
   const [showChangeDirectoryDialog, setShowChangeDirectoryDialog] = useState(false);
   const [isChangingDirectory, setIsChangingDirectory] = useState(false);
-  const [dialogAction, setDialogAction] = useState<'change' | 'restore' | null>(null);
+  const [dialogAction, setDialogAction] = useState<SaveDirectoryChangeAction | null>(null);
   const { reloadData, settings } = useGrailStore();
 
   const loadMonitoringStatus = useCallback(async () => {
@@ -371,7 +363,7 @@ export function SaveFileMonitor() {
       </CardContent>
 
       {/* Change Directory Confirmation Dialog */}
-      <AlertDialog
+      <SaveDirectoryChangeDialog
         open={showChangeDirectoryDialog}
         onOpenChange={(open) => {
           setShowChangeDirectoryDialog(open);
@@ -379,51 +371,12 @@ export function SaveFileMonitor() {
             setDialogAction(null);
           }
         }}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2">
-              <AlertCircle className="h-5 w-5 text-warning" />
-              {dialogAction === 'restore'
-                ? t(translations.settings.saveFileMonitor.restoreDefaultDirectory)
-                : t(translations.settings.saveFileMonitor.changeSaveFileDirectory)}
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              <span className="mb-2 block">
-                {dialogAction === 'restore'
-                  ? t(translations.settings.saveFileMonitor.confirmRestoreDirectory)
-                  : t(translations.settings.saveFileMonitor.confirmChangeDirectory)}
-              </span>
-              <span className="mb-2 block font-medium text-warning">
-                {t(translations.settings.saveFileMonitor.deleteWarning)}
-              </span>
-              <span className="block text-sm">
-                {t(translations.settings.saveFileMonitor.backupWarning)}
-              </span>
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={isChangingDirectory}>
-              {t(translations.common.cancel)}
-            </AlertDialogCancel>
-            <AlertDialogAction
-              onClick={
-                dialogAction === 'restore' ? handleRestoreDefaultDirectory : handleChangeDirectory
-              }
-              disabled={isChangingDirectory}
-              variant="destructive"
-            >
-              {isChangingDirectory
-                ? dialogAction === 'restore'
-                  ? t(translations.settings.saveFileMonitor.restoring)
-                  : t(translations.settings.saveFileMonitor.changing)
-                : dialogAction === 'restore'
-                  ? t(translations.settings.saveFileMonitor.restoreDefault)
-                  : t(translations.settings.saveFileMonitor.changeDirectory)}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+        action={dialogAction ?? 'change'}
+        isProcessing={isChangingDirectory}
+        onConfirm={
+          dialogAction === 'restore' ? handleRestoreDefaultDirectory : handleChangeDirectory
+        }
+      />
     </Card>
   );
 }

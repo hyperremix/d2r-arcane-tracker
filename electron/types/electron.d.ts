@@ -149,6 +149,11 @@ export interface ElectronAPI {
      */
     getMonitoringStatus(): Promise<MonitoringStatus>
     /**
+     * Gets the platform-specific default save directory.
+     * @returns {Promise<string>} A promise that resolves with the default directory path.
+     */
+    getDefaultDirectory(): Promise<string>
+    /**
      * Updates the save directory being monitored.
      * @param {string} saveDir - The new save directory path.
      * @returns {Promise<{ success: boolean }>} A promise that resolves with a success indicator.
