@@ -135,6 +135,9 @@ class GrailDatabase {
   getProgressByItem(itemId: string): GrailProgress[] {
     return progressModule.getProgressByItem(this, itemId);
   }
+  getProgressById(progressId: string): GrailProgress | null {
+    return progressModule.getProgressById(this, progressId);
+  }
   getCharacterProgress(characterId: string, itemId: string): GrailProgress | null {
     return progressModule.getCharacterProgress(this, characterId, itemId);
   }

@@ -60,10 +60,18 @@ interface LabeledSelectProps {
   options: SelectOption[];
   value: string | undefined;
   placeholder?: string;
+  describedBy?: string;
   onValueChange: (value: string) => void;
 }
 
-function LabeledSelect({ label, options, value, placeholder, onValueChange }: LabeledSelectProps) {
+function LabeledSelect({
+  label,
+  options,
+  value,
+  placeholder,
+  describedBy,
+  onValueChange,
+}: LabeledSelectProps) {
   const id = useId();
 
   return (
@@ -74,7 +82,7 @@ function LabeledSelect({ label, options, value, placeholder, onValueChange }: La
         value={value ?? null}
         onValueChange={(next) => next && onValueChange(next as string)}
       >
-        <SelectTrigger id={id} className="w-full">
+        <SelectTrigger id={id} className="w-full" aria-describedby={describedBy}>
           <SelectValue placeholder={placeholder} />
         </SelectTrigger>
         <SelectContent>
@@ -87,6 +95,11 @@ function LabeledSelect({ label, options, value, placeholder, onValueChange }: La
       </Select>
     </div>
   );
+}
+
+/** Returns the ID to reference with aria-describedby only while the condition holds. */
+function idIf(condition: boolean, id: string): string | undefined {
+  return condition ? id : undefined;
 }
 
 function isVersionRecorded(
@@ -183,6 +196,7 @@ function MarkAsFoundForm({ item, onDone }: MarkAsFoundFormProps) {
             options={characterOptions}
             value={characterId}
             placeholder={t(translations.grail.itemDetails.selectCharacter)}
+            describedBy={idIf(alreadyRecorded, messageId)}
             onValueChange={setCharacterId}
           />
 
@@ -191,6 +205,7 @@ function MarkAsFoundForm({ item, onDone }: MarkAsFoundFormProps) {
               label={t(translations.grail.itemDetails.version)}
               options={versionOptions}
               value={version}
+              describedBy={idIf(alreadyRecorded, messageId)}
               onValueChange={(value) => setVersion(value as ItemVersion)}
             />
           )}
@@ -227,7 +242,11 @@ function MarkAsFoundForm({ item, onDone }: MarkAsFoundFormProps) {
         <DialogClose render={<Button type="button" variant="outline" />}>
           {t(translations.common.cancel)}
         </DialogClose>
-        <Button type="submit" disabled={!canSubmit || submitting}>
+        <Button
+          type="submit"
+          disabled={!canSubmit || submitting}
+          aria-describedby={idIf(message !== undefined, messageId)}
+        >
           {t(translations.grail.itemDetails.markAsFound)}
         </Button>
       </DialogFooter>

@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { GrailProgressBuilder } from '@/fixtures';
 import { createInMemoryDatabase, initializeDatabaseSchema } from '../test/helpers/databaseHelpers';
 import { createDrizzleDb } from './drizzle';
-import { deleteManualProgress, getAllProgress, upsertProgress } from './progress';
+import { deleteManualProgress, getAllProgress, getProgressById, upsertProgress } from './progress';
 import type { DatabaseContext } from './types';
 
 function insertItem(rawDb: DatabaseType, id: string): void {
@@ -110,6 +110,32 @@ describe('When grail progress is persisted to the database', () => {
 
       // Assert
       expect(deleted).toBe(false);
+    });
+  });
+
+  describe('If a record is looked up by ID', () => {
+    it('Then the stored record is returned', () => {
+      // Arrange
+      const progress = GrailProgressBuilder.new()
+        .withId('auto-1')
+        .withItemId('shako')
+        .withManuallyAdded(false)
+        .build();
+      upsertProgress(ctx, progress);
+
+      // Act
+      const found = getProgressById(ctx, 'auto-1');
+
+      // Assert
+      expect(found).toMatchObject({ id: 'auto-1', itemId: 'shako', manuallyAdded: false });
+    });
+
+    it('Then null is returned if the record does not exist', () => {
+      // Arrange & Act
+      const found = getProgressById(ctx, 'missing');
+
+      // Assert
+      expect(found).toBeNull();
     });
   });
 });

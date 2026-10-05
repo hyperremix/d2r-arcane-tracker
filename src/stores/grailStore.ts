@@ -224,8 +224,18 @@ export const useGrailStore = create<GrailState>((set, get) => ({
 
   removeProgress: async (progressId) => {
     const result = await window.electronAPI?.grail.deleteProgress(progressId);
-    if (!result?.success) {
+    if (!result) {
       throw new Error('Failed to remove progress');
+    }
+
+    // The main process only deletes manual records, so a failed delete of a manual (or already
+    // dropped) record means it is already gone and removal is idempotent. A failed delete of an
+    // auto-detected record is a real failure.
+    if (!result.success) {
+      const local = get().progress.find((p) => p.id === progressId);
+      if (local && !local.manuallyAdded) {
+        throw new Error('Failed to remove progress');
+      }
     }
 
     set((state) => ({ progress: state.progress.filter((p) => p.id !== progressId) }));

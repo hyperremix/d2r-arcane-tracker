@@ -77,6 +77,11 @@ export function getProgressByItem(ctx: DatabaseContext, itemId: string): GrailPr
   return dbProgress.map(dbProgressToProgress);
 }
 
+export function getProgressById(ctx: DatabaseContext, progressId: string): GrailProgress | null {
+  const dbProg = ctx.db.select().from(grailProgress).where(eq(grailProgress.id, progressId)).get();
+  return dbProg ? dbProgressToProgress(dbProg) : null;
+}
+
 export function getCharacterProgress(
   ctx: DatabaseContext,
   characterId: string,

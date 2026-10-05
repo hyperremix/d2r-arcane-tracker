@@ -278,10 +278,38 @@ describe('When useGrailStore is used', () => {
       expect(result.current.progress).toEqual([keep]);
     });
 
-    it('Then should keep state and reject if nothing was deleted', async () => {
+    it('Then should treat an already deleted manual record as removed', async () => {
       // Arrange
       const { result } = renderHook(() => useGrailStore());
-      const record = GrailProgressBuilder.new().withId('auto').withItemId('item1').build();
+      const keep = GrailProgressBuilder.new().withId('keep').withItemId('item1').build();
+      const stale = GrailProgressBuilder.new()
+        .withId('stale')
+        .withItemId('item1')
+        .withManuallyAdded(true)
+        .build();
+      mockElectronAPI.grail.deleteProgress.mockResolvedValue({ success: false });
+      act(() => {
+        result.current.setProgress([keep, stale]);
+      });
+
+      // Act
+      await act(async () => {
+        await result.current.removeProgress('stale');
+      });
+
+      // Assert
+      expect(mockElectronAPI.grail.deleteProgress).toHaveBeenCalledWith('stale');
+      expect(result.current.progress).toEqual([keep]);
+    });
+
+    it('Then should keep state and reject if an auto-detected record was not deleted', async () => {
+      // Arrange
+      const { result } = renderHook(() => useGrailStore());
+      const record = GrailProgressBuilder.new()
+        .withId('auto')
+        .withItemId('item1')
+        .withManuallyAdded(false)
+        .build();
       mockElectronAPI.grail.deleteProgress.mockResolvedValue({ success: false });
       act(() => {
         result.current.setProgress([record]);

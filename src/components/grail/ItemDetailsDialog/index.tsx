@@ -1,5 +1,5 @@
 import type { Item } from 'electron/types/grail';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import {
@@ -28,6 +28,23 @@ interface ItemDetailsDialogProps {
 }
 
 /**
+ * Button and prompt for manually recording an item as found.
+ * Its open state lives here so it resets whenever the details dialog closes (this component
+ * unmounts with the dialog content) or is keyed to another item.
+ */
+function MarkAsFoundAction({ item }: { item: Item }) {
+  const { t } = useTranslation();
+  const [open, setOpen] = useState(false);
+
+  return (
+    <>
+      <Button onClick={() => setOpen(true)}>{t(translations.grail.itemDetails.markAsFound)}</Button>
+      <MarkAsFoundDialog item={item} open={open} onOpenChange={setOpen} />
+    </>
+  );
+}
+
+/**
  * ItemDetailsDialog component that displays comprehensive information about a Holy Grail item.
  * Shows item metadata, icon, and per-character progress, and lets the user manually
  * record or remove finds.
@@ -35,13 +52,6 @@ interface ItemDetailsDialogProps {
 export function ItemDetailsDialog({ itemId, open, onOpenChange }: ItemDetailsDialogProps) {
   const { t } = useTranslation();
   const { items, progress, characters, removeProgress, settings } = useGrailStore();
-  const [markAsFoundOpen, setMarkAsFoundOpen] = useState(false);
-
-  // Never carry an open "mark as found" prompt over to another item or a reopened dialog
-  // biome-ignore lint/correctness/useExhaustiveDependencies: itemId is an intentional reset trigger
-  useEffect(() => {
-    setMarkAsFoundOpen(false);
-  }, [open, itemId]);
 
   // Find the item by ID
   const item = useMemo(() => {
@@ -127,14 +137,11 @@ export function ItemDetailsDialog({ itemId, open, onOpenChange }: ItemDetailsDia
         </div>
 
         <DialogFooter>
-          <Button onClick={() => setMarkAsFoundOpen(true)}>
-            {t(translations.grail.itemDetails.markAsFound)}
-          </Button>
+          <MarkAsFoundAction key={item.id} item={item} />
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             {t(translations.common.close)}
           </Button>
         </DialogFooter>
-        <MarkAsFoundDialog item={item} open={markAsFoundOpen} onOpenChange={setMarkAsFoundOpen} />
       </DialogContent>
     </Dialog>
   );

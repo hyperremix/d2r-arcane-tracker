@@ -71,6 +71,46 @@ export function isValidGrailProgress(value: unknown): value is GrailProgress {
 }
 
 /**
+ * Enforces in the main process the rules the renderer applies when recording a find manually.
+ * Auto-detected records are written by the main process itself, so this channel only accepts
+ * manually added records. Re-saving an existing manual record (same ID) is allowed.
+ * @param progress - The validated progress payload received over IPC
+ * @throws If the record is not manual, references an unknown character, has a future found date,
+ *   reuses the ID of an auto-detected record, or duplicates an existing record
+ */
+function assertManualProgressAllowed(progress: GrailProgress): void {
+  if (!progress.manuallyAdded) {
+    throw new Error('Only manually added progress can be saved');
+  }
+
+  if (!grailDB.getCharacterById(progress.characterId)) {
+    throw new Error(`Unknown character: ${progress.characterId}`);
+  }
+
+  if (progress.foundDate && progress.foundDate.getTime() > Date.now()) {
+    throw new Error('Found date cannot be in the future');
+  }
+
+  const existing = grailDB.getProgressById(progress.id);
+  if (existing && !existing.manuallyAdded) {
+    throw new Error(`Progress ID already in use: ${progress.id}`);
+  }
+
+  const alreadyRecorded = grailDB
+    .getProgressByCharacter(progress.characterId)
+    .some(
+      (p) =>
+        p.id !== progress.id &&
+        p.itemId === progress.itemId &&
+        p.isEthereal === progress.isEthereal &&
+        p.foundDate !== undefined,
+    );
+  if (alreadyRecorded) {
+    throw new Error(`Item already recorded for character: ${progress.characterId}`);
+  }
+}
+
+/**
  * Notifies all renderer windows that grail progress changed so they can reload it.
  */
 function notifyProgressUpdated(): void {
@@ -195,10 +235,7 @@ export function initializeGrailHandlers(): void {
         throw new Error('Invalid grail progress payload');
       }
 
-      // Manually added records must reference an existing (non-deleted) character
-      if (progress.manuallyAdded && !grailDB.getCharacterById(progress.characterId)) {
-        throw new Error(`Unknown character: ${progress.characterId}`);
-      }
+      assertManualProgressAllowed(progress);
 
       grailDB.upsertProgress(progress);
 

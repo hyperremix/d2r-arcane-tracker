@@ -26,6 +26,7 @@ vi.mock('../database/database', () => {
     getAllRunewords: vi.fn(),
     insertItems: vi.fn(),
     getProgressByCharacter: vi.fn(),
+    getProgressById: vi.fn(),
     getAllProgress: vi.fn(),
     getFilteredProgress: vi.fn(),
     upsertProgress: vi.fn(),
@@ -51,10 +52,18 @@ import { GrailDatabase, grailDatabase } from '../database/database';
 import type { Character, Settings } from '../types/grail';
 import { closeGrailDatabase, initializeGrailHandlers } from './grailHandlers';
 
+function getUpdateProgressHandler() {
+  return vi
+    .mocked(ipcMain.handle)
+    .mock.calls.find((call) => call[0] === 'grail:updateProgress')?.[1] as any;
+}
+
 describe('When grailHandlers is used', () => {
   beforeEach(() => {
     // Clear all mocks
     vi.clearAllMocks();
+    vi.mocked(grailDatabase.getProgressById).mockReturnValue(null);
+    vi.mocked(grailDatabase.getProgressByCharacter).mockReturnValue([]);
   });
 
   describe('If initializeGrailHandlers is called', () => {
@@ -382,28 +391,23 @@ describe('When grailHandlers is used', () => {
       ]);
     });
 
-    it('Then grail:updateProgress should upsert progress', async () => {
+    it('Then grail:updateProgress should reject a record that is not manually added', async () => {
       // Arrange
       const mockProgress = GrailProgressBuilder.new()
         .withId('progress-1')
-        .withCharacterId('char-1')
+        .withCharacterId('ghost')
         .withItemId('shako')
-        .withFoundDate(new Date('2024-01-01'))
         .withFoundDate(new Date('2024-01-01T00:00:00.000Z'))
         .withManuallyAdded(false)
-        .withNotes('Found in Baal run')
         .build();
 
-      const handler = vi
-        .mocked(ipcMain.handle)
-        .mock.calls.find((call) => call[0] === 'grail:updateProgress')?.[1] as any;
+      const handler = getUpdateProgressHandler();
 
-      // Act
-      const result = await handler(null, mockProgress);
-
-      // Assert
-      expect(grailDatabase.upsertProgress).toHaveBeenCalledWith(mockProgress);
-      expect(result).toEqual({ success: true });
+      // Act & Assert
+      await expect(handler(null, mockProgress)).rejects.toThrow(
+        'Only manually added progress can be saved',
+      );
+      expect(grailDatabase.upsertProgress).not.toHaveBeenCalled();
     });
 
     it('Then grail:updateProgress should persist a manual record for an existing character', async () => {
@@ -448,6 +452,137 @@ describe('When grailHandlers is used', () => {
       // Act & Assert
       await expect(handler(null, mockProgress)).rejects.toThrow('Unknown character: ghost');
       expect(grailDatabase.upsertProgress).not.toHaveBeenCalled();
+    });
+
+    it('Then grail:updateProgress should reject a found date in the future', async () => {
+      // Arrange
+      const mockProgress = GrailProgressBuilder.new()
+        .withId('manual-1')
+        .withCharacterId('char-1')
+        .withItemId('shako')
+        .withFoundDate(new Date(Date.now() + 24 * 60 * 60 * 1000))
+        .withManuallyAdded(true)
+        .build();
+      vi.mocked(grailDatabase.getCharacterById).mockReturnValue({ id: 'char-1' } as Character);
+
+      const handler = getUpdateProgressHandler();
+
+      // Act & Assert
+      await expect(handler(null, mockProgress)).rejects.toThrow(
+        'Found date cannot be in the future',
+      );
+      expect(grailDatabase.upsertProgress).not.toHaveBeenCalled();
+    });
+
+    it('Then grail:updateProgress should reject reusing the ID of an auto-detected record', async () => {
+      // Arrange
+      const mockProgress = GrailProgressBuilder.new()
+        .withId('auto-1')
+        .withCharacterId('char-1')
+        .withItemId('shako')
+        .withFoundDate(new Date('2024-01-01T00:00:00.000Z'))
+        .withManuallyAdded(true)
+        .build();
+      vi.mocked(grailDatabase.getCharacterById).mockReturnValue({ id: 'char-1' } as Character);
+      vi.mocked(grailDatabase.getProgressById).mockReturnValue(
+        GrailProgressBuilder.new().withId('auto-1').withManuallyAdded(false).build(),
+      );
+
+      const handler = getUpdateProgressHandler();
+
+      // Act & Assert
+      await expect(handler(null, mockProgress)).rejects.toThrow(
+        'Progress ID already in use: auto-1',
+      );
+      expect(grailDatabase.upsertProgress).not.toHaveBeenCalled();
+    });
+
+    it('Then grail:updateProgress should reject a duplicate record for the same character, item and version', async () => {
+      // Arrange
+      const mockProgress = GrailProgressBuilder.new()
+        .withId('manual-2')
+        .withCharacterId('char-1')
+        .withItemId('shako')
+        .withFoundDate(new Date('2024-01-01T00:00:00.000Z'))
+        .withManuallyAdded(true)
+        .asNormal()
+        .build();
+      vi.mocked(grailDatabase.getCharacterById).mockReturnValue({ id: 'char-1' } as Character);
+      vi.mocked(grailDatabase.getProgressByCharacter).mockReturnValue([
+        GrailProgressBuilder.new()
+          .withId('auto-1')
+          .withCharacterId('char-1')
+          .withItemId('shako')
+          .withFoundDate(new Date('2023-01-01T00:00:00.000Z'))
+          .withManuallyAdded(false)
+          .asNormal()
+          .build(),
+      ]);
+
+      const handler = getUpdateProgressHandler();
+
+      // Act & Assert
+      await expect(handler(null, mockProgress)).rejects.toThrow(
+        'Item already recorded for character: char-1',
+      );
+      expect(grailDatabase.upsertProgress).not.toHaveBeenCalled();
+    });
+
+    it('Then grail:updateProgress should allow the other version of the same item for the same character', async () => {
+      // Arrange
+      const mockProgress = GrailProgressBuilder.new()
+        .withId('manual-2')
+        .withCharacterId('char-1')
+        .withItemId('shako')
+        .withFoundDate(new Date('2024-01-01T00:00:00.000Z'))
+        .withManuallyAdded(true)
+        .asEthereal()
+        .build();
+      vi.mocked(grailDatabase.getCharacterById).mockReturnValue({ id: 'char-1' } as Character);
+      vi.mocked(grailDatabase.getProgressByCharacter).mockReturnValue([
+        GrailProgressBuilder.new()
+          .withId('manual-1')
+          .withCharacterId('char-1')
+          .withItemId('shako')
+          .withFoundDate(new Date('2023-01-01T00:00:00.000Z'))
+          .withManuallyAdded(true)
+          .asNormal()
+          .build(),
+      ]);
+
+      const handler = getUpdateProgressHandler();
+
+      // Act
+      const result = await handler(null, mockProgress);
+
+      // Assert
+      expect(grailDatabase.upsertProgress).toHaveBeenCalledWith(mockProgress);
+      expect(result).toEqual({ success: true });
+    });
+
+    it('Then grail:updateProgress should allow re-saving an existing manual record', async () => {
+      // Arrange
+      const existing = GrailProgressBuilder.new()
+        .withId('manual-1')
+        .withCharacterId('char-1')
+        .withItemId('shako')
+        .withFoundDate(new Date('2023-01-01T00:00:00.000Z'))
+        .withManuallyAdded(true)
+        .asNormal()
+        .build();
+      const updated = { ...existing, foundDate: new Date('2024-01-01T00:00:00.000Z') };
+      vi.mocked(grailDatabase.getCharacterById).mockReturnValue({ id: 'char-1' } as Character);
+      vi.mocked(grailDatabase.getProgressById).mockReturnValue(existing);
+      vi.mocked(grailDatabase.getProgressByCharacter).mockReturnValue([existing]);
+
+      const handler = getUpdateProgressHandler();
+
+      // Act
+      const result = await handler(null, updated);
+
+      // Assert
+      expect(grailDatabase.upsertProgress).toHaveBeenCalledWith(updated);
+      expect(result).toEqual({ success: true });
     });
 
     it.each([

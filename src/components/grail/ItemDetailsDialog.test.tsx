@@ -673,6 +673,33 @@ describe('When the user marks an item as found', () => {
       ).toBeInTheDocument();
       expect(within(prompt).getByRole('button', { name: 'Mark as Found' })).toBeDisabled();
     });
+
+    it('Then the message is associated with the controls it explains', () => {
+      // Arrange
+      const item = HolyGrailItemBuilder.new().withId('item-1').withEtherealType('none').build();
+      const character = CharacterBuilder.new().withId('char-1').withName('Sorc').build();
+      const progress = GrailProgressBuilder.new()
+        .withId('prog-1')
+        .withCharacterId('char-1')
+        .withItemId('item-1')
+        .withFoundDate(new Date('2024-01-01'))
+        .asNormal()
+        .build();
+      setupStoreMock({ items: [item], characters: [character], progress: [progress] });
+      render(<ItemDetailsDialog itemId="item-1" open={true} onOpenChange={vi.fn()} />);
+
+      // Act
+      const prompt = openMarkAsFoundPrompt();
+
+      // Assert
+      const message = 'Sorc already has this version recorded.';
+      expect(
+        within(prompt).getByRole('combobox', { name: 'Character' }),
+      ).toHaveAccessibleDescription(message);
+      expect(
+        within(prompt).getByRole('button', { name: 'Mark as Found' }),
+      ).toHaveAccessibleDescription(message);
+    });
   });
 
   describe('If no characters exist', () => {
@@ -689,6 +716,49 @@ describe('When the user marks an item as found', () => {
       expect(within(prompt).getByText(/No characters available yet/)).toBeInTheDocument();
       expect(within(prompt).queryByRole('combobox')).not.toBeInTheDocument();
       expect(within(prompt).getByRole('button', { name: 'Mark as Found' })).toBeDisabled();
+    });
+
+    it('Then the message is associated with the disabled submit button', () => {
+      // Arrange
+      const item = HolyGrailItemBuilder.new().withId('item-1').build();
+      setupStoreMock({ items: [item], characters: [] });
+      render(<ItemDetailsDialog itemId="item-1" open={true} onOpenChange={vi.fn()} />);
+
+      // Act
+      const prompt = openMarkAsFoundPrompt();
+
+      // Assert
+      expect(
+        within(prompt).getByRole('button', { name: 'Mark as Found' }),
+      ).toHaveAccessibleDescription(/No characters available yet/);
+    });
+  });
+
+  describe('If the details dialog is closed and reopened or switched to another item', () => {
+    it('Then the Mark as Found prompt does not carry over', () => {
+      // Arrange
+      const item = HolyGrailItemBuilder.new().withId('item-1').withEtherealType('none').build();
+      const other = HolyGrailItemBuilder.new().withId('item-2').withEtherealType('none').build();
+      const character = CharacterBuilder.new().withId('char-1').withName('Sorc').build();
+      setupStoreMock({ items: [item, other], characters: [character] });
+      const { rerender } = render(
+        <ItemDetailsDialog itemId="item-1" open={true} onOpenChange={vi.fn()} />,
+      );
+      openMarkAsFoundPrompt();
+
+      // Act
+      rerender(<ItemDetailsDialog itemId="item-2" open={true} onOpenChange={vi.fn()} />);
+
+      // Assert
+      expect(screen.queryByRole('dialog', { name: 'Mark as Found' })).not.toBeInTheDocument();
+
+      // Act
+      openMarkAsFoundPrompt();
+      rerender(<ItemDetailsDialog itemId="item-2" open={false} onOpenChange={vi.fn()} />);
+      rerender(<ItemDetailsDialog itemId="item-2" open={true} onOpenChange={vi.fn()} />);
+
+      // Assert
+      expect(screen.queryByRole('dialog', { name: 'Mark as Found' })).not.toBeInTheDocument();
     });
   });
 
