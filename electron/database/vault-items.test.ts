@@ -248,6 +248,24 @@ describe('When vault item database operations are executed', () => {
       expect(flags.filter((flag) => flag === false)).toHaveLength(1);
     });
 
+    it('Then an exact fingerprint match claims the only scanned item so the moved-away identical row reads missing', () => {
+      // Arrange
+      const stayed = insertRuneRow('fp-stayed');
+      const moved = insertRuneRow('fp-moved-away');
+
+      // Act: a single El Rune is left, and it sits at the stayed row's spot
+      reconcileVaultItemsForScan(ctx, {
+        sourceFileType: 'd2i',
+        sourceFilePath: FILE,
+        presentFingerprints: ['fp-stayed'],
+        presentIdentityKeys: [runeKey],
+      });
+
+      // Assert
+      expect(getVaultItemById(ctx, stayed.id)?.isPresentInLatestScan).toBe(true);
+      expect(getVaultItemById(ctx, moved.id)?.isPresentInLatestScan).toBe(false);
+    });
+
     it('Then an exact fingerprint match is not stolen by a moved identical item', () => {
       // Arrange
       const stayed = insertRuneRow('fp-stayed');

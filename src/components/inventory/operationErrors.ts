@@ -15,10 +15,17 @@ function getMessage(error: unknown): string | undefined {
 /**
  * Backend refusals that mean the save file (or vault row) no longer matches what the view shows:
  * the explicit "Refresh the inventory" hints, the "<thing> not found in <save/stash/tab>" errors of
- * the save file editor, and a missing vault row. Unrelated "... not found: <id>" messages (for
- * example an unknown category) must keep the generic failure message.
+ * the save file editor (this includes a target stash tab that the file does not have, because the
+ * view then shows a layout the file no longer matches), a missing vault row and a vault row that
+ * was already unvaulted elsewhere. Other refusals (for example a bookmark that cannot be unvaulted)
+ * keep the generic failure message.
  */
-const STALE_ITEM_FRAGMENTS = ['Refresh the inventory', 'not found in', 'Vault item not found'];
+const STALE_ITEM_FRAGMENTS = [
+  'Refresh the inventory',
+  'not found in',
+  'Vault item not found',
+  'Vault item is not currently vaulted',
+];
 
 function includesAny(message: string | undefined, fragments: string[]): boolean {
   return message !== undefined && fragments.some((fragment) => message.includes(fragment));

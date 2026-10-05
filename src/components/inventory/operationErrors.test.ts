@@ -53,8 +53,23 @@ describe('When showInventoryOperationErrorToast is called', () => {
     ],
     ['the vault row was not found', new Error('Vault item not found'), messages.itemChanged],
     [
-      'an unrelated entity was not found',
-      new Error('Vault category not found: cat-1'),
+      'the target stash tab is missing from the file',
+      new Error('Stash tab 3 not found in modern stash (2 JM sectors)'),
+      messages.itemChanged,
+    ],
+    [
+      'the vault row is no longer vaulted',
+      new Error('Vault item is not currently vaulted'),
+      messages.itemChanged,
+    ],
+    [
+      'the vault row is already being unvaulted',
+      new Error('This vault item is already being unvaulted'),
+      messages.failed,
+    ],
+    [
+      'a grail bookmark is unvaulted',
+      new Error('A grail bookmark holds no item data and cannot be unvaulted into a save file'),
       messages.failed,
     ],
     ['the error is unknown', new Error('boom'), messages.failed],

@@ -885,6 +885,22 @@ describe('When vault IPC handlers are initialized', () => {
       });
     });
 
+    describe('If the row does not exist', () => {
+      it('Then it refuses with "Vault item not found" and writes nothing', async () => {
+        // Arrange
+        mocks.grailDatabaseMock.getVaultItemById.mockReturnValue(undefined);
+        const handler = getUnvaultHandler();
+
+        // Act
+        const promise = handler?.(null, 'missing-row', inventoryTarget);
+
+        // Assert
+        await expect(promise).rejects.toThrow('Vault item not found');
+        expect(mocks.saveFileEditorMock.addItemToSaveFile).not.toHaveBeenCalled();
+        expect(mocks.grailDatabaseMock.unvaultVaultItem).not.toHaveBeenCalled();
+      });
+    });
+
     describe('If the row is not vaulted anymore', () => {
       it('Then it does not write the item a second time', async () => {
         // Arrange
