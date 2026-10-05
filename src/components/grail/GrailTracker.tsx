@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useLayoutEffect } from 'react';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { startLoad, useGrailStatistics, useGrailStore } from '@/stores/grailStore';
 import { AdvancedSearch } from './AdvancedSearch';
@@ -21,8 +21,9 @@ export function GrailTracker() {
 
   const statistics = useGrailStatistics();
 
-  // Load initial data
-  useEffect(() => {
+  // Load initial data. A layout effect is used so the loading flag is set before the first paint;
+  // otherwise the empty store would briefly render the "no items" state before the spinner.
+  useLayoutEffect(() => {
     const loadData = async () => {
       try {
         // Load settings first (other UI may depend on it)

@@ -1,6 +1,7 @@
 import { act, render, screen, waitFor } from '@testing-library/react';
 import type { GrailStatistics, Settings } from 'electron/types/grail';
 import { GameMode, GameVersion } from 'electron/types/grail';
+import { useEffect } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useGrailStatistics, useGrailStore } from '@/stores/grailStore';
 import { GrailTracker } from './GrailTracker';
@@ -12,9 +13,20 @@ vi.mock('@/stores/grailStore', async (importOriginal) => ({
 vi.mock('./AdvancedSearch', () => ({
   AdvancedSearch: () => <div data-testid="advanced-search" />,
 }));
-vi.mock('./ItemGrid', () => ({
-  ItemGrid: () => <div data-testid="item-grid" />,
-}));
+const itemGridObservations = vi.hoisted(() => ({ loadingAtFirstEffect: [] as boolean[] }));
+vi.mock('./ItemGrid', async () => {
+  const { useGrailStore: store } = await import('@/stores/grailStore');
+  return {
+    ItemGrid: () => {
+      // Child passive effects flush after the first commit, before the parent's passive effects.
+      // This records the store loading flag as it is when the first committed render is painted.
+      useEffect(() => {
+        itemGridObservations.loadingAtFirstEffect.push(store.getState().loading);
+      }, []);
+      return <div data-testid="item-grid" />;
+    },
+  };
+});
 vi.mock('./ProgressSummary', () => ({
   ProgressSummary: ({
     statistics,
@@ -102,6 +114,7 @@ beforeEach(() => {
   testWindow.ipcRenderer = { on: vi.fn(), off: vi.fn() };
   vi.mocked(useGrailStatistics).mockReset();
   useGrailStore.setState(initialStoreState, true);
+  itemGridObservations.loadingAtFirstEffect.length = 0;
 });
 
 afterEach(() => {
@@ -170,6 +183,24 @@ describe('When GrailTracker mounts', () => {
       // Assert
       await waitFor(() => expect(useGrailStore.getState().loading).toBe(false));
       expect(getItems).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('If the store has no items yet when GrailTracker is first committed', () => {
+    it('Then the loading flag is already true before the first paint so the empty state does not flash', async () => {
+      // Arrange
+      const settingsDeferred = createDeferred<undefined>();
+      getSettings.mockReturnValue(settingsDeferred.promise);
+
+      // Act
+      render(<GrailTracker />);
+
+      settingsDeferred.resolve(undefined);
+      await waitFor(() => expect(useGrailStore.getState().loading).toBe(false));
+
+      // Assert
+      expect(useGrailStore.getState().items).toHaveLength(0);
+      expect(itemGridObservations.loadingAtFirstEffect).toEqual([true]);
     });
   });
 
