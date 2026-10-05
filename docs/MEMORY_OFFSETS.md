@@ -2,6 +2,42 @@
 
 This document contains memory offsets and configuration for Diablo II: Resurrected (D2R) memory reading functionality.
 
+## Current approach (read this first)
+
+> The pointer-chain description below is historical. Run detection now reads **one byte** (the
+> in-game flag: 0 = lobby, 1 = in a game) at a fixed offset from the `D2R.exe` base address.
+
+The offset is resolved in `MemoryReader.resolveInGameFlagOffset()`:
+
+1. **Known build** (`electron/config/d2rBuilds.ts`): the build is identified from the PE header
+   (`TimeDateStamp` + `SizeOfImage`), which is always readable, and the verified offset is used
+   directly. No code is scanned. If the flag byte does not read as 0/1 yet (D2R still starting),
+   the verified offset is retried rather than falling back to the scan.
+2. **Unknown build**: falls back to the d2go UI signature (`electron/config/d2rPatterns.ts`),
+   which is **unverified**. It stopped resolving to the right byte in current builds (see below),
+   so an unknown build usually means run detection does not work until it is added to the table.
+   The log says so: `Unknown D2R build (PE timestamp ..., image size ...)`.
+
+Why not just scan for the flag: in D2R 3.3 the code is obfuscated, roughly a quarter of the image
+is `PAGE_NOACCESS` at any moment (the page holding a signature may be unreadable), and the
+d2go signature `40 84 ed 0f 94 05` matches two instructions that write other fields. Neither match
+is the in-game flag, and the flag is not at a stable distance from them across game versions.
+
+### Adding a new build
+
+When a D2R patch breaks run detection and the log shows `Unknown D2R build`:
+
+1. Start D2R, then run `python scripts/d2r-find-ingame-flag.py` (Windows, no dependencies).
+2. While it runs: sit in the lobby, enter a game, stay 10-20 seconds, leave back to the lobby.
+3. The script prints the build identity and the bytes that behaved like the flag. The flag is the
+   one marked `<- 0->1->0 once` with a "longest 1" about as long as you stayed in the game.
+4. Add an entry to `KNOWN_D2R_BUILDS` with `timeDateStamp`, `sizeOfImage`, the file version and the
+   RVA (the `0x...` value from the script).
+5. Verify in the app: the log shows `Known D2R build <version> - using verified in-game flag offset`
+   and a run starts/ends as you enter/leave a game.
+
+D2R 3.3.93847 is the first entry (flag at RVA `0x1EBD158`, found this way).
+
 ## Architecture Overview
 
 The memory reading implementation uses a **3-level pointer chain architecture**:

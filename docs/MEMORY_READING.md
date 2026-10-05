@@ -234,6 +234,29 @@ D2R receives regular updates that may change memory layouts:
 - Users must use manual run controls (keyboard shortcuts) when auto mode cannot operate
 - Save file monitoring continues to run for **item detection only** (via SaveFileMonitor)
 
+## Offset Resolution
+
+The in-game flag offset is resolved in `MemoryReader.resolveInGameFlagOffset()`:
+
+- **Known builds** are identified from the PE header and use a verified offset
+  (`electron/config/d2rBuilds.ts`). See `docs/MEMORY_OFFSETS.md` ("Adding a new build").
+- **Unknown builds** fall back to the d2go UI signature (`40 84 ed 0f 94 05`), which is unverified
+  and no longer lands on the in-game flag in current builds.
+
+For the fallback scan to behave sensibly:
+
+- The module image is read into a **position-preserving** buffer (buffer index === RVA). Pages that
+  cannot be read stay zero-filled instead of being skipped; skipping them would shift every offset
+  found after the gap. Part of the image is `PAGE_NOACCESS`, so this matters.
+- The read is bounded by the module's real image size (`ModuleMemorySize`), not a fixed 100 MB.
+- The RIP-relative displacement is a **signed** 32-bit value.
+- Every pattern match is validated rather than trusting the first hit
+  (`electron/services/uiOffsetResolver.ts`): a candidate is accepted only if its flag byte reads
+  as 0 or 1 in the live process. The zero-filled snapshot is not used as evidence, since it cannot
+  tell an unreadable page apart from a zero byte. If no candidate qualifies, resolving is retried.
+- D2R is often still starting when the process is detected, so resolving offsets is **retried every
+  5 seconds** (up to 10 minutes) until it succeeds or D2R exits.
+
 ## Safety Considerations
 
 1. **Single-Player Only**: Memory reading should only be used for single-player mode
