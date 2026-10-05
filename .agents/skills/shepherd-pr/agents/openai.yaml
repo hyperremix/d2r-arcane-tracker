@@ -1,0 +1,4 @@
+interface:
+  display_name: "Shepherd PR"
+  short_description: "Coordinate PR fix and review agents until verified 5/5"
+  default_prompt: "Use $shepherd-pr to manage this PR with review and feedback sub-agents, commit and push fixes, post updated reviews, and keep monitoring until its current head has verified 5/5 merge confidence."
