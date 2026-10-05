@@ -105,6 +105,8 @@ function createGrailProgress(character: Character, event: ItemDetectionEvent): G
   };
 }
 
+// Manual rows are excluded: run_items.grail_progress_id cascades on delete, so
+// attaching a run item to a manual row would lose it when the row is removed.
 function findMatchingProgressForCharacter(
   existingProgress: GrailProgress[] | undefined,
   targetProgress: GrailProgress,
@@ -115,6 +117,7 @@ function findMatchingProgressForCharacter(
 
   return existingProgress.find(
     (progress) =>
+      !progress.manuallyAdded &&
       progress.characterId === targetProgress.characterId &&
       Boolean(progress.isEthereal) === Boolean(targetProgress.isEthereal),
   );
