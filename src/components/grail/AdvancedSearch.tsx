@@ -1,4 +1,5 @@
 import type { AdvancedGrailFilter, ItemCategory, ItemType } from 'electron/types/grail';
+import type { TFunction } from 'i18next';
 import {
   ArrowDownWideNarrow,
   ArrowUpNarrowWide,
@@ -34,7 +35,6 @@ type FoundStatus = 'all' | 'found' | 'missing';
 type SortBy = AdvancedGrailFilter['sortBy'];
 type SortOrder = AdvancedGrailFilter['sortOrder'];
 type GroupMode = 'none' | 'category' | 'type' | 'ethereal';
-type TranslateFn = (key: string, options?: Record<string, unknown>) => string;
 
 /**
  * Default sort configuration, matching the grail store defaults.
@@ -120,7 +120,7 @@ interface ActiveFilterChipsInput {
   foundStatus: FoundStatus;
   categories: ItemCategory[];
   types: ItemType[];
-  t: TranslateFn;
+  t: TFunction;
   onClearSearch: () => void;
   onClearStatus: () => void;
   onToggleCategory: (category: ItemCategory) => void;

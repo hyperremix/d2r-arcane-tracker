@@ -10,6 +10,7 @@ import { useGrailStore } from '@/stores/grailStore';
 import placeholderUrl from '/images/placeholder-item.png';
 import { RuneImages } from '../RuneImages';
 import { ItemTypeIcon } from '../StatusIcons';
+import { getTooltipTriggerRender } from '../tooltipTriggerRender';
 import { DiscoveryAttribution, DiscoveryInfo, StatusIndicators, VersionCounts } from './indicators';
 import { getCardStateClasses, interactiveCardStyles, missingArtworkStyles } from './styles';
 
@@ -18,7 +19,7 @@ import { getCardStateClasses, interactiveCardStyles, missingArtworkStyles } from
  */
 export type InteractiveCardProps = Pick<
   HTMLAttributes<HTMLDivElement>,
-  'role' | 'tabIndex' | 'aria-label' | 'onClick' | 'onKeyDown'
+  'role' | 'tabIndex' | 'aria-label' | 'onClick' | 'onKeyDown' | 'onKeyUp'
 >;
 
 /**
@@ -107,7 +108,10 @@ export function GridView({
   const { t } = useTranslation();
   const { settings } = useGrailStore();
   const isFound = allProgress.length > 0;
-  // Tooltip triggers are only taken out of the tab order when the card itself is the focusable button
+  // Tooltip triggers are only taken out of the tab order when the card itself is the focusable button.
+  // Trade-off: on clickable cards the tooltip content (name, status, character, recent find) is
+  // mouse-only by design: nested focusable elements are invalid inside a button, and keyboard and
+  // screen reader users reach the same details through the item details dialog the card opens.
   const focusableTriggers = !interactiveProps;
 
   return (
@@ -151,7 +155,7 @@ export function GridView({
             {/* Item Name (always full contrast, regardless of found state) */}
             <Tooltip>
               <TooltipTrigger
-                render={focusableTriggers ? undefined : <span />}
+                render={getTooltipTriggerRender(focusableTriggers)}
                 className="block w-full text-center"
               >
                 <h3 className="truncate font-semibold text-foreground text-sm leading-tight">

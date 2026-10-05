@@ -4,6 +4,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import type { RunewordCompletionStatus } from '@/lib/runeword-utils';
 import { cn } from '@/lib/utils';
 import placeholderUrl from '/images/placeholder-item.png';
+import { getTooltipTriggerRender } from './tooltipTriggerRender';
 
 interface RuneImagesProps {
   runeIds: string[];
@@ -138,7 +139,7 @@ export function RuneImages({
               isLoading={isLoading}
               showRuneName={showRuneNames}
               isMissing={missingRuneIndices.has(index)}
-              focusableTrigger={focusableTriggers}
+              focusableTriggers={focusableTriggers}
             />
           );
         })}
@@ -156,7 +157,7 @@ interface RuneImageProps {
   isLoading: boolean;
   showRuneName?: boolean;
   isMissing?: boolean;
-  focusableTrigger?: boolean;
+  focusableTriggers?: boolean;
 }
 
 function RuneImage({
@@ -165,12 +166,12 @@ function RuneImage({
   isLoading,
   showRuneName = false,
   isMissing = false,
-  focusableTrigger = true,
+  focusableTriggers = true,
 }: RuneImageProps) {
   return (
     <Tooltip>
       <TooltipTrigger
-        render={focusableTrigger ? undefined : <span />}
+        render={getTooltipTriggerRender(focusableTriggers)}
         className="relative flex items-center justify-center"
       >
         {isLoading ? (

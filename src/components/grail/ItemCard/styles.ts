@@ -1,9 +1,11 @@
+import type { ItemType } from 'electron/types/grail';
+
 /**
  * Border color mapping for different item types, for found and missing items.
  * Item type is conveyed by the border color and the type icon only; the card background
  * stays neutral so that text keeps full contrast.
  */
-export const typeBorderColors: Record<string, { found: string; missing: string }> = {
+export const typeBorderColors: Record<ItemType, { found: string; missing: string }> = {
   unique: {
     found: 'border-item-unique',
     missing: 'border-item-unique/60',
@@ -36,7 +38,7 @@ export const foundStateStyles = {
 /**
  * Returns the border and surface classes for an item card.
  */
-export function getCardStateClasses(itemType: string, isFound: boolean): string {
+export function getCardStateClasses(itemType: ItemType, isFound: boolean): string {
   const state = isFound ? 'found' : 'missing';
   return `${typeBorderColors[itemType]?.[state] ?? 'border-border'} ${foundStateStyles[state]}`;
 }

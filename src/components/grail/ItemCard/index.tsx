@@ -42,8 +42,6 @@ interface ItemCardProps {
   withoutStatusIndicators?: boolean;
 }
 
-export { typeBorderColors } from './styles';
-
 /**
  * ItemCard component that displays a Holy Grail item with its discovery status and information.
  * Supports both grid and list view modes, showing progress, character attribution, and version counts.
@@ -69,11 +67,22 @@ export const ItemCard = memo(function ItemCard({
   // Get character info for discoveries from both versions
   const discoveringCharacters = getDiscoveringCharacters(allProgress, characters);
 
-  // Handle keyboard events for accessibility
+  // Mirror native button activation: Enter activates on keydown, Space on keyup.
+  // Only react to keys pressed on the card itself, not bubbling from nested elements.
   const handleKeyDown = (event: React.KeyboardEvent) => {
-    // Only react to keys pressed on the card itself, not bubbling from nested elements
     if (event.target !== event.currentTarget) return;
-    if (event.key === 'Enter' || event.key === ' ') {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      onClick?.();
+    } else if (event.key === ' ') {
+      // Prevent page scroll; activation happens on keyup
+      event.preventDefault();
+    }
+  };
+
+  const handleKeyUp = (event: React.KeyboardEvent) => {
+    if (event.target !== event.currentTarget) return;
+    if (event.key === ' ') {
       event.preventDefault();
       onClick?.();
     }
@@ -92,6 +101,7 @@ export const ItemCard = memo(function ItemCard({
         }),
         onClick,
         onKeyDown: handleKeyDown,
+        onKeyUp: handleKeyUp,
       }
     : undefined;
 

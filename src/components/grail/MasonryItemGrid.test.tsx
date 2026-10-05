@@ -145,24 +145,25 @@ describe('MasonryItemGrid Column Count Calculation', () => {
         );
 
         // Assert
-        for (const columnWidth of columnWidths) {
-          expect(columnWidth).toBeGreaterThanOrEqual(MIN_COLUMN_WIDTH);
-          expect(columnWidth).toBeLessThanOrEqual(230);
-        }
+        expect(Math.min(...columnWidths)).toBeGreaterThanOrEqual(MIN_COLUMN_WIDTH);
+        expect(Math.max(...columnWidths)).toBeLessThanOrEqual(230);
       });
     });
 
     describe('If the container grows', () => {
       it('Then should never decrease the column count', () => {
         // Arrange
-        let previous = getColumnCount(300);
-
-        // Act & Assert
+        const widths: number[] = [];
         for (let width = 300; width <= 2560; width += 10) {
-          const current = getColumnCount(width);
-          expect(current).toBeGreaterThanOrEqual(previous);
-          previous = current;
+          widths.push(width);
         }
+
+        // Act
+        const columnCounts = widths.map((width) => getColumnCount(width));
+
+        // Assert
+        const decreases = columnCounts.filter((count, index) => count < columnCounts[index - 1]);
+        expect(decreases).toEqual([]);
       });
     });
   });

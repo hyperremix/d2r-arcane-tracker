@@ -323,35 +323,83 @@ describe('When ItemCard is rendered', () => {
       },
     );
 
-    it.each([
-      ['grid', 'Enter'],
-      ['grid', ' '],
-      ['list', 'Enter'],
-      ['list', ' '],
-    ] as const)('Then the %s card calls onClick on "%s" key', (viewMode, key) => {
+    it.each(['grid', 'list'] as const)(
+      'Then the %s card calls onClick once when Enter is pressed',
+      (viewMode) => {
+        // Arrange
+        const onClick = vi.fn();
+        const item = HolyGrailItemBuilder.new().withName('Pressable').build();
+        render(<ItemCard item={item} onClick={onClick} viewMode={viewMode} />);
+        const card = screen.getByRole('button', { name: 'Pressable, Not Found' });
+
+        // Act
+        fireEvent.keyDown(card, { key: 'Enter' });
+
+        // Assert
+        expect(onClick).toHaveBeenCalledTimes(1);
+      },
+    );
+
+    it.each(['grid', 'list'] as const)(
+      'Then the %s card calls onClick once when Space is released',
+      (viewMode) => {
+        // Arrange
+        const onClick = vi.fn();
+        const item = HolyGrailItemBuilder.new().withName('Pressable').build();
+        render(<ItemCard item={item} onClick={onClick} viewMode={viewMode} />);
+        const card = screen.getByRole('button', { name: 'Pressable, Not Found' });
+
+        // Act
+        fireEvent.keyDown(card, { key: ' ' });
+        fireEvent.keyUp(card, { key: ' ' });
+
+        // Assert
+        expect(onClick).toHaveBeenCalledTimes(1);
+      },
+    );
+
+    it.each(['grid', 'list'] as const)(
+      'Then the %s card does not call onClick on Space keydown alone and prevents page scroll',
+      (viewMode) => {
+        // Arrange
+        const onClick = vi.fn();
+        const item = HolyGrailItemBuilder.new().withName('Pressable').build();
+        render(<ItemCard item={item} onClick={onClick} viewMode={viewMode} />);
+        const card = screen.getByRole('button', { name: 'Pressable, Not Found' });
+
+        // Act
+        const notPrevented = fireEvent.keyDown(card, { key: ' ' });
+
+        // Assert
+        expect(onClick).not.toHaveBeenCalled();
+        expect(notPrevented).toBe(false);
+      },
+    );
+
+    it('Then does not call onClick when Enter is released', () => {
       // Arrange
       const onClick = vi.fn();
       const item = HolyGrailItemBuilder.new().withName('Pressable').build();
-      render(<ItemCard item={item} onClick={onClick} viewMode={viewMode} />);
+      render(<ItemCard item={item} onClick={onClick} />);
       const card = screen.getByRole('button', { name: 'Pressable, Not Found' });
 
       // Act
-      fireEvent.keyDown(card, { key });
+      fireEvent.keyUp(card, { key: 'Enter' });
 
       // Assert
-      expect(onClick).toHaveBeenCalledTimes(1);
+      expect(onClick).not.toHaveBeenCalled();
     });
 
-    it('Then does not call onClick on other keys', () => {
+    it.each(['Tab', 'Escape', 'a'])('Then does not call onClick on the "%s" key', (key) => {
       // Arrange
       const onClick = vi.fn();
       const item = HolyGrailItemBuilder.new().withName('Ignorable').build();
       render(<ItemCard item={item} onClick={onClick} />);
+      const card = screen.getByRole('button', { name: 'Ignorable, Not Found' });
 
       // Act
-      fireEvent.keyDown(screen.getByRole('button', { name: 'Ignorable, Not Found' }), {
-        key: 'Tab',
-      });
+      fireEvent.keyDown(card, { key });
+      fireEvent.keyUp(card, { key });
 
       // Assert
       expect(onClick).not.toHaveBeenCalled();
@@ -434,11 +482,11 @@ describe('When ItemCard is rendered', () => {
         );
 
         // Assert
-        const triggers = container.querySelectorAll('[data-slot="tooltip-trigger"]');
-        expect(triggers).toHaveLength(3);
-        for (const trigger of triggers) {
-          expect(trigger.tagName).toBe('BUTTON');
-        }
+        const triggerTagNames = Array.from(
+          container.querySelectorAll('[data-slot="tooltip-trigger"]'),
+          (trigger) => trigger.tagName,
+        );
+        expect(triggerTagNames).toEqual(['BUTTON', 'BUTTON', 'BUTTON']);
       },
     );
 
@@ -470,11 +518,11 @@ describe('When ItemCard is rendered', () => {
 
         // Assert
         const name = screen.getByText('Missing Item');
-        let element: HTMLElement | null = name;
-        while (element) {
-          expect(element.className).not.toMatch(/(^|\s)opacity-\d+/);
-          element = element.parentElement;
+        const ancestorsWithOpacity = [];
+        for (let element: HTMLElement | null = name; element; element = element.parentElement) {
+          if (/(^|\s)opacity-\d+/.test(element.className)) ancestorsWithOpacity.push(element);
         }
+        expect(ancestorsWithOpacity).toHaveLength(0);
         expect(name).toHaveClass('text-foreground');
       },
     );

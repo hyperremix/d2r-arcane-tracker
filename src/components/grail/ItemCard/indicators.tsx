@@ -6,6 +6,7 @@ import { translations } from '@/i18n/translations';
 import { isEtherealOnly, shouldShowEtherealStatus, shouldShowNormalStatus } from '@/lib/ethereal';
 import { cn, formatShortDate, isRecentFind } from '@/lib/utils';
 import { CharacterIcon, RecentDiscoveryIndicator } from '../StatusIcons';
+import { getTooltipTriggerRender } from '../tooltipTriggerRender';
 
 /**
  * Props interface for the DiscoveryInfo component.
@@ -132,7 +133,7 @@ export function StatusIndicators({
       <div className="-top-3 -right-3 absolute z-40">
         <RecentDiscoveryIndicator
           foundDate={mostRecentDiscovery.foundDate}
-          focusableTrigger={focusableTriggers}
+          focusableTriggers={focusableTriggers}
         />
       </div>
     );
@@ -157,7 +158,7 @@ export function StatusIndicators({
     <div className="-top-3 -right-3 absolute z-40">
       <Tooltip>
         {/* Rendered as a span inside an interactive card so it adds no nested tab stop */}
-        <TooltipTrigger render={focusableTriggers ? undefined : <span />} className="inline-flex">
+        <TooltipTrigger render={getTooltipTriggerRender(focusableTriggers)} className="inline-flex">
           {allVersionsFound ? (
             <CheckCheck className="h-5 w-5 rounded-full bg-background text-found" />
           ) : (
@@ -200,7 +201,7 @@ export function DiscoveryAttribution({
           character ? (
             <Tooltip key={`${character.id}-${item.id}-${index}`}>
               <TooltipTrigger
-                render={focusableTriggers ? undefined : <span />}
+                render={getTooltipTriggerRender(focusableTriggers)}
                 className="inline-flex"
               >
                 <CharacterIcon
