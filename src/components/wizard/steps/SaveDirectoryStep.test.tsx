@@ -50,6 +50,12 @@ function createElectronAPI(options: { hasUserData: boolean }): MockElectronAPI {
   };
 }
 
+// Assign instead of redefining: other test files in this shared (non-isolated) window define
+// `electronAPI` as a non-configurable property, which makes `Object.defineProperty` throw.
+function installElectronAPI(api: unknown): void {
+  (window as unknown as { electronAPI: unknown }).electronAPI = api;
+}
+
 describe('When SaveDirectoryStep is rendered', () => {
   const originalElectronAPI = window.electronAPI;
   let electronAPI: MockElectronAPI;
@@ -71,20 +77,12 @@ describe('When SaveDirectoryStep is rendered', () => {
       reloadData,
     } as unknown as ReturnType<typeof useGrailStore>);
     electronAPI = createElectronAPI({ hasUserData: true });
-    Object.defineProperty(window, 'electronAPI', {
-      value: electronAPI,
-      writable: true,
-      configurable: true,
-    });
+    installElectronAPI(electronAPI);
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
-    Object.defineProperty(window, 'electronAPI', {
-      value: originalElectronAPI,
-      writable: true,
-      configurable: true,
-    });
+    installElectronAPI(originalElectronAPI);
   });
 
   describe('If the user browses to a different directory while progress exists', () => {
@@ -145,11 +143,7 @@ describe('When SaveDirectoryStep is rendered', () => {
     it('Then the directory is applied without confirmation and grail data is reloaded', async () => {
       // Arrange
       electronAPI = createElectronAPI({ hasUserData: false });
-      Object.defineProperty(window, 'electronAPI', {
-        value: electronAPI,
-        writable: true,
-        configurable: true,
-      });
+      installElectronAPI(electronAPI);
       await renderStep();
 
       // Act
@@ -217,11 +211,7 @@ describe('When SaveDirectoryStep is rendered', () => {
       // Arrange
       electronAPI = createElectronAPI({ hasUserData: false });
       electronAPI.saveFile.updateSaveDirectory.mockRejectedValue(new Error('boom'));
-      Object.defineProperty(window, 'electronAPI', {
-        value: electronAPI,
-        writable: true,
-        configurable: true,
-      });
+      installElectronAPI(electronAPI);
       await renderStep();
 
       // Act
