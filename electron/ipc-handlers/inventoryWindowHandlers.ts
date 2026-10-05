@@ -1,19 +1,21 @@
 import { BrowserWindow, ipcMain } from 'electron';
 import type { InventorySnapshotWindowTarget, VaultSourceFileType } from '../types/grail';
+import { assert } from '../utils/assert';
+import { assertSaveFilePathAllowed } from '../utils/saveFilePathGuard';
+import { VALID_SOURCE_FILE_TYPES } from '../utils/vaultState';
 import { openInventorySnapshotWindow } from '../window/inventorySnapshotWindow';
 
-const VALID_SOURCE_FILE_TYPES = new Set<VaultSourceFileType>(['d2s', 'sss', 'd2x', 'd2i']);
 const VAULT_DRAG_STATE_CHANNEL = 'inventory:vault-drag-state';
 const INVENTORY_DRAG_STATE_CHANNEL = 'inventory:item-drag-state';
 
-type VaultDragStatePayload = {
+interface VaultDragStatePayload {
   active: boolean;
   id: string;
   gridWidth: number;
   gridHeight: number;
-};
+}
 
-type InventoryDragStatePayload = {
+interface InventoryDragStatePayload {
   active: boolean;
   fingerprint: string;
   sourceFilePath: string;
@@ -32,21 +34,15 @@ type InventoryDragStatePayload = {
   stackPickupMaxCount?: number;
   stackPickupItemName?: string;
   stackPickupIconFileName?: string;
-};
+}
 
-type ActiveDragStateSnapshot = {
+interface ActiveDragStateSnapshot {
   vault?: VaultDragStatePayload;
   inventory?: InventoryDragStatePayload;
-};
+}
 
 let activeVaultDragState: VaultDragStatePayload | undefined;
 let activeInventoryDragState: InventoryDragStatePayload | undefined;
-
-function assert(condition: boolean, message: string): void {
-  if (!condition) {
-    throw new Error(message);
-  }
-}
 
 function normalizeVaultDragStatePayload(payload: unknown): VaultDragStatePayload | undefined {
   if (!payload || typeof payload !== 'object') {
@@ -230,6 +226,7 @@ function sendActiveDragStateSnapshot(window: BrowserWindow): void {
 
 function validateSnapshotTarget(
   target: InventorySnapshotWindowTarget,
+  saveDirectory: string | undefined,
 ): InventorySnapshotWindowTarget {
   assert(target !== undefined && target !== null, 'Snapshot target is required');
 
@@ -249,6 +246,7 @@ function validateSnapshotTarget(
     typeof characterName === 'string' && characterName.length > 0,
     'characterName is required',
   );
+  assertSaveFilePathAllowed(sourceFilePath, saveDirectory, 'sourceFilePath');
 
   return {
     sourceFilePath,
@@ -261,6 +259,7 @@ export function initializeInventoryWindowHandlers(
   __dirname: string,
   viteDevServerUrl?: string,
   rendererDist?: string,
+  getSaveDirectory?: () => string | undefined,
 ): void {
   activeVaultDragState = undefined;
   activeInventoryDragState = undefined;
@@ -293,7 +292,7 @@ export function initializeInventoryWindowHandlers(
   ipcMain.handle(
     'inventory:openSnapshotWindow',
     async (_, target: InventorySnapshotWindowTarget): Promise<{ success: boolean }> => {
-      const validatedTarget = validateSnapshotTarget(target);
+      const validatedTarget = validateSnapshotTarget(target, getSaveDirectory?.());
       const snapshotWindow = openInventorySnapshotWindow(
         validatedTarget,
         __dirname,

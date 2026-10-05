@@ -101,6 +101,7 @@ interface MockGrailDatabase {
   getCharacterByName: ReturnType<typeof vi.fn>;
   getAllSaveFileStates: ReturnType<typeof vi.fn>;
   deleteSaveFileState: ReturnType<typeof vi.fn>;
+  reconcileVaultItemsForScan: ReturnType<typeof vi.fn>;
 }
 
 const createMockDatabase = (): MockGrailDatabase => ({
@@ -111,6 +112,7 @@ const createMockDatabase = (): MockGrailDatabase => ({
   getCharacterByName: vi.fn(),
   getAllSaveFileStates: vi.fn(),
   deleteSaveFileState: vi.fn(),
+  reconcileVaultItemsForScan: vi.fn(),
 });
 
 describe('When SaveFileMonitor is used', () => {
@@ -1602,6 +1604,140 @@ describe('When SaveFileMonitor is used', () => {
         expect.any(Object),
       );
       expect((monitor as any).inventorySnapshots).toHaveLength(2);
+    });
+
+    it('Then each successfully parsed file reconciles vault presence scoped to that file', async () => {
+      // Arrange
+      const snapshotA = {
+        snapshotId: 'a-new',
+        characterName: 'A',
+        sourceFileType: 'd2s',
+        sourceFilePath: '/test/save/dir/a.d2s',
+        capturedAt: new Date('2024-01-02T00:00:00.000Z'),
+        items: [{ fingerprint: 'fp-a-visible', isSocketedItem: false }],
+      };
+      vi.spyOn(monitor as any, 'filterFilesToParse').mockResolvedValue(['/test/save/dir/a.d2s']);
+      vi.spyOn(monitor as any, 'executeConcurrently').mockResolvedValue([
+        {
+          saveName: 'A',
+          success: true,
+          inventorySnapshot: snapshotA,
+          presentFingerprints: ['fp-a-visible', 'fp-a-socketed'],
+        },
+      ]);
+      vi.spyOn(monitor as any, 'emitSaveFileEvents').mockResolvedValue(undefined);
+
+      // Act
+      await (monitor as any).parseFiles(['/test/save/dir/a.d2s', '/test/save/dir/b.d2s'], false);
+
+      // Assert
+      expect(mockDatabase.reconcileVaultItemsForScan).toHaveBeenCalledTimes(1);
+      expect(mockDatabase.reconcileVaultItemsForScan).toHaveBeenCalledWith({
+        sourceFileType: 'd2s',
+        sourceFilePath: '/test/save/dir/a.d2s',
+        presentFingerprints: ['fp-a-visible', 'fp-a-socketed'],
+        lastSeenAt: snapshotA.capturedAt,
+      });
+    });
+
+    it('Then a file that failed to parse never marks its vault rows as missing', async () => {
+      // Arrange
+      vi.spyOn(monitor as any, 'filterFilesToParse').mockResolvedValue(['/test/save/dir/a.d2s']);
+      vi.spyOn(monitor as any, 'executeConcurrently').mockResolvedValue([
+        { saveName: 'A', success: false, inventorySnapshot: undefined },
+      ]);
+      vi.spyOn(monitor as any, 'emitSaveFileEvents').mockResolvedValue(undefined);
+
+      // Act
+      await (monitor as any).parseFiles(['/test/save/dir/a.d2s'], false);
+
+      // Assert
+      expect(mockDatabase.reconcileVaultItemsForScan).not.toHaveBeenCalled();
+    });
+
+    it('Then unchanged files are not reconciled when no file needs reparsing', async () => {
+      // Arrange
+      (monitor as any).inventorySnapshots = [
+        {
+          snapshotId: 'a-old',
+          characterName: 'A',
+          sourceFileType: 'd2s',
+          sourceFilePath: '/test/save/dir/a.d2s',
+          capturedAt: new Date('2024-01-01T00:00:00.000Z'),
+          items: [],
+        },
+      ];
+      vi.spyOn(monitor as any, 'filterFilesToParse').mockResolvedValue([]);
+
+      // Act
+      await (monitor as any).parseFiles(['/test/save/dir/a.d2s'], false);
+
+      // Assert
+      expect(mockDatabase.reconcileVaultItemsForScan).not.toHaveBeenCalled();
+    });
+
+    it('Then a reconciliation database error does not break the scan or the snapshots', async () => {
+      // Arrange
+      const snapshotA = {
+        snapshotId: 'a-new',
+        characterName: 'A',
+        sourceFileType: 'd2s',
+        sourceFilePath: '/test/save/dir/a.d2s',
+        capturedAt: new Date('2024-01-02T00:00:00.000Z'),
+        items: [{ fingerprint: 'fp-a', isSocketedItem: false }],
+      };
+      mockDatabase.reconcileVaultItemsForScan.mockImplementation(() => {
+        throw new Error('database is locked');
+      });
+      vi.spyOn(monitor as any, 'filterFilesToParse').mockResolvedValue(['/test/save/dir/a.d2s']);
+      vi.spyOn(monitor as any, 'executeConcurrently').mockResolvedValue([
+        { saveName: 'A', success: true, inventorySnapshot: snapshotA },
+      ]);
+      const emitSpy = vi.spyOn(monitor as any, 'emitSaveFileEvents').mockResolvedValue(undefined);
+
+      // Act
+      await (monitor as any).parseFiles(['/test/save/dir/a.d2s'], false);
+
+      // Assert
+      expect((monitor as any).inventorySnapshots).toHaveLength(1);
+      expect(emitSpy).toHaveBeenCalled();
+    });
+
+    it('Then processSingleFile reports the fingerprints of every item including socketed ones', async () => {
+      // Arrange
+      const saveDir = mkdtempSync(join(tmpdir(), 'save-monitor-'));
+      const savePath = join(saveDir, 'Hero.d2s');
+      writeFileSync(savePath, Buffer.from('mock file content'));
+      vi.spyOn(monitor as any, 'parseSave').mockResolvedValue([
+        {
+          fingerprint: 'fp-parent',
+          itemName: 'Shako',
+          characterName: 'Hero',
+          isSocketedItem: false,
+          rawParsedItem: { name: 'Shako' },
+        },
+        {
+          fingerprint: 'fp-socketed',
+          itemName: 'Ist Rune',
+          characterName: 'Hero',
+          isSocketedItem: true,
+          rawParsedItem: { name: 'Ist Rune' },
+        },
+      ]);
+      vi.spyOn(monitor as any, 'updateSaveFileState').mockResolvedValue(undefined);
+
+      // Act
+      const parseResult = await (monitor as any).processSingleFile(savePath, {
+        items: {},
+        ethItems: {},
+        stats: {},
+        availableRunes: {},
+      });
+      rmSync(saveDir, { recursive: true, force: true });
+
+      // Assert
+      expect(parseResult.presentFingerprints).toEqual(['fp-parent', 'fp-socketed']);
+      expect(parseResult.inventorySnapshot?.items).toHaveLength(1);
     });
 
     it('Then createFingerprint returns deterministic output for the same inputs', () => {

@@ -1029,6 +1029,7 @@ class SaveFileMonitor {
     saveName: string;
     success: boolean;
     inventorySnapshot?: CharacterInventorySnapshot;
+    presentFingerprints?: string[];
   }> {
     let saveName = this.getSaveNameFromPath(filePath);
 
@@ -1083,6 +1084,8 @@ class SaveFileMonitor {
       return {
         saveName,
         success: true,
+        // Includes socketed items, which the snapshot omits, so vault reconciliation sees every item.
+        presentFingerprints: inventoryItemsWithCharacter.map((item) => item.fingerprint),
         inventorySnapshot: {
           snapshotId: `${saveName}-${Date.now()}`,
           characterName: saveName,
@@ -1283,6 +1286,7 @@ class SaveFileMonitor {
     const successfulSnapshots = parseResults
       .filter((r) => r?.success && r.inventorySnapshot)
       .map((r) => r.inventorySnapshot as CharacterInventorySnapshot);
+    this.reconcileVaultPresence(parseResults);
     if (failedFiles.length > 0) {
       log.warn(
         'parseFiles',
@@ -1324,6 +1328,49 @@ class SaveFileMonitor {
       results,
     );
     log.info('parseFiles', `Complete - processed ${filesToParse.length} files`);
+  }
+
+  /**
+   * Updates the "present in latest scan" flag of vault rows for every save file that was parsed
+   * successfully in this scan.
+   *
+   * Only parsed files are reconciled (a failed or skipped file keeps its previous flags), and each
+   * reconciliation is scoped to that one file, so it can never mark rows from other files as
+   * missing. It only touches presence flags: vaulted state and item data are never modified.
+   * Errors are logged and swallowed so a database problem cannot break save file scanning.
+   *
+   * Limitation: fingerprints include the character name and item position. An item that moved (or
+   * a renamed character) therefore gets a new fingerprint, and its old vault row reads as missing.
+   * @private
+   */
+  private reconcileVaultPresence(
+    parseResults: Array<
+      | {
+          success: boolean;
+          inventorySnapshot?: CharacterInventorySnapshot;
+          presentFingerprints?: string[];
+        }
+      | undefined
+    >,
+  ): void {
+    for (const result of parseResults) {
+      const snapshot = result?.inventorySnapshot;
+      if (!result?.success || !snapshot) {
+        continue;
+      }
+
+      try {
+        this.grailDatabase?.reconcileVaultItemsForScan({
+          sourceFileType: snapshot.sourceFileType,
+          sourceFilePath: snapshot.sourceFilePath,
+          presentFingerprints:
+            result.presentFingerprints ?? snapshot.items.map((item) => item.fingerprint),
+          lastSeenAt: snapshot.capturedAt,
+        });
+      } catch (error) {
+        log.error('reconcileVaultPresence', error, { filePath: snapshot.sourceFilePath });
+      }
+    }
   }
 
   /**

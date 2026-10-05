@@ -9,6 +9,7 @@ import type {
   VaultItemUpsertInput,
 } from '../types/grail';
 import { isResourceStackFromRawJson, resolveStackCountFromRawJson } from '../utils/stackableItems';
+import { isCurrentlyVaulted } from '../utils/vaultState';
 import { dbVaultItemToVaultItem, fromISOString, toISOString } from './converters';
 import { schema } from './drizzle';
 import type { DatabaseContext } from './types';
@@ -16,12 +17,12 @@ import { getCategoryIdsByVaultItemIds, setVaultItemCategories } from './vault-ca
 
 const { vaultItems } = schema;
 
-type SearchClauses = {
+interface SearchClauses {
   clauses: string[];
   params: Array<string | number>;
-};
+}
 
-type RawVaultSearchRow = {
+interface RawVaultSearchRow {
   id: string;
   fingerprint: string;
   item_name: string;
@@ -51,7 +52,7 @@ type RawVaultSearchRow = {
   unvaulted_at: string | null;
   created_at: string | null;
   updated_at: string | null;
-};
+}
 
 function toBoolean(value: number | boolean | null | undefined): boolean {
   if (typeof value === 'boolean') {
@@ -233,14 +234,6 @@ export interface VaultAddResult {
   item: VaultItem;
   /** Puts the vault back into the state it had before this add (used when removing the source item fails). */
   undo: () => void;
-}
-
-function isCurrentlyVaulted(item: Pick<VaultItem, 'vaultedAt' | 'unvaultedAt'>): boolean {
-  if (!item.vaultedAt) {
-    return false;
-  }
-
-  return !item.unvaultedAt || item.unvaultedAt < item.vaultedAt;
 }
 
 function findVaultItemByFingerprint(ctx: DatabaseContext, fingerprint: string): VaultItem | null {
@@ -510,36 +503,63 @@ export function markVaultItemAsMissing(
     .run();
 }
 
+export interface VaultScanReconciliationInput {
+  sourceFileType: VaultItem['sourceFileType'];
+  /** The exact save file that was scanned. Only rows that came from this file are reconciled. */
+  sourceFilePath: string;
+  /** Fingerprints of every item found in `sourceFilePath` by the scan. */
+  presentFingerprints: string[];
+  lastSeenAt?: Date;
+}
+
+/**
+ * Updates `is_present_in_latest_scan` (and `last_seen_at` when an item reappears) for the vault rows
+ * that were taken from one scanned save file.
+ *
+ * Safety properties:
+ * - Only the presence flag and `last_seen_at` are written. Vaulted/unvaulted state, stack counts,
+ *   item data and categories are never modified, and no row is ever deleted.
+ * - The scope is the specific source file, so a scan of one stash/character can never mark rows
+ *   that came from another file as missing. Rows without a source file (bookmarks / tags) are
+ *   never touched.
+ * - Rows are only written when their presence flag changes, which keeps `updated_at` stable.
+ *
+ * Limitation: fingerprints include the character name and the item position, so an item that was
+ * moved (or a character that was renamed) gets a new fingerprint and its old row reads as missing.
+ */
 export function reconcileVaultItemsForScan(
   ctx: DatabaseContext,
-  scan: {
-    sourceFileType: 'd2s' | 'sss' | 'd2x' | 'd2i';
-    sourceCharacterId?: string;
-    sourceCharacterName?: string;
-    presentFingerprints: string[];
-    lastSeenAt?: Date;
-  },
+  scan: VaultScanReconciliationInput,
 ): void {
-  const presentSet = new Set(scan.presentFingerprints);
-  const filter = scan.sourceCharacterId
-    ? and(
-        eq(vaultItems.sourceFileType, scan.sourceFileType),
-        eq(vaultItems.sourceCharacterId, scan.sourceCharacterId),
-      )
-    : eq(vaultItems.sourceFileType, scan.sourceFileType);
+  if (typeof scan.sourceFilePath !== 'string' || scan.sourceFilePath.length === 0) {
+    return;
+  }
 
-  const existingRows = ctx.db.select().from(vaultItems).where(filter).all();
+  const presentSet = new Set(scan.presentFingerprints);
+  const existingRows = ctx.db
+    .select()
+    .from(vaultItems)
+    .where(
+      and(
+        eq(vaultItems.sourceFileType, scan.sourceFileType),
+        eq(vaultItems.sourceFilePath, scan.sourceFilePath),
+      ),
+    )
+    .all();
   const seenAt = toISOString(scan.lastSeenAt) ?? new Date().toISOString();
 
   const tx = ctx.rawDb.transaction(() => {
     for (const row of existingRows) {
       const isPresent = presentSet.has(row.fingerprint);
+      if (Boolean(row.isPresentInLatestScan) === isPresent) {
+        continue;
+      }
+
       ctx.db
         .update(vaultItems)
         .set({
           isPresentInLatestScan: isPresent,
-          lastSeenAt: isPresent ? seenAt : row.lastSeenAt,
-          sourceCharacterName: scan.sourceCharacterName ?? row.sourceCharacterName,
+          ...(isPresent && { lastSeenAt: seenAt }),
         })
         .where(eq(vaultItems.id, row.id))
         .run();

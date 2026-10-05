@@ -275,7 +275,12 @@ app.whenReady().then(() => {
   initializeDialogHandlers();
   initializeShellHandlers();
   initializeIconHandlers();
-  initializeInventoryWindowHandlers(__dirname, VITE_DEV_SERVER_URL, RENDERER_DIST);
+  initializeInventoryWindowHandlers(
+    __dirname,
+    VITE_DEV_SERVER_URL,
+    RENDERER_DIST,
+    () => getSaveFileMonitor()?.getSaveDirectory() ?? undefined,
+  );
   initializeTerrorZoneHandlers();
   initializeUpdateHandlers();
 

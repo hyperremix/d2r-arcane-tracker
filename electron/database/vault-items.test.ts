@@ -110,6 +110,7 @@ describe('When vault item database operations are executed', () => {
         rawItemJson: '{"seed":1}',
         sourceCharacterName: 'SorcOne',
         sourceFileType: 'd2s',
+        sourceFilePath: '/saves/SorcOne.d2s',
         locationContext: 'stash',
         lastSeenAt,
         isPresentInLatestScan: true,
@@ -118,7 +119,7 @@ describe('When vault item database operations are executed', () => {
       // Act
       reconcileVaultItemsForScan(ctx, {
         sourceFileType: 'd2s',
-        sourceCharacterName: 'SorcOne',
+        sourceFilePath: '/saves/SorcOne.d2s',
         presentFingerprints: [],
         lastSeenAt: new Date('2024-01-02T12:00:00.000Z'),
       });
@@ -130,6 +131,140 @@ describe('When vault item database operations are executed', () => {
       expect(reconciled?.isPresentInLatestScan).toBe(false);
       expect(reconciled?.lastSeenAt?.toISOString()).toBe(lastSeenAt.toISOString());
       expect(reconciled?.sourceCharacterName).toBe('SorcOne');
+    });
+  });
+
+  describe('If a missing item shows up again in a scan', () => {
+    it('Then reconciliation marks it present and refreshes its last-seen time', () => {
+      // Arrange
+      const saved = upsertVaultItemByFingerprint(ctx, {
+        fingerprint: 'fp-back',
+        itemName: 'Stone of Jordan',
+        quality: 'unique',
+        ethereal: false,
+        rawItemJson: '{"seed":1}',
+        sourceFileType: 'd2s',
+        sourceFilePath: '/saves/SorcOne.d2s',
+        locationContext: 'stash',
+        lastSeenAt: new Date('2024-01-01T12:00:00.000Z'),
+        isPresentInLatestScan: false,
+      });
+
+      // Act
+      reconcileVaultItemsForScan(ctx, {
+        sourceFileType: 'd2s',
+        sourceFilePath: '/saves/SorcOne.d2s',
+        presentFingerprints: ['fp-back'],
+        lastSeenAt: new Date('2024-01-03T12:00:00.000Z'),
+      });
+      const reconciled = getVaultItemById(ctx, saved.id);
+
+      // Assert
+      expect(reconciled?.isPresentInLatestScan).toBe(true);
+      expect(reconciled?.lastSeenAt?.toISOString()).toBe('2024-01-03T12:00:00.000Z');
+    });
+  });
+
+  describe('If a scan covers one stash file while vault rows exist for other files', () => {
+    it('Then rows from other files of the same file type and rows without a source file stay untouched', () => {
+      // Arrange
+      const baseRow = {
+        itemName: 'Item',
+        quality: 'unique',
+        ethereal: false,
+        rawItemJson: '{}',
+        sourceFileType: 'd2i' as const,
+        locationContext: 'stash' as const,
+        isPresentInLatestScan: true,
+      };
+      const scannedFile = upsertVaultItemByFingerprint(ctx, {
+        ...baseRow,
+        fingerprint: 'fp-scanned-file',
+        sourceFilePath: '/saves/SharedStashSoftCoreV2.d2i',
+      });
+      const otherFile = upsertVaultItemByFingerprint(ctx, {
+        ...baseRow,
+        fingerprint: 'fp-other-file',
+        sourceFilePath: '/saves/SharedStashHardCoreV2.d2i',
+      });
+      const bookmark = upsertVaultItemByFingerprint(ctx, {
+        ...baseRow,
+        fingerprint: 'grail:some-item',
+      });
+
+      // Act
+      reconcileVaultItemsForScan(ctx, {
+        sourceFileType: 'd2i',
+        sourceFilePath: '/saves/SharedStashSoftCoreV2.d2i',
+        presentFingerprints: [],
+      });
+
+      // Assert
+      expect(getVaultItemById(ctx, scannedFile.id)?.isPresentInLatestScan).toBe(false);
+      expect(getVaultItemById(ctx, otherFile.id)?.isPresentInLatestScan).toBe(true);
+      expect(getVaultItemById(ctx, bookmark.id)?.isPresentInLatestScan).toBe(true);
+    });
+  });
+
+  describe('If reconciliation runs against a vaulted item', () => {
+    it('Then only the presence flag changes and vault state and item data are preserved', () => {
+      // Arrange
+      const vaulted = addVaultItem(ctx, {
+        fingerprint: 'fp-vaulted',
+        itemName: 'Harlequin Crest',
+        quality: 'unique',
+        ethereal: false,
+        rawItemJson: '{"id":7}',
+        stackCount: 1,
+        sourceFileType: 'd2s',
+        sourceFilePath: '/saves/SorcOne.d2s',
+        locationContext: 'inventory',
+      });
+      addVaultCategory(ctx, { id: 'cat-keep', name: 'Keep' });
+      setVaultItemCategories(ctx, vaulted.id, ['cat-keep']);
+
+      // Act
+      reconcileVaultItemsForScan(ctx, {
+        sourceFileType: 'd2s',
+        sourceFilePath: '/saves/SorcOne.d2s',
+        presentFingerprints: [],
+      });
+      const reconciled = getVaultItemById(ctx, vaulted.id);
+
+      // Assert
+      expect(reconciled?.isPresentInLatestScan).toBe(false);
+      expect(reconciled?.vaultedAt?.toISOString()).toBe(vaulted.vaultedAt?.toISOString());
+      expect(reconciled?.unvaultedAt).toBeUndefined();
+      expect(reconciled?.rawItemJson).toBe('{"id":7}');
+      expect(reconciled?.stackCount).toBe(1);
+      expect(reconciled?.categoryIds).toEqual(['cat-keep']);
+    });
+  });
+
+  describe('If reconciliation is asked to scan without a source file', () => {
+    it('Then it changes nothing', () => {
+      // Arrange
+      const saved = upsertVaultItemByFingerprint(ctx, {
+        fingerprint: 'fp-no-path-scan',
+        itemName: 'Item',
+        quality: 'unique',
+        ethereal: false,
+        rawItemJson: '{}',
+        sourceFileType: 'd2s',
+        sourceFilePath: '/saves/SorcOne.d2s',
+        locationContext: 'stash',
+        isPresentInLatestScan: true,
+      });
+
+      // Act
+      reconcileVaultItemsForScan(ctx, {
+        sourceFileType: 'd2s',
+        sourceFilePath: '',
+        presentFingerprints: [],
+      });
+
+      // Assert
+      expect(getVaultItemById(ctx, saved.id)?.isPresentInLatestScan).toBe(true);
     });
   });
 

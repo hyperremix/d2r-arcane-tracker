@@ -288,13 +288,7 @@ class GrailDatabase {
   searchVaultItems(filter: VaultItemFilter): VaultItemSearchResult {
     return vaultItemsModule.searchVaultItems(this, filter);
   }
-  reconcileVaultItemsForScan(scan: {
-    sourceFileType: 'd2s' | 'sss' | 'd2x' | 'd2i';
-    sourceCharacterId?: string;
-    sourceCharacterName?: string;
-    presentFingerprints: string[];
-    lastSeenAt?: Date;
-  }): void {
+  reconcileVaultItemsForScan(scan: vaultItemsModule.VaultScanReconciliationInput): void {
     vaultItemsModule.reconcileVaultItemsForScan(this, scan);
   }
   setVaultItemsPresentInLatestScan(

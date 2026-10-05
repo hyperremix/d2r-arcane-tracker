@@ -26,7 +26,10 @@ import type {
   VaultLocationContext,
   VaultSourceFileType,
 } from '../types/grail';
+import { assert } from '../utils/assert';
+import { assertSaveFilePathAllowed } from '../utils/saveFilePathGuard';
 import { isResourceStackFromRawJson, resolveStackCountFromRawJson } from '../utils/stackableItems';
+import { isCurrentlyVaulted, VALID_SOURCE_FILE_TYPES } from '../utils/vaultState';
 
 const GRAIL_BOOKMARK_FINGERPRINT_PREFIX = 'grail:';
 const MAX_SEARCH_TEXT_LENGTH = 120;
@@ -39,7 +42,6 @@ const VALID_PRESENT_STATES = new Set(['all', 'present', 'missing']);
 const VALID_VAULTED_STATES = new Set(['all', 'vaulted', 'unvaulted']);
 const VALID_SORT_BY = new Set(['itemName', 'lastSeenAt', 'createdAt', 'updatedAt', 'vaultedAt']);
 const VALID_SORT_ORDER = new Set(['asc', 'desc']);
-const VALID_SOURCE_FILE_TYPES = new Set(['d2s', 'sss', 'd2x', 'd2i']);
 const VALID_LOCATION_CONTEXTS = new Set([
   'equipped',
   'inventory',
@@ -93,12 +95,6 @@ interface NormalizedSplitStackInput {
   targets: NormalizedSplitStackTarget[];
 }
 
-function assert(condition: boolean, message: string): asserts condition {
-  if (!condition) {
-    throw new Error(message);
-  }
-}
-
 function sanitizeFilter(filter?: VaultItemFilter): VaultItemFilter {
   const safeFilter = filter ?? {};
 
@@ -141,7 +137,7 @@ function sanitizeFilter(filter?: VaultItemFilter): VaultItemFilter {
   if (safeFilter.sortBy !== undefined) {
     assert(
       VALID_SORT_BY.has(safeFilter.sortBy),
-      'sortBy must be one of: itemName, lastSeenAt, createdAt, updatedAt',
+      'sortBy must be one of: itemName, lastSeenAt, createdAt, updatedAt, vaultedAt',
     );
   }
 
@@ -341,14 +337,6 @@ function isGrailBookmark(vaultItem: Pick<VaultItem, 'fingerprint'>): boolean {
   return vaultItem.fingerprint.startsWith(GRAIL_BOOKMARK_FINGERPRINT_PREFIX);
 }
 
-function isCurrentlyVaulted(vaultItem: Pick<VaultItem, 'vaultedAt' | 'unvaultedAt'>): boolean {
-  if (!vaultItem.vaultedAt) {
-    return false;
-  }
-
-  return !vaultItem.unvaultedAt || vaultItem.unvaultedAt < vaultItem.vaultedAt;
-}
-
 function normalizeCode(value: unknown): string | undefined {
   return typeof value === 'string' && value.trim() ? value.trim().toLowerCase() : undefined;
 }
@@ -406,8 +394,34 @@ async function removeSourceItemAfterVaultAdd(
   }
 }
 
-async function addVaultItemWithSafeSourceRemoval(item: VaultItemUpsertInput): Promise<VaultItem> {
+/**
+ * The directory the save file monitor watches. Renderer-supplied file paths must resolve to a save
+ * file inside it before they can be read or written.
+ */
+function resolveSaveDirectory(
+  getSaveFileMonitor: () => SaveFileMonitor | undefined,
+): string | undefined {
+  const monitorDirectory = getSaveFileMonitor()?.getSaveDirectory();
+  if (monitorDirectory) {
+    return monitorDirectory;
+  }
+
+  try {
+    return grailDatabase.getAllSettings().saveDir || undefined;
+  } catch (error) {
+    console.error('Failed to read the configured save directory', error);
+    return undefined;
+  }
+}
+
+async function addVaultItemWithSafeSourceRemoval(
+  item: VaultItemUpsertInput,
+  saveDirectory: string | undefined,
+): Promise<VaultItem> {
   const sourceFilePath = item.sourceFilePath?.trim();
+  if (sourceFilePath) {
+    assertSaveFilePathAllowed(sourceFilePath, saveDirectory, 'sourceFilePath');
+  }
   const sourceLocator = sourceFilePath ? resolveVaultSourceItemLocator(item) : undefined;
 
   if (sourceFilePath && sourceLocator) {
@@ -851,7 +865,10 @@ export function initializeVaultHandlers(
   ipcMain.handle('vault:addItem', async (_, item: VaultItemUpsertInput): Promise<VaultItem> => {
     const normalizedItem = normalizeVaultItemInput(item);
     validateVaultItemInput(normalizedItem);
-    return addVaultItemWithSafeSourceRemoval(normalizedItem);
+    return addVaultItemWithSafeSourceRemoval(
+      normalizedItem,
+      resolveSaveDirectory(getSaveFileMonitor),
+    );
   });
 
   ipcMain.handle('vault:removeItem', async (_, itemId: string): Promise<{ success: boolean }> => {
@@ -883,6 +900,11 @@ export function initializeVaultHandlers(
 
       if (targetOptions !== undefined) {
         validateUnvaultTargetOptions(targetOptions);
+        assertSaveFilePathAllowed(
+          targetOptions.targetFilePath.trim(),
+          resolveSaveDirectory(getSaveFileMonitor),
+          'targetOptions.targetFilePath',
+        );
       }
 
       await unvaultVaultItemSafely(itemId, targetOptions, resolveWithdrawCount(withdrawCount));
@@ -899,24 +921,23 @@ export function initializeVaultHandlers(
         categoryIds.every((id) => typeof id === 'string' && id.length > 0),
         'Each categoryId must be a non-empty string',
       );
+      assert(grailDatabase.getVaultItemById(itemId) != null, 'Vault item not found');
+      const knownCategoryIds = new Set(grailDatabase.getAllVaultCategories().map(({ id }) => id));
+      const unknownCategoryId = categoryIds.find((id) => !knownCategoryIds.has(id));
+      assert(unknownCategoryId === undefined, `Vault category not found: ${unknownCategoryId}`);
       grailDatabase.setVaultItemCategories(itemId, categoryIds);
       return { success: true };
     },
   );
 
-  ipcMain.handle(
-    'vault:listItems',
-    async (_, filter?: VaultItemFilter): Promise<VaultItemSearchResult> => {
-      return grailDatabase.searchVaultItems(sanitizeFilter(filter));
-    },
-  );
+  const searchVaultItems = async (
+    _: unknown,
+    filter?: VaultItemFilter,
+  ): Promise<VaultItemSearchResult> => grailDatabase.searchVaultItems(sanitizeFilter(filter));
 
-  ipcMain.handle(
-    'vault:search',
-    async (_, filter?: VaultItemFilter): Promise<VaultItemSearchResult> => {
-      return grailDatabase.searchVaultItems(sanitizeFilter(filter));
-    },
-  );
+  // `vault:listItems` and `vault:search` are public API names that share one implementation.
+  ipcMain.handle('vault:listItems', searchVaultItems);
+  ipcMain.handle('vault:search', searchVaultItems);
 
   ipcMain.handle(
     'vault:createCategory',
@@ -985,6 +1006,9 @@ export function initializeVaultHandlers(
     'inventory:moveItem',
     async (_, input: InventoryItemMoveInput): Promise<{ success: boolean }> => {
       const normalizedInput = normalizeInventoryMoveInput(input);
+      const saveDirectory = resolveSaveDirectory(getSaveFileMonitor);
+      assertSaveFilePathAllowed(normalizedInput.sourceFilePath, saveDirectory, 'sourceFilePath');
+      assertSaveFilePathAllowed(normalizedInput.targetFilePath, saveDirectory, 'targetFilePath');
       await assertGameNotRunning();
       await moveItemBetweenSaveFiles(normalizedInput);
       return { success: true };
@@ -995,6 +1019,11 @@ export function initializeVaultHandlers(
     'inventory:splitStack',
     async (_, input: InventoryStackSplitInput): Promise<{ success: boolean }> => {
       const normalizedInput = normalizeSplitStackInput(input);
+      const saveDirectory = resolveSaveDirectory(getSaveFileMonitor);
+      assertSaveFilePathAllowed(normalizedInput.sourceFilePath, saveDirectory, 'sourceFilePath');
+      for (const target of normalizedInput.targets) {
+        assertSaveFilePathAllowed(target.targetFilePath, saveDirectory, 'targetFilePath');
+      }
       await assertGameNotRunning();
       await splitStackInSaveFile(normalizedInput);
 
