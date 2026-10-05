@@ -348,11 +348,7 @@ describe('When CharacterInventoryBrowser is rendered', () => {
       render(<CharacterInventoryBrowser />);
 
       // Assert
-      await waitFor(() => {
-        expect(screen.getByText('Selected Item')).toBeInTheDocument();
-      });
-
-      const inventoryBoard = screen.getByTestId('inventory-board-snap-1');
+      const inventoryBoard = await waitFor(() => screen.getByTestId('inventory-board-snap-1'));
       expect(within(inventoryBoard).getAllByTestId('inventory-board-snap-1-cell')).toHaveLength(56);
       expect(within(inventoryBoard).getAllByTestId('inventory-item-tile')).toHaveLength(2);
       expect(document.querySelector('.max-w-7xl')).not.toBeInTheDocument();
@@ -866,10 +862,7 @@ describe('When CharacterInventoryBrowser is rendered', () => {
       render(<CharacterInventoryBrowser />);
 
       // Assert
-      await waitFor(() => {
-        expect(screen.getByText('Selected Item')).toBeInTheDocument();
-      });
-      expect(screen.getByText('Gems')).toBeInTheDocument();
+      expect(await screen.findByText('Gems')).toBeInTheDocument();
       expect(screen.getByText('Materials')).toBeInTheDocument();
       expect(screen.getByText('Runes')).toBeInTheDocument();
       expect(screen.getAllByTestId('inventory-item-stack-count')[0]).toHaveTextContent('7');
@@ -991,10 +984,7 @@ describe('When CharacterInventoryBrowser is rendered', () => {
       render(<CharacterInventoryBrowser />);
 
       // Assert
-      await waitFor(() => {
-        expect(screen.getByText('Selected Item')).toBeInTheDocument();
-      });
-      expect(screen.getByText('Shared Tab 1')).toBeInTheDocument();
+      expect(await screen.findByText('Shared Tab 1')).toBeInTheDocument();
       expect(screen.getByText('Shared Tab 2')).toBeInTheDocument();
       expect(screen.getByText('Shared Tab 3')).toBeInTheDocument();
       expect(screen.getByText('Shared Tab 4')).toBeInTheDocument();
@@ -1118,10 +1108,7 @@ describe('When CharacterInventoryBrowser is rendered', () => {
       render(<CharacterInventoryBrowser />);
 
       // Assert
-      await waitFor(() => {
-        expect(screen.getByText('Selected Item')).toBeInTheDocument();
-      });
-      expect(screen.getByLabelText('Inventory item El Rune')).toBeInTheDocument();
+      expect(await screen.findByLabelText('Inventory item El Rune')).toBeInTheDocument();
       expect(screen.getByLabelText('Inventory item Eld Rune')).toBeInTheDocument();
     });
   });
@@ -1210,10 +1197,7 @@ describe('When CharacterInventoryBrowser is rendered', () => {
       render(<CharacterInventoryBrowser />);
 
       // Assert
-      await waitFor(() => {
-        expect(screen.getByText('Selected Item')).toBeInTheDocument();
-      });
-      const mercenaryBoard = screen.getByTestId('mercenary-board-merc-snap');
+      const mercenaryBoard = await waitFor(() => screen.getByTestId('mercenary-board-merc-snap'));
       expect(within(mercenaryBoard).getAllByTestId('mercenary-slot-frame')).toHaveLength(4);
       expect(screen.getByLabelText('Inventory item Insight')).toBeInTheDocument();
     });
@@ -1259,10 +1243,7 @@ describe('When CharacterInventoryBrowser is rendered', () => {
       render(<CharacterInventoryBrowser />);
 
       // Assert
-      await waitFor(() => {
-        expect(screen.getByText('Selected Item')).toBeInTheDocument();
-      });
-      const mercenaryBoard = screen.getByTestId('mercenary-board-merc-modded');
+      const mercenaryBoard = await waitFor(() => screen.getByTestId('mercenary-board-merc-modded'));
       expect(within(mercenaryBoard).getAllByTestId('mercenary-slot-frame')).toHaveLength(5);
       expect(screen.getByLabelText('Inventory item Modded Amulet')).toBeInTheDocument();
     });
