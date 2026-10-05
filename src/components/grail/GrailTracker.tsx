@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { TooltipProvider } from '@/components/ui/tooltip';
-import { useGrailStatistics, useGrailStore } from '@/stores/grailStore';
+import { startLoad, useGrailStatistics, useGrailStore } from '@/stores/grailStore';
 import { AdvancedSearch } from './AdvancedSearch';
 import { ItemGrid } from './ItemGrid';
 import { ProgressSummary } from './ProgressSummary';
@@ -17,8 +17,7 @@ function getSettledValue<T>(result: PromiseSettledResult<T>, label: string): T |
  * @returns {JSX.Element} The main grail tracker interface with statistics and item grid
  */
 export function GrailTracker() {
-  const { setCharacters, setItems, setProgress, setLoading, hydrateSettings, settings } =
-    useGrailStore();
+  const { setCharacters, setItems, setProgress, hydrateSettings, settings } = useGrailStore();
 
   const statistics = useGrailStatistics();
 
@@ -60,9 +59,9 @@ export function GrailTracker() {
       }
     };
 
-    setLoading(true);
-    loadData().finally(() => setLoading(false));
-  }, [setCharacters, setItems, setProgress, setLoading, hydrateSettings]);
+    const finishLoad = startLoad();
+    loadData().finally(finishLoad);
+  }, [setCharacters, setItems, setProgress, hydrateSettings]);
 
   // Listen for grail progress updates from automatic detection
   useEffect(() => {

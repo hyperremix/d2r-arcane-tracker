@@ -17,16 +17,35 @@ import { useGrailStore } from '@/stores/grailStore';
  * The reasons the item grid can have nothing to display.
  * - `trackingDisabled`: both normal and ethereal grail tracking are turned off
  * - `noMatches`: items exist, but the active search/filters match none of them
+ * - `hiddenBySettings`: items exist and no filters are active, but the normal/ethereal tracking
+ *   settings hide all of them
  * - `loading`: items are still being loaded
  * - `noItems`: there are no items at all
  */
-export type ItemGridEmptyStateVariant = 'trackingDisabled' | 'noMatches' | 'loading' | 'noItems';
+export type ItemGridEmptyStateVariant =
+  | 'trackingDisabled'
+  | 'noMatches'
+  | 'hiddenBySettings'
+  | 'loading'
+  | 'noItems';
 
 /**
  * Props for the ItemGridEmptyState component.
  */
 interface ItemGridEmptyStateProps {
   variant: ItemGridEmptyStateVariant;
+}
+
+/**
+ * Inputs used to decide which empty state the item grid should display.
+ */
+interface ItemGridEmptyStateInput {
+  displayItemCount: number;
+  totalItemCount: number;
+  grailNormal: boolean;
+  grailEthereal: boolean;
+  hasActiveFilters: boolean;
+  loading: boolean;
 }
 
 /**
@@ -50,19 +69,12 @@ export function getItemGridEmptyStateVariant({
   grailEthereal,
   hasActiveFilters,
   loading,
-}: {
-  displayItemCount: number;
-  totalItemCount: number;
-  grailNormal: boolean;
-  grailEthereal: boolean;
-  hasActiveFilters: boolean;
-  loading: boolean;
-}): ItemGridEmptyStateVariant | undefined {
+}: ItemGridEmptyStateInput): ItemGridEmptyStateVariant | undefined {
   if (!grailNormal && !grailEthereal) return 'trackingDisabled';
   if (displayItemCount > 0) return undefined;
   if (totalItemCount === 0) return loading ? 'loading' : 'noItems';
   if (hasActiveFilters) return 'noMatches';
-  return 'noItems';
+  return 'hiddenBySettings';
 }
 
 /**
@@ -96,6 +108,16 @@ export function ItemGridEmptyState({ variant }: ItemGridEmptyStateProps) {
         onClick: resetFilters,
       },
     },
+    hiddenBySettings: {
+      icon: Settings,
+      title: t(translations.grail.itemGrid.emptyHiddenBySettingsTitle),
+      description: t(translations.grail.itemGrid.emptyHiddenBySettingsDescription),
+      action: {
+        label: t(translations.grail.itemGrid.openSettings),
+        icon: Settings,
+        onClick: () => navigate('/settings'),
+      },
+    },
     loading: {
       icon: Loader2Icon,
       title: t(translations.common.loading),
@@ -120,6 +142,8 @@ export function ItemGridEmptyState({ variant }: ItemGridEmptyStateProps) {
     <div
       data-testid="item-grid-empty-state"
       data-variant={variant}
+      role={variant === 'loading' ? 'status' : undefined}
+      aria-busy={variant === 'loading' ? true : undefined}
       className="flex flex-col items-center justify-center gap-3 px-6 py-16 text-center"
     >
       <Icon

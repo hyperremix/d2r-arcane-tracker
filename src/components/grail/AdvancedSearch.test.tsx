@@ -33,6 +33,7 @@ describe('When AdvancedSearch toolbar is rendered', () => {
 
   afterEach(() => {
     vi.useRealTimers();
+    resetStore();
   });
 
   describe('If no filters are active', () => {

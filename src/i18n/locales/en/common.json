@@ -111,6 +111,8 @@
       "emptyTrackingDisabledTitle": "Grail tracking is turned off",
       "emptyTrackingDisabledDescription": "Both normal and ethereal item tracking are disabled. Enable at least one in Settings to see your Holy Grail items.",
       "openSettings": "Open Settings",
+      "emptyHiddenBySettingsTitle": "No items match your tracking settings",
+      "emptyHiddenBySettingsDescription": "Your current normal and ethereal tracking settings hide all of the loaded items. Adjust them in Settings to see more items.",
       "emptyNoItemsTitle": "No items to show yet",
       "emptyNoItemsDescription": "Holy Grail items will appear here once they have been loaded."
     },

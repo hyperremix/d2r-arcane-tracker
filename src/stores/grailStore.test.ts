@@ -3,6 +3,7 @@ import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vites
 import { CharacterBuilder, GrailProgressBuilder, HolyGrailItemBuilder } from '@/fixtures';
 import {
   countActiveFilters,
+  startLoad,
   useFilteredItems,
   useGrailStatistics,
   useGrailStore,
@@ -57,10 +58,40 @@ const resetStoreState = () => {
   });
 };
 
+/**
+ * Resets the grail store fields exercised by these tests to their initial values.
+ * Tests share module state (isolate: false), so leaked state must be cleared explicitly.
+ */
+const resetFullStoreState = () => {
+  act(() => {
+    useGrailStore.setState({
+      characters: [],
+      items: [],
+      progress: [],
+      statistics: null,
+      filter: { foundStatus: 'all' },
+      filterResetCount: 0,
+      viewMode: 'grid',
+      groupMode: 'none',
+      loading: false,
+      error: null,
+      settings: {
+        ...useGrailStore.getState().settings,
+        grailNormal: true,
+        grailEthereal: false,
+        grailRunes: false,
+        grailRunewords: false,
+      },
+    });
+  });
+  resetStoreState();
+};
+
 describe('When useGrailStore is used', () => {
   beforeEach(() => {
     // Reset all mocks
     vi.clearAllMocks();
+    resetFullStoreState();
 
     // Reset store state
     act(() => {
@@ -82,6 +113,7 @@ describe('When useGrailStore is used', () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+    resetFullStoreState();
   });
 
   describe('If setting characters', () => {
@@ -477,6 +509,83 @@ describe('When useGrailStore is used', () => {
       expect(result.current.progress).toEqual(mockProgress);
       expect(result.current.loading).toBe(false);
       expect(result.current.error).toBeNull();
+    });
+  });
+
+  describe('If reloading data returns settings that disable rune and runeword tracking', () => {
+    afterEach(() => {
+      act(() => {
+        useGrailStore.getState().resetFilters();
+        useGrailStore.setState({
+          settings: {
+            ...useGrailStore.getState().settings,
+            grailRunes: false,
+            grailRunewords: false,
+          },
+        });
+      });
+    });
+
+    it('Then the unavailable type filters are pruned from the filter', async () => {
+      // Arrange
+      act(() => {
+        useGrailStore.setState({
+          settings: {
+            ...useGrailStore.getState().settings,
+            grailRunes: true,
+            grailRunewords: true,
+          },
+        });
+        useGrailStore.getState().setFilter({ types: ['unique', 'rune', 'runeword'] });
+      });
+      mockElectronAPI.grail.getSettings.mockResolvedValue({
+        grailRunes: false,
+        grailRunewords: true,
+      });
+      mockElectronAPI.grail.getCharacters.mockResolvedValue([]);
+      mockElectronAPI.grail.getItems.mockResolvedValue([]);
+      mockElectronAPI.grail.getProgress.mockResolvedValue([]);
+
+      // Act
+      await act(async () => {
+        await useGrailStore.getState().reloadData();
+      });
+
+      // Assert
+      expect(useGrailStore.getState().settings.grailRunes).toBe(false);
+      expect(useGrailStore.getState().filter.types).toEqual(['unique', 'runeword']);
+    });
+  });
+
+  describe('If several loads overlap', () => {
+    it('Then loading stays true until the last outstanding load finishes', async () => {
+      // Arrange
+      mockElectronAPI.grail.getSettings.mockResolvedValue(undefined);
+      mockElectronAPI.grail.getCharacters.mockResolvedValue(undefined);
+      mockElectronAPI.grail.getItems.mockResolvedValue(undefined);
+      mockElectronAPI.grail.getProgress.mockResolvedValue(undefined);
+      const finishFirst = startLoad();
+      const finishSecond = startLoad();
+
+      // Act
+      act(() => finishFirst());
+
+      // Assert
+      expect(useGrailStore.getState().loading).toBe(true);
+
+      // Act
+      await act(async () => {
+        await useGrailStore.getState().reloadData();
+      });
+
+      // Assert - reloadData finishing must not clear the flag while another load is pending
+      expect(useGrailStore.getState().loading).toBe(true);
+
+      // Act
+      act(() => finishSecond());
+
+      // Assert
+      expect(useGrailStore.getState().loading).toBe(false);
     });
   });
 

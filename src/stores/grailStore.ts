@@ -272,8 +272,9 @@ export const useGrailStore = create<GrailState>((set, get) => ({
 
   // Reload all data from database
   reloadData: async () => {
+    const finishLoad = startLoad();
     try {
-      set({ loading: true, error: null });
+      set({ error: null });
 
       // Load settings first
       const settingsData = await window.electronAPI?.grail.getSettings();
@@ -305,10 +306,33 @@ export const useGrailStore = create<GrailState>((set, get) => ({
       console.error('Failed to reload grail data:', error);
       set({ error: 'Failed to reload data' });
     } finally {
-      set({ loading: false });
+      finishLoad();
     }
   },
 }));
+
+/** Number of data loads (initial load, reloadData) that are currently in flight. */
+let pendingLoadCount = 0;
+
+/**
+ * Marks a data load as started and sets the store loading flag.
+ * The flag is only cleared once every load started this way has finished, so an earlier
+ * load completing cannot hide a later one that is still pending.
+ * @returns {() => void} A function that must be called exactly once when the load finishes
+ */
+export const startLoad = (): (() => void) => {
+  pendingLoadCount++;
+  useGrailStore.setState({ loading: true });
+  let finished = false;
+  return () => {
+    if (finished) return;
+    finished = true;
+    pendingLoadCount--;
+    if (pendingLoadCount === 0) {
+      useGrailStore.setState({ loading: false });
+    }
+  };
+};
 
 /**
  * Counts the number of user-facing filters that are currently narrowing the item list.

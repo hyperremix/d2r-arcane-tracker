@@ -716,6 +716,7 @@ describe('When ItemGrid component is rendered', () => {
         'loading',
       );
       expect(screen.getByText('Loading...')).toBeInTheDocument();
+      expect(screen.getByRole('status')).toHaveAttribute('aria-busy', 'true');
       expect(screen.queryByRole('button')).not.toBeInTheDocument();
     });
   });
@@ -736,6 +737,31 @@ describe('When ItemGrid component is rendered', () => {
       );
       expect(screen.getByText('No items to show yet')).toBeInTheDocument();
       expect(mockReloadData).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('If items are loaded but tracking settings hide all of them and no filters are active', () => {
+    it('Then renders the hidden-by-settings empty state with a link to Settings', () => {
+      // Arrange
+      const ethOnlyItems = HolyGrailItemBuilder.new().withEtherealType('only').buildMany(3);
+      setupComponentMocks({
+        filteredItems: ethOnlyItems,
+        settings: { grailNormal: true, grailEthereal: false },
+      });
+      render(<ItemGrid />);
+
+      // Act
+      fireEvent.click(screen.getByRole('button', { name: 'Open Settings' }));
+
+      // Assert
+      expect(screen.getByTestId('item-grid-empty-state')).toHaveAttribute(
+        'data-variant',
+        'hiddenBySettings',
+      );
+      expect(screen.getByText('No items match your tracking settings')).toBeInTheDocument();
+      expect(screen.queryByText('No items to show yet')).not.toBeInTheDocument();
+      expect(screen.queryByRole('status')).not.toBeInTheDocument();
+      expect(mockNavigate).toHaveBeenCalledWith('/settings');
     });
   });
 

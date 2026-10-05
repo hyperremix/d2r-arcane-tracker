@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import type { GrailStatistics, Settings } from 'electron/types/grail';
 import { GameMode, GameVersion } from 'electron/types/grail';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -173,8 +173,8 @@ describe('When GrailTracker mounts', () => {
     });
   });
 
-  describe('If the initial data load rejects', () => {
-    it('Then the store loading flag is reset to false', async () => {
+  describe('If the settings call rejects during the initial data load', () => {
+    it('Then the error is logged and the store loading flag is reset to false', async () => {
       // Arrange
       const settingsDeferred = createDeferred<undefined>();
       getSettings.mockReturnValue(settingsDeferred.promise);
@@ -195,19 +195,58 @@ describe('When GrailTracker mounts', () => {
   });
 
   describe('If one of the parallel data calls rejects', () => {
-    it('Then the remaining data is applied and the loading flag is reset to false', async () => {
+    it('Then the remaining data is applied and the loading flag is reset once the load settles', async () => {
       // Arrange
-      getItems.mockRejectedValue(new Error('items failed'));
+      const itemsDeferred = createDeferred<never[]>();
+      getItems.mockReturnValue(itemsDeferred.promise);
       getCharacters.mockResolvedValue([]);
       getProgress.mockResolvedValue([]);
 
       // Act
       render(<GrailTracker />);
+      await waitFor(() => expect(getItems).toHaveBeenCalledTimes(1));
+
+      // Assert
+      expect(useGrailStore.getState().loading).toBe(true);
+
+      // Act
+      itemsDeferred.reject(new Error('items failed'));
 
       // Assert
       await waitFor(() => expect(useGrailStore.getState().loading).toBe(false));
       expect(console.error).toHaveBeenCalledWith('Failed to load items:', expect.any(Error));
       expect(getProgress).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('If a second load starts while the first initial load is still pending', () => {
+    it('Then the loading flag stays true until the last outstanding load finishes', async () => {
+      // Arrange
+      const firstSettings = createDeferred<undefined>();
+      const secondSettings = createDeferred<undefined>();
+      getSettings
+        .mockReturnValueOnce(firstSettings.promise)
+        .mockReturnValueOnce(secondSettings.promise);
+      const first = render(<GrailTracker />);
+      first.unmount();
+      render(<GrailTracker />);
+
+      // Act
+      firstSettings.resolve(undefined);
+      await waitFor(() => expect(getItems).toHaveBeenCalledTimes(1));
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      });
+
+      // Assert
+      expect(useGrailStore.getState().loading).toBe(true);
+
+      // Act
+      secondSettings.resolve(undefined);
+
+      // Assert
+      await waitFor(() => expect(useGrailStore.getState().loading).toBe(false));
+      expect(getItems).toHaveBeenCalledTimes(2);
     });
   });
 });
