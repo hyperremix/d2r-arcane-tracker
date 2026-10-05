@@ -20,16 +20,16 @@ interface SessionDetailViewProps {
   onBack: () => void;
 }
 
-/**
- * SessionDetailView component that displays detailed information about a specific session
- * including session stats, notes, controls (if active), and the list of runs.
- */
 const TIME_FORMAT_OPTIONS: Intl.DateTimeFormatOptions = {
   hour: '2-digit',
   minute: '2-digit',
   second: '2-digit',
 };
 
+/**
+ * SessionDetailView component that displays detailed information about a specific session
+ * including session stats, notes, controls (if active), and the list of runs.
+ */
 export function SessionDetailView({ sessionId, onBack }: SessionDetailViewProps) {
   const { t, i18n } = useTranslation();
   const {
