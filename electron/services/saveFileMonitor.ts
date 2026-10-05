@@ -40,6 +40,14 @@ const log = createServiceLogger('SaveFileMonitor');
 /** 'parsed' = the whole file was read; 'skipped' = filtered out by game mode; 'errored' = parse error swallowed. */
 type SaveParseStatus = 'parsed' | 'skipped' | 'errored';
 
+interface SingleFileParseResult {
+  saveName: string;
+  success: boolean;
+  inventorySnapshot?: CharacterInventorySnapshot;
+  presentFingerprints?: string[];
+  parseStatus?: SaveParseStatus;
+}
+
 const SUPPORTED_SAVE_EXTENSIONS = new Set(['.d2s', '.sss', '.d2x', '.d2i']);
 const MODERN_STASH_MIN_VERSION = 105;
 
@@ -1023,25 +1031,18 @@ class SaveFileMonitor {
    * @private
    * @param {string} filePath - Path to the save file.
    * @param {FileReaderResponse} results - Results object to update.
-   * @returns {Promise<{saveName: string, success: boolean}>} Parse result with save name and success status.
+   * @returns {Promise<SingleFileParseResult>} Parse result with save name, success status and snapshot data.
    */
   private async processSingleFile(
     filePath: string,
     results: FileReaderResponse,
-  ): Promise<{
-    saveName: string;
-    success: boolean;
-    inventorySnapshot?: CharacterInventorySnapshot;
-    presentFingerprints?: string[];
-    parseStatus?: SaveParseStatus;
-  }> {
+  ): Promise<SingleFileParseResult> {
     let saveName = this.getSaveNameFromPath(filePath);
 
     try {
       const buffer = await readFile(filePath);
       const extension = extname(filePath).toLowerCase();
       let sourceFileVersion: number | undefined;
-      const readOnly = false;
 
       if (extension === '.d2i') {
         try {
@@ -1103,7 +1104,7 @@ class SaveFileMonitor {
           sourceFileType: extension.replace('.', '') as VaultSourceFileType,
           sourceFilePath: filePath,
           sourceFileVersion,
-          readOnly,
+          readOnly: false,
           capturedAt: new Date(),
           items: snapshotItems,
         },
@@ -1353,17 +1354,7 @@ class SaveFileMonitor {
    * a renamed character) therefore gets a new fingerprint, and its old vault row reads as missing.
    * @private
    */
-  private reconcileVaultPresence(
-    parseResults: Array<
-      | {
-          success: boolean;
-          inventorySnapshot?: CharacterInventorySnapshot;
-          presentFingerprints?: string[];
-          parseStatus?: SaveParseStatus;
-        }
-      | undefined
-    >,
-  ): void {
+  private reconcileVaultPresence(parseResults: Array<SingleFileParseResult | undefined>): void {
     for (const result of parseResults) {
       const snapshot = result?.inventorySnapshot;
       // Only a completed parse proves which items are gone. A skipped (game mode) or errored

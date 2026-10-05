@@ -11,12 +11,12 @@ const GEM_AND_MATERIAL_CODES = new Set(
   [...gems, ...materials].map((entry) => entry.code.trim().toLowerCase()),
 );
 
-type RawItemJson = {
+interface RawItemJson {
   code?: unknown;
   type?: unknown;
   quantity?: unknown;
   magic_attributes?: Array<{ id?: unknown; values?: unknown[] }>;
-};
+}
 
 function parseRawItem(rawItemJson: string): RawItemJson | undefined {
   try {

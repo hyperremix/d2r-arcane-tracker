@@ -16,10 +16,10 @@ import { constants105Extended, resolveStackCount, SHARED_TAB_COUNT } from './mod
 import { backupSaveFile } from './saveFileBackup';
 import { readD2iMetadata } from './stashFormat';
 
-type StashConstants = {
+interface StashConstants {
   constants: d2sTypes.IConstantData;
   version: number;
-};
+}
 
 interface MoveSaveFileItemOptions {
   sourceFilePath: string;
@@ -79,25 +79,25 @@ async function assertWritableStashMutationTarget(
   assertWritableD2iBuffer(extname(filePath), buffer);
 }
 
-type ConstantItemDefinition = {
+interface ConstantItemDefinition {
   c?: unknown;
   mind?: unknown;
   maxd?: unknown;
   min2d?: unknown;
   max2d?: unknown;
-};
+}
 
-type ConstantDataWithItems = {
+interface ConstantDataWithItems {
   armor_items?: Record<string, ConstantItemDefinition>;
   weapon_items?: Record<string, ConstantItemDefinition>;
   other_items?: Record<string, ConstantItemDefinition>;
-};
+}
 
-type ItemEquipMetadata = {
+interface ItemEquipMetadata {
   categories?: Set<string>;
   hasOneHandDamage: boolean;
   hasTwoHandDamage: boolean;
-};
+}
 
 type EquipValidationCode =
   | 'INVALID_SLOT'

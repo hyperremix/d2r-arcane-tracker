@@ -4,19 +4,19 @@ import { translations } from '@/i18n/translations';
 
 type TranslateFn = (key: string, options?: Record<string, unknown>) => string;
 
-type ParsedBaseDamage = {
+interface ParsedBaseDamage {
   mindam?: unknown;
   maxdam?: unknown;
   twohandmindam?: unknown;
   twohandmaxdam?: unknown;
-};
+}
 
-type ParsedMagicAttribute = {
+interface ParsedMagicAttribute {
   description?: unknown;
   visible?: unknown;
-};
+}
 
-type ParsedSocketedRawItem = {
+interface ParsedSocketedRawItem {
   runeword_name?: unknown;
   unique_name?: unknown;
   set_name?: unknown;
@@ -29,9 +29,9 @@ type ParsedSocketedRawItem = {
   type?: unknown;
   code?: unknown;
   inv_file?: unknown;
-};
+}
 
-type ParsedRawItem = {
+interface ParsedRawItem {
   runeword_name?: unknown;
   unique_name?: unknown;
   set_name?: unknown;
@@ -60,7 +60,7 @@ type ParsedRawItem = {
   level_req?: unknown;
   requiredlvl?: unknown;
   displayed_combined_magic_attributes?: unknown;
-};
+}
 
 export interface GameItemTooltipSocketEntry {
   id: string;

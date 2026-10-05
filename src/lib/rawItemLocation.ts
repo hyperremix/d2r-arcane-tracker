@@ -12,7 +12,7 @@ export interface RawItemLocation {
 
 type ItemWithRawJson = Pick<ParsedInventoryItem | VaultItem, 'rawItemJson'>;
 
-type ParsedRawItem = {
+interface ParsedRawItem {
   location_id?: unknown;
   alt_position_id?: unknown;
   equipped_id?: unknown;
@@ -20,7 +20,7 @@ type ParsedRawItem = {
   position_y?: unknown;
   inv_width?: unknown;
   inv_height?: unknown;
-};
+}
 
 function toOptionalNumber(value: unknown): number | undefined {
   return typeof value === 'number' && Number.isFinite(value) ? value : undefined;

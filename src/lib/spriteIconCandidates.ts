@@ -5,7 +5,7 @@ type SpatialIconItemLike = Pick<
   'iconFileName' | 'grailItemId' | 'itemCode' | 'itemName' | 'rawItemJson'
 >;
 
-type RawItemShape = {
+interface RawItemShape {
   inv_file?: unknown;
   unique_name?: unknown;
   set_name?: unknown;
@@ -13,7 +13,7 @@ type RawItemShape = {
   name?: unknown;
   code?: unknown;
   type?: unknown;
-};
+}
 
 export interface SpriteIconLookupIndex {
   byItemId: Map<string, string>;

@@ -6,9 +6,9 @@ const iconCache = new Map<string, string>();
 const PLACEHOLDER_ICON_URL = placeholderUrl;
 type IconFilenameInput = string | string[];
 
-type UseSpriteIconOptions = {
+interface UseSpriteIconOptions {
   forceEnabled?: boolean;
-};
+}
 
 function basename(input: string): string {
   const segments = input.split(/[\\/]/);
