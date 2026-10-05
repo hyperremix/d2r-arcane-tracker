@@ -1,6 +1,6 @@
-import { fireEvent, render, screen, within } from '@testing-library/react';
-import { createMemoryRouter, RouterProvider, useLocation } from 'react-router';
-import { describe, expect, it, vi } from 'vitest';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { createBrowserRouter, createMemoryRouter, RouterProvider, useLocation } from 'react-router';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { TitleBar } from './TitleBar';
 
 vi.mock('./grail/NotificationButton', () => ({
@@ -20,11 +20,31 @@ function renderTitleBar(initialPath = '/') {
     </>
   );
   const router = createMemoryRouter(
-    ['/', '/statistics', '/runs', '/runewords', '/terror-zones', '/settings'].map((path) => ({
-      path,
-      element: layout,
-    })),
+    ['/', '/statistics', '/runs', '/runs/:id', '/runewords', '/terror-zones', '/settings'].map(
+      (path) => ({
+        path,
+        element: layout,
+      }),
+    ),
     { initialEntries: [initialPath] },
+  );
+  return render(<RouterProvider router={router} />);
+}
+
+/**
+ * Renders the title bar on a browser router so that `window.history` (which the
+ * back/forward buttons read) reflects real navigation.
+ */
+function renderTitleBarWithBrowserHistory(initialPath: string) {
+  window.history.replaceState(undefined, '', initialPath);
+  const layout = (
+    <>
+      <TitleBar />
+      <LocationProbe />
+    </>
+  );
+  const router = createBrowserRouter(
+    ['/', '/statistics', '/runs'].map((path) => ({ path, element: layout })),
   );
   return render(<RouterProvider router={router} />);
 }
@@ -34,6 +54,10 @@ function getNavigation() {
 }
 
 describe('When TitleBar is rendered', () => {
+  afterEach(() => {
+    window.history.replaceState(undefined, '', '/');
+  });
+
   it('Then it exposes a labeled navigation landmark with a link per destination', () => {
     // Arrange & Act
     renderTitleBar();
@@ -111,5 +135,48 @@ describe('When TitleBar is rendered', () => {
       'page',
     );
     expect(within(nav).getByRole('link', { name: 'Grail' })).not.toHaveAttribute('aria-current');
+  });
+
+  it('If the current route is a nested path like /runs/123, then the Runs link stays active', () => {
+    // Arrange & Act
+    renderTitleBar('/runs/123');
+
+    // Assert
+    const nav = getNavigation();
+    expect(within(nav).getByRole('link', { name: 'Runs' })).toHaveAttribute('aria-current', 'page');
+    expect(within(nav).getByRole('link', { name: 'Grail' })).not.toHaveAttribute('aria-current');
+  });
+
+  it('If the current route is /runs, then the root Grail link is not active', () => {
+    // Arrange & Act
+    renderTitleBar('/runs');
+
+    // Assert
+    expect(within(getNavigation()).getByRole('link', { name: 'Grail' })).not.toHaveAttribute(
+      'aria-current',
+    );
+  });
+
+  it('If the user navigates to a new route, then back is enabled and after going back forward is enabled', async () => {
+    // Arrange
+    renderTitleBarWithBrowserHistory('/');
+    const nav = getNavigation();
+    const back = screen.getByRole('button', { name: 'Go back' });
+    const forward = screen.getByRole('button', { name: 'Go forward' });
+
+    // Act - navigate to a new route
+    fireEvent.click(within(nav).getByRole('link', { name: 'Statistics' }));
+
+    // Assert - back is enabled, forward is not
+    await waitFor(() => expect(back).toBeEnabled());
+    expect(forward).toBeDisabled();
+
+    // Act - go back
+    fireEvent.click(back);
+
+    // Assert - now at the start, so back is disabled and forward is enabled
+    await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent('/'));
+    await waitFor(() => expect(forward).toBeEnabled());
+    expect(back).toBeDisabled();
   });
 });

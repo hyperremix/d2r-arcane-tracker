@@ -395,7 +395,7 @@ export function NotificationButton() {
               {activeNotifications.map((notification) => (
                 <li
                   key={notification.id}
-                  className={`relative ${!notification.seen ? 'rounded-lg ring-2 ring-blue-200 dark:ring-blue-800' : ''}`}
+                  className={`relative ${!notification.seen ? 'rounded-lg ring-2 ring-primary/30' : ''}`}
                 >
                   <ItemCard
                     item={notification.grailItem}

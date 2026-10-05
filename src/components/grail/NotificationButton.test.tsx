@@ -155,4 +155,31 @@ describe('When NotificationButton is rendered', () => {
       screen.queryByRole('button', { name: 'Dismiss notification for Shako' }),
     ).not.toBeInTheDocument();
   });
+
+  it('If the popover opens, then focus moves into it and returns to the bell when it closes', async () => {
+    // Arrange
+    await renderNotificationButton();
+    const bell = screen.getByRole('button', { name: 'Notifications' });
+    bell.focus();
+
+    // Act - open
+    fireEvent.click(bell);
+
+    // Assert - focus is inside the popup
+    const dialog = await screen.findByRole('dialog');
+    await waitFor(() => {
+      expect(dialog).toContainElement(document.activeElement as HTMLElement);
+    });
+
+    // Act - close via keyboard
+    fireEvent.keyDown(document.activeElement ?? document.body, { key: 'Escape' });
+
+    // Assert - focus returns to the bell
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    });
+    await waitFor(() => {
+      expect(bell).toHaveFocus();
+    });
+  });
 });
