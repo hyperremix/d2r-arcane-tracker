@@ -33,20 +33,21 @@ interface ListArtworkProps {
   item: Item;
   isFound: boolean;
   showItemIcons: boolean;
+  focusableTriggers: boolean;
 }
 
 /**
  * Renders the item icon, rune images or type icon for a list row.
  * Artwork is dimmed and grayscale while the item is missing.
  */
-function ListArtwork({ item, isFound, showItemIcons }: ListArtworkProps) {
+function ListArtwork({ item, isFound, showItemIcons, focusableTriggers }: ListArtworkProps) {
   const { iconUrl, isLoading } = useItemIcon(item);
 
   if (item.type === 'runeword' && item.runes && item.runes.length > 0) {
     return (
       <div className="relative flex-shrink-0">
         <div data-testid="item-artwork" className={cn(!isFound && missingArtworkStyles)}>
-          <RuneImages runeIds={item.runes} viewMode="list" focusableTriggers={false} />
+          <RuneImages runeIds={item.runes} viewMode="list" focusableTriggers={focusableTriggers} />
         </div>
         <ItemTypeIcon type={item.type} className="-right-2 -bottom-1 absolute h-4 w-4" />
       </div>
@@ -100,6 +101,8 @@ export function ListView({
 }: ListViewProps) {
   const { settings } = useGrailStore();
   const isFound = allProgress.length > 0;
+  // Tooltip triggers are only taken out of the tab order when the row itself is the focusable button
+  const focusableTriggers = !interactiveProps;
 
   return (
     <TooltipProvider>
@@ -115,7 +118,12 @@ export function ListView({
         )}
       >
         {/* Item Icon, Rune Images, or Type Icon */}
-        <ListArtwork item={item} isFound={isFound} showItemIcons={settings.showItemIcons} />
+        <ListArtwork
+          item={item}
+          isFound={isFound}
+          showItemIcons={settings.showItemIcons}
+          focusableTriggers={focusableTriggers}
+        />
 
         {/* Status indicators */}
         {!withoutStatusIndicators && (
@@ -125,12 +133,16 @@ export function ListView({
             normalProgress={normalProgress}
             etherealProgress={etherealProgress}
             settings={settings}
+            focusableTriggers={focusableTriggers}
           />
         )}
 
         {/* Item Name (always full contrast, regardless of found state) */}
         <Tooltip>
-          <TooltipTrigger render={<span />} className="block flex-1 truncate text-left">
+          <TooltipTrigger
+            render={focusableTriggers ? undefined : <span />}
+            className="block flex-1 truncate text-left"
+          >
             <h3 className="truncate font-semibold text-foreground text-sm">{item.name}</h3>
           </TooltipTrigger>
           <TooltipContent side="top" className="max-w-sm">
@@ -150,7 +162,11 @@ export function ListView({
 
         {/* Character attribution */}
         {allProgress.length > 0 && (
-          <DiscoveryAttribution discoveringCharacters={discoveringCharacters} item={item} />
+          <DiscoveryAttribution
+            discoveringCharacters={discoveringCharacters}
+            item={item}
+            focusableTriggers={focusableTriggers}
+          />
         )}
 
         {/* Version counts */}

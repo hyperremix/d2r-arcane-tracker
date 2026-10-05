@@ -12,8 +12,16 @@ vi.mock('@/hooks/useItemIcon', () => ({
 }));
 vi.mock('/images/placeholder-item.png', () => ({ default: '/mock-placeholder.png' }));
 vi.mock('./RuneImages', () => ({
-  RuneImages: ({ runeIds }: { runeIds: string[] }) => (
-    <div data-testid="rune-images">{runeIds.join(',')}</div>
+  RuneImages: ({
+    runeIds,
+    focusableTriggers = true,
+  }: {
+    runeIds: string[];
+    focusableTriggers?: boolean;
+  }) => (
+    <div data-testid="rune-images" data-focusable-triggers={String(focusableTriggers)}>
+      {runeIds.join(',')}
+    </div>
   ),
 }));
 vi.mock('./StatusIcons', () => ({
@@ -373,6 +381,21 @@ describe('When ItemCard is rendered', () => {
       const card = screen.getByRole('button', { name: 'Nested, Found' });
       expect(card.querySelectorAll('button, [tabindex]:not([tabindex="-1"])')).toHaveLength(0);
     });
+
+    it('Then rune tooltip triggers are not focusable on a runeword card', () => {
+      // Arrange
+      const item = HolyGrailItemBuilder.new()
+        .withType('runeword')
+        .withRunewordSubCategory('runewords')
+        .build();
+      (item as { runes: string[] }).runes = ['r01', 'r02'];
+
+      // Act
+      render(<ItemCard item={item} onClick={vi.fn()} />);
+
+      // Assert
+      expect(screen.getByTestId('rune-images')).toHaveAttribute('data-focusable-triggers', 'false');
+    });
   });
 
   describe('If onClick is not provided', () => {
@@ -384,7 +407,54 @@ describe('When ItemCard is rendered', () => {
       render(<ItemCard item={item} />);
 
       // Assert
-      expect(screen.queryByRole('button', { name: /Static/ })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Static, Not Found' })).not.toBeInTheDocument();
+    });
+
+    it.each(['grid', 'list'] as const)(
+      'Then the %s card keeps item, status and character tooltip triggers keyboard focusable',
+      (viewMode) => {
+        // Arrange
+        const item = HolyGrailItemBuilder.new().withId('item-1').withName('Static').build();
+        const normalProgress = GrailProgressBuilder.new()
+          .withCharacterId('char-1')
+          .withItemId('item-1')
+          .withFoundDate(new Date('2020-01-01T00:00:00Z'))
+          .asNormal()
+          .build();
+        const characters = [CharacterBuilder.new().withId('char-1').withName('Char').build()];
+
+        // Act
+        const { container } = render(
+          <ItemCard
+            item={item}
+            normalProgress={[normalProgress]}
+            characters={characters}
+            viewMode={viewMode}
+          />,
+        );
+
+        // Assert
+        const triggers = container.querySelectorAll('[data-slot="tooltip-trigger"]');
+        expect(triggers).toHaveLength(3);
+        for (const trigger of triggers) {
+          expect(trigger.tagName).toBe('BUTTON');
+        }
+      },
+    );
+
+    it('Then rune tooltip triggers stay focusable on a runeword card', () => {
+      // Arrange
+      const item = HolyGrailItemBuilder.new()
+        .withType('runeword')
+        .withRunewordSubCategory('runewords')
+        .build();
+      (item as { runes: string[] }).runes = ['r01', 'r02'];
+
+      // Act
+      render(<ItemCard item={item} />);
+
+      // Assert
+      expect(screen.getByTestId('rune-images')).toHaveAttribute('data-focusable-triggers', 'true');
     });
   });
 

@@ -108,6 +108,7 @@ export interface StatusIndicatorsProps {
   normalProgress: GrailProgress[];
   etherealProgress: GrailProgress[];
   settings: Settings;
+  focusableTriggers?: boolean;
 }
 
 /**
@@ -119,6 +120,7 @@ export function StatusIndicators({
   normalProgress,
   etherealProgress,
   settings,
+  focusableTriggers = true,
 }: StatusIndicatorsProps) {
   const { t } = useTranslation();
   if (
@@ -128,7 +130,10 @@ export function StatusIndicators({
   ) {
     return (
       <div className="-top-3 -right-3 absolute z-40">
-        <RecentDiscoveryIndicator foundDate={mostRecentDiscovery.foundDate} />
+        <RecentDiscoveryIndicator
+          foundDate={mostRecentDiscovery.foundDate}
+          focusableTrigger={focusableTriggers}
+        />
       </div>
     );
   }
@@ -151,8 +156,8 @@ export function StatusIndicators({
   return (
     <div className="-top-3 -right-3 absolute z-40">
       <Tooltip>
-        {/* Rendered as a span: tooltips inside the interactive card must not add extra tab stops */}
-        <TooltipTrigger render={<span />} className="inline-flex">
+        {/* Rendered as a span inside an interactive card so it adds no nested tab stop */}
+        <TooltipTrigger render={focusableTriggers ? undefined : <span />} className="inline-flex">
           {allVersionsFound ? (
             <CheckCheck className="h-5 w-5 rounded-full bg-background text-found" />
           ) : (
@@ -173,12 +178,17 @@ export function StatusIndicators({
 export interface DiscoveryAttributionProps {
   discoveringCharacters: Character[];
   item: Item;
+  focusableTriggers?: boolean;
 }
 
 /**
  * DiscoveryAttribution component that displays character icons showing who found the item.
  */
-export function DiscoveryAttribution({ discoveringCharacters, item }: DiscoveryAttributionProps) {
+export function DiscoveryAttribution({
+  discoveringCharacters,
+  item,
+  focusableTriggers = true,
+}: DiscoveryAttributionProps) {
   const { t } = useTranslation();
   return (
     <div className="flex items-center justify-center gap-1 pt-3">
@@ -189,7 +199,10 @@ export function DiscoveryAttribution({ discoveringCharacters, item }: DiscoveryA
         {discoveringCharacters.slice(0, 2).map((character, index) =>
           character ? (
             <Tooltip key={`${character.id}-${item.id}-${index}`}>
-              <TooltipTrigger render={<span />} className="inline-flex">
+              <TooltipTrigger
+                render={focusableTriggers ? undefined : <span />}
+                className="inline-flex"
+              >
                 <CharacterIcon
                   characterClass={character.characterClass}
                   className="text-muted-foreground"

@@ -44,12 +44,13 @@ interface GridArtworkProps {
   item: Item;
   isFound: boolean;
   showItemIcons: boolean;
+  focusableTriggers: boolean;
 }
 
 /**
  * Renders the item icon or rune images for a grid card, dimmed and grayscale while missing.
  */
-function GridArtwork({ item, isFound, showItemIcons }: GridArtworkProps) {
+function GridArtwork({ item, isFound, showItemIcons, focusableTriggers }: GridArtworkProps) {
   const { iconUrl, isLoading } = useItemIcon(item);
 
   if (item.type === 'runeword' && item.runes && item.runes.length > 0) {
@@ -58,7 +59,7 @@ function GridArtwork({ item, isFound, showItemIcons }: GridArtworkProps) {
         data-testid="item-artwork"
         className={cn('mx-auto mb-2 flex justify-center', !isFound && missingArtworkStyles)}
       >
-        <RuneImages runeIds={item.runes} focusableTriggers={false} />
+        <RuneImages runeIds={item.runes} focusableTriggers={focusableTriggers} />
       </div>
     );
   }
@@ -106,6 +107,8 @@ export function GridView({
   const { t } = useTranslation();
   const { settings } = useGrailStore();
   const isFound = allProgress.length > 0;
+  // Tooltip triggers are only taken out of the tab order when the card itself is the focusable button
+  const focusableTriggers = !interactiveProps;
 
   return (
     <TooltipProvider>
@@ -129,6 +132,7 @@ export function GridView({
               normalProgress={normalProgress}
               etherealProgress={etherealProgress}
               settings={settings}
+              focusableTriggers={focusableTriggers}
             />
           )}
 
@@ -137,11 +141,19 @@ export function GridView({
             <ItemTypeIcon type={item.type} className="absolute top-2 left-2" />
 
             {/* Item Icon or Rune Images */}
-            <GridArtwork item={item} isFound={isFound} showItemIcons={settings.showItemIcons} />
+            <GridArtwork
+              item={item}
+              isFound={isFound}
+              showItemIcons={settings.showItemIcons}
+              focusableTriggers={focusableTriggers}
+            />
 
             {/* Item Name (always full contrast, regardless of found state) */}
             <Tooltip>
-              <TooltipTrigger render={<span />} className="block w-full text-center">
+              <TooltipTrigger
+                render={focusableTriggers ? undefined : <span />}
+                className="block w-full text-center"
+              >
                 <h3 className="truncate font-semibold text-foreground text-sm leading-tight">
                   {item.name}
                 </h3>
@@ -172,7 +184,11 @@ export function GridView({
 
             {/* Discovery attribution */}
             {allProgress.length > 0 && (
-              <DiscoveryAttribution discoveringCharacters={discoveringCharacters} item={item} />
+              <DiscoveryAttribution
+                discoveringCharacters={discoveringCharacters}
+                item={item}
+                focusableTriggers={focusableTriggers}
+              />
             )}
 
             {/* Version counts */}
