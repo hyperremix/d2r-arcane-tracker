@@ -130,7 +130,7 @@ export function GridView({
 
             {/* Set specific info */}
             {item.setName && (
-              <p className="truncate text-center font-medium text-found text-xs">
+              <p className="truncate text-center font-medium text-item-set text-xs">
                 {t(translations.grail.itemCard.setName, { name: item.setName })}
               </p>
             )}
