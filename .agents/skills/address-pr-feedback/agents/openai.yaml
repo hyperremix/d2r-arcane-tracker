@@ -1,0 +1,5 @@
+interface:
+  display_name: "Address PR Feedback"
+  short_description: "Apply the newest PR feedback on the current branch"
+  default_prompt: "Use $address-pr-feedback to implement every suggestion from the newest PR feedback on my current branch."
+

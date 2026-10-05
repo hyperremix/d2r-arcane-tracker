@@ -40,7 +40,8 @@ sign-*.sh
 # IDE and editor files
 .vscode/
 .idea/
-.claude/
+.claude/*
+!.claude/skills/
 *.swp
 *.swo
 *~
@@ -81,3 +82,13 @@ coverage
 FEATURES.md
 IMPROVEMENTS.md
 BUGS.md
+
+# Agent Skills
+# Installed from skills.sh and pinned in skills-lock.json; restore with `bunx skills experimental_install`.
+# Locally maintained skills and the .claude/skills symlinks are committed.
+.agents/skills/*
+!.agents/skills/README.md
+!.agents/skills/address-pr-feedback/
+!.agents/skills/pr-review/
+!.agents/skills/resolving-merge-conflicts/
+!.agents/skills/shepherd-pr/
