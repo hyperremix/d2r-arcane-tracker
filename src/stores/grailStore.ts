@@ -53,6 +53,7 @@ interface GrailState {
   hydrateSettings: (settings: Partial<Settings>) => void;
   setFilter: (filter: Partial<GrailFilter>) => void;
   setAdvancedFilter: (filter: Partial<AdvancedGrailFilter>) => void;
+  resetFilters: () => void;
   setViewMode: (mode: 'grid' | 'list') => void;
   setGroupMode: (mode: 'none' | 'category' | 'type' | 'ethereal') => void;
   setLoading: (loading: boolean) => void;
@@ -190,6 +191,7 @@ export const useGrailStore = create<GrailState>((set, get) => ({
     set((state) => ({
       advancedFilter: { ...state.advancedFilter, ...filterUpdate },
     })),
+  resetFilters: () => set({ filter: defaultFilter, advancedFilter: defaultAdvancedFilter }),
   setViewMode: (viewMode) => set({ viewMode }),
   setGroupMode: (groupMode) => set({ groupMode }),
   setLoading: (loading) => set({ loading }),
@@ -280,6 +282,21 @@ export const useGrailStore = create<GrailState>((set, get) => ({
     }
   },
 }));
+
+/**
+ * Counts the number of user-facing filters that are currently narrowing the item list.
+ * Sorting and fuzzy-search mode are not counted since they never hide items on their own.
+ * @param {GrailFilter} filter - The current grail filter
+ * @returns {number} The number of active filters
+ */
+export const countActiveFilters = (filter: GrailFilter): number => {
+  let count = 0;
+  if (filter.searchTerm) count++;
+  if (filter.categories && filter.categories.length > 0) count++;
+  if (filter.types && filter.types.length > 0) count++;
+  if (filter.foundStatus && filter.foundStatus !== 'all') count++;
+  return count;
+};
 
 /**
  * Checks if an item matches the specified categories filter.

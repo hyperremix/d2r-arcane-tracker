@@ -63,6 +63,7 @@ function setupStoreMock(settingsOverrides: Partial<Settings> = {}) {
     setCharacters: vi.fn(),
     setItems: vi.fn(),
     setProgress: vi.fn(),
+    setLoading: vi.fn(),
     hydrateSettings: vi.fn(),
   };
   vi.mocked(useGrailStore).mockReturnValue(

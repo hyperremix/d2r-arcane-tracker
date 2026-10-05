@@ -1,8 +1,10 @@
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import type { Settings } from 'electron/types/grail';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useGrailStore } from '@/stores/grailStore';
 import { AdvancedSearch } from './AdvancedSearch';
+
+const SEARCH_DEBOUNCE_MS = 150;
 
 const initialStoreState = useGrailStore.getState();
 
@@ -27,6 +29,10 @@ function openFiltersPopover() {
 describe('When AdvancedSearch toolbar is rendered', () => {
   beforeEach(() => {
     resetStore();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   describe('If no filters are active', () => {
@@ -56,16 +62,67 @@ describe('When AdvancedSearch toolbar is rendered', () => {
   });
 
   describe('If user types in the search input', () => {
-    it('Then updates the search term in the store', () => {
+    it('Then updates the input immediately and the store searchTerm after the debounce', () => {
       // Arrange
+      vi.useFakeTimers();
       render(<AdvancedSearch />);
+      const input = screen.getByLabelText('Search');
 
       // Act
+      fireEvent.change(input, { target: { value: 'Shako' } });
+      const searchTermBeforeDebounce = useGrailStore.getState().filter.searchTerm;
+      act(() => {
+        vi.advanceTimersByTime(SEARCH_DEBOUNCE_MS);
+      });
+
+      // Assert
+      expect(input).toHaveValue('Shako');
+      expect(searchTermBeforeDebounce).toBeUndefined();
+      expect(useGrailStore.getState().filter.searchTerm).toBe('Shako');
+    });
+  });
+
+  describe('If user types and the component unmounts before the debounce elapses', () => {
+    it('Then commits the pending search term to the store', () => {
+      // Arrange
+      vi.useFakeTimers();
+      const { unmount } = render(<AdvancedSearch />);
       fireEvent.change(screen.getByLabelText('Search'), { target: { value: 'Shako' } });
+
+      // Act
+      unmount();
 
       // Assert
       expect(useGrailStore.getState().filter.searchTerm).toBe('Shako');
+    });
+  });
+
+  describe('If filters are set and the component remounts', () => {
+    it('Then the controls reflect the store filter state', () => {
+      // Arrange
+      vi.useFakeTimers();
+      const { unmount } = render(<AdvancedSearch />);
+      fireEvent.change(screen.getByLabelText('Search'), { target: { value: 'Shako' } });
+      act(() => {
+        vi.advanceTimersByTime(SEARCH_DEBOUNCE_MS);
+      });
+      fireEvent.click(screen.getByRole('button', { name: 'Missing' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Fuzzy Search' }));
+
+      // Act — simulate navigating away and back
+      unmount();
+      render(<AdvancedSearch />);
+
+      // Assert
       expect(screen.getByLabelText('Search')).toHaveValue('Shako');
+      expect(screen.getByRole('button', { name: 'Missing' })).toHaveAttribute(
+        'aria-pressed',
+        'true',
+      );
+      expect(screen.getByRole('button', { name: 'Fuzzy Search' })).toHaveAttribute(
+        'aria-pressed',
+        'true',
+      );
     });
   });
 
@@ -82,6 +139,22 @@ describe('When AdvancedSearch toolbar is rendered', () => {
       // Assert
       expect(screen.getByLabelText('Search')).toHaveValue('Windforce');
       expect(screen.getByRole('button', { name: 'Found' })).toHaveAttribute('aria-pressed', 'true');
+    });
+
+    it('Then clears the search input if the store filters are reset', () => {
+      // Arrange
+      useGrailStore.getState().setFilter({ searchTerm: 'Shako', categories: ['armor'] });
+      render(<AdvancedSearch />);
+      expect(screen.getByLabelText('Search')).toHaveValue('Shako');
+
+      // Act
+      act(() => {
+        useGrailStore.getState().resetFilters();
+      });
+
+      // Assert
+      expect(screen.getByLabelText('Search')).toHaveValue('');
+      expect(screen.queryByRole('list', { name: 'Active filters' })).not.toBeInTheDocument();
     });
   });
 
@@ -265,14 +338,31 @@ describe('When AdvancedSearch toolbar is rendered', () => {
 
       // Assert
       const { filter, advancedFilter } = useGrailStore.getState();
-      expect(filter).toEqual(
-        expect.objectContaining({ searchTerm: '', foundStatus: 'all', categories: [], types: [] }),
-      );
+      expect(filter).toEqual({ foundStatus: 'all' });
       expect(advancedFilter).toEqual(
         expect.objectContaining({ sortBy: 'found_date', sortOrder: 'desc', fuzzySearch: false }),
       );
       expect(screen.getByLabelText('Search')).toHaveValue('');
       expect(screen.queryByRole('button', { name: 'Clear all' })).not.toBeInTheDocument();
+    });
+
+    it('Then discards a search edit that is still pending', () => {
+      // Arrange
+      vi.useFakeTimers();
+      useGrailStore.getState().setFilter({ foundStatus: 'missing' });
+      render(<AdvancedSearch />);
+      const input = screen.getByLabelText('Search');
+      fireEvent.change(input, { target: { value: 'Shako' } });
+
+      // Act
+      fireEvent.click(screen.getByRole('button', { name: 'Clear all' }));
+      act(() => {
+        vi.advanceTimersByTime(SEARCH_DEBOUNCE_MS);
+      });
+
+      // Assert
+      expect(input).toHaveValue('');
+      expect(useGrailStore.getState().filter.searchTerm).toBeUndefined();
     });
   });
 

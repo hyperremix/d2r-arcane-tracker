@@ -11,9 +11,10 @@ import {
   shouldShowEtherealStatus,
   shouldShowNormalStatus,
 } from '@/lib/ethereal';
-import { useFilteredItems, useGrailStore } from '@/stores/grailStore';
+import { countActiveFilters, useFilteredItems, useGrailStore } from '@/stores/grailStore';
 import { ItemCard } from './ItemCard';
 import { ItemDetailsDialog } from './ItemDetailsDialog';
+import { getItemGridEmptyStateVariant, ItemGridEmptyState } from './ItemGridEmptyState';
 import { GroupedMasonryGrid, MasonryItemGrid } from './MasonryItemGrid';
 
 /**
@@ -82,6 +83,9 @@ export const ItemGrid = memo(function ItemGrid() {
   const viewMode = useGrailStore((state) => state.viewMode);
   const groupMode = useGrailStore((state) => state.groupMode);
   const setGroupMode = useGrailStore((state) => state.setGroupMode);
+  const totalItemCount = useGrailStore((state) => state.items.length);
+  const loading = useGrailStore((state) => state.loading);
+  const hasActiveFilters = useGrailStore((state) => countActiveFilters(state.filter) > 0);
   const filteredItems = useFilteredItems(); // This uses DB items as base and applies all filters
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
 
@@ -166,17 +170,30 @@ export const ItemGrid = memo(function ItemGrid() {
     setSelectedItemId(itemId);
   }, []);
 
+  const emptyStateVariant = getItemGridEmptyStateVariant({
+    displayItemCount: displayItems.length,
+    totalItemCount,
+    grailNormal: settings.grailNormal,
+    grailEthereal: settings.grailEthereal,
+    hasActiveFilters,
+    loading,
+  });
+
   return (
     <div>
-      {/* Items Grid with Virtual Scrolling */}
-      <VirtualizedItemsContainer
-        groupedItems={groupedItems}
-        viewMode={viewMode}
-        groupMode={groupMode}
-        progressLookup={progressLookup}
-        characters={characters}
-        handleItemClick={handleItemClick}
-      />
+      {emptyStateVariant ? (
+        <ItemGridEmptyState variant={emptyStateVariant} />
+      ) : (
+        /* Items Grid with Virtual Scrolling */
+        <VirtualizedItemsContainer
+          groupedItems={groupedItems}
+          viewMode={viewMode}
+          groupMode={groupMode}
+          progressLookup={progressLookup}
+          characters={characters}
+          handleItemClick={handleItemClick}
+        />
+      )}
 
       {/* Item Details Dialog */}
       <ItemDetailsDialog

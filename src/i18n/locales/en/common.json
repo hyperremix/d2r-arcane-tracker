@@ -104,7 +104,15 @@
       "bothFound": "Both Found",
       "etherealOnly": "Ethereal Only",
       "normalOnly": "Normal Only",
-      "neitherFound": "Neither Found"
+      "neitherFound": "Neither Found",
+      "emptyNoMatchesTitle": "No items match your filters",
+      "emptyNoMatchesDescription": "Try a different search term or clear the active filters to see more items.",
+      "clearFilters": "Clear filters",
+      "emptyTrackingDisabledTitle": "Grail tracking is turned off",
+      "emptyTrackingDisabledDescription": "Both normal and ethereal item tracking are disabled. Enable at least one in Settings to see your Holy Grail items.",
+      "openSettings": "Open Settings",
+      "emptyNoItemsTitle": "No items to show yet",
+      "emptyNoItemsDescription": "Holy Grail items will appear here once they have been loaded."
     },
     "advancedSearch": {
       "noGrouping": "No Grouping",

@@ -1,7 +1,12 @@
 import { act, renderHook } from '@testing-library/react';
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CharacterBuilder, GrailProgressBuilder, HolyGrailItemBuilder } from '@/fixtures';
-import { useFilteredItems, useGrailStatistics, useGrailStore } from './grailStore';
+import {
+  countActiveFilters,
+  useFilteredItems,
+  useGrailStatistics,
+  useGrailStore,
+} from './grailStore';
 
 // Mock the electron API
 const mockElectronAPI = {
@@ -162,6 +167,37 @@ describe('When useGrailStore is used', () => {
 
       // Assert
       expect(result.current.advancedFilter.sortBy).toBe('category');
+    });
+  });
+
+  describe('If resetting filters after filters and sorting were changed', () => {
+    it('Then should restore the default filter and advanced filter', () => {
+      // Arrange
+      const { result } = renderHook(() => useGrailStore());
+      act(() => {
+        result.current.setFilter({
+          searchTerm: 'Shako',
+          categories: ['armor'],
+          types: ['unique'],
+          foundStatus: 'missing',
+        });
+        result.current.setAdvancedFilter({
+          sortBy: 'name',
+          sortOrder: 'asc',
+          fuzzySearch: true,
+        });
+      });
+
+      // Act
+      act(() => {
+        result.current.resetFilters();
+      });
+
+      // Assert
+      expect(result.current.filter).toEqual({ foundStatus: 'all' });
+      expect(result.current.advancedFilter).toEqual(
+        expect.objectContaining({ sortBy: 'found_date', sortOrder: 'desc', fuzzySearch: false }),
+      );
     });
   });
 
@@ -691,6 +727,52 @@ describe('When useGrailStatistics is used', () => {
       expect(setStats?.total).toBe(1);
       expect(setStats?.found).toBe(1);
       expect(setStats?.percentage).toBe(100);
+    });
+  });
+});
+
+describe('When countActiveFilters is called', () => {
+  describe('If no filters are set', () => {
+    it('Then should return 0', () => {
+      // Arrange
+      const filter = { foundStatus: 'all' as const };
+
+      // Act
+      const count = countActiveFilters(filter);
+
+      // Assert
+      expect(count).toBe(0);
+    });
+  });
+
+  describe('If empty search term and empty arrays are set', () => {
+    it('Then should return 0', () => {
+      // Arrange
+      const filter = { searchTerm: '', categories: [], types: [], foundStatus: 'all' as const };
+
+      // Act
+      const count = countActiveFilters(filter);
+
+      // Assert
+      expect(count).toBe(0);
+    });
+  });
+
+  describe('If search, categories, types and found status are all set', () => {
+    it('Then should return 4', () => {
+      // Arrange
+      const filter = {
+        searchTerm: 'Shako',
+        categories: ['armor' as const],
+        types: ['unique' as const],
+        foundStatus: 'found' as const,
+      };
+
+      // Act
+      const count = countActiveFilters(filter);
+
+      // Assert
+      expect(count).toBe(4);
     });
   });
 });

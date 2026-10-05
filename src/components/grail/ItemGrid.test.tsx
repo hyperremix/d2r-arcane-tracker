@@ -1,5 +1,5 @@
-import { render, screen } from '@testing-library/react';
-import type { Item, Settings } from 'electron/types/grail';
+import { fireEvent, render, screen } from '@testing-library/react';
+import type { GrailFilter, Item, Settings } from 'electron/types/grail';
 import { GameMode, GameVersion } from 'electron/types/grail';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { HolyGrailItemBuilder } from '@/fixtures';
@@ -494,8 +494,17 @@ describe('When createListRows is called', () => {
 // ============================================================================
 
 // Mock dependencies for component tests
-vi.mock('@/stores/grailStore');
+vi.mock('@/stores/grailStore', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/stores/grailStore')>()),
+  useGrailStore: vi.fn(),
+  useFilteredItems: vi.fn(),
+}));
 vi.mock('@/hooks/useProgressLookup');
+const mockNavigate = vi.fn();
+vi.mock('react-router', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('react-router')>()),
+  useNavigate: () => mockNavigate,
+}));
 vi.mock('@tanstack/react-virtual', () => ({
   useVirtualizer: () => ({
     getVirtualItems: () => [],
@@ -526,10 +535,15 @@ import { useProgressLookup } from '@/hooks/useProgressLookup';
 import { useFilteredItems, useGrailStore } from '@/stores/grailStore';
 
 const mockSetGroupMode = vi.fn();
+const mockResetFilters = vi.fn();
+const mockReloadData = vi.fn();
 
 function setupComponentMocks(
   overrides: {
     filteredItems?: Item[];
+    items?: Item[];
+    filter?: GrailFilter;
+    loading?: boolean;
     progress?: unknown[];
     characters?: unknown[];
     settings?: Partial<Settings>;
@@ -545,6 +559,11 @@ function setupComponentMocks(
     viewMode: overrides.viewMode ?? 'grid',
     groupMode: overrides.groupMode ?? 'none',
     setGroupMode: mockSetGroupMode,
+    items: overrides.items ?? overrides.filteredItems ?? [],
+    filter: overrides.filter ?? { foundStatus: 'all' },
+    loading: overrides.loading ?? false,
+    resetFilters: mockResetFilters,
+    reloadData: mockReloadData,
   };
 
   const mockUseGrailStore = vi.mocked(useGrailStore);
@@ -610,16 +629,113 @@ describe('When ItemGrid component is rendered', () => {
     });
   });
 
-  describe('If no items pass filter', () => {
-    it('Then renders empty grid', () => {
+  describe.each([
+    ['grid', 'none'],
+    ['grid', 'category'],
+    ['list', 'none'],
+  ])(
+    'If viewMode "%s", groupMode "%s" and active filters match no items',
+    (viewMode, groupMode) => {
+      it('Then renders the no-matches empty state instead of the items container', () => {
+        // Arrange
+        setupComponentMocks({
+          filteredItems: [],
+          items: HolyGrailItemBuilder.new().buildMany(3),
+          filter: { foundStatus: 'all', searchTerm: 'does-not-exist' },
+          viewMode,
+          groupMode,
+        });
+
+        // Act
+        render(<ItemGrid />);
+
+        // Assert
+        expect(screen.getByTestId('item-grid-empty-state')).toHaveAttribute(
+          'data-variant',
+          'noMatches',
+        );
+        expect(screen.getByText('No items match your filters')).toBeInTheDocument();
+        expect(screen.queryByTestId('masonry-item-grid')).not.toBeInTheDocument();
+        expect(screen.queryByTestId('grouped-masonry-grid')).not.toBeInTheDocument();
+      });
+    },
+  );
+
+  describe('If active filters match no items and the user clicks Clear filters', () => {
+    it('Then resets the store filters', () => {
       // Arrange
-      setupComponentMocks({ filteredItems: [], viewMode: 'grid', groupMode: 'none' });
+      setupComponentMocks({
+        filteredItems: [],
+        items: HolyGrailItemBuilder.new().buildMany(3),
+        filter: { foundStatus: 'missing', categories: ['armor'] },
+      });
+      render(<ItemGrid />);
+
+      // Act
+      fireEvent.click(screen.getByRole('button', { name: 'Clear filters' }));
+
+      // Assert
+      expect(mockResetFilters).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('If both normal and ethereal grail tracking are disabled', () => {
+    it('Then renders the tracking-disabled empty state with a link to Settings', () => {
+      // Arrange
+      setupComponentMocks({
+        filteredItems: HolyGrailItemBuilder.new().buildMany(3),
+        settings: { grailNormal: false, grailEthereal: false },
+      });
+      render(<ItemGrid />);
+
+      // Act
+      fireEvent.click(screen.getByRole('button', { name: 'Open Settings' }));
+
+      // Assert
+      expect(screen.getByTestId('item-grid-empty-state')).toHaveAttribute(
+        'data-variant',
+        'trackingDisabled',
+      );
+      expect(screen.getByText('Grail tracking is turned off')).toBeInTheDocument();
+      expect(mockNavigate).toHaveBeenCalledWith('/settings');
+      expect(screen.queryByTestId('masonry-item-grid')).not.toBeInTheDocument();
+    });
+  });
+
+  describe('If items are still loading and none are available yet', () => {
+    it('Then renders the loading empty state without an action', () => {
+      // Arrange
+      setupComponentMocks({ filteredItems: [], items: [], loading: true });
 
       // Act
       render(<ItemGrid />);
 
       // Assert
-      expect(screen.getByTestId('masonry-item-grid')).toHaveTextContent('0 items');
+      expect(screen.getByTestId('item-grid-empty-state')).toHaveAttribute(
+        'data-variant',
+        'loading',
+      );
+      expect(screen.getByText('Loading...')).toBeInTheDocument();
+      expect(screen.queryByRole('button')).not.toBeInTheDocument();
+    });
+  });
+
+  describe('If there are no items at all and nothing is loading', () => {
+    it('Then renders the no-items empty state and Retry reloads the data', () => {
+      // Arrange
+      setupComponentMocks({ filteredItems: [], items: [], loading: false });
+      render(<ItemGrid />);
+
+      // Act
+      fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+
+      // Assert
+      expect(screen.getByTestId('item-grid-empty-state')).toHaveAttribute(
+        'data-variant',
+        'noItems',
+      );
+      expect(screen.getByText('No items to show yet')).toBeInTheDocument();
+      expect(mockReloadData).toHaveBeenCalledTimes(1);
     });
   });
 

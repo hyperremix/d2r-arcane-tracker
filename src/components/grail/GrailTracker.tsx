@@ -17,7 +17,8 @@ function getSettledValue<T>(result: PromiseSettledResult<T>, label: string): T |
  * @returns {JSX.Element} The main grail tracker interface with statistics and item grid
  */
 export function GrailTracker() {
-  const { setCharacters, setItems, setProgress, hydrateSettings, settings } = useGrailStore();
+  const { setCharacters, setItems, setProgress, setLoading, hydrateSettings, settings } =
+    useGrailStore();
 
   const statistics = useGrailStatistics();
 
@@ -59,8 +60,9 @@ export function GrailTracker() {
       }
     };
 
-    loadData();
-  }, [setCharacters, setItems, setProgress, hydrateSettings]);
+    setLoading(true);
+    loadData().finally(() => setLoading(false));
+  }, [setCharacters, setItems, setProgress, setLoading, hydrateSettings]);
 
   // Listen for grail progress updates from automatic detection
   useEffect(() => {
