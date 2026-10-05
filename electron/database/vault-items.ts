@@ -10,7 +10,7 @@ import { isResourceStackFromRawJson, resolveStackCountFromRawJson } from '../uti
 import { createVaultPresenceKey, readItemUidFromRawJson } from '../utils/vaultPresence';
 import { GRAIL_BOOKMARK_FINGERPRINT_PREFIX, isCurrentlyVaulted } from '../utils/vaultState';
 import { dbVaultItemToVaultItem, fromISOString, toISOString } from './converters';
-import { schema } from './drizzle';
+import { type DbVaultItem, schema } from './drizzle';
 import type { DatabaseContext } from './types';
 
 const { vaultItems } = schema;
@@ -180,7 +180,7 @@ function findVaultItemByFingerprint(
 /**
  * Restores every persisted column of a vault row to a previously read state.
  */
-function restoreVaultItemRow(ctx: DatabaseContext, previous: VaultItem): void {
+function restoreDbVaultItem(ctx: DatabaseContext, previous: VaultItem): void {
   const values = buildVaultItemValues({
     ...previous,
     id: previous.id,
@@ -230,7 +230,7 @@ function createMergeUndo(ctx: DatabaseContext, rowId: string, mergedCount: numbe
 function createUndo(ctx: DatabaseContext, savedId: string, previous: VaultItem | undefined) {
   return () => {
     if (previous) {
-      restoreVaultItemRow(ctx, previous);
+      restoreDbVaultItem(ctx, previous);
       return;
     }
 
@@ -408,14 +408,12 @@ export interface VaultScanReconciliationInput {
   presentFingerprints: string[];
   /**
    * Location-independent identity key (see `createVaultPresenceKey`) of each scanned item, parallel
-   * to `presentFingerprints` (index i describes `presentFingerprints[i]`). When given, rows whose
-   * fingerprint is gone (the item moved) are matched against it. Ignored if the lengths differ.
+   * to `presentFingerprints` (index i describes `presentFingerprints[i]`). Rows whose fingerprint is
+   * gone (the item moved) are matched against it. Ignored if the lengths differ.
    */
-  presentIdentityKeys?: string[];
+  presentIdentityKeys: string[];
   lastSeenAt?: Date;
 }
-
-type VaultItemRow = typeof vaultItems.$inferSelect;
 
 function toIdentityPool(scan: VaultScanReconciliationInput): {
   /** Number of scanned items per identity key that no row has claimed yet. */
@@ -425,7 +423,7 @@ function toIdentityPool(scan: VaultScanReconciliationInput): {
   const unclaimed = new Map<string, number>();
   const keyByFingerprint = new Map<string, string>();
   const keys = scan.presentIdentityKeys;
-  if (!keys || keys.length !== scan.presentFingerprints.length) {
+  if (keys.length !== scan.presentFingerprints.length) {
     return { unclaimed, keyByFingerprint };
   }
 
@@ -449,7 +447,7 @@ function claimIdentity(unclaimed: Map<string, number>, key: string | undefined):
   return true;
 }
 
-function createRowPresenceKey(row: VaultItemRow): string {
+function createRowPresenceKey(row: DbVaultItem): string {
   return createVaultPresenceKey({
     sourceFileType: row.sourceFileType,
     itemCode: row.itemCode,
@@ -473,7 +471,7 @@ function createRowPresenceKey(row: VaultItemRow): string {
  * that happens to remain there is not them.
  */
 function resolveRowPresence(
-  rows: VaultItemRow[],
+  rows: DbVaultItem[],
   scan: VaultScanReconciliationInput,
 ): Map<string, boolean> {
   const presentSet = new Set(scan.presentFingerprints);

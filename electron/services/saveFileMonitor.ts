@@ -71,7 +71,6 @@ interface IncompleteFileParseResult extends FileParseSuccess {
 interface FailedFileParseResult {
   saveName: string;
   success: false;
-  inventorySnapshot?: undefined;
 }
 
 type SingleFileParseResult =
@@ -93,10 +92,6 @@ const processItemName = (item: D2SItem): string => {
 
   if (isRune(item as d2s.types.IItem)) {
     return name;
-  }
-
-  if (item.type === 'runeword') {
-    return (item.runeword_name || '').toLowerCase().replace(/[^a-z0-9]/gi, '');
   }
 
   return name;
@@ -827,7 +822,7 @@ class SaveFileMonitor {
     }
 
     try {
-      const stats = await import('node:fs/promises').then((fs) => fs.stat(filePath));
+      const stats = await stat(filePath);
       const fileState = this.grailDatabase?.getSaveFileState(filePath);
 
       if (!fileState) {
@@ -987,7 +982,7 @@ class SaveFileMonitor {
       socketCount: item.socketCount,
       itemName: item.itemName,
       isSocketedItem: item.isSocketedItem,
-      itemUid: (item.rawParsedItem as { id?: unknown } | undefined)?.id as number | undefined,
+      itemUid: item.rawParsedItem?.id,
     });
   }
 
@@ -1174,7 +1169,7 @@ class SaveFileMonitor {
     } catch (error) {
       log.error('processSingleFile', error, { filePath });
       results.stats[saveName] = null;
-      return { saveName, success: false, inventorySnapshot: undefined };
+      return { saveName, success: false };
     }
   }
 
@@ -1185,7 +1180,7 @@ class SaveFileMonitor {
    */
   private async updateSaveFileState(filePath: string): Promise<void> {
     try {
-      const stats = await import('node:fs/promises').then((fs) => fs.stat(filePath));
+      const stats = await stat(filePath);
 
       // Check if state already exists and reuse its ID
       const existingState = this.grailDatabase?.getSaveFileState(filePath);
@@ -1671,7 +1666,7 @@ class SaveFileMonitor {
    */
   private async parseSaveFile(filePath: string): Promise<D2SaveFile | null> {
     try {
-      const stats = await import('node:fs/promises').then((fs) => fs.stat(filePath));
+      const stats = await stat(filePath);
       const buffer = await readFile(filePath);
       const extension = extname(filePath).toLowerCase();
 

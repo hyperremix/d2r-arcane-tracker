@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { assert } from './assert';
-import { isCurrentlyVaulted, VALID_SOURCE_FILE_TYPES } from './vaultState';
+import { isCurrentlyVaulted, isGrailBookmark, VALID_SOURCE_FILE_TYPES } from './vaultState';
 
 describe('When resolving whether a vault row is currently vaulted', () => {
   describe('If the row was never vaulted', () => {
@@ -116,5 +116,22 @@ describe('When using the shared vault validation helpers', () => {
       expect(failure).toEqual(new Error('boom'));
       expect(() => assert(true, 'never')).not.toThrow();
     });
+  });
+});
+
+describe('When isGrailBookmark inspects a vault row fingerprint', () => {
+  it.each([
+    ['a bookmark fingerprint', 'grail:item-1', true],
+    ['an item fingerprint', 'd2s|Sorc|stash|unique|Windforce|0,0', false],
+    ['a fingerprint that only contains the prefix', 'x-grail:item-1', false],
+  ])('Then %s is classified correctly', (_scenario, fingerprint, expected) => {
+    // Arrange
+    const row = { fingerprint };
+
+    // Act
+    const result = isGrailBookmark(row);
+
+    // Assert
+    expect(result).toBe(expected);
   });
 });

@@ -4,7 +4,7 @@ import type {
   VaultItemUpsertInput,
   VaultLocationContext,
 } from 'electron/types/grail';
-import { GRAIL_BOOKMARK_FINGERPRINT_PREFIX } from 'electron/utils/vaultState';
+import { isGrailBookmark } from 'electron/utils/vaultState';
 import { type DragEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -371,10 +371,7 @@ export function InventoryBrowserMain() {
 
   // Grail bookmarks are tracker bookmarks, not items: they must not show up as vault tiles.
   const vaultItems = useMemo(
-    () =>
-      (inventoryResponse?.vault.items ?? []).filter(
-        (item) => !item.fingerprint.startsWith(GRAIL_BOOKMARK_FINGERPRINT_PREFIX),
-      ),
+    () => (inventoryResponse?.vault.items ?? []).filter((item) => !isGrailBookmark(item)),
     [inventoryResponse?.vault.items],
   );
 

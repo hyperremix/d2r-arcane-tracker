@@ -123,6 +123,7 @@ describe('When vault item database operations are executed', () => {
         sourceFileType: 'd2s',
         sourceFilePath: '/saves/SorcOne.d2s',
         presentFingerprints: [],
+        presentIdentityKeys: [],
         lastSeenAt: new Date('2024-01-02T12:00:00.000Z'),
       });
 
@@ -157,6 +158,7 @@ describe('When vault item database operations are executed', () => {
         sourceFileType: 'd2s',
         sourceFilePath: '/saves/SorcOne.d2s',
         presentFingerprints: ['fp-back'],
+        presentIdentityKeys: ['identity-back'],
         lastSeenAt: new Date('2024-01-03T12:00:00.000Z'),
       });
       const reconciled = getVaultItemById(ctx, saved.id);
@@ -372,7 +374,7 @@ describe('When vault item database operations are executed', () => {
       expect(getVaultItemById(ctx, vaulted.id)?.isPresentInLatestScan).toBe(false);
     });
 
-    it('Then only exact fingerprints are compared when no identity keys are supplied', () => {
+    it('Then only exact fingerprints are compared when the identity keys do not match the scanned items', () => {
       // Arrange
       const row = insertRuneRow('fp-old-position');
 
@@ -381,6 +383,7 @@ describe('When vault item database operations are executed', () => {
         sourceFileType: 'd2i',
         sourceFilePath: FILE,
         presentFingerprints: ['fp-new-position'],
+        presentIdentityKeys: [],
       });
 
       // Assert
@@ -540,6 +543,7 @@ describe('When vault item database operations are executed', () => {
         sourceFileType: 'd2s',
         sourceFilePath: '/saves/Restored.d2s',
         presentFingerprints: ['fp-restored'],
+        presentIdentityKeys: ['identity-restored'],
       });
 
       // Assert
@@ -579,6 +583,7 @@ describe('When vault item database operations are executed', () => {
         sourceFileType: 'd2i',
         sourceFilePath: '/saves/SharedStashSoftCoreV2.d2i',
         presentFingerprints: [],
+        presentIdentityKeys: [],
       });
 
       // Assert
@@ -608,6 +613,7 @@ describe('When vault item database operations are executed', () => {
         sourceFileType: 'd2s',
         sourceFilePath: '/saves/SorcOne.d2s',
         presentFingerprints: [],
+        presentIdentityKeys: [],
       });
       const reconciled = getVaultItemById(ctx, vaulted.id);
 
@@ -640,6 +646,7 @@ describe('When vault item database operations are executed', () => {
         sourceFileType: 'd2s',
         sourceFilePath: '',
         presentFingerprints: [],
+        presentIdentityKeys: [],
       });
 
       // Assert

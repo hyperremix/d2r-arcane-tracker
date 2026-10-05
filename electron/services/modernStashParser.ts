@@ -1,7 +1,7 @@
 import { enhanceItems } from '@dschu012/d2s';
 import { readItem } from '@dschu012/d2s/lib/d2/items';
 import { constants as constants105 } from '@dschu012/d2s/lib/data/versions/105_constant_data';
-import type { D2SItem } from '../types/grail';
+import type { D2SItem, StashTabKind } from '../types/grail';
 import { createBoundedBitReader } from './boundedBitReader';
 import { type D2iMetadata, readD2iMetadata } from './stashFormat';
 
@@ -39,8 +39,6 @@ const RESOURCE_STASH_TAB_BY_KIND = {
   materials: 6,
   runes: 7,
 } as const;
-
-export type StashTabKind = 'shared' | 'gems' | 'materials' | 'runes';
 
 export interface ModernStashParsedItem {
   item: D2SItem;

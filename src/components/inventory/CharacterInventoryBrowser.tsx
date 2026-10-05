@@ -11,7 +11,7 @@ import type {
   VaultLocationContext,
   VaultSourceFileType,
 } from 'electron/types/grail';
-import { GRAIL_BOOKMARK_FINGERPRINT_PREFIX, isCurrentlyVaulted } from 'electron/utils/vaultState';
+import { isCurrentlyVaulted, isGrailBookmark } from 'electron/utils/vaultState';
 import { PackagePlus, Sparkles, X } from 'lucide-react';
 import { type DragEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -252,10 +252,6 @@ function showModernStashReadOnlyToast(
   t: (key: string, options?: Record<string, unknown>) => string,
 ): void {
   toast.error(t(translations.inventoryBrowser.modernStashReadOnlyError));
-}
-
-function isGrailBookmark(item: VaultItem): boolean {
-  return item.fingerprint.startsWith(GRAIL_BOOKMARK_FINGERPRINT_PREFIX);
 }
 
 function isStashSourceFileType(sourceFileType: VaultSourceFileType): boolean {

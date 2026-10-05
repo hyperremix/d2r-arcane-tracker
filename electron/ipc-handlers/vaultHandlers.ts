@@ -26,11 +26,7 @@ import type {
 import { assert } from '../utils/assert';
 import { assertSaveFilePathAllowed } from '../utils/saveFilePathGuard';
 import { isResourceStackFromRawJson, resolveStackCountFromRawJson } from '../utils/stackableItems';
-import {
-  GRAIL_BOOKMARK_FINGERPRINT_PREFIX,
-  isCurrentlyVaulted,
-  VALID_SOURCE_FILE_TYPES,
-} from '../utils/vaultState';
+import { isCurrentlyVaulted, isGrailBookmark, VALID_SOURCE_FILE_TYPES } from '../utils/vaultState';
 
 const MAX_SEARCH_TEXT_LENGTH = 120;
 const MAX_PAGE = 10000;
@@ -311,10 +307,6 @@ function resolveVaultSourceItemLocator(input: VaultItemUpsertInput): SaveFileIte
   }
 
   return locator;
-}
-
-function isGrailBookmark(vaultItem: Pick<VaultItem, 'fingerprint'>): boolean {
-  return vaultItem.fingerprint.startsWith(GRAIL_BOOKMARK_FINGERPRINT_PREFIX);
 }
 
 function normalizeCode(value: unknown): string | undefined {
