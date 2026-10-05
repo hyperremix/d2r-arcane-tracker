@@ -2028,4 +2028,60 @@ describe('When SaveFileMonitor is used', () => {
       expect(counts.elrune).toBe(6);
     });
   });
+
+  describe('When a save contains runes socketed into items', () => {
+    let saveDir: string;
+
+    beforeEach(() => {
+      saveDir = mkdtempSync(join(tmpdir(), 'save-monitor-runes-'));
+    });
+
+    afterEach(() => {
+      rmSync(saveDir, { recursive: true, force: true });
+    });
+
+    describe('If a socketed item holds an embedded rune and a loose rune sits in the inventory', () => {
+      it('Then only the loose rune counts as an available rune', async () => {
+        // Arrange
+        mockDatabase.getAllSettings.mockReturnValue({
+          saveDir: '/test/save/dir',
+          gameMode: GameMode.Both,
+        });
+        vi.mocked(isRune).mockImplementation((item) => /^r\d\d$/.test(item.type ?? ''));
+        vi.mocked(getGrailItemId).mockImplementation((item) =>
+          (item as { type?: string }).type === 'r01'
+            ? 'el'
+            : (item as { type?: string }).type === 'r02'
+              ? 'eld'
+              : null,
+        );
+        vi.mocked(d2s.read).mockResolvedValue({
+          header: { status: { hardcore: false } },
+          items: [
+            { type: 'r01' },
+            {
+              type: 'armor',
+              unique_name: "Tyrael's Might",
+              socketed: 1,
+              socketed_items: [{ type: 'r02' }],
+            },
+          ],
+          merc_items: [],
+          corpse_items: [],
+        } as any);
+        const filePath = join(saveDir, 'Hero.d2s');
+        writeFileSync(filePath, Buffer.from('mock'));
+        vi.spyOn(monitor as any, 'filterFilesToParse').mockResolvedValue([filePath]);
+        vi.spyOn(monitor as any, 'updateSaveFileState').mockResolvedValue(undefined);
+        vi.spyOn(monitor as any, 'emitSaveFileEvents').mockResolvedValue(undefined);
+
+        // Act
+        await (monitor as any).parseFiles([filePath], false);
+
+        // Assert
+        expect(monitor.getAvailableRunesCount()).toEqual({ el: 1 });
+        expect(Object.keys((monitor as any).currentData.items)).toContain('eld');
+      });
+    });
+  });
 });

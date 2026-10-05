@@ -73,6 +73,10 @@ const processItemName = (item: D2SItem): string => {
 
 const shouldSkipItem = (name: string): boolean => name === '';
 
+/** True when a save's softcore/hardcore status is excluded by the configured game mode. */
+const isGameModeMismatch = (gameMode: GameMode | undefined, isHardcore: boolean): boolean =>
+  (gameMode === GameMode.Softcore && isHardcore) || (gameMode === GameMode.Hardcore && !isHardcore);
+
 const createSavedItem = (item: D2SItem, quantity?: number): ItemDetails => ({
   ethereal: !!item.ethereal,
   ilevel: item.level ?? null,
@@ -1081,7 +1085,8 @@ class SaveFileMonitor {
         const isEthereal = !!item.ethereal;
         addItemToResults(results, name, savedItem, saveName, item, isEthereal);
 
-        if (isRune(item) && !item.socketed) {
+        // Runes sitting in another item's sockets are used up and not available for runewords.
+        if (isRune(item) && !item.socketed && !inventoryItem.isSocketedItem) {
           addRuneToAvailableRunes(results, name, savedItem, saveName, item);
         }
 
@@ -1448,10 +1453,7 @@ class SaveFileMonitor {
       const settings = this.grailDatabase.getAllSettings();
       const isHardcore = response.header.status.hardcore;
 
-      if (
-        (settings.gameMode === GameMode.Softcore && isHardcore) ||
-        (settings.gameMode === GameMode.Hardcore && !isHardcore)
-      ) {
+      if (isGameModeMismatch(settings.gameMode, isHardcore)) {
         status = 'skipped';
         return;
       }
@@ -1473,10 +1475,7 @@ class SaveFileMonitor {
       // Use hardcore flag from parsed stash header instead of filename
       const isHardcore = response.hardcore;
 
-      if (
-        (settings.gameMode === GameMode.Softcore && isHardcore) ||
-        (settings.gameMode === GameMode.Hardcore && !isHardcore)
-      ) {
+      if (isGameModeMismatch(settings.gameMode, isHardcore)) {
         status = 'skipped';
         return;
       }
@@ -1496,10 +1495,7 @@ class SaveFileMonitor {
       const settings = this.grailDatabase.getAllSettings();
       const isHardcore = modern.hardcore;
 
-      if (
-        (settings.gameMode === GameMode.Softcore && isHardcore) ||
-        (settings.gameMode === GameMode.Hardcore && !isHardcore)
-      ) {
+      if (isGameModeMismatch(settings.gameMode, isHardcore)) {
         status = 'skipped';
         return;
       }
