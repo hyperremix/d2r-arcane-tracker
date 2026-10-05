@@ -1385,6 +1385,7 @@ describe('When CharacterInventoryBrowser is rendered', () => {
         expect(screen.getByText('Runes')).toBeInTheDocument();
       });
 
+      // Act
       const runeTile = screen.getByLabelText('Inventory item Fal Rune');
       fireEvent.click(runeTile);
       fireEvent.click(runeTile);
@@ -1658,6 +1659,7 @@ describe('When CharacterInventoryBrowser is rendered', () => {
           },
         });
 
+        // Act
         render(<CharacterInventoryBrowser />);
         await waitFor(() => {
           expect(invokeMock).toHaveBeenCalledWith('inventory:getActiveDragState');
@@ -1886,6 +1888,7 @@ describe('When CharacterInventoryBrowser is rendered', () => {
         expect(screen.getByText('Runes')).toBeInTheDocument();
       });
 
+      // Act
       const runeTile = screen.getByLabelText('Inventory item Fal Rune');
       fireEvent.click(runeTile);
       fireEvent.click(runeTile);
@@ -1982,6 +1985,7 @@ describe('When CharacterInventoryBrowser is rendered', () => {
         expect(screen.getByText('Runes')).toBeInTheDocument();
       });
 
+      // Act
       const runeTile = screen.getByLabelText('Inventory item Fal Rune');
       fireEvent.click(runeTile);
       fireEvent.click(runeTile);
@@ -2132,6 +2136,7 @@ describe('When CharacterInventoryBrowser is rendered', () => {
         expect(screen.getByText('Runes')).toBeInTheDocument();
       });
 
+      // Act
       const runeTile = screen.getByLabelText('Inventory item Fal Rune');
       fireEvent.click(runeTile);
       fireEvent.click(runeTile);

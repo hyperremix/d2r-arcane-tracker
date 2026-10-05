@@ -180,7 +180,7 @@ function findVaultItemByFingerprint(
 /**
  * Restores every persisted column of a vault row to a previously read state.
  */
-function restoreDbVaultItem(ctx: DatabaseContext, previous: VaultItem): void {
+function restoreVaultItemRow(ctx: DatabaseContext, previous: VaultItem): void {
   const values = buildVaultItemValues({
     ...previous,
     id: previous.id,
@@ -230,7 +230,7 @@ function createMergeUndo(ctx: DatabaseContext, rowId: string, mergedCount: numbe
 function createUndo(ctx: DatabaseContext, savedId: string, previous: VaultItem | undefined) {
   return () => {
     if (previous) {
-      restoreDbVaultItem(ctx, previous);
+      restoreVaultItemRow(ctx, previous);
       return;
     }
 

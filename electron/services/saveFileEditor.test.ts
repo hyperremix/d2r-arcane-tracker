@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { D2I_SECTOR_HEADER_SIZE } from './stashFormat';
 
 type SaveFileEditorModule = typeof import('./saveFileEditor');
 
@@ -255,7 +256,6 @@ function makeStashData(pages: { id: number }[][] = []): StashData {
 
 const fakeBuffer = Buffer.from([0x01, 0x02]);
 const fakeResultBuffer = new Uint8Array([0x03, 0x04]);
-const D2I_SECTOR_HEADER_SIZE = 64;
 
 function createModernSectorPayload(itemCount: number, itemBytes: number[] = []): Buffer {
   const payload = Buffer.alloc(4 + itemBytes.length);
@@ -345,12 +345,12 @@ describe('When removeItemFromSaveFile is called', () => {
     });
 
     it('Then rejects locator-only removal without a numeric item id', async () => {
+      // Arrange
+      const locator = { gridX: 1, gridY: 1 };
+
       // Act
       const message = await rejectionMessage(
-        removeItemFromSaveFile('/path/to/char.d2s', 'd2s', {
-          gridX: 1,
-          gridY: 1,
-        }),
+        removeItemFromSaveFile('/path/to/char.d2s', 'd2s', locator),
       );
 
       // Assert

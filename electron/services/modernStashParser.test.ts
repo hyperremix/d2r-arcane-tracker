@@ -6,14 +6,12 @@ import { _readMagicProperties, writeItem } from '@dschu012/d2s/lib/d2/items';
 import { constants as constants105 } from '@dschu012/d2s/lib/data/versions/105_constant_data';
 import { describe, expect, it } from 'vitest';
 import { constants105Extended, parseModernStash, resolveStackCount } from './modernStashParser';
-import { readD2iMetadata } from './stashFormat';
+import { D2I_SECTOR_HEADER_SIZE, readD2iMetadata } from './stashFormat';
 
 const FIXTURE_PATH = resolve(
   process.cwd(),
   'electron/services/fixtures/ModernSharedStashSoftCoreV2.d2i',
 );
-
-const D2I_SECTOR_HEADER_SIZE = 64;
 
 /** Wraps one JM payload into a minimal v105 .d2i file with a single (shared tab 0) sector. */
 function buildSingleSectorD2i(payload: Buffer): Buffer {

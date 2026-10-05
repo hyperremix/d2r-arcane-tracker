@@ -268,7 +268,7 @@ describe('When vault item database operations are executed', () => {
       expect(getVaultItemById(ctx, moved.id)?.isPresentInLatestScan).toBe(false);
     });
 
-    it('Then an exact fingerprint match is not stolen by a moved identical item', () => {
+    it('Then identical items that are all still present are all kept present', () => {
       // Arrange
       const stayed = insertRuneRow('fp-stayed');
       const moved = insertRuneRow('fp-moved-away');
@@ -515,18 +515,25 @@ describe('When vault item database operations are executed', () => {
         fingerprint: 'fp-bulk-kept',
         sourceFilePath: '/saves/Kept.d2s',
       });
-      const updateSpy = vi.spyOn(ctx.db, 'update');
+      const prepareSpy = vi.spyOn(ctx.rawDb, 'prepare');
 
       // Act
       markVaultItemsMissingForSourceFiles(ctx, paths);
 
-      // Assert
-      expect(updateSpy).toHaveBeenCalledTimes(3);
+      // Assert: every statement binds the path list plus two fixed parameters (the new flag value
+      // and the "currently present" filter)
+      const nonPathParameters = 2;
+      const pathsPerStatement = prepareSpy.mock.calls
+        .map(([sql]) => String(sql))
+        .filter((sql) => /^update "vault_items"/i.test(sql))
+        .map((sql) => (sql.match(/\?/g) ?? []).length - nonPathParameters);
+      expect(pathsPerStatement).toHaveLength(3);
+      expect(Math.max(...pathsPerStatement)).toBeLessThanOrEqual(500);
       expect(
         rows.every((row) => getVaultItemById(ctx, row.id)?.isPresentInLatestScan === false),
       ).toBe(true);
       expect(getVaultItemById(ctx, kept.id)?.isPresentInLatestScan).toBe(true);
-      updateSpy.mockRestore();
+      prepareSpy.mockRestore();
     });
 
     it('Then rows come back as present when the file is scanned again', () => {
