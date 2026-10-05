@@ -102,7 +102,7 @@ describe('When resolveUiOffset is called', () => {
   });
 
   describe('If no match has a lobby or in-game flag value', () => {
-    it('Then should fall back to the first in-range match', async () => {
+    it('Then should return undefined', async () => {
       // Arrange
       const image = Buffer.alloc(IMAGE_SIZE);
       writeUiInstruction(image, 0x100, 0x700, 0x7f);
@@ -112,7 +112,7 @@ describe('When resolveUiOffset is called', () => {
       const result = await resolveUiOffset(image, readFlagFrom(image));
 
       // Assert
-      expect(result).toBe(0x700);
+      expect(result).toBeUndefined();
     });
   });
 

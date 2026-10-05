@@ -336,8 +336,8 @@ describe('When D2R starts and the memory offsets are resolved', () => {
     });
   });
 
-  describe('If a known build does not expose a 0/1 flag at the known offset', () => {
-    it('Then should fall back to the signature scan', async () => {
+  describe('If a known build does not expose a 0/1 flag at the known offset yet', () => {
+    it('Then should retry the verified offset instead of scanning', async () => {
       // Arrange
       peHeader = createPeHeader(KNOWN_BUILD.timeDateStamp, KNOWN_BUILD.sizeOfImage);
       gameStateByte = 0x7f;
@@ -345,9 +345,30 @@ describe('When D2R starts and the memory offsets are resolved', () => {
       // Act
       eventBus.emit('d2r-started', { processId: 1234, processName: 'D2R.exe' });
       await flushPromises();
+      const validBeforeRetry = memoryReader.isOffsetsValid();
+      gameStateByte = 0;
+      await vi.advanceTimersByTimeAsync(5000);
 
       // Assert
-      expect(fakeReader.readModuleImage).toHaveBeenCalledTimes(1);
+      expect(validBeforeRetry).toBe(false);
+      expect(memoryReader.isOffsetsValid()).toBe(true);
+      expect(fakeReader.readModuleImage).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('If no UI pattern candidate has a live 0/1 flag', () => {
+    it('Then should leave offsets invalid and keep retrying', async () => {
+      // Arrange
+      gameStateByte = 0x55;
+
+      // Act
+      eventBus.emit('d2r-started', { processId: 1234, processName: 'D2R.exe' });
+      await flushPromises();
+      await vi.advanceTimersByTimeAsync(5000);
+
+      // Assert
+      expect(memoryReader.isOffsetsValid()).toBe(false);
+      expect(fakeReader.readModuleImage).toHaveBeenCalledTimes(2);
     });
   });
 

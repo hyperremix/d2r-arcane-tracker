@@ -11,7 +11,8 @@ The offset is resolved in `MemoryReader.resolveInGameFlagOffset()`:
 
 1. **Known build** (`electron/config/d2rBuilds.ts`): the build is identified from the PE header
    (`TimeDateStamp` + `SizeOfImage`), which is always readable, and the verified offset is used
-   directly. No code is scanned.
+   directly. No code is scanned. If the flag byte does not read as 0/1 yet (D2R still starting),
+   the verified offset is retried rather than falling back to the scan.
 2. **Unknown build**: falls back to the d2go UI signature (`electron/config/d2rPatterns.ts`),
    which is **unverified**. It stopped resolving to the right byte in current builds (see below),
    so an unknown build usually means run detection does not work until it is added to the table.

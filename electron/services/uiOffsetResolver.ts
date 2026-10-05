@@ -17,9 +17,8 @@ export type InGameFlagReader = (stateRva: number) => Promise<number | undefined>
  *
  * Every pattern match is validated rather than trusting the first one:
  * - the in-game flag address must fall inside the module image
- * - the flag byte must be readable in the live process; the snapshot cannot tell an unreadable
- *   page apart from a zero byte, so it is not used as evidence
- * - candidates whose flag byte currently reads as a known game state (0 or 1) are preferred
+ * - the flag byte must read as a known game state (0 or 1) in the live process; the snapshot
+ *   cannot tell an unreadable page apart from a zero byte, so it is not used as evidence
  *
  * @param image - Module image snapshot where index equals RVA
  * @param readFlag - Reads the live flag byte at a module-relative address
@@ -32,7 +31,6 @@ export async function resolveUiOffset(
   const pattern = D2R_PATTERNS.UI;
   const { UI_READ_OFFSET, UI_INSTRUCTION_OFFSET, UI_STATE_ADJUSTMENT } = OFFSET_ADJUSTMENTS;
 
-  let fallback: number | undefined;
   let searchFrom = 0;
 
   while (searchFrom < image.length) {
@@ -55,16 +53,10 @@ export async function resolveUiOffset(
     }
 
     const stateValue = await readFlag(stateOffset);
-    if (stateValue === undefined) {
-      continue;
-    }
-
     if (stateValue === D2RGameState.Lobby || stateValue === D2RGameState.InGame) {
       return uiOffset;
     }
-
-    fallback ??= uiOffset;
   }
 
-  return fallback;
+  return undefined;
 }

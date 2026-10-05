@@ -947,7 +947,7 @@ export class MemoryReader {
    *
    * Known builds (identified from the PE header) use a verified offset directly. The header is
    * always readable, unlike the code a signature scan needs, a large part of which is
-   * PAGE_NOACCESS. Unknown builds fall back to the d2go UI signature, which is unverified: it no
+   * PAGE_NOACCESS. If a known build's flag byte is not 0/1 yet, this fails so the caller retries. Unknown builds fall back to the d2go UI signature, which is unverified: it no
    * longer resolves to the in-game flag in current builds, so a new build needs an entry in
    * KNOWN_D2R_BUILDS (see docs/MEMORY_OFFSETS.md).
    *
@@ -984,10 +984,12 @@ export class MemoryReader {
           );
           return true;
         }
+        // Usually D2R is still starting; retry the verified offset rather than the unverified scan
         log.warn(
           'resolveInGameFlagOffset',
-          `Known D2R build ${knownBuild.fileVersion} but the flag byte is not readable as 0/1 (got ${flag?.[0]}); falling back to signature scan`,
+          `Known D2R build ${knownBuild.fileVersion} but the flag byte is not readable as 0/1 yet (got ${flag?.[0]}); will retry`,
         );
+        return false;
       } else {
         log.warn(
           'resolveInGameFlagOffset',

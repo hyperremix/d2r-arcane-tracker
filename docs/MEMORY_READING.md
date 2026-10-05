@@ -251,7 +251,9 @@ For the fallback scan to behave sensibly:
 - The read is bounded by the module's real image size (`ModuleMemorySize`), not a fixed 100 MB.
 - The RIP-relative displacement is a **signed** 32-bit value.
 - Every pattern match is validated rather than trusting the first hit
-  (`electron/services/uiOffsetResolver.ts`).
+  (`electron/services/uiOffsetResolver.ts`): a candidate is accepted only if its flag byte reads
+  as 0 or 1 in the live process. The zero-filled snapshot is not used as evidence, since it cannot
+  tell an unreadable page apart from a zero byte. If no candidate qualifies, resolving is retried.
 - D2R is often still starting when the process is detected, so resolving offsets is **retried every
   5 seconds** (up to 10 minutes) until it succeeds or D2R exits.
 
