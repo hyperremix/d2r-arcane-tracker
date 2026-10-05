@@ -329,7 +329,7 @@ export function createSchema(ctx: DatabaseContext): void {
   upsertItemsFromGrailData(ctx);
 }
 
-type VaultItemSpatialBackfillRow = {
+interface VaultItemSpatialBackfillRow {
   id: string;
   raw_item_json: string;
   item_name: string;
@@ -344,7 +344,7 @@ type VaultItemSpatialBackfillRow = {
   grid_height: number | null;
   equipped_slot_id: number | null;
   icon_file_name: string | null;
-};
+}
 
 const vaultItemSpatialColumns = [
   { name: 'source_file_path', definition: 'TEXT' },
@@ -430,7 +430,7 @@ function ensureMissingVaultItemColumns(ctx: DatabaseContext, columnNames: Set<st
   }
 }
 
-type VaultItemSpatialBackfillValues = {
+interface VaultItemSpatialBackfillValues {
   locationContext: VaultLocationContext;
   stashTab: number | null;
   gridX: number | null;
@@ -439,7 +439,7 @@ type VaultItemSpatialBackfillValues = {
   gridHeight: number | null;
   equippedSlotId: number | null;
   iconFileName: string | null;
-};
+}
 
 function buildVaultItemSpatialBackfillValues(
   row: VaultItemSpatialBackfillRow,

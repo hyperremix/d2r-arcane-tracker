@@ -267,7 +267,7 @@ class GrailDatabase {
   }
 
   // Vault items
-  getVaultItemById(itemId: string): VaultItem | null {
+  getVaultItemById(itemId: string): VaultItem | undefined {
     return vaultItemsModule.getVaultItemById(this, itemId);
   }
   addVaultItem(item: VaultItemUpsertInput): VaultItem {
@@ -276,7 +276,7 @@ class GrailDatabase {
   addVaultItemWithUndo(item: VaultItemUpsertInput): vaultItemsModule.VaultAddResult {
     return vaultItemsModule.addVaultItemWithUndo(this, item);
   }
-  updateVaultItem(itemId: string, updates: VaultItemUpdateInput): VaultItem | null {
+  updateVaultItem(itemId: string, updates: VaultItemUpdateInput): VaultItem | undefined {
     return vaultItemsModule.updateVaultItem(this, itemId, updates);
   }
   removeVaultItem(itemId: string): void {

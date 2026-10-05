@@ -9,7 +9,7 @@ import type {
   VaultItemUpsertInput,
 } from '../types/grail';
 import { isResourceStackFromRawJson, resolveStackCountFromRawJson } from '../utils/stackableItems';
-import { isCurrentlyVaulted } from '../utils/vaultState';
+import { GRAIL_BOOKMARK_FINGERPRINT_PREFIX, isCurrentlyVaulted } from '../utils/vaultState';
 import { dbVaultItemToVaultItem, fromISOString, toISOString } from './converters';
 import { schema } from './drizzle';
 import type { DatabaseContext } from './types';
@@ -215,13 +215,13 @@ function findExistingStackableVaultItem(
         SELECT vi.*
         FROM vault_items vi
         WHERE vi.item_code = ?
-          AND vi.fingerprint NOT LIKE 'grail:%'
+          AND vi.fingerprint NOT LIKE ?
           AND vi.vaulted_at IS NOT NULL
           AND (vi.unvaulted_at IS NULL OR vi.unvaulted_at < vi.vaulted_at)
         LIMIT 1
       `,
     )
-    .get(itemCode) as RawVaultSearchRow | undefined;
+    .get(itemCode, `${GRAIL_BOOKMARK_FINGERPRINT_PREFIX}%`) as RawVaultSearchRow | undefined;
 
   if (!row) {
     return undefined;
@@ -236,9 +236,12 @@ export interface VaultAddResult {
   undo: () => void;
 }
 
-function findVaultItemByFingerprint(ctx: DatabaseContext, fingerprint: string): VaultItem | null {
+function findVaultItemByFingerprint(
+  ctx: DatabaseContext,
+  fingerprint: string,
+): VaultItem | undefined {
   const row = ctx.db.select().from(vaultItems).where(eq(vaultItems.fingerprint, fingerprint)).get();
-  return row ? getVaultItemById(ctx, row.id) : null;
+  return row ? getVaultItemById(ctx, row.id) : undefined;
 }
 
 /**
@@ -293,7 +296,7 @@ function createMergeUndo(ctx: DatabaseContext, rowId: string, mergedCount: numbe
   };
 }
 
-function createUndo(ctx: DatabaseContext, savedId: string, previous: VaultItem | null) {
+function createUndo(ctx: DatabaseContext, savedId: string, previous: VaultItem | undefined) {
   return () => {
     if (previous) {
       restoreVaultItemRow(ctx, previous);
@@ -353,7 +356,7 @@ export function addVaultItemWithUndo(
     };
   }
 
-  const previous = normalizedInput === input ? rowWithSameFingerprint : null;
+  const previous = normalizedInput === input ? rowWithSameFingerprint : undefined;
   const inputWithVault: VaultItemUpsertInput = {
     ...normalizedInput,
     vaultedAt: normalizedInput.vaultedAt ?? new Date(nowIso),
@@ -407,7 +410,7 @@ export function updateVaultItem(
   ctx: DatabaseContext,
   itemId: string,
   updates: VaultItemUpdateInput,
-): VaultItem | null {
+): VaultItem | undefined {
   const updatePayload = buildVaultItemUpdatePayload(updates);
 
   if (Object.keys(updatePayload).length > 0) {
@@ -595,10 +598,10 @@ export function setVaultItemsPresentInLatestScan(
   }
 }
 
-export function getVaultItemById(ctx: DatabaseContext, itemId: string): VaultItem | null {
+export function getVaultItemById(ctx: DatabaseContext, itemId: string): VaultItem | undefined {
   const row = ctx.db.select().from(vaultItems).where(eq(vaultItems.id, itemId)).get();
   if (!row) {
-    return null;
+    return undefined;
   }
 
   return attachCategoryIds(ctx, [dbVaultItemToVaultItem(row)])[0];

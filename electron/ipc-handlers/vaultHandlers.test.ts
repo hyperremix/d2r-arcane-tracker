@@ -1427,7 +1427,7 @@ describe('When vault IPC handlers are initialized', () => {
     describe('If the vault item does not exist', () => {
       it('Then it rejects without writing', async () => {
         // Arrange
-        mocks.grailDatabaseMock.getVaultItemById.mockReturnValue(null);
+        mocks.grailDatabaseMock.getVaultItemById.mockReturnValue(undefined);
         mocks.grailDatabaseMock.getAllVaultCategories.mockReturnValue([{ id: 'cat-1' }]);
         initializeVaultHandlers(() => undefined);
         const handler = mocks.handleMock.mock.calls.find(

@@ -813,7 +813,7 @@ async function unvaultVaultItemSafely(
   withdrawCount: number | undefined,
 ): Promise<void> {
   const vaultItem = grailDatabase.getVaultItemById(itemId);
-  assert(vaultItem != null, 'Vault item not found');
+  assert(vaultItem !== undefined, 'Vault item not found');
   assert(isCurrentlyVaulted(vaultItem), 'Vault item is not currently vaulted');
   assert(
     !isGrailBookmark(vaultItem),
@@ -880,7 +880,7 @@ export function initializeVaultHandlers(
     // A row that is still vaulted and was taken out of a save file is the only copy of that item.
     const vaultItem = grailDatabase.getVaultItemById(itemId);
     assert(
-      vaultItem == null ||
+      vaultItem === undefined ||
         isGrailBookmark(vaultItem) ||
         !vaultItem.sourceFilePath?.trim() ||
         !isCurrentlyVaulted(vaultItem),
@@ -924,7 +924,7 @@ export function initializeVaultHandlers(
         categoryIds.every((id) => typeof id === 'string' && id.length > 0),
         'Each categoryId must be a non-empty string',
       );
-      assert(grailDatabase.getVaultItemById(itemId) != null, 'Vault item not found');
+      assert(grailDatabase.getVaultItemById(itemId) !== undefined, 'Vault item not found');
       const knownCategoryIds = new Set(grailDatabase.getAllVaultCategories().map(({ id }) => id));
       const unknownCategoryId = categoryIds.find((id) => !knownCategoryIds.has(id));
       assert(unknownCategoryId === undefined, `Vault category not found: ${unknownCategoryId}`);

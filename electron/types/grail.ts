@@ -377,16 +377,16 @@ export interface VaultItemSearchResult {
   pageSize: number;
 }
 
-export type DatabaseVaultCategory = {
+export interface DatabaseVaultCategory {
   id: string;
   name: string;
   color: string | null;
   metadata: string | null;
   created_at: string;
   updated_at: string;
-};
+}
 
-export type DatabaseVaultItem = {
+export interface DatabaseVaultItem {
   id: string;
   fingerprint: string;
   item_name: string;
@@ -416,7 +416,7 @@ export type DatabaseVaultItem = {
   unvaulted_at: string | null;
   created_at: string;
   updated_at: string;
-};
+}
 
 export interface GrailProgress {
   id: string;

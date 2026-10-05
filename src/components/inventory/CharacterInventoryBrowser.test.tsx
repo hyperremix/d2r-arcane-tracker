@@ -344,7 +344,10 @@ describe('When CharacterInventoryBrowser is rendered', () => {
 
   describe('If cross-search returns inventory and vault data', () => {
     it('Then it renders board sections with extended inventory cells merged into the main board', async () => {
-      // Arrange & Act
+      // Arrange
+      // Inventory snapshots, vault rows and grail data come from the mocks set up in beforeEach.
+
+      // Act
       render(<CharacterInventoryBrowser />);
 
       // Assert
@@ -2158,7 +2161,10 @@ describe('When CharacterInventoryBrowser is rendered', () => {
 
   describe('If the board tile is rendered', () => {
     it('Then item text is shown in the selected panel instead of on the grid tile', async () => {
-      // Arrange & Act
+      // Arrange
+      // Inventory snapshots, vault rows and grail data come from the mocks set up in beforeEach.
+
+      // Act
       render(<CharacterInventoryBrowser />);
 
       // Assert

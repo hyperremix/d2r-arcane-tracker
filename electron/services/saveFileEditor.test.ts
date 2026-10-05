@@ -151,27 +151,27 @@ afterAll(() => {
   vi.resetModules();
 });
 
-type D2sItem = {
+interface D2sItem {
   id?: unknown;
-};
+}
 
-type D2sData = {
+interface D2sData {
   header?: {
     class?: string;
   };
   items: D2sItem[];
   corpse_items: D2sItem[];
   merc_items: D2sItem[];
-};
+}
 
-type StashData = {
+interface StashData {
   pages: { name: string; type: number; items: { id: number }[] }[];
   pageCount: number;
   hardcore: boolean;
   version: string;
   type: number;
   sharedGold: number;
-};
+}
 
 function makeD2sData(
   items: D2sItem[] = [],

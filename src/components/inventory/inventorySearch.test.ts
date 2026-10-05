@@ -62,8 +62,13 @@ describe('When buildInventorySearchFilter is called', () => {
 
   describe('If the character is "all"', () => {
     it('Then no character filter is applied', () => {
-      // Arrange / Act
-      const filter = buildInventorySearchFilter('', 'all', 'all');
+      // Arrange
+      const text = '';
+      const characterId = 'all';
+      const location = 'all';
+
+      // Act
+      const filter = buildInventorySearchFilter(text, characterId, location);
 
       // Assert
       expect(filter.characterId).toBeUndefined();
@@ -72,8 +77,13 @@ describe('When buildInventorySearchFilter is called', () => {
 
   describe('If the character id uses the name: prefix', () => {
     it('Then the prefix is stripped', () => {
-      // Arrange / Act
-      const filter = buildInventorySearchFilter('', 'name:Sorc', 'all');
+      // Arrange
+      const text = '';
+      const characterId = 'name:Sorc';
+      const location = 'all';
+
+      // Act
+      const filter = buildInventorySearchFilter(text, characterId, location);
 
       // Assert
       expect(filter.characterId).toBe('Sorc');
@@ -82,8 +92,13 @@ describe('When buildInventorySearchFilter is called', () => {
 
   describe('If the character id is a plain id', () => {
     it('Then it is passed through unchanged', () => {
-      // Arrange / Act
-      const filter = buildInventorySearchFilter('', 'char-7', 'all');
+      // Arrange
+      const text = '';
+      const characterId = 'char-7';
+      const location = 'all';
+
+      // Act
+      const filter = buildInventorySearchFilter(text, characterId, location);
 
       // Assert
       expect(filter.characterId).toBe('char-7');
@@ -92,8 +107,13 @@ describe('When buildInventorySearchFilter is called', () => {
 
   describe('If the location is "all"', () => {
     it('Then no location filter is applied', () => {
-      // Arrange / Act
-      const filter = buildInventorySearchFilter('', 'all', 'all');
+      // Arrange
+      const text = '';
+      const characterId = 'all';
+      const location = 'all';
+
+      // Act
+      const filter = buildInventorySearchFilter(text, characterId, location);
 
       // Assert
       expect(filter.locationContext).toBeUndefined();
@@ -102,8 +122,13 @@ describe('When buildInventorySearchFilter is called', () => {
 
   describe('If a specific location is chosen', () => {
     it('Then the filter targets only vaulted, non-socketed items in that location', () => {
-      // Arrange / Act
-      const filter = buildInventorySearchFilter('', 'all', 'stash');
+      // Arrange
+      const text = '';
+      const characterId = 'all';
+      const location = 'stash';
+
+      // Act
+      const filter = buildInventorySearchFilter(text, characterId, location);
 
       // Assert
       expect(filter).toMatchObject({

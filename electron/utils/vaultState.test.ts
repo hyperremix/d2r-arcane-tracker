@@ -85,8 +85,11 @@ describe('When resolving whether a vault row is currently vaulted', () => {
 describe('When using the shared vault validation helpers', () => {
   describe('If a source file type is checked', () => {
     it('Then only d2s, sss, d2x and d2i are valid', () => {
-      // Arrange / Act
-      const valid = ['d2s', 'sss', 'd2x', 'd2i'].every((type) => VALID_SOURCE_FILE_TYPES.has(type));
+      // Arrange
+      const supportedTypes = ['d2s', 'sss', 'd2x', 'd2i'];
+
+      // Act
+      const valid = supportedTypes.every((type) => VALID_SOURCE_FILE_TYPES.has(type));
 
       // Assert
       expect(valid).toBe(true);
@@ -96,11 +99,21 @@ describe('When using the shared vault validation helpers', () => {
 
   describe('If assert receives a false condition', () => {
     it('Then it throws an Error with the message', () => {
-      // Arrange / Act
+      // Arrange
       const call = () => assert(false, 'boom');
 
+      // Act
+      const failure = (() => {
+        try {
+          call();
+          return undefined;
+        } catch (error) {
+          return error;
+        }
+      })();
+
       // Assert
-      expect(call).toThrow('boom');
+      expect(failure).toEqual(new Error('boom'));
       expect(() => assert(true, 'never')).not.toThrow();
     });
   });

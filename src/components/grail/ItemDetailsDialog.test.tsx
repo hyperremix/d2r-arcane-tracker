@@ -614,8 +614,8 @@ describe('When ItemDetailsDialog is rendered', () => {
 
       // Act
       render(<ItemDetailsDialog itemId="item-1" open={true} onOpenChange={vi.fn()} />);
-      const vaultButton = await screen.findByRole('button', { name: 'Bookmark' });
-      fireEvent.click(vaultButton);
+      const bookmarkButton = await screen.findByRole('button', { name: 'Bookmark' });
+      fireEvent.click(bookmarkButton);
 
       // Assert
       expect(mockVaultAddItem).toHaveBeenCalledTimes(1);
@@ -695,8 +695,8 @@ describe('When ItemDetailsDialog is rendered', () => {
 
       // Act
       render(<ItemDetailsDialog itemId="item-1" open={true} onOpenChange={vi.fn()} />);
-      const vaultButton = await screen.findByRole('button', { name: 'Bookmark' });
-      fireEvent.click(vaultButton);
+      const bookmarkButton = await screen.findByRole('button', { name: 'Bookmark' });
+      fireEvent.click(bookmarkButton);
 
       // Assert
       expect(screen.queryByText('Bookmarked')).not.toBeInTheDocument();
@@ -743,10 +743,10 @@ describe('When ItemDetailsDialog is rendered', () => {
       mockVaultAddItem.mockRejectedValue(failure);
       const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
       render(<ItemDetailsDialog itemId="item-1" open={true} onOpenChange={vi.fn()} />);
-      const vaultButton = await screen.findByRole('button', { name: 'Bookmark' });
+      const bookmarkButton = await screen.findByRole('button', { name: 'Bookmark' });
 
       // Act
-      fireEvent.click(vaultButton);
+      fireEvent.click(bookmarkButton);
 
       // Assert
       await waitFor(() =>
@@ -764,20 +764,20 @@ describe('When ItemDetailsDialog is rendered', () => {
       // Arrange
       const item = HolyGrailItemBuilder.new().withId('item-1').withName('Windforce').build();
       setupStoreMock({ items: [item] });
-      const vaulted = {
+      const bookmark = {
         id: 'vault-1',
         fingerprint: 'grail:item-1',
         itemName: 'Windforce',
         categoryIds: [],
       };
-      mockVaultAddItem.mockResolvedValue(vaulted);
+      mockVaultAddItem.mockResolvedValue(bookmark);
       const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
       render(<ItemDetailsDialog itemId="item-1" open={true} onOpenChange={vi.fn()} />);
-      const vaultButton = await screen.findByRole('button', { name: 'Bookmark' });
+      const bookmarkButton = await screen.findByRole('button', { name: 'Bookmark' });
       mockVaultListCategories.mockRejectedValue(new Error('refresh failed'));
 
       // Act
-      fireEvent.click(vaultButton);
+      fireEvent.click(bookmarkButton);
 
       // Assert
       await waitFor(() =>
