@@ -1,5 +1,5 @@
 const D2I_SECTOR_SIGNATURE = 0xaa55aa55;
-const D2I_SECTOR_HEADER_SIZE = 64;
+export const D2I_SECTOR_HEADER_SIZE = 64;
 const MAX_SECTORS = 1024;
 
 export interface D2iSectorDescriptor {
@@ -36,6 +36,19 @@ function readPayloadSignature(buffer: Buffer, payloadOffset: number, payloadSize
   }
 
   return signatureBytes.toString('hex');
+}
+
+/**
+ * Reads only the format version from the first sector header, without validating any sector size.
+ * Lets callers tell a damaged v105+ file (whose metadata read throws) from a pre-105 file.
+ * Returns `undefined` when the buffer does not start with a sector header.
+ */
+export function readD2iHeaderVersion(buffer: Buffer): number | undefined {
+  if (buffer.length < 12 || buffer.readUInt32LE(0) !== D2I_SECTOR_SIGNATURE) {
+    return undefined;
+  }
+
+  return buffer.readUInt32LE(8);
 }
 
 export function readD2iMetadata(buffer: Buffer): D2iMetadata {

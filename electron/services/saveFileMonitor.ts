@@ -35,7 +35,7 @@ import { resolveSpatialLocation } from '../utils/spatialLocationResolver';
 import { createVaultPresenceKey } from '../utils/vaultPresence';
 import type { EventBus } from './EventBus';
 import { parseModernStash } from './modernStashParser';
-import { readD2iMetadata } from './stashFormat';
+import { readD2iHeaderVersion, readD2iMetadata } from './stashFormat';
 
 const log = createServiceLogger('SaveFileMonitor');
 /**
@@ -89,10 +89,6 @@ const processItemName = (item: D2SItem): string => {
 
   let name = item.unique_name || item.set_name || '';
   name = name.toLowerCase().replace(/[^a-z0-9]/gi, '');
-
-  if (isRune(item as d2s.types.IItem)) {
-    return name;
-  }
 
   return name;
 };
@@ -1633,7 +1629,9 @@ class SaveFileMonitor {
       } catch {
         // Only fall back to classic stash parsing for pre-105 format files.
         // Calling d2stash.read on a v105+ .d2i file would fail or produce
-        // garbage because the formats are incompatible.
+        // garbage because the formats are incompatible. A v105+ file cut off inside a
+        // sector throws before the metadata version is known, so read it from the header.
+        d2iVersion ??= readD2iHeaderVersion(content);
         if (d2iVersion === undefined || d2iVersion < 105) {
           return await d2stash.read(content, constants99).then(parseStash);
         }

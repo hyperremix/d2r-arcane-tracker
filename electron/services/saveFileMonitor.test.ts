@@ -2231,6 +2231,29 @@ describe('When SaveFileMonitor is used', () => {
       });
     });
 
+    describe('If a v105+ shared stash is cut off inside a sector', () => {
+      it('Then it is reported as errored without falling back to the legacy stash parser', async () => {
+        // Arrange
+        mockDatabase.getAllSettings.mockReturnValue({
+          saveDir: '/test/save/dir',
+          gameMode: GameMode.Both,
+        });
+        const truncated = readFileSync(MODERN_STASH_FIXTURE_PATH).subarray(0, 3000);
+        vi.mocked(d2stash.read).mockClear();
+        const parseSaveSpy = vi.spyOn(monitor as any, 'parseSave');
+
+        // Act
+        await scanFile('ModernSharedStashSoftCoreV2.d2i', truncated);
+
+        // Assert
+        const outcome = await parseSaveSpy.mock.results[0]?.value;
+        expect(outcome.status).toBe('errored');
+        expect(outcome.items).toEqual([]);
+        expect(d2stash.read).not.toHaveBeenCalled();
+        expect(mockDatabase.reconcileVaultItemsForScan).not.toHaveBeenCalled();
+      });
+    });
+
     describe('If a v105+ shared stash is only partially parsed', () => {
       it('Then its vault rows are not reconciled but the items read so far stay visible', async () => {
         // Arrange
