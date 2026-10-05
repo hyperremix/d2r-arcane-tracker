@@ -72,9 +72,10 @@ vi.mock('../utils/grailItemUtils', () => ({
   getGrailItemId: vi.fn(),
 }));
 
-import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { readFile, stat } from 'node:fs/promises';
-import { resolve } from 'node:path';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
 import * as d2s from '@dschu012/d2s';
 import * as d2stash from '@dschu012/d2s/lib/d2/stash';
 import { app } from 'electron';
@@ -412,6 +413,49 @@ describe('When SaveFileMonitor is used', () => {
       // Act & Assert
       expect((monitor as any).getCharacterClass(99)).toBe('unknown');
       expect((monitor as any).getCharacterClass(-1)).toBe('unknown');
+    });
+  });
+
+  describe('If parseSaveFile is called for legacy shared stash files', () => {
+    let saveDir: string;
+
+    beforeEach(() => {
+      saveDir = mkdtempSync(join(tmpdir(), 'save-monitor-stash-'));
+    });
+
+    afterEach(() => {
+      rmSync(saveDir, { recursive: true, force: true });
+    });
+
+    it.each([
+      '.sss',
+      '.d2x',
+    ])('Then a %s file is described as a shared stash instead of a character', async (extension) => {
+      // Arrange
+      const filePath = join(saveDir, `SharedStashSoftCoreV2${extension}`);
+      writeFileSync(filePath, Buffer.alloc(1024, 0xff));
+
+      // Act
+      const saveFile = await (monitor as any).parseSaveFile(filePath);
+
+      // Assert
+      expect(saveFile?.characterClass).toBe('shared_stash');
+      expect(saveFile?.name).toBe('SharedStashSoftCoreV2');
+      expect(saveFile?.level).toBe(1);
+    });
+
+    it('Then the hardcore flag of a legacy stash comes from its parsed header', async () => {
+      // Arrange
+      const filePath = join(saveDir, 'SharedStash.sss');
+      writeFileSync(filePath, Buffer.alloc(1024));
+      vi.mocked(d2stash.read).mockResolvedValue({ hardcore: true, pages: [] } as any);
+
+      // Act
+      const saveFile = await (monitor as any).parseSaveFile(filePath);
+
+      // Assert
+      expect(saveFile?.characterClass).toBe('shared_stash');
+      expect(saveFile?.hardcore).toBe(true);
     });
   });
 
@@ -1641,6 +1685,38 @@ describe('When SaveFileMonitor is used', () => {
       expect(parseResult.inventorySnapshot?.readOnly).toBe(false);
       expect(parseResult.inventorySnapshot?.sourceFileVersion).toBe(105);
       expect(parseResult.saveName).toBe('Modern Shared Stash Softcore');
+    });
+
+    it('Then processSingleFile stamps every snapshot item with the stored character id', async () => {
+      // Arrange
+      const saveDir = mkdtempSync(join(tmpdir(), 'save-monitor-'));
+      const savePath = join(saveDir, 'Hero.d2s');
+      writeFileSync(savePath, Buffer.from('mock file content'));
+      mockDatabase.getCharacterByName.mockReturnValue({ id: 'char-1', name: 'Hero' });
+      vi.spyOn(monitor as any, 'parseSave').mockResolvedValue([
+        {
+          itemName: 'Shako',
+          characterName: 'Hero',
+          isSocketedItem: false,
+          rawParsedItem: { name: 'Shako' },
+        },
+      ]);
+      vi.spyOn(monitor as any, 'updateSaveFileState').mockResolvedValue(undefined);
+
+      // Act
+      const parseResult = await (monitor as any).processSingleFile(savePath, {
+        items: {},
+        ethItems: {},
+        stats: {},
+        availableRunes: {},
+      });
+      rmSync(saveDir, { recursive: true, force: true });
+
+      // Assert
+      expect(parseResult.inventorySnapshot?.characterId).toBe('char-1');
+      expect(parseResult.inventorySnapshot?.items.map((item: any) => item.characterId)).toEqual([
+        'char-1',
+      ]);
     });
 
     it('Then getAvailableRunesCount sums rune quantities instead of entry counts', () => {

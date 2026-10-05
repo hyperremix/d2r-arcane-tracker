@@ -212,6 +212,48 @@ describe('When vault IPC handlers are initialized', () => {
     });
   });
 
+  describe('If vault:addItem receives a stackable d2i item without id or position in its raw JSON', () => {
+    it('Then the source item is located by the input stash tab, coordinates and code', async () => {
+      // Arrange
+      initializeVaultHandlers(() => undefined);
+      mocks.saveFileEditorMock.readSaveFileItem.mockResolvedValue({ type: 'r19', code: 'r19' });
+      mocks.grailDatabaseMock.addVaultItemWithUndo.mockReturnValue({
+        item: { id: 'vault-item-3' },
+        undo: vi.fn(),
+      });
+      const handler = mocks.handleMock.mock.calls.find((call) => call[0] === 'vault:addItem')?.[1];
+
+      // Act
+      await handler?.(null, {
+        fingerprint: 'fp-rune-no-position',
+        itemName: 'Fal Rune',
+        itemCode: 'r19',
+        quality: 'normal',
+        ethereal: false,
+        rawItemJson: '{"type":"r19","code":"r19"}',
+        sourceFileType: 'd2i',
+        sourceFilePath: '/tmp/shared-stash.d2i',
+        locationContext: 'stash',
+        stashTab: 7,
+        gridX: 3,
+        gridY: 2,
+      });
+
+      // Assert
+      expect(mocks.saveFileEditorMock.removeItemFromSaveFile).toHaveBeenCalledWith(
+        '/tmp/shared-stash.d2i',
+        'd2i',
+        expect.objectContaining({
+          itemId: undefined,
+          itemCode: 'r19',
+          stashTab: 7,
+          gridX: 3,
+          gridY: 2,
+        }),
+      );
+    });
+  });
+
   describe('If vault:addItem source removal fails after vault row is written', () => {
     it('Then it reverts vaulted state and returns a clear error', async () => {
       // Arrange
@@ -241,6 +283,33 @@ describe('When vault IPC handlers are initialized', () => {
       // Assert
       await expect(promise).rejects.toThrow('Vault add persisted but source item removal failed');
       expect(undo).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('If vault:addItem fails to write the vault row', () => {
+    it('Then the item is never removed from the save file', async () => {
+      // Arrange
+      initializeVaultHandlers(() => undefined);
+      mocks.grailDatabaseMock.addVaultItemWithUndo.mockImplementation(() => {
+        throw new Error('database is locked');
+      });
+      const handler = mocks.handleMock.mock.calls.find((call) => call[0] === 'vault:addItem')?.[1];
+
+      // Act
+      const promise = handler?.(null, {
+        fingerprint: 'fp-shako-db-failure',
+        itemName: 'Shako',
+        quality: 'unique',
+        ethereal: false,
+        rawItemJson: '{"id":42}',
+        sourceFileType: 'd2s',
+        sourceFilePath: '/tmp/sorc.d2s',
+        locationContext: 'inventory',
+      });
+
+      // Assert
+      await expect(promise).rejects.toThrow('database is locked');
+      expect(mocks.saveFileEditorMock.removeItemFromSaveFile).not.toHaveBeenCalled();
     });
   });
 

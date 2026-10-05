@@ -1525,6 +1525,30 @@ class SaveFileMonitor {
         };
       }
 
+      // Legacy shared stash files (.sss/.d2x) have no character header: reading one as a .d2s would
+      // produce an invalid character class that the characters table rejects.
+      if (extension === '.sss' || extension === '.d2x') {
+        let isHardcore = basename(filePath).toLowerCase().includes('hardcore');
+        try {
+          isHardcore = (await d2stash.read(buffer, constants96)).hardcore;
+        } catch (_parseError) {
+          log.warn(
+            'parseSaveFile',
+            'Failed to parse legacy stash header, falling back to filename',
+          );
+        }
+
+        return {
+          name: this.getSaveNameFromPath(filePath),
+          path: filePath,
+          lastModified: stats.mtime,
+          characterClass: 'shared_stash',
+          level: 1,
+          hardcore: isHardcore,
+          expansion: true,
+        };
+      }
+
       // Basic D2 save file parsing (simplified)
       const fileName = basename(filePath, '.d2s');
 
