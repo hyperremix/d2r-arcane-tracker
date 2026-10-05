@@ -6,7 +6,6 @@ import type {
   RunItem,
   SaveFileState,
   Session,
-  VaultCategory,
   VaultItem,
 } from '../types/grail';
 import type {
@@ -17,7 +16,6 @@ import type {
   DbRunItem,
   DbSaveFileState,
   DbSession,
-  DbVaultCategory,
   DbVaultItem,
 } from './drizzle';
 
@@ -156,17 +154,6 @@ export function dbRunItemToRunItem(dbRunItem: DbRunItem): RunItem {
     name: dbRunItem.name ?? undefined,
     foundTime: new Date(dbRunItem.foundTime),
     created: new Date(dbRunItem.createdAt ?? new Date().toISOString()),
-  };
-}
-
-export function dbVaultCategoryToVaultCategory(dbCategory: DbVaultCategory): VaultCategory {
-  return {
-    id: dbCategory.id,
-    name: dbCategory.name,
-    color: dbCategory.color ?? undefined,
-    metadata: dbCategory.metadata ?? undefined,
-    created: new Date(dbCategory.createdAt ?? new Date().toISOString()),
-    lastUpdated: new Date(dbCategory.updatedAt ?? new Date().toISOString()),
   };
 }
 

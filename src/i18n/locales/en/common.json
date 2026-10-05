@@ -86,7 +86,6 @@
       "unbookmarkAction": "Remove Bookmark",
       "bookmarked": "Bookmarked",
       "notBookmarked": "Not Bookmarked",
-      "noTags": "No tags assigned",
       "bookmarkActionFailed": "Failed to update the bookmark. Nothing was changed.",
       "bookmarkLoadError": "Failed to load bookmark status.",
       "markAsFoundDescription": "Record which character found {{item}}.",

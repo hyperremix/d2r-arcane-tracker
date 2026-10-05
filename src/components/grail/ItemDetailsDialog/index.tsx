@@ -1,4 +1,4 @@
-import type { Item, VaultCategory, VaultItem, VaultItemUpsertInput } from 'electron/types/grail';
+import type { Item, VaultItem, VaultItemUpsertInput } from 'electron/types/grail';
 import { GRAIL_BOOKMARK_FINGERPRINT_PREFIX } from 'electron/utils/vaultState';
 import { Archive, ArchiveRestore } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -84,8 +84,7 @@ export function ItemDetailsDialog({ itemId, open, onOpenChange }: ItemDetailsDia
   const { t } = useTranslation();
   const { items, progress, characters, removeProgress, settings } = useGrailStore();
   const [isBookmarkActionPending, setIsBookmarkActionPending] = useState(false);
-  const [bookmarkCategories, setBookmarkCategories] = useState<VaultCategory[]>([]);
-  const [linkedBookmark, setLinkedBookmark] = useState<VaultItem | null>(null);
+  const [linkedBookmark, setLinkedBookmark] = useState<VaultItem | undefined>(undefined);
 
   const item = useMemo(() => {
     if (!itemId) {
@@ -119,18 +118,14 @@ export function ItemDetailsDialog({ itemId, open, onOpenChange }: ItemDetailsDia
       return;
     }
 
-    const [categories, searchResult] = await Promise.all([
-      window.electronAPI.vault.listCategories(),
-      window.electronAPI.vault.search({
-        text: item.name,
-        presentState: 'all',
-        page: 1,
-        pageSize: 100,
-      }),
-    ]);
+    const searchResult = await window.electronAPI.vault.search({
+      text: item.name,
+      presentState: 'all',
+      page: 1,
+      pageSize: 100,
+    });
 
-    setBookmarkCategories(categories);
-    setLinkedBookmark(findLinkedBookmark(searchResult.items, item) ?? null);
+    setLinkedBookmark(findLinkedBookmark(searchResult.items, item));
   }, [item, open]);
 
   useEffect(() => {
@@ -150,7 +145,7 @@ export function ItemDetailsDialog({ itemId, open, onOpenChange }: ItemDetailsDia
 
     try {
       if (linkedBookmark) {
-        setLinkedBookmark(null);
+        setLinkedBookmark(undefined);
         await window.electronAPI.vault.removeItem(linkedBookmark.id);
       } else {
         const newBookmark = await window.electronAPI.vault.addItem(toBookmarkUpsertInput(item));
@@ -175,9 +170,6 @@ export function ItemDetailsDialog({ itemId, open, onOpenChange }: ItemDetailsDia
     return null;
   }
 
-  const assignedCategoryNames = (linkedBookmark?.categoryIds ?? [])
-    .map((categoryId) => bookmarkCategories.find((category) => category.id === categoryId)?.name)
-    .filter((name): name is string => Boolean(name));
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -229,17 +221,6 @@ export function ItemDetailsDialog({ itemId, open, onOpenChange }: ItemDetailsDia
                     ? t(translations.grail.itemDetails.bookmarked)
                     : t(translations.grail.itemDetails.notBookmarked)}
                 </Badge>
-              </div>
-              <div className="flex flex-wrap gap-1">
-                {assignedCategoryNames.length > 0 ? (
-                  assignedCategoryNames.map((name) => (
-                    <Badge key={name} variant="outline">
-                      {name}
-                    </Badge>
-                  ))
-                ) : (
-                  <Badge variant="outline">{t(translations.grail.itemDetails.noTags)}</Badge>
-                )}
               </div>
             </div>
 

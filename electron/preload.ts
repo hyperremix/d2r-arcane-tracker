@@ -17,7 +17,6 @@ import type {
   TerrorZone,
   TerrorZoneValidationResult,
   UpdateStatus,
-  VaultCategory,
   VaultItem,
   VaultItemFilter,
   VaultItemSearchResult,
@@ -266,7 +265,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.invoke('vault:removeItem', itemId),
     search: (filter?: VaultItemFilter): Promise<VaultItemSearchResult> =>
       ipcRenderer.invoke('vault:search', filter),
-    listCategories: (): Promise<VaultCategory[]> => ipcRenderer.invoke('vault:listCategories'),
     unvaultItem: (
       itemId: string,
       targetOptions?: {

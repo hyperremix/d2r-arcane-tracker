@@ -4,8 +4,6 @@ import type {
   VaultItem,
   VaultItemFilter,
   VaultItemSearchResult,
-  VaultItemUpdateInput,
-  VaultItemUpsertByFingerprintInput,
   VaultItemUpsertInput,
 } from '../types/grail';
 import { isResourceStackFromRawJson, resolveStackCountFromRawJson } from '../utils/stackableItems';
@@ -14,7 +12,6 @@ import { GRAIL_BOOKMARK_FINGERPRINT_PREFIX, isCurrentlyVaulted } from '../utils/
 import { dbVaultItemToVaultItem, fromISOString, toISOString } from './converters';
 import { schema } from './drizzle';
 import type { DatabaseContext } from './types';
-import { getCategoryIdsByVaultItemIds, setVaultItemCategories } from './vault-categories';
 
 const { vaultItems } = schema;
 
@@ -107,14 +104,6 @@ function toNullable<T>(value: T | undefined): T | null {
   return value ?? null;
 }
 
-function toOptionalIsoTimestamp(value: Date | string | undefined): string | undefined {
-  if (typeof value === 'string') {
-    return value;
-  }
-
-  return toISOString(value) ?? undefined;
-}
-
 function buildVaultItemValues(input: VaultItemUpsertInput) {
   const nowIso = new Date().toISOString();
 
@@ -149,63 +138,6 @@ function buildVaultItemValues(input: VaultItemUpsertInput) {
   };
 }
 
-type VaultItemValues = ReturnType<typeof buildVaultItemValues>;
-type VaultItemUpdatePayload = Partial<VaultItemValues>;
-
-function setPayloadValue<K extends keyof VaultItemUpdatePayload>(
-  payload: VaultItemUpdatePayload,
-  key: K,
-  value: VaultItemUpdatePayload[K] | undefined,
-): void {
-  if (value !== undefined) {
-    payload[key] = value;
-  }
-}
-
-function buildVaultItemUpdatePayload(updates: VaultItemUpdateInput) {
-  const payload: VaultItemUpdatePayload = {};
-
-  setPayloadValue(payload, 'itemName', updates.itemName);
-  setPayloadValue(payload, 'itemCode', updates.itemCode);
-  setPayloadValue(payload, 'quality', updates.quality);
-  setPayloadValue(payload, 'ethereal', updates.ethereal);
-  setPayloadValue(payload, 'socketCount', updates.socketCount);
-  setPayloadValue(payload, 'stackCount', updates.stackCount);
-  setPayloadValue(payload, 'rawItemJson', updates.rawItemJson);
-  setPayloadValue(payload, 'sourceCharacterId', updates.sourceCharacterId);
-  setPayloadValue(payload, 'sourceCharacterName', updates.sourceCharacterName);
-  setPayloadValue(payload, 'sourceFileType', updates.sourceFileType);
-  setPayloadValue(payload, 'sourceFilePath', updates.sourceFilePath);
-  setPayloadValue(payload, 'locationContext', updates.locationContext);
-  setPayloadValue(payload, 'stashTab', updates.stashTab);
-  setPayloadValue(payload, 'gridX', updates.gridX);
-  setPayloadValue(payload, 'gridY', updates.gridY);
-  setPayloadValue(payload, 'gridWidth', updates.gridWidth);
-  setPayloadValue(payload, 'gridHeight', updates.gridHeight);
-  setPayloadValue(payload, 'equippedSlotId', updates.equippedSlotId);
-  setPayloadValue(payload, 'iconFileName', updates.iconFileName);
-  setPayloadValue(payload, 'isSocketedItem', updates.isSocketedItem);
-  setPayloadValue(payload, 'grailItemId', updates.grailItemId);
-  setPayloadValue(payload, 'isPresentInLatestScan', updates.isPresentInLatestScan);
-  setPayloadValue(payload, 'lastSeenAt', toOptionalIsoTimestamp(updates.lastSeenAt));
-  setPayloadValue(payload, 'vaultedAt', toOptionalIsoTimestamp(updates.vaultedAt));
-  setPayloadValue(payload, 'unvaultedAt', toOptionalIsoTimestamp(updates.unvaultedAt));
-
-  return payload;
-}
-
-function attachCategoryIds(ctx: DatabaseContext, items: VaultItem[]): VaultItem[] {
-  const categoryMap = getCategoryIdsByVaultItemIds(
-    ctx,
-    items.map((item) => item.id),
-  );
-
-  return items.map((item) => ({
-    ...item,
-    categoryIds: categoryMap[item.id] ?? [],
-  }));
-}
-
 function findExistingStackableVaultItem(
   ctx: DatabaseContext,
   itemCode: string,
@@ -228,7 +160,7 @@ function findExistingStackableVaultItem(
     return undefined;
   }
 
-  return attachCategoryIds(ctx, [mapRawVaultSearchRowToVaultItem(row)])[0];
+  return mapRawVaultSearchRowToVaultItem(row);
 }
 
 export interface VaultAddResult {
@@ -246,7 +178,7 @@ function findVaultItemByFingerprint(
 }
 
 /**
- * Restores every persisted column of a vault row (and its categories) to a previously read state.
+ * Restores every persisted column of a vault row to a previously read state.
  */
 function restoreVaultItemRow(ctx: DatabaseContext, previous: VaultItem): void {
   const values = buildVaultItemValues({
@@ -268,8 +200,6 @@ function restoreVaultItemRow(ctx: DatabaseContext, previous: VaultItem): void {
     })
     .where(eq(vaultItems.id, previous.id))
     .run();
-
-  setVaultItemCategories(ctx, previous.id, previous.categoryIds ?? []);
 }
 
 /**
@@ -407,31 +337,13 @@ export function unvaultVaultItem(
   ctx.db.update(vaultItems).set({ unvaultedAt: nowIso }).where(eq(vaultItems.id, itemId)).run();
 }
 
-export function updateVaultItem(
-  ctx: DatabaseContext,
-  itemId: string,
-  updates: VaultItemUpdateInput,
-): VaultItem | undefined {
-  const updatePayload = buildVaultItemUpdatePayload(updates);
-
-  if (Object.keys(updatePayload).length > 0) {
-    ctx.db.update(vaultItems).set(updatePayload).where(eq(vaultItems.id, itemId)).run();
-  }
-
-  if (updates.categoryIds !== undefined) {
-    setVaultItemCategories(ctx, itemId, updates.categoryIds);
-  }
-
-  return getVaultItemById(ctx, itemId);
-}
-
 export function removeVaultItem(ctx: DatabaseContext, itemId: string): void {
   ctx.db.delete(vaultItems).where(eq(vaultItems.id, itemId)).run();
 }
 
 export function upsertVaultItemByFingerprint(
   ctx: DatabaseContext,
-  input: VaultItemUpsertByFingerprintInput,
+  input: VaultItemUpsertInput,
 ): VaultItem {
   const values = buildVaultItemValues(input);
 
@@ -478,10 +390,6 @@ export function upsertVaultItemByFingerprint(
 
   if (!persisted) {
     throw new Error(`Unable to upsert vault item with fingerprint: ${input.fingerprint}`);
-  }
-
-  if (input.categoryIds) {
-    setVaultItemCategories(ctx, persisted.id, input.categoryIds);
   }
 
   const saved = getVaultItemById(ctx, persisted.id);
@@ -604,7 +512,7 @@ function resolveRowPresence(
  *
  * Safety properties:
  * - Only the presence flag and `last_seen_at` are written. Vaulted/unvaulted state, stack counts,
- *   item data and categories are never modified, and no row is ever deleted.
+ *   item data are never modified, and no row is ever deleted.
  * - The scope is the specific source file, so a scan of one stash/character can never mark rows
  *   that came from another file as missing. Rows without a source file (bookmarks / tags) are
  *   never touched.
@@ -682,7 +590,7 @@ const MAX_SQL_PARAMETERS_PER_STATEMENT = 500;
  * files that no longer exist, so their rows cannot stay "present in the latest scan" forever.
  *
  * Only `is_present_in_latest_scan` is written (and only on rows that were flagged present). Vault
- * state, item data, categories and `last_seen_at` are untouched and no row is deleted, so a file
+ * state, item data and `last_seen_at` are untouched and no row is deleted, so a file
  * that comes back is reconciled by the next scan. The caller decides which files are truly gone.
  */
 export function markVaultItemsMissingForSourceFiles(
@@ -715,7 +623,7 @@ export function getVaultItemById(ctx: DatabaseContext, itemId: string): VaultIte
     return undefined;
   }
 
-  return attachCategoryIds(ctx, [dbVaultItemToVaultItem(row)])[0];
+  return dbVaultItemToVaultItem(row);
 }
 
 function appendTextClause(query: SearchClauses, text: string | undefined): void {
@@ -806,21 +714,6 @@ function appendSocketedClause(
   query.clauses.push('COALESCE(vi.is_socketed_item, 0) = 0');
 }
 
-function appendCategoryClause(
-  query: SearchClauses,
-  categoryIds: VaultItemFilter['categoryIds'],
-): void {
-  if (!categoryIds || categoryIds.length === 0) {
-    return;
-  }
-
-  const placeholders = categoryIds.map(() => '?').join(', ');
-  query.clauses.push(
-    `EXISTS (SELECT 1 FROM vault_item_categories vic WHERE vic.vault_item_id = vi.id AND vic.vault_category_id IN (${placeholders}))`,
-  );
-  query.params.push(...categoryIds);
-}
-
 function buildSearchQuery(filter: VaultItemFilter): SearchClauses {
   const query: SearchClauses = { clauses: [], params: [] };
   appendTextClause(query, filter.text);
@@ -830,7 +723,6 @@ function buildSearchQuery(filter: VaultItemFilter): SearchClauses {
   appendPresentStateClause(query, filter.presentState);
   appendVaultedStateClause(query, filter.vaultedState);
   appendSocketedClause(query, filter.includeSocketed);
-  appendCategoryClause(query, filter.categoryIds);
   return query;
 }
 
@@ -868,10 +760,8 @@ export function searchVaultItems(
     )
     .all(...query.params, pageSize, offset) as RawVaultSearchRow[];
 
-  const mappedItems = rows.map(mapRawVaultSearchRowToVaultItem);
-
   return {
-    items: attachCategoryIds(ctx, mappedItems),
+    items: rows.map(mapRawVaultSearchRowToVaultItem),
     total: countRow.total,
     page,
     pageSize,

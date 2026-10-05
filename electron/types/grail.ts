@@ -263,15 +263,6 @@ export type VaultLocationContext =
 
 export type StashTabKind = 'shared' | 'gems' | 'materials' | 'runes';
 
-export interface VaultCategory {
-  id: string;
-  name: string;
-  color?: string;
-  metadata?: string;
-  created: Date;
-  lastUpdated: Date;
-}
-
 export interface VaultItem {
   id: string;
   fingerprint: string;
@@ -301,7 +292,6 @@ export interface VaultItem {
   lastSeenAt?: Date;
   vaultedAt?: Date;
   unvaultedAt?: Date;
-  categoryIds?: string[];
   created: Date;
   lastUpdated: Date;
 }
@@ -335,16 +325,10 @@ export interface VaultItemUpsertInput {
   lastSeenAt?: Date;
   vaultedAt?: Date;
   unvaultedAt?: Date;
-  categoryIds?: string[];
 }
-
-export type VaultItemUpsertByFingerprintInput = VaultItemUpsertInput;
-
-export type VaultItemUpdateInput = Partial<Omit<VaultItemUpsertInput, 'fingerprint'>>;
 
 export interface VaultItemFilter {
   text?: string;
-  categoryIds?: string[];
   characterId?: string;
   locationContext?: VaultLocationContext;
   sourceFileType?: VaultSourceFileType;
@@ -362,15 +346,6 @@ export interface VaultItemSearchResult {
   total: number;
   page: number;
   pageSize: number;
-}
-
-export interface DatabaseVaultCategory {
-  id: string;
-  name: string;
-  color: string | null;
-  metadata: string | null;
-  created_at: string;
-  updated_at: string;
 }
 
 export interface DatabaseVaultItem {

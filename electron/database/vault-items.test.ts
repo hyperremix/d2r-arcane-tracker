@@ -1,10 +1,9 @@
 import Database from 'better-sqlite3';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { createVaultPresenceKey } from '../utils/vaultPresence';
-import { createDrizzleDb, schema } from './drizzle';
+import { createDrizzleDb } from './drizzle';
 import { createSchema } from './schema';
 import type { DatabaseContext } from './types';
-import { setVaultItemCategories } from './vault-categories';
 import {
   addVaultItem,
   addVaultItemWithUndo,
@@ -27,12 +26,6 @@ function createTestContext(): DatabaseContext {
   };
   createSchema(ctx);
   return ctx;
-}
-
-// Categories have no production writer anymore (their table is kept for stored data), so tests
-// insert them directly.
-function insertCategory(ctx: DatabaseContext, id: string, name: string): void {
-  ctx.db.insert(schema.vaultCategories).values({ id, name }).run();
 }
 
 describe('When vault item database operations are executed', () => {
@@ -562,8 +555,6 @@ describe('When vault item database operations are executed', () => {
         sourceFilePath: '/saves/SorcOne.d2s',
         locationContext: 'inventory',
       });
-      insertCategory(ctx, 'cat-keep', 'Keep');
-      setVaultItemCategories(ctx, vaulted.id, ['cat-keep']);
 
       // Act
       reconcileVaultItemsForScan(ctx, {
@@ -579,7 +570,6 @@ describe('When vault item database operations are executed', () => {
       expect(reconciled?.unvaultedAt).toBeUndefined();
       expect(reconciled?.rawItemJson).toBe('{"id":7}');
       expect(reconciled?.stackCount).toBe(1);
-      expect(reconciled?.categoryIds).toEqual(['cat-keep']);
     });
   });
 
@@ -607,47 +597,6 @@ describe('When vault item database operations are executed', () => {
 
       // Assert
       expect(getVaultItemById(ctx, saved.id)?.isPresentInLatestScan).toBe(true);
-    });
-  });
-
-  describe('If categories are created and assigned to a vault item', () => {
-    it('Then category filtering returns only tagged items', () => {
-      // Arrange
-      insertCategory(ctx, 'cat-1', 'Trade');
-      insertCategory(ctx, 'cat-2', 'Keep');
-
-      const tagged = upsertVaultItemByFingerprint(ctx, {
-        fingerprint: 'fp-tagged',
-        itemName: 'Arachnid Mesh',
-        quality: 'unique',
-        ethereal: false,
-        rawItemJson: '{}',
-        sourceFileType: 'd2s',
-        locationContext: 'inventory',
-      });
-      setVaultItemCategories(ctx, tagged.id, ['cat-1']);
-
-      upsertVaultItemByFingerprint(ctx, {
-        fingerprint: 'fp-untagged',
-        itemName: 'Magefist',
-        quality: 'unique',
-        ethereal: false,
-        rawItemJson: '{}',
-        sourceFileType: 'd2s',
-        locationContext: 'inventory',
-      });
-
-      // Act
-      const filtered = searchVaultItems(ctx, {
-        categoryIds: ['cat-1'],
-        page: 1,
-        pageSize: 20,
-      });
-
-      // Assert
-      expect(filtered.total).toBe(1);
-      expect(filtered.items[0]?.fingerprint).toBe('fp-tagged');
-      expect(filtered.items[0]?.categoryIds).toEqual(['cat-1']);
     });
   });
 

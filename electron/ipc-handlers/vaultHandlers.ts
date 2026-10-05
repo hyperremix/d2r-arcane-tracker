@@ -16,7 +16,6 @@ import type {
   InventoryItemMoveInput,
   InventorySearchResult,
   InventoryStackSplitInput,
-  VaultCategory,
   VaultItem,
   VaultItemFilter,
   VaultItemSearchResult,
@@ -162,14 +161,6 @@ function sanitizeFilter(filter?: VaultItemFilter): VaultItemFilter {
 
   if (safeFilter.includeSocketed !== undefined) {
     assert(typeof safeFilter.includeSocketed === 'boolean', 'includeSocketed must be a boolean');
-  }
-
-  if (safeFilter.categoryIds !== undefined) {
-    assert(Array.isArray(safeFilter.categoryIds), 'categoryIds must be an array');
-    assert(
-      safeFilter.categoryIds.every((id) => typeof id === 'string' && id.length > 0),
-      'Each categoryId must be a non-empty string',
-    );
   }
 
   if (safeFilter.characterId !== undefined) {
@@ -906,10 +897,6 @@ export function initializeVaultHandlers(
     async (_, filter?: VaultItemFilter): Promise<VaultItemSearchResult> =>
       grailDatabase.searchVaultItems(sanitizeFilter(filter)),
   );
-
-  ipcMain.handle('vault:listCategories', async (): Promise<VaultCategory[]> => {
-    return grailDatabase.getAllVaultCategories();
-  });
 
   ipcMain.handle(
     'inventory:searchAll',

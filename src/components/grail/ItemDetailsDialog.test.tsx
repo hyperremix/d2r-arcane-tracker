@@ -57,7 +57,6 @@ const mockRemoveProgress = vi.fn();
 const mockVaultSearch = vi.fn();
 const mockVaultAddItem = vi.fn();
 const mockVaultRemoveItem = vi.fn();
-const mockVaultListCategories = vi.fn();
 
 function setupStoreMock(
   overrides: {
@@ -110,12 +109,10 @@ describe('When ItemDetailsDialog is rendered', () => {
           search: mockVaultSearch,
           addItem: mockVaultAddItem,
           removeItem: mockVaultRemoveItem,
-          listCategories: mockVaultListCategories,
         },
       },
     });
     mockVaultSearch.mockResolvedValue({ items: [], total: 0, page: 1, pageSize: 20 });
-    mockVaultListCategories.mockResolvedValue([]);
     setupStoreMock();
     setupProgressLookup();
   });
@@ -562,7 +559,7 @@ describe('When ItemDetailsDialog is rendered', () => {
   });
 
   describe('If a bookmark exists for the item', () => {
-    it('Then it shows the bookmarked status badge and tags', async () => {
+    it('Then it shows the bookmarked status badge', async () => {
       // Arrange
       const item = HolyGrailItemBuilder.new().withId('item-1').withName('Windforce').build();
       setupStoreMock({ items: [item] });
@@ -578,7 +575,6 @@ describe('When ItemDetailsDialog is rendered', () => {
             sourceFileType: 'd2s',
             locationContext: 'unknown',
             grailItemId: 'item-1',
-            categoryIds: ['cat-1'],
             isPresentInLatestScan: false,
             created: new Date('2024-01-01T00:00:00.000Z'),
             lastUpdated: new Date('2024-01-01T00:00:00.000Z'),
@@ -588,21 +584,12 @@ describe('When ItemDetailsDialog is rendered', () => {
         page: 1,
         pageSize: 20,
       });
-      mockVaultListCategories.mockResolvedValue([
-        {
-          id: 'cat-1',
-          name: 'Trade',
-          created: new Date('2024-01-01T00:00:00.000Z'),
-          lastUpdated: new Date('2024-01-01T00:00:00.000Z'),
-        },
-      ]);
 
       // Act
       render(<ItemDetailsDialog itemId="item-1" open={true} onOpenChange={vi.fn()} />);
 
       // Assert
       expect(await screen.findByText('Bookmarked')).toBeInTheDocument();
-      expect(screen.getByText('Trade')).toBeInTheDocument();
     });
   });
 
@@ -640,7 +627,6 @@ describe('When ItemDetailsDialog is rendered', () => {
             sourceFileType: 'd2s',
             locationContext: 'unknown',
             grailItemId: 'item-1',
-            categoryIds: [],
             isPresentInLatestScan: false,
             created: new Date('2024-01-01T00:00:00.000Z'),
             lastUpdated: new Date('2024-01-01T00:00:00.000Z'),
@@ -681,7 +667,6 @@ describe('When ItemDetailsDialog is rendered', () => {
             sourceFilePath: '/saves/Sorc.d2s',
             locationContext: 'stash',
             grailItemId: 'item-1',
-            categoryIds: [],
             isPresentInLatestScan: true,
             vaultedAt: new Date('2024-01-01T00:00:00.000Z'),
             created: new Date('2024-01-01T00:00:00.000Z'),
@@ -711,7 +696,7 @@ describe('When ItemDetailsDialog is rendered', () => {
       const item = HolyGrailItemBuilder.new().withId('item-1').withName('Windforce').build();
       setupStoreMock({ items: [item] });
       const failure = new Error('ipc failed');
-      mockVaultListCategories.mockRejectedValue(failure);
+      mockVaultSearch.mockRejectedValue(failure);
       const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
       const unhandledRejections: unknown[] = [];
       const onUnhandledRejection = (reason: unknown) => {
@@ -768,13 +753,12 @@ describe('When ItemDetailsDialog is rendered', () => {
         id: 'vault-1',
         fingerprint: 'grail:item-1',
         itemName: 'Windforce',
-        categoryIds: [],
       };
       mockVaultAddItem.mockResolvedValue(bookmark);
       const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
       render(<ItemDetailsDialog itemId="item-1" open={true} onOpenChange={vi.fn()} />);
       const bookmarkButton = await screen.findByRole('button', { name: 'Bookmark' });
-      mockVaultListCategories.mockRejectedValue(new Error('refresh failed'));
+      mockVaultSearch.mockRejectedValue(new Error('refresh failed'));
 
       // Act
       fireEvent.click(bookmarkButton);

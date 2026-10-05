@@ -14,7 +14,6 @@ import type {
   RunItem,
   Session,
   Settings,
-  VaultCategory,
   VaultLocationContext,
   VaultItem,
   VaultItemFilter,
@@ -648,7 +647,6 @@ export interface ElectronAPI {
     addItem(item: VaultItemUpsertInput): Promise<VaultItem>
     removeItem(itemId: string): Promise<{ success: boolean }>
     search(filter?: VaultItemFilter): Promise<VaultItemSearchResult>
-    listCategories(): Promise<VaultCategory[]>
     unvaultItem(
       itemId: string,
       targetOptions?: {

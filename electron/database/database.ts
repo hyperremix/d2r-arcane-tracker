@@ -13,12 +13,9 @@ import type {
   Session,
   SessionStats,
   Settings,
-  VaultCategory,
   VaultItem,
   VaultItemFilter,
   VaultItemSearchResult,
-  VaultItemUpdateInput,
-  VaultItemUpsertByFingerprintInput,
   VaultItemUpsertInput,
 } from '../types/grail';
 import * as charactersModule from './characters';
@@ -33,7 +30,6 @@ import * as schemaModule from './schema';
 import * as sessionsModule from './sessions';
 import * as settingsModule from './settings';
 import * as statisticsModule from './statistics';
-import * as vaultCategoriesModule from './vault-categories';
 import * as vaultItemsModule from './vault-items';
 
 /**
@@ -268,20 +264,11 @@ class GrailDatabase {
   getVaultItemById(itemId: string): VaultItem | undefined {
     return vaultItemsModule.getVaultItemById(this, itemId);
   }
-  addVaultItem(item: VaultItemUpsertInput): VaultItem {
-    return vaultItemsModule.addVaultItem(this, item);
-  }
   addVaultItemWithUndo(item: VaultItemUpsertInput): vaultItemsModule.VaultAddResult {
     return vaultItemsModule.addVaultItemWithUndo(this, item);
   }
-  updateVaultItem(itemId: string, updates: VaultItemUpdateInput): VaultItem | undefined {
-    return vaultItemsModule.updateVaultItem(this, itemId, updates);
-  }
   removeVaultItem(itemId: string): void {
     vaultItemsModule.removeVaultItem(this, itemId);
-  }
-  upsertVaultItemByFingerprint(input: VaultItemUpsertByFingerprintInput): VaultItem {
-    return vaultItemsModule.upsertVaultItemByFingerprint(this, input);
   }
   searchVaultItems(filter: VaultItemFilter): VaultItemSearchResult {
     return vaultItemsModule.searchVaultItems(this, filter);
@@ -297,14 +284,6 @@ class GrailDatabase {
   }
   unvaultVaultItem(itemId: string, withdrawCount?: number): void {
     vaultItemsModule.unvaultVaultItem(this, itemId, withdrawCount);
-  }
-
-  // Vault categories
-  getAllVaultCategories(): VaultCategory[] {
-    return vaultCategoriesModule.getAllVaultCategories(this);
-  }
-  getVaultCategoryById(categoryId: string): VaultCategory | null {
-    return vaultCategoriesModule.getVaultCategoryById(this, categoryId);
   }
 
   // Management

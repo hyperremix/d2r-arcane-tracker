@@ -9,7 +9,6 @@ const mocks = vi.hoisted(() => ({
     removeVaultItem: vi.fn(),
     getVaultItemById: vi.fn(),
     searchVaultItems: vi.fn(),
-    getAllVaultCategories: vi.fn(),
     getAllSettings: vi.fn(),
   },
   assertGameNotRunning: vi.fn(),
@@ -91,7 +90,6 @@ describe('When vault IPC handlers are initialized', () => {
       expect(mocks.handleMock).toHaveBeenCalledWith('vault:addItem', expect.any(Function));
       expect(mocks.handleMock).toHaveBeenCalledWith('vault:removeItem', expect.any(Function));
       expect(mocks.handleMock).toHaveBeenCalledWith('vault:search', expect.any(Function));
-      expect(mocks.handleMock).toHaveBeenCalledWith('vault:listCategories', expect.any(Function));
       expect(mocks.handleMock).toHaveBeenCalledWith('inventory:searchAll', expect.any(Function));
       expect(mocks.handleMock).toHaveBeenCalledWith('inventory:moveItem', expect.any(Function));
     });
@@ -100,6 +98,7 @@ describe('When vault IPC handlers are initialized', () => {
       // Arrange
       const removedChannels = [
         'vault:listItems',
+        'vault:listCategories',
         'vault:updateItemTags',
         'vault:createCategory',
         'vault:updateCategory',
