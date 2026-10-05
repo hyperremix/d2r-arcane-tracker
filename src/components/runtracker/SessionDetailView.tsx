@@ -1,5 +1,5 @@
 import type { Session } from 'electron/types/grail';
-import { Archive, ArrowLeft, FileDown } from 'lucide-react';
+import { Archive, ArrowLeft, FileDown, Loader2 } from 'lucide-react';
 import { useCallback, useEffect, useId, useMemo, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -8,6 +8,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
 import { formatDuration, formatSessionDate } from '@/lib/utils';
 import { useRunTrackerStore } from '@/stores/runTrackerStore';
+import { ArchiveSessionDialog } from './ArchiveSessionDialog';
 import { ExportDialog } from './ExportDialog';
 import { RunList } from './RunList';
 import { SessionControls } from './SessionControls';
@@ -26,7 +27,8 @@ export function SessionDetailView({ sessionId, onBack }: SessionDetailViewProps)
     sessions,
     activeSession,
     runs,
-    loading,
+    sessionsLoading,
+    pendingActions,
     archiveSession,
     updateSessionNotes,
     loadSessionRuns,
@@ -36,7 +38,9 @@ export function SessionDetailView({ sessionId, onBack }: SessionDetailViewProps)
   const [notes, setNotes] = useState<string>('');
   const [isSavingNotes, setIsSavingNotes] = useState<boolean>(false);
   const [showExportDialog, setShowExportDialog] = useState<boolean>(false);
+  const [showArchiveDialog, setShowArchiveDialog] = useState<boolean>(false);
   const notesId = useId();
+  const isArchiving = Boolean(pendingActions.archiveSession);
 
   // Find the session
   const session = useMemo(() => {
@@ -123,10 +127,12 @@ export function SessionDetailView({ sessionId, onBack }: SessionDetailViewProps)
     if (!session) return;
     try {
       await archiveSession(session.id);
+      setShowArchiveDialog(false);
       // Navigate back after archiving
       onBack();
     } catch (error) {
       console.error('Error archiving session:', error);
+      setShowArchiveDialog(false);
     }
   }, [archiveSession, session, onBack]);
 
@@ -148,7 +154,7 @@ export function SessionDetailView({ sessionId, onBack }: SessionDetailViewProps)
   );
 
   // Loading state
-  if (loading && !session) {
+  if (sessionsLoading && !session) {
     return (
       <div className="space-y-6">
         <div className="flex items-center gap-4">
@@ -306,11 +312,16 @@ export function SessionDetailView({ sessionId, onBack }: SessionDetailViewProps)
               <Button
                 variant="outline"
                 size="sm"
-                onClick={handleArchiveSession}
-                disabled={loading}
+                onClick={() => setShowArchiveDialog(true)}
+                disabled={isArchiving}
+                aria-busy={isArchiving}
                 className="flex-1"
               >
-                <Archive className="mr-2 h-4 w-4" />
+                {isArchiving ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Archive className="mr-2 h-4 w-4" />
+                )}
                 Archive Session
               </Button>
             )}
@@ -318,7 +329,7 @@ export function SessionDetailView({ sessionId, onBack }: SessionDetailViewProps)
               variant="outline"
               size="sm"
               onClick={handleExportClick}
-              disabled={loading || session.runCount === 0}
+              disabled={session.runCount === 0}
               title={session.runCount === 0 ? 'No runs to export' : 'Export session data'}
               className="flex-1"
             >
@@ -340,6 +351,14 @@ export function SessionDetailView({ sessionId, onBack }: SessionDetailViewProps)
         sessionId={sessionId}
         open={showExportDialog}
         onOpenChange={setShowExportDialog}
+      />
+
+      {/* Archive Confirmation Dialog */}
+      <ArchiveSessionDialog
+        open={showArchiveDialog}
+        onOpenChange={setShowArchiveDialog}
+        onConfirm={handleArchiveSession}
+        pending={isArchiving}
       />
     </div>
   );

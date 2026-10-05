@@ -687,7 +687,6 @@
       "itemsFound": "Items Found",
       "sessionNotes": "Session Notes",
       "notesPlaceholder": "Add notes about this session...",
-      "endSession": "End Session",
       "archiveSession": "Archive Session",
       "noRunsToExport": "No runs to export",
       "exportSessionData": "Export session data"
@@ -720,6 +719,12 @@
       "ending": "Ending...",
       "endCurrentSessionTitle": "End Current Session",
       "endCurrentSessionDescription": "Are you sure you want to end the current session? This will end any active run and cannot be undone."
+    },
+    "archiveDialog": {
+      "title": "Archive Session",
+      "description": "Are you sure you want to archive this session? Archived sessions are hidden from the sessions list unless \"Show archived\" is enabled.",
+      "confirm": "Archive",
+      "archiving": "Archiving..."
     }
   },
   "widget": {

@@ -4,6 +4,13 @@ import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { translations } from '@/i18n/translations';
 
+export interface ControlButtonsPending {
+  startRun: boolean;
+  pauseResume: boolean;
+  endRun: boolean;
+  endSession: boolean;
+}
+
 export interface ControlButtonsProps {
   shortcuts: {
     startRun: string;
@@ -16,7 +23,7 @@ export interface ControlButtonsProps {
   canEndRun: boolean;
   canEndSession: boolean;
   isPaused: boolean;
-  loading: boolean;
+  pending: ControlButtonsPending;
   onStartRun: () => void;
   onPauseRun: () => void;
   onResumeRun: () => void;
@@ -31,7 +38,7 @@ export function ControlButtons({
   canEndRun,
   canEndSession,
   isPaused,
-  loading,
+  pending,
   onStartRun,
   onPauseRun,
   onResumeRun,
@@ -50,12 +57,17 @@ export function ControlButtons({
                 variant="default"
                 size="sm"
                 onClick={onStartRun}
-                disabled={!canStartRun || loading}
+                disabled={!canStartRun || pending.startRun}
+                aria-busy={pending.startRun}
                 className="flex items-center gap-2"
               />
             }
           >
-            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
+            {pending.startRun ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Play className="h-4 w-4" />
+            )}
             {t(translations.runTracker.controls.startRun)}
           </TooltipTrigger>
           <TooltipContent>
@@ -75,12 +87,13 @@ export function ControlButtons({
                 variant="outline"
                 size="sm"
                 onClick={isPaused ? onResumeRun : onPauseRun}
-                disabled={!canPauseResume || loading}
+                disabled={!canPauseResume || pending.pauseResume}
+                aria-busy={pending.pauseResume}
                 className="flex items-center gap-2"
               />
             }
           >
-            {loading ? (
+            {pending.pauseResume ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : isPaused ? (
               <Play className="h-4 w-4" />
@@ -112,12 +125,13 @@ export function ControlButtons({
                 variant="outline"
                 size="sm"
                 onClick={onEndRun}
-                disabled={!canEndRun || loading}
+                disabled={!canEndRun || pending.endRun}
+                aria-busy={pending.endRun}
                 className="flex items-center gap-2"
               />
             }
           >
-            {loading ? (
+            {pending.endRun ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
               <Square className="h-4 w-4" />
@@ -141,12 +155,13 @@ export function ControlButtons({
                 variant="destructive"
                 size="sm"
                 onClick={onEndSession}
-                disabled={!canEndSession || loading}
+                disabled={!canEndSession || pending.endSession}
+                aria-busy={pending.endSession}
                 className="flex items-center gap-2"
               />
             }
           >
-            {loading ? (
+            {pending.endSession ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
               <StopCircle className="h-4 w-4" />

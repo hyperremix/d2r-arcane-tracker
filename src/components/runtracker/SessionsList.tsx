@@ -99,8 +99,10 @@ function TableRowSkeleton() {
  * and the ability to select a session to view its details.
  */
 export function SessionsList({ onSessionSelect }: SessionsListProps) {
-  const { sessions, loading, getSessionStats, runs, loadSessionRuns, loadingSessions } =
+  const { sessions, sessionsLoading, getSessionStats, runs, loadSessionRuns, loadingSessions } =
     useRunTrackerStore();
+  // Only show the skeleton when there is nothing to display yet; background refreshes keep the list visible
+  const showSkeleton = sessionsLoading && sessions.length === 0;
   const [showArchived, setShowArchived] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [sortField, setSortField] = useState<SortField>('startTime');
@@ -214,7 +216,7 @@ export function SessionsList({ onSessionSelect }: SessionsListProps) {
 
   // Load runs (and their items) for sessions that don't have runs loaded yet
   useEffect(() => {
-    if (sessionsNeedingRuns.length === 0 || loading) return;
+    if (sessionsNeedingRuns.length === 0 || sessionsLoading) return;
 
     // Mark these sessions as initiated before starting the load
     sessionsNeedingRuns.forEach((sessionId) => {
@@ -227,7 +229,7 @@ export function SessionsList({ onSessionSelect }: SessionsListProps) {
         console.error('[SessionsList] Error loading session runs:', error);
       },
     );
-  }, [sessionsNeedingRuns, loadSessionRuns, loading]);
+  }, [sessionsNeedingRuns, loadSessionRuns, sessionsLoading]);
 
   // Clean up initiated loads when runs are actually loaded or loading completes
   useEffect(() => {
@@ -320,12 +322,16 @@ export function SessionsList({ onSessionSelect }: SessionsListProps) {
           <span>Previous Sessions</span>
           <div className="flex items-center gap-2">
             <span className="text-muted-foreground text-sm">Show archived</span>
-            <Switch checked={showArchived} onCheckedChange={setShowArchived} disabled={loading} />
+            <Switch
+              checked={showArchived}
+              onCheckedChange={setShowArchived}
+              disabled={showSkeleton}
+            />
           </div>
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        {loading ? (
+        {showSkeleton ? (
           <Table>
             <TableHeader>
               <TableRow>

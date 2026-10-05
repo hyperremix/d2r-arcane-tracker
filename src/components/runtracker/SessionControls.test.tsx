@@ -1,5 +1,5 @@
 import '@testing-library/jest-dom';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useGrailStore } from '@/stores/grailStore';
 import { useRunTrackerStore } from '@/stores/runTrackerStore';
@@ -64,7 +64,7 @@ const defaultStoreState = {
   activeRun: null,
   isTracking: false,
   isPaused: false,
-  loading: false,
+  pendingActions: {},
   runs: new Map(),
   ...mockStoreActions,
 };
@@ -227,12 +227,13 @@ describe('SessionControls', () => {
       expect(endSessionButton).not.toBeDisabled();
     });
 
-    it('disables all buttons when loading', () => {
+    it('When a run action is in flight, Then all run control buttons are disabled', () => {
+      // Arrange
       mockUseRunTrackerStore.mockReturnValue({
         ...defaultStoreState,
         activeSession: mockSession,
         activeRun: mockRun,
-        loading: true,
+        pendingActions: { pauseRun: true },
       });
 
       render(<SessionControls />);
@@ -330,26 +331,107 @@ describe('SessionControls', () => {
   });
 
   describe('Confirmation Dialogs', () => {
-    it('disables dialog buttons when loading', () => {
+    it('When End Session is clicked, Then the session only ends after confirming', async () => {
+      // Arrange
       mockUseRunTrackerStore.mockReturnValue({
         ...defaultStoreState,
         activeSession: mockSession,
-        activeRun: mockRun,
-        loading: true,
       });
-
       render(<SessionControls />);
 
-      // All buttons should be disabled when loading
-      const startButton = screen.getByText('Start Run');
-      const pauseButton = screen.getByText('Pause');
-      const endRunButton = screen.getByText('End Run');
-      const endSessionButton = screen.getByText('End Session');
+      // Act
+      fireEvent.click(screen.getByRole('button', { name: 'End Session' }));
+      const dialog = await screen.findByRole('alertdialog');
 
-      expect(startButton).toBeDisabled();
-      expect(pauseButton).toBeDisabled();
-      expect(endRunButton).toBeDisabled();
-      expect(endSessionButton).toBeDisabled();
+      // Assert
+      expect(within(dialog).getByText('End Current Session')).toBeInTheDocument();
+      expect(mockStoreActions.endSession).not.toHaveBeenCalled();
+
+      // Act
+      fireEvent.click(within(dialog).getByRole('button', { name: 'End Session' }));
+
+      // Assert
+      await waitFor(() => {
+        expect(mockStoreActions.endSession).toHaveBeenCalledTimes(1);
+      });
+    });
+
+    it('If the end session confirmation is cancelled, Then the session is not ended', async () => {
+      // Arrange
+      mockUseRunTrackerStore.mockReturnValue({
+        ...defaultStoreState,
+        activeSession: mockSession,
+      });
+      render(<SessionControls />);
+      fireEvent.click(screen.getByRole('button', { name: 'End Session' }));
+      const dialog = await screen.findByRole('alertdialog');
+
+      // Act
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+
+      // Assert
+      await waitFor(() => {
+        expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+      });
+      expect(mockStoreActions.endSession).not.toHaveBeenCalled();
+    });
+
+    it('When ending the session is in flight, Then the dialog buttons are disabled', async () => {
+      // Arrange
+      mockUseRunTrackerStore.mockReturnValue({
+        ...defaultStoreState,
+        activeSession: mockSession,
+      });
+      const { rerender } = render(<SessionControls />);
+      fireEvent.click(screen.getByRole('button', { name: 'End Session' }));
+      const dialog = await screen.findByRole('alertdialog');
+
+      // Act
+      mockUseRunTrackerStore.mockReturnValue({
+        ...defaultStoreState,
+        activeSession: mockSession,
+        pendingActions: { endSession: true },
+      });
+      rerender(<SessionControls />);
+
+      // Assert
+      expect(within(dialog).getByRole('button', { name: 'Ending...' })).toBeDisabled();
+      expect(within(dialog).getByRole('button', { name: 'Cancel' })).toBeDisabled();
+    });
+
+    it('If auto mode is enabled, Then End Session is disabled', () => {
+      // Arrange
+      const originalElectronAPI = window.electronAPI;
+      Object.defineProperty(window, 'electronAPI', {
+        value: {
+          platform: 'win32',
+          runTracker: {
+            getMemoryStatus: vi.fn().mockResolvedValue({ available: true, reason: null }),
+          },
+        },
+        writable: true,
+        configurable: true,
+      });
+      mockUseGrailStore.mockReturnValue({
+        ...defaultGrailStoreState,
+        settings: { ...defaultGrailStoreState.settings, runTrackerMemoryReading: true },
+      });
+      mockUseRunTrackerStore.mockReturnValue({
+        ...defaultStoreState,
+        activeSession: mockSession,
+      });
+
+      // Act
+      render(<SessionControls />);
+
+      // Assert
+      expect(screen.getByRole('button', { name: 'End Session' })).toBeDisabled();
+
+      Object.defineProperty(window, 'electronAPI', {
+        value: originalElectronAPI,
+        writable: true,
+        configurable: true,
+      });
     });
   });
 

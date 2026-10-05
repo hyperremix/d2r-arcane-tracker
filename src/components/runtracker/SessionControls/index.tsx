@@ -1,4 +1,4 @@
-import { AlertCircle, Timer } from 'lucide-react';
+import { AlertCircle, Loader2, Timer } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -17,7 +17,9 @@ import { Switch } from '@/components/ui/switch';
 import { translations } from '@/i18n/translations';
 import { matchesShortcut } from '@/lib/hotkeys';
 import { useGrailStore } from '@/stores/grailStore';
+import type { RunTrackerAction } from '@/stores/runTrackerStore';
 import { useRunTrackerStore } from '@/stores/runTrackerStore';
+import type { ControlButtonsPending } from './ControlButtons';
 import { ControlButtons } from './ControlButtons';
 import { ManualItemEntry } from './ManualItemEntry';
 
@@ -49,6 +51,37 @@ function _hasRunsInSession(
   return sessionRuns !== undefined && sessionRuns.length > 0;
 }
 
+interface PendingLabelProps {
+  pending: boolean;
+  label: string;
+  pendingLabel: string;
+}
+
+// Confirm button content that swaps to a spinner and pending label while the action is in flight
+function PendingLabel({ pending, label, pendingLabel }: PendingLabelProps) {
+  if (!pending) {
+    return <>{label}</>;
+  }
+  return (
+    <>
+      <Loader2 className="h-4 w-4 animate-spin" />
+      {pendingLabel}
+    </>
+  );
+}
+
+// Helper function to map store action pending flags to the control buttons
+function _getControlsPending(
+  pendingActions: Partial<Record<RunTrackerAction, boolean>>,
+): ControlButtonsPending {
+  return {
+    startRun: Boolean(pendingActions.startRun),
+    pauseResume: Boolean(pendingActions.pauseRun || pendingActions.resumeRun),
+    endRun: Boolean(pendingActions.endRun),
+    endSession: Boolean(pendingActions.endSession),
+  };
+}
+
 /**
  * SessionControls component that provides controls for managing run tracking.
  * Includes buttons for start, pause, resume, end run, and end session with keyboard shortcuts.
@@ -60,7 +93,7 @@ export function SessionControls() {
     activeRun,
     isTracking,
     isPaused,
-    loading,
+    pendingActions,
     runs,
     startRun,
     endRun,
@@ -146,6 +179,11 @@ export function SessionControls() {
     }
   }, [endSession]);
 
+  // Per-action pending state: only the in-flight action shows a spinner,
+  // but all run controls are locked while any of them is in flight.
+  const pending = _getControlsPending(pendingActions);
+  const controlsBusy = Object.values(pending).some(Boolean);
+
   // Check if there are any runs in the session (active run or finished runs)
   const hasRuns = useMemo(
     () => _hasRunsInSession(activeSession, activeRun, runs),
@@ -156,17 +194,17 @@ export function SessionControls() {
   const handleStartRunShortcut = useCallback(
     (event: KeyboardEvent) => {
       event.preventDefault();
-      if (activeSession && !activeRun && !loading) {
+      if (activeSession && !activeRun && !controlsBusy) {
         handleStartRun();
       }
     },
-    [activeSession, activeRun, loading, handleStartRun],
+    [activeSession, activeRun, controlsBusy, handleStartRun],
   );
 
   const handlePauseResumeShortcut = useCallback(
     (event: KeyboardEvent) => {
       event.preventDefault();
-      if (activeRun && !loading) {
+      if (activeRun && !controlsBusy) {
         if (isPaused) {
           handleResumeRun();
         } else {
@@ -174,27 +212,27 @@ export function SessionControls() {
         }
       }
     },
-    [activeRun, isPaused, loading, handlePauseRun, handleResumeRun],
+    [activeRun, isPaused, controlsBusy, handlePauseRun, handleResumeRun],
   );
 
   const handleEndRunShortcut = useCallback(
     (event: KeyboardEvent) => {
       event.preventDefault();
-      if (activeRun && !loading) {
+      if (activeRun && !controlsBusy) {
         setShowEndRunDialog(true);
       }
     },
-    [activeRun, loading],
+    [activeRun, controlsBusy],
   );
 
   const handleEndSessionShortcut = useCallback(
     (event: KeyboardEvent) => {
       event.preventDefault();
-      if (activeSession && !loading) {
+      if (activeSession && !controlsBusy) {
         setShowEndSessionDialog(true);
       }
     },
-    [activeSession, loading],
+    [activeSession, controlsBusy],
   );
 
   // Keyboard shortcuts handler
@@ -242,10 +280,10 @@ export function SessionControls() {
   }, [handleKeyDown]);
 
   // Determine button states
-  const canStartRun = Boolean(activeSession && !activeRun && !loading && !autoModeEnabled);
-  const canPauseResume = Boolean(activeRun && !loading && !autoModeEnabled);
-  const canEndRun = Boolean(activeRun && !loading && !autoModeEnabled);
-  const canEndSession = Boolean(activeSession && !loading && !autoModeEnabled);
+  const canStartRun = Boolean(activeSession && !activeRun && !controlsBusy && !autoModeEnabled);
+  const canPauseResume = Boolean(activeRun && !controlsBusy && !autoModeEnabled);
+  const canEndRun = Boolean(activeRun && !controlsBusy && !autoModeEnabled);
+  const canEndSession = Boolean(activeSession && !controlsBusy && !autoModeEnabled);
 
   return (
     <>
@@ -301,7 +339,7 @@ export function SessionControls() {
               canEndRun={canEndRun}
               canEndSession={canEndSession}
               isPaused={isPaused}
-              loading={loading}
+              pending={pending}
               onStartRun={handleStartRun}
               onPauseRun={handlePauseRun}
               onResumeRun={handleResumeRun}
@@ -312,7 +350,7 @@ export function SessionControls() {
             {/* Manual Item Entry */}
             <ManualItemEntry
               hasRuns={hasRuns}
-              loading={loading}
+              loading={Boolean(pendingActions.addManualRunItem)}
               addManualRunItem={addManualRunItem}
             />
           </div>
@@ -331,13 +369,19 @@ export function SessionControls() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={loading}>
+            <AlertDialogCancel disabled={pending.endRun}>
               {t(translations.common.cancel)}
             </AlertDialogCancel>
-            <AlertDialogAction onClick={handleEndRun} disabled={loading} variant="destructive">
-              {loading
-                ? t(translations.runTracker.controls.ending)
-                : t(translations.runTracker.controls.endRun)}
+            <AlertDialogAction
+              variant="destructive"
+              onClick={handleEndRun}
+              disabled={pending.endRun}
+            >
+              <PendingLabel
+                pending={pending.endRun}
+                label={t(translations.runTracker.controls.endRun)}
+                pendingLabel={t(translations.runTracker.controls.ending)}
+              />
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -355,13 +399,19 @@ export function SessionControls() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={loading}>
+            <AlertDialogCancel disabled={pending.endSession}>
               {t(translations.common.cancel)}
             </AlertDialogCancel>
-            <AlertDialogAction onClick={handleEndSession} disabled={loading} variant="destructive">
-              {loading
-                ? t(translations.runTracker.controls.ending)
-                : t(translations.runTracker.controls.endSession)}
+            <AlertDialogAction
+              variant="destructive"
+              onClick={handleEndSession}
+              disabled={pending.endSession}
+            >
+              <PendingLabel
+                pending={pending.endSession}
+                label={t(translations.runTracker.controls.endSession)}
+                pendingLabel={t(translations.runTracker.controls.ending)}
+              />
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

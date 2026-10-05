@@ -50,12 +50,12 @@ const defaultSettings: Settings = {
 const mockLoadRunItems = vi.fn();
 
 function setupRunTrackerStore(
-  overrides: { runItems?: Map<string, RunItem[]>; loading?: boolean } = {},
+  overrides: { runItems?: Map<string, RunItem[]>; loadingRunItems?: Set<string> } = {},
 ) {
   const storeState = {
     runItems: overrides.runItems ?? new Map(),
     loadRunItems: mockLoadRunItems,
-    loading: overrides.loading ?? false,
+    loadingRunItems: overrides.loadingRunItems ?? new Set<string>(),
   };
 
   const mockStore = vi.mocked(useRunTrackerStore);
@@ -433,11 +433,11 @@ describe('When RunDetailsDialog is rendered', () => {
     });
   });
 
-  describe('If loading', () => {
+  describe('If the selected run items are loading', () => {
     it('Then renders skeleton placeholders', () => {
       // Arrange
       const runs = [RunBuilder.new().withId('run-1').withRunNumber(1).build()];
-      setupRunTrackerStore({ loading: true });
+      setupRunTrackerStore({ loadingRunItems: new Set(['run-1']) });
       render(<RunList runs={runs} />);
 
       // Act — open dialog
