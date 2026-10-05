@@ -9,6 +9,7 @@ import type {
   VaultItemUpsertInput,
 } from '../types/grail';
 import { isResourceStackFromRawJson, resolveStackCountFromRawJson } from '../utils/stackableItems';
+import { createVaultPresenceKey, readItemUidFromRawJson } from '../utils/vaultPresence';
 import { GRAIL_BOOKMARK_FINGERPRINT_PREFIX, isCurrentlyVaulted } from '../utils/vaultState';
 import { dbVaultItemToVaultItem, fromISOString, toISOString } from './converters';
 import { schema } from './drizzle';
@@ -497,7 +498,104 @@ export interface VaultScanReconciliationInput {
   sourceFilePath: string;
   /** Fingerprints of every item found in `sourceFilePath` by the scan. */
   presentFingerprints: string[];
+  /**
+   * Location-independent identity key (see `createVaultPresenceKey`) of each scanned item, parallel
+   * to `presentFingerprints` (index i describes `presentFingerprints[i]`). When given, rows whose
+   * fingerprint is gone (the item moved) are matched against it. Ignored if the lengths differ.
+   */
+  presentIdentityKeys?: string[];
   lastSeenAt?: Date;
+}
+
+type VaultItemRow = typeof vaultItems.$inferSelect;
+
+function toIdentityPool(scan: VaultScanReconciliationInput): {
+  /** Number of scanned items per identity key that no row has claimed yet. */
+  unclaimed: Map<string, number>;
+  keyByFingerprint: Map<string, string>;
+} {
+  const unclaimed = new Map<string, number>();
+  const keyByFingerprint = new Map<string, string>();
+  const keys = scan.presentIdentityKeys;
+  if (!keys || keys.length !== scan.presentFingerprints.length) {
+    return { unclaimed, keyByFingerprint };
+  }
+
+  keys.forEach((key, index) => {
+    unclaimed.set(key, (unclaimed.get(key) ?? 0) + 1);
+    if (!keyByFingerprint.has(scan.presentFingerprints[index])) {
+      keyByFingerprint.set(scan.presentFingerprints[index], key);
+    }
+  });
+
+  return { unclaimed, keyByFingerprint };
+}
+
+function claimIdentity(unclaimed: Map<string, number>, key: string | undefined): boolean {
+  const remaining = key === undefined ? 0 : (unclaimed.get(key) ?? 0);
+  if (key === undefined || remaining <= 0) {
+    return false;
+  }
+
+  unclaimed.set(key, remaining - 1);
+  return true;
+}
+
+function createRowPresenceKey(row: VaultItemRow): string {
+  return createVaultPresenceKey({
+    sourceFileType: row.sourceFileType,
+    itemCode: row.itemCode,
+    quality: row.quality,
+    ethereal: Boolean(row.ethereal),
+    socketCount: row.socketCount,
+    itemName: row.itemName,
+    isSocketedItem: Boolean(row.isSocketedItem),
+    itemUid: readItemUidFromRawJson(row.rawItemJson),
+  });
+}
+
+/**
+ * Decides which rows of one file are present in a scan. A row is present when
+ * 1. its fingerprint is in the scan (exact match, always tried first for every row), or
+ * 2. it is not vaulted and an item with the same identity key is left in the scan that no other
+ *    row has claimed. This covers an item that moved inside its save (its position, and therefore
+ *    its fingerprint, changed). Each scanned item can satisfy only one row, so one of two identical
+ *    items disappearing still marks one row missing.
+ * Vaulted rows only ever match exactly: their item was taken out of the file, so an identical item
+ * that happens to remain there is not them.
+ */
+function resolveRowPresence(
+  rows: VaultItemRow[],
+  scan: VaultScanReconciliationInput,
+): Map<string, boolean> {
+  const presentSet = new Set(scan.presentFingerprints);
+  const { unclaimed, keyByFingerprint } = toIdentityPool(scan);
+  const presence = new Map<string, boolean>();
+
+  for (const row of rows) {
+    if (presentSet.has(row.fingerprint)) {
+      presence.set(row.id, true);
+      claimIdentity(unclaimed, keyByFingerprint.get(row.fingerprint));
+    }
+  }
+
+  const candidates = rows
+    .filter((row) => !presence.has(row.id))
+    .sort(
+      (left, right) =>
+        (left.createdAt ?? '').localeCompare(right.createdAt ?? '') ||
+        left.id.localeCompare(right.id),
+    );
+  for (const row of candidates) {
+    const isMovedItem =
+      !isCurrentlyVaulted({
+        vaultedAt: row.vaultedAt ?? undefined,
+        unvaultedAt: row.unvaultedAt ?? undefined,
+      }) && claimIdentity(unclaimed, createRowPresenceKey(row));
+    presence.set(row.id, isMovedItem);
+  }
+
+  return presence;
 }
 
 /**
@@ -512,8 +610,11 @@ export interface VaultScanReconciliationInput {
  *   never touched.
  * - Rows are only written when their presence flag changes, which keeps `updated_at` stable.
  *
- * Limitation: fingerprints include the character name and the item position, so an item that was
- * moved (or a character that was renamed) gets a new fingerprint and its old row reads as missing.
+ * Matching: fingerprints include the character name and the item position, so an item that moved
+ * gets a new fingerprint. Existing rows keep the fingerprint they were stored with, so a row that
+ * no longer matches exactly is matched by item identity instead (see `resolveRowPresence`). A
+ * renamed character is a different file and is not covered. Rows vaulted out of their file (and
+ * their `#uuid` collision rows) match by exact fingerprint only, so they read as missing by design.
  */
 export function reconcileVaultItemsForScan(
   ctx: DatabaseContext,
@@ -523,7 +624,6 @@ export function reconcileVaultItemsForScan(
     return;
   }
 
-  const presentSet = new Set(scan.presentFingerprints);
   const existingRows = ctx.db
     .select()
     .from(vaultItems)
@@ -534,11 +634,12 @@ export function reconcileVaultItemsForScan(
       ),
     )
     .all();
+  const presence = resolveRowPresence(existingRows, scan);
   const seenAt = toISOString(scan.lastSeenAt) ?? new Date().toISOString();
 
   const tx = ctx.rawDb.transaction(() => {
     for (const row of existingRows) {
-      const isPresent = presentSet.has(row.fingerprint);
+      const isPresent = presence.get(row.id) === true;
       if (Boolean(row.isPresentInLatestScan) === isPresent) {
         continue;
       }

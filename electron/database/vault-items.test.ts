@@ -1,5 +1,6 @@
 import Database from 'better-sqlite3';
 import { beforeEach, describe, expect, it } from 'vitest';
+import { createVaultPresenceKey } from '../utils/vaultPresence';
 import { createDrizzleDb, schema } from './drizzle';
 import { createSchema } from './schema';
 import type { DatabaseContext } from './types';
@@ -168,6 +169,209 @@ describe('When vault item database operations are executed', () => {
       // Assert
       expect(reconciled?.isPresentInLatestScan).toBe(true);
       expect(reconciled?.lastSeenAt?.toISOString()).toBe('2024-01-03T12:00:00.000Z');
+    });
+  });
+
+  describe('If an item moves within its save file', () => {
+    const FILE = '/saves/SharedStashSoftCoreV2.d2i';
+    const runeKey = createVaultPresenceKey({
+      sourceFileType: 'd2i',
+      itemCode: 'r01',
+      quality: 'normal',
+      itemName: 'El Rune',
+    });
+
+    function insertRuneRow(fingerprint: string, overrides: Record<string, unknown> = {}) {
+      return upsertVaultItemByFingerprint(ctx, {
+        fingerprint,
+        itemName: 'El Rune',
+        itemCode: 'r01',
+        quality: 'normal',
+        ethereal: false,
+        rawItemJson: '{"code":"r01"}',
+        sourceFileType: 'd2i',
+        sourceFilePath: FILE,
+        locationContext: 'stash',
+        isPresentInLatestScan: true,
+        ...overrides,
+      });
+    }
+
+    it('Then its row stays present although the fingerprint changed', () => {
+      // Arrange
+      const row = insertRuneRow('fp-old-position');
+
+      // Act
+      reconcileVaultItemsForScan(ctx, {
+        sourceFileType: 'd2i',
+        sourceFilePath: FILE,
+        presentFingerprints: ['fp-new-position'],
+        presentIdentityKeys: [runeKey],
+      });
+
+      // Assert
+      expect(getVaultItemById(ctx, row.id)?.isPresentInLatestScan).toBe(true);
+    });
+
+    it('Then a row that was already flagged missing is present again', () => {
+      // Arrange
+      const row = insertRuneRow('fp-old-position', { isPresentInLatestScan: false });
+
+      // Act
+      reconcileVaultItemsForScan(ctx, {
+        sourceFileType: 'd2i',
+        sourceFilePath: FILE,
+        presentFingerprints: ['fp-new-position'],
+        presentIdentityKeys: [runeKey],
+        lastSeenAt: new Date('2024-02-01T00:00:00.000Z'),
+      });
+
+      // Assert
+      const reconciled = getVaultItemById(ctx, row.id);
+      expect(reconciled?.isPresentInLatestScan).toBe(true);
+      expect(reconciled?.lastSeenAt?.toISOString()).toBe('2024-02-01T00:00:00.000Z');
+    });
+
+    it('Then one of two identical items being removed marks exactly one row missing', () => {
+      // Arrange
+      const first = insertRuneRow('fp-first');
+      const second = insertRuneRow('fp-second');
+
+      // Act: one El Rune left, and it sits somewhere new
+      reconcileVaultItemsForScan(ctx, {
+        sourceFileType: 'd2i',
+        sourceFilePath: FILE,
+        presentFingerprints: ['fp-somewhere-else'],
+        presentIdentityKeys: [runeKey],
+      });
+
+      // Assert
+      const flags = [first, second].map(
+        (row) => getVaultItemById(ctx, row.id)?.isPresentInLatestScan,
+      );
+      expect(flags.filter(Boolean)).toHaveLength(1);
+      expect(flags.filter((flag) => flag === false)).toHaveLength(1);
+    });
+
+    it('Then an exact fingerprint match is not stolen by a moved identical item', () => {
+      // Arrange
+      const stayed = insertRuneRow('fp-stayed');
+      const moved = insertRuneRow('fp-moved-away');
+
+      // Act: both are still there, one at its old spot and one at a new spot
+      reconcileVaultItemsForScan(ctx, {
+        sourceFileType: 'd2i',
+        sourceFilePath: FILE,
+        presentFingerprints: ['fp-stayed', 'fp-new-spot'],
+        presentIdentityKeys: [runeKey, runeKey],
+      });
+
+      // Assert
+      expect(getVaultItemById(ctx, stayed.id)?.isPresentInLatestScan).toBe(true);
+      expect(getVaultItemById(ctx, moved.id)?.isPresentInLatestScan).toBe(true);
+    });
+
+    it('Then an item that is really gone is marked missing', () => {
+      // Arrange
+      const row = insertRuneRow('fp-gone');
+
+      // Act: the file now holds a different item
+      reconcileVaultItemsForScan(ctx, {
+        sourceFileType: 'd2i',
+        sourceFilePath: FILE,
+        presentFingerprints: ['fp-other'],
+        presentIdentityKeys: [
+          createVaultPresenceKey({
+            sourceFileType: 'd2i',
+            itemCode: 'r02',
+            quality: 'normal',
+            itemName: 'Eld Rune',
+          }),
+        ],
+      });
+
+      // Assert
+      expect(getVaultItemById(ctx, row.id)?.isPresentInLatestScan).toBe(false);
+    });
+
+    it('Then items sharing a name are told apart by their game item id', () => {
+      // Arrange
+      const ringKey = (uid: number) =>
+        createVaultPresenceKey({
+          sourceFileType: 'd2i',
+          itemCode: 'rin',
+          quality: 'magic',
+          itemName: 'Ring of Fire',
+          itemUid: uid,
+        });
+      const ringRow = (fingerprint: string, uid: number) =>
+        upsertVaultItemByFingerprint(ctx, {
+          fingerprint,
+          itemName: 'Ring of Fire',
+          itemCode: 'rin',
+          quality: 'magic',
+          ethereal: false,
+          rawItemJson: JSON.stringify({ id: uid, code: 'rin' }),
+          sourceFileType: 'd2i',
+          sourceFilePath: FILE,
+          locationContext: 'stash',
+          isPresentInLatestScan: true,
+        });
+      const ringOne = ringRow('fp-ring-1', 1);
+      const ringTwo = ringRow('fp-ring-2', 2);
+
+      // Act: ring 2 moved, ring 1 is gone
+      reconcileVaultItemsForScan(ctx, {
+        sourceFileType: 'd2i',
+        sourceFilePath: FILE,
+        presentFingerprints: ['fp-ring-2-moved'],
+        presentIdentityKeys: [ringKey(2)],
+      });
+
+      // Assert
+      expect(getVaultItemById(ctx, ringOne.id)?.isPresentInLatestScan).toBe(false);
+      expect(getVaultItemById(ctx, ringTwo.id)?.isPresentInLatestScan).toBe(true);
+    });
+
+    it('Then a vaulted row is never matched by content, because its item left the file', () => {
+      // Arrange
+      const vaulted = addVaultItem(ctx, {
+        fingerprint: 'fp-vaulted-el',
+        itemName: 'El Rune',
+        itemCode: 'r01',
+        quality: 'normal',
+        ethereal: false,
+        rawItemJson: '{"code":"r01"}',
+        sourceFileType: 'd2i',
+        sourceFilePath: FILE,
+        locationContext: 'stash',
+      });
+
+      // Act: another, identical El Rune remains in the file
+      reconcileVaultItemsForScan(ctx, {
+        sourceFileType: 'd2i',
+        sourceFilePath: FILE,
+        presentFingerprints: ['fp-other-el'],
+        presentIdentityKeys: [runeKey],
+      });
+
+      // Assert
+      expect(getVaultItemById(ctx, vaulted.id)?.isPresentInLatestScan).toBe(false);
+    });
+
+    it('Then only exact fingerprints are compared when no identity keys are supplied', () => {
+      // Arrange
+      const row = insertRuneRow('fp-old-position');
+
+      // Act
+      reconcileVaultItemsForScan(ctx, {
+        sourceFileType: 'd2i',
+        sourceFilePath: FILE,
+        presentFingerprints: ['fp-new-position'],
+      });
+
+      // Assert
+      expect(getVaultItemById(ctx, row.id)?.isPresentInLatestScan).toBe(false);
     });
   });
 

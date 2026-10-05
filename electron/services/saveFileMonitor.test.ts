@@ -1625,6 +1625,7 @@ describe('When SaveFileMonitor is used', () => {
           inventorySnapshot: snapshotA,
           parseStatus: 'parsed',
           presentFingerprints: ['fp-a-visible', 'fp-a-socketed'],
+          presentIdentityKeys: ['key-a-visible', 'key-a-socketed'],
         },
       ]);
       vi.spyOn(monitor as any, 'emitSaveFileEvents').mockResolvedValue(undefined);
@@ -1638,6 +1639,7 @@ describe('When SaveFileMonitor is used', () => {
         sourceFileType: 'd2s',
         sourceFilePath: '/test/save/dir/a.d2s',
         presentFingerprints: ['fp-a-visible', 'fp-a-socketed'],
+        presentIdentityKeys: ['key-a-visible', 'key-a-socketed'],
         lastSeenAt: snapshotA.capturedAt,
       });
     });
@@ -1743,6 +1745,126 @@ describe('When SaveFileMonitor is used', () => {
       // Assert
       expect(parseResult.presentFingerprints).toEqual(['fp-parent', 'fp-socketed']);
       expect(parseResult.inventorySnapshot?.items).toHaveLength(1);
+    });
+
+    it('Then a moved item keeps its presence identity while its fingerprint changes', () => {
+      // Arrange
+      vi.mocked(getGrailItemId).mockReturnValue(null);
+      const itemAt = (x: number, y: number) =>
+        ({
+          name: 'Ring of Fire',
+          type: 'ring',
+          code: 'rin',
+          quality: 4,
+          id: 987654,
+          location_id: 0,
+          alt_position_id: 5,
+          position_x: x,
+          position_y: y,
+          inv_width: 1,
+          inv_height: 1,
+        }) as any;
+      const parse = (item: any) =>
+        (monitor as any).createParsedInventoryItem({
+          filePath: '/tmp/SharedStash.d2i',
+          saveName: 'Shared',
+          sourceFileType: 'd2i',
+          item,
+          fallbackLocation: 'stash',
+          stashTab: 0,
+        });
+
+      // Act
+      const before = parse(itemAt(1, 1));
+      const after = parse(itemAt(6, 4));
+
+      // Assert
+      expect(after.fingerprint).not.toBe(before.fingerprint);
+      expect((monitor as any).createPresenceIdentityKey(after)).toBe(
+        (monitor as any).createPresenceIdentityKey(before),
+      );
+    });
+
+    it('Then items that differ only by their game item id have different presence identities', () => {
+      // Arrange
+      vi.mocked(getGrailItemId).mockReturnValue(null);
+      const ring = (id: number) =>
+        ({
+          name: 'Ring of Fire',
+          type: 'ring',
+          code: 'rin',
+          quality: 4,
+          id,
+          position_x: 1,
+          position_y: 1,
+          inv_width: 1,
+          inv_height: 1,
+        }) as any;
+      const parse = (item: any) =>
+        (monitor as any).createParsedInventoryItem({
+          filePath: '/tmp/SharedStash.d2i',
+          saveName: 'Shared',
+          sourceFileType: 'd2i',
+          item,
+          fallbackLocation: 'stash',
+          stashTab: 0,
+        });
+
+      // Act
+      const first = (monitor as any).createPresenceIdentityKey(parse(ring(1)));
+      const second = (monitor as any).createPresenceIdentityKey(parse(ring(2)));
+
+      // Assert
+      expect(first).not.toBe(second);
+    });
+
+    it('Then processSingleFile reports one identity key per fingerprint, in the same order', async () => {
+      // Arrange
+      const saveDir = mkdtempSync(join(tmpdir(), 'save-monitor-'));
+      const savePath = join(saveDir, 'Hero.d2s');
+      writeFileSync(savePath, Buffer.from('mock file content'));
+      const parsedItems = [
+        {
+          fingerprint: 'fp-parent',
+          itemName: 'Shako',
+          itemCode: 'uap',
+          quality: 'unique',
+          sourceFileType: 'd2s',
+          characterName: 'Hero',
+          isSocketedItem: false,
+          rawParsedItem: { name: 'Shako', id: 11 },
+        },
+        {
+          fingerprint: 'fp-socketed',
+          itemName: 'Ist Rune',
+          itemCode: 'r24',
+          quality: 'normal',
+          sourceFileType: 'd2s',
+          characterName: 'Hero',
+          isSocketedItem: true,
+          rawParsedItem: { name: 'Ist Rune' },
+        },
+      ];
+      vi.spyOn(monitor as any, 'parseSave').mockResolvedValue({
+        status: 'parsed',
+        items: parsedItems,
+      });
+      vi.spyOn(monitor as any, 'updateSaveFileState').mockResolvedValue(undefined);
+
+      // Act
+      const parseResult = await (monitor as any).processSingleFile(savePath, {
+        items: {},
+        ethItems: {},
+        stats: {},
+        availableRunes: {},
+      });
+      rmSync(saveDir, { recursive: true, force: true });
+
+      // Assert
+      expect(parseResult.presentIdentityKeys).toEqual(
+        parsedItems.map((item) => (monitor as any).createPresenceIdentityKey(item)),
+      );
+      expect(parseResult.presentIdentityKeys).toHaveLength(parseResult.presentFingerprints.length);
     });
 
     it('Then createFingerprint returns deterministic output for the same inputs', () => {

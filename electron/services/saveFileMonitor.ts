@@ -32,6 +32,7 @@ import { normalizeIconFilename, resolveCanonicalIconFilename } from '../utils/ic
 import { isRune } from '../utils/objects';
 import { createServiceLogger } from '../utils/serviceLogger';
 import { resolveSpatialLocation } from '../utils/spatialLocationResolver';
+import { createVaultPresenceKey } from '../utils/vaultPresence';
 import type { EventBus } from './EventBus';
 import { parseModernStash } from './modernStashParser';
 import { readD2iMetadata } from './stashFormat';
@@ -58,6 +59,8 @@ interface CompleteFileParseResult extends FileParseSuccess {
   parseStatus: 'parsed';
   /** Fingerprints of every item in the file, including socketed ones the snapshot omits. */
   presentFingerprints: string[];
+  /** Location-independent identity of each item, parallel to `presentFingerprints`. */
+  presentIdentityKeys: string[];
 }
 
 /** A parse that read no items or only some of them; it must never mark vault rows as missing. */
@@ -971,6 +974,23 @@ class SaveFileMonitor {
     ].join('|');
   }
 
+  /**
+   * Describes an item without its position, location or character, so presence matching can still
+   * recognise an item after it moved inside its save (which changes its fingerprint).
+   */
+  private createPresenceIdentityKey(item: ParsedInventoryItem): string {
+    return createVaultPresenceKey({
+      sourceFileType: item.sourceFileType,
+      itemCode: item.itemCode,
+      quality: item.quality,
+      ethereal: item.ethereal,
+      socketCount: item.socketCount,
+      itemName: item.itemName,
+      isSocketedItem: item.isSocketedItem,
+      itemUid: (item.rawParsedItem as { id?: unknown } | undefined)?.id as number | undefined,
+    });
+  }
+
   private createParsedInventoryItem(params: {
     filePath: string;
     saveName: string;
@@ -1146,6 +1166,9 @@ class SaveFileMonitor {
         parseStatus,
         // Includes socketed items, which the snapshot omits, so vault reconciliation sees every item.
         presentFingerprints: inventoryItemsWithCharacter.map((item) => item.fingerprint),
+        presentIdentityKeys: inventoryItemsWithCharacter.map((item) =>
+          this.createPresenceIdentityKey(item),
+        ),
         inventorySnapshot,
       };
     } catch (error) {
@@ -1389,8 +1412,10 @@ class SaveFileMonitor {
    * missing. It only touches presence flags: vaulted state and item data are never modified.
    * Errors are logged and swallowed so a database problem cannot break save file scanning.
    *
-   * Limitation: fingerprints include the character name and item position. An item that moved (or
-   * a renamed character) therefore gets a new fingerprint, and its old vault row reads as missing.
+   * Fingerprints include the character name and item position, so an item that moved inside its
+   * file gets a new fingerprint. The database therefore also matches rows by a location-independent
+   * identity key (`presentIdentityKeys`), and a moved item stays present. A renamed character is a
+   * different file and is not covered.
    * @private
    */
   private reconcileVaultPresence(parseResults: Array<SingleFileParseResult | undefined>): void {
@@ -1407,6 +1432,7 @@ class SaveFileMonitor {
           sourceFileType: snapshot.sourceFileType,
           sourceFilePath: snapshot.sourceFilePath,
           presentFingerprints: result.presentFingerprints,
+          presentIdentityKeys: result.presentIdentityKeys,
           lastSeenAt: snapshot.capturedAt,
         });
       } catch (error) {
