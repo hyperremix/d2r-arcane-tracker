@@ -62,7 +62,7 @@ body:
     attributes:
       label: Diablo II Resurrected Version
       description: What version of D2R are you playing?
-      placeholder: e.g., 2.7, 2.8, etc.
+      placeholder: e.g., 3.3
     validations:
       required: false
 

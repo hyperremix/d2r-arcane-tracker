@@ -1,390 +1,43 @@
-# Release Guide
+# Releasing
 
-This document provides comprehensive instructions for building and distributing D2R Arcane Tracker across different platforms.
+Releases ship as a Windows NSIS installer on [GitHub Releases](https://github.com/hyperremix/d2r-arcane-tracker/releases). Installed apps use `electron-updater` to update themselves from there. CI (`.github/workflows/ci.yml`) runs checks and deploys the website from `docs/`. It doesn't build releases.
 
-## Prerequisites
+## Steps
 
-### Development Environment
-
-- **Node.js** v22.15.0 or higher
-- **Yarn** package manager
-- **Git** for version control
-
-### Platform-Specific Requirements
-
-#### Windows Builds (from macOS/Linux)
-
-- **Wine** (optional, for testing Windows installers)
-- **Cross-platform compilation** requires proper native module handling
-
-#### Code Signing (Optional but Recommended)
-
-- **Windows**: Code signing certificate (EV certificate recommended)
-- **macOS**: Apple Developer account and certificates
-- **Linux**: No signing required for most distributions
-
-## Building for Release
-
-### Platform-Specific Builds
-
-```bash
-# Build for Windows only
-yarn build:win
-
-# Build for macOS only
-yarn build:mac
-
-# Build for Linux only
-yarn build:linux
-
-# Build for all platforms
-yarn build
-```
-
-### Build Outputs
-
-Built applications will be available in `release/${version}/`:
-
-- **Windows**: `D2R Arcane Tracker-Windows-${version}-Setup.exe`
-- **macOS**: `D2R Arcane Tracker-Mac-${version}-Installer.dmg`
-- **Linux**: `D2R Arcane Tracker-Linux-${version}.AppImage`
-
-**Current Version**: 0.1.0
-
-## Native Module Considerations
-
-This application uses several native modules that require special handling during packaging:
-
-### Critical Native Dependencies
-
-1. **better-sqlite3** - SQLite database engine
-2. **@dschu012/d2s** - Diablo II save file parser
-
-### Configuration
-
-The `electron-builder.json5` configuration includes:
-
-```json5
-"asarUnpack": [
-  "**/node_modules/better-sqlite3/**/*",
-  "**/node_modules/@dschu012/**/*"
-]
-```
-
-This ensures native `.node` binaries are unpacked from the ASAR archive and remain accessible at runtime.
-
-### Troubleshooting Native Modules
-
-If you encounter issues with native modules:
-
-1. **Rebuild for target platform**:
+1. **Check `main`**: CI is green, and the [manual checks](#manual-checks) pass on Windows.
+2. **Bump the version** (updates `package.json`, commits, tags `vX.Y.Z` and pushes):
 
    ```bash
-   # For Electron (production)
-   yarn dev  # This runs electron-rebuild automatically
-   
-   # Manual rebuild
-   npx electron-rebuild --force --module-dir . --which-module better-sqlite3
+   bun run version:patch   # or version:minor / version:major
    ```
 
-2. **Check Node.js version compatibility**:
-   - Development: Node.js v22.15.0 (NODE_MODULE_VERSION 127)
-   - Production: Electron v30.0.1 (NODE_MODULE_VERSION 123)
-
-## Windows Distribution
-
-### Building Windows Installer from macOS
-
-Cross-platform builds for Windows from macOS are supported but require attention to native modules:
-
-1. **Ensure proper native module configuration**:
+3. **Build** from the tagged commit. Windows is the safest machine to build on, because native modules must match the target platform:
 
    ```bash
-   # The asarUnpack configuration in electron-builder.json5 handles this
-   yarn build:win
+   bun run build   # typecheck → vite build → electron-builder --win
    ```
 
-2. **Test the installer** (if Wine is available):
+   This writes to `release/<version>/`.
+4. **Publish**: create a GitHub release for the tag with generated notes, and upload:
+   - `D2R-Arcane-Tracker-Windows-<version>-Setup.exe`
+   - `latest.yml`. Auto-update needs this file. Without it, installed apps won't see the release.
 
-   ```bash
-   # Install Wine on macOS
-   brew install --cask wine-stable
-   
-   # Test the installer
-   wine "release/0.0.1/D2R Arcane Tracker-Windows-0.0.1-Setup.exe"
-   ```
+## Build configuration
 
-### Windows-Specific Configuration
+`electron-builder.json5` defines a per-user x64 NSIS installer that lets the user change the install folder and keeps app data on uninstall. `better-sqlite3` and `@dschu012/d2s` are unpacked from the ASAR (`asarUnpack`) so their files can be loaded at runtime. The icon is `build/logo.ico`.
 
-#### Icon Format
+Builds aren't code-signed, so Windows SmartScreen warns on first run. The [README](../README.md#install) tells users how to get past it.
 
-- Uses `build/logo.png`
-- Must be in ICO format for proper Windows integration
-- Supports multiple resolutions in single ICO file
+If a build fails with `NODE_MODULE_VERSION` or `Cannot find module 'better-sqlite3'`, run `bun run rebuild` and make sure the module is still listed in `asarUnpack`.
 
-#### Installer Behavior
+## Manual checks
 
-- **NSIS installer** with custom configuration
-- **Per-user installation** (not system-wide)
-- **Custom installation directory** allowed
-- **App data preserved** on uninstall
+On a clean Windows machine with D2R installed:
 
-#### Windows Defender / Antivirus
-
-- Unsigned applications may trigger warnings
-- Users may need to click "More info" → "Run anyway"
-- Code signing eliminates these warnings
-
-## Code Signing Setup
-
-### Windows Code Signing
-
-#### Prerequisites
-
-- Code signing certificate (EV certificate recommended)
-- Certificate must be installed in Windows Certificate Store
-- Access to Windows machine or Wine for signing
-
-#### Configuration
-
-Add to `electron-builder.json5`:
-
-```json5
-"win": {
-  "certificateFile": "path/to/certificate.p12",
-  "certificatePassword": "password",
-  "signingHashAlgorithms": ["sha256"],
-  "sign": "path/to/sign-tool.exe"
-}
-```
-
-#### Signing Process
-
-```bash
-# Sign the installer after build
-yarn build:win
-# Signing happens automatically if configured
-```
-
-### macOS Code Signing
-
-#### Prerequisites
-
-- Apple Developer account
-- Developer certificates installed in Keychain
-- App Store Connect app record (for notarization)
-
-#### Configuration
-
-```json5
-"mac": {
-  "identity": "Developer ID Application: Your Name (TEAM_ID)",
-  "hardenedRuntime": true,
-  "notarize": {
-    "teamId": "TEAM_ID"
-  }
-}
-```
-
-## Testing Releases
-
-### Pre-Release Testing Checklist
-
-- [ ] **Installation Test**: Install on clean system
-- [ ] **Functionality Test**: Core features work correctly
-- [ ] **Save File Detection**: D2R save files are detected
-- [ ] **Database Operations**: SQLite database works properly
-- [ ] **Native Modules**: No module loading errors
-- [ ] **Icon Display**: Application icon shows correctly
-- [ ] **Auto-Update**: Update mechanism works (if configured)
-- [ ] **Uninstall**: Clean removal of application
-- [ ] **Run Tracker Auto Mode (Windows)**: Runs start/end automatically when entering/exiting games
-- [ ] **Run Tracker Manual Controls**: Keyboard shortcuts and UI buttons start/pause/end runs
-- [ ] **Run Items Logging**: Items found during runs appear in session detail view
-- [ ] **Run Tracker Export**: CSV / JSON / Text exports save correctly and copy to clipboard
-
-### Platform-Specific Testing
-
-#### Windows Testing
-
-- [ ] Installer runs without errors
-- [ ] Application launches from Start Menu
-- [ ] Icon displays in taskbar
-- [ ] No antivirus false positives
-- [ ] Save file monitoring works
-- [ ] Database operations function
-- [ ] Auto-mode run tracking behaves correctly (sessions, runs, pause/resume)
-
-#### macOS Testing
-
-- [ ] DMG mounts and installs correctly
-- [ ] Application launches from Applications folder
-- [ ] No Gatekeeper warnings (if signed)
-- [ ] Native modules load properly
-- [ ] Manual run tracking works via shortcuts/UI controls
-- [ ] Session export dialog saves files and copies to clipboard
-
-#### Linux Testing
-
-- [ ] AppImage is executable
-- [ ] Application launches correctly
-- [ ] File permissions are correct
-- [ ] Desktop integration works
-- [ ] Manual run tracking works via shortcuts/UI controls
-- [ ] Session export dialog saves files and copies to clipboard
-
-## Distribution
-
-### GitHub Releases
-
-1. **Create Release**:
-   - Tag version: `v0.0.1`
-   - Title: `D2R Arcane Tracker v0.0.1`
-   - Description: Include changelog and installation notes
-
-2. **Upload Artifacts**:
-   - Upload Windows installer
-   - Upload macOS DMG
-   - Upload Linux AppImage
-   - Include SHA256 checksums
-
-3. **Release Notes Template**:
-
-   ```markdown
-   ## D2R Arcane Tracker v0.0.1
-   
-   ### New Features
-   - Initial release
-   - Holy Grail tracking
-   - Automatic save file monitoring
-   - Integrated Run Tracker (sessions, auto/manual runs, exports)
-   
-   ### Installation
-   - **Windows**: Download and run the `.exe` installer
-   - **macOS**: Download and open the `.dmg` file
-   - **Linux**: Download and run the `.AppImage`
-   
-   ### System Requirements
-   - Windows 10+, macOS 10.15+, or Linux
-   - Diablo II: Resurrected installed
-   ```
-
-### Alternative Distribution
-
-- **Direct Download**: Host files on project website
-- **Package Managers**: Consider Windows Package Manager, Homebrew Cask
-- **App Stores**: Future consideration for Microsoft Store, Mac App Store
-
-## Troubleshooting
-
-### Common Build Issues
-
-#### Native Module Errors
-
-```
-Error: The module 'better-sqlite3' was compiled against a different Node.js version
-```
-
-**Solution**: Run `yarn dev` to rebuild native modules for Electron
-
-#### Cross-Platform Build Issues
-
-```
-Error: Cannot find module 'better-sqlite3'
-```
-
-**Solution**: Ensure `asarUnpack` configuration includes all native modules
-
-#### Icon Issues
-
-```
-Warning: Icon file not found or invalid format
-```
-
-**Solution**: Verify `build/logo.png` exists and is valid ICO format
-
-### Platform-Specific Issues
-
-#### Windows
-
-- **"Unknown Publisher" Warning**: Normal for unsigned apps, document for users
-- **Antivirus False Positive**: Common with Electron apps, consider code signing
-- **Path Length Issues**: Ensure install path doesn't exceed Windows limits
-
-#### macOS
-
-- **Gatekeeper Warnings**: Expected for unsigned apps
-- **Notarization Issues**: Required for distribution outside App Store
-
-#### Linux
-
-- **Permission Issues**: Ensure AppImage has execute permissions
-- **Missing Dependencies**: AppImage should be self-contained
-
-## Security Considerations
-
-### Code Signing Benefits
-
-- Eliminates "Unknown Publisher" warnings
-- Prevents tampering with distributed files
-- Improves user trust and adoption
-- Required for some enterprise environments
-
-### Unsigned Distribution
-
-- Users will see security warnings
-- May be blocked by enterprise firewalls
-- Document the warnings and provide guidance
-- Consider community-driven verification (GitHub releases with checksums)
-
-## Future Improvements
-
-### Automated Releases
-
-- GitHub Actions for automated building
-- Automated code signing (with secure secrets)
-- Automated upload to GitHub Releases
-- Automated testing across platforms
-
-### Update Mechanism
-
-- Implement electron-updater
-- Host update server
-- Configure automatic update checks
-- Handle update rollback scenarios
-
-### Enhanced Distribution
-
-- Windows Package Manager integration
-- Homebrew Cask for macOS
-- Snap package for Linux
-- Microsoft Store submission
-
----
-
-## Quick Reference
-
-### Build Commands
-
-```bash
-yarn build:win    # Windows installer
-yarn build:mac    # macOS DMG
-yarn build:linux  # Linux AppImage
-yarn build        # All platforms
-```
-
-### Key Files
-
-- `electron-builder.json5` - Build configuration
-- `build/logo.png` - icon
-
-### Release Checklist
-
-- [ ] Version bump in package.json
-- [ ] Update CHANGELOG.md
-- [ ] Run tests: `yarn test`
-- [ ] Build for all platforms
-- [ ] Test installers
-- [ ] Create GitHub release
-- [ ] Upload artifacts
-- [ ] Update documentation
+- [ ] The installer runs. The app starts from the Start Menu and shows its icon in the taskbar.
+- [ ] The setup wizard finds the save folder. Characters and items appear.
+- [ ] A new grail item is detected after leaving a game, and a notification appears.
+- [ ] Run Tracker auto mode starts and ends runs on entering and leaving a game ([memory reading](MEMORY_READING.md)), and manual shortcuts work with auto mode off.
+- [ ] Session export saves CSV, JSON and text files, and copies to the clipboard.
+- [ ] Database backup and restore work.
+- [ ] Updating from the previous release works through **Settings → Application Updates**.
