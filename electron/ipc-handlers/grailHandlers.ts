@@ -1,6 +1,6 @@
 import { ipcMain, webContents } from 'electron';
 import { type GrailDatabase, grailDatabase } from '../database/database';
-import type { GrailProgress, Item, Settings } from '../types/grail';
+import type { Difficulty, GrailProgress, Item, Settings } from '../types/grail';
 
 /**
  * Global database instance for grail operations.
@@ -26,6 +26,60 @@ function convertSettingValueToString(value: unknown): string | null {
 
   // Convert primitives to strings
   return String(value);
+}
+
+const VALID_DIFFICULTIES: readonly Difficulty[] = ['normal', 'nightmare', 'hell'];
+
+function isNonEmptyString(value: unknown): value is string {
+  return typeof value === 'string' && value.trim().length > 0;
+}
+
+function isOptionalString(value: unknown): boolean {
+  return value === undefined || typeof value === 'string';
+}
+
+function isOptionalBoolean(value: unknown): boolean {
+  return value === undefined || typeof value === 'boolean';
+}
+
+/**
+ * Validates a renderer-provided grail progress payload before it is persisted.
+ * @param value - The untrusted payload received over IPC
+ * @returns True if the payload has the shape of a GrailProgress record
+ */
+export function isValidGrailProgress(value: unknown): value is GrailProgress {
+  if (typeof value !== 'object' || value === null) {
+    return false;
+  }
+
+  const progress = value as Record<string, unknown>;
+  const { foundDate, difficulty } = progress;
+
+  return (
+    isNonEmptyString(progress.id) &&
+    isNonEmptyString(progress.characterId) &&
+    isNonEmptyString(progress.itemId) &&
+    typeof progress.isEthereal === 'boolean' &&
+    typeof progress.manuallyAdded === 'boolean' &&
+    isOptionalBoolean(progress.fromInitialScan) &&
+    isOptionalString(progress.foundBy) &&
+    isOptionalString(progress.notes) &&
+    (foundDate === undefined ||
+      (foundDate instanceof Date && !Number.isNaN(foundDate.getTime()))) &&
+    (difficulty === undefined || VALID_DIFFICULTIES.includes(difficulty as Difficulty))
+  );
+}
+
+/**
+ * Notifies all renderer windows that grail progress changed so they can reload it.
+ */
+function notifyProgressUpdated(): void {
+  const allWebContents = webContents.getAllWebContents();
+  for (const wc of allWebContents) {
+    if (!wc.isDestroyed() && wc.getType() === 'window') {
+      wc.send('grail-progress-updated');
+    }
+  }
 }
 
 /**
@@ -135,21 +189,50 @@ export function initializeGrailHandlers(): void {
    * @param _ - IPC event (unused)
    * @param progress - Grail progress data to update
    */
-  ipcMain.handle('grail:updateProgress', async (_, progress: GrailProgress) => {
+  ipcMain.handle('grail:updateProgress', async (_, progress: unknown) => {
     try {
+      if (!isValidGrailProgress(progress)) {
+        throw new Error('Invalid grail progress payload');
+      }
+
+      // Manually added records must reference an existing (non-deleted) character
+      if (progress.manuallyAdded && !grailDB.getCharacterById(progress.characterId)) {
+        throw new Error(`Unknown character: ${progress.characterId}`);
+      }
+
       grailDB.upsertProgress(progress);
 
       // Emit event to all renderer windows to refresh their progress data
-      const allWebContents = webContents.getAllWebContents();
-      for (const wc of allWebContents) {
-        if (!wc.isDestroyed() && wc.getType() === 'window') {
-          wc.send('grail-progress-updated');
-        }
-      }
+      notifyProgressUpdated();
 
       return { success: true };
     } catch (error) {
       console.error('Failed to update progress:', error);
+      throw error;
+    }
+  });
+
+  /**
+   * IPC handler for deleting a manually added grail progress record.
+   * Auto-detected records are derived from save files and are not deletable.
+   * Emits a grail-progress-updated event to all renderer windows after a successful delete.
+   * @param _ - IPC event (unused)
+   * @param progressId - ID of the progress record to delete
+   */
+  ipcMain.handle('grail:deleteProgress', async (_, progressId: unknown) => {
+    try {
+      if (!isNonEmptyString(progressId)) {
+        throw new Error('Invalid progress ID');
+      }
+
+      const deleted = grailDB.deleteManualProgress(progressId);
+      if (deleted) {
+        notifyProgressUpdated();
+      }
+
+      return { success: deleted };
+    } catch (error) {
+      console.error('Failed to delete progress:', error);
       throw error;
     }
   });

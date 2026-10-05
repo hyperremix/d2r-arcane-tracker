@@ -7,30 +7,14 @@ import { shouldShowEtherealStatus, shouldShowNormalStatus } from '@/lib/ethereal
  * Uses pre-built progress map for O(1) lookup instead of O(N) array search.
  * @param {Item} item - The Holy Grail item to calculate progress for
  * @param {GrailProgress[]} itemProgress - Pre-filtered progress records for this item
- * @param {string | null} selectedCharacterId - Optional character ID to filter by
  * @param {Settings} settings - The application settings
  * @returns {Object} Object containing found status and relevant progress records
  * @returns {boolean} returns.found - Whether the normal version is found
  * @returns {GrailProgress[]} returns.relevantProgress - Array of relevant progress records
  */
-function calculateNormalProgress(
-  item: Item,
-  itemProgress: GrailProgress[],
-  selectedCharacterId: string | null,
-  settings: Settings,
-) {
+function calculateNormalProgress(item: Item, itemProgress: GrailProgress[], settings: Settings) {
   if (!shouldShowNormalStatus(item, settings)) {
     return { found: false, relevantProgress: [] };
-  }
-
-  if (selectedCharacterId) {
-    const characterProgress = itemProgress.find(
-      (p) => p.characterId === selectedCharacterId && p.foundDate !== undefined && !p.isEthereal,
-    );
-    return {
-      found: Boolean(characterProgress),
-      relevantProgress: characterProgress ? [characterProgress] : [],
-    };
   }
 
   const relevantProgress = itemProgress.filter((p) => p.foundDate !== undefined && !p.isEthereal);
@@ -45,30 +29,14 @@ function calculateNormalProgress(
  * Uses pre-built progress map for O(1) lookup instead of O(N) array search.
  * @param {Item} item - The Holy Grail item to calculate progress for
  * @param {GrailProgress[]} itemProgress - Pre-filtered progress records for this item
- * @param {string | null} selectedCharacterId - Optional character ID to filter by
  * @param {Settings} settings - The application settings
  * @returns {Object} Object containing found status and relevant progress records
  * @returns {boolean} returns.found - Whether the ethereal version is found
  * @returns {GrailProgress[]} returns.relevantProgress - Array of relevant progress records
  */
-function calculateEtherealProgress(
-  item: Item,
-  itemProgress: GrailProgress[],
-  selectedCharacterId: string | null,
-  settings: Settings,
-) {
+function calculateEtherealProgress(item: Item, itemProgress: GrailProgress[], settings: Settings) {
   if (!shouldShowEtherealStatus(item, settings)) {
     return { found: false, relevantProgress: [] };
-  }
-
-  if (selectedCharacterId) {
-    const characterProgress = itemProgress.find(
-      (p) => p.characterId === selectedCharacterId && p.foundDate !== undefined && p.isEthereal,
-    );
-    return {
-      found: Boolean(characterProgress),
-      relevantProgress: characterProgress ? [characterProgress] : [],
-    };
   }
 
   const relevantProgress = itemProgress.filter((p) => p.foundDate !== undefined && p.isEthereal);
@@ -97,15 +65,9 @@ export interface ProgressLookupData {
  * @param {Item[]} items - Array of Holy Grail items to create lookup for
  * @param {GrailProgress[]} progress - All progress records from the database
  * @param {Settings} settings - The application settings
- * @param {string | null} [selectedCharacterId] - Optional character ID to filter progress by
  * @returns {Map<string, ProgressLookupData>} A Map with item IDs as keys and progress data as values
  */
-export function useProgressLookup(
-  items: Item[],
-  progress: GrailProgress[],
-  settings: Settings,
-  selectedCharacterId?: string | null,
-) {
+export function useProgressLookup(items: Item[], progress: GrailProgress[], settings: Settings) {
   return useMemo(() => {
     const lookup = new Map<string, ProgressLookupData>();
 
@@ -124,18 +86,8 @@ export function useProgressLookup(
       // Get pre-filtered progress for this item (O(1) lookup)
       const itemProgress = progressByItemId.get(item.id) ?? [];
 
-      const normalProgress = calculateNormalProgress(
-        item,
-        itemProgress,
-        selectedCharacterId ?? null,
-        settings,
-      );
-      const etherealProgress = calculateEtherealProgress(
-        item,
-        itemProgress,
-        selectedCharacterId ?? null,
-        settings,
-      );
+      const normalProgress = calculateNormalProgress(item, itemProgress, settings);
+      const etherealProgress = calculateEtherealProgress(item, itemProgress, settings);
 
       // Overall found status (either normal OR ethereal found)
       const overallFound = normalProgress.found || etherealProgress.found;
@@ -150,5 +102,5 @@ export function useProgressLookup(
     }
 
     return lookup;
-  }, [items, progress, selectedCharacterId, settings]);
+  }, [items, progress, settings]);
 }

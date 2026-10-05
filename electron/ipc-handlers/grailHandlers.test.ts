@@ -16,6 +16,7 @@ vi.mock('../database/database', () => {
   // Create mock database instance inside the factory
   const mockDB = {
     getAllCharacters: vi.fn(),
+    getCharacterById: vi.fn(),
     getCharacterMap: vi.fn(() => new Map()),
     insertCharacter: vi.fn(),
     updateCharacter: vi.fn(),
@@ -28,6 +29,7 @@ vi.mock('../database/database', () => {
     getAllProgress: vi.fn(),
     getFilteredProgress: vi.fn(),
     upsertProgress: vi.fn(),
+    deleteManualProgress: vi.fn(),
     getFilteredGrailStatistics: vi.fn(),
     setSetting: vi.fn(),
     backup: vi.fn(),
@@ -67,6 +69,7 @@ describe('When grailHandlers is used', () => {
       expect(ipcMain.handle).toHaveBeenCalledWith('grail:seedItems', expect.any(Function));
       expect(ipcMain.handle).toHaveBeenCalledWith('grail:getProgress', expect.any(Function));
       expect(ipcMain.handle).toHaveBeenCalledWith('grail:updateProgress', expect.any(Function));
+      expect(ipcMain.handle).toHaveBeenCalledWith('grail:deleteProgress', expect.any(Function));
       expect(ipcMain.handle).toHaveBeenCalledWith('grail:getSettings', expect.any(Function));
       expect(ipcMain.handle).toHaveBeenCalledWith('grail:updateSettings', expect.any(Function));
       expect(ipcMain.handle).toHaveBeenCalledWith('grail:getStatistics', expect.any(Function));
@@ -401,6 +404,125 @@ describe('When grailHandlers is used', () => {
       // Assert
       expect(grailDatabase.upsertProgress).toHaveBeenCalledWith(mockProgress);
       expect(result).toEqual({ success: true });
+    });
+
+    it('Then grail:updateProgress should persist a manual record for an existing character', async () => {
+      // Arrange
+      const mockProgress = GrailProgressBuilder.new()
+        .withId('manual_char-1_shako_normal_1')
+        .withCharacterId('char-1')
+        .withItemId('shako')
+        .withFoundDate(new Date('2024-01-01T00:00:00.000Z'))
+        .withManuallyAdded(true)
+        .asNormal()
+        .build();
+      vi.mocked(grailDatabase.getCharacterById).mockReturnValue({ id: 'char-1' } as Character);
+
+      const handler = vi
+        .mocked(ipcMain.handle)
+        .mock.calls.find((call) => call[0] === 'grail:updateProgress')?.[1] as any;
+
+      // Act
+      const result = await handler(null, mockProgress);
+
+      // Assert
+      expect(grailDatabase.getCharacterById).toHaveBeenCalledWith('char-1');
+      expect(grailDatabase.upsertProgress).toHaveBeenCalledWith(mockProgress);
+      expect(result).toEqual({ success: true });
+    });
+
+    it('Then grail:updateProgress should reject a manual record for an unknown character', async () => {
+      // Arrange
+      const mockProgress = GrailProgressBuilder.new()
+        .withId('manual-1')
+        .withCharacterId('ghost')
+        .withItemId('shako')
+        .withManuallyAdded(true)
+        .build();
+      vi.mocked(grailDatabase.getCharacterById).mockReturnValue(undefined);
+
+      const handler = vi
+        .mocked(ipcMain.handle)
+        .mock.calls.find((call) => call[0] === 'grail:updateProgress')?.[1] as any;
+
+      // Act & Assert
+      await expect(handler(null, mockProgress)).rejects.toThrow('Unknown character: ghost');
+      expect(grailDatabase.upsertProgress).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ['a non-object payload', 'not-progress'],
+      ['a missing item ID', { id: 'p', characterId: 'c', isEthereal: false, manuallyAdded: true }],
+      [
+        'an invalid found date',
+        {
+          id: 'p',
+          characterId: 'c',
+          itemId: 'i',
+          isEthereal: false,
+          manuallyAdded: true,
+          foundDate: new Date('invalid'),
+        },
+      ],
+      [
+        'a non-boolean ethereal flag',
+        { id: 'p', characterId: 'c', itemId: 'i', isEthereal: 'yes', manuallyAdded: true },
+      ],
+    ])('Then grail:updateProgress should reject %s', async (_label, payload) => {
+      // Arrange
+      const handler = vi
+        .mocked(ipcMain.handle)
+        .mock.calls.find((call) => call[0] === 'grail:updateProgress')?.[1] as any;
+
+      // Act & Assert
+      await expect(handler(null, payload)).rejects.toThrow('Invalid grail progress payload');
+      expect(grailDatabase.upsertProgress).not.toHaveBeenCalled();
+    });
+
+    it('Then grail:deleteProgress should delete a manual record', async () => {
+      // Arrange
+      vi.mocked(grailDatabase.deleteManualProgress).mockReturnValue(true);
+
+      const handler = vi
+        .mocked(ipcMain.handle)
+        .mock.calls.find((call) => call[0] === 'grail:deleteProgress')?.[1] as any;
+
+      // Act
+      const result = await handler(null, 'manual-1');
+
+      // Assert
+      expect(grailDatabase.deleteManualProgress).toHaveBeenCalledWith('manual-1');
+      expect(result).toEqual({ success: true });
+    });
+
+    it('Then grail:deleteProgress should report failure if nothing was deleted', async () => {
+      // Arrange
+      vi.mocked(grailDatabase.deleteManualProgress).mockReturnValue(false);
+
+      const handler = vi
+        .mocked(ipcMain.handle)
+        .mock.calls.find((call) => call[0] === 'grail:deleteProgress')?.[1] as any;
+
+      // Act
+      const result = await handler(null, 'auto-1');
+
+      // Assert
+      expect(result).toEqual({ success: false });
+    });
+
+    it.each([
+      ['an empty string', ''],
+      ['a number', 42],
+      ['undefined', undefined],
+    ])('Then grail:deleteProgress should reject %s as progress ID', async (_label, progressId) => {
+      // Arrange
+      const handler = vi
+        .mocked(ipcMain.handle)
+        .mock.calls.find((call) => call[0] === 'grail:deleteProgress')?.[1] as any;
+
+      // Act & Assert
+      await expect(handler(null, progressId)).rejects.toThrow('Invalid progress ID');
+      expect(grailDatabase.deleteManualProgress).not.toHaveBeenCalled();
     });
 
     it('Then progress handlers should handle errors properly', async () => {

@@ -78,7 +78,6 @@ export const ItemGrid = memo(function ItemGrid() {
   // Use individual selectors to prevent unnecessary re-renders
   const progress = useGrailStore((state) => state.progress);
   const characters = useGrailStore((state) => state.characters);
-  const selectedCharacterId = useGrailStore((state) => state.selectedCharacterId);
   const settings = useGrailStore((state) => state.settings);
   const viewMode = useGrailStore((state) => state.viewMode);
   const groupMode = useGrailStore((state) => state.groupMode);
@@ -112,7 +111,7 @@ export const ItemGrid = memo(function ItemGrid() {
   }, [filteredItems, settings.grailNormal, settings.grailEthereal, filterSingleGrailType]);
 
   // Create a lookup map for progress data including both normal and ethereal versions
-  const progressLookup = useProgressLookup(displayItems, progress, settings, selectedCharacterId);
+  const progressLookup = useProgressLookup(displayItems, progress, settings);
 
   // Reset group mode to 'none' if ethereal grouping is selected but ethereal items are enabled
   useEffect(() => {

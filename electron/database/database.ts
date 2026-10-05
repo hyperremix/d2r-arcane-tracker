@@ -144,6 +144,9 @@ class GrailDatabase {
   upsertProgressBatch(progressList: GrailProgress[]): void {
     progressModule.upsertProgressBatch(this, progressList);
   }
+  deleteManualProgress(progressId: string): boolean {
+    return progressModule.deleteManualProgress(this, progressId);
+  }
 
   // Settings
   getAllSettings(): Settings {

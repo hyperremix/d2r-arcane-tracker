@@ -99,7 +99,7 @@ export function upsertProgress(ctx: DatabaseContext, progress: GrailProgress): v
       itemId: progress.itemId,
       foundDate: toISOString(progress.foundDate),
       manuallyAdded: progress.manuallyAdded,
-      autoDetected: true,
+      autoDetected: !progress.manuallyAdded,
       difficulty: progress.difficulty ?? null,
       notes: progress.notes ?? null,
       isEthereal: progress.isEthereal,
@@ -112,7 +112,7 @@ export function upsertProgress(ctx: DatabaseContext, progress: GrailProgress): v
         itemId: progress.itemId,
         foundDate: toISOString(progress.foundDate),
         manuallyAdded: progress.manuallyAdded,
-        autoDetected: true,
+        autoDetected: !progress.manuallyAdded,
         difficulty: progress.difficulty ?? null,
         notes: progress.notes ?? null,
         isEthereal: progress.isEthereal,
@@ -135,7 +135,7 @@ export function upsertProgressBatch(ctx: DatabaseContext, progressList: GrailPro
           itemId: progress.itemId,
           foundDate: toISOString(progress.foundDate),
           manuallyAdded: progress.manuallyAdded,
-          autoDetected: true,
+          autoDetected: !progress.manuallyAdded,
           difficulty: progress.difficulty ?? null,
           notes: progress.notes ?? null,
           isEthereal: progress.isEthereal,
@@ -148,7 +148,7 @@ export function upsertProgressBatch(ctx: DatabaseContext, progressList: GrailPro
             itemId: progress.itemId,
             foundDate: toISOString(progress.foundDate),
             manuallyAdded: progress.manuallyAdded,
-            autoDetected: true,
+            autoDetected: !progress.manuallyAdded,
             difficulty: progress.difficulty ?? null,
             notes: progress.notes ?? null,
             isEthereal: progress.isEthereal,
@@ -159,4 +159,17 @@ export function upsertProgressBatch(ctx: DatabaseContext, progressList: GrailPro
     }
   });
   insertMany();
+}
+
+/**
+ * Deletes a progress record, but only if it was added manually by the user.
+ * Auto-detected records are derived from save files and cannot be removed here.
+ * @returns True if a record was deleted, false otherwise
+ */
+export function deleteManualProgress(ctx: DatabaseContext, progressId: string): boolean {
+  const result = ctx.db
+    .delete(grailProgress)
+    .where(and(eq(grailProgress.id, progressId), eq(grailProgress.manuallyAdded, true)))
+    .run();
+  return result.changes > 0;
 }

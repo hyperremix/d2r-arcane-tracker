@@ -1,5 +1,5 @@
 import type { Item } from 'electron/types/grail';
-import { useCallback, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import {
@@ -18,6 +18,7 @@ import placeholderUrl from '/images/placeholder-item.png';
 import { RuneImages } from '../RuneImages';
 import { CharacterProgressTable } from './CharacterProgressTable';
 import { ItemInfoSection } from './ItemInfoSection';
+import { MarkAsFoundDialog } from './MarkAsFoundDialog';
 import { ProgressStatusSection } from './ProgressStatusSection';
 
 interface ItemDetailsDialogProps {
@@ -28,13 +29,19 @@ interface ItemDetailsDialogProps {
 
 /**
  * ItemDetailsDialog component that displays comprehensive information about a Holy Grail item.
- * Shows item metadata, icon, and per-character progress with toggle actions.
+ * Shows item metadata, icon, and per-character progress, and lets the user manually
+ * record or remove finds.
  */
-// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Complex dialog component with many features
 export function ItemDetailsDialog({ itemId, open, onOpenChange }: ItemDetailsDialogProps) {
   const { t } = useTranslation();
-  const { items, progress, characters, selectedCharacterId, toggleItemFound, settings } =
-    useGrailStore();
+  const { items, progress, characters, removeProgress, settings } = useGrailStore();
+  const [markAsFoundOpen, setMarkAsFoundOpen] = useState(false);
+
+  // Never carry an open "mark as found" prompt over to another item or a reopened dialog
+  // biome-ignore lint/correctness/useExhaustiveDependencies: itemId is an intentional reset trigger
+  useEffect(() => {
+    setMarkAsFoundOpen(false);
+  }, [open, itemId]);
 
   // Find the item by ID
   const item = useMemo(() => {
@@ -43,12 +50,7 @@ export function ItemDetailsDialog({ itemId, open, onOpenChange }: ItemDetailsDia
   }, [items, itemId]);
 
   // Get progress lookup for this item
-  const progressLookup = useProgressLookup(
-    item ? [item] : [],
-    progress,
-    settings,
-    selectedCharacterId,
-  );
+  const progressLookup = useProgressLookup(item ? [item] : [], progress, settings);
   const itemProgress = useMemo(
     () => (item ? progressLookup.get(item.id) : null),
     [item, progressLookup],
@@ -68,17 +70,9 @@ export function ItemDetailsDialog({ itemId, open, onOpenChange }: ItemDetailsDia
   };
   const { iconUrl, isLoading } = useItemIcon(item || placeholderItem);
 
-  // Handle toggle found action
-  const handleToggleFound = useCallback(() => {
-    if (!item || !selectedCharacterId) return;
-    toggleItemFound(item.id, selectedCharacterId, true);
-  }, [item, selectedCharacterId, toggleItemFound]);
-
   if (!item) {
     return null;
   }
-
-  const isFound = itemProgress?.overallFound || false;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -122,23 +116,25 @@ export function ItemDetailsDialog({ itemId, open, onOpenChange }: ItemDetailsDia
             <ItemInfoSection item={item} />
             <ProgressStatusSection item={item} itemProgress={itemProgress} />
             {characters.length > 0 && (
-              <CharacterProgressTable characters={characters} progress={progress} item={item} />
+              <CharacterProgressTable
+                characters={characters}
+                progress={progress}
+                item={item}
+                onRemoveProgress={removeProgress}
+              />
             )}
           </div>
         </div>
 
         <DialogFooter>
-          {selectedCharacterId && (
-            <Button onClick={handleToggleFound} variant={isFound ? 'outline' : 'default'}>
-              {isFound
-                ? t(translations.grail.itemDetails.markAsNotFound)
-                : t(translations.grail.itemDetails.markAsFound)}
-            </Button>
-          )}
+          <Button onClick={() => setMarkAsFoundOpen(true)}>
+            {t(translations.grail.itemDetails.markAsFound)}
+          </Button>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             {t(translations.common.close)}
           </Button>
         </DialogFooter>
+        <MarkAsFoundDialog item={item} open={markAsFoundOpen} onOpenChange={setMarkAsFoundOpen} />
       </DialogContent>
     </Dialog>
   );

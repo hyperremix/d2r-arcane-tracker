@@ -78,8 +78,21 @@
       "character": "Character",
       "foundDate": "Found Date",
       "method": "Method",
-      "markAsNotFound": "Mark as Not Found",
-      "markAsFound": "Mark as Found"
+      "actions": "Actions",
+      "markAsFound": "Mark as Found",
+      "markAsFoundDescription": "Record which character found {{item}}.",
+      "selectCharacter": "Select a character",
+      "noCharactersAvailable": "No characters available yet. Characters are added automatically once your save files are detected, so configure your save directory in Settings first.",
+      "version": "Version",
+      "ethereal": "Ethereal",
+      "alreadyRecorded": "{{character}} already has this version recorded.",
+      "invalidFoundDate": "Choose a date that is not in the future.",
+      "markAsFoundError": "Could not save this find. Please try again.",
+      "remove": "Remove",
+      "removeRecordLabel": "Remove {{version}} record for {{character}}",
+      "removeRecordTitle": "Remove found record?",
+      "removeRecordDescription": "This removes the manually added {{version}} record of {{item}} for {{character}}. This cannot be undone.",
+      "removeRecordError": "Could not remove this record. Please try again."
     },
     "itemGrid": {
       "notApplicable": "Not Applicable",

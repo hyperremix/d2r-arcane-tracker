@@ -1,4 +1,5 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import dayjs from 'dayjs';
 import type { Settings } from 'electron/types/grail';
 import { GameMode, GameVersion } from 'electron/types/grail';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -47,14 +48,14 @@ const defaultSettings: Settings = {
   showItemIcons: false,
 };
 
-const mockToggleItemFound = vi.fn();
+const mockAddManualProgress = vi.fn();
+const mockRemoveProgress = vi.fn();
 
 function setupStoreMock(
   overrides: {
     items?: ReturnType<typeof HolyGrailItemBuilder.prototype.build>[];
     progress?: ReturnType<typeof GrailProgressBuilder.prototype.build>[];
     characters?: ReturnType<typeof CharacterBuilder.prototype.build>[];
-    selectedCharacterId?: string | null;
     settings?: Partial<Settings>;
   } = {},
 ) {
@@ -62,8 +63,8 @@ function setupStoreMock(
     items: overrides.items ?? [],
     progress: overrides.progress ?? [],
     characters: overrides.characters ?? [],
-    selectedCharacterId: overrides.selectedCharacterId ?? null,
-    toggleItemFound: mockToggleItemFound,
+    addManualProgress: mockAddManualProgress,
+    removeProgress: mockRemoveProgress,
     settings: { ...defaultSettings, ...overrides.settings },
   };
 
@@ -269,7 +270,7 @@ describe('When ItemDetailsDialog is rendered', () => {
     it('Then shows Found badge', () => {
       // Arrange
       const item = HolyGrailItemBuilder.new().withId('item-1').build();
-      setupStoreMock({ items: [item], selectedCharacterId: 'char-1' });
+      setupStoreMock({ items: [item] });
       setupProgressLookup(
         new Map([
           [
@@ -291,39 +292,13 @@ describe('When ItemDetailsDialog is rendered', () => {
       // Assert
       expect(screen.getByText('Found')).toBeInTheDocument();
     });
-
-    it('Then shows Mark as Not Found button', () => {
-      // Arrange
-      const item = HolyGrailItemBuilder.new().withId('item-1').build();
-      setupStoreMock({ items: [item], selectedCharacterId: 'char-1' });
-      setupProgressLookup(
-        new Map([
-          [
-            'item-1',
-            {
-              normalFound: true,
-              etherealFound: false,
-              overallFound: true,
-              normalProgress: [],
-              etherealProgress: [],
-            },
-          ],
-        ]),
-      );
-
-      // Act
-      render(<ItemDetailsDialog itemId="item-1" open={true} onOpenChange={vi.fn()} />);
-
-      // Assert
-      expect(screen.getByRole('button', { name: 'Mark as Not Found' })).toBeInTheDocument();
-    });
   });
 
   describe('If progress shows not found', () => {
     it('Then shows Not Found badge', () => {
       // Arrange
       const item = HolyGrailItemBuilder.new().withId('item-1').build();
-      setupStoreMock({ items: [item], selectedCharacterId: 'char-1' });
+      setupStoreMock({ items: [item] });
       setupProgressLookup(
         new Map([
           [
@@ -344,76 +319,6 @@ describe('When ItemDetailsDialog is rendered', () => {
 
       // Assert
       expect(screen.getByText('Not Found')).toBeInTheDocument();
-    });
-
-    it('Then shows Mark as Found button', () => {
-      // Arrange
-      const item = HolyGrailItemBuilder.new().withId('item-1').build();
-      setupStoreMock({ items: [item], selectedCharacterId: 'char-1' });
-      setupProgressLookup(
-        new Map([
-          [
-            'item-1',
-            {
-              normalFound: false,
-              etherealFound: false,
-              overallFound: false,
-              normalProgress: [],
-              etherealProgress: [],
-            },
-          ],
-        ]),
-      );
-
-      // Act
-      render(<ItemDetailsDialog itemId="item-1" open={true} onOpenChange={vi.fn()} />);
-
-      // Assert
-      expect(screen.getByRole('button', { name: 'Mark as Found' })).toBeInTheDocument();
-    });
-  });
-
-  describe('If selectedCharacterId is null', () => {
-    it('Then no toggle button is shown', () => {
-      // Arrange
-      const item = HolyGrailItemBuilder.new().withId('item-1').build();
-      setupStoreMock({ items: [item], selectedCharacterId: null });
-
-      // Act
-      render(<ItemDetailsDialog itemId="item-1" open={true} onOpenChange={vi.fn()} />);
-
-      // Assert
-      expect(screen.queryByRole('button', { name: /Mark as/ })).not.toBeInTheDocument();
-    });
-  });
-
-  describe('If "Mark as Found" clicked', () => {
-    it('Then calls toggleItemFound', () => {
-      // Arrange
-      const item = HolyGrailItemBuilder.new().withId('item-1').build();
-      setupStoreMock({ items: [item], selectedCharacterId: 'char-1' });
-      setupProgressLookup(
-        new Map([
-          [
-            'item-1',
-            {
-              normalFound: false,
-              etherealFound: false,
-              overallFound: false,
-              normalProgress: [],
-              etherealProgress: [],
-            },
-          ],
-        ]),
-      );
-
-      render(<ItemDetailsDialog itemId="item-1" open={true} onOpenChange={vi.fn()} />);
-
-      // Act
-      fireEvent.click(screen.getByRole('button', { name: 'Mark as Found' }));
-
-      // Assert
-      expect(mockToggleItemFound).toHaveBeenCalledWith('item-1', 'char-1', true);
     });
   });
 
@@ -631,6 +536,335 @@ describe('When ItemDetailsDialog is rendered', () => {
 
       // Assert
       expect(screen.getByText('Auto')).toBeInTheDocument();
+    });
+  });
+
+  describe('If the item is shown without any found records', () => {
+    it('Then the Mark as Found action is always available', () => {
+      // Arrange
+      const item = HolyGrailItemBuilder.new().withId('item-1').build();
+      setupStoreMock({ items: [item] });
+
+      // Act
+      render(<ItemDetailsDialog itemId="item-1" open={true} onOpenChange={vi.fn()} />);
+
+      // Assert
+      expect(screen.getByRole('button', { name: 'Mark as Found' })).toBeEnabled();
+      expect(screen.queryByRole('button', { name: /Not Found/ })).not.toBeInTheDocument();
+    });
+  });
+});
+
+function openMarkAsFoundPrompt() {
+  fireEvent.click(screen.getByRole('button', { name: 'Mark as Found' }));
+  return screen.getByRole('dialog', { name: 'Mark as Found' });
+}
+
+describe('When the user marks an item as found', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    setupProgressLookup();
+    mockAddManualProgress.mockResolvedValue(undefined);
+  });
+
+  describe('If characters exist', () => {
+    it('Then the prompt asks for a character and a found date defaulting to today', () => {
+      // Arrange
+      const item = HolyGrailItemBuilder.new().withId('item-1').withEtherealType('none').build();
+      const character = CharacterBuilder.new().withId('char-1').withName('Sorc').build();
+      setupStoreMock({ items: [item], characters: [character] });
+      render(<ItemDetailsDialog itemId="item-1" open={true} onOpenChange={vi.fn()} />);
+
+      // Act
+      const prompt = openMarkAsFoundPrompt();
+
+      // Assert
+      expect(within(prompt).getByRole('combobox', { name: 'Character' })).toHaveTextContent('Sorc');
+      expect(within(prompt).getByLabelText('Found Date')).toHaveValue(dayjs().format('YYYY-MM-DD'));
+      expect(within(prompt).queryByRole('combobox', { name: 'Version' })).not.toBeInTheDocument();
+    });
+
+    it('Then submitting saves a manual record for the chosen character and date', async () => {
+      // Arrange
+      const item = HolyGrailItemBuilder.new().withId('item-1').withEtherealType('none').build();
+      const character = CharacterBuilder.new().withId('char-1').withName('Sorc').build();
+      setupStoreMock({ items: [item], characters: [character] });
+      render(<ItemDetailsDialog itemId="item-1" open={true} onOpenChange={vi.fn()} />);
+      const prompt = openMarkAsFoundPrompt();
+      fireEvent.change(within(prompt).getByLabelText('Found Date'), {
+        target: { value: '2024-06-15' },
+      });
+
+      // Act
+      fireEvent.click(within(prompt).getByRole('button', { name: 'Mark as Found' }));
+
+      // Assert
+      await waitFor(() => expect(mockAddManualProgress).toHaveBeenCalledTimes(1));
+      const input = mockAddManualProgress.mock.calls[0][0];
+      expect(input).toMatchObject({ itemId: 'item-1', characterId: 'char-1', isEthereal: false });
+      expect(dayjs(input.foundDate).format('YYYY-MM-DD')).toBe('2024-06-15');
+      await waitFor(() =>
+        expect(screen.queryByRole('dialog', { name: 'Mark as Found' })).not.toBeInTheDocument(),
+      );
+    });
+
+    it('Then a future found date cannot be submitted', () => {
+      // Arrange
+      const item = HolyGrailItemBuilder.new().withId('item-1').withEtherealType('none').build();
+      const character = CharacterBuilder.new().withId('char-1').withName('Sorc').build();
+      setupStoreMock({ items: [item], characters: [character] });
+      render(<ItemDetailsDialog itemId="item-1" open={true} onOpenChange={vi.fn()} />);
+      const prompt = openMarkAsFoundPrompt();
+
+      // Act
+      fireEvent.change(within(prompt).getByLabelText('Found Date'), {
+        target: { value: dayjs().add(1, 'day').format('YYYY-MM-DD') },
+      });
+
+      // Assert
+      expect(within(prompt).getByRole('button', { name: 'Mark as Found' })).toBeDisabled();
+      expect(
+        within(prompt).getByText('Choose a date that is not in the future.'),
+      ).toBeInTheDocument();
+    });
+
+    it('Then saving errors are shown and the prompt stays open', async () => {
+      // Arrange
+      const item = HolyGrailItemBuilder.new().withId('item-1').withEtherealType('none').build();
+      const character = CharacterBuilder.new().withId('char-1').withName('Sorc').build();
+      setupStoreMock({ items: [item], characters: [character] });
+      mockAddManualProgress.mockRejectedValue(new Error('DB error'));
+      vi.spyOn(console, 'error').mockImplementation(() => undefined);
+      render(<ItemDetailsDialog itemId="item-1" open={true} onOpenChange={vi.fn()} />);
+      const prompt = openMarkAsFoundPrompt();
+
+      // Act
+      fireEvent.click(within(prompt).getByRole('button', { name: 'Mark as Found' }));
+
+      // Assert
+      expect(await within(prompt).findByRole('alert')).toHaveTextContent(
+        'Could not save this find. Please try again.',
+      );
+      expect(screen.getByRole('dialog', { name: 'Mark as Found' })).toBeInTheDocument();
+    });
+  });
+
+  describe('If the character already has the version recorded', () => {
+    it('Then the prompt explains it and cannot be submitted', () => {
+      // Arrange
+      const item = HolyGrailItemBuilder.new().withId('item-1').withEtherealType('none').build();
+      const character = CharacterBuilder.new().withId('char-1').withName('Sorc').build();
+      const progress = GrailProgressBuilder.new()
+        .withId('prog-1')
+        .withCharacterId('char-1')
+        .withItemId('item-1')
+        .withFoundDate(new Date('2024-01-01'))
+        .asNormal()
+        .build();
+      setupStoreMock({ items: [item], characters: [character], progress: [progress] });
+      render(<ItemDetailsDialog itemId="item-1" open={true} onOpenChange={vi.fn()} />);
+
+      // Act
+      const prompt = openMarkAsFoundPrompt();
+
+      // Assert
+      expect(
+        within(prompt).getByText('Sorc already has this version recorded.'),
+      ).toBeInTheDocument();
+      expect(within(prompt).getByRole('button', { name: 'Mark as Found' })).toBeDisabled();
+    });
+  });
+
+  describe('If no characters exist', () => {
+    it('Then the prompt explains why and cannot be submitted', () => {
+      // Arrange
+      const item = HolyGrailItemBuilder.new().withId('item-1').build();
+      setupStoreMock({ items: [item], characters: [] });
+      render(<ItemDetailsDialog itemId="item-1" open={true} onOpenChange={vi.fn()} />);
+
+      // Act
+      const prompt = openMarkAsFoundPrompt();
+
+      // Assert
+      expect(within(prompt).getByText(/No characters available yet/)).toBeInTheDocument();
+      expect(within(prompt).queryByRole('combobox')).not.toBeInTheDocument();
+      expect(within(prompt).getByRole('button', { name: 'Mark as Found' })).toBeDisabled();
+    });
+  });
+
+  describe('If ethereal tracking is enabled and the item can be both versions', () => {
+    it('Then the prompt asks for the version and saves the chosen one', async () => {
+      // Arrange
+      const item = HolyGrailItemBuilder.new().withId('item-1').withEtherealType('optional').build();
+      const character = CharacterBuilder.new().withId('char-1').withName('Sorc').build();
+      setupStoreMock({ items: [item], characters: [character], settings: { grailEthereal: true } });
+      render(<ItemDetailsDialog itemId="item-1" open={true} onOpenChange={vi.fn()} />);
+      const prompt = openMarkAsFoundPrompt();
+      const versionSelect = within(prompt).getByRole('combobox', { name: 'Version' });
+      expect(versionSelect).toHaveTextContent('Normal');
+
+      // Act
+      fireEvent.click(versionSelect);
+      const etherealOption = await screen.findByRole('option', { name: 'Ethereal' });
+      fireEvent.mouseMove(etherealOption);
+      fireEvent.click(etherealOption);
+      await waitFor(() => expect(versionSelect).toHaveTextContent('Ethereal'));
+      fireEvent.click(within(prompt).getByRole('button', { name: 'Mark as Found' }));
+
+      // Assert
+      await waitFor(() =>
+        expect(mockAddManualProgress).toHaveBeenCalledWith(
+          expect.objectContaining({ itemId: 'item-1', isEthereal: true }),
+        ),
+      );
+    });
+  });
+
+  describe('If ethereal tracking is disabled', () => {
+    it('Then the version is not asked and the normal version is saved', async () => {
+      // Arrange
+      const item = HolyGrailItemBuilder.new().withId('item-1').withEtherealType('optional').build();
+      const character = CharacterBuilder.new().withId('char-1').withName('Sorc').build();
+      setupStoreMock({
+        items: [item],
+        characters: [character],
+        settings: { grailEthereal: false },
+      });
+      render(<ItemDetailsDialog itemId="item-1" open={true} onOpenChange={vi.fn()} />);
+      const prompt = openMarkAsFoundPrompt();
+
+      // Act
+      fireEvent.click(within(prompt).getByRole('button', { name: 'Mark as Found' }));
+
+      // Assert
+      expect(within(prompt).queryByRole('combobox', { name: 'Version' })).not.toBeInTheDocument();
+      await waitFor(() =>
+        expect(mockAddManualProgress).toHaveBeenCalledWith(
+          expect.objectContaining({ isEthereal: false }),
+        ),
+      );
+    });
+  });
+
+  describe('If the item can only be ethereal', () => {
+    it('Then the version is not asked and the ethereal version is saved', async () => {
+      // Arrange
+      const item = HolyGrailItemBuilder.new().withId('item-1').withEtherealType('only').build();
+      const character = CharacterBuilder.new().withId('char-1').withName('Sorc').build();
+      setupStoreMock({ items: [item], characters: [character], settings: { grailEthereal: true } });
+      render(<ItemDetailsDialog itemId="item-1" open={true} onOpenChange={vi.fn()} />);
+      const prompt = openMarkAsFoundPrompt();
+
+      // Act
+      fireEvent.click(within(prompt).getByRole('button', { name: 'Mark as Found' }));
+
+      // Assert
+      expect(within(prompt).queryByRole('combobox', { name: 'Version' })).not.toBeInTheDocument();
+      await waitFor(() =>
+        expect(mockAddManualProgress).toHaveBeenCalledWith(
+          expect.objectContaining({ isEthereal: true }),
+        ),
+      );
+    });
+  });
+});
+
+describe('When the user removes a found record', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    setupProgressLookup();
+    mockRemoveProgress.mockResolvedValue(undefined);
+  });
+
+  function setupWithRecord(manuallyAdded: boolean) {
+    const item = HolyGrailItemBuilder.new().withId('item-1').withName('Shako').build();
+    const character = CharacterBuilder.new().withId('char-1').withName('Sorc').build();
+    const progress = GrailProgressBuilder.new()
+      .withId('prog-1')
+      .withCharacterId('char-1')
+      .withItemId('item-1')
+      .withFoundDate(new Date('2024-01-01'))
+      .withManuallyAdded(manuallyAdded)
+      .asNormal()
+      .build();
+    setupStoreMock({ items: [item], characters: [character], progress: [progress] });
+  }
+
+  describe('If the record was auto-detected', () => {
+    it('Then no remove action is offered', () => {
+      // Arrange
+      setupWithRecord(false);
+
+      // Act
+      render(<ItemDetailsDialog itemId="item-1" open={true} onOpenChange={vi.fn()} />);
+
+      // Assert
+      expect(screen.queryByRole('button', { name: /^Remove/ })).not.toBeInTheDocument();
+    });
+  });
+
+  describe('If the record was manually added and removal is confirmed', () => {
+    it('Then the record is removed', async () => {
+      // Arrange
+      setupWithRecord(true);
+      render(<ItemDetailsDialog itemId="item-1" open={true} onOpenChange={vi.fn()} />);
+      fireEvent.click(screen.getByRole('button', { name: 'Remove Normal record for Sorc' }));
+      const confirmation = screen.getByRole('alertdialog', { name: 'Remove found record?' });
+      expect(confirmation).toHaveTextContent(
+        'This removes the manually added Normal record of Shako for Sorc.',
+      );
+
+      // Act
+      fireEvent.click(within(confirmation).getByRole('button', { name: 'Remove' }));
+
+      // Assert
+      await waitFor(() => expect(mockRemoveProgress).toHaveBeenCalledWith('prog-1'));
+      await waitFor(() =>
+        expect(
+          screen.queryByRole('alertdialog', { name: 'Remove found record?' }),
+        ).not.toBeInTheDocument(),
+      );
+    });
+  });
+
+  describe('If the removal is cancelled', () => {
+    it('Then the record is kept', async () => {
+      // Arrange
+      setupWithRecord(true);
+      render(<ItemDetailsDialog itemId="item-1" open={true} onOpenChange={vi.fn()} />);
+      fireEvent.click(screen.getByRole('button', { name: 'Remove Normal record for Sorc' }));
+      const confirmation = screen.getByRole('alertdialog', { name: 'Remove found record?' });
+
+      // Act
+      fireEvent.click(within(confirmation).getByRole('button', { name: 'Cancel' }));
+
+      // Assert
+      await waitFor(() =>
+        expect(
+          screen.queryByRole('alertdialog', { name: 'Remove found record?' }),
+        ).not.toBeInTheDocument(),
+      );
+      expect(mockRemoveProgress).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('If the removal fails', () => {
+    it('Then an error is shown in the confirmation', async () => {
+      // Arrange
+      setupWithRecord(true);
+      mockRemoveProgress.mockRejectedValue(new Error('DB error'));
+      vi.spyOn(console, 'error').mockImplementation(() => undefined);
+      render(<ItemDetailsDialog itemId="item-1" open={true} onOpenChange={vi.fn()} />);
+      fireEvent.click(screen.getByRole('button', { name: 'Remove Normal record for Sorc' }));
+      const confirmation = screen.getByRole('alertdialog', { name: 'Remove found record?' });
+
+      // Act
+      fireEvent.click(within(confirmation).getByRole('button', { name: 'Remove' }));
+
+      // Assert
+      expect(await within(confirmation).findByRole('alert')).toHaveTextContent(
+        'Could not remove this record. Please try again.',
+      );
     });
   });
 });

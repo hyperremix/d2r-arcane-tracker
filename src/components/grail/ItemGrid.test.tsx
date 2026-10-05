@@ -532,7 +532,6 @@ function setupComponentMocks(
     filteredItems?: Item[];
     progress?: unknown[];
     characters?: unknown[];
-    selectedCharacterId?: string | null;
     settings?: Partial<Settings>;
     viewMode?: string;
     groupMode?: string;
@@ -542,7 +541,6 @@ function setupComponentMocks(
   const storeState = {
     progress: overrides.progress ?? [],
     characters: overrides.characters ?? [],
-    selectedCharacterId: overrides.selectedCharacterId ?? null,
     settings: mergedSettings,
     viewMode: overrides.viewMode ?? 'grid',
     groupMode: overrides.groupMode ?? 'none',
