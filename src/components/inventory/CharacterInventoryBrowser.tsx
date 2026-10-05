@@ -7,11 +7,11 @@ import type {
   ParsedInventoryItem,
   StashTabKind,
   VaultItem,
-  VaultItemFilter,
   VaultItemUpsertInput,
   VaultLocationContext,
   VaultSourceFileType,
 } from 'electron/types/grail';
+import { isCurrentlyVaulted } from 'electron/utils/vaultState';
 import { PackagePlus, Sparkles, X } from 'lucide-react';
 import { type DragEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -27,6 +27,11 @@ import {
 } from '@/components/inventory/dragPayloads';
 import { GameItemTooltipContent } from '@/components/inventory/GameItemTooltipContent';
 import { GemsTabSection } from '@/components/inventory/GemsTabSection';
+import {
+  buildInventorySearchFilter,
+  type InventorySearchAllResponse,
+  loadInventorySearchResponse,
+} from '@/components/inventory/inventorySearch';
 import { MaterialsTabSection } from '@/components/inventory/MaterialsTabSection';
 import { RunesTabSection } from '@/components/inventory/RunesTabSection';
 import {
@@ -84,20 +89,6 @@ import {
 import { cn } from '@/lib/utils';
 import { useGrailStore } from '@/stores/grailStore';
 import { showInventoryOperationErrorToast } from './operationErrors';
-
-type InventorySearchAllResponse = {
-  inventory: {
-    snapshots: CharacterInventorySnapshot[];
-    totalSnapshots: number;
-    totalItems: number;
-  };
-  vault: {
-    items: VaultItem[];
-    total: number;
-    page: number;
-    pageSize: number;
-  };
-};
 
 type TypeFilter = 'all' | 'unique' | 'set' | 'runeword' | 'rune' | 'other';
 type EquipmentUnplacedReason = UnplacedReason | 'unknownEquippedSlot';
@@ -269,118 +260,6 @@ function isGrailBookmark(item: VaultItem): boolean {
 
 function isStashSourceFileType(sourceFileType: VaultSourceFileType): boolean {
   return STASH_SOURCE_FILE_TYPES.has(sourceFileType);
-}
-
-function getVaultItemLastUpdatedMs(item: VaultItem): number {
-  const rawValue = item.lastUpdated as unknown;
-  if (rawValue instanceof Date) {
-    return rawValue.getTime();
-  }
-
-  if (typeof rawValue === 'string') {
-    const parsed = Date.parse(rawValue);
-    return Number.isNaN(parsed) ? 0 : parsed;
-  }
-
-  return 0;
-}
-
-function compareVaultItems(a: VaultItem, b: VaultItem): number {
-  const timeDiff = getVaultItemLastUpdatedMs(b) - getVaultItemLastUpdatedMs(a);
-  if (timeDiff !== 0) {
-    return timeDiff;
-  }
-
-  return a.fingerprint.localeCompare(b.fingerprint);
-}
-
-function mergeAndSortVaultItems(pages: VaultItem[][]): VaultItem[] {
-  const deduped = new Map<string, VaultItem>();
-
-  for (const pageItems of pages) {
-    for (const item of pageItems) {
-      const key = item.id || item.fingerprint;
-      deduped.set(key, item);
-    }
-  }
-
-  return [...deduped.values()].sort(compareVaultItems);
-}
-
-async function fetchAllVaultItemsForFilter(
-  filter: VaultItemFilter,
-  initialVault: InventorySearchAllResponse['vault'],
-): Promise<VaultItem[]> {
-  const initialItems = initialVault.items ?? [];
-  const pageSize = Math.max(initialVault.pageSize, 1);
-  const totalPages = Math.ceil(initialVault.total / pageSize);
-
-  if (totalPages <= 1) {
-    return mergeAndSortVaultItems([initialItems]);
-  }
-
-  const remainingPageRequests: Promise<InventorySearchAllResponse['vault']>[] = [];
-  for (let page = 2; page <= totalPages; page += 1) {
-    remainingPageRequests.push(
-      window.electronAPI.vault.search({
-        ...filter,
-        page,
-        pageSize,
-      }),
-    );
-  }
-
-  const remainingPages = await Promise.all(remainingPageRequests);
-  return mergeAndSortVaultItems([initialItems, ...remainingPages.map((page) => page.items)]);
-}
-
-function resolveCharacterFilter(characterId: string): string | undefined {
-  if (characterId === 'all') {
-    return undefined;
-  }
-
-  if (characterId.startsWith('name:')) {
-    return characterId.slice('name:'.length);
-  }
-
-  return characterId;
-}
-
-function buildInventorySearchFilter(
-  searchText: string,
-  characterId: string,
-  locationContext: 'all' | VaultLocationContext,
-): VaultItemFilter {
-  return {
-    text: searchText.trim() || undefined,
-    characterId: resolveCharacterFilter(characterId),
-    locationContext: locationContext === 'all' ? undefined : locationContext,
-    includeSocketed: false,
-    vaultedState: 'vaulted',
-    page: 1,
-    pageSize: 200,
-  };
-}
-
-function withMergedVaultItems(
-  response: InventorySearchAllResponse,
-  allVaultItems: VaultItem[],
-): InventorySearchAllResponse {
-  return {
-    ...response,
-    vault: {
-      ...response.vault,
-      items: allVaultItems,
-    },
-  };
-}
-
-async function loadInventorySearchResponse(
-  filter: VaultItemFilter,
-): Promise<InventorySearchAllResponse> {
-  const response = await window.electronAPI.inventory.searchAll(filter);
-  const allVaultItems = await fetchAllVaultItemsForFilter(filter, response.vault);
-  return withMergedVaultItems(response, allVaultItems);
 }
 
 interface VaultedItemTileProps {
@@ -1435,28 +1314,6 @@ function toVaultUpsertInput(item: ParsedInventoryItem): VaultItemUpsertInput {
     isPresentInLatestScan: true,
     lastSeenAt: item.seenAt,
   };
-}
-
-function isCurrentlyVaulted(vaultItem: VaultItem): boolean {
-  if (!vaultItem.vaultedAt) {
-    return false;
-  }
-
-  const vaultedAtMs =
-    vaultItem.vaultedAt instanceof Date
-      ? vaultItem.vaultedAt.getTime()
-      : Date.parse(vaultItem.vaultedAt as unknown as string);
-
-  if (!vaultItem.unvaultedAt) {
-    return true;
-  }
-
-  const unvaultedAtMs =
-    vaultItem.unvaultedAt instanceof Date
-      ? vaultItem.unvaultedAt.getTime()
-      : Date.parse(vaultItem.unvaultedAt as unknown as string);
-
-  return vaultedAtMs > unvaultedAtMs;
 }
 
 function getEffectiveVaultPresent(

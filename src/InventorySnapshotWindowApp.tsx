@@ -1,4 +1,5 @@
 import type { InventorySnapshotWindowTarget, VaultSourceFileType } from 'electron/types/grail';
+import { VALID_SOURCE_FILE_TYPES } from 'electron/utils/vaultState';
 import type { JSX } from 'react';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -6,8 +7,6 @@ import { CharacterInventoryBrowser } from '@/components/inventory/CharacterInven
 import { useTheme } from '@/hooks/useTheme';
 import { translations } from '@/i18n/translations';
 import logoUrl from '/logo.png';
-
-const VALID_SOURCE_FILE_TYPES = new Set<VaultSourceFileType>(['d2s', 'sss', 'd2x', 'd2i']);
 
 function parseSnapshotTargetFromHash(hash: string): InventorySnapshotWindowTarget | undefined {
   const queryStart = hash.indexOf('?');

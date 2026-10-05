@@ -1,11 +1,13 @@
 import { runes } from 'electron/items/runes';
 import type { ParsedInventoryItem } from 'electron/types/grail';
 import type { DragEvent, ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 import { BoardSurface } from '@/components/inventory/boardPrimitives';
 import type { GridSize } from '@/components/inventory/spatialLayout';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useSpriteIcon } from '@/hooks/useSpriteIcon';
+import { translations } from '@/i18n/translations';
 
 const RUNE_GRID_SIZE: GridSize = { columns: 10, rows: 4 };
 
@@ -15,6 +17,7 @@ interface RunePlaceholderTileProps {
 }
 
 function RunePlaceholderTile({ imageFilename, runeName }: RunePlaceholderTileProps) {
+  const { t } = useTranslation();
   const { iconUrl } = useSpriteIcon(imageFilename, { forceEnabled: true });
 
   return (
@@ -38,7 +41,9 @@ function RunePlaceholderTile({ imageFilename, runeName }: RunePlaceholderTilePro
         </Badge>
       </TooltipTrigger>
       <TooltipContent className="max-w-md p-3 text-sm">
-        <div className="font-semibold tracking-wide">{runeName} Rune</div>
+        <div className="font-semibold tracking-wide">
+          {t(translations.inventoryBrowser.tooltip.runeName, { name: runeName })}
+        </div>
       </TooltipContent>
     </Tooltip>
   );

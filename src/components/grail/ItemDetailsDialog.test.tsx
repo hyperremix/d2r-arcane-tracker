@@ -6,7 +6,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { CharacterBuilder, GrailProgressBuilder, HolyGrailItemBuilder } from '@/fixtures';
 import { ItemDetailsDialog } from './ItemDetailsDialog';
 
+const { toastErrorMock } = vi.hoisted(() => ({ toastErrorMock: vi.fn() }));
+
 // Mock dependencies
+vi.mock('sonner', () => ({ toast: { error: toastErrorMock } }));
 vi.mock('@/stores/grailStore');
 vi.mock('@/hooks/useProgressLookup');
 vi.mock('@/hooks/useItemIcon', () => ({
@@ -659,6 +662,95 @@ describe('When ItemDetailsDialog is rendered', () => {
       expect(screen.queryByText('Vaulted')).not.toBeInTheDocument();
       expect(mockVaultRemoveItem).not.toHaveBeenCalled();
       expect(mockVaultAddItem).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('If loading the vault metadata rejects', () => {
+    it('Then the rejection is handled, logged and surfaced as an error toast', async () => {
+      // Arrange
+      const item = HolyGrailItemBuilder.new().withId('item-1').withName('Windforce').build();
+      setupStoreMock({ items: [item] });
+      const failure = new Error('ipc failed');
+      mockVaultListCategories.mockRejectedValue(failure);
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+      const unhandledRejections: unknown[] = [];
+      const onUnhandledRejection = (reason: unknown) => {
+        unhandledRejections.push(reason);
+      };
+      process.on('unhandledRejection', onUnhandledRejection);
+
+      // Act
+      render(<ItemDetailsDialog itemId="item-1" open={true} onOpenChange={vi.fn()} />);
+      await waitFor(() =>
+        expect(toastErrorMock).toHaveBeenCalledWith('Failed to load vault items.'),
+      );
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      process.off('unhandledRejection', onUnhandledRejection);
+
+      // Assert
+      expect(consoleErrorSpy).toHaveBeenCalledWith('Failed to load vault metadata', failure);
+      expect(unhandledRejections).toEqual([]);
+      consoleErrorSpy.mockRestore();
+    });
+  });
+
+  describe('If the vault action fails', () => {
+    it('Then the error is logged and surfaced as an error toast', async () => {
+      // Arrange
+      const item = HolyGrailItemBuilder.new().withId('item-1').withName('Windforce').build();
+      setupStoreMock({ items: [item] });
+      const failure = new Error('write failed');
+      mockVaultAddItem.mockRejectedValue(failure);
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+      render(<ItemDetailsDialog itemId="item-1" open={true} onOpenChange={vi.fn()} />);
+      const vaultButton = await screen.findByRole('button', { name: 'Vault' });
+
+      // Act
+      fireEvent.click(vaultButton);
+
+      // Assert
+      await waitFor(() =>
+        expect(toastErrorMock).toHaveBeenCalledWith(
+          'Failed to update the vault. Nothing was changed.',
+        ),
+      );
+      expect(consoleErrorSpy).toHaveBeenCalledWith('Failed to update vault item', failure);
+      expect(screen.queryByText('Vaulted')).not.toBeInTheDocument();
+      consoleErrorSpy.mockRestore();
+    });
+  });
+  describe('If the vault write succeeds but refreshing the vault metadata fails', () => {
+    it('Then the item stays vaulted and only the load error is shown', async () => {
+      // Arrange
+      const item = HolyGrailItemBuilder.new().withId('item-1').withName('Windforce').build();
+      setupStoreMock({ items: [item] });
+      const vaulted = {
+        id: 'vault-1',
+        fingerprint: 'grail:item-1',
+        itemName: 'Windforce',
+        categoryIds: [],
+      };
+      mockVaultAddItem.mockResolvedValue(vaulted);
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+      render(<ItemDetailsDialog itemId="item-1" open={true} onOpenChange={vi.fn()} />);
+      const vaultButton = await screen.findByRole('button', { name: 'Vault' });
+      mockVaultListCategories.mockRejectedValue(new Error('refresh failed'));
+
+      // Act
+      fireEvent.click(vaultButton);
+
+      // Assert
+      await waitFor(() =>
+        expect(toastErrorMock).toHaveBeenCalledWith('Failed to load vault items.'),
+      );
+      expect(toastErrorMock).not.toHaveBeenCalledWith(
+        'Failed to update the vault. Nothing was changed.',
+      );
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        'Failed to refresh vault metadata',
+        expect.any(Error),
+      );
+      consoleErrorSpy.mockRestore();
     });
   });
 

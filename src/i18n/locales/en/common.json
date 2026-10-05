@@ -99,7 +99,8 @@
       "unvaultAction": "Unvault",
       "vaulted": "Vaulted",
       "notVaulted": "Not Vaulted",
-      "noVaultTags": "No tags assigned"
+      "noVaultTags": "No tags assigned",
+      "vaultActionFailed": "Failed to update the vault. Nothing was changed."
     },
     "itemGrid": {
       "notApplicable": "Not Applicable",
@@ -712,7 +713,8 @@
       "dimensionsValue": "{{width}}x{{height}}",
       "slotLabel": "Slot:",
       "presenceLabel": "Presence:",
-      "unplacedReasonLabel": "Unplaced reason:"
+      "unplacedReasonLabel": "Unplaced reason:",
+      "runeName": "{{name}} Rune"
     },
     "unplacedReasons": {
       "missingPosition": "Missing grid position",

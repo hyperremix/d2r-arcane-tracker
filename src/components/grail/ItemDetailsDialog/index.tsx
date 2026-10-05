@@ -2,6 +2,7 @@ import type { Item, VaultCategory, VaultItem, VaultItemUpsertInput } from 'elect
 import { Archive, ArchiveRestore } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -134,8 +135,11 @@ export function ItemDetailsDialog({ itemId, open, onOpenChange }: ItemDetailsDia
   }, [item, open]);
 
   useEffect(() => {
-    void loadVaultMetadata();
-  }, [loadVaultMetadata]);
+    loadVaultMetadata().catch((error: unknown) => {
+      console.error('Failed to load vault metadata', error);
+      toast.error(t(translations.vault.loadError));
+    });
+  }, [loadVaultMetadata, t]);
 
   const handleVaultAction = useCallback(async (): Promise<void> => {
     if (!item || isVaultActionPending || !window.electronAPI?.vault) {
@@ -154,13 +158,19 @@ export function ItemDetailsDialog({ itemId, open, onOpenChange }: ItemDetailsDia
         setLinkedVaultItem(newVaultItem);
       }
 
-      await loadVaultMetadata();
-    } catch {
+      // The write already succeeded: a failed refresh must not roll the optimistic state back.
+      await loadVaultMetadata().catch((error: unknown) => {
+        console.error('Failed to refresh vault metadata', error);
+        toast.error(t(translations.vault.loadError));
+      });
+    } catch (error) {
+      console.error('Failed to update vault item', error);
+      toast.error(t(translations.grail.itemDetails.vaultActionFailed));
       setLinkedVaultItem(previousVaultItem);
     } finally {
       setIsVaultActionPending(false);
     }
-  }, [isVaultActionPending, item, linkedVaultItem, loadVaultMetadata]);
+  }, [isVaultActionPending, item, linkedVaultItem, loadVaultMetadata, t]);
 
   if (!item) {
     return null;
