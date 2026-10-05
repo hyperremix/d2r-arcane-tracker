@@ -1021,10 +1021,13 @@ export class MemoryReader {
       return false;
     }
 
+    const handle = this.processHandle;
+    const baseAddress = Number.parseInt(this.addresses.baseAddress, 16);
+
     try {
       // Read the module image for pattern scanning (buffer index === RVA)
       const image = await this.memoryReader.readModuleImage(
-        this.processHandle,
+        handle,
         this.addresses.baseAddress,
         this.addresses.moduleSize,
       );
@@ -1035,7 +1038,11 @@ export class MemoryReader {
       }
 
       // Find the UI pattern and resolve the UI offset from it (see resolveUiOffset)
-      const uiOffset = resolveUiOffset(image);
+      // Candidate flags are read live: unreadable pages are zero-filled in the image
+      const uiOffset = await resolveUiOffset(image, async (stateRva) => {
+        const flag = await this.memoryReader.readMemory(handle, baseAddress + stateRva, 1, true);
+        return flag?.[0];
+      });
       if (uiOffset === undefined) {
         log.error(
           'scanForInGameFlag',

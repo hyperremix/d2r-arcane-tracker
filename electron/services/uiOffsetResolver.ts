@@ -2,6 +2,12 @@ import { D2R_PATTERNS, D2RGameState, OFFSET_ADJUSTMENTS } from '../config/d2rPat
 import { findPatternString } from './patternScanner';
 
 /**
+ * Reads the live value of the in-game flag byte at a module-relative address.
+ * Resolves to undefined if the byte cannot be read.
+ */
+export type InGameFlagReader = (stateRva: number) => Promise<number | undefined>;
+
+/**
  * Resolves the module-relative UI offset from a position-preserving snapshot of the D2R.exe image
  * (buffer index === RVA).
  *
@@ -11,12 +17,18 @@ import { findPatternString } from './patternScanner';
  *
  * Every pattern match is validated rather than trusting the first one:
  * - the in-game flag address must fall inside the module image
+ * - the flag byte must be readable in the live process; the snapshot cannot tell an unreadable
+ *   page apart from a zero byte, so it is not used as evidence
  * - candidates whose flag byte currently reads as a known game state (0 or 1) are preferred
  *
  * @param image - Module image snapshot where index equals RVA
+ * @param readFlag - Reads the live flag byte at a module-relative address
  * @returns The UI offset (RVA), or undefined if no usable match exists
  */
-export function resolveUiOffset(image: Buffer): number | undefined {
+export async function resolveUiOffset(
+  image: Buffer,
+  readFlag: InGameFlagReader,
+): Promise<number | undefined> {
   const pattern = D2R_PATTERNS.UI;
   const { UI_READ_OFFSET, UI_INSTRUCTION_OFFSET, UI_STATE_ADJUSTMENT } = OFFSET_ADJUSTMENTS;
 
@@ -42,7 +54,11 @@ export function resolveUiOffset(image: Buffer): number | undefined {
       continue;
     }
 
-    const stateValue = image[stateOffset];
+    const stateValue = await readFlag(stateOffset);
+    if (stateValue === undefined) {
+      continue;
+    }
+
     if (stateValue === D2RGameState.Lobby || stateValue === D2RGameState.InGame) {
       return uiOffset;
     }
