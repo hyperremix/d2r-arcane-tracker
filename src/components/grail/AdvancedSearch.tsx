@@ -11,7 +11,7 @@ import {
   WandSparkles,
   X,
 } from 'lucide-react';
-import { type ReactNode, useEffect, useId, useMemo, useState } from 'react';
+import { type ReactNode, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useDebouncedCallback } from 'use-debounce';
 import { Badge } from '@/components/ui/badge';
@@ -407,6 +407,7 @@ export function AdvancedSearch() {
   const setFilter = useGrailStore((state) => state.setFilter);
   const setAdvancedFilter = useGrailStore((state) => state.setAdvancedFilter);
   const resetStoreFilters = useGrailStore((state) => state.resetFilters);
+  const filterResetCount = useGrailStore((state) => state.filterResetCount);
   const viewMode = useGrailStore((state) => state.viewMode);
   const setViewMode = useGrailStore((state) => state.setViewMode);
   const groupMode = useGrailStore((state) => state.groupMode);
@@ -438,6 +439,16 @@ export function AdvancedSearch() {
   const debouncedSetSearchTerm = useDebouncedCallback((value: string) => {
     setFilter({ searchTerm: value });
   }, SEARCH_DEBOUNCE_MS);
+
+  // When the store filters are reset from elsewhere (e.g. the empty state's "Clear filters"),
+  // discard any pending edit so the debounced write cannot re-apply the old search text.
+  const seenResetCountRef = useRef(filterResetCount);
+  useEffect(() => {
+    if (seenResetCountRef.current === filterResetCount) return;
+    seenResetCountRef.current = filterResetCount;
+    debouncedSetSearchTerm.cancel();
+    setSearchInput('');
+  }, [filterResetCount, debouncedSetSearchTerm]);
 
   // Sync external store changes (e.g. filters cleared elsewhere) into the input,
   // unless the user has a pending edit that has not been committed yet.

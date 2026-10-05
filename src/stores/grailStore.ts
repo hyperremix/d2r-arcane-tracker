@@ -38,6 +38,8 @@ interface GrailState {
 
   // UI State
   filter: GrailFilter;
+  /** Incremented on every resetFilters() call so UI holding local filter state can discard it. */
+  filterResetCount: number;
   advancedFilter: AdvancedGrailFilter;
   viewMode: 'grid' | 'list';
   groupMode: 'none' | 'category' | 'type' | 'ethereal';
@@ -120,6 +122,29 @@ const defaultAdvancedFilter: AdvancedGrailFilter = {
 };
 
 /**
+ * Applies a settings update and drops type filters (rune/runeword) whose tracking was
+ * disabled, since their checkboxes are no longer shown and could not be untoggled.
+ * @param {Pick<GrailState, 'settings' | 'filter'>} state - The current store state
+ * @param {Partial<Settings>} settingsUpdate - The settings to merge
+ * @returns {Pick<GrailState, 'settings' | 'filter'>} The next settings and (pruned) filter
+ */
+const withSettingsUpdate = (
+  state: Pick<GrailState, 'settings' | 'filter'>,
+  settingsUpdate: Partial<Settings>,
+): Pick<GrailState, 'settings' | 'filter'> => {
+  const settings = { ...state.settings, ...settingsUpdate };
+  const { filter } = state;
+  const types = filter.types?.filter(
+    (type) =>
+      (type !== 'rune' || settings.grailRunes) && (type !== 'runeword' || settings.grailRunewords),
+  );
+  return {
+    settings,
+    filter: types && types.length !== filter.types?.length ? { ...filter, types } : filter,
+  };
+};
+
+/**
  * Zustand store for managing Holy Grail state including items, progress, characters, and settings.
  * Provides actions for data manipulation and persistence to the Electron backend.
  */
@@ -131,6 +156,7 @@ export const useGrailStore = create<GrailState>((set, get) => ({
   statistics: null,
   settings: defaultSettings,
   filter: defaultFilter,
+  filterResetCount: 0,
   advancedFilter: defaultAdvancedFilter,
   viewMode: 'grid',
   groupMode: 'none',
@@ -144,9 +170,7 @@ export const useGrailStore = create<GrailState>((set, get) => ({
   setStatistics: (statistics) => set({ statistics }),
   setSettings: async (settingsUpdate) => {
     // Update local state
-    set((state) => ({
-      settings: { ...state.settings, ...settingsUpdate },
-    }));
+    set((state) => withSettingsUpdate(state, settingsUpdate));
 
     // Persist to database
     try {
@@ -179,9 +203,7 @@ export const useGrailStore = create<GrailState>((set, get) => ({
     // Update local state only, without persisting to database
     // This is used when loading settings from the database to avoid triggering
     // settings-updated events that would cause unwanted side effects (e.g., widget resize)
-    set((state) => ({
-      settings: { ...state.settings, ...settingsUpdate },
-    }));
+    set((state) => withSettingsUpdate(state, settingsUpdate));
   },
   setFilter: (filterUpdate) =>
     set((state) => ({
@@ -191,7 +213,12 @@ export const useGrailStore = create<GrailState>((set, get) => ({
     set((state) => ({
       advancedFilter: { ...state.advancedFilter, ...filterUpdate },
     })),
-  resetFilters: () => set({ filter: defaultFilter, advancedFilter: defaultAdvancedFilter }),
+  resetFilters: () =>
+    set((state) => ({
+      filter: defaultFilter,
+      advancedFilter: defaultAdvancedFilter,
+      filterResetCount: state.filterResetCount + 1,
+    })),
   setViewMode: (viewMode) => set({ viewMode }),
   setGroupMode: (groupMode) => set({ groupMode }),
   setLoading: (loading) => set({ loading }),
@@ -251,7 +278,7 @@ export const useGrailStore = create<GrailState>((set, get) => ({
       // Load settings first
       const settingsData = await window.electronAPI?.grail.getSettings();
       if (settingsData) {
-        set((state) => ({ settings: { ...state.settings, ...settingsData } }));
+        set((state) => withSettingsUpdate(state, settingsData));
         console.log('Reloaded settings from database');
       }
 

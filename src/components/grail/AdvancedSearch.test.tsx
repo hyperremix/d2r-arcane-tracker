@@ -378,4 +378,68 @@ describe('When AdvancedSearch toolbar is rendered', () => {
       expect(screen.getByRole('button', { name: 'Clear all' })).toBeInTheDocument();
     });
   });
+
+  describe('If the store filters are cleared externally while a search edit is still pending', () => {
+    it('Then the pending edit is discarded and the input is cleared', () => {
+      // Arrange
+      vi.useFakeTimers();
+      useGrailStore.getState().setFilter({ searchTerm: 'nomatch' });
+      render(<AdvancedSearch />);
+      const input = screen.getByLabelText('Search');
+      fireEvent.change(input, { target: { value: 'edited' } });
+
+      // Act
+      act(() => {
+        useGrailStore.getState().resetFilters();
+      });
+      act(() => {
+        vi.advanceTimersByTime(SEARCH_DEBOUNCE_MS);
+      });
+
+      // Assert
+      expect(input).toHaveValue('');
+      expect(useGrailStore.getState().filter.searchTerm).toBeUndefined();
+    });
+
+    it('Then the pending edit is discarded even if the store search term was already empty', () => {
+      // Arrange
+      vi.useFakeTimers();
+      useGrailStore.getState().setFilter({ types: ['unique'] });
+      render(<AdvancedSearch />);
+      const input = screen.getByLabelText('Search');
+      fireEvent.change(input, { target: { value: 'edited' } });
+
+      // Act
+      act(() => {
+        useGrailStore.getState().resetFilters();
+      });
+      act(() => {
+        vi.advanceTimersByTime(SEARCH_DEBOUNCE_MS);
+      });
+
+      // Assert
+      expect(input).toHaveValue('');
+      expect(useGrailStore.getState().filter.searchTerm).toBeUndefined();
+    });
+  });
+
+  describe('If a selected type becomes unavailable because its tracking setting is disabled', () => {
+    it('Then the type is removed from the filter, the chips and the active filter count', () => {
+      // Arrange
+      resetStore({ grailRunes: true });
+      useGrailStore.getState().setFilter({ types: ['rune'] });
+      render(<AdvancedSearch />);
+      expect(screen.getByRole('button', { name: 'Filters (1 active)' })).toBeInTheDocument();
+
+      // Act
+      act(() => {
+        useGrailStore.getState().hydrateSettings({ grailRunes: false });
+      });
+
+      // Assert
+      expect(useGrailStore.getState().filter.types).toEqual([]);
+      expect(screen.getByRole('button', { name: 'Filters' })).toBeInTheDocument();
+      expect(screen.queryByRole('list', { name: 'Active filters' })).not.toBeInTheDocument();
+    });
+  });
 });

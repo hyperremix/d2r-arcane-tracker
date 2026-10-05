@@ -201,6 +201,93 @@ describe('When useGrailStore is used', () => {
     });
   });
 
+  describe('If rune and runeword type filters are selected and their tracking is disabled', () => {
+    afterEach(() => {
+      act(() => {
+        useGrailStore.getState().resetFilters();
+        useGrailStore.setState({
+          settings: {
+            ...useGrailStore.getState().settings,
+            grailRunes: false,
+            grailRunewords: false,
+          },
+        });
+      });
+    });
+
+    it('Then setSettings removes the unavailable types from the filter', async () => {
+      // Arrange
+      mockElectronAPI.grail.updateSettings.mockResolvedValue(undefined);
+      act(() => {
+        useGrailStore.setState({
+          settings: {
+            ...useGrailStore.getState().settings,
+            grailRunes: true,
+            grailRunewords: true,
+          },
+        });
+        useGrailStore.getState().setFilter({ types: ['unique', 'rune', 'runeword'] });
+      });
+
+      // Act
+      await act(async () => {
+        await useGrailStore.getState().setSettings({ grailRunes: false });
+      });
+
+      // Assert
+      expect(useGrailStore.getState().filter.types).toEqual(['unique', 'runeword']);
+
+      // Act
+      await act(async () => {
+        await useGrailStore.getState().setSettings({ grailRunewords: false });
+      });
+
+      // Assert
+      expect(useGrailStore.getState().filter.types).toEqual(['unique']);
+    });
+
+    it('Then hydrateSettings removes the unavailable types from the filter', () => {
+      // Arrange
+      act(() => {
+        useGrailStore.setState({
+          settings: {
+            ...useGrailStore.getState().settings,
+            grailRunes: true,
+            grailRunewords: true,
+          },
+        });
+        useGrailStore.getState().setFilter({ types: ['rune', 'runeword'] });
+      });
+
+      // Act
+      act(() => {
+        useGrailStore.getState().hydrateSettings({ grailRunes: false, grailRunewords: false });
+      });
+
+      // Assert
+      expect(useGrailStore.getState().filter.types).toEqual([]);
+    });
+
+    it('Then the filter object is left untouched when every selected type stays available', () => {
+      // Arrange
+      act(() => {
+        useGrailStore.setState({
+          settings: { ...useGrailStore.getState().settings, grailRunes: true },
+        });
+        useGrailStore.getState().setFilter({ types: ['rune'] });
+      });
+      const filterBefore = useGrailStore.getState().filter;
+
+      // Act
+      act(() => {
+        useGrailStore.getState().hydrateSettings({ grailNormal: true });
+      });
+
+      // Assert
+      expect(useGrailStore.getState().filter).toBe(filterBefore);
+    });
+  });
+
   describe('If setting loading state', () => {
     it('Then should update loading state', () => {
       // Arrange
