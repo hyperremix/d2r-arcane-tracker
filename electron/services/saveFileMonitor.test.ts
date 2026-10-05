@@ -1,12 +1,17 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: This file is testing private methods */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-// Mock the d2s library
-vi.mock('@dschu012/d2s', () => ({
-  read: vi.fn(),
-  getConstantData: vi.fn(),
-  setConstantData: vi.fn(),
-}));
+// Mock the d2s library. Keep the real remaining exports (e.g. enhanceItems): with isolate:false,
+// modernStashParser is cached with this mock and reused by modernStashParser.test.ts.
+vi.mock('@dschu012/d2s', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@dschu012/d2s')>();
+  return {
+    ...actual,
+    read: vi.fn(),
+    getConstantData: vi.fn(),
+    setConstantData: vi.fn(),
+  };
+});
 
 vi.mock('@dschu012/d2s/lib/d2/stash', () => ({
   read: vi.fn(),
