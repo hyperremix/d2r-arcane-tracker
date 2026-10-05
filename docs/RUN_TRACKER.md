@@ -28,13 +28,13 @@ Auto mode reads D2R's memory to tell whether you're in a game. It starts a run w
 2. Turn on **Auto Mode** in the session controls.
 3. Optional: change the polling interval in **Settings → Run Tracker Settings** (100–5000 ms, default 500). Lower values react faster and use more CPU.
 
-While auto mode is on, the manual run and end-session controls (buttons and shortcuts) are disabled.
+While auto mode is on, the manual run and end-session buttons are disabled. The keyboard shortcuts are not gated by auto mode, so avoid pressing them during automatic tracking.
 
 Auto mode only reads memory and never writes to the game process. Each D2R patch needs a verified memory offset. After a patch that isn't supported yet, auto mode does nothing until an app update adds it. See [Troubleshooting](#troubleshooting).
 
 ### Manual controls and shortcuts
 
-With auto mode off, use the buttons or these shortcuts. You can change them in **Settings → Run Tracker Settings**.
+Turn auto mode off to use the buttons, or use these shortcuts. You can change the shortcuts in **Settings → Run Tracker Settings**.
 
 | Action | Default |
 | --- | --- |
@@ -64,7 +64,7 @@ You can include or leave out per-run items, and either save to a file or copy to
 | Problem | Fix |
 | --- | --- |
 | Auto mode does nothing | Make sure you're on Windows, D2R is running, and a session is active. If the settings show *Auto mode temporarily unavailable*, or the log says `Unknown D2R build`, your D2R version isn't supported yet. Use manual controls and [open an issue](https://github.com/hyperremix/d2r-arcane-tracker/issues) with your D2R version. |
-| Shortcut doesn't fire | Focus the app on the Run Tracker page and turn auto mode off. Choose a combination that doesn't clash with other software. |
+| Shortcut doesn't fire | Focus the app on the Run Tracker page and make sure you're not typing in a text field. Choose a combination that doesn't clash with other software. |
 | Items missing from a run | Check that the item shows as found in the grail view. Leave the game so D2R writes the save file. Add the item manually if needed. |
 | Export has no loot | Turn on the option to include items, and make sure the session has runs with items. |
 
