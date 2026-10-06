@@ -11,6 +11,7 @@ import type {
   Session,
   Settings,
   TerrorZone,
+  TerrorZoneValidationResult,
   UpdateStatus,
 } from './types/grail';
 
@@ -788,9 +789,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
     /**
      * Validates the D2R installation path for terror zone configuration.
-     * @returns {Promise<{ valid: boolean; path?: string; error?: string }>} A promise that resolves with validation result.
+     * @returns {Promise<TerrorZoneValidationResult>} A promise that resolves with validation result.
      */
-    validatePath: (): Promise<{ valid: boolean; path?: string; error?: string }> =>
+    validatePath: (): Promise<TerrorZoneValidationResult> =>
       ipcRenderer.invoke('terrorZone:validatePath'),
   },
 });

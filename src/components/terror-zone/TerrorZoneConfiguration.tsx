@@ -1,6 +1,10 @@
-import type { TerrorZone } from 'electron/types/grail';
+import type {
+  TerrorZone,
+  TerrorZoneValidationErrorCode,
+  TerrorZoneValidationResult,
+} from 'electron/types/grail';
 import { AlertCircle, AlertTriangle, RotateCcw, Search, XCircle } from 'lucide-react';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import {
@@ -22,22 +26,35 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import { translations } from '@/i18n/translations';
 
 /**
+ * Maps validation error codes from the main process to translation keys.
+ */
+const validationErrorKeys: Record<TerrorZoneValidationErrorCode, string> = {
+  pathNotConfigured: translations.terrorZone.pathNotConfigured,
+  directoryNotFound: translations.terrorZone.validationErrors.directoryNotFound,
+  gameFileNotFound: translations.terrorZone.validationErrors.gameFileNotFound,
+  invalidStructure: translations.terrorZone.validationErrors.invalidStructure,
+  corruptedFile: translations.terrorZone.validationErrors.corruptedFile,
+  unknown: translations.terrorZone.validationErrors.unknown,
+};
+
+/**
  * TerrorZoneConfiguration component that serves as the main terror zone configuration page.
  * Allows users to enable/disable specific terror zones by modifying the game's desecratedzones.json file.
  * @returns {JSX.Element} The main terror zone configuration interface
  */
 export function TerrorZoneConfiguration() {
   const { t } = useTranslation();
+  const zoneLabelIdPrefix = useId();
+  const zoneSwitchIdPrefix = useId();
   const [zones, setZones] = useState<TerrorZone[]>([]);
   const [config, setConfig] = useState<Record<string, boolean>>({});
   const [searchTerm, setSearchTerm] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const [validationStatus, setValidationStatus] = useState<{
-    valid: boolean;
-    path?: string;
-    error?: string;
-  }>({ valid: false });
+  const [validationStatus, setValidationStatus] = useState<TerrorZoneValidationResult>({
+    valid: false,
+    errorCode: 'pathNotConfigured',
+  });
   const [showRestoreDialog, setShowRestoreDialog] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -65,11 +82,11 @@ export function TerrorZoneConfiguration() {
       setConfig(configData);
     } catch (err) {
       console.error('Failed to load terror zone data:', err);
-      setError(err instanceof Error ? err.message : 'Failed to load terror zone data');
+      setError(t(translations.terrorZone.errors.loadFailed));
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [t]);
 
   // Load zones and configuration on mount
   useEffect(() => {
@@ -89,14 +106,14 @@ export function TerrorZoneConfiguration() {
         }
       } catch (err) {
         console.error('Failed to update zone:', err);
-        setError(err instanceof Error ? err.message : 'Failed to update zone');
+        setError(t(translations.terrorZone.errors.updateFailed));
         // Revert the change
         setConfig(config);
       } finally {
         setIsSaving(false);
       }
     },
-    [config],
+    [config, t],
   );
 
   const handleEnableAll = useCallback(async () => {
@@ -114,12 +131,12 @@ export function TerrorZoneConfiguration() {
       }
     } catch (err) {
       console.error('Failed to enable all zones:', err);
-      setError(err instanceof Error ? err.message : 'Failed to enable all zones');
+      setError(t(translations.terrorZone.errors.enableAllFailed));
       setConfig(config);
     } finally {
       setIsSaving(false);
     }
-  }, [zones, config]);
+  }, [zones, config, t]);
 
   const handleDisableAll = useCallback(async () => {
     try {
@@ -136,12 +153,12 @@ export function TerrorZoneConfiguration() {
       }
     } catch (err) {
       console.error('Failed to disable all zones:', err);
-      setError(err instanceof Error ? err.message : 'Failed to disable all zones');
+      setError(t(translations.terrorZone.errors.disableAllFailed));
       setConfig(config);
     } finally {
       setIsSaving(false);
     }
-  }, [zones, config]);
+  }, [zones, config, t]);
 
   const handleRestoreOriginal = useCallback(async () => {
     try {
@@ -156,11 +173,11 @@ export function TerrorZoneConfiguration() {
       setShowRestoreDialog(false);
     } catch (err) {
       console.error('Failed to restore original:', err);
-      setError(err instanceof Error ? err.message : 'Failed to restore original file');
+      setError(t(translations.terrorZone.errors.restoreFailed));
     } finally {
       setIsSaving(false);
     }
-  }, [loadData]);
+  }, [loadData, t]);
 
   // Filter zones based on search term
   const filteredZones = zones.filter(
@@ -174,6 +191,11 @@ export function TerrorZoneConfiguration() {
     return (config[zone.id] ?? true) ? count + 1 : count;
   }, 0);
   const totalCount = zones.length;
+
+  const validationErrorMessage = validationStatus.valid
+    ? undefined
+    : t(validationErrorKeys[validationStatus.errorCode]);
+  const showExtractionGuide = validationStatus.errorCode === 'gameFileNotFound';
 
   if (isLoading) {
     return (
@@ -230,8 +252,8 @@ export function TerrorZoneConfiguration() {
                     {t(translations.common.error)}
                   </AlertTitle>
                   <AlertDescription className="space-y-2 text-destructive">
-                    <p>{validationStatus.error || t(translations.terrorZone.pathNotConfigured)}</p>
-                    {validationStatus.error?.includes('not found') && (
+                    <p>{validationErrorMessage}</p>
+                    {showExtractionGuide && (
                       <div>
                         <p className="font-semibold text-sm">
                           {t(translations.terrorZone.gameFilesMustBeExtracted)}
@@ -251,48 +273,31 @@ export function TerrorZoneConfiguration() {
                           </p>
                           <ol className="mt-1 ml-4 list-decimal space-y-1 text-sm">
                             <li>
-                              Download{' '}
+                              {t(translations.settings.itemIcons.downloadCascViewer)}{' '}
                               <a
                                 href="https://www.hiveworkshop.com/threads/ladiks-casc-viewer.331540/"
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="underline hover:decoration-2"
                               >
-                                Ladik's CASC Viewer
+                                {t(translations.settings.itemIcons.ladiksCascViewer)}
                               </a>
                             </li>
-                            <li>Open the x64 version (or appropriate version for your OS)</li>
-                            <li>In CASC Viewer, click "Open Storage"</li>
+                            <li>{t(translations.settings.itemIcons.openX64Version)}</li>
+                            <li>{t(translations.settings.itemIcons.openStorage)}</li>
+                            <li>{t(translations.settings.itemIcons.selectD2rFolder)}</li>
+                            <li>{t(translations.settings.itemIcons.clickData)}</li>
+                            <li>{t(translations.settings.itemIcons.clickDataExtract)}</li>
+                            <li>{t(translations.settings.itemIcons.waitForExtraction)}</li>
+                            <li>{t(translations.settings.itemIcons.moveFolders)}</li>
                             <li>
-                              Select your D2R folder (e.g.,{' '}
-                              <code className="text-xs">
-                                C:\Program Files (x86)\Diablo II Resurrected
-                              </code>
-                              )
-                            </li>
-                            <li>Click "data" on the left side of the screen</li>
-                            <li>
-                              Click "data" again from the newly opened options, then click "Extract"
-                              at the top
-                            </li>
-                            <li>
-                              Wait for extraction (extracts ~40GB: global, hd, local folders to
-                              CascView work folder)
-                            </li>
-                            <li>
-                              Move the 3 extracted folders to{' '}
-                              <code className="text-xs">
-                                C:\Program Files (x86)\Diablo II Resurrected\Data
-                              </code>
-                            </li>
-                            <li>
-                              Create a D2R shortcut and add{' '}
+                              {t(translations.terrorZone.createShortcut)}{' '}
                               <code className="rounded bg-background/60 px-1 text-xs">
-                                -direct -txt
+                                {t(translations.terrorZone.flagsValue)}
                               </code>{' '}
-                              to the target
+                              {t(translations.terrorZone.toTheTarget)}
                             </li>
-                            <li>Always launch D2R using this shortcut</li>
+                            <li>{t(translations.terrorZone.alwaysLaunchShortcut)}</li>
                           </ol>
                         </div>
                         <p className="mt-2 text-xs">
@@ -367,12 +372,17 @@ export function TerrorZoneConfiguration() {
                 {filteredZones.map((zone) => (
                   <div key={zone.id} className="flex flex-1 items-center gap-4">
                     <Switch
-                      id={`zone-${zone.id}`}
+                      id={`${zoneSwitchIdPrefix}-${zone.id}`}
+                      aria-labelledby={`${zoneLabelIdPrefix}-${zone.id}`}
                       checked={config[zone.id] ?? true}
                       onCheckedChange={(checked: boolean) => handleZoneToggle(zone.id, checked)}
                       disabled={isSaving || !validationStatus.valid}
                     />
-                    <Label htmlFor={`zone-${zone.id}`} className="font-medium">
+                    <Label
+                      id={`${zoneLabelIdPrefix}-${zone.id}`}
+                      htmlFor={`${zoneSwitchIdPrefix}-${zone.id}`}
+                      className="font-medium"
+                    >
                       {zone.name}
                     </Label>
                   </div>

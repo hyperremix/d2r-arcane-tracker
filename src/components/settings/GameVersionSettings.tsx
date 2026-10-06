@@ -57,7 +57,9 @@ export function GameVersionSettings() {
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="space-y-2">
-          <Label htmlFor={gameVersionSelectId}>Select Game Version</Label>
+          <Label htmlFor={gameVersionSelectId}>
+            {t(translations.settings.gameVersion.selectGameVersion)}
+          </Label>
           <Select
             value={settings.gameVersion}
             onValueChange={(value) => value && updateGameVersion(value as GameVersion)}
@@ -80,9 +82,8 @@ export function GameVersionSettings() {
 
         <div className="rounded bg-info/10 p-3">
           <p className="text-info text-sm">
-            <strong>Note:</strong> The game version setting affects item detection compatibility and
-            may influence which save file formats are supported. Make sure to select the version
-            that matches your Diablo II installation.
+            <strong>{t(translations.common.note)}</strong>{' '}
+            {t(translations.settings.gameVersion.note)}
           </p>
         </div>
       </CardContent>

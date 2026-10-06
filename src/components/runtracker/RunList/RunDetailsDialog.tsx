@@ -1,8 +1,10 @@
 import type { Character, GrailProgress, Item, Run, RunItem } from 'electron/types/grail';
+import { useTranslation } from 'react-i18next';
 import { ItemCard } from '@/components/grail/ItemCard';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
+import { translations } from '@/i18n/translations';
 import { formatDuration } from '@/lib/utils';
 
 export interface RunDetailsDialogProps {
@@ -32,10 +34,14 @@ export function RunDetailsDialog({
   getItemCardData,
   characters,
 }: RunDetailsDialogProps) {
+  const { t } = useTranslation();
+
   if (!run) {
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-lg">Select a run to view details.</DialogContent>
+        <DialogContent className="max-w-lg">
+          {t(translations.runTracker.runDetails.selectRun)}
+        </DialogContent>
       </Dialog>
     );
   }
@@ -46,28 +52,40 @@ export function RunDetailsDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Run #{run.runNumber}</DialogTitle>
+          <DialogTitle>
+            {t(translations.runTracker.runDetails.title, { number: run.runNumber })}
+          </DialogTitle>
         </DialogHeader>
         <div className="space-y-6">
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-1">
-              <p className="font-medium text-muted-foreground text-sm">Start Time</p>
+              <p className="font-medium text-muted-foreground text-sm">
+                {t(translations.runTracker.table.startTime)}
+              </p>
               <p className="font-mono text-sm">{formatTimestamp(run.startTime)}</p>
             </div>
             <div className="space-y-1">
-              <p className="font-medium text-muted-foreground text-sm">Duration</p>
+              <p className="font-medium text-muted-foreground text-sm">
+                {t(translations.runTracker.table.duration)}
+              </p>
               <p className="font-mono text-sm">
-                {run.duration ? formatDuration(run.duration) : 'In progress'}
+                {run.duration
+                  ? formatDuration(run.duration)
+                  : t(translations.runTracker.runDetails.inProgress)}
               </p>
             </div>
             {run.endTime && (
               <div className="space-y-1">
-                <p className="font-medium text-muted-foreground text-sm">End Time</p>
+                <p className="font-medium text-muted-foreground text-sm">
+                  {t(translations.runTracker.table.endTime)}
+                </p>
                 <p className="font-mono text-sm">{formatTimestamp(run.endTime)}</p>
               </div>
             )}
             <div className="space-y-1">
-              <p className="font-medium text-muted-foreground text-sm">Items Found</p>
+              <p className="font-medium text-muted-foreground text-sm">
+                {t(translations.runTracker.sessionCard.itemsFound)}
+              </p>
               <Badge variant="secondary" className="text-xs">
                 {itemsCount}
               </Badge>
@@ -76,9 +94,11 @@ export function RunDetailsDialog({
 
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <h4 className="font-medium text-sm">Items Found</h4>
+              <h4 className="font-medium text-sm">
+                {t(translations.runTracker.sessionCard.itemsFound)}
+              </h4>
               <Badge variant="outline" className="text-xs">
-                {itemsCount} items
+                {t(translations.runTracker.runDetails.itemsCount, { count: itemsCount })}
               </Badge>
             </div>
 
@@ -104,7 +124,7 @@ export function RunDetailsDialog({
                         <span className="text-sm">{itemInfo.name}</span>
                         {itemInfo.isNewGrail && (
                           <Badge variant="secondary" className="text-xs">
-                            New
+                            {t(translations.runTracker.runDetails.new)}
                           </Badge>
                         )}
                       </div>
@@ -124,7 +144,9 @@ export function RunDetailsDialog({
                 })}
               </div>
             ) : (
-              <p className="text-muted-foreground text-sm">No items found in this run.</p>
+              <p className="text-muted-foreground text-sm">
+                {t(translations.runTracker.runDetails.noItemsFound)}
+              </p>
             )}
           </div>
         </div>

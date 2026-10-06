@@ -143,7 +143,7 @@ function WidgetDragGrip() {
     <GripHorizontal
       aria-hidden="true"
       data-testid="widget-drag-grip"
-      className="-translate-x-1/2 pointer-events-none absolute top-1 left-1/2 h-4 w-4 text-white opacity-30 transition-opacity duration-200 group-hover:opacity-80 group-focus-visible:opacity-80"
+      className="-translate-x-1/2 pointer-events-none absolute top-1 left-1/2 h-4 w-4 text-white opacity-30 transition-opacity duration-200 group-hover:opacity-80"
     />
   );
 }
@@ -253,6 +253,7 @@ function RunOnlyDisplay({
                       ? t(translations.widget.addItemPlaceholder)
                       : t(translations.runTracker.controls.startRunFirst)
                   }
+                  aria-label={t(translations.runTracker.controls.addItemManually)}
                   value={manualItemName}
                   onChange={(e) => setManualItemName(e.target.value)}
                   onKeyDown={handleKeyDown}
@@ -301,6 +302,7 @@ function RunOnlyDisplay({
  */
 export function Widget({ statistics, settings, onDragStart, onDragEnd }: WidgetProps) {
   const { t } = useTranslation();
+  const widgetLabel = t(translations.widget.ariaLabel);
   // Split/all modes need ethereal tracking; fall back to overall here so the widget never renders empty
   const displayMode = resolveWidgetDisplayMode(settings.widgetDisplay, settings.grailEthereal);
   const opacity = clampWidgetOpacity(settings.widgetOpacity);
@@ -427,10 +429,8 @@ export function Widget({ statistics, settings, onDragStart, onDragEnd }: WidgetP
   // Handle run-only mode separately (doesn't need statistics)
   if (displayMode === 'run-only') {
     return (
-      // biome-ignore lint/a11y/useSemanticElements: Widget is a draggable container, not a traditional button
-      <div
-        role="button"
-        tabIndex={0}
+      <section
+        aria-label={widgetLabel}
         className={containerClasses}
         style={{
           backgroundColor,
@@ -443,8 +443,6 @@ export function Widget({ statistics, settings, onDragStart, onDragEnd }: WidgetP
         }}
         onMouseDown={onDragStart}
         onMouseUp={onDragEnd}
-        // biome-ignore lint/suspicious/noEmptyBlockStatements: No keyboard interaction needed for drag-only widget
-        onKeyDown={() => {}}
       >
         <WidgetDragGrip />
         <RunOnlyDisplay
@@ -456,16 +454,14 @@ export function Widget({ statistics, settings, onDragStart, onDragEnd }: WidgetP
           onAddManualItem={addManualRunItem}
           hasRuns={hasRuns}
         />
-      </div>
+      </section>
     );
   }
 
   if (!statistics) {
     return (
-      // biome-ignore lint/a11y/useSemanticElements: Widget is a draggable container, not a traditional button
-      <div
-        role="button"
-        tabIndex={0}
+      <section
+        aria-label={widgetLabel}
         className={containerClasses}
         style={{
           backgroundColor,
@@ -478,20 +474,16 @@ export function Widget({ statistics, settings, onDragStart, onDragEnd }: WidgetP
         }}
         onMouseDown={onDragStart}
         onMouseUp={onDragEnd}
-        // biome-ignore lint/suspicious/noEmptyBlockStatements: No keyboard interaction needed for drag-only widget
-        onKeyDown={() => {}}
       >
         <WidgetDragGrip />
         <p className="text-sm text-white">{t(translations.common.loading)}</p>
-      </div>
+      </section>
     );
   }
 
   return (
-    // biome-ignore lint/a11y/useSemanticElements: Widget is a draggable container, not a traditional button
-    <div
-      role="button"
-      tabIndex={0}
+    <section
+      aria-label={widgetLabel}
       className={containerClasses}
       style={{
         backgroundColor,
@@ -504,8 +496,6 @@ export function Widget({ statistics, settings, onDragStart, onDragEnd }: WidgetP
       }}
       onMouseDown={onDragStart}
       onMouseUp={onDragEnd}
-      // biome-ignore lint/suspicious/noEmptyBlockStatements: No keyboard interaction needed for drag-only widget
-      onKeyDown={() => {}}
     >
       <WidgetDragGrip />
       {/* Display mode: overall - Just overall progress */}
@@ -576,6 +566,6 @@ export function Widget({ statistics, settings, onDragStart, onDragEnd }: WidgetP
           )}
         </div>
       )}
-    </div>
+    </section>
   );
 }

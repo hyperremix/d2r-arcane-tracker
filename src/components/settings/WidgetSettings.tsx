@@ -1,12 +1,14 @@
+import type { Settings } from 'electron/types/grail';
 import { Layers, RotateCcw } from 'lucide-react';
-import { useCallback, useEffect, useId } from 'react';
+import { useCallback, useEffect, useId, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
 import { translations } from '@/i18n/translations';
+import { cn } from '@/lib/utils';
 import {
   clampWidgetOpacity,
   MAX_WIDGET_OPACITY,
@@ -14,6 +16,14 @@ import {
   resolveWidgetDisplayMode,
 } from '@/lib/widget';
 import { useGrailStore } from '@/stores/grailStore';
+
+type WidgetDisplayMode = NonNullable<Settings['widgetDisplay']>;
+
+interface DisplayModeOption {
+  value: WidgetDisplayMode;
+  label: string;
+  disabled: boolean;
+}
 
 /**
  * WidgetSettings component that provides controls for configuring the overlay widget.
@@ -23,7 +33,13 @@ import { useGrailStore } from '@/stores/grailStore';
 export function WidgetSettings() {
   const { t } = useTranslation();
   const { settings, setSettings } = useGrailStore();
-  const opacitySliderId = useId();
+  const enableWidgetLabelId = useId();
+  const enableWidgetDescriptionId = useId();
+  const displayModeName = useId();
+  const displayModeDescriptionId = useId();
+  const runItemsLabelId = useId();
+  const runItemsDescriptionId = useId();
+  const opacityLabelId = useId();
 
   const toggleWidget = useCallback(
     async (checked: boolean) => {
@@ -35,7 +51,7 @@ export function WidgetSettings() {
   );
 
   const updateDisplay = useCallback(
-    async (display: 'overall' | 'split' | 'all' | 'run-only') => {
+    async (display: WidgetDisplayMode) => {
       await setSettings({ widgetDisplay: display });
       // Update widget display mode via IPC
       await window.electronAPI?.widget.updateDisplay(display, settings);
@@ -96,6 +112,32 @@ export function WidgetSettings() {
     [setSettings],
   );
 
+  const displayModeOptions = useMemo<DisplayModeOption[]>(
+    () => [
+      {
+        value: 'overall',
+        label: t(translations.settings.widget.overall),
+        disabled: !widgetEnabled,
+      },
+      {
+        value: 'split',
+        label: t(translations.settings.widget.split),
+        disabled: !widgetEnabled || !settings.grailEthereal,
+      },
+      {
+        value: 'all',
+        label: t(translations.settings.widget.all),
+        disabled: !widgetEnabled || !settings.grailEthereal,
+      },
+      {
+        value: 'run-only',
+        label: t(translations.settings.widget.runOnly),
+        disabled: !widgetEnabled,
+      },
+    ],
+    [settings.grailEthereal, t, widgetEnabled],
+  );
+
   return (
     <Card>
       <CardHeader>
@@ -109,60 +151,52 @@ export function WidgetSettings() {
           {/* Enable Widget Toggle */}
           <div className="flex items-center justify-between">
             <div>
-              <h4 className="font-medium text-sm">
+              <h4 id={enableWidgetLabelId} className="font-medium text-sm">
                 {t(translations.settings.widget.enableWidget)}
               </h4>
-              <p className="text-muted-foreground text-xs">
+              <p id={enableWidgetDescriptionId} className="text-muted-foreground text-xs">
                 {t(translations.settings.widget.enableDescription)}
               </p>
             </div>
-            <Switch checked={widgetEnabled} onCheckedChange={toggleWidget} />
+            <Switch
+              checked={widgetEnabled}
+              onCheckedChange={toggleWidget}
+              aria-labelledby={enableWidgetLabelId}
+              aria-describedby={enableWidgetDescriptionId}
+            />
           </div>
 
-          {/* Display Mode Selection */}
-          <div className="space-y-2">
-            <Label className="font-medium text-sm">
+          {/* Display Mode Selection: native radios give arrow-key and Tab support */}
+          <fieldset className="space-y-2" aria-describedby={displayModeDescriptionId}>
+            <legend className="mb-2 font-medium text-sm">
               {t(translations.settings.widget.displayMode)}
-            </Label>
+            </legend>
             <div className="grid grid-cols-2 gap-2">
-              <Button
-                variant={widgetDisplay === 'overall' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => updateDisplay('overall')}
-                disabled={!widgetEnabled}
-                className="flex-1"
-              >
-                {t(translations.settings.widget.overall)}
-              </Button>
-              <Button
-                variant={widgetDisplay === 'split' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => updateDisplay('split')}
-                disabled={!widgetEnabled || !settings.grailEthereal}
-                className="flex-1"
-              >
-                {t(translations.settings.widget.split)}
-              </Button>
-              <Button
-                variant={widgetDisplay === 'all' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => updateDisplay('all')}
-                disabled={!widgetEnabled || !settings.grailEthereal}
-                className="flex-1"
-              >
-                {t(translations.settings.widget.all)}
-              </Button>
-              <Button
-                variant={widgetDisplay === 'run-only' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => updateDisplay('run-only')}
-                disabled={!widgetEnabled}
-                className="flex-1"
-              >
-                {t(translations.settings.widget.runOnly)}
-              </Button>
+              {displayModeOptions.map((option) => {
+                const isSelected = widgetDisplay === option.value;
+                return (
+                  <label
+                    key={option.value}
+                    className={cn(
+                      buttonVariants({ variant: isSelected ? 'default' : 'outline', size: 'sm' }),
+                      'relative flex-1 cursor-pointer has-disabled:pointer-events-none has-focus-visible:border-ring has-disabled:opacity-50 has-focus-visible:ring-[3px] has-focus-visible:ring-ring/50',
+                    )}
+                  >
+                    <input
+                      type="radio"
+                      name={displayModeName}
+                      value={option.value}
+                      checked={isSelected}
+                      onChange={() => updateDisplay(option.value)}
+                      disabled={option.disabled}
+                      className="sr-only"
+                    />
+                    {option.label}
+                  </label>
+                );
+              })}
             </div>
-            <p className="text-muted-foreground text-xs">
+            <p id={displayModeDescriptionId} className="text-muted-foreground text-xs">
               {t(translations.settings.widget.displayModeDescription)}
               {!settings.grailEthereal && (
                 <span className="text-warning">
@@ -171,15 +205,15 @@ export function WidgetSettings() {
                 </span>
               )}
             </p>
-          </div>
+          </fieldset>
 
           {/* Run Only Item List Toggle */}
           <div className="flex items-center justify-between">
             <div>
-              <h4 className="font-medium text-sm">
+              <h4 id={runItemsLabelId} className="font-medium text-sm">
                 {t(translations.settings.widget.showRunItemList)}
               </h4>
-              <p className="text-muted-foreground text-xs">
+              <p id={runItemsDescriptionId} className="text-muted-foreground text-xs">
                 {t(translations.settings.widget.showRunItemListDescription)}
               </p>
             </div>
@@ -187,13 +221,15 @@ export function WidgetSettings() {
               checked={widgetRunOnlyShowItems}
               onCheckedChange={toggleRunOnlyItems}
               disabled={!widgetEnabled}
+              aria-labelledby={runItemsLabelId}
+              aria-describedby={runItemsDescriptionId}
             />
           </div>
 
           {/* Opacity Slider */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <Label htmlFor={opacitySliderId} className="font-medium text-sm">
+              <Label id={opacityLabelId} className="font-medium text-sm">
                 {t(translations.settings.widget.opacity)}
               </Label>
               <span className="text-muted-foreground text-sm">
@@ -201,7 +237,7 @@ export function WidgetSettings() {
               </span>
             </div>
             <Slider
-              id={opacitySliderId}
+              aria-labelledby={opacityLabelId}
               min={MIN_WIDGET_OPACITY}
               max={MAX_WIDGET_OPACITY}
               step={0.05}

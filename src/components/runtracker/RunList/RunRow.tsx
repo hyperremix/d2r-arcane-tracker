@@ -1,7 +1,9 @@
 import type { Run } from 'electron/types/grail';
+import { useTranslation } from 'react-i18next';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { TableCell, TableRow } from '@/components/ui/table';
+import { translations } from '@/i18n/translations';
 import { formatDuration } from '@/lib/utils';
 
 // Skeleton loader for table rows
@@ -35,6 +37,8 @@ export interface RunRowProps {
 }
 
 export function RunRow({ run, itemsCount, onViewDetails, formatTimestamp }: RunRowProps) {
+  const { t } = useTranslation();
+
   return (
     <TableRow
       className="cursor-pointer hover:bg-muted/70 focus-visible:bg-muted/70"
@@ -46,7 +50,7 @@ export function RunRow({ run, itemsCount, onViewDetails, formatTimestamp }: RunR
           onViewDetails(run);
         }
       }}
-      aria-label={`View run #${run.runNumber} details`}
+      aria-label={t(translations.runTracker.runList.viewRunDetails, { number: run.runNumber })}
     >
       <TableCell className="font-medium">#{run.runNumber}</TableCell>
       <TableCell className="font-mono text-sm">{formatTimestamp(run.startTime)}</TableCell>

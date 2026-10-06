@@ -107,7 +107,7 @@ export function SaveFileMonitor() {
 
       // Open directory dialog
       const result = await window.electronAPI?.dialog.showOpenDialog({
-        title: 'Select Save File Directory',
+        title: t(translations.settings.saveFileMonitor.selectSaveFileDirectory),
         properties: ['openDirectory'],
       });
 
@@ -130,11 +130,11 @@ export function SaveFileMonitor() {
       setShowChangeDirectoryDialog(false);
     } catch (error) {
       console.error('Failed to change directory:', error);
-      setError('Failed to change directory');
+      setError(t(translations.settings.saveFileMonitor.changeDirectoryFailed));
     } finally {
       setIsChangingDirectory(false);
     }
-  }, [loadMonitoringStatus, loadSaveFiles, reloadData]);
+  }, [loadMonitoringStatus, loadSaveFiles, reloadData, t]);
 
   const handleRestoreDefaultDirectory = useCallback(async () => {
     try {
@@ -155,11 +155,11 @@ export function SaveFileMonitor() {
       setDialogAction(null);
     } catch (error) {
       console.error('Failed to restore default directory:', error);
-      setError('Failed to restore default directory');
+      setError(t(translations.settings.saveFileMonitor.restoreDirectoryFailed));
     } finally {
       setIsChangingDirectory(false);
     }
-  }, [loadMonitoringStatus, loadSaveFiles, reloadData]);
+  }, [loadMonitoringStatus, loadSaveFiles, reloadData, t]);
 
   useEffect(() => {
     loadMonitoringStatus();
@@ -191,7 +191,7 @@ export function SaveFileMonitor() {
       }));
 
       if (status.status === 'error') {
-        setError(status.error || 'Unknown error occurred');
+        setError(status.error || t(translations.settings.saveFileMonitor.unknownError));
         setSaveFileCount(status.saveFileCount || 0);
       } else if (status.status === 'started') {
         setError(null);
@@ -212,6 +212,7 @@ export function SaveFileMonitor() {
   }, [
     loadMonitoringStatus, // Reload save files when events occur
     loadSaveFiles,
+    t,
   ]);
 
   // Automatically stop monitoring when gameMode is Manual

@@ -203,7 +203,10 @@ export const StatsDashboard = memo(function StatsDashboard() {
                         <div>
                           <div className="font-medium">{charStat.character.name}</div>
                           <div className="text-muted-foreground text-sm">
-                            {charStat.character.characterClass} • Level {charStat.character.level}
+                            {t(translations.statistics.dashboard.classLevel, {
+                              characterClass: charStat.character.characterClass,
+                              level: charStat.character.level,
+                            })}
                           </div>
                         </div>
                       </div>

@@ -271,7 +271,11 @@
       "deleteWarning": "This action will permanently delete all characters and progress data.",
       "backupWarning": "Make sure you have created a backup before proceeding if you want to keep your current progress.",
       "changing": "Changing...",
-      "restoring": "Restoring..."
+      "restoring": "Restoring...",
+      "selectSaveFileDirectory": "Select Save File Directory",
+      "changeDirectoryFailed": "Failed to change directory",
+      "restoreDirectoryFailed": "Failed to restore default directory",
+      "unknownError": "Unknown error occurred"
     },
     "database": {
       "title": "Database",
@@ -472,7 +476,8 @@
       "categoryProgress": "{{category}} progress",
       "characterComparison": "Character Comparison",
       "items": "{{count}} items",
-      "recentLabel": "{{count}} recent"
+      "recentLabel": "{{count}} recent",
+      "classLevel": "{{characterClass}} • Level {{level}}"
     },
     "runAnalytics": {
       "loadingAnalytics": "Loading analytics data...",
@@ -697,7 +702,21 @@
     "infoText": "Changes to terror zone configuration require restarting Diablo II: Resurrected to take effect. The original file is automatically backed up and can be restored at any time.",
     "restoreOriginalFile": "Restore Original File",
     "restoreDescription": "This will restore the original desecratedzones.json file from backup and clear your current configuration. This action cannot be undone. Are you sure you want to continue?",
-    "restoring": "Restoring..."
+    "restoring": "Restoring...",
+    "validationErrors": {
+      "directoryNotFound": "D2R installation directory does not exist",
+      "gameFileNotFound": "desecratedzones.json file not found in D2R installation",
+      "invalidStructure": "Invalid desecratedzones.json file structure",
+      "corruptedFile": "desecratedzones.json file is corrupted or invalid",
+      "unknown": "Unable to validate the D2R installation"
+    },
+    "errors": {
+      "loadFailed": "Failed to load terror zone data",
+      "updateFailed": "Failed to update terror zone configuration",
+      "enableAllFailed": "Failed to enable all zones",
+      "disableAllFailed": "Failed to disable all zones",
+      "restoreFailed": "Failed to restore original file"
+    }
   },
   "runTracker": {
     "loadingData": "Loading run tracker data...",
@@ -783,9 +802,63 @@
       "description": "Are you sure you want to archive this session? Archived sessions are hidden from the sessions list unless \"Show archived\" is enabled.",
       "confirm": "Archive",
       "archiving": "Archiving..."
+    },
+    "table": {
+      "date": "Date",
+      "startTime": "Start Time",
+      "endTime": "End Time",
+      "duration": "Duration",
+      "runs": "Runs",
+      "items": "Items",
+      "runNumber": "Run #"
+    },
+    "sessionsList": {
+      "title": "Previous Sessions",
+      "showArchived": "Show archived",
+      "viewSessionDetails": "View session from {{date}} details",
+      "noArchivedSessions": "No archived sessions",
+      "noArchivedSessionsDescription": "Archived sessions will appear here when you archive them.",
+      "noPreviousSessions": "No previous sessions",
+      "noPreviousSessionsDescription": "Start a session to begin tracking your runs.",
+      "showingRange": "Showing {{start}}-{{end}} of {{total}} sessions"
+    },
+    "sessionDetail": {
+      "title": "Session Details",
+      "back": "Back",
+      "goBack": "Go Back",
+      "sessionNotFound": "Session Not Found",
+      "sessionNotFoundDescription": "The requested session could not be found.",
+      "sessionInformation": "Session Information",
+      "active": "Active",
+      "archived": "Archived",
+      "sessionDuration": "Session Duration",
+      "export": "Export"
+    },
+    "runList": {
+      "title": "Run History",
+      "runsCount": "{{count}} runs",
+      "virtualScrollingInfo": "Showing {{count}} runs (virtual scrolling enabled)",
+      "showingRange": "Showing {{start}}-{{end}} of {{total}} runs",
+      "noRuns": "No runs recorded",
+      "noRunsDescription": "Runs will appear here once they are tracked for this session.",
+      "viewRunDetails": "View run #{{number}} details",
+      "unknownItem": "Unknown Item"
+    },
+    "runDetails": {
+      "title": "Run #{{number}}",
+      "selectRun": "Select a run to view details.",
+      "inProgress": "In progress",
+      "itemsCount": "{{count}} items",
+      "new": "New",
+      "noItemsFound": "No items found in this run."
+    },
+    "errorDisplay": {
+      "attempt": "(Attempt {{current}}/{{max}})",
+      "dismiss": "Dismiss error"
     }
   },
   "widget": {
+    "ariaLabel": "Grail progress widget",
     "ethereal": "Ethereal",
     "startSessionPrompt": "Start a session to track runs",
     "run": "Run",

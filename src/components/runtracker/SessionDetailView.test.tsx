@@ -1,7 +1,8 @@
 import '@testing-library/jest-dom';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import type { Session } from 'electron/types/grail';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import i18n from 'i18next';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useRunTrackerStore } from '@/stores/runTrackerStore';
 import { SessionDetailView } from './SessionDetailView';
 
@@ -107,6 +108,87 @@ describe('SessionDetailView', () => {
 
       // Assert
       expect(screen.getByRole('button', { name: 'Archive Session' })).toBeDisabled();
+    });
+  });
+
+  describe('When an archived session is shown', () => {
+    const archivedSession: Session = {
+      id: 'session-archived',
+      startTime: new Date(2024, 0, 1, 14, 5, 6),
+      endTime: new Date(2024, 0, 1, 15, 7, 8),
+      totalRunTime: 0,
+      totalSessionTime: 0,
+      runCount: 0,
+      archived: true,
+      created: new Date(2024, 0, 1, 14, 5, 6),
+      lastUpdated: new Date(2024, 0, 1, 15, 7, 8),
+    };
+
+    beforeEach(() => {
+      mockUseRunTrackerStore.mockReturnValue(
+        createStoreState({
+          sessions: [archivedSession],
+          runs: new Map([[archivedSession.id, []]]),
+        }),
+      );
+    });
+
+    afterEach(async () => {
+      await i18n.changeLanguage('en');
+    });
+
+    it('Then translated labels are shown', () => {
+      // Arrange & Act
+      render(<SessionDetailView sessionId={archivedSession.id} onBack={vi.fn()} />);
+
+      // Assert
+      expect(screen.getByText('Session Details')).toBeInTheDocument();
+      expect(screen.getByText('Session Information')).toBeInTheDocument();
+      expect(screen.getByText('Archived')).toBeInTheDocument();
+      expect(screen.getByText('Session Duration')).toBeInTheDocument();
+      expect(screen.getByLabelText('Session Notes')).toHaveAttribute(
+        'placeholder',
+        'Add notes about this session...',
+      );
+      expect(screen.getByRole('button', { name: /Export/ })).toHaveAttribute(
+        'title',
+        'No runs to export',
+      );
+    });
+
+    it('If the active language is English, Then session times are shown in 12-hour format', () => {
+      // Arrange & Act
+      render(<SessionDetailView sessionId={archivedSession.id} onBack={vi.fn()} />);
+
+      // Assert
+      expect(screen.getByText(/^0?2:05:06\sPM$/)).toBeInTheDocument();
+      expect(screen.getByText(/^0?3:07:08\sPM$/)).toBeInTheDocument();
+    });
+
+    it('If the active language changes to Swedish, Then session times are shown in 24-hour format', async () => {
+      // Arrange
+      await i18n.changeLanguage('sv');
+
+      // Act
+      render(<SessionDetailView sessionId={archivedSession.id} onBack={vi.fn()} />);
+
+      // Assert
+      expect(screen.getByText('14:05:06')).toBeInTheDocument();
+      expect(screen.getByText('15:07:08')).toBeInTheDocument();
+    });
+  });
+
+  describe('When the session is missing', () => {
+    it('Then the translated not-found state is shown', () => {
+      // Arrange
+      mockUseRunTrackerStore.mockReturnValue(createStoreState({ sessions: [] }));
+
+      // Act
+      render(<SessionDetailView sessionId="missing" onBack={vi.fn()} />);
+
+      // Assert
+      expect(screen.getByText('Session Not Found')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Go Back' })).toBeInTheDocument();
     });
   });
 });

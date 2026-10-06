@@ -1,12 +1,15 @@
 import { useVirtualizer } from '@tanstack/react-virtual';
 import type { Run, RunItem } from 'electron/types/grail';
-import { ArrowDown, ArrowUp, ChevronLeft, ChevronRight as ChevronRightIcon } from 'lucide-react';
+import { ChevronLeft, ChevronRight as ChevronRightIcon } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { SortableTableHead, type SortOrder } from '@/components/runtracker/SortableTableHead';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { translations } from '@/i18n/translations';
 import { formatTimestamp } from '@/lib/utils';
 import { useGrailStore } from '@/stores/grailStore';
 import { useRunTrackerStore } from '@/stores/runTrackerStore';
@@ -18,16 +21,16 @@ interface RunListProps {
 }
 
 type SortField = 'duration' | 'startTime' | 'itemsFound';
-type SortOrder = 'asc' | 'desc';
 
 const ITEMS_PER_PAGE = 10;
 const VIRTUAL_SCROLLING_THRESHOLD = 100;
 
 /**
- * RunList component that displays a paginated list of runs with filtering, sorting,
- * and expandable details showing items found and run statistics.
+ * RunList component that displays a paginated, sortable list of runs
+ * and a details dialog showing items found and run statistics.
  */
 export function RunList({ runs }: RunListProps) {
+  const { t } = useTranslation();
   const { runItems, loadRunItems, loadingRunItems } = useRunTrackerStore();
   const { items, progress, characters } = useGrailStore();
 
@@ -126,19 +129,6 @@ export function RunList({ runs }: RunListProps) {
     [sortField, sortOrder],
   );
 
-  // Helper to render sort icon
-  const renderSortIcon = useCallback(
-    (field: SortField) => {
-      if (sortField !== field) return null;
-      return sortOrder === 'asc' ? (
-        <ArrowUp className="ml-1 h-3 w-3" />
-      ) : (
-        <ArrowDown className="ml-1 h-3 w-3" />
-      );
-    },
-    [sortField, sortOrder],
-  );
-
   // Handle pagination
   const goToPage = useCallback(
     (page: number) => {
@@ -192,7 +182,7 @@ export function RunList({ runs }: RunListProps) {
       // Otherwise, find the progress record by matching the grailProgressId
       if (!runItem.grailProgressId) {
         return {
-          name: 'Unknown Item',
+          name: t(translations.runTracker.runList.unknownItem),
           isNewGrail: false,
         };
       }
@@ -201,13 +191,13 @@ export function RunList({ runs }: RunListProps) {
       // Then use the progress record's itemId to find the actual item
       const item = progressRecord ? items.find((i) => i.id === progressRecord.itemId) : undefined;
       return {
-        name: item?.name || 'Unknown Item',
+        name: item?.name || t(translations.runTracker.runList.unknownItem),
         isNewGrail: Boolean(
           progressRecord?.foundDate && progressRecord.foundDate >= runItem.foundTime,
         ),
       };
     },
-    [items, progress],
+    [items, progress, t],
   );
 
   // Helper function to get ItemCard data from RunItem
@@ -258,11 +248,13 @@ export function RunList({ runs }: RunListProps) {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-16">Run #</TableHead>
-                  <TableHead>Start Time</TableHead>
-                  <TableHead>End Time</TableHead>
-                  <TableHead>Duration</TableHead>
-                  <TableHead className="w-24">Items</TableHead>
+                  <TableHead className="w-16">
+                    {t(translations.runTracker.table.runNumber)}
+                  </TableHead>
+                  <TableHead>{t(translations.runTracker.table.startTime)}</TableHead>
+                  <TableHead>{t(translations.runTracker.table.endTime)}</TableHead>
+                  <TableHead>{t(translations.runTracker.table.duration)}</TableHead>
+                  <TableHead className="w-24">{t(translations.runTracker.table.items)}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -281,9 +273,9 @@ export function RunList({ runs }: RunListProps) {
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          Run History
+          {t(translations.runTracker.runList.title)}
           <Badge variant="outline" className="text-xs">
-            {sortedRuns.length} runs
+            {t(translations.runTracker.runList.runsCount, { count: sortedRuns.length })}
           </Badge>
         </CardTitle>
       </CardHeader>
@@ -295,7 +287,9 @@ export function RunList({ runs }: RunListProps) {
               // Virtual scrolling table
               <div className="space-y-2">
                 <div className="text-muted-foreground text-sm">
-                  Showing {sortedRuns.length} runs (virtual scrolling enabled)
+                  {t(translations.runTracker.runList.virtualScrollingInfo, {
+                    count: sortedRuns.length,
+                  })}
                 </div>
                 <div ref={parentRef} className="h-[600px] overflow-auto rounded-md border">
                   <div
@@ -308,35 +302,33 @@ export function RunList({ runs }: RunListProps) {
                     <Table>
                       <TableHeader className="sticky top-0 z-10 bg-background">
                         <TableRow>
-                          <TableHead className="w-16">Run #</TableHead>
-                          <TableHead
-                            className="cursor-pointer select-none hover:bg-muted/50"
-                            onClick={() => handleSort('startTime')}
-                          >
-                            <div className="flex items-center">
-                              Start Time
-                              {renderSortIcon('startTime')}
-                            </div>
+                          <TableHead className="w-16">
+                            {t(translations.runTracker.table.runNumber)}
                           </TableHead>
-                          <TableHead>End Time</TableHead>
-                          <TableHead
-                            className="cursor-pointer select-none hover:bg-muted/50"
-                            onClick={() => handleSort('duration')}
-                          >
-                            <div className="flex items-center">
-                              Duration
-                              {renderSortIcon('duration')}
-                            </div>
-                          </TableHead>
-                          <TableHead
-                            className="w-24 cursor-pointer select-none text-center hover:bg-muted/50"
-                            onClick={() => handleSort('itemsFound')}
-                          >
-                            <div className="flex items-center justify-center">
-                              Items
-                              {renderSortIcon('itemsFound')}
-                            </div>
-                          </TableHead>
+                          <SortableTableHead
+                            field="startTime"
+                            label={t(translations.runTracker.table.startTime)}
+                            activeField={sortField}
+                            sortOrder={sortOrder}
+                            onSort={handleSort}
+                          />
+                          <TableHead>{t(translations.runTracker.table.endTime)}</TableHead>
+                          <SortableTableHead
+                            field="duration"
+                            label={t(translations.runTracker.table.duration)}
+                            activeField={sortField}
+                            sortOrder={sortOrder}
+                            onSort={handleSort}
+                          />
+                          <SortableTableHead
+                            field="itemsFound"
+                            label={t(translations.runTracker.table.items)}
+                            activeField={sortField}
+                            sortOrder={sortOrder}
+                            onSort={handleSort}
+                            align="center"
+                            className="w-24"
+                          />
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -376,35 +368,33 @@ export function RunList({ runs }: RunListProps) {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="w-16">Run #</TableHead>
-                      <TableHead
-                        className="cursor-pointer select-none hover:bg-muted/50"
-                        onClick={() => handleSort('startTime')}
-                      >
-                        <div className="flex items-center">
-                          Start Time
-                          {renderSortIcon('startTime')}
-                        </div>
+                      <TableHead className="w-16">
+                        {t(translations.runTracker.table.runNumber)}
                       </TableHead>
-                      <TableHead>End Time</TableHead>
-                      <TableHead
-                        className="cursor-pointer select-none hover:bg-muted/50"
-                        onClick={() => handleSort('duration')}
-                      >
-                        <div className="flex items-center">
-                          Duration
-                          {renderSortIcon('duration')}
-                        </div>
-                      </TableHead>
-                      <TableHead
-                        className="w-24 cursor-pointer select-none text-center hover:bg-muted/50"
-                        onClick={() => handleSort('itemsFound')}
-                      >
-                        <div className="flex items-center justify-center">
-                          Items
-                          {renderSortIcon('itemsFound')}
-                        </div>
-                      </TableHead>
+                      <SortableTableHead
+                        field="startTime"
+                        label={t(translations.runTracker.table.startTime)}
+                        activeField={sortField}
+                        sortOrder={sortOrder}
+                        onSort={handleSort}
+                      />
+                      <TableHead>{t(translations.runTracker.table.endTime)}</TableHead>
+                      <SortableTableHead
+                        field="duration"
+                        label={t(translations.runTracker.table.duration)}
+                        activeField={sortField}
+                        sortOrder={sortOrder}
+                        onSort={handleSort}
+                      />
+                      <SortableTableHead
+                        field="itemsFound"
+                        label={t(translations.runTracker.table.items)}
+                        activeField={sortField}
+                        sortOrder={sortOrder}
+                        onSort={handleSort}
+                        align="center"
+                        className="w-24"
+                      />
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -428,8 +418,11 @@ export function RunList({ runs }: RunListProps) {
                 {totalPages > 1 && (
                   <div className="flex items-center justify-between pt-4">
                     <div className="text-muted-foreground text-sm">
-                      Showing {startIndex + 1}-{Math.min(endIndex, sortedRuns.length)} of{' '}
-                      {sortedRuns.length} runs
+                      {t(translations.runTracker.runList.showingRange, {
+                        start: startIndex + 1,
+                        end: Math.min(endIndex, sortedRuns.length),
+                        total: sortedRuns.length,
+                      })}
                     </div>
                     <div className="flex items-center gap-2">
                       <Button
@@ -439,7 +432,7 @@ export function RunList({ runs }: RunListProps) {
                         disabled={currentPage === 1}
                       >
                         <ChevronLeft className="h-4 w-4" />
-                        Previous
+                        {t(translations.common.previous)}
                       </Button>
                       <div className="flex items-center gap-1">
                         {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
@@ -477,7 +470,7 @@ export function RunList({ runs }: RunListProps) {
                         onClick={() => goToPage(currentPage + 1)}
                         disabled={currentPage === totalPages}
                       >
-                        Next
+                        {t(translations.common.next)}
                         <ChevronRightIcon className="h-4 w-4" />
                       </Button>
                     </div>
@@ -488,9 +481,11 @@ export function RunList({ runs }: RunListProps) {
           </div>
         ) : (
           <div className="flex flex-col items-center justify-center py-8 text-center">
-            <p className="mb-2 font-medium text-muted-foreground">No runs match your filters</p>
+            <p className="mb-2 font-medium text-muted-foreground">
+              {t(translations.runTracker.runList.noRuns)}
+            </p>
             <p className="text-muted-foreground text-sm">
-              Try adjusting your filter criteria to see more runs.
+              {t(translations.runTracker.runList.noRunsDescription)}
             </p>
           </div>
         )}

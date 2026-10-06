@@ -39,9 +39,7 @@ describe('WidgetSettings', () => {
     render(ui);
 
     // Assert
-    const opacityLabel = screen.getByText('Opacity', { selector: 'label' }) as HTMLLabelElement;
-    const opacitySliderRoot = document.getElementById(opacityLabel.htmlFor);
-    const opacityInput = opacitySliderRoot?.querySelector('input[type="range"]');
+    const opacityInput = screen.getByRole('slider', { hidden: true });
     expect(opacityInput).toHaveAttribute('min', '0.3');
     expect(opacityInput).toHaveAttribute('max', '1');
     expect(screen.getByText('30%')).toBeInTheDocument();
@@ -114,5 +112,119 @@ describe('WidgetSettings', () => {
     // Assert
     expect(resetSize).toHaveBeenCalledTimes(1);
     expect(resetSize).toHaveBeenCalledWith('overall');
+  });
+
+  describe('When the widget is enabled with ethereal tracking', () => {
+    const mockSetSettings = vi.fn().mockResolvedValue(undefined);
+
+    beforeEach(() => {
+      mockSetSettings.mockClear();
+      Object.defineProperty(window, 'electronAPI', {
+        value: { widget: { updateDisplay: vi.fn().mockResolvedValue(undefined) } },
+        configurable: true,
+        writable: true,
+      });
+      useGrailStore.setState((state) => ({
+        setSettings: mockSetSettings,
+        settings: {
+          ...state.settings,
+          widgetEnabled: true,
+          widgetDisplay: 'overall',
+          widgetOpacity: 0.9,
+          grailEthereal: true,
+        },
+      }));
+    });
+
+    it('Then the enable and run item list switches are labelled', () => {
+      // Arrange & Act
+      render(<WidgetSettings />);
+
+      // Assert
+      expect(screen.getByLabelText('Enable Widget')).toHaveAttribute('role', 'switch');
+      expect(screen.getByLabelText('Show Run Item List')).toHaveAttribute('role', 'switch');
+    });
+
+    it('Then the opacity slider is labelled', () => {
+      // Arrange & Act
+      render(<WidgetSettings />);
+
+      // Assert (the thumb input stays visibility:hidden in jsdom until measured, which blanks its
+      // computed role name, so verify the label association via getAllByLabelText instead)
+      const slider = screen.getByRole('slider', { hidden: true });
+      expect(screen.getAllByLabelText('Opacity')).toContain(slider);
+    });
+
+    it('Then display modes are exposed as a labelled radio group', () => {
+      // Arrange & Act
+      render(<WidgetSettings />);
+
+      // Assert
+      const group = screen.getByRole('group', { name: 'Display Mode' });
+      expect(group).toBeInTheDocument();
+      expect(screen.getByRole('radio', { name: 'Overall' })).toBeChecked();
+      expect(screen.getByRole('radio', { name: 'Split' })).not.toBeChecked();
+      expect(screen.getByRole('radio', { name: 'All' })).not.toBeChecked();
+      expect(screen.getByRole('radio', { name: 'Run Only' })).not.toBeChecked();
+    });
+
+    it('Then the enable and run item list switches are described by their help text', () => {
+      // Arrange & Act
+      render(<WidgetSettings />);
+
+      // Assert
+      expect(screen.getByLabelText('Enable Widget')).toHaveAccessibleDescription(
+        'Show an overlay widget with grail progress',
+      );
+      expect(screen.getByLabelText('Show Run Item List')).toHaveAccessibleDescription(
+        'In Run Only mode, show a compact text list of grail-relevant items found each run.',
+      );
+    });
+
+    it('Then the display mode group is described by its help text', () => {
+      // Arrange & Act
+      render(<WidgetSettings />);
+
+      // Assert
+      expect(screen.getByRole('group', { name: 'Display Mode' })).toHaveAccessibleDescription(
+        /Overall: Total progress only/,
+      );
+    });
+
+    it('Then all display mode radios share one native radio group name (browser arrow-key navigation is not simulated by jsdom)', () => {
+      // Arrange & Act
+      render(<WidgetSettings />);
+
+      // Assert
+      const names = screen.getAllByRole('radio').map((radio) => radio.getAttribute('name'));
+      expect(new Set(names).size).toBe(1);
+      expect(names[0]).toBeTruthy();
+    });
+
+    it('Then selecting a display mode updates the setting', () => {
+      // Arrange
+      render(<WidgetSettings />);
+
+      // Act
+      fireEvent.click(screen.getByRole('radio', { name: 'Run Only' }));
+
+      // Assert
+      expect(mockSetSettings).toHaveBeenCalledWith({ widgetDisplay: 'run-only' });
+    });
+
+    it('If ethereal tracking is disabled, Then the split and all radios are disabled', () => {
+      // Arrange
+      useGrailStore.setState((state) => ({
+        settings: { ...state.settings, grailEthereal: false },
+      }));
+
+      // Act
+      render(<WidgetSettings />);
+
+      // Assert
+      expect(screen.getByRole('radio', { name: 'Split' })).toBeDisabled();
+      expect(screen.getByRole('radio', { name: 'All' })).toBeDisabled();
+      expect(screen.getByRole('radio', { name: 'Overall' })).toBeEnabled();
+    });
   });
 });

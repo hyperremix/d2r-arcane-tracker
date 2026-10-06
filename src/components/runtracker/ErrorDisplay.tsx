@@ -1,6 +1,10 @@
 import { AlertCircle, RefreshCw, X } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
+import { translations } from '@/i18n/translations';
+
+const MAX_RETRY_ATTEMPTS = 3;
 
 interface ErrorDisplayProps {
   error: string | null;
@@ -19,6 +23,8 @@ export function ErrorDisplay({
   onRetry,
   onDismiss,
 }: ErrorDisplayProps) {
+  const { t } = useTranslation();
+
   if (!error) return null;
 
   const getErrorIcon = () => {
@@ -47,7 +53,7 @@ export function ErrorDisplay({
     }
   };
 
-  const canRetry = errorType === 'network' && retryCount < 3;
+  const canRetry = errorType === 'network' && retryCount < MAX_RETRY_ATTEMPTS;
 
   return (
     <Alert variant={getErrorVariant()}>
@@ -57,7 +63,12 @@ export function ErrorDisplay({
           <AlertDescription className="text-sm">
             {error}
             {retryCount > 0 && (
-              <span className="ml-2 text-muted-foreground">(Attempt {retryCount}/3)</span>
+              <span className="ml-2 text-muted-foreground">
+                {t(translations.runTracker.errorDisplay.attempt, {
+                  current: retryCount,
+                  max: MAX_RETRY_ATTEMPTS,
+                })}
+              </span>
             )}
           </AlertDescription>
         </div>
@@ -71,11 +82,17 @@ export function ErrorDisplay({
               className="h-8 px-2"
             >
               <RefreshCw className={`h-3 w-3 ${loading ? 'animate-spin' : ''}`} />
-              Retry
+              {t(translations.common.retry)}
             </Button>
           )}
-          <Button variant="ghost" size="sm" onClick={onDismiss} className="h-8 w-8 p-0">
-            <X className="h-3 w-3" />
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onDismiss}
+            className="h-8 w-8 p-0"
+            aria-label={t(translations.runTracker.errorDisplay.dismiss)}
+          >
+            <X className="h-3 w-3" aria-hidden="true" />
           </Button>
         </div>
       </div>
