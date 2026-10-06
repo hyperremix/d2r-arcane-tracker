@@ -1,3 +1,4 @@
+import { isAbsolute, resolve } from 'node:path';
 import { ipcMain, webContents } from 'electron';
 import type { GrailDatabase } from '../database/database';
 import { grailDatabase } from '../database/database';
@@ -337,6 +338,77 @@ function initializeWindowsServices(): void {
 }
 
 /**
+ * Validates a renderer-provided save directory path.
+ * @param saveDir - Value received over IPC
+ * @returns The trimmed, validated directory path
+ * @throws Error if the value is not a non-empty absolute path string
+ */
+function validateSaveDirectoryInput(saveDir: unknown): string {
+  if (typeof saveDir !== 'string') {
+    throw new Error('Invalid save directory: expected a string');
+  }
+  const trimmed = saveDir.trim();
+  if (trimmed === '' || !isAbsolute(trimmed)) {
+    throw new Error('Invalid save directory: expected a non-empty absolute path');
+  }
+  return trimmed;
+}
+
+/**
+ * Normalizes a directory path for equality comparison.
+ * @param directory - Directory path to normalize
+ * @returns Resolved path (case-insensitive on Windows)
+ */
+function normalizeDirectoryForComparison(directory: string): string {
+  const resolved = resolve(directory.trim());
+  return process.platform === 'win32' ? resolved.toLowerCase() : resolved;
+}
+
+/**
+ * Gets the save directory whose data is currently stored in the database:
+ * the configured `saveDir` setting, falling back to the platform default.
+ * @returns The current effective save directory, or undefined if unknown
+ */
+function getCurrentSaveDirectory(): string | undefined {
+  const configured = grailDatabase.getAllSettings().saveDir?.trim();
+  if (configured) {
+    return configured;
+  }
+  return saveFileMonitor?.getDefaultDirectory();
+}
+
+/**
+ * Persists a new save directory, truncates user data only when the directory
+ * is known to have changed, and restarts save file monitoring.
+ * Fails safe: if the current directory cannot be determined, user data is kept.
+ * @param newDirectory - The validated new save directory
+ */
+async function applySaveDirectoryChange(newDirectory: string): Promise<void> {
+  const currentDirectory = getCurrentSaveDirectory();
+  let directoryChanged = false;
+  if (currentDirectory) {
+    directoryChanged =
+      normalizeDirectoryForComparison(currentDirectory) !==
+      normalizeDirectoryForComparison(newDirectory);
+  } else {
+    console.warn(
+      '[applySaveDirectoryChange] Current save directory is unknown; keeping existing user data',
+    );
+  }
+
+  // Update the database setting
+  grailDatabase.setSetting('saveDir', newDirectory);
+
+  // Only truncate user data when switching away from a known, different directory
+  if (directoryChanged) {
+    grailDatabase.truncateUserData();
+  }
+
+  // Update the monitor's directories and restart if needed
+  await saveFileMonitor.updateSaveDirectory();
+}
+
+/**
  * Initializes IPC handlers for save file monitoring and item detection.
  * Sets up event listeners for save file changes and item detection.
  * Configures automatic grail progress updates and forwards events to renderer processes.
@@ -542,21 +614,30 @@ export function initializeSaveFileHandlers(): void {
   });
 
   /**
+   * IPC handler for getting the platform default save directory.
+   * @returns The platform-specific default save directory path
+   */
+  ipcMain.handle('saveFile:getDefaultDirectory', async (): Promise<string> => {
+    try {
+      return saveFileMonitor.getDefaultDirectory();
+    } catch (error) {
+      console.error('Failed to get default directory:', error);
+      throw error;
+    }
+  });
+
+  /**
    * IPC handler for updating the save directory.
-   * Updates database settings, truncates user data, and restarts monitoring.
+   * Updates database settings, truncates user data if the directory actually changed,
+   * and restarts monitoring.
    * @param _ - IPC event (unused)
    * @param saveDir - New save directory path
    */
-  ipcMain.handle('saveFile:updateSaveDirectory', async (_, saveDir: string) => {
+  ipcMain.handle('saveFile:updateSaveDirectory', async (_, saveDir: unknown) => {
     try {
-      // Update the database setting
-      grailDatabase.setSetting('saveDir', saveDir);
+      const newDirectory = validateSaveDirectoryInput(saveDir);
 
-      // Truncate user data before changing directory
-      grailDatabase.truncateUserData();
-
-      // Update the monitor's directories and restart if needed
-      await saveFileMonitor.updateSaveDirectory();
+      await applySaveDirectoryChange(newDirectory);
 
       return { success: true };
     } catch (error) {
@@ -568,20 +649,14 @@ export function initializeSaveFileHandlers(): void {
   /**
    * IPC handler for restoring the default save directory.
    * Gets platform-specific default directory and updates settings accordingly.
+   * User data is only truncated if the default differs from the current directory.
    */
   ipcMain.handle('saveFile:restoreDefaultDirectory', async () => {
     try {
       // Get the platform default directory
       const defaultDirectory = saveFileMonitor.getDefaultDirectory();
 
-      // Update the database setting to the default
-      grailDatabase.setSetting('saveDir', defaultDirectory);
-
-      // Truncate user data before changing directory
-      grailDatabase.truncateUserData();
-
-      // Update the monitor's directories and restart if needed
-      await saveFileMonitor.updateSaveDirectory();
+      await applySaveDirectoryChange(defaultDirectory);
 
       return { success: true, defaultDirectory };
     } catch (error) {

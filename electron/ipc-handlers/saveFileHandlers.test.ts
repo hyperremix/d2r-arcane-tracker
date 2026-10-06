@@ -1,5 +1,6 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: This file is testing private methods */
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { MockInstance } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Mock process.platform to non-Windows to prevent Windows-specific services from initializing
 Object.defineProperty(process, 'platform', {
@@ -71,6 +72,7 @@ vi.mock('../database/database', () => ({
     upsertProgressBatch: vi.fn(),
     getAllItems: vi.fn(),
     getAllProgress: vi.fn(),
+    getAllSettings: vi.fn(),
     setSetting: vi.fn(),
     truncateUserData: vi.fn(),
     // Run tracking methods
@@ -322,6 +324,7 @@ describe('When saveFileHandlers is used', () => {
     vi.mocked(grailDatabase.getCharacterProgress).mockReturnValue(null);
     vi.mocked(grailDatabase.getAllItems).mockReturnValue([]);
     vi.mocked(grailDatabase.getAllProgress).mockReturnValue([]);
+    vi.mocked(grailDatabase.getAllSettings).mockReturnValue({ saveDir: '/test/save/dir' } as any);
 
     // Setup run tracking database mocks
     vi.mocked(grailDatabase.getActiveSession).mockReturnValue(null);
@@ -803,8 +806,25 @@ describe('When saveFileHandlers is used', () => {
   });
 
   describe('If IPC handlers are called', () => {
+    const originalPlatform = process.platform;
+    let consoleSpies: MockInstance[] = [];
+
+    const silenceConsole = (method: 'error' | 'warn') => {
+      const spy = vi.spyOn(console, method).mockImplementation(() => undefined);
+      consoleSpies.push(spy);
+      return spy;
+    };
+
     beforeEach(() => {
       initializeSaveFileHandlers();
+    });
+
+    afterEach(() => {
+      for (const spy of consoleSpies) {
+        spy.mockRestore();
+      }
+      consoleSpies = [];
+      Object.defineProperty(process, 'platform', { value: originalPlatform });
     });
 
     it('Then saveFile:getSaveFiles should return save files', async () => {
@@ -845,39 +865,166 @@ describe('When saveFileHandlers is used', () => {
       });
     });
 
-    it('Then saveFile:updateSaveDirectory should update directory', async () => {
+    const getHandler = (channel: string) =>
+      vi.mocked(ipcMain.handle).mock.calls.find((call) => call[0] === channel)?.[1] as any;
+
+    it('Then saveFile:getDefaultDirectory should return the platform default', async () => {
+      // Arrange
+      mockSaveFileMonitor.getDefaultDirectory.mockReturnValue('/default/save/dir');
+      const handler = getHandler('saveFile:getDefaultDirectory');
+
+      // Act
+      const result = await handler();
+
+      // Assert
+      expect(result).toBe('/default/save/dir');
+      expect(grailDatabase.truncateUserData).not.toHaveBeenCalled();
+    });
+
+    it('Then saveFile:updateSaveDirectory should truncate user data when the directory changes', async () => {
       // Arrange
       const newSaveDir = '/new/save/dir';
-
-      const handler = vi
-        .mocked(ipcMain.handle)
-        .mock.calls.find((call) => call[0] === 'saveFile:updateSaveDirectory')?.[1] as any;
+      const handler = getHandler('saveFile:updateSaveDirectory');
 
       // Act
       const result = await handler(null, newSaveDir);
 
       // Assert
       expect(grailDatabase.setSetting).toHaveBeenCalledWith('saveDir', newSaveDir);
-      expect(grailDatabase.truncateUserData).toHaveBeenCalled();
+      expect(grailDatabase.truncateUserData).toHaveBeenCalledTimes(1);
       expect(mockSaveFileMonitor.updateSaveDirectory).toHaveBeenCalled();
       expect(result).toEqual({ success: true });
     });
 
-    it('Then saveFile:restoreDefaultDirectory should restore default', async () => {
+    it('Then saveFile:updateSaveDirectory should not truncate user data when the directory is unchanged', async () => {
+      // Arrange
+      vi.mocked(grailDatabase.getAllSettings).mockReturnValue({
+        saveDir: '/test/save/dir',
+      } as any);
+      const handler = getHandler('saveFile:updateSaveDirectory');
+
+      // Act
+      const result = await handler(null, '/test/save/dir/');
+
+      // Assert
+      expect(grailDatabase.truncateUserData).not.toHaveBeenCalled();
+      expect(grailDatabase.setSetting).toHaveBeenCalledWith('saveDir', '/test/save/dir/');
+      expect(mockSaveFileMonitor.updateSaveDirectory).toHaveBeenCalled();
+      expect(result).toEqual({ success: true });
+    });
+
+    it('Then saveFile:updateSaveDirectory should not truncate when no setting exists and the platform default is selected', async () => {
+      // Arrange
+      vi.mocked(grailDatabase.getAllSettings).mockReturnValue({ saveDir: '' } as any);
+      mockSaveFileMonitor.getDefaultDirectory.mockReturnValue('/default/save/dir');
+      const handler = getHandler('saveFile:updateSaveDirectory');
+
+      // Act
+      await handler(null, '/default/save/dir');
+
+      // Assert
+      expect(grailDatabase.truncateUserData).not.toHaveBeenCalled();
+      expect(grailDatabase.setSetting).toHaveBeenCalledWith('saveDir', '/default/save/dir');
+    });
+
+    it('Then saveFile:updateSaveDirectory should not truncate user data when the current directory is unknown', async () => {
+      // Arrange
+      vi.mocked(grailDatabase.getAllSettings).mockReturnValue({ saveDir: '' } as any);
+      mockSaveFileMonitor.getDefaultDirectory.mockReturnValue('');
+      const warnSpy = silenceConsole('warn');
+      const handler = getHandler('saveFile:updateSaveDirectory');
+
+      // Act
+      const result = await handler(null, '/new/save/dir');
+
+      // Assert
+      expect(grailDatabase.truncateUserData).not.toHaveBeenCalled();
+      expect(grailDatabase.setSetting).toHaveBeenCalledWith('saveDir', '/new/save/dir');
+      expect(mockSaveFileMonitor.updateSaveDirectory).toHaveBeenCalled();
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('unknown'));
+      expect(result).toEqual({ success: true });
+    });
+
+    it('Then saveFile:updateSaveDirectory should compare paths case-insensitively on win32', async () => {
+      // Arrange
+      Object.defineProperty(process, 'platform', { value: 'win32' });
+      vi.mocked(grailDatabase.getAllSettings).mockReturnValue({ saveDir: '/test/save/dir' } as any);
+      const handler = getHandler('saveFile:updateSaveDirectory');
+
+      // Act
+      await handler(null, '/Test/Save/DIR');
+
+      // Assert
+      expect(grailDatabase.truncateUserData).not.toHaveBeenCalled();
+      expect(grailDatabase.setSetting).toHaveBeenCalledWith('saveDir', '/Test/Save/DIR');
+    });
+
+    it('Then saveFile:updateSaveDirectory should compare paths case-sensitively on other platforms', async () => {
+      // Arrange
+      Object.defineProperty(process, 'platform', { value: 'linux' });
+      vi.mocked(grailDatabase.getAllSettings).mockReturnValue({ saveDir: '/test/save/dir' } as any);
+      const handler = getHandler('saveFile:updateSaveDirectory');
+
+      // Act
+      await handler(null, '/Test/Save/DIR');
+
+      // Assert
+      expect(grailDatabase.truncateUserData).toHaveBeenCalledTimes(1);
+    });
+
+    it.each([
+      ['an empty string', ''],
+      ['whitespace only', '   '],
+      ['a relative path', 'relative/save/dir'],
+      ['a number', 42],
+      ['undefined', undefined],
+      ['an object', { path: '/new/save/dir' }],
+    ])(
+      'Then saveFile:updateSaveDirectory should reject %s without touching data',
+      async (_label, input) => {
+        // Arrange
+        const handler = getHandler('saveFile:updateSaveDirectory');
+        silenceConsole('error');
+
+        // Act
+        const act = handler(null, input);
+
+        // Assert
+        await expect(act).rejects.toThrow('Invalid save directory');
+        expect(grailDatabase.setSetting).not.toHaveBeenCalled();
+        expect(grailDatabase.truncateUserData).not.toHaveBeenCalled();
+        expect(mockSaveFileMonitor.updateSaveDirectory).not.toHaveBeenCalled();
+      },
+    );
+
+    it('Then saveFile:restoreDefaultDirectory should truncate user data when the default differs', async () => {
       // Arrange
       const defaultDir = '/default/save/dir';
       mockSaveFileMonitor.getDefaultDirectory.mockReturnValue(defaultDir);
-
-      const handler = vi
-        .mocked(ipcMain.handle)
-        .mock.calls.find((call) => call[0] === 'saveFile:restoreDefaultDirectory')?.[1] as any;
+      const handler = getHandler('saveFile:restoreDefaultDirectory');
 
       // Act
       const result = await handler();
 
       // Assert
       expect(grailDatabase.setSetting).toHaveBeenCalledWith('saveDir', defaultDir);
-      expect(grailDatabase.truncateUserData).toHaveBeenCalled();
+      expect(grailDatabase.truncateUserData).toHaveBeenCalledTimes(1);
+      expect(mockSaveFileMonitor.updateSaveDirectory).toHaveBeenCalled();
+      expect(result).toEqual({ success: true, defaultDirectory: defaultDir });
+    });
+
+    it('Then saveFile:restoreDefaultDirectory should not truncate user data when already using the default', async () => {
+      // Arrange
+      const defaultDir = '/default/save/dir';
+      mockSaveFileMonitor.getDefaultDirectory.mockReturnValue(defaultDir);
+      vi.mocked(grailDatabase.getAllSettings).mockReturnValue({ saveDir: defaultDir } as any);
+      const handler = getHandler('saveFile:restoreDefaultDirectory');
+
+      // Act
+      const result = await handler();
+
+      // Assert
+      expect(grailDatabase.truncateUserData).not.toHaveBeenCalled();
       expect(mockSaveFileMonitor.updateSaveDirectory).toHaveBeenCalled();
       expect(result).toEqual({ success: true, defaultDirectory: defaultDir });
     });

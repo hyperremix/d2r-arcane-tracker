@@ -489,6 +489,12 @@
     "optional": "Optional",
     "back": "Back",
     "skipSetup": "Skip Setup",
+    "skipConfirm": {
+      "title": "Skip setup?",
+      "description": "You can run setup later from Settings.",
+      "confirm": "Skip Setup",
+      "continue": "Continue Setup"
+    },
     "finish": "Finish",
     "tip": "Tip:",
     "saveDirectoryRequired": "Select your save directory to continue, or skip setup to configure it later.",
@@ -510,6 +516,8 @@
       "browse": "Browse",
       "dialogTitle": "Select Save File Directory",
       "useDefault": "Use Default Directory",
+      "applying": "Applying save directory...",
+      "changeFailed": "Failed to change the save directory. Please try again.",
       "validated": "Directory validated",
       "foundCharacters": "Found {{count}} character files",
       "foundCharacters_one": "Found {{count}} character file",

@@ -1,9 +1,14 @@
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import '@testing-library/jest-dom';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { useGrailStore } from '@/stores/grailStore';
 import { useWizardStore } from '@/stores/wizardStore';
 import { SetupWizard, wizardSteps } from './SetupWizard';
 
+vi.mock('@/stores/grailStore');
 vi.mock('./steps/WelcomeStep', () => ({ WelcomeStep: () => <div>WelcomeContent</div> }));
+// Stubbed so this file's grailStore mock isn't baked into the shared module cache
+// (vitest runs with isolate: false) that SaveDirectoryStep.test.tsx also relies on.
 vi.mock('./steps/SaveDirectoryStep', () => ({
   SAVE_DIRECTORY_STEP_ID: 'saveDirectory',
   SaveDirectoryStep: () => <div>SaveDirectoryContent</div>,
@@ -23,6 +28,8 @@ vi.mock('./steps/PreferencesStep', () => ({
 }));
 vi.mock('./steps/CompletionStep', () => ({ CompletionStep: () => <div>CompletionContent</div> }));
 
+const mockUseGrailStore = vi.mocked(useGrailStore);
+
 /**
  * Opens the wizard at the given step with a clean validation state.
  */
@@ -32,6 +39,10 @@ function openWizardAt(step: number, stepValidity: Record<string, boolean> = {}) 
 
 describe('SetupWizard', () => {
   beforeEach(() => {
+    vi.clearAllMocks();
+    mockUseGrailStore.mockReturnValue({
+      setSettings: vi.fn().mockResolvedValue(undefined),
+    } as unknown as ReturnType<typeof useGrailStore>);
     useWizardStore.setState({ isOpen: false, currentStep: 0, stepValidity: {} });
   });
 
@@ -110,17 +121,138 @@ describe('SetupWizard', () => {
     expect(screen.queryByRole('button', { name: 'Skip Setup' })).not.toBeInTheDocument();
   });
 
-  it('When Skip Setup is clicked on an invalid step, Then the wizard closes', async () => {
+  it('When Skip Setup is confirmed on an invalid step, Then the wizard closes', async () => {
     // Arrange
     openWizardAt(1);
     render(<SetupWizard />);
+    fireEvent.click(screen.getByRole('button', { name: 'Skip Setup' }));
+    const confirm = await screen.findByRole('alertdialog');
 
     // Act
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Skip Setup' }));
+      fireEvent.click(within(confirm).getByRole('button', { name: 'Skip Setup' }));
     });
 
     // Assert
-    expect(useWizardStore.getState().isOpen).toBe(false);
+    await waitFor(() => expect(useWizardStore.getState().isOpen).toBe(false));
+  });
+});
+
+describe('When SetupWizard is open', () => {
+  let setSettings: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    setSettings = vi.fn().mockResolvedValue(undefined);
+    mockUseGrailStore.mockReturnValue({ setSettings } as unknown as ReturnType<
+      typeof useGrailStore
+    >);
+    openWizardAt(0);
+  });
+
+  afterEach(() => {
+    useWizardStore.setState({ isOpen: false, currentStep: 0, stepValidity: {} });
+  });
+
+  describe('If the user presses Escape', () => {
+    it('Then the skip confirmation is shown and the wizard is not marked as skipped', async () => {
+      // Arrange
+      render(<SetupWizard />);
+      const wizard = await screen.findByRole('dialog');
+
+      // Act
+      fireEvent.keyDown(wizard, { key: 'Escape' });
+
+      // Assert
+      const confirm = await screen.findByRole('alertdialog');
+      expect(within(confirm).getByText('You can run setup later from Settings.')).toBeVisible();
+      expect(setSettings).not.toHaveBeenCalled();
+      expect(useWizardStore.getState().isOpen).toBe(true);
+    });
+
+    it('Then pressing Escape again dismisses only the confirmation', async () => {
+      // Arrange
+      render(<SetupWizard />);
+      const wizard = await screen.findByRole('dialog');
+      fireEvent.keyDown(wizard, { key: 'Escape' });
+      const confirm = await screen.findByRole('alertdialog');
+
+      // Act
+      fireEvent.keyDown(confirm, { key: 'Escape' });
+
+      // Assert
+      await waitFor(() => expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument());
+      expect(screen.getByRole('dialog')).toBeInTheDocument();
+      expect(setSettings).not.toHaveBeenCalled();
+      expect(useWizardStore.getState().isOpen).toBe(true);
+    });
+  });
+
+  describe('If the user clicks outside the wizard', () => {
+    it('Then the wizard stays open and is not marked as skipped', async () => {
+      // Arrange
+      render(<SetupWizard />);
+      await screen.findByRole('dialog');
+
+      // Act
+      fireEvent.pointerDown(document.body);
+      fireEvent.mouseDown(document.body);
+      fireEvent.click(document.body);
+
+      // Assert
+      await waitFor(() => expect(screen.getByRole('dialog')).toBeInTheDocument());
+      expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+      expect(setSettings).not.toHaveBeenCalled();
+      expect(useWizardStore.getState().isOpen).toBe(true);
+    });
+  });
+
+  describe('If the user clicks Skip Setup', () => {
+    it('Then a confirmation is shown before anything is persisted', async () => {
+      // Arrange
+      render(<SetupWizard />);
+      const wizard = await screen.findByRole('dialog');
+
+      // Act
+      fireEvent.click(within(wizard).getByRole('button', { name: 'Skip Setup' }));
+
+      // Assert
+      const confirm = await screen.findByRole('alertdialog');
+      expect(within(confirm).getByText('Skip setup?')).toBeInTheDocument();
+      expect(setSettings).not.toHaveBeenCalled();
+    });
+
+    it('Then confirming marks the wizard as skipped and closes it', async () => {
+      // Arrange
+      render(<SetupWizard />);
+      const wizard = await screen.findByRole('dialog');
+      fireEvent.click(within(wizard).getByRole('button', { name: 'Skip Setup' }));
+      const confirm = await screen.findByRole('alertdialog');
+
+      // Act
+      fireEvent.click(within(confirm).getByRole('button', { name: 'Skip Setup' }));
+
+      // Assert
+      await waitFor(() =>
+        expect(setSettings).toHaveBeenCalledWith({ wizardSkipped: true, wizardCompleted: false }),
+      );
+      await waitFor(() => expect(useWizardStore.getState().isOpen).toBe(false));
+    });
+
+    it('Then choosing to continue keeps the wizard open without persisting anything', async () => {
+      // Arrange
+      render(<SetupWizard />);
+      const wizard = await screen.findByRole('dialog');
+      fireEvent.click(within(wizard).getByRole('button', { name: 'Skip Setup' }));
+      const confirm = await screen.findByRole('alertdialog');
+
+      // Act
+      fireEvent.click(within(confirm).getByRole('button', { name: 'Continue Setup' }));
+
+      // Assert
+      await waitFor(() => expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument());
+      expect(setSettings).not.toHaveBeenCalled();
+      expect(useWizardStore.getState().isOpen).toBe(true);
+    });
   });
 });
