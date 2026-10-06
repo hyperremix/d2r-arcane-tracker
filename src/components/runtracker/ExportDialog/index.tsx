@@ -1,7 +1,7 @@
 import dayjs from 'dayjs';
 import type { Run, RunItem, Session } from 'electron/types/grail';
 import { CopyIcon, DownloadIcon, EyeIcon, EyeOffIcon } from 'lucide-react';
-import { useCallback, useEffect, useId, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -54,6 +54,34 @@ function getErrorDetail(err: unknown): string | undefined {
   return undefined;
 }
 
+interface SessionExportData {
+  session: Session;
+  runs: Run[];
+  items: RunItem[];
+}
+
+/**
+ * Fetches everything needed for an export without touching component state, so callers can
+ * commit the result atomically only when every request succeeded.
+ * @param {string} sessionId - The session to load
+ * @param {boolean} includeItems - Whether run items should be loaded too
+ * @returns {Promise<SessionExportData | undefined>} The loaded data, or undefined if the session is missing
+ */
+async function fetchSessionExportData(
+  sessionId: string,
+  includeItems: boolean,
+): Promise<SessionExportData | undefined> {
+  const session = await window.electronAPI?.runTracker.getSessionById(sessionId);
+  if (!session) return undefined;
+
+  const runs = await window.electronAPI?.runTracker.getRunsBySession(sessionId);
+  const items = includeItems
+    ? await window.electronAPI?.runTracker.getSessionItems(sessionId)
+    : undefined;
+
+  return { session, runs: runs || [], items: items || [] };
+}
+
 /**
  * ExportDialog component for exporting session data in multiple formats
  */
@@ -82,42 +110,47 @@ export function ExportDialog({ sessionId, open, onOpenChange }: ExportDialogProp
   const [exportContent, setExportContent] = useState<string>('');
   const [isExporting, setIsExporting] = useState(false);
 
-  const loadSessionData = useCallback(async () => {
-    setLoading(true);
-    setError(undefined);
-    // Drop any previously loaded data so a failed reload cannot export stale content
+  // Incremented for every load so a superseded request cannot overwrite newer state
+  const loadRequestRef = useRef(0);
+
+  const clearLoadedData = useCallback(() => {
     setSession(null);
     setRuns([]);
     setItems([]);
     setExportContent('');
+  }, []);
+
+  const loadSessionData = useCallback(async () => {
+    const requestId = ++loadRequestRef.current;
+    const isStale = () => requestId !== loadRequestRef.current;
+
+    setLoading(true);
+    setError(undefined);
+    // Drop any previously loaded data so a failed reload cannot export stale content
+    clearLoadedData();
 
     try {
-      // Load session
-      const sessionData = await window.electronAPI?.runTracker.getSessionById(sessionId);
-      if (!sessionData) {
+      const data = await fetchSessionExportData(sessionId, includeItems);
+      if (isStale()) return;
+      if (!data) {
         setError({ message: t(exportT.loadFailed) });
         return;
       }
-      setSession(sessionData);
 
-      // Load runs
-      const runsData = await window.electronAPI?.runTracker.getRunsBySession(sessionId);
-      setRuns(runsData || []);
-
-      // Load items if requested
-      if (includeItems) {
-        const itemsData = await window.electronAPI?.runTracker.getSessionItems(sessionId);
-        setItems(itemsData || []);
-      } else {
-        setItems([]);
-      }
+      // Commit session, runs and items together only after every request succeeded
+      setSession(data.session);
+      setRuns(data.runs);
+      setItems(data.items);
     } catch (err) {
+      if (isStale()) return;
       setError({ message: t(exportT.loadFailed), detail: getErrorDetail(err) });
       console.error('[ExportDialog] Error loading session data:', err);
     } finally {
-      setLoading(false);
+      if (!isStale()) {
+        setLoading(false);
+      }
     }
-  }, [sessionId, includeItems, t]);
+  }, [sessionId, includeItems, clearLoadedData, t]);
 
   const generateExportContent = useCallback(async () => {
     if (!session || runs.length === 0) return;
@@ -142,6 +175,7 @@ export function ExportDialog({ sessionId, open, onOpenChange }: ExportDialogProp
       setExportContent(content);
     } catch (err) {
       console.error('[ExportDialog] Error generating export content:', err);
+      setExportContent('');
       setError({ message: t(exportT.generateFailed), detail: getErrorDetail(err) });
     }
   }, [session, runs, items, format, textDetailLevel, includeItems, t]);
@@ -215,17 +249,15 @@ export function ExportDialog({ sessionId, open, onOpenChange }: ExportDialogProp
     }
   }, [exportContent, t]);
 
+  // Changing includeItems changes loadSessionData, which makes the load effect reload the data.
+  // The loaded data is cleared in the same batch so the content effect cannot regenerate an
+  // export from data loaded with the previous option while the reload is in flight.
   const handleIncludeItemsChange = useCallback(
     (checked: boolean) => {
+      clearLoadedData();
       setIncludeItems(checked);
-      if (checked) {
-        // Reload data with items
-        loadSessionData();
-      } else {
-        setItems([]);
-      }
     },
-    [loadSessionData],
+    [clearLoadedData],
   );
 
   if (loading) {

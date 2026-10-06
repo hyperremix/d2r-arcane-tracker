@@ -181,6 +181,43 @@ describe('When managing database backups', () => {
     ).not.toBeInTheDocument();
   });
 
+  it('If a backup is in flight from the restore confirmation, Then Restore, Cancel and Back up first are disabled', async () => {
+    // Arrange
+    let finishBackup: (value: { success: boolean }) => void = () => undefined;
+    mockElectronAPI.dialog.showSaveDialog.mockResolvedValue({
+      canceled: false,
+      filePath: '/backups/pre-restore.db',
+    });
+    mockElectronAPI.grail.backup.mockReturnValue(
+      new Promise<{ success: boolean }>((resolve) => {
+        finishBackup = resolve;
+      }),
+    );
+    render(<DatabaseCard />);
+    const backupFirstButton = await openRestoreConfirmation();
+
+    // Act
+    fireEvent.click(backupFirstButton);
+
+    // Assert
+    await waitFor(() => expect(mockElectronAPI.grail.backup).toHaveBeenCalledTimes(1));
+    expect(screen.getByRole('button', { name: 'Restore Database' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Cancel' })).toBeDisabled();
+    const inFlightButtons = screen.getAllByRole('button', { name: 'Creating Backup...' });
+    expect(inFlightButtons.length).toBeGreaterThan(0);
+    for (const button of inFlightButtons) {
+      expect(button).toBeDisabled();
+    }
+
+    // Act
+    finishBackup({ success: true });
+
+    // Assert
+    expect(await screen.findByRole('button', { name: 'Restore Database' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Cancel' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Back up first' })).toBeEnabled();
+  });
+
   it('If a restore fails, Then a translated error is shown', async () => {
     // Arrange
     mockElectronAPI.grail.restore.mockResolvedValue({ success: false });
@@ -191,6 +228,6 @@ describe('When managing database backups', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Restore Database' }));
 
     // Assert
-    expect(await screen.findByText('Failed to restore database')).toBeInTheDocument();
+    expect(await screen.findByRole('alert')).toHaveTextContent('Failed to restore database');
   });
 });

@@ -235,11 +235,11 @@ export function DatabaseCard() {
               : t(translations.settings.database.backupDatabase)}
           </Button>
           {lastBackupPath && (
-            <p className="text-success text-xs">
+            <output className="block text-success text-xs">
               {t(translations.settings.database.lastBackup, {
                 filename: getFileName(lastBackupPath),
               })}
-            </p>
+            </output>
           )}
         </div>
 

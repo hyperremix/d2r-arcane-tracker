@@ -63,6 +63,18 @@ describe('When the dialog:writeFile IPC handler is invoked', () => {
     expect(writeFile).not.toHaveBeenCalled();
   });
 
+  it('If the file path is relative, Then it rejects without writing', async () => {
+    // Arrange
+    const handler = getWriteFileHandler();
+
+    // Act
+    const promise = handler(null, '../outside/run-analytics.csv', 'content');
+
+    // Assert
+    await expect(promise).rejects.toThrow('Invalid file path');
+    expect(writeFile).not.toHaveBeenCalled();
+  });
+
   it('If the file path is not a string, Then it rejects without writing', async () => {
     // Arrange
     const handler = getWriteFileHandler();

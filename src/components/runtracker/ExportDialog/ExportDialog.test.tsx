@@ -221,4 +221,60 @@ describe('When using the session export dialog', () => {
     expect(screen.getByRole('button', { name: /Copy to Clipboard/i })).toBeDisabled();
     expect(mockElectronAPI.dialog.showSaveDialog).not.toHaveBeenCalled();
   });
+
+  it('If loading the items fails after the session and runs loaded, Then export actions stay disabled and the form is kept', async () => {
+    // Arrange
+    renderDialog();
+    await waitForExportReady(/Save to File/i);
+    mockElectronAPI.runTracker.getSessionItems.mockRejectedValue(new Error('Items unavailable'));
+
+    // Act
+    fireEvent.click(screen.getByLabelText(/Include items found during runs/i));
+
+    // Assert
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('Failed to load session data');
+    expect(alert).toHaveTextContent('Items unavailable');
+    expect(screen.getByText('Export Format')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Save to File/i })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /Copy to Clipboard/i })).toBeDisabled();
+  });
+
+  it('If the include items option is toggled, Then the session data is reloaded exactly once', async () => {
+    // Arrange
+    renderDialog();
+    await waitForExportReady(/Save to File/i);
+    expect(mockElectronAPI.runTracker.getSessionById).toHaveBeenCalledTimes(1);
+
+    // Act
+    fireEvent.click(screen.getByLabelText(/Include items found during runs/i));
+
+    // Assert
+    await waitForExportReady(/Save to File/i);
+    expect(mockElectronAPI.runTracker.getSessionById).toHaveBeenCalledTimes(2);
+    expect(mockElectronAPI.runTracker.getSessionItems).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    [1, 'Session has 1 run.'],
+    [2, 'Session has 2 runs.'],
+  ])(
+    'If the session has %i run(s), Then the description uses the matching plural form',
+    async (count, expected) => {
+      // Arrange
+      mockElectronAPI.runTracker.getRunsBySession.mockResolvedValue(
+        Array.from({ length: count }, (_, index) => ({
+          id: `run-${index}`,
+          sessionId: 'session-12345678',
+        })),
+      );
+
+      // Act
+      renderDialog();
+      await waitForExportReady(/Save to File/i);
+
+      // Assert
+      expect(screen.getByText(new RegExp(expected.replace('.', '\\.')))).toBeInTheDocument();
+    },
+  );
 });

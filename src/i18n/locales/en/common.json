@@ -714,7 +714,8 @@
     "exportDialog": {
       "title": "Export Session Data",
       "loadingDescription": "Loading session data...",
-      "description": "Export session data in your preferred format. Session has {{count}} runs.",
+      "description_one": "Export session data in your preferred format. Session has {{count}} run.",
+      "description_other": "Export session data in your preferred format. Session has {{count}} runs.",
       "format": "Export Format",
       "formatCsv": "CSV (Spreadsheet)",
       "formatJson": "JSON (Structured Data)",

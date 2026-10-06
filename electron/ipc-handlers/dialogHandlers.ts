@@ -1,4 +1,5 @@
 import { writeFile } from 'node:fs/promises';
+import { isAbsolute } from 'node:path';
 import { dialog, ipcMain } from 'electron';
 
 /**
@@ -30,7 +31,7 @@ export function initializeDialogHandlers(): void {
 
   // Write file handler
   ipcMain.handle('dialog:writeFile', async (_, filePath: unknown, content: unknown) => {
-    if (typeof filePath !== 'string' || filePath.trim().length === 0) {
+    if (typeof filePath !== 'string' || filePath.trim().length === 0 || !isAbsolute(filePath)) {
       throw new Error('Invalid file path');
     }
     if (typeof content !== 'string') {

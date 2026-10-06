@@ -14,7 +14,7 @@ import { getFileName } from '@/lib/path';
  * @param {string | number} value - The cell value
  * @returns {string} The escaped cell value
  */
-function escapeCsvCell(value: string | number): string {
+export function escapeCsvCell(value: string | number): string {
   const text = String(value);
   return /[",\n\r]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
 }
