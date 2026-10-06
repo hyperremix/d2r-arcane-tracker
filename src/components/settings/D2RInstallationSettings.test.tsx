@@ -20,12 +20,15 @@ describe('When D2RInstallationSettings is rendered', () => {
     window.electronAPI = originalElectronAPI;
   });
 
-  it('Then the icon-only browse button has an accessible name', async () => {
+  it('Then the icon-only browse button has a translated aria-label', async () => {
     // Arrange & Act
     render(<D2RInstallationSettings />);
 
     // Assert
     expect(await screen.findByDisplayValue('/games/d2r')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Browse for directory' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Browse for directory' })).toHaveAttribute(
+      'aria-label',
+      'Browse for directory',
+    );
   });
 });

@@ -45,6 +45,7 @@ const validationErrorKeys: Record<TerrorZoneValidationErrorCode, string> = {
 export function TerrorZoneConfiguration() {
   const { t } = useTranslation();
   const zoneLabelIdPrefix = useId();
+  const zoneSwitchIdPrefix = useId();
   const [zones, setZones] = useState<TerrorZone[]>([]);
   const [config, setConfig] = useState<Record<string, boolean>>({});
   const [searchTerm, setSearchTerm] = useState('');
@@ -371,12 +372,17 @@ export function TerrorZoneConfiguration() {
                 {filteredZones.map((zone) => (
                   <div key={zone.id} className="flex flex-1 items-center gap-4">
                     <Switch
+                      id={`${zoneSwitchIdPrefix}-${zone.id}`}
                       aria-labelledby={`${zoneLabelIdPrefix}-${zone.id}`}
                       checked={config[zone.id] ?? true}
                       onCheckedChange={(checked: boolean) => handleZoneToggle(zone.id, checked)}
                       disabled={isSaving || !validationStatus.valid}
                     />
-                    <Label id={`${zoneLabelIdPrefix}-${zone.id}`} className="font-medium">
+                    <Label
+                      id={`${zoneLabelIdPrefix}-${zone.id}`}
+                      htmlFor={`${zoneSwitchIdPrefix}-${zone.id}`}
+                      className="font-medium"
+                    >
                       {zone.name}
                     </Label>
                   </div>

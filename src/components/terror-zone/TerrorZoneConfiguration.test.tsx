@@ -122,6 +122,23 @@ describe('When TerrorZoneConfiguration lists zones', () => {
     expect(coldPlains).not.toBeChecked();
   });
 
+  describe('If the zone name label is clicked', () => {
+    it('Then the zone switch is toggled', async () => {
+      // Arrange
+      const terrorZone = setupValidTerrorZoneApi();
+      render(<TerrorZoneConfiguration />);
+      const coldPlains = await screen.findByRole('switch', { name: 'Cold Plains' });
+      expect(coldPlains).not.toBeChecked();
+
+      // Act
+      fireEvent.click(screen.getByText('Cold Plains'));
+
+      // Assert
+      await waitFor(() => expect(coldPlains).toBeChecked());
+      expect(terrorZone.updateConfig).toHaveBeenCalledWith({ '1': true, '2': true });
+    });
+  });
+
   describe('If saving a zone change fails', () => {
     it('Then the translated update failure is shown instead of the raw error', async () => {
       // Arrange
