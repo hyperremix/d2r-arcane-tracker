@@ -224,6 +224,120 @@ describe('When SaveDirectoryStep is rendered', () => {
       expect(reloadData).not.toHaveBeenCalled();
     });
   });
+
+  describe('If the change succeeds but refreshing afterwards fails', () => {
+    it('Then reloadData failing does not show a change-failed alert and still loads save files', async () => {
+      // Arrange
+      electronAPI = createElectronAPI({ hasUserData: false });
+      installElectronAPI(electronAPI);
+      reloadData.mockRejectedValue(new Error('reload failed'));
+      await renderStep();
+      electronAPI.saveFile.getSaveFiles.mockClear();
+
+      // Act
+      fireEvent.click(screen.getByRole('button', { name: /browse/i }));
+
+      // Assert
+      await waitFor(() => expect(reloadData).toHaveBeenCalledTimes(1));
+      await waitFor(() => expect(screen.getByDisplayValue(NEW_DIR)).toBeInTheDocument());
+      await waitFor(() => expect(electronAPI.saveFile.getSaveFiles).toHaveBeenCalledTimes(1));
+      expect(electronAPI.saveFile.updateSaveDirectory).toHaveBeenCalledWith(NEW_DIR);
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /browse/i })).toBeEnabled();
+    });
+
+    it('Then getSaveFiles failing does not show a change-failed alert', async () => {
+      // Arrange
+      electronAPI = createElectronAPI({ hasUserData: false });
+      installElectronAPI(electronAPI);
+      await renderStep();
+      electronAPI.saveFile.getSaveFiles.mockRejectedValue(new Error('read failed'));
+
+      // Act
+      fireEvent.click(screen.getByRole('button', { name: /browse/i }));
+
+      // Assert
+      await waitFor(() => expect(reloadData).toHaveBeenCalledTimes(1));
+      await waitFor(() => expect(screen.getByDisplayValue(NEW_DIR)).toBeInTheDocument());
+      await waitFor(() => expect(screen.getByRole('button', { name: /browse/i })).toBeEnabled());
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    });
+  });
+
+  describe('If the default directory cannot be determined', () => {
+    it('Then an error message is shown and no change is made', async () => {
+      // Arrange
+      await renderStep();
+      electronAPI.saveFile.getDefaultDirectory.mockRejectedValue(new Error('no default'));
+
+      // Act
+      fireEvent.click(screen.getByRole('button', { name: 'Use Default Directory' }));
+
+      // Assert
+      expect(await screen.findByRole('alert')).toHaveTextContent(
+        'Failed to change the save directory. Please try again.',
+      );
+      expect(electronAPI.saveFile.restoreDefaultDirectory).not.toHaveBeenCalled();
+      expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+    });
+  });
+
+  describe('If the current directory is decided', () => {
+    it('Then the monitoring status directory is used rather than the stored setting', async () => {
+      // Arrange: the stored setting is stale, the monitor is actually using CURRENT_DIR
+      mockUseGrailStore.mockReturnValue({
+        settings: { saveDir: NEW_DIR },
+        reloadData,
+      } as unknown as ReturnType<typeof useGrailStore>);
+      await renderStep();
+
+      // Act: picking the stale setting value is a real change, so it must be confirmed
+      fireEvent.click(screen.getByRole('button', { name: /browse/i }));
+
+      // Assert
+      expect(await screen.findByRole('alertdialog')).toBeInTheDocument();
+      expect(electronAPI.saveFile.updateSaveDirectory).not.toHaveBeenCalled();
+    });
+
+    it('Then confirmation is requested when neither the monitoring status nor the setting identify it', async () => {
+      // Arrange
+      mockUseGrailStore.mockReturnValue({
+        settings: { saveDir: '' },
+        reloadData,
+      } as unknown as ReturnType<typeof useGrailStore>);
+      electronAPI.saveFile.getMonitoringStatus.mockResolvedValue({
+        isMonitoring: false,
+        directory: null,
+      });
+      render(<SaveDirectoryStep />);
+      await waitFor(() => expect(screen.getByRole('button', { name: 'Browse' })).toBeEnabled());
+
+      // Act
+      fireEvent.click(screen.getByRole('button', { name: 'Browse' }));
+
+      // Assert
+      expect(await screen.findByRole('alertdialog')).toBeInTheDocument();
+      expect(electronAPI.saveFile.updateSaveDirectory).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('If the user opens the directory picker', () => {
+    it('Then the localized dialog title is passed to the picker', async () => {
+      // Arrange
+      await renderStep();
+
+      // Act
+      fireEvent.click(screen.getByRole('button', { name: /browse/i }));
+
+      // Assert
+      await waitFor(() =>
+        expect(electronAPI.dialog.showOpenDialog).toHaveBeenCalledWith({
+          title: 'Select Save File Directory',
+          properties: ['openDirectory'],
+        }),
+      );
+    });
+  });
 });
 
 describe('When SaveDirectoryStep is rendered without a detected directory', () => {
@@ -245,21 +359,13 @@ describe('When SaveDirectoryStep is rendered without a detected directory', () =
       isMonitoring: false,
       directory: null,
     });
-    Object.defineProperty(window, 'electronAPI', {
-      value: electronAPI,
-      writable: true,
-      configurable: true,
-    });
+    installElectronAPI(electronAPI);
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
     useWizardStore.setState({ stepValidity: {} });
-    Object.defineProperty(window, 'electronAPI', {
-      value: originalElectronAPI,
-      writable: true,
-      configurable: true,
-    });
+    installElectronAPI(originalElectronAPI);
   });
 
   it('Then it shows a not-detected state with a Browse prompt and blocks the step', async () => {
@@ -350,20 +456,12 @@ describe('When SaveDirectoryStep is rendered with a detected directory', () => {
       settings: { saveDir: '' },
       reloadData: vi.fn().mockResolvedValue(undefined),
     } as unknown as ReturnType<typeof useGrailStore>);
-    Object.defineProperty(window, 'electronAPI', {
-      value: createElectronAPI({ hasUserData: false }),
-      writable: true,
-      configurable: true,
-    });
+    installElectronAPI(createElectronAPI({ hasUserData: false }));
   });
 
   afterEach(() => {
     useWizardStore.setState({ stepValidity: {} });
-    Object.defineProperty(window, 'electronAPI', {
-      value: originalElectronAPI,
-      writable: true,
-      configurable: true,
-    });
+    installElectronAPI(originalElectronAPI);
   });
 
   it('Then the step is valid and no not-detected state is shown', async () => {

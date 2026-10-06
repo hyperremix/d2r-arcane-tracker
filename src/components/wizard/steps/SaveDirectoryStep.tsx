@@ -97,10 +97,10 @@ export function SaveDirectoryStep() {
 
   const applyDirectoryChange = useCallback(
     async (change: PendingDirectoryChange) => {
-      try {
-        setIsApplying(true);
-        setHasError(false);
+      setIsApplying(true);
+      setHasError(false);
 
+      try {
         // The main process persists the setting, clears data if needed and restarts monitoring
         if (change.action === 'restore') {
           const result = await window.electronAPI?.saveFile.restoreDefaultDirectory();
@@ -109,20 +109,33 @@ export function SaveDirectoryStep() {
           await window.electronAPI?.saveFile.updateSaveDirectory(change.directory);
           setSaveDir(change.directory);
         }
+      } catch (error) {
+        console.error('Failed to change save directory:', error);
+        setHasError(true);
+        setPendingChange(undefined);
+        setIsApplying(false);
+        return;
+      }
 
+      // The change has been applied. Refreshing the UI is best effort: a failure here is
+      // logged but must not report the (already completed) change as failed.
+      try {
         // Reload settings, characters and progress so the UI isn't stale
         await reloadData();
+      } catch (error) {
+        console.error('Failed to reload data after save directory change:', error);
+      }
 
+      try {
         // Load save files from the new directory
         const files = await window.electronAPI?.saveFile.getSaveFiles();
         setSaveFiles(files || []);
       } catch (error) {
-        console.error('Failed to change save directory:', error);
-        setHasError(true);
-      } finally {
-        setPendingChange(undefined);
-        setIsApplying(false);
+        console.error('Failed to load save files after save directory change:', error);
       }
+
+      setPendingChange(undefined);
+      setIsApplying(false);
     },
     [reloadData],
   );
@@ -130,6 +143,11 @@ export function SaveDirectoryStep() {
   const requestDirectoryChange = useCallback(
     async (change: PendingDirectoryChange) => {
       setHasError(false);
+      // `saveDir` is the directory the monitor is actually using (monitoring status), which is the
+      // same effective directory (saveDir setting, else platform default) the main process compares
+      // against before clearing data. Both only change together via the update/restore IPCs, so a
+      // match here means main will not truncate. When the status is unknown, `saveDir` falls back
+      // to '' or the stored setting, which errs toward asking for confirmation.
       const isSameDirectory =
         saveDir !== '' && normalizeDirectory(saveDir) === normalizeDirectory(change.directory);
 

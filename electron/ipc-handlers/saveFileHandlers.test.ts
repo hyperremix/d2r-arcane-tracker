@@ -1,5 +1,6 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: This file is testing private methods */
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { MockInstance } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Mock process.platform to non-Windows to prevent Windows-specific services from initializing
 Object.defineProperty(process, 'platform', {
@@ -805,8 +806,25 @@ describe('When saveFileHandlers is used', () => {
   });
 
   describe('If IPC handlers are called', () => {
+    const originalPlatform = process.platform;
+    let consoleSpies: MockInstance[] = [];
+
+    const silenceConsole = (method: 'error' | 'warn') => {
+      const spy = vi.spyOn(console, method).mockImplementation(() => undefined);
+      consoleSpies.push(spy);
+      return spy;
+    };
+
     beforeEach(() => {
       initializeSaveFileHandlers();
+    });
+
+    afterEach(() => {
+      for (const spy of consoleSpies) {
+        spy.mockRestore();
+      }
+      consoleSpies = [];
+      Object.defineProperty(process, 'platform', { value: originalPlatform });
     });
 
     it('Then saveFile:getSaveFiles should return save files', async () => {
@@ -909,6 +927,51 @@ describe('When saveFileHandlers is used', () => {
       expect(grailDatabase.setSetting).toHaveBeenCalledWith('saveDir', '/default/save/dir');
     });
 
+    it('Then saveFile:updateSaveDirectory should not truncate user data when the current directory is unknown', async () => {
+      // Arrange
+      vi.mocked(grailDatabase.getAllSettings).mockReturnValue({ saveDir: '' } as any);
+      mockSaveFileMonitor.getDefaultDirectory.mockReturnValue('');
+      const warnSpy = silenceConsole('warn');
+      const handler = getHandler('saveFile:updateSaveDirectory');
+
+      // Act
+      const result = await handler(null, '/new/save/dir');
+
+      // Assert
+      expect(grailDatabase.truncateUserData).not.toHaveBeenCalled();
+      expect(grailDatabase.setSetting).toHaveBeenCalledWith('saveDir', '/new/save/dir');
+      expect(mockSaveFileMonitor.updateSaveDirectory).toHaveBeenCalled();
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('unknown'));
+      expect(result).toEqual({ success: true });
+    });
+
+    it('Then saveFile:updateSaveDirectory should compare paths case-insensitively on win32', async () => {
+      // Arrange
+      Object.defineProperty(process, 'platform', { value: 'win32' });
+      vi.mocked(grailDatabase.getAllSettings).mockReturnValue({ saveDir: '/test/save/dir' } as any);
+      const handler = getHandler('saveFile:updateSaveDirectory');
+
+      // Act
+      await handler(null, '/Test/Save/DIR');
+
+      // Assert
+      expect(grailDatabase.truncateUserData).not.toHaveBeenCalled();
+      expect(grailDatabase.setSetting).toHaveBeenCalledWith('saveDir', '/Test/Save/DIR');
+    });
+
+    it('Then saveFile:updateSaveDirectory should compare paths case-sensitively on other platforms', async () => {
+      // Arrange
+      Object.defineProperty(process, 'platform', { value: 'linux' });
+      vi.mocked(grailDatabase.getAllSettings).mockReturnValue({ saveDir: '/test/save/dir' } as any);
+      const handler = getHandler('saveFile:updateSaveDirectory');
+
+      // Act
+      await handler(null, '/Test/Save/DIR');
+
+      // Assert
+      expect(grailDatabase.truncateUserData).toHaveBeenCalledTimes(1);
+    });
+
     it.each([
       ['an empty string', ''],
       ['whitespace only', '   '],
@@ -921,7 +984,7 @@ describe('When saveFileHandlers is used', () => {
       async (_label, input) => {
         // Arrange
         const handler = getHandler('saveFile:updateSaveDirectory');
-        const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+        silenceConsole('error');
 
         // Act
         const act = handler(null, input);
@@ -931,7 +994,6 @@ describe('When saveFileHandlers is used', () => {
         expect(grailDatabase.setSetting).not.toHaveBeenCalled();
         expect(grailDatabase.truncateUserData).not.toHaveBeenCalled();
         expect(mockSaveFileMonitor.updateSaveDirectory).not.toHaveBeenCalled();
-        consoleErrorSpy.mockRestore();
       },
     );
 

@@ -379,20 +379,27 @@ function getCurrentSaveDirectory(): string | undefined {
 
 /**
  * Persists a new save directory, truncates user data only when the directory
- * actually changes, and restarts save file monitoring.
+ * is known to have changed, and restarts save file monitoring.
+ * Fails safe: if the current directory cannot be determined, user data is kept.
  * @param newDirectory - The validated new save directory
  */
 async function applySaveDirectoryChange(newDirectory: string): Promise<void> {
   const currentDirectory = getCurrentSaveDirectory();
-  const directoryChanged =
-    !currentDirectory ||
-    normalizeDirectoryForComparison(currentDirectory) !==
+  let directoryChanged = false;
+  if (currentDirectory) {
+    directoryChanged =
+      normalizeDirectoryForComparison(currentDirectory) !==
       normalizeDirectoryForComparison(newDirectory);
+  } else {
+    console.warn(
+      '[applySaveDirectoryChange] Current save directory is unknown; keeping existing user data',
+    );
+  }
 
   // Update the database setting
   grailDatabase.setSetting('saveDir', newDirectory);
 
-  // Only truncate user data when switching to a different directory
+  // Only truncate user data when switching away from a known, different directory
   if (directoryChanged) {
     grailDatabase.truncateUserData();
   }

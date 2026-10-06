@@ -80,11 +80,7 @@ export function SaveDirectoryChangeDialog({
           <AlertDialogCancel disabled={isProcessing}>
             {t(translations.common.cancel)}
           </AlertDialogCancel>
-          <AlertDialogAction
-            onClick={onConfirm}
-            disabled={isProcessing}
-            variant="destructive"
-          >
+          <AlertDialogAction onClick={onConfirm} disabled={isProcessing} variant="destructive">
             {confirmLabel}
           </AlertDialogAction>
         </AlertDialogFooter>
