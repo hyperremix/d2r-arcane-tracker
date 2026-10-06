@@ -34,6 +34,7 @@ function installElectronApi(api: ReturnType<typeof createElectronApiMock>) {
 
 describe('D2RInstallationStep', () => {
   const originalElectronAPI = window.electronAPI;
+  const originalSettings = useGrailStore.getState().settings;
 
   beforeEach(() => {
     useGrailStore.setState((state) => ({
@@ -42,6 +43,7 @@ describe('D2RInstallationStep', () => {
   });
 
   afterEach(() => {
+    useGrailStore.setState({ settings: originalSettings });
     Object.defineProperty(window, 'electronAPI', {
       value: originalElectronAPI,
       configurable: true,
@@ -215,5 +217,136 @@ describe('D2RInstallationStep', () => {
       screen.getByText('Extracted game files were not found at this location'),
     ).toBeInTheDocument();
     expect(screen.queryByText('Game files found at this location')).not.toBeInTheDocument();
+  });
+
+  it('When the user presses Enter, Then the path is saved and validated', async () => {
+    // Arrange
+    const api = createElectronApiMock(null);
+    installElectronApi(api);
+    render(<D2RInstallationStep />);
+    await screen.findByRole('button', { name: 'Use this' });
+    const input = screen.getByLabelText('Installation Path');
+    fireEvent.change(input, { target: { value: 'D:\\D2R' } });
+
+    // Act
+    await act(async () => {
+      fireEvent.keyDown(input, { key: 'Enter' });
+    });
+
+    // Assert
+    expect(api.icon.setD2RPath).toHaveBeenCalledTimes(1);
+    expect(api.icon.setD2RPath).toHaveBeenCalledWith('D:\\D2R');
+    expect(await screen.findByText('Game files found at this location')).toBeInTheDocument();
+  });
+
+  it('If Enter is immediately followed by blur, Then the path is only saved once', async () => {
+    // Arrange
+    const api = createElectronApiMock(null);
+    let resolveSave: () => void = () => undefined;
+    api.icon.setD2RPath.mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveSave = resolve;
+        }),
+    );
+    installElectronApi(api);
+    render(<D2RInstallationStep />);
+    await screen.findByRole('button', { name: 'Use this' });
+    const input = screen.getByLabelText('Installation Path');
+    fireEvent.change(input, { target: { value: 'D:\\D2R' } });
+
+    // Act
+    await act(async () => {
+      fireEvent.keyDown(input, { key: 'Enter' });
+      fireEvent.blur(input);
+    });
+    await act(async () => {
+      resolveSave();
+    });
+
+    // Assert
+    expect(api.icon.setD2RPath).toHaveBeenCalledTimes(1);
+  });
+
+  it('When the user browses to a folder, Then the chosen path is saved and validated', async () => {
+    // Arrange
+    const api = createElectronApiMock(null);
+    api.dialog.showOpenDialog.mockResolvedValue({ canceled: false, filePaths: ['F:\\Games\\D2R'] });
+    installElectronApi(api);
+    render(<D2RInstallationStep />);
+    await screen.findByRole('button', { name: 'Use this' });
+
+    // Act
+    await act(async () => {
+      fireEvent.click(screen.getAllByRole('button', { name: 'Browse for directory' })[0]);
+    });
+
+    // Assert
+    expect(api.icon.setD2RPath).toHaveBeenCalledWith('F:\\Games\\D2R');
+    expect(screen.getByLabelText('Installation Path')).toHaveValue('F:\\Games\\D2R');
+    expect(await screen.findByText('Game files found at this location')).toBeInTheDocument();
+  });
+
+  it('If the user cancels the browse dialog, Then nothing is saved', async () => {
+    // Arrange
+    const api = createElectronApiMock(null);
+    api.dialog.showOpenDialog.mockResolvedValue({ canceled: true, filePaths: [] });
+    installElectronApi(api);
+    render(<D2RInstallationStep />);
+    await screen.findByRole('button', { name: 'Use this' });
+
+    // Act
+    await act(async () => {
+      fireEvent.click(screen.getAllByRole('button', { name: 'Browse for directory' })[0]);
+    });
+
+    // Assert
+    expect(api.icon.setD2RPath).not.toHaveBeenCalled();
+  });
+
+  it('If saving the path fails, Then a save error is shown and the path is not validated', async () => {
+    // Arrange
+    const api = createElectronApiMock(null);
+    api.icon.setD2RPath.mockRejectedValue(new Error('disk full'));
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    installElectronApi(api);
+    render(<D2RInstallationStep />);
+    await screen.findByRole('button', { name: 'Use this' });
+    const input = screen.getByLabelText('Installation Path');
+    fireEvent.change(input, { target: { value: 'D:\\D2R' } });
+
+    // Act
+    await act(async () => {
+      fireEvent.blur(input);
+    });
+
+    // Assert
+    expect(
+      await screen.findByText('Could not save the installation path. Please try again.'),
+    ).toBeInTheDocument();
+    expect(input).toHaveAttribute('aria-invalid', 'true');
+    expect(api.icon.validatePath).not.toHaveBeenCalled();
+  });
+
+  it('If the user types and then restores the saved path, Then the saved path is validated again', async () => {
+    // Arrange
+    const api = createElectronApiMock('E:\\Diablo II Resurrected');
+    installElectronApi(api);
+    render(<D2RInstallationStep />);
+    const input = await screen.findByDisplayValue('E:\\Diablo II Resurrected');
+    expect(await screen.findByText('Game files found at this location')).toBeInTheDocument();
+    fireEvent.change(input, { target: { value: 'E:\\Other' } });
+    fireEvent.change(input, { target: { value: 'E:\\Diablo II Resurrected' } });
+    expect(screen.queryByText('Game files found at this location')).not.toBeInTheDocument();
+
+    // Act
+    await act(async () => {
+      fireEvent.blur(input);
+    });
+
+    // Assert
+    expect(api.icon.setD2RPath).not.toHaveBeenCalled();
+    expect(api.icon.validatePath).toHaveBeenCalledTimes(2);
+    expect(await screen.findByText('Game files found at this location')).toBeInTheDocument();
   });
 });

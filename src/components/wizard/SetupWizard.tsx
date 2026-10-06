@@ -64,7 +64,7 @@ export const wizardSteps: WizardStep[] = [
   {
     id: 'preferences',
     component: PreferencesStep,
-    titleKey: translations.wizard.steps.preferences,
+    titleKey: translations.wizard.preferences.title,
     optional: true,
   },
   { id: 'complete', component: CompletionStep, titleKey: translations.wizard.steps.complete },

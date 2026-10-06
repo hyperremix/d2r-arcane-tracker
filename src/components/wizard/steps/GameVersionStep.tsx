@@ -10,21 +10,31 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { gameVersionLabelKeys } from '@/components/wizard/labelKeys';
 import { translations } from '@/i18n/translations';
 import { useGrailStore } from '@/stores/grailStore';
 
 /**
+ * A selectable game version with its label and description translation keys.
+ */
+interface GameVersionOption {
+  value: GameVersion;
+  labelKey: string;
+  descriptionKey: string;
+}
+
+/**
  * Available game versions with their label and description translation keys.
  */
-const gameVersions: { value: GameVersion; labelKey: string; descriptionKey: string }[] = [
+const gameVersions: GameVersionOption[] = [
   {
     value: GameVersion.Resurrected,
-    labelKey: translations.settings.gameVersion.resurrectedLabel,
+    labelKey: gameVersionLabelKeys[GameVersion.Resurrected],
     descriptionKey: translations.settings.gameVersion.resurrectedDescription,
   },
   {
     value: GameVersion.Classic,
-    labelKey: translations.settings.gameVersion.classicLabel,
+    labelKey: gameVersionLabelKeys[GameVersion.Classic],
     descriptionKey: translations.settings.gameVersion.classicDescription,
   },
 ];

@@ -1,5 +1,5 @@
 import { act, renderHook } from '@testing-library/react';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CharacterBuilder, GrailProgressBuilder, HolyGrailItemBuilder } from '@/fixtures';
 import { useFilteredItems, useGrailStatistics, useGrailStore } from './grailStore';
 
@@ -15,11 +15,20 @@ const mockElectronAPI = {
   },
 };
 
-// Mock window.electronAPI
+// Mock window.electronAPI (restored afterwards because test files share one window)
+const originalElectronAPI = window.electronAPI;
 Object.defineProperty(window, 'electronAPI', {
   value: mockElectronAPI,
   configurable: true,
   writable: true,
+});
+
+afterAll(() => {
+  Object.defineProperty(window, 'electronAPI', {
+    value: originalElectronAPI,
+    configurable: true,
+    writable: true,
+  });
 });
 
 // Test data builders

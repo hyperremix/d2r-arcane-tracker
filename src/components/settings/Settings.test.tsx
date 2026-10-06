@@ -70,8 +70,11 @@ describe('Settings', () => {
   }
 
   it('When the page renders, Then it shows a navigation entry and a headed section per group', () => {
-    // Arrange & Act
-    render(<Settings />);
+    // Arrange
+    const ui = <Settings />;
+
+    // Act
+    render(ui);
 
     // Assert
     const nav = screen.getByRole('navigation', { name: 'Settings sections' });
@@ -84,8 +87,11 @@ describe('Settings', () => {
   });
 
   it('When the page renders, Then the cards are grouped into their sections', () => {
-    // Arrange & Act
-    render(<Settings />);
+    // Arrange
+    const ui = <Settings />;
+
+    // Act
+    render(ui);
 
     // Assert
     const general = screen.getByRole('region', { name: 'General' });
@@ -114,8 +120,11 @@ describe('Settings', () => {
   });
 
   it('When the page renders, Then the first section is marked as current', () => {
-    // Arrange & Act
-    render(<Settings />);
+    // Arrange
+    const ui = <Settings />;
+
+    // Act
+    render(ui);
 
     // Assert
     const nav = screen.getByRole('navigation', { name: 'Settings sections' });
@@ -203,5 +212,122 @@ describe('Settings', () => {
       'aria-current',
       'location',
     );
+  });
+
+  /**
+   * Prepares a scrollable container with mocked geometry for scroll-spy scenarios.
+   */
+  function prepareScrollContainer(scrollTop: number) {
+    const container = screen.getByTestId('settings-scroll-container');
+    container.getBoundingClientRect = () => ({ top: 0 }) as DOMRect;
+    Object.defineProperty(container, 'scrollHeight', { configurable: true, value: 5000 });
+    Object.defineProperty(container, 'clientHeight', { configurable: true, value: 800 });
+    container.scrollTop = scrollTop;
+    return container;
+  }
+
+  it('If the user scrolls elsewhere after a navigation click, Then the highlight is recomputed when the lock releases', async () => {
+    // Arrange
+    mockAnimationFrames();
+    render(<Settings />);
+    const container = prepareScrollContainer(900);
+    const nav = screen.getByRole('navigation', { name: 'Settings sections' });
+    fireEvent.click(within(nav).getByRole('button', { name: 'Display' }));
+    mockSectionPositions({ general: -900, tracking: 40, display: 700, data: 1500, about: 2200 });
+
+    // Act
+    fireEvent.scroll(container);
+    await act(async () => {
+      vi.advanceTimersByTime(1000);
+    });
+
+    // Assert
+    expect(within(nav).getByRole('button', { name: 'Tracking' })).toHaveAttribute(
+      'aria-current',
+      'location',
+    );
+    expect(within(nav).getByRole('button', { name: 'Display' })).not.toHaveAttribute(
+      'aria-current',
+    );
+  });
+
+  it('If a clicked section is too short to reach the top at the bottom of the page, Then it stays current after the lock releases', async () => {
+    // Arrange
+    mockAnimationFrames();
+    render(<Settings />);
+    const container = prepareScrollContainer(4200);
+    const nav = screen.getByRole('navigation', { name: 'Settings sections' });
+    fireEvent.click(within(nav).getByRole('button', { name: 'Data' }));
+    mockSectionPositions({
+      general: -4200,
+      tracking: -3000,
+      display: -2000,
+      data: 300,
+      about: 600,
+    });
+
+    // Act
+    fireEvent.scroll(container);
+    await act(async () => {
+      vi.advanceTimersByTime(1000);
+    });
+
+    // Assert
+    expect(within(nav).getByRole('button', { name: 'Data' })).toHaveAttribute(
+      'aria-current',
+      'location',
+    );
+  });
+
+  it('When the user prefers reduced motion, Then navigation scrolls without smooth behavior', () => {
+    // Arrange
+    vi.stubGlobal(
+      'matchMedia',
+      vi.fn().mockReturnValue({
+        matches: true,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      }),
+    );
+    render(<Settings />);
+    const nav = screen.getByRole('navigation', { name: 'Settings sections' });
+
+    // Act
+    fireEvent.click(within(nav).getByRole('button', { name: 'Display' }));
+
+    // Assert
+    expect(scrollIntoViewMock).toHaveBeenCalledWith({ behavior: 'auto', block: 'start' });
+  });
+
+  it('When motion is not reduced, Then navigation scrolls smoothly', () => {
+    // Arrange
+    render(<Settings />);
+    const nav = screen.getByRole('navigation', { name: 'Settings sections' });
+
+    // Act
+    fireEvent.click(within(nav).getByRole('button', { name: 'Display' }));
+
+    // Assert
+    expect(scrollIntoViewMock).toHaveBeenCalledWith({ behavior: 'smooth', block: 'start' });
+  });
+
+  it('When the page unmounts, Then the scroll listener and pending timers are cleaned up', () => {
+    // Arrange
+    mockAnimationFrames();
+    const { unmount } = render(<Settings />);
+    const container = screen.getByTestId('settings-scroll-container');
+    const removeListener = vi.spyOn(container, 'removeEventListener');
+    const nav = screen.getByRole('navigation', { name: 'Settings sections' });
+    fireEvent.click(within(nav).getByRole('button', { name: 'Display' }));
+    fireEvent.scroll(container);
+    const pendingTimers = vi.getTimerCount();
+    expect(pendingTimers).toBeGreaterThan(0);
+
+    // Act
+    unmount();
+
+    // Assert
+    expect(removeListener).toHaveBeenCalledWith('scroll', expect.any(Function));
+    expect(vi.getTimerCount()).toBeLessThan(pendingTimers);
   });
 });

@@ -192,7 +192,9 @@ function RunOnlyDisplay({
   if (!activeSession) {
     return (
       <div className="text-center">
-        <p className="text-sm text-white">{t(translations.widget.noActiveSession)}</p>
+        <p className="text-sm text-white">
+          {t(translations.runTracker.sessionCard.noActiveSession)}
+        </p>
         <p className="text-white/80 text-xs">{t(translations.widget.startSessionPrompt)}</p>
       </div>
     );
@@ -505,6 +507,7 @@ export function Widget({ statistics, settings, onDragStart, onDragEnd }: WidgetP
             current={statistics.foundItems}
             total={statistics.totalItems}
             showLabel
+            tone="overlay"
             color="purple"
           />
         </div>
@@ -519,6 +522,7 @@ export function Widget({ statistics, settings, onDragStart, onDragEnd }: WidgetP
               current={statistics.normalItems.found}
               total={statistics.normalItems.total}
               showLabel
+              tone="overlay"
               color="orange"
             />
           </div>
@@ -528,6 +532,7 @@ export function Widget({ statistics, settings, onDragStart, onDragEnd }: WidgetP
               current={statistics.etherealItems.found}
               total={statistics.etherealItems.total}
               showLabel
+              tone="overlay"
               color="blue"
             />
           </div>
@@ -543,6 +548,7 @@ export function Widget({ statistics, settings, onDragStart, onDragEnd }: WidgetP
               current={statistics.foundItems}
               total={statistics.totalItems}
               showLabel
+              tone="overlay"
               color="purple"
             />
           </div>
@@ -555,6 +561,7 @@ export function Widget({ statistics, settings, onDragStart, onDragEnd }: WidgetP
                   current={statistics.normalItems.found}
                   total={statistics.normalItems.total}
                   showLabel
+                  tone="overlay"
                   color="orange"
                 />
               </div>
@@ -564,6 +571,7 @@ export function Widget({ statistics, settings, onDragStart, onDragEnd }: WidgetP
                   current={statistics.etherealItems.found}
                   total={statistics.etherealItems.total}
                   showLabel
+                  tone="overlay"
                   color="blue"
                 />
               </div>

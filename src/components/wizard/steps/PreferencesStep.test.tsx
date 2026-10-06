@@ -1,9 +1,15 @@
 import { render, screen } from '@testing-library/react';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { useGrailStore } from '@/stores/grailStore';
 import { PreferencesStep } from './PreferencesStep';
 
 describe('PreferencesStep', () => {
+  const originalSettings = useGrailStore.getState().settings;
+
+  afterEach(() => {
+    useGrailStore.setState({ settings: originalSettings });
+  });
+
   beforeEach(() => {
     useGrailStore.setState((state) => ({
       settings: { ...state.settings, widgetEnabled: true, widgetOpacity: 0.1 },
@@ -11,8 +17,11 @@ describe('PreferencesStep', () => {
   });
 
   it('When rendered, Then it combines the theme, notification and widget preferences', () => {
-    // Arrange & Act
-    render(<PreferencesStep />);
+    // Arrange
+    const ui = <PreferencesStep />;
+
+    // Act
+    render(ui);
 
     // Assert
     expect(screen.getByRole('heading', { level: 2, name: 'Preferences' })).toBeInTheDocument();
@@ -24,8 +33,11 @@ describe('PreferencesStep', () => {
   });
 
   it('If a stored widget opacity is below the minimum, Then the slider is clamped to 30%', () => {
-    // Arrange & Act
-    render(<PreferencesStep />);
+    // Arrange
+    const ui = <PreferencesStep />;
+
+    // Act
+    render(ui);
 
     // Assert
     const opacityLabel = screen.getByText('Opacity', { selector: 'label' }) as HTMLLabelElement;

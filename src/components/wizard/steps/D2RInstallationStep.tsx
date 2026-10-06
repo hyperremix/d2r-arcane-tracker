@@ -40,26 +40,63 @@ export function D2RInstallationStep() {
   const [hasLoaded, setHasLoaded] = useState(false);
   const [validation, setValidation] = useState<PathValidationState>('idle');
   const savedPathRef = useRef<string>(settings.d2rInstallPath || '');
-  // Incremented whenever a validation starts or the path changes, so older results can be discarded
+  // Incremented whenever a validation starts, the path changes or the step unmounts,
+  // so older results can be discarded
   const validationRequestRef = useRef(0);
+  // Mirrors `validation` so callbacks can tell whether the shown status is still current
+  const validationStateRef = useRef<PathValidationState>('idle');
+  // Path currently being saved, so Enter followed by blur does not save it twice
+  const savingPathRef = useRef<string | undefined>(undefined);
   const suggestedPath = getSuggestedD2RPath();
+
+  const applyValidation = useCallback((state: PathValidationState) => {
+    validationStateRef.current = state;
+    setValidation(state);
+  }, []);
 
   const validatePath = useCallback(async () => {
     validationRequestRef.current += 1;
     const requestId = validationRequestRef.current;
-    setValidation('validating');
+    applyValidation('validating');
     try {
       const result = await window.electronAPI?.icon.validatePath();
       if (requestId === validationRequestRef.current) {
-        setValidation(result?.valid ? 'valid' : 'invalid');
+        applyValidation(result?.valid ? 'valid' : 'invalid');
       }
     } catch (error) {
       console.error('Failed to validate D2R path:', error);
       if (requestId === validationRequestRef.current) {
-        setValidation('invalid');
+        applyValidation('invalid');
       }
     }
-  }, []);
+  }, [applyValidation]);
+
+  /**
+   * Saves the path to the main process and settings.
+   * @returns {Promise<boolean>} Whether the path was saved
+   */
+  const savePath = useCallback(
+    async (trimmedPath: string, requestId: number): Promise<boolean> => {
+      savingPathRef.current = trimmedPath;
+      try {
+        await window.electronAPI?.icon.setD2RPath(trimmedPath);
+        await setSettings({ d2rInstallPath: trimmedPath });
+        savedPathRef.current = trimmedPath;
+        return true;
+      } catch (error) {
+        console.error('Failed to save D2R path:', error);
+        if (requestId === validationRequestRef.current) {
+          applyValidation('error');
+        }
+        return false;
+      } finally {
+        if (savingPathRef.current === trimmedPath) {
+          savingPathRef.current = undefined;
+        }
+      }
+    },
+    [applyValidation, setSettings],
+  );
 
   const persistPath = useCallback(
     async (newPath: string) => {
@@ -67,6 +104,14 @@ export function D2RInstallationStep() {
       setD2rPath(trimmedPath);
 
       if (trimmedPath === savedPathRef.current) {
+        // Typing hides the status; if the saved path was restored, show its status again
+        if (trimmedPath && validationStateRef.current === 'idle') {
+          await validatePath();
+        }
+        return;
+      }
+
+      if (savingPathRef.current === trimmedPath) {
         return;
       }
 
@@ -74,29 +119,26 @@ export function D2RInstallationStep() {
       validationRequestRef.current += 1;
       const requestId = validationRequestRef.current;
 
-      try {
-        await window.electronAPI?.icon.setD2RPath(trimmedPath);
-        await setSettings({ d2rInstallPath: trimmedPath });
-        savedPathRef.current = trimmedPath;
-      } catch (error) {
-        console.error('Failed to save D2R path:', error);
-        if (requestId === validationRequestRef.current) {
-          setValidation('error');
-        }
-        return;
-      }
-
-      if (requestId !== validationRequestRef.current) {
+      const saved = await savePath(trimmedPath, requestId);
+      if (!saved || requestId !== validationRequestRef.current) {
         return;
       }
 
       if (trimmedPath) {
         await validatePath();
       } else {
-        setValidation('idle');
+        applyValidation('idle');
       }
     },
-    [setSettings, validatePath],
+    [applyValidation, savePath, validatePath],
+  );
+
+  // Discard any validation result that resolves after the step unmounted
+  useEffect(
+    () => () => {
+      validationRequestRef.current += 1;
+    },
+    [],
   );
 
   // Load D2R path on mount
@@ -135,12 +177,15 @@ export function D2RInstallationStep() {
     }
   }, [d2rPath, persistPath, suggestedPath, t]);
 
-  const handlePathChange = useCallback((newPath: string) => {
-    // Only update local state while typing; the path is persisted and validated on blur
-    validationRequestRef.current += 1;
-    setD2rPath(newPath);
-    setValidation('idle');
-  }, []);
+  const handlePathChange = useCallback(
+    (newPath: string) => {
+      // Only update local state while typing; the path is persisted and validated on blur
+      validationRequestRef.current += 1;
+      setD2rPath(newPath);
+      applyValidation('idle');
+    },
+    [applyValidation],
+  );
 
   const handleKeyDown = useCallback(
     (event: React.KeyboardEvent<HTMLInputElement>) => {
@@ -180,7 +225,7 @@ export function D2RInstallationStep() {
               type="text"
               value={d2rPath}
               onChange={(e) => handlePathChange(e.target.value)}
-              onBlur={(e) => persistPath(e.target.value)}
+              onBlur={(e) => void persistPath(e.target.value)}
               onKeyDown={handleKeyDown}
               placeholder={suggestedPath}
               aria-invalid={validation === 'invalid' || validation === 'error' || undefined}

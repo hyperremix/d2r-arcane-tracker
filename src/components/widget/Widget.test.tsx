@@ -10,7 +10,7 @@ import type {
   Settings,
 } from 'electron/types/grail';
 import i18n from 'i18next';
-import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useRunTrackerStore } from '@/stores/runTrackerStore';
 import { Widget } from './Widget';
 
@@ -160,6 +160,34 @@ vi.mock('@/stores/grailStore', () => {
   };
 });
 
+/**
+ * The mocked run tracker store is shared by every test in this file (and by the whole run, since
+ * test files share one module registry), so snapshot and restore the maps tests mutate.
+ */
+interface RunStoreMaps {
+  runs: Map<string, Run[]>;
+  runItems: Map<string, RunItem[]>;
+}
+
+let runStoreSnapshot: { runs: [string, Run[]][]; runItems: [string, RunItem[]][] };
+
+beforeEach(() => {
+  const store = useRunTrackerStore() as unknown as RunStoreMaps;
+  runStoreSnapshot = { runs: [...store.runs], runItems: [...store.runItems] };
+});
+
+afterEach(() => {
+  const store = useRunTrackerStore() as unknown as RunStoreMaps;
+  store.runs.clear();
+  store.runItems.clear();
+  for (const [key, value] of runStoreSnapshot.runs) {
+    store.runs.set(key, value);
+  }
+  for (const [key, value] of runStoreSnapshot.runItems) {
+    store.runItems.set(key, value);
+  }
+});
+
 describe('Widget run-only item list', () => {
   const baseSettings: Partial<Settings> = {
     widgetDisplay: 'run-only',
@@ -267,7 +295,7 @@ describe('Widget run-only item list', () => {
     store.loadSessionRuns.mockClear();
     store.loadRunItems.mockClear();
 
-    // Act - initial render triggers data loading effect
+    // Act - the initial render triggers the data loading effect
     render(
       <Widget
         statistics={null}
@@ -277,15 +305,8 @@ describe('Widget run-only item list', () => {
       />,
     );
 
-    // Simulate run-item-added IPC event for each run by directly invoking the store-side effect
-    sessionRuns.forEach((run) => {
-      const { loadRunItems } = useRunTrackerStore.getState() as unknown as {
-        loadRunItems: (runId: string) => Promise<void>;
-      };
-      loadRunItems(run.id);
-    });
-
-    // Assert - loadRunItems should have been called for each run in response to events
+    // Assert - loadRunItems is called once for each run that is missing its items
+    expect(sessionRuns.length).toBeGreaterThan(0);
     expect(store.loadRunItems).toHaveBeenCalledTimes(sessionRuns.length);
     for (const run of sessionRuns) {
       expect(store.loadRunItems).toHaveBeenCalledWith(run.id);
@@ -447,6 +468,27 @@ describe('Widget display and legibility', () => {
     expect(root.style.backgroundColor).toBe('rgba(0, 0, 0, 0.3)');
   });
 
+  it('When gauges render, Then their text uses light overlay colors instead of theme grays', () => {
+    // Arrange
+    const settings: Partial<Settings> = { widgetDisplay: 'overall' };
+
+    // Act
+    const { getByText } = render(
+      <Widget
+        statistics={statistics}
+        settings={settings}
+        onDragStart={() => ({})}
+        onDragEnd={() => ({})}
+      />,
+    );
+
+    // Assert
+    const ratio = getByText('40/100');
+    expect(ratio.className).toContain('text-white/85');
+    expect(ratio.className).not.toContain('text-gray');
+    expect(getByText('Overall', { selector: 'div' }).className).not.toContain('text-gray');
+  });
+
   it('When the widget renders, Then it shows a decorative drag grip that ignores pointer events', () => {
     // Arrange
     const settings: Partial<Settings> = { widgetDisplay: 'overall' };
@@ -514,10 +556,12 @@ describe('Widget localization', () => {
         common: { loading: 'tr:loading' },
         grail: { itemCard: { normal: 'tr:normal' } },
         settings: { widget: { overall: 'tr:overall' } },
-        runTracker: { controls: { startRunFirst: 'tr:startRunFirst' } },
+        runTracker: {
+          controls: { startRunFirst: 'tr:startRunFirst' },
+          sessionCard: { noActiveSession: 'tr:noActiveSession' },
+        },
         widget: {
           ethereal: 'tr:ethereal',
-          noActiveSession: 'tr:noActiveSession',
           startSessionPrompt: 'tr:startSessionPrompt',
           run: 'tr:run',
           current: 'tr:current',

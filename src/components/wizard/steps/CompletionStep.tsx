@@ -1,35 +1,21 @@
 import { GameMode, GameVersion } from 'electron/types/grail';
 import { CheckCircle2, Sparkles } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import {
+  gameModeLabelKeys,
+  gameVersionLabelKeys,
+  themeLabelKeys,
+} from '@/components/wizard/labelKeys';
 import { translations } from '@/i18n/translations';
 import { useGrailStore } from '@/stores/grailStore';
 
 /**
- * Translation keys for the game mode values shown in the summary.
+ * A label/value pair shown in the configuration summary.
  */
-const gameModeLabelKeys: Record<GameMode, string> = {
-  [GameMode.Both]: translations.settings.gameMode.bothLabel,
-  [GameMode.Softcore]: translations.settings.gameMode.softcoreLabel,
-  [GameMode.Hardcore]: translations.settings.gameMode.hardcoreLabel,
-  [GameMode.Manual]: translations.settings.gameMode.manualLabel,
-};
-
-/**
- * Translation keys for the game version values shown in the summary.
- */
-const gameVersionLabelKeys: Record<GameVersion, string> = {
-  [GameVersion.Resurrected]: translations.settings.gameVersion.resurrectedLabel,
-  [GameVersion.Classic]: translations.settings.gameVersion.classicLabel,
-};
-
-/**
- * Translation keys for the theme values shown in the summary.
- */
-const themeLabelKeys: Record<'light' | 'dark' | 'system', string> = {
-  light: translations.settings.theme.light,
-  dark: translations.settings.theme.dark,
-  system: translations.settings.theme.system,
-};
+interface SummaryRow {
+  labelKey: string;
+  value: string;
+}
 
 /**
  * CompletionStep component - Final step of the setup wizard.
@@ -45,7 +31,7 @@ export function CompletionStep() {
       ? t(translations.wizard.completion.enabled)
       : t(translations.wizard.completion.disabled);
 
-  const summaryRows: { labelKey: string; value: string }[] = [
+  const summaryRows: SummaryRow[] = [
     {
       labelKey: translations.wizard.completion.saveDirectory,
       value: settings.saveDir

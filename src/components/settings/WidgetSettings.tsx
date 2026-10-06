@@ -237,20 +237,20 @@ export function WidgetSettings() {
               </Button>
             </div>
             <p className="text-muted-foreground text-xs">
-              The widget can be dragged, resized, and snaps to screen edges and corners
+              {t(translations.settings.widget.positionDescription)}
             </p>
           </div>
 
           {/* Widget Preview Description */}
           <div className="rounded-lg bg-blue-50 p-3 dark:bg-blue-950">
             <p className="text-blue-800 text-xs dark:text-blue-200">
-              <strong>Widget Features:</strong>
-              <br />• Always on top of other windows
-              <br />• Transparent background
-              <br />• Drag to reposition, resize by edges/corners
-              <br />• Auto-snaps to screen edges and corners
-              <br />• Size persists per display mode
-              <br />• Updates in real-time with grail progress
+              <strong>{t(translations.settings.widget.features)}</strong>
+              <br />• {t(translations.settings.widget.featureAlwaysOnTop)}
+              <br />• {t(translations.settings.widget.featureTransparent)}
+              <br />• {t(translations.settings.widget.featureDrag)}
+              <br />• {t(translations.settings.widget.featureSnap)}
+              <br />• {t(translations.settings.widget.featureSizePersists)}
+              <br />• {t(translations.settings.widget.featureRealtime)}
             </p>
           </div>
         </div>

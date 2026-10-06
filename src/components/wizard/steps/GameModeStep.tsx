@@ -10,39 +10,45 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { gameModeLabelKeys } from '@/components/wizard/labelKeys';
 import { translations } from '@/i18n/translations';
 import { useGrailStore } from '@/stores/grailStore';
 
 /**
- * Available game modes with their label/description translation keys and icons.
+ * A selectable game mode with its label/description translation keys and icon.
  */
-const gameModes: {
+interface GameModeOption {
   value: GameMode;
   labelKey: string;
   descriptionKey: string;
   icon: React.ReactNode;
-}[] = [
+}
+
+/**
+ * Available game modes with their label/description translation keys and icons.
+ */
+const gameModes: GameModeOption[] = [
   {
     value: GameMode.Both,
-    labelKey: translations.settings.gameMode.bothLabel,
+    labelKey: gameModeLabelKeys[GameMode.Both],
     descriptionKey: translations.settings.gameMode.bothDescription,
     icon: <Users className="h-4 w-4" />,
   },
   {
     value: GameMode.Softcore,
-    labelKey: translations.settings.gameMode.softcoreLabel,
+    labelKey: gameModeLabelKeys[GameMode.Softcore],
     descriptionKey: translations.settings.gameMode.softcoreDescription,
     icon: <Shield className="h-4 w-4" />,
   },
   {
     value: GameMode.Hardcore,
-    labelKey: translations.settings.gameMode.hardcoreLabel,
+    labelKey: gameModeLabelKeys[GameMode.Hardcore],
     descriptionKey: translations.settings.gameMode.hardcoreDescription,
     icon: <Sword className="h-4 w-4" />,
   },
   {
     value: GameMode.Manual,
-    labelKey: translations.settings.gameMode.manualLabel,
+    labelKey: gameModeLabelKeys[GameMode.Manual],
     descriptionKey: translations.settings.gameMode.manualDescription,
     icon: <Wrench className="h-4 w-4" />,
   },

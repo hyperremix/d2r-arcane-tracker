@@ -69,11 +69,13 @@ export function SaveDirectoryStep() {
       }
 
       const newDirectory = result.filePaths[0];
-      setSaveDir(newDirectory);
 
       // Apply the setting immediately and restart monitoring
       await setSettings({ saveDir: newDirectory });
       await window.electronAPI?.saveFile.updateSaveDirectory(newDirectory);
+
+      // Only reflect the directory (and mark the step valid) once it has been saved
+      setSaveDir(newDirectory);
 
       // Load save files from the new directory
       const files = await window.electronAPI?.saveFile.getSaveFiles();
@@ -90,10 +92,9 @@ export function SaveDirectoryStep() {
       setIsLoading(true);
       const result = await window.electronAPI?.saveFile.restoreDefaultDirectory();
       if (result?.defaultDirectory) {
-        setSaveDir(result.defaultDirectory);
-
         // Apply the setting immediately
         await setSettings({ saveDir: result.defaultDirectory });
+        setSaveDir(result.defaultDirectory);
 
         // Get current save files to validate
         const files = await window.electronAPI?.saveFile.getSaveFiles();

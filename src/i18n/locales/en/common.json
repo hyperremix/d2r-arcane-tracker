@@ -465,7 +465,6 @@
       "gameMode": "Game Mode",
       "gameVersion": "Game Version",
       "grailSettings": "Grail Settings",
-      "preferences": "Preferences",
       "complete": "Complete"
     },
     "progress": "Step {{current}} of {{total}}",
@@ -536,7 +535,6 @@
     },
     "theme": {
       "description": "Choose your preferred theme for the application.",
-      "selectTheme": "Select Theme",
       "preview": "Preview",
       "previewSystem": "Automatically matches your operating system appearance",
       "previewSelected": "{{theme}} theme selected"
@@ -688,7 +686,6 @@
   },
   "widget": {
     "ethereal": "Ethereal",
-    "noActiveSession": "No Active Session",
     "startSessionPrompt": "Start a session to track runs",
     "run": "Run",
     "current": "Current",

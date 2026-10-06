@@ -27,6 +27,7 @@ function createElectronApiMock(directory: string | null) {
 
 describe('SaveDirectoryStep', () => {
   const originalElectronAPI = window.electronAPI;
+  const originalSettings = useGrailStore.getState().settings;
 
   beforeEach(() => {
     useWizardStore.setState({ stepValidity: {} });
@@ -34,6 +35,8 @@ describe('SaveDirectoryStep', () => {
   });
 
   afterEach(() => {
+    useGrailStore.setState({ settings: originalSettings });
+    useWizardStore.setState({ stepValidity: {} });
     Object.defineProperty(window, 'electronAPI', {
       value: originalElectronAPI,
       configurable: true,
@@ -100,5 +103,65 @@ describe('SaveDirectoryStep', () => {
       expect(useWizardStore.getState().stepValidity.saveDirectory).toBe(true);
     });
     expect(screen.queryByText('No save directory detected')).not.toBeInTheDocument();
+  });
+
+  it('If the browsed directory is still being saved, Then the step is not valid until the save succeeds', async () => {
+    // Arrange
+    const electronApi = createElectronApiMock(null);
+    let resolveSave: (value: { success: boolean }) => void = () => undefined;
+    electronApi.saveFile.updateSaveDirectory.mockImplementation(
+      () =>
+        new Promise<{ success: boolean }>((resolve) => {
+          resolveSave = resolve;
+        }),
+    );
+    Object.defineProperty(window, 'electronAPI', {
+      value: electronApi,
+      configurable: true,
+      writable: true,
+    });
+    render(<SaveDirectoryStep />);
+    const browseButton = await screen.findByRole('button', { name: 'Browse for Folder' });
+
+    // Act
+    await act(async () => {
+      fireEvent.click(browseButton);
+    });
+
+    // Assert
+    expect(useWizardStore.getState().stepValidity.saveDirectory).toBe(false);
+
+    // Act
+    await act(async () => {
+      resolveSave({ success: true });
+    });
+
+    // Assert
+    await waitFor(() => {
+      expect(useWizardStore.getState().stepValidity.saveDirectory).toBe(true);
+    });
+  });
+
+  it('If saving the browsed directory fails, Then the step stays invalid', async () => {
+    // Arrange
+    const electronApi = createElectronApiMock(null);
+    electronApi.saveFile.updateSaveDirectory.mockRejectedValue(new Error('monitor failed'));
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    Object.defineProperty(window, 'electronAPI', {
+      value: electronApi,
+      configurable: true,
+      writable: true,
+    });
+    render(<SaveDirectoryStep />);
+    const browseButton = await screen.findByRole('button', { name: 'Browse for Folder' });
+
+    // Act
+    await act(async () => {
+      fireEvent.click(browseButton);
+    });
+
+    // Assert
+    expect(useWizardStore.getState().stepValidity.saveDirectory).toBe(false);
+    expect(screen.getByText('No save directory detected')).toBeInTheDocument();
   });
 });

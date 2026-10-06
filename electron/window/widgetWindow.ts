@@ -1,6 +1,7 @@
 import path from 'node:path';
 import { BrowserWindow, screen } from 'electron';
 import type { Settings } from '../types/grail';
+import { resolveWidgetDisplayMode } from '../utils/widgetDisplay';
 import {
   calculateSnapPosition,
   getDefaultPosition,
@@ -70,7 +71,7 @@ export function createWidgetWindow(
     size: { width: number; height: number },
   ) => void,
 ): BrowserWindow {
-  const displayMode = settings.widgetDisplay || 'overall';
+  const displayMode = resolveWidgetDisplayMode(settings.widgetDisplay, settings.grailEthereal);
   const size = getWidgetSize(displayMode, settings);
 
   // Get all displays
@@ -188,7 +189,10 @@ export function createWidgetWindow(
   widgetWindow.on('resize', () => {
     if (widgetWindow && onSizeChange) {
       const bounds = widgetWindow.getBounds();
-      const currentDisplay = settings.widgetDisplay || 'overall';
+      const currentDisplay = resolveWidgetDisplayMode(
+        settings.widgetDisplay,
+        settings.grailEthereal,
+      );
       onSizeChange(currentDisplay, { width: bounds.width, height: bounds.height });
     }
   });
@@ -280,7 +284,10 @@ export function updateWidgetWindowSize(
   settings: Partial<Settings>,
 ): void {
   if (widgetWindow) {
-    const newSize = getWidgetSize(display, settings);
+    const newSize = getWidgetSize(
+      resolveWidgetDisplayMode(display, settings.grailEthereal),
+      settings,
+    );
     const currentBounds = widgetWindow.getBounds();
     widgetWindow.setBounds({
       x: currentBounds.x,

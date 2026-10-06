@@ -1,9 +1,6 @@
-import type { Settings } from 'electron/types/grail';
-
-/**
- * Display modes supported by the overlay widget.
- */
-export type WidgetDisplayMode = NonNullable<Settings['widgetDisplay']>;
+// Shared with the main process so the native window size matches what the renderer draws
+export type { WidgetDisplayMode } from 'electron/utils/widgetDisplay';
+export { resolveWidgetDisplayMode } from 'electron/utils/widgetDisplay';
 
 /**
  * Minimum widget background opacity. Lower values make the widget text unreadable
@@ -31,22 +28,4 @@ export function clampWidgetOpacity(opacity: number | undefined): number {
     return DEFAULT_WIDGET_OPACITY;
   }
   return Math.min(MAX_WIDGET_OPACITY, Math.max(MIN_WIDGET_OPACITY, opacity));
-}
-
-/**
- * Resolves the display mode the widget can actually render.
- * The split and all modes depend on ethereal tracking; without it they fall back to overall.
- * @param {WidgetDisplayMode | undefined} displayMode - The stored display mode
- * @param {boolean | undefined} grailEthereal - Whether ethereal tracking is enabled
- * @returns {WidgetDisplayMode} The display mode to render
- */
-export function resolveWidgetDisplayMode(
-  displayMode: WidgetDisplayMode | undefined,
-  grailEthereal: boolean | undefined,
-): WidgetDisplayMode {
-  const mode = displayMode ?? 'overall';
-  if (!grailEthereal && (mode === 'split' || mode === 'all')) {
-    return 'overall';
-  }
-  return mode;
 }

@@ -194,8 +194,8 @@ export function Settings() {
   const { t } = useTranslation();
   const [activeSection, setActiveSection] = useState<SettingsSectionId>('general');
   const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const navigationTargetRef = useRef<SettingsSectionId | null>(null);
-  const settleTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const navigationTargetRef = useRef<SettingsSectionId | undefined>(undefined);
+  const settleTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   /**
    * Determines the section currently at the top of the scroll container.
@@ -223,6 +223,34 @@ export function Settings() {
     return current;
   }, []);
 
+  /**
+   * Releases the navigation lock and recomputes the highlight, since scroll events that
+   * arrived while it was held were ignored. A clicked section that is visible but too short
+   * to reach the top of the page keeps its highlight at the bottom of the page.
+   */
+  const releaseNavigationLock = useCallback(() => {
+    const target = navigationTargetRef.current;
+    navigationTargetRef.current = undefined;
+    settleTimeoutRef.current = undefined;
+
+    const container = scrollContainerRef.current;
+    const next = computeActiveSection();
+    if (target && target !== next && container) {
+      const atBottom = container.scrollTop + container.clientHeight >= container.scrollHeight - 2;
+      const targetTop = document
+        .getElementById(getSectionDomId(target))
+        ?.getBoundingClientRect().top;
+      const containerTop = container.getBoundingClientRect().top;
+      const targetVisibleBelowTop =
+        targetTop !== undefined && targetTop - containerTop > SCROLL_SPY_OFFSET;
+      if (atBottom && targetVisibleBelowTop) {
+        setActiveSection(target);
+        return;
+      }
+    }
+    setActiveSection(next);
+  }, [computeActiveSection]);
+
   // Scroll-spy: highlight the section currently in view
   useEffect(() => {
     const container = scrollContainerRef.current;
@@ -230,7 +258,7 @@ export function Settings() {
       return;
     }
 
-    let frame: number | null = null;
+    let frame: number | undefined;
 
     const handleScroll = () => {
       // While a navigation-triggered scroll is in progress keep the clicked section highlighted
@@ -240,17 +268,15 @@ export function Settings() {
         }
         // Keep the clicked section active once scrolling settles, even if a shorter
         // section below it is also visible at the bottom of the page
-        settleTimeoutRef.current = setTimeout(() => {
-          navigationTargetRef.current = null;
-        }, SCROLL_SETTLE_DELAY);
+        settleTimeoutRef.current = setTimeout(releaseNavigationLock, SCROLL_SETTLE_DELAY);
         return;
       }
 
-      if (frame !== null) {
+      if (frame !== undefined) {
         return;
       }
       frame = requestAnimationFrame(() => {
-        frame = null;
+        frame = undefined;
         setActiveSection(computeActiveSection());
       });
     };
@@ -258,36 +284,37 @@ export function Settings() {
     container.addEventListener('scroll', handleScroll, { passive: true });
     return () => {
       container.removeEventListener('scroll', handleScroll);
-      if (frame !== null) {
+      if (frame !== undefined) {
         cancelAnimationFrame(frame);
       }
       if (settleTimeoutRef.current) {
         clearTimeout(settleTimeoutRef.current);
       }
     };
-  }, [computeActiveSection]);
+  }, [computeActiveSection, releaseNavigationLock]);
 
-  const handleNavigate = useCallback((id: SettingsSectionId) => {
-    const section = document.getElementById(getSectionDomId(id));
-    navigationTargetRef.current = id;
-    setActiveSection(id);
+  const handleNavigate = useCallback(
+    (id: SettingsSectionId) => {
+      const section = document.getElementById(getSectionDomId(id));
+      navigationTargetRef.current = id;
+      setActiveSection(id);
 
-    // Release the navigation lock even if no scroll happens (section already in place)
-    if (settleTimeoutRef.current) {
-      clearTimeout(settleTimeoutRef.current);
-    }
-    settleTimeoutRef.current = setTimeout(() => {
-      navigationTargetRef.current = null;
-    }, SCROLL_SETTLE_DELAY * 4);
+      // Release the navigation lock even if no scroll happens (section already in place)
+      if (settleTimeoutRef.current) {
+        clearTimeout(settleTimeoutRef.current);
+      }
+      settleTimeoutRef.current = setTimeout(releaseNavigationLock, SCROLL_SETTLE_DELAY * 4);
 
-    section?.scrollIntoView({
-      behavior: prefersReducedMotion() ? 'auto' : 'smooth',
-      block: 'start',
-    });
+      section?.scrollIntoView({
+        behavior: prefersReducedMotion() ? 'auto' : 'smooth',
+        block: 'start',
+      });
 
-    // Move focus to the section heading so keyboard and screen reader users land in the section
-    document.getElementById(getSectionHeadingId(id))?.focus({ preventScroll: true });
-  }, []);
+      // Move focus to the section heading so keyboard and screen reader users land in the section
+      document.getElementById(getSectionHeadingId(id))?.focus({ preventScroll: true });
+    },
+    [releaseNavigationLock],
+  );
 
   return (
     <TooltipProvider>

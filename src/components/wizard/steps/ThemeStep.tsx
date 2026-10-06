@@ -9,17 +9,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { themeLabelKeys } from '@/components/wizard/labelKeys';
 import { translations } from '@/i18n/translations';
 import { useGrailStore } from '@/stores/grailStore';
-
-/**
- * Theme labels keyed by theme value.
- */
-const themeLabelKeys: Record<'light' | 'dark' | 'system', string> = {
-  light: translations.settings.theme.light,
-  dark: translations.settings.theme.dark,
-  system: translations.settings.theme.system,
-};
 
 /**
  * ThemeStep component - Theme section of the wizard Preferences step.
@@ -62,7 +54,7 @@ export function ThemeStep() {
 
       <div className="space-y-4">
         <div className="space-y-2">
-          <Label htmlFor={themeId}>{t(translations.wizard.theme.selectTheme)}</Label>
+          <Label htmlFor={themeId}>{t(translations.settings.theme.selectThemePlaceholder)}</Label>
           <Select
             value={theme}
             onValueChange={(value) =>
