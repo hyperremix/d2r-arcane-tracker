@@ -11,8 +11,9 @@ import {
   WandSparkles,
   X,
 } from 'lucide-react';
-import { type ReactNode, useId, useMemo } from 'react';
+import { type ReactNode, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useDebouncedCallback } from 'use-debounce';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -41,6 +42,12 @@ type GroupMode = 'none' | 'category' | 'type' | 'ethereal';
  */
 const DEFAULT_SORT_BY: SortBy = 'found_date';
 const DEFAULT_SORT_ORDER: SortOrder = 'desc';
+
+/**
+ * Delay in milliseconds before the typed search term is written to the store.
+ * Keeps typing responsive while the (potentially expensive) item filtering catches up.
+ */
+const SEARCH_DEBOUNCE_MS = 150;
 
 /**
  * Available item category values for filtering.
@@ -399,6 +406,8 @@ export function AdvancedSearch() {
   const advancedFilter = useGrailStore((state) => state.advancedFilter);
   const setFilter = useGrailStore((state) => state.setFilter);
   const setAdvancedFilter = useGrailStore((state) => state.setAdvancedFilter);
+  const resetStoreFilters = useGrailStore((state) => state.resetFilters);
+  const filterResetCount = useGrailStore((state) => state.filterResetCount);
   const viewMode = useGrailStore((state) => state.viewMode);
   const setViewMode = useGrailStore((state) => state.setViewMode);
   const groupMode = useGrailStore((state) => state.groupMode);
@@ -424,18 +433,54 @@ export function AdvancedSearch() {
     [settings.grailRunes, settings.grailRunewords],
   );
 
+  // Only the raw search text is kept locally so typing stays responsive;
+  // it is written to the store after a short debounce.
+  const [searchInput, setSearchInput] = useState(searchTerm);
+  const debouncedSetSearchTerm = useDebouncedCallback((value: string) => {
+    setFilter({ searchTerm: value });
+  }, SEARCH_DEBOUNCE_MS);
+
+  // When the store filters are reset from elsewhere (e.g. the empty state's "Clear filters"),
+  // discard any pending edit so the debounced write cannot re-apply the old search text.
+  const seenResetCountRef = useRef(filterResetCount);
+  useEffect(() => {
+    if (seenResetCountRef.current === filterResetCount) return;
+    seenResetCountRef.current = filterResetCount;
+    debouncedSetSearchTerm.cancel();
+    setSearchInput('');
+  }, [filterResetCount, debouncedSetSearchTerm]);
+
+  // Sync external store changes (e.g. filters cleared elsewhere) into the input,
+  // unless the user has a pending edit that has not been committed yet.
+  useEffect(() => {
+    if (!debouncedSetSearchTerm.isPending()) {
+      setSearchInput(searchTerm);
+    }
+  }, [searchTerm, debouncedSetSearchTerm]);
+
+  // Commit any pending search edit when unmounting so it is not lost on navigation
+  useEffect(() => () => debouncedSetSearchTerm.flush(), [debouncedSetSearchTerm]);
+
+  const handleSearchChange = (value: string) => {
+    setSearchInput(value);
+    debouncedSetSearchTerm(value);
+  };
+
+  const clearSearch = () => {
+    debouncedSetSearchTerm.cancel();
+    setSearchInput('');
+    setFilter({ searchTerm: '' });
+  };
+
   const toggleCategory = (category: ItemCategory) =>
     setFilter({ categories: toggleValue(selectedCategories, category) });
 
   const toggleType = (type: ItemType) => setFilter({ types: toggleValue(selectedTypes, type) });
 
   const resetAll = () => {
-    setFilter({ searchTerm: '', categories: [], types: [], foundStatus: 'all' });
-    setAdvancedFilter({
-      sortBy: DEFAULT_SORT_BY,
-      sortOrder: DEFAULT_SORT_ORDER,
-      fuzzySearch: false,
-    });
+    debouncedSetSearchTerm.cancel();
+    setSearchInput('');
+    resetStoreFilters();
   };
 
   const activeChips = buildActiveFilterChips({
@@ -444,7 +489,7 @@ export function AdvancedSearch() {
     categories: selectedCategories,
     types: selectedTypes,
     t,
-    onClearSearch: () => setFilter({ searchTerm: '' }),
+    onClearSearch: clearSearch,
     onClearStatus: () => setFilter({ foundStatus: 'all' }),
     onToggleCategory: toggleCategory,
     onToggleType: toggleType,
@@ -480,8 +525,8 @@ export function AdvancedSearch() {
           <Input
             id={searchId}
             placeholder={t(translations.grail.advancedSearch.searchPlaceholder)}
-            value={searchTerm}
-            onChange={(e) => setFilter({ searchTerm: e.target.value })}
+            value={searchInput}
+            onChange={(e) => handleSearchChange(e.target.value)}
             className="h-9 pr-10 pl-8"
           />
           <Tooltip>

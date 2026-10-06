@@ -1,7 +1,13 @@
 import { act, renderHook } from '@testing-library/react';
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CharacterBuilder, GrailProgressBuilder, HolyGrailItemBuilder } from '@/fixtures';
-import { useFilteredItems, useGrailStatistics, useGrailStore } from './grailStore';
+import {
+  countActiveFilters,
+  startLoad,
+  useFilteredItems,
+  useGrailStatistics,
+  useGrailStore,
+} from './grailStore';
 
 // Mock the electron API
 const mockElectronAPI = {
@@ -52,10 +58,40 @@ const resetStoreState = () => {
   });
 };
 
+/**
+ * Resets the grail store fields exercised by these tests to their initial values.
+ * Tests share module state (isolate: false), so leaked state must be cleared explicitly.
+ */
+const resetFullStoreState = () => {
+  act(() => {
+    useGrailStore.setState({
+      characters: [],
+      items: [],
+      progress: [],
+      statistics: null,
+      filter: { foundStatus: 'all' },
+      filterResetCount: 0,
+      viewMode: 'grid',
+      groupMode: 'none',
+      loading: false,
+      error: null,
+      settings: {
+        ...useGrailStore.getState().settings,
+        grailNormal: true,
+        grailEthereal: false,
+        grailRunes: false,
+        grailRunewords: false,
+      },
+    });
+  });
+  resetStoreState();
+};
+
 describe('When useGrailStore is used', () => {
   beforeEach(() => {
     // Reset all mocks
     vi.clearAllMocks();
+    resetFullStoreState();
 
     // Reset store state
     act(() => {
@@ -77,6 +113,7 @@ describe('When useGrailStore is used', () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+    resetFullStoreState();
   });
 
   describe('If setting characters', () => {
@@ -162,6 +199,124 @@ describe('When useGrailStore is used', () => {
 
       // Assert
       expect(result.current.advancedFilter.sortBy).toBe('category');
+    });
+  });
+
+  describe('If resetting filters after filters and sorting were changed', () => {
+    it('Then should restore the default filter and advanced filter', () => {
+      // Arrange
+      const { result } = renderHook(() => useGrailStore());
+      act(() => {
+        result.current.setFilter({
+          searchTerm: 'Shako',
+          categories: ['armor'],
+          types: ['unique'],
+          foundStatus: 'missing',
+        });
+        result.current.setAdvancedFilter({
+          sortBy: 'name',
+          sortOrder: 'asc',
+          fuzzySearch: true,
+        });
+      });
+
+      // Act
+      act(() => {
+        result.current.resetFilters();
+      });
+
+      // Assert
+      expect(result.current.filter).toEqual({ foundStatus: 'all' });
+      expect(result.current.advancedFilter).toEqual(
+        expect.objectContaining({ sortBy: 'found_date', sortOrder: 'desc', fuzzySearch: false }),
+      );
+    });
+  });
+
+  describe('If rune and runeword type filters are selected and their tracking is disabled', () => {
+    afterEach(() => {
+      act(() => {
+        useGrailStore.getState().resetFilters();
+        useGrailStore.setState({
+          settings: {
+            ...useGrailStore.getState().settings,
+            grailRunes: false,
+            grailRunewords: false,
+          },
+        });
+      });
+    });
+
+    it('Then setSettings removes the unavailable types from the filter', async () => {
+      // Arrange
+      mockElectronAPI.grail.updateSettings.mockResolvedValue(undefined);
+      act(() => {
+        useGrailStore.setState({
+          settings: {
+            ...useGrailStore.getState().settings,
+            grailRunes: true,
+            grailRunewords: true,
+          },
+        });
+        useGrailStore.getState().setFilter({ types: ['unique', 'rune', 'runeword'] });
+      });
+
+      // Act
+      await act(async () => {
+        await useGrailStore.getState().setSettings({ grailRunes: false });
+      });
+
+      // Assert
+      expect(useGrailStore.getState().filter.types).toEqual(['unique', 'runeword']);
+
+      // Act
+      await act(async () => {
+        await useGrailStore.getState().setSettings({ grailRunewords: false });
+      });
+
+      // Assert
+      expect(useGrailStore.getState().filter.types).toEqual(['unique']);
+    });
+
+    it('Then hydrateSettings removes the unavailable types from the filter', () => {
+      // Arrange
+      act(() => {
+        useGrailStore.setState({
+          settings: {
+            ...useGrailStore.getState().settings,
+            grailRunes: true,
+            grailRunewords: true,
+          },
+        });
+        useGrailStore.getState().setFilter({ types: ['rune', 'runeword'] });
+      });
+
+      // Act
+      act(() => {
+        useGrailStore.getState().hydrateSettings({ grailRunes: false, grailRunewords: false });
+      });
+
+      // Assert
+      expect(useGrailStore.getState().filter.types).toEqual([]);
+    });
+
+    it('Then the filter object is left untouched when every selected type stays available', () => {
+      // Arrange
+      act(() => {
+        useGrailStore.setState({
+          settings: { ...useGrailStore.getState().settings, grailRunes: true },
+        });
+        useGrailStore.getState().setFilter({ types: ['rune'] });
+      });
+      const filterBefore = useGrailStore.getState().filter;
+
+      // Act
+      act(() => {
+        useGrailStore.getState().hydrateSettings({ grailNormal: true });
+      });
+
+      // Assert
+      expect(useGrailStore.getState().filter).toBe(filterBefore);
     });
   });
 
@@ -354,6 +509,83 @@ describe('When useGrailStore is used', () => {
       expect(result.current.progress).toEqual(mockProgress);
       expect(result.current.loading).toBe(false);
       expect(result.current.error).toBeNull();
+    });
+  });
+
+  describe('If reloading data returns settings that disable rune and runeword tracking', () => {
+    afterEach(() => {
+      act(() => {
+        useGrailStore.getState().resetFilters();
+        useGrailStore.setState({
+          settings: {
+            ...useGrailStore.getState().settings,
+            grailRunes: false,
+            grailRunewords: false,
+          },
+        });
+      });
+    });
+
+    it('Then the unavailable type filters are pruned from the filter', async () => {
+      // Arrange
+      act(() => {
+        useGrailStore.setState({
+          settings: {
+            ...useGrailStore.getState().settings,
+            grailRunes: true,
+            grailRunewords: true,
+          },
+        });
+        useGrailStore.getState().setFilter({ types: ['unique', 'rune', 'runeword'] });
+      });
+      mockElectronAPI.grail.getSettings.mockResolvedValue({
+        grailRunes: false,
+        grailRunewords: true,
+      });
+      mockElectronAPI.grail.getCharacters.mockResolvedValue([]);
+      mockElectronAPI.grail.getItems.mockResolvedValue([]);
+      mockElectronAPI.grail.getProgress.mockResolvedValue([]);
+
+      // Act
+      await act(async () => {
+        await useGrailStore.getState().reloadData();
+      });
+
+      // Assert
+      expect(useGrailStore.getState().settings.grailRunes).toBe(false);
+      expect(useGrailStore.getState().filter.types).toEqual(['unique', 'runeword']);
+    });
+  });
+
+  describe('If several loads overlap', () => {
+    it('Then loading stays true until the last outstanding load finishes', async () => {
+      // Arrange
+      mockElectronAPI.grail.getSettings.mockResolvedValue(undefined);
+      mockElectronAPI.grail.getCharacters.mockResolvedValue(undefined);
+      mockElectronAPI.grail.getItems.mockResolvedValue(undefined);
+      mockElectronAPI.grail.getProgress.mockResolvedValue(undefined);
+      const finishFirst = startLoad();
+      const finishSecond = startLoad();
+
+      // Act
+      act(() => finishFirst());
+
+      // Assert
+      expect(useGrailStore.getState().loading).toBe(true);
+
+      // Act
+      await act(async () => {
+        await useGrailStore.getState().reloadData();
+      });
+
+      // Assert - reloadData finishing must not clear the flag while another load is pending
+      expect(useGrailStore.getState().loading).toBe(true);
+
+      // Act
+      act(() => finishSecond());
+
+      // Assert
+      expect(useGrailStore.getState().loading).toBe(false);
     });
   });
 
@@ -691,6 +923,52 @@ describe('When useGrailStatistics is used', () => {
       expect(setStats?.total).toBe(1);
       expect(setStats?.found).toBe(1);
       expect(setStats?.percentage).toBe(100);
+    });
+  });
+});
+
+describe('When countActiveFilters is called', () => {
+  describe('If no filters are set', () => {
+    it('Then should return 0', () => {
+      // Arrange
+      const filter = { foundStatus: 'all' as const };
+
+      // Act
+      const count = countActiveFilters(filter);
+
+      // Assert
+      expect(count).toBe(0);
+    });
+  });
+
+  describe('If empty search term and empty arrays are set', () => {
+    it('Then should return 0', () => {
+      // Arrange
+      const filter = { searchTerm: '', categories: [], types: [], foundStatus: 'all' as const };
+
+      // Act
+      const count = countActiveFilters(filter);
+
+      // Assert
+      expect(count).toBe(0);
+    });
+  });
+
+  describe('If search, categories, types and found status are all set', () => {
+    it('Then should return 4', () => {
+      // Arrange
+      const filter = {
+        searchTerm: 'Shako',
+        categories: ['armor' as const],
+        types: ['unique' as const],
+        foundStatus: 'found' as const,
+      };
+
+      // Act
+      const count = countActiveFilters(filter);
+
+      // Assert
+      expect(count).toBe(4);
     });
   });
 });

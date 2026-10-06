@@ -38,6 +38,8 @@ interface GrailState {
 
   // UI State
   filter: GrailFilter;
+  /** Incremented on every resetFilters() call so UI holding local filter state can discard it. */
+  filterResetCount: number;
   advancedFilter: AdvancedGrailFilter;
   viewMode: 'grid' | 'list';
   groupMode: 'none' | 'category' | 'type' | 'ethereal';
@@ -53,6 +55,7 @@ interface GrailState {
   hydrateSettings: (settings: Partial<Settings>) => void;
   setFilter: (filter: Partial<GrailFilter>) => void;
   setAdvancedFilter: (filter: Partial<AdvancedGrailFilter>) => void;
+  resetFilters: () => void;
   setViewMode: (mode: 'grid' | 'list') => void;
   setGroupMode: (mode: 'none' | 'category' | 'type' | 'ethereal') => void;
   setLoading: (loading: boolean) => void;
@@ -119,6 +122,29 @@ const defaultAdvancedFilter: AdvancedGrailFilter = {
 };
 
 /**
+ * Applies a settings update and drops type filters (rune/runeword) whose tracking was
+ * disabled, since their checkboxes are no longer shown and could not be untoggled.
+ * @param {Pick<GrailState, 'settings' | 'filter'>} state - The current store state
+ * @param {Partial<Settings>} settingsUpdate - The settings to merge
+ * @returns {Pick<GrailState, 'settings' | 'filter'>} The next settings and (pruned) filter
+ */
+const withSettingsUpdate = (
+  state: Pick<GrailState, 'settings' | 'filter'>,
+  settingsUpdate: Partial<Settings>,
+): Pick<GrailState, 'settings' | 'filter'> => {
+  const settings = { ...state.settings, ...settingsUpdate };
+  const { filter } = state;
+  const types = filter.types?.filter(
+    (type) =>
+      (type !== 'rune' || settings.grailRunes) && (type !== 'runeword' || settings.grailRunewords),
+  );
+  return {
+    settings,
+    filter: types && types.length !== filter.types?.length ? { ...filter, types } : filter,
+  };
+};
+
+/**
  * Zustand store for managing Holy Grail state including items, progress, characters, and settings.
  * Provides actions for data manipulation and persistence to the Electron backend.
  */
@@ -130,6 +156,7 @@ export const useGrailStore = create<GrailState>((set, get) => ({
   statistics: null,
   settings: defaultSettings,
   filter: defaultFilter,
+  filterResetCount: 0,
   advancedFilter: defaultAdvancedFilter,
   viewMode: 'grid',
   groupMode: 'none',
@@ -143,9 +170,7 @@ export const useGrailStore = create<GrailState>((set, get) => ({
   setStatistics: (statistics) => set({ statistics }),
   setSettings: async (settingsUpdate) => {
     // Update local state
-    set((state) => ({
-      settings: { ...state.settings, ...settingsUpdate },
-    }));
+    set((state) => withSettingsUpdate(state, settingsUpdate));
 
     // Persist to database
     try {
@@ -178,9 +203,7 @@ export const useGrailStore = create<GrailState>((set, get) => ({
     // Update local state only, without persisting to database
     // This is used when loading settings from the database to avoid triggering
     // settings-updated events that would cause unwanted side effects (e.g., widget resize)
-    set((state) => ({
-      settings: { ...state.settings, ...settingsUpdate },
-    }));
+    set((state) => withSettingsUpdate(state, settingsUpdate));
   },
   setFilter: (filterUpdate) =>
     set((state) => ({
@@ -189,6 +212,12 @@ export const useGrailStore = create<GrailState>((set, get) => ({
   setAdvancedFilter: (filterUpdate) =>
     set((state) => ({
       advancedFilter: { ...state.advancedFilter, ...filterUpdate },
+    })),
+  resetFilters: () =>
+    set((state) => ({
+      filter: defaultFilter,
+      advancedFilter: defaultAdvancedFilter,
+      filterResetCount: state.filterResetCount + 1,
     })),
   setViewMode: (viewMode) => set({ viewMode }),
   setGroupMode: (groupMode) => set({ groupMode }),
@@ -243,13 +272,14 @@ export const useGrailStore = create<GrailState>((set, get) => ({
 
   // Reload all data from database
   reloadData: async () => {
+    const finishLoad = startLoad();
     try {
-      set({ loading: true, error: null });
+      set({ error: null });
 
       // Load settings first
       const settingsData = await window.electronAPI?.grail.getSettings();
       if (settingsData) {
-        set((state) => ({ settings: { ...state.settings, ...settingsData } }));
+        set((state) => withSettingsUpdate(state, settingsData));
         console.log('Reloaded settings from database');
       }
 
@@ -276,10 +306,48 @@ export const useGrailStore = create<GrailState>((set, get) => ({
       console.error('Failed to reload grail data:', error);
       set({ error: 'Failed to reload data' });
     } finally {
-      set({ loading: false });
+      finishLoad();
     }
   },
 }));
+
+/** Number of data loads (initial load, reloadData) that are currently in flight. */
+let pendingLoadCount = 0;
+
+/**
+ * Marks a data load as started and sets the store loading flag.
+ * The flag is only cleared once every load started this way has finished, so an earlier
+ * load completing cannot hide a later one that is still pending.
+ * @returns {() => void} A function that must be called exactly once when the load finishes
+ */
+export const startLoad = (): (() => void) => {
+  pendingLoadCount++;
+  useGrailStore.setState({ loading: true });
+  let finished = false;
+  return () => {
+    if (finished) return;
+    finished = true;
+    pendingLoadCount--;
+    if (pendingLoadCount === 0) {
+      useGrailStore.setState({ loading: false });
+    }
+  };
+};
+
+/**
+ * Counts the number of user-facing filters that are currently narrowing the item list.
+ * Sorting and fuzzy-search mode are not counted since they never hide items on their own.
+ * @param {GrailFilter} filter - The current grail filter
+ * @returns {number} The number of active filters
+ */
+export const countActiveFilters = (filter: GrailFilter): number => {
+  let count = 0;
+  if (filter.searchTerm) count++;
+  if (filter.categories && filter.categories.length > 0) count++;
+  if (filter.types && filter.types.length > 0) count++;
+  if (filter.foundStatus && filter.foundStatus !== 'all') count++;
+  return count;
+};
 
 /**
  * Checks if an item matches the specified categories filter.
