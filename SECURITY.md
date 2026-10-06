@@ -1,100 +1,29 @@
 # Security Policy
 
-## Reporting a Vulnerability
+## Reporting a vulnerability
 
-**Please do not report security vulnerabilities through public GitHub issues.**
+**Don't open public issues for security problems.** Report them privately through [GitHub Security Advisories](https://github.com/hyperremix/d2r-arcane-tracker/security/advisories/new).
 
-We take the security of D2R Arcane Tracker seriously. If you believe you have found a security vulnerability, please report it to us through GitHub Security Advisories.
+Please include:
 
-### How to Report
+- The type of issue and its impact.
+- The affected files, version or commit.
+- Steps to reproduce, and a proof of concept if you have one.
 
-1. Go to the [Security Advisories page](https://github.com/hyperremix/d2r-arcane-tracker/security/advisories)
-2. Click "Report a vulnerability"
-3. Fill out the advisory form with as much detail as possible
+You'll get an acknowledgment within 48 hours. Most fixes should ship within 90 days, depending on complexity. Fixes are released as patch versions and announced in a security advisory and the release notes. With your permission, you'll be credited.
 
-Alternatively, you can report via email to the repository maintainer if you prefer private communication.
-
-### What to Include in Your Report
-
-To help us better understand and resolve the issue, please include:
-
-- **Type of vulnerability** (e.g., buffer overflow, SQL injection, cross-site scripting, etc.)
-- **Full paths of source file(s)** related to the vulnerability
-- **Location of the affected source code** (tag/branch/commit or direct URL)
-- **Step-by-step instructions** to reproduce the issue
-- **Proof-of-concept or exploit code** (if possible)
-- **Impact of the vulnerability** and how an attacker might exploit it
-- **Any special configuration** required to reproduce the issue
-
-### What to Expect
-
-- **Acknowledgment**: We will acknowledge receipt of your vulnerability report within 48 hours
-- **Updates**: We will keep you informed about our progress in addressing the vulnerability
-- **Timeline**: We aim to release a fix within 90 days of disclosure, depending on complexity
-- **Credit**: With your permission, we will publicly credit you for the discovery once the fix is released
-
-## Security Update Process
-
-When a security vulnerability is reported:
-
-1. We will confirm the vulnerability and determine its severity
-2. We will develop and test a fix
-3. We will prepare a security advisory
-4. We will release a patched version
-5. We will publish the security advisory with appropriate credits
-
-Security updates will be released as patch versions (e.g., 0.3.1) and announced through:
-
-- GitHub Security Advisories
-- GitHub Releases page
-- Repository README
+Only the [latest release](https://github.com/hyperremix/d2r-arcane-tracker/releases/latest) receives security fixes.
 
 ## Scope
 
-### In Scope
+**In scope:** the Electron main and renderer processes, IPC and the preload API, save file parsing and other filesystem access (including writes to D2R files for terror zones), the SQLite database, the auto-updater, and bundled dependencies.
 
-Security vulnerabilities in:
+**Out of scope:** issues that need physical access or malware already on the machine, problems in Diablo II: Resurrected itself, social engineering, and local denial of service.
 
-- The Electron application and its main/renderer processes
-- IPC communication between processes
-- File system operations and save file parsing
-- Database operations (SQLite)
-- Auto-update mechanism
-- Third-party dependencies bundled with the application
+## What the app accesses
 
-### Out of Scope
+- **Reads** your D2R save files. With auto mode on, it also reads D2R's process memory and never writes to it.
+- **Writes** its own database and data folder. It writes `desecratedzones.json` in the D2R folder only when you use [Terror Zone Configuration](docs/TERROR_ZONE_CONFIGURATION.md).
+- **Network**: it checks GitHub Releases for updates on startup. It doesn't collect or send any personal or save data.
 
-The following are generally **not** considered security vulnerabilities:
-
-- Issues that require physical access to the user's machine
-- Issues in third-party applications (Diablo II: Resurrected itself)
-- Social engineering attacks
-- Denial of service attacks on local application
-- Issues that require the user to install malicious software
-- Issues in outdated/unsupported versions
-
-## Security Best Practices for Users
-
-To ensure the security of your system while using D2R Arcane Tracker:
-
-1. **Download from Official Sources**: Only download releases from the official GitHub repository
-2. **Keep Updated**: Always use the latest version to benefit from security patches
-3. **Verify Checksums**: Check file hashes for downloaded releases when available
-4. **File Permissions**: Ensure the application has only necessary file system permissions
-5. **Antivirus**: Keep your antivirus software up to date (the app is safe, but your system should be protected)
-6. **Save File Backups**: Regularly backup your D2R save files as a precaution
-
-## Known Security Considerations
-
-- The application requires read access to your D2R save files to function
-- The application uses a local SQLite database to store tracking data
-- The application may check for updates automatically (can be disabled in settings)
-- The application does not collect or transmit personal data to external servers
-
-## Questions?
-
-If you have questions about this security policy or need clarification, please open a [GitHub Discussion](https://github.com/hyperremix/d2r-arcane-tracker/discussions).
-
----
-
-**Thank you for helping keep D2R Arcane Tracker and our users safe!**
+Only download the app from the official [Releases page](https://github.com/hyperremix/d2r-arcane-tracker/releases).

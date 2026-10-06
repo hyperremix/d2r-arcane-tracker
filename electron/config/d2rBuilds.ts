@@ -6,7 +6,7 @@
  * layout around the flag changed. Known builds are therefore identified from the PE header (which
  * is always readable) and use a verified offset directly, without scanning code.
  *
- * To add a build after a patch, see docs/MEMORY_OFFSETS.md ("Adding a new build").
+ * To add a build after a patch, see docs/MEMORY_READING.md ("Adding a new D2R build").
  */
 
 /**

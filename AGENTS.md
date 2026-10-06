@@ -21,6 +21,7 @@ If any command fails, fix the issue and re-run from the failing step onward.
 - Prefer root-cause fixes over superficial workarounds.
 - Preserve existing architecture and naming conventions unless the task explicitly requires refactoring.
 - Update tests when behavior changes.
+- Update the matching guide in `docs/` when user-facing behavior changes; link to existing docs instead of duplicating them.
 
 ## Coding conventions agents must follow
 - Use TypeScript and prefer named exports for components/utilities.

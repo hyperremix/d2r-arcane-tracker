@@ -696,10 +696,7 @@ interface D2RMemoryAddresses {
  * Service for reading D2R game state from process memory.
  * Detects when player enters/exits games by reading memory addresses.
  *
- * Implementation structure based on patterns from d2go repository.
- * Memory addresses need to be extracted from d2go's pkg/memory package.
- *
- * See docs/EXTRACT_D2GO_ADDRESSES.md for instructions.
+ * See docs/MEMORY_READING.md for how the in-game flag offset is resolved.
  */
 export class MemoryReader {
   private processHandle: number | null = null;
@@ -949,7 +946,7 @@ export class MemoryReader {
    * always readable, unlike the code a signature scan needs, a large part of which is
    * PAGE_NOACCESS. If a known build's flag byte is not 0/1 yet, this fails so the caller retries. Unknown builds fall back to the d2go UI signature, which is unverified: it no
    * longer resolves to the in-game flag in current builds, so a new build needs an entry in
-   * KNOWN_D2R_BUILDS (see docs/MEMORY_OFFSETS.md).
+   * KNOWN_D2R_BUILDS (see docs/MEMORY_READING.md).
    *
    * @returns True if an offset was resolved, false otherwise
    * @private
