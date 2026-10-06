@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { RunStatistics } from 'electron/types/grail';
+import i18n from 'i18next';
 import { toast } from 'sonner';
 import {
   afterAll,
@@ -11,6 +12,7 @@ import {
   type MockInstance,
   vi,
 } from 'vitest';
+import { translations } from '@/i18n/translations';
 import { RunAnalytics } from './RunAnalytics';
 
 vi.mock('sonner', () => ({
@@ -106,6 +108,30 @@ describe('When exporting run analytics', () => {
       description: 'Saved to run-analytics.csv',
     });
     expect(toast.error).not.toHaveBeenCalled();
+  });
+
+  it('If a CSV label contains a comma and a double quote, Then the exported cell is quoted and escaped', async () => {
+    // Arrange
+    const labelKey = translations.statistics.runAnalytics.totalSessions;
+    const originalLabel = i18n.t(labelKey);
+    i18n.addResource('en', 'common', labelKey, 'Sessions, "all"');
+    mockElectronAPI.dialog.showSaveDialog.mockResolvedValue({
+      canceled: false,
+      filePath: '/tmp/run-analytics.csv',
+    });
+    mockElectronAPI.dialog.writeFile.mockResolvedValue({ success: true });
+
+    try {
+      // Act
+      await renderAndClickExport();
+
+      // Assert
+      await waitFor(() => expect(mockElectronAPI.dialog.writeFile).toHaveBeenCalledTimes(1));
+      const [, content] = mockElectronAPI.dialog.writeFile.mock.calls[0];
+      expect(content.split('\n')[1]).toBe('"Sessions, ""all""",3');
+    } finally {
+      i18n.addResource('en', 'common', labelKey, originalLabel);
+    }
   });
 
   it('If the save dialog is canceled, Then no file is written and no toast is shown', async () => {
