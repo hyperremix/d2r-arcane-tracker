@@ -13,6 +13,10 @@ vi.mock('electron', () => ({
   },
 }));
 
+vi.mock('../database/database', () => ({
+  grailDatabase: { getAllSettings: vi.fn(() => ({})) },
+}));
+
 vi.mock('../window/widgetWindow', () => ({
   closeWidgetWindow: vi.fn(),
   getWidgetWindowPosition: vi.fn(),
@@ -23,6 +27,7 @@ vi.mock('../window/widgetWindow', () => ({
   widgetWindow: null,
 }));
 
+import { grailDatabase } from '../database/database';
 import { resetWidgetWindowSize, updateWidgetWindowSize } from '../window/widgetWindow';
 import { initializeWidgetHandlers } from './widgetHandlers';
 
@@ -35,6 +40,10 @@ describe('widget IPC handlers display mode validation', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(grailDatabase.getAllSettings).mockReset();
+    vi.mocked(grailDatabase.getAllSettings).mockReturnValue(
+      {} as ReturnType<typeof grailDatabase.getAllSettings>,
+    );
     handlers.clear();
     consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     initializeWidgetHandlers('/app', undefined, undefined, undefined, onSizeChange);
@@ -99,5 +108,56 @@ describe('widget IPC handlers display mode validation', () => {
     // Assert
     expect(result).toMatchObject({ success: false });
     expect(onSizeChange).not.toHaveBeenCalled();
+  });
+
+  it('If the renderer sends stale custom sizes, Then the persisted sizes from the database are used', async () => {
+    // Arrange
+    const persistedSplit = { width: 400, height: 300 };
+    vi.mocked(grailDatabase.getAllSettings).mockReturnValue({
+      widgetSizeSplit: persistedSplit,
+      grailEthereal: true,
+    } as ReturnType<typeof grailDatabase.getAllSettings>);
+    const staleSettings = { grailEthereal: true, widgetSizeSplit: { width: 350, height: 250 } };
+
+    // Act
+    const result = await invoke('widget:update-display', 'split', staleSettings);
+
+    // Assert
+    expect(result).toEqual({ success: true });
+    expect(updateWidgetWindowSize).toHaveBeenCalledWith(
+      'split',
+      expect.objectContaining({ widgetSizeSplit: persistedSplit, grailEthereal: true }),
+    );
+  });
+
+  it('When the renderer reports the ethereal flag, Then it decides whether split and all can be used', async () => {
+    // Arrange
+    vi.mocked(grailDatabase.getAllSettings).mockReturnValue({
+      grailEthereal: true,
+    } as ReturnType<typeof grailDatabase.getAllSettings>);
+
+    // Act
+    await invoke('widget:update-display', 'overall', { grailEthereal: false });
+
+    // Assert
+    expect(updateWidgetWindowSize).toHaveBeenCalledWith(
+      'overall',
+      expect.objectContaining({ grailEthereal: false }),
+    );
+  });
+
+  it('If the database cannot be read, Then the renderer settings are used as a fallback', async () => {
+    // Arrange
+    vi.mocked(grailDatabase.getAllSettings).mockImplementation(() => {
+      throw new Error('db unavailable');
+    });
+    const rendererSettings = { grailEthereal: true, widgetSizeSplit: { width: 350, height: 250 } };
+
+    // Act
+    const result = await invoke('widget:update-display', 'split', rendererSettings);
+
+    // Assert
+    expect(result).toEqual({ success: true });
+    expect(updateWidgetWindowSize).toHaveBeenCalledWith('split', rendererSettings);
   });
 });

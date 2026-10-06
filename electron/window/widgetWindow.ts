@@ -295,7 +295,8 @@ export function updateWidgetWindowSize(
 }
 
 /**
- * Resets the widget window size to default for the current display mode.
+ * Resets the widget window size to the default for the given display mode and makes that mode the
+ * one resize events are saved under. Unknown modes are ignored.
  *
  * @param display - The display mode to reset size for
  * @returns The default size for the mode, or null if window doesn't exist

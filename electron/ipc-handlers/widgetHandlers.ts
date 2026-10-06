@@ -1,4 +1,5 @@
 import { ipcMain } from 'electron';
+import { grailDatabase } from '../database/database';
 import type { Settings } from '../types/grail';
 import type { WidgetDisplayMode } from '../utils/widgetDisplay';
 import { isWidgetDisplayMode } from '../utils/widgetDisplay';
@@ -11,6 +12,34 @@ import {
   updateWidgetWindowSize,
   widgetWindow,
 } from '../window/widgetWindow';
+
+/**
+ * Builds the settings used to size the widget window. The custom window sizes are read from the
+ * database because the renderer's settings snapshot can be stale (sizes are saved without being
+ * broadcast); only the ethereal flag, which decides the resolved display mode, comes from the
+ * renderer. Falls back to the renderer-provided settings if the database cannot be read.
+ *
+ * @param rendererSettings - Settings snapshot sent by the renderer
+ * @returns Settings to size the widget window with
+ */
+function getSettingsForWidgetSizing(rendererSettings: Partial<Settings>): Partial<Settings> {
+  try {
+    const persisted = grailDatabase.getAllSettings();
+    return {
+      ...rendererSettings,
+      widgetSizeOverall: persisted.widgetSizeOverall,
+      widgetSizeSplit: persisted.widgetSizeSplit,
+      widgetSizeAll: persisted.widgetSizeAll,
+      grailEthereal:
+        typeof rendererSettings?.grailEthereal === 'boolean'
+          ? rendererSettings.grailEthereal
+          : persisted.grailEthereal,
+    };
+  } catch (error) {
+    console.error('Failed to read persisted widget sizes:', error);
+    return rendererSettings;
+  }
+}
 
 /**
  * Initializes IPC handlers for widget window operations.
@@ -95,7 +124,7 @@ export function initializeWidgetHandlers(
         if (!isWidgetDisplayMode(display)) {
           return { success: false, error: 'Invalid widget display mode' };
         }
-        updateWidgetWindowSize(display, settings);
+        updateWidgetWindowSize(display, getSettingsForWidgetSizing(settings));
         return { success: true };
       } catch (error) {
         console.error('Failed to update widget display mode:', error);
