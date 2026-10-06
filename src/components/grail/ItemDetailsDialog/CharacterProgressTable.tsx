@@ -1,7 +1,17 @@
 import type { Character, GrailProgress, Item } from 'electron/types/grail';
-import { ChevronLeft, ChevronRight, User } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Trash2, User } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -15,21 +25,31 @@ import {
 import { translations } from '@/i18n/translations';
 import { DetectionMethods, FoundDates } from './ProgressStatusSection';
 
+interface PendingRemoval {
+  progress: GrailProgress;
+  character: Character;
+}
+
 // Component for character progress table row
 function CharacterProgressRow({
   character,
   progress,
   item,
+  onRequestRemove,
 }: {
   character: Character;
   progress: GrailProgress[];
   item: Item;
+  onRequestRemove: (removal: PendingRemoval) => void;
 }) {
+  const { t } = useTranslation();
   const characterProgress = progress.filter(
     (p) => p.characterId === character.id && p.itemId === item.id,
   );
   const normalProgress = characterProgress.find((p) => !p.isEthereal);
   const etherealProgress = characterProgress.find((p) => p.isEthereal);
+  // Only manually added records can be removed; auto-detected ones mirror the save files
+  const removableProgress = characterProgress.filter((p) => p.manuallyAdded && p.foundDate);
 
   return (
     <TableRow>
@@ -40,6 +60,28 @@ function CharacterProgressRow({
       <TableCell className="text-muted-foreground">
         <DetectionMethods normalProgress={normalProgress} etherealProgress={etherealProgress} />
       </TableCell>
+      <TableCell className="text-right">
+        {removableProgress.map((p) => {
+          const label = t(translations.grail.itemDetails.removeRecordLabel, {
+            version: p.isEthereal
+              ? t(translations.grail.itemDetails.ethereal)
+              : t(translations.grail.itemCard.normal),
+            character: character.name,
+          });
+          return (
+            <Button
+              key={p.id}
+              variant="ghost"
+              size="icon"
+              aria-label={label}
+              title={label}
+              onClick={() => onRequestRemove({ progress: p, character })}
+            >
+              <Trash2 className="h-4 w-4" aria-hidden="true" />
+            </Button>
+          );
+        })}
+      </TableCell>
     </TableRow>
   );
 }
@@ -49,13 +91,38 @@ export function CharacterProgressTable({
   characters,
   progress,
   item,
+  onRemoveProgress,
 }: {
   characters: Character[];
   progress: GrailProgress[];
   item: Item;
+  onRemoveProgress: (progressId: string) => Promise<void>;
 }) {
   const { t } = useTranslation();
   const [currentPage, setCurrentPage] = useState(1);
+  const [pendingRemoval, setPendingRemoval] = useState<PendingRemoval | undefined>(undefined);
+  const [removing, setRemoving] = useState(false);
+  const [removeFailed, setRemoveFailed] = useState(false);
+
+  const handleRequestRemove = (removal: PendingRemoval) => {
+    setRemoveFailed(false);
+    setPendingRemoval(removal);
+  };
+
+  const handleConfirmRemove = async () => {
+    if (!pendingRemoval || removing) return;
+    setRemoving(true);
+    setRemoveFailed(false);
+    try {
+      await onRemoveProgress(pendingRemoval.progress.id);
+      setPendingRemoval(undefined);
+    } catch (error) {
+      console.error('Failed to remove progress record:', error);
+      setRemoveFailed(true);
+    } finally {
+      setRemoving(false);
+    }
+  };
   const charactersPerPage = 5;
 
   // Sort characters by found date (most recent first)
@@ -139,6 +206,9 @@ export function CharacterProgressTable({
               <TableHead>{t(translations.grail.itemDetails.character)}</TableHead>
               <TableHead>{t(translations.grail.itemDetails.foundDate)}</TableHead>
               <TableHead>{t(translations.grail.itemDetails.method)}</TableHead>
+              <TableHead className="text-right">
+                {t(translations.grail.itemDetails.actions)}
+              </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -148,6 +218,7 @@ export function CharacterProgressTable({
                 character={character}
                 progress={progress}
                 item={item}
+                onRequestRemove={handleRequestRemove}
               />
             ))}
           </TableBody>
@@ -184,6 +255,48 @@ export function CharacterProgressTable({
           </div>
         )}
       </CardContent>
+
+      <AlertDialog
+        open={pendingRemoval !== undefined}
+        onOpenChange={(open) => {
+          if (!open && !removing) setPendingRemoval(undefined);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {t(translations.grail.itemDetails.removeRecordTitle)}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {pendingRemoval &&
+                t(translations.grail.itemDetails.removeRecordDescription, {
+                  version: pendingRemoval.progress.isEthereal
+                    ? t(translations.grail.itemDetails.ethereal)
+                    : t(translations.grail.itemCard.normal),
+                  item: item.name,
+                  character: pendingRemoval.character.name,
+                })}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          {removeFailed && (
+            <p className="text-destructive text-sm" role="alert">
+              {t(translations.grail.itemDetails.removeRecordError)}
+            </p>
+          )}
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={removing}>
+              {t(translations.common.cancel)}
+            </AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              disabled={removing}
+              onClick={handleConfirmRemove}
+            >
+              {t(translations.grail.itemDetails.remove)}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 }

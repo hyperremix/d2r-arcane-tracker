@@ -38,12 +38,9 @@ describe('When useProgressLookup is used', () => {
       // Arrange
       const items: Item[] = [];
       const progress: GrailProgress[] = [];
-      const selectedCharacterId = null;
 
       // Act
-      const { result } = renderHook(() =>
-        useProgressLookup(items, progress, settings, selectedCharacterId),
-      );
+      const { result } = renderHook(() => useProgressLookup(items, progress, settings));
 
       // Assert
       expect(result.current.size).toBe(0);
@@ -58,16 +55,13 @@ describe('When useProgressLookup is used', () => {
         HolyGrailItemBuilder.new().withId('item2').withName('Test Item 2').build(),
       ];
       const progress: GrailProgress[] = [];
-      const selectedCharacterId = null;
 
       // Mock ethereal functions to return true
       vi.mocked(shouldShowNormalStatus).mockReturnValue(true);
       vi.mocked(shouldShowEtherealStatus).mockReturnValue(true);
 
       // Act
-      const { result } = renderHook(() =>
-        useProgressLookup(items, progress, settings, selectedCharacterId),
-      );
+      const { result } = renderHook(() => useProgressLookup(items, progress, settings));
 
       // Assert
       expect(result.current.size).toBe(2);
@@ -100,16 +94,13 @@ describe('When useProgressLookup is used', () => {
           .withFoundDate(new Date('2024-01-01'))
           .build(),
       ];
-      const selectedCharacterId = null;
 
       // Mock ethereal functions
       vi.mocked(shouldShowNormalStatus).mockReturnValue(true);
       vi.mocked(shouldShowEtherealStatus).mockReturnValue(true);
 
       // Act
-      const { result } = renderHook(() =>
-        useProgressLookup(items, progress, settings, selectedCharacterId),
-      );
+      const { result } = renderHook(() => useProgressLookup(items, progress, settings));
 
       // Assert
       const lookupData = result.current.get('item1');
@@ -136,16 +127,13 @@ describe('When useProgressLookup is used', () => {
           .asEthereal()
           .build(),
       ];
-      const selectedCharacterId = null;
 
       // Mock ethereal functions
       vi.mocked(shouldShowNormalStatus).mockReturnValue(true);
       vi.mocked(shouldShowEtherealStatus).mockReturnValue(true);
 
       // Act
-      const { result } = renderHook(() =>
-        useProgressLookup(items, progress, settings, selectedCharacterId),
-      );
+      const { result } = renderHook(() => useProgressLookup(items, progress, settings));
 
       // Assert
       const lookupData = result.current.get('item1');
@@ -178,16 +166,13 @@ describe('When useProgressLookup is used', () => {
           .asEthereal()
           .build(),
       ];
-      const selectedCharacterId = null;
 
       // Mock ethereal functions
       vi.mocked(shouldShowNormalStatus).mockReturnValue(true);
       vi.mocked(shouldShowEtherealStatus).mockReturnValue(true);
 
       // Act
-      const { result } = renderHook(() =>
-        useProgressLookup(items, progress, settings, selectedCharacterId),
-      );
+      const { result } = renderHook(() => useProgressLookup(items, progress, settings));
 
       // Assert
       const lookupData = result.current.get('item1');
@@ -201,8 +186,8 @@ describe('When useProgressLookup is used', () => {
     });
   });
 
-  describe('If character-specific progress is requested', () => {
-    it('Then should return only progress for selected character', () => {
+  describe('If multiple characters found the same item', () => {
+    it('Then should aggregate progress from all characters', () => {
       // Arrange
       const items = [HolyGrailItemBuilder.new().withId('item1').withName('Test Item 1').build()];
       const progress = [
@@ -219,60 +204,22 @@ describe('When useProgressLookup is used', () => {
           .withFoundDate(new Date('2024-01-01'))
           .build(),
       ];
-      const selectedCharacterId = 'char1';
 
       // Mock ethereal functions
       vi.mocked(shouldShowNormalStatus).mockReturnValue(true);
       vi.mocked(shouldShowEtherealStatus).mockReturnValue(true);
 
       // Act
-      const { result } = renderHook(() =>
-        useProgressLookup(items, progress, settings, selectedCharacterId),
-      );
+      const { result } = renderHook(() => useProgressLookup(items, progress, settings));
 
       // Assert
       const lookupData = result.current.get('item1');
       expect(lookupData).toEqual({
         normalFound: true,
         etherealFound: false,
-        normalProgress: [progress[0]], // Only char1's progress
+        normalProgress: [progress[0], progress[1]],
         etherealProgress: [],
         overallFound: true,
-      });
-    });
-  });
-
-  describe('If character-specific progress is not found', () => {
-    it('Then should return not found for selected character', () => {
-      // Arrange
-      const items = [HolyGrailItemBuilder.new().withId('item1').withName('Test Item 1').build()];
-      const progress = [
-        GrailProgressBuilder.new()
-          .withId('prog1')
-          .withCharacterId('char2')
-          .withItemId('item1')
-          .withFoundDate(new Date('2024-01-01'))
-          .build(),
-      ];
-      const selectedCharacterId = 'char1';
-
-      // Mock ethereal functions
-      vi.mocked(shouldShowNormalStatus).mockReturnValue(true);
-      vi.mocked(shouldShowEtherealStatus).mockReturnValue(true);
-
-      // Act
-      const { result } = renderHook(() =>
-        useProgressLookup(items, progress, settings, selectedCharacterId),
-      );
-
-      // Assert
-      const lookupData = result.current.get('item1');
-      expect(lookupData).toEqual({
-        normalFound: false,
-        etherealFound: false,
-        normalProgress: [],
-        etherealProgress: [],
-        overallFound: false,
       });
     });
   });
@@ -289,16 +236,13 @@ describe('When useProgressLookup is used', () => {
           .withFoundDate(new Date('2024-01-01'))
           .build(),
       ];
-      const selectedCharacterId = null;
 
       // Mock ethereal functions
       vi.mocked(shouldShowNormalStatus).mockReturnValue(false);
       vi.mocked(shouldShowEtherealStatus).mockReturnValue(true);
 
       // Act
-      const { result } = renderHook(() =>
-        useProgressLookup(items, progress, settings, selectedCharacterId),
-      );
+      const { result } = renderHook(() => useProgressLookup(items, progress, settings));
 
       // Assert
       const lookupData = result.current.get('item1');
@@ -324,16 +268,13 @@ describe('When useProgressLookup is used', () => {
           .withFoundDate(new Date('2024-01-01'))
           .build(),
       ];
-      const selectedCharacterId = null;
 
       // Mock ethereal functions
       vi.mocked(shouldShowNormalStatus).mockReturnValue(true);
       vi.mocked(shouldShowEtherealStatus).mockReturnValue(false);
 
       // Act
-      const { result } = renderHook(() =>
-        useProgressLookup(items, progress, settings, selectedCharacterId),
-      );
+      const { result } = renderHook(() => useProgressLookup(items, progress, settings));
 
       // Assert
       const lookupData = result.current.get('item1');
@@ -371,16 +312,13 @@ describe('When useProgressLookup is used', () => {
           .build(),
         // item3 has no progress
       ];
-      const selectedCharacterId = null;
 
       // Mock ethereal functions
       vi.mocked(shouldShowNormalStatus).mockReturnValue(true);
       vi.mocked(shouldShowEtherealStatus).mockReturnValue(true);
 
       // Act
-      const { result } = renderHook(() =>
-        useProgressLookup(items, progress, settings, selectedCharacterId),
-      );
+      const { result } = renderHook(() => useProgressLookup(items, progress, settings));
 
       // Assert
       expect(result.current.size).toBe(3);
@@ -426,16 +364,13 @@ describe('When useProgressLookup is used', () => {
           .withoutFoundDate()
           .build(),
       ];
-      const selectedCharacterId = null;
 
       // Mock ethereal functions
       vi.mocked(shouldShowNormalStatus).mockReturnValue(true);
       vi.mocked(shouldShowEtherealStatus).mockReturnValue(true);
 
       // Act
-      const { result } = renderHook(() =>
-        useProgressLookup(items, progress, settings, selectedCharacterId),
-      );
+      const { result } = renderHook(() => useProgressLookup(items, progress, settings));
 
       // Assert
       const lookupData = result.current.get('item1');
@@ -462,7 +397,6 @@ describe('When useProgressLookup is used', () => {
           .withFoundDate(new Date('2024-01-01'))
           .build(),
       ];
-      const selectedCharacterId = null;
 
       // Mock ethereal functions
       vi.mocked(shouldShowNormalStatus).mockReturnValue(true);
@@ -470,7 +404,7 @@ describe('When useProgressLookup is used', () => {
 
       // Act
       const { result, rerender } = renderHook(
-        ({ progress }) => useProgressLookup(items, progress, settings, selectedCharacterId),
+        ({ progress }) => useProgressLookup(items, progress, settings),
         { initialProps: { progress: initialProgress } },
       );
 

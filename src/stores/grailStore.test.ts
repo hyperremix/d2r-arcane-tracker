@@ -12,6 +12,7 @@ const mockElectronAPI = {
     getProgress: vi.fn(),
     getCharacters: vi.fn(),
     updateProgress: vi.fn(),
+    deleteProgress: vi.fn(),
   },
 };
 
@@ -61,7 +62,6 @@ describe('When useGrailStore is used', () => {
       useGrailStore.getState().setCharacters([]);
       useGrailStore.getState().setItems([]);
       useGrailStore.getState().setProgress([]);
-      useGrailStore.getState().setSelectedCharacterId(null);
       useGrailStore.getState().setFilter({ foundStatus: 'all' });
       useGrailStore.getState().setAdvancedFilter({
         rarities: [],
@@ -133,22 +133,6 @@ describe('When useGrailStore is used', () => {
     });
   });
 
-  describe('If setting selected character ID', () => {
-    it('Then should update selectedCharacterId state', () => {
-      // Arrange
-      const { result } = renderHook(() => useGrailStore());
-      const characterId = 'char1';
-
-      // Act
-      act(() => {
-        result.current.setSelectedCharacterId(characterId);
-      });
-
-      // Assert
-      expect(result.current.selectedCharacterId).toBe(characterId);
-    });
-  });
-
   describe('If setting filter', () => {
     it('Then should update filter state', () => {
       // Arrange
@@ -212,77 +196,131 @@ describe('When useGrailStore is used', () => {
     });
   });
 
-  describe('If toggling item found without selected character', () => {
-    it('Then should not update progress', () => {
+  describe('If adding manual progress', () => {
+    it('Then should persist a manually added record and add it to state', async () => {
       // Arrange
       const { result } = renderHook(() => useGrailStore());
-      const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {
-        // Mock implementation
+      const character = CharacterBuilder.new().withId('char1').withName('Sorc').build();
+      const foundDate = new Date('2024-06-15T12:00:00.000Z');
+      mockElectronAPI.grail.updateProgress.mockResolvedValue({ success: true });
+      act(() => {
+        result.current.setCharacters([character]);
       });
 
       // Act
-      act(() => {
-        result.current.toggleItemFound('item1');
+      await act(async () => {
+        await result.current.addManualProgress({
+          itemId: 'item1',
+          characterId: 'char1',
+          isEthereal: true,
+          foundDate,
+        });
       });
 
       // Assert
-      expect(result.current.progress).toEqual([]);
-      expect(consoleSpy).toHaveBeenCalledWith('No character selected for tracking progress');
-      consoleSpy.mockRestore();
-    });
-  });
-
-  describe('If toggling item found with selected character', () => {
-    it('Then should create new progress entry', () => {
-      // Arrange
-      const { result } = renderHook(() => useGrailStore());
-      const characterId = 'char1';
-      const itemId = 'item1';
-
-      act(() => {
-        result.current.setSelectedCharacterId(characterId);
-      });
-
-      // Act
-      act(() => {
-        result.current.toggleItemFound(itemId, 'Test Character');
-      });
-
-      // Assert
+      expect(mockElectronAPI.grail.updateProgress).toHaveBeenCalledWith(
+        expect.objectContaining({
+          characterId: 'char1',
+          itemId: 'item1',
+          isEthereal: true,
+          foundDate,
+          foundBy: 'Sorc',
+          manuallyAdded: true,
+        }),
+      );
       expect(result.current.progress).toHaveLength(1);
-      expect(result.current.progress[0].characterId).toBe(characterId);
-      expect(result.current.progress[0].itemId).toBe(itemId);
-      expect(result.current.progress[0].foundDate).toBeDefined();
-      expect(result.current.progress[0].foundBy).toBe('Test Character');
-      expect(result.current.progress[0].manuallyAdded).toBe(true);
+      expect(result.current.progress[0]).toEqual(
+        mockElectronAPI.grail.updateProgress.mock.calls[0][0],
+      );
     });
-  });
 
-  describe('If toggling existing item found', () => {
-    it('Then should toggle found status', () => {
+    it('Then should not change state and should reject if persisting fails', async () => {
       // Arrange
       const { result } = renderHook(() => useGrailStore());
-      const characterId = 'char1';
-      const itemId = 'item1';
-      const existingProgress = GrailProgressBuilder.new()
-        .withId('prog1')
-        .withCharacterId(characterId)
-        .withItemId(itemId)
-        .withFoundDate(new Date('2024-01-01'))
-        .build();
-
-      act(() => {
-        result.current.setSelectedCharacterId(characterId);
-        result.current.setProgress([existingProgress]);
-      });
+      mockElectronAPI.grail.updateProgress.mockRejectedValue(new Error('DB error'));
 
       // Act
-      act(() => {
-        result.current.toggleItemFound(itemId);
+      const addPromise = result.current.addManualProgress({
+        itemId: 'item1',
+        characterId: 'char1',
+        isEthereal: false,
+        foundDate: new Date(),
       });
 
       // Assert
-      expect(result.current.progress[0].foundDate).toBeUndefined();
+      await expect(addPromise).rejects.toThrow('DB error');
+      expect(result.current.progress).toEqual([]);
+    });
+  });
+
+  describe('If removing progress', () => {
+    it('Then should delete the record via IPC and remove it from state', async () => {
+      // Arrange
+      const { result } = renderHook(() => useGrailStore());
+      const keep = GrailProgressBuilder.new().withId('keep').withItemId('item1').build();
+      const remove = GrailProgressBuilder.new()
+        .withId('remove')
+        .withItemId('item1')
+        .withManuallyAdded(true)
+        .build();
+      mockElectronAPI.grail.deleteProgress.mockResolvedValue({ success: true });
+      act(() => {
+        result.current.setProgress([keep, remove]);
+      });
+
+      // Act
+      await act(async () => {
+        await result.current.removeProgress('remove');
+      });
+
+      // Assert
+      expect(mockElectronAPI.grail.deleteProgress).toHaveBeenCalledWith('remove');
+      expect(result.current.progress).toEqual([keep]);
+    });
+
+    it('Then should treat an already deleted manual record as removed', async () => {
+      // Arrange
+      const { result } = renderHook(() => useGrailStore());
+      const keep = GrailProgressBuilder.new().withId('keep').withItemId('item1').build();
+      const stale = GrailProgressBuilder.new()
+        .withId('stale')
+        .withItemId('item1')
+        .withManuallyAdded(true)
+        .build();
+      mockElectronAPI.grail.deleteProgress.mockResolvedValue({ success: false });
+      act(() => {
+        result.current.setProgress([keep, stale]);
+      });
+
+      // Act
+      await act(async () => {
+        await result.current.removeProgress('stale');
+      });
+
+      // Assert
+      expect(mockElectronAPI.grail.deleteProgress).toHaveBeenCalledWith('stale');
+      expect(result.current.progress).toEqual([keep]);
+    });
+
+    it('Then should keep state and reject if an auto-detected record was not deleted', async () => {
+      // Arrange
+      const { result } = renderHook(() => useGrailStore());
+      const record = GrailProgressBuilder.new()
+        .withId('auto')
+        .withItemId('item1')
+        .withManuallyAdded(false)
+        .build();
+      mockElectronAPI.grail.deleteProgress.mockResolvedValue({ success: false });
+      act(() => {
+        result.current.setProgress([record]);
+      });
+
+      // Act
+      const removePromise = result.current.removeProgress('auto');
+
+      // Assert
+      await expect(removePromise).rejects.toThrow('Failed to remove progress');
+      expect(result.current.progress).toEqual([record]);
     });
   });
 

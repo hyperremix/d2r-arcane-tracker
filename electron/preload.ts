@@ -120,6 +120,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
      */
     updateProgress: (progress: GrailProgress): Promise<{ success: boolean }> =>
       ipcRenderer.invoke('grail:updateProgress', progress),
+    /**
+     * Deletes a manually added grail progress record.
+     * @param {string} progressId - The ID of the progress record to delete.
+     * @returns {Promise<{ success: boolean }>} A promise that resolves with whether a record was deleted.
+     */
+    deleteProgress: (progressId: string): Promise<{ success: boolean }> =>
+      ipcRenderer.invoke('grail:deleteProgress', progressId),
 
     /**
      * Retrieves current application settings.

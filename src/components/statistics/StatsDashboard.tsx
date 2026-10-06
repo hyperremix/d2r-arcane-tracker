@@ -19,8 +19,8 @@ import { useGrailStatistics, useGrailStore } from '@/stores/grailStore';
 export const StatsDashboard = memo(function StatsDashboard() {
   const { t } = useTranslation();
   const stats = useGrailStatistics();
-  const { items, progress, characters, selectedCharacterId, settings } = useGrailStore();
-  const progressLookup = useProgressLookup(items, progress, settings, selectedCharacterId);
+  const { items, progress, characters, settings } = useGrailStore();
+  const progressLookup = useProgressLookup(items, progress, settings);
 
   const lastFindItem = useMemo(
     () => items.find((i) => i.id === stats.lastFind?.itemId),

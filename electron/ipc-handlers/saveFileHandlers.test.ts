@@ -722,6 +722,7 @@ describe('When saveFileHandlers is used', () => {
         .withCharacterId(mockCharacter.id)
         .withItemId(mockEvent.grailItem.id)
         .asNormal()
+        .withManuallyAdded(false)
         .build();
       const activeRun = { id: 'run-1' } as any;
 
@@ -743,6 +744,60 @@ describe('When saveFileHandlers is used', () => {
         }),
       );
       expect(grailDatabase.addRunItem).not.toHaveBeenCalled();
+    });
+
+    it('Then should not attach run items to manually added progress when a duplicate find occurs during an active run', () => {
+      // Arrange
+      const mockEvent: ItemDetectionEvent = {
+        type: 'item-found',
+        item: D2ItemBuilder.new()
+          .withId('test-item')
+          .withName('Windforce')
+          .withType('bows')
+          .withQuality('unique')
+          .withLevel(75)
+          .withCharacterName('TestCharacter')
+          .withLocation('inventory')
+          .build(),
+        grailItem: HolyGrailItemBuilder.new()
+          .withId('windforce')
+          .withName('windforce')
+          .withType('unique')
+          .withWeaponSubCategory('bows')
+          .build(),
+      };
+
+      const mockCharacter = CharacterBuilder.new()
+        .withId('char-1')
+        .withName('TestCharacter')
+        .build();
+      const manualProgress = GrailProgressBuilder.new()
+        .withId('manual-progress')
+        .withCharacterId(mockCharacter.id)
+        .withItemId(mockEvent.grailItem.id)
+        .asNormal()
+        .withManuallyAdded(true)
+        .build();
+      const activeRun = { id: 'run-1' } as any;
+
+      vi.mocked(grailDatabase.getCharacterByName).mockReturnValue(mockCharacter as any);
+      vi.mocked(grailDatabase.getProgressByItem).mockReturnValue([manualProgress as any]);
+      mockRunTrackerService.getActiveRun.mockReturnValue(activeRun);
+
+      initializeSaveFileHandlers();
+
+      // Act
+      mockEventBus.emit('item-detection', mockEvent);
+
+      // Assert
+      const queuedProgress = mockBatchWriter.queueProgress.mock.calls[0][0];
+      expect(queuedProgress.id).not.toBe(manualProgress.id);
+      expect(mockBatchWriter.queueRunItem).toHaveBeenCalledWith(
+        expect.objectContaining({
+          grailProgressId: queuedProgress.id,
+          runId: activeRun.id,
+        }),
+      );
     });
   });
 

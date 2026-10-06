@@ -62,6 +62,12 @@ export interface ElectronAPI {
      * @returns {Promise<{ success: boolean }>} A promise that resolves with a success indicator.
      */
     updateProgress(progress: GrailProgress): Promise<{ success: boolean }>
+    /**
+     * Deletes a manually added grail progress record.
+     * @param {string} progressId - The ID of the progress record to delete.
+     * @returns {Promise<{ success: boolean }>} A promise that resolves with whether a record was deleted.
+     */
+    deleteProgress(progressId: string): Promise<{ success: boolean }>
 
     /**
      * Retrieves current application settings.

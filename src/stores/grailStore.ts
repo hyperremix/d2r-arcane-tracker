@@ -15,6 +15,16 @@ import { canItemBeEthereal, canItemBeNormal } from '@/lib/ethereal';
 import { isRecentFind } from '@/lib/utils';
 
 /**
+ * Information needed to manually record an item as found.
+ */
+export interface ManualProgressInput {
+  itemId: string;
+  characterId: string;
+  isEthereal: boolean;
+  foundDate: Date;
+}
+
+/**
  * Interface defining the complete state structure and actions for the Grail store.
  * Manages Holy Grail data, UI state, and provides actions for data manipulation.
  */
@@ -27,7 +37,6 @@ interface GrailState {
   settings: Settings;
 
   // UI State
-  selectedCharacterId: string | null;
   filter: GrailFilter;
   advancedFilter: AdvancedGrailFilter;
   viewMode: 'grid' | 'list';
@@ -42,7 +51,6 @@ interface GrailState {
   setStatistics: (statistics: GrailStatistics) => void;
   setSettings: (settings: Partial<Settings>) => Promise<void>;
   hydrateSettings: (settings: Partial<Settings>) => void;
-  setSelectedCharacterId: (characterId: string | null) => void;
   setFilter: (filter: Partial<GrailFilter>) => void;
   setAdvancedFilter: (filter: Partial<AdvancedGrailFilter>) => void;
   setViewMode: (mode: 'grid' | 'list') => void;
@@ -51,7 +59,8 @@ interface GrailState {
   setError: (error: string | null) => void;
 
   // Complex actions
-  toggleItemFound: (itemId: string, foundBy?: string, manuallyAdded?: boolean) => void;
+  addManualProgress: (input: ManualProgressInput) => Promise<void>;
+  removeProgress: (progressId: string) => Promise<void>;
   reloadData: () => Promise<void>;
 }
 
@@ -120,7 +129,6 @@ export const useGrailStore = create<GrailState>((set, get) => ({
   progress: [],
   statistics: null,
   settings: defaultSettings,
-  selectedCharacterId: null,
   filter: defaultFilter,
   advancedFilter: defaultAdvancedFilter,
   viewMode: 'grid',
@@ -174,7 +182,6 @@ export const useGrailStore = create<GrailState>((set, get) => ({
       settings: { ...state.settings, ...settingsUpdate },
     }));
   },
-  setSelectedCharacterId: (selectedCharacterId) => set({ selectedCharacterId }),
   setFilter: (filterUpdate) =>
     set((state) => ({
       filter: { ...state.filter, ...filterUpdate },
@@ -189,57 +196,49 @@ export const useGrailStore = create<GrailState>((set, get) => ({
   setError: (error) => set({ error }),
 
   // Complex actions
-  toggleItemFound: (itemId, foundBy, manuallyAdded = true) => {
-    const { progress, selectedCharacterId } = get();
+  addManualProgress: async ({ itemId, characterId, isEthereal, foundDate }) => {
+    const character = get().characters.find((c) => c.id === characterId);
+    const entry: GrailProgress = {
+      id: `manual_${characterId}_${itemId}_${isEthereal ? 'ethereal' : 'normal'}_${Date.now()}`,
+      characterId,
+      itemId,
+      foundDate,
+      foundBy: character?.name,
+      manuallyAdded: true,
+      isEthereal,
+    };
 
-    // Need a selected character to track progress
-    if (!selectedCharacterId) {
-      console.warn('No character selected for tracking progress');
-      return;
+    // Persist first so local state never diverges from the database
+    const result = await window.electronAPI?.grail.updateProgress(entry);
+    if (!result?.success) {
+      throw new Error('Failed to save manual progress');
     }
 
-    const existingProgress = progress.find(
-      (p) => p.itemId === itemId && p.characterId === selectedCharacterId,
+    // The main process also broadcasts a progress reload, which may already include the entry
+    set((state) =>
+      state.progress.some((p) => p.id === entry.id)
+        ? state
+        : { progress: [...state.progress, entry] },
     );
+  },
 
-    let newProgress: GrailProgress[];
-
-    if (existingProgress) {
-      // Toggle existing progress
-      const isCurrentlyFound = existingProgress.foundDate !== undefined;
-      newProgress = progress.map((p) =>
-        p.itemId === itemId && p.characterId === selectedCharacterId
-          ? {
-              ...p,
-              foundDate: !isCurrentlyFound ? new Date() : undefined,
-              foundBy: !isCurrentlyFound ? foundBy : undefined,
-              manuallyAdded,
-            }
-          : p,
-      );
-    } else {
-      // Create new progress entry
-      const newEntry: GrailProgress = {
-        id: `${selectedCharacterId}-${itemId}-${Date.now()}`,
-        characterId: selectedCharacterId,
-        itemId,
-        foundDate: new Date(),
-        foundBy,
-        manuallyAdded,
-        isEthereal: false, // Default to normal version
-      };
-      newProgress = [...progress, newEntry];
+  removeProgress: async (progressId) => {
+    const result = await window.electronAPI?.grail.deleteProgress(progressId);
+    if (!result) {
+      throw new Error('Failed to remove progress');
     }
 
-    set({ progress: newProgress });
-
-    // Persist to database via IPC
-    const updatedEntry = newProgress.find(
-      (p) => p.itemId === itemId && p.characterId === selectedCharacterId,
-    );
-    if (updatedEntry) {
-      window.electronAPI?.grail.updateProgress(updatedEntry);
+    // The main process only deletes manual records, so a failed delete of a manual (or already
+    // dropped) record means it is already gone and removal is idempotent. A failed delete of an
+    // auto-detected record is a real failure.
+    if (!result.success) {
+      const local = get().progress.find((p) => p.id === progressId);
+      if (local && !local.manuallyAdded) {
+        throw new Error('Failed to remove progress');
+      }
     }
+
+    set((state) => ({ progress: state.progress.filter((p) => p.id !== progressId) }));
   },
 
   // Reload all data from database
