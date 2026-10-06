@@ -15,6 +15,13 @@ import {
 export let widgetWindow: BrowserWindow | null = null;
 
 /**
+ * The display mode the widget window is currently sized for. Kept up to date whenever the window
+ * is created or resized by mode, so resize events are saved under the live mode rather than the
+ * settings captured at creation.
+ */
+let currentDisplayMode: WidgetDisplayMode = 'overall';
+
+/**
  * Size mapping for different widget display modes.
  * These are the default sizes used when no custom size is saved.
  */
@@ -68,6 +75,7 @@ export function createWidgetWindow(
 ): BrowserWindow {
   const displayMode = resolveWidgetDisplayMode(settings.widgetDisplay, settings.grailEthereal);
   const size = getWidgetSize(displayMode, settings);
+  currentDisplayMode = displayMode;
 
   // Get all displays
   const displays = screen.getAllDisplays();
@@ -184,11 +192,7 @@ export function createWidgetWindow(
   widgetWindow.on('resize', () => {
     if (widgetWindow && onSizeChange) {
       const bounds = widgetWindow.getBounds();
-      const currentDisplay = resolveWidgetDisplayMode(
-        settings.widgetDisplay,
-        settings.grailEthereal,
-      );
-      onSizeChange(currentDisplay, { width: bounds.width, height: bounds.height });
+      onSizeChange(currentDisplayMode, { width: bounds.width, height: bounds.height });
     }
   });
 
@@ -276,10 +280,10 @@ export function updateWidgetWindowSize(
   settings: Partial<Settings>,
 ): void {
   if (widgetWindow) {
-    const newSize = getWidgetSize(
-      resolveWidgetDisplayMode(display, settings.grailEthereal),
-      settings,
-    );
+    const resolvedDisplay = resolveWidgetDisplayMode(display, settings.grailEthereal);
+    const newSize = getWidgetSize(resolvedDisplay, settings);
+    // Set before resizing: setBounds emits a resize event that is saved under the current mode
+    currentDisplayMode = resolvedDisplay;
     const currentBounds = widgetWindow.getBounds();
     widgetWindow.setBounds({
       x: currentBounds.x,
@@ -301,6 +305,7 @@ export function resetWidgetWindowSize(
 ): { width: number; height: number } | null {
   if (widgetWindow && isWidgetDisplayMode(display)) {
     const defaultSize = SIZE_MAP[display];
+    currentDisplayMode = display;
     const currentBounds = widgetWindow.getBounds();
     widgetWindow.setBounds({
       x: currentBounds.x,

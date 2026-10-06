@@ -137,4 +137,68 @@ describe('widgetWindow display mode resolution', () => {
     expect(size).toBeNull();
     expect(window.setBounds).not.toHaveBeenCalled();
   });
+
+  it('When the display mode is switched after creation, Then a resize is saved under the new mode', () => {
+    // Arrange
+    const onSizeChange = vi.fn();
+    createWidgetWindow(
+      { widgetDisplay: 'overall', grailEthereal: true },
+      '/app',
+      undefined,
+      undefined,
+      undefined,
+      onSizeChange,
+    );
+    const window = created.windows[0] as MockWindow;
+    updateWidgetWindowSize('split', { widgetDisplay: 'split', grailEthereal: true });
+
+    // Act
+    window.handlers.get('resize')?.();
+
+    // Assert
+    expect(onSizeChange).toHaveBeenLastCalledWith('split', { width: 111, height: 222 });
+  });
+
+  it('If ethereal tracking is toggled after creation, Then resizes follow the resolved mode', () => {
+    // Arrange
+    const onSizeChange = vi.fn();
+    const stored: Partial<Settings> = { widgetDisplay: 'split', grailEthereal: true };
+    createWidgetWindow(stored, '/app', undefined, undefined, undefined, onSizeChange);
+    const window = created.windows[0] as MockWindow;
+
+    // Act
+    updateWidgetWindowSize('overall', { ...stored, grailEthereal: false });
+    window.handlers.get('resize')?.();
+
+    // Assert
+    expect(onSizeChange).toHaveBeenLastCalledWith('overall', { width: 111, height: 222 });
+
+    // Act
+    updateWidgetWindowSize('split', { ...stored, grailEthereal: true });
+    window.handlers.get('resize')?.();
+
+    // Assert
+    expect(onSizeChange).toHaveBeenLastCalledWith('split', { width: 111, height: 222 });
+  });
+
+  it('When the size is reset for a mode, Then a following resize is saved under that mode', () => {
+    // Arrange
+    const onSizeChange = vi.fn();
+    createWidgetWindow(
+      { widgetDisplay: 'overall', grailEthereal: true },
+      '/app',
+      undefined,
+      undefined,
+      undefined,
+      onSizeChange,
+    );
+    const window = created.windows[0] as MockWindow;
+
+    // Act
+    resetWidgetWindowSize('all');
+    window.handlers.get('resize')?.();
+
+    // Assert
+    expect(onSizeChange).toHaveBeenLastCalledWith('all', { width: 111, height: 222 });
+  });
 });

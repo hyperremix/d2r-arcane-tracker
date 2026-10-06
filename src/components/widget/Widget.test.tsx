@@ -489,6 +489,31 @@ describe('Widget display and legibility', () => {
     expect(getByText('Overall', { selector: 'div' }).className).not.toContain('text-gray');
   });
 
+  it('When the focusable widget root is hovered or focused, Then the drag grip brightens', () => {
+    // Arrange
+    const settings: Partial<Settings> = { widgetDisplay: 'overall' };
+
+    // Act
+    const { getByTestId, container } = render(
+      <Widget
+        statistics={statistics}
+        settings={settings}
+        onDragStart={() => ({})}
+        onDragEnd={() => ({})}
+      />,
+    );
+
+    // Assert
+    const root = container.firstElementChild as HTMLElement;
+    expect(root).toHaveAttribute('role', 'button');
+    expect(root).toHaveAttribute('tabindex', '0');
+    expect(root.className).toContain('group');
+    const gripClasses = getByTestId('widget-drag-grip').getAttribute('class') ?? '';
+    expect(gripClasses).toContain('opacity-30');
+    expect(gripClasses).toContain('group-hover:opacity-80');
+    expect(gripClasses).toContain('group-focus-visible:opacity-80');
+  });
+
   it('When the widget renders, Then it shows a decorative drag grip that ignores pointer events', () => {
     // Arrange
     const settings: Partial<Settings> = { widgetDisplay: 'overall' };
