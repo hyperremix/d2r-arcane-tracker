@@ -1,6 +1,10 @@
-import type { TerrorZone, TerrorZoneValidationResult } from 'electron/types/grail';
+import type {
+  TerrorZone,
+  TerrorZoneValidationErrorCode,
+  TerrorZoneValidationResult,
+} from 'electron/types/grail';
 import { AlertCircle, AlertTriangle, RotateCcw, Search, XCircle } from 'lucide-react';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import {
@@ -24,7 +28,7 @@ import { translations } from '@/i18n/translations';
 /**
  * Maps validation error codes from the main process to translation keys.
  */
-const validationErrorKeys: Record<NonNullable<TerrorZoneValidationResult['errorCode']>, string> = {
+const validationErrorKeys: Record<TerrorZoneValidationErrorCode, string> = {
   pathNotConfigured: translations.terrorZone.pathNotConfigured,
   directoryNotFound: translations.terrorZone.validationErrors.directoryNotFound,
   gameFileNotFound: translations.terrorZone.validationErrors.gameFileNotFound,
@@ -40,6 +44,7 @@ const validationErrorKeys: Record<NonNullable<TerrorZoneValidationResult['errorC
  */
 export function TerrorZoneConfiguration() {
   const { t } = useTranslation();
+  const zoneLabelIdPrefix = useId();
   const [zones, setZones] = useState<TerrorZone[]>([]);
   const [config, setConfig] = useState<Record<string, boolean>>({});
   const [searchTerm, setSearchTerm] = useState('');
@@ -47,6 +52,7 @@ export function TerrorZoneConfiguration() {
   const [isSaving, setIsSaving] = useState(false);
   const [validationStatus, setValidationStatus] = useState<TerrorZoneValidationResult>({
     valid: false,
+    errorCode: 'pathNotConfigured',
   });
   const [showRestoreDialog, setShowRestoreDialog] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -185,9 +191,9 @@ export function TerrorZoneConfiguration() {
   }, 0);
   const totalCount = zones.length;
 
-  const validationErrorMessage = validationStatus.errorCode
-    ? t(validationErrorKeys[validationStatus.errorCode])
-    : validationStatus.error || t(translations.terrorZone.pathNotConfigured);
+  const validationErrorMessage = validationStatus.valid
+    ? undefined
+    : t(validationErrorKeys[validationStatus.errorCode]);
   const showExtractionGuide = validationStatus.errorCode === 'gameFileNotFound';
 
   if (isLoading) {
@@ -365,12 +371,12 @@ export function TerrorZoneConfiguration() {
                 {filteredZones.map((zone) => (
                   <div key={zone.id} className="flex flex-1 items-center gap-4">
                     <Switch
-                      id={`zone-${zone.id}`}
+                      aria-labelledby={`${zoneLabelIdPrefix}-${zone.id}`}
                       checked={config[zone.id] ?? true}
                       onCheckedChange={(checked: boolean) => handleZoneToggle(zone.id, checked)}
                       disabled={isSaving || !validationStatus.valid}
                     />
-                    <Label htmlFor={`zone-${zone.id}`} className="font-medium">
+                    <Label id={`${zoneLabelIdPrefix}-${zone.id}`} className="font-medium">
                       {zone.name}
                     </Label>
                   </div>

@@ -601,12 +601,9 @@ export type TerrorZoneValidationErrorCode =
 /**
  * Result of validating the D2R installation for terror zone configuration.
  */
-export interface TerrorZoneValidationResult {
-  valid: boolean;
-  path?: string;
-  error?: string;
-  errorCode?: TerrorZoneValidationErrorCode;
-}
+export type TerrorZoneValidationResult =
+  | { valid: true; path?: string; error?: undefined; errorCode?: undefined }
+  | { valid: false; path?: string; error?: string; errorCode: TerrorZoneValidationErrorCode };
 
 /**
  * Type representing comprehensive Holy Grail statistics.

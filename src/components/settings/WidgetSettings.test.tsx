@@ -168,7 +168,30 @@ describe('WidgetSettings', () => {
       expect(screen.getByRole('radio', { name: 'Run Only' })).not.toBeChecked();
     });
 
-    it('Then all display mode radios share one name so arrow keys move between them', () => {
+    it('Then the enable and run item list switches are described by their help text', () => {
+      // Arrange & Act
+      render(<WidgetSettings />);
+
+      // Assert
+      expect(screen.getByLabelText('Enable Widget')).toHaveAccessibleDescription(
+        'Show an overlay widget with grail progress',
+      );
+      expect(screen.getByLabelText('Show Run Item List')).toHaveAccessibleDescription(
+        'In Run Only mode, show a compact text list of grail-relevant items found each run.',
+      );
+    });
+
+    it('Then the display mode group is described by its help text', () => {
+      // Arrange & Act
+      render(<WidgetSettings />);
+
+      // Assert
+      expect(screen.getByRole('group', { name: 'Display Mode' })).toHaveAccessibleDescription(
+        /Overall: Total progress only/,
+      );
+    });
+
+    it('Then all display mode radios share one native radio group name (browser arrow-key navigation is not simulated by jsdom)', () => {
       // Arrange & Act
       render(<WidgetSettings />);
 

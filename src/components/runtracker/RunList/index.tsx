@@ -3,6 +3,7 @@ import type { Run, RunItem } from 'electron/types/grail';
 import { ChevronLeft, ChevronRight as ChevronRightIcon } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { SortableTableHead, type SortOrder } from '@/components/runtracker/SortableTableHead';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -12,7 +13,6 @@ import { translations } from '@/i18n/translations';
 import { formatTimestamp } from '@/lib/utils';
 import { useGrailStore } from '@/stores/grailStore';
 import { useRunTrackerStore } from '@/stores/runTrackerStore';
-import { SortableTableHead, type SortOrder } from '../SortableTableHead';
 import { RunDetailsDialog } from './RunDetailsDialog';
 import { RunRow, TableRowSkeleton } from './RunRow';
 

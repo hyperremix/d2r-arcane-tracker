@@ -136,12 +136,26 @@ describe('SessionCard', () => {
   });
 
   describe('When the icon-only export button is shown', () => {
-    it('Then it has an accessible name', () => {
+    it('If the session has runs, Then the button is enabled and named "Export session data"', () => {
       // Arrange & Act
       render(<SessionCard session={mockSession} />);
 
       // Assert
       expect(screen.getByRole('button', { name: 'Export session data' })).toBeEnabled();
+    });
+
+    it('If the session has no runs, Then the title explains why but the accessible name stays "Export session data"', () => {
+      // Arrange
+      const emptySession: Session = { ...mockSession, runCount: 0 };
+      mockUseRunTrackerStore.mockReturnValue(createStoreState({ activeSession: emptySession }));
+
+      // Act
+      render(<SessionCard session={emptySession} />);
+
+      // Assert
+      const exportButton = screen.getByRole('button', { name: 'Export session data' });
+      expect(exportButton).toHaveAttribute('title', 'No runs to export');
+      expect(exportButton).toBeDisabled();
     });
   });
 });

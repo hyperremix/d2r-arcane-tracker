@@ -147,5 +147,47 @@ describe('TerrorZoneService', () => {
       // Assert
       expect(result).toMatchObject({ valid: false, errorCode: 'gameFileNotFound' });
     });
+
+    it('If the game file has no desecrated_zones array, Then returns the invalidStructure error code', async () => {
+      // Arrange
+      const installDir = path.join(tempDir, 'bad-structure-install');
+      const installedGameFile = path.join(
+        installDir,
+        'Data',
+        'hd',
+        'global',
+        'excel',
+        'desecratedzones.json',
+      );
+      mkdirSync(path.dirname(installedGameFile), { recursive: true });
+      writeFileSync(installedGameFile, JSON.stringify({ something_else: [] }), 'utf-8');
+
+      // Act
+      const result = await service.validateGameFile(installDir);
+
+      // Assert
+      expect(result).toMatchObject({ valid: false, errorCode: 'invalidStructure' });
+    });
+
+    it('If the game file is not parseable JSON, Then returns the corruptedFile error code', async () => {
+      // Arrange
+      const installDir = path.join(tempDir, 'corrupt-install');
+      const installedGameFile = path.join(
+        installDir,
+        'Data',
+        'hd',
+        'global',
+        'excel',
+        'desecratedzones.json',
+      );
+      mkdirSync(path.dirname(installedGameFile), { recursive: true });
+      writeFileSync(installedGameFile, '{ "desecrated_zones": [ not json', 'utf-8');
+
+      // Act
+      const result = await service.validateGameFile(installDir);
+
+      // Assert
+      expect(result).toMatchObject({ valid: false, errorCode: 'corruptedFile' });
+    });
   });
 });

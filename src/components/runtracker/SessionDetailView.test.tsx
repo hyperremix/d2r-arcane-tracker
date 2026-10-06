@@ -123,7 +123,6 @@ describe('SessionDetailView', () => {
       created: new Date(2024, 0, 1, 14, 5, 6),
       lastUpdated: new Date(2024, 0, 1, 15, 7, 8),
     };
-    let toLocaleTimeStringSpy: ReturnType<typeof vi.spyOn> | undefined;
 
     beforeEach(() => {
       mockUseRunTrackerStore.mockReturnValue(
@@ -135,8 +134,6 @@ describe('SessionDetailView', () => {
     });
 
     afterEach(async () => {
-      toLocaleTimeStringSpy?.mockRestore();
-      toLocaleTimeStringSpy = undefined;
       await i18n.changeLanguage('en');
     });
 
@@ -159,17 +156,25 @@ describe('SessionDetailView', () => {
       );
     });
 
-    it('If the active language changes, Then session times are formatted for that language', async () => {
+    it('If the active language is English, Then session times are shown in 12-hour format', () => {
+      // Arrange & Act
+      render(<SessionDetailView sessionId={archivedSession.id} onBack={vi.fn()} />);
+
+      // Assert
+      expect(screen.getByText(/^0?2:05:06\sPM$/)).toBeInTheDocument();
+      expect(screen.getByText(/^0?3:07:08\sPM$/)).toBeInTheDocument();
+    });
+
+    it('If the active language changes to Swedish, Then session times are shown in 24-hour format', async () => {
       // Arrange
-      toLocaleTimeStringSpy = vi.spyOn(Date.prototype, 'toLocaleTimeString');
       await i18n.changeLanguage('sv');
 
       // Act
       render(<SessionDetailView sessionId={archivedSession.id} onBack={vi.fn()} />);
 
       // Assert
-      expect(toLocaleTimeStringSpy).toHaveBeenCalledWith('sv', expect.any(Object));
-      expect(toLocaleTimeStringSpy).not.toHaveBeenCalledWith('en-US', expect.anything());
+      expect(screen.getByText('14:05:06')).toBeInTheDocument();
+      expect(screen.getByText('15:07:08')).toBeInTheDocument();
     });
   });
 
