@@ -74,6 +74,10 @@ describe('When the real SaveDirectoryStep is rendered inside SetupWizard', () =>
   afterEach(() => {
     installElectronAPI(originalElectronAPI);
     useWizardStore.setState({ isOpen: false, currentStep: 0 });
+    // Drop the module instances created in beforeEach so later files sharing this worker do not
+    // inherit a divergent registry (and grailStore mock) from this file.
+    vi.clearAllMocks();
+    vi.resetModules();
   });
 
   describe('If the user presses Escape on the destructive confirmation dialog', () => {
