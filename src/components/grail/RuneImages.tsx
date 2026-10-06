@@ -164,9 +164,9 @@ function RuneImage({
     <Tooltip>
       <TooltipTrigger className="relative flex items-center justify-center">
         {isLoading ? (
-          <div className="absolute inset-0 animate-pulse rounded bg-gray-200 dark:bg-gray-700" />
+          <div className="absolute inset-0 animate-pulse rounded bg-muted" />
         ) : imageUrl ? (
-          <div className={cn('relative', isMissing && 'rounded-lg bg-red-400 p-1 dark:bg-red-900')}>
+          <div className={cn('relative', isMissing && 'rounded-lg bg-missing/50 p-1')}>
             <div className="flex flex-col items-center justify-center">
               <img
                 src={imageUrl}
@@ -181,7 +181,7 @@ function RuneImage({
             </div>
           </div>
         ) : (
-          <div className={cn(isMissing && 'rounded-lg bg-red-400 p-1 dark:bg-red-900')}>
+          <div className={cn(isMissing && 'rounded-lg bg-missing/50 p-1')}>
             <div className="text-center text-xs">{runeName}</div>
           </div>
         )}

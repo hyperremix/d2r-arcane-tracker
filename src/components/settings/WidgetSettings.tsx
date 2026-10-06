@@ -165,7 +165,7 @@ export function WidgetSettings() {
             <p className="text-muted-foreground text-xs">
               {t(translations.settings.widget.displayModeDescription)}
               {!settings.grailEthereal && (
-                <span className="text-yellow-600">
+                <span className="text-warning">
                   {' '}
                   {t(translations.settings.widget.splitAllRequireEthereal)}
                 </span>
@@ -250,8 +250,8 @@ export function WidgetSettings() {
           </div>
 
           {/* Widget Preview Description */}
-          <div className="rounded-lg bg-blue-50 p-3 dark:bg-blue-950">
-            <p className="text-blue-800 text-xs dark:text-blue-200">
+          <div className="rounded-lg bg-info/10 p-3">
+            <p className="text-info text-xs">
               <strong>{t(translations.settings.widget.features)}</strong>
               <br />• {t(translations.settings.widget.featureAlwaysOnTop)}
               <br />• {t(translations.settings.widget.featureTransparent)}

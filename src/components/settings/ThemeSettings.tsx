@@ -53,7 +53,9 @@ export function ThemeSettings() {
               <Label htmlFor={themeSelectId} className="font-medium text-sm">
                 {t(translations.settings.theme.appearance)}
               </Label>
-              <p className="text-gray-600 text-xs">{t(translations.settings.theme.selectTheme)}</p>
+              <p className="text-muted-foreground text-xs">
+                {t(translations.settings.theme.selectTheme)}
+              </p>
             </div>
             <Select
               value={settings.theme}
@@ -86,8 +88,8 @@ export function ThemeSettings() {
           </div>
         </div>
 
-        <div className="rounded-lg bg-blue-50 p-3 dark:bg-blue-950">
-          <p className="text-blue-800 text-xs dark:text-blue-200">
+        <div className="rounded-lg bg-info/10 p-3">
+          <p className="text-info text-xs">
             <strong>{t(translations.common.note)}</strong> {t(translations.settings.theme.note)}
           </p>
         </div>

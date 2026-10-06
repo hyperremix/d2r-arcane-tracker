@@ -154,12 +154,12 @@ export function UpdateSettings() {
 
   const getStatusColor = () => {
     if (updateStatus.error) {
-      return 'text-red-600 dark:text-red-400';
+      return 'text-destructive';
     }
     if (updateStatus.available || updateStatus.downloaded) {
-      return 'text-blue-600 dark:text-blue-400';
+      return 'text-info';
     }
-    return 'text-green-600 dark:text-green-400';
+    return 'text-success';
   };
 
   return (
@@ -178,7 +178,7 @@ export function UpdateSettings() {
                 <p className="font-medium text-sm">
                   {t(translations.settings.update.currentVersion)}
                 </p>
-                <p className="text-gray-600 text-xs dark:text-gray-400">{currentVersion}</p>
+                <p className="text-muted-foreground text-xs">{currentVersion}</p>
               </div>
             </div>
 
@@ -190,7 +190,7 @@ export function UpdateSettings() {
               {updateStatus.downloading && updateStatus.info?.downloadedPercent !== undefined && (
                 <div className="space-y-1">
                   <Progress value={updateStatus.info.downloadedPercent} className="h-2" />
-                  <p className="text-gray-600 text-xs dark:text-gray-400">
+                  <p className="text-muted-foreground text-xs">
                     {t(translations.settings.update.percentDownloaded, {
                       percent: updateStatus.info.downloadedPercent.toFixed(1),
                     })}
@@ -225,8 +225,8 @@ export function UpdateSettings() {
             </div>
           </div>
 
-          <div className="rounded-lg bg-blue-50 p-3 dark:bg-blue-950">
-            <p className="text-blue-800 text-xs dark:text-blue-200">
+          <div className="rounded-lg bg-info/10 p-3">
+            <p className="text-info text-xs">
               <strong>{t(translations.common.note)}</strong> {t(translations.settings.update.note)}
             </p>
           </div>

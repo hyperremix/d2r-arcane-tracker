@@ -75,7 +75,7 @@ export function UpdateDialog({
               <p className="font-medium text-sm">
                 {t(translations.settings.updateDialog.version, { version: updateInfo.version })}
                 {updateInfo.releaseDate && (
-                  <span className="ml-2 font-normal text-gray-600 dark:text-gray-400">
+                  <span className="ml-2 font-normal text-muted-foreground">
                     {t(translations.settings.updateDialog.released, {
                       date: formatShortDate(updateInfo.releaseDate),
                     })}
@@ -85,7 +85,7 @@ export function UpdateDialog({
             </div>
 
             {updateInfo.releaseNotes && (
-              <div className="rounded-lg bg-gray-50 p-3 dark:bg-gray-900">
+              <div className="rounded-lg bg-muted p-3">
                 <p className="mb-2 font-medium text-sm">
                   {t(translations.settings.updateDialog.releaseNotes)}
                 </p>

@@ -78,17 +78,17 @@ export function ItemTypeIcon({ type, className }: ItemTypeIconProps) {
   const Icon = iconMap[type as keyof typeof iconMap] || Circle;
 
   const colorMap = {
-    unique: 'text-yellow-500',
-    set: 'text-green-500',
-    rune: 'text-orange-500',
-    runeword: 'text-purple-500',
+    unique: 'text-item-unique',
+    set: 'text-item-set',
+    rune: 'text-item-rune',
+    runeword: 'text-item-runeword',
   };
 
   return (
     <Icon
       className={cn(
         'h-4 w-4',
-        colorMap[type as keyof typeof colorMap] || 'text-gray-500',
+        colorMap[type as keyof typeof colorMap] || 'text-muted-foreground',
         className,
       )}
     />
@@ -118,10 +118,7 @@ export function RecentDiscoveryIndicator({ foundDate, className }: RecentDiscove
     <Tooltip>
       <TooltipTrigger>
         <Flame
-          className={cn(
-            'h-6 w-6 rounded-full bg-white pb-0.5 text-orange-500 dark:bg-gray-950',
-            className,
-          )}
+          className={cn('h-6 w-6 rounded-full bg-background pb-0.5 text-item-rune', className)}
         />
       </TooltipTrigger>
       <TooltipContent>

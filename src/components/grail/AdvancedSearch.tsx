@@ -268,7 +268,7 @@ export function AdvancedSearch() {
         <div className="flex gap-2">
           {/* Search */}
           <div className="space-y-2">
-            <Label htmlFor={advancedSearchId} className="text-gray-600 text-xs dark:text-gray-400">
+            <Label htmlFor={advancedSearchId} className="text-muted-foreground text-xs">
               {t(translations.grail.advancedSearch.searchLabel)}
             </Label>
             <Input
@@ -294,7 +294,7 @@ export function AdvancedSearch() {
 
           {/* Status */}
           <div className="space-y-2">
-            <Label className="text-gray-600 text-xs dark:text-gray-400">
+            <Label className="text-muted-foreground text-xs">
               {t(translations.grail.advancedSearch.status)}
             </Label>
             <Select
@@ -322,7 +322,7 @@ export function AdvancedSearch() {
         <div className="flex gap-2">
           {/* Categories */}
           <div className="space-y-2">
-            <Label className="text-gray-600 text-xs dark:text-gray-400">
+            <Label className="text-muted-foreground text-xs">
               {t(translations.grail.advancedSearch.categories)}
             </Label>
             <div className="space-y-2">
@@ -343,7 +343,7 @@ export function AdvancedSearch() {
 
           {/* Types */}
           <div className="space-y-2">
-            <Label className="text-gray-600 text-xs dark:text-gray-400">
+            <Label className="text-muted-foreground text-xs">
               {t(translations.grail.advancedSearch.types)}
             </Label>
             <div className="space-y-2">
@@ -366,7 +366,7 @@ export function AdvancedSearch() {
         {/* Sorting */}
         <div className="flex items-center gap-2">
           <div className="space-y-2">
-            <Label className="text-gray-600 text-xs dark:text-gray-400">
+            <Label className="text-muted-foreground text-xs">
               {t(translations.grail.advancedSearch.sortBy)}
             </Label>
             <Select
@@ -390,7 +390,7 @@ export function AdvancedSearch() {
             </Select>
           </div>
           <div className="space-y-2">
-            <Label className="text-gray-600 text-xs dark:text-gray-400">
+            <Label className="text-muted-foreground text-xs">
               {t(translations.grail.advancedSearch.sortOrder)}
             </Label>
             <Select

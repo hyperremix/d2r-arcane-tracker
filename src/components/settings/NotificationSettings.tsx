@@ -62,7 +62,7 @@ export function NotificationSettings() {
                 <Bell className="h-4 w-4" />
                 {t(translations.settings.notifications.soundNotifications)}
               </h4>
-              <p className="text-gray-600 text-xs dark:text-gray-400">
+              <p className="text-muted-foreground text-xs">
                 {t(translations.settings.notifications.soundDescription)}
               </p>
             </div>
@@ -70,7 +70,7 @@ export function NotificationSettings() {
           </div>
 
           <div className="flex items-center gap-2">
-            <Label htmlFor={volumeSliderId} className="text-gray-600 text-xs dark:text-gray-400">
+            <Label htmlFor={volumeSliderId} className="text-muted-foreground text-xs">
               {t(translations.settings.notifications.volume)}
             </Label>
             <Slider
@@ -86,7 +86,7 @@ export function NotificationSettings() {
               className="w-20"
               disabled={!settings.enableSounds}
             />
-            <span className="w-8 text-gray-600 text-xs dark:text-gray-400">
+            <span className="w-8 text-muted-foreground text-xs">
               {Math.round((settings.enableSounds ? settings.notificationVolume : 0) * 100)}%
             </span>
           </div>
@@ -99,7 +99,7 @@ export function NotificationSettings() {
                 <Monitor className="h-4 w-4" />
                 {t(translations.settings.notifications.inAppNotifications)}
               </h4>
-              <p className="text-gray-600 text-xs dark:text-gray-400">
+              <p className="text-muted-foreground text-xs">
                 {t(translations.settings.notifications.inAppDescription)}
               </p>
             </div>
@@ -117,7 +117,7 @@ export function NotificationSettings() {
                 <Smartphone className="h-4 w-4" />
                 {t(translations.settings.notifications.nativeNotifications)}
               </h4>
-              <p className="text-gray-600 text-xs dark:text-gray-400">
+              <p className="text-muted-foreground text-xs">
                 {t(translations.settings.notifications.nativeDescription)}
               </p>
             </div>
@@ -128,8 +128,8 @@ export function NotificationSettings() {
           </div>
         </div>
 
-        <div className="rounded-lg bg-blue-50 p-3 dark:bg-blue-950">
-          <p className="text-blue-800 text-xs dark:text-blue-200">
+        <div className="rounded-lg bg-info/10 p-3">
+          <p className="text-info text-xs">
             <strong>{t(translations.common.note)}</strong>{' '}
             {t(translations.settings.notifications.nativeNote)}
           </p>

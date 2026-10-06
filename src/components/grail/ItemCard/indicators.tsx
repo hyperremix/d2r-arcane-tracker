@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { translations } from '@/i18n/translations';
 import { isEtherealOnly, shouldShowEtherealStatus, shouldShowNormalStatus } from '@/lib/ethereal';
-import { formatShortDate, isRecentFind } from '@/lib/utils';
+import { cn, formatShortDate, isRecentFind } from '@/lib/utils';
 import { CharacterIcon, RecentDiscoveryIndicator } from '../StatusIcons';
 
 /**
@@ -23,7 +23,7 @@ export function DiscoveryInfo({ allProgress, characters }: DiscoveryInfoProps) {
   if (allProgress.length === 0) return null;
 
   return (
-    <div className="mt-2 border-gray-200 border-t pt-2">
+    <div className="mt-2 border-border border-t pt-2">
       <p className="font-medium text-xs">{t(translations.grail.itemCard.discoveryInfo)}</p>
       {allProgress.slice(0, 3).map((p) => {
         const character = characters.find((c) => c.id === p.characterId);
@@ -34,19 +34,23 @@ export function DiscoveryInfo({ allProgress, characters }: DiscoveryInfoProps) {
               <CharacterIcon characterClass={character.characterClass} className="h-3 w-3" />
             )}
             <span>{character?.name || t(translations.common.unknown)}</span>
-            <span className="text-blue-600 text-xs">
+            <span
+              className={cn('text-xs', isEthProgress ? 'text-ethereal' : 'text-muted-foreground')}
+            >
               (
               {isEthProgress
                 ? t(translations.grail.itemCard.eth)
                 : t(translations.grail.itemCard.normal)}
               )
             </span>
-            {p.foundDate && <span className="text-gray-500">• {formatShortDate(p.foundDate)}</span>}
+            {p.foundDate && (
+              <span className="text-muted-foreground">• {formatShortDate(p.foundDate)}</span>
+            )}
           </div>
         );
       })}
       {allProgress.length > 3 && (
-        <p className="mt-1 text-gray-500 text-xs">
+        <p className="mt-1 text-muted-foreground text-xs">
           {t(translations.grail.itemCard.moreDiscoveries, { count: allProgress.length - 3 })}
         </p>
       )}
@@ -149,9 +153,9 @@ export function StatusIndicators({
       <Tooltip>
         <TooltipTrigger>
           {allVersionsFound ? (
-            <CheckCheck className="h-5 w-5 rounded-full bg-white text-green-600 dark:bg-gray-950" />
+            <CheckCheck className="h-5 w-5 rounded-full bg-background text-found" />
           ) : (
-            <Check className="h-5 w-5 rounded-full bg-white text-yellow-600 dark:bg-gray-950" />
+            <Check className="h-5 w-5 rounded-full bg-background text-warning" />
           )}
         </TooltipTrigger>
         <TooltipContent>
@@ -177,7 +181,7 @@ export function DiscoveryAttribution({ discoveringCharacters, item }: DiscoveryA
   const { t } = useTranslation();
   return (
     <div className="flex items-center justify-center gap-1 pt-3">
-      <span className="text-gray-500 text-xs dark:text-gray-400">
+      <span className="text-muted-foreground text-xs">
         {t(translations.grail.itemCard.foundBy)}
       </span>
       <div className="flex items-center gap-1">
@@ -187,7 +191,7 @@ export function DiscoveryAttribution({ discoveringCharacters, item }: DiscoveryA
               <TooltipTrigger>
                 <CharacterIcon
                   characterClass={character.characterClass}
-                  className="text-gray-500 dark:text-gray-400"
+                  className="text-muted-foreground"
                 />
               </TooltipTrigger>
               <TooltipContent>
@@ -199,9 +203,7 @@ export function DiscoveryAttribution({ discoveringCharacters, item }: DiscoveryA
           ) : null,
         )}
         {discoveringCharacters.length > 2 && (
-          <span className="text-gray-500 text-xs dark:text-gray-400">
-            +{discoveringCharacters.length - 2}
-          </span>
+          <span className="text-muted-foreground text-xs">+{discoveringCharacters.length - 2}</span>
         )}
       </div>
     </div>
@@ -236,12 +238,12 @@ export function VersionCounts({
   return (
     <div className="flex items-center justify-center gap-2 pt-2">
       {shouldShowNormalStatus(item, settings) && normalCount > 0 && (
-        <span className="rounded bg-green-100 px-2 py-1 font-medium text-green-700 text-xs dark:bg-green-900 dark:text-green-200">
+        <span className="rounded bg-found/15 px-2 py-1 font-medium text-found text-xs">
           {t(translations.grail.itemCard.normalCount, { count: normalCount })}
         </span>
       )}
       {shouldShowEtherealStatus(item, settings) && etherealCount > 0 && (
-        <span className="rounded bg-blue-100 px-2 py-1 font-medium text-blue-700 text-xs dark:bg-blue-900 dark:text-blue-200">
+        <span className="rounded bg-ethereal/15 px-2 py-1 font-medium text-ethereal text-xs">
           {isEtherealOnly(item)
             ? t(translations.grail.itemCard.etherealOnly)
             : t(translations.grail.itemCard.etherealCount, { count: etherealCount })}

@@ -99,7 +99,7 @@ export function RunAnalytics() {
     return (
       <div className="flex items-center justify-center p-8">
         <div className="text-center">
-          <div className="mb-4 h-8 w-8 animate-spin rounded-full border-4 border-gray-300 border-t-blue-600" />
+          <div className="mb-4 h-8 w-8 animate-spin rounded-full border-4 border-muted border-t-primary" />
           <p className="text-muted-foreground">
             {t(translations.statistics.runAnalytics.loadingAnalytics)}
           </p>

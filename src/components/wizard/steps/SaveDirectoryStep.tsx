@@ -169,19 +169,17 @@ export function SaveDirectoryStep() {
         {saveDir && !isLoading && (
           <div
             className={`flex items-start gap-2 rounded-lg border p-4 ${
-              hasD2SFiles
-                ? 'border-green-200 bg-green-50 dark:border-green-900 dark:bg-green-950'
-                : 'border-yellow-200 bg-yellow-50 dark:border-yellow-900 dark:bg-yellow-950'
+              hasD2SFiles ? 'border-success/30 bg-success/10' : 'border-warning/30 bg-warning/10'
             }`}
           >
             {hasD2SFiles ? (
               <>
-                <CheckCircle className="mt-0.5 h-5 w-5 text-green-600 dark:text-green-400" />
+                <CheckCircle className="mt-0.5 h-5 w-5 text-success" />
                 <div className="flex-1">
-                  <p className="font-medium text-green-800 text-sm dark:text-green-200">
+                  <p className="font-medium text-sm text-success">
                     {t(translations.wizard.saveDirectory.validated)}
                   </p>
-                  <p className="text-green-700 text-xs dark:text-green-300">
+                  <p className="text-success text-xs">
                     {t(translations.wizard.saveDirectory.foundCharacters, {
                       count: saveFiles.length,
                     })}
@@ -190,12 +188,12 @@ export function SaveDirectoryStep() {
               </>
             ) : (
               <>
-                <AlertTriangle className="mt-0.5 h-5 w-5 text-yellow-600 dark:text-yellow-400" />
+                <AlertTriangle className="mt-0.5 h-5 w-5 text-warning" />
                 <div className="flex-1">
-                  <p className="font-medium text-sm text-yellow-800 dark:text-yellow-200">
+                  <p className="font-medium text-sm text-warning">
                     {t(translations.wizard.saveDirectory.noCharacterFiles)}
                   </p>
-                  <p className="text-xs text-yellow-700 dark:text-yellow-300">
+                  <p className="text-warning text-xs">
                     {t(translations.wizard.saveDirectory.noCharacterFilesHint)}
                   </p>
                 </div>
@@ -205,11 +203,11 @@ export function SaveDirectoryStep() {
         )}
 
         {/* Info Box */}
-        <div className="rounded-lg bg-blue-50 p-4 dark:bg-blue-950">
-          <p className="text-blue-800 text-sm dark:text-blue-200">
+        <div className="rounded-lg bg-info/10 p-4">
+          <p className="text-info text-sm">
             <strong>{t(translations.wizard.saveDirectory.typicalLocation)}</strong>
           </p>
-          <p className="font-mono text-blue-700 text-xs dark:text-blue-300">
+          <p className="font-mono text-info text-xs">
             {window.electronAPI?.platform === 'win32'
               ? t(translations.wizard.saveDirectory.typicalLocationWindows)
               : t(translations.wizard.saveDirectory.typicalLocationMac)}

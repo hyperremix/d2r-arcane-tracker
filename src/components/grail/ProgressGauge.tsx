@@ -33,8 +33,8 @@ interface ToneClasses {
 
 const toneConfig: Record<GaugeTone, ToneClasses> = {
   default: {
-    secondaryText: 'text-gray-500 dark:text-gray-400',
-    track: 'text-zinc-300 dark:text-zinc-800',
+    secondaryText: 'text-muted-foreground',
+    track: 'text-muted-foreground/30',
   },
   overlay: {
     secondaryText: 'text-white/85',
@@ -48,24 +48,20 @@ const toneConfig: Record<GaugeTone, ToneClasses> = {
  */
 const colorConfig = {
   blue: {
-    stroke:
-      'text-blue-600 group-hover:text-blue-700 dark:text-blue-500 dark:group-hover:text-blue-400',
-    text: 'text-blue-600 dark:text-blue-500',
+    stroke: 'text-ethereal group-hover:text-ethereal/80',
+    text: 'text-ethereal',
   },
   green: {
-    stroke:
-      'text-green-600 group-hover:text-green-700 dark:text-green-500 dark:group-hover:text-green-400',
-    text: 'text-green-600 dark:text-green-500',
+    stroke: 'text-chart-3 group-hover:text-chart-3/80',
+    text: 'text-item-set',
   },
   purple: {
-    stroke:
-      'text-purple-600 group-hover:text-purple-700 dark:text-purple-500 dark:group-hover:text-purple-400',
-    text: 'text-purple-600 dark:text-purple-500',
+    stroke: 'text-chart-4 group-hover:text-chart-4/80',
+    text: 'text-item-runeword',
   },
   orange: {
-    stroke:
-      'text-orange-600 group-hover:text-orange-700 dark:text-orange-500 dark:group-hover:text-orange-400',
-    text: 'text-orange-600 dark:text-orange-500',
+    stroke: 'text-chart-5 group-hover:text-chart-5/80',
+    text: 'text-item-rune',
   },
 };
 

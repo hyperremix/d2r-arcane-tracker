@@ -82,8 +82,8 @@ export function CompletionStep() {
   return (
     <div className="space-y-6">
       <div className="flex flex-col items-center gap-4 text-center">
-        <div className="rounded-full bg-gradient-to-br from-green-500 to-emerald-500 p-4">
-          <CheckCircle2 className="h-12 w-12 text-white" />
+        <div className="rounded-full bg-success p-4">
+          <CheckCircle2 className="h-12 w-12 text-success-foreground" />
         </div>
         <h2 className="font-bold text-2xl">{t(translations.wizard.completion.title)}</h2>
         <p className="max-w-lg text-muted-foreground">
