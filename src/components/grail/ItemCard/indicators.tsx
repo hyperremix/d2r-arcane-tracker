@@ -6,6 +6,7 @@ import { translations } from '@/i18n/translations';
 import { isEtherealOnly, shouldShowEtherealStatus, shouldShowNormalStatus } from '@/lib/ethereal';
 import { cn, formatShortDate, isRecentFind } from '@/lib/utils';
 import { CharacterIcon, RecentDiscoveryIndicator } from '../StatusIcons';
+import { getTooltipTriggerRender } from '../tooltipTriggerRender';
 
 /**
  * Props interface for the DiscoveryInfo component.
@@ -108,6 +109,7 @@ export interface StatusIndicatorsProps {
   normalProgress: GrailProgress[];
   etherealProgress: GrailProgress[];
   settings: Settings;
+  focusableTriggers?: boolean;
 }
 
 /**
@@ -119,6 +121,7 @@ export function StatusIndicators({
   normalProgress,
   etherealProgress,
   settings,
+  focusableTriggers = true,
 }: StatusIndicatorsProps) {
   const { t } = useTranslation();
   if (
@@ -128,7 +131,10 @@ export function StatusIndicators({
   ) {
     return (
       <div className="-top-3 -right-3 absolute z-40">
-        <RecentDiscoveryIndicator foundDate={mostRecentDiscovery.foundDate} />
+        <RecentDiscoveryIndicator
+          foundDate={mostRecentDiscovery.foundDate}
+          focusableTriggers={focusableTriggers}
+        />
       </div>
     );
   }
@@ -151,7 +157,8 @@ export function StatusIndicators({
   return (
     <div className="-top-3 -right-3 absolute z-40">
       <Tooltip>
-        <TooltipTrigger>
+        {/* Rendered as a span inside an interactive card so it adds no nested tab stop */}
+        <TooltipTrigger render={getTooltipTriggerRender(focusableTriggers)} className="inline-flex">
           {allVersionsFound ? (
             <CheckCheck className="h-5 w-5 rounded-full bg-background text-found" />
           ) : (
@@ -172,12 +179,17 @@ export function StatusIndicators({
 export interface DiscoveryAttributionProps {
   discoveringCharacters: Character[];
   item: Item;
+  focusableTriggers?: boolean;
 }
 
 /**
  * DiscoveryAttribution component that displays character icons showing who found the item.
  */
-export function DiscoveryAttribution({ discoveringCharacters, item }: DiscoveryAttributionProps) {
+export function DiscoveryAttribution({
+  discoveringCharacters,
+  item,
+  focusableTriggers = true,
+}: DiscoveryAttributionProps) {
   const { t } = useTranslation();
   return (
     <div className="flex items-center justify-center gap-1 pt-3">
@@ -188,7 +200,10 @@ export function DiscoveryAttribution({ discoveringCharacters, item }: DiscoveryA
         {discoveringCharacters.slice(0, 2).map((character, index) =>
           character ? (
             <Tooltip key={`${character.id}-${item.id}-${index}`}>
-              <TooltipTrigger>
+              <TooltipTrigger
+                render={getTooltipTriggerRender(focusableTriggers)}
+                className="inline-flex"
+              >
                 <CharacterIcon
                   characterClass={character.characterClass}
                   className="text-muted-foreground"

@@ -1,6 +1,8 @@
 import type { Character, GrailProgress, Item } from 'electron/types/grail';
-import { memo } from 'react';
-import { GridView } from './GridView';
+import { memo, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
+import { translations } from '@/i18n/translations';
+import { GridView, type InteractiveCardProps } from './GridView';
 import { ListView } from './ListView';
 
 /**
@@ -40,8 +42,6 @@ interface ItemCardProps {
   withoutStatusIndicators?: boolean;
 }
 
-export { typeColors } from './styles';
-
 /**
  * ItemCard component that displays a Holy Grail item with its discovery status and information.
  * Supports both grid and list view modes, showing progress, character attribution, and version counts.
@@ -56,6 +56,8 @@ export const ItemCard = memo(function ItemCard({
   viewMode = 'grid',
   withoutStatusIndicators = false,
 }: ItemCardProps) {
+  const { t } = useTranslation();
+
   // Calculate discovery metadata for both normal and ethereal versions
   const { allProgress, mostRecentDiscovery } = getDiscoveryMetadata(
     normalProgress,
@@ -65,13 +67,54 @@ export const ItemCard = memo(function ItemCard({
   // Get character info for discoveries from both versions
   const discoveringCharacters = getDiscoveringCharacters(allProgress, characters);
 
-  // Handle keyboard events for accessibility
+  // Tracks a Space keydown that started on the card so a stray keyup does not activate it
+  const spacePressedRef = useRef(false);
+
+  // Mirror native button activation: Enter activates on keydown, Space on keyup.
+  // Only react to keys pressed on the card itself, not bubbling from nested elements.
   const handleKeyDown = (event: React.KeyboardEvent) => {
-    if (event.key === 'Enter' || event.key === ' ') {
+    if (event.target !== event.currentTarget) return;
+    if (event.key === 'Enter') {
       event.preventDefault();
+      onClick?.();
+    } else if (event.key === ' ') {
+      // Prevent page scroll; activation happens on keyup
+      event.preventDefault();
+      spacePressedRef.current = true;
+    }
+  };
+
+  const handleKeyUp = (event: React.KeyboardEvent) => {
+    if (event.target !== event.currentTarget) return;
+    if (event.key === ' ') {
+      event.preventDefault();
+      if (!spacePressedRef.current) return;
+      spacePressedRef.current = false;
       onClick?.();
     }
   };
+
+  const handleBlur = () => {
+    spacePressedRef.current = false;
+  };
+
+  // Clickable cards are focusable buttons named after the item and its found status
+  const interactiveProps: InteractiveCardProps | undefined = onClick
+    ? {
+        role: 'button',
+        tabIndex: 0,
+        'aria-label': t(translations.grail.itemCard.cardLabel, {
+          name: item.name,
+          status: t(
+            allProgress.length > 0 ? translations.common.found : translations.common.notFound,
+          ),
+        }),
+        onClick,
+        onKeyDown: handleKeyDown,
+        onKeyUp: handleKeyUp,
+        onBlur: handleBlur,
+      }
+    : undefined;
 
   // Render list view if viewMode is 'list'
   if (viewMode === 'list') {
@@ -85,8 +128,7 @@ export const ItemCard = memo(function ItemCard({
         discoveringCharacters={discoveringCharacters}
         mostRecentDiscovery={mostRecentDiscovery}
         className={className}
-        handleKeyDown={handleKeyDown}
-        onClick={onClick}
+        interactiveProps={interactiveProps}
         withoutStatusIndicators={withoutStatusIndicators}
       />
     );
@@ -103,8 +145,7 @@ export const ItemCard = memo(function ItemCard({
       etherealProgress={etherealProgress}
       mostRecentDiscovery={mostRecentDiscovery}
       className={className}
-      handleKeyDown={handleKeyDown}
-      onClick={onClick}
+      interactiveProps={interactiveProps}
       withoutStatusIndicators={withoutStatusIndicators}
     />
   );

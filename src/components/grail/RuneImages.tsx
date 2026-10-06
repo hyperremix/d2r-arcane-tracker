@@ -4,6 +4,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import type { RunewordCompletionStatus } from '@/lib/runeword-utils';
 import { cn } from '@/lib/utils';
 import placeholderUrl from '/images/placeholder-item.png';
+import { getTooltipTriggerRender } from './tooltipTriggerRender';
 
 interface RuneImagesProps {
   runeIds: string[];
@@ -11,6 +12,7 @@ interface RuneImagesProps {
   className?: string;
   showRuneNames?: boolean;
   completionStatus?: RunewordCompletionStatus;
+  focusableTriggers?: boolean;
 }
 
 /**
@@ -19,6 +21,8 @@ interface RuneImagesProps {
  * @param viewMode - Display mode: 'grid' (3-column grid) or 'list' (single row)
  * @param showRuneNames - Whether to show the name of each rune
  * @param className - Optional additional CSS classes
+ * @param focusableTriggers - Whether rune tooltip triggers are focusable buttons. Disable when
+ * rendered inside another interactive element (e.g. a clickable item card).
  */
 export function RuneImages({
   runeIds,
@@ -26,6 +30,7 @@ export function RuneImages({
   showRuneNames = false,
   completionStatus,
   className,
+  focusableTriggers = true,
 }: RuneImagesProps) {
   const [runeImages, setRuneImages] = useState<Map<string, string>>(new Map());
   const [isLoading, setIsLoading] = useState(true);
@@ -134,6 +139,7 @@ export function RuneImages({
               isLoading={isLoading}
               showRuneName={showRuneNames}
               isMissing={missingRuneIndices.has(index)}
+              focusableTriggers={focusableTriggers}
             />
           );
         })}
@@ -151,6 +157,7 @@ interface RuneImageProps {
   isLoading: boolean;
   showRuneName?: boolean;
   isMissing?: boolean;
+  focusableTriggers?: boolean;
 }
 
 function RuneImage({
@@ -159,10 +166,14 @@ function RuneImage({
   isLoading,
   showRuneName = false,
   isMissing = false,
+  focusableTriggers = true,
 }: RuneImageProps) {
   return (
     <Tooltip>
-      <TooltipTrigger className="relative flex items-center justify-center">
+      <TooltipTrigger
+        render={getTooltipTriggerRender(focusableTriggers)}
+        className="relative flex items-center justify-center"
+      >
         {isLoading ? (
           <div className="absolute inset-0 animate-pulse rounded bg-muted" />
         ) : imageUrl ? (

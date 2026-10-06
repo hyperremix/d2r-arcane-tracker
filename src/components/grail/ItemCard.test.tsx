@@ -12,8 +12,16 @@ vi.mock('@/hooks/useItemIcon', () => ({
 }));
 vi.mock('/images/placeholder-item.png', () => ({ default: '/mock-placeholder.png' }));
 vi.mock('./RuneImages', () => ({
-  RuneImages: ({ runeIds }: { runeIds: string[] }) => (
-    <div data-testid="rune-images">{runeIds.join(',')}</div>
+  RuneImages: ({
+    runeIds,
+    focusableTriggers = true,
+  }: {
+    runeIds: string[];
+    focusableTriggers?: boolean;
+  }) => (
+    <div data-testid="rune-images" data-focusable-triggers={String(focusableTriggers)}>
+      {runeIds.join(',')}
+    </div>
   ),
 }));
 vi.mock('./StatusIcons', () => ({
@@ -276,60 +284,383 @@ describe('When ItemCard is rendered', () => {
       // Arrange
       const onClick = vi.fn();
       const item = HolyGrailItemBuilder.new().withName('Clickable').build();
+      render(<ItemCard item={item} onClick={onClick} />);
 
       // Act
-      render(<ItemCard item={item} onClick={onClick} />);
-      const card = screen.getByText('Clickable').closest('[class*="rounded-lg"]');
-      expect(card).toBeTruthy();
-      fireEvent.click(card as Element);
+      fireEvent.click(screen.getByRole('button', { name: 'Clickable, Not Found' }));
 
       // Assert
       expect(onClick).toHaveBeenCalledTimes(1);
     });
 
-    it('Then calls onClick on Enter key', () => {
+    it.each(['grid', 'list'] as const)(
+      'Then the %s card is a focusable button labeled with name and found status',
+      (viewMode) => {
+        // Arrange
+        const item = HolyGrailItemBuilder.new().withId('item-1').withName('Focusable').build();
+        const normalProgress = GrailProgressBuilder.new()
+          .withCharacterId('char-1')
+          .withItemId('item-1')
+          .asNormal()
+          .build();
+        render(
+          <ItemCard
+            item={item}
+            normalProgress={[normalProgress]}
+            onClick={vi.fn()}
+            viewMode={viewMode}
+          />,
+        );
+        const card = screen.getByRole('button', { name: 'Focusable, Found' });
+
+        // Act
+        card.focus();
+
+        // Assert
+        expect(card).toHaveAttribute('tabindex', '0');
+        expect(card).toHaveFocus();
+        expect(card.className).toContain('focus-visible:ring-[3px]');
+      },
+    );
+
+    it.each(['grid', 'list'] as const)(
+      'Then the %s card calls onClick once when Enter is pressed',
+      (viewMode) => {
+        // Arrange
+        const onClick = vi.fn();
+        const item = HolyGrailItemBuilder.new().withName('Pressable').build();
+        render(<ItemCard item={item} onClick={onClick} viewMode={viewMode} />);
+        const card = screen.getByRole('button', { name: 'Pressable, Not Found' });
+
+        // Act
+        fireEvent.keyDown(card, { key: 'Enter' });
+
+        // Assert
+        expect(onClick).toHaveBeenCalledTimes(1);
+      },
+    );
+
+    it.each(['grid', 'list'] as const)(
+      'Then the %s card calls onClick once when Space is released',
+      (viewMode) => {
+        // Arrange
+        const onClick = vi.fn();
+        const item = HolyGrailItemBuilder.new().withName('Pressable').build();
+        render(<ItemCard item={item} onClick={onClick} viewMode={viewMode} />);
+        const card = screen.getByRole('button', { name: 'Pressable, Not Found' });
+
+        // Act
+        fireEvent.keyDown(card, { key: ' ' });
+        fireEvent.keyUp(card, { key: ' ' });
+
+        // Assert
+        expect(onClick).toHaveBeenCalledTimes(1);
+      },
+    );
+
+    it.each(['grid', 'list'] as const)(
+      'Then the %s card does not call onClick on Space keydown alone and prevents page scroll',
+      (viewMode) => {
+        // Arrange
+        const onClick = vi.fn();
+        const item = HolyGrailItemBuilder.new().withName('Pressable').build();
+        render(<ItemCard item={item} onClick={onClick} viewMode={viewMode} />);
+        const card = screen.getByRole('button', { name: 'Pressable, Not Found' });
+
+        // Act
+        const notPrevented = fireEvent.keyDown(card, { key: ' ' });
+
+        // Assert
+        expect(onClick).not.toHaveBeenCalled();
+        expect(notPrevented).toBe(false);
+      },
+    );
+
+    it.each(['grid', 'list'] as const)(
+      'Then the %s card does not call onClick when Enter or Space bubble from a nested element',
+      (viewMode) => {
+        // Arrange
+        const onClick = vi.fn();
+        const item = HolyGrailItemBuilder.new().withName('Nested Key').build();
+        render(<ItemCard item={item} onClick={onClick} viewMode={viewMode} />);
+        const card = screen.getByRole('button', { name: 'Nested Key, Not Found' });
+        const nested = screen.getByText('Nested Key');
+        expect(card).not.toBe(nested);
+        expect(card).toContainElement(nested);
+
+        // Act
+        fireEvent.keyDown(nested, { key: 'Enter' });
+        fireEvent.keyDown(nested, { key: ' ' });
+        fireEvent.keyUp(nested, { key: ' ' });
+
+        // Assert
+        expect(onClick).not.toHaveBeenCalled();
+      },
+    );
+
+    it.each(['grid', 'list'] as const)(
+      'Then the %s card ignores a stray Space keyup without a prior keydown on the card',
+      (viewMode) => {
+        // Arrange
+        const onClick = vi.fn();
+        const item = HolyGrailItemBuilder.new().withName('Stray Key').build();
+        render(<ItemCard item={item} onClick={onClick} viewMode={viewMode} />);
+        const card = screen.getByRole('button', { name: 'Stray Key, Not Found' });
+
+        // Act
+        fireEvent.keyUp(card, { key: ' ' });
+
+        // Assert
+        expect(onClick).not.toHaveBeenCalled();
+      },
+    );
+
+    it.each(['grid', 'list'] as const)(
+      'Then the %s card activates only once per Space press and ignores a second keyup',
+      (viewMode) => {
+        // Arrange
+        const onClick = vi.fn();
+        const item = HolyGrailItemBuilder.new().withName('Once Key').build();
+        render(<ItemCard item={item} onClick={onClick} viewMode={viewMode} />);
+        const card = screen.getByRole('button', { name: 'Once Key, Not Found' });
+
+        // Act
+        fireEvent.keyDown(card, { key: ' ' });
+        fireEvent.keyUp(card, { key: ' ' });
+        fireEvent.keyUp(card, { key: ' ' });
+
+        // Assert
+        expect(onClick).toHaveBeenCalledTimes(1);
+      },
+    );
+
+    it.each(['grid', 'list'] as const)(
+      'Then the %s card ignores a Space keyup after focus left the card mid-press',
+      (viewMode) => {
+        // Arrange
+        const onClick = vi.fn();
+        const item = HolyGrailItemBuilder.new().withName('Blur Key').build();
+        render(<ItemCard item={item} onClick={onClick} viewMode={viewMode} />);
+        const card = screen.getByRole('button', { name: 'Blur Key, Not Found' });
+        fireEvent.keyDown(card, { key: ' ' });
+
+        // Act
+        fireEvent.blur(card);
+        fireEvent.keyUp(card, { key: ' ' });
+
+        // Assert
+        expect(onClick).not.toHaveBeenCalled();
+      },
+    );
+
+    it('Then does not call onClick when Enter is released', () => {
       // Arrange
       const onClick = vi.fn();
       const item = HolyGrailItemBuilder.new().withName('Pressable').build();
+      render(<ItemCard item={item} onClick={onClick} />);
+      const card = screen.getByRole('button', { name: 'Pressable, Not Found' });
 
       // Act
-      render(<ItemCard item={item} onClick={onClick} />);
-      const card = screen.getByText('Pressable').closest('[class*="rounded-lg"]');
-      expect(card).toBeTruthy();
-      fireEvent.keyDown(card as Element, { key: 'Enter' });
-
-      // Assert
-      expect(onClick).toHaveBeenCalledTimes(1);
-    });
-
-    it('Then calls onClick on Space key', () => {
-      // Arrange
-      const onClick = vi.fn();
-      const item = HolyGrailItemBuilder.new().withName('Spaceable').build();
-
-      // Act
-      render(<ItemCard item={item} onClick={onClick} />);
-      const card = screen.getByText('Spaceable').closest('[class*="rounded-lg"]');
-      expect(card).toBeTruthy();
-      fireEvent.keyDown(card as Element, { key: ' ' });
-
-      // Assert
-      expect(onClick).toHaveBeenCalledTimes(1);
-    });
-
-    it('Then does not call onClick on other keys', () => {
-      // Arrange
-      const onClick = vi.fn();
-      const item = HolyGrailItemBuilder.new().withName('Ignorable').build();
-
-      // Act
-      render(<ItemCard item={item} onClick={onClick} />);
-      const card = screen.getByText('Ignorable').closest('[class*="rounded-lg"]');
-      expect(card).toBeTruthy();
-      fireEvent.keyDown(card as Element, { key: 'Tab' });
+      fireEvent.keyUp(card, { key: 'Enter' });
 
       // Assert
       expect(onClick).not.toHaveBeenCalled();
+    });
+
+    it.each(['Tab', 'Escape', 'a'])('Then does not call onClick on the "%s" key', (key) => {
+      // Arrange
+      const onClick = vi.fn();
+      const item = HolyGrailItemBuilder.new().withName('Ignorable').build();
+      render(<ItemCard item={item} onClick={onClick} />);
+      const card = screen.getByRole('button', { name: 'Ignorable, Not Found' });
+
+      // Act
+      fireEvent.keyDown(card, { key });
+      fireEvent.keyUp(card, { key });
+
+      // Assert
+      expect(onClick).not.toHaveBeenCalled();
+    });
+
+    it('Then contains no nested focusable elements', () => {
+      // Arrange
+      const item = HolyGrailItemBuilder.new().withId('item-1').withName('Nested').build();
+      const normalProgress = GrailProgressBuilder.new()
+        .withCharacterId('char-1')
+        .withItemId('item-1')
+        .asNormal()
+        .build();
+      const characters = [CharacterBuilder.new().withId('char-1').withName('Char').build()];
+
+      // Act
+      render(
+        <ItemCard
+          item={item}
+          normalProgress={[normalProgress]}
+          characters={characters}
+          onClick={vi.fn()}
+        />,
+      );
+
+      // Assert
+      const card = screen.getByRole('button', { name: 'Nested, Found' });
+      expect(card.querySelectorAll('button, [tabindex]:not([tabindex="-1"])')).toHaveLength(0);
+    });
+
+    it('Then rune tooltip triggers are not focusable on a runeword card', () => {
+      // Arrange
+      const item = HolyGrailItemBuilder.new()
+        .withType('runeword')
+        .withRunewordSubCategory('runewords')
+        .build();
+      (item as { runes: string[] }).runes = ['r01', 'r02'];
+
+      // Act
+      render(<ItemCard item={item} onClick={vi.fn()} />);
+
+      // Assert
+      expect(screen.getByTestId('rune-images')).toHaveAttribute('data-focusable-triggers', 'false');
+    });
+  });
+
+  describe('If onClick is not provided', () => {
+    it('Then the card is not exposed as a focusable button', () => {
+      // Arrange
+      const item = HolyGrailItemBuilder.new().withName('Static').build();
+
+      // Act
+      render(<ItemCard item={item} />);
+
+      // Assert
+      expect(screen.queryByRole('button', { name: 'Static, Not Found' })).not.toBeInTheDocument();
+    });
+
+    it.each(['grid', 'list'] as const)(
+      'Then the %s card keeps item, status and character tooltip triggers keyboard focusable',
+      (viewMode) => {
+        // Arrange
+        const item = HolyGrailItemBuilder.new().withId('item-1').withName('Static').build();
+        const normalProgress = GrailProgressBuilder.new()
+          .withCharacterId('char-1')
+          .withItemId('item-1')
+          .withFoundDate(new Date('2020-01-01T00:00:00Z'))
+          .asNormal()
+          .build();
+        const characters = [CharacterBuilder.new().withId('char-1').withName('Char').build()];
+
+        // Act
+        const { container } = render(
+          <ItemCard
+            item={item}
+            normalProgress={[normalProgress]}
+            characters={characters}
+            viewMode={viewMode}
+          />,
+        );
+
+        // Assert
+        const triggerTagNames = Array.from(
+          container.querySelectorAll('[data-slot="tooltip-trigger"]'),
+          (trigger) => trigger.tagName,
+        );
+        expect(triggerTagNames).toEqual(['BUTTON', 'BUTTON', 'BUTTON']);
+      },
+    );
+
+    it('Then rune tooltip triggers stay focusable on a runeword card', () => {
+      // Arrange
+      const item = HolyGrailItemBuilder.new()
+        .withType('runeword')
+        .withRunewordSubCategory('runewords')
+        .build();
+      (item as { runes: string[] }).runes = ['r01', 'r02'];
+
+      // Act
+      render(<ItemCard item={item} />);
+
+      // Assert
+      expect(screen.getByTestId('rune-images')).toHaveAttribute('data-focusable-triggers', 'true');
+    });
+  });
+
+  describe('If item is missing', () => {
+    it.each(['grid', 'list'] as const)(
+      'Then the %s card does not dim the item name with opacity',
+      (viewMode) => {
+        // Arrange
+        const item = HolyGrailItemBuilder.new().withName('Missing Item').build();
+
+        // Act
+        render(<ItemCard item={item} viewMode={viewMode} onClick={vi.fn()} />);
+
+        // Assert
+        const name = screen.getByText('Missing Item');
+        const ancestorsWithOpacity = [];
+        for (let element: HTMLElement | null = name; element; element = element.parentElement) {
+          if (/(^|\s)opacity-\d+/.test(element.className)) ancestorsWithOpacity.push(element);
+        }
+        expect(ancestorsWithOpacity).toHaveLength(0);
+        expect(name).toHaveClass('text-foreground');
+      },
+    );
+
+    it.each(['grid', 'list'] as const)(
+      'Then the %s card shows grayscale, dimmed artwork',
+      (viewMode) => {
+        // Arrange
+        setupStoreMock({ showItemIcons: true });
+        const item = HolyGrailItemBuilder.new().withType('unique').build();
+
+        // Act
+        render(<ItemCard item={item} viewMode={viewMode} />);
+
+        // Assert
+        expect(screen.getByTestId('item-artwork')).toHaveClass('grayscale', 'opacity-50');
+      },
+    );
+
+    it('Then the card uses a neutral muted surface with a dashed type border', () => {
+      // Arrange
+      const item = HolyGrailItemBuilder.new().withType('unique').withName('Dashed').build();
+
+      // Act
+      render(<ItemCard item={item} onClick={vi.fn()} />);
+
+      // Assert
+      const surface = screen
+        .getByRole('button', { name: 'Dashed, Not Found' })
+        .querySelector('[data-found]');
+      expect(surface).toHaveAttribute('data-found', 'false');
+      expect(surface).toHaveClass('border-dashed', 'bg-muted/40');
+      expect(surface?.className).not.toMatch(/bg-yellow/);
+    });
+  });
+
+  describe('If item is found', () => {
+    it('Then the card uses a solid type border on a neutral card surface with colored artwork', () => {
+      // Arrange
+      setupStoreMock({ showItemIcons: true });
+      const item = HolyGrailItemBuilder.new()
+        .withId('item-1')
+        .withType('unique')
+        .withName('Found Item')
+        .build();
+      const normalProgress = GrailProgressBuilder.new()
+        .withCharacterId('char-1')
+        .withItemId('item-1')
+        .asNormal()
+        .build();
+
+      // Act
+      render(<ItemCard item={item} normalProgress={[normalProgress]} onClick={vi.fn()} />);
+
+      // Assert
+      const surface = screen
+        .getByRole('button', { name: 'Found Item, Found' })
+        .querySelector('[data-found]');
+      expect(surface).toHaveAttribute('data-found', 'true');
+      expect(surface).toHaveClass('border-solid', 'bg-card', 'border-item-unique');
+      expect(screen.getByTestId('item-artwork')).not.toHaveClass('grayscale');
     });
   });
 

@@ -19,6 +19,7 @@ import { useTranslation } from 'react-i18next';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { translations } from '@/i18n/translations';
 import { cn, isRecentFind } from '@/lib/utils';
+import { getTooltipTriggerRender } from './tooltipTriggerRender';
 
 /**
  * Props interface for the CharacterIcon component.
@@ -101,6 +102,7 @@ export function ItemTypeIcon({ type, className }: ItemTypeIconProps) {
 interface RecentDiscoveryProps {
   foundDate: Date;
   className?: string;
+  focusableTriggers?: boolean;
 }
 
 /**
@@ -108,15 +110,20 @@ interface RecentDiscoveryProps {
  * @param {RecentDiscoveryProps} props - Component props
  * @param {Date} props.foundDate - The date when the item was found
  * @param {string} [props.className] - Optional additional CSS classes
+ * @param {boolean} [props.focusableTriggers] - Whether the tooltip trigger is a focusable button
  * @returns {JSX.Element | null} A flame icon if the find is recent, null otherwise
  */
-export function RecentDiscoveryIndicator({ foundDate, className }: RecentDiscoveryProps) {
+export function RecentDiscoveryIndicator({
+  foundDate,
+  className,
+  focusableTriggers = true,
+}: RecentDiscoveryProps) {
   const { t } = useTranslation();
   if (!isRecentFind(foundDate)) return null;
 
   return (
     <Tooltip>
-      <TooltipTrigger>
+      <TooltipTrigger render={getTooltipTriggerRender(focusableTriggers)} className="inline-flex">
         <Flame
           className={cn('h-6 w-6 rounded-full bg-background pb-0.5 text-item-rune', className)}
         />

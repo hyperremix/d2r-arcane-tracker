@@ -1,288 +1,291 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import type { Settings } from 'electron/types/grail';
-import { GameMode, GameVersion } from 'electron/types/grail';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import { useGrailStore } from '@/stores/grailStore';
 import { AdvancedSearch } from './AdvancedSearch';
 
-// Mock the store
-vi.mock('@/stores/grailStore');
+const initialStoreState = useGrailStore.getState();
 
-const mockSetFilter = vi.fn();
-const mockSetAdvancedFilter = vi.fn();
-const mockSetViewMode = vi.fn();
-const mockSetGroupMode = vi.fn();
-
-const defaultSettings: Settings = {
-  saveDir: '',
-  lang: 'en',
-  gameMode: GameMode.Both,
-  grailNormal: true,
-  grailEthereal: false,
-  grailRunes: false,
-  grailRunewords: false,
-  gameVersion: GameVersion.Resurrected,
-  enableSounds: true,
-  notificationVolume: 0.5,
-  inAppNotifications: true,
-  nativeNotifications: true,
-  needsSeeding: true,
-  theme: 'system',
-  showItemIcons: false,
-};
-
-function setupStoreMock(
-  overrides: { viewMode?: string; groupMode?: string; settings?: Partial<Settings> } = {},
-) {
-  const state = {
-    setFilter: mockSetFilter,
-    setAdvancedFilter: mockSetAdvancedFilter,
-    viewMode: overrides.viewMode ?? 'grid',
-    setViewMode: mockSetViewMode,
-    groupMode: overrides.groupMode ?? 'none',
-    setGroupMode: mockSetGroupMode,
-    settings: { ...defaultSettings, ...overrides.settings },
-  };
-
-  const mockUseGrailStore = vi.mocked(useGrailStore);
-  // Handle selector-based calls: useGrailStore((state) => state.someField)
-  mockUseGrailStore.mockImplementation((selector?: unknown) => {
-    if (typeof selector === 'function') {
-      return (selector as (s: typeof state) => unknown)(state);
-    }
-    return state as ReturnType<typeof useGrailStore>;
-  });
+function resetStore(settings: Partial<Settings> = {}) {
+  useGrailStore.setState(
+    {
+      ...initialStoreState,
+      filter: { foundStatus: 'all' },
+      advancedFilter: { ...initialStoreState.advancedFilter },
+      viewMode: 'grid',
+      groupMode: 'none',
+      settings: { ...initialStoreState.settings, ...settings },
+    },
+    true,
+  );
 }
 
-describe('When AdvancedSearch is rendered', () => {
+function openFiltersPopover() {
+  fireEvent.click(screen.getByRole('button', { name: /^Filters/ }));
+}
+
+describe('When AdvancedSearch toolbar is rendered', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
-    setupStoreMock();
+    resetStore();
   });
 
-  describe('If initial state (no active filters)', () => {
-    it('Then renders search input', () => {
+  describe('If no filters are active', () => {
+    it('Then renders the search input, status control, sort, group and view controls', () => {
       // Arrange & Act
       render(<AdvancedSearch />);
 
       // Assert
-      expect(screen.getByPlaceholderText('Search items...')).toBeInTheDocument();
+      expect(screen.getByLabelText('Search')).toHaveAttribute('placeholder', 'Search items...');
+      expect(screen.getByRole('group', { name: 'Status' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Filters' })).toBeInTheDocument();
+      expect(screen.getByLabelText('Sort By')).toBeInTheDocument();
+      expect(screen.getByLabelText('Group By')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Grid' })).toHaveAttribute('aria-pressed', 'true');
+      expect(screen.getByRole('button', { name: 'List' })).toHaveAttribute('aria-pressed', 'false');
     });
 
-    it('Then renders category checkboxes', () => {
+    it('Then does not show the clear all button, filter count or active filter chips', () => {
       // Arrange & Act
       render(<AdvancedSearch />);
 
       // Assert
-      expect(screen.getByLabelText('Weapons')).toBeInTheDocument();
-      expect(screen.getByLabelText('Armor')).toBeInTheDocument();
-      expect(screen.getByLabelText('Jewelry')).toBeInTheDocument();
-      expect(screen.getByLabelText('Charms')).toBeInTheDocument();
-    });
-
-    it('Then renders type checkboxes for Unique and Set', () => {
-      // Arrange & Act
-      render(<AdvancedSearch />);
-
-      // Assert
-      expect(screen.getByLabelText('Unique')).toBeInTheDocument();
-      expect(screen.getByLabelText('Set')).toBeInTheDocument();
-    });
-
-    it('Then renders view mode buttons', () => {
-      // Arrange & Act
-      render(<AdvancedSearch />);
-
-      // Assert
-      expect(screen.getByRole('button', { name: /Grid/i })).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: /List/i })).toBeInTheDocument();
-    });
-
-    it('Then does not show active filter count badge', () => {
-      // Arrange & Act
-      render(<AdvancedSearch />);
-
-      // Assert — no badge with a number should appear when no filters active
-      expect(screen.getByRole('button', { name: /Reset/i })).toBeInTheDocument();
-      // The badge only shows when getActiveFiltersCount() > 0
-      const badges = screen.queryAllByText(/^\d+$/);
-      expect(badges).toHaveLength(0);
+      expect(screen.queryByRole('button', { name: 'Clear all' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('list', { name: 'Active filters' })).not.toBeInTheDocument();
+      expect(screen.queryByText(/^\d+$/)).not.toBeInTheDocument();
     });
   });
 
-  describe('If grailRunes enabled', () => {
-    it('Then includes Rune type checkbox', () => {
-      // Arrange
-      setupStoreMock({ settings: { grailRunes: true } });
-
-      // Act
-      render(<AdvancedSearch />);
-
-      // Assert
-      expect(screen.getByLabelText('Rune')).toBeInTheDocument();
-    });
-  });
-
-  describe('If grailRunewords enabled', () => {
-    it('Then includes Runeword type checkbox', () => {
-      // Arrange
-      setupStoreMock({ settings: { grailRunewords: true } });
-
-      // Act
-      render(<AdvancedSearch />);
-
-      // Assert
-      expect(screen.getByLabelText('Runeword')).toBeInTheDocument();
-    });
-  });
-
-  describe('If user types in search input', () => {
-    it('Then updates input value and calls setFilter with searchTerm', () => {
+  describe('If user types in the search input', () => {
+    it('Then updates the search term in the store', () => {
       // Arrange
       render(<AdvancedSearch />);
-      const input = screen.getByPlaceholderText('Search items...');
 
       // Act
-      fireEvent.change(input, { target: { value: 'Shako' } });
+      fireEvent.change(screen.getByLabelText('Search'), { target: { value: 'Shako' } });
 
       // Assert
-      expect(input).toHaveValue('Shako');
-      expect(mockSetFilter).toHaveBeenCalledWith(expect.objectContaining({ searchTerm: 'Shako' }));
+      expect(useGrailStore.getState().filter.searchTerm).toBe('Shako');
+      expect(screen.getByLabelText('Search')).toHaveValue('Shako');
+    });
+  });
+
+  describe('If the store filter changes elsewhere', () => {
+    it('Then the toolbar reflects the store state', () => {
+      // Arrange
+      render(<AdvancedSearch />);
+
+      // Act
+      act(() => {
+        useGrailStore.getState().setFilter({ searchTerm: 'Windforce', foundStatus: 'found' });
+      });
+
+      // Assert
+      expect(screen.getByLabelText('Search')).toHaveValue('Windforce');
+      expect(screen.getByRole('button', { name: 'Found' })).toHaveAttribute('aria-pressed', 'true');
+    });
+  });
+
+  describe('If user selects a found status segment', () => {
+    it('Then updates foundStatus in the store and marks the segment as pressed', () => {
+      // Arrange
+      render(<AdvancedSearch />);
+      const missingButton = screen.getByRole('button', { name: 'Missing' });
+
+      // Act
+      fireEvent.click(missingButton);
+
+      // Assert
+      expect(useGrailStore.getState().filter.foundStatus).toBe('missing');
+      expect(missingButton).toHaveAttribute('aria-pressed', 'true');
+      expect(screen.getByRole('button', { name: 'All' })).toHaveAttribute('aria-pressed', 'false');
     });
   });
 
   describe('If user toggles fuzzy search', () => {
-    it('Then calls setAdvancedFilter with fuzzySearch: true', () => {
+    it('Then enables fuzzy search in the store', () => {
       // Arrange
       render(<AdvancedSearch />);
-      const fuzzyCheckbox = screen.getByLabelText('Fuzzy Search');
+      const fuzzyToggle = screen.getByRole('button', { name: 'Fuzzy Search' });
 
       // Act
-      fireEvent.click(fuzzyCheckbox);
+      fireEvent.click(fuzzyToggle);
 
       // Assert
-      expect(mockSetAdvancedFilter).toHaveBeenCalledWith(
-        expect.objectContaining({ fuzzySearch: true }),
+      expect(useGrailStore.getState().advancedFilter.fuzzySearch).toBe(true);
+      expect(fuzzyToggle).toHaveAttribute('aria-pressed', 'true');
+    });
+  });
+
+  describe('If user opens the filters popover', () => {
+    it('Then shows category and type checkboxes', async () => {
+      // Arrange
+      render(<AdvancedSearch />);
+
+      // Act
+      openFiltersPopover();
+
+      // Assert
+      expect(await screen.findByLabelText('Weapons')).toBeInTheDocument();
+      expect(screen.getByLabelText('Armor')).toBeInTheDocument();
+      expect(screen.getByLabelText('Jewelry')).toBeInTheDocument();
+      expect(screen.getByLabelText('Charms')).toBeInTheDocument();
+      expect(screen.getByLabelText('Unique')).toBeInTheDocument();
+      expect(screen.getByLabelText('Set')).toBeInTheDocument();
+      expect(screen.queryByLabelText('Rune')).not.toBeInTheDocument();
+      expect(screen.queryByLabelText('Runeword')).not.toBeInTheDocument();
+    });
+
+    it('Then includes rune and runeword types if they are tracked', async () => {
+      // Arrange
+      resetStore({ grailRunes: true, grailRunewords: true });
+      render(<AdvancedSearch />);
+
+      // Act
+      openFiltersPopover();
+
+      // Assert
+      expect(await screen.findByLabelText('Rune')).toBeInTheDocument();
+      expect(screen.getByLabelText('Runeword')).toBeInTheDocument();
+    });
+
+    it('Then toggling a category updates the store categories', async () => {
+      // Arrange
+      render(<AdvancedSearch />);
+      openFiltersPopover();
+
+      // Act
+      fireEvent.click(await screen.findByLabelText('Armor'));
+
+      // Assert
+      expect(useGrailStore.getState().filter.categories).toEqual(['armor']);
+    });
+
+    it('Then toggling a type updates the store types', async () => {
+      // Arrange
+      render(<AdvancedSearch />);
+      openFiltersPopover();
+
+      // Act
+      fireEvent.click(await screen.findByLabelText('Set'));
+
+      // Assert
+      expect(useGrailStore.getState().filter.types).toEqual(['set']);
+    });
+  });
+
+  describe('If categories and types are selected', () => {
+    it('Then the filters trigger shows the active filter count', () => {
+      // Arrange
+      useGrailStore.getState().setFilter({ categories: ['armor', 'weapons'], types: ['set'] });
+
+      // Act
+      render(<AdvancedSearch />);
+
+      // Assert
+      const trigger = screen.getByRole('button', { name: 'Filters (3 active)' });
+      expect(within(trigger).getByText('3')).toBeInTheDocument();
+    });
+
+    it('Then shows removable chips that update the store when removed', () => {
+      // Arrange
+      useGrailStore.getState().setFilter({ categories: ['armor'], types: ['set'] });
+      render(<AdvancedSearch />);
+      const chips = screen.getByRole('list', { name: 'Active filters' });
+      expect(within(chips).getByText('Armor')).toBeInTheDocument();
+      expect(within(chips).getByText('Set')).toBeInTheDocument();
+
+      // Act
+      fireEvent.click(screen.getByRole('button', { name: 'Remove filter: Armor' }));
+
+      // Assert
+      expect(useGrailStore.getState().filter.categories).toEqual([]);
+      expect(useGrailStore.getState().filter.types).toEqual(['set']);
+    });
+  });
+
+  describe('If user clicks the sort direction toggle', () => {
+    it('Then flips the sort order in the store and updates its label', () => {
+      // Arrange
+      render(<AdvancedSearch />);
+      const toggle = screen.getByRole('button', { name: 'Sort order: Descending' });
+
+      // Act
+      fireEvent.click(toggle);
+
+      // Assert
+      expect(useGrailStore.getState().advancedFilter.sortOrder).toBe('asc');
+      expect(screen.getByRole('button', { name: 'Sort order: Ascending' })).toBeInTheDocument();
+    });
+
+    it('Then toggles back to descending on a second click', () => {
+      // Arrange
+      render(<AdvancedSearch />);
+      fireEvent.click(screen.getByRole('button', { name: 'Sort order: Descending' }));
+
+      // Act
+      fireEvent.click(screen.getByRole('button', { name: 'Sort order: Ascending' }));
+
+      // Assert
+      expect(useGrailStore.getState().advancedFilter.sortOrder).toBe('desc');
+    });
+  });
+
+  describe('If user clicks the list view toggle', () => {
+    it('Then sets the view mode to list in the store', () => {
+      // Arrange
+      render(<AdvancedSearch />);
+
+      // Act
+      fireEvent.click(screen.getByRole('button', { name: 'List' }));
+
+      // Assert
+      expect(useGrailStore.getState().viewMode).toBe('list');
+      expect(screen.getByRole('button', { name: 'List' })).toHaveAttribute('aria-pressed', 'true');
+    });
+  });
+
+  describe('If something is active and user clicks Clear all', () => {
+    it('Then resets filters and sorting in the store and hides the button', () => {
+      // Arrange
+      useGrailStore.getState().setFilter({
+        searchTerm: 'Shako',
+        foundStatus: 'missing',
+        categories: ['armor'],
+        types: ['unique'],
+      });
+      useGrailStore.getState().setAdvancedFilter({
+        sortBy: 'name',
+        sortOrder: 'asc',
+        fuzzySearch: true,
+      });
+      render(<AdvancedSearch />);
+
+      // Act
+      fireEvent.click(screen.getByRole('button', { name: 'Clear all' }));
+
+      // Assert
+      const { filter, advancedFilter } = useGrailStore.getState();
+      expect(filter).toEqual(
+        expect.objectContaining({ searchTerm: '', foundStatus: 'all', categories: [], types: [] }),
       );
-    });
-  });
-
-  describe('If user clicks category checkbox', () => {
-    it('Then calls setFilter with categories array containing that value', () => {
-      // Arrange
-      render(<AdvancedSearch />);
-      const armorCheckbox = screen.getByLabelText('Armor');
-
-      // Act
-      fireEvent.click(armorCheckbox);
-
-      // Assert
-      expect(mockSetFilter).toHaveBeenCalledWith(
-        expect.objectContaining({ categories: ['armor'] }),
+      expect(advancedFilter).toEqual(
+        expect.objectContaining({ sortBy: 'found_date', sortOrder: 'desc', fuzzySearch: false }),
       );
+      expect(screen.getByLabelText('Search')).toHaveValue('');
+      expect(screen.queryByRole('button', { name: 'Clear all' })).not.toBeInTheDocument();
     });
   });
 
-  describe('If user clicks type checkbox', () => {
-    it('Then calls setFilter with types array containing that value', () => {
+  describe('If only the sort order differs from the default', () => {
+    it('Then shows the clear all button', () => {
       // Arrange
-      render(<AdvancedSearch />);
-      const setCheckbox = screen.getByLabelText('Set');
+      useGrailStore.getState().setAdvancedFilter({ sortOrder: 'asc' });
 
       // Act
-      fireEvent.click(setCheckbox);
-
-      // Assert
-      expect(mockSetFilter).toHaveBeenCalledWith(expect.objectContaining({ types: ['set'] }));
-    });
-  });
-
-  describe('If user clicks Grid button', () => {
-    it('Then calls setViewMode with grid', () => {
-      // Arrange
-      render(<AdvancedSearch />);
-      const gridButton = screen.getByRole('button', { name: /Grid/i });
-
-      // Act
-      fireEvent.click(gridButton);
-
-      // Assert
-      expect(mockSetViewMode).toHaveBeenCalledWith('grid');
-    });
-  });
-
-  describe('If user clicks List button', () => {
-    it('Then calls setViewMode with list', () => {
-      // Arrange
-      render(<AdvancedSearch />);
-      const listButton = screen.getByRole('button', { name: /List/i });
-
-      // Act
-      fireEvent.click(listButton);
-
-      // Assert
-      expect(mockSetViewMode).toHaveBeenCalledWith('list');
-    });
-  });
-
-  describe('If user clicks Reset', () => {
-    it('Then clears input and calls setFilter and setAdvancedFilter with defaults', () => {
-      // Arrange
-      render(<AdvancedSearch />);
-      const input = screen.getByPlaceholderText('Search items...');
-
-      // First set a search term
-      fireEvent.change(input, { target: { value: 'Shako' } });
-      vi.clearAllMocks();
-
-      // Act
-      const resetButton = screen.getByRole('button', { name: /Reset/i });
-      fireEvent.click(resetButton);
-
-      // Assert
-      expect(input).toHaveValue('');
-      expect(mockSetFilter).toHaveBeenCalledWith(
-        expect.objectContaining({
-          searchTerm: '',
-          categories: [],
-          types: [],
-          foundStatus: 'all',
-        }),
-      );
-      expect(mockSetAdvancedFilter).toHaveBeenCalledWith(
-        expect.objectContaining({
-          sortBy: 'found_date',
-          sortOrder: 'desc',
-          fuzzySearch: false,
-        }),
-      );
-    });
-  });
-
-  describe('If multiple filters active', () => {
-    it('Then shows correct count badge', () => {
-      // Arrange
       render(<AdvancedSearch />);
 
-      // Act — activate search and a category
-      const input = screen.getByPlaceholderText('Search items...');
-      fireEvent.change(input, { target: { value: 'test' } });
-      const armorCheckbox = screen.getByLabelText('Armor');
-      fireEvent.click(armorCheckbox);
-
-      // Assert — 2 active filters: search + category
-      expect(screen.getByText('2')).toBeInTheDocument();
-    });
-  });
-
-  describe('If grailEthereal enabled', () => {
-    it('Then renders without errors', () => {
-      // Arrange
-      setupStoreMock({ settings: { grailEthereal: true } });
-
-      // Act & Assert — component renders successfully with ethereal enabled
-      const { container } = render(<AdvancedSearch />);
-      expect(container.querySelector('[data-slot="select-trigger"]')).toBeInTheDocument();
+      // Assert
+      expect(screen.getByRole('button', { name: 'Clear all' })).toBeInTheDocument();
     });
   });
 });

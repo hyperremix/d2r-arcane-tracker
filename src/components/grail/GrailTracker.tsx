@@ -1,12 +1,9 @@
 import { useEffect } from 'react';
-import { useTranslation } from 'react-i18next';
-import { Card, CardContent } from '@/components/ui/card';
 import { TooltipProvider } from '@/components/ui/tooltip';
-import { translations } from '@/i18n/translations';
 import { useGrailStatistics, useGrailStore } from '@/stores/grailStore';
 import { AdvancedSearch } from './AdvancedSearch';
 import { ItemGrid } from './ItemGrid';
-import { ProgressGauge } from './ProgressGauge';
+import { ProgressSummary } from './ProgressSummary';
 
 function getSettledValue<T>(result: PromiseSettledResult<T>, label: string): T | undefined {
   if (result.status === 'fulfilled') return result.value;
@@ -20,7 +17,6 @@ function getSettledValue<T>(result: PromiseSettledResult<T>, label: string): T |
  * @returns {JSX.Element} The main grail tracker interface with statistics and item grid
  */
 export function GrailTracker() {
-  const { t } = useTranslation();
   const { setCharacters, setItems, setProgress, hydrateSettings, settings } = useGrailStore();
 
   const statistics = useGrailStatistics();
@@ -96,49 +92,17 @@ export function GrailTracker() {
 
   return (
     <TooltipProvider>
-      <div className="flex h-full gap-6 p-6">
-        {/* Left Sidebar - Progress Overview and Advanced Search */}
-        <div className="flex w-80 shrink-0 flex-col gap-6 overflow-y-auto">
-          {statistics && (
-            <Card>
-              <CardContent className="flex flex-col items-center gap-4">
-                <ProgressGauge
-                  label={t(translations.grail.tracker.totalProgress)}
-                  current={statistics.foundItems}
-                  total={statistics.totalItems}
-                  showLabel
-                  color="purple"
-                />
+      <div className="flex h-full flex-col gap-4 p-6">
+        {/* Progress summary */}
+        {statistics && (
+          <ProgressSummary statistics={statistics} showEtherealBreakdown={settings.grailEthereal} />
+        )}
 
-                {/* Progress breakdown */}
-                {settings.grailEthereal && (
-                  <div className="flex gap-4">
-                    <ProgressGauge
-                      label={t(translations.grail.tracker.normalItems)}
-                      current={statistics.normalItems.found}
-                      total={statistics.normalItems.total}
-                      showLabel
-                      color="orange"
-                    />
-                    <ProgressGauge
-                      label={t(translations.grail.tracker.etherealItems)}
-                      current={statistics.etherealItems.found}
-                      total={statistics.etherealItems.total}
-                      showLabel
-                      color="blue"
-                    />
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          )}
+        {/* Toolbar: search, filters, sorting, grouping and view mode */}
+        <AdvancedSearch />
 
-          {/* Advanced Search */}
-          <AdvancedSearch />
-        </div>
-
-        {/* Right Content - Item Grid */}
-        <div className="flex min-w-0 flex-1 flex-col overflow-y-auto">
+        {/* Item Grid - full content width */}
+        <div className="-mx-4 flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto">
           <ItemGrid />
         </div>
       </div>
