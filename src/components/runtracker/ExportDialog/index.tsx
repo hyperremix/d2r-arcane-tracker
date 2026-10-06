@@ -173,6 +173,8 @@ export function ExportDialog({ sessionId, open, onOpenChange }: ExportDialogProp
       }
 
       setExportContent(content);
+      // A previous generation failure no longer applies once content is produced again
+      setError(undefined);
     } catch (err) {
       console.error('[ExportDialog] Error generating export content:', err);
       setExportContent('');
@@ -180,12 +182,18 @@ export function ExportDialog({ sessionId, open, onOpenChange }: ExportDialogProp
     }
   }, [session, runs, items, format, textDetailLevel, includeItems, t]);
 
-  // Load session data when dialog opens
+  // Load session data when dialog opens. When it closes or loses its session, invalidate any
+  // in-flight load and drop loaded data so nothing stale remains exportable.
   useEffect(() => {
     if (open && sessionId) {
       loadSessionData();
+      return;
     }
-  }, [open, sessionId, loadSessionData]);
+
+    loadRequestRef.current += 1;
+    clearLoadedData();
+    setLoading(false);
+  }, [open, sessionId, loadSessionData, clearLoadedData]);
 
   // Generate export content when options change
   useEffect(() => {

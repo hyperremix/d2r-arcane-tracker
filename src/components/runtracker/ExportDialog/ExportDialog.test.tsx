@@ -10,6 +10,7 @@ import {
   type MockInstance,
   vi,
 } from 'vitest';
+import { formatSessionAsCSV } from './formatters';
 import { ExportDialog } from './index';
 
 vi.mock('sonner', () => ({
@@ -253,6 +254,69 @@ describe('When using the session export dialog', () => {
     await waitForExportReady(/Save to File/i);
     expect(mockElectronAPI.runTracker.getSessionById).toHaveBeenCalledTimes(2);
     expect(mockElectronAPI.runTracker.getSessionItems).toHaveBeenCalledTimes(1);
+  });
+
+  it('If the session id becomes empty while the dialog is open, Then loaded content is cleared and export actions are disabled', async () => {
+    // Arrange
+    const onOpenChange = vi.fn();
+    const { rerender } = render(
+      <ExportDialog sessionId="session-12345678" open onOpenChange={onOpenChange} />,
+    );
+    await waitForExportReady(/Save to File/i);
+
+    // Act
+    rerender(<ExportDialog sessionId="" open onOpenChange={onOpenChange} />);
+
+    // Assert
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: /Save to File/i })).toBeDisabled(),
+    );
+    expect(screen.getByRole('button', { name: /Copy to Clipboard/i })).toBeDisabled();
+  });
+
+  it('If the session id becomes empty while a load is in flight, Then the late result is ignored', async () => {
+    // Arrange
+    let resolveSession: (value: unknown) => void = () => undefined;
+    mockElectronAPI.runTracker.getSessionById.mockReturnValue(
+      new Promise((resolve) => {
+        resolveSession = resolve;
+      }),
+    );
+    const onOpenChange = vi.fn();
+    const { rerender } = render(
+      <ExportDialog sessionId="session-12345678" open onOpenChange={onOpenChange} />,
+    );
+    await waitFor(() => expect(mockElectronAPI.runTracker.getSessionById).toHaveBeenCalled());
+
+    // Act
+    rerender(<ExportDialog sessionId="" open onOpenChange={onOpenChange} />);
+    resolveSession(mockSession);
+
+    // Assert
+    await waitFor(() => expect(mockElectronAPI.runTracker.getRunsBySession).toHaveBeenCalled());
+    expect(screen.getByRole('button', { name: /Save to File/i })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /Copy to Clipboard/i })).toBeDisabled();
+  });
+
+  it('If generating the export fails and the format is then changed successfully, Then the generation error is cleared', async () => {
+    // Arrange
+    vi.mocked(formatSessionAsCSV).mockImplementationOnce(() => {
+      throw new Error('Formatter exploded');
+    });
+    renderDialog();
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('Failed to generate export content');
+    expect(alert).toHaveTextContent('Formatter exploded');
+
+    // Act
+    fireEvent.click(screen.getByRole('combobox', { name: /Export Format/i }));
+    const option = await screen.findByRole('option', { name: /JSON/i });
+    fireEvent.mouseMove(option);
+    fireEvent.click(option);
+
+    // Assert
+    await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument());
+    expect(screen.getByRole('button', { name: /Save to File/i })).toBeEnabled();
   });
 
   it.each([

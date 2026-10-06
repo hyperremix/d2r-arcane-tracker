@@ -7,17 +7,8 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { translations } from '@/i18n/translations';
+import { escapeCsvCell } from '@/lib/csv';
 import { getFileName } from '@/lib/path';
-
-/**
- * Escapes a single CSV cell, quoting it when it contains a delimiter, quote or newline.
- * @param {string | number} value - The cell value
- * @returns {string} The escaped cell value
- */
-export function escapeCsvCell(value: string | number): string {
-  const text = String(value);
-  return /[",\n\r]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
-}
 
 /**
  * RunAnalytics component that displays overall run statistics and highlights.
