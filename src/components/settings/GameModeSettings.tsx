@@ -12,7 +12,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { translations } from '@/i18n/translations';
-import { gameModeLabelKeys } from '@/lib/labelKeys';
+import { gameModeDescriptionKeys, gameModeLabelKeys } from '@/lib/labelKeys';
 import { useGrailStore } from '@/stores/grailStore';
 
 /**
@@ -37,27 +37,12 @@ export function GameModeSettings() {
 
   const gameModes = useMemo(
     () =>
-      gameModeValues.map(({ value, icon }) => {
-        const keyMap: Record<GameMode, { label: string; description: string }> = {
-          [GameMode.Both]: {
-            label: t(gameModeLabelKeys[GameMode.Both]),
-            description: t(translations.settings.gameMode.bothDescription),
-          },
-          [GameMode.Softcore]: {
-            label: t(gameModeLabelKeys[GameMode.Softcore]),
-            description: t(translations.settings.gameMode.softcoreDescription),
-          },
-          [GameMode.Hardcore]: {
-            label: t(gameModeLabelKeys[GameMode.Hardcore]),
-            description: t(translations.settings.gameMode.hardcoreDescription),
-          },
-          [GameMode.Manual]: {
-            label: t(gameModeLabelKeys[GameMode.Manual]),
-            description: t(translations.settings.gameMode.manualDescription),
-          },
-        };
-        return { value, icon, ...keyMap[value] };
-      }),
+      gameModeValues.map(({ value, icon }) => ({
+        value,
+        icon,
+        label: t(gameModeLabelKeys[value]),
+        description: t(gameModeDescriptionKeys[value]),
+      })),
     [t],
   );
 

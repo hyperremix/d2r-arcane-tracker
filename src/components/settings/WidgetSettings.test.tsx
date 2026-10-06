@@ -1,15 +1,22 @@
-import { render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import i18n from 'i18next';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useGrailStore } from '@/stores/grailStore';
 import { WidgetSettings } from './WidgetSettings';
 
 describe('WidgetSettings', () => {
   const originalSettings = useGrailStore.getState().settings;
+  const originalSetSettings = useGrailStore.getState().setSettings;
+  const originalElectronAPI = window.electronAPI;
   const originalBundle = structuredClone(i18n.getResourceBundle('en', 'common'));
 
   afterEach(() => {
-    useGrailStore.setState({ settings: originalSettings });
+    useGrailStore.setState({ settings: originalSettings, setSettings: originalSetSettings });
+    Object.defineProperty(window, 'electronAPI', {
+      value: originalElectronAPI,
+      configurable: true,
+      writable: true,
+    });
     i18n.addResourceBundle('en', 'common', originalBundle, true, true);
   });
 
@@ -80,5 +87,32 @@ describe('WidgetSettings', () => {
     ]) {
       expect(screen.getByText(new RegExp(`tr:${key}`))).toBeInTheDocument();
     }
+  });
+
+  it('If split is stored but ethereal tracking is off, Then Reset Size resets the resolved overall mode', async () => {
+    // Arrange
+    const resetSize = vi
+      .fn()
+      .mockResolvedValue({ success: true, size: { width: 250, height: 250 } });
+    Object.defineProperty(window, 'electronAPI', {
+      value: { widget: { resetSize, updateDisplay: vi.fn().mockResolvedValue({ success: true }) } },
+      configurable: true,
+      writable: true,
+    });
+    // Keep the stored mode as split: the component would otherwise auto-switch it to overall
+    useGrailStore.setState((state) => ({
+      setSettings: vi.fn().mockResolvedValue(undefined),
+      settings: { ...state.settings, widgetDisplay: 'split', grailEthereal: false },
+    }));
+    render(<WidgetSettings />);
+
+    // Act
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Reset Size' }));
+    });
+
+    // Assert
+    expect(resetSize).toHaveBeenCalledTimes(1);
+    expect(resetSize).toHaveBeenCalledWith('overall');
   });
 });

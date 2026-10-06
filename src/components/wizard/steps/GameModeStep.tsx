@@ -11,7 +11,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { translations } from '@/i18n/translations';
-import { gameModeLabelKeys } from '@/lib/labelKeys';
+import { gameModeDescriptionKeys, gameModeLabelKeys } from '@/lib/labelKeys';
 import { useGrailStore } from '@/stores/grailStore';
 
 /**
@@ -31,25 +31,25 @@ const gameModes: GameModeOption[] = [
   {
     value: GameMode.Both,
     labelKey: gameModeLabelKeys[GameMode.Both],
-    descriptionKey: translations.settings.gameMode.bothDescription,
+    descriptionKey: gameModeDescriptionKeys[GameMode.Both],
     icon: <Users className="h-4 w-4" />,
   },
   {
     value: GameMode.Softcore,
     labelKey: gameModeLabelKeys[GameMode.Softcore],
-    descriptionKey: translations.settings.gameMode.softcoreDescription,
+    descriptionKey: gameModeDescriptionKeys[GameMode.Softcore],
     icon: <Shield className="h-4 w-4" />,
   },
   {
     value: GameMode.Hardcore,
     labelKey: gameModeLabelKeys[GameMode.Hardcore],
-    descriptionKey: translations.settings.gameMode.hardcoreDescription,
+    descriptionKey: gameModeDescriptionKeys[GameMode.Hardcore],
     icon: <Sword className="h-4 w-4" />,
   },
   {
     value: GameMode.Manual,
     labelKey: gameModeLabelKeys[GameMode.Manual],
-    descriptionKey: translations.settings.gameMode.manualDescription,
+    descriptionKey: gameModeDescriptionKeys[GameMode.Manual],
     icon: <Wrench className="h-4 w-4" />,
   },
 ];

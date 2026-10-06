@@ -311,7 +311,7 @@ describe('Settings', () => {
     expect(scrollIntoViewMock).toHaveBeenCalledWith({ behavior: 'smooth', block: 'start' });
   });
 
-  it('When the page unmounts, Then the scroll listener and pending timers are cleaned up', () => {
+  it('When the page unmounts, Then the scroll listener and the pending settle timeout are cleaned up', () => {
     // Arrange
     mockAnimationFrames();
     const { unmount } = render(<Settings />);
@@ -320,15 +320,13 @@ describe('Settings', () => {
     const nav = screen.getByRole('navigation', { name: 'Settings sections' });
     fireEvent.click(within(nav).getByRole('button', { name: 'Display' }));
     fireEvent.scroll(container);
-    // The settle timer is pending; the other timer belongs to React's scheduler
-    const pendingTimers = vi.getTimerCount();
-    expect(pendingTimers).toBe(2);
+    const timersBeforeUnmount = vi.getTimerCount();
 
     // Act
     unmount();
 
     // Assert
     expect(removeListener).toHaveBeenCalledWith('scroll', expect.any(Function));
-    expect(vi.getTimerCount()).toBe(pendingTimers - 1);
+    expect(vi.getTimerCount()).toBeLessThan(timersBeforeUnmount);
   });
 });

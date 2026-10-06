@@ -5,6 +5,17 @@ import type { Settings } from '../types/grail';
  */
 export type WidgetDisplayMode = NonNullable<Settings['widgetDisplay']>;
 
+const WIDGET_DISPLAY_MODES: readonly WidgetDisplayMode[] = ['overall', 'split', 'all', 'run-only'];
+
+/**
+ * Type guard for values received over IPC, which can be anything at runtime.
+ * @param {unknown} value - The value to check
+ * @returns {boolean} True when the value is a supported widget display mode
+ */
+export function isWidgetDisplayMode(value: unknown): value is WidgetDisplayMode {
+  return typeof value === 'string' && (WIDGET_DISPLAY_MODES as readonly string[]).includes(value);
+}
+
 /**
  * Resolves the display mode the widget can actually render.
  * The split and all modes depend on ethereal tracking; without it they fall back to overall.

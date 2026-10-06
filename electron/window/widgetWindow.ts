@@ -1,7 +1,7 @@
 import path from 'node:path';
 import { BrowserWindow, screen } from 'electron';
 import type { Settings } from '../types/grail';
-import { resolveWidgetDisplayMode } from '../utils/widgetDisplay';
+import { isWidgetDisplayMode, resolveWidgetDisplayMode } from '../utils/widgetDisplay';
 import {
   calculateSnapPosition,
   getDefaultPosition,
@@ -307,7 +307,7 @@ export function updateWidgetWindowSize(
 export function resetWidgetWindowSize(
   display: 'overall' | 'split' | 'all' | 'run-only',
 ): { width: number; height: number } | null {
-  if (widgetWindow) {
+  if (widgetWindow && isWidgetDisplayMode(display)) {
     const defaultSize = SIZE_MAP[display];
     const currentBounds = widgetWindow.getBounds();
     widgetWindow.setBounds({

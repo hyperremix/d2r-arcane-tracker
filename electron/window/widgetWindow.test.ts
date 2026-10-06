@@ -43,7 +43,7 @@ vi.mock('electron', () => {
   };
 });
 
-import { createWidgetWindow, updateWidgetWindowSize } from './widgetWindow';
+import { createWidgetWindow, resetWidgetWindowSize, updateWidgetWindowSize } from './widgetWindow';
 
 const overallSize = { width: 250, height: 250 };
 const splitSize = { width: 350, height: 250 };
@@ -109,5 +109,32 @@ describe('widgetWindow display mode resolution', () => {
 
     // Assert
     expect(window.setBounds).toHaveBeenCalledWith({ x: 10, y: 20, ...overallSize });
+  });
+
+  it('When the size is reset for a known mode, Then the default size of that mode is applied', () => {
+    // Arrange
+    createWidgetWindow({ widgetDisplay: 'overall' }, '/app');
+    const window = created.windows[0] as MockWindow;
+
+    // Act
+    const size = resetWidgetWindowSize('split');
+
+    // Assert
+    expect(size).toEqual(splitSize);
+    expect(window.setBounds).toHaveBeenCalledWith({ x: 10, y: 20, ...splitSize });
+  });
+
+  it('If the size is reset for an unknown mode, Then nothing is applied', () => {
+    // Arrange
+    createWidgetWindow({ widgetDisplay: 'overall' }, '/app');
+    const window = created.windows[0] as MockWindow;
+    const unknownMode = 'constructor' as unknown as Parameters<typeof resetWidgetWindowSize>[0];
+
+    // Act
+    const size = resetWidgetWindowSize(unknownMode);
+
+    // Assert
+    expect(size).toBeNull();
+    expect(window.setBounds).not.toHaveBeenCalled();
   });
 });

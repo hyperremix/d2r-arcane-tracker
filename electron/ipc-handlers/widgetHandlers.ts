@@ -1,5 +1,6 @@
 import { ipcMain } from 'electron';
 import type { Settings } from '../types/grail';
+import { isWidgetDisplayMode } from '../utils/widgetDisplay';
 import {
   closeWidgetWindow,
   getWidgetWindowPosition,
@@ -93,6 +94,9 @@ export function initializeWidgetHandlers(
       settings: Partial<Settings>,
     ) => {
       try {
+        if (!isWidgetDisplayMode(display)) {
+          return { success: false, error: 'Invalid widget display mode' };
+        }
         updateWidgetWindowSize(display, settings);
         return { success: true };
       } catch (error) {
@@ -138,6 +142,9 @@ export function initializeWidgetHandlers(
       size: { width: number; height: number },
     ) => {
       try {
+        if (!isWidgetDisplayMode(display)) {
+          return { success: false, error: 'Invalid widget display mode' };
+        }
         if (onSizeChange) {
           onSizeChange(display, size);
         }
@@ -156,6 +163,9 @@ export function initializeWidgetHandlers(
     'widget:reset-size',
     async (_event, display: 'overall' | 'split' | 'all' | 'run-only') => {
       try {
+        if (!isWidgetDisplayMode(display)) {
+          return { success: false, error: 'Invalid widget display mode', size: null };
+        }
         const defaultSize = resetWidgetWindowSize(display);
         if (defaultSize && onSizeChange) {
           onSizeChange(display, defaultSize);

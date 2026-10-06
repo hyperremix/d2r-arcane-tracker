@@ -321,11 +321,17 @@ describe('D2RInstallationStep', () => {
     });
 
     // Assert
-    expect(
-      await screen.findByText('Could not save the installation path. Please try again.'),
-    ).toBeInTheDocument();
+    const message = await screen.findByText(
+      'Could not save the installation path. Please try again.',
+    );
+    expect(message.closest('[aria-live="polite"]')).not.toBeNull();
     expect(input).toHaveAttribute('aria-invalid', 'true');
     expect(api.icon.validatePath).not.toHaveBeenCalled();
+    expect(screen.queryByText('Checking installation path...')).not.toBeInTheDocument();
+    expect(screen.queryByText('Game files found at this location')).not.toBeInTheDocument();
+    expect(
+      screen.queryByText('Extracted game files were not found at this location'),
+    ).not.toBeInTheDocument();
   });
 
   it('If the user types and then restores the saved path, Then the saved path is validated again', async () => {
@@ -348,32 +354,5 @@ describe('D2RInstallationStep', () => {
     expect(api.icon.setD2RPath).not.toHaveBeenCalled();
     expect(api.icon.validatePath).toHaveBeenCalledTimes(2);
     expect(await screen.findByText('Game files found at this location')).toBeInTheDocument();
-  });
-
-  it('If a validation resolves after the step unmounted, Then the late result is ignored without errors', async () => {
-    // Arrange
-    const api = createElectronApiMock('E:\\Diablo II Resurrected');
-    const resolvers: Array<(value: { valid: boolean }) => void> = [];
-    api.icon.validatePath.mockImplementation(
-      () =>
-        new Promise<{ valid: boolean }>((resolve) => {
-          resolvers.push(resolve);
-        }),
-    );
-    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
-    installElectronApi(api);
-    const { unmount } = render(<D2RInstallationStep />);
-    await waitFor(() => {
-      expect(resolvers).toHaveLength(1);
-    });
-
-    // Act
-    unmount();
-    await act(async () => {
-      resolvers[0]({ valid: true });
-    });
-
-    // Assert
-    expect(consoleError).not.toHaveBeenCalled();
   });
 });

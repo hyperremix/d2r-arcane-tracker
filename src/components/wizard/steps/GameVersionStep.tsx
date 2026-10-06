@@ -11,7 +11,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { translations } from '@/i18n/translations';
-import { gameVersionLabelKeys } from '@/lib/labelKeys';
+import { gameVersionDescriptionKeys, gameVersionLabelKeys } from '@/lib/labelKeys';
 import { useGrailStore } from '@/stores/grailStore';
 
 /**
@@ -30,12 +30,12 @@ const gameVersions: GameVersionOption[] = [
   {
     value: GameVersion.Resurrected,
     labelKey: gameVersionLabelKeys[GameVersion.Resurrected],
-    descriptionKey: translations.settings.gameVersion.resurrectedDescription,
+    descriptionKey: gameVersionDescriptionKeys[GameVersion.Resurrected],
   },
   {
     value: GameVersion.Classic,
     labelKey: gameVersionLabelKeys[GameVersion.Classic],
-    descriptionKey: translations.settings.gameVersion.classicDescription,
+    descriptionKey: gameVersionDescriptionKeys[GameVersion.Classic],
   },
 ];
 
