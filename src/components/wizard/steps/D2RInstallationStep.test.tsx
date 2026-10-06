@@ -349,4 +349,31 @@ describe('D2RInstallationStep', () => {
     expect(api.icon.validatePath).toHaveBeenCalledTimes(2);
     expect(await screen.findByText('Game files found at this location')).toBeInTheDocument();
   });
+
+  it('If a validation resolves after the step unmounted, Then the late result is ignored without errors', async () => {
+    // Arrange
+    const api = createElectronApiMock('E:\\Diablo II Resurrected');
+    const resolvers: Array<(value: { valid: boolean }) => void> = [];
+    api.icon.validatePath.mockImplementation(
+      () =>
+        new Promise<{ valid: boolean }>((resolve) => {
+          resolvers.push(resolve);
+        }),
+    );
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    installElectronApi(api);
+    const { unmount } = render(<D2RInstallationStep />);
+    await waitFor(() => {
+      expect(resolvers).toHaveLength(1);
+    });
+
+    // Act
+    unmount();
+    await act(async () => {
+      resolvers[0]({ valid: true });
+    });
+
+    // Assert
+    expect(consoleError).not.toHaveBeenCalled();
+  });
 });

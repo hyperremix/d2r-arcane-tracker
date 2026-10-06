@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useWizardStore } from '@/stores/wizardStore';
 import { SetupWizard, wizardSteps } from './SetupWizard';
 
@@ -32,6 +32,10 @@ function openWizardAt(step: number, stepValidity: Record<string, boolean> = {}) 
 
 describe('SetupWizard', () => {
   beforeEach(() => {
+    useWizardStore.setState({ isOpen: false, currentStep: 0, stepValidity: {} });
+  });
+
+  afterEach(() => {
     useWizardStore.setState({ isOpen: false, currentStep: 0, stepValidity: {} });
   });
 

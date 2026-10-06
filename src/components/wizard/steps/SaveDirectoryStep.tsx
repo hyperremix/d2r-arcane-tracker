@@ -70,9 +70,9 @@ export function SaveDirectoryStep() {
 
       const newDirectory = result.filePaths[0];
 
-      // Apply the setting immediately and restart monitoring
-      await setSettings({ saveDir: newDirectory });
+      // Persist the directory and restart monitoring first, so nothing is updated if it fails
       await window.electronAPI?.saveFile.updateSaveDirectory(newDirectory);
+      await setSettings({ saveDir: newDirectory });
 
       // Only reflect the directory (and mark the step valid) once it has been saved
       setSaveDir(newDirectory);

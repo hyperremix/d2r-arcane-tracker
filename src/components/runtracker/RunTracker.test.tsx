@@ -1,6 +1,6 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import type { Run, Session } from 'electron/types/grail';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useRunTrackerStore } from '@/stores/runTrackerStore';
 import { RunTracker } from './RunTracker';
 
@@ -14,10 +14,20 @@ const mockIpcRenderer = {
   off: vi.fn(),
 };
 
-// Mock window.electronAPI
+// Mock window.ipcRenderer (restored afterwards because test files share one window)
+const originalIpcRenderer = window.ipcRenderer;
 Object.defineProperty(window, 'ipcRenderer', {
   value: mockIpcRenderer,
+  configurable: true,
   writable: true,
+});
+
+afterAll(() => {
+  Object.defineProperty(window, 'ipcRenderer', {
+    value: originalIpcRenderer,
+    configurable: true,
+    writable: true,
+  });
 });
 
 // Mock child components

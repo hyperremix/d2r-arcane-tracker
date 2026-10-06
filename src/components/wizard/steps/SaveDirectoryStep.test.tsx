@@ -163,5 +163,7 @@ describe('SaveDirectoryStep', () => {
     // Assert
     expect(useWizardStore.getState().stepValidity.saveDirectory).toBe(false);
     expect(screen.getByText('No save directory detected')).toBeInTheDocument();
+    expect(useGrailStore.getState().settings.saveDir).toBe('');
+    expect(electronApi.grail.updateSettings).not.toHaveBeenCalled();
   });
 });

@@ -12,6 +12,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { translations } from '@/i18n/translations';
+import { gameVersionLabelKeys } from '@/lib/labelKeys';
 import { useGrailStore } from '@/stores/grailStore';
 
 /**
@@ -33,11 +34,7 @@ export function GameVersionSettings() {
     () =>
       gameVersionValues.map((value) => ({
         value,
-        label: t(
-          value === GameVersion.Resurrected
-            ? translations.settings.gameVersion.resurrectedLabel
-            : translations.settings.gameVersion.classicLabel,
-        ),
+        label: t(gameVersionLabelKeys[value]),
         description: t(
           value === GameVersion.Resurrected
             ? translations.settings.gameVersion.resurrectedDescription

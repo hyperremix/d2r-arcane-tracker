@@ -1,3 +1,4 @@
+import type { LucideIcon } from 'lucide-react';
 import { Monitor, Moon, Sun } from 'lucide-react';
 import { useId } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -9,9 +10,23 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { themeLabelKeys } from '@/components/wizard/labelKeys';
 import { translations } from '@/i18n/translations';
+import { themeLabelKeys } from '@/lib/labelKeys';
 import { useGrailStore } from '@/stores/grailStore';
+
+/**
+ * A selectable theme with its icon; labels come from the shared theme label keys.
+ */
+interface ThemeOption {
+  value: 'light' | 'dark' | 'system';
+  Icon: LucideIcon;
+}
+
+const themeOptions: ThemeOption[] = [
+  { value: 'light', Icon: Sun },
+  { value: 'dark', Icon: Moon },
+  { value: 'system', Icon: Monitor },
+];
 
 /**
  * ThemeStep component - Theme section of the wizard Preferences step.
@@ -54,7 +69,7 @@ export function ThemeStep() {
 
       <div className="space-y-4">
         <div className="space-y-2">
-          <Label htmlFor={themeId}>{t(translations.settings.theme.selectThemePlaceholder)}</Label>
+          <Label htmlFor={themeId}>{t(translations.settings.theme.selectTheme)}</Label>
           <Select
             value={theme}
             onValueChange={(value) =>
@@ -67,24 +82,14 @@ export function ThemeStep() {
               </SelectValue>
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="light">
-                <div className="flex items-center gap-2">
-                  <Sun className="h-4 w-4" />
-                  {t(translations.settings.theme.light)}
-                </div>
-              </SelectItem>
-              <SelectItem value="dark">
-                <div className="flex items-center gap-2">
-                  <Moon className="h-4 w-4" />
-                  {t(translations.settings.theme.dark)}
-                </div>
-              </SelectItem>
-              <SelectItem value="system">
-                <div className="flex items-center gap-2">
-                  <Monitor className="h-4 w-4" />
-                  {t(translations.settings.theme.system)}
-                </div>
-              </SelectItem>
+              {themeOptions.map(({ value, Icon }) => (
+                <SelectItem key={value} value={value}>
+                  <div className="flex items-center gap-2">
+                    <Icon className="h-4 w-4" />
+                    {t(themeLabelKeys[value])}
+                  </div>
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>

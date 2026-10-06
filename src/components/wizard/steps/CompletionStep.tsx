@@ -1,12 +1,8 @@
 import { GameMode, GameVersion } from 'electron/types/grail';
 import { CheckCircle2, Sparkles } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import {
-  gameModeLabelKeys,
-  gameVersionLabelKeys,
-  themeLabelKeys,
-} from '@/components/wizard/labelKeys';
 import { translations } from '@/i18n/translations';
+import { gameModeLabelKeys, gameVersionLabelKeys, themeLabelKeys } from '@/lib/labelKeys';
 import { useGrailStore } from '@/stores/grailStore';
 
 /**

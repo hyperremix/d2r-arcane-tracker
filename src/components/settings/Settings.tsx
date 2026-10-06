@@ -85,6 +85,25 @@ const SCROLL_SPY_OFFSET = 96;
 const SCROLL_SETTLE_DELAY = 150;
 
 /**
+ * Time (ms) after a navigation click before the navigation lock is released if no scroll happens
+ * (for example when the section is already in place).
+ */
+const NAVIGATION_LOCK_TIMEOUT = SCROLL_SETTLE_DELAY * 4;
+
+/**
+ * Tolerance (px) for treating the scroll position as the very bottom, absorbing sub-pixel rounding.
+ */
+const SCROLL_BOTTOM_TOLERANCE = 2;
+
+/**
+ * Returns whether a scroll container is scrolled to (within a few pixels of) its bottom.
+ * @param {HTMLElement} container - The scroll container
+ * @returns {boolean} True when the container cannot scroll down any further
+ */
+const isAtBottom = (container: HTMLElement) =>
+  container.scrollTop + container.clientHeight >= container.scrollHeight - SCROLL_BOTTOM_TOLERANCE;
+
+/**
  * Builds the DOM id of a settings section.
  * @param {SettingsSectionId} id - The section id
  * @returns {string} The DOM id of the section element
@@ -207,7 +226,7 @@ export function Settings() {
     }
 
     // At the very bottom, the last section is active even if it is too short to reach the top
-    if (container.scrollTop + container.clientHeight >= container.scrollHeight - 2) {
+    if (isAtBottom(container)) {
       return settingsSections[settingsSections.length - 1].id;
     }
 
@@ -236,14 +255,13 @@ export function Settings() {
     const container = scrollContainerRef.current;
     const next = computeActiveSection();
     if (target && target !== next && container) {
-      const atBottom = container.scrollTop + container.clientHeight >= container.scrollHeight - 2;
       const targetTop = document
         .getElementById(getSectionDomId(target))
         ?.getBoundingClientRect().top;
       const containerTop = container.getBoundingClientRect().top;
       const targetVisibleBelowTop =
         targetTop !== undefined && targetTop - containerTop > SCROLL_SPY_OFFSET;
-      if (atBottom && targetVisibleBelowTop) {
+      if (isAtBottom(container) && targetVisibleBelowTop) {
         setActiveSection(target);
         return;
       }
@@ -303,7 +321,7 @@ export function Settings() {
       if (settleTimeoutRef.current) {
         clearTimeout(settleTimeoutRef.current);
       }
-      settleTimeoutRef.current = setTimeout(releaseNavigationLock, SCROLL_SETTLE_DELAY * 4);
+      settleTimeoutRef.current = setTimeout(releaseNavigationLock, NAVIGATION_LOCK_TIMEOUT);
 
       section?.scrollIntoView({
         behavior: prefersReducedMotion() ? 'auto' : 'smooth',

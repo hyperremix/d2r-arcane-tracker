@@ -12,6 +12,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { translations } from '@/i18n/translations';
+import { gameModeLabelKeys } from '@/lib/labelKeys';
 import { useGrailStore } from '@/stores/grailStore';
 
 /**
@@ -39,19 +40,19 @@ export function GameModeSettings() {
       gameModeValues.map(({ value, icon }) => {
         const keyMap: Record<GameMode, { label: string; description: string }> = {
           [GameMode.Both]: {
-            label: t(translations.settings.gameMode.bothLabel),
+            label: t(gameModeLabelKeys[GameMode.Both]),
             description: t(translations.settings.gameMode.bothDescription),
           },
           [GameMode.Softcore]: {
-            label: t(translations.settings.gameMode.softcoreLabel),
+            label: t(gameModeLabelKeys[GameMode.Softcore]),
             description: t(translations.settings.gameMode.softcoreDescription),
           },
           [GameMode.Hardcore]: {
-            label: t(translations.settings.gameMode.hardcoreLabel),
+            label: t(gameModeLabelKeys[GameMode.Hardcore]),
             description: t(translations.settings.gameMode.hardcoreDescription),
           },
           [GameMode.Manual]: {
-            label: t(translations.settings.gameMode.manualLabel),
+            label: t(gameModeLabelKeys[GameMode.Manual]),
             description: t(translations.settings.gameMode.manualDescription),
           },
         };

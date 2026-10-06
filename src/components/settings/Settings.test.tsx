@@ -320,14 +320,15 @@ describe('Settings', () => {
     const nav = screen.getByRole('navigation', { name: 'Settings sections' });
     fireEvent.click(within(nav).getByRole('button', { name: 'Display' }));
     fireEvent.scroll(container);
+    // The settle timer is pending; the other timer belongs to React's scheduler
     const pendingTimers = vi.getTimerCount();
-    expect(pendingTimers).toBeGreaterThan(0);
+    expect(pendingTimers).toBe(2);
 
     // Act
     unmount();
 
     // Assert
     expect(removeListener).toHaveBeenCalledWith('scroll', expect.any(Function));
-    expect(vi.getTimerCount()).toBeLessThan(pendingTimers);
+    expect(vi.getTimerCount()).toBe(pendingTimers - 1);
   });
 });

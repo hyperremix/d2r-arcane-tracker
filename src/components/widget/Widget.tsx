@@ -9,6 +9,7 @@ import type {
   Settings,
 } from 'electron/types/grail';
 import { GripHorizontal } from 'lucide-react';
+import type { ComponentProps } from 'react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ProgressGauge } from '@/components/grail/ProgressGauge';
@@ -145,6 +146,14 @@ function WidgetDragGrip() {
       className="-translate-x-1/2 pointer-events-none absolute top-1 left-1/2 h-4 w-4 text-white opacity-30 transition-opacity duration-200 group-hover:opacity-80 group-focus-visible:opacity-80"
     />
   );
+}
+
+/**
+ * Progress gauge styled for the widget: labelled, with light text that stays legible on the
+ * widget's always-dark background.
+ */
+function WidgetGauge(props: Omit<ComponentProps<typeof ProgressGauge>, 'showLabel' | 'tone'>) {
+  return <ProgressGauge {...props} showLabel tone="overlay" />;
 }
 
 /**
@@ -502,12 +511,10 @@ export function Widget({ statistics, settings, onDragStart, onDragEnd }: WidgetP
       {/* Display mode: overall - Just overall progress */}
       {displayMode === 'overall' && (
         <div style={{ transform: `scale(${gaugeScale})` }} className="mt-8">
-          <ProgressGauge
+          <WidgetGauge
             label={t(translations.settings.widget.overall)}
             current={statistics.foundItems}
             total={statistics.totalItems}
-            showLabel
-            tone="overlay"
             color="purple"
           />
         </div>
@@ -517,22 +524,18 @@ export function Widget({ statistics, settings, onDragStart, onDragEnd }: WidgetP
       {displayMode === 'split' && (
         <div className="mt-4 flex justify-center gap-12">
           <div style={{ transform: `scale(${gaugeScale})` }}>
-            <ProgressGauge
+            <WidgetGauge
               label={t(translations.grail.itemCard.normal)}
               current={statistics.normalItems.found}
               total={statistics.normalItems.total}
-              showLabel
-              tone="overlay"
               color="orange"
             />
           </div>
           <div style={{ transform: `scale(${gaugeScale})` }}>
-            <ProgressGauge
+            <WidgetGauge
               label={t(translations.widget.ethereal)}
               current={statistics.etherealItems.found}
               total={statistics.etherealItems.total}
-              showLabel
-              tone="overlay"
               color="blue"
             />
           </div>
@@ -543,12 +546,10 @@ export function Widget({ statistics, settings, onDragStart, onDragEnd }: WidgetP
       {displayMode === 'all' && (
         <div className="mt-4 flex flex-col items-center gap-8">
           <div style={{ transform: `scale(${gaugeScale})` }}>
-            <ProgressGauge
+            <WidgetGauge
               label={t(translations.settings.widget.overall)}
               current={statistics.foundItems}
               total={statistics.totalItems}
-              showLabel
-              tone="overlay"
               color="purple"
             />
           </div>
@@ -556,22 +557,18 @@ export function Widget({ statistics, settings, onDragStart, onDragEnd }: WidgetP
           {settings.grailEthereal && (
             <div className="flex justify-center gap-6">
               <div style={{ transform: `scale(${gaugeScale * 0.85})` }}>
-                <ProgressGauge
+                <WidgetGauge
                   label={t(translations.grail.itemCard.normal)}
                   current={statistics.normalItems.found}
                   total={statistics.normalItems.total}
-                  showLabel
-                  tone="overlay"
                   color="orange"
                 />
               </div>
               <div style={{ transform: `scale(${gaugeScale * 0.85})` }}>
-                <ProgressGauge
+                <WidgetGauge
                   label={t(translations.widget.ethereal)}
                   current={statistics.etherealItems.found}
                   total={statistics.etherealItems.total}
-                  showLabel
-                  tone="overlay"
                   color="blue"
                 />
               </div>

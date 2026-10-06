@@ -10,8 +10,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { gameVersionLabelKeys } from '@/components/wizard/labelKeys';
 import { translations } from '@/i18n/translations';
+import { gameVersionLabelKeys } from '@/lib/labelKeys';
 import { useGrailStore } from '@/stores/grailStore';
 
 /**

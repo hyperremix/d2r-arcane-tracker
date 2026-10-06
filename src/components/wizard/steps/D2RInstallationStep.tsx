@@ -10,7 +10,7 @@ import { useGrailStore } from '@/stores/grailStore';
 /**
  * Validation state of the configured D2R installation path.
  */
-type PathValidationState = 'idle' | 'validating' | 'valid' | 'invalid' | 'error';
+type PathValidationState = 'idle' | 'validating' | 'valid' | 'invalid';
 
 /**
  * Returns the most common D2R installation directory for the current platform.
@@ -39,6 +39,8 @@ export function D2RInstallationStep() {
   const [d2rPath, setD2rPath] = useState<string>(settings.d2rInstallPath || '');
   const [hasLoaded, setHasLoaded] = useState(false);
   const [validation, setValidation] = useState<PathValidationState>('idle');
+  // Saving the path failed; shown instead of any validation status until the next attempt
+  const [saveFailed, setSaveFailed] = useState(false);
   const savedPathRef = useRef<string>(settings.d2rInstallPath || '');
   // Incremented whenever a validation starts, the path changes or the step unmounts,
   // so older results can be discarded
@@ -52,6 +54,7 @@ export function D2RInstallationStep() {
   const applyValidation = useCallback((state: PathValidationState) => {
     validationStateRef.current = state;
     setValidation(state);
+    setSaveFailed(false);
   }, []);
 
   const validatePath = useCallback(async () => {
@@ -86,7 +89,8 @@ export function D2RInstallationStep() {
       } catch (error) {
         console.error('Failed to save D2R path:', error);
         if (requestId === validationRequestRef.current) {
-          applyValidation('error');
+          applyValidation('idle');
+          setSaveFailed(true);
         }
         return false;
       } finally {
@@ -198,7 +202,7 @@ export function D2RInstallationStep() {
   );
 
   const showSuggestion = hasLoaded && !d2rPath;
-  const describedBy = [pathHintId, validation !== 'idle' ? validationId : undefined]
+  const describedBy = [pathHintId, validation !== 'idle' || saveFailed ? validationId : undefined]
     .filter(Boolean)
     .join(' ');
 
@@ -228,7 +232,7 @@ export function D2RInstallationStep() {
               onBlur={(e) => void persistPath(e.target.value)}
               onKeyDown={handleKeyDown}
               placeholder={suggestedPath}
-              aria-invalid={validation === 'invalid' || validation === 'error' || undefined}
+              aria-invalid={validation === 'invalid' || saveFailed || undefined}
               aria-describedby={describedBy}
               className="flex-1"
             />
@@ -299,7 +303,7 @@ export function D2RInstallationStep() {
               </div>
             </div>
           )}
-          {validation === 'error' && (
+          {saveFailed && (
             <p className="flex items-center gap-2 text-destructive text-sm">
               <AlertTriangle className="h-4 w-4" />
               {t(translations.wizard.d2rInstallation.saveFailed)}
