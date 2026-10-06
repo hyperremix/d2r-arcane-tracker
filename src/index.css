@@ -6,30 +6,6 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme {
-  --color-primary-50: #fef2f2;
-  --color-primary-100: #fee2e2;
-  --color-primary-200: #fecaca;
-  --color-primary-300: #fca5a5;
-  --color-primary-400: #f87171;
-  --color-primary-500: #8b0000;
-  --color-primary-600: #7a0000;
-  --color-primary-700: #6a0000;
-  --color-primary-800: #5a0000;
-  --color-primary-900: #4a0000;
-  --color-primary-950: #2a0000;
-
-  --color-secondary-50: #fefce8;
-  --color-secondary-100: #fef9c3;
-  --color-secondary-200: #fef08a;
-  --color-secondary-300: #fde047;
-  --color-secondary-400: #facc15;
-  --color-secondary-500: #c9a227;
-  --color-secondary-600: #b38c1f;
-  --color-secondary-700: #9d7719;
-  --color-secondary-800: #876214;
-  --color-secondary-900: #6d4e10;
-  --color-secondary-950: #3d2b09;
-
   --color-gray-50: #f9fafb;
   --color-gray-100: #f3f4f6;
   --color-gray-200: #e5e7eb;
@@ -41,15 +17,6 @@
   --color-gray-800: #1f2937;
   --color-gray-900: #111827;
   --color-gray-950: #0a0a0a;
-
-  --color-accent-blue: #646cff;
-  --color-accent-purple: #7c3aed;
-  --color-accent-green: #10b981;
-  --color-accent-red: #ef4444;
-  --color-accent-yellow: #f59e0b;
-
-  --font-family-sans: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
-  --font-family-gaming: Orbitron, monospace;
 }
 
 @layer base {
@@ -101,6 +68,20 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-info: var(--info);
+  --color-found: var(--found);
+  --color-found-foreground: var(--found-foreground);
+  --color-missing: var(--missing);
+  --color-missing-foreground: var(--missing-foreground);
+  --color-ethereal: var(--ethereal);
+  --color-ethereal-foreground: var(--ethereal-foreground);
+  --color-item-unique: var(--item-unique);
+  --color-item-set: var(--item-set);
+  --color-item-rune: var(--item-rune);
+  --color-item-runeword: var(--item-runeword);
 }
 
 :root {
@@ -111,42 +92,63 @@
   --card-foreground: oklch(0.141 0.005 285.823);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.141 0.005 285.823);
-  --primary: oklch(0.21 0.006 285.885);
-  --primary-foreground: oklch(0.985 0 0);
+  /* Brand: D2 blood red */
+  --primary: oklch(0.44 0.16 25);
+  --primary-foreground: oklch(0.985 0.01 85);
   --secondary: oklch(0.967 0.001 286.375);
   --secondary-foreground: oklch(0.21 0.006 285.885);
   --muted: oklch(0.967 0.001 286.375);
-  --muted-foreground: oklch(0.552 0.016 285.938);
+  --muted-foreground: oklch(0.51 0.016 285.938);
   --accent: oklch(0.967 0.001 286.375);
   --accent-foreground: oklch(0.21 0.006 285.885);
-  --destructive: oklch(0.577 0.245 27.325);
+  --destructive: oklch(0.52 0.21 27);
   --border: oklch(0.92 0.004 286.32);
   --input: oklch(0.92 0.004 286.32);
-  --ring: oklch(0.705 0.015 286.067);
-  --chart-1: oklch(0.646 0.222 41.116);
-  --chart-2: oklch(0.6 0.118 184.704);
-  --chart-3: oklch(0.398 0.07 227.392);
-  --chart-4: oklch(0.828 0.189 84.429);
-  --chart-5: oklch(0.769 0.188 70.08);
+  --ring: oklch(0.44 0.16 25);
+  --chart-1: oklch(0.44 0.16 25);
+  --chart-2: oklch(0.66 0.13 80);
+  --chart-3: oklch(0.55 0.13 150);
+  --chart-4: oklch(0.5 0.2 300);
+  --chart-5: oklch(0.58 0.16 50);
   --sidebar: oklch(0.985 0 0);
   --sidebar-foreground: oklch(0.141 0.005 285.823);
-  --sidebar-primary: oklch(0.21 0.006 285.885);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.44 0.16 25);
+  --sidebar-primary-foreground: oklch(0.985 0.01 85);
   --sidebar-accent: oklch(0.967 0.001 286.375);
   --sidebar-accent-foreground: oklch(0.21 0.006 285.885);
   --sidebar-border: oklch(0.92 0.004 286.32);
-  --sidebar-ring: oklch(0.705 0.015 286.067);
+  --sidebar-ring: oklch(0.44 0.16 25);
+  /* Status (text-safe on background and on /10-/15 tints) */
+  --success: oklch(0.47 0.13 150);
+  --success-foreground: oklch(0.985 0 0);
+  --warning: oklch(0.5 0.12 65);
+  --info: oklch(0.48 0.15 255);
+  /* Grail item states */
+  --found: oklch(0.47 0.13 150);
+  --found-foreground: oklch(0.985 0 0);
+  --missing: oklch(0.5 0.19 27);
+  --missing-foreground: oklch(0.985 0 0);
+  --ethereal: oklch(0.48 0.12 240);
+  --ethereal-foreground: oklch(0.985 0 0);
+  /* Item qualities (D2: unique gold, set green, rune orange, runeword purple) */
+  --item-unique: oklch(0.52 0.11 75);
+  --item-set: oklch(0.48 0.14 145);
+  --item-rune: oklch(0.52 0.15 50);
+  --item-runeword: oklch(0.48 0.2 300);
 }
 
-.dark {
+/* The widget overlay always renders on a black backdrop, so it always uses the dark tokens. */
+.dark,
+body.widget {
   --background: oklch(0.141 0.005 285.823);
   --foreground: oklch(0.985 0 0);
   --card: oklch(0.21 0.006 285.885);
   --card-foreground: oklch(0.985 0 0);
   --popover: oklch(0.21 0.006 285.885);
   --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.92 0.004 286.32);
-  --primary-foreground: oklch(0.21 0.006 285.885);
+  /* Brand: D2 gold (dark red is too dim on a dark background) */
+  --primary: oklch(0.8 0.13 85);
+  --primary-foreground: oklch(0.2 0.03 60);
   --secondary: oklch(0.274 0.006 286.033);
   --secondary-foreground: oklch(0.985 0 0);
   --muted: oklch(0.274 0.006 286.033);
@@ -156,20 +158,34 @@
   --destructive: oklch(0.704 0.191 22.216);
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.552 0.016 285.938);
-  --chart-1: oklch(0.488 0.243 264.376);
-  --chart-2: oklch(0.696 0.17 162.48);
-  --chart-3: oklch(0.769 0.188 70.08);
-  --chart-4: oklch(0.627 0.265 303.9);
-  --chart-5: oklch(0.645 0.246 16.439);
+  --ring: oklch(0.8 0.13 85);
+  --chart-1: oklch(0.65 0.2 25);
+  --chart-2: oklch(0.8 0.13 85);
+  --chart-3: oklch(0.72 0.15 150);
+  --chart-4: oklch(0.68 0.17 300);
+  --chart-5: oklch(0.75 0.16 55);
   --sidebar: oklch(0.21 0.006 285.885);
   --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.8 0.13 85);
+  --sidebar-primary-foreground: oklch(0.2 0.03 60);
   --sidebar-accent: oklch(0.274 0.006 286.033);
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.552 0.016 285.938);
+  --sidebar-ring: oklch(0.8 0.13 85);
+  --success: oklch(0.75 0.17 150);
+  --success-foreground: oklch(0.141 0.005 285.823);
+  --warning: oklch(0.8 0.14 75);
+  --info: oklch(0.75 0.12 250);
+  --found: oklch(0.75 0.17 150);
+  --found-foreground: oklch(0.141 0.005 285.823);
+  --missing: oklch(0.7 0.18 25);
+  --missing-foreground: oklch(0.141 0.005 285.823);
+  --ethereal: oklch(0.75 0.11 230);
+  --ethereal-foreground: oklch(0.141 0.005 285.823);
+  --item-unique: oklch(0.8 0.13 85);
+  --item-set: oklch(0.78 0.18 145);
+  --item-rune: oklch(0.75 0.16 55);
+  --item-runeword: oklch(0.72 0.16 300);
 }
 
 @layer base {
@@ -208,10 +224,11 @@
   app-region: no-drag;
 }
 
-/* Custom scrollbar styling for light mode */
+/* Custom scrollbar styling (follows theme tokens in light and dark mode) */
 * {
   scrollbar-width: thin;
-  scrollbar-color: oklch(0.8 0.003 286.32) oklch(0.985 0 0);
+  scrollbar-color: color-mix(in oklch, var(--muted-foreground) 35%, var(--background))
+    var(--background);
 }
 
 *::-webkit-scrollbar {
@@ -220,44 +237,22 @@
 }
 
 *::-webkit-scrollbar-track {
-  background: oklch(0.985 0 0);
+  background: var(--background);
   border-radius: 6px;
 }
 
 *::-webkit-scrollbar-thumb {
-  background: oklch(0.8 0.003 286.32);
+  background: color-mix(in oklch, var(--muted-foreground) 35%, var(--background));
   border-radius: 6px;
-  border: 2px solid oklch(0.985 0 0);
+  border: 2px solid var(--background);
 }
 
 *::-webkit-scrollbar-thumb:hover {
-  background: oklch(0.705 0.015 286.067);
+  background: color-mix(in oklch, var(--muted-foreground) 60%, var(--background));
 }
 
 *::-webkit-scrollbar-thumb:active {
-  background: oklch(0.552 0.016 285.938);
-}
-
-/* Custom scrollbar styling for dark mode */
-.dark * {
-  scrollbar-color: oklch(0.274 0.006 286.033) oklch(0.141 0.005 285.823);
-}
-
-.dark *::-webkit-scrollbar-track {
-  background: oklch(0.141 0.005 285.823);
-}
-
-.dark *::-webkit-scrollbar-thumb {
-  background: oklch(0.274 0.006 286.033);
-  border: 2px solid oklch(0.141 0.005 285.823);
-}
-
-.dark *::-webkit-scrollbar-thumb:hover {
-  background: oklch(0.374 0.008 286.033);
-}
-
-.dark *::-webkit-scrollbar-thumb:active {
-  background: oklch(0.474 0.01 286.033);
+  background: var(--muted-foreground);
 }
 
 /* Release notes HTML styling */
@@ -274,7 +269,7 @@
 }
 
 .release-notes a {
-  @apply text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 underline;
+  @apply text-primary hover:text-primary/80 underline;
 }
 
 .release-notes p {
@@ -283,5 +278,5 @@
 
 .release-notes code,
 .release-notes tt {
-  @apply bg-gray-200 dark:bg-gray-800 px-1 py-0.5 rounded text-xs font-mono;
+  @apply bg-muted px-1 py-0.5 rounded text-xs font-mono;
 }

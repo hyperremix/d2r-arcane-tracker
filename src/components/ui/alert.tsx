@@ -19,15 +19,18 @@ const alertVariants = cva(
   },
 );
 
-function Alert({
-  className,
-  variant,
-  ...props
-}: React.ComponentProps<'div'> & VariantProps<typeof alertVariants>) {
+interface AlertProps
+  extends Omit<React.ComponentProps<'div'>, 'role'>,
+    VariantProps<typeof alertVariants> {
+  /** Use `polite` for non-error notices so assistive tech does not interrupt the user. */
+  live?: 'assertive' | 'polite';
+}
+
+function Alert({ className, variant, live = 'assertive', ...props }: AlertProps) {
   return (
     <div
       data-slot="alert"
-      role="alert"
+      role={live === 'polite' ? 'status' : 'alert'}
       className={cn(alertVariants({ variant }), className)}
       {...props}
     />

@@ -29,8 +29,8 @@ export function ProgressBar({ label, current, total, className }: ProgressBarPro
   return (
     <div className={cn('space-y-2', className)}>
       <div className="flex items-center justify-between">
-        <span className="font-medium text-gray-700 text-sm dark:text-gray-300">{label}</span>
-        <span className="text-gray-500 text-sm dark:text-gray-400">
+        <span className="font-medium text-foreground text-sm">{label}</span>
+        <span className="text-muted-foreground text-sm">
           {t(translations.grail.progressBar.progress, {
             current,
             total,

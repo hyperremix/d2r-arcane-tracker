@@ -126,7 +126,7 @@ export function WidgetStep() {
             Overall: Total progress only | Split: Normal + Ethereal | All: All three gauges | Run
             Only: Current run counter
             {!grailEthereal && (
-              <span className="text-yellow-600"> (Split & All require Ethereal tracking)</span>
+              <span className="text-warning"> (Split & All require Ethereal tracking)</span>
             )}
           </p>
         </div>
@@ -170,8 +170,8 @@ export function WidgetStep() {
         </div>
 
         {/* Widget Preview Description */}
-        <div className="rounded-lg bg-blue-50 p-3 dark:bg-blue-950">
-          <p className="text-blue-800 text-xs dark:text-blue-200">
+        <div className="rounded-lg bg-info/10 p-3">
+          <p className="text-info text-xs">
             <strong>Widget Features:</strong>
             <br />• Always on top of other windows
             <br />• Transparent background

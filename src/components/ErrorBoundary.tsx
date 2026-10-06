@@ -69,14 +69,14 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
       return (
         <Translation>
           {(t) => (
-            <div className="flex min-h-screen items-center justify-center bg-gray-900 p-4">
-              <Card className="w-full max-w-2xl border-red-500/50 bg-gray-800 p-8">
+            <div className="flex min-h-screen items-center justify-center bg-background p-4">
+              <Card className="w-full max-w-2xl border-destructive/50 bg-card p-8">
                 <div className="space-y-6">
                   {/* Error Icon */}
                   <div className="flex justify-center">
-                    <div className="flex h-16 w-16 items-center justify-center rounded-full bg-red-500/20">
+                    <div className="flex h-16 w-16 items-center justify-center rounded-full bg-destructive/20">
                       <svg
-                        className="h-8 w-8 text-red-500"
+                        className="h-8 w-8 text-destructive"
                         fill="none"
                         viewBox="0 0 24 24"
                         stroke="currentColor"
@@ -94,35 +94,35 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
 
                   {/* Error Title */}
                   <div className="text-center">
-                    <h1 className="font-bold text-2xl text-white">
+                    <h1 className="font-bold text-2xl text-foreground">
                       {t(translations.errorBoundary.title)}
                     </h1>
-                    <p className="mt-2 text-gray-400">
+                    <p className="mt-2 text-muted-foreground">
                       {t(translations.errorBoundary.description)}
                     </p>
                   </div>
 
                   {/* Error Details (collapsed by default) */}
                   {this.state.error && (
-                    <details className="rounded-lg border border-red-500/30 bg-gray-900/50 p-4">
-                      <summary className="cursor-pointer font-semibold text-red-400 hover:text-red-300">
+                    <details className="rounded-lg border border-destructive/30 bg-muted/50 p-4">
+                      <summary className="cursor-pointer font-semibold text-destructive hover:underline">
                         {t(translations.errorBoundary.errorDetails)}
                       </summary>
                       <div className="mt-4 space-y-2">
                         <div className="text-sm">
-                          <p className="font-semibold text-gray-300">
+                          <p className="font-semibold text-foreground">
                             {t(translations.errorBoundary.errorMessage)}
                           </p>
-                          <pre className="mt-1 overflow-x-auto rounded bg-gray-950 p-2 text-red-400 text-xs">
+                          <pre className="mt-1 overflow-x-auto rounded bg-muted p-2 text-destructive text-xs">
                             {this.state.error.toString()}
                           </pre>
                         </div>
                         {this.state.errorInfo && (
                           <div className="text-sm">
-                            <p className="font-semibold text-gray-300">
+                            <p className="font-semibold text-foreground">
                               {t(translations.errorBoundary.componentStack)}
                             </p>
-                            <pre className="mt-1 max-h-48 overflow-auto rounded bg-gray-950 p-2 text-gray-400 text-xs">
+                            <pre className="mt-1 max-h-48 overflow-auto rounded bg-muted p-2 text-muted-foreground text-xs">
                               {this.state.errorInfo.componentStack}
                             </pre>
                           </div>
@@ -133,11 +133,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
 
                   {/* Action Buttons */}
                   <div className="flex flex-col gap-3 sm:flex-row sm:justify-center">
-                    <Button
-                      onClick={this.handleReset}
-                      variant="default"
-                      className="bg-blue-600 hover:bg-blue-700"
-                    >
+                    <Button onClick={this.handleReset} variant="default">
                       {t(translations.errorBoundary.tryToRecover)}
                     </Button>
                     <Button onClick={this.handleReload} variant="outline">
@@ -146,7 +142,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
                   </div>
 
                   {/* Help Text */}
-                  <p className="text-center text-gray-500 text-xs">
+                  <p className="text-center text-muted-foreground text-xs">
                     {t(translations.errorBoundary.persistHelp)}
                   </p>
                 </div>

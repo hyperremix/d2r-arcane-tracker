@@ -92,15 +92,15 @@ export function ThemeStep() {
               </p>
             </div>
             <div className="flex gap-2">
-              {theme === 'light' && <Sun className="h-8 w-8 text-yellow-500" />}
-              {theme === 'dark' && <Moon className="h-8 w-8 text-blue-500" />}
-              {theme === 'system' && <Monitor className="h-8 w-8 text-purple-500" />}
+              {theme === 'light' && <Sun className="h-8 w-8 text-warning" />}
+              {theme === 'dark' && <Moon className="h-8 w-8 text-info" />}
+              {theme === 'system' && <Monitor className="h-8 w-8 text-primary" />}
             </div>
           </div>
         </div>
 
-        <div className="rounded-lg bg-blue-50 p-4 dark:bg-blue-950">
-          <p className="text-blue-800 text-sm dark:text-blue-200">
+        <div className="rounded-lg bg-info/10 p-4">
+          <p className="text-info text-sm">
             <strong>Note:</strong> System theme will automatically match your operating system's
             appearance preference and update when it changes.
           </p>

@@ -64,7 +64,7 @@ export function GrailSettings() {
               <Label htmlFor={grailNormalId} className="text-base">
                 {t(translations.settings.grail.includeNormal)}
               </Label>
-              <p className="text-gray-600 text-sm dark:text-gray-400">
+              <p className="text-muted-foreground text-sm">
                 {t(translations.settings.grail.includeNormalDescription)}
               </p>
             </div>
@@ -80,7 +80,7 @@ export function GrailSettings() {
               <Label htmlFor={grailEtherealId} className="text-base">
                 {t(translations.settings.grail.includeEthereal)}
               </Label>
-              <p className="text-gray-600 text-sm dark:text-gray-400">
+              <p className="text-muted-foreground text-sm">
                 {t(translations.settings.grail.includeEtherealDescription)}
               </p>
             </div>
@@ -99,7 +99,7 @@ export function GrailSettings() {
               <Label htmlFor={grailRunesId} className="text-base">
                 {t(translations.settings.grail.includeRunes)}
               </Label>
-              <p className="text-gray-600 text-sm dark:text-gray-400">
+              <p className="text-muted-foreground text-sm">
                 {t(translations.settings.grail.includeRunesDescription)}
               </p>
             </div>
@@ -115,7 +115,7 @@ export function GrailSettings() {
               <Label htmlFor={grailRunewordsId} className="text-base">
                 {t(translations.settings.grail.includeRunewords)}
               </Label>
-              <p className="text-gray-600 text-sm dark:text-gray-400">
+              <p className="text-muted-foreground text-sm">
                 {t(translations.settings.grail.includeRunewordsDescription)}
               </p>
             </div>
@@ -128,8 +128,8 @@ export function GrailSettings() {
         </div>
 
         {/* Information Box */}
-        <div className="rounded bg-blue-50 p-3 dark:bg-blue-950">
-          <p className="text-blue-800 text-sm dark:text-blue-200">
+        <div className="rounded bg-info/10 p-3">
+          <p className="text-info text-sm">
             <strong>{t(translations.common.note)}</strong> {t(translations.settings.grail.note)}
           </p>
         </div>

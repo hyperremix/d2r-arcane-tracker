@@ -53,7 +53,7 @@ export function ListView({
           'relative flex w-full items-center gap-3 p-3 transition-all duration-200',
           'rounded-lg border-2',
           typeColors[item.type],
-          allProgress.length > 0 ? '' : 'bg-gray-50 opacity-60 hover:opacity-80 dark:bg-gray-950',
+          allProgress.length > 0 ? '' : 'bg-muted/50 opacity-60 hover:opacity-80',
           className,
         )}
         onClick={onClick}
@@ -78,9 +78,7 @@ export function ListView({
                 }
               }}
             />
-            {isLoading && (
-              <div className="absolute inset-0 animate-pulse rounded bg-gray-200 dark:bg-gray-700" />
-            )}
+            {isLoading && <div className="absolute inset-0 animate-pulse rounded bg-muted" />}
             <ItemTypeIcon type={item.type} className="absolute right-0 bottom-0 h-4 w-4" />
           </div>
         ) : (
@@ -101,9 +99,7 @@ export function ListView({
         {/* Item Name */}
         <Tooltip>
           <TooltipTrigger className="flex-1 truncate text-left">
-            <h3 className="truncate font-semibold text-black text-sm dark:text-white">
-              {item.name}
-            </h3>
+            <h3 className="truncate font-semibold text-foreground text-sm">{item.name}</h3>
           </TooltipTrigger>
           <TooltipContent side="top" className="max-w-sm">
             <div className="space-y-1">
@@ -111,7 +107,7 @@ export function ListView({
                 {item.name}
                 {item.itemBase && ` • ${item.itemBase}`}
               </p>
-              <p className="text-gray-500 text-xs">
+              <p className="text-muted-foreground text-xs">
                 {item.category} • {item.subCategory.replace('_', ' ')}
               </p>
 

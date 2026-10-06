@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -251,7 +252,7 @@ export function SaveFileMonitor() {
           <div className="flex items-center gap-2">
             {getStatusBadge()}
             {error && (
-              <div className="flex items-center gap-1 text-red-600 text-sm">
+              <div className="flex items-center gap-1 text-destructive text-sm">
                 <AlertCircle className="h-3 w-3" />
                 {error}
               </div>
@@ -261,12 +262,12 @@ export function SaveFileMonitor() {
 
         {/* Manual Mode Notice */}
         {settings.gameMode === GameMode.Manual && (
-          <div className="rounded bg-amber-50 p-3">
-            <p className="text-amber-800 text-sm">
+          <Alert live="polite" className="border-warning/30 bg-warning/10">
+            <AlertDescription className="text-sm text-warning">
               <strong>{t(translations.settings.saveFileMonitor.manualModeActive)}</strong>{' '}
               {t(translations.settings.saveFileMonitor.manualModeNotice)}
-            </p>
-          </div>
+            </AlertDescription>
+          </Alert>
         )}
 
         {/* Monitored Directory */}
@@ -303,11 +304,11 @@ export function SaveFileMonitor() {
             </div>
           </div>
           {monitoringStatus.directory ? (
-            <div className="rounded bg-gray-50 p-2 font-mono text-gray-600 text-xs dark:bg-gray-950 dark:text-gray-400">
+            <div className="rounded bg-muted p-2 font-mono text-muted-foreground text-xs">
               {monitoringStatus.directory}
             </div>
           ) : (
-            <div className="rounded bg-gray-50 p-2 text-gray-500 text-xs">
+            <div className="rounded bg-muted p-2 text-muted-foreground text-xs">
               {t(translations.settings.saveFileMonitor.noDirectorySelected)}
             </div>
           )}
@@ -326,7 +327,7 @@ export function SaveFileMonitor() {
                 </Badge>
                 <span className="font-medium">{lastEvent.file.name}</span>
               </div>
-              <div className="text-gray-600">
+              <div className="text-muted-foreground">
                 {t(translations.settings.saveFileMonitor.levelClass, {
                   level: lastEvent.file.level,
                   characterClass: lastEvent.file.characterClass,
@@ -349,11 +350,11 @@ export function SaveFileMonitor() {
               {saveFiles.map((file, index) => (
                 <div
                   key={`${file.path}-${index}`}
-                  className="flex items-center justify-between rounded bg-gray-50 p-2 text-xs dark:bg-gray-950"
+                  className="flex items-center justify-between rounded bg-muted p-2 text-xs"
                 >
                   <div>
                     <div className="font-medium">{file.name}</div>
-                    <div className="text-gray-600 dark:text-gray-400">
+                    <div className="text-muted-foreground">
                       {t(translations.settings.saveFileMonitor.levelClass, {
                         level: file.level,
                         characterClass: file.characterClass,
@@ -361,9 +362,7 @@ export function SaveFileMonitor() {
                       {file.hardcore && ` ${t(translations.settings.saveFileMonitor.hc)}`}
                     </div>
                   </div>
-                  <div className="text-gray-500 dark:text-gray-400">
-                    {formatShortDate(file.lastModified)}
-                  </div>
+                  <div className="text-muted-foreground">{formatShortDate(file.lastModified)}</div>
                 </div>
               ))}
             </div>
@@ -384,7 +383,7 @@ export function SaveFileMonitor() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
-              <AlertCircle className="h-5 w-5 text-orange-500" />
+              <AlertCircle className="h-5 w-5 text-warning" />
               {dialogAction === 'restore'
                 ? t(translations.settings.saveFileMonitor.restoreDefaultDirectory)
                 : t(translations.settings.saveFileMonitor.changeSaveFileDirectory)}
@@ -395,7 +394,7 @@ export function SaveFileMonitor() {
                   ? t(translations.settings.saveFileMonitor.confirmRestoreDirectory)
                   : t(translations.settings.saveFileMonitor.confirmChangeDirectory)}
               </span>
-              <span className="mb-2 block font-medium text-orange-600">
+              <span className="mb-2 block font-medium text-warning">
                 {t(translations.settings.saveFileMonitor.deleteWarning)}
               </span>
               <span className="block text-sm">
@@ -412,7 +411,7 @@ export function SaveFileMonitor() {
                 dialogAction === 'restore' ? handleRestoreDefaultDirectory : handleChangeDirectory
               }
               disabled={isChangingDirectory}
-              className="bg-orange-600 hover:bg-orange-700"
+              variant="destructive"
             >
               {isChangingDirectory
                 ? dialogAction === 'restore'
