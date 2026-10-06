@@ -7,7 +7,12 @@ import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
 import { translations } from '@/i18n/translations';
-import { clampWidgetOpacity, MAX_WIDGET_OPACITY, MIN_WIDGET_OPACITY } from '@/lib/widget';
+import {
+  clampWidgetOpacity,
+  MAX_WIDGET_OPACITY,
+  MIN_WIDGET_OPACITY,
+  resolveWidgetDisplayMode,
+} from '@/lib/widget';
 import { useGrailStore } from '@/stores/grailStore';
 
 /**
@@ -61,18 +66,21 @@ export function WidgetSettings() {
   const widgetEnabled = settings.widgetEnabled ?? false;
   const widgetRunOnlyShowItems = settings.widgetRunOnlyShowItems ?? true;
 
+  // The window size follows the mode the widget actually renders (split/all need ethereal tracking)
+  const effectiveDisplay = resolveWidgetDisplayMode(widgetDisplay, settings.grailEthereal);
+
   const resetSize = useCallback(async () => {
-    const result = await window.electronAPI?.widget.resetSize(widgetDisplay);
+    const result = await window.electronAPI?.widget.resetSize(effectiveDisplay);
     if (result?.success && result.size) {
       // Clear the custom size for this display mode
       const sizeKey =
-        `widgetSize${widgetDisplay.charAt(0).toUpperCase()}${widgetDisplay.slice(1)}` as
+        `widgetSize${effectiveDisplay.charAt(0).toUpperCase()}${effectiveDisplay.slice(1)}` as
           | 'widgetSizeOverall'
           | 'widgetSizeSplit'
           | 'widgetSizeAll';
       await setSettings({ [sizeKey]: undefined });
     }
-  }, [setSettings, widgetDisplay]);
+  }, [setSettings, effectiveDisplay]);
 
   // Auto-switch to 'overall' mode if ethereal tracking is disabled and user is in split/all mode
   useEffect(() => {
