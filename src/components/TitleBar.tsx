@@ -1,79 +1,133 @@
+import type { LucideIcon } from 'lucide-react';
 import {
-  AlertTriangle,
   BarChart3,
   Calculator,
   ChevronLeft,
   ChevronRight,
+  MapPinned,
   Settings,
   Timer,
   Trophy,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useLocation, useNavigate } from 'react-router';
-import { Button } from '@/components/ui/button';
+import { Link, useLocation, useNavigate } from 'react-router';
+import { buttonVariants } from '@/components/ui/button';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { translations } from '@/i18n/translations';
 import { cn } from '@/lib/utils';
 import logoUrl from '/logo.png';
 import { NotificationButton } from './grail/NotificationButton';
 
 /**
- * Navigation button component
+ * Describes a single top-level destination in the title bar navigation.
  */
-function NavigationButton({
-  to,
-  title,
-  icon: Icon,
-  isActive,
-  onClick,
-}: {
+interface NavigationItem {
   to: string;
-  title: string;
-  icon: React.ComponentType<{ className?: string }>;
-  isActive: boolean;
-  onClick: (to: string) => void;
-}) {
+  labelKey: string;
+  icon: LucideIcon;
+}
+
+/**
+ * Top-level destinations shown in the title bar navigation, in display order.
+ * Terror Zones uses `MapPinned` (a marked area on a map) rather than a warning
+ * icon so it does not read as an error state.
+ */
+const NAVIGATION_ITEMS: NavigationItem[] = [
+  { to: '/', labelKey: translations.titleBar.grail, icon: Trophy },
+  { to: '/statistics', labelKey: translations.titleBar.statistics, icon: BarChart3 },
+  { to: '/runs', labelKey: translations.titleBar.runs, icon: Timer },
+  { to: '/runewords', labelKey: translations.titleBar.runewords, icon: Calculator },
+  { to: '/terror-zones', labelKey: translations.titleBar.terrorZones, icon: MapPinned },
+  { to: '/settings', labelKey: translations.titleBar.settings, icon: Settings },
+];
+
+/**
+ * Determines whether a navigation destination matches the current pathname.
+ * The root route only matches exactly; other routes also match nested paths.
+ */
+function isRouteActive(pathname: string, to: string): boolean {
+  if (to === '/') {
+    return pathname === '/';
+  }
+  return pathname === to || pathname.startsWith(`${to}/`);
+}
+
+/**
+ * Navigation link with an icon and a text label.
+ * The label is visible from the `lg` breakpoint; below it the link collapses to
+ * icon-only, the label is shown in a tooltip and stays available to assistive
+ * technology as visually hidden text.
+ */
+function NavigationLink({ item, isActive }: { item: NavigationItem; isActive: boolean }) {
   const { t } = useTranslation();
+  const label = t(item.labelKey);
+  const Icon = item.icon;
+
   return (
-    <div className="relative">
-      <div
-        className={cn(
-          '-top-1.75 absolute right-0 left-0',
-          isActive && 'border-t-4 border-t-primary',
-        )}
-      />
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={() => onClick(to)}
-        title={t(title)}
-        className={cn('relative hover:text-primary', isActive && 'text-primary')}
+    <Tooltip>
+      <TooltipTrigger
+        render={
+          <Link
+            to={item.to}
+            aria-current={isActive ? 'page' : undefined}
+            className={cn(
+              'relative inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md px-2 font-medium text-sm outline-none transition-colors',
+              'focus-visible:ring-[3px] focus-visible:ring-ring/50',
+              isActive
+                ? 'bg-accent text-accent-foreground after:absolute after:inset-x-1.5 after:bottom-0.5 after:h-0.5 after:rounded-full after:bg-foreground'
+                : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground',
+            )}
+          />
+        }
       >
-        <Icon className="h-4 w-4" />
-      </Button>
-    </div>
+        <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
+        <span className="sr-only lg:not-sr-only">{label}</span>
+      </TooltipTrigger>
+      <TooltipContent side="bottom" className="lg:hidden">
+        {label}
+      </TooltipContent>
+    </Tooltip>
   );
 }
 
 /**
- * Hook to get route active states
+ * Icon-only history button (back/forward) with an accessible name and tooltip.
  */
-function useRouteStates(pathname: string) {
-  return {
-    isTrackerActive: pathname === '/',
-    isStatisticsActive: pathname === '/statistics',
-    isRunsActive: pathname === '/runs',
-    isRunewordsActive: pathname === '/runewords',
-    isTerrorZonesActive: pathname === '/terror-zones',
-    isSettingsActive: pathname === '/settings',
-  };
+function HistoryButton({
+  label,
+  icon: Icon,
+  disabled,
+  onClick,
+}: {
+  label: string;
+  icon: LucideIcon;
+  disabled: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <Tooltip>
+      <TooltipTrigger
+        // Render the native button directly so `disabled` reaches the DOM element
+        render={<button type="button" disabled={disabled} />}
+        onClick={onClick}
+        aria-label={label}
+        className={cn(buttonVariants({ variant: 'ghost', size: 'icon-sm' }), 'h-7 w-7')}
+      >
+        <Icon className="h-4 w-4" aria-hidden="true" />
+      </TooltipTrigger>
+      <TooltipContent side="bottom">{label}</TooltipContent>
+    </Tooltip>
+  );
 }
 
 /**
  * TitleBar component that provides a custom draggable title bar for the Electron app.
  * Works across macOS, Linux, and Windows with platform-specific styling.
+ * Interactive elements (buttons and links) are excluded from the drag region by the
+ * `.titlebar` rules in `index.css`; all remaining empty space stays draggable.
  * Follows Electron best practices from: https://www.electronjs.org/docs/latest/tutorial/custom-title-bar
- * @returns {JSX.Element} A custom title bar with app name and platform controls
+ * @returns {JSX.Element} A custom title bar with history controls, app name and navigation
  */
 export function TitleBar() {
   const { t } = useTranslation();
@@ -102,7 +156,6 @@ export function TitleBar() {
   const isMac = platform === 'darwin';
   const canGoBack = historyIndex > 0;
   const canGoForward = historyIndex < historyLength - 1;
-  const routeStates = useRouteStates(location.pathname);
 
   const handleBack = () => {
     if (canGoBack) {
@@ -117,9 +170,9 @@ export function TitleBar() {
   };
 
   return (
-    <div
+    <header
       className={cn(
-        'flex h-12 min-h-12 w-full select-none items-center border-border border-b px-4',
+        'flex h-12 min-h-12 w-full select-none items-center gap-2 border-border border-b px-4',
         'titlebar', // Custom class for Electron dragging
       )}
       style={
@@ -131,105 +184,50 @@ export function TitleBar() {
       }
     >
       {/* Left section - macOS traffic lights spacing */}
-      {isMac && <div className="w-20" />}
+      {isMac && <div className="w-20 shrink-0" />}
 
-      {/* Navigation buttons */}
-      <div
-        className="flex items-center gap-1"
-        style={
-          {
-            // Make buttons clickable (not draggable)
-            WebkitAppRegion: 'no-drag',
-            appRegion: 'no-drag',
-          } as React.CSSProperties
-        }
-      >
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={handleBack}
+      {/* History buttons */}
+      <div className="flex shrink-0 items-center gap-1">
+        <HistoryButton
+          label={t(translations.titleBar.goBack)}
+          icon={ChevronLeft}
           disabled={!canGoBack}
-          title={t(translations.titleBar.goBack)}
-          className="h-7 w-7 p-0"
-        >
-          <ChevronLeft className="h-4 w-4" />
-        </Button>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={handleForward}
+          onClick={handleBack}
+        />
+        <HistoryButton
+          label={t(translations.titleBar.goForward)}
+          icon={ChevronRight}
           disabled={!canGoForward}
-          title={t(translations.titleBar.goForward)}
-          className="h-7 w-7 p-0"
-        >
-          <ChevronRight className="h-4 w-4" />
-        </Button>
+          onClick={handleForward}
+        />
       </div>
 
-      {/* Center section - App title */}
-      <div className="flex flex-1 items-center justify-center gap-2">
-        <img src={logoUrl} alt={t(translations.app.title)} className="h-5 w-5" />
-        <span className="font-semibold text-sm tracking-wide">{t(translations.app.title)}</span>
+      {/* Center section - App title (hidden at narrow widths; the area stays draggable) */}
+      <div className="flex min-w-0 flex-1 items-center justify-center">
+        <div className="hidden min-w-0 items-center gap-2 min-[1180px]:flex">
+          <img src={logoUrl} alt="" className="h-5 w-5 shrink-0" />
+          <span className="truncate font-semibold text-sm tracking-wide">
+            {t(translations.app.title)}
+          </span>
+        </div>
       </div>
 
-      {/* Right section - Action buttons */}
-      <div
-        className="flex items-center gap-2"
-        style={
-          {
-            // Make buttons clickable (not draggable)
-            WebkitAppRegion: 'no-drag',
-            appRegion: 'no-drag',
-          } as React.CSSProperties
-        }
-      >
+      {/* Right section - Notifications and primary navigation */}
+      <div className="flex shrink-0 items-center gap-2">
         <NotificationButton />
-        <NavigationButton
-          to="/"
-          title={translations.titleBar.holyGrailTracker}
-          icon={Trophy}
-          isActive={routeStates.isTrackerActive}
-          onClick={navigate}
-        />
-        <NavigationButton
-          to="/statistics"
-          title={translations.titleBar.statistics}
-          icon={BarChart3}
-          isActive={routeStates.isStatisticsActive}
-          onClick={navigate}
-        />
-        <NavigationButton
-          to="/runs"
-          title={translations.titleBar.runCounter}
-          icon={Timer}
-          isActive={routeStates.isRunsActive}
-          onClick={navigate}
-        />
-        <NavigationButton
-          to="/runewords"
-          title={translations.titleBar.runewordCalculator}
-          icon={Calculator}
-          isActive={routeStates.isRunewordsActive}
-          onClick={navigate}
-        />
-        <NavigationButton
-          to="/terror-zones"
-          title={translations.titleBar.terrorZoneConfiguration}
-          icon={AlertTriangle}
-          isActive={routeStates.isTerrorZonesActive}
-          onClick={navigate}
-        />
-        <NavigationButton
-          to="/settings"
-          title={translations.titleBar.settings}
-          icon={Settings}
-          isActive={routeStates.isSettingsActive}
-          onClick={navigate}
-        />
+        <nav aria-label={t(translations.titleBar.mainNavigation)}>
+          <ul className="flex items-center gap-1">
+            {NAVIGATION_ITEMS.map((item) => (
+              <li key={item.to}>
+                <NavigationLink item={item} isActive={isRouteActive(location.pathname, item.to)} />
+              </li>
+            ))}
+          </ul>
+        </nav>
       </div>
 
       {/* Spacing for Windows/Linux native controls overlay */}
-      {!isMac && <div className="w-36" />}
-    </div>
+      {!isMac && <div className="w-36 shrink-0" />}
+    </header>
   );
 }

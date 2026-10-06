@@ -125,6 +125,8 @@ function createWindow() {
   mainWindow = new BrowserWindow({
     width: windowBounds.width,
     height: windowBounds.height,
+    // Keep the custom title bar (navigation, notifications, platform controls) from overflowing
+    minWidth: 800,
     ...(windowBounds.x !== undefined && windowBounds.y !== undefined
       ? { x: windowBounds.x, y: windowBounds.y }
       : {}),

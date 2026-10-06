@@ -1,0 +1,185 @@
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import type { ItemDetectionEvent } from 'electron/types/grail';
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+
+vi.mock('@/stores/grailStore', () => ({
+  useGrailStore: () => ({
+    settings: {
+      enableSounds: false,
+      notificationVolume: 0,
+      inAppNotifications: true,
+      nativeNotifications: false,
+    },
+  }),
+}));
+
+vi.mock('@/components/grail/ItemCard', () => ({
+  ItemCard: ({ item }: { item: { name: string } }) => <div>{item.name}</div>,
+}));
+
+type DetectionHandler = (event: unknown, itemEvent: ItemDetectionEvent) => void;
+
+let detectionHandler: DetectionHandler | undefined;
+
+const mockIpcRenderer = {
+  invoke: vi.fn(async () => []),
+  on: vi.fn((channel: string, handler: DetectionHandler) => {
+    if (channel === 'item-detection-event') {
+      detectionHandler = handler;
+    }
+  }),
+  off: vi.fn(),
+};
+
+function createDetectionEvent(id: string, name: string): ItemDetectionEvent {
+  return {
+    type: 'item-found',
+    item: { id, name, characterName: 'Sorc' },
+    grailItem: { id, name },
+  } as unknown as ItemDetectionEvent;
+}
+
+let NotificationButton: typeof import('./NotificationButton').NotificationButton;
+
+/**
+ * Imports a fresh copy of the component so its module-level IPC registration guard is reset.
+ */
+async function loadFreshNotificationButton() {
+  vi.resetModules();
+  ({ NotificationButton } = await import('./NotificationButton'));
+}
+
+async function renderNotificationButton() {
+  // Flush the mount-time IPC requests (characters, icon path) inside act
+  await act(async () => {
+    render(<NotificationButton />);
+  });
+}
+
+async function emitDetections(events: ItemDetectionEvent[]) {
+  await act(async () => {
+    for (const event of events) {
+      detectionHandler?.({}, event);
+    }
+  });
+}
+
+describe('When NotificationButton is rendered', () => {
+  beforeAll(async () => {
+    // Warm the transform cache once so per-test fresh imports stay fast
+    await import('./NotificationButton');
+  }, 120000);
+
+  beforeEach(async () => {
+    detectionHandler = undefined;
+    vi.clearAllMocks();
+    // Assign rather than redefine: other suites may already have defined a writable,
+    // non-configurable `window.ipcRenderer` in the shared test environment.
+    Object.assign(window, { ipcRenderer: mockIpcRenderer });
+    await loadFreshNotificationButton();
+  }, 60000);
+
+  it('Then the bell button has an accessible name', async () => {
+    // Arrange & Act
+    await renderNotificationButton();
+
+    // Assert
+    expect(screen.getByRole('button', { name: 'Notifications' })).toBeInTheDocument();
+  });
+
+  it('If there are unseen notifications, then the bell accessible name includes the count', async () => {
+    // Arrange
+    await renderNotificationButton();
+
+    // Act
+    await emitDetections([
+      createDetectionEvent('1', 'Shako'),
+      createDetectionEvent('2', 'Arachnid Mesh'),
+    ]);
+
+    // Assert
+    await waitFor(
+      () => {
+        expect(screen.getByRole('button', { name: 'Notifications, 2 unread' })).toBeInTheDocument();
+      },
+      { timeout: 2000 },
+    );
+  });
+
+  it('If the bell is activated, then the popover opens and Escape closes it', async () => {
+    // Arrange
+    await renderNotificationButton();
+    const bell = screen.getByRole('button', { name: 'Notifications' });
+
+    // Act - open
+    fireEvent.click(bell);
+
+    // Assert - open
+    const dialog = await screen.findByRole('dialog');
+    expect(dialog).toHaveTextContent('Recent Notifications');
+    expect(dialog).toHaveTextContent('No recent item detections');
+    expect(bell).toHaveAttribute('aria-expanded', 'true');
+
+    // Act - close via keyboard
+    fireEvent.keyDown(document.activeElement ?? document.body, { key: 'Escape' });
+
+    // Assert - closed
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    });
+    expect(bell).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  it('If notifications are listed, then each dismiss button has a translated label and removes its item', async () => {
+    // Arrange
+    await renderNotificationButton();
+    await emitDetections([createDetectionEvent('1', 'Shako')]);
+    const bell = await screen.findByRole(
+      'button',
+      { name: 'Notifications, 1 unread' },
+      { timeout: 2000 },
+    );
+    fireEvent.click(bell);
+    const dismissButton = await screen.findByRole('button', {
+      name: 'Dismiss notification for Shako',
+    });
+
+    // Act
+    fireEvent.click(dismissButton);
+
+    // Assert
+    await waitFor(() => {
+      expect(screen.getByRole('dialog')).toHaveTextContent('No recent item detections');
+    });
+    expect(
+      screen.queryByRole('button', { name: 'Dismiss notification for Shako' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('If the popover opens, then focus moves into it and returns to the bell when it closes', async () => {
+    // Arrange
+    await renderNotificationButton();
+    const bell = screen.getByRole('button', { name: 'Notifications' });
+    bell.focus();
+
+    // Act - open
+    fireEvent.click(bell);
+
+    // Assert - focus is inside the popup
+    const dialog = await screen.findByRole('dialog');
+    await waitFor(() => {
+      expect(dialog).toContainElement(document.activeElement as HTMLElement);
+    });
+
+    // Act - close via keyboard
+    fireEvent.keyDown(document.activeElement ?? document.body, { key: 'Escape' });
+
+    // Assert - focus returns to the bell
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    });
+    await waitFor(() => {
+      expect(bell).toHaveFocus();
+    });
+  });
+});
