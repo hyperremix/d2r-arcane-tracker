@@ -3,6 +3,27 @@ import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
 
 /**
+ * User-initiated run tracker actions whose in-flight state is tracked individually,
+ * so a single pending action never blanks or disables unrelated parts of the UI.
+ */
+export type RunTrackerAction =
+  | 'startSession'
+  | 'endSession'
+  | 'archiveSession'
+  | 'startRun'
+  | 'endRun'
+  | 'pauseRun'
+  | 'resumeRun'
+  | 'addManualRunItem';
+
+/**
+ * Lifecycle of the first data load of the run tracker page.
+ * Only `idle`/`loading` show a full-page spinner and only `error` shows a full-page error;
+ * once `success` is reached all later refreshes happen in the background.
+ */
+export type InitialLoadStatus = 'idle' | 'loading' | 'success' | 'error';
+
+/**
  * Interface defining the complete state structure and actions for the Run Tracker store.
  * Manages run tracking sessions, runs, and associated items with real-time updates.
  */
@@ -15,12 +36,16 @@ interface RunTrackerState {
   runItems: Map<string, RunItem[]>; // runId -> items
   isTracking: boolean;
   isPaused: boolean;
-  loading: boolean;
+  initialLoadStatus: InitialLoadStatus;
+  initialLoadError: string | undefined;
+  pendingActions: Partial<Record<RunTrackerAction, boolean>>;
+  sessionsLoading: boolean;
   error: string | null;
   errorType: 'network' | 'validation' | 'permission' | 'unknown' | null;
   retryCount: number;
   sessionStatsCache: Map<string, SessionStats>; // sessionId -> stats
   loadingSessions: Set<string>; // sessionId -> tracks in-flight loads
+  loadingRunItems: Set<string>; // runId -> tracks in-flight item loads
 
   // Actions - Session Management
   startSession: () => Promise<void>;
@@ -35,6 +60,7 @@ interface RunTrackerState {
   resumeRun: () => Promise<void>;
 
   // Actions - Data Loading
+  loadInitialData: () => Promise<void>;
   loadSessions: (includeArchived?: boolean) => Promise<void>;
   loadAllSessions: () => Promise<void>;
   loadSessionById: (sessionId: string) => Promise<void>;
@@ -46,7 +72,6 @@ interface RunTrackerState {
   addManualRunItem: (name: string) => Promise<void>;
 
   // Actions - State Management
-  setLoading: (loading: boolean) => void;
   setError: (
     error: string | null,
     errorType?: 'network' | 'validation' | 'permission' | 'unknown',
@@ -172,6 +197,50 @@ async function handleSuccessfulItemAdd(
   }
 }
 
+type InitialDataUpdate = Partial<
+  Pick<RunTrackerState, 'sessions' | 'activeSession' | 'activeRun' | 'isTracking' | 'isPaused'>
+>;
+
+/**
+ * Builds the state update applied after the initial sessions and tracker state were fetched.
+ * Missing responses (e.g. no Electron API) leave the existing state untouched.
+ */
+function buildInitialDataUpdate(
+  sessions: Session[] | undefined,
+  trackerState:
+    | {
+        isRunning: boolean;
+        isPaused: boolean;
+        activeSession: Session | null;
+        activeRun: Run | null;
+      }
+    | undefined,
+): InitialDataUpdate {
+  const update: InitialDataUpdate = {};
+  if (sessions) {
+    update.sessions = sessions;
+  }
+  if (trackerState) {
+    update.activeSession = trackerState.activeSession;
+    update.activeRun = trackerState.activeRun;
+    update.isTracking = trackerState.isRunning;
+    update.isPaused = trackerState.isPaused;
+  }
+  return update;
+}
+
+/**
+ * Returns a state updater that marks a single user action as pending or settled.
+ */
+function setActionPending(action: RunTrackerAction, pending: boolean) {
+  return (state: { pendingActions: Partial<Record<RunTrackerAction, boolean>> }) => ({
+    pendingActions: { ...state.pendingActions, [action]: pending },
+  });
+}
+
+// Tracks the first (blocking) initial load so overlapping calls share one request
+let initialLoadInFlight: Promise<void> | undefined;
+
 /**
  * Zustand store for managing run tracking state including sessions, runs, and items.
  * Provides actions for data manipulation and real-time updates from the Electron backend.
@@ -186,16 +255,21 @@ export const useRunTrackerStore = create<RunTrackerState>()(
     runItems: new Map(),
     isTracking: false,
     isPaused: false,
-    loading: false,
+    initialLoadStatus: 'idle',
+    initialLoadError: undefined,
+    pendingActions: {},
+    sessionsLoading: false,
     error: null,
     errorType: null,
     retryCount: 0,
     sessionStatsCache: new Map(),
     loadingSessions: new Set(),
+    loadingRunItems: new Set(),
 
     // Session management actions
     startSession: async () => {
-      set({ loading: true, error: null, errorType: null });
+      set({ error: null, errorType: null });
+      set(setActionPending('startSession', true));
       try {
         const session = await window.electronAPI?.runTracker.startSession();
         if (session) {
@@ -207,7 +281,6 @@ export const useRunTrackerStore = create<RunTrackerState>()(
           set({
             activeSession: session,
             isTracking: true,
-            loading: false,
             runs: updatedRuns,
           });
           console.log('[RunTrackerStore] Session started:', session.id);
@@ -215,7 +288,6 @@ export const useRunTrackerStore = create<RunTrackerState>()(
           set({
             error: 'Unable to start session. Please ensure a character is selected.',
             errorType: 'validation',
-            loading: false,
           });
         }
       } catch (error) {
@@ -224,13 +296,16 @@ export const useRunTrackerStore = create<RunTrackerState>()(
           errorMessage.includes('network') || errorMessage.includes('connection')
             ? 'network'
             : 'unknown';
-        set({ error: `Failed to start session: ${errorMessage}`, errorType, loading: false });
+        set({ error: `Failed to start session: ${errorMessage}`, errorType });
         console.error('[RunTrackerStore] Error starting session:', error);
+      } finally {
+        set(setActionPending('startSession', false));
       }
     },
 
     endSession: async () => {
-      set({ loading: true, error: null, errorType: null });
+      set({ error: null, errorType: null });
+      set(setActionPending('endSession', true));
       try {
         await window.electronAPI?.runTracker.endSession();
         set({
@@ -238,7 +313,6 @@ export const useRunTrackerStore = create<RunTrackerState>()(
           activeRun: null,
           isTracking: false,
           isPaused: false,
-          loading: false,
         });
         console.log('[RunTrackerStore] Session ended');
       } catch (error) {
@@ -246,27 +320,30 @@ export const useRunTrackerStore = create<RunTrackerState>()(
         set({
           error: `Failed to end session: ${errorMessage}. Your progress has been saved.`,
           errorType: 'network',
-          loading: false,
         });
         console.error('[RunTrackerStore] Error ending session:', error);
+      } finally {
+        set(setActionPending('endSession', false));
       }
     },
 
     archiveSession: async (sessionId) => {
-      set({ loading: true, error: null });
+      set({ error: null });
+      set(setActionPending('archiveSession', true));
       try {
         await window.electronAPI?.runTracker.archiveSession(sessionId);
-        set({ loading: false });
         console.log('[RunTrackerStore] Session archived:', sessionId);
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
-        set({ error: errorMessage, loading: false });
+        set({ error: errorMessage });
         console.error('[RunTrackerStore] Error archiving session:', error);
+      } finally {
+        set(setActionPending('archiveSession', false));
       }
     },
 
     updateSessionNotes: async (sessionId, notes) => {
-      set({ loading: true, error: null });
+      set({ error: null });
       try {
         // Note: This would need to be implemented in the IPC handlers if not already available
         // For now, we'll update the local state
@@ -274,119 +351,150 @@ export const useRunTrackerStore = create<RunTrackerState>()(
         const updatedSessions = sessions.map((session) =>
           session.id === sessionId ? { ...session, notes, lastUpdated: new Date() } : session,
         );
-        set({ sessions: updatedSessions, loading: false });
+        set({ sessions: updatedSessions });
         console.log('[RunTrackerStore] Session notes updated:', sessionId);
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
-        set({ error: errorMessage, loading: false });
+        set({ error: errorMessage });
         console.error('[RunTrackerStore] Error updating session notes:', error);
       }
     },
 
     // Run management actions
     startRun: async (characterId) => {
-      set({ loading: true, error: null });
+      set({ error: null });
+      set(setActionPending('startRun', true));
       try {
         const run = await window.electronAPI?.runTracker.startRun(characterId);
         if (run) {
-          set({ activeRun: run, isPaused: false, loading: false });
+          set({ activeRun: run, isPaused: false });
           console.log('[RunTrackerStore] Run started:', run.id);
         }
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
-        set({ error: errorMessage, loading: false });
+        set({ error: errorMessage });
         console.error('[RunTrackerStore] Error starting run:', error);
+      } finally {
+        set(setActionPending('startRun', false));
       }
     },
 
     endRun: async () => {
-      set({ loading: true, error: null });
+      set({ error: null });
+      set(setActionPending('endRun', true));
       try {
         await window.electronAPI?.runTracker.endRun();
-        set({ activeRun: null, isPaused: false, loading: false });
+        set({ activeRun: null, isPaused: false });
         console.log('[RunTrackerStore] Run ended');
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
-        set({ error: errorMessage, loading: false });
+        set({ error: errorMessage });
         console.error('[RunTrackerStore] Error ending run:', error);
+      } finally {
+        set(setActionPending('endRun', false));
       }
     },
 
     pauseRun: async () => {
-      set({ loading: true, error: null });
+      set({ error: null });
+      set(setActionPending('pauseRun', true));
       try {
         await window.electronAPI?.runTracker.pauseRun();
-        set({ isPaused: true, loading: false });
+        set({ isPaused: true });
         console.log('[RunTrackerStore] Run paused');
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
-        set({ error: errorMessage, loading: false });
+        set({ error: errorMessage });
         console.error('[RunTrackerStore] Error pausing run:', error);
+      } finally {
+        set(setActionPending('pauseRun', false));
       }
     },
 
     resumeRun: async () => {
-      set({ loading: true, error: null });
+      set({ error: null });
+      set(setActionPending('resumeRun', true));
       try {
         await window.electronAPI?.runTracker.resumeRun();
-        set({ isPaused: false, loading: false });
+        set({ isPaused: false });
         console.log('[RunTrackerStore] Run resumed');
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
-        set({ error: errorMessage, loading: false });
+        set({ error: errorMessage });
         console.error('[RunTrackerStore] Error resuming run:', error);
+      } finally {
+        set(setActionPending('resumeRun', false));
       }
     },
 
     // Data loading actions
+    loadInitialData: () => {
+      // Only the very first load (or a retry after it failed) blocks the page.
+      // Later calls refresh in the background and report failures inline.
+      const isFirstLoad = get().initialLoadStatus !== 'success';
+      if (isFirstLoad && initialLoadInFlight) {
+        return initialLoadInFlight;
+      }
+
+      const load = runInitialLoad(isFirstLoad);
+      if (isFirstLoad) {
+        initialLoadInFlight = load.finally(() => {
+          initialLoadInFlight = undefined;
+        });
+        return initialLoadInFlight;
+      }
+      return load;
+    },
+
     loadSessions: async (includeArchived = false) => {
-      set({ loading: true, error: null });
+      set({ sessionsLoading: true });
       try {
         const sessions = await window.electronAPI?.runTracker.getAllSessions(includeArchived);
         if (sessions) {
-          set({ sessions, loading: false });
+          set({ sessions });
           console.log(`[RunTrackerStore] Loaded ${sessions.length} sessions`);
         }
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
-        set({ error: errorMessage, loading: false });
+        set({ error: errorMessage });
         console.error('[RunTrackerStore] Error loading sessions:', error);
+      } finally {
+        set({ sessionsLoading: false });
       }
     },
 
     loadAllSessions: async () => {
-      set({ loading: true, error: null });
+      set({ sessionsLoading: true });
       try {
         // Load all sessions regardless of character
         const sessions = await window.electronAPI?.runTracker.getAllSessions(true); // Include archived
         if (sessions) {
-          set({ sessions, loading: false });
+          set({ sessions });
           console.log(`[RunTrackerStore] Loaded ${sessions.length} sessions (all characters)`);
         }
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
-        set({ error: errorMessage, loading: false });
+        set({ error: errorMessage });
         console.error('[RunTrackerStore] Error loading all sessions:', error);
+      } finally {
+        set({ sessionsLoading: false });
       }
     },
 
     loadSessionById: async (sessionId) => {
-      set({ loading: true, error: null });
       try {
         const session = await window.electronAPI?.runTracker.getSessionById(sessionId);
         if (session) {
           const { sessions: currentSessions } = get();
           const sessionExists = currentSessions.some((s) => s.id === sessionId);
           if (!sessionExists) {
-            set({ sessions: [...currentSessions, session], loading: false });
+            set({ sessions: [...currentSessions, session] });
             console.log('[RunTrackerStore] Loaded session by ID:', sessionId);
-          } else {
-            set({ loading: false });
           }
         }
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
-        set({ error: errorMessage, loading: false });
+        set({ error: errorMessage });
         console.error('[RunTrackerStore] Error loading session by ID:', error);
       }
     },
@@ -404,7 +512,7 @@ export const useRunTrackerStore = create<RunTrackerState>()(
       // Mark this session as loading
       const updatedLoadingSessions = new Set(loadingSessions);
       updatedLoadingSessions.add(sessionId);
-      set({ loading: true, error: null, loadingSessions: updatedLoadingSessions });
+      set({ loadingSessions: updatedLoadingSessions });
 
       try {
         const runs = await window.electronAPI?.runTracker.getRunsBySession(sessionId);
@@ -426,7 +534,6 @@ export const useRunTrackerStore = create<RunTrackerState>()(
           set({
             runs: newRuns,
             sessionStatsCache: newCache,
-            loading: false,
             loadingSessions: newLoadingSessions,
           });
           console.log(`[RunTrackerStore] Loaded ${runs.length} runs for session:`, sessionId);
@@ -477,7 +584,7 @@ export const useRunTrackerStore = create<RunTrackerState>()(
           const { loadingSessions: currentLoadingSessions } = get();
           const newLoadingSessions = new Set(currentLoadingSessions);
           newLoadingSessions.delete(sessionId);
-          set({ loading: false, loadingSessions: newLoadingSessions });
+          set({ loadingSessions: newLoadingSessions });
         }
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
@@ -485,31 +592,36 @@ export const useRunTrackerStore = create<RunTrackerState>()(
         const { loadingSessions: currentLoadingSessions } = get();
         const newLoadingSessions = new Set(currentLoadingSessions);
         newLoadingSessions.delete(sessionId);
-        set({ error: errorMessage, loading: false, loadingSessions: newLoadingSessions });
+        set({ error: errorMessage, loadingSessions: newLoadingSessions });
         console.error('[RunTrackerStore] Error loading session runs:', error);
       }
     },
 
     loadRunItems: async (runId) => {
-      set({ loading: true, error: null });
+      const updatedLoadingRunItems = new Set(get().loadingRunItems);
+      updatedLoadingRunItems.add(runId);
+      set({ loadingRunItems: updatedLoadingRunItems });
       try {
         const items = await window.electronAPI?.runTracker.getRunItems(runId);
         if (items) {
           const { runItems: currentRunItems } = get();
           const newRunItems = new Map(currentRunItems);
           newRunItems.set(runId, items);
-          set({ runItems: newRunItems, loading: false });
+          set({ runItems: newRunItems });
           console.log(`[RunTrackerStore] Loaded ${items.length} items for run:`, runId);
         }
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
-        set({ error: errorMessage, loading: false });
+        set({ error: errorMessage });
         console.error('[RunTrackerStore] Error loading run items:', error);
+      } finally {
+        const newLoadingRunItems = new Set(get().loadingRunItems);
+        newLoadingRunItems.delete(runId);
+        set({ loadingRunItems: newLoadingRunItems });
       }
     },
 
     refreshActiveRun: async () => {
-      set({ loading: true, error: null });
       try {
         const state = await window.electronAPI?.runTracker.getState();
         if (state) {
@@ -518,13 +630,12 @@ export const useRunTrackerStore = create<RunTrackerState>()(
             activeRun: state.activeRun,
             isTracking: state.isRunning,
             isPaused: state.isPaused,
-            loading: false,
           });
           console.log('[RunTrackerStore] Active run refreshed');
         }
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
-        set({ error: errorMessage, loading: false });
+        set({ error: errorMessage });
         console.error('[RunTrackerStore] Error refreshing active run:', error);
       }
     },
@@ -535,14 +646,14 @@ export const useRunTrackerStore = create<RunTrackerState>()(
         return;
       }
 
-      set({ loading: true, error: null, errorType: null });
+      set({ error: null, errorType: null });
+      set(setActionPending('addManualRunItem', true));
       try {
         const targetRunId = getTargetRunId(get());
         if (!targetRunId) {
           set({
             error: 'No active run or finished run found. Please start a run first.',
             errorType: 'validation',
-            loading: false,
           });
           return;
         }
@@ -554,13 +665,11 @@ export const useRunTrackerStore = create<RunTrackerState>()(
 
         if (result?.success) {
           await handleSuccessfulItemAdd(targetRunId, get, set);
-          set({ loading: false });
           console.log('[RunTrackerStore] Manual run item added:', name);
         } else {
           set({
             error: 'Failed to add manual run item',
             errorType: 'unknown',
-            loading: false,
           });
         }
       } catch (error) {
@@ -568,14 +677,12 @@ export const useRunTrackerStore = create<RunTrackerState>()(
         set({
           error: `Failed to add manual run item: ${errorMessage}`,
           errorType: 'unknown',
-          loading: false,
         });
         console.error('[RunTrackerStore] Error adding manual run item:', error);
+      } finally {
+        set(setActionPending('addManualRunItem', false));
       }
     },
-
-    // State management actions
-    setLoading: (loading) => set({ loading }),
 
     // Internal event handlers (called from components)
     handleSessionStarted: (session) => {
@@ -755,17 +862,57 @@ export const useRunTrackerStore = create<RunTrackerState>()(
         return;
       }
 
-      set({ retryCount: retryCount + 1, loading: true, error: null });
+      set({ retryCount: retryCount + 1, error: null });
 
       // Simple retry logic - in a real app, you'd store the last action
       try {
         await new Promise((resolve) => setTimeout(resolve, 1000 * retryCount)); // Exponential backoff
         // Here you would retry the last failed action
-        set({ loading: false });
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
-        set({ error: errorMessage, errorType: 'network', loading: false });
+        set({ error: errorMessage, errorType: 'network' });
       }
     },
   })),
 );
+
+/**
+ * Fetches sessions and tracker state, then the active session's runs.
+ * Only a first load reports failures as a fatal initial-load error; refreshes report them inline.
+ */
+async function runInitialLoad(isFirstLoad: boolean): Promise<void> {
+  const { setState: set, getState: get } = useRunTrackerStore;
+  if (isFirstLoad) {
+    set({ initialLoadStatus: 'loading', initialLoadError: undefined });
+  }
+  set({ sessionsLoading: true });
+
+  try {
+    const [sessions, trackerState] = await Promise.all([
+      window.electronAPI?.runTracker.getAllSessions(true), // Include archived
+      window.electronAPI?.runTracker.getState(),
+    ]);
+    set({ ...buildInitialDataUpdate(sessions, trackerState), sessionsLoading: false });
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error('[RunTrackerStore] Error loading initial data:', error);
+    set(
+      isFirstLoad
+        ? {
+            initialLoadStatus: 'error',
+            initialLoadError: errorMessage,
+            sessionsLoading: false,
+          }
+        : { error: errorMessage, errorType: 'unknown', sessionsLoading: false },
+    );
+    return;
+  }
+
+  // Load runs for the active session; failures here are reported inline
+  const activeSessionId = get().activeSession?.id;
+  if (activeSessionId) {
+    await get().loadSessionRuns(activeSessionId);
+  }
+
+  set({ initialLoadStatus: 'success', initialLoadError: undefined });
+}

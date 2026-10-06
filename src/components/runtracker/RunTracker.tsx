@@ -20,20 +20,19 @@ export function RunTracker() {
   const { t } = useTranslation();
   const {
     activeSession,
-    loading,
+    initialLoadStatus,
+    initialLoadError,
+    pendingActions,
     error,
     errorType,
     retryCount,
-    loadAllSessions,
-    loadSessionRuns,
-    refreshActiveRun,
+    loadInitialData,
     handleSessionStarted,
     handleSessionEnded,
     handleRunStarted,
     handleRunEnded,
     handleRunPaused,
     handleRunResumed,
-    setError,
     clearError,
     retryLastAction,
     loadRunItems,
@@ -42,28 +41,13 @@ export function RunTracker() {
   // Navigation state
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
 
-  // Load initial data on mount
+  // Load initial data on mount and refresh in the background when the active session changes.
+  // Only the first load blocks the page; later refreshes keep the current content visible.
   // biome-ignore lint/correctness/useExhaustiveDependencies: Zustand actions are stable
   useEffect(() => {
-    const loadInitialData = async () => {
-      try {
-        // Load all sessions (including archived) for the sessions list
-        await loadAllSessions();
-
-        // Load runs for active session if it exists
-        if (activeSession?.id) {
-          await loadSessionRuns(activeSession.id);
-        }
-
-        // Refresh active run state to sync with backend
-        await refreshActiveRun();
-      } catch (err) {
-        console.error('[RunTracker] Error loading initial data:', err);
-        setError(err instanceof Error ? err.message : String(err));
-      }
-    };
-
-    loadInitialData();
+    loadInitialData().catch((err) => {
+      console.error('[RunTracker] Error loading initial data:', err);
+    });
   }, [activeSession?.id]); // Only re-run when active session changes
 
   // Set up IPC event listeners for real-time updates
@@ -145,8 +129,8 @@ export function RunTracker() {
     };
   }, []); // Only set up once on mount
 
-  // Handle loading state
-  if (loading) {
+  // Full-page spinner only until the first data load has completed
+  if (initialLoadStatus === 'idle' || initialLoadStatus === 'loading') {
     return (
       <div className="flex items-center justify-center p-8">
         <Card className="w-full max-w-md">
@@ -159,24 +143,20 @@ export function RunTracker() {
     );
   }
 
-  // Handle error state
-  if (error) {
+  // Full-page error only when the first data load failed
+  if (initialLoadStatus === 'error') {
     return (
       <div className="flex items-center justify-center p-8">
         <Card className="w-full max-w-md">
           <CardContent className="flex flex-col items-center gap-4 p-6">
             <div className="text-center text-destructive">
               <h3 className="mb-2 font-semibold">{t(translations.runTracker.errorLoading)}</h3>
-              <p className="mb-4 text-muted-foreground text-sm">{error}</p>
+              <p className="mb-4 text-muted-foreground text-sm">{initialLoadError}</p>
               <Button
                 onClick={() => {
-                  setError(null);
-                  // Retry loading data
-                  loadAllSessions();
-                  if (activeSession?.id) {
-                    loadSessionRuns(activeSession.id);
-                  }
-                  refreshActiveRun();
+                  loadInitialData().catch((err) => {
+                    console.error('[RunTracker] Error retrying initial data load:', err);
+                  });
                 }}
                 variant="outline"
               >
@@ -198,15 +178,17 @@ export function RunTracker() {
     setSelectedSessionId(null);
   };
 
+  const isAnyActionPending = Object.values(pendingActions).some(Boolean);
+
   // Main layout with conditional rendering
   return (
     <div className="max-h-[94vh] space-y-6 overflow-y-auto p-6">
-      {/* Error Display */}
+      {/* Inline error for failed actions and background refreshes */}
       <ErrorDisplay
         error={error}
         errorType={errorType}
         retryCount={retryCount}
-        loading={loading}
+        loading={isAnyActionPending}
         onRetry={retryLastAction}
         onDismiss={clearError}
       />

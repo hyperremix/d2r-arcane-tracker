@@ -482,3 +482,215 @@ describe('runTrackerStore duplicate prevention', () => {
     });
   });
 });
+
+describe('runTrackerStore loading and error state', () => {
+  const session: Session = {
+    id: 'session-1',
+    startTime: new Date('2024-01-01T10:00:00Z'),
+    totalRunTime: 0,
+    totalSessionTime: 0,
+    runCount: 0,
+    archived: false,
+    created: new Date('2024-01-01T10:00:00Z'),
+    lastUpdated: new Date('2024-01-01T10:00:00Z'),
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    useRunTrackerStore.setState({
+      activeSession: null,
+      activeRun: null,
+      sessions: [],
+      runs: new Map(),
+      runItems: new Map(),
+      isTracking: false,
+      isPaused: false,
+      initialLoadStatus: 'idle',
+      initialLoadError: undefined,
+      pendingActions: {},
+      sessionsLoading: false,
+      error: null,
+      errorType: null,
+      retryCount: 0,
+      sessionStatsCache: new Map(),
+      loadingSessions: new Set(),
+      loadingRunItems: new Set(),
+    });
+  });
+
+  describe('When the initial load succeeds', () => {
+    it('Then the initial load status is success and data is populated', async () => {
+      // Arrange
+      mockElectronAPI.runTracker.getAllSessions.mockResolvedValue([session]);
+      mockElectronAPI.runTracker.getState.mockResolvedValue({
+        activeSession: session,
+        activeRun: null,
+        isRunning: true,
+        isPaused: false,
+      });
+      mockElectronAPI.runTracker.getRunsBySession.mockResolvedValue([]);
+
+      // Act
+      await act(async () => {
+        await useRunTrackerStore.getState().loadInitialData();
+      });
+
+      // Assert
+      const state = useRunTrackerStore.getState();
+      expect(state.initialLoadStatus).toBe('success');
+      expect(state.initialLoadError).toBeUndefined();
+      expect(state.sessions).toEqual([session]);
+      expect(state.activeSession).toEqual(session);
+      expect(mockElectronAPI.runTracker.getRunsBySession).toHaveBeenCalledWith('session-1');
+    });
+  });
+
+  describe('When the initial load is requested again while it is still in flight', () => {
+    it('Then the in-flight load is reused instead of querying the backend twice', async () => {
+      // Arrange
+      let resolveSessions: (sessions: Session[]) => void = () => undefined;
+      mockElectronAPI.runTracker.getAllSessions.mockReturnValue(
+        new Promise<Session[]>((resolve) => {
+          resolveSessions = resolve;
+        }),
+      );
+      mockElectronAPI.runTracker.getState.mockResolvedValue(null);
+
+      // Act
+      let firstLoad: Promise<void> = Promise.resolve();
+      let secondLoad: Promise<void> = Promise.resolve();
+      act(() => {
+        firstLoad = useRunTrackerStore.getState().loadInitialData();
+        secondLoad = useRunTrackerStore.getState().loadInitialData();
+      });
+      await act(async () => {
+        resolveSessions([session]);
+        await Promise.all([firstLoad, secondLoad]);
+      });
+
+      // Assert
+      expect(mockElectronAPI.runTracker.getAllSessions).toHaveBeenCalledTimes(1);
+      expect(mockElectronAPI.runTracker.getState).toHaveBeenCalledTimes(1);
+      expect(useRunTrackerStore.getState().initialLoadStatus).toBe('success');
+    });
+  });
+
+  describe('If the initial load fails', () => {
+    it('Then the failure is stored as a fatal initial-load error', async () => {
+      // Arrange
+      mockElectronAPI.runTracker.getAllSessions.mockRejectedValue(new Error('Database offline'));
+      mockElectronAPI.runTracker.getState.mockResolvedValue(null);
+
+      // Act
+      await act(async () => {
+        await useRunTrackerStore.getState().loadInitialData();
+      });
+
+      // Assert
+      const state = useRunTrackerStore.getState();
+      expect(state.initialLoadStatus).toBe('error');
+      expect(state.initialLoadError).toBe('Database offline');
+      expect(state.error).toBeNull();
+    });
+  });
+
+  describe('If a background refresh fails after the initial load', () => {
+    it('Then the page stays loaded and the error is reported inline', async () => {
+      // Arrange
+      useRunTrackerStore.setState({ initialLoadStatus: 'success' });
+      mockElectronAPI.runTracker.getAllSessions.mockRejectedValue(new Error('Database offline'));
+      mockElectronAPI.runTracker.getState.mockResolvedValue(null);
+
+      // Act
+      await act(async () => {
+        await useRunTrackerStore.getState().loadInitialData();
+      });
+
+      // Assert
+      const state = useRunTrackerStore.getState();
+      expect(state.initialLoadStatus).toBe('success');
+      expect(state.initialLoadError).toBeUndefined();
+      expect(state.error).toBe('Database offline');
+    });
+  });
+
+  describe('When run items are refreshed in the background', () => {
+    it('Then only the per-run loading flag changes and existing errors are kept', async () => {
+      // Arrange
+      useRunTrackerStore.setState({
+        initialLoadStatus: 'success',
+        error: 'Previous action failed',
+      });
+      let resolveItems: (items: unknown[]) => void = () => undefined;
+      mockElectronAPI.runTracker.getRunItems.mockReturnValue(
+        new Promise((resolve) => {
+          resolveItems = resolve;
+        }),
+      );
+
+      // Act
+      let loadPromise: Promise<void> = Promise.resolve();
+      act(() => {
+        loadPromise = useRunTrackerStore.getState().loadRunItems('run-1');
+      });
+      const inFlightState = useRunTrackerStore.getState();
+      await act(async () => {
+        resolveItems([]);
+        await loadPromise;
+      });
+
+      // Assert
+      expect(inFlightState.loadingRunItems.has('run-1')).toBe(true);
+      expect(inFlightState.initialLoadStatus).toBe('success');
+      expect(inFlightState.pendingActions).toEqual({});
+      const state = useRunTrackerStore.getState();
+      expect(state.loadingRunItems.has('run-1')).toBe(false);
+      expect(state.runItems.get('run-1')).toEqual([]);
+      expect(state.error).toBe('Previous action failed');
+    });
+  });
+
+  describe('When a user action is in flight', () => {
+    it('Then only that action is marked pending until it settles', async () => {
+      // Arrange
+      let resolveEndRun: () => void = () => undefined;
+      mockElectronAPI.runTracker.endRun.mockReturnValue(
+        new Promise<void>((resolve) => {
+          resolveEndRun = resolve;
+        }),
+      );
+
+      // Act
+      let endRunPromise: Promise<void> = Promise.resolve();
+      act(() => {
+        endRunPromise = useRunTrackerStore.getState().endRun();
+      });
+      const inFlightState = useRunTrackerStore.getState();
+      await act(async () => {
+        resolveEndRun();
+        await endRunPromise;
+      });
+
+      // Assert
+      expect(inFlightState.pendingActions).toEqual({ endRun: true });
+      expect(useRunTrackerStore.getState().pendingActions.endRun).toBe(false);
+    });
+
+    it('If the action fails, Then the error is reported inline and the pending flag is cleared', async () => {
+      // Arrange
+      useRunTrackerStore.setState({ initialLoadStatus: 'success' });
+      mockElectronAPI.runTracker.pauseRun.mockRejectedValue(new Error('IPC failed'));
+
+      // Act
+      await act(async () => {
+        await useRunTrackerStore.getState().pauseRun();
+      });
+
+      // Assert
+      const state = useRunTrackerStore.getState();
+      expect(state.error).toBe('IPC failed');
+      expect(state.pendingActions.pauseRun).toBe(false);
+      expect(state.initialLoadStatus).toBe('success');
+    });
+  });
+});

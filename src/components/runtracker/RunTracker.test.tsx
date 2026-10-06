@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { Run, Session } from 'electron/types/grail';
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useRunTrackerStore } from '@/stores/runTrackerStore';
@@ -97,19 +97,29 @@ describe('RunTracker', () => {
     runItems: new Map(),
     isTracking: false,
     isPaused: false,
-    loading: false,
+    initialLoadStatus: 'success',
+    initialLoadError: undefined,
+    pendingActions: {},
+    sessionsLoading: false,
+    loadingRunItems: new Set(),
     error: null,
-    loadSessions: vi.fn(),
-    loadAllSessions: vi.fn(),
-    loadSessionRuns: vi.fn(),
-    refreshActiveRun: vi.fn(),
+    errorType: null,
+    retryCount: 0,
+    loadInitialData: vi.fn().mockResolvedValue(undefined),
+    loadRunItems: vi.fn().mockResolvedValue(undefined),
     handleSessionStarted: vi.fn(),
     handleSessionEnded: vi.fn(),
     handleRunStarted: vi.fn(),
     handleRunEnded: vi.fn(),
     handleRunPaused: vi.fn(),
     handleRunResumed: vi.fn(),
-    setError: vi.fn(),
+    clearError: vi.fn(),
+    retryLastAction: vi.fn(),
+  };
+
+  const getIpcHandler = (channel: string) => {
+    const call = mockIpcRenderer.on.mock.calls.find(([registered]) => registered === channel);
+    return call?.[1] as ((event: unknown, payload: unknown) => void) | undefined;
   };
 
   beforeEach(() => {
@@ -130,27 +140,139 @@ describe('RunTracker', () => {
     ).toBeDefined();
   });
 
-  it('displays loading state correctly', () => {
-    mockUseRunTrackerStore.mockReturnValue({
-      ...defaultStoreState,
-      loading: true,
-    });
+  describe('When the initial load has not completed yet', () => {
+    it('Then a full-page loading state is shown', () => {
+      // Arrange
+      mockUseRunTrackerStore.mockReturnValue({
+        ...defaultStoreState,
+        initialLoadStatus: 'loading',
+      });
 
-    render(<RunTracker />);
-    expect(screen.getByText('Loading run tracker data...')).toBeDefined();
+      // Act
+      render(<RunTracker />);
+
+      // Assert
+      expect(screen.getByText('Loading run tracker data...')).toBeDefined();
+      expect(screen.queryByTestId('session-card')).toBeNull();
+    });
   });
 
-  it('displays error state with retry button', () => {
-    const errorMessage = 'Failed to load data';
-    mockUseRunTrackerStore.mockReturnValue({
-      ...defaultStoreState,
-      error: errorMessage,
+  describe('If the initial load fails', () => {
+    it('Then a full-page error with a retry button is shown', () => {
+      // Arrange
+      const errorMessage = 'Failed to load data';
+      mockUseRunTrackerStore.mockReturnValue({
+        ...defaultStoreState,
+        initialLoadStatus: 'error',
+        initialLoadError: errorMessage,
+      });
+
+      // Act
+      render(<RunTracker />);
+
+      // Assert
+      expect(screen.getByText('Error Loading Run Tracker')).toBeDefined();
+      expect(screen.getByText(errorMessage)).toBeDefined();
+      expect(screen.getByText('Retry')).toBeDefined();
+      expect(screen.queryByTestId('session-card')).toBeNull();
     });
 
-    render(<RunTracker />);
-    expect(screen.getByText('Error Loading Run Tracker')).toBeDefined();
-    expect(screen.getByText(errorMessage)).toBeDefined();
-    expect(screen.getByText('Retry')).toBeDefined();
+    it('Then clicking retry reloads the initial data', async () => {
+      // Arrange
+      const mockLoadInitialData = vi.fn().mockResolvedValue(undefined);
+      mockUseRunTrackerStore.mockReturnValue({
+        ...defaultStoreState,
+        initialLoadStatus: 'error',
+        initialLoadError: 'Test error',
+        loadInitialData: mockLoadInitialData,
+      });
+      render(<RunTracker />);
+      mockLoadInitialData.mockClear();
+
+      // Act
+      fireEvent.click(screen.getByText('Retry'));
+
+      // Assert
+      await waitFor(() => {
+        expect(mockLoadInitialData).toHaveBeenCalledTimes(1);
+      });
+    });
+  });
+
+  describe('If a user action fails after the initial load', () => {
+    it('Then the error is shown inline and the page content stays visible', () => {
+      // Arrange
+      mockUseRunTrackerStore.mockReturnValue({
+        ...defaultStoreState,
+        activeSession: mockSession,
+        error: 'Failed to end session: boom',
+        errorType: 'unknown',
+      });
+
+      // Act
+      render(<RunTracker />);
+
+      // Assert
+      expect(screen.getByText('Failed to end session: boom')).toBeDefined();
+      expect(screen.queryByText('Error Loading Run Tracker')).toBeNull();
+      expect(screen.getByTestId('session-card')).toBeDefined();
+      expect(screen.getByTestId('session-controls')).toBeDefined();
+      expect(screen.getByTestId('sessions-list')).toBeDefined();
+    });
+  });
+
+  describe('When a user action is in flight', () => {
+    it('Then the page content stays visible', () => {
+      // Arrange
+      mockUseRunTrackerStore.mockReturnValue({
+        ...defaultStoreState,
+        activeSession: mockSession,
+        pendingActions: { endRun: true },
+      });
+
+      // Act
+      render(<RunTracker />);
+
+      // Assert
+      expect(screen.queryByText('Loading run tracker data...')).toBeNull();
+      expect(screen.getByTestId('session-card')).toBeDefined();
+      expect(screen.getByTestId('session-controls')).toBeDefined();
+    });
+  });
+
+  describe('When a run item is added in the background', () => {
+    it('Then run items are refreshed without blanking the page', async () => {
+      // Arrange
+      const mockLoadRunItems = vi.fn().mockResolvedValue(undefined);
+      mockUseRunTrackerStore.mockReturnValue({
+        ...defaultStoreState,
+        activeSession: mockSession,
+        loadRunItems: mockLoadRunItems,
+      });
+      const { rerender } = render(<RunTracker />);
+      const handler = getIpcHandler('run-tracker:run-item-added');
+
+      // Act
+      act(() => {
+        handler?.({}, { runId: 'run-1' });
+      });
+      mockUseRunTrackerStore.mockReturnValue({
+        ...defaultStoreState,
+        activeSession: mockSession,
+        loadRunItems: mockLoadRunItems,
+        loadingRunItems: new Set(['run-1']),
+      });
+      rerender(<RunTracker />);
+
+      // Assert
+      expect(handler).toBeDefined();
+      await waitFor(() => {
+        expect(mockLoadRunItems).toHaveBeenCalledWith('run-1');
+      });
+      expect(screen.queryByText('Loading run tracker data...')).toBeNull();
+      expect(screen.getByTestId('session-card')).toBeDefined();
+      expect(screen.getByTestId('sessions-list')).toBeDefined();
+    });
   });
 
   it('displays empty state when no active session', () => {
@@ -182,44 +304,17 @@ describe('RunTracker', () => {
   });
 
   it('loads initial data on mount', async () => {
-    const mockLoadAllSessions = vi.fn().mockResolvedValue(undefined);
-    const mockLoadSessionRuns = vi.fn().mockResolvedValue(undefined);
-    const mockRefreshActiveRun = vi.fn().mockResolvedValue(undefined);
+    const mockLoadInitialData = vi.fn().mockResolvedValue(undefined);
 
     mockUseRunTrackerStore.mockReturnValue({
       ...defaultStoreState,
-      loadAllSessions: mockLoadAllSessions,
-      loadSessionRuns: mockLoadSessionRuns,
-      refreshActiveRun: mockRefreshActiveRun,
+      loadInitialData: mockLoadInitialData,
     });
 
     render(<RunTracker />);
 
     await waitFor(() => {
-      expect(mockLoadAllSessions).toHaveBeenCalled();
-      expect(mockRefreshActiveRun).toHaveBeenCalled();
-    });
-  });
-
-  it('loads session runs when active session exists', async () => {
-    const mockLoadAllSessions = vi.fn().mockResolvedValue(undefined);
-    const mockLoadSessionRuns = vi.fn().mockResolvedValue(undefined);
-    const mockRefreshActiveRun = vi.fn().mockResolvedValue(undefined);
-
-    mockUseRunTrackerStore.mockReturnValue({
-      ...defaultStoreState,
-      activeSession: mockSession,
-      loadAllSessions: mockLoadAllSessions,
-      loadSessionRuns: mockLoadSessionRuns,
-      refreshActiveRun: mockRefreshActiveRun,
-    });
-
-    render(<RunTracker />);
-
-    await waitFor(() => {
-      expect(mockLoadAllSessions).toHaveBeenCalled();
-      expect(mockLoadSessionRuns).toHaveBeenCalledWith('session-1');
-      expect(mockRefreshActiveRun).toHaveBeenCalled();
+      expect(mockLoadInitialData).toHaveBeenCalled();
     });
   });
 
@@ -291,51 +386,5 @@ describe('RunTracker', () => {
 
     // Check that SessionsList is rendered
     expect(screen.getByTestId('sessions-list')).toBeDefined();
-  });
-
-  it('handles data loading errors gracefully', async () => {
-    const mockSetError = vi.fn();
-    const mockLoadAllSessions = vi.fn().mockRejectedValue(new Error('Network error'));
-
-    mockUseRunTrackerStore.mockReturnValue({
-      ...defaultStoreState,
-      loadAllSessions: mockLoadAllSessions,
-      setError: mockSetError,
-    });
-
-    render(<RunTracker />);
-
-    await waitFor(() => {
-      expect(mockSetError).toHaveBeenCalledWith('Network error');
-    });
-  });
-
-  it('retry button calls data loading functions', async () => {
-    const mockLoadAllSessions = vi.fn().mockResolvedValue(undefined);
-    const mockLoadSessionRuns = vi.fn().mockResolvedValue(undefined);
-    const mockRefreshActiveRun = vi.fn().mockResolvedValue(undefined);
-    const mockSetError = vi.fn();
-
-    mockUseRunTrackerStore.mockReturnValue({
-      ...defaultStoreState,
-      error: 'Test error',
-      activeSession: mockSession,
-      loadAllSessions: mockLoadAllSessions,
-      loadSessionRuns: mockLoadSessionRuns,
-      refreshActiveRun: mockRefreshActiveRun,
-      setError: mockSetError,
-    });
-
-    render(<RunTracker />);
-
-    const retryButton = screen.getByText('Retry');
-    retryButton.click();
-
-    await waitFor(() => {
-      expect(mockSetError).toHaveBeenCalledWith(null);
-      expect(mockLoadAllSessions).toHaveBeenCalled();
-      expect(mockLoadSessionRuns).toHaveBeenCalledWith('session-1');
-      expect(mockRefreshActiveRun).toHaveBeenCalled();
-    });
   });
 });

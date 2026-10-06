@@ -1,5 +1,5 @@
 import type { Session } from 'electron/types/grail';
-import { FileDownIcon } from 'lucide-react';
+import { FileDownIcon, Loader2 } from 'lucide-react';
 import { useCallback, useEffect, useId, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
@@ -8,6 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { translations } from '@/i18n/translations';
 import { formatDuration } from '@/lib/utils';
 import { useRunTrackerStore } from '@/stores/runTrackerStore';
+import { ArchiveSessionDialog } from './ArchiveSessionDialog';
 import { ExportDialog } from './ExportDialog';
 
 interface SessionCardProps {
@@ -16,15 +17,15 @@ interface SessionCardProps {
 
 /**
  * SessionCard component that displays active session information including session time,
- * run count, items found, efficiency percentage, and provides controls to end or archive the session.
+ * run count, items found, efficiency percentage, and provides controls to archive or export the session.
+ * Ending the session is handled by SessionControls, which owns the confirmation dialog and auto-mode rules.
  */
 export function SessionCard({ session }: SessionCardProps) {
   const { t } = useTranslation();
   const {
     activeSession,
     activeRun,
-    loading,
-    endSession,
+    pendingActions,
     archiveSession,
     updateSessionNotes,
     getSessionStats,
@@ -37,7 +38,10 @@ export function SessionCard({ session }: SessionCardProps) {
   const [notes, setNotes] = useState<string>(session?.notes || '');
   const [isSavingNotes, setIsSavingNotes] = useState<boolean>(false);
   const [showExportDialog, setShowExportDialog] = useState<boolean>(false);
+  const [showArchiveDialog, setShowArchiveDialog] = useState<boolean>(false);
   const notesId = useId();
+  const isArchiving = Boolean(pendingActions.archiveSession);
+  const isStartingSession = Boolean(pendingActions.startSession);
 
   // Calculate current session time
   const currentSession = activeSession || session;
@@ -111,20 +115,14 @@ export function SessionCard({ session }: SessionCardProps) {
   }, [sessionStats]);
 
   // Button handlers
-  const handleEndSession = useCallback(async () => {
-    try {
-      await endSession();
-    } catch (error) {
-      console.error('Error ending session:', error);
-    }
-  }, [endSession]);
-
   const handleArchiveSession = useCallback(async () => {
     if (!currentSession) return;
     try {
       await archiveSession(currentSession.id);
     } catch (error) {
       console.error('Error archiving session:', error);
+    } finally {
+      setShowArchiveDialog(false);
     }
   }, [archiveSession, currentSession]);
 
@@ -177,8 +175,11 @@ export function SessionCard({ session }: SessionCardProps) {
                 console.error('[RunTracker] Failed to start session:', error);
               }
             }}
+            disabled={isStartingSession}
+            aria-busy={isStartingSession}
             className="w-full"
           >
+            {isStartingSession && <Loader2 className="h-4 w-4 animate-spin" />}
             {t(translations.runTracker.sessionCard.startNewSession)}
           </Button>
         </CardContent>
@@ -271,28 +272,21 @@ export function SessionCard({ session }: SessionCardProps) {
         {/* Action Buttons */}
         <div className="flex gap-2 pt-2">
           <Button
-            variant="destructive"
-            size="sm"
-            onClick={handleEndSession}
-            disabled={loading}
-            className="flex-1"
-          >
-            {t(translations.runTracker.sessionCard.endSession)}
-          </Button>
-          <Button
             variant="outline"
             size="sm"
-            onClick={handleArchiveSession}
-            disabled={loading}
+            onClick={() => setShowArchiveDialog(true)}
+            disabled={isArchiving}
+            aria-busy={isArchiving}
             className="flex-1"
           >
+            {isArchiving && <Loader2 className="h-4 w-4 animate-spin" />}
             {t(translations.runTracker.sessionCard.archiveSession)}
           </Button>
           <Button
             variant="outline"
             size="sm"
             onClick={handleExportClick}
-            disabled={loading || currentSession.runCount === 0}
+            disabled={currentSession.runCount === 0}
             title={
               currentSession.runCount === 0
                 ? t(translations.runTracker.sessionCard.noRunsToExport)
@@ -313,6 +307,12 @@ export function SessionCard({ session }: SessionCardProps) {
         sessionId={currentSession?.id || ''}
         open={showExportDialog}
         onOpenChange={setShowExportDialog}
+      />
+      <ArchiveSessionDialog
+        open={showArchiveDialog}
+        onOpenChange={setShowArchiveDialog}
+        onConfirm={handleArchiveSession}
+        pending={isArchiving}
       />
     </>
   );

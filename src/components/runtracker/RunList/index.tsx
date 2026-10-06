@@ -28,7 +28,7 @@ const VIRTUAL_SCROLLING_THRESHOLD = 100;
  * and expandable details showing items found and run statistics.
  */
 export function RunList({ runs }: RunListProps) {
-  const { runItems, loadRunItems, loading } = useRunTrackerStore();
+  const { runItems, loadRunItems, loadingRunItems } = useRunTrackerStore();
   const { items, progress, characters } = useGrailStore();
 
   // State management
@@ -499,7 +499,11 @@ export function RunList({ runs }: RunListProps) {
           onOpenChange={handleRunDialogChange}
           run={selectedRun}
           runItems={selectedRun ? runItems.get(selectedRun.id) || [] : []}
-          loading={loading && selectedRun !== null && !runItems.has(selectedRun.id)}
+          loading={
+            selectedRun !== null &&
+            loadingRunItems.has(selectedRun.id) &&
+            !runItems.has(selectedRun.id)
+          }
           formatTimestamp={formatTimestampCallback}
           getItemInfo={getItemInfo}
           getItemCardData={getItemCardData}
