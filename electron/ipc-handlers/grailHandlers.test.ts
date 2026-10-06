@@ -836,6 +836,35 @@ describe('When grailHandlers is used', () => {
       expect(result).toEqual({ success: true });
     });
 
+    it('If the backup has not completed yet, Then grail:backup should not report success until it does', async () => {
+      // Arrange
+      let finishBackup: () => void = () => undefined;
+      vi.mocked(grailDatabase.backup).mockReturnValue(
+        new Promise<void>((resolve) => {
+          finishBackup = resolve;
+        }),
+      );
+      const handler = vi
+        .mocked(ipcMain.handle)
+        .mock.calls.find((call) => call[0] === 'grail:backup')?.[1] as any;
+      let settled = false;
+
+      // Act
+      const pending = handler(null, '/path/to/backup.db').then((value: unknown) => {
+        settled = true;
+        return value;
+      });
+      await Promise.resolve();
+      await Promise.resolve();
+      const settledBeforeCompletion = settled;
+      finishBackup();
+      const result = await pending;
+
+      // Assert
+      expect(settledBeforeCompletion).toBe(false);
+      expect(result).toEqual({ success: true });
+    });
+
     it('Then grail:restore should restore database', async () => {
       // Arrange
       const backupPath = '/path/to/backup.db';
@@ -884,9 +913,7 @@ describe('When grailHandlers is used', () => {
 
     it('Then backup handlers should handle errors properly', async () => {
       // Arrange
-      vi.mocked(grailDatabase.backup).mockImplementation(() => {
-        throw new Error('Backup failed');
-      });
+      vi.mocked(grailDatabase.backup).mockRejectedValue(new Error('Backup failed'));
 
       const handler = vi
         .mocked(ipcMain.handle)

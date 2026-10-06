@@ -2,6 +2,7 @@ import dayjs from 'dayjs';
 import { AlertTriangle, Database, Download, Upload } from 'lucide-react';
 import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { toast } from 'sonner';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
   AlertDialog,
@@ -16,6 +17,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { translations } from '@/i18n/translations';
+import { getFileName } from '@/lib/path';
 import { useGrailStore } from '@/stores/grailStore';
 
 /**
@@ -38,10 +40,15 @@ export function DatabaseCard() {
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [restoreError, setRestoreError] = useState<string | null>(null);
   const [restoreSuccess, setRestoreSuccess] = useState(false);
+  const [backedUpBeforeRestore, setBackedUpBeforeRestore] = useState(false);
   const { reloadData } = useGrailStore();
 
   // Backup functionality
-  const handleBackup = async () => {
+  /**
+   * Prompts for a backup location and backs up the database.
+   * @returns {Promise<boolean>} True if a backup was written, false if canceled or failed
+   */
+  const handleBackup = async (): Promise<boolean> => {
     try {
       setIsBackingUp(true);
 
@@ -50,14 +57,14 @@ export function DatabaseCard() {
         title: t(translations.settings.database.backupDatabase),
         defaultPath: `holy-grail-backup-${dayjs().format('YYYY-MM-DD')}.db`,
         filters: [
-          { name: 'SQLite Database', extensions: ['db'] },
-          { name: 'All Files', extensions: ['*'] },
+          { name: t(translations.settings.database.sqliteDatabaseFilter), extensions: ['db'] },
+          { name: t(translations.common.allFiles), extensions: ['*'] },
         ],
         properties: ['createDirectory'],
       });
 
       if (result?.canceled || !result?.filePath) {
-        return;
+        return false;
       }
 
       // Perform the backup
@@ -65,14 +72,32 @@ export function DatabaseCard() {
 
       if (backupResult?.success) {
         setLastBackupPath(result.filePath);
-        console.log('Database backup completed successfully');
-      } else {
-        console.error('Backup failed');
+        toast.success(t(translations.settings.database.backupSuccess), {
+          description: t(translations.settings.database.backupSuccessDescription, {
+            filename: getFileName(result.filePath),
+          }),
+        });
+        return true;
       }
+
+      console.error('Backup failed');
+      toast.error(t(translations.settings.database.backupFailed));
+      return false;
     } catch (error) {
       console.error('Failed to backup database:', error);
+      toast.error(t(translations.settings.database.backupFailed), {
+        description: error instanceof Error ? error.message : undefined,
+      });
+      return false;
     } finally {
       setIsBackingUp(false);
+    }
+  };
+
+  const handleBackupBeforeRestore = async () => {
+    const backedUp = await handleBackup();
+    if (backedUp) {
+      setBackedUpBeforeRestore(true);
     }
   };
 
@@ -89,31 +114,35 @@ export function DatabaseCard() {
     setIsDragOver(false);
   }, []);
 
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragOver(false);
+  const handleDrop = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setIsDragOver(false);
 
-    const files = Array.from(e.dataTransfer.files);
-    if (files.length > 0) {
-      const file = files[0];
-      if (file.name.endsWith('.db')) {
-        setSelectedFile(file);
-        setSelectedFilePath(null); // No direct path for drag-and-drop
-        setShowConfirmDialog(true);
-      } else {
-        setRestoreError('Please select a valid database file (.db)');
+      const files = Array.from(e.dataTransfer.files);
+      if (files.length > 0) {
+        const file = files[0];
+        if (file.name.endsWith('.db')) {
+          setSelectedFile(file);
+          setSelectedFilePath(null); // No direct path for drag-and-drop
+          setBackedUpBeforeRestore(false);
+          setShowConfirmDialog(true);
+        } else {
+          setRestoreError(t(translations.settings.database.invalidFileError));
+        }
       }
-    }
-  }, []);
+    },
+    [t],
+  );
 
   const handleFileSelect = async () => {
     try {
       const result = await window.electronAPI?.dialog.showOpenDialog({
-        title: 'Select Database Backup',
+        title: t(translations.settings.database.selectBackupFile),
         filters: [
-          { name: 'SQLite Database', extensions: ['db'] },
-          { name: 'All Files', extensions: ['*'] },
+          { name: t(translations.settings.database.sqliteDatabaseFilter), extensions: ['db'] },
+          { name: t(translations.common.allFiles), extensions: ['*'] },
         ],
         properties: ['openFile'],
       });
@@ -125,6 +154,7 @@ export function DatabaseCard() {
       const filePath = result.filePaths[0];
       setSelectedFilePath(filePath);
       setSelectedFile(null); // Clear drag-and-drop file
+      setBackedUpBeforeRestore(false);
       setShowConfirmDialog(true);
     } catch (error) {
       console.error('Failed to select file:', error);
@@ -160,11 +190,11 @@ export function DatabaseCard() {
         // Reload data from the restored database
         await reloadData();
       } else {
-        setRestoreError('Restore failed');
+        setRestoreError(t(translations.settings.database.restoreFailed));
       }
     } catch (error) {
       console.error('Failed to restore database:', error);
-      setRestoreError('Failed to restore database');
+      setRestoreError(t(translations.settings.database.restoreFailed));
     } finally {
       setIsRestoring(false);
       setShowConfirmDialog(false);
@@ -176,6 +206,7 @@ export function DatabaseCard() {
     setSelectedFilePath(null);
     setRestoreError(null);
     setRestoreSuccess(false);
+    setBackedUpBeforeRestore(false);
     setShowConfirmDialog(false);
   };
 
@@ -204,11 +235,11 @@ export function DatabaseCard() {
               : t(translations.settings.database.backupDatabase)}
           </Button>
           {lastBackupPath && (
-            <p className="text-success text-xs">
+            <output className="block text-success text-xs">
               {t(translations.settings.database.lastBackup, {
-                filename: lastBackupPath.split('/').pop(),
+                filename: getFileName(lastBackupPath),
               })}
-            </p>
+            </output>
           )}
         </div>
 
@@ -281,15 +312,31 @@ export function DatabaseCard() {
                 <span className="block text-sm">
                   {t(translations.settings.database.keepCurrentWarning)}
                 </span>
+                {backedUpBeforeRestore && (
+                  <output className="mt-2 block text-green-600 text-sm">
+                    {t(translations.settings.database.backupCreatedContinue)}
+                  </output>
+                )}
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel disabled={isRestoring} onClick={resetState}>
+              <AlertDialogCancel disabled={isRestoring || isBackingUp} onClick={resetState}>
                 {t(translations.common.cancel)}
               </AlertDialogCancel>
+              <Button
+                variant="outline"
+                onClick={handleBackupBeforeRestore}
+                disabled={isRestoring || isBackingUp}
+                className="gap-2"
+              >
+                <Download className="h-3 w-3" />
+                {isBackingUp
+                  ? t(translations.settings.database.creatingBackup)
+                  : t(translations.settings.database.backupFirst)}
+              </Button>
               <AlertDialogAction
                 onClick={handleRestore}
-                disabled={isRestoring}
+                disabled={isRestoring || isBackingUp}
                 variant="destructive"
               >
                 {isRestoring

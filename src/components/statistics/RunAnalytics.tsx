@@ -2,10 +2,13 @@ import type { RunStatistics } from 'electron/types/grail';
 import { Clock, Download, Target, TrendingUp, Trophy } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { translations } from '@/i18n/translations';
+import { escapeCsvCell } from '@/lib/csv';
+import { getFileName } from '@/lib/path';
 
 /**
  * RunAnalytics component that displays overall run statistics and highlights.
@@ -61,39 +64,51 @@ export function RunAnalytics() {
 
   // Export functionality
   const exportData = useCallback(async () => {
+    const analyticsT = translations.statistics.runAnalytics;
     try {
       const csvData = [
-        ['Metric', 'Value'],
-        ['Total Sessions', overallStats?.totalSessions || 0],
-        ['Total Runs', overallStats?.totalRuns || 0],
-        ['Total Time', overallStats?.totalTime ? formatTime(overallStats.totalTime) : '0m'],
+        [t(analyticsT.csvHeaders.metric), t(analyticsT.csvHeaders.value)],
+        [t(analyticsT.totalSessions), overallStats?.totalSessions || 0],
+        [t(analyticsT.csvHeaders.totalRuns), overallStats?.totalRuns || 0],
         [
-          'Average Run Duration',
+          t(analyticsT.totalTime),
+          overallStats?.totalTime ? formatTime(overallStats.totalTime) : '0m',
+        ],
+        [
+          t(analyticsT.csvHeaders.averageRunDuration),
           overallStats?.averageRunDuration
             ? formatDuration(overallStats.averageRunDuration)
             : '0:00',
         ],
-        ['Items Per Run', overallStats?.itemsPerRun.toFixed(2) || '0.00'],
+        [t(analyticsT.itemsPerRun), overallStats?.itemsPerRun.toFixed(2) || '0.00'],
       ];
 
-      const csvContent = csvData.map((row) => row.join(',')).join('\n');
+      const csvContent = csvData.map((row) => row.map(escapeCsvCell).join(',')).join('\n');
 
-      // Use Electron dialog to save file
       const result = await window.electronAPI?.dialog.showSaveDialog({
-        title: 'Export Analytics Data',
+        title: t(analyticsT.exportDialogTitle),
         defaultPath: 'run-analytics.csv',
-        filters: [{ name: 'CSV Files', extensions: ['csv'] }],
+        filters: [{ name: t(analyticsT.csvFilesFilter), extensions: ['csv'] }],
       });
 
-      if (result && !result.canceled && result.filePath) {
-        // Write file using Node.js fs (this would need to be implemented in Electron)
-        console.log('Would save CSV to:', result.filePath);
-        console.log('CSV content:', csvContent);
+      if (!result || result.canceled || !result.filePath) {
+        return;
       }
+
+      await window.electronAPI.dialog.writeFile(result.filePath, csvContent);
+
+      toast.success(t(analyticsT.exportSuccess), {
+        description: t(analyticsT.exportSuccessDescription, {
+          filename: getFileName(result.filePath),
+        }),
+      });
     } catch (err) {
       console.error('[Analytics] Error exporting data:', err);
+      toast.error(t(analyticsT.exportFailed), {
+        description: err instanceof Error ? err.message : String(err),
+      });
     }
-  }, [overallStats, formatDuration, formatTime]);
+  }, [overallStats, formatDuration, formatTime, t]);
 
   if (loading) {
     return (

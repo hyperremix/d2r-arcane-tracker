@@ -1,4 +1,5 @@
 import type { Run, RunItem, Session } from 'electron/types/grail';
+import { escapeCsvCell } from '@/lib/csv';
 import { formatDate, formatDuration } from '@/lib/utils';
 
 export function formatSessionAsCSV(
@@ -54,20 +55,7 @@ export function formatSessionAsCSV(
   }
 
   // Convert to CSV string with proper escaping
-  return rows
-    .map((row) =>
-      row
-        .map((cell) => {
-          const cellStr = String(cell);
-          // Escape quotes and wrap in quotes if contains comma, quote, or newline
-          if (cellStr.includes(',') || cellStr.includes('"') || cellStr.includes('\n')) {
-            return `"${cellStr.replace(/"/g, '""')}"`;
-          }
-          return cellStr;
-        })
-        .join(','),
-    )
-    .join('\n');
+  return rows.map((row) => row.map(escapeCsvCell).join(',')).join('\n');
 }
 
 export function formatSessionAsJSON(

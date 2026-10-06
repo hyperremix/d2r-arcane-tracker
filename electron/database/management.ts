@@ -4,8 +4,8 @@ import type { DatabaseContext } from './types';
 
 const { characters, grailProgress } = schema;
 
-export function backup(ctx: DatabaseContext, backupPath: string): void {
-  ctx.rawDb.backup(backupPath);
+export async function backup(ctx: DatabaseContext, backupPath: string): Promise<void> {
+  await ctx.rawDb.backup(backupPath);
 }
 
 export function close(ctx: DatabaseContext): void {

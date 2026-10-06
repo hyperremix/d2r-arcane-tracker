@@ -9,6 +9,8 @@ import type { ConvertedToObjectType, TranslationJsonType } from './types';
 // biome-ignore lint/suspicious/noExplicitAny: ignore this
 export const translations: ConvertedToObjectType<TranslationJsonType> = {} as any;
 
+const PLURAL_SUFFIX_PATTERN = /_(zero|one|two|few|many|other)$/;
+
 /**
  * Recursively converts a language JSON file to a nested object structure.
  * Each leaf string value is replaced with the full key path for type-safe translation access.
@@ -23,12 +25,14 @@ const convertLanguageJsonToObject = (
   current?: string,
 ) => {
   for (const key in json) {
-    const currentLookupKey = current ? `${current}.${key}` : key;
     if (typeof json[key] === 'object') {
+      const currentLookupKey = current ? `${current}.${key}` : key;
       objToConvertTo[key] = {};
       convertLanguageJsonToObject(json[key], objToConvertTo[key], currentLookupKey);
     } else {
-      objToConvertTo[key] = currentLookupKey;
+      // Plural variants (`key_one`, `key_other`, ...) share the base key so t(key, { count }) resolves them
+      const baseKey = key.replace(PLURAL_SUFFIX_PATTERN, '');
+      objToConvertTo[baseKey] = current ? `${current}.${baseKey}` : baseKey;
     }
   }
 };

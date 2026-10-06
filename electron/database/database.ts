@@ -256,8 +256,8 @@ class GrailDatabase {
   }
 
   // Management
-  backup(backupPath: string): void {
-    managementModule.backup(this, backupPath);
+  backup(backupPath: string): Promise<void> {
+    return managementModule.backup(this, backupPath);
   }
   close(): void {
     managementModule.close(this);
