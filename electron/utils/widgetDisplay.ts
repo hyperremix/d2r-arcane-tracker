@@ -5,7 +5,15 @@ import type { Settings } from '../types/grail';
  */
 export type WidgetDisplayMode = NonNullable<Settings['widgetDisplay']>;
 
-const WIDGET_DISPLAY_MODES: readonly WidgetDisplayMode[] = ['overall', 'split', 'all', 'run-only'];
+/**
+ * Every supported display mode, used to validate values received over IPC.
+ */
+const WIDGET_DISPLAY_MODES = ['overall', 'split', 'all', 'run-only'] as const;
+
+// Compile-time check that the list above covers the whole WidgetDisplayMode union
+type MissingDisplayModes = Exclude<WidgetDisplayMode, (typeof WIDGET_DISPLAY_MODES)[number]>;
+const displayModesAreExhaustive: MissingDisplayModes extends never ? true : never = true;
+void displayModesAreExhaustive;
 
 /**
  * Type guard for values received over IPC, which can be anything at runtime.

@@ -1,5 +1,6 @@
 import { ipcMain } from 'electron';
 import type { Settings } from '../types/grail';
+import type { WidgetDisplayMode } from '../utils/widgetDisplay';
 import { isWidgetDisplayMode } from '../utils/widgetDisplay';
 import {
   closeWidgetWindow,
@@ -26,10 +27,7 @@ export function initializeWidgetHandlers(
   viteDevServerUrl?: string,
   rendererDist?: string,
   onPositionChange?: (position: { x: number; y: number }) => void,
-  onSizeChange?: (
-    display: 'overall' | 'split' | 'all' | 'run-only',
-    size: { width: number; height: number },
-  ) => void,
+  onSizeChange?: (display: WidgetDisplayMode, size: { width: number; height: number }) => void,
 ): void {
   /**
    * Toggle widget visibility based on settings.
@@ -90,7 +88,7 @@ export function initializeWidgetHandlers(
     'widget:update-display',
     async (
       _event,
-      display: 'overall' | 'split' | 'all' | 'run-only',
+      display: unknown, // Renderer-provided: validated below
       settings: Partial<Settings>,
     ) => {
       try {
@@ -138,7 +136,7 @@ export function initializeWidgetHandlers(
     'widget:update-size',
     async (
       _event,
-      display: 'overall' | 'split' | 'all' | 'run-only',
+      display: unknown, // Renderer-provided: validated below
       size: { width: number; height: number },
     ) => {
       try {
@@ -159,24 +157,21 @@ export function initializeWidgetHandlers(
   /**
    * Reset widget size to default for current display mode.
    */
-  ipcMain.handle(
-    'widget:reset-size',
-    async (_event, display: 'overall' | 'split' | 'all' | 'run-only') => {
-      try {
-        if (!isWidgetDisplayMode(display)) {
-          return { success: false, error: 'Invalid widget display mode', size: null };
-        }
-        const defaultSize = resetWidgetWindowSize(display);
-        if (defaultSize && onSizeChange) {
-          onSizeChange(display, defaultSize);
-        }
-        return { success: true, size: defaultSize };
-      } catch (error) {
-        console.error('Failed to reset widget size:', error);
-        return { success: false, error: String(error), size: null };
+  ipcMain.handle('widget:reset-size', async (_event, display: unknown) => {
+    try {
+      if (!isWidgetDisplayMode(display)) {
+        return { success: false, error: 'Invalid widget display mode', size: null };
       }
-    },
-  );
+      const defaultSize = resetWidgetWindowSize(display);
+      if (defaultSize && onSizeChange) {
+        onSizeChange(display, defaultSize);
+      }
+      return { success: true, size: defaultSize };
+    } catch (error) {
+      console.error('Failed to reset widget size:', error);
+      return { success: false, error: String(error), size: null };
+    }
+  });
 
   /**
    * Reset widget position to center of screen.

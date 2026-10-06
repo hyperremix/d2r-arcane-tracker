@@ -137,7 +137,8 @@ export function D2RInstallationStep() {
     [applyValidation, savePath, validatePath],
   );
 
-  // Discard any validation result that resolves after the step unmounted
+  // Discard any validation result that resolves after the step unmounted. This is deliberately
+  // not unit-tested: with React 18 nothing is observable after unmount, so a test could not fail.
   useEffect(
     () => () => {
       validationRequestRef.current += 1;

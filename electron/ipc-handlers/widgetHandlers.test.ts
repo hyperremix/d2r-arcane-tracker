@@ -1,4 +1,5 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { MockInstance } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 type Handler = (event: unknown, ...args: unknown[]) => Promise<Record<string, unknown>>;
 
@@ -30,12 +31,17 @@ const invoke = (channel: string, ...args: unknown[]) =>
 
 describe('widget IPC handlers display mode validation', () => {
   const onSizeChange = vi.fn();
+  let consoleError: MockInstance;
 
   beforeEach(() => {
     vi.clearAllMocks();
     handlers.clear();
-    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     initializeWidgetHandlers('/app', undefined, undefined, undefined, onSizeChange);
+  });
+
+  afterEach(() => {
+    consoleError.mockRestore();
   });
 
   it('When widget:reset-size receives a valid display mode, Then the size is reset and reported', async () => {
@@ -59,11 +65,10 @@ describe('widget IPC handlers display mode validation', () => {
   ])(
     'If widget:reset-size receives %s, Then it is rejected without touching the window',
     async (_name, display) => {
-      // Arrange
-      const invalid = display;
+      // Arrange: the invalid display mode comes from the test table
 
       // Act
-      const result = await invoke('widget:reset-size', invalid);
+      const result = await invoke('widget:reset-size', display);
 
       // Assert
       expect(result).toMatchObject({ success: false, size: null });

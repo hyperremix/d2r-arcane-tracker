@@ -1,4 +1,5 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import type { MockInstance } from 'vitest';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useGrailStore } from '@/stores/grailStore';
 import { useWizardStore } from '@/stores/wizardStore';
@@ -28,6 +29,7 @@ function createElectronApiMock(directory: string | null) {
 describe('SaveDirectoryStep', () => {
   const originalElectronAPI = window.electronAPI;
   const originalSettings = useGrailStore.getState().settings;
+  let consoleError: MockInstance | undefined;
 
   beforeEach(() => {
     useWizardStore.setState({ stepValidity: {} });
@@ -35,6 +37,8 @@ describe('SaveDirectoryStep', () => {
   });
 
   afterEach(() => {
+    consoleError?.mockRestore();
+    consoleError = undefined;
     useGrailStore.setState({ settings: originalSettings });
     useWizardStore.setState({ stepValidity: {} });
     Object.defineProperty(window, 'electronAPI', {
@@ -146,7 +150,7 @@ describe('SaveDirectoryStep', () => {
     // Arrange
     const electronApi = createElectronApiMock(null);
     electronApi.saveFile.updateSaveDirectory.mockRejectedValue(new Error('monitor failed'));
-    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     Object.defineProperty(window, 'electronAPI', {
       value: electronApi,
       configurable: true,

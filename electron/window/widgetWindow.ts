@@ -1,6 +1,7 @@
 import path from 'node:path';
 import { BrowserWindow, screen } from 'electron';
 import type { Settings } from '../types/grail';
+import type { WidgetDisplayMode } from '../utils/widgetDisplay';
 import { isWidgetDisplayMode, resolveWidgetDisplayMode } from '../utils/widgetDisplay';
 import {
   calculateSnapPosition,
@@ -17,10 +18,7 @@ export let widgetWindow: BrowserWindow | null = null;
  * Size mapping for different widget display modes.
  * These are the default sizes used when no custom size is saved.
  */
-const SIZE_MAP: Record<
-  'overall' | 'split' | 'all' | 'run-only',
-  { width: number; height: number }
-> = {
+const SIZE_MAP: Record<WidgetDisplayMode, { width: number; height: number }> = {
   overall: { width: 250, height: 250 }, // Single large gauge
   split: { width: 350, height: 250 }, // Two gauges side by side
   all: { width: 300, height: 350 }, // Overall on top, normal+ethereal below
@@ -35,7 +33,7 @@ const SIZE_MAP: Record<
  * @returns The size { width, height } for the display mode
  */
 function getWidgetSize(
-  display: 'overall' | 'split' | 'all' | 'run-only',
+  display: WidgetDisplayMode,
   settings: Partial<Settings>,
 ): { width: number; height: number } {
   switch (display) {
@@ -66,10 +64,7 @@ export function createWidgetWindow(
   viteDevServerUrl?: string,
   rendererDist?: string,
   onPositionChange?: (position: { x: number; y: number }) => void,
-  onSizeChange?: (
-    display: 'overall' | 'split' | 'all' | 'run-only',
-    size: { width: number; height: number },
-  ) => void,
+  onSizeChange?: (display: WidgetDisplayMode, size: { width: number; height: number }) => void,
 ): BrowserWindow {
   const displayMode = resolveWidgetDisplayMode(settings.widgetDisplay, settings.grailEthereal);
   const size = getWidgetSize(displayMode, settings);
@@ -221,10 +216,7 @@ export function showWidgetWindow(
   viteDevServerUrl?: string,
   rendererDist?: string,
   onPositionChange?: (position: { x: number; y: number }) => void,
-  onSizeChange?: (
-    display: 'overall' | 'split' | 'all' | 'run-only',
-    size: { width: number; height: number },
-  ) => void,
+  onSizeChange?: (display: WidgetDisplayMode, size: { width: number; height: number }) => void,
 ): void {
   if (widgetWindow) {
     widgetWindow.show();
@@ -280,7 +272,7 @@ export function getWidgetWindowPosition(): { x: number; y: number } | null {
  * @param settings - Application settings containing custom sizes
  */
 export function updateWidgetWindowSize(
-  display: 'overall' | 'split' | 'all' | 'run-only',
+  display: WidgetDisplayMode,
   settings: Partial<Settings>,
 ): void {
   if (widgetWindow) {
@@ -305,7 +297,7 @@ export function updateWidgetWindowSize(
  * @returns The default size for the mode, or null if window doesn't exist
  */
 export function resetWidgetWindowSize(
-  display: 'overall' | 'split' | 'all' | 'run-only',
+  display: WidgetDisplayMode,
 ): { width: number; height: number } | null {
   if (widgetWindow && isWidgetDisplayMode(display)) {
     const defaultSize = SIZE_MAP[display];

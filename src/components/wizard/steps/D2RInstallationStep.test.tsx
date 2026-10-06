@@ -1,4 +1,5 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import type { MockInstance } from 'vitest';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useGrailStore } from '@/stores/grailStore';
 import { D2RInstallationStep } from './D2RInstallationStep';
@@ -35,6 +36,7 @@ function installElectronApi(api: ReturnType<typeof createElectronApiMock>) {
 describe('D2RInstallationStep', () => {
   const originalElectronAPI = window.electronAPI;
   const originalSettings = useGrailStore.getState().settings;
+  let consoleError: MockInstance | undefined;
 
   beforeEach(() => {
     useGrailStore.setState((state) => ({
@@ -43,6 +45,8 @@ describe('D2RInstallationStep', () => {
   });
 
   afterEach(() => {
+    consoleError?.mockRestore();
+    consoleError = undefined;
     useGrailStore.setState({ settings: originalSettings });
     Object.defineProperty(window, 'electronAPI', {
       value: originalElectronAPI,
@@ -308,7 +312,7 @@ describe('D2RInstallationStep', () => {
     // Arrange
     const api = createElectronApiMock(null);
     api.icon.setD2RPath.mockRejectedValue(new Error('disk full'));
-    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     installElectronApi(api);
     render(<D2RInstallationStep />);
     await screen.findByRole('button', { name: 'Use this' });
