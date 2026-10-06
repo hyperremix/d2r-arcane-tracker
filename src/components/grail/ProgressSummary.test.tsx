@@ -21,9 +21,9 @@ describe('When ProgressSummary is rendered', () => {
       render(<ProgressSummary statistics={statistics} showEtherealBreakdown={false} />);
 
       // Assert
-      expect(screen.getByText('Total Progress')).toBeInTheDocument();
+      expect(screen.getByRole('progressbar', { name: 'Total Progress' })).toBeInTheDocument();
       expect(screen.getByText('19.5%')).toBeInTheDocument();
-      expect(screen.getByText('190/975')).toBeInTheDocument();
+      expect(screen.getByText('190 of 975 found')).toBeInTheDocument();
       expect(screen.getAllByRole('progressbar')).toHaveLength(1);
       expect(screen.queryByText('Normal Items')).not.toBeInTheDocument();
       expect(screen.queryByText('Ethereal Items')).not.toBeInTheDocument();
@@ -31,16 +31,49 @@ describe('When ProgressSummary is rendered', () => {
   });
 
   describe('If ethereal tracking is enabled', () => {
-    it('Then also shows the normal and ethereal breakdown', () => {
+    it('Then splits the bar into a normal and an ethereal lane while keeping the total', () => {
       // Arrange & Act
       render(<ProgressSummary statistics={statistics} showEtherealBreakdown />);
 
       // Assert
-      expect(screen.getAllByRole('progressbar')).toHaveLength(3);
-      expect(screen.getByText('Normal Items')).toBeInTheDocument();
+      const progressBars = screen.getAllByRole('progressbar');
+      expect(progressBars).toHaveLength(2);
+      expect(screen.getByRole('progressbar', { name: 'Normal Items' })).toBeInTheDocument();
+      expect(screen.getByRole('progressbar', { name: 'Ethereal Items' })).toBeInTheDocument();
       expect(screen.getByText('184/628')).toBeInTheDocument();
-      expect(screen.getByText('Ethereal Items')).toBeInTheDocument();
       expect(screen.getByText('6/347')).toBeInTheDocument();
+      expect(screen.getByText('19.5%')).toBeInTheDocument();
+      expect(screen.getByText('190 of 975 found')).toBeInTheDocument();
+    });
+
+    it('Then sizes each lane by its share of the grail', () => {
+      // Arrange & Act
+      render(<ProgressSummary statistics={statistics} showEtherealBreakdown />);
+
+      // Assert
+      expect(screen.getByRole('progressbar', { name: 'Normal Items' })).toHaveStyle({
+        flexGrow: '628',
+      });
+      expect(screen.getByRole('progressbar', { name: 'Ethereal Items' })).toHaveStyle({
+        flexGrow: '347',
+      });
+    });
+  });
+
+  describe('If ethereal tracking is enabled but there are no ethereal items', () => {
+    it('Then shows a single total bar instead of lanes', () => {
+      // Arrange
+      const noEtherealStatistics: GrailStatistics = {
+        ...statistics,
+        etherealItems: { total: 0, found: 0 },
+      };
+
+      // Act
+      render(<ProgressSummary statistics={noEtherealStatistics} showEtherealBreakdown />);
+
+      // Assert
+      expect(screen.getAllByRole('progressbar')).toHaveLength(1);
+      expect(screen.getByRole('progressbar', { name: 'Total Progress' })).toBeInTheDocument();
     });
   });
 

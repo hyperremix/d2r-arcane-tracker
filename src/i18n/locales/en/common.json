@@ -32,7 +32,8 @@
       "totalProgress": "Total Progress",
       "normalItems": "Normal Items",
       "etherealItems": "Ethereal Items",
-      "progressSummary": "Grail progress"
+      "progressSummary": "Grail progress",
+      "foundOfTotal": "{{found}} of {{total}} found"
     },
     "itemCard": {
       "discoveryInfo": "Discovery Info:",
