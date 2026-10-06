@@ -1,17 +1,21 @@
 import { Bell, Monitor, Smartphone } from 'lucide-react';
 import { useId } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
+import { translations } from '@/i18n/translations';
 import { useGrailStore } from '@/stores/grailStore';
 
 /**
- * NotificationsStep component - Step for configuring notification preferences.
+ * NotificationsStep component - Notifications section of the wizard Preferences step.
  * Allows users to enable/disable sounds, adjust volume, and toggle notification types.
- * @returns {JSX.Element} Notifications configuration step content
+ * @returns {JSX.Element} Notifications configuration section content
  */
 export function NotificationsStep() {
+  const { t } = useTranslation();
   const volumeSliderId = useId();
+  const headingId = useId();
   const { settings, setSettings } = useGrailStore();
 
   const enableSounds = settings.enableSounds ?? true;
@@ -20,14 +24,16 @@ export function NotificationsStep() {
   const nativeNotifications = settings.nativeNotifications ?? true;
 
   return (
-    <div className="space-y-6">
-      <div className="space-y-2">
+    <section aria-labelledby={headingId} className="space-y-4">
+      <div className="space-y-1">
         <div className="flex items-center gap-2">
           <Bell className="h-6 w-6" />
-          <h2 className="font-bold text-2xl">Notification Settings</h2>
+          <h3 id={headingId} className="font-semibold text-lg">
+            {t(translations.settings.notifications.title)}
+          </h3>
         </div>
-        <p className="text-muted-foreground">
-          Configure how you want to be notified when new items are found.
+        <p className="text-muted-foreground text-sm">
+          {t(translations.wizard.notifications.description)}
         </p>
       </div>
 
@@ -38,11 +44,14 @@ export function NotificationsStep() {
             <div>
               <h4 className="flex items-center gap-2 font-medium text-sm">
                 <Bell className="h-4 w-4" />
-                Sound Notifications
+                {t(translations.settings.notifications.soundNotifications)}
               </h4>
-              <p className="text-muted-foreground text-xs">Play sound when items are found</p>
+              <p className="text-muted-foreground text-xs">
+                {t(translations.settings.notifications.soundDescription)}
+              </p>
             </div>
             <Switch
+              aria-label={t(translations.settings.notifications.soundNotifications)}
               checked={enableSounds}
               onCheckedChange={(checked) => setSettings({ enableSounds: checked })}
             />
@@ -50,7 +59,7 @@ export function NotificationsStep() {
 
           <div className="flex items-center gap-2">
             <Label htmlFor={volumeSliderId} className="text-muted-foreground text-xs">
-              Volume:
+              {t(translations.settings.notifications.volume)}
             </Label>
             <Slider
               id={volumeSliderId}
@@ -77,11 +86,14 @@ export function NotificationsStep() {
             <div>
               <h4 className="flex items-center gap-2 font-medium text-sm">
                 <Monitor className="h-4 w-4" />
-                In-App Notifications
+                {t(translations.settings.notifications.inAppNotifications)}
               </h4>
-              <p className="text-muted-foreground text-xs">Show notification cards in the app</p>
+              <p className="text-muted-foreground text-xs">
+                {t(translations.settings.notifications.inAppDescription)}
+              </p>
             </div>
             <Switch
+              aria-label={t(translations.settings.notifications.inAppNotifications)}
               checked={inAppNotifications}
               onCheckedChange={(checked) => setSettings({ inAppNotifications: checked })}
             />
@@ -94,11 +106,14 @@ export function NotificationsStep() {
             <div>
               <h4 className="flex items-center gap-2 font-medium text-sm">
                 <Smartphone className="h-4 w-4" />
-                Native Notifications
+                {t(translations.settings.notifications.nativeNotifications)}
               </h4>
-              <p className="text-muted-foreground text-xs">Show browser/OS notifications</p>
+              <p className="text-muted-foreground text-xs">
+                {t(translations.settings.notifications.nativeDescription)}
+              </p>
             </div>
             <Switch
+              aria-label={t(translations.settings.notifications.nativeNotifications)}
               checked={nativeNotifications}
               onCheckedChange={(checked) => setSettings({ nativeNotifications: checked })}
             />
@@ -107,11 +122,11 @@ export function NotificationsStep() {
 
         <div className="rounded-lg bg-info/10 p-4">
           <p className="text-info text-sm">
-            <strong>Note:</strong> Native notifications require browser permission. You'll be
-            prompted to allow notifications when you first enable this setting.
+            <strong>{t(translations.common.note)}</strong>{' '}
+            {t(translations.settings.notifications.nativeNote)}
           </p>
         </div>
       </div>
-    </div>
+    </section>
   );
 }

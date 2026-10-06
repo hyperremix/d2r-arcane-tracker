@@ -1,6 +1,6 @@
 import { act, renderHook } from '@testing-library/react';
 import type { Run, Session } from 'electron/types/grail';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useRunTrackerStore } from './runTrackerStore';
 
 // Mock the electron API
@@ -21,10 +21,20 @@ const mockElectronAPI = {
   },
 };
 
-// Mock window.electronAPI
+// Mock window.electronAPI (restored afterwards because test files share one window)
+const originalElectronAPI = window.electronAPI;
 Object.defineProperty(window, 'electronAPI', {
   value: mockElectronAPI,
+  configurable: true,
   writable: true,
+});
+
+afterAll(() => {
+  Object.defineProperty(window, 'electronAPI', {
+    value: originalElectronAPI,
+    configurable: true,
+    writable: true,
+  });
 });
 
 describe('runTrackerStore duplicate prevention', () => {

@@ -135,6 +135,19 @@
   },
   "settings": {
     "title": "Settings",
+    "nav": {
+      "label": "Settings sections",
+      "general": "General",
+      "generalDescription": "Save files, D2R installation, game mode and game version",
+      "tracking": "Tracking",
+      "trackingDescription": "Holy Grail and run tracking",
+      "display": "Display",
+      "displayDescription": "Theme, item icons, overlay widget and notifications",
+      "data": "Data",
+      "dataDescription": "Database backups and the setup wizard",
+      "about": "About",
+      "aboutDescription": "Application updates and issue reporting"
+    },
     "setupWizard": {
       "title": "Setup Wizard",
       "description": "Run the guided setup wizard to configure all essential settings at once. This is helpful if you want to review or change multiple settings quickly.",
@@ -298,7 +311,7 @@
       "showRunItemList": "Show Run Item List",
       "showRunItemListDescription": "In Run Only mode, show a compact text list of grail-relevant items found each run.",
       "opacity": "Opacity",
-      "opacityDescription": "Adjust widget transparency (0% to 100%)",
+      "opacityDescription": "Adjust widget background opacity ({{min}}% to 100%)",
       "positionAndSize": "Position & Size",
       "resetPosition": "Reset Position",
       "resetSize": "Reset Size",
@@ -444,6 +457,121 @@
     "goBack": "Go back",
     "goForward": "Go forward"
   },
+  "wizard": {
+    "steps": {
+      "welcome": "Welcome",
+      "saveDirectory": "Save Directory",
+      "d2rInstallation": "D2R Installation",
+      "gameMode": "Game Mode",
+      "gameVersion": "Game Version",
+      "grailSettings": "Grail Settings",
+      "complete": "Complete"
+    },
+    "progress": "Step {{current}} of {{total}}",
+    "progressPercent": "{{percent}}%",
+    "optional": "Optional",
+    "back": "Back",
+    "skipSetup": "Skip Setup",
+    "finish": "Finish",
+    "tip": "Tip:",
+    "saveDirectoryRequired": "Select your save directory to continue, or skip setup to configure it later.",
+    "welcome": {
+      "title": "Welcome to D2R Arcane Tracker!",
+      "description": "Track your Diablo II: Resurrected Holy Grail progress with automatic save file monitoring and real-time item detection.",
+      "configureHeading": "This wizard will help you configure:",
+      "configureSaveDirectory": "Save file directory for automatic character monitoring",
+      "configureGameModeVersion": "Game mode and version preferences",
+      "configureGrail": "Holy Grail tracking options (normal, ethereal, runes, runewords)",
+      "configurePreferences": "Optional preferences: theme, notifications and widget overlay",
+      "skipHint": "You can skip this wizard and configure settings later, or click Next to get started."
+    },
+    "saveDirectory": {
+      "title": "Save File Directory",
+      "description": "Select the directory where your Diablo II: Resurrected save files are located.",
+      "pathLabel": "Save Directory Path",
+      "placeholder": "Select your save directory...",
+      "browse": "Browse",
+      "dialogTitle": "Select Save File Directory",
+      "useDefault": "Use Default Directory",
+      "validated": "Directory validated",
+      "foundCharacters": "Found {{count}} character files",
+      "foundCharacters_one": "Found {{count}} character file",
+      "noCharacterFiles": "No character files found",
+      "noCharacterFilesHint": "Make sure you've selected the correct directory containing your .d2s files",
+      "notDetectedTitle": "No save directory detected",
+      "notDetectedDescription": "We couldn't find your Diablo II: Resurrected save files automatically. Browse to the folder that contains your .d2s character files to continue.",
+      "browseForFolder": "Browse for Folder",
+      "typicalLocation": "Typical location:",
+      "typicalLocationWindows": "C:\\Users\\[YourUsername]\\Saved Games\\Diablo II Resurrected",
+      "typicalLocationMac": "~/Library/Application Support/Diablo II Resurrected"
+    },
+    "d2rInstallation": {
+      "title": "D2R Installation Path",
+      "description": "Configure the path to your Diablo II: Resurrected installation. This setting is used by both item icon management and terror zone configuration features.",
+      "pathHint": "This path will be used to access game files for item icons and terror zone configuration.",
+      "dialogTitle": "Select D2R Installation Directory",
+      "notDetectedTitle": "Installation not detected",
+      "suggestion": "A common install location is:",
+      "useSuggestion": "Use this",
+      "validating": "Checking installation path...",
+      "valid": "Game files found at this location",
+      "invalid": "Extracted game files were not found at this location",
+      "invalidHint": "Item icons and terror zone configuration need extracted game files. You can continue and fix this later in Settings.",
+      "saveFailed": "Could not save the installation path. Please try again."
+    },
+    "gameMode": {
+      "description": "Choose which character types you want to track in your Holy Grail."
+    },
+    "gameVersion": {
+      "description": "Select which version of Diablo II you're playing."
+    },
+    "grail": {
+      "description": "Choose what items you want to track in your Holy Grail collection.",
+      "tip": "Most players start by tracking normal items only. You can always enable ethereal items, runes, and runewords later for additional challenge!"
+    },
+    "preferences": {
+      "title": "Preferences",
+      "description": "Personalize the look, notifications and overlay widget. These are optional and can be changed later in Settings."
+    },
+    "theme": {
+      "description": "Choose your preferred theme for the application.",
+      "preview": "Preview",
+      "previewSystem": "Automatically matches your operating system appearance",
+      "previewSelected": "{{theme}} theme selected"
+    },
+    "notifications": {
+      "description": "Configure how you want to be notified when new items are found."
+    },
+    "widget": {
+      "description": "Configure the optional overlay widget that displays your grail progress.",
+      "tip": "The widget is great for monitoring progress while playing in fullscreen mode. You can always enable it later from settings!"
+    },
+    "completion": {
+      "title": "You're All Set!",
+      "description": "Your D2R Arcane Tracker is now configured and ready to track your Holy Grail progress.",
+      "summary": "Configuration Summary",
+      "saveDirectory": "Save Directory:",
+      "gameMode": "Game Mode:",
+      "gameVersion": "Game Version:",
+      "normalItems": "Normal Items:",
+      "etherealItems": "Ethereal Items:",
+      "runes": "Runes:",
+      "runewords": "Runewords:",
+      "theme": "Theme:",
+      "notifications": "Notifications:",
+      "widget": "Widget:",
+      "configured": "Configured",
+      "notSet": "Not set",
+      "enabled": "Enabled",
+      "disabled": "Disabled",
+      "nextSteps": "Next Steps",
+      "nextStepPlay": "Start playing Diablo II: Resurrected",
+      "nextStepMonitor": "The tracker will automatically monitor your save files",
+      "nextStepProgress": "View your progress in the main tracker interface",
+      "nextStepStatistics": "Check statistics to see your completion percentage",
+      "finishHint": "Click Finish to save your settings and start using D2R Arcane Tracker!"
+    }
+  },
   "errorBoundary": {
     "title": "Something went wrong",
     "description": "An unexpected error occurred. You can try to recover or reload the application.",
@@ -555,5 +683,15 @@
       "endCurrentSessionTitle": "End Current Session",
       "endCurrentSessionDescription": "Are you sure you want to end the current session? This will end any active run and cannot be undone."
     }
+  },
+  "widget": {
+    "ethereal": "Ethereal",
+    "startSessionPrompt": "Start a session to track runs",
+    "run": "Run",
+    "current": "Current",
+    "fastest": "Fastest",
+    "average": "Avg",
+    "runItems": "Run Items",
+    "addItemPlaceholder": "Add item..."
   }
 }

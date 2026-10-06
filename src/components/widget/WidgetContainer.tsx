@@ -6,8 +6,10 @@ import type {
   Session,
   Settings,
 } from 'electron/types/grail';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { canItemBeEthereal, canItemBeNormal } from '@/lib/ethereal';
+import type { WidgetDisplayMode } from '@/lib/widget';
+import { resolveWidgetDisplayMode } from '@/lib/widget';
 import { useGrailStore } from '@/stores/grailStore';
 import { useRunTrackerStore } from '@/stores/runTrackerStore';
 import { Widget } from './Widget';
@@ -123,20 +125,34 @@ export function WidgetContainer() {
     };
   }, [setItems, setProgress]);
 
+  // Resize the native window whenever the mode the widget actually renders changes. That covers
+  // display mode changes and ethereal tracking toggles (which switch split/all to overall)
+  const effectiveDisplay = resolveWidgetDisplayMode(settings.widgetDisplay, settings.grailEthereal);
+  const settingsLoaded = settings.widgetDisplay !== undefined;
+  const appliedDisplayRef = useRef<WidgetDisplayMode | undefined>(undefined);
+  useEffect(() => {
+    if (!settingsLoaded) {
+      return;
+    }
+    const previousDisplay = appliedDisplayRef.current;
+    appliedDisplayRef.current = effectiveDisplay;
+    // The window was already created with the size for the initially loaded mode
+    if (previousDisplay === undefined || previousDisplay === effectiveDisplay) {
+      return;
+    }
+    window.electronAPI?.widget.updateDisplay(effectiveDisplay, settings).catch((error: unknown) => {
+      console.error('Failed to update widget window size:', error);
+    });
+  }, [effectiveDisplay, settings, settingsLoaded]);
+
   // Listen for settings updates
   useEffect(() => {
     const handleSettingsUpdate = async (_event: unknown, updatedSettings: Partial<Settings>) => {
       setSettings((prev) => {
         const newSettings = { ...prev, ...updatedSettings };
 
-        // Update widget appearance based on new settings (use async IIFE to handle promises)
+        // Update widget opacity based on new settings (use async IIFE to handle promises)
         (async () => {
-          if (updatedSettings.widgetDisplay) {
-            await window.electronAPI?.widget.updateDisplay(
-              updatedSettings.widgetDisplay,
-              newSettings,
-            );
-          }
           if (updatedSettings.widgetOpacity !== undefined) {
             await window.electronAPI?.widget.updateOpacity(updatedSettings.widgetOpacity);
           }

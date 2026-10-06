@@ -13,7 +13,35 @@ interface ProgressGaugeProps {
   className?: string;
   showLabel?: boolean;
   color?: 'blue' | 'green' | 'purple' | 'orange';
+  /** Use 'overlay' on an always-dark surface (e.g. the widget) so text stays legible in any theme */
+  tone?: GaugeTone;
 }
+
+/**
+ * Text tone of the gauge. 'overlay' is for always-dark surfaces and ignores the app theme.
+ */
+type GaugeTone = 'default' | 'overlay';
+
+/**
+ * Text and track classes per tone. Only the default tone follows the app theme.
+ */
+interface ToneClasses {
+  secondaryText: string;
+  track: string;
+  percentage?: string;
+}
+
+const toneConfig: Record<GaugeTone, ToneClasses> = {
+  default: {
+    secondaryText: 'text-muted-foreground',
+    track: 'text-muted-foreground/30',
+  },
+  overlay: {
+    secondaryText: 'text-white/85',
+    track: 'text-white/25',
+    percentage: 'text-white',
+  },
+};
 
 /**
  * Color configuration for the progress gauge
@@ -47,6 +75,7 @@ const colorConfig = {
  * @param {string} [props.className] - Optional additional CSS classes
  * @param {boolean} [props.showLabel=false] - Whether to show the label below the gauge
  * @param {'blue' | 'green' | 'purple' | 'orange'} [props.color='blue'] - Color variant of the gauge
+ * @param {'default' | 'overlay'} [props.tone='default'] - Text tone; 'overlay' is for always-dark surfaces
  * @returns {JSX.Element} A circular progress gauge with animated stroke and centered statistics
  */
 export function ProgressGauge({
@@ -56,10 +85,12 @@ export function ProgressGauge({
   className,
   showLabel = false,
   color = 'blue',
+  tone = 'default',
 }: ProgressGaugeProps) {
   const percentage = useMemo(() => (total > 0 ? (current / total) * 100 : 0), [current, total]);
   const degree = useMemo(() => Math.floor((percentage / 100) * 75), [percentage]);
   const colors = colorConfig[color];
+  const toneClasses = toneConfig[tone];
 
   const sizeClasses = 'size-22';
   const percentageTextSize = 'text-lg';
@@ -86,7 +117,7 @@ export function ProgressGauge({
             cy="18"
             r="16"
             fill="none"
-            className="stroke-current text-muted-foreground/30"
+            className={cn('stroke-current', toneClasses.track)}
             strokeWidth="2"
             strokeDasharray="75 100"
             strokeLinecap="round"
@@ -109,10 +140,12 @@ export function ProgressGauge({
 
         {/* Centered content */}
         <div className="-translate-x-1/2 -translate-y-1/2 absolute start-1/2 top-1/2 flex transform flex-col items-center gap-0.5 text-center">
-          <div className={cn('font-bold', colors.text, percentageTextSize)}>
+          <div
+            className={cn('font-bold', toneClasses.percentage ?? colors.text, percentageTextSize)}
+          >
             {percentage.toFixed(1)}%
           </div>
-          <div className={cn('text-muted-foreground', ratioTextSize)}>
+          <div className={cn(toneClasses.secondaryText, ratioTextSize)}>
             {current}/{total}
           </div>
         </div>
@@ -127,7 +160,9 @@ export function ProgressGauge({
     return (
       <div className={cn('flex flex-col items-center', className)}>
         {gaugeElement}
-        <div className={cn('-mt-2 text-center text-muted-foreground', labelTextSize)}>{label}</div>
+        <div className={cn('-mt-2 text-center', toneClasses.secondaryText, labelTextSize)}>
+          {label}
+        </div>
       </div>
     );
   }

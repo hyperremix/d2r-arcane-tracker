@@ -7,6 +7,12 @@ import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
 import { translations } from '@/i18n/translations';
+import {
+  clampWidgetOpacity,
+  MAX_WIDGET_OPACITY,
+  MIN_WIDGET_OPACITY,
+  resolveWidgetDisplayMode,
+} from '@/lib/widget';
 import { useGrailStore } from '@/stores/grailStore';
 
 /**
@@ -40,7 +46,7 @@ export function WidgetSettings() {
   const updateOpacity = useCallback(
     async (value: number | readonly number[]) => {
       const values = Array.isArray(value) ? value : [value];
-      const opacity = values[0];
+      const opacity = clampWidgetOpacity(values[0]);
       await setSettings({ widgetOpacity: opacity });
       // Update widget opacity via IPC
       await window.electronAPI?.widget.updateOpacity(opacity);
@@ -56,22 +62,25 @@ export function WidgetSettings() {
   }, [setSettings]);
 
   const widgetDisplay = settings.widgetDisplay || 'overall';
-  const widgetOpacity = settings.widgetOpacity ?? 0.9;
+  const widgetOpacity = clampWidgetOpacity(settings.widgetOpacity);
   const widgetEnabled = settings.widgetEnabled ?? false;
   const widgetRunOnlyShowItems = settings.widgetRunOnlyShowItems ?? true;
 
+  // The window size follows the mode the widget actually renders (split/all need ethereal tracking)
+  const effectiveDisplay = resolveWidgetDisplayMode(widgetDisplay, settings.grailEthereal);
+
   const resetSize = useCallback(async () => {
-    const result = await window.electronAPI?.widget.resetSize(widgetDisplay);
+    const result = await window.electronAPI?.widget.resetSize(effectiveDisplay);
     if (result?.success && result.size) {
       // Clear the custom size for this display mode
       const sizeKey =
-        `widgetSize${widgetDisplay.charAt(0).toUpperCase()}${widgetDisplay.slice(1)}` as
+        `widgetSize${effectiveDisplay.charAt(0).toUpperCase()}${effectiveDisplay.slice(1)}` as
           | 'widgetSizeOverall'
           | 'widgetSizeSplit'
           | 'widgetSizeAll';
       await setSettings({ [sizeKey]: undefined });
     }
-  }, [setSettings, widgetDisplay]);
+  }, [setSettings, effectiveDisplay]);
 
   // Auto-switch to 'overall' mode if ethereal tracking is disabled and user is in split/all mode
   useEffect(() => {
@@ -193,8 +202,8 @@ export function WidgetSettings() {
             </div>
             <Slider
               id={opacitySliderId}
-              min={0}
-              max={1.0}
+              min={MIN_WIDGET_OPACITY}
+              max={MAX_WIDGET_OPACITY}
               step={0.05}
               value={[widgetOpacity]}
               onValueChange={updateOpacity}
@@ -202,7 +211,9 @@ export function WidgetSettings() {
               className="w-full"
             />
             <p className="text-muted-foreground text-xs">
-              {t(translations.settings.widget.opacityDescription)}
+              {t(translations.settings.widget.opacityDescription, {
+                min: Math.round(MIN_WIDGET_OPACITY * 100),
+              })}
             </p>
           </div>
 
@@ -234,20 +245,20 @@ export function WidgetSettings() {
               </Button>
             </div>
             <p className="text-muted-foreground text-xs">
-              The widget can be dragged, resized, and snaps to screen edges and corners
+              {t(translations.settings.widget.positionDescription)}
             </p>
           </div>
 
           {/* Widget Preview Description */}
           <div className="rounded-lg bg-info/10 p-3">
             <p className="text-info text-xs">
-              <strong>Widget Features:</strong>
-              <br />• Always on top of other windows
-              <br />• Transparent background
-              <br />• Drag to reposition, resize by edges/corners
-              <br />• Auto-snaps to screen edges and corners
-              <br />• Size persists per display mode
-              <br />• Updates in real-time with grail progress
+              <strong>{t(translations.settings.widget.features)}</strong>
+              <br />• {t(translations.settings.widget.featureAlwaysOnTop)}
+              <br />• {t(translations.settings.widget.featureTransparent)}
+              <br />• {t(translations.settings.widget.featureDrag)}
+              <br />• {t(translations.settings.widget.featureSnap)}
+              <br />• {t(translations.settings.widget.featureSizePersists)}
+              <br />• {t(translations.settings.widget.featureRealtime)}
             </p>
           </div>
         </div>

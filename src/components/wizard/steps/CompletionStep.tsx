@@ -1,5 +1,17 @@
+import { GameMode, GameVersion } from 'electron/types/grail';
 import { CheckCircle2, Sparkles } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
+import { translations } from '@/i18n/translations';
+import { gameModeLabelKeys, gameVersionLabelKeys, themeLabelKeys } from '@/lib/labelKeys';
 import { useGrailStore } from '@/stores/grailStore';
+
+/**
+ * A label/value pair shown in the configuration summary.
+ */
+interface SummaryRow {
+  labelKey: string;
+  value: string;
+}
 
 /**
  * CompletionStep component - Final step of the setup wizard.
@@ -7,7 +19,65 @@ import { useGrailStore } from '@/stores/grailStore';
  * @returns {JSX.Element} Completion step content
  */
 export function CompletionStep() {
+  const { t } = useTranslation();
   const { settings } = useGrailStore();
+
+  const enabledLabel = (enabled: boolean) =>
+    enabled
+      ? t(translations.wizard.completion.enabled)
+      : t(translations.wizard.completion.disabled);
+
+  const summaryRows: SummaryRow[] = [
+    {
+      labelKey: translations.wizard.completion.saveDirectory,
+      value: settings.saveDir
+        ? t(translations.wizard.completion.configured)
+        : t(translations.wizard.completion.notSet),
+    },
+    {
+      labelKey: translations.wizard.completion.gameMode,
+      value: t(gameModeLabelKeys[settings.gameMode || GameMode.Both]),
+    },
+    {
+      labelKey: translations.wizard.completion.gameVersion,
+      value: t(gameVersionLabelKeys[settings.gameVersion || GameVersion.Resurrected]),
+    },
+    {
+      labelKey: translations.wizard.completion.normalItems,
+      value: enabledLabel(settings.grailNormal ?? true),
+    },
+    {
+      labelKey: translations.wizard.completion.etherealItems,
+      value: enabledLabel(Boolean(settings.grailEthereal)),
+    },
+    {
+      labelKey: translations.wizard.completion.runes,
+      value: enabledLabel(Boolean(settings.grailRunes)),
+    },
+    {
+      labelKey: translations.wizard.completion.runewords,
+      value: enabledLabel(Boolean(settings.grailRunewords)),
+    },
+    {
+      labelKey: translations.wizard.completion.theme,
+      value: t(themeLabelKeys[settings.theme || 'system']),
+    },
+    {
+      labelKey: translations.wizard.completion.notifications,
+      value: enabledLabel(settings.enableSounds ?? true),
+    },
+    {
+      labelKey: translations.wizard.completion.widget,
+      value: enabledLabel(Boolean(settings.widgetEnabled)),
+    },
+  ];
+
+  const nextSteps = [
+    translations.wizard.completion.nextStepPlay,
+    translations.wizard.completion.nextStepMonitor,
+    translations.wizard.completion.nextStepProgress,
+    translations.wizard.completion.nextStepStatistics,
+  ];
 
   return (
     <div className="space-y-6">
@@ -15,89 +85,43 @@ export function CompletionStep() {
         <div className="rounded-full bg-success p-4">
           <CheckCircle2 className="h-12 w-12 text-success-foreground" />
         </div>
-        <h2 className="font-bold text-2xl">You're All Set!</h2>
+        <h2 className="font-bold text-2xl">{t(translations.wizard.completion.title)}</h2>
         <p className="max-w-lg text-muted-foreground">
-          Your D2R Arcane Tracker is now configured and ready to track your Holy Grail progress.
+          {t(translations.wizard.completion.description)}
         </p>
       </div>
 
       <div className="space-y-4 rounded-lg border bg-muted/30 p-6">
         <h3 className="flex items-center gap-2 font-semibold text-lg">
           <Sparkles className="h-5 w-5" />
-          Configuration Summary
+          {t(translations.wizard.completion.summary)}
         </h3>
-        <div className="space-y-2 text-sm">
-          <div className="flex justify-between">
-            <span className="text-muted-foreground">Save Directory:</span>
-            <span className="font-medium">{settings.saveDir ? 'Configured' : 'Not set'}</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-muted-foreground">Game Mode:</span>
-            <span className="font-medium">{settings.gameMode || 'Both'}</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-muted-foreground">Game Version:</span>
-            <span className="font-medium">{settings.gameVersion || 'Resurrected'}</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-muted-foreground">Normal Items:</span>
-            <span className="font-medium">
-              {(settings.grailNormal ?? true) ? 'Enabled' : 'Disabled'}
-            </span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-muted-foreground">Ethereal Items:</span>
-            <span className="font-medium">{settings.grailEthereal ? 'Enabled' : 'Disabled'}</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-muted-foreground">Runes:</span>
-            <span className="font-medium">{settings.grailRunes ? 'Enabled' : 'Disabled'}</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-muted-foreground">Runewords:</span>
-            <span className="font-medium">{settings.grailRunewords ? 'Enabled' : 'Disabled'}</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-muted-foreground">Theme:</span>
-            <span className="font-medium capitalize">{settings.theme || 'system'}</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-muted-foreground">Notifications:</span>
-            <span className="font-medium">
-              {(settings.enableSounds ?? true) ? 'Enabled' : 'Disabled'}
-            </span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-muted-foreground">Widget:</span>
-            <span className="font-medium">{settings.widgetEnabled ? 'Enabled' : 'Disabled'}</span>
-          </div>
-        </div>
+        <dl className="space-y-2 text-sm">
+          {summaryRows.map((row) => (
+            <div key={row.labelKey} className="flex justify-between">
+              <dt className="text-muted-foreground">{t(row.labelKey)}</dt>
+              <dd className="font-medium">{row.value}</dd>
+            </div>
+          ))}
+        </dl>
       </div>
 
       <div className="rounded-lg border-2 border-primary/50 border-dashed bg-primary/5 p-6">
-        <h3 className="font-semibold text-lg">Next Steps</h3>
-        <ul className="mt-3 space-y-2 text-sm">
-          <li className="flex items-start gap-2">
-            <span className="text-primary">1.</span>
-            <span>Start playing Diablo II: Resurrected</span>
-          </li>
-          <li className="flex items-start gap-2">
-            <span className="text-primary">2.</span>
-            <span>The tracker will automatically monitor your save files</span>
-          </li>
-          <li className="flex items-start gap-2">
-            <span className="text-primary">3.</span>
-            <span>View your progress in the main tracker interface</span>
-          </li>
-          <li className="flex items-start gap-2">
-            <span className="text-primary">4.</span>
-            <span>Check statistics to see your completion percentage</span>
-          </li>
-        </ul>
+        <h3 className="font-semibold text-lg">{t(translations.wizard.completion.nextSteps)}</h3>
+        <ol className="mt-3 space-y-2 text-sm">
+          {nextSteps.map((key, index) => (
+            <li key={key} className="flex items-start gap-2">
+              <span className="text-primary" aria-hidden="true">
+                {index + 1}.
+              </span>
+              <span>{t(key)}</span>
+            </li>
+          ))}
+        </ol>
       </div>
 
       <div className="text-center text-muted-foreground text-sm">
-        Click Finish to save your settings and start using D2R Arcane Tracker!
+        {t(translations.wizard.completion.finishHint)}
       </div>
     </div>
   );

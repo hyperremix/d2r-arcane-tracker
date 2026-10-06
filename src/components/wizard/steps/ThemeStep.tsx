@@ -1,5 +1,7 @@
+import type { LucideIcon } from 'lucide-react';
 import { Monitor, Moon, Sun } from 'lucide-react';
 import { useId } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Label } from '@/components/ui/label';
 import {
   Select,
@@ -8,15 +10,33 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { translations } from '@/i18n/translations';
+import { themeLabelKeys } from '@/lib/labelKeys';
 import { useGrailStore } from '@/stores/grailStore';
 
 /**
- * ThemeStep component - Step for selecting the app theme.
+ * A selectable theme with its icon; labels come from the shared theme label keys.
+ */
+interface ThemeOption {
+  value: 'light' | 'dark' | 'system';
+  Icon: LucideIcon;
+}
+
+const themeOptions: ThemeOption[] = [
+  { value: 'light', Icon: Sun },
+  { value: 'dark', Icon: Moon },
+  { value: 'system', Icon: Monitor },
+];
+
+/**
+ * ThemeStep component - Theme section of the wizard Preferences step.
  * Allows users to choose between Light, Dark, or System theme.
- * @returns {JSX.Element} Theme selection step content
+ * @returns {JSX.Element} Theme selection section content
  */
 export function ThemeStep() {
+  const { t } = useTranslation();
   const themeId = useId();
+  const headingId = useId();
   const { settings, setSettings } = useGrailStore();
   const theme = settings.theme || 'system';
 
@@ -36,18 +56,20 @@ export function ThemeStep() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="space-y-2">
+    <section aria-labelledby={headingId} className="space-y-4">
+      <div className="space-y-1">
         <div className="flex items-center gap-2">
           {getThemeIcon()}
-          <h2 className="font-bold text-2xl">Appearance</h2>
+          <h3 id={headingId} className="font-semibold text-lg">
+            {t(translations.settings.theme.appearance)}
+          </h3>
         </div>
-        <p className="text-muted-foreground">Choose your preferred theme for the application.</p>
+        <p className="text-muted-foreground text-sm">{t(translations.wizard.theme.description)}</p>
       </div>
 
       <div className="space-y-4">
         <div className="space-y-2">
-          <Label htmlFor={themeId}>Select Theme</Label>
+          <Label htmlFor={themeId}>{t(translations.settings.theme.selectTheme)}</Label>
           <Select
             value={theme}
             onValueChange={(value) =>
@@ -55,27 +77,19 @@ export function ThemeStep() {
             }
           >
             <SelectTrigger id={themeId}>
-              <SelectValue placeholder="Select theme" />
+              <SelectValue placeholder={t(translations.settings.theme.selectThemePlaceholder)}>
+                {t(themeLabelKeys[theme])}
+              </SelectValue>
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="light">
-                <div className="flex items-center gap-2">
-                  <Sun className="h-4 w-4" />
-                  Light
-                </div>
-              </SelectItem>
-              <SelectItem value="dark">
-                <div className="flex items-center gap-2">
-                  <Moon className="h-4 w-4" />
-                  Dark
-                </div>
-              </SelectItem>
-              <SelectItem value="system">
-                <div className="flex items-center gap-2">
-                  <Monitor className="h-4 w-4" />
-                  System
-                </div>
-              </SelectItem>
+              {themeOptions.map(({ value, Icon }) => (
+                <SelectItem key={value} value={value}>
+                  <div className="flex items-center gap-2">
+                    <Icon className="h-4 w-4" />
+                    {t(themeLabelKeys[value])}
+                  </div>
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>
@@ -84,11 +98,13 @@ export function ThemeStep() {
         <div className="rounded-lg border p-6">
           <div className="flex items-center justify-between">
             <div className="space-y-1">
-              <p className="font-medium text-sm">Preview</p>
+              <p className="font-medium text-sm">{t(translations.wizard.theme.preview)}</p>
               <p className="text-muted-foreground text-xs">
                 {theme === 'system'
-                  ? 'Automatically matches your operating system appearance'
-                  : `${theme.charAt(0).toUpperCase() + theme.slice(1)} theme selected`}
+                  ? t(translations.wizard.theme.previewSystem)
+                  : t(translations.wizard.theme.previewSelected, {
+                      theme: t(themeLabelKeys[theme]),
+                    })}
               </p>
             </div>
             <div className="flex gap-2">
@@ -101,11 +117,10 @@ export function ThemeStep() {
 
         <div className="rounded-lg bg-info/10 p-4">
           <p className="text-info text-sm">
-            <strong>Note:</strong> System theme will automatically match your operating system's
-            appearance preference and update when it changes.
+            <strong>{t(translations.common.note)}</strong> {t(translations.settings.theme.note)}
           </p>
         </div>
       </div>
-    </div>
+    </section>
   );
 }

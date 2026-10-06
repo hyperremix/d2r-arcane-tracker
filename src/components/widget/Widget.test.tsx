@@ -1,6 +1,7 @@
 import { render } from '@testing-library/react';
 import type {
   GrailProgress,
+  GrailStatistics,
   Item,
   Run,
   RunItem,
@@ -8,9 +9,12 @@ import type {
   SessionStats,
   Settings,
 } from 'electron/types/grail';
-import { describe, expect, it, vi } from 'vitest';
+import i18n from 'i18next';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useRunTrackerStore } from '@/stores/runTrackerStore';
 import { Widget } from './Widget';
+
+const widgetTestState = vi.hoisted(() => ({ hideSession: false }));
 
 // Minimal mocks for zustand stores used by Widget
 vi.mock('@/stores/runTrackerStore', () => {
@@ -85,12 +89,13 @@ vi.mock('@/stores/runTrackerStore', () => {
   const mockStore = {
     useRunTrackerStore: () => ({
       activeRun: null,
-      activeSession: session,
+      activeSession: widgetTestState.hideSession ? null : session,
       runs,
       runItems,
       getSessionStats: () => sessionStats,
       loadSessionRuns,
       loadRunItems,
+      addManualRunItem: vi.fn().mockResolvedValue(undefined),
       refreshActiveRun: vi.fn().mockResolvedValue(undefined),
       handleSessionStarted: vi.fn(),
       handleSessionEnded: vi.fn(),
@@ -153,6 +158,34 @@ vi.mock('@/stores/grailStore', () => {
       setSettings: async () => ({}),
     }),
   };
+});
+
+/**
+ * The mocked run tracker store is shared by every test in this file (and by the whole run, since
+ * test files share one module registry), so snapshot and restore the maps tests mutate.
+ */
+interface RunStoreMaps {
+  runs: Map<string, Run[]>;
+  runItems: Map<string, RunItem[]>;
+}
+
+let runStoreSnapshot: { runs: [string, Run[]][]; runItems: [string, RunItem[]][] };
+
+beforeEach(() => {
+  const store = useRunTrackerStore() as unknown as RunStoreMaps;
+  runStoreSnapshot = { runs: [...store.runs], runItems: [...store.runItems] };
+});
+
+afterEach(() => {
+  const store = useRunTrackerStore() as unknown as RunStoreMaps;
+  store.runs.clear();
+  store.runItems.clear();
+  for (const [key, value] of runStoreSnapshot.runs) {
+    store.runs.set(key, value);
+  }
+  for (const [key, value] of runStoreSnapshot.runItems) {
+    store.runItems.set(key, value);
+  }
 });
 
 describe('Widget run-only item list', () => {
@@ -262,7 +295,7 @@ describe('Widget run-only item list', () => {
     store.loadSessionRuns.mockClear();
     store.loadRunItems.mockClear();
 
-    // Act - initial render triggers data loading effect
+    // Act - the initial render triggers the data loading effect
     render(
       <Widget
         statistics={null}
@@ -272,15 +305,8 @@ describe('Widget run-only item list', () => {
       />,
     );
 
-    // Simulate run-item-added IPC event for each run by directly invoking the store-side effect
-    sessionRuns.forEach((run) => {
-      const { loadRunItems } = useRunTrackerStore.getState() as unknown as {
-        loadRunItems: (runId: string) => Promise<void>;
-      };
-      loadRunItems(run.id);
-    });
-
-    // Assert - loadRunItems should have been called for each run in response to events
+    // Assert - loadRunItems is called once for each run that is missing its items
+    expect(sessionRuns.length).toBeGreaterThan(0);
     expect(store.loadRunItems).toHaveBeenCalledTimes(sessionRuns.length);
     for (const run of sessionRuns) {
       expect(store.loadRunItems).toHaveBeenCalledWith(run.id);
@@ -342,5 +368,350 @@ describe('Widget run-only item list', () => {
     // Also verify that "Test Item" appears only once
     const itemElements = getAllByText('Test Item');
     expect(itemElements.length).toBe(1);
+  });
+});
+
+describe('Widget display and legibility', () => {
+  beforeAll(() => {
+    // ProgressGauge animations rely on IntersectionObserver, which jsdom does not provide
+    vi.stubGlobal(
+      'IntersectionObserver',
+      class {
+        observe = vi.fn();
+        unobserve = vi.fn();
+        disconnect = vi.fn();
+        takeRecords = vi.fn(() => []);
+      },
+    );
+    // framer-motion reads matchMedia for reduced-motion, which jsdom does not provide
+    vi.stubGlobal(
+      'matchMedia',
+      vi.fn().mockReturnValue({
+        matches: false,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      }),
+    );
+  });
+
+  afterAll(() => {
+    vi.unstubAllGlobals();
+  });
+
+  const statistics: GrailStatistics = {
+    totalItems: 100,
+    foundItems: 40,
+    completionPercentage: 40,
+    recentFinds: 0,
+    normalItems: { total: 60, found: 30 },
+    etherealItems: { total: 40, found: 10 },
+    currentStreak: 0,
+    maxStreak: 0,
+  };
+
+  it('If split mode is stored but ethereal tracking is off, Then the widget falls back to overall', () => {
+    // Arrange
+    const settings: Partial<Settings> = { widgetDisplay: 'split', grailEthereal: false };
+
+    // Act
+    const { getAllByText, queryAllByText } = render(
+      <Widget
+        statistics={statistics}
+        settings={settings}
+        onDragStart={() => ({})}
+        onDragEnd={() => ({})}
+      />,
+    );
+
+    // Assert
+    expect(getAllByText('Overall').length).toBeGreaterThan(0);
+    expect(queryAllByText('Normal')).toHaveLength(0);
+    expect(queryAllByText('Ethereal')).toHaveLength(0);
+  });
+
+  it('If split mode is stored and ethereal tracking is on, Then normal and ethereal gauges render', () => {
+    // Arrange
+    const settings: Partial<Settings> = { widgetDisplay: 'split', grailEthereal: true };
+
+    // Act
+    const { getAllByText, queryAllByText } = render(
+      <Widget
+        statistics={statistics}
+        settings={settings}
+        onDragStart={() => ({})}
+        onDragEnd={() => ({})}
+      />,
+    );
+
+    // Assert
+    expect(getAllByText('Normal').length).toBeGreaterThan(0);
+    expect(getAllByText('Ethereal').length).toBeGreaterThan(0);
+    expect(queryAllByText('Overall')).toHaveLength(0);
+  });
+
+  it('If the stored opacity is below the minimum, Then the background uses the clamped opacity', () => {
+    // Arrange
+    const settings: Partial<Settings> = { widgetDisplay: 'overall', widgetOpacity: 0 };
+
+    // Act
+    const { container } = render(
+      <Widget
+        statistics={statistics}
+        settings={settings}
+        onDragStart={() => ({})}
+        onDragEnd={() => ({})}
+      />,
+    );
+
+    // Assert
+    const root = container.firstElementChild as HTMLElement;
+    expect(root.style.backgroundColor).toBe('rgba(0, 0, 0, 0.3)');
+  });
+
+  it('When gauges render, Then their text uses light overlay colors instead of theme grays', () => {
+    // Arrange
+    const settings: Partial<Settings> = { widgetDisplay: 'overall' };
+
+    // Act
+    const { getByText } = render(
+      <Widget
+        statistics={statistics}
+        settings={settings}
+        onDragStart={() => ({})}
+        onDragEnd={() => ({})}
+      />,
+    );
+
+    // Assert
+    const ratio = getByText('40/100');
+    expect(ratio.className).toContain('text-white/85');
+    expect(ratio.className).not.toContain('text-gray');
+    expect(getByText('Overall', { selector: 'div' }).className).not.toContain('text-gray');
+  });
+
+  it('When the focusable widget root is hovered or focused, Then the drag grip brightens', () => {
+    // Arrange
+    const settings: Partial<Settings> = { widgetDisplay: 'overall' };
+
+    // Act
+    const { getByTestId, container } = render(
+      <Widget
+        statistics={statistics}
+        settings={settings}
+        onDragStart={() => ({})}
+        onDragEnd={() => ({})}
+      />,
+    );
+
+    // Assert
+    const root = container.firstElementChild as HTMLElement;
+    expect(root).toHaveAttribute('role', 'button');
+    expect(root).toHaveAttribute('tabindex', '0');
+    expect(root.className).toContain('group');
+    const gripClasses = getByTestId('widget-drag-grip').getAttribute('class') ?? '';
+    expect(gripClasses).toContain('opacity-30');
+    expect(gripClasses).toContain('group-hover:opacity-80');
+    expect(gripClasses).toContain('group-focus-visible:opacity-80');
+  });
+
+  it('When the widget renders, Then it shows a decorative drag grip that ignores pointer events', () => {
+    // Arrange
+    const settings: Partial<Settings> = { widgetDisplay: 'overall' };
+
+    // Act
+    const { getByTestId, container } = render(
+      <Widget
+        statistics={statistics}
+        settings={settings}
+        onDragStart={() => ({})}
+        onDragEnd={() => ({})}
+      />,
+    );
+
+    // Assert
+    const grip = getByTestId('widget-drag-grip');
+    expect(grip).toHaveAttribute('aria-hidden', 'true');
+    expect(grip.getAttribute('class')).toContain('pointer-events-none');
+    const root = container.firstElementChild as HTMLElement;
+    expect(root.style.cursor).toBe('move');
+    expect(root).toContainElement(grip);
+  });
+});
+
+describe('Widget localization', () => {
+  const originalBundle = structuredClone(i18n.getResourceBundle('en', 'common'));
+
+  beforeAll(() => {
+    vi.stubGlobal(
+      'IntersectionObserver',
+      class {
+        observe = vi.fn();
+        unobserve = vi.fn();
+        disconnect = vi.fn();
+        takeRecords = vi.fn(() => []);
+      },
+    );
+    vi.stubGlobal(
+      'matchMedia',
+      vi.fn().mockReturnValue({
+        matches: false,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      }),
+    );
+  });
+
+  afterEach(() => {
+    widgetTestState.hideSession = false;
+    i18n.addResourceBundle('en', 'common', originalBundle, true, true);
+  });
+
+  afterAll(() => {
+    vi.unstubAllGlobals();
+  });
+
+  /**
+   * Replaces the English strings the widget uses with marked values so untranslated literals stand out.
+   */
+  function markTranslations() {
+    i18n.addResourceBundle(
+      'en',
+      'common',
+      {
+        common: { loading: 'tr:loading' },
+        grail: { itemCard: { normal: 'tr:normal' } },
+        settings: { widget: { overall: 'tr:overall' } },
+        runTracker: {
+          controls: { startRunFirst: 'tr:startRunFirst' },
+          sessionCard: { noActiveSession: 'tr:noActiveSession' },
+        },
+        widget: {
+          ethereal: 'tr:ethereal',
+          startSessionPrompt: 'tr:startSessionPrompt',
+          run: 'tr:run',
+          current: 'tr:current',
+          fastest: 'tr:fastest',
+          average: 'tr:average',
+          runItems: 'tr:runItems',
+          addItemPlaceholder: 'tr:addItemPlaceholder',
+        },
+      },
+      true,
+      true,
+    );
+  }
+
+  const renderWidget = (settings: Partial<Settings>, statistics: GrailStatistics | null) =>
+    render(
+      <Widget
+        statistics={statistics}
+        settings={settings}
+        onDragStart={() => ({})}
+        onDragEnd={() => ({})}
+      />,
+    );
+
+  it('If there is no active session in run-only mode, Then the status copy is translated', () => {
+    // Arrange
+    markTranslations();
+    widgetTestState.hideSession = true;
+
+    // Act
+    const { getByText } = renderWidget({ widgetDisplay: 'run-only' }, null);
+
+    // Assert
+    expect(getByText('tr:noActiveSession')).toBeDefined();
+    expect(getByText('tr:startSessionPrompt')).toBeDefined();
+  });
+
+  it('If a session is active in run-only mode, Then the labels and placeholder are translated', () => {
+    // Arrange
+    markTranslations();
+    const store = useRunTrackerStore() as unknown as {
+      runs: Map<string, Run[]>;
+      activeSession: Session;
+    };
+    store.runs.set(store.activeSession.id, [
+      {
+        id: 'run-l10n',
+        sessionId: store.activeSession.id,
+        runNumber: 1,
+        startTime: new Date(),
+        created: new Date(),
+        lastUpdated: new Date(),
+      },
+    ]);
+
+    // Act
+    const { getByText, getByPlaceholderText } = renderWidget(
+      { widgetDisplay: 'run-only', widgetRunOnlyShowItems: true },
+      null,
+    );
+
+    // Assert
+    expect(getByText('tr:run')).toBeDefined();
+    expect(getByText('tr:current')).toBeDefined();
+    expect(getByText('tr:fastest')).toBeDefined();
+    expect(getByText('tr:average')).toBeDefined();
+    expect(getByText('tr:runItems')).toBeDefined();
+    expect(getByPlaceholderText('tr:addItemPlaceholder')).toBeDefined();
+  });
+
+  it('If a session has no runs yet, Then the add item placeholder asks to start a run in translated copy', () => {
+    // Arrange
+    markTranslations();
+    const store = useRunTrackerStore() as unknown as {
+      runs: Map<string, Run[]>;
+    };
+    store.runs.clear();
+
+    // Act
+    const { getByPlaceholderText } = renderWidget(
+      { widgetDisplay: 'run-only', widgetRunOnlyShowItems: true },
+      null,
+    );
+
+    // Assert
+    expect(getByPlaceholderText('tr:startRunFirst')).toBeDefined();
+  });
+
+  it('If statistics are not loaded yet, Then the loading message is translated', () => {
+    // Arrange
+    markTranslations();
+
+    // Act
+    const { getByText } = renderWidget({ widgetDisplay: 'overall' }, null);
+
+    // Assert
+    expect(getByText('tr:loading')).toBeDefined();
+  });
+
+  it('If gauges are shown, Then their labels are translated', () => {
+    // Arrange
+    markTranslations();
+    const statistics: GrailStatistics = {
+      totalItems: 100,
+      foundItems: 40,
+      completionPercentage: 40,
+      recentFinds: 0,
+      normalItems: { total: 60, found: 30 },
+      etherealItems: { total: 40, found: 10 },
+      currentStreak: 0,
+      maxStreak: 0,
+    };
+
+    // Act
+    const overall = renderWidget({ widgetDisplay: 'overall' }, statistics);
+
+    // Assert
+    expect(overall.getAllByText('tr:overall').length).toBeGreaterThan(0);
+    overall.unmount();
+
+    // Act
+    const split = renderWidget({ widgetDisplay: 'split', grailEthereal: true }, statistics);
+
+    // Assert
+    expect(split.getAllByText('tr:normal').length).toBeGreaterThan(0);
+    expect(split.getAllByText('tr:ethereal').length).toBeGreaterThan(0);
   });
 });

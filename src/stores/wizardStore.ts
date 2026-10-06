@@ -10,6 +10,8 @@ interface WizardState {
   isOpen: boolean;
   currentStep: number;
   totalSteps: number;
+  /** Validation results reported by steps that must be completed before proceeding, keyed by step id. */
+  stepValidity: Record<string, boolean>;
 
   // Actions
   openWizard: () => void;
@@ -18,6 +20,7 @@ interface WizardState {
   previousStep: () => void;
   jumpToStep: (step: number) => void;
   skip: () => void;
+  setStepValidity: (stepId: string, isValid: boolean) => void;
 }
 
 /**
@@ -28,13 +31,15 @@ export const useWizardStore = create<WizardState>((set) => ({
   // Initial state
   isOpen: false,
   currentStep: 0,
-  totalSteps: 9, // Welcome, Save Dir, Game Mode, Game Version, Grail, Theme, Notifications, Widget, Completion
+  totalSteps: 8, // Welcome, Save Dir, D2R Installation, Game Mode, Game Version, Grail, Preferences, Completion
+  stepValidity: {},
 
   // Actions
   openWizard: () =>
     set({
       isOpen: true,
       currentStep: 0,
+      stepValidity: {},
     }),
 
   closeWizard: () =>
@@ -63,4 +68,11 @@ export const useWizardStore = create<WizardState>((set) => ({
       isOpen: false,
       currentStep: 0,
     }),
+
+  setStepValidity: (stepId: string, isValid: boolean) =>
+    set((state) =>
+      state.stepValidity[stepId] === isValid
+        ? state
+        : { stepValidity: { ...state.stepValidity, [stepId]: isValid } },
+    ),
 }));

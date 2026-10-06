@@ -1,0 +1,235 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { Settings } from '../types/grail';
+
+interface MockWindow {
+  options: { width: number; height: number };
+  handlers: Map<string, (...args: unknown[]) => void>;
+  setBounds: ReturnType<typeof vi.fn>;
+}
+
+const created = vi.hoisted(() => ({ windows: [] as unknown[] }));
+
+vi.mock('electron', () => {
+  class BrowserWindow {
+    options: { width: number; height: number };
+    handlers = new Map<string, (...args: unknown[]) => void>();
+    setBounds = vi.fn();
+    setAlwaysOnTop = vi.fn();
+    loadURL = vi.fn();
+    loadFile = vi.fn();
+    getBounds = vi.fn(() => ({ x: 10, y: 20, width: 111, height: 222 }));
+    isDestroyed = vi.fn(() => false);
+
+    constructor(options: { width: number; height: number }) {
+      this.options = options;
+      created.windows.push(this);
+    }
+
+    on(event: string, handler: (...args: unknown[]) => void) {
+      this.handlers.set(event, handler);
+    }
+  }
+
+  return {
+    BrowserWindow,
+    screen: {
+      getAllDisplays: () => [{ bounds: { x: 0, y: 0, width: 1920, height: 1080 } }],
+      getPrimaryDisplay: () => ({
+        bounds: { x: 0, y: 0, width: 1920, height: 1080 },
+        workArea: { x: 0, y: 0, width: 1920, height: 1080 },
+      }),
+      getDisplayNearestPoint: vi.fn(),
+    },
+  };
+});
+
+import { createWidgetWindow, resetWidgetWindowSize, updateWidgetWindowSize } from './widgetWindow';
+
+const overallSize = { width: 250, height: 250 };
+const splitSize = { width: 350, height: 250 };
+
+describe('widgetWindow display mode resolution', () => {
+  beforeEach(() => {
+    created.windows.length = 0;
+  });
+
+  it('If split mode is stored but ethereal tracking is off, Then the window uses the overall size', () => {
+    // Arrange
+    const settings: Partial<Settings> = { widgetDisplay: 'split', grailEthereal: false };
+
+    // Act
+    createWidgetWindow(settings, '/app');
+
+    // Assert
+    const window = created.windows[0] as MockWindow;
+    expect(window.options.width).toBe(overallSize.width);
+    expect(window.options.height).toBe(overallSize.height);
+  });
+
+  it('If split mode is stored and ethereal tracking is on, Then the window uses the split size', () => {
+    // Arrange
+    const settings: Partial<Settings> = { widgetDisplay: 'split', grailEthereal: true };
+
+    // Act
+    createWidgetWindow(settings, '/app');
+
+    // Assert
+    const window = created.windows[0] as MockWindow;
+    expect(window.options.width).toBe(splitSize.width);
+    expect(window.options.height).toBe(splitSize.height);
+  });
+
+  it('If the window is resized while split falls back to overall, Then the size is saved for overall', () => {
+    // Arrange
+    const onSizeChange = vi.fn();
+    createWidgetWindow(
+      { widgetDisplay: 'split', grailEthereal: false },
+      '/app',
+      undefined,
+      undefined,
+      undefined,
+      onSizeChange,
+    );
+    const window = created.windows[0] as MockWindow;
+
+    // Act
+    window.handlers.get('resize')?.();
+
+    // Assert
+    expect(onSizeChange).toHaveBeenCalledWith('overall', { width: 111, height: 222 });
+  });
+
+  it('When the display mode is updated to split without ethereal tracking, Then the overall size is applied', () => {
+    // Arrange
+    createWidgetWindow({ widgetDisplay: 'overall', grailEthereal: false }, '/app');
+    const window = created.windows[0] as MockWindow;
+
+    // Act
+    updateWidgetWindowSize('split', { grailEthereal: false });
+
+    // Assert
+    expect(window.setBounds).toHaveBeenCalledWith({ x: 10, y: 20, ...overallSize });
+  });
+
+  it('When the size is reset for a known mode, Then the default size of that mode is applied', () => {
+    // Arrange
+    createWidgetWindow({ widgetDisplay: 'overall' }, '/app');
+    const window = created.windows[0] as MockWindow;
+
+    // Act
+    const size = resetWidgetWindowSize('split');
+
+    // Assert
+    expect(size).toEqual(splitSize);
+    expect(window.setBounds).toHaveBeenCalledWith({ x: 10, y: 20, ...splitSize });
+  });
+
+  it('If the size is reset for an unknown mode, Then nothing is applied', () => {
+    // Arrange
+    createWidgetWindow({ widgetDisplay: 'overall' }, '/app');
+    const window = created.windows[0] as MockWindow;
+    const unknownMode = 'constructor' as unknown as Parameters<typeof resetWidgetWindowSize>[0];
+
+    // Act
+    const size = resetWidgetWindowSize(unknownMode);
+
+    // Assert
+    expect(size).toBeNull();
+    expect(window.setBounds).not.toHaveBeenCalled();
+  });
+
+  it('When the display mode is switched after creation, Then a resize is saved under the new mode', () => {
+    // Arrange
+    const onSizeChange = vi.fn();
+    createWidgetWindow(
+      { widgetDisplay: 'overall', grailEthereal: true },
+      '/app',
+      undefined,
+      undefined,
+      undefined,
+      onSizeChange,
+    );
+    const window = created.windows[0] as MockWindow;
+    updateWidgetWindowSize('split', { widgetDisplay: 'split', grailEthereal: true });
+
+    // Act
+    window.handlers.get('resize')?.();
+
+    // Assert
+    expect(onSizeChange).toHaveBeenLastCalledWith('split', { width: 111, height: 222 });
+  });
+
+  it('If ethereal tracking is toggled off after creation, Then a resize is saved under overall', () => {
+    // Arrange
+    const onSizeChange = vi.fn();
+    const stored: Partial<Settings> = { widgetDisplay: 'split', grailEthereal: true };
+    createWidgetWindow(stored, '/app', undefined, undefined, undefined, onSizeChange);
+    const window = created.windows[0] as MockWindow;
+    updateWidgetWindowSize('overall', { ...stored, grailEthereal: false });
+
+    // Act
+    window.handlers.get('resize')?.();
+
+    // Assert
+    expect(onSizeChange).toHaveBeenLastCalledWith('overall', { width: 111, height: 222 });
+  });
+
+  it('If ethereal tracking is toggled back on, Then a resize is saved under split again', () => {
+    // Arrange
+    const onSizeChange = vi.fn();
+    const stored: Partial<Settings> = { widgetDisplay: 'split', grailEthereal: true };
+    createWidgetWindow(stored, '/app', undefined, undefined, undefined, onSizeChange);
+    const window = created.windows[0] as MockWindow;
+    updateWidgetWindowSize('overall', { ...stored, grailEthereal: false });
+    updateWidgetWindowSize('split', { ...stored, grailEthereal: true });
+
+    // Act
+    window.handlers.get('resize')?.();
+
+    // Assert
+    expect(onSizeChange).toHaveBeenLastCalledWith('split', { width: 111, height: 222 });
+  });
+
+  it('If resizing the window synchronously emits a resize event, Then the size is saved under the new mode', () => {
+    // Arrange
+    const onSizeChange = vi.fn();
+    createWidgetWindow(
+      { widgetDisplay: 'overall', grailEthereal: true },
+      '/app',
+      undefined,
+      undefined,
+      undefined,
+      onSizeChange,
+    );
+    const window = created.windows[0] as MockWindow;
+    window.setBounds.mockImplementation(() => window.handlers.get('resize')?.());
+
+    // Act
+    updateWidgetWindowSize('split', { widgetDisplay: 'split', grailEthereal: true });
+
+    // Assert
+    expect(onSizeChange).toHaveBeenCalledTimes(1);
+    expect(onSizeChange).toHaveBeenCalledWith('split', { width: 111, height: 222 });
+  });
+
+  it('When the size is reset for a mode, Then a following resize is saved under that mode', () => {
+    // Arrange
+    const onSizeChange = vi.fn();
+    createWidgetWindow(
+      { widgetDisplay: 'overall', grailEthereal: true },
+      '/app',
+      undefined,
+      undefined,
+      undefined,
+      onSizeChange,
+    );
+    const window = created.windows[0] as MockWindow;
+
+    // Act
+    resetWidgetWindowSize('all');
+    window.handlers.get('resize')?.();
+
+    // Assert
+    expect(onSizeChange).toHaveBeenLastCalledWith('all', { width: 111, height: 222 });
+  });
+});
