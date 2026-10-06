@@ -87,6 +87,7 @@ beforeAll(async () => {
   }));
 
   vi.doMock('./stashFormat', () => ({
+    D2I_SECTOR_HEADER_SIZE,
     readD2iMetadata: mockReadD2iMetadata,
   }));
 

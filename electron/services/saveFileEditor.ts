@@ -14,7 +14,7 @@ import { writeFileAtomic } from '../utils/atomicWrite';
 import { createBoundedBitReader } from './boundedBitReader';
 import { constants105Extended, resolveStackCount, SHARED_TAB_COUNT } from './modernStashParser';
 import { backupSaveFile } from './saveFileBackup';
-import { readD2iMetadata } from './stashFormat';
+import { D2I_SECTOR_HEADER_SIZE, readD2iMetadata } from './stashFormat';
 
 interface StashConstants {
   constants: d2sTypes.IConstantData;
@@ -1116,8 +1116,6 @@ async function removeItemFromSaveFileUnlocked(
   await writeClassicStashFile(filePath, data, { constants, version });
 }
 
-// Size in bytes of the sector header in a .d2i file.
-const D2I_SECTOR_HEADER_SIZE = 64;
 // Byte offset within the sector header where the total sector size (header + payload) is stored.
 const D2I_SECTOR_SIZE_FIELD_OFFSET = 16;
 // Resource-stash stack-count magic attribute ID (9-bit unsigned, D2R-only).
