@@ -24,6 +24,7 @@ describe('When InventorySnapshotWindowApp is rendered', () => {
     vi.clearAllMocks();
 
     Object.defineProperty(window, 'electronAPI', {
+      configurable: true,
       writable: true,
       value: {
         platform: 'darwin',

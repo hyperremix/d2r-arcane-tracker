@@ -1,10 +1,6 @@
-import type { Item, VaultItem, VaultItemUpsertInput } from 'electron/types/grail';
-import { GRAIL_BOOKMARK_FINGERPRINT_PREFIX } from 'electron/utils/vaultState';
-import { Archive, ArchiveRestore } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import type { Item } from 'electron/types/grail';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { toast } from 'sonner';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -20,42 +16,17 @@ import { cn } from '@/lib/utils';
 import { useGrailStore } from '@/stores/grailStore';
 import placeholderUrl from '/images/placeholder-item.svg';
 import { RuneImages } from '../RuneImages';
+import { BookmarkAction, BookmarkStatusSection } from './BookmarkControls';
 import { CharacterProgressTable } from './CharacterProgressTable';
 import { ItemInfoSection } from './ItemInfoSection';
 import { MarkAsFoundDialog } from './MarkAsFoundDialog';
 import { ProgressStatusSection } from './ProgressStatusSection';
+import { useGrailBookmark } from './useGrailBookmark';
 
 interface ItemDetailsDialogProps {
   itemId: string | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-}
-
-function toGrailBookmarkFingerprint(item: Item): string {
-  return `${GRAIL_BOOKMARK_FINGERPRINT_PREFIX}${item.id}`;
-}
-
-function toBookmarkUpsertInput(item: Item): VaultItemUpsertInput {
-  return {
-    fingerprint: toGrailBookmarkFingerprint(item),
-    itemName: item.name,
-    itemCode: item.code,
-    type: item.type,
-    quality: item.type,
-    ethereal: item.etherealType === 'only',
-    rawItemJson: JSON.stringify(item),
-    sourceCharacterName: 'Grail Tracker',
-    sourceFileType: 'd2s',
-    locationContext: 'unknown',
-    grailItemId: item.id,
-    isPresentInLatestScan: false,
-  };
-}
-
-// Only the bookmark created by this dialog may be linked (and later deleted). Real vaulted items
-// carry the same grailItemId, but their vault row is the only copy of that item.
-function findLinkedBookmark(vaultItems: VaultItem[], item: Item): VaultItem | undefined {
-  return vaultItems.find((vaultItem) => vaultItem.fingerprint === toGrailBookmarkFingerprint(item));
 }
 
 /**
@@ -83,8 +54,6 @@ function MarkAsFoundAction({ item }: { item: Item }) {
 export function ItemDetailsDialog({ itemId, open, onOpenChange }: ItemDetailsDialogProps) {
   const { t } = useTranslation();
   const { items, progress, characters, removeProgress, settings } = useGrailStore();
-  const [isBookmarkActionPending, setIsBookmarkActionPending] = useState(false);
-  const [linkedBookmark, setLinkedBookmark] = useState<VaultItem | undefined>(undefined);
 
   const item = useMemo(() => {
     if (!itemId) {
@@ -113,63 +82,11 @@ export function ItemDetailsDialog({ itemId, open, onOpenChange }: ItemDetailsDia
   };
   const { iconUrl, isLoading } = useItemIcon(item || placeholderItem);
 
-  const loadBookmarkMetadata = useCallback(async (): Promise<void> => {
-    if (!item || !open || !window.electronAPI?.vault) {
-      return;
-    }
-
-    const searchResult = await window.electronAPI.vault.search({
-      text: item.name,
-      presentState: 'all',
-      page: 1,
-      pageSize: 100,
-    });
-
-    setLinkedBookmark(findLinkedBookmark(searchResult.items, item));
-  }, [item, open]);
-
-  useEffect(() => {
-    loadBookmarkMetadata().catch((error: unknown) => {
-      console.error('Failed to load bookmark metadata', error);
-      toast.error(t(translations.grail.itemDetails.bookmarkLoadError));
-    });
-  }, [loadBookmarkMetadata, t]);
-
-  const handleBookmarkAction = useCallback(async (): Promise<void> => {
-    if (!item || isBookmarkActionPending || !window.electronAPI?.vault) {
-      return;
-    }
-
-    setIsBookmarkActionPending(true);
-    const previousBookmark = linkedBookmark;
-
-    try {
-      if (linkedBookmark) {
-        setLinkedBookmark(undefined);
-        await window.electronAPI.vault.removeItem(linkedBookmark.id);
-      } else {
-        const newBookmark = await window.electronAPI.vault.addItem(toBookmarkUpsertInput(item));
-        setLinkedBookmark(newBookmark);
-      }
-
-      // The write already succeeded: a failed refresh must not roll the optimistic state back.
-      await loadBookmarkMetadata().catch((error: unknown) => {
-        console.error('Failed to refresh bookmark metadata', error);
-        toast.error(t(translations.grail.itemDetails.bookmarkLoadError));
-      });
-    } catch (error) {
-      console.error('Failed to update bookmark', error);
-      toast.error(t(translations.grail.itemDetails.bookmarkActionFailed));
-      setLinkedBookmark(previousBookmark);
-    } finally {
-      setIsBookmarkActionPending(false);
-    }
-  }, [isBookmarkActionPending, item, linkedBookmark, loadBookmarkMetadata, t]);
+  const { linkedBookmark, isBookmarkActionPending, toggleBookmark } = useGrailBookmark(item, open);
 
   if (!item) {
     return null;
   }
-
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -211,18 +128,7 @@ export function ItemDetailsDialog({ itemId, open, onOpenChange }: ItemDetailsDia
             <ItemInfoSection item={item} />
             <ProgressStatusSection item={item} itemProgress={itemProgress} />
 
-            <div className="rounded-lg border p-3">
-              <div className="mb-2 flex items-center justify-between">
-                <div className="font-medium text-sm">
-                  {t(translations.grail.itemDetails.bookmarkStatusTitle)}
-                </div>
-                <Badge variant={linkedBookmark ? 'default' : 'secondary'}>
-                  {linkedBookmark
-                    ? t(translations.grail.itemDetails.bookmarked)
-                    : t(translations.grail.itemDetails.notBookmarked)}
-                </Badge>
-              </div>
-            </div>
+            <BookmarkStatusSection linkedBookmark={linkedBookmark} />
 
             {characters.length > 0 && (
               <CharacterProgressTable
@@ -236,20 +142,11 @@ export function ItemDetailsDialog({ itemId, open, onOpenChange }: ItemDetailsDia
         </div>
 
         <DialogFooter>
-          <Button
-            variant="outline"
-            disabled={isBookmarkActionPending}
-            onClick={() => void handleBookmarkAction()}
-          >
-            {linkedBookmark ? (
-              <ArchiveRestore className="mr-1 h-4 w-4" />
-            ) : (
-              <Archive className="mr-1 h-4 w-4" />
-            )}
-            {linkedBookmark
-              ? t(translations.grail.itemDetails.unbookmarkAction)
-              : t(translations.grail.itemDetails.bookmarkAction)}
-          </Button>
+          <BookmarkAction
+            linkedBookmark={linkedBookmark}
+            isPending={isBookmarkActionPending}
+            onToggle={toggleBookmark}
+          />
           <MarkAsFoundAction key={item.id} item={item} />
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             {t(translations.common.close)}

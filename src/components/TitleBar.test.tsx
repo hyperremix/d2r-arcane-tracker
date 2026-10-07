@@ -86,6 +86,7 @@ describe('When TitleBar is rendered', () => {
       'Statistics',
       'Runs',
       'Runewords',
+      'Inventory Browser',
       'Terror Zones',
       'Settings',
     ]);

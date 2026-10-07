@@ -25,6 +25,7 @@ describe('When useSpriteIcon is used', () => {
     }));
 
     Object.defineProperty(window, 'electronAPI', {
+      configurable: true,
       writable: true,
       value: {
         icon: {

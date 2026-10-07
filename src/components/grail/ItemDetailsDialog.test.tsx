@@ -103,6 +103,7 @@ describe('When ItemDetailsDialog is rendered', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     Object.defineProperty(window, 'electronAPI', {
+      configurable: true,
       writable: true,
       value: {
         vault: {

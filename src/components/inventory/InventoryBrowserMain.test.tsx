@@ -15,6 +15,7 @@ describe('When InventoryBrowserMain is rendered', () => {
     useGrailStore.setState({ items: [] });
 
     Object.defineProperty(window, 'electronAPI', {
+      configurable: true,
       writable: true,
       value: {
         grail: {

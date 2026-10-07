@@ -149,6 +149,7 @@ describe('When loadInventorySearchResponse is called', () => {
     searchAll.mockReset();
     vaultSearch.mockReset();
     Object.defineProperty(window, 'electronAPI', {
+      configurable: true,
       value: { inventory: { searchAll }, vault: { search: vaultSearch } },
       writable: true,
     });

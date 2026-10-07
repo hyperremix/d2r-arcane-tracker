@@ -79,6 +79,7 @@ describe('When CharacterInventoryBrowser is rendered', () => {
     useGrailStore.setState({ items: [] });
 
     Object.defineProperty(window, 'electronAPI', {
+      configurable: true,
       writable: true,
       value: {
         inventory: {
@@ -311,6 +312,7 @@ describe('When CharacterInventoryBrowser is rendered', () => {
       ];
       const grailGetItemsMock = vi.fn().mockResolvedValue(grailItems);
       Object.defineProperty(window, 'electronAPI', {
+        configurable: true,
         writable: true,
         value: {
           inventory: {
