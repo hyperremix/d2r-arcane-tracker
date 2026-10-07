@@ -1,4 +1,10 @@
-import type { AdvancedGrailFilter, ItemCategory, ItemType } from 'electron/types/grail';
+import type {
+  AdvancedGrailFilter,
+  Item,
+  ItemCategory,
+  ItemSubCategory,
+  ItemType,
+} from 'electron/types/grail';
 import type { TFunction } from 'i18next';
 import {
   ArrowDownWideNarrow,
@@ -11,7 +17,15 @@ import {
   WandSparkles,
   X,
 } from 'lucide-react';
-import { type ReactNode, useEffect, useId, useMemo, useRef, useState } from 'react';
+import {
+  type KeyboardEvent,
+  type ReactNode,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { useTranslation } from 'react-i18next';
 import { useDebouncedCallback } from 'use-debounce';
 import { Badge } from '@/components/ui/badge';
@@ -29,8 +43,9 @@ import {
 } from '@/components/ui/select';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { translations } from '@/i18n/translations';
+import { subCategoryLabelKeys } from '@/lib/labelKeys';
 import { cn } from '@/lib/utils';
-import { useGrailStore } from '@/stores/grailStore';
+import { useGrailStore, useItemResultCount } from '@/stores/grailStore';
 
 type FoundStatus = 'all' | 'found' | 'missing';
 type SortBy = AdvancedGrailFilter['sortBy'];
@@ -104,6 +119,150 @@ const typeLabelKeys: Record<ItemType, string> = {
 };
 
 /**
+ * Item type colors for the inline type toggle chips, using the shared `--item-*` theme tokens.
+ */
+const typeChipStyles: Record<ItemType, { dot: string; pressed: string }> = {
+  unique: { dot: 'bg-item-unique', pressed: 'border-item-unique bg-item-unique/15' },
+  set: { dot: 'bg-item-set', pressed: 'border-item-set bg-item-set/15' },
+  rune: { dot: 'bg-item-rune', pressed: 'border-item-rune bg-item-rune/15' },
+  runeword: { dot: 'bg-item-runeword', pressed: 'border-item-runeword bg-item-runeword/15' },
+};
+
+/**
+ * Character class sub-categories hold class-specific items. They are listed after the regular
+ * sub-categories (e.g. "Helms", "Shields") of a category.
+ */
+const classSubCategories = new Set<string>([
+  'amazon',
+  'assassin',
+  'barbarian',
+  'druid',
+  'necromancer',
+  'paladin',
+  'sorceress',
+  'shared_stash',
+]);
+
+/**
+ * Sub-categories available for a single category in the filters popover.
+ */
+interface SubCategoryGroup {
+  category: ItemCategory;
+  subCategories: ItemSubCategory[];
+}
+
+/**
+ * Collects the sub-categories present in the loaded items, grouped by the categories offered in
+ * the filters popover. Runes and runewords are skipped since their only sub-category is the
+ * category itself.
+ * @param {Item[]} items - All loaded grail items
+ * @returns {SubCategoryGroup[]} The sub-category groups in category order
+ */
+function getSubCategoryGroups(items: Item[]): SubCategoryGroup[] {
+  const byCategory = new Map<ItemCategory, Set<ItemSubCategory>>();
+  for (const item of items) {
+    let subCategories = byCategory.get(item.category);
+    if (!subCategories) {
+      subCategories = new Set();
+      byCategory.set(item.category, subCategories);
+    }
+    subCategories.add(item.subCategory);
+  }
+
+  return categoryValues.flatMap((category) => {
+    const subCategories = byCategory.get(category);
+    return subCategories && subCategories.size > 0
+      ? [{ category, subCategories: [...subCategories] }]
+      : [];
+  });
+}
+
+/**
+ * Returns the translated label of a sub-category, falling back to the raw value.
+ */
+function getSubCategoryLabel(subCategory: string, t: TFunction): string {
+  const key = subCategoryLabelKeys[subCategory as ItemSubCategory];
+  return key ? t(key) : subCategory;
+}
+
+/**
+ * Orders sub-category options alphabetically, with character class sub-categories last.
+ */
+function compareSubCategoryOptions(
+  a: { value: string; label: string },
+  b: { value: string; label: string },
+): number {
+  const classOrder =
+    Number(classSubCategories.has(a.value)) - Number(classSubCategories.has(b.value));
+  return classOrder || a.label.localeCompare(b.label);
+}
+
+/**
+ * Checks whether the keyboard event target is a text field or other editable element
+ * where typing must not be intercepted by global shortcuts.
+ */
+function isEditableTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  if (target.isContentEditable) return true;
+  return target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT';
+}
+
+/**
+ * Checks whether a dialog, alert dialog or popover is currently open.
+ */
+function isDialogOpen(): boolean {
+  return document.querySelector('[role="dialog"], [role="alertdialog"]') !== null;
+}
+
+/**
+ * Identifies which focus-search shortcut, if any, a key press is.
+ * @returns {'find' | 'slash' | undefined} `find` for Ctrl/Cmd+F, `slash` for `/`
+ */
+function getSearchShortcut(event: globalThis.KeyboardEvent): 'find' | 'slash' | undefined {
+  if (event.defaultPrevented || event.isComposing || event.altKey) return undefined;
+  const hasCommandModifier = event.ctrlKey || event.metaKey;
+  if (hasCommandModifier && !event.shiftKey && event.key.toLowerCase() === 'f') return 'find';
+  if (!hasCommandModifier && event.key === '/') return 'slash';
+  return undefined;
+}
+
+/**
+ * Checks whether a focus-search shortcut should move focus to the search input. It must not
+ * interrupt typing in another field (or typing "/" into the search itself) or an open dialog.
+ */
+function shouldFocusSearch(
+  event: globalThis.KeyboardEvent,
+  shortcut: 'find' | 'slash',
+  input: HTMLInputElement,
+): boolean {
+  if (event.target === input) return shortcut === 'find';
+  return !isEditableTarget(event.target) && !isDialogOpen();
+}
+
+/**
+ * Focuses the search field when the user presses `/` or Ctrl/Cmd+F, unless they are typing in
+ * another field or a dialog is open. The listener is removed when the toolbar unmounts.
+ * @param {string} inputId - The id of the search input
+ */
+function useFocusSearchShortcut(inputId: string) {
+  useEffect(() => {
+    const handleKeyDown = (event: globalThis.KeyboardEvent) => {
+      const input = document.getElementById(inputId);
+      const shortcut = getSearchShortcut(event);
+      if (!(input instanceof HTMLInputElement) || !shortcut) return;
+      if (!shouldFocusSearch(event, shortcut, input)) return;
+
+      event.preventDefault();
+      input.focus();
+      input.select();
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [inputId]);
+}
+
+/**
  * Toggles a value in a list, adding it when absent and removing it when present.
  */
 function toggleValue<T>(values: T[], value: T): T[] {
@@ -126,11 +285,13 @@ interface ActiveFilterChipsInput {
   searchTerm: string;
   foundStatus: FoundStatus;
   categories: ItemCategory[];
+  subCategories: string[];
   types: ItemType[];
   t: TFunction;
   onClearSearch: () => void;
   onClearStatus: () => void;
   onToggleCategory: (category: ItemCategory) => void;
+  onToggleSubCategory: (subCategory: string) => void;
   onToggleType: (type: ItemType) => void;
 }
 
@@ -141,11 +302,13 @@ function buildActiveFilterChips({
   searchTerm,
   foundStatus,
   categories,
+  subCategories,
   types,
   t,
   onClearSearch,
   onClearStatus,
   onToggleCategory,
+  onToggleSubCategory,
   onToggleType,
 }: ActiveFilterChipsInput): ActiveFilterChip[] {
   const chips: ActiveFilterChip[] = [];
@@ -175,6 +338,14 @@ function buildActiveFilterChips({
       key: `category-${category}`,
       label: t(categoryLabelKeys[category] ?? category),
       onRemove: () => onToggleCategory(category),
+    });
+  }
+
+  for (const subCategory of subCategories) {
+    chips.push({
+      key: `subCategory-${subCategory}`,
+      label: getSubCategoryLabel(subCategory, t),
+      onRemove: () => onToggleSubCategory(subCategory),
     });
   }
 
@@ -248,8 +419,9 @@ interface FilterCheckboxGroupProps<T extends string> {
   legend: string;
   idPrefix: string;
   options: { value: T; label: string }[];
-  selected: T[];
+  selected: string[];
   onToggle: (value: T) => void;
+  className?: string;
 }
 
 /**
@@ -261,14 +433,15 @@ function FilterCheckboxGroup<T extends string>({
   options,
   selected,
   onToggle,
+  className,
 }: FilterCheckboxGroupProps<T>) {
   return (
-    <fieldset className="space-y-2">
+    <fieldset className={cn('space-y-2', className)}>
       <legend className="mb-2 font-medium text-muted-foreground text-xs">{legend}</legend>
       {options.map((option) => {
         const id = `${idPrefix}-${option.value}`;
         return (
-          <div key={option.value} className="flex items-center gap-2">
+          <div key={option.value} className="flex min-w-0 items-center gap-2">
             <Checkbox
               id={id}
               checked={selected.includes(option.value)}
@@ -289,25 +462,26 @@ function FilterCheckboxGroup<T extends string>({
  */
 interface FiltersPopoverProps {
   selectedCategories: ItemCategory[];
-  selectedTypes: ItemType[];
-  typeValues: ItemType[];
+  selectedSubCategories: string[];
+  subCategoryGroups: SubCategoryGroup[];
   onToggleCategory: (category: ItemCategory) => void;
-  onToggleType: (type: ItemType) => void;
+  onToggleSubCategory: (subCategory: string) => void;
 }
 
 /**
- * Popover with category and type filters. The trigger shows the number of active filters.
+ * Popover with category and sub-category filters. Sub-categories are grouped by category.
+ * The trigger shows the number of active filters inside the popover.
  */
 function FiltersPopover({
   selectedCategories,
-  selectedTypes,
-  typeValues,
+  selectedSubCategories,
+  subCategoryGroups,
   onToggleCategory,
-  onToggleType,
+  onToggleSubCategory,
 }: FiltersPopoverProps) {
   const { t } = useTranslation();
   const idPrefix = useId();
-  const activeCount = selectedCategories.length + selectedTypes.length;
+  const activeCount = selectedCategories.length + selectedSubCategories.length;
   const filtersLabel = t(translations.grail.advancedSearch.filters);
 
   return (
@@ -328,7 +502,7 @@ function FiltersPopover({
           </Badge>
         )}
       </PopoverTrigger>
-      <PopoverContent align="start" className="w-64">
+      <PopoverContent align="start" className="max-h-[min(70vh,36rem)] w-96 overflow-y-auto">
         <FilterCheckboxGroup
           legend={t(translations.grail.advancedSearch.categories)}
           idPrefix={`${idPrefix}-category`}
@@ -338,16 +512,99 @@ function FiltersPopover({
           }))}
           selected={selectedCategories}
           onToggle={onToggleCategory}
+          className="grid grid-cols-2 gap-x-4 gap-y-2 space-y-0"
         />
-        <FilterCheckboxGroup
-          legend={t(translations.grail.advancedSearch.types)}
-          idPrefix={`${idPrefix}-type`}
-          options={typeValues.map((value) => ({ value, label: t(typeLabelKeys[value]) }))}
-          selected={selectedTypes}
-          onToggle={onToggleType}
-        />
+        {subCategoryGroups.length > 0 && (
+          <fieldset className="space-y-3">
+            <legend className="mb-2 font-medium text-muted-foreground text-xs">
+              {t(translations.grail.advancedSearch.subCategories)}
+            </legend>
+            {subCategoryGroups.map((group) => (
+              <FilterCheckboxGroup
+                key={group.category}
+                legend={t(categoryLabelKeys[group.category] ?? group.category)}
+                idPrefix={`${idPrefix}-subcategory-${group.category}`}
+                options={group.subCategories
+                  .map((value) => ({ value, label: getSubCategoryLabel(value, t) }))
+                  .sort(compareSubCategoryOptions)}
+                selected={selectedSubCategories}
+                onToggle={onToggleSubCategory}
+                className="grid grid-cols-2 gap-x-4 gap-y-2 space-y-0"
+              />
+            ))}
+          </fieldset>
+        )}
       </PopoverContent>
     </Popover>
+  );
+}
+
+/**
+ * Props for the TypeToggleChips component.
+ */
+interface TypeToggleChipsProps {
+  typeValues: ItemType[];
+  selectedTypes: ItemType[];
+  onToggleType: (type: ItemType) => void;
+}
+
+/**
+ * Inline toggle chips for the tracked item types, colored like the item cards.
+ */
+function TypeToggleChips({ typeValues, selectedTypes, onToggleType }: TypeToggleChipsProps) {
+  const { t } = useTranslation();
+
+  return (
+    <fieldset className="inline-flex flex-wrap items-center gap-1.5">
+      <legend className="sr-only">{t(translations.grail.advancedSearch.types)}</legend>
+      {typeValues.map((type) => {
+        const pressed = selectedTypes.includes(type);
+        return (
+          <button
+            key={type}
+            type="button"
+            aria-pressed={pressed}
+            onClick={() => onToggleType(type)}
+            className={cn(
+              'inline-flex h-9 items-center gap-1.5 rounded-full border border-border px-3 font-medium text-muted-foreground text-sm outline-none transition-colors',
+              'hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50',
+              pressed && ['text-foreground', typeChipStyles[type].pressed],
+            )}
+          >
+            <span
+              aria-hidden="true"
+              className={cn('size-2 shrink-0 rounded-full', typeChipStyles[type].dot)}
+            />
+            {t(typeLabelKeys[type])}
+          </button>
+        );
+      })}
+    </fieldset>
+  );
+}
+
+/**
+ * Props for the ResultCount component.
+ */
+interface ResultCountProps {
+  className?: string;
+}
+
+/**
+ * Live "N of M items" count of the items matching the current filters.
+ * Announced politely to screen readers whenever it changes.
+ */
+function ResultCount({ className }: ResultCountProps) {
+  const { t } = useTranslation();
+  const { shown, total } = useItemResultCount();
+
+  return (
+    <output
+      aria-live="polite"
+      className={cn('text-muted-foreground text-xs tabular-nums', className)}
+    >
+      {total > 0 && t(translations.grail.advancedSearch.resultCount, { shown, count: total })}
+    </output>
   );
 }
 
@@ -390,8 +647,9 @@ function ActiveFilterChips({ chips }: ActiveFilterChipsProps) {
 
 /**
  * AdvancedSearch renders the Holy Grail toolbar shown above the item grid.
- * It provides search (with optional fuzzy matching), a found-status segmented control,
- * a filters popover for categories and types, sorting, grouping, and view mode controls.
+ * It provides search (with optional fuzzy matching and a `/` / Ctrl+F shortcut), a found-status
+ * segmented control, item type toggle chips, a filters popover for categories and sub-categories,
+ * sorting, grouping, view mode controls and a live result count.
  * The grail store is the single source of truth for all filter values.
  * @returns {JSX.Element} The grail toolbar with active filter chips
  */
@@ -413,12 +671,17 @@ export function AdvancedSearch() {
   const groupMode = useGrailStore((state) => state.groupMode);
   const setGroupMode = useGrailStore((state) => state.setGroupMode);
   const settings = useGrailStore((state) => state.settings);
+  const items = useGrailStore((state) => state.items);
 
   const searchTerm = filter.searchTerm ?? '';
   const foundStatus: FoundStatus = filter.foundStatus ?? 'all';
   const selectedCategories = filter.categories ?? [];
+  const selectedSubCategories = filter.subCategories ?? [];
   const selectedTypes = filter.types ?? [];
   const { sortBy, sortOrder, fuzzySearch } = advancedFilter;
+  const subCategoryGroups = useMemo(() => getSubCategoryGroups(items), [items]);
+
+  useFocusSearchShortcut(searchId);
 
   /**
    * Available item types for filtering, filtered based on grail settings.
@@ -475,7 +738,21 @@ export function AdvancedSearch() {
   const toggleCategory = (category: ItemCategory) =>
     setFilter({ categories: toggleValue(selectedCategories, category) });
 
+  const toggleSubCategory = (subCategory: string) =>
+    setFilter({ subCategories: toggleValue(selectedSubCategories, subCategory) });
+
   const toggleType = (type: ItemType) => setFilter({ types: toggleValue(selectedTypes, type) });
+
+  // Escape clears the search; Escape on an empty field leaves the field
+  const handleSearchKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key !== 'Escape') return;
+    if (searchInput) {
+      event.preventDefault();
+      clearSearch();
+    } else {
+      event.currentTarget.blur();
+    }
+  };
 
   const resetAll = () => {
     debouncedSetSearchTerm.cancel();
@@ -487,11 +764,13 @@ export function AdvancedSearch() {
     searchTerm,
     foundStatus,
     categories: selectedCategories,
+    subCategories: selectedSubCategories,
     types: selectedTypes,
     t,
     onClearSearch: clearSearch,
     onClearStatus: () => setFilter({ foundStatus: 'all' }),
     onToggleCategory: toggleCategory,
+    onToggleSubCategory: toggleSubCategory,
     onToggleType: toggleType,
   });
 
@@ -525,8 +804,10 @@ export function AdvancedSearch() {
           <Input
             id={searchId}
             placeholder={t(translations.grail.advancedSearch.searchPlaceholder)}
+            aria-keyshortcuts="/ Control+F Meta+F"
             value={searchInput}
             onChange={(e) => handleSearchChange(e.target.value)}
+            onKeyDown={handleSearchKeyDown}
             className="h-9 pr-10 pl-8"
           />
           <Tooltip>
@@ -566,13 +847,20 @@ export function AdvancedSearch() {
           ))}
         </SegmentedControl>
 
-        {/* Category / type filters */}
+        {/* Item type toggles */}
+        <TypeToggleChips
+          typeValues={typeValues}
+          selectedTypes={selectedTypes}
+          onToggleType={toggleType}
+        />
+
+        {/* Category / sub-category filters */}
         <FiltersPopover
           selectedCategories={selectedCategories}
-          selectedTypes={selectedTypes}
-          typeValues={typeValues}
+          selectedSubCategories={selectedSubCategories}
+          subCategoryGroups={subCategoryGroups}
           onToggleCategory={toggleCategory}
-          onToggleType={toggleType}
+          onToggleSubCategory={toggleSubCategory}
         />
 
         {/* Sorting */}
@@ -673,8 +961,11 @@ export function AdvancedSearch() {
         )}
       </div>
 
-      {/* Active filter chips */}
-      {activeChips.length > 0 && <ActiveFilterChips chips={activeChips} />}
+      {/* Active filter chips and result count */}
+      <div className="flex flex-wrap items-center gap-2">
+        {activeChips.length > 0 && <ActiveFilterChips chips={activeChips} />}
+        <ResultCount className="ml-auto" />
+      </div>
     </section>
   );
 }

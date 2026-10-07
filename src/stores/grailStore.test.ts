@@ -1,12 +1,15 @@
 import { act, renderHook } from '@testing-library/react';
+import type { AdvancedGrailFilter, GrailFilter } from 'electron/types/grail';
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CharacterBuilder, GrailProgressBuilder, HolyGrailItemBuilder } from '@/fixtures';
 import {
   countActiveFilters,
+  filterAndSortItems,
   startLoad,
   useFilteredItems,
   useGrailStatistics,
   useGrailStore,
+  useItemResultCount,
 } from './grailStore';
 
 // Mock the electron API
@@ -740,6 +743,171 @@ describe('When useFilteredItems is used', () => {
   });
 });
 
+describe('When filterAndSortItems is called', () => {
+  const defaultSort: AdvancedGrailFilter = {
+    rarities: [],
+    difficulties: [],
+    levelRange: { min: 1, max: 99 },
+    requiredLevelRange: { min: 1, max: 99 },
+    sortBy: 'found_date',
+    sortOrder: 'desc',
+    fuzzySearch: false,
+  };
+  const noFilter: GrailFilter = { foundStatus: 'all' };
+
+  describe('If sorting by found date and several items are missing', () => {
+    it('Then found items come first and missing items are ordered by name', () => {
+      // Arrange
+      const items = [
+        HolyGrailItemBuilder.new().withId('c').withName('Cranebeak').build(),
+        HolyGrailItemBuilder.new().withId('a').withName('Arreat').build(),
+        HolyGrailItemBuilder.new().withId('f').withName('Found Item').build(),
+        HolyGrailItemBuilder.new().withId('b').withName('Bloodfist').build(),
+      ];
+      const progress = [
+        GrailProgressBuilder.new()
+          .withId('p1')
+          .withItemId('f')
+          .withFoundDate(new Date('2024-01-01'))
+          .build(),
+      ];
+
+      // Act
+      const result = filterAndSortItems(items, progress, noFilter, defaultSort);
+
+      // Assert
+      expect(result.map((item) => item.id)).toEqual(['f', 'a', 'b', 'c']);
+    });
+  });
+
+  describe('If items have the same sort key regardless of input order', () => {
+    it('Then the order is the same for both sort directions within equal keys', () => {
+      // Arrange
+      const items = [
+        HolyGrailItemBuilder.new().withId('z').withName('Zephyr').withType('set').build(),
+        HolyGrailItemBuilder.new().withId('m').withName('Magefist').withType('unique').build(),
+        HolyGrailItemBuilder.new().withId('a').withName('Angelic Halo').withType('set').build(),
+        HolyGrailItemBuilder.new().withId('b').withName('Bul-Kathos').withType('unique').build(),
+      ];
+
+      // Act
+      const ascending = filterAndSortItems(items, [], noFilter, {
+        ...defaultSort,
+        sortBy: 'type',
+        sortOrder: 'asc',
+      });
+      const descending = filterAndSortItems([...items].reverse(), [], noFilter, {
+        ...defaultSort,
+        sortBy: 'type',
+        sortOrder: 'desc',
+      });
+
+      // Assert
+      expect(ascending.map((item) => item.id)).toEqual(['a', 'z', 'b', 'm']);
+      expect(descending.map((item) => item.id)).toEqual(['b', 'm', 'a', 'z']);
+    });
+  });
+
+  describe('If sub-categories are selected', () => {
+    it('Then only items in those sub-categories are returned', () => {
+      // Arrange
+      const items = [
+        HolyGrailItemBuilder.new()
+          .withId('helm')
+          .withCategory('armor')
+          .withArmorSubCategory('helms')
+          .build(),
+        HolyGrailItemBuilder.new()
+          .withId('boots')
+          .withCategory('armor')
+          .withArmorSubCategory('boots')
+          .build(),
+        HolyGrailItemBuilder.new()
+          .withId('sword')
+          .withCategory('weapons')
+          .withWeaponSubCategory('1h_swords')
+          .build(),
+      ];
+
+      // Act
+      const result = filterAndSortItems(
+        items,
+        [],
+        { ...noFilter, subCategories: ['helms', '1h_swords'] },
+        { ...defaultSort, sortBy: 'name', sortOrder: 'asc' },
+      );
+
+      // Assert
+      expect(result.map((item) => item.id).sort()).toEqual(['helm', 'sword']);
+    });
+  });
+
+  describe('If the search term is a base item name', () => {
+    it('Then returns the items with that base', () => {
+      // Arrange
+      const items = [
+        HolyGrailItemBuilder.new()
+          .withId('harlequincrest')
+          .withName('Harlequin Crest')
+          .withItemBase('Shako')
+          .build(),
+        HolyGrailItemBuilder.new()
+          .withId('shaftstop')
+          .withName('Shaftstop')
+          .withItemBase('Mesh Armor')
+          .build(),
+      ];
+
+      // Act
+      const result = filterAndSortItems(
+        items,
+        [],
+        { ...noFilter, searchTerm: 'shako' },
+        defaultSort,
+      );
+
+      // Assert
+      expect(result.map((item) => item.id)).toEqual(['harlequincrest']);
+    });
+  });
+});
+
+describe('When useItemResultCount is used', () => {
+  const initialState = useGrailStore.getState();
+
+  afterEach(() => {
+    useGrailStore.setState(initialState, true);
+  });
+
+  describe('If filters hide some items and only normal items are tracked', () => {
+    it('Then returns the shown and total counts of tracked items', () => {
+      // Arrange
+      const items = [
+        HolyGrailItemBuilder.new().withId('u1').withType('unique').build(),
+        HolyGrailItemBuilder.new().withId('u2').withType('unique').build(),
+        HolyGrailItemBuilder.new().withId('s1').withType('set').build(),
+        HolyGrailItemBuilder.new()
+          .withId('eth')
+          .withType('unique')
+          .withEtherealType('only')
+          .build(),
+      ];
+      useGrailStore.setState({
+        items,
+        progress: [],
+        filter: { foundStatus: 'all', types: ['unique'] },
+        settings: { ...initialState.settings, grailNormal: true, grailEthereal: false },
+      });
+
+      // Act
+      const { result } = renderHook(() => useItemResultCount());
+
+      // Assert
+      expect(result.current).toEqual({ shown: 2, total: 3 });
+    });
+  });
+});
+
 // Note: Category filtering and sorting tests were removed due to complex test execution order issues
 // with Zustand state management in the test environment. The functionality is working correctly
 // as evidenced by the existing tests that pass when run individually.
@@ -969,6 +1137,19 @@ describe('When countActiveFilters is called', () => {
 
       // Assert
       expect(count).toBe(4);
+    });
+  });
+
+  describe('If sub-categories are selected', () => {
+    it('Then counts them as one active filter', () => {
+      // Arrange
+      const filter = { foundStatus: 'all' as const, subCategories: ['helms', 'boots'] };
+
+      // Act
+      const count = countActiveFilters(filter);
+
+      // Assert
+      expect(count).toBe(1);
     });
   });
 });

@@ -1,5 +1,56 @@
-import { GameMode, GameVersion } from 'electron/types/grail';
+import { GameMode, GameVersion, type ItemSubCategory } from 'electron/types/grail';
 import { translations } from '@/i18n/translations';
+
+const subCategoryKeys = translations.grail.advancedSearch.subCategory;
+
+/**
+ * Translation keys for the item sub-category labels (e.g. "Helms", "1H Swords", "Amazon").
+ */
+export const subCategoryLabelKeys: Record<ItemSubCategory, string> = {
+  '1h_swords': subCategoryKeys['1h_swords'],
+  '2h_swords': subCategoryKeys['2h_swords'],
+  '1h_axes': subCategoryKeys['1h_axes'],
+  '2h_axes': subCategoryKeys['2h_axes'],
+  '1h_maces': subCategoryKeys['1h_maces'],
+  '2h_maces': subCategoryKeys['2h_maces'],
+  '1h_clubs': subCategoryKeys['1h_clubs'],
+  bows: subCategoryKeys.bows,
+  crossbows: subCategoryKeys.crossbows,
+  daggers: subCategoryKeys.daggers,
+  javelins: subCategoryKeys.javelins,
+  polearms: subCategoryKeys.polearms,
+  scepters: subCategoryKeys.scepters,
+  spears: subCategoryKeys.spears,
+  staves: subCategoryKeys.staves,
+  throwing: subCategoryKeys.throwing,
+  wands: subCategoryKeys.wands,
+  hammers: subCategoryKeys.hammers,
+  mauls: subCategoryKeys.mauls,
+  maces: subCategoryKeys.maces,
+  helms: subCategoryKeys.helms,
+  body_armor: subCategoryKeys.body_armor,
+  shields: subCategoryKeys.shields,
+  gloves: subCategoryKeys.gloves,
+  boots: subCategoryKeys.boots,
+  belts: subCategoryKeys.belts,
+  amulets: subCategoryKeys.amulets,
+  rings: subCategoryKeys.rings,
+  rainbow_facets: subCategoryKeys.rainbow_facets,
+  dies: subCategoryKeys.dies,
+  small_charms: subCategoryKeys.small_charms,
+  large_charms: subCategoryKeys.large_charms,
+  grand_charms: subCategoryKeys.grand_charms,
+  runes: subCategoryKeys.runes,
+  runewords: subCategoryKeys.runewords,
+  amazon: subCategoryKeys.amazon,
+  assassin: subCategoryKeys.assassin,
+  barbarian: subCategoryKeys.barbarian,
+  druid: subCategoryKeys.druid,
+  necromancer: subCategoryKeys.necromancer,
+  paladin: subCategoryKeys.paladin,
+  sorceress: subCategoryKeys.sorceress,
+  shared_stash: subCategoryKeys.shared_stash,
+};
 
 /**
  * Translation keys for the game mode labels, shared by the wizard and settings.
