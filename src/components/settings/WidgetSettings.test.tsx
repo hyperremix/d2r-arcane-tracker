@@ -227,4 +227,118 @@ describe('WidgetSettings', () => {
       expect(screen.getByRole('radio', { name: 'Overall' })).toBeEnabled();
     });
   });
+
+  describe('When the widget lock, size and opacity controls are used', () => {
+    const mockSetSettings = vi.fn().mockResolvedValue(undefined);
+    const setLocked = vi.fn().mockResolvedValue({ success: true });
+    const updateOpacity = vi.fn().mockResolvedValue({ success: true });
+    const updateDisplay = vi.fn().mockResolvedValue({ success: true });
+    const resetSize = vi
+      .fn()
+      .mockResolvedValue({ success: true, size: { width: 270, height: 320 } });
+
+    beforeEach(() => {
+      for (const mock of [mockSetSettings, setLocked, updateOpacity, updateDisplay, resetSize]) {
+        mock.mockClear();
+      }
+      Object.defineProperty(window, 'electronAPI', {
+        value: { widget: { setLocked, updateOpacity, updateDisplay, resetSize } },
+        configurable: true,
+        writable: true,
+      });
+      useGrailStore.setState((state) => ({
+        setSettings: mockSetSettings,
+        settings: {
+          ...state.settings,
+          widgetEnabled: true,
+          widgetDisplay: 'run-only',
+          widgetOpacity: 0.9,
+          widgetLocked: false,
+          widgetRunOnlyShowItems: true,
+        },
+      }));
+    });
+
+    it('Then the lock switch is labelled and described', () => {
+      // Arrange & Act
+      render(<WidgetSettings />);
+
+      // Assert
+      const lockSwitch = screen.getByLabelText('Lock Widget (Click-Through)');
+      expect(lockSwitch).toHaveAttribute('role', 'switch');
+      expect(lockSwitch).toHaveAccessibleDescription(/Clicks pass through the widget to the game/);
+    });
+
+    it('If the lock switch is turned on, Then the setting is saved and the window is locked', async () => {
+      // Arrange
+      render(<WidgetSettings />);
+
+      // Act
+      await act(async () => {
+        fireEvent.click(screen.getByLabelText('Lock Widget (Click-Through)'));
+      });
+
+      // Assert
+      expect(mockSetSettings).toHaveBeenCalledWith({ widgetLocked: true });
+      expect(setLocked).toHaveBeenCalledWith(true);
+    });
+
+    it('If the size is reset in run-only mode, Then the default is stored under the run-only key', async () => {
+      // Arrange
+      render(<WidgetSettings />);
+
+      // Act
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: 'Reset Size' }));
+      });
+
+      // Assert
+      expect(resetSize).toHaveBeenCalledWith('run-only');
+      expect(mockSetSettings).toHaveBeenCalledWith({
+        widgetSizeRunOnly: { width: 270, height: 320 },
+      });
+    });
+
+    it('If the run item list is hidden in run-only mode, Then the compact default size is applied', async () => {
+      // Arrange
+      render(<WidgetSettings />);
+
+      // Act
+      await act(async () => {
+        fireEvent.click(screen.getByLabelText('Show Run Item List'));
+      });
+
+      // Assert
+      expect(mockSetSettings).toHaveBeenCalledWith({
+        widgetRunOnlyShowItems: false,
+        widgetSizeRunOnly: { width: 270, height: 190 },
+      });
+      expect(updateDisplay).toHaveBeenCalledWith('run-only', expect.any(Object));
+    });
+
+    it('If the opacity is changed, Then it is saved and sent to the widget exactly once', async () => {
+      // Arrange
+      render(<WidgetSettings />);
+      const opacityInput = screen.getByRole('slider', { hidden: true });
+
+      // Act
+      await act(async () => {
+        fireEvent.change(opacityInput, { target: { value: '0.5' } });
+      });
+
+      // Assert
+      expect(mockSetSettings).toHaveBeenCalledTimes(1);
+      expect(mockSetSettings).toHaveBeenCalledWith({ widgetOpacity: 0.5 });
+      expect(updateOpacity).toHaveBeenCalledTimes(1);
+      expect(updateOpacity).toHaveBeenCalledWith(0.5);
+    });
+
+    it('Then the fullscreen tip recommends the Windowed (Fullscreen) display mode', () => {
+      // Arrange & Act
+      render(<WidgetSettings />);
+
+      // Assert
+      expect(screen.getByText(/Windowed \(Fullscreen\)/)).toBeInTheDocument();
+    });
+  });
 });

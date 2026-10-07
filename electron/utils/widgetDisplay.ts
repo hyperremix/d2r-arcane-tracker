@@ -42,3 +42,75 @@ export function resolveWidgetDisplayMode(
   }
   return mode;
 }
+
+/**
+ * Width and height of the widget window in pixels.
+ */
+export interface WidgetSize {
+  width: number;
+  height: number;
+}
+
+/**
+ * Settings keys that store a custom widget window size, one per display mode.
+ */
+export type WidgetSizeSettingKey =
+  | 'widgetSizeOverall'
+  | 'widgetSizeSplit'
+  | 'widgetSizeAll'
+  | 'widgetSizeRunOnly';
+
+const WIDGET_SIZE_SETTING_KEYS: Record<WidgetDisplayMode, WidgetSizeSettingKey> = {
+  overall: 'widgetSizeOverall',
+  split: 'widgetSizeSplit',
+  all: 'widgetSizeAll',
+  'run-only': 'widgetSizeRunOnly',
+};
+
+/**
+ * Default window sizes used when no custom size has been saved for a display mode.
+ */
+const DEFAULT_WIDGET_SIZES: Record<Exclude<WidgetDisplayMode, 'run-only'>, WidgetSize> = {
+  overall: { width: 250, height: 250 }, // Single large gauge
+  split: { width: 350, height: 250 }, // Two gauges side by side
+  all: { width: 300, height: 350 }, // Overall on top, normal+ethereal below
+};
+
+/**
+ * Default run-only sizes. The item list (shown by default) needs room for the manual entry field
+ * and a few runs, so it gets a taller window than the stats-only layout.
+ */
+const DEFAULT_RUN_ONLY_SIZES: Record<'withItems' | 'statsOnly', WidgetSize> = {
+  withItems: { width: 270, height: 320 },
+  statsOnly: { width: 270, height: 190 },
+};
+
+/**
+ * Maps a display mode to the settings key its custom window size is saved under.
+ * @param {WidgetDisplayMode} displayMode - The display mode
+ * @returns {WidgetSizeSettingKey} The settings key for that mode's size
+ */
+export function getWidgetSizeSettingKey(displayMode: WidgetDisplayMode): WidgetSizeSettingKey {
+  return WIDGET_SIZE_SETTING_KEYS[displayMode];
+}
+
+/**
+ * Returns the default window size for a display mode. The run-only default depends on whether
+ * its item list is shown.
+ * @param {WidgetDisplayMode} displayMode - The display mode
+ * @param {boolean | undefined} runOnlyShowItems - Whether the run-only item list is shown (defaults to true)
+ * @returns {WidgetSize} A copy of the default size
+ */
+export function getDefaultWidgetSize(
+  displayMode: WidgetDisplayMode,
+  runOnlyShowItems: boolean | undefined,
+): WidgetSize {
+  if (displayMode === 'run-only') {
+    const size =
+      runOnlyShowItems === false
+        ? DEFAULT_RUN_ONLY_SIZES.statsOnly
+        : DEFAULT_RUN_ONLY_SIZES.withItems;
+    return { ...size };
+  }
+  return { ...DEFAULT_WIDGET_SIZES[displayMode] };
+}

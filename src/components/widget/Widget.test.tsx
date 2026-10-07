@@ -211,6 +211,25 @@ describe('Widget run-only item list', () => {
     expect(getByText("Tyrael's Might")).toBeDefined();
   });
 
+  it('If the widget is locked, Then the unclickable manual item field is hidden but runs stay listed', () => {
+    // Arrange
+    const settings: Partial<Settings> = { ...baseSettings, widgetLocked: true };
+
+    // Act
+    const { getByText, queryByRole } = render(
+      <Widget
+        statistics={null}
+        settings={settings}
+        onDragStart={() => ({})}
+        onDragEnd={() => ({})}
+      />,
+    );
+
+    // Assert
+    expect(queryByRole('textbox')).toBeNull();
+    expect(getByText('Harlequin Crest')).toBeDefined();
+  });
+
   it('hides run item list when disabled in settings', () => {
     const settings: Partial<Settings> = {
       ...baseSettings,
@@ -532,6 +551,46 @@ describe('Widget display and legibility', () => {
     const root = container.firstElementChild as HTMLElement;
     expect(root.style.cursor).toBe('move');
     expect(root).toContainElement(grip);
+  });
+
+  it('If the widget is locked, Then it shows no drag grip or move cursor', () => {
+    // Arrange
+    const settings: Partial<Settings> = { widgetDisplay: 'overall', widgetLocked: true };
+
+    // Act
+    const { queryByTestId, container } = render(
+      <Widget
+        statistics={statistics}
+        settings={settings}
+        onDragStart={() => ({})}
+        onDragEnd={() => ({})}
+      />,
+    );
+
+    // Assert
+    const root = container.firstElementChild as HTMLElement;
+    expect(queryByTestId('widget-drag-grip')).toBeNull();
+    expect(root.style.cursor).toBe('default');
+  });
+
+  it('When gauges render, Then they are sized by layout instead of a CSS scale transform', () => {
+    // Arrange
+    const settings: Partial<Settings> = { widgetDisplay: 'all', grailEthereal: true };
+
+    // Act
+    const { container, getByLabelText } = render(
+      <Widget
+        statistics={statistics}
+        settings={settings}
+        onDragStart={() => ({})}
+        onDragEnd={() => ({})}
+      />,
+    );
+
+    // Assert
+    expect(container.querySelector('[style*="scale"]')).toBeNull();
+    expect(getByLabelText('Overall: 40/100 (40.0%)').getAttribute('class')).toContain('size-31');
+    expect(getByLabelText('Normal: 30/60 (50.0%)').getAttribute('class')).toContain('size-26');
   });
 });
 

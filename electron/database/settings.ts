@@ -153,6 +153,12 @@ export function getAllSettings(ctx: DatabaseContext): Settings {
       settingsMap.widgetSizeAll,
       'widgetSizeAll',
     ),
+    widgetSizeRunOnly: parseJSONSetting<{ width: number; height: number }>(
+      settingsMap.widgetSizeRunOnly,
+      'widgetSizeRunOnly',
+    ),
+    widgetRunOnlyShowItems: settingsMap.widgetRunOnlyShowItems !== 'false', // Default to true
+    widgetLocked: parseBooleanSetting(settingsMap.widgetLocked),
     // Main window settings
     mainWindowBounds: parseJSONSetting<{
       x: number;

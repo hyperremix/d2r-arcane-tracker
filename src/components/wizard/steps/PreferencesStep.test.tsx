@@ -47,4 +47,17 @@ describe('PreferencesStep', () => {
     expect(screen.getByText('30%')).toBeInTheDocument();
     expect(screen.getByText('Adjust widget background opacity (30% to 100%)')).toBeInTheDocument();
   });
+
+  it('When rendered, Then the widget tip recommends Windowed (Fullscreen) over exclusive fullscreen', () => {
+    // Arrange
+    const ui = <PreferencesStep />;
+
+    // Act
+    render(ui);
+
+    // Assert
+    const widgetRegion = screen.getByRole('region', { name: 'Widget Settings' });
+    expect(widgetRegion).toHaveTextContent('"Windowed (Fullscreen)"');
+    expect(widgetRegion).toHaveTextContent('exclusive "Fullscreen"');
+  });
 });

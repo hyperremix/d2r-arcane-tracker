@@ -148,18 +148,9 @@ export function WidgetContainer() {
   // Listen for settings updates
   useEffect(() => {
     const handleSettingsUpdate = async (_event: unknown, updatedSettings: Partial<Settings>) => {
-      setSettings((prev) => {
-        const newSettings = { ...prev, ...updatedSettings };
-
-        // Update widget opacity based on new settings (use async IIFE to handle promises)
-        (async () => {
-          if (updatedSettings.widgetOpacity !== undefined) {
-            await window.electronAPI?.widget.updateOpacity(updatedSettings.widgetOpacity);
-          }
-        })();
-
-        return newSettings;
-      });
+      // Opacity is applied by the widget's CSS from these settings; the settings UI already notifies
+      // the main process, so no IPC is sent from here
+      setSettings((prev) => ({ ...prev, ...updatedSettings }));
 
       // Recalculate statistics if grail settings changed
       if (

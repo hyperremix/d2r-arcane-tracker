@@ -15,7 +15,31 @@ interface ProgressGaugeProps {
   color?: 'blue' | 'green' | 'purple' | 'orange';
   /** Use 'overlay' on an always-dark surface (e.g. the widget) so text stays legible in any theme */
   tone?: GaugeTone;
+  /** Rendered size of the gauge and its text; the gauge takes up real layout space at every size */
+  size?: GaugeSize;
 }
+
+/**
+ * Size of the gauge. 'sm' is the compact default; larger sizes scale the ring and text together.
+ */
+type GaugeSize = 'sm' | 'md' | 'lg' | 'xl';
+
+/**
+ * Ring and text classes per gauge size.
+ */
+interface SizeClasses {
+  ring: string;
+  percentage: string;
+  ratio: string;
+  label: string;
+}
+
+const sizeConfig: Record<GaugeSize, SizeClasses> = {
+  sm: { ring: 'size-22', percentage: 'text-lg', ratio: 'text-xs', label: 'text-xs' },
+  md: { ring: 'size-26', percentage: 'text-xl', ratio: 'text-xs', label: 'text-xs' },
+  lg: { ring: 'size-31', percentage: 'text-2xl', ratio: 'text-sm', label: 'text-sm' },
+  xl: { ring: 'size-40', percentage: 'text-3xl', ratio: 'text-base', label: 'text-sm' },
+};
 
 /**
  * Text tone of the gauge. 'overlay' is for always-dark surfaces and ignores the app theme.
@@ -76,6 +100,7 @@ const colorConfig = {
  * @param {boolean} [props.showLabel=false] - Whether to show the label below the gauge
  * @param {'blue' | 'green' | 'purple' | 'orange'} [props.color='blue'] - Color variant of the gauge
  * @param {'default' | 'overlay'} [props.tone='default'] - Text tone; 'overlay' is for always-dark surfaces
+ * @param {'sm' | 'md' | 'lg' | 'xl'} [props.size='sm'] - Size of the ring and its text
  * @returns {JSX.Element} A circular progress gauge with animated stroke and centered statistics
  */
 export function ProgressGauge({
@@ -86,23 +111,26 @@ export function ProgressGauge({
   showLabel = false,
   color = 'blue',
   tone = 'default',
+  size = 'sm',
 }: ProgressGaugeProps) {
   const percentage = useMemo(() => (total > 0 ? (current / total) * 100 : 0), [current, total]);
   const degree = useMemo(() => Math.floor((percentage / 100) * 75), [percentage]);
   const colors = colorConfig[color];
   const toneClasses = toneConfig[tone];
 
-  const sizeClasses = 'size-22';
-  const percentageTextSize = 'text-lg';
-  const ratioTextSize = 'text-xs';
-  const labelTextSize = 'text-xs';
+  const {
+    ring: sizeClasses,
+    percentage: percentageTextSize,
+    ratio: ratioTextSize,
+    label: labelTextSize,
+  } = sizeConfig[size];
 
   const tooltipContent = `${label}: ${current}/${total} (${percentage.toFixed(1)}%)`;
 
   const gaugeElement = (
     <Tooltip delay={0}>
       <TooltipTrigger
-        className={cn('group relative', sizeClasses, showLabel ? '' : className)}
+        className={cn('group relative shrink-0', sizeClasses, showLabel ? '' : className)}
         aria-label={tooltipContent}
       >
         <svg

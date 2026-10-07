@@ -138,7 +138,13 @@ You can limit the terror zone rotation to zones you choose. See the [Terror Zone
 - **Overall**: total progress.
 - **Split**: normal and ethereal progress. Requires ethereal tracking.
 - **All**: all three gauges. Requires ethereal tracking.
-- **Run Only**: the current run counter, and optionally a list of items found in this run.
+- **Run Only**: the current run counter, and optionally a list of items found in this run. Turning the item list on or off switches the widget to the matching default height.
+
+The widget remembers its size separately for each display mode. **Reset Size** restores the default for the current mode.
+
+To see the widget over the game, set D2R's display mode to **Windowed (Fullscreen)**. Always-on-top windows can't appear over exclusive **Fullscreen** mode.
+
+**Lock Widget (Click-Through)** stops the widget from getting in the way while you play. Clicks pass through it to the game, and it can't take focus, be dragged or be resized. In Run Only mode the manual item field is hidden while the widget is locked. To move or resize the widget again, turn the lock off in **Settings → Widget Settings**.
 
 ### Backups
 

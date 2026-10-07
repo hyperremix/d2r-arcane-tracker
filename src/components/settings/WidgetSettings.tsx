@@ -1,6 +1,6 @@
 import type { Settings } from 'electron/types/grail';
 import { Layers, RotateCcw } from 'lucide-react';
-import { useCallback, useEffect, useId, useMemo } from 'react';
+import { useCallback, useEffect, useId, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -11,6 +11,8 @@ import { translations } from '@/i18n/translations';
 import { cn } from '@/lib/utils';
 import {
   clampWidgetOpacity,
+  getDefaultWidgetSize,
+  getWidgetSizeSettingKey,
   MAX_WIDGET_OPACITY,
   MIN_WIDGET_OPACITY,
   resolveWidgetDisplayMode,
@@ -39,7 +41,11 @@ export function WidgetSettings() {
   const displayModeDescriptionId = useId();
   const runItemsLabelId = useId();
   const runItemsDescriptionId = useId();
+  const lockLabelId = useId();
+  const lockDescriptionId = useId();
   const opacityLabelId = useId();
+  // Opacity shown while the slider is dragged; it is only saved once the drag is committed
+  const [draftOpacity, setDraftOpacity] = useState<number | undefined>(undefined);
 
   const toggleWidget = useCallback(
     async (checked: boolean) => {
@@ -59,13 +65,31 @@ export function WidgetSettings() {
     [setSettings, settings],
   );
 
-  const updateOpacity = useCallback(
+  const previewOpacity = useCallback((value: number | readonly number[]) => {
+    const values = Array.isArray(value) ? value : [value];
+    setDraftOpacity(clampWidgetOpacity(values[0]));
+  }, []);
+
+  const commitOpacity = useCallback(
     async (value: number | readonly number[]) => {
       const values = Array.isArray(value) ? value : [value];
       const opacity = clampWidgetOpacity(values[0]);
-      await setSettings({ widgetOpacity: opacity });
-      // Update widget opacity via IPC
-      await window.electronAPI?.widget.updateOpacity(opacity);
+      try {
+        await setSettings({ widgetOpacity: opacity });
+        // Update widget opacity via IPC
+        await window.electronAPI?.widget.updateOpacity(opacity);
+      } finally {
+        setDraftOpacity(undefined);
+      }
+    },
+    [setSettings],
+  );
+
+  const toggleLock = useCallback(
+    async (checked: boolean) => {
+      await setSettings({ widgetLocked: checked });
+      // Apply click-through to the widget window via IPC
+      await window.electronAPI?.widget.setLocked(checked);
     },
     [setSettings],
   );
@@ -78,9 +102,10 @@ export function WidgetSettings() {
   }, [setSettings]);
 
   const widgetDisplay = settings.widgetDisplay || 'overall';
-  const widgetOpacity = clampWidgetOpacity(settings.widgetOpacity);
+  const widgetOpacity = draftOpacity ?? clampWidgetOpacity(settings.widgetOpacity);
   const widgetEnabled = settings.widgetEnabled ?? false;
   const widgetRunOnlyShowItems = settings.widgetRunOnlyShowItems ?? true;
+  const widgetLocked = settings.widgetLocked ?? false;
 
   // The window size follows the mode the widget actually renders (split/all need ethereal tracking)
   const effectiveDisplay = resolveWidgetDisplayMode(widgetDisplay, settings.grailEthereal);
@@ -88,13 +113,8 @@ export function WidgetSettings() {
   const resetSize = useCallback(async () => {
     const result = await window.electronAPI?.widget.resetSize(effectiveDisplay);
     if (result?.success && result.size) {
-      // Clear the custom size for this display mode
-      const sizeKey =
-        `widgetSize${effectiveDisplay.charAt(0).toUpperCase()}${effectiveDisplay.slice(1)}` as
-          | 'widgetSizeOverall'
-          | 'widgetSizeSplit'
-          | 'widgetSizeAll';
-      await setSettings({ [sizeKey]: undefined });
+      // Store the default size the window was reset to for this display mode
+      await setSettings({ [getWidgetSizeSettingKey(effectiveDisplay)]: result.size });
     }
   }, [setSettings, effectiveDisplay]);
 
@@ -107,9 +127,16 @@ export function WidgetSettings() {
 
   const toggleRunOnlyItems = useCallback(
     async (checked: boolean) => {
-      await setSettings({ widgetRunOnlyShowItems: checked });
+      // The item list changes how tall the run-only widget needs to be, so switch to its default size
+      await setSettings({
+        widgetRunOnlyShowItems: checked,
+        widgetSizeRunOnly: getDefaultWidgetSize('run-only', checked),
+      });
+      if (widgetEnabled && effectiveDisplay === 'run-only') {
+        await window.electronAPI?.widget.updateDisplay('run-only', settings);
+      }
     },
-    [setSettings],
+    [effectiveDisplay, setSettings, settings, widgetEnabled],
   );
 
   const displayModeOptions = useMemo<DisplayModeOption[]>(
@@ -226,6 +253,25 @@ export function WidgetSettings() {
             />
           </div>
 
+          {/* Lock (click-through) Toggle */}
+          <div className="flex items-center justify-between">
+            <div>
+              <h4 id={lockLabelId} className="font-medium text-sm">
+                {t(translations.settings.widget.lockWidget)}
+              </h4>
+              <p id={lockDescriptionId} className="text-muted-foreground text-xs">
+                {t(translations.settings.widget.lockWidgetDescription)}
+              </p>
+            </div>
+            <Switch
+              checked={widgetLocked}
+              onCheckedChange={toggleLock}
+              disabled={!widgetEnabled}
+              aria-labelledby={lockLabelId}
+              aria-describedby={lockDescriptionId}
+            />
+          </div>
+
           {/* Opacity Slider */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
@@ -242,7 +288,8 @@ export function WidgetSettings() {
               max={MAX_WIDGET_OPACITY}
               step={0.05}
               value={[widgetOpacity]}
-              onValueChange={updateOpacity}
+              onValueChange={previewOpacity}
+              onValueCommitted={commitOpacity}
               disabled={!widgetEnabled}
               className="w-full"
             />
@@ -295,6 +342,10 @@ export function WidgetSettings() {
               <br />• {t(translations.settings.widget.featureSnap)}
               <br />• {t(translations.settings.widget.featureSizePersists)}
               <br />• {t(translations.settings.widget.featureRealtime)}
+              <br />
+              <br />
+              <strong>{t(translations.wizard.tip)}</strong>{' '}
+              {t(translations.settings.widget.fullscreenTip)}
             </p>
           </div>
         </div>

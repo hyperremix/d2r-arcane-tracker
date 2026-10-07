@@ -1,12 +1,18 @@
 import { Layers } from 'lucide-react';
-import { useCallback, useId } from 'react';
+import { useCallback, useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
 import { translations } from '@/i18n/translations';
-import { clampWidgetOpacity, MAX_WIDGET_OPACITY, MIN_WIDGET_OPACITY } from '@/lib/widget';
+import {
+  clampWidgetOpacity,
+  getDefaultWidgetSize,
+  MAX_WIDGET_OPACITY,
+  MIN_WIDGET_OPACITY,
+  resolveWidgetDisplayMode,
+} from '@/lib/widget';
 import { useGrailStore } from '@/stores/grailStore';
 
 /**
@@ -19,10 +25,12 @@ export function WidgetStep() {
   const opacitySliderId = useId();
   const headingId = useId();
   const { settings, setSettings } = useGrailStore();
+  // Opacity shown while the slider is dragged; it is only saved once the drag is committed
+  const [draftOpacity, setDraftOpacity] = useState<number | undefined>(undefined);
 
   const widgetEnabled = settings.widgetEnabled ?? false;
   const widgetDisplay = settings.widgetDisplay || 'overall';
-  const widgetOpacity = clampWidgetOpacity(settings.widgetOpacity);
+  const widgetOpacity = draftOpacity ?? clampWidgetOpacity(settings.widgetOpacity);
   const grailEthereal = settings.grailEthereal ?? false;
   const widgetRunOnlyShowItems = settings.widgetRunOnlyShowItems ?? true;
 
@@ -44,22 +52,38 @@ export function WidgetStep() {
     [setSettings, settings],
   );
 
-  const handleOpacityChange = useCallback(
+  const handleOpacityChange = useCallback((value: number | readonly number[]) => {
+    const values = Array.isArray(value) ? value : [value];
+    setDraftOpacity(clampWidgetOpacity(values[0]));
+  }, []);
+
+  const handleOpacityCommit = useCallback(
     async (value: number | readonly number[]) => {
       const values = Array.isArray(value) ? value : [value];
       const opacity = clampWidgetOpacity(values[0]);
-      await setSettings({ widgetOpacity: opacity });
-      // Update widget opacity via IPC
-      await window.electronAPI?.widget.updateOpacity(opacity);
+      try {
+        await setSettings({ widgetOpacity: opacity });
+        // Update widget opacity via IPC
+        await window.electronAPI?.widget.updateOpacity(opacity);
+      } finally {
+        setDraftOpacity(undefined);
+      }
     },
     [setSettings],
   );
 
   const handleRunOnlyItemsChange = useCallback(
     async (checked: boolean) => {
-      await setSettings({ widgetRunOnlyShowItems: checked });
+      // The item list changes how tall the run-only widget needs to be, so switch to its default size
+      await setSettings({
+        widgetRunOnlyShowItems: checked,
+        widgetSizeRunOnly: getDefaultWidgetSize('run-only', checked),
+      });
+      if (widgetEnabled && resolveWidgetDisplayMode(widgetDisplay, grailEthereal) === 'run-only') {
+        await window.electronAPI?.widget.updateDisplay('run-only', settings);
+      }
     },
-    [setSettings],
+    [grailEthereal, setSettings, settings, widgetDisplay, widgetEnabled],
   );
 
   return (
@@ -179,6 +203,7 @@ export function WidgetStep() {
             step={0.05}
             value={[widgetOpacity]}
             onValueChange={handleOpacityChange}
+            onValueCommitted={handleOpacityCommit}
             disabled={!widgetEnabled}
             className="w-full"
           />

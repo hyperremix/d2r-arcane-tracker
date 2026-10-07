@@ -1,6 +1,14 @@
 // Shared with the main process so the native window size matches what the renderer draws
-export type { WidgetDisplayMode } from 'electron/utils/widgetDisplay';
-export { resolveWidgetDisplayMode } from 'electron/utils/widgetDisplay';
+export type {
+  WidgetDisplayMode,
+  WidgetSize,
+  WidgetSizeSettingKey,
+} from 'electron/utils/widgetDisplay';
+export {
+  getDefaultWidgetSize,
+  getWidgetSizeSettingKey,
+  resolveWidgetDisplayMode,
+} from 'electron/utils/widgetDisplay';
 
 /**
  * Minimum widget background opacity. Lower values make the widget text unreadable

@@ -1,8 +1,13 @@
 import path from 'node:path';
 import { BrowserWindow, screen } from 'electron';
 import type { Settings } from '../types/grail';
-import type { WidgetDisplayMode } from '../utils/widgetDisplay';
-import { isWidgetDisplayMode, resolveWidgetDisplayMode } from '../utils/widgetDisplay';
+import type { WidgetDisplayMode, WidgetSize } from '../utils/widgetDisplay';
+import {
+  getDefaultWidgetSize,
+  getWidgetSizeSettingKey,
+  isWidgetDisplayMode,
+  resolveWidgetDisplayMode,
+} from '../utils/widgetDisplay';
 import {
   calculateSnapPosition,
   getDefaultPosition,
@@ -22,15 +27,10 @@ export let widgetWindow: BrowserWindow | null = null;
 let currentDisplayMode: WidgetDisplayMode = 'overall';
 
 /**
- * Size mapping for different widget display modes.
- * These are the default sizes used when no custom size is saved.
+ * Whether the widget is locked (click-through). Kept in sync with the setting so re-showing an
+ * existing window keeps it inactive while locked.
  */
-const SIZE_MAP: Record<WidgetDisplayMode, { width: number; height: number }> = {
-  overall: { width: 250, height: 250 }, // Single large gauge
-  split: { width: 350, height: 250 }, // Two gauges side by side
-  all: { width: 300, height: 350 }, // Overall on top, normal+ethereal below
-  'run-only': { width: 270, height: 190 }, // Compact run counter display
-};
+let widgetLocked = false;
 
 /**
  * Gets the size for a specific display mode from settings or defaults.
@@ -39,20 +39,31 @@ const SIZE_MAP: Record<WidgetDisplayMode, { width: number; height: number }> = {
  * @param settings - Application settings containing custom sizes
  * @returns The size { width, height } for the display mode
  */
-function getWidgetSize(
-  display: WidgetDisplayMode,
-  settings: Partial<Settings>,
-): { width: number; height: number } {
-  switch (display) {
-    case 'overall':
-      return settings.widgetSizeOverall || SIZE_MAP.overall;
-    case 'split':
-      return settings.widgetSizeSplit || SIZE_MAP.split;
-    case 'all':
-      return settings.widgetSizeAll || SIZE_MAP.all;
-    case 'run-only':
-      return SIZE_MAP['run-only'];
+function getWidgetSize(display: WidgetDisplayMode, settings: Partial<Settings>): WidgetSize {
+  return (
+    settings[getWidgetSizeSettingKey(display)] ||
+    getDefaultWidgetSize(display, settings.widgetRunOnlyShowItems)
+  );
+}
+
+/**
+ * Applies the lock (click-through) state to a widget window. A locked widget ignores the mouse
+ * (forwarding mouse moves so hover styles keep working) and cannot take focus from the game, so it
+ * can't be dragged or resized either. Unlocking restores normal interaction.
+ *
+ * @param window - The widget window
+ * @param locked - Whether the widget should be locked
+ */
+function applyWidgetLock(window: BrowserWindow, locked: boolean): void {
+  if (locked) {
+    window.setIgnoreMouseEvents(true, { forward: true });
+  } else {
+    window.setIgnoreMouseEvents(false);
   }
+  window.setFocusable(!locked);
+  // Changing focusability can reset these on Windows, so re-assert the overlay behavior
+  window.setSkipTaskbar(true);
+  window.setAlwaysOnTop(true, 'screen-saver');
 }
 
 /**
@@ -76,6 +87,7 @@ export function createWidgetWindow(
   const displayMode = resolveWidgetDisplayMode(settings.widgetDisplay, settings.grailEthereal);
   const size = getWidgetSize(displayMode, settings);
   currentDisplayMode = displayMode;
+  widgetLocked = settings.widgetLocked === true;
 
   // Get all displays
   const displays = screen.getAllDisplays();
@@ -107,6 +119,9 @@ export function createWidgetWindow(
     minimizable: false,
     maximizable: false,
     fullscreenable: false,
+    // A locked widget must never take focus from the game, so it is shown inactive below
+    focusable: !widgetLocked,
+    show: !widgetLocked,
     webPreferences: {
       preload: path.join(__dirname, 'preload.mjs'),
       contextIsolation: true,
@@ -116,6 +131,10 @@ export function createWidgetWindow(
     },
   });
   widgetWindow.setAlwaysOnTop(true, 'screen-saver');
+  if (widgetLocked) {
+    applyWidgetLock(widgetWindow, true);
+    widgetWindow.showInactive();
+  }
 
   // Load the widget page
   if (viteDevServerUrl) {
@@ -223,7 +242,11 @@ export function showWidgetWindow(
   onSizeChange?: (display: WidgetDisplayMode, size: { width: number; height: number }) => void,
 ): void {
   if (widgetWindow) {
-    widgetWindow.show();
+    if (widgetLocked) {
+      widgetWindow.showInactive();
+    } else {
+      widgetWindow.show();
+    }
   } else {
     createWidgetWindow(
       settings,
@@ -299,13 +322,15 @@ export function updateWidgetWindowSize(
  * one resize events are saved under. Unknown modes are ignored.
  *
  * @param display - The display mode to reset size for
+ * @param runOnlyShowItems - Whether the run-only item list is shown (decides the run-only default)
  * @returns The default size for the mode, or null if window doesn't exist
  */
 export function resetWidgetWindowSize(
   display: WidgetDisplayMode,
-): { width: number; height: number } | null {
+  runOnlyShowItems?: boolean,
+): WidgetSize | null {
   if (widgetWindow && isWidgetDisplayMode(display)) {
-    const defaultSize = SIZE_MAP[display];
+    const defaultSize = getDefaultWidgetSize(display, runOnlyShowItems);
     currentDisplayMode = display;
     const currentBounds = widgetWindow.getBounds();
     widgetWindow.setBounds({
@@ -317,6 +342,26 @@ export function resetWidgetWindowSize(
     return defaultSize;
   }
   return null;
+}
+
+/**
+ * Locks or unlocks the widget window. While locked, clicks pass through the widget to the game
+ * and the widget cannot be focused, dragged or resized. The state is also remembered for the next
+ * time an existing window is shown.
+ *
+ * @param locked - Whether the widget should be locked
+ * @returns True if the state was applied to an open widget window
+ */
+export function setWidgetWindowLocked(locked: boolean): boolean {
+  widgetLocked = locked;
+  if (!widgetWindow || widgetWindow.isDestroyed()) {
+    return false;
+  }
+  applyWidgetLock(widgetWindow, locked);
+  if (locked && widgetWindow.isFocused()) {
+    widgetWindow.blur();
+  }
+  return true;
 }
 
 /**

@@ -9,7 +9,7 @@ import type {
   Settings,
 } from 'electron/types/grail';
 import { GripHorizontal } from 'lucide-react';
-import type { ComponentProps } from 'react';
+import type { ComponentProps, CSSProperties } from 'react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ProgressGauge } from '@/components/grail/ProgressGauge';
@@ -29,6 +29,12 @@ interface WidgetProps {
   onDragStart: () => void;
   onDragEnd: () => void;
 }
+
+/**
+ * Inline styles of the widget root. WebkitAppRegion is an Electron-specific CSS property that
+ * marks the area the window can be dragged by.
+ */
+type WidgetRootStyle = CSSProperties & { WebkitAppRegion: 'drag' | 'no-drag' };
 
 /**
  * Props for the RunOnlyDisplay component.
@@ -210,7 +216,7 @@ function RunOnlyDisplay({
   }
 
   return (
-    <div className="flex w-full flex-col gap-3 overflow-hidden px-4">
+    <div className="flex min-h-0 w-full flex-1 flex-col gap-3 overflow-hidden px-4">
       {/* Top Row: Run # and Current Duration */}
       <div className="grid grid-cols-2 gap-4">
         <div className="text-center">
@@ -239,7 +245,7 @@ function RunOnlyDisplay({
 
       {/* Per-run item list */}
       {showItemList && (
-        <div className="flex flex-col gap-2 overflow-hidden">
+        <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden">
           <p className="font-bold text-md text-white/85">{t(translations.widget.runItems)}</p>
 
           {/* Manual Item Entry */}
@@ -270,7 +276,7 @@ function RunOnlyDisplay({
 
           {runItemsByRun.length > 0 && (
             <div
-              className="mt-2 flex flex-col gap-1 overflow-y-auto text-white/95 text-xs"
+              className="mt-2 flex min-h-0 flex-col gap-1 overflow-y-auto text-white/95 text-xs"
               style={{
                 // @ts-expect-error - WebkitAppRegion is an Electron-specific CSS property
                 WebkitAppRegion: 'no-drag',
@@ -306,7 +312,20 @@ export function Widget({ statistics, settings, onDragStart, onDragEnd }: WidgetP
   // Split/all modes need ethereal tracking; fall back to overall here so the widget never renders empty
   const displayMode = resolveWidgetDisplayMode(settings.widgetDisplay, settings.grailEthereal);
   const opacity = clampWidgetOpacity(settings.widgetOpacity);
-  const backgroundColor = `rgba(0, 0, 0, ${opacity})`;
+  // A locked widget is click-through, so it must not be a drag region (Windows would still catch
+  // clicks on it) and must not advertise dragging with the cursor or grip
+  const locked = settings.widgetLocked === true;
+  const rootStyle = useMemo<WidgetRootStyle>(
+    () => ({
+      backgroundColor: `rgba(0, 0, 0, ${opacity})`,
+      backdropFilter: 'blur(10px)',
+      cursor: locked ? 'default' : 'move',
+      height: '100vh',
+      width: '100vw',
+      WebkitAppRegion: locked ? 'no-drag' : 'drag',
+    }),
+    [locked, opacity],
+  );
 
   // Run tracker state for run-only mode
   const {
@@ -406,7 +425,7 @@ export function Widget({ statistics, settings, onDragStart, onDragEnd }: WidgetP
   const containerClasses = useMemo(() => {
     // Text shadow keeps the overlay legible over bright game scenes
     const baseClasses =
-      'group relative flex flex-col items-center p-2 text-white [text-shadow:0_1px_2px_rgb(0_0_0/0.9),0_0_1px_rgb(0_0_0/0.9)]';
+      'group relative flex flex-col items-center overflow-hidden p-2 text-white [text-shadow:0_1px_2px_rgb(0_0_0/0.9),0_0_1px_rgb(0_0_0/0.9)]';
     const gapClasses = {
       overall: 'gap-4',
       split: 'gap-4',
@@ -416,42 +435,25 @@ export function Widget({ statistics, settings, onDragStart, onDragEnd }: WidgetP
     return `${baseClasses} ${gapClasses[displayMode]}`;
   }, [displayMode]);
 
-  // Calculate gauge scale based on display mode
-  const gaugeScale = useMemo(() => {
-    return {
-      overall: 1.8, // Single gauge, can be larger
-      split: 1.4, // Two gauges side by side
-      all: 1.4, // Multiple gauges, standard size
-      'run-only': 1.0, // No gauge scaling for run-only mode
-    }[displayMode];
-  }, [displayMode]);
-
   // Handle run-only mode separately (doesn't need statistics)
   if (displayMode === 'run-only') {
     return (
       <section
         aria-label={widgetLabel}
         className={containerClasses}
-        style={{
-          backgroundColor,
-          backdropFilter: 'blur(10px)',
-          cursor: 'move',
-          height: '100vh',
-          width: '100vw',
-          // @ts-expect-error - WebkitAppRegion is an Electron-specific CSS property
-          WebkitAppRegion: 'drag',
-        }}
+        style={rootStyle}
         onMouseDown={onDragStart}
         onMouseUp={onDragEnd}
       >
-        <WidgetDragGrip />
+        {!locked && <WidgetDragGrip />}
         <RunOnlyDisplay
           activeSession={activeSession}
           runDuration={runDuration}
           sessionStats={sessionStats}
           runItemsByRun={runItemsByRun}
           showItemList={settings.widgetRunOnlyShowItems ?? true}
-          onAddManualItem={addManualRunItem}
+          // The manual entry field can't be clicked while the widget is click-through
+          onAddManualItem={locked ? undefined : addManualRunItem}
           hasRuns={hasRuns}
         />
       </section>
@@ -463,19 +465,11 @@ export function Widget({ statistics, settings, onDragStart, onDragEnd }: WidgetP
       <section
         aria-label={widgetLabel}
         className={containerClasses}
-        style={{
-          backgroundColor,
-          backdropFilter: 'blur(10px)',
-          cursor: 'move',
-          height: '100vh',
-          width: '100vw',
-          // @ts-expect-error - WebkitAppRegion is an Electron-specific CSS property
-          WebkitAppRegion: 'drag',
-        }}
+        style={rootStyle}
         onMouseDown={onDragStart}
         onMouseUp={onDragEnd}
       >
-        <WidgetDragGrip />
+        {!locked && <WidgetDragGrip />}
         <p className="text-sm text-white">{t(translations.common.loading)}</p>
       </section>
     );
@@ -485,83 +479,71 @@ export function Widget({ statistics, settings, onDragStart, onDragEnd }: WidgetP
     <section
       aria-label={widgetLabel}
       className={containerClasses}
-      style={{
-        backgroundColor,
-        backdropFilter: 'blur(10px)',
-        cursor: 'move',
-        height: '100vh',
-        width: '100vw',
-        // @ts-expect-error - WebkitAppRegion is an Electron-specific CSS property
-        WebkitAppRegion: 'drag',
-      }}
+      style={rootStyle}
       onMouseDown={onDragStart}
       onMouseUp={onDragEnd}
     >
-      <WidgetDragGrip />
+      {!locked && <WidgetDragGrip />}
       {/* Display mode: overall - Just overall progress */}
       {displayMode === 'overall' && (
-        <div style={{ transform: `scale(${gaugeScale})` }} className="mt-8">
+        <div className="flex min-h-0 flex-1 items-center justify-center">
           <WidgetGauge
             label={t(translations.settings.widget.overall)}
             current={statistics.foundItems}
             total={statistics.totalItems}
             color="purple"
+            size="xl"
           />
         </div>
       )}
 
       {/* Display mode: split - Normal and Ethereal side by side */}
       {displayMode === 'split' && (
-        <div className="mt-4 flex justify-center gap-12">
-          <div style={{ transform: `scale(${gaugeScale})` }}>
-            <WidgetGauge
-              label={t(translations.grail.itemCard.normal)}
-              current={statistics.normalItems.found}
-              total={statistics.normalItems.total}
-              color="orange"
-            />
-          </div>
-          <div style={{ transform: `scale(${gaugeScale})` }}>
-            <WidgetGauge
-              label={t(translations.widget.ethereal)}
-              current={statistics.etherealItems.found}
-              total={statistics.etherealItems.total}
-              color="blue"
-            />
-          </div>
+        <div className="flex min-h-0 flex-1 items-center justify-center gap-6">
+          <WidgetGauge
+            label={t(translations.grail.itemCard.normal)}
+            current={statistics.normalItems.found}
+            total={statistics.normalItems.total}
+            color="orange"
+            size="lg"
+          />
+          <WidgetGauge
+            label={t(translations.widget.ethereal)}
+            current={statistics.etherealItems.found}
+            total={statistics.etherealItems.total}
+            color="blue"
+            size="lg"
+          />
         </div>
       )}
 
       {/* Display mode: all - Overall on top, Normal and Ethereal below */}
       {displayMode === 'all' && (
-        <div className="mt-4 flex flex-col items-center gap-8">
-          <div style={{ transform: `scale(${gaugeScale})` }}>
-            <WidgetGauge
-              label={t(translations.settings.widget.overall)}
-              current={statistics.foundItems}
-              total={statistics.totalItems}
-              color="purple"
-            />
-          </div>
+        <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-4">
+          <WidgetGauge
+            label={t(translations.settings.widget.overall)}
+            current={statistics.foundItems}
+            total={statistics.totalItems}
+            color="purple"
+            size="lg"
+          />
 
           {settings.grailEthereal && (
             <div className="flex justify-center gap-6">
-              <div style={{ transform: `scale(${gaugeScale * 0.85})` }}>
-                <WidgetGauge
-                  label={t(translations.grail.itemCard.normal)}
-                  current={statistics.normalItems.found}
-                  total={statistics.normalItems.total}
-                  color="orange"
-                />
-              </div>
-              <div style={{ transform: `scale(${gaugeScale * 0.85})` }}>
-                <WidgetGauge
-                  label={t(translations.widget.ethereal)}
-                  current={statistics.etherealItems.found}
-                  total={statistics.etherealItems.total}
-                  color="blue"
-                />
-              </div>
+              <WidgetGauge
+                label={t(translations.grail.itemCard.normal)}
+                current={statistics.normalItems.found}
+                total={statistics.normalItems.total}
+                color="orange"
+                size="md"
+              />
+              <WidgetGauge
+                label={t(translations.widget.ethereal)}
+                current={statistics.etherealItems.found}
+                total={statistics.etherealItems.total}
+                color="blue"
+                size="md"
+              />
             </div>
           )}
         </div>

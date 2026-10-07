@@ -7,6 +7,7 @@ import {
   closeWidgetWindow,
   getWidgetWindowPosition,
   resetWidgetWindowSize,
+  setWidgetWindowLocked,
   showWidgetWindow,
   updateWidgetWindowOpacity,
   updateWidgetWindowSize,
@@ -14,13 +15,14 @@ import {
 } from '../window/widgetWindow';
 
 /**
- * Builds the settings used to size the widget window. The custom window sizes are read from the
- * database because the renderer's settings snapshot can be stale (sizes are saved without being
- * broadcast); only the ethereal flag, which decides the resolved display mode, comes from the
+ * Builds the settings used to create and size the widget window. The custom window sizes, the
+ * run-only item list flag (which decides the run-only default size) and the lock state are read
+ * from the database because the renderer's settings snapshot can be stale (sizes are saved without
+ * being broadcast); only the ethereal flag, which decides the resolved display mode, comes from the
  * renderer. Falls back to the renderer-provided settings if the database cannot be read.
  *
  * @param rendererSettings - Settings snapshot sent by the renderer
- * @returns Settings to size the widget window with
+ * @returns Settings to create or size the widget window with
  */
 function getSettingsForWidgetSizing(rendererSettings: Partial<Settings>): Partial<Settings> {
   try {
@@ -30,6 +32,9 @@ function getSettingsForWidgetSizing(rendererSettings: Partial<Settings>): Partia
       widgetSizeOverall: persisted.widgetSizeOverall,
       widgetSizeSplit: persisted.widgetSizeSplit,
       widgetSizeAll: persisted.widgetSizeAll,
+      widgetSizeRunOnly: persisted.widgetSizeRunOnly,
+      widgetRunOnlyShowItems: persisted.widgetRunOnlyShowItems,
+      widgetLocked: persisted.widgetLocked,
       grailEthereal:
         typeof rendererSettings?.grailEthereal === 'boolean'
           ? rendererSettings.grailEthereal
@@ -65,7 +70,7 @@ export function initializeWidgetHandlers(
     try {
       if (enabled) {
         showWidgetWindow(
-          settings,
+          getSettingsForWidgetSizing(settings),
           __dirname,
           viteDevServerUrl,
           rendererDist,
@@ -147,6 +152,28 @@ export function initializeWidgetHandlers(
   });
 
   /**
+   * Lock or unlock the widget (click-through mode).
+   */
+  ipcMain.handle(
+    'widget:set-locked',
+    async (
+      _event,
+      locked: unknown, // Renderer-provided: validated below
+    ) => {
+      try {
+        if (typeof locked !== 'boolean') {
+          return { success: false, error: 'Invalid widget lock state' };
+        }
+        setWidgetWindowLocked(locked);
+        return { success: true };
+      } catch (error) {
+        console.error('Failed to update widget lock state:', error);
+        return { success: false, error: String(error) };
+      }
+    },
+  );
+
+  /**
    * Check if widget is currently open.
    */
   ipcMain.handle('widget:is-open', async () => {
@@ -191,7 +218,10 @@ export function initializeWidgetHandlers(
       if (!isWidgetDisplayMode(display)) {
         return { success: false, error: 'Invalid widget display mode', size: null };
       }
-      const defaultSize = resetWidgetWindowSize(display);
+      const defaultSize = resetWidgetWindowSize(
+        display,
+        getSettingsForWidgetSizing({}).widgetRunOnlyShowItems,
+      );
       if (defaultSize && onSizeChange) {
         onSizeChange(display, defaultSize);
       }

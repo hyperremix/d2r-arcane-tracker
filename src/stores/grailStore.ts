@@ -89,6 +89,7 @@ const defaultSettings: Settings = {
   widgetEnabled: false,
   widgetDisplay: 'overall',
   widgetOpacity: 0.9,
+  widgetLocked: false,
   wizardCompleted: false,
   wizardSkipped: false,
   runTrackerAutoStart: true,

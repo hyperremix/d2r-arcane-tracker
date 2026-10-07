@@ -541,6 +541,12 @@ export type Settings = {
   widgetSizeOverall?: { width: number; height: number }; // Custom size for overall mode
   widgetSizeSplit?: { width: number; height: number }; // Custom size for split mode
   widgetSizeAll?: { width: number; height: number }; // Custom size for all mode
+  widgetSizeRunOnly?: { width: number; height: number }; // Custom size for run-only mode
+  /**
+   * When true, the widget is locked in place: clicks pass through it to the game, it cannot be
+   * focused, dragged or resized. Unlock it again from the widget settings. Defaults to false.
+   */
+  widgetLocked?: boolean;
   /**
    * When true (default), the run-only widget variant shows a compact text list
    * of grail-relevant items found in recent runs for the active session.
