@@ -23,7 +23,7 @@ const subCategoryItems: Item[] = [
   HolyGrailItemBuilder.new().withId('annihilus').withCharmSubCategory('small_charms').build(),
 ];
 
-const initialStoreState = useGrailStore.getState();
+const initialStoreState = useGrailStore.getInitialState();
 
 function resetStore(settings: Partial<Settings> = {}) {
   useGrailStore.setState(
