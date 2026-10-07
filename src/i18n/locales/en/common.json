@@ -506,9 +506,7 @@
       "averageEfficiency": "Average efficiency",
       "performanceHighlights": "Performance Highlights",
       "fastestRun": "Fastest Run",
-      "slowestRun": "Slowest Run",
-      "overallEfficiency": "Overall Efficiency",
-      "itemsPerRunMetric": "{{count}} items/run"
+      "slowestRun": "Slowest Run"
     }
   },
   "titleBar": {
