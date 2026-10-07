@@ -275,7 +275,14 @@
       "selectSaveFileDirectory": "Select Save File Directory",
       "changeDirectoryFailed": "Failed to change directory",
       "restoreDirectoryFailed": "Failed to restore default directory",
-      "unknownError": "Unknown error occurred"
+      "unknownError": "Unknown error occurred",
+      "currentDirectoryLabel": "Current folder",
+      "newDirectoryLabel": "New folder",
+      "backupCreatedContinue": "Backup created. You can now continue with the directory change.",
+      "directoryUnchanged": "Save folder unchanged",
+      "directoryUnchangedDescription": "{{directory}} is already the monitored folder.",
+      "directoryChanged": "Save folder updated",
+      "directoryChangedDescription": "Now monitoring {{directory}}"
     },
     "database": {
       "title": "Database",

@@ -11,20 +11,28 @@ import {
 } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { toast } from 'sonner';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useDatabaseBackup } from '@/hooks/useDatabaseBackup';
+import type {
+  SaveDirectoryChangeOutcome,
+  SaveDirectoryChangeRequest,
+} from '@/hooks/useSaveDirectoryChange';
+import { useSaveDirectoryChange } from '@/hooks/useSaveDirectoryChange';
 import { translations } from '@/i18n/translations';
 import { formatShortDate } from '@/lib/utils';
 import { useGrailStore } from '@/stores/grailStore';
-import type { SaveDirectoryChangeAction } from './SaveDirectoryChangeDialog';
 import { SaveDirectoryChangeDialog } from './SaveDirectoryChangeDialog';
 
 /**
  * SaveFileMonitor component that displays and manages save file monitoring status.
  * Shows monitoring status, monitored directory, detected characters, and provides controls
  * for changing the monitored directory or restoring to the default platform location.
+ * Selecting the directory that is already monitored does nothing; switching to a different
+ * directory while characters or progress exist asks for confirmation first.
  * @returns {JSX.Element} A settings card with save file monitoring status and controls
  */
 export function SaveFileMonitor() {
@@ -37,10 +45,10 @@ export function SaveFileMonitor() {
   const [lastEvent, setLastEvent] = useState<SaveFileEvent | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saveFileCount, setSaveFileCount] = useState<number>(0);
-  const [showChangeDirectoryDialog, setShowChangeDirectoryDialog] = useState(false);
-  const [isChangingDirectory, setIsChangingDirectory] = useState(false);
-  const [dialogAction, setDialogAction] = useState<SaveDirectoryChangeAction | null>(null);
+  const [isSelectingDirectory, setIsSelectingDirectory] = useState(false);
+  const [hasBackedUp, setHasBackedUp] = useState(false);
   const { reloadData, settings } = useGrailStore();
+  const { backup, isBackingUp } = useDatabaseBackup();
 
   const loadMonitoringStatus = useCallback(async () => {
     try {
@@ -100,12 +108,57 @@ export function SaveFileMonitor() {
     );
   }, [error, monitoringStatus.isMonitoring, saveFileCount, settings.gameMode, t]);
 
+  const refreshAfterDirectoryChange = useCallback(async () => {
+    // Reload data, monitoring status and save files to reflect the new directory
+    await reloadData();
+    await loadMonitoringStatus();
+    await loadSaveFiles();
+  }, [loadMonitoringStatus, loadSaveFiles, reloadData]);
+
+  const { pendingChange, isApplying, requestChange, confirmPendingChange, cancelPendingChange } =
+    useSaveDirectoryChange({
+      currentDirectory: monitoringStatus.directory ?? undefined,
+      onApplied: refreshAfterDirectoryChange,
+    });
+
+  const reportOutcome = useCallback(
+    (change: SaveDirectoryChangeRequest, outcome: SaveDirectoryChangeOutcome) => {
+      if (outcome === 'unchanged') {
+        toast.info(t(translations.settings.saveFileMonitor.directoryUnchanged), {
+          description: t(translations.settings.saveFileMonitor.directoryUnchangedDescription, {
+            directory: change.directory,
+          }),
+        });
+      } else if (outcome === 'applied') {
+        toast.success(t(translations.settings.saveFileMonitor.directoryChanged), {
+          description: t(translations.settings.saveFileMonitor.directoryChangedDescription, {
+            directory: change.directory,
+          }),
+        });
+      } else if (outcome === 'failed') {
+        toast.error(
+          change.action === 'restore'
+            ? t(translations.settings.saveFileMonitor.restoreDirectoryFailed)
+            : t(translations.settings.saveFileMonitor.changeDirectoryFailed),
+        );
+      }
+    },
+    [t],
+  );
+
+  const handleRequestChange = useCallback(
+    async (change: SaveDirectoryChangeRequest) => {
+      setHasBackedUp(false);
+      const outcome = await requestChange(change);
+      reportOutcome(change, outcome);
+    },
+    [reportOutcome, requestChange],
+  );
+
   const handleChangeDirectory = useCallback(async () => {
     try {
-      setIsChangingDirectory(true);
-      setError(null);
+      setIsSelectingDirectory(true);
 
-      // Open directory dialog
       const result = await window.electronAPI?.dialog.showOpenDialog({
         title: t(translations.settings.saveFileMonitor.selectSaveFileDirectory),
         properties: ['openDirectory'],
@@ -115,51 +168,58 @@ export function SaveFileMonitor() {
         return;
       }
 
-      const newDirectory = result.filePaths[0];
-
-      // Update the save directory (this will truncate user data and restart monitoring)
-      await window.electronAPI?.saveFile.updateSaveDirectory(newDirectory);
-
-      // Reload data to reflect the changes
-      await reloadData();
-
-      // Reload monitoring status and save files
-      await loadMonitoringStatus();
-      await loadSaveFiles();
-
-      setShowChangeDirectoryDialog(false);
+      await handleRequestChange({ action: 'change', directory: result.filePaths[0] });
     } catch (error) {
       console.error('Failed to change directory:', error);
-      setError(t(translations.settings.saveFileMonitor.changeDirectoryFailed));
+      toast.error(t(translations.settings.saveFileMonitor.changeDirectoryFailed));
     } finally {
-      setIsChangingDirectory(false);
+      setIsSelectingDirectory(false);
     }
-  }, [loadMonitoringStatus, loadSaveFiles, reloadData, t]);
+  }, [handleRequestChange, t]);
 
   const handleRestoreDefaultDirectory = useCallback(async () => {
     try {
-      setIsChangingDirectory(true);
-      setError(null);
+      setIsSelectingDirectory(true);
 
-      // Restore the default directory (this will truncate user data and restart monitoring)
-      await window.electronAPI?.saveFile.restoreDefaultDirectory();
+      const defaultDirectory = await window.electronAPI?.saveFile.getDefaultDirectory();
+      if (!defaultDirectory) {
+        throw new Error('Default save directory is unavailable');
+      }
 
-      // Reload data to reflect the changes
-      await reloadData();
-
-      // Reload monitoring status and save files
-      await loadMonitoringStatus();
-      await loadSaveFiles();
-
-      setShowChangeDirectoryDialog(false);
-      setDialogAction(null);
+      await handleRequestChange({ action: 'restore', directory: defaultDirectory });
     } catch (error) {
       console.error('Failed to restore default directory:', error);
-      setError(t(translations.settings.saveFileMonitor.restoreDirectoryFailed));
+      toast.error(t(translations.settings.saveFileMonitor.restoreDirectoryFailed));
     } finally {
-      setIsChangingDirectory(false);
+      setIsSelectingDirectory(false);
     }
-  }, [loadMonitoringStatus, loadSaveFiles, reloadData, t]);
+  }, [handleRequestChange, t]);
+
+  const handleConfirmChange = useCallback(async () => {
+    if (!pendingChange) {
+      return;
+    }
+    const change = pendingChange;
+    const outcome = await confirmPendingChange();
+    reportOutcome(change, outcome);
+  }, [confirmPendingChange, pendingChange, reportOutcome]);
+
+  const handleBackupFirst = useCallback(async () => {
+    if (await backup()) {
+      setHasBackedUp(true);
+    }
+  }, [backup]);
+
+  const handleConfirmDialogOpenChange = useCallback(
+    (open: boolean) => {
+      if (!open && !isBackingUp) {
+        cancelPendingChange();
+      }
+    },
+    [cancelPendingChange, isBackingUp],
+  );
+
+  const isDirectoryActionBusy = isSelectingDirectory || isApplying || pendingChange !== undefined;
 
   useEffect(() => {
     loadMonitoringStatus();
@@ -273,11 +333,8 @@ export function SaveFileMonitor() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => {
-                  setDialogAction('change');
-                  setShowChangeDirectoryDialog(true);
-                }}
-                disabled={isChangingDirectory}
+                onClick={handleChangeDirectory}
+                disabled={isDirectoryActionBusy}
               >
                 <FolderOpen className="h-3 w-3" />
                 {t(translations.settings.saveFileMonitor.changeDirectory)}
@@ -285,11 +342,8 @@ export function SaveFileMonitor() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => {
-                  setDialogAction('restore');
-                  setShowChangeDirectoryDialog(true);
-                }}
-                disabled={isChangingDirectory}
+                onClick={handleRestoreDefaultDirectory}
+                disabled={isDirectoryActionBusy}
               >
                 <RotateCcw className="h-3 w-3" />
                 {t(translations.settings.saveFileMonitor.restoreDefault)}
@@ -365,18 +419,16 @@ export function SaveFileMonitor() {
 
       {/* Change Directory Confirmation Dialog */}
       <SaveDirectoryChangeDialog
-        open={showChangeDirectoryDialog}
-        onOpenChange={(open) => {
-          setShowChangeDirectoryDialog(open);
-          if (!open) {
-            setDialogAction(null);
-          }
-        }}
-        action={dialogAction ?? 'change'}
-        isProcessing={isChangingDirectory}
-        onConfirm={
-          dialogAction === 'restore' ? handleRestoreDefaultDirectory : handleChangeDirectory
-        }
+        open={pendingChange !== undefined}
+        onOpenChange={handleConfirmDialogOpenChange}
+        action={pendingChange?.action ?? 'change'}
+        isProcessing={isApplying}
+        onConfirm={handleConfirmChange}
+        currentDirectory={monitoringStatus.directory ?? ''}
+        newDirectory={pendingChange?.directory ?? ''}
+        onBackup={handleBackupFirst}
+        isBackingUp={isBackingUp}
+        hasBackedUp={hasBackedUp}
       />
     </Card>
   );
