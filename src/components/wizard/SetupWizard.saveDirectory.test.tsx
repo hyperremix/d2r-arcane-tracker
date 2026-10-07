@@ -41,7 +41,7 @@ describe('When the real SaveDirectoryStep is rendered inside SetupWizard', () =>
     ({ useWizardStore } = await import('@/stores/wizardStore'));
     ({ SetupWizard } = await import('./SetupWizard'));
     const mockUseGrailStore = vi.mocked(useGrailStore);
-    setSettings = vi.fn().mockResolvedValue(undefined);
+    setSettings = vi.fn().mockResolvedValue({ success: true });
     updateSaveDirectory = vi.fn().mockResolvedValue({ success: true });
     restoreDefaultDirectory = vi.fn().mockResolvedValue({ success: true });
     mockUseGrailStore.mockReturnValue({

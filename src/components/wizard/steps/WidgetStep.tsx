@@ -28,7 +28,10 @@ export function WidgetStep() {
 
   const toggleWidget = useCallback(
     async (checked: boolean) => {
-      await setSettings({ widgetEnabled: checked });
+      const result = await setSettings({ widgetEnabled: checked });
+      if (!result.success) {
+        return;
+      }
       // Toggle widget visibility via IPC
       await window.electronAPI?.widget.toggle(checked, settings);
     },
@@ -37,7 +40,10 @@ export function WidgetStep() {
 
   const handleDisplayChange = useCallback(
     async (display: 'overall' | 'split' | 'all' | 'run-only') => {
-      await setSettings({ widgetDisplay: display });
+      const result = await setSettings({ widgetDisplay: display });
+      if (!result.success) {
+        return;
+      }
       // Update widget display mode via IPC
       await window.electronAPI?.widget.updateDisplay(display, settings);
     },
@@ -48,7 +54,10 @@ export function WidgetStep() {
     async (value: number | readonly number[]) => {
       const values = Array.isArray(value) ? value : [value];
       const opacity = clampWidgetOpacity(values[0]);
-      await setSettings({ widgetOpacity: opacity });
+      const result = await setSettings({ widgetOpacity: opacity });
+      if (!result.success) {
+        return;
+      }
       // Update widget opacity via IPC
       await window.electronAPI?.widget.updateOpacity(opacity);
     },

@@ -99,7 +99,7 @@ describe('WidgetSettings', () => {
     });
     // Keep the stored mode as split: the component would otherwise auto-switch it to overall
     useGrailStore.setState((state) => ({
-      setSettings: vi.fn().mockResolvedValue(undefined),
+      setSettings: vi.fn().mockResolvedValue({ success: true }),
       settings: { ...state.settings, widgetDisplay: 'split', grailEthereal: false },
     }));
     render(<WidgetSettings />);
@@ -115,7 +115,7 @@ describe('WidgetSettings', () => {
   });
 
   describe('When the widget is enabled with ethereal tracking', () => {
-    const mockSetSettings = vi.fn().mockResolvedValue(undefined);
+    const mockSetSettings = vi.fn().mockResolvedValue({ success: true });
 
     beforeEach(() => {
       mockSetSettings.mockClear();

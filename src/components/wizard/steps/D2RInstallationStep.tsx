@@ -83,7 +83,11 @@ export function D2RInstallationStep() {
       savingPathRef.current = trimmedPath;
       try {
         await window.electronAPI?.icon.setD2RPath(trimmedPath);
-        await setSettings({ d2rInstallPath: trimmedPath });
+        // This step shows its own inline error, so the store's toast is suppressed
+        const result = await setSettings({ d2rInstallPath: trimmedPath }, { notifyOnError: false });
+        if (!result.success) {
+          throw result.error;
+        }
         savedPathRef.current = trimmedPath;
         return true;
       } catch (error) {

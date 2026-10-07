@@ -1,4 +1,5 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { toast } from 'sonner';
 import type { MockInstance } from 'vitest';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useGrailStore } from '@/stores/grailStore';
@@ -306,6 +307,33 @@ describe('D2RInstallationStep', () => {
 
     // Assert
     expect(api.icon.setD2RPath).not.toHaveBeenCalled();
+  });
+
+  it('If persisting the path setting fails, Then only the inline save error is shown and the path is reverted', async () => {
+    // Arrange
+    const api = createElectronApiMock(null);
+    api.grail.updateSettings.mockRejectedValue(new Error('database locked'));
+    consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const toastError = vi.spyOn(toast, 'error');
+    installElectronApi(api);
+    render(<D2RInstallationStep />);
+    await screen.findByRole('button', { name: 'Use this' });
+    const input = screen.getByLabelText('Installation Path');
+    fireEvent.change(input, { target: { value: 'D:\\D2R' } });
+
+    // Act
+    await act(async () => {
+      fireEvent.blur(input);
+    });
+
+    // Assert
+    expect(
+      await screen.findByText('Could not save the installation path. Please try again.'),
+    ).toBeInTheDocument();
+    expect(useGrailStore.getState().settings.d2rInstallPath).toBeUndefined();
+    expect(api.icon.validatePath).not.toHaveBeenCalled();
+    expect(toastError).not.toHaveBeenCalled();
+    toastError.mockRestore();
   });
 
   it('If saving the path fails, Then a save error is shown and the path is not validated', async () => {

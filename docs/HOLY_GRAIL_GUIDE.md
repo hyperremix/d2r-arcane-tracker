@@ -35,6 +35,8 @@ The setup wizard opens on first launch. You can run it again from **Settings →
 
 All of these can be changed later in **Settings**.
 
+Settings are saved as soon as you change them. If a change can't be saved, the app undoes it and shows an error with a **Retry** button. If the wizard can't save when you click **Finish** or **Skip Setup**, it stays open and shows an error so you can try again.
+
 > **Warning:** changing the monitored save folder deletes all characters and progress in the app. Back up first (**Settings → Database → Backup**).
 
 ## Choosing what to track

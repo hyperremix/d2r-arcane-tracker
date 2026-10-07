@@ -175,6 +175,10 @@
   },
   "settings": {
     "title": "Settings",
+    "saveError": {
+      "title": "Couldn't save your settings",
+      "description": "Your change has been undone. Please try again."
+    },
     "nav": {
       "label": "Settings sections",
       "general": "General",
@@ -546,6 +550,7 @@
     "finish": "Finish",
     "tip": "Tip:",
     "saveDirectoryRequired": "Select your save directory to continue, or skip setup to configure it later.",
+    "saveError": "Your setup could not be saved. Please try again.",
     "welcome": {
       "title": "Welcome to D2R Arcane Tracker!",
       "description": "Track your Diablo II: Resurrected Holy Grail progress with automatic save file monitoring and real-time item detection.",

@@ -9,8 +9,11 @@ import {
   type Item,
   type Settings,
 } from 'electron/types/grail';
+import i18n from 'i18next';
 import { useMemo } from 'react';
+import { toast } from 'sonner';
 import { create } from 'zustand';
+import { translations } from '@/i18n/translations';
 import { canItemBeEthereal, canItemBeNormal } from '@/lib/ethereal';
 import { isRecentFind } from '@/lib/utils';
 
@@ -22,6 +25,23 @@ export interface ManualProgressInput {
   characterId: string;
   isEthereal: boolean;
   foundDate: Date;
+}
+
+/**
+ * Outcome of a settings save. `setSettings` never rejects; callers that need to react to a
+ * failed save (e.g. keep a dialog open) inspect `success` instead.
+ */
+export type SettingsSaveResult = { success: true } | { success: false; error: unknown };
+
+/**
+ * Options controlling how `setSettings` reports a failed save.
+ */
+export interface SetSettingsOptions {
+  /**
+   * Show an error toast with a Retry action when the save fails. Defaults to `true`.
+   * Disable when the caller presents its own inline error (e.g. inside a modal dialog).
+   */
+  notifyOnError?: boolean;
 }
 
 /**
@@ -51,7 +71,10 @@ interface GrailState {
   setItems: (items: Item[]) => void;
   setProgress: (progress: GrailProgress[]) => void;
   setStatistics: (statistics: GrailStatistics) => void;
-  setSettings: (settings: Partial<Settings>) => Promise<void>;
+  setSettings: (
+    settings: Partial<Settings>,
+    options?: SetSettingsOptions,
+  ) => Promise<SettingsSaveResult>;
   hydrateSettings: (settings: Partial<Settings>) => void;
   setFilter: (filter: Partial<GrailFilter>) => void;
   setAdvancedFilter: (filter: Partial<AdvancedGrailFilter>) => void;
@@ -144,6 +167,99 @@ const withSettingsUpdate = (
   };
 };
 
+/** Settings whose change requires reloading the (filtered) items and progress. */
+const GRAIL_FILTER_SETTING_KEYS: ReadonlyArray<keyof Settings> = [
+  'grailNormal',
+  'grailEthereal',
+  'grailRunes',
+  'grailRunewords',
+];
+
+/** Stable toast id so repeated failures (e.g. while dragging a slider) replace one another. */
+const SETTINGS_SAVE_ERROR_TOAST_ID = 'settings-save-error';
+
+/**
+ * Builds the rollback for a failed settings update. Only keys that still hold the optimistic
+ * value are reverted, so a newer update to the same key made while the save was in flight
+ * is never clobbered.
+ * @param {Settings} currentSettings - The settings as they are now
+ * @param {Settings} previousSettings - The settings before the failed update was applied
+ * @param {Partial<Settings>} settingsUpdate - The update that failed to persist
+ * @returns {Partial<Settings>} The previous values of the keys that should be reverted
+ */
+const buildSettingsRollback = (
+  currentSettings: Settings,
+  previousSettings: Settings,
+  settingsUpdate: Partial<Settings>,
+): Partial<Settings> => {
+  const rollback: Partial<Settings> = {};
+  for (const key of Object.keys(settingsUpdate) as Array<keyof Settings>) {
+    if (Object.is(currentSettings[key], settingsUpdate[key])) {
+      Object.assign(rollback, { [key]: previousSettings[key] });
+    }
+  }
+  return rollback;
+};
+
+/**
+ * Picks the given keys from a settings update.
+ * @param {Partial<Settings>} settingsUpdate - The original update
+ * @param {Array<keyof Settings>} keys - The keys to keep
+ * @returns {Partial<Settings>} The update restricted to `keys`
+ */
+const pickSettings = (
+  settingsUpdate: Partial<Settings>,
+  keys: Array<keyof Settings>,
+): Partial<Settings> => {
+  const picked: Partial<Settings> = {};
+  for (const key of keys) {
+    Object.assign(picked, { [key]: settingsUpdate[key] });
+  }
+  return picked;
+};
+
+/**
+ * Shows the error toast for a failed settings save with a Retry action.
+ * @param {() => Promise<SettingsSaveResult>} retry - Re-applies the reverted update
+ */
+const notifySettingsSaveFailed = (retry: () => Promise<SettingsSaveResult>): void => {
+  toast.error(i18n.t(translations.settings.saveError.title), {
+    id: SETTINGS_SAVE_ERROR_TOAST_ID,
+    description: i18n.t(translations.settings.saveError.description),
+    action: {
+      label: i18n.t(translations.common.retry),
+      onClick: () => {
+        void retry();
+      },
+    },
+  });
+};
+
+/**
+ * Reloads items and progress after a grail filter setting changed. Failures are logged only:
+ * the setting itself was saved, so it must not be rolled back.
+ * @param {(partial: Pick<GrailState, 'items'> | Pick<GrailState, 'progress'>) => void} set - Store setter
+ */
+const reloadFilteredGrailData = async (
+  set: (partial: Pick<GrailState, 'items'> | Pick<GrailState, 'progress'>) => void,
+): Promise<void> => {
+  try {
+    const items = await window.electronAPI?.grail.getItems();
+    if (items) {
+      set({ items });
+      console.log(`Reloaded ${items.length} filtered Holy Grail items from database`);
+    }
+
+    const progressData = await window.electronAPI?.grail.getProgress();
+    if (progressData) {
+      set({ progress: progressData });
+      console.log(`Reloaded ${progressData.length} filtered progress entries from database`);
+    }
+  } catch (error) {
+    console.error('Failed to reload grail data after updating settings:', error);
+  }
+};
+
 /**
  * Zustand store for managing Holy Grail state including items, progress, characters, and settings.
  * Provides actions for data manipulation and persistence to the Electron backend.
@@ -168,36 +284,45 @@ export const useGrailStore = create<GrailState>((set, get) => ({
   setItems: (items) => set({ items }),
   setProgress: (progress) => set({ progress }),
   setStatistics: (statistics) => set({ statistics }),
-  setSettings: async (settingsUpdate) => {
-    // Update local state
+  setSettings: async (settingsUpdate, options) => {
+    const previousSettings = get().settings;
+
+    // Update local state optimistically
     set((state) => withSettingsUpdate(state, settingsUpdate));
 
     // Persist to database
     try {
-      await window.electronAPI?.grail.updateSettings(settingsUpdate);
-
-      // Reload data if grail-related settings changed
-      const grailSettingsChanged = Object.keys(settingsUpdate).some((key) =>
-        ['grailNormal', 'grailEthereal', 'grailRunes', 'grailRunewords'].includes(key),
-      );
-
-      if (grailSettingsChanged) {
-        // Reload items and progress to apply filtering
-        const items = await window.electronAPI?.grail.getItems();
-        if (items) {
-          set({ items });
-          console.log(`Reloaded ${items.length} filtered Holy Grail items from database`);
-        }
-
-        const progressData = await window.electronAPI?.grail.getProgress();
-        if (progressData) {
-          set({ progress: progressData });
-          console.log(`Reloaded ${progressData.length} filtered progress entries from database`);
-        }
+      const result = await window.electronAPI?.grail.updateSettings(settingsUpdate);
+      if (result && !result.success) {
+        throw new Error('Settings update was not persisted');
       }
     } catch (error) {
       console.error('Failed to update settings:', error);
+
+      const rollback = buildSettingsRollback(get().settings, previousSettings, settingsUpdate);
+      const revertedKeys = Object.keys(rollback) as Array<keyof Settings>;
+      // Nothing to revert or report if every key was already superseded by a newer update
+      if (revertedKeys.length > 0) {
+        set((state) => withSettingsUpdate(state, rollback));
+        if (options?.notifyOnError !== false) {
+          const retryUpdate = pickSettings(settingsUpdate, revertedKeys);
+          notifySettingsSaveFailed(() => get().setSettings(retryUpdate, options));
+        }
+      }
+
+      return { success: false, error };
     }
+
+    // The setting is saved at this point; a failed reload only leaves stale item data and
+    // must not roll the setting back.
+    const grailSettingsChanged = Object.keys(settingsUpdate).some((key) =>
+      GRAIL_FILTER_SETTING_KEYS.includes(key as keyof Settings),
+    );
+    if (grailSettingsChanged) {
+      await reloadFilteredGrailData(set);
+    }
+
+    return { success: true };
   },
   hydrateSettings: (settingsUpdate) => {
     // Update local state only, without persisting to database
