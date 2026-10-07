@@ -4,6 +4,10 @@ import { fileURLToPath } from 'node:url';
 import { app, BrowserWindow, type IpcMainEvent, ipcMain, screen, session } from 'electron';
 import { grailDatabase } from './database/database';
 import { initializeDialogHandlers } from './ipc-handlers/dialogHandlers';
+import {
+  closeGlobalHotkeys,
+  initializeGlobalHotkeyHandlers,
+} from './ipc-handlers/globalHotkeyHandlers';
 import { closeGrailDatabase, initializeGrailHandlers } from './ipc-handlers/grailHandlers';
 import { initializeIconHandlers } from './ipc-handlers/iconHandlers';
 import { closeRunTracker, initializeRunTrackerHandlers } from './ipc-handlers/runTrackerHandlers';
@@ -260,6 +264,9 @@ app.whenReady().then(() => {
     console.error('[main] Check the logs above for any RunTrackerService creation errors');
   }
 
+  // Opt-in global hotkeys for the run tracker (work while D2R is focused)
+  initializeGlobalHotkeyHandlers(runTracker ?? null, () => mainWindow);
+
   initializeDialogHandlers();
   initializeShellHandlers();
   initializeIconHandlers();
@@ -372,6 +379,11 @@ app.on('before-quit', () => {
   closeSaveFileMonitor();
   closeRunTracker();
   closeWidgetWindow();
+});
+
+// Release OS-wide hotkeys so other applications can use the key combinations again
+app.on('will-quit', () => {
+  closeGlobalHotkeys();
 });
 
 /**

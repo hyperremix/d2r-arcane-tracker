@@ -1,5 +1,6 @@
-import { Loader2, Pause, Play, Square, StopCircle } from 'lucide-react';
+import { Globe, Loader2, Pause, Play, Square, StopCircle } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { translations } from '@/i18n/translations';
@@ -24,6 +25,8 @@ export interface ControlButtonsProps {
   canEndSession: boolean;
   isPaused: boolean;
   pending: ControlButtonsPending;
+  /** Whether the shortcuts are registered as OS-wide hotkeys (work while D2R is focused). */
+  globalHotkeysActive?: boolean;
   onStartRun: () => void;
   onPauseRun: () => void;
   onResumeRun: () => void;
@@ -39,6 +42,7 @@ export function ControlButtons({
   canEndSession,
   isPaused,
   pending,
+  globalHotkeysActive = false,
   onStartRun,
   onPauseRun,
   onResumeRun,
@@ -179,7 +183,7 @@ export function ControlButtons({
       </div>
 
       {/* Keyboard Shortcuts Info */}
-      <div className="rounded-md bg-muted p-3">
+      <div className="flex flex-wrap items-center gap-2 rounded-md bg-muted p-3">
         <p className="text-muted-foreground text-xs">
           <strong>{t(translations.runTracker.controls.shortcutsInfo)}</strong>{' '}
           {t(translations.runTracker.controls.shortcutsDetail, {
@@ -189,6 +193,12 @@ export function ControlButtons({
             endSession: shortcuts.endSession,
           })}
         </p>
+        {globalHotkeysActive && (
+          <Badge variant="outline">
+            <Globe aria-hidden="true" />
+            {t(translations.runTracker.controls.globalHotkeysActive)}
+          </Badge>
+        )}
       </div>
     </div>
   );

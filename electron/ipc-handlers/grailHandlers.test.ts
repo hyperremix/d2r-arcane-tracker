@@ -50,7 +50,11 @@ import { ipcMain } from 'electron';
 import { GrailProgressBuilder, HolyGrailItemBuilder } from '@/fixtures';
 import { GrailDatabase, grailDatabase } from '../database/database';
 import type { Character, Settings } from '../types/grail';
-import { closeGrailDatabase, initializeGrailHandlers } from './grailHandlers';
+import {
+  addSettingsUpdatedListener,
+  closeGrailDatabase,
+  initializeGrailHandlers,
+} from './grailHandlers';
 
 function getUpdateProgressHandler() {
   return vi
@@ -718,6 +722,40 @@ describe('When grailHandlers is used', () => {
       expect(grailDatabase.setSetting).toHaveBeenCalledWith('grailEthereal', 'true');
       expect(grailDatabase.setSetting).toHaveBeenCalledWith('saveDir', '/new/path/to/saves');
       expect(result).toEqual({ success: true });
+    });
+
+    it('When settings are updated, Then registered main-process listeners are notified', async () => {
+      // Arrange
+      const listener = vi.fn();
+      const removeListener = addSettingsUpdatedListener(listener);
+      const handler = vi
+        .mocked(ipcMain.handle)
+        .mock.calls.find((call) => call[0] === 'grail:updateSettings')?.[1] as any;
+
+      // Act
+      await handler(null, { runTrackerGlobalHotkeys: true });
+      removeListener();
+      await handler(null, { runTrackerGlobalHotkeys: false });
+
+      // Assert
+      expect(grailDatabase.setSetting).toHaveBeenCalledWith('runTrackerGlobalHotkeys', 'true');
+      expect(listener).toHaveBeenCalledTimes(1);
+      expect(listener).toHaveBeenCalledWith({ runTrackerGlobalHotkeys: true });
+    });
+
+    it('If runTrackerGlobalHotkeys is not a boolean, Then the update is rejected', async () => {
+      // Arrange
+      const handler = vi
+        .mocked(ipcMain.handle)
+        .mock.calls.find((call) => call[0] === 'grail:updateSettings')?.[1] as any;
+      const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+      // Act & Assert
+      await expect(handler(null, { runTrackerGlobalHotkeys: 'yes' })).rejects.toThrow(
+        'Invalid runTrackerGlobalHotkeys setting',
+      );
+      expect(grailDatabase.setSetting).not.toHaveBeenCalled();
+      consoleError.mockRestore();
     });
 
     it('Then settings handlers should handle errors properly', async () => {

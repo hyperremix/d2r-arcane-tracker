@@ -1,6 +1,6 @@
 import '@testing-library/jest-dom';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useGrailStore } from '@/stores/grailStore';
 import { useRunTrackerStore } from '@/stores/runTrackerStore';
 import { SessionControls } from './SessionControls';
@@ -689,6 +689,155 @@ describe('SessionControls', () => {
       keyboardHandler(event);
 
       expect(mockStoreActions.startRun).toHaveBeenCalledWith();
+    });
+  });
+
+  describe('Auto Mode Shortcut Gating', () => {
+    const originalElectronAPI = window.electronAPI;
+
+    beforeEach(() => {
+      vi.spyOn(document, 'addEventListener').mockImplementation(mockAddEventListener);
+      vi.spyOn(document, 'removeEventListener').mockImplementation(mockRemoveEventListener);
+      Object.defineProperty(window, 'electronAPI', {
+        value: {
+          platform: 'win32',
+          runTracker: {
+            getMemoryStatus: vi.fn().mockResolvedValue({ available: true, reason: null }),
+          },
+        },
+        writable: true,
+        configurable: true,
+      });
+      mockUseGrailStore.mockReturnValue({
+        ...defaultGrailStoreState,
+        settings: { ...defaultGrailStoreState.settings, runTrackerMemoryReading: true },
+      });
+    });
+
+    afterEach(() => {
+      Object.defineProperty(window, 'electronAPI', {
+        value: originalElectronAPI,
+        writable: true,
+        configurable: true,
+      });
+    });
+
+    const pressShortcut = (init: KeyboardEventInit) => {
+      const keyboardHandler = mockAddEventListener.mock.calls.find(
+        (call) => call[0] === 'keydown',
+      )?.[1] as (event: KeyboardEvent) => void;
+      const event = new KeyboardEvent('keydown', init);
+      Object.defineProperty(event, 'target', { value: document.body });
+      act(() => {
+        keyboardHandler(event);
+      });
+    };
+
+    it('If auto mode is enabled, Then the start run shortcut is ignored', () => {
+      // Arrange
+      mockUseRunTrackerStore.mockReturnValue({
+        ...defaultStoreState,
+        activeSession: mockSession,
+        activeRun: null,
+      });
+      render(<SessionControls />);
+
+      // Act
+      pressShortcut({ key: 'r', ctrlKey: true });
+
+      // Assert
+      expect(mockStoreActions.startRun).not.toHaveBeenCalled();
+    });
+
+    it('If auto mode is enabled, Then the pause and end run shortcuts are ignored', () => {
+      // Arrange
+      mockUseRunTrackerStore.mockReturnValue({
+        ...defaultStoreState,
+        activeSession: mockSession,
+        activeRun: mockRun,
+      });
+      render(<SessionControls />);
+
+      // Act
+      pressShortcut({ key: ' ', ctrlKey: true });
+      pressShortcut({ key: 'e', ctrlKey: true });
+
+      // Assert
+      expect(mockStoreActions.pauseRun).not.toHaveBeenCalled();
+      expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+    });
+
+    it('If auto mode is enabled, Then the end session shortcut still opens the confirmation', async () => {
+      // Arrange
+      mockUseRunTrackerStore.mockReturnValue({
+        ...defaultStoreState,
+        activeSession: mockSession,
+      });
+      render(<SessionControls />);
+
+      // Act
+      pressShortcut({ key: 'e', ctrlKey: true, shiftKey: true });
+
+      // Assert
+      const dialog = await screen.findByRole('alertdialog');
+      expect(within(dialog).getByText('End Current Session')).toBeInTheDocument();
+    });
+  });
+
+  describe('Global Hotkeys Indicator', () => {
+    const originalElectronAPI = window.electronAPI;
+
+    const setGlobalHotkeyStatus = (status: unknown) => {
+      Object.defineProperty(window, 'electronAPI', {
+        value: {
+          platform: 'darwin',
+          runTracker: {
+            getGlobalHotkeyStatus: vi.fn().mockResolvedValue(status),
+            onGlobalHotkeyStatus: vi.fn(() => vi.fn()),
+          },
+        },
+        writable: true,
+        configurable: true,
+      });
+    };
+
+    afterEach(() => {
+      Object.defineProperty(window, 'electronAPI', {
+        value: originalElectronAPI,
+        writable: true,
+        configurable: true,
+      });
+    });
+
+    it('If global hotkeys are registered, Then the "Global hotkeys active" indicator is shown', async () => {
+      // Arrange
+      setGlobalHotkeyStatus({
+        enabled: true,
+        registrations: [{ action: 'startRun', shortcut: 'Ctrl+R', state: 'registered' }],
+      });
+
+      // Act
+      render(<SessionControls />);
+
+      // Assert
+      expect(await screen.findByText('Global hotkeys active')).toBeInTheDocument();
+    });
+
+    it('If no global hotkey could be registered, Then the indicator is hidden', async () => {
+      // Arrange
+      setGlobalHotkeyStatus({
+        enabled: true,
+        registrations: [{ action: 'startRun', shortcut: 'Ctrl+R', state: 'conflict' }],
+      });
+
+      // Act
+      render(<SessionControls />);
+      await waitFor(() =>
+        expect(window.electronAPI.runTracker.getGlobalHotkeyStatus).toHaveBeenCalled(),
+      );
+
+      // Assert
+      expect(screen.queryByText('Global hotkeys active')).not.toBeInTheDocument();
     });
   });
 

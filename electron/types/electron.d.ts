@@ -3,6 +3,7 @@ import type {
   D2Item,
   D2SaveFile,
   FileReaderResponse,
+  GlobalHotkeyStatus,
   GrailProgress,
   Item,
   MonitoringStatus,
@@ -627,6 +628,19 @@ export interface ElectronAPI {
      * @returns {Promise<{ available: boolean; reason: string | null }>} A promise that resolves with memory status.
      */
     getMemoryStatus(): Promise<{ available: boolean; reason: string | null }>
+
+    /**
+     * Gets the registration status of the run tracker global hotkeys.
+     * @returns {Promise<GlobalHotkeyStatus>} A promise that resolves with the hotkey status.
+     */
+    getGlobalHotkeyStatus(): Promise<GlobalHotkeyStatus>
+
+    /**
+     * Registers a callback for global hotkey status changes.
+     * @param {(status: GlobalHotkeyStatus) => void} callback - Called with the new status.
+     * @returns {() => void} Cleanup function to remove the listener.
+     */
+    onGlobalHotkeyStatus(callback: (status: GlobalHotkeyStatus) => void): () => void
   }
 
   /**

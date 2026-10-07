@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
+import { isGlobalHotkeysActive, useGlobalHotkeyStatus } from '@/hooks/useGlobalHotkeyStatus';
 import { translations } from '@/i18n/translations';
 import { matchesShortcut } from '@/lib/hotkeys';
 import { useGrailStore } from '@/stores/grailStore';
@@ -113,6 +114,7 @@ export function SessionControls() {
 
   const isWindows = window.electronAPI?.platform === 'win32';
   const autoModeEnabled = (settings.runTrackerMemoryReading ?? false) && isWindows;
+  const globalHotkeysActive = isGlobalHotkeysActive(useGlobalHotkeyStatus());
 
   const [showEndRunDialog, setShowEndRunDialog] = useState(false);
   const [showEndSessionDialog, setShowEndSessionDialog] = useState(false);
@@ -190,21 +192,21 @@ export function SessionControls() {
     [activeSession, activeRun, runs],
   );
 
-  // Keyboard shortcut handlers
+  // Keyboard shortcut handlers (gated on auto mode like the buttons; End Session stays allowed)
   const handleStartRunShortcut = useCallback(
     (event: KeyboardEvent) => {
       event.preventDefault();
-      if (activeSession && !activeRun && !controlsBusy) {
+      if (activeSession && !activeRun && !controlsBusy && !autoModeEnabled) {
         handleStartRun();
       }
     },
-    [activeSession, activeRun, controlsBusy, handleStartRun],
+    [activeSession, activeRun, controlsBusy, autoModeEnabled, handleStartRun],
   );
 
   const handlePauseResumeShortcut = useCallback(
     (event: KeyboardEvent) => {
       event.preventDefault();
-      if (activeRun && !controlsBusy) {
+      if (activeRun && !controlsBusy && !autoModeEnabled) {
         if (isPaused) {
           handleResumeRun();
         } else {
@@ -212,17 +214,17 @@ export function SessionControls() {
         }
       }
     },
-    [activeRun, isPaused, controlsBusy, handlePauseRun, handleResumeRun],
+    [activeRun, isPaused, controlsBusy, autoModeEnabled, handlePauseRun, handleResumeRun],
   );
 
   const handleEndRunShortcut = useCallback(
     (event: KeyboardEvent) => {
       event.preventDefault();
-      if (activeRun && !controlsBusy) {
+      if (activeRun && !controlsBusy && !autoModeEnabled) {
         setShowEndRunDialog(true);
       }
     },
-    [activeRun, controlsBusy],
+    [activeRun, controlsBusy, autoModeEnabled],
   );
 
   const handleEndSessionShortcut = useCallback(
@@ -341,6 +343,7 @@ export function SessionControls() {
               canEndSession={canEndSession}
               isPaused={isPaused}
               pending={pending}
+              globalHotkeysActive={globalHotkeysActive}
               onStartRun={handleStartRun}
               onPauseRun={handlePauseRun}
               onResumeRun={handleResumeRun}

@@ -1,14 +1,39 @@
-import { AlertCircle, Keyboard, Timer } from 'lucide-react';
+import type { GlobalHotkeyRegistration, RunTrackerShortcutAction } from 'electron/types/grail';
+import { AlertCircle, Globe, Keyboard, Timer } from 'lucide-react';
 import { useCallback, useEffect, useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
+import { Switch } from '@/components/ui/switch';
+import { useGlobalHotkeyStatus } from '@/hooks/useGlobalHotkeyStatus';
 import { translations } from '@/i18n/translations';
 import { normalizeShortcut } from '@/lib/hotkeys';
 import { useGrailStore } from '@/stores/grailStore';
 import { ShortcutRecorder } from './ShortcutRecorder';
+
+const SHORTCUT_LABEL_KEYS: Record<RunTrackerShortcutAction, string> = {
+  startRun: translations.settings.runTracker.startRunLabel,
+  pauseRun: translations.settings.runTracker.pauseResumeLabel,
+  endRun: translations.settings.runTracker.endRunLabel,
+  endSession: translations.settings.runTracker.endSessionLabel,
+};
+
+type FailedGlobalHotkeyState = Exclude<GlobalHotkeyRegistration['state'], 'registered'>;
+
+interface FailedGlobalHotkeyRegistration extends GlobalHotkeyRegistration {
+  state: FailedGlobalHotkeyState;
+}
+
+const FAILURE_MESSAGE_KEYS: Record<FailedGlobalHotkeyState, string> = {
+  conflict: translations.settings.runTracker.globalHotkeysConflict,
+  unsupported: translations.settings.runTracker.globalHotkeysUnsupported,
+};
+
+const isFailedRegistration = (
+  registration: GlobalHotkeyRegistration,
+): registration is FailedGlobalHotkeyRegistration => registration.state !== 'registered';
 
 /**
  * RunTrackerSettings component that provides controls for configuring run tracking behavior.
@@ -23,6 +48,8 @@ export function RunTrackerSettings() {
   const endRunShortcutId = useId();
   const endSessionShortcutId = useId();
   const pollingIntervalId = useId();
+  const globalHotkeysLabelId = useId();
+  const globalHotkeysDescriptionId = useId();
 
   const autoModeEnabled = settings.runTrackerMemoryReading ?? false;
   const runTrackerMemoryPollingInterval = settings.runTrackerMemoryPollingInterval ?? 500;
@@ -32,6 +59,13 @@ export function RunTrackerSettings() {
     endRun: 'Ctrl+E',
     endSession: 'Ctrl+Shift+E',
   };
+
+  const globalHotkeysEnabled = settings.runTrackerGlobalHotkeys ?? false;
+  const globalHotkeyStatus = useGlobalHotkeyStatus();
+  const failedGlobalHotkeys =
+    globalHotkeysEnabled && globalHotkeyStatus?.enabled
+      ? globalHotkeyStatus.registrations.filter(isFailedRegistration)
+      : [];
 
   const isWindows = window.electronAPI?.platform === 'win32';
   const [memoryStatus, setMemoryStatus] = useState<{
@@ -50,6 +84,13 @@ export function RunTrackerSettings() {
       const values = Array.isArray(value) ? value : [value];
       const interval = Math.max(100, Math.min(5000, values[0])); // Clamp between 100ms and 5s
       await setSettings({ runTrackerMemoryPollingInterval: interval });
+    },
+    [setSettings],
+  );
+
+  const toggleGlobalHotkeys = useCallback(
+    async (checked: boolean) => {
+      await setSettings({ runTrackerGlobalHotkeys: checked });
     },
     [setSettings],
   );
@@ -187,6 +228,45 @@ export function RunTrackerSettings() {
               onChange={(shortcut) => updateShortcut('endSession', shortcut)}
             />
           </div>
+
+          <div className="flex items-center justify-between gap-4 rounded-md border p-3">
+            <div className="space-y-1">
+              <h5 id={globalHotkeysLabelId} className="flex items-center gap-2 font-medium text-sm">
+                <Globe className="h-4 w-4" aria-hidden="true" />
+                {t(translations.settings.runTracker.globalHotkeys)}
+              </h5>
+              <p id={globalHotkeysDescriptionId} className="text-muted-foreground text-xs">
+                {t(translations.settings.runTracker.globalHotkeysDescription)}
+              </p>
+            </div>
+            <Switch
+              checked={globalHotkeysEnabled}
+              onCheckedChange={toggleGlobalHotkeys}
+              aria-labelledby={globalHotkeysLabelId}
+              aria-describedby={globalHotkeysDescriptionId}
+            />
+          </div>
+
+          {failedGlobalHotkeys.length > 0 && (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription className="text-xs">
+                <strong>
+                  {t(translations.settings.runTracker.globalHotkeysRegistrationFailed)}
+                </strong>
+                <ul className="list-disc pl-4">
+                  {failedGlobalHotkeys.map((registration) => (
+                    <li key={registration.action}>
+                      {t(FAILURE_MESSAGE_KEYS[registration.state], {
+                        action: t(SHORTCUT_LABEL_KEYS[registration.action]),
+                        shortcut: registration.shortcut,
+                      })}
+                    </li>
+                  ))}
+                </ul>
+              </AlertDescription>
+            </Alert>
+          )}
         </div>
 
         {/* Information Box */}

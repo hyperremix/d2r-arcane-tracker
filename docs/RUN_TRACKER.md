@@ -28,7 +28,7 @@ Auto mode reads D2R's memory to tell whether you're in a game. It starts a run w
 2. Turn on **Auto Mode** in the session controls.
 3. Optional: change the polling interval in **Settings → Run Tracker Settings** (100–5000 ms, default 500). Lower values react faster and use more CPU.
 
-While auto mode is on, the manual run and end-session buttons are disabled. The keyboard shortcuts are not gated by auto mode, so avoid pressing them during automatic tracking.
+While auto mode is on, the Start Run, Pause/Resume and End Run buttons and shortcuts are disabled. End Session stays available, so you can still stop a tracked session.
 
 Auto mode only reads memory and never writes to the game process. Each D2R patch needs a verified memory offset. After a patch that isn't supported yet, auto mode does nothing until an app update adds it. See [Troubleshooting](#troubleshooting).
 
@@ -43,7 +43,18 @@ Turn auto mode off to use the buttons, or use these shortcuts. You can change th
 | End run | `Ctrl+E` |
 | End session | `Ctrl+Shift+E` |
 
-Shortcuts only work while the app window is focused on the Run Tracker page. They are ignored while you're typing in a text field.
+By default, shortcuts only work while the app window is focused on the Run Tracker page. They are ignored while you're typing in a text field.
+
+### Global hotkeys
+
+Turn on **Global hotkeys** in **Settings → Run Tracker Settings** to use the shortcuts while D2R (or any other app) is focused, so you don't have to alt-tab between runs. It is off by default.
+
+- From another app, the shortcuts work no matter which page the tracker shows, even when its window is minimized. **Global hotkeys active** appears next to the shortcut list in the session controls once they're set up.
+- When you press a shortcut from another app, End Run and End Session act right away, without the confirmation dialog.
+- While the app window itself is focused, the shortcuts behave as described above, so each press only triggers once.
+- While the app is in the background, other apps (including D2R) don't receive these key combinations. Pick combinations you don't need elsewhere.
+- Global shortcuts must use `Ctrl` or `Alt` (`Cmd` or `Option` on macOS), unless the key is a function key (`F1`–`F24`). This keeps plain typing working in other apps.
+- If a shortcut is already taken by another app, or two actions share the same shortcut, the settings show which one couldn't be registered. Choose a different shortcut.
 
 ## Run items
 
@@ -64,7 +75,7 @@ You can include or leave out per-run items, and either save to a file or copy to
 | Problem | Fix |
 | --- | --- |
 | Auto mode does nothing | Make sure you're on Windows, D2R is running, and a session is active. If the settings show *Auto mode temporarily unavailable*, or the log says `Unknown D2R build`, your D2R version isn't supported yet. Use manual controls and [open an issue](https://github.com/hyperremix/d2r-arcane-tracker/issues) with your D2R version. |
-| Shortcut doesn't fire | Focus the app on the Run Tracker page and make sure you're not typing in a text field. Choose a combination that doesn't clash with other software. |
+| Shortcut doesn't fire | Focus the app on the Run Tracker page and make sure you're not typing in a text field, or turn on [global hotkeys](#global-hotkeys). Choose a combination that doesn't clash with other software. In auto mode only End Session works. |
 | Items missing from a run | Check that the item shows as found in the grail view. Leave the game so D2R writes the save file. Add the item manually if needed. |
 | Export has no loot | Turn on the option to include items, and make sure the session has runs with items. |
 
