@@ -1,0 +1,121 @@
+import type { Settings } from 'electron/types/grail';
+
+/**
+ * A theme preference that has been resolved to a concrete appearance.
+ */
+export type ResolvedTheme = 'light' | 'dark';
+
+/**
+ * Media query matching an OS-level dark color scheme preference.
+ */
+export const SYSTEM_DARK_QUERY = '(prefers-color-scheme: dark)';
+
+/**
+ * localStorage key holding the last resolved theme, used to apply the theme before settings load.
+ */
+export const RESOLVED_THEME_STORAGE_KEY = 'd2r-arcane-tracker:resolved-theme';
+
+/**
+ * Window chrome colors (Windows title bar overlay) per resolved theme.
+ */
+export const THEME_CHROME_COLORS: Record<
+  ResolvedTheme,
+  { backgroundColor: string; symbolColor: string }
+> = {
+  dark: { backgroundColor: '#09090b', symbolColor: '#ffffff' },
+  light: { backgroundColor: '#ffffff', symbolColor: '#000000' },
+};
+
+/**
+ * Resolves a theme preference to a concrete light/dark appearance.
+ * @param {Settings['theme']} theme - The user's theme preference
+ * @param {boolean} systemPrefersDark - Whether the OS currently prefers a dark color scheme
+ * @returns {ResolvedTheme} The concrete theme to apply
+ */
+export function resolveTheme(theme: Settings['theme'], systemPrefersDark: boolean): ResolvedTheme {
+  if (theme === 'system') {
+    return systemPrefersDark ? 'dark' : 'light';
+  }
+  return theme;
+}
+
+/**
+ * Reports whether the OS currently prefers a dark color scheme.
+ * @returns {boolean} True when `prefers-color-scheme: dark` matches; false if matchMedia is unavailable
+ */
+export function getSystemPrefersDark(): boolean {
+  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+    return false;
+  }
+  return window.matchMedia(SYSTEM_DARK_QUERY).matches;
+}
+
+/**
+ * Reads the last resolved theme cached by a previous session.
+ * @param {Pick<Storage, 'getItem'>} [storage] - Storage to read from (defaults to localStorage)
+ * @returns {ResolvedTheme | undefined} The cached theme, or undefined if missing, invalid or unreadable
+ */
+export function readCachedResolvedTheme(
+  storage: Pick<Storage, 'getItem'> | undefined = getLocalStorage(),
+): ResolvedTheme | undefined {
+  try {
+    const value = storage?.getItem(RESOLVED_THEME_STORAGE_KEY);
+    return value === 'light' || value === 'dark' ? value : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Caches the resolved theme so the next startup can apply it before settings load.
+ * @param {ResolvedTheme} theme - The resolved theme to cache
+ * @param {Pick<Storage, 'setItem'>} [storage] - Storage to write to (defaults to localStorage)
+ */
+export function cacheResolvedTheme(
+  theme: ResolvedTheme,
+  storage: Pick<Storage, 'setItem'> | undefined = getLocalStorage(),
+): void {
+  try {
+    storage?.setItem(RESOLVED_THEME_STORAGE_KEY, theme);
+  } catch {
+    // Storage may be unavailable or full; the theme still applies, only the startup cache is lost
+  }
+}
+
+/**
+ * Toggles the `dark` class on the given root element.
+ * @param {ResolvedTheme} theme - The resolved theme to apply
+ * @param {HTMLElement} [root] - Element to update (defaults to the document root)
+ */
+export function applyThemeClass(
+  theme: ResolvedTheme,
+  root: HTMLElement = document.documentElement,
+): void {
+  root.classList.toggle('dark', theme === 'dark');
+}
+
+/**
+ * Gets the theme to use before settings have loaded: the cached theme, else the OS preference.
+ * @returns {ResolvedTheme} The best-guess theme for startup
+ */
+export function getInitialResolvedTheme(): ResolvedTheme {
+  return readCachedResolvedTheme() ?? resolveTheme('system', getSystemPrefersDark());
+}
+
+/**
+ * Applies the startup theme synchronously, before React mounts, to avoid a light flash.
+ * @returns {ResolvedTheme} The theme that was applied
+ */
+export function applyInitialTheme(): ResolvedTheme {
+  const theme = getInitialResolvedTheme();
+  applyThemeClass(theme);
+  return theme;
+}
+
+function getLocalStorage(): Storage | undefined {
+  try {
+    return typeof window === 'undefined' ? undefined : window.localStorage;
+  } catch {
+    return undefined;
+  }
+}

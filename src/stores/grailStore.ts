@@ -35,6 +35,8 @@ interface GrailState {
   progress: GrailProgress[];
   statistics: GrailStatistics | null;
   settings: Settings;
+  /** True once settings have been loaded from the database (until then `settings` holds defaults). */
+  settingsHydrated: boolean;
 
   // UI State
   filter: GrailFilter;
@@ -155,6 +157,7 @@ export const useGrailStore = create<GrailState>((set, get) => ({
   progress: [],
   statistics: null,
   settings: defaultSettings,
+  settingsHydrated: false,
   filter: defaultFilter,
   filterResetCount: 0,
   advancedFilter: defaultAdvancedFilter,
@@ -203,7 +206,7 @@ export const useGrailStore = create<GrailState>((set, get) => ({
     // Update local state only, without persisting to database
     // This is used when loading settings from the database to avoid triggering
     // settings-updated events that would cause unwanted side effects (e.g., widget resize)
-    set((state) => withSettingsUpdate(state, settingsUpdate));
+    set((state) => ({ ...withSettingsUpdate(state, settingsUpdate), settingsHydrated: true }));
   },
   setFilter: (filterUpdate) =>
     set((state) => ({
