@@ -423,6 +423,33 @@ export interface MonitoringStatus {
 }
 
 /**
+ * Outcome of inspecting a candidate save directory without applying it.
+ * - `invalidPath`: not a usable absolute path
+ * - `notFound`: the path does not exist or is not a readable directory
+ * - `noSaveFiles`: the directory exists but contains no `.d2s` character files
+ * - `hasSaveFiles`: the directory contains at least one `.d2s` character file
+ */
+export type SaveDirectoryInspectionStatus =
+  | 'invalidPath'
+  | 'notFound'
+  | 'noSaveFiles'
+  | 'hasSaveFiles';
+
+/**
+ * Result of inspecting a candidate save directory.
+ */
+export interface SaveDirectoryInspection {
+  status: SaveDirectoryInspectionStatus;
+  /** Number of `.d2s` character files directly inside the directory. */
+  saveFileCount: number;
+  /**
+   * A nearby `Diablo II Resurrected` folder that does contain character files, offered when the
+   * candidate looks like its parent (e.g. "Saved Games") or one of its subfolders.
+   */
+  suggestedDirectory?: string;
+}
+
+/**
  * Interface representing the current state of run tracking.
  */
 export interface RunState {

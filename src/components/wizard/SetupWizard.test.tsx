@@ -16,13 +16,7 @@ vi.mock('./steps/SaveDirectoryStep', () => ({
 vi.mock('./steps/D2RInstallationStep', () => ({
   D2RInstallationStep: () => <div>D2RInstallationContent</div>,
 }));
-vi.mock('./steps/GameModeStep', () => ({ GameModeStep: () => <div>GameModeContent</div> }));
-vi.mock('./steps/GameVersionStep', () => ({
-  GameVersionStep: () => <div>GameVersionContent</div>,
-}));
-vi.mock('./steps/GrailSettingsStep', () => ({
-  GrailSettingsStep: () => <div>GrailSettingsContent</div>,
-}));
+vi.mock('./steps/TrackingStep', () => ({ TrackingStep: () => <div>TrackingContent</div> }));
 vi.mock('./steps/PreferencesStep', () => ({
   PreferencesStep: () => <div>PreferencesContent</div>,
 }));
@@ -58,9 +52,9 @@ describe('SetupWizard', () => {
     render(<SetupWizard />);
 
     // Assert
-    expect(wizardSteps).toHaveLength(8);
+    expect(wizardSteps).toHaveLength(6);
     expect(useWizardStore.getState().totalSteps).toBe(wizardSteps.length);
-    expect(screen.getByText('Step 1 of 8')).toBeInTheDocument();
+    expect(screen.getByText('Step 1 of 6')).toBeInTheDocument();
     expect(screen.getByText('WelcomeContent')).toBeInTheDocument();
   });
 
@@ -76,10 +70,11 @@ describe('SetupWizard', () => {
     expect(nextButton).toBeDisabled();
     expect(
       screen.getByText(
-        'Select your save directory to continue, or skip setup to configure it later.',
+        'Choose the folder that contains your .d2s character files to continue, or skip setup to configure it later.',
       ),
     ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Skip Setup' })).toBeEnabled();
+    expect(screen.queryByRole('button', { name: 'Skip Optional Steps' })).not.toBeInTheDocument();
   });
 
   it('If the save directory step reports a directory, Then Next is enabled and advances', () => {
@@ -94,14 +89,41 @@ describe('SetupWizard', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Next' }));
 
     // Assert
-    expect(screen.getByText('D2RInstallationContent')).toBeInTheDocument();
-    expect(screen.getByText('Step 3 of 8')).toBeInTheDocument();
+    expect(screen.getByText('TrackingContent')).toBeInTheDocument();
+    expect(screen.getByText('Step 3 of 6')).toBeInTheDocument();
   });
 
-  it('When advancing past grail settings, Then a single optional Preferences step precedes completion', () => {
+  it('When the flow is configured, Then only the save folder is required and everything after What to Track is optional', () => {
+    // Arrange & Act
+    const flow = wizardSteps.map((wizardStep) => ({
+      id: wizardStep.id,
+      optional: Boolean(wizardStep.optional),
+      requiresValidation: Boolean(wizardStep.requiresValidation),
+    }));
+
+    // Assert
+    expect(flow).toEqual([
+      { id: 'welcome', optional: false, requiresValidation: false },
+      { id: 'saveDirectory', optional: false, requiresValidation: true },
+      { id: 'tracking', optional: false, requiresValidation: false },
+      { id: 'd2rInstallation', optional: true, requiresValidation: false },
+      { id: 'preferences', optional: true, requiresValidation: false },
+      { id: 'complete', optional: false, requiresValidation: false },
+    ]);
+  });
+
+  it('When advancing past What to Track, Then the optional D2R installation and Preferences steps precede completion', () => {
     // Arrange
-    openWizardAt(5);
+    openWizardAt(2);
     render(<SetupWizard />);
+
+    // Act
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+
+    // Assert
+    expect(screen.getByText('D2RInstallationContent')).toBeInTheDocument();
+    expect(screen.getByText('Optional')).toBeInTheDocument();
+    expect(screen.getByText('Step 4 of 6')).toBeInTheDocument();
 
     // Act
     fireEvent.click(screen.getByRole('button', { name: 'Next' }));
@@ -109,8 +131,9 @@ describe('SetupWizard', () => {
     // Assert
     expect(screen.getByText('PreferencesContent')).toBeInTheDocument();
     expect(screen.getByText('Optional')).toBeInTheDocument();
-    expect(screen.getByText('Step 7 of 8')).toBeInTheDocument();
-    expect(screen.queryByText('ThemeContent')).not.toBeInTheDocument();
+    expect(screen.getByText('Step 5 of 6')).toBeInTheDocument();
+    // Only the summary is left, so there is nothing optional to skip
+    expect(screen.queryByRole('button', { name: 'Skip Optional Steps' })).not.toBeInTheDocument();
 
     // Act
     fireEvent.click(screen.getByRole('button', { name: 'Next' }));
@@ -119,6 +142,33 @@ describe('SetupWizard', () => {
     expect(screen.getByText('CompletionContent')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Finish' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Skip Setup' })).not.toBeInTheDocument();
+  });
+
+  it('When the user skips optional steps from What to Track, Then the wizard jumps straight to the summary', () => {
+    // Arrange
+    openWizardAt(2);
+    render(<SetupWizard />);
+
+    // Act
+    fireEvent.click(screen.getByRole('button', { name: 'Skip Optional Steps' }));
+
+    // Assert
+    expect(screen.getByText('CompletionContent')).toBeInTheDocument();
+    expect(screen.getByText('Step 6 of 6')).toBeInTheDocument();
+    expect(screen.queryByText('D2RInstallationContent')).not.toBeInTheDocument();
+    expect(screen.queryByText('PreferencesContent')).not.toBeInTheDocument();
+  });
+
+  it('If the save directory step is valid, Then optional steps cannot be skipped yet because What to Track follows', () => {
+    // Arrange
+    openWizardAt(1, { saveDirectory: true });
+
+    // Act
+    render(<SetupWizard />);
+
+    // Assert
+    expect(screen.getByRole('button', { name: 'Next' })).toBeEnabled();
+    expect(screen.queryByRole('button', { name: 'Skip Optional Steps' })).not.toBeInTheDocument();
   });
 
   it('When Skip Setup is confirmed on an invalid step, Then the wizard closes', async () => {

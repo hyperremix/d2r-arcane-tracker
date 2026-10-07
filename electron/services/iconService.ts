@@ -44,6 +44,16 @@ interface SpriteHeader {
  * Service for managing D2R item icons.
  * Handles sprite conversion from D2R installation to PNGs stored in userData.
  */
+/**
+ * Battle.net's default D2R installation directory on Windows.
+ */
+export const WINDOWS_DEFAULT_D2R_INSTALL_PATH = 'C:\\Program Files (x86)\\Diablo II Resurrected';
+
+/**
+ * Default D2R application location on macOS.
+ */
+export const MAC_DEFAULT_D2R_INSTALL_PATH = '/Applications/Diablo II Resurrected.app';
+
 export class IconService {
   private d2rPath: string | null = null;
   private iconCache: Map<string, string> = new Map();
@@ -120,6 +130,23 @@ export class IconService {
     }
 
     return null;
+  }
+
+  /**
+   * Gets the platform's default D2R installation path, but only if it exists on disk,
+   * so the setup wizard never suggests a location that isn't there.
+   * Unlike {@link findD2RInstallation}, this does not change the configured path.
+   * @returns The existing default installation path, or undefined
+   */
+  getSuggestedD2RPath(): string | undefined {
+    const currentPlatform = platform();
+    let defaultPath: string | undefined;
+    if (currentPlatform === 'win32') {
+      defaultPath = WINDOWS_DEFAULT_D2R_INSTALL_PATH;
+    } else if (currentPlatform === 'darwin') {
+      defaultPath = MAC_DEFAULT_D2R_INSTALL_PATH;
+    }
+    return defaultPath && existsSync(defaultPath) ? defaultPath : undefined;
   }
 
   /**

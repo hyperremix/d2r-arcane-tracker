@@ -55,13 +55,14 @@ const gameModes: GameModeOption[] = [
 ];
 
 /**
- * GameModeStep component - Step for selecting the game mode.
+ * GameModeStep component - Game mode section of the wizard "What to track" step.
  * Allows users to choose between Both, Softcore, Hardcore, or Manual tracking.
- * @returns {JSX.Element} Game mode selection step content
+ * @returns {JSX.Element} Game mode selection section content
  */
 export function GameModeStep() {
   const { t } = useTranslation();
   const gameModeId = useId();
+  const headingId = useId();
   const { settings, setSettings } = useGrailStore();
   const gameMode = settings.gameMode || GameMode.Both;
   const selectedMode = gameModes.find((mode) => mode.value === gameMode);
@@ -71,10 +72,14 @@ export function GameModeStep() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="space-y-2">
-        <h2 className="font-bold text-2xl">{t(translations.settings.gameMode.title)}</h2>
-        <p className="text-muted-foreground">{t(translations.wizard.gameMode.description)}</p>
+    <section aria-labelledby={headingId} className="space-y-4">
+      <div className="space-y-1">
+        <h3 id={headingId} className="font-semibold text-lg">
+          {t(translations.settings.gameMode.title)}
+        </h3>
+        <p className="text-muted-foreground text-sm">
+          {t(translations.wizard.gameMode.description)}
+        </p>
       </div>
 
       <div className="space-y-4">
@@ -111,6 +116,6 @@ export function GameModeStep() {
           </p>
         </div>
       </div>
-    </div>
+    </section>
   );
 }

@@ -7,9 +7,9 @@ import { translations } from '@/i18n/translations';
 import { useGrailStore } from '@/stores/grailStore';
 
 /**
- * GrailSettingsStep component - Step for configuring Holy Grail tracking options.
+ * GrailSettingsStep component - Grail contents section of the wizard "What to track" step.
  * Allows users to toggle tracking of normal, ethereal, runes, and runewords.
- * @returns {JSX.Element} Grail settings configuration step content
+ * @returns {JSX.Element} Grail settings configuration section content
  */
 export function GrailSettingsStep() {
   const { t } = useTranslation();
@@ -17,6 +17,7 @@ export function GrailSettingsStep() {
   const grailEtherealId = useId();
   const grailRunesId = useId();
   const grailRunewordsId = useId();
+  const headingId = useId();
   const { settings, setSettings } = useGrailStore();
 
   const grailNormal = settings.grailNormal ?? true;
@@ -25,13 +26,15 @@ export function GrailSettingsStep() {
   const grailRunewords = settings.grailRunewords ?? false;
 
   return (
-    <div className="space-y-6">
-      <div className="space-y-2">
+    <section aria-labelledby={headingId} className="space-y-4">
+      <div className="space-y-1">
         <div className="flex items-center gap-2">
-          <Trophy className="h-6 w-6" />
-          <h2 className="font-bold text-2xl">{t(translations.settings.grail.title)}</h2>
+          <Trophy className="h-5 w-5" aria-hidden="true" />
+          <h3 id={headingId} className="font-semibold text-lg">
+            {t(translations.settings.grail.title)}
+          </h3>
         </div>
-        <p className="text-muted-foreground">{t(translations.wizard.grail.description)}</p>
+        <p className="text-muted-foreground text-sm">{t(translations.wizard.grail.description)}</p>
       </div>
 
       <div className="space-y-6">
@@ -112,6 +115,6 @@ export function GrailSettingsStep() {
           </p>
         </div>
       </div>
-    </div>
+    </section>
   );
 }

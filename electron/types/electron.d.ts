@@ -8,6 +8,7 @@ import type {
   MonitoringStatus,
   Run,
   RunItem,
+  SaveDirectoryInspection,
   Session,
   Settings,
   TerrorZone,
@@ -167,6 +168,13 @@ export interface ElectronAPI {
      */
     updateSaveDirectory(saveDir: string): Promise<{ success: boolean }>
     /**
+     * Inspects a candidate save directory without applying it: checks that it exists,
+     * counts its character save files and suggests a nearby D2R save folder if needed.
+     * @param {string} directory - The candidate directory path.
+     * @returns {Promise<SaveDirectoryInspection>} A promise that resolves with the inspection result.
+     */
+    inspectDirectory(directory: string): Promise<SaveDirectoryInspection>
+    /**
      * Restores the default save directory for the current platform.
      * @returns {Promise<{ success: boolean; defaultDirectory: string }>} A promise that resolves with success indicator and default directory path.
      */
@@ -201,6 +209,12 @@ export interface ElectronAPI {
      * @returns {Promise<string | null>} D2R path or null if not set.
      */
     getD2RPath(): Promise<string | null>
+
+    /**
+     * Gets the default D2R installation path for this platform, if it exists on disk.
+     * @returns {Promise<string | undefined>} The existing default path, or undefined.
+     */
+    getSuggestedD2RPath(): Promise<string | undefined>
 
     /**
      * Converts all sprite files from D2R installation to PNGs.

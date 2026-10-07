@@ -526,10 +526,8 @@
     "steps": {
       "welcome": "Welcome",
       "saveDirectory": "Save Directory",
+      "tracking": "What to Track",
       "d2rInstallation": "D2R Installation",
-      "gameMode": "Game Mode",
-      "gameVersion": "Game Version",
-      "grailSettings": "Grail Settings",
       "complete": "Complete"
     },
     "progress": "Step {{current}} of {{total}}",
@@ -537,6 +535,7 @@
     "optional": "Optional",
     "back": "Back",
     "skipSetup": "Skip Setup",
+    "skipOptionalSteps": "Skip Optional Steps",
     "skipConfirm": {
       "title": "Skip setup?",
       "description": "You can run setup later from Settings.",
@@ -545,7 +544,7 @@
     },
     "finish": "Finish",
     "tip": "Tip:",
-    "saveDirectoryRequired": "Select your save directory to continue, or skip setup to configure it later.",
+    "saveDirectoryRequired": "Choose the folder that contains your .d2s character files to continue, or skip setup to configure it later.",
     "welcome": {
       "title": "Welcome to D2R Arcane Tracker!",
       "description": "Track your Diablo II: Resurrected Holy Grail progress with automatic save file monitoring and real-time item detection.",
@@ -553,7 +552,7 @@
       "configureSaveDirectory": "Save file directory for automatic character monitoring",
       "configureGameModeVersion": "Game mode and version preferences",
       "configureGrail": "Holy Grail tracking options (normal, ethereal, runes, runewords)",
-      "configurePreferences": "Optional preferences: theme, notifications and widget overlay",
+      "configurePreferences": "Optional extras: D2R installation folder, theme, notifications and widget overlay",
       "skipHint": "You can skip this wizard and configure settings later, or click Next to get started."
     },
     "saveDirectory": {
@@ -561,6 +560,11 @@
       "description": "Select the directory where your Diablo II: Resurrected save files are located.",
       "pathLabel": "Save Directory Path",
       "placeholder": "Select your save directory...",
+      "pathHint": "Paste or type a folder path, or use Browse.",
+      "useThisFolder": "Use This Folder",
+      "checking": "Checking folder...",
+      "invalidPath": "Enter a full folder path",
+      "folderNotFound": "This folder doesn't exist",
       "browse": "Browse",
       "dialogTitle": "Select Save File Directory",
       "useDefault": "Use Default Directory",
@@ -571,6 +575,11 @@
       "foundCharacters_one": "Found {{count}} character file",
       "noCharacterFiles": "No character files found",
       "noCharacterFilesHint": "Make sure you've selected the correct directory containing your .d2s files",
+      "suggestionTitle": "Did you mean this folder?",
+      "suggestionDescription": "Your character files seem to be in:",
+      "useSuggestion": "Use Suggested Folder",
+      "continueAnyway": "Continue anyway without character files",
+      "continueAnywayHint": "Choose this if you haven't created a character yet. Tracking starts once a .d2s file appears in this folder.",
       "notDetectedTitle": "No save directory detected",
       "notDetectedDescription": "We couldn't find your Diablo II: Resurrected save files automatically. Browse to the folder that contains your .d2s character files to continue.",
       "browseForFolder": "Browse for Folder",
@@ -578,13 +587,18 @@
       "typicalLocationWindows": "C:\\Users\\[YourUsername]\\Saved Games\\Diablo II Resurrected",
       "typicalLocationMac": "~/Library/Application Support/Diablo II Resurrected"
     },
+    "tracking": {
+      "title": "What to Track",
+      "description": "Choose which characters and items count toward your Holy Grail. The defaults suit most players, and you can change them later in Settings."
+    },
     "d2rInstallation": {
       "title": "D2R Installation Path",
       "description": "Configure the path to your Diablo II: Resurrected installation. This setting is used by both item icon management and terror zone configuration features.",
       "pathHint": "This path will be used to access game files for item icons and terror zone configuration.",
       "dialogTitle": "Select D2R Installation Directory",
       "notDetectedTitle": "Installation not detected",
-      "suggestion": "A common install location is:",
+      "notDetectedHint": "Browse to your Diablo II: Resurrected folder, or skip this optional step and set it later in Settings.",
+      "suggestion": "Diablo II: Resurrected was found at the default location:",
       "useSuggestion": "Use this",
       "validating": "Checking installation path...",
       "valid": "Game files found at this location",
@@ -624,6 +638,7 @@
       "description": "Your D2R Arcane Tracker is now configured and ready to track your Holy Grail progress.",
       "summary": "Configuration Summary",
       "saveDirectory": "Save Directory:",
+      "characterFiles": "Character Files:",
       "gameMode": "Game Mode:",
       "gameVersion": "Game Version:",
       "normalItems": "Normal Items:",
@@ -633,7 +648,6 @@
       "theme": "Theme:",
       "notifications": "Notifications:",
       "widget": "Widget:",
-      "configured": "Configured",
       "notSet": "Not set",
       "enabled": "Enabled",
       "disabled": "Disabled",

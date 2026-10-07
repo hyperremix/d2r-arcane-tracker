@@ -8,6 +8,7 @@ import { ItemDetectionService } from '../services/itemDetection';
 import { MemoryReader } from '../services/memoryReader';
 import { ProcessMonitor } from '../services/processMonitor';
 import { RunTrackerService } from '../services/runTracker';
+import { inspectSaveDirectory } from '../services/saveDirectoryInspector';
 import type { D2SaveFile, SaveFileEvent } from '../services/saveFileMonitor';
 import { SaveFileMonitor } from '../services/saveFileMonitor';
 import type {
@@ -17,6 +18,7 @@ import type {
   Item,
   ItemDetectionEvent,
   RunItem,
+  SaveDirectoryInspection,
 } from '../types/grail';
 import { setErrorForwarder } from '../utils/serviceLogger';
 
@@ -648,6 +650,29 @@ export function initializeSaveFileHandlers(): void {
       throw error;
     }
   });
+
+  /**
+   * IPC handler for inspecting a candidate save directory without applying it.
+   * Used by the setup wizard to validate typed/pasted paths and to suggest the
+   * actual D2R save folder when the user picked its parent or a subfolder.
+   * @param _ - IPC event (unused)
+   * @param directory - Candidate directory path
+   * @returns The inspection result
+   */
+  ipcMain.handle(
+    'saveFile:inspectDirectory',
+    async (_, directory: unknown): Promise<SaveDirectoryInspection> => {
+      if (typeof directory !== 'string') {
+        throw new Error('Invalid save directory: expected a string');
+      }
+      try {
+        return await inspectSaveDirectory(directory);
+      } catch (error) {
+        console.error('Failed to inspect save directory:', error);
+        throw error;
+      }
+    },
+  );
 
   /**
    * IPC handler for restoring the default save directory.
