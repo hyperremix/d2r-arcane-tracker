@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { translations } from '@/i18n/translations';
 import { escapeCsvCell } from '@/lib/csv';
+import { formatDuration, formatLocalizedDate } from '@/lib/date';
 import { getFileName } from '@/lib/path';
 
 /**
@@ -16,7 +17,7 @@ import { getFileName } from '@/lib/path';
  * @returns {JSX.Element} Run analytics dashboard with statistics
  */
 export function RunAnalytics() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [overallStats, setOverallStats] = useState<RunStatistics | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -45,13 +46,6 @@ export function RunAnalytics() {
     loadAnalyticsData();
   }, [loadAnalyticsData]);
 
-  // Format duration helper
-  const formatDuration = useCallback((ms: number): string => {
-    const minutes = Math.floor(ms / 60000);
-    const seconds = Math.floor((ms % 60000) / 1000);
-    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
-  }, []);
-
   // Format time helper
   const formatTime = useCallback((ms: number): string => {
     const hours = Math.floor(ms / 3600000);
@@ -76,9 +70,7 @@ export function RunAnalytics() {
         ],
         [
           t(analyticsT.csvHeaders.averageRunDuration),
-          overallStats?.averageRunDuration
-            ? formatDuration(overallStats.averageRunDuration)
-            : '0:00',
+          formatDuration(overallStats?.averageRunDuration),
         ],
         [t(analyticsT.itemsPerRun), overallStats?.itemsPerRun.toFixed(2) || '0.00'],
       ];
@@ -108,7 +100,7 @@ export function RunAnalytics() {
         description: err instanceof Error ? err.message : String(err),
       });
     }
-  }, [overallStats, formatDuration, formatTime, t]);
+  }, [overallStats, formatTime, t]);
 
   if (loading) {
     return (
@@ -250,7 +242,7 @@ export function RunAnalytics() {
                   {formatDuration(overallStats.fastestRun.duration)}
                 </Badge>
                 <span className="text-muted-foreground text-sm">
-                  {overallStats.fastestRun.timestamp.toLocaleDateString()}
+                  {formatLocalizedDate(overallStats.fastestRun.timestamp, i18n.language)}
                 </span>
               </div>
             </div>
@@ -261,7 +253,7 @@ export function RunAnalytics() {
                   {formatDuration(overallStats.slowestRun.duration)}
                 </Badge>
                 <span className="text-muted-foreground text-sm">
-                  {overallStats.slowestRun.timestamp.toLocaleDateString()}
+                  {formatLocalizedDate(overallStats.slowestRun.timestamp, i18n.language)}
                 </span>
               </div>
             </div>

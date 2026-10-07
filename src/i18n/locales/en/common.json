@@ -29,6 +29,7 @@
     "allItems": "All Items"
   },
   "grail": {
+    "title": "Holy Grail",
     "tracker": {
       "totalProgress": "Total Progress",
       "normalItems": "Normal Items",
@@ -175,6 +176,7 @@
   },
   "settings": {
     "title": "Settings",
+    "description": "Configure save file monitoring, tracking, display and data options",
     "nav": {
       "label": "Settings sections",
       "general": "General",
@@ -446,7 +448,7 @@
       "runTracking": "Run Tracking:"
     },
     "shortcutRecorder": {
-      "recording": "Recording\u2026",
+      "recording": "Recording…",
       "pressKeyCombination": "Press desired key combination (Esc to cancel)",
       "includeNonModifier": "Include a non-modifier key in the shortcut."
     },
@@ -457,6 +459,7 @@
     }
   },
   "statistics": {
+    "description": "Your Holy Grail progress and run performance at a glance",
     "grailStatistics": "Grail Statistics",
     "runStatistics": "Run Statistics",
     "dashboard": {
@@ -674,11 +677,13 @@
     "filters": {
       "filterByRunes": "Filter by Runes",
       "showPartial": "Show Partial",
-      "runesSelected": "{{count}} rune{{plural}} selected"
+      "runesSelected_one": "{{count}} rune selected",
+      "runesSelected_other": "{{count}} runes selected"
     }
   },
   "terrorZone": {
     "title": "Terror Zone Configuration",
+    "description": "Choose which terror zones can appear in your game",
     "loadingTerrorZones": "Loading terror zones...",
     "warning": "This feature modifies game files in your D2R installation. Any issues related to these changes are your own responsibility. Changes require a game restart to take effect.",
     "pathNotConfigured": "D2R installation path is not configured",
@@ -719,6 +724,8 @@
     }
   },
   "runTracker": {
+    "title": "Run Tracker",
+    "description": "Track your sessions and runs and review past sessions",
     "loadingData": "Loading run tracker data...",
     "errorLoading": "Error Loading Run Tracker",
     "sessionCard": {

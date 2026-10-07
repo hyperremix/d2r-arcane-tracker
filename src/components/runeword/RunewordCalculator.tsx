@@ -1,6 +1,7 @@
 import type { Item } from 'electron/types/grail';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { PageHeader } from '@/components/layout/PageHeader';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { translations } from '@/i18n/translations';
@@ -95,14 +96,15 @@ export function RunewordCalculator() {
   }, [allRunewords, searchTerm, selectedRunes, showPartial, availableRunes]);
 
   return (
-    <div className="flex h-full gap-6 p-6">
-      {/* Left Sidebar - Filters */}
-      <div className="flex w-80 shrink-0 flex-col gap-6">
-        <div>
-          <h1 className="mb-2 font-bold text-3xl">{t(translations.runeword.calculator.title)}</h1>
-          <p className="text-muted-foreground">{t(translations.runeword.calculator.subtitle)}</p>
-        </div>
+    <div className="grid min-h-0 flex-1 grid-cols-[20rem_minmax(0,1fr)] grid-rows-[auto_minmax(0,1fr)] gap-6 p-6">
+      <PageHeader
+        className="col-span-2"
+        title={t(translations.runeword.calculator.title)}
+        description={t(translations.runeword.calculator.subtitle)}
+      />
 
+      {/* Left Sidebar - Filters */}
+      <div className="flex min-h-0 flex-col gap-6">
         {/* Search Bar */}
         <Card className="flex flex-1 flex-col overflow-hidden">
           <CardContent className="flex flex-1 flex-col gap-4 overflow-hidden">
@@ -134,7 +136,7 @@ export function RunewordCalculator() {
       </div>
 
       {/* Right Content - Runewords */}
-      <div className="flex min-w-0 flex-1 flex-col overflow-y-auto">
+      <div className="flex min-h-0 min-w-0 flex-col overflow-y-auto">
         {/* Loading State */}
         {isLoading && (
           <div className="flex items-center justify-center py-12">

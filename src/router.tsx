@@ -15,9 +15,9 @@ function RootLayout() {
   return (
     <div className="flex h-screen flex-col overflow-hidden">
       <TitleBar />
-      <div className="flex flex-1 flex-col overflow-hidden">
+      <main className="flex min-h-0 flex-1 flex-col overflow-hidden">
         <Outlet />
-      </div>
+      </main>
     </div>
   );
 }

@@ -94,7 +94,7 @@ describe('When exporting run analytics', () => {
         'Total Sessions,3',
         'Total Runs,42',
         'Total Time,1h 5m',
-        'Average Run Duration,1:35',
+        'Average Run Duration,1m 35s',
         'Items Per Run,1.50',
       ].join('\n'),
     );
@@ -166,5 +166,37 @@ describe('When exporting run analytics', () => {
       }),
     );
     expect(toast.success).not.toHaveBeenCalled();
+  });
+});
+
+describe('When run analytics are displayed', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockElectronAPI.runTracker.getOverallStatistics.mockResolvedValue(mockStats);
+    setElectronAPI(mockElectronAPI);
+  });
+
+  afterAll(() => {
+    setElectronAPI(originalElectronAPI);
+  });
+
+  it('If statistics are loaded, Then durations use the shared formatter and dates use the app locale', async () => {
+    // Arrange
+    const formatWithAppLocale = (date: Date) =>
+      new Intl.DateTimeFormat(i18n.language, { dateStyle: 'medium' }).format(date);
+
+    // Act
+    render(<RunAnalytics />);
+
+    // Assert
+    expect(await screen.findByText('1m 35s')).toBeInTheDocument();
+    expect(screen.getByText('1m')).toBeInTheDocument();
+    expect(screen.getByText('3m')).toBeInTheDocument();
+    expect(
+      screen.getByText(formatWithAppLocale(mockStats.fastestRun.timestamp)),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(formatWithAppLocale(mockStats.slowestRun.timestamp)),
+    ).toBeInTheDocument();
   });
 });

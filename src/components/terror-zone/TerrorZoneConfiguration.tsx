@@ -6,6 +6,8 @@ import type {
 import { AlertCircle, AlertTriangle, RotateCcw, Search, XCircle } from 'lucide-react';
 import { useCallback, useEffect, useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { PageHeader } from '@/components/layout/PageHeader';
+import { PageShell } from '@/components/layout/PageShell';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import {
   AlertDialog,
@@ -18,7 +20,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
@@ -197,43 +199,38 @@ export function TerrorZoneConfiguration() {
     : t(validationErrorKeys[validationStatus.errorCode]);
   const showExtractionGuide = validationStatus.errorCode === 'gameFileNotFound';
 
+  const pageHeader = (
+    <PageHeader
+      title={t(translations.terrorZone.title)}
+      description={t(translations.terrorZone.description)}
+    />
+  );
+
   if (isLoading) {
     return (
       <TooltipProvider>
-        <div className="flex-1 overflow-y-auto">
-          <div className="space-y-6 p-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-lg">
-                  <AlertTriangle className="h-5 w-5" />
-                  {t(translations.terrorZone.title)}
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center justify-center py-8">
-                  <div className="text-muted-foreground">
-                    {t(translations.terrorZone.loadingTerrorZones)}
-                  </div>
+        <PageShell>
+          {pageHeader}
+          <Card>
+            <CardContent>
+              <div className="flex items-center justify-center py-8">
+                <div className="text-muted-foreground">
+                  {t(translations.terrorZone.loadingTerrorZones)}
                 </div>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
+              </div>
+            </CardContent>
+          </Card>
+        </PageShell>
       </TooltipProvider>
     );
   }
 
   return (
     <TooltipProvider>
-      <div className="flex-1 overflow-y-auto">
+      <PageShell padded={false}>
         <div className="space-y-6 p-6">
+          {pageHeader}
           <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-lg">
-                <AlertTriangle className="h-5 w-5" />
-                {t(translations.terrorZone.title)}
-              </CardTitle>
-            </CardHeader>
             <CardContent className="space-y-4">
               {/* Warning Alert */}
               <Alert>
@@ -428,7 +425,7 @@ export function TerrorZoneConfiguration() {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
-      </div>
+      </PageShell>
     </TooltipProvider>
   );
 }

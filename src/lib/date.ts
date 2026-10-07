@@ -71,6 +71,31 @@ export function formatShortDate(date: Date | string | number | undefined): strin
 }
 
 /**
+ * Formats a date as a localized date string using the given locale
+ * (e.g. "Jan 15, 2024" for "en", "15.01.2024" for "de").
+ * Falls back to the runtime default locale if the given locale is not supported.
+ * @param {Date | string | number | undefined} date - The date to format
+ * @param {string} [locale] - BCP 47 locale to format with (e.g. the app's `i18n.language`)
+ * @param {Intl.DateTimeFormatOptions} [options={ dateStyle: 'medium' }] - Intl formatting options
+ * @returns {string} Localized date string or "-" if the date is undefined or invalid
+ */
+export function formatLocalizedDate(
+  date: Date | string | number | undefined,
+  locale?: string,
+  options: Intl.DateTimeFormatOptions = { dateStyle: 'medium' },
+): string {
+  if (date === undefined) return '-';
+  const value = date instanceof Date ? date : new Date(date);
+  if (Number.isNaN(value.getTime())) return '-';
+
+  try {
+    return new Intl.DateTimeFormat(locale, options).format(value);
+  } catch {
+    return new Intl.DateTimeFormat(undefined, options).format(value);
+  }
+}
+
+/**
  * Formats a date as a long date string (e.g., "Monday, January 15, 2024").
  * @param {Date | string | number | undefined} date - The date to format
  * @returns {string} Formatted date string or "Never" if date is undefined

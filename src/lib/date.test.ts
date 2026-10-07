@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   formatDate,
   formatDuration,
+  formatLocalizedDate,
   formatLongDate,
   formatShortDate,
   formatTime,
@@ -90,6 +91,41 @@ describe('formatShortDate', () => {
     const date = new Date('2024-01-15T12:00:00Z');
     const result = formatShortDate(date);
     expect(result).toBe('Jan 15, 2024');
+  });
+});
+
+describe('formatLocalizedDate', () => {
+  it('When the date is undefined, Then it returns a dash', () => {
+    expect(formatLocalizedDate(undefined, 'en')).toBe('-');
+  });
+
+  it('When the date is invalid, Then it returns a dash', () => {
+    expect(formatLocalizedDate('not a date', 'en')).toBe('-');
+  });
+
+  it('When a locale is given, Then the date is formatted for that locale', () => {
+    // Arrange
+    const date = new Date('2024-01-15T12:00:00Z');
+
+    // Act
+    const english = formatLocalizedDate(date, 'en', { dateStyle: 'medium', timeZone: 'UTC' });
+    const german = formatLocalizedDate(date, 'de', { dateStyle: 'medium', timeZone: 'UTC' });
+
+    // Assert
+    expect(english).toBe('Jan 15, 2024');
+    expect(german).toBe('15.01.2024');
+  });
+
+  it('If the locale is not a valid language tag, Then it falls back to the default locale', () => {
+    // Arrange
+    const date = new Date('2024-01-15T12:00:00Z');
+    const options: Intl.DateTimeFormatOptions = { dateStyle: 'medium', timeZone: 'UTC' };
+
+    // Act
+    const result = formatLocalizedDate(date, 'not_a_locale!', options);
+
+    // Assert
+    expect(result).toBe(new Intl.DateTimeFormat(undefined, options).format(date));
   });
 });
 
