@@ -16,7 +16,7 @@ import type {
   UpdateStatus,
 } from './grail'
 
-import type { ServiceErrorPayload } from '../utils/serviceLogger'
+import type { ServiceErrorPayload } from './serviceError'
 
 /**
  * Main interface defining the Electron API available to the renderer process.

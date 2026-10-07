@@ -166,7 +166,8 @@ export class DatabaseBatchWriter {
         };
         log.error('flush', 'Max retries exceeded, dropping remaining unflushed items', remaining, {
           surfaceToUI: true,
-          userMessage: 'Database write failed — some item data was lost',
+          code: 'databaseWriteFailed',
+          detail: `Max retries exceeded, dropped ${remaining.characters} characters, ${remaining.progress} progress entries and ${remaining.runItems} run items. Last error: ${error instanceof Error ? error.message : String(error)}`,
         });
         this.characterQueue.clear();
         this.progressQueue.clear();
