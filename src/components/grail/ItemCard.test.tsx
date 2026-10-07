@@ -588,7 +588,7 @@ describe('When ItemCard is rendered', () => {
       'Then the %s card does not dim the item name with opacity',
       (viewMode) => {
         // Arrange
-        const item = HolyGrailItemBuilder.new().withName('Missing Item').build();
+        const item = HolyGrailItemBuilder.new().withType('unique').withName('Missing Item').build();
 
         // Act
         render(<ItemCard item={item} viewMode={viewMode} onClick={vi.fn()} />);
@@ -600,7 +600,7 @@ describe('When ItemCard is rendered', () => {
           if (/(^|\s)opacity-\d+/.test(element.className)) ancestorsWithOpacity.push(element);
         }
         expect(ancestorsWithOpacity).toHaveLength(0);
-        expect(name).toHaveClass('text-foreground');
+        expect(name).toHaveClass('text-item-unique');
       },
     );
 
@@ -661,6 +661,45 @@ describe('When ItemCard is rendered', () => {
       expect(surface).toHaveAttribute('data-found', 'true');
       expect(surface).toHaveClass('border-solid', 'bg-card', 'border-item-unique');
       expect(screen.getByTestId('item-artwork')).not.toHaveClass('grayscale');
+    });
+  });
+
+  describe('If the item has a quality type', () => {
+    it.each([
+      ['grid', 'unique', 'text-item-unique'],
+      ['grid', 'set', 'text-item-set'],
+      ['grid', 'rune', 'text-item-rune'],
+      ['grid', 'runeword', 'text-item-runeword'],
+      ['list', 'unique', 'text-item-unique'],
+      ['list', 'set', 'text-item-set'],
+      ['list', 'rune', 'text-item-rune'],
+      ['list', 'runeword', 'text-item-runeword'],
+    ] as const)('Then the %s card colors a %s item name with %s', (viewMode, type, expected) => {
+      // Arrange
+      const item = HolyGrailItemBuilder.new().withType(type).withName('Quality Item').build();
+
+      // Act
+      render(<ItemCard item={item} viewMode={viewMode} />);
+
+      // Assert
+      const name = screen.getByRole('heading', { name: 'Quality Item' });
+      expect(name).toHaveClass(expected);
+      expect(name).not.toHaveClass('text-foreground');
+    });
+
+    it('Then the grid card does not scale on hover, so it never overlaps its gutters', () => {
+      // Arrange
+      const item = HolyGrailItemBuilder.new().withType('unique').withName('Steady').build();
+
+      // Act
+      render(<ItemCard item={item} onClick={vi.fn()} />);
+
+      // Assert
+      const card = screen.getByRole('button', { name: 'Steady, Not Found' });
+      const surface = card.querySelector('[data-found]');
+      expect(card.className).not.toMatch(/scale-/);
+      expect(surface?.className).not.toMatch(/scale-/);
+      expect(surface).toHaveClass('hover:ring-item-unique/40');
     });
   });
 

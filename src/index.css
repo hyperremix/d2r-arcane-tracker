@@ -2,10 +2,14 @@
 @import 'tw-animate-css';
 @import 'shadcn/tailwind.css';
 @import '@fontsource-variable/inter';
+@import '@fontsource-variable/cinzel';
 
 @custom-variant dark (&:is(.dark *));
 
 @theme {
+  /* Inter for body/UI text; Cinzel (D2-style display serif) for headings via `font-display` */
+  --font-sans: 'Inter Variable', 'Inter', system-ui, Avenir, Helvetica, Arial, sans-serif;
+  --font-display: 'Cinzel Variable', 'Cinzel', Georgia, 'Times New Roman', serif;
   --color-gray-50: #f9fafb;
   --color-gray-100: #f3f4f6;
   --color-gray-200: #e5e7eb;
@@ -21,7 +25,7 @@
 
 @layer base {
   html {
-    font-family: 'Inter', system-ui, Avenir, Helvetica, Arial, sans-serif;
+    font-family: var(--font-sans);
     line-height: 1.5;
     font-weight: 400;
     font-synthesis: none;
@@ -29,6 +33,12 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     -webkit-text-size-adjust: 100%;
+  }
+  /* Page, section and dialog headings use the display serif; dense UI text stays in Inter */
+  h1,
+  h2 {
+    font-family: var(--font-display);
+    letter-spacing: 0.02em;
   }
 }
 
@@ -84,39 +94,44 @@
   --color-item-runeword: var(--item-runeword);
 }
 
+/*
+ * Neutrals use a low-chroma warm stone hue (~55-85) instead of the stock cool zinc.
+ * Text tokens are checked for WCAG AA (>= 4.5:1) on background, card, muted and the
+ * missing-card surface (muted/40 over background; muted/20 in dark) in both themes.
+ */
 :root {
-  --radius: 0.625rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.141 0.005 285.823);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.141 0.005 285.823);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.141 0.005 285.823);
+  --radius: 0.5rem;
+  --background: oklch(0.985 0.004 80);
+  --foreground: oklch(0.17 0.012 55);
+  --card: oklch(0.995 0.003 85);
+  --card-foreground: oklch(0.17 0.012 55);
+  --popover: oklch(0.995 0.003 85);
+  --popover-foreground: oklch(0.17 0.012 55);
   /* Brand: D2 blood red */
   --primary: oklch(0.44 0.16 25);
   --primary-foreground: oklch(0.985 0.01 85);
-  --secondary: oklch(0.967 0.001 286.375);
-  --secondary-foreground: oklch(0.21 0.006 285.885);
-  --muted: oklch(0.967 0.001 286.375);
-  --muted-foreground: oklch(0.51 0.016 285.938);
-  --accent: oklch(0.967 0.001 286.375);
-  --accent-foreground: oklch(0.21 0.006 285.885);
+  --secondary: oklch(0.955 0.008 75);
+  --secondary-foreground: oklch(0.22 0.014 55);
+  --muted: oklch(0.955 0.008 75);
+  --muted-foreground: oklch(0.5 0.02 60);
+  --accent: oklch(0.955 0.008 75);
+  --accent-foreground: oklch(0.22 0.014 55);
   --destructive: oklch(0.52 0.21 27);
-  --border: oklch(0.92 0.004 286.32);
-  --input: oklch(0.92 0.004 286.32);
+  --border: oklch(0.9 0.012 70);
+  --input: oklch(0.9 0.012 70);
   --ring: oklch(0.44 0.16 25);
   --chart-1: oklch(0.44 0.16 25);
   --chart-2: oklch(0.66 0.13 80);
   --chart-3: oklch(0.55 0.13 150);
   --chart-4: oklch(0.5 0.2 300);
   --chart-5: oklch(0.58 0.16 50);
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.141 0.005 285.823);
+  --sidebar: oklch(0.975 0.006 78);
+  --sidebar-foreground: oklch(0.17 0.012 55);
   --sidebar-primary: oklch(0.44 0.16 25);
   --sidebar-primary-foreground: oklch(0.985 0.01 85);
-  --sidebar-accent: oklch(0.967 0.001 286.375);
-  --sidebar-accent-foreground: oklch(0.21 0.006 285.885);
-  --sidebar-border: oklch(0.92 0.004 286.32);
+  --sidebar-accent: oklch(0.955 0.008 75);
+  --sidebar-accent-foreground: oklch(0.22 0.014 55);
+  --sidebar-border: oklch(0.9 0.012 70);
   --sidebar-ring: oklch(0.44 0.16 25);
   /* Status (text-safe on background and on /10-/15 tints) */
   --success: oklch(0.47 0.13 150);
@@ -130,7 +145,10 @@
   --missing-foreground: oklch(0.985 0 0);
   --ethereal: oklch(0.48 0.12 240);
   --ethereal-foreground: oklch(0.985 0 0);
-  /* Item qualities (D2: unique gold, set green, rune orange, runeword purple) */
+  /*
+   * Item qualities (D2: unique gold, set green, rune orange, runeword purple).
+   * Also used as item name text color, so they must stay >= 4.5:1 on card, muted and background.
+   */
   --item-unique: oklch(0.52 0.11 75);
   --item-set: oklch(0.48 0.14 145);
   --item-rune: oklch(0.52 0.15 50);
@@ -140,48 +158,48 @@
 /* The widget overlay always renders on a black backdrop, so it always uses the dark tokens. */
 .dark,
 body.widget {
-  --background: oklch(0.141 0.005 285.823);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.21 0.006 285.885);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.21 0.006 285.885);
-  --popover-foreground: oklch(0.985 0 0);
+  --background: oklch(0.155 0.008 60);
+  --foreground: oklch(0.965 0.01 85);
+  --card: oklch(0.205 0.01 62);
+  --card-foreground: oklch(0.965 0.01 85);
+  --popover: oklch(0.205 0.01 62);
+  --popover-foreground: oklch(0.965 0.01 85);
   /* Brand: D2 gold (dark red is too dim on a dark background) */
   --primary: oklch(0.8 0.13 85);
   --primary-foreground: oklch(0.2 0.03 60);
-  --secondary: oklch(0.274 0.006 286.033);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.274 0.006 286.033);
-  --muted-foreground: oklch(0.705 0.015 286.067);
-  --accent: oklch(0.274 0.006 286.033);
-  --accent-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.265 0.012 62);
+  --secondary-foreground: oklch(0.965 0.01 85);
+  --muted: oklch(0.265 0.012 62);
+  --muted-foreground: oklch(0.72 0.02 75);
+  --accent: oklch(0.265 0.012 62);
+  --accent-foreground: oklch(0.965 0.01 85);
   --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
+  --border: oklch(0.92 0.02 75 / 12%);
+  --input: oklch(0.92 0.02 75 / 16%);
   --ring: oklch(0.8 0.13 85);
   --chart-1: oklch(0.65 0.2 25);
   --chart-2: oklch(0.8 0.13 85);
   --chart-3: oklch(0.72 0.15 150);
   --chart-4: oklch(0.68 0.17 300);
   --chart-5: oklch(0.75 0.16 55);
-  --sidebar: oklch(0.21 0.006 285.885);
-  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar: oklch(0.205 0.01 62);
+  --sidebar-foreground: oklch(0.965 0.01 85);
   --sidebar-primary: oklch(0.8 0.13 85);
   --sidebar-primary-foreground: oklch(0.2 0.03 60);
-  --sidebar-accent: oklch(0.274 0.006 286.033);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-accent: oklch(0.265 0.012 62);
+  --sidebar-accent-foreground: oklch(0.965 0.01 85);
+  --sidebar-border: oklch(0.92 0.02 75 / 12%);
   --sidebar-ring: oklch(0.8 0.13 85);
   --success: oklch(0.75 0.17 150);
-  --success-foreground: oklch(0.141 0.005 285.823);
+  --success-foreground: oklch(0.155 0.008 60);
   --warning: oklch(0.8 0.14 75);
   --info: oklch(0.75 0.12 250);
   --found: oklch(0.75 0.17 150);
-  --found-foreground: oklch(0.141 0.005 285.823);
+  --found-foreground: oklch(0.155 0.008 60);
   --missing: oklch(0.7 0.18 25);
-  --missing-foreground: oklch(0.141 0.005 285.823);
+  --missing-foreground: oklch(0.155 0.008 60);
   --ethereal: oklch(0.75 0.11 230);
-  --ethereal-foreground: oklch(0.141 0.005 285.823);
+  --ethereal-foreground: oklch(0.155 0.008 60);
   --item-unique: oklch(0.8 0.13 85);
   --item-set: oklch(0.78 0.18 145);
   --item-rune: oklch(0.75 0.16 55);

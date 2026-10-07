@@ -139,6 +139,25 @@ describe('When ItemDetailsDialog is rendered', () => {
       expect(screen.getByText('Windforce')).toBeInTheDocument();
     });
 
+    it('Then renders the title in the display font, colored by item quality', () => {
+      // Arrange
+      const item = HolyGrailItemBuilder.new()
+        .withId('item-1')
+        .withType('set')
+        .withName("Tal Rasha's Guardianship")
+        .build();
+      setupStoreMock({ items: [item] });
+
+      // Act
+      render(<ItemDetailsDialog itemId="item-1" open={true} onOpenChange={vi.fn()} />);
+
+      // Assert
+      expect(screen.getByText("Tal Rasha's Guardianship")).toHaveClass(
+        'font-display',
+        'text-item-set',
+      );
+    });
+
     it('Then renders ItemInfoSection with type and category badges', () => {
       // Arrange
       const item = HolyGrailItemBuilder.new()

@@ -12,7 +12,12 @@ import { RuneImages } from '../RuneImages';
 import { ItemTypeIcon } from '../StatusIcons';
 import { getTooltipTriggerRender } from '../tooltipTriggerRender';
 import { DiscoveryAttribution, DiscoveryInfo, StatusIndicators, VersionCounts } from './indicators';
-import { getCardStateClasses, interactiveCardStyles, missingArtworkStyles } from './styles';
+import {
+  getCardStateClasses,
+  getItemQualityTextClass,
+  interactiveCardStyles,
+  missingArtworkStyles,
+} from './styles';
 
 /**
  * Accessibility and interaction props applied to a clickable item card root element.
@@ -119,14 +124,14 @@ export function GridView({
       <div
         {...interactiveProps}
         className={cn(
-          'h-fit w-full rounded-lg transition-all duration-200 hover:scale-105 hover:shadow-lg',
+          'h-fit w-full rounded-lg',
           interactiveProps && interactiveCardStyles,
           className,
         )}
       >
         <Card
           data-found={isFound}
-          className={cn('relative border-2', getCardStateClasses(item.type, isFound))}
+          className={cn('relative rounded-lg border-2', getCardStateClasses(item.type, isFound))}
         >
           {/* Status indicators overlay */}
           {!withoutStatusIndicators && (
@@ -152,13 +157,18 @@ export function GridView({
               focusableTriggers={focusableTriggers}
             />
 
-            {/* Item Name (always full contrast, regardless of found state) */}
+            {/* Item Name (quality colored, never dimmed regardless of found state) */}
             <Tooltip>
               <TooltipTrigger
                 render={getTooltipTriggerRender(focusableTriggers)}
                 className="block w-full text-center"
               >
-                <h3 className="truncate font-semibold text-foreground text-sm leading-tight">
+                <h3
+                  className={cn(
+                    'truncate font-semibold text-sm leading-tight',
+                    getItemQualityTextClass(item.type),
+                  )}
+                >
                   {item.name}
                 </h3>
               </TooltipTrigger>
