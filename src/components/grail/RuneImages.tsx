@@ -1,6 +1,9 @@
 import { runes } from 'electron/items/runes';
+import { X } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { translations } from '@/i18n/translations';
 import type { RunewordCompletionStatus } from '@/lib/runeword-utils';
 import { cn } from '@/lib/utils';
 import placeholderUrl from '/images/placeholder-item.png';
@@ -168,6 +171,10 @@ function RuneImage({
   isMissing = false,
   focusableTriggers = true,
 }: RuneImageProps) {
+  const { t } = useTranslation();
+  const missingTooltip = t(translations.runeword.card.missingRuneTooltip, { rune: runeName });
+  const missingLabel = t(translations.runeword.card.missingRune);
+
   return (
     <Tooltip>
       <TooltipTrigger
@@ -182,24 +189,48 @@ function RuneImage({
               <img
                 src={imageUrl}
                 alt={runeName}
-                className="h-8 w-8 object-contain"
+                className={cn('h-8 w-8 object-contain', isMissing && 'opacity-60 grayscale')}
                 onError={(e) => {
                   // Fallback to placeholder if image fails to load
                   e.currentTarget.src = placeholderUrl;
                 }}
               />
-              {showRuneName && <div className="text-center text-xs">{runeName}</div>}
+              {showRuneName && (
+                <div className={cn('text-center text-xs', isMissing && 'line-through')}>
+                  {runeName}
+                </div>
+              )}
             </div>
+            {isMissing && <MissingRuneMarker label={missingLabel} />}
           </div>
         ) : (
-          <div className={cn(isMissing && 'rounded-lg bg-missing/50 p-1')}>
-            <div className="text-center text-xs">{runeName}</div>
+          <div className={cn('relative', isMissing && 'rounded-lg bg-missing/50 p-1')}>
+            <div className={cn('text-center text-xs', isMissing && 'line-through')}>{runeName}</div>
+            {isMissing && <MissingRuneMarker label={missingLabel} />}
           </div>
         )}
       </TooltipTrigger>
       <TooltipContent>
-        <p className="text-xs">{runeName}</p>
+        <p className="text-xs">{isMissing ? missingTooltip : runeName}</p>
       </TooltipContent>
     </Tooltip>
+  );
+}
+
+/**
+ * Non-color indicator for a missing rune: a cross icon plus screen-reader text.
+ */
+function MissingRuneMarker({ label }: { label: string }) {
+  return (
+    <>
+      <span
+        aria-hidden="true"
+        data-testid="missing-rune-marker"
+        className="-top-1 -right-1 absolute flex h-4 w-4 items-center justify-center rounded-full bg-missing text-missing-foreground"
+      >
+        <X className="h-3 w-3" strokeWidth={3} />
+      </span>
+      <span className="sr-only">{label}</span>
+    </>
   );
 }
