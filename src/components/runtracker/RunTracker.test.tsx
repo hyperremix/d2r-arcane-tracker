@@ -32,9 +32,20 @@ afterAll(() => {
 
 // Mock child components
 vi.mock('./SessionCard', () => ({
-  SessionCard: ({ session }: { session: Session | null }) => (
+  SessionCard: ({
+    session,
+    onViewAllRuns,
+  }: {
+    session: Session | null;
+    onViewAllRuns?: () => void;
+  }) => (
     <div data-testid="session-card">
       Session Card - {session ? `Session ${session.id}` : 'No Session'}
+      {onViewAllRuns && (
+        <button type="button" onClick={onViewAllRuns}>
+          View all runs
+        </button>
+      )}
     </div>
   ),
 }));
@@ -386,5 +397,34 @@ describe('RunTracker', () => {
 
     // Check that SessionsList is rendered
     expect(screen.getByTestId('sessions-list')).toBeDefined();
+  });
+  describe('When View all runs is used for the active session', () => {
+    it('Then the session detail view opens for the active session', () => {
+      // Arrange
+      mockUseRunTrackerStore.mockReturnValue({
+        ...defaultStoreState,
+        activeSession: mockSession,
+      });
+      render(<RunTracker />);
+
+      // Act
+      fireEvent.click(screen.getByRole('button', { name: 'View all runs' }));
+
+      // Assert
+      expect(screen.getByTestId('session-detail-view')).toHaveTextContent(
+        'Session Detail View - session-1',
+      );
+      expect(screen.queryByTestId('session-controls')).toBeNull();
+    });
+  });
+
+  describe('If no session is active', () => {
+    it('Then the session card offers no View all runs action', () => {
+      // Arrange & Act
+      render(<RunTracker />);
+
+      // Assert
+      expect(screen.queryByRole('button', { name: 'View all runs' })).toBeNull();
+    });
   });
 });

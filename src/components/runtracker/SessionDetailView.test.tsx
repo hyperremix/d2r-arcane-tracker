@@ -191,4 +191,18 @@ describe('SessionDetailView', () => {
       expect(screen.getByRole('button', { name: 'Go Back' })).toBeInTheDocument();
     });
   });
+  describe('When the active session is not in the loaded sessions list yet', () => {
+    it('Then the active session details are shown instead of the not-found state', () => {
+      // Arrange
+      const activeSession: Session = { ...mockSession, id: 'session-live', endTime: undefined };
+      mockUseRunTrackerStore.mockReturnValue(createStoreState({ sessions: [], activeSession }));
+
+      // Act
+      render(<SessionDetailView sessionId="session-live" onBack={vi.fn()} />);
+
+      // Assert
+      expect(screen.getByText('Session Information')).toBeInTheDocument();
+      expect(screen.queryByText('Session Not Found')).not.toBeInTheDocument();
+    });
+  });
 });

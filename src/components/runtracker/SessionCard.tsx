@@ -1,26 +1,48 @@
 import type { Session } from 'electron/types/grail';
-import { FileDownIcon, Loader2 } from 'lucide-react';
-import { useCallback, useEffect, useId, useMemo, useState } from 'react';
+import { ChevronDown, FileDownIcon, Loader2 } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Textarea } from '@/components/ui/textarea';
+import { useNow } from '@/hooks/useNow';
 import { translations } from '@/i18n/translations';
 import { formatDuration } from '@/lib/utils';
 import { useRunTrackerStore } from '@/stores/runTrackerStore';
 import { ArchiveSessionDialog } from './ArchiveSessionDialog';
 import { ExportDialog } from './ExportDialog';
+import { calculateLiveEfficiency } from './liveSession';
+import { RecentRuns } from './RecentRuns';
 
 interface SessionCardProps {
   session: Session | null;
+  /** Opens the full run history of the session. */
+  onViewAllRuns?: () => void;
+}
+
+interface CompactStatProps {
+  label: string;
+  value: string;
+}
+
+// Single entry of the compact secondary statistics row
+function CompactStat({ label, value }: CompactStatProps) {
+  return (
+    <div className="min-w-0 space-y-0.5">
+      <dt className="truncate text-muted-foreground text-xs">{label}</dt>
+      <dd className="font-mono text-sm tabular-nums">{value}</dd>
+    </div>
+  );
 }
 
 /**
- * SessionCard component that displays active session information including session time,
- * run count, items found, efficiency percentage, and provides controls to archive or export the session.
- * Ending the session is handled by SessionControls, which owns the confirmation dialog and auto-mode rules.
+ * SessionCard component that summarizes the active session: a compact row of live statistics,
+ * the most recent runs with their loot, collapsible notes, and archive/export actions.
+ * The live timer and run/session actions are rendered by SessionControls.
+ * Renders nothing while no session is active; SessionControls offers starting one.
  */
-export function SessionCard({ session }: SessionCardProps) {
+export function SessionCard({ session, onViewAllRuns }: SessionCardProps) {
   const { t } = useTranslation();
   const {
     activeSession,
@@ -29,21 +51,15 @@ export function SessionCard({ session }: SessionCardProps) {
     archiveSession,
     updateSessionNotes,
     getSessionStats,
-    startSession,
     runs,
   } = useRunTrackerStore();
 
-  const [sessionTime, setSessionTime] = useState<number>(0);
-  const [runDuration, setRunDuration] = useState<number>(0);
   const [notes, setNotes] = useState<string>(session?.notes || '');
   const [isSavingNotes, setIsSavingNotes] = useState<boolean>(false);
   const [showExportDialog, setShowExportDialog] = useState<boolean>(false);
   const [showArchiveDialog, setShowArchiveDialog] = useState<boolean>(false);
-  const notesId = useId();
   const isArchiving = Boolean(pendingActions.archiveSession);
-  const isStartingSession = Boolean(pendingActions.startSession);
 
-  // Calculate current session time
   const currentSession = activeSession || session;
   // biome-ignore lint/correctness/useExhaustiveDependencies: runs is needed to trigger recalculation when run data changes
   const sessionStats = useMemo(() => {
@@ -51,49 +67,27 @@ export function SessionCard({ session }: SessionCardProps) {
     return getSessionStats(currentSession.id);
   }, [currentSession?.id, runs, getSessionStats]);
 
-  // Real-time timer updates
-  useEffect(() => {
-    if (!currentSession || !currentSession.startTime) {
-      setSessionTime(0);
-      return;
-    }
+  const sessionRuns = useMemo(
+    () => (currentSession ? (runs.get(currentSession.id) ?? []) : []),
+    [currentSession, runs],
+  );
 
-    const updateTimer = () => {
-      const now = Date.now();
-      const elapsed = now - currentSession.startTime.getTime();
-      setSessionTime(elapsed);
-    };
-
-    // Update immediately
-    updateTimer();
-
-    // Set up interval for updates
-    const interval = setInterval(updateTimer, 1000);
-
-    return () => clearInterval(interval);
-  }, [currentSession]);
-
-  // Real-time run duration updates
-  useEffect(() => {
-    if (!activeRun) {
-      setRunDuration(0);
-      return;
-    }
-
-    const updateRunTimer = () => {
-      const now = Date.now();
-      const elapsed = now - activeRun.startTime.getTime();
-      setRunDuration(elapsed);
-    };
-
-    // Update immediately
-    updateRunTimer();
-
-    // Set up interval for updates
-    const interval = setInterval(updateRunTimer, 1000);
-
-    return () => clearInterval(interval);
-  }, [activeRun]);
+  // Live clock for session time and efficiency while the session is running
+  const isLive = Boolean(currentSession && !currentSession.endTime);
+  const now = useNow(isLive);
+  const sessionEnd = currentSession?.endTime?.getTime() ?? now;
+  const sessionElapsed = currentSession
+    ? Math.max(0, sessionEnd - currentSession.startTime.getTime())
+    : 0;
+  const currentRunElapsed =
+    isLive && activeRun ? Math.max(0, now - activeRun.startTime.getTime()) : 0;
+  const efficiencyPercentage = currentSession
+    ? calculateLiveEfficiency({
+        completedRunTime: currentSession.totalRunTime,
+        currentRunElapsed,
+        sessionElapsed,
+      })
+    : 0;
 
   // Update notes when session changes
   useEffect(() => {
@@ -101,18 +95,6 @@ export function SessionCard({ session }: SessionCardProps) {
       setNotes(currentSession.notes || '');
     }
   }, [currentSession?.notes]);
-
-  // Calculate efficiency percentage
-  const efficiencyPercentage = useMemo(() => {
-    if (!currentSession || currentSession.totalSessionTime === 0) return 0;
-    return (currentSession.totalRunTime / currentSession.totalSessionTime) * 100;
-  }, [currentSession]);
-
-  // Calculate average run time
-  const averageRunTime = useMemo(() => {
-    if (!sessionStats || sessionStats.totalRuns === 0) return 0;
-    return sessionStats.averageRunDuration;
-  }, [sessionStats]);
 
   // Button handlers
   const handleArchiveSession = useCallback(async () => {
@@ -151,161 +133,116 @@ export function SessionCard({ session }: SessionCardProps) {
     }
   }, [currentSession]);
 
-  // Empty state
+  // Starting a session is offered by SessionControls
   if (!currentSession) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle>{t(translations.runTracker.sessionCard.title)}</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-col items-center justify-center py-8 text-center">
-            <p className="mb-4 text-muted-foreground">
-              {t(translations.runTracker.sessionCard.noActiveSession)}
-            </p>
-            <p className="text-muted-foreground text-sm">
-              {t(translations.runTracker.sessionCard.startSessionPrompt)}
-            </p>
-          </div>
-          <Button
-            onClick={async () => {
-              try {
-                await startSession();
-              } catch (error) {
-                console.error('[RunTracker] Failed to start session:', error);
-              }
-            }}
-            disabled={isStartingSession}
-            aria-busy={isStartingSession}
-            className="w-full"
-          >
-            {isStartingSession && <Loader2 className="h-4 w-4 animate-spin" />}
-            {t(translations.runTracker.sessionCard.startNewSession)}
-          </Button>
-        </CardContent>
-      </Card>
-    );
+    return null;
   }
-
-  const sessionCard = (
-    <Card className="transition-all duration-300 ease-in-out hover:shadow-md">
-      <CardHeader>
-        <CardTitle>
-          <span className="transition-colors duration-200">
-            {t(translations.runTracker.sessionCard.activeSession)}
-          </span>
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4 transition-all duration-300">
-        {/* Session Statistics */}
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-1">
-            <p className="font-medium text-muted-foreground text-sm">
-              {t(translations.runTracker.sessionCard.sessionTime)}
-            </p>
-            <p className="font-mono text-lg">{formatDuration(sessionTime)}</p>
-          </div>
-          <div className="space-y-1">
-            <p className="font-medium text-muted-foreground text-sm">
-              {t(translations.runTracker.sessionCard.runCount)}
-            </p>
-            <p className="font-semibold text-lg">{currentSession.runCount}</p>
-          </div>
-          <div className="space-y-1">
-            <p className="font-medium text-muted-foreground text-sm">
-              {t(translations.runTracker.sessionCard.averageRunTime)}
-            </p>
-            <p className="font-mono text-lg">{formatDuration(averageRunTime)}</p>
-          </div>
-          <div className="space-y-1">
-            <p className="font-medium text-muted-foreground text-sm">
-              {t(translations.runTracker.sessionCard.currentRun)}
-            </p>
-            <p className="font-mono text-lg">{activeRun ? formatDuration(runDuration) : '0s'}</p>
-          </div>
-          <div className="space-y-1">
-            <p className="font-medium text-muted-foreground text-sm">
-              {t(translations.runTracker.sessionCard.fastestRun)}
-            </p>
-            <p className="font-mono text-lg">{formatDuration(sessionStats?.fastestRun || 0)}</p>
-          </div>
-          <div className="space-y-1">
-            <p className="font-medium text-muted-foreground text-sm">
-              {t(translations.runTracker.sessionCard.efficiency)}
-            </p>
-            <p className="font-semibold text-lg">{efficiencyPercentage.toFixed(1)}%</p>
-          </div>
-        </div>
-
-        {/* Items Found */}
-        {sessionStats && (
-          <div className="space-y-1">
-            <p className="font-medium text-muted-foreground text-sm">
-              {t(translations.runTracker.sessionCard.itemsFound)}
-            </p>
-            <p className="font-semibold text-lg">{sessionStats.itemsFound}</p>
-          </div>
-        )}
-
-        {/* Notes Editor */}
-        <div className="space-y-2">
-          <label htmlFor={notesId} className="font-medium text-muted-foreground text-sm">
-            {t(translations.runTracker.sessionCard.sessionNotes)}
-          </label>
-          <div className="relative">
-            <Textarea
-              id={notesId}
-              placeholder={t(translations.runTracker.sessionCard.notesPlaceholder)}
-              value={notes}
-              onChange={handleNotesChange}
-              onBlur={handleNotesBlur}
-              className="min-h-[80px] resize-none"
-            />
-            {isSavingNotes && (
-              <div className="absolute top-2 right-2">
-                <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Action Buttons */}
-        <div className="flex gap-2 pt-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setShowArchiveDialog(true)}
-            disabled={isArchiving}
-            aria-busy={isArchiving}
-            className="flex-1"
-          >
-            {isArchiving && <Loader2 className="h-4 w-4 animate-spin" />}
-            {t(translations.runTracker.sessionCard.archiveSession)}
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleExportClick}
-            disabled={currentSession.runCount === 0}
-            title={
-              currentSession.runCount === 0
-                ? t(translations.runTracker.sessionCard.noRunsToExport)
-                : t(translations.runTracker.sessionCard.exportSessionData)
-            }
-            aria-label={t(translations.runTracker.sessionCard.exportSessionData)}
-          >
-            <FileDownIcon className="h-4 w-4" aria-hidden="true" />
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
-  );
 
   return (
     <>
-      {sessionCard}
+      <Card>
+        <CardHeader>
+          <CardTitle>{t(translations.runTracker.sessionCard.activeSession)}</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-5">
+          {/* Compact secondary statistics */}
+          <dl className="grid grid-cols-3 gap-x-4 gap-y-3 sm:grid-cols-6">
+            <CompactStat
+              label={t(translations.runTracker.sessionCard.sessionTime)}
+              value={formatDuration(sessionElapsed)}
+            />
+            <CompactStat
+              label={t(translations.runTracker.sessionCard.runCount)}
+              value={String(currentSession.runCount)}
+            />
+            <CompactStat
+              label={t(translations.runTracker.sessionCard.averageRunTime)}
+              value={formatDuration(sessionStats?.averageRunDuration ?? 0)}
+            />
+            <CompactStat
+              label={t(translations.runTracker.sessionCard.fastestRun)}
+              value={formatDuration(sessionStats?.fastestRun ?? 0)}
+            />
+            <CompactStat
+              label={t(translations.runTracker.sessionCard.efficiency)}
+              value={`${efficiencyPercentage.toFixed(1)}%`}
+            />
+            <CompactStat
+              label={t(translations.runTracker.sessionCard.itemsFound)}
+              value={String(sessionStats?.itemsFound ?? 0)}
+            />
+          </dl>
+
+          <RecentRuns runs={sessionRuns} onViewAllRuns={onViewAllRuns} />
+
+          {/* Notes Editor (collapsed by default to keep the live view glanceable) */}
+          <Collapsible>
+            <CollapsibleTrigger
+              render={
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="group -ml-2.5 gap-1 text-muted-foreground"
+                />
+              }
+            >
+              <ChevronDown
+                className="h-4 w-4 transition-transform group-aria-expanded:rotate-180"
+                aria-hidden="true"
+              />
+              {t(translations.runTracker.sessionCard.sessionNotes)}
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <div className="relative pt-2">
+                <Textarea
+                  aria-label={t(translations.runTracker.sessionCard.sessionNotes)}
+                  placeholder={t(translations.runTracker.sessionCard.notesPlaceholder)}
+                  value={notes}
+                  onChange={handleNotesChange}
+                  onBlur={handleNotesBlur}
+                  className="min-h-[80px] resize-none"
+                />
+                {isSavingNotes && (
+                  <div className="absolute top-4 right-2">
+                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                  </div>
+                )}
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
+
+          {/* Action Buttons */}
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowArchiveDialog(true)}
+              disabled={isArchiving}
+              aria-busy={isArchiving}
+              className="flex-1"
+            >
+              {isArchiving && <Loader2 className="h-4 w-4 animate-spin" />}
+              {t(translations.runTracker.sessionCard.archiveSession)}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleExportClick}
+              disabled={currentSession.runCount === 0}
+              title={
+                currentSession.runCount === 0
+                  ? t(translations.runTracker.sessionCard.noRunsToExport)
+                  : t(translations.runTracker.sessionCard.exportSessionData)
+              }
+              aria-label={t(translations.runTracker.sessionCard.exportSessionData)}
+            >
+              <FileDownIcon className="h-4 w-4" aria-hidden="true" />
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
       <ExportDialog
-        sessionId={currentSession?.id || ''}
+        sessionId={currentSession.id}
         open={showExportDialog}
         onOpenChange={setShowExportDialog}
       />

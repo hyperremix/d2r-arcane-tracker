@@ -15,6 +15,7 @@ export function cn(...inputs: ClassValue[]) {
 
 // Re-export date utilities from date.ts for backward compatibility
 export {
+  formatClockDuration,
   formatDate,
   formatDuration,
   formatLongDate,

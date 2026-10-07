@@ -12,11 +12,13 @@ Data is stored locally. Closing or crashing the app ends any open session, and y
 
 ## The Run Tracker page
 
-Open the Run Tracker from the title bar (the **Run Counter** button):
+Open the Run Tracker from the title bar (the **Run Counter** button). The page is built to be read at a glance between runs:
 
-- **Session card**: the active session with session and run timers, quick stats and notes.
-- **Session controls**: start or end the session, start, pause, resume or end runs, add items by hand, and toggle **Auto Mode**.
+- **Live session**: a large timer for the current run and a status badge (**Running**, **Paused**, **Idle** or **No Session**). Next to it is one main button that changes with the state: **Start New Session** when no session is active, **Start Run** between runs, and **End Run** during a run. **Pause**/**Resume** and **End Session** sit beside it. Below are **Auto Mode** (Windows only), **Add Item Manually** and a reminder of your keyboard shortcuts.
+- **Active session**: a compact row of session time, run count, average and fastest run, efficiency and items found, then **Recent Runs** and the session actions. Recent Runs lists the last five finished runs, newest first, with each run's duration and the items found in it. **View all runs** opens the full run history of the active session. **Session Notes** are collapsed by default; select the toggle to open them. Archive and export are at the bottom.
 - **Sessions list**: past sessions. Select one to see its runs, the items in each run, and summary stats.
+
+Efficiency is the share of the session spent in runs. It updates live and counts the run in progress, so it is correct before your first run ends.
 
 ## Tracking runs
 
@@ -28,7 +30,7 @@ Auto mode reads D2R's memory to tell whether you're in a game. It starts a run w
 2. Turn on **Auto Mode** in the session controls.
 3. Optional: change the polling interval in **Settings → Run Tracker Settings** (100–5000 ms, default 500). Lower values react faster and use more CPU.
 
-While auto mode is on, the manual run and end-session buttons are disabled. The keyboard shortcuts are not gated by auto mode, so avoid pressing them during automatic tracking.
+While auto mode is on, the run buttons are replaced by a *Runs are tracked automatically* notice. **End Session** stays available. The keyboard shortcuts are not gated by auto mode, so avoid pressing them during automatic tracking. If auto mode is on but memory reading isn't available for your D2R version, a warning appears in the live session area.
 
 Auto mode only reads memory and never writes to the game process. Each D2R patch needs a verified memory offset. After a patch that isn't supported yet, auto mode does nothing until an app update adds it. See [Troubleshooting](#troubleshooting).
 
@@ -51,7 +53,7 @@ Grail items detected while a run is active are added to that run automatically. 
 
 ## Exporting
 
-Use the export button on the session card or in a session's detail view:
+Use the export button on the active session card or in a session's detail view:
 
 - **CSV**: for spreadsheets.
 - **JSON**: for scripts and other tools.
