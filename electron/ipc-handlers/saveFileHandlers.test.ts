@@ -1038,23 +1038,20 @@ describe('When saveFileHandlers is used', () => {
       ['a number', 42],
       ['undefined', undefined],
       ['an object', { path: '/new/save/dir' }],
-    ])(
-      'Then saveFile:updateSaveDirectory should reject %s without touching data',
-      async (_label, input) => {
-        // Arrange
-        const handler = getHandler('saveFile:updateSaveDirectory');
-        silenceConsole('error');
+    ])('Then saveFile:updateSaveDirectory should reject %s without touching data', async (_label, input) => {
+      // Arrange
+      const handler = getHandler('saveFile:updateSaveDirectory');
+      silenceConsole('error');
 
-        // Act
-        const act = handler(null, input);
+      // Act
+      const act = handler(null, input);
 
-        // Assert
-        await expect(act).rejects.toThrow('Invalid save directory');
-        expect(grailDatabase.setSetting).not.toHaveBeenCalled();
-        expect(grailDatabase.truncateUserData).not.toHaveBeenCalled();
-        expect(mockSaveFileMonitor.updateSaveDirectory).not.toHaveBeenCalled();
-      },
-    );
+      // Assert
+      await expect(act).rejects.toThrow('Invalid save directory');
+      expect(grailDatabase.setSetting).not.toHaveBeenCalled();
+      expect(grailDatabase.truncateUserData).not.toHaveBeenCalled();
+      expect(mockSaveFileMonitor.updateSaveDirectory).not.toHaveBeenCalled();
+    });
 
     it('Then saveFile:restoreDefaultDirectory should truncate user data when the default differs', async () => {
       // Arrange

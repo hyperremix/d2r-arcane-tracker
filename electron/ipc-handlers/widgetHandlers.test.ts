@@ -71,20 +71,17 @@ describe('widget IPC handlers display mode validation', () => {
     ['a prototype key', 'constructor'],
     ['a non-string', 42],
     ['undefined', undefined],
-  ])(
-    'If widget:reset-size receives %s, Then it is rejected without touching the window',
-    async (_name, display) => {
-      // Arrange: the invalid display mode comes from the test table
+  ])('If widget:reset-size receives %s, Then it is rejected without touching the window', async (_name, display) => {
+    // Arrange: the invalid display mode comes from the test table
 
-      // Act
-      const result = await invoke('widget:reset-size', display);
+    // Act
+    const result = await invoke('widget:reset-size', display);
 
-      // Assert
-      expect(result).toMatchObject({ success: false, size: null });
-      expect(resetWidgetWindowSize).not.toHaveBeenCalled();
-      expect(onSizeChange).not.toHaveBeenCalled();
-    },
-  );
+    // Assert
+    expect(result).toMatchObject({ success: false, size: null });
+    expect(resetWidgetWindowSize).not.toHaveBeenCalled();
+    expect(onSizeChange).not.toHaveBeenCalled();
+  });
 
   it('If widget:update-display receives an invalid display mode, Then it is rejected', async () => {
     // Arrange

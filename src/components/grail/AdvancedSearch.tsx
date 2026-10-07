@@ -520,7 +520,7 @@ export function AdvancedSearch() {
           </Label>
           <Search
             aria-hidden="true"
-            className="-translate-y-1/2 pointer-events-none absolute top-1/2 left-2.5 size-4 text-muted-foreground"
+            className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground"
           />
           <Input
             id={searchId}
@@ -539,7 +539,7 @@ export function AdvancedSearch() {
                   aria-label={fuzzySearchLabel}
                   onClick={() => setAdvancedFilter({ fuzzySearch: !fuzzySearch })}
                   className={cn(
-                    '-translate-y-1/2 absolute top-1/2 right-1.5 text-muted-foreground',
+                    'absolute top-1/2 right-1.5 -translate-y-1/2 text-muted-foreground',
                     fuzzySearch && 'bg-muted text-foreground',
                   )}
                 />

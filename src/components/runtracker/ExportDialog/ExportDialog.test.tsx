@@ -322,23 +322,20 @@ describe('When using the session export dialog', () => {
   it.each([
     [1, 'Session has 1 run.'],
     [2, 'Session has 2 runs.'],
-  ])(
-    'If the session has %i run(s), Then the description uses the matching plural form',
-    async (count, expected) => {
-      // Arrange
-      mockElectronAPI.runTracker.getRunsBySession.mockResolvedValue(
-        Array.from({ length: count }, (_, index) => ({
-          id: `run-${index}`,
-          sessionId: 'session-12345678',
-        })),
-      );
+  ])('If the session has %i run(s), Then the description uses the matching plural form', async (count, expected) => {
+    // Arrange
+    mockElectronAPI.runTracker.getRunsBySession.mockResolvedValue(
+      Array.from({ length: count }, (_, index) => ({
+        id: `run-${index}`,
+        sessionId: 'session-12345678',
+      })),
+    );
 
-      // Act
-      renderDialog();
-      await waitForExportReady(/Save to File/i);
+    // Act
+    renderDialog();
+    await waitForExportReady(/Save to File/i);
 
-      // Assert
-      expect(screen.getByText(new RegExp(expected.replace('.', '\\.')))).toBeInTheDocument();
-    },
-  );
+    // Assert
+    expect(screen.getByText(new RegExp(expected.replace('.', '\\.')))).toBeInTheDocument();
+  });
 });
