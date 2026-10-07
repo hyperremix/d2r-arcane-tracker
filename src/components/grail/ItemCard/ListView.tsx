@@ -1,5 +1,5 @@
 import type { Character, GrailProgress, Item } from 'electron/types/grail';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useItemIcon } from '@/hooks/useItemIcon';
 import { cn } from '@/lib/utils';
 import { useGrailStore } from '@/stores/grailStore';
@@ -100,7 +100,9 @@ export function ListView({
   interactiveProps,
   withoutStatusIndicators = false,
 }: ListViewProps) {
-  const { settings } = useGrailStore();
+  // Only subscribe to settings so unrelated store updates (filters, progress of other items, ...)
+  // don't re-render every row
+  const settings = useGrailStore((state) => state.settings);
   const isFound = allProgress.length > 0;
   // Tooltip triggers are only taken out of the tab order when the row itself is the focusable button.
   // Trade-off: on clickable cards the tooltip content (name, status, character, recent find) is
@@ -109,78 +111,76 @@ export function ListView({
   const focusableTriggers = !interactiveProps;
 
   return (
-    <TooltipProvider>
-      <div
-        {...interactiveProps}
-        data-found={isFound}
-        className={cn(
-          'relative flex w-full items-center gap-3 p-3 transition-all duration-200',
-          'rounded-lg border-2',
-          getCardStateClasses(item.type, isFound),
-          interactiveProps && interactiveCardStyles,
-          className,
-        )}
-      >
-        {/* Item Icon, Rune Images, or Type Icon */}
-        <ListArtwork
-          item={item}
-          isFound={isFound}
-          showItemIcons={settings.showItemIcons}
-          focusableTriggers={focusableTriggers}
-        />
+    <div
+      {...interactiveProps}
+      data-found={isFound}
+      className={cn(
+        'relative flex w-full items-center gap-3 p-3 transition-all duration-200',
+        'rounded-lg border-2',
+        getCardStateClasses(item.type, isFound),
+        interactiveProps && interactiveCardStyles,
+        className,
+      )}
+    >
+      {/* Item Icon, Rune Images, or Type Icon */}
+      <ListArtwork
+        item={item}
+        isFound={isFound}
+        showItemIcons={settings.showItemIcons}
+        focusableTriggers={focusableTriggers}
+      />
 
-        {/* Status indicators */}
-        {!withoutStatusIndicators && (
-          <StatusIndicators
-            mostRecentDiscovery={mostRecentDiscovery}
-            item={item}
-            normalProgress={normalProgress}
-            etherealProgress={etherealProgress}
-            settings={settings}
-            focusableTriggers={focusableTriggers}
-          />
-        )}
-
-        {/* Item Name (always full contrast, regardless of found state) */}
-        <Tooltip>
-          <TooltipTrigger
-            render={getTooltipTriggerRender(focusableTriggers)}
-            className="block flex-1 truncate text-left"
-          >
-            <h3 className="truncate font-semibold text-foreground text-sm">{item.name}</h3>
-          </TooltipTrigger>
-          <TooltipContent side="top" className="max-w-sm">
-            <div className="space-y-1">
-              <p className="font-semibold">
-                {item.name}
-                {item.itemBase && ` • ${item.itemBase}`}
-              </p>
-              <p className="text-muted-foreground text-xs">
-                {item.category} • {item.subCategory.replace('_', ' ')}
-              </p>
-
-              <DiscoveryInfo allProgress={allProgress} characters={characters} />
-            </div>
-          </TooltipContent>
-        </Tooltip>
-
-        {/* Character attribution */}
-        {allProgress.length > 0 && (
-          <DiscoveryAttribution
-            discoveringCharacters={discoveringCharacters}
-            item={item}
-            focusableTriggers={focusableTriggers}
-          />
-        )}
-
-        {/* Version counts */}
-        <VersionCounts
+      {/* Status indicators */}
+      {!withoutStatusIndicators && (
+        <StatusIndicators
+          mostRecentDiscovery={mostRecentDiscovery}
           item={item}
           normalProgress={normalProgress}
           etherealProgress={etherealProgress}
           settings={settings}
+          focusableTriggers={focusableTriggers}
         />
-      </div>
-    </TooltipProvider>
+      )}
+
+      {/* Item Name (always full contrast, regardless of found state) */}
+      <Tooltip>
+        <TooltipTrigger
+          render={getTooltipTriggerRender(focusableTriggers)}
+          className="block flex-1 truncate text-left"
+        >
+          <h3 className="truncate font-semibold text-foreground text-sm">{item.name}</h3>
+        </TooltipTrigger>
+        <TooltipContent side="top" className="max-w-sm">
+          <div className="space-y-1">
+            <p className="font-semibold">
+              {item.name}
+              {item.itemBase && ` • ${item.itemBase}`}
+            </p>
+            <p className="text-muted-foreground text-xs">
+              {item.category} • {item.subCategory.replace('_', ' ')}
+            </p>
+
+            <DiscoveryInfo allProgress={allProgress} characters={characters} />
+          </div>
+        </TooltipContent>
+      </Tooltip>
+
+      {/* Character attribution */}
+      {allProgress.length > 0 && (
+        <DiscoveryAttribution
+          discoveringCharacters={discoveringCharacters}
+          item={item}
+          focusableTriggers={focusableTriggers}
+        />
+      )}
+
+      {/* Version counts */}
+      <VersionCounts
+        item={item}
+        normalProgress={normalProgress}
+        etherealProgress={etherealProgress}
+        settings={settings}
+      />
+    </div>
   );
 }

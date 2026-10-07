@@ -51,7 +51,12 @@ function MarkAsFoundAction({ item }: { item: Item }) {
  */
 export function ItemDetailsDialog({ itemId, open, onOpenChange }: ItemDetailsDialogProps) {
   const { t } = useTranslation();
-  const { items, progress, characters, removeProgress, settings } = useGrailStore();
+  // Narrow selectors so unrelated store updates (filters, view mode, ...) don't re-render the dialog
+  const items = useGrailStore((state) => state.items);
+  const progress = useGrailStore((state) => state.progress);
+  const characters = useGrailStore((state) => state.characters);
+  const removeProgress = useGrailStore((state) => state.removeProgress);
+  const settings = useGrailStore((state) => state.settings);
 
   // Find the item by ID
   const item = useMemo(() => {

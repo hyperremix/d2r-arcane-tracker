@@ -520,6 +520,7 @@ vi.mock('./ItemDetailsDialog', () => ({
     open ? <div data-testid="item-details-dialog">{itemId}</div> : null,
 }));
 vi.mock('./MasonryItemGrid', () => ({
+  ItemCardCell: ({ item }: { item: Item }) => <div data-testid="item-card">{item.name}</div>,
   MasonryItemGrid: ({ items }: { items: Item[] }) => (
     <div data-testid="masonry-item-grid">{items.length} items</div>
   ),
@@ -626,6 +627,42 @@ describe('When ItemGrid component is rendered', () => {
       // Assert — list view uses a div-based virtualized container (no masonry)
       expect(screen.queryByTestId('masonry-item-grid')).not.toBeInTheDocument();
       expect(screen.queryByTestId('grouped-masonry-grid')).not.toBeInTheDocument();
+    });
+  });
+
+  describe.each([
+    ['grid', 'none'],
+    ['list', 'none'],
+  ])('If viewMode "%s", groupMode "%s" and there are items to show', (viewMode, groupMode) => {
+    it('Then the items container is the single scroll container inside a bounded root', () => {
+      // Arrange
+      const items = HolyGrailItemBuilder.new().buildMany(3);
+      setupComponentMocks({ filteredItems: items, viewMode, groupMode });
+
+      // Act
+      const { container } = render(<ItemGrid />);
+
+      // Assert — a bounded root lets the virtualizers measure the visible viewport
+      const root = container.firstElementChild;
+      const scroller = root?.firstElementChild;
+      expect(root).toHaveClass('flex', 'min-h-0', 'flex-1', 'flex-col');
+      expect(root).not.toHaveClass('overflow-auto');
+      expect(root).not.toHaveClass('overflow-y-auto');
+      expect(scroller).toHaveClass('min-h-0', 'flex-1', 'overflow-auto');
+    });
+  });
+
+  describe('If the empty state is shown', () => {
+    it('Then the empty state scrolls inside the bounded root', () => {
+      // Arrange
+      setupComponentMocks({ filteredItems: [], items: [], loading: false });
+
+      // Act
+      render(<ItemGrid />);
+
+      // Assert
+      const emptyState = screen.getByTestId('item-grid-empty-state');
+      expect(emptyState.parentElement).toHaveClass('min-h-0', 'flex-1', 'overflow-y-auto');
     });
   });
 

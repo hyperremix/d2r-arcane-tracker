@@ -1,9 +1,10 @@
 import { render, screen } from '@testing-library/react';
 import type { Character, GrailProgress, Item } from 'electron/types/grail';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   COLUMN_GUTTER,
   calculateColumnWidth,
+  createGroupedGridRows,
   GroupedMasonryGrid,
   getColumnCount,
   MIN_COLUMN_WIDTH,
@@ -243,10 +244,90 @@ describe('MasonryItemGrid Column Width Calculation', () => {
   });
 });
 
+/**
+ * jsdom has no layout engine, so every element reports a size of 0 and the virtualizer would
+ * render nothing. Stub the sizes the virtualizer and the column measurement read.
+ */
+function stubLayout({ height = 600, width = 0 }: { height?: number; width?: number } = {}) {
+  vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(height);
+  vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockReturnValue(width);
+  vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(width);
+}
+
+/**
+ * Width that fits exactly the given number of minimum-width columns.
+ */
+function widthForColumns(columns: number) {
+  return columns * MIN_COLUMN_WIDTH + (columns - 1) * COLUMN_GUTTER;
+}
+
+describe('When createGroupedGridRows is called', () => {
+  describe('If a group has more items than fit into one row', () => {
+    it('Then emits a header followed by rows of at most columnCount items', () => {
+      // Arrange
+      const items = [1, 2, 3, 4, 5].map((n) => createMockItem({ id: `item-${n}` }));
+
+      // Act
+      const rows = createGroupedGridRows([{ title: 'Helms', items, foundCount: 2 }], 2);
+
+      // Assert
+      expect(rows.map((row) => row.type)).toEqual(['header', 'items', 'items', 'items']);
+      expect(rows[0]).toMatchObject({ title: 'Helms', itemCount: 5, foundCount: 2 });
+      const itemRows = rows.filter((row) => row.type === 'items');
+      expect(itemRows.map((row) => row.items.map((item) => item.id))).toEqual([
+        ['item-1', 'item-2'],
+        ['item-3', 'item-4'],
+        ['item-5'],
+      ]);
+    });
+  });
+
+  describe('If there are multiple groups', () => {
+    it('Then only the first header is marked as the first group and keys are unique', () => {
+      // Arrange
+      const groupedItems = [
+        { title: 'Armor', items: [createMockItem({ id: 'a' })], foundCount: 0 },
+        { title: 'Weapons', items: [createMockItem({ id: 'b' })], foundCount: 1 },
+      ];
+
+      // Act
+      const rows = createGroupedGridRows(groupedItems, 3);
+
+      // Assert
+      const headers = rows.filter((row) => row.type === 'header');
+      expect(headers.map((header) => header.isFirstGroup)).toEqual([true, false]);
+      expect(new Set(rows.map((row) => row.key)).size).toBe(rows.length);
+    });
+  });
+
+  describe('If the column count is zero or not a number', () => {
+    it('Then falls back to one item per row', () => {
+      // Arrange
+      const items = [createMockItem({ id: 'a' }), createMockItem({ id: 'b' })];
+
+      // Act
+      const zeroRows = createGroupedGridRows([{ title: 'G', items, foundCount: 0 }], 0);
+      const nanRows = createGroupedGridRows([{ title: 'G', items, foundCount: 0 }], Number.NaN);
+
+      // Assert
+      expect(zeroRows.filter((row) => row.type === 'items')).toHaveLength(2);
+      expect(nanRows.filter((row) => row.type === 'items')).toHaveLength(2);
+    });
+  });
+});
+
 describe('GroupedMasonryGrid Component', () => {
+  beforeEach(() => {
+    stubLayout();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   describe('When GroupedMasonryGrid is rendered', () => {
     describe('If groupedItems is empty', () => {
-      it('Then should render empty container', () => {
+      it('Then should render an empty scroll container without rows', () => {
         // Arrange
         const progressLookup = createMockProgressLookup();
         const characters: Character[] = [];
@@ -263,7 +344,8 @@ describe('GroupedMasonryGrid Component', () => {
         );
 
         // Assert
-        expect(container.querySelector('.h-full.w-full')).toBeDefined();
+        expect(container.firstElementChild).toHaveClass('overflow-auto');
+        expect(screen.queryAllByTestId('grouped-grid-row')).toHaveLength(0);
       });
     });
 
@@ -532,13 +614,18 @@ describe('GroupedMasonryGrid Component', () => {
 });
 
 describe('GroupedMasonryGrid Column Sizing', () => {
-  describe('When GroupedMasonryGrid renders a group', () => {
-    it('Then the CSS columns use the same minimum width and gutter as the masonry grid', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  describe('When GroupedMasonryGrid renders a group in a container that fits three columns', () => {
+    it('Then rows use the same column count and gutter as the masonry grid', () => {
       // Arrange
+      stubLayout({ width: widthForColumns(3) });
       const groupedItems = [
         {
           title: 'Unique Armor',
-          items: [createMockItem({ id: 'item-1', name: 'Harlequin Crest' })],
+          items: [1, 2, 3, 4].map((n) => createMockItem({ id: `item-${n}`, name: `Item ${n}` })),
           foundCount: 0,
         },
       ];
@@ -554,9 +641,46 @@ describe('GroupedMasonryGrid Column Sizing', () => {
       );
 
       // Assert
-      const columns = screen.getByTestId('grouped-masonry-columns');
-      expect(columns.style.columnWidth).toBe(`${MIN_COLUMN_WIDTH}px`);
-      expect(columns.style.columnGap).toBe(`${COLUMN_GUTTER}px`);
+      const rows = screen.getAllByTestId('grouped-grid-row');
+      expect(rows).toHaveLength(2);
+      expect(rows[0].style.gridTemplateColumns).toBe('repeat(3, minmax(0, 1fr))');
+      expect(rows[0].style.columnGap).toBe(`${COLUMN_GUTTER}px`);
+      expect(rows[0].children).toHaveLength(3);
+      expect(rows[1].children).toHaveLength(1);
+    });
+  });
+});
+
+describe('GroupedMasonryGrid Virtualization', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  describe('When a group has far more items than fit into the viewport', () => {
+    it('Then only the rows near the top of the scroll container are mounted', () => {
+      // Arrange
+      stubLayout({ height: 600 });
+      const items = Array.from({ length: 50 }, (_, n) =>
+        createMockItem({ id: `item-${n}`, name: `Item ${n}` }),
+      );
+
+      // Act
+      render(
+        <GroupedMasonryGrid
+          groupedItems={[{ title: 'Unique Armor', items, foundCount: 0 }]}
+          progressLookup={createMockProgressLookup()}
+          characters={[]}
+          onItemClick={vi.fn()}
+        />,
+      );
+
+      // Assert
+      const renderedCards = screen.getAllByTestId(/^item-card-/);
+      expect(renderedCards.length).toBeGreaterThan(0);
+      expect(renderedCards.length).toBeLessThan(items.length);
+      expect(screen.getByText('Unique Armor')).toBeInTheDocument();
+      expect(screen.getByTestId('item-card-item-0')).toBeInTheDocument();
+      expect(screen.queryByTestId('item-card-item-49')).not.toBeInTheDocument();
     });
   });
 });

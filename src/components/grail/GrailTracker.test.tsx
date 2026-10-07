@@ -147,6 +147,22 @@ describe('When GrailTracker is rendered', () => {
     });
   });
 
+  describe('If the page lays out the item grid', () => {
+    it('Then the grid wrapper bounds its height without becoming the scroll container', () => {
+      // Arrange
+      setupStatistics();
+
+      // Act
+      render(<GrailTracker />);
+
+      // Assert — the grid's own container scrolls so its virtualization can measure the viewport
+      const wrapper = screen.getByTestId('item-grid').parentElement;
+      expect(wrapper).toHaveClass('flex', 'min-h-0', 'flex-1', 'flex-col');
+      expect(wrapper).not.toHaveClass('overflow-y-auto');
+      expect(wrapper).not.toHaveClass('overflow-auto');
+    });
+  });
+
   describe('If ethereal tracking is disabled in settings', () => {
     it('Then passes showEtherealBreakdown=false to ProgressSummary', () => {
       // Arrange

@@ -17,7 +17,12 @@ function getSettledValue<T>(result: PromiseSettledResult<T>, label: string): T |
  * @returns {JSX.Element} The main grail tracker interface with statistics and item grid
  */
 export function GrailTracker() {
-  const { setCharacters, setItems, setProgress, hydrateSettings, settings } = useGrailStore();
+  // Narrow selectors so unrelated store updates (filters, view mode, ...) don't re-render the page
+  const setCharacters = useGrailStore((state) => state.setCharacters);
+  const setItems = useGrailStore((state) => state.setItems);
+  const setProgress = useGrailStore((state) => state.setProgress);
+  const hydrateSettings = useGrailStore((state) => state.hydrateSettings);
+  const grailEthereal = useGrailStore((state) => state.settings.grailEthereal);
 
   const statistics = useGrailStatistics();
 
@@ -97,14 +102,15 @@ export function GrailTracker() {
       <div className="flex h-full flex-col gap-4 p-6">
         {/* Progress summary */}
         {statistics && (
-          <ProgressSummary statistics={statistics} showEtherealBreakdown={settings.grailEthereal} />
+          <ProgressSummary statistics={statistics} showEtherealBreakdown={grailEthereal} />
         )}
 
         {/* Toolbar: search, filters, sorting, grouping and view mode */}
         <AdvancedSearch />
 
-        {/* Item Grid - full content width */}
-        <div className="-mx-4 flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto">
+        {/* Item Grid - full content width. This wrapper only bounds the height; the grid's own
+            container is the scroll element so its virtualization can measure the viewport. */}
+        <div className="-mx-4 flex min-h-0 min-w-0 flex-1 flex-col">
           <ItemGrid />
         </div>
       </div>
