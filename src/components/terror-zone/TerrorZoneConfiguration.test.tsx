@@ -1,7 +1,15 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import type { TerrorZoneValidationResult } from 'electron/types/grail';
+import { toast } from 'sonner';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { TerrorZoneConfiguration } from './TerrorZoneConfiguration';
+
+vi.mock('sonner', () => ({
+  toast: {
+    success: vi.fn(),
+    error: vi.fn(),
+  },
+}));
 
 const originalElectronAPI = window.electronAPI;
 
@@ -29,9 +37,25 @@ function setupValidTerrorZoneApi(overrides: Record<string, unknown> = {}) {
     restoreOriginal: vi.fn().mockResolvedValue({ success: true }),
     ...overrides,
   };
-  window.electronAPI = { terrorZone } as unknown as typeof window.electronAPI;
-  return terrorZone;
+  const shell = { openExternal: vi.fn().mockResolvedValue({ success: true }) };
+  window.electronAPI = { terrorZone, shell } as unknown as typeof window.electronAPI;
+  return { ...terrorZone, shell };
 }
+
+interface Deferred<T> {
+  promise: Promise<T>;
+  resolve: (value: T) => void;
+}
+
+function createDeferred<T>(): Deferred<T> {
+  let resolve: (value: T) => void = () => undefined;
+  const promise = new Promise<T>((res) => {
+    resolve = res;
+  });
+  return { promise, resolve };
+}
+
+const saveSuccess = { success: true, requiresRestart: true };
 
 describe('When TerrorZoneConfiguration validates the game installation', () => {
   afterEach(() => {
@@ -140,6 +164,25 @@ describe('When TerrorZoneConfiguration lists zones', () => {
   });
 
   describe('If saving a zone change fails', () => {
+    it('Then the switch is rolled back to its saved state', async () => {
+      // Arrange
+      vi.mocked(toast.success).mockClear();
+      setupValidTerrorZoneApi({
+        updateConfig: vi.fn().mockRejectedValue(new Error('EACCES: raw failure')),
+      });
+      render(<TerrorZoneConfiguration />);
+      const coldPlains = await screen.findByRole('switch', { name: 'Cold Plains' });
+
+      // Act
+      fireEvent.click(coldPlains);
+
+      // Assert
+      await screen.findByText('Failed to update terror zone configuration');
+      expect(coldPlains).not.toBeChecked();
+      expect(coldPlains).not.toHaveAttribute('data-disabled');
+      expect(toast.success).not.toHaveBeenCalled();
+    });
+
     it('Then the translated update failure is shown instead of the raw error', async () => {
       // Arrange
       setupValidTerrorZoneApi({
@@ -175,17 +218,20 @@ describe('When TerrorZoneConfiguration lists zones', () => {
   });
 
   describe('If disabling all zones fails', () => {
-    it('Then the translated disable-all failure is shown', async () => {
+    it('Then the translated disable-all failure is shown and the zones are rolled back', async () => {
       // Arrange
       setupValidTerrorZoneApi({ updateConfig: vi.fn().mockRejectedValue(new Error('boom')) });
       render(<TerrorZoneConfiguration />);
-      await screen.findByRole('switch', { name: 'Blood Moor' });
+      const bloodMoor = await screen.findByRole('switch', { name: 'Blood Moor' });
+      fireEvent.click(screen.getByRole('button', { name: 'Disable All' }));
+      const dialog = await screen.findByRole('alertdialog');
 
       // Act
-      fireEvent.click(screen.getByRole('button', { name: 'Disable All' }));
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Disable All' }));
 
       // Assert
       expect(await screen.findByText('Failed to disable all zones')).toBeInTheDocument();
+      expect(bloodMoor).toBeChecked();
     });
   });
 
@@ -204,6 +250,248 @@ describe('When TerrorZoneConfiguration lists zones', () => {
       // Assert
       await waitFor(() =>
         expect(screen.getByText('Failed to restore original file')).toBeInTheDocument(),
+      );
+    });
+  });
+});
+
+describe('When TerrorZoneConfiguration saves changes', () => {
+  beforeEach(() => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    vi.mocked(toast.success).mockClear();
+  });
+
+  afterEach(() => {
+    window.electronAPI = originalElectronAPI;
+    vi.restoreAllMocks();
+  });
+
+  describe('If zone changes are saved', () => {
+    it('Then one deduplicated success toast with the restart hint is shown', async () => {
+      // Arrange
+      setupValidTerrorZoneApi();
+      render(<TerrorZoneConfiguration />);
+      const coldPlains = await screen.findByRole('switch', { name: 'Cold Plains' });
+      const bloodMoor = screen.getByRole('switch', { name: 'Blood Moor' });
+
+      // Act
+      fireEvent.click(coldPlains);
+      await waitFor(() => expect(toast.success).toHaveBeenCalledTimes(1));
+      fireEvent.click(bloodMoor);
+      await waitFor(() => expect(toast.success).toHaveBeenCalledTimes(2));
+
+      // Assert
+      const [firstCall, secondCall] = vi.mocked(toast.success).mock.calls;
+      expect(firstCall).toEqual([
+        'Terror zones saved',
+        {
+          id: 'terror-zone-config-saved',
+          description: 'Restart D2R with -direct -txt to apply.',
+        },
+      ]);
+      expect(secondCall).toEqual(firstCall);
+    });
+  });
+
+  describe('If a save succeeds after an earlier failure', () => {
+    it('Then the previous error is cleared', async () => {
+      // Arrange
+      const updateConfig = vi
+        .fn()
+        .mockRejectedValueOnce(new Error('EBUSY'))
+        .mockResolvedValue(saveSuccess);
+      setupValidTerrorZoneApi({ updateConfig });
+      render(<TerrorZoneConfiguration />);
+      const coldPlains = await screen.findByRole('switch', { name: 'Cold Plains' });
+      fireEvent.click(coldPlains);
+      await screen.findByText('Failed to update terror zone configuration');
+
+      // Act
+      fireEvent.click(coldPlains);
+
+      // Assert
+      await waitFor(() =>
+        expect(
+          screen.queryByText('Failed to update terror zone configuration'),
+        ).not.toBeInTheDocument(),
+      );
+      expect(coldPlains).toBeChecked();
+      expect(toast.success).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('If no zone has been configured yet', () => {
+    it('Then toggling one zone saves an explicit state for every zone', async () => {
+      // Arrange
+      const terrorZone = setupValidTerrorZoneApi({ getConfig: vi.fn().mockResolvedValue({}) });
+      render(<TerrorZoneConfiguration />);
+      const bloodMoor = await screen.findByRole('switch', { name: 'Blood Moor' });
+
+      // Act
+      fireEvent.click(bloodMoor);
+
+      // Assert
+      await waitFor(() =>
+        expect(terrorZone.updateConfig).toHaveBeenCalledWith({ '1': false, '2': true }),
+      );
+    });
+  });
+
+  describe('If a zone change is still being written', () => {
+    it('Then only the toggled switch is pending and the other switches stay usable', async () => {
+      // Arrange
+      const write = createDeferred<typeof saveSuccess>();
+      setupValidTerrorZoneApi({ updateConfig: vi.fn().mockReturnValue(write.promise) });
+      render(<TerrorZoneConfiguration />);
+      const coldPlains = await screen.findByRole('switch', { name: 'Cold Plains' });
+      const bloodMoor = screen.getByRole('switch', { name: 'Blood Moor' });
+
+      // Act
+      fireEvent.click(coldPlains);
+
+      // Assert
+      await waitFor(() => expect(coldPlains).toHaveAttribute('data-disabled'));
+      expect(coldPlains).toBeChecked();
+      expect(coldPlains).toHaveAttribute('aria-busy', 'true');
+      expect(bloodMoor).not.toHaveAttribute('data-disabled');
+      expect(bloodMoor).not.toHaveAttribute('aria-busy');
+
+      write.resolve(saveSuccess);
+      await waitFor(() => expect(coldPlains).not.toHaveAttribute('data-disabled'));
+      expect(coldPlains).not.toHaveAttribute('aria-busy');
+    });
+
+    it('Then a second change waits for the first write before it is written', async () => {
+      // Arrange
+      const firstWrite = createDeferred<typeof saveSuccess>();
+      const updateConfig = vi
+        .fn()
+        .mockReturnValueOnce(firstWrite.promise)
+        .mockResolvedValue(saveSuccess);
+      setupValidTerrorZoneApi({ updateConfig });
+      render(<TerrorZoneConfiguration />);
+      const coldPlains = await screen.findByRole('switch', { name: 'Cold Plains' });
+      const bloodMoor = screen.getByRole('switch', { name: 'Blood Moor' });
+      fireEvent.click(coldPlains);
+      await waitFor(() => expect(updateConfig).toHaveBeenCalledTimes(1));
+
+      // Act
+      fireEvent.click(bloodMoor);
+
+      // Assert
+      expect(bloodMoor).not.toBeChecked();
+      expect(updateConfig).toHaveBeenCalledTimes(1);
+
+      firstWrite.resolve(saveSuccess);
+      await waitFor(() => expect(updateConfig).toHaveBeenCalledTimes(2));
+      expect(updateConfig).toHaveBeenNthCalledWith(1, { '1': true, '2': true });
+      expect(updateConfig).toHaveBeenNthCalledWith(2, { '1': false, '2': true });
+    });
+  });
+});
+
+describe('When TerrorZoneConfiguration disables all zones', () => {
+  beforeEach(() => {
+    vi.mocked(toast.success).mockClear();
+  });
+
+  afterEach(() => {
+    window.electronAPI = originalElectronAPI;
+    vi.restoreAllMocks();
+  });
+
+  describe('If Disable All is clicked', () => {
+    it('Then a confirmation dialog is shown and nothing is written yet', async () => {
+      // Arrange
+      const terrorZone = setupValidTerrorZoneApi();
+      render(<TerrorZoneConfiguration />);
+      await screen.findByRole('switch', { name: 'Blood Moor' });
+
+      // Act
+      fireEvent.click(screen.getByRole('button', { name: 'Disable All' }));
+
+      // Assert
+      const dialog = await screen.findByRole('alertdialog');
+      expect(within(dialog).getByText('Disable all terror zones?')).toBeInTheDocument();
+      expect(terrorZone.updateConfig).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('If the confirmation is cancelled', () => {
+    it('Then the zones are left unchanged', async () => {
+      // Arrange
+      const terrorZone = setupValidTerrorZoneApi();
+      render(<TerrorZoneConfiguration />);
+      const bloodMoor = await screen.findByRole('switch', { name: 'Blood Moor' });
+      fireEvent.click(screen.getByRole('button', { name: 'Disable All' }));
+      const dialog = await screen.findByRole('alertdialog');
+
+      // Act
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+
+      // Assert
+      await waitFor(() => expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument());
+      expect(terrorZone.updateConfig).not.toHaveBeenCalled();
+      expect(bloodMoor).toBeChecked();
+    });
+  });
+
+  describe('If the confirmation is accepted', () => {
+    it('Then every zone is disabled and saved', async () => {
+      // Arrange
+      const terrorZone = setupValidTerrorZoneApi();
+      render(<TerrorZoneConfiguration />);
+      const bloodMoor = await screen.findByRole('switch', { name: 'Blood Moor' });
+      fireEvent.click(screen.getByRole('button', { name: 'Disable All' }));
+      const dialog = await screen.findByRole('alertdialog');
+
+      // Act
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Disable All' }));
+
+      // Assert
+      await waitFor(() =>
+        expect(terrorZone.updateConfig).toHaveBeenCalledWith({ '1': false, '2': false }),
+      );
+      await waitFor(() => expect(toast.success).toHaveBeenCalledTimes(1));
+      expect(bloodMoor).not.toBeChecked();
+    });
+  });
+});
+
+describe('When TerrorZoneConfiguration is configured', () => {
+  afterEach(() => {
+    window.electronAPI = originalElectronAPI;
+    vi.restoreAllMocks();
+  });
+
+  it('Then the launch requirements are shown', async () => {
+    // Arrange
+    setupValidTerrorZoneApi();
+
+    // Act
+    render(<TerrorZoneConfiguration />);
+
+    // Assert
+    expect(await screen.findByText('Before your changes show up in game')).toBeInTheDocument();
+    expect(screen.getByText('-direct -txt')).toBeInTheDocument();
+    expect(
+      screen.getByText('Restart D2R after saving. A running game does not pick up changes.'),
+    ).toBeInTheDocument();
+  });
+
+  describe('If the guide link is clicked', () => {
+    it('Then the guide is opened in the system browser', async () => {
+      // Arrange
+      const { shell } = setupValidTerrorZoneApi();
+      render(<TerrorZoneConfiguration />);
+      const guideLink = await screen.findByRole('link', { name: 'Read the terror zone guide' });
+
+      // Act
+      fireEvent.click(guideLink);
+
+      // Assert
+      expect(shell.openExternal).toHaveBeenCalledWith(
+        'https://github.com/hyperremix/d2r-arcane-tracker/blob/main/docs/TERROR_ZONE_CONFIGURATION.md',
       );
     });
   });
