@@ -88,7 +88,7 @@ The main screen lists every grail item with its found status. The search and fil
 
 - Search by name, with optional fuzzy matching.
 - Filter by status (all, found, missing), category (weapons, armor, jewelry, charms) and type (unique, set, rune, runeword).
-- Group by category, type or ethereal status, and switch between grid and list views.
+- Group by category, type or ethereal status (available when ethereal tracking is on), and switch between grid and list views.
 - Sort by name, category, type or found date.
 
 Click an item to see its details, which characters found it and when, and links to [diablo2.io](https://diablo2.io/) or [d2runewizard](https://d2runewizard.com/).
