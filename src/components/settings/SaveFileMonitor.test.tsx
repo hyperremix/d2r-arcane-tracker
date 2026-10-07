@@ -1,5 +1,5 @@
 import '@testing-library/jest-dom';
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import { GameMode } from 'electron/types/grail';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useGrailStore } from '@/stores/grailStore';
@@ -74,6 +74,60 @@ describe('SaveFileMonitor', () => {
       // Assert
       await waitFor(() => expect(window.electronAPI?.saveFile.getSaveFiles).toHaveBeenCalled());
       expect(screen.queryByText(/Manual Mode Active:/)).not.toBeInTheDocument();
+    });
+  });
+
+  describe('latest activity', () => {
+    function emitSaveFileEvent(type: string) {
+      const onMock = vi.mocked(
+        (windowGlobals.ipcRenderer as { on: (channel: string, listener: unknown) => void }).on,
+      );
+      const call = onMock.mock.calls.find(([channel]) => channel === 'save-file-event');
+      const listener = call?.[1] as (event: unknown, payload: unknown) => void;
+      act(() => {
+        listener(
+          {},
+          {
+            type,
+            file: { name: 'Sorc', level: 90, characterClass: 'sorceress', hardcore: false },
+          },
+        );
+      });
+    }
+
+    it.each([
+      ['created', 'Created'],
+      ['modified', 'Modified'],
+      ['deleted', 'Deleted'],
+    ])(
+      'When a "%s" save file event arrives, then the event type is shown as "%s"',
+      async (type, label) => {
+        // Arrange
+        mockGameMode(GameMode.Both);
+        render(<SaveFileMonitor />);
+        await waitFor(() => expect(window.electronAPI?.saveFile.getSaveFiles).toHaveBeenCalled());
+
+        // Act
+        emitSaveFileEvent(type);
+
+        // Assert
+        expect(screen.getByText(label)).toBeInTheDocument();
+        expect(screen.queryByText(type)).not.toBeInTheDocument();
+      },
+    );
+
+    it('If the event type is unrecognized, then a translated fallback is shown', async () => {
+      // Arrange
+      mockGameMode(GameMode.Both);
+      render(<SaveFileMonitor />);
+      await waitFor(() => expect(window.electronAPI?.saveFile.getSaveFiles).toHaveBeenCalled());
+
+      // Act
+      emitSaveFileEvent('renamed');
+
+      // Assert
+      expect(screen.getByText('Unknown')).toBeInTheDocument();
+      expect(screen.queryByText('renamed')).not.toBeInTheDocument();
     });
   });
 });
