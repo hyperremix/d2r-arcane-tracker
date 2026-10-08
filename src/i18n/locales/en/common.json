@@ -663,15 +663,29 @@
       "loadingRuneData": "Loading rune data...",
       "thisMayTake": "This may take a few moments",
       "noRunewordsFound": "No runewords found",
-      "adjustFilters": "Try adjusting your filters or search term"
+      "adjustFilters": "Try adjusting your filters or search term",
+      "availabilityLegend": "Show runewords",
+      "availability": {
+        "craftable": "Craftable now",
+        "missingOne": "Missing ≤ 1"
+      },
+      "refreshRunes": "Refresh runes",
+      "refreshFailed": "Failed to refresh runes from save files",
+      "noCraftable": "You can't craft any runeword with your current runes",
+      "showMissingOne": "Show runewords missing at most 1 rune",
+      "showAll": "Show all runewords"
     },
     "card": {
       "viewDetails": "View details",
-      "allRunesAvailable": "All runes available"
+      "allRunesAvailable": "All runes available",
+      "runesOwned": "{{available}}/{{total}} runes",
+      "runesOwnedLabel": "{{available}} of {{total}} runes available",
+      "missingRuneTooltip": "{{rune}} (missing)"
     },
     "filters": {
+      "matchAllHint": "Shows runewords that use all selected runes",
+      "clearSelection": "Clear selection",
       "filterByRunes": "Filter by Runes",
-      "showPartial": "Show Partial",
       "runesSelected": "{{count}} rune{{plural}} selected"
     }
   },
