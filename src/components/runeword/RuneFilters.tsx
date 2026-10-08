@@ -163,10 +163,7 @@ export function RuneFilters({
       {/* Selection summary */}
       {selectedRunes.length > 0 && (
         <div className="border-border border-t pt-3 text-muted-foreground text-sm">
-          {t(translations.runeword.filters.runesSelected, {
-            count: selectedRunes.length,
-            plural: selectedRunes.length !== 1 ? 's' : '',
-          })}
+          {t(translations.runeword.filters.runesSelected, { count: selectedRunes.length })}
         </div>
       )}
     </div>

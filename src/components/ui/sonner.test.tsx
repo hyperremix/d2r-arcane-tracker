@@ -11,7 +11,13 @@ vi.mock('@/hooks/useTheme', () => ({
 
 import { Toaster as Sonner } from 'sonner';
 import { useResolvedTheme } from '@/hooks/useTheme';
-import { Toaster } from './sonner';
+import type { Toaster as ToasterComponent } from './sonner';
+
+// Test files share one module registry (isolate: false), so './sonner' may already be cached by
+// another suite with the real dependencies. Load a separate instance so this suite's mocks apply.
+const { Toaster } = (await import(/* @vite-ignore */ `${'./sonner'}?isolated`)) as {
+  Toaster: typeof ToasterComponent;
+};
 
 describe('When the Toaster is rendered', () => {
   afterEach(() => {

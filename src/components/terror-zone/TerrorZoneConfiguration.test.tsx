@@ -786,3 +786,34 @@ describe('When TerrorZoneConfiguration is configured', () => {
     });
   });
 });
+
+describe('When TerrorZoneConfiguration is rendered as a page', () => {
+  afterEach(() => {
+    window.electronAPI = originalElectronAPI;
+  });
+
+  it('If the zones are loaded, Then exactly one level-1 heading is present', async () => {
+    // Arrange
+    setupValidTerrorZoneApi();
+
+    // Act
+    render(<TerrorZoneConfiguration />);
+    await screen.findByRole('switch', { name: 'Blood Moor' });
+
+    // Assert
+    expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
+  });
+
+  it('If the zones are still loading, Then exactly one level-1 heading is present', () => {
+    // Arrange
+    setupValidTerrorZoneApi({
+      validatePath: vi.fn().mockReturnValue(new Promise(() => undefined)),
+    });
+
+    // Act
+    render(<TerrorZoneConfiguration />);
+
+    // Assert
+    expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
+  });
+});

@@ -379,4 +379,30 @@ describe('RunewordCalculator', () => {
       consoleError.mockRestore();
     });
   });
+
+  describe('page heading', () => {
+    it('If the data is still loading, Then exactly one level-1 heading is present', () => {
+      // Arrange
+      const api = stubElectronApi();
+      api.grail.getAllRunewords.mockReturnValue(new Promise(() => undefined));
+
+      // Act
+      render(<RunewordCalculator />);
+
+      // Assert
+      expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
+      expect(screen.getByRole('heading', { level: 1, name: 'Runeword Calculator' })).toBeVisible();
+    });
+
+    it('If the data has loaded, Then exactly one level-1 heading is present', async () => {
+      // Arrange
+      stubElectronApi();
+
+      // Act
+      await renderCalculator();
+
+      // Assert
+      expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
+    });
+  });
 });

@@ -140,6 +140,37 @@ describe('RunTracker', () => {
     ).toBeDefined();
   });
 
+  describe('When the page is rendered', () => {
+    it.each([
+      ['the main state is shown', { activeSession: mockSession }],
+      ['the initial load is pending', { initialLoadStatus: 'loading' }],
+      [
+        'the initial load failed',
+        { initialLoadStatus: 'error', initialLoadError: 'Failed to load data' },
+      ],
+    ])('If %s, Then exactly one level-1 heading is present', (_scenario, storeOverrides) => {
+      // Arrange
+      mockUseRunTrackerStore.mockReturnValue({ ...defaultStoreState, ...storeOverrides });
+
+      // Act
+      render(<RunTracker />);
+
+      // Assert
+      expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
+    });
+
+    it('If the main state is shown, Then the level-1 heading is the page title', () => {
+      // Arrange
+      mockUseRunTrackerStore.mockReturnValue({ ...defaultStoreState, activeSession: mockSession });
+
+      // Act
+      render(<RunTracker />);
+
+      // Assert
+      expect(screen.getByRole('heading', { level: 1, name: 'Run Tracker' })).toBeDefined();
+    });
+  });
+
   describe('When the initial load has not completed yet', () => {
     it('Then a full-page loading state is shown', () => {
       // Arrange

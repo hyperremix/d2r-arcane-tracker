@@ -111,7 +111,7 @@ Conversion only reads game files and is safe to run again. The PNGs are stored i
 
 ### Statistics
 
-The **Statistics** page shows overall and per-category progress, recent finds, find streaks, a comparison between characters, and run analytics from the [Run Tracker](RUN_TRACKER.md).
+The **Statistics** page shows overall and per-category progress, recent finds, find streaks, a comparison between characters, and run analytics from the [Run Tracker](RUN_TRACKER.md). The selected tab (**Grail Statistics** or **Run Statistics**) is kept in the page address, so going back to the page with the browser's back button restores it.
 
 ### Runeword Calculator
 
