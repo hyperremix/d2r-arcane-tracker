@@ -1,5 +1,9 @@
 import { useCallback, useState } from 'react';
-import type { SaveDirectoryChangeAction } from '@/components/settings/SaveDirectoryChangeDialog';
+
+/**
+ * The kind of save directory change being confirmed.
+ */
+export type SaveDirectoryChangeAction = 'change' | 'restore';
 
 /**
  * A requested save directory change.
@@ -9,6 +13,14 @@ export interface SaveDirectoryChangeRequest {
   action: SaveDirectoryChangeAction;
   /** The directory the change would switch to. */
   directory: string;
+}
+
+/**
+ * A change awaiting confirmation, with the directory it would switch away from.
+ */
+export interface PendingSaveDirectoryChange extends SaveDirectoryChangeRequest {
+  /** The directory that was being monitored when the change was requested, if known. */
+  currentDirectory: string | undefined;
 }
 
 /**
@@ -28,7 +40,7 @@ export type SaveDirectoryChangeOutcome =
  * Options for {@link useSaveDirectoryChange}.
  */
 export interface UseSaveDirectoryChangeOptions {
-  /** The directory currently being monitored, if known. */
+  /** The directory currently being monitored, if known. When unknown, the saved setting or platform default is used. */
   currentDirectory: string | undefined;
   /** Called after a change has been applied, e.g. to reload data. Failures are logged only. */
   onApplied?: (change: SaveDirectoryChangeRequest) => Promise<void> | void;
@@ -39,7 +51,7 @@ export interface UseSaveDirectoryChangeOptions {
  */
 export interface SaveDirectoryChangeState {
   /** The change awaiting user confirmation, if any. */
-  pendingChange: SaveDirectoryChangeRequest | undefined;
+  pendingChange: PendingSaveDirectoryChange | undefined;
   /** Whether a change is currently being applied. */
   isApplying: boolean;
   /** Compares the requested directory with the current one and applies or defers the change. */
@@ -80,6 +92,31 @@ async function hasExistingUserData(): Promise<boolean> {
 }
 
 /**
+ * Resolves the directory the database content belongs to, mirroring the main process:
+ * the known monitored directory, else the saved `saveDir` setting, else the platform default.
+ * @param {string | undefined} knownDirectory - Directory reported by the monitoring status
+ * @returns {Promise<string | undefined>} The effective current directory, or undefined if unknown
+ */
+async function resolveCurrentDirectory(
+  knownDirectory: string | undefined,
+): Promise<string | undefined> {
+  if (knownDirectory?.trim()) {
+    return knownDirectory;
+  }
+  try {
+    const settings = await window.electronAPI?.grail.getSettings();
+    if (settings?.saveDir?.trim()) {
+      return settings.saveDir;
+    }
+    const defaultDirectory = await window.electronAPI?.saveFile.getDefaultDirectory();
+    return defaultDirectory?.trim() ? defaultDirectory : undefined;
+  } catch (error) {
+    console.error('Failed to resolve the current save directory:', error);
+    return undefined;
+  }
+}
+
+/**
  * Manages changing the monitored save directory safely:
  * an unchanged directory is a no-op, and switching to a different directory while
  * characters or progress exist requires explicit confirmation, because the main
@@ -91,7 +128,7 @@ export function useSaveDirectoryChange({
   currentDirectory,
   onApplied,
 }: UseSaveDirectoryChangeOptions): SaveDirectoryChangeState {
-  const [pendingChange, setPendingChange] = useState<SaveDirectoryChangeRequest | undefined>(
+  const [pendingChange, setPendingChange] = useState<PendingSaveDirectoryChange | undefined>(
     undefined,
   );
   const [isApplying, setIsApplying] = useState(false);
@@ -128,10 +165,10 @@ export function useSaveDirectoryChange({
 
   const requestChange = useCallback(
     async (change: SaveDirectoryChangeRequest): Promise<SaveDirectoryChangeOutcome> => {
+      const resolvedDirectory = await resolveCurrentDirectory(currentDirectory);
       const isSameDirectory =
-        currentDirectory !== undefined &&
-        currentDirectory.trim() !== '' &&
-        normalizeDirectoryForComparison(currentDirectory) ===
+        resolvedDirectory !== undefined &&
+        normalizeDirectoryForComparison(resolvedDirectory) ===
           normalizeDirectoryForComparison(change.directory);
 
       if (isSameDirectory) {
@@ -140,7 +177,7 @@ export function useSaveDirectoryChange({
 
       if (await hasExistingUserData()) {
         // Require explicit confirmation before wiping existing progress
-        setPendingChange(change);
+        setPendingChange({ ...change, currentDirectory: resolvedDirectory });
         return 'confirmationRequired';
       }
 
@@ -153,7 +190,10 @@ export function useSaveDirectoryChange({
     if (!pendingChange) {
       return 'failed';
     }
-    const outcome = await applyChange(pendingChange);
+    const outcome = await applyChange({
+      action: pendingChange.action,
+      directory: pendingChange.directory,
+    });
     setPendingChange(undefined);
     return outcome;
   }, [applyChange, pendingChange]);

@@ -32,6 +32,7 @@ interface MockElectronAPI {
   grail: {
     getCharacters: ReturnType<typeof vi.fn>;
     getProgress: ReturnType<typeof vi.fn>;
+    getSettings: ReturnType<typeof vi.fn>;
     backup: ReturnType<typeof vi.fn>;
   };
   saveFile: {
@@ -95,6 +96,7 @@ describe('SaveFileMonitor', () => {
       grail: {
         getCharacters: vi.fn().mockResolvedValue([]),
         getProgress: vi.fn().mockResolvedValue([]),
+        getSettings: vi.fn().mockResolvedValue({ saveDir: '' }),
         backup: vi.fn().mockResolvedValue({ success: true }),
       },
       saveFile: {
@@ -338,6 +340,178 @@ describe('SaveFileMonitor', () => {
       // Assert
       await waitFor(() => expect(toast.error).toHaveBeenCalledWith('Failed to change directory'));
       expect(toast.success).not.toHaveBeenCalled();
+    });
+
+    it('If restoring the default fails, then a translated restore error toast is shown', async () => {
+      // Arrange
+      arrangeMonitoredDirectory(false);
+      getElectronAPI().saveFile.restoreDefaultDirectory.mockRejectedValue(new Error('boom'));
+      await renderWithLoadedDirectory();
+
+      // Act
+      fireEvent.click(screen.getByRole('button', { name: 'Restore Default' }));
+
+      // Assert
+      await waitFor(() =>
+        expect(toast.error).toHaveBeenCalledWith('Failed to restore default directory'),
+      );
+      expect(toast.success).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ['nothing', () => getElectronAPI().saveFile.getDefaultDirectory.mockResolvedValue('')],
+      [
+        'rejects',
+        () => getElectronAPI().saveFile.getDefaultDirectory.mockRejectedValue(new Error('boom')),
+      ],
+    ])(
+      'If the default directory lookup returns %s, then a restore error toast is shown and nothing changes',
+      async (_name, arrange) => {
+        // Arrange
+        arrangeMonitoredDirectory(true);
+        arrange();
+        await renderWithLoadedDirectory();
+
+        // Act
+        fireEvent.click(screen.getByRole('button', { name: 'Restore Default' }));
+
+        // Assert
+        await waitFor(() =>
+          expect(toast.error).toHaveBeenCalledWith('Failed to restore default directory'),
+        );
+        expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+        expect(getElectronAPI().saveFile.restoreDefaultDirectory).not.toHaveBeenCalled();
+      },
+    );
+
+    it('If checking for existing data fails, then the confirmation is shown to be safe', async () => {
+      // Arrange
+      arrangeMonitoredDirectory(false);
+      getElectronAPI().grail.getCharacters.mockRejectedValue(new Error('db locked'));
+      await renderWithLoadedDirectory();
+
+      // Act
+      pickFolder(NEW_DIRECTORY);
+
+      // Assert
+      await screen.findByRole('alertdialog');
+      expect(getElectronAPI().saveFile.updateSaveDirectory).not.toHaveBeenCalled();
+    });
+
+    it('If applying fails after the user confirms, then an error toast is shown and the dialog closes', async () => {
+      // Arrange
+      arrangeMonitoredDirectory(true);
+      getElectronAPI().saveFile.updateSaveDirectory.mockRejectedValue(new Error('boom'));
+      await renderWithLoadedDirectory();
+      pickFolder(NEW_DIRECTORY);
+      const dialog = await screen.findByRole('alertdialog');
+
+      // Act
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Change Directory' }));
+
+      // Assert
+      await waitFor(() => expect(toast.error).toHaveBeenCalledWith('Failed to change directory'));
+      await waitFor(() => expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument());
+      expect(toast.success).not.toHaveBeenCalled();
+    });
+
+    it('If reloading data fails after the change was applied, then the change is still reported as successful', async () => {
+      // Arrange
+      arrangeMonitoredDirectory(false);
+      mockReloadData.mockRejectedValue(new Error('reload failed'));
+      await renderWithLoadedDirectory();
+
+      // Act
+      pickFolder(NEW_DIRECTORY);
+
+      // Assert
+      await waitFor(() =>
+        expect(toast.success).toHaveBeenCalledWith('Save folder updated', {
+          description: `Now monitoring ${NEW_DIRECTORY}`,
+        }),
+      );
+      expect(toast.error).not.toHaveBeenCalled();
+    });
+
+    it('If the backup from the dialog is canceled, then no backup note is shown and the change is not applied', async () => {
+      // Arrange
+      arrangeMonitoredDirectory(true);
+      await renderWithLoadedDirectory();
+      pickFolder(NEW_DIRECTORY);
+      const dialog = await screen.findByRole('alertdialog');
+
+      // Act
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Back up first' }));
+
+      // Assert
+      await waitFor(() => expect(getElectronAPI().dialog.showSaveDialog).toHaveBeenCalled());
+      await waitFor(() =>
+        expect(within(dialog).getByRole('button', { name: 'Back up first' })).toBeEnabled(),
+      );
+      expect(
+        within(dialog).queryByText(
+          'Backup created. You can now continue with the directory change.',
+        ),
+      ).not.toBeInTheDocument();
+      expect(getElectronAPI().grail.backup).not.toHaveBeenCalled();
+      expect(getElectronAPI().saveFile.updateSaveDirectory).not.toHaveBeenCalled();
+    });
+
+    it('If the backup from the dialog fails, then an error toast is shown and no backup note appears', async () => {
+      // Arrange
+      arrangeMonitoredDirectory(true);
+      const api = getElectronAPI();
+      api.dialog.showSaveDialog.mockResolvedValue({ canceled: false, filePath: '/backups/b.db' });
+      api.grail.backup.mockResolvedValue({ success: false });
+      await renderWithLoadedDirectory();
+      pickFolder(NEW_DIRECTORY);
+      const dialog = await screen.findByRole('alertdialog');
+
+      // Act
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Back up first' }));
+
+      // Assert
+      await waitFor(() => expect(toast.error).toHaveBeenCalledWith('Failed to back up database'));
+      expect(
+        within(dialog).queryByText(
+          'Backup created. You can now continue with the directory change.',
+        ),
+      ).not.toBeInTheDocument();
+      expect(api.saveFile.updateSaveDirectory).not.toHaveBeenCalled();
+    });
+
+    it('If the monitored directory is not loaded, then the saved saveDir setting is used so an unchanged folder needs no confirmation', async () => {
+      // Arrange
+      const api = getElectronAPI();
+      api.grail.getSettings.mockResolvedValue({ saveDir: NEW_DIRECTORY });
+      api.grail.getCharacters.mockResolvedValue([{ id: 'char-1' }]);
+      render(<SaveFileMonitor />);
+      await waitFor(() => expect(api.saveFile.getMonitoringStatus).toHaveBeenCalled());
+
+      // Act
+      pickFolder(NEW_DIRECTORY);
+
+      // Assert
+      await waitFor(() => expect(toast.info).toHaveBeenCalled());
+      expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+      expect(api.saveFile.updateSaveDirectory).not.toHaveBeenCalled();
+    });
+
+    it('If the monitored directory is not loaded and a different folder is picked, then the confirmation shows the resolved current folder', async () => {
+      // Arrange
+      const api = getElectronAPI();
+      api.grail.getSettings.mockResolvedValue({ saveDir: CURRENT_DIRECTORY });
+      api.grail.getCharacters.mockResolvedValue([{ id: 'char-1' }]);
+      render(<SaveFileMonitor />);
+      await waitFor(() => expect(api.saveFile.getMonitoringStatus).toHaveBeenCalled());
+
+      // Act
+      pickFolder(NEW_DIRECTORY);
+
+      // Assert
+      const dialog = await screen.findByRole('alertdialog');
+      expect(within(dialog).getByText(CURRENT_DIRECTORY)).toBeInTheDocument();
+      expect(within(dialog).getByText(NEW_DIRECTORY)).toBeInTheDocument();
     });
 
     it('If the folder picker is canceled, then nothing changes', async () => {

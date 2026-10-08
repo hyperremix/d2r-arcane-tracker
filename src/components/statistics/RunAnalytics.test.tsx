@@ -15,12 +15,7 @@ import {
 import { translations } from '@/i18n/translations';
 import { RunAnalytics } from './RunAnalytics';
 
-vi.mock('sonner', () => ({
-  toast: {
-    success: vi.fn(),
-    error: vi.fn(),
-  },
-}));
+vi.mock('sonner', () => import('@/test/sonnerMock'));
 
 const mockStats: RunStatistics = {
   totalSessions: 3,

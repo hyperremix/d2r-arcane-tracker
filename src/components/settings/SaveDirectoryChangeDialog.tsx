@@ -11,12 +11,8 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
+import type { SaveDirectoryChangeAction } from '@/hooks/useSaveDirectoryChange';
 import { translations } from '@/i18n/translations';
-
-/**
- * The kind of save directory change being confirmed.
- */
-export type SaveDirectoryChangeAction = 'change' | 'restore';
 
 /**
  * Props for the SaveDirectoryChangeDialog component.
@@ -27,7 +23,7 @@ export interface SaveDirectoryChangeDialogProps {
   action: SaveDirectoryChangeAction;
   isProcessing: boolean;
   onConfirm: () => void;
-  /** Directory currently being monitored, shown when provided. */
+  /** Directory currently being monitored; shown (or as "no directory selected") when either path is provided. */
   currentDirectory?: string;
   /** Directory the change would switch to, shown when provided. */
   newDirectory?: string;
@@ -52,8 +48,8 @@ function DirectoryChangePaths({
   const pathClassName = 'break-all rounded bg-muted p-2 font-mono text-muted-foreground text-xs';
 
   return (
-    <dl className="space-y-2 text-sm">
-      {currentDirectory !== undefined && (
+    <dl className="mt-3 space-y-2 text-sm">
+      {(currentDirectory !== undefined || newDirectory !== undefined) && (
         <div>
           <dt className="font-medium">
             {t(translations.settings.saveFileMonitor.currentDirectoryLabel)}
@@ -116,7 +112,7 @@ export function SaveDirectoryChangeDialog({
               ? t(translations.settings.saveFileMonitor.restoreDefaultDirectory)
               : t(translations.settings.saveFileMonitor.changeSaveFileDirectory)}
           </AlertDialogTitle>
-          <AlertDialogDescription>
+          <AlertDialogDescription render={<div />}>
             <span className="mb-2 block">
               {isRestore
                 ? t(translations.settings.saveFileMonitor.confirmRestoreDirectory)
@@ -133,11 +129,14 @@ export function SaveDirectoryChangeDialog({
                 {t(translations.settings.saveFileMonitor.backupCreatedContinue)}
               </output>
             )}
+            {(currentDirectory !== undefined || newDirectory !== undefined) && (
+              <DirectoryChangePaths
+                currentDirectory={currentDirectory}
+                newDirectory={newDirectory}
+              />
+            )}
           </AlertDialogDescription>
         </AlertDialogHeader>
-        {(currentDirectory !== undefined || newDirectory !== undefined) && (
-          <DirectoryChangePaths currentDirectory={currentDirectory} newDirectory={newDirectory} />
-        )}
         <AlertDialogFooter>
           <AlertDialogCancel disabled={isBusy}>{t(translations.common.cancel)}</AlertDialogCancel>
           {onBackup && (

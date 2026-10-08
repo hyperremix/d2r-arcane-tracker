@@ -424,8 +424,8 @@ export function SaveFileMonitor() {
         action={pendingChange?.action ?? 'change'}
         isProcessing={isApplying}
         onConfirm={handleConfirmChange}
-        currentDirectory={monitoringStatus.directory ?? ''}
-        newDirectory={pendingChange?.directory ?? ''}
+        currentDirectory={pendingChange?.currentDirectory}
+        newDirectory={pendingChange?.directory}
         onBackup={handleBackupFirst}
         isBackingUp={isBackingUp}
         hasBackedUp={hasBackedUp}
