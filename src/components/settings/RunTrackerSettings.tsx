@@ -66,6 +66,7 @@ export function RunTrackerSettings() {
     globalHotkeysEnabled && globalHotkeyStatus?.enabled
       ? globalHotkeyStatus.registrations.filter(isFailedRegistration)
       : [];
+  const globalHotkeysUnavailable = globalHotkeysEnabled && Boolean(globalHotkeyStatus?.unavailable);
 
   const isWindows = window.electronAPI?.platform === 'win32';
   const [memoryStatus, setMemoryStatus] = useState<{
@@ -246,6 +247,15 @@ export function RunTrackerSettings() {
               aria-describedby={globalHotkeysDescriptionId}
             />
           </div>
+
+          {globalHotkeysUnavailable && (
+            <Alert live="polite">
+              <AlertCircle className="h-4 w-4" aria-hidden="true" />
+              <AlertDescription className="text-xs">
+                {t(translations.settings.runTracker.globalHotkeysUnavailable)}
+              </AlertDescription>
+            </Alert>
+          )}
 
           {failedGlobalHotkeys.length > 0 && (
             <Alert variant="destructive">

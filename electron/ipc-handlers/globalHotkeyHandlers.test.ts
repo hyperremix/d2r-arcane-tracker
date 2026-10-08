@@ -169,7 +169,7 @@ describe('When the global hotkey handlers are initialized', () => {
     expect(mocks.settingsListeners.size).toBe(0);
   });
 
-  it('If the run tracker is unavailable, Then no hotkeys are registered and the status stays disabled', async () => {
+  it('If the run tracker is unavailable, Then no hotkeys are registered and the status reports the tracker as unavailable', async () => {
     // Arrange
     const mainWindow = createMainWindow(false);
 
@@ -179,7 +179,7 @@ describe('When the global hotkey handlers are initialized', () => {
 
     // Assert
     expect(mocks.registered.size).toBe(0);
-    expect(status).toEqual({ enabled: false, registrations: [] });
+    expect(status).toEqual({ enabled: false, registrations: [], unavailable: true });
     expect(mocks.settingsListeners.size).toBe(0);
     expect(mocks.appListeners.get('browser-window-blur')?.size ?? 0).toBe(0);
   });

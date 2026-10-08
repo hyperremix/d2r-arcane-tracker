@@ -138,4 +138,51 @@ describe('When RunTrackerSettings renders the global hotkeys option', () => {
     // Assert
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
+
+  it('If the switch is on but the run tracker is unavailable, Then a translated note explains no global hotkeys are registered', async () => {
+    // Arrange
+    setupElectronAPI({ enabled: false, registrations: [], unavailable: true });
+    setupGrailStore({ runTrackerGlobalHotkeys: true });
+
+    // Act
+    render(<RunTrackerSettings />);
+
+    // Assert
+    const note = await screen.findByText(
+      'Global hotkeys are not registered because the run tracker is unavailable.',
+    );
+    expect(note.closest('[role="status"]')).toBeInTheDocument();
+  });
+
+  it('If the run tracker is unavailable but the switch is off, Then no note is shown', async () => {
+    // Arrange
+    setupElectronAPI({ enabled: false, registrations: [], unavailable: true });
+    setupGrailStore({ runTrackerGlobalHotkeys: false });
+
+    // Act
+    render(<RunTrackerSettings />);
+    await act(async () => {
+      // Let the global hotkey status query resolve
+      await Promise.resolve();
+    });
+
+    // Assert
+    expect(screen.queryByText(/run tracker is unavailable/)).not.toBeInTheDocument();
+  });
+
+  it('If the setting is on and the status has not been applied yet, Then no unavailable note is shown', async () => {
+    // Arrange
+    setupElectronAPI({ enabled: false, registrations: [] });
+    setupGrailStore({ runTrackerGlobalHotkeys: true });
+
+    // Act
+    render(<RunTrackerSettings />);
+    await act(async () => {
+      // Let the global hotkey status query resolve
+      await Promise.resolve();
+    });
+
+    // Assert
+    expect(screen.queryByText(/run tracker is unavailable/)).not.toBeInTheDocument();
+  });
 });

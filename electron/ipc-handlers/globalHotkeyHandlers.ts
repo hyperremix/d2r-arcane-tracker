@@ -41,7 +41,7 @@ export function initializeGlobalHotkeyHandlers(
     console.error('[globalHotkeys] Run tracker unavailable, global hotkeys are not registered');
     ipcMain.handle(
       'run-tracker:get-global-hotkey-status',
-      (): GlobalHotkeyStatus => ({ enabled: false, registrations: [] }),
+      (): GlobalHotkeyStatus => ({ enabled: false, registrations: [], unavailable: true }),
     );
     cleanups.push(() => ipcMain.removeHandler('run-tracker:get-global-hotkey-status'));
     return;
