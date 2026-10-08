@@ -29,6 +29,7 @@ import {
 } from '@/components/ui/select';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { translations } from '@/i18n/translations';
+import { itemCategoryLabelKeys, itemTypeLabelKeys } from '@/lib/labelKeys';
 import { cn } from '@/lib/utils';
 import { useGrailStore } from '@/stores/grailStore';
 
@@ -81,26 +82,6 @@ const sortLabelKeys: Record<SortBy, string> = {
   category: translations.grail.advancedSearch.sortCategory,
   type: translations.grail.advancedSearch.sortType,
   found_date: translations.grail.advancedSearch.sortFoundDate,
-};
-
-/**
- * Translation keys for the category filters offered in the filters popover.
- */
-const categoryLabelKeys: Partial<Record<ItemCategory, string>> = {
-  weapons: translations.grail.advancedSearch.categoryWeapons,
-  armor: translations.grail.advancedSearch.categoryArmor,
-  jewelry: translations.grail.advancedSearch.categoryJewelry,
-  charms: translations.grail.advancedSearch.categoryCharms,
-};
-
-/**
- * Translation keys for the item type filters.
- */
-const typeLabelKeys: Record<ItemType, string> = {
-  unique: translations.grail.advancedSearch.typeUnique,
-  set: translations.grail.advancedSearch.typeSet,
-  rune: translations.grail.advancedSearch.typeRune,
-  runeword: translations.grail.advancedSearch.typeRuneword,
 };
 
 /**
@@ -173,7 +154,7 @@ function buildActiveFilterChips({
   for (const category of categories) {
     chips.push({
       key: `category-${category}`,
-      label: t(categoryLabelKeys[category] ?? category),
+      label: t(itemCategoryLabelKeys[category]),
       onRemove: () => onToggleCategory(category),
     });
   }
@@ -181,7 +162,7 @@ function buildActiveFilterChips({
   for (const type of types) {
     chips.push({
       key: `type-${type}`,
-      label: t(typeLabelKeys[type]),
+      label: t(itemTypeLabelKeys[type]),
       onRemove: () => onToggleType(type),
     });
   }
@@ -334,7 +315,7 @@ function FiltersPopover({
           idPrefix={`${idPrefix}-category`}
           options={categoryValues.map((value) => ({
             value,
-            label: t(categoryLabelKeys[value] ?? value),
+            label: t(itemCategoryLabelKeys[value]),
           }))}
           selected={selectedCategories}
           onToggle={onToggleCategory}
@@ -342,7 +323,7 @@ function FiltersPopover({
         <FilterCheckboxGroup
           legend={t(translations.grail.advancedSearch.types)}
           idPrefix={`${idPrefix}-type`}
-          options={typeValues.map((value) => ({ value, label: t(typeLabelKeys[value]) }))}
+          options={typeValues.map((value) => ({ value, label: t(itemTypeLabelKeys[value]) }))}
           selected={selectedTypes}
           onToggle={onToggleType}
         />

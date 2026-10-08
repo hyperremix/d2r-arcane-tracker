@@ -23,6 +23,7 @@ import type {
 } from '@/hooks/useSaveDirectoryChange';
 import { useSaveDirectoryChange } from '@/hooks/useSaveDirectoryChange';
 import { translations } from '@/i18n/translations';
+import { saveFileEventTypeLabelKeys } from '@/lib/labelKeys';
 import { formatShortDate } from '@/lib/utils';
 import { useGrailStore } from '@/stores/grailStore';
 import { SaveDirectoryChangeDialog } from './SaveDirectoryChangeDialog';
@@ -370,7 +371,7 @@ export function SaveFileMonitor() {
             <div className="space-y-1 text-xs">
               <div className="flex items-center gap-2">
                 <Badge variant="outline" className="text-xs">
-                  {lastEvent.type}
+                  {t(saveFileEventTypeLabelKeys[lastEvent.type] ?? translations.common.unknown)}
                 </Badge>
                 <span className="font-medium">{lastEvent.file.name}</span>
               </div>

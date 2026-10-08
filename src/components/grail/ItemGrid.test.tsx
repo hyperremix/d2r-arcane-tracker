@@ -533,7 +533,7 @@ vi.mock('./MasonryItemGrid', () => ({
       <ul>
         {groupedItems.map((group) => (
           <li key={group.title} data-testid="group">
-            {group.title}: {group.items.length}
+            <span data-testid="group-title">{group.title}</span>: {group.items.length}
           </li>
         ))}
       </ul>
@@ -623,6 +623,40 @@ describe('When ItemGrid component is rendered', () => {
 
       // Assert
       expect(screen.getByTestId('grouped-masonry-grid')).toBeInTheDocument();
+    });
+
+    it('Then group titles are translated category labels', () => {
+      // Arrange
+      const items = [
+        HolyGrailItemBuilder.new().withId('a').withCategory('armor').build(),
+        HolyGrailItemBuilder.new().withId('b').withCategory('runewords').build(),
+      ];
+      setupComponentMocks({ filteredItems: items, viewMode: 'grid', groupMode: 'category' });
+
+      // Act
+      render(<ItemGrid />);
+
+      // Assert
+      const titles = screen.getAllByTestId('group-title').map((el) => el.textContent);
+      expect(titles).toEqual(['Armor', 'Runewords']);
+    });
+  });
+
+  describe('If viewMode "grid" and groupMode "type"', () => {
+    it('Then group titles are translated type labels', () => {
+      // Arrange
+      const items = [
+        HolyGrailItemBuilder.new().withId('a').withType('unique').build(),
+        HolyGrailItemBuilder.new().withId('b').withType('runeword').build(),
+      ];
+      setupComponentMocks({ filteredItems: items, viewMode: 'grid', groupMode: 'type' });
+
+      // Act
+      render(<ItemGrid />);
+
+      // Assert
+      const titles = screen.getAllByTestId('group-title').map((el) => el.textContent);
+      expect(titles).toEqual(['Unique', 'Runeword']);
     });
   });
 
