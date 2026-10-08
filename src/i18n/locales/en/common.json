@@ -279,7 +279,14 @@
       "selectSaveFileDirectory": "Select Save File Directory",
       "changeDirectoryFailed": "Failed to change directory",
       "restoreDirectoryFailed": "Failed to restore default directory",
-      "unknownError": "Unknown error occurred"
+      "unknownError": "Unknown error occurred",
+      "currentDirectoryLabel": "Current folder",
+      "newDirectoryLabel": "New folder",
+      "backupCreatedContinue": "Backup created. You can now continue with the directory change.",
+      "directoryUnchanged": "Save folder unchanged",
+      "directoryUnchangedDescription": "{{directory}} is already the monitored folder.",
+      "directoryChanged": "Save folder updated",
+      "directoryChangedDescription": "Now monitoring {{directory}}"
     },
     "database": {
       "title": "Database",
@@ -510,9 +517,7 @@
       "averageEfficiency": "Average efficiency",
       "performanceHighlights": "Performance Highlights",
       "fastestRun": "Fastest Run",
-      "slowestRun": "Slowest Run",
-      "overallEfficiency": "Overall Efficiency",
-      "itemsPerRunMetric": "{{count}} items/run"
+      "slowestRun": "Slowest Run"
     }
   },
   "titleBar": {
@@ -656,9 +661,17 @@
     "errorDetails": "Error Details",
     "errorMessage": "Error Message:",
     "componentStack": "Component Stack:",
+    "stackTrace": "Stack Trace:",
+    "appVersion": "App Version:",
+    "pageDescription": "This page ran into an unexpected error. Try again, reload the application, or switch to another page from the title bar.",
     "tryToRecover": "Try to Recover",
     "reloadApplication": "Reload Application",
-    "persistHelp": "If this error persists, please report it with the error details shown above."
+    "copyDetails": "Copy Error Details",
+    "copySuccess": "Error details copied to clipboard",
+    "copyFailed": "Couldn't copy the error details",
+    "reportIssue": "Report Issue",
+    "reportFailed": "Couldn't open the issue tracker",
+    "persistHelp": "If this error persists, copy the error details and paste them into a new issue on GitHub."
   },
   "runeword": {
     "calculator": {
@@ -670,15 +683,29 @@
       "loadingRuneData": "Loading rune data...",
       "thisMayTake": "This may take a few moments",
       "noRunewordsFound": "No runewords found",
-      "adjustFilters": "Try adjusting your filters or search term"
+      "adjustFilters": "Try adjusting your filters or search term",
+      "availabilityLegend": "Show runewords",
+      "availability": {
+        "craftable": "Craftable now",
+        "missingOne": "Missing ≤ 1"
+      },
+      "refreshRunes": "Refresh runes",
+      "refreshFailed": "Failed to refresh runes from save files",
+      "noCraftable": "You can't craft any runeword with your current runes",
+      "showMissingOne": "Show runewords missing at most 1 rune",
+      "showAll": "Show all runewords"
     },
     "card": {
       "viewDetails": "View details",
-      "allRunesAvailable": "All runes available"
+      "allRunesAvailable": "All runes available",
+      "runesOwned": "{{available}}/{{total}} runes",
+      "runesOwnedLabel": "{{available}} of {{total}} runes available",
+      "missingRuneTooltip": "{{rune}} (missing)"
     },
     "filters": {
+      "matchAllHint": "Shows runewords that use all selected runes",
+      "clearSelection": "Clear selection",
       "filterByRunes": "Filter by Runes",
-      "showPartial": "Show Partial",
       "runesSelected": "{{count}} rune{{plural}} selected"
     }
   },
@@ -708,6 +735,21 @@
     "restoreOriginalFile": "Restore Original File",
     "restoreDescription": "This will restore the original desecratedzones.json file from backup and clear your current configuration. This action cannot be undone. Are you sure you want to continue?",
     "restoring": "Restoring...",
+    "requirements": {
+      "title": "Before your changes show up in game",
+      "launchWithFlags": "Launch D2R with",
+      "restartAfterChanges": "Restart D2R after saving. A running game does not pick up changes.",
+      "openGuide": "Read the terror zone guide"
+    },
+    "feedback": {
+      "saved": "Terror zones saved",
+      "restored": "Original terror zone file restored",
+      "restartToApply": "Restart D2R with {{flags}} to apply."
+    },
+    "disableAllDialog": {
+      "title": "Disable all terror zones?",
+      "description": "This saves a game file with no terror zones, so D2R has none to rotate through. Enable at least one zone or restore the original file to bring them back."
+    },
     "validationErrors": {
       "directoryNotFound": "D2R installation directory does not exist",
       "gameFileNotFound": "desecratedzones.json file not found in D2R installation",
