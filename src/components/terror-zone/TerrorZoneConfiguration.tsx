@@ -209,7 +209,9 @@ export function TerrorZoneConfiguration() {
       setError(undefined);
       toast.success(title, {
         id: SAVE_TOAST_ID,
-        description: t(translations.terrorZone.feedback.restartToApply),
+        description: t(translations.terrorZone.feedback.restartToApply, {
+          flags: t(translations.terrorZone.flagsValue),
+        }),
       });
     },
     [t],

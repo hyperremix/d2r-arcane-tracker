@@ -712,7 +712,7 @@
     "feedback": {
       "saved": "Terror zones saved",
       "restored": "Original terror zone file restored",
-      "restartToApply": "Restart D2R with -direct -txt to apply."
+      "restartToApply": "Restart D2R with {{flags}} to apply."
     },
     "disableAllDialog": {
       "title": "Disable all terror zones?",

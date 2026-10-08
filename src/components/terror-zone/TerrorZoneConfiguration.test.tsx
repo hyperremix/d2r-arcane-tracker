@@ -316,6 +316,10 @@ describe('When TerrorZoneConfiguration lists zones', () => {
 
       // Assert
       await waitFor(() => expect(toast.success).toHaveBeenCalledTimes(1));
+      expect(toast.success).toHaveBeenCalledWith('Original terror zone file restored', {
+        id: 'terror-zone-config-saved',
+        description: 'Restart D2R with -direct -txt to apply.',
+      });
       expect(
         screen.queryByText('Failed to update terror zone configuration'),
       ).not.toBeInTheDocument();
