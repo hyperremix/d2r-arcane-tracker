@@ -47,14 +47,17 @@ const threeZones = [...zones, { id: '3', name: 'Rogue Encampment', levels: [] }]
 interface Deferred<T> {
   promise: Promise<T>;
   resolve: (value: T) => void;
+  reject: (reason: Error) => void;
 }
 
 function createDeferred<T>(): Deferred<T> {
   let resolve: (value: T) => void = () => undefined;
-  const promise = new Promise<T>((res) => {
+  let reject: (reason: Error) => void = () => undefined;
+  const promise = new Promise<T>((res, rej) => {
     resolve = res;
+    reject = rej;
   });
-  return { promise, resolve };
+  return { promise, resolve, reject };
 }
 
 const saveSuccess = { success: true, requiresRestart: true };
@@ -104,6 +107,21 @@ describe('When TerrorZoneConfiguration validates the game installation', () => {
         await screen.findByText('D2R installation directory does not exist'),
       ).toBeInTheDocument();
       expect(screen.queryByText('Game Files Must Be Extracted')).not.toBeInTheDocument();
+    });
+  });
+
+  describe('If the installation is invalid', () => {
+    it('Then the launch requirements callout is hidden', async () => {
+      // Arrange
+      setupTerrorZoneApi({ valid: false, errorCode: 'directoryNotFound' });
+
+      // Act
+      render(<TerrorZoneConfiguration />);
+
+      // Assert
+      await screen.findByText('D2R installation directory does not exist');
+      expect(screen.queryByText('Before your changes show up in game')).not.toBeInTheDocument();
+      expect(screen.queryByText('-direct -txt')).not.toBeInTheDocument();
     });
   });
 
@@ -499,6 +517,123 @@ describe('When TerrorZoneConfiguration saves changes', () => {
       expect(rogueEncampment).toBeChecked();
       expect(bloodMoor).not.toBeChecked();
       expect(updateConfig).toHaveBeenCalledTimes(2);
+    });
+
+    it('Then Enable All, Disable All and Restore Original are disabled until the write finishes', async () => {
+      // Arrange
+      const write = createDeferred<typeof saveSuccess>();
+      setupValidTerrorZoneApi({ updateConfig: vi.fn().mockReturnValue(write.promise) });
+      render(<TerrorZoneConfiguration />);
+      const coldPlains = await screen.findByRole('switch', { name: 'Cold Plains' });
+      const enableAll = screen.getByRole('button', { name: 'Enable All' });
+      const disableAll = screen.getByRole('button', { name: 'Disable All' });
+      const restoreOriginal = screen.getByRole('button', { name: 'Restore Original' });
+      expect(enableAll).toBeEnabled();
+
+      // Act
+      fireEvent.click(coldPlains);
+
+      // Assert
+      await waitFor(() => expect(enableAll).toBeDisabled());
+      expect(disableAll).toBeDisabled();
+      expect(restoreOriginal).toBeDisabled();
+
+      write.resolve(saveSuccess);
+      await waitFor(() => expect(enableAll).toBeEnabled());
+      expect(disableAll).toBeEnabled();
+      expect(restoreOriginal).toBeEnabled();
+    });
+
+    it('Then a bulk write disables every action and zone switch until it finishes', async () => {
+      // Arrange
+      const write = createDeferred<typeof saveSuccess>();
+      setupValidTerrorZoneApi({ updateConfig: vi.fn().mockReturnValue(write.promise) });
+      render(<TerrorZoneConfiguration />);
+      const bloodMoor = await screen.findByRole('switch', { name: 'Blood Moor' });
+      const enableAll = screen.getByRole('button', { name: 'Enable All' });
+      const disableAll = screen.getByRole('button', { name: 'Disable All' });
+      const restoreOriginal = screen.getByRole('button', { name: 'Restore Original' });
+
+      // Act
+      fireEvent.click(enableAll);
+
+      // Assert
+      await waitFor(() => expect(enableAll).toBeDisabled());
+      expect(disableAll).toBeDisabled();
+      expect(restoreOriginal).toBeDisabled();
+      expect(bloodMoor).toHaveAttribute('data-disabled');
+
+      write.resolve(saveSuccess);
+      await waitFor(() => expect(enableAll).toBeEnabled());
+      expect(disableAll).toBeEnabled();
+      expect(restoreOriginal).toBeEnabled();
+      expect(bloodMoor).not.toHaveAttribute('data-disabled');
+    });
+
+    it('Then a failed write logs one error even when it covered several toggles', async () => {
+      // Arrange
+      const firstWrite = createDeferred<typeof saveSuccess>();
+      const updateConfig = vi
+        .fn()
+        .mockReturnValueOnce(firstWrite.promise)
+        .mockRejectedValueOnce(new Error('EBUSY'));
+      setupValidTerrorZoneApi({
+        getZones: vi.fn().mockResolvedValue(threeZones),
+        getConfig: vi.fn().mockResolvedValue({ '1': true, '2': true, '3': true }),
+        updateConfig,
+      });
+      render(<TerrorZoneConfiguration />);
+      const bloodMoor = await screen.findByRole('switch', { name: 'Blood Moor' });
+      const coldPlains = screen.getByRole('switch', { name: 'Cold Plains' });
+      const rogueEncampment = screen.getByRole('switch', { name: 'Rogue Encampment' });
+      fireEvent.click(bloodMoor);
+      await waitFor(() => expect(updateConfig).toHaveBeenCalledTimes(1));
+      fireEvent.click(coldPlains);
+      fireEvent.click(rogueEncampment);
+
+      // Act
+      firstWrite.resolve(saveSuccess);
+
+      // Assert
+      await screen.findByText('Failed to update terror zone configuration');
+      await waitFor(() => expect(rogueEncampment).not.toHaveAttribute('data-disabled'));
+      expect(console.error).toHaveBeenCalledTimes(1);
+    });
+
+    it('Then if the first write fails the queued write of another zone starts without the rolled-back zone', async () => {
+      // Arrange
+      const firstWrite = createDeferred<typeof saveSuccess>();
+      const updateConfig = vi
+        .fn()
+        .mockReturnValueOnce(firstWrite.promise)
+        .mockResolvedValue(saveSuccess);
+      setupValidTerrorZoneApi({
+        getZones: vi.fn().mockResolvedValue(threeZones),
+        getConfig: vi.fn().mockResolvedValue({ '1': true, '2': true, '3': true }),
+        updateConfig,
+      });
+      render(<TerrorZoneConfiguration />);
+      const bloodMoor = await screen.findByRole('switch', { name: 'Blood Moor' });
+      const coldPlains = screen.getByRole('switch', { name: 'Cold Plains' });
+      const rogueEncampment = screen.getByRole('switch', { name: 'Rogue Encampment' });
+      fireEvent.click(bloodMoor);
+      await waitFor(() => expect(updateConfig).toHaveBeenCalledTimes(1));
+      fireEvent.click(coldPlains);
+      expect(bloodMoor).not.toBeChecked();
+      expect(coldPlains).not.toBeChecked();
+
+      // Act
+      firstWrite.reject(new Error('EBUSY'));
+
+      // Assert
+      await waitFor(() => expect(updateConfig).toHaveBeenCalledTimes(2));
+      await waitFor(() => expect(coldPlains).not.toHaveAttribute('data-disabled'));
+      expect(updateConfig).toHaveBeenNthCalledWith(1, { '1': false, '2': true, '3': true });
+      expect(updateConfig).toHaveBeenNthCalledWith(2, { '1': true, '2': false, '3': true });
+      expect(bloodMoor).toBeChecked();
+      expect(coldPlains).not.toBeChecked();
+      expect(rogueEncampment).toBeChecked();
+      expect(bloodMoor).not.toHaveAttribute('data-disabled');
     });
   });
 });

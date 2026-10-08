@@ -188,6 +188,7 @@ export function TerrorZoneConfiguration() {
           }
           persistedConfigRef.current = snapshot;
         } catch (err) {
+          console.error('Failed to update terror zone configuration:', err);
           const rolledBack = { ...desiredConfigRef.current };
           for (const zoneId of coveredZoneIds) {
             rolledBack[zoneId] = persistedConfigRef.current[zoneId] ?? true;
@@ -222,8 +223,7 @@ export function TerrorZoneConfiguration() {
       try {
         await persistDesiredConfig([zoneId]);
         handleSaveSuccess(t(translations.terrorZone.feedback.saved));
-      } catch (err) {
-        console.error('Failed to update zone:', err);
+      } catch {
         setError(t(translations.terrorZone.errors.updateFailed));
       } finally {
         setPendingZoneIds((previous) => {
@@ -245,8 +245,7 @@ export function TerrorZoneConfiguration() {
       try {
         await persistDesiredConfig(zones.map((zone) => zone.id));
         handleSaveSuccess(t(translations.terrorZone.feedback.saved));
-      } catch (err) {
-        console.error(`Failed to ${enabled ? 'enable' : 'disable'} all zones:`, err);
+      } catch {
         setError(
           t(
             enabled
