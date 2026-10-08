@@ -10,16 +10,12 @@ import {
   type MockInstance,
   vi,
 } from 'vitest';
-import {
-  SERVICE_WARNING_TOAST_DURATION,
-  useServiceErrorNotifications,
-} from './useServiceErrorNotifications';
+import { useServiceErrorNotifications } from './useServiceErrorNotifications';
 
 vi.mock('sonner', () => ({
   toast: {
     success: vi.fn(),
     error: vi.fn(),
-    warning: vi.fn(),
   },
 }));
 
@@ -178,7 +174,11 @@ describe('When useServiceErrorNotifications is used', () => {
 
       // Assert
       expect(action.label).toBe('Copy details');
-      await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Copied to clipboard'));
+      await waitFor(() =>
+        expect(toast.success).toHaveBeenCalledWith('Details copied to clipboard', {
+          id: 'serviceErrors.copyDetails',
+        }),
+      );
       expect(mockClipboard.writeText).toHaveBeenCalledWith(
         [
           '[DatabaseBatchWriter.flush] databaseWriteFailed (error)',
@@ -188,7 +188,7 @@ describe('When useServiceErrorNotifications is used', () => {
       );
     });
 
-    it('Then shows an error toast if copying fails', async () => {
+    it('Then shows an error toast with a stable id if copying fails', async () => {
       // Arrange
       mockClipboard.writeText.mockRejectedValue(new Error('denied'));
       renderHook(() => useServiceErrorNotifications({ onOpenSettings: vi.fn() }));
@@ -200,8 +200,31 @@ describe('When useServiceErrorNotifications is used', () => {
 
       // Assert
       await waitFor(() =>
-        expect(toast.error).toHaveBeenLastCalledWith('Failed to copy to clipboard'),
+        expect(toast.error).toHaveBeenLastCalledWith('Failed to copy details to clipboard', {
+          id: 'serviceErrors.copyDetails',
+        }),
       );
+    });
+
+    it('Then reuses the same toast id when copying fails repeatedly', async () => {
+      // Arrange
+      mockClipboard.writeText.mockRejectedValue(new Error('denied'));
+      renderHook(() => useServiceErrorNotifications({ onOpenSettings: vi.fn() }));
+      emit({ ...parseErrorPayload, code: 'databaseWriteFailed', operation: 'flush' });
+      const { action } = lastToastOptions(toast.error);
+
+      // Act
+      action.onClick();
+      await waitFor(() => expect(toast.error).toHaveBeenCalledTimes(2));
+      action.onClick();
+      await waitFor(() => expect(toast.error).toHaveBeenCalledTimes(3));
+
+      // Assert
+      const copyFailureIds = vi
+        .mocked(toast.error)
+        .mock.calls.slice(1)
+        .map((call) => (call[1] as { id: string }).id);
+      expect(copyFailureIds).toEqual(['serviceErrors.copyDetails', 'serviceErrors.copyDetails']);
     });
   });
 
@@ -219,21 +242,6 @@ describe('When useServiceErrorNotifications is used', () => {
     });
   });
 
-  describe('If a warning is received', () => {
-    it('Then shows a warning toast with a long duration', () => {
-      // Arrange
-      renderHook(() => useServiceErrorNotifications({ onOpenSettings: vi.fn() }));
-
-      // Act
-      emit({ ...parseErrorPayload, severity: 'warn' });
-
-      // Assert
-      expect(toast.warning).toHaveBeenCalledWith('Could not read save file', expect.any(Object));
-      expect(lastToastOptions(toast.warning).duration).toBe(SERVICE_WARNING_TOAST_DURATION);
-      expect(toast.error).not.toHaveBeenCalled();
-    });
-  });
-
   describe('If a malformed payload is received', () => {
     it.each([
       ['a string', 'Failed to parse save file'],
@@ -242,6 +250,7 @@ describe('When useServiceErrorNotifications is used', () => {
         { service: 'X', operation: 'y', severity: 'error', message: 'm' },
       ],
       ['an invalid severity', { ...parseErrorPayload, severity: 'fatal' }],
+      ['an unsupported warn severity', { ...parseErrorPayload, severity: 'warn' }],
     ])('Then ignores %s without showing a toast', (_label, payload) => {
       // Arrange
       renderHook(() => useServiceErrorNotifications({ onOpenSettings: vi.fn() }));
@@ -251,7 +260,6 @@ describe('When useServiceErrorNotifications is used', () => {
 
       // Assert
       expect(toast.error).not.toHaveBeenCalled();
-      expect(toast.warning).not.toHaveBeenCalled();
       expect(consoleWarnSpy).toHaveBeenCalled();
     });
   });

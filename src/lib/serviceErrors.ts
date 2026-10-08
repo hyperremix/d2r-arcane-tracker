@@ -27,7 +27,15 @@ export interface ServiceErrorCopy {
   descriptionKey: string;
 }
 
-const SEVERITIES: readonly string[] = ['error', 'warn'];
+/**
+ * Interpolation param names the translated service error copy uses. Untrusted payloads may
+ * not introduce any other name, as names such as `count` or `lng` change how i18next resolves copy.
+ */
+const ALLOWED_PARAM_KEYS: ReadonlySet<string> = new Set(['fileName']);
+
+const MAX_IDENTIFIER_LENGTH = 100;
+const MAX_PARAM_LENGTH = 512;
+const MAX_DETAIL_LENGTH = 4000;
 
 const isNonEmptyString = (value: unknown): value is string =>
   typeof value === 'string' && value.trim().length > 0;
@@ -35,8 +43,10 @@ const isNonEmptyString = (value: unknown): value is string =>
 const isPlainObject = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
 
+const truncate = (value: string, maxLength: number): string => value.slice(0, maxLength);
+
 /**
- * Keeps only string and finite number entries of untrusted interpolation params.
+ * Keeps only allow-listed, string and finite number entries of untrusted interpolation params.
  * @param value - Untrusted params value
  * @returns Sanitized params, or undefined when none remain
  */
@@ -47,7 +57,12 @@ function sanitizeParams(value: unknown): ServiceErrorParams | undefined {
 
   const params: ServiceErrorParams = {};
   for (const [key, entry] of Object.entries(value)) {
-    if (typeof entry === 'string' || (typeof entry === 'number' && Number.isFinite(entry))) {
+    if (!ALLOWED_PARAM_KEYS.has(key)) {
+      continue;
+    }
+    if (typeof entry === 'string') {
+      params[key] = truncate(entry, MAX_PARAM_LENGTH);
+    } else if (typeof entry === 'number' && Number.isFinite(entry)) {
       params[key] = entry;
     }
   }
@@ -69,8 +84,7 @@ export function parseServiceErrorPayload(value: unknown): IncomingServiceError |
     !isNonEmptyString(service) ||
     !isNonEmptyString(operation) ||
     !isNonEmptyString(code) ||
-    typeof severity !== 'string' ||
-    !SEVERITIES.includes(severity) ||
+    severity !== 'error' ||
     typeof timestamp !== 'number' ||
     !Number.isFinite(timestamp)
   ) {
@@ -79,12 +93,13 @@ export function parseServiceErrorPayload(value: unknown): IncomingServiceError |
 
   const sanitizedParams = sanitizeParams(params);
   return {
-    service,
-    operation,
-    severity: severity as IncomingServiceError['severity'],
-    code,
+    service: truncate(service, MAX_IDENTIFIER_LENGTH),
+    operation: truncate(operation, MAX_IDENTIFIER_LENGTH),
+    severity,
+    code: truncate(code, MAX_IDENTIFIER_LENGTH),
     ...(sanitizedParams && { params: sanitizedParams }),
-    ...(typeof detail === 'string' && detail.length > 0 && { detail }),
+    ...(typeof detail === 'string' &&
+      detail.length > 0 && { detail: truncate(detail, MAX_DETAIL_LENGTH) }),
     timestamp,
   };
 }

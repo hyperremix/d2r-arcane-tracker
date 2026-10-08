@@ -16,9 +16,9 @@ export const SERVICE_ERROR_CODES = [
 export type ServiceErrorCode = (typeof SERVICE_ERROR_CODES)[number];
 
 /**
- * Severity of a surfaced service error.
+ * Severity of a surfaced service error. Only errors are surfaced to the UI.
  */
-export type ServiceErrorSeverity = 'error' | 'warn';
+export type ServiceErrorSeverity = 'error';
 
 /**
  * Interpolation parameters for the translated error copy (e.g. `{ fileName: 'Sorc.d2s' }`).

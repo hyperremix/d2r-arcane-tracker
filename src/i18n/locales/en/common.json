@@ -657,6 +657,8 @@
   },
   "serviceErrors": {
     "copyDetails": "Copy details",
+    "copySuccess": "Details copied to clipboard",
+    "copyFailed": "Failed to copy details to clipboard",
     "unknown": {
       "title": "A background task failed",
       "description": "Something went wrong in the background. Copy the details to report the problem."

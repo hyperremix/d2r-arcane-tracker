@@ -164,10 +164,12 @@ export class DatabaseBatchWriter {
           progress: this.progressQueue.size,
           runItems: this.runItemQueue.size,
         };
+        const lastError = error instanceof Error ? error.message : String(error);
+        const detail = `Max retries exceeded, dropped ${remaining.characters} characters, ${remaining.progress} progress entries and ${remaining.runItems} run items. Last error: ${lastError}`;
         log.error('flush', 'Max retries exceeded, dropping remaining unflushed items', remaining, {
           surfaceToUI: true,
           code: 'databaseWriteFailed',
-          detail: `Max retries exceeded, dropped ${remaining.characters} characters, ${remaining.progress} progress entries and ${remaining.runItems} run items. Last error: ${error instanceof Error ? error.message : String(error)}`,
+          detail,
         });
         this.characterQueue.clear();
         this.progressQueue.clear();

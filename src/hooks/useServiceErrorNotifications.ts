@@ -11,10 +11,7 @@ import {
   parseServiceErrorPayload,
 } from '@/lib/serviceErrors';
 
-/**
- * How long (ms) warning toasts stay visible. Error toasts stay open until dismissed.
- */
-export const SERVICE_WARNING_TOAST_DURATION = 10_000;
+const COPY_DETAILS_TOAST_ID = 'serviceErrors.copyDetails';
 
 /**
  * Options for {@link useServiceErrorNotifications}.
@@ -46,10 +43,10 @@ export function useServiceErrorNotifications({
     const copyDetails = async (payload: IncomingServiceError) => {
       try {
         await navigator.clipboard.writeText(formatServiceErrorDetails(payload));
-        toast.success(t(translations.runTracker.exportDialog.copySuccess));
+        toast.success(t(translations.serviceErrors.copySuccess), { id: COPY_DETAILS_TOAST_ID });
       } catch (error) {
         console.error('[useServiceErrorNotifications] Failed to copy error details:', error);
-        toast.error(t(translations.runTracker.exportDialog.copyFailed));
+        toast.error(t(translations.serviceErrors.copyFailed), { id: COPY_DETAILS_TOAST_ID });
       }
     };
 
@@ -74,12 +71,10 @@ export function useServiceErrorNotifications({
               },
             };
 
-      const isError = payload.severity === 'error';
-      const showToast = isError ? toast.error : toast.warning;
-      showToast(t(copy.titleKey, payload.params), {
+      toast.error(t(copy.titleKey, payload.params), {
         id: getServiceErrorToastId(payload),
         description: t(copy.descriptionKey, payload.params),
-        duration: isError ? Number.POSITIVE_INFINITY : SERVICE_WARNING_TOAST_DURATION,
+        duration: Number.POSITIVE_INFINITY,
         closeButton: true,
         action,
       });

@@ -28,13 +28,50 @@ describe('When parseServiceErrorPayload is called', () => {
 
   it('If params contain non-primitive values, Then drops them', () => {
     // Arrange
-    const payload = { ...validPayload, params: { fileName: 'a.d2s', nested: { x: 1 }, count: 2 } };
+    const payload = { ...validPayload, params: { fileName: { x: 1 } } };
 
     // Act
     const result = parseServiceErrorPayload(payload);
 
     // Assert
-    expect(result?.params).toEqual({ fileName: 'a.d2s', count: 2 });
+    expect(result).not.toHaveProperty('params');
+  });
+
+  it('If params contain names the copy does not use, Then drops them', () => {
+    // Arrange
+    const payload = {
+      ...validPayload,
+      params: { fileName: 'a.d2s', count: 2, context: 'x', defaultValue: 'y', lng: 'sv' },
+    };
+
+    // Act
+    const result = parseServiceErrorPayload(payload);
+
+    // Assert
+    expect(result?.params).toEqual({ fileName: 'a.d2s' });
+  });
+
+  it('If text fields are very long, Then truncates them', () => {
+    // Arrange
+    const long = 'x'.repeat(10_000);
+    const payload = {
+      ...validPayload,
+      service: long,
+      operation: long,
+      code: long,
+      detail: long,
+      params: { fileName: long },
+    };
+
+    // Act
+    const result = parseServiceErrorPayload(payload);
+
+    // Assert
+    expect(result?.service).toHaveLength(100);
+    expect(result?.operation).toHaveLength(100);
+    expect(result?.code).toHaveLength(100);
+    expect(result?.detail).toHaveLength(4000);
+    expect(String(result?.params?.fileName)).toHaveLength(512);
   });
 
   it('If detail and params are not usable, Then omits them', () => {
@@ -55,6 +92,7 @@ describe('When parseServiceErrorPayload is called', () => {
     ['a missing code', { ...validPayload, code: undefined }],
     ['an empty service', { ...validPayload, service: ' ' }],
     ['an unknown severity', { ...validPayload, severity: 'fatal' }],
+    ['a warn severity', { ...validPayload, severity: 'warn' }],
     ['a non-numeric timestamp', { ...validPayload, timestamp: 'now' }],
   ])('If the payload has %s, Then returns undefined', (_label, payload) => {
     // Act

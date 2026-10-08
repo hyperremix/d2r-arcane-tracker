@@ -14,7 +14,6 @@ import type {
   TerrorZoneValidationResult,
   UpdateStatus,
 } from './types/grail';
-import type { ServiceErrorPayload } from './types/serviceError';
 
 /**
  * Exposes a secure IPC renderer API to the renderer process.
@@ -313,9 +312,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
      * @param callback - Function to call when service errors are received.
      * @returns Cleanup function to remove the listener.
      */
-    onServiceError: (callback: (payload: ServiceErrorPayload) => void) => {
-      const listener = (_event: Electron.IpcRendererEvent, value: ServiceErrorPayload) =>
-        callback(value);
+    onServiceError: (callback: (payload: unknown) => void) => {
+      const listener = (_event: Electron.IpcRendererEvent, value: unknown) => callback(value);
       ipcRenderer.on('service-error', listener);
       return () => ipcRenderer.removeListener('service-error', listener);
     },
