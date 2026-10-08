@@ -124,10 +124,9 @@ describe('When a settings save fails and the real Toaster is mounted', () => {
     // Assert: sonner keeps a removed toast in the DOM (data-removed) until it unmounts it
     const shownToasts = document.querySelectorAll('[data-sonner-toast][data-removed="false"]');
     expect(shownToasts).toHaveLength(1);
-    expect(within(shownToasts[0] as HTMLElement).getByText(TOAST_TITLE)).toBeInTheDocument();
-    expect(
-      within(shownToasts[0] as HTMLElement).getByRole('button', { name: 'Retry' }),
-    ).toBeInTheDocument();
+    const shownToast = within(shownToasts[0] as HTMLElement);
+    expect(shownToast.getByText(TOAST_TITLE)).toBeInTheDocument();
+    expect(shownToast.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
   });
 
   it('If the failed key is saved again by hand and fails again, Then the error toast stays visible with a working Retry', async () => {

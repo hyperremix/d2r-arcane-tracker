@@ -295,7 +295,7 @@ describe('WidgetSettings', () => {
 
     it('If the first attempt fails, Then the widget window is not toggled', async () => {
       // Arrange
-      vi.spyOn(toast, 'error').mockImplementation(() => 'toast-id');
+      spies.push(vi.spyOn(toast, 'error').mockImplementation(() => 'toast-id'));
       const toggle = vi.fn().mockResolvedValue({ success: true });
       Object.defineProperty(window, 'electronAPI', {
         value: {

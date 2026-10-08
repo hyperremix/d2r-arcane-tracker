@@ -45,8 +45,9 @@ export function WidgetSettings() {
     async (checked: boolean) => {
       // The widget window is only created or closed through IPC, so this follow-up must also run
       // when the error toast's Retry re-applies the change (hence `onSaved`, not code after the
-      // await). Display mode and opacity need no such hook: the widget window applies them itself
-      // when it receives `settings-updated`.
+      // await). Display mode and opacity have no such hook for Retry: the widget window applies
+      // them itself when it receives `settings-updated` (their handlers still call the IPC after
+      // a successful save).
       await setSettings(
         { widgetEnabled: checked },
         {
