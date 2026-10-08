@@ -51,11 +51,11 @@ export function SessionDetailView({ sessionId, onBack }: SessionDetailViewProps)
   const notesId = useId();
   const isArchiving = Boolean(pendingActions.archiveSession);
 
-  // Find the session; a session started after the last list refresh is only known as the active session
+  // Find the session; prefer the live active session since the sessions list entry can be a stale snapshot
   const session = useMemo(() => {
     return (
-      sessions.find((s) => s.id === sessionId) ||
-      (activeSession?.id === sessionId ? activeSession : null)
+      (activeSession?.id === sessionId ? activeSession : undefined) ||
+      sessions.find((s) => s.id === sessionId)
     );
   }, [sessions, sessionId, activeSession]);
 

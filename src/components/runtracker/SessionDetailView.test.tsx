@@ -205,4 +205,38 @@ describe('SessionDetailView', () => {
       expect(screen.queryByText('Session Not Found')).not.toBeInTheDocument();
     });
   });
+
+  describe('When the active session also exists in the loaded sessions list as a stale snapshot', () => {
+    it('Then the live active session values are shown instead of the stale snapshot', () => {
+      // Arrange
+      const staleSession: Session = {
+        ...mockSession,
+        id: 'session-live',
+        endTime: undefined,
+        runCount: 3,
+        totalRunTime: 300000,
+        totalSessionTime: 600000,
+        notes: 'stale notes',
+      };
+      const activeSession: Session = {
+        ...staleSession,
+        runCount: 7,
+        totalRunTime: 900000,
+        totalSessionTime: 1000000,
+        notes: 'live notes',
+      };
+      mockUseRunTrackerStore.mockReturnValue(
+        createStoreState({ sessions: [staleSession], activeSession }),
+      );
+
+      // Act
+      render(<SessionDetailView sessionId="session-live" onBack={vi.fn()} />);
+
+      // Assert
+      expect(screen.getByText('7')).toBeInTheDocument();
+      expect(screen.queryByText('3')).not.toBeInTheDocument();
+      expect(screen.getByText('90.0%')).toBeInTheDocument();
+      expect(screen.getByLabelText('Session Notes')).toHaveValue('live notes');
+    });
+  });
 });
