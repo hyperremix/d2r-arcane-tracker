@@ -9,6 +9,7 @@ import type {
   MonitoringStatus,
   Run,
   RunItem,
+  SaveDirectoryInspection,
   Session,
   Settings,
   TerrorZone,
@@ -230,6 +231,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
     updateSaveDirectory: (saveDir: string): Promise<{ success: boolean }> =>
       ipcRenderer.invoke('saveFile:updateSaveDirectory', saveDir),
     /**
+     * Inspects a candidate save directory without applying it.
+     * @param {string} directory - The candidate directory path.
+     * @returns {Promise<SaveDirectoryInspection>} A promise that resolves with the inspection result.
+     */
+    inspectDirectory: (directory: string): Promise<SaveDirectoryInspection> =>
+      ipcRenderer.invoke('saveFile:inspectDirectory', directory),
+    /**
      * Restores the default save directory for the current platform.
      * @returns {Promise<{ success: boolean; defaultDirectory: string }>} A promise that resolves with success and default directory.
      */
@@ -336,6 +344,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
      * @returns {Promise<string | null>} D2R path or null if not set.
      */
     getD2RPath: (): Promise<string | null> => ipcRenderer.invoke('icon:getD2RPath'),
+
+    /**
+     * Gets the default D2R installation path for this platform, if it exists on disk.
+     * @returns {Promise<string | undefined>} The existing default path, or undefined.
+     */
+    getSuggestedD2RPath: (): Promise<string | undefined> =>
+      ipcRenderer.invoke('icon:getSuggestedD2RPath'),
 
     /**
      * Converts all sprite files from D2R installation to PNGs.

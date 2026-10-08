@@ -1,4 +1,4 @@
-import { ArrowLeft, ArrowRight, Check } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Check, FastForward } from 'lucide-react';
 import type { ComponentType } from 'react';
 import { useCallback, useId, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -22,11 +22,9 @@ import { useGrailStore } from '@/stores/grailStore';
 import { useWizardStore } from '@/stores/wizardStore';
 import { CompletionStep } from './steps/CompletionStep';
 import { D2RInstallationStep } from './steps/D2RInstallationStep';
-import { GameModeStep } from './steps/GameModeStep';
-import { GameVersionStep } from './steps/GameVersionStep';
-import { GrailSettingsStep } from './steps/GrailSettingsStep';
 import { PreferencesStep } from './steps/PreferencesStep';
 import { SAVE_DIRECTORY_STEP_ID, SaveDirectoryStep } from './steps/SaveDirectoryStep';
+import { TrackingStep } from './steps/TrackingStep';
 import { WelcomeStep } from './steps/WelcomeStep';
 
 /**
@@ -40,12 +38,14 @@ interface WizardStep {
   requiresValidation?: boolean;
   /** Translation key explaining what is missing while the step is invalid. */
   validationMessageKey?: string;
-  /** Step only contains optional preferences. */
+  /** Step only contains settings with sensible defaults; it can be skipped. */
   optional?: boolean;
 }
 
 /**
  * Ordered wizard steps. The length must match `totalSteps` in the wizard store.
+ * Only the save folder is essential; everything after "What to track" is optional
+ * and can be skipped in one click (or changed later in Settings).
  */
 export const wizardSteps: WizardStep[] = [
   { id: 'welcome', component: WelcomeStep, titleKey: translations.wizard.steps.welcome },
@@ -56,21 +56,12 @@ export const wizardSteps: WizardStep[] = [
     requiresValidation: true,
     validationMessageKey: translations.wizard.saveDirectoryRequired,
   },
+  { id: 'tracking', component: TrackingStep, titleKey: translations.wizard.steps.tracking },
   {
     id: 'd2rInstallation',
     component: D2RInstallationStep,
     titleKey: translations.wizard.steps.d2rInstallation,
-  },
-  { id: 'gameMode', component: GameModeStep, titleKey: translations.wizard.steps.gameMode },
-  {
-    id: 'gameVersion',
-    component: GameVersionStep,
-    titleKey: translations.wizard.steps.gameVersion,
-  },
-  {
-    id: 'grailSettings',
-    component: GrailSettingsStep,
-    titleKey: translations.wizard.steps.grailSettings,
+    optional: true,
   },
   {
     id: 'preferences',
@@ -96,6 +87,7 @@ export function SetupWizard() {
     stepValidity,
     nextStep,
     previousStep,
+    jumpToStep,
     skip,
     closeWizard,
   } = useWizardStore();
@@ -122,12 +114,26 @@ export function SetupWizard() {
 
   const showValidationMessage = !canProceed && Boolean(step?.validationMessageKey);
 
+  // Offer to jump straight to the summary when every step before it is optional
+  const remainingSteps = wizardSteps.slice(currentStep + 1, totalSteps - 1);
+  const canSkipOptionalSteps =
+    !isLastStep &&
+    canProceed &&
+    remainingSteps.length > 0 &&
+    remainingSteps.every((remainingStep) => remainingStep.optional);
+
   const handleNext = useCallback(() => {
     if (!isLastStep && canProceed) {
       setSaveFailed(false);
       nextStep();
     }
   }, [isLastStep, canProceed, nextStep]);
+
+  const handleSkipOptionalSteps = useCallback(() => {
+    if (canSkipOptionalSteps) {
+      jumpToStep(totalSteps - 1);
+    }
+  }, [canSkipOptionalSteps, jumpToStep, totalSteps]);
 
   const handleBack = useCallback(() => {
     if (!isFirstStep) {
@@ -241,6 +247,13 @@ export function SetupWizard() {
             {!isLastStep && (
               <Button variant="ghost" onClick={handleRequestSkip}>
                 {t(translations.wizard.skipSetup)}
+              </Button>
+            )}
+
+            {canSkipOptionalSteps && (
+              <Button variant="outline" onClick={handleSkipOptionalSteps}>
+                <FastForward className="mr-2 h-4 w-4" />
+                {t(translations.wizard.skipOptionalSteps)}
               </Button>
             )}
 

@@ -637,7 +637,7 @@ class SaveFileMonitor {
    * Parses all save files in a single directory.
    * @private
    * @param {string} directory - The directory path to parse.
-   * @returns {Promise<boolean>} A promise that resolves to true if parsing was successful, false otherwise.
+   * @returns {Promise<boolean>} A promise that resolves to true if the directory was readable (even when it holds no save files yet), false otherwise.
    */
   private async parseSaveDirectory(directory: string): Promise<boolean> {
     try {
@@ -650,6 +650,8 @@ class SaveFileMonitor {
       const allFiles = files.map((file) => join(directory, file));
 
       if (allFiles.length === 0) {
+        // The directory exists and is readable, so keep watching it: the first character
+        // save created later must still be detected.
         log.warn('parseSaveDirectory', `No D2R save files found in directory: ${directory}`);
         this.eventBus.emit('monitoring-error', {
           type: 'no-save-files',
@@ -657,7 +659,7 @@ class SaveFileMonitor {
           directory: directory,
           saveFileCount: 0,
         });
-        return false;
+        return true;
       }
 
       // Parse all files and update current data
@@ -743,10 +745,10 @@ class SaveFileMonitor {
   private getSaveNameFromPath(filePath: string, isHardcore?: boolean): string {
     const extension = extname(filePath).toLowerCase();
     let saveName = basename(filePath)
-      .replace('.d2s', '')
-      .replace('.sss', '')
-      .replace('.d2x', '')
-      .replace('.d2i', '');
+      .replace(/\.d2s/i, '')
+      .replace(/\.sss/i, '')
+      .replace(/\.d2x/i, '')
+      .replace(/\.d2i/i, '');
 
     // Use friendly names for shared stash files
     if (extension === '.d2i') {
@@ -1159,7 +1161,9 @@ class SaveFileMonitor {
       }
 
       // Basic D2 save file parsing (simplified)
-      const fileName = basename(filePath, '.d2s');
+      // Strip the extension case-insensitively (e.g. Hero.D2S), matching getSaveNameFromPath
+      const fileName =
+        extension === '.d2s' ? basename(filePath, extname(filePath)) : basename(filePath);
 
       // Character name is typically the filename
       const characterName = fileName;
@@ -1235,7 +1239,7 @@ class SaveFileMonitor {
       const files = readdirSync(this.saveDirectory);
       log.info('getSaveFiles', `Total files in directory: ${files.length}`);
 
-      const d2sFiles = files.filter((file) => file.endsWith('.d2s'));
+      const d2sFiles = files.filter((file) => extname(file).toLowerCase() === '.d2s');
       log.info('getSaveFiles', `.d2s files found: ${d2sFiles.length}`);
 
       for (const file of d2sFiles) {

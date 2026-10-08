@@ -28,12 +28,12 @@ Common variants are the classic grail (normal uniques and sets), the ethereal gr
 
 The setup wizard opens on first launch. You can run it again from **Settings → Setup Wizard**. It asks for:
 
-1. **Save folder**: usually `%USERPROFILE%\Saved Games\Diablo II Resurrected`, the folder containing your `.d2s` files.
-2. **D2R installation folder**: only needed for [item icons](#item-icons) and [terror zones](TERROR_ZONE_CONFIGURATION.md).
-3. **Game mode, game version and grail options**: see [Choosing what to track](#choosing-what-to-track).
-4. **Notifications, widget and theme**.
+1. **Save folder** (required): usually `%USERPROFILE%\Saved Games\Diablo II Resurrected`, the folder containing your `.d2s` files. Browse to it, or type or paste the path and click **Use This Folder**. The wizard checks the folder and only continues once it finds at least one character file. If you picked the parent folder (such as `Saved Games`) or a folder inside the save folder, it offers the right folder with **Use Suggested Folder**. If you haven't created a character yet, tick **Continue anyway without character files**.
+2. **What to track**: game mode, grail contents and game version. The defaults suit most players. See [Choosing what to track](#choosing-what-to-track).
+3. **D2R installation folder** (optional): only needed for [item icons](#item-icons) and [terror zones](TERROR_ZONE_CONFIGURATION.md). The wizard only suggests the Battle.net default, `C:\Program Files (x86)\Diablo II Resurrected`, if that folder exists.
+4. **Preferences** (optional): theme, notifications and widget.
 
-All of these can be changed later in **Settings**.
+Click **Skip Optional Steps** on the "What to track" step to go straight to the summary, which shows the save folder and how many character files were found. You can change all of these settings later in **Settings**.
 
 Settings are saved as soon as you change them. If a change can't be saved, the app undoes it and shows an error with a **Retry** button. Inside the setup wizard, a setting that can't be saved is undone and an error appears in the step instead; if the wizard can't save when you click **Finish** or **Skip Setup**, it stays open and shows an error so you can try again.
 

@@ -41,13 +41,14 @@ const gameVersions: GameVersionOption[] = [
 ];
 
 /**
- * GameVersionStep component - Step for selecting the game version.
+ * GameVersionStep component - Game version section of the wizard "What to track" step.
  * Allows users to choose between Resurrected or Classic.
- * @returns {JSX.Element} Game version selection step content
+ * @returns {JSX.Element} Game version selection section content
  */
 export function GameVersionStep() {
   const { t } = useTranslation();
   const gameVersionId = useId();
+  const headingId = useId();
   const { settings } = useGrailStore();
   const { saveSettings, saveFailed } = useWizardSettingsSave();
   const gameVersion = settings.gameVersion || GameVersion.Resurrected;
@@ -58,10 +59,14 @@ export function GameVersionStep() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="space-y-2">
-        <h2 className="font-bold text-2xl">{t(translations.settings.gameVersion.title)}</h2>
-        <p className="text-muted-foreground">{t(translations.wizard.gameVersion.description)}</p>
+    <section aria-labelledby={headingId} className="space-y-4">
+      <div className="space-y-1">
+        <h3 id={headingId} className="font-semibold text-lg">
+          {t(translations.settings.gameVersion.title)}
+        </h3>
+        <p className="text-muted-foreground text-sm">
+          {t(translations.wizard.gameVersion.description)}
+        </p>
       </div>
 
       <div className="space-y-4">
@@ -103,6 +108,6 @@ export function GameVersionStep() {
           </p>
         </div>
       </div>
-    </div>
+    </section>
   );
 }

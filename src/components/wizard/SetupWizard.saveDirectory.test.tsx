@@ -9,9 +9,7 @@ vi.mock('@/components/wizard/wizardSettingsSave', () => import('@/test/wizardSet
 // bound to this file's grailStore mock in the shared (non-isolated) module registry.
 vi.mock('./steps/WelcomeStep', () => ({ WelcomeStep: () => null }));
 vi.mock('./steps/D2RInstallationStep', () => ({ D2RInstallationStep: () => null }));
-vi.mock('./steps/GameModeStep', () => ({ GameModeStep: () => null }));
-vi.mock('./steps/GameVersionStep', () => ({ GameVersionStep: () => null }));
-vi.mock('./steps/GrailSettingsStep', () => ({ GrailSettingsStep: () => null }));
+vi.mock('./steps/TrackingStep', () => ({ TrackingStep: () => null }));
 vi.mock('./steps/PreferencesStep', () => ({ PreferencesStep: () => null }));
 vi.mock('./steps/CompletionStep', () => ({ CompletionStep: () => null }));
 
@@ -68,6 +66,7 @@ describe('When the real SaveDirectoryStep is rendered inside SetupWizard', () =>
         getDefaultDirectory: vi.fn().mockResolvedValue('/default/save/dir'),
         updateSaveDirectory,
         restoreDefaultDirectory,
+        inspectDirectory: vi.fn().mockResolvedValue({ status: 'noSaveFiles', saveFileCount: 0 }),
       },
     });
     useWizardStore.setState({ isOpen: true, currentStep: SAVE_DIRECTORY_STEP_INDEX });

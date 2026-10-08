@@ -3,7 +3,7 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useGrailStore } from '@/stores/grailStore';
 import { useWizardStore } from '@/stores/wizardStore';
-import { SaveDirectoryStep } from './SaveDirectoryStep';
+import { SAVE_DIRECTORY_INSPECTION_DEBOUNCE_MS, SaveDirectoryStep } from './SaveDirectoryStep';
 
 vi.mock('@/stores/grailStore');
 
@@ -12,6 +12,11 @@ const mockUseGrailStore = vi.mocked(useGrailStore);
 const CURRENT_DIR = '/current/save/dir';
 const NEW_DIR = '/new/save/dir';
 const DEFAULT_DIR = '/default/save/dir';
+const TYPED_DIR = '/typed/save/dir';
+const SUGGESTED_DIR = '/Users/me/Saved Games/Diablo II Resurrected';
+// Debounced inspection must have run well within this timeout
+const INSPECTION_TIMEOUT_MS = SAVE_DIRECTORY_INSPECTION_DEBOUNCE_MS + 1500;
+const SAVE_FILE = { name: 'Sorceress', path: `${CURRENT_DIR}/Sorceress.d2s` };
 
 interface MockElectronAPI {
   platform: string;
@@ -23,10 +28,14 @@ interface MockElectronAPI {
     getDefaultDirectory: ReturnType<typeof vi.fn>;
     updateSaveDirectory: ReturnType<typeof vi.fn>;
     restoreDefaultDirectory: ReturnType<typeof vi.fn>;
+    inspectDirectory: ReturnType<typeof vi.fn>;
   };
 }
 
-function createElectronAPI(options: { hasUserData: boolean }): MockElectronAPI {
+function createElectronAPI(options: {
+  hasUserData: boolean;
+  saveFiles?: unknown[];
+}): MockElectronAPI {
   return {
     platform: 'darwin',
     dialog: {
@@ -40,12 +49,13 @@ function createElectronAPI(options: { hasUserData: boolean }): MockElectronAPI {
       getMonitoringStatus: vi
         .fn()
         .mockResolvedValue({ isMonitoring: true, directory: CURRENT_DIR }),
-      getSaveFiles: vi.fn().mockResolvedValue([]),
+      getSaveFiles: vi.fn().mockResolvedValue(options.saveFiles ?? []),
       getDefaultDirectory: vi.fn().mockResolvedValue(DEFAULT_DIR),
       updateSaveDirectory: vi.fn().mockResolvedValue({ success: true }),
       restoreDefaultDirectory: vi
         .fn()
         .mockResolvedValue({ success: true, defaultDirectory: DEFAULT_DIR }),
+      inspectDirectory: vi.fn().mockResolvedValue({ status: 'noSaveFiles', saveFileCount: 0 }),
     },
   };
 }
@@ -378,8 +388,9 @@ describe('When SaveDirectoryStep is rendered without a detected directory', () =
     expect(useWizardStore.getState().stepValidity.saveDirectory).toBe(false);
   });
 
-  it('When the user browses to a folder, Then the directory is applied and the step becomes valid', async () => {
+  it('When the user browses to a folder with character files, Then the directory is applied and the step becomes valid', async () => {
     // Arrange
+    electronAPI.saveFile.getSaveFiles.mockResolvedValueOnce([]).mockResolvedValue([SAVE_FILE]);
     render(<SaveDirectoryStep />);
     const browseButton = await screen.findByRole('button', { name: 'Browse for Folder' });
 
@@ -399,6 +410,7 @@ describe('When SaveDirectoryStep is rendered without a detected directory', () =
 
   it('If the browsed directory is still being saved, Then the step is not valid until the save succeeds', async () => {
     // Arrange
+    electronAPI.saveFile.getSaveFiles.mockResolvedValueOnce([]).mockResolvedValue([SAVE_FILE]);
     let resolveSave: (value: { success: boolean }) => void = () => undefined;
     electronAPI.saveFile.updateSaveDirectory.mockImplementation(
       () =>
@@ -456,7 +468,7 @@ describe('When SaveDirectoryStep is rendered with a detected directory', () => {
       settings: { saveDir: '' },
       reloadData: vi.fn().mockResolvedValue(undefined),
     } as unknown as ReturnType<typeof useGrailStore>);
-    installElectronAPI(createElectronAPI({ hasUserData: false }));
+    installElectronAPI(createElectronAPI({ hasUserData: false, saveFiles: [SAVE_FILE] }));
   });
 
   afterEach(() => {
@@ -464,7 +476,7 @@ describe('When SaveDirectoryStep is rendered with a detected directory', () => {
     installElectronAPI(originalElectronAPI);
   });
 
-  it('Then the step is valid and no not-detected state is shown', async () => {
+  it('If it contains character files, Then the step is valid and no not-detected state is shown', async () => {
     // Arrange & Act
     render(<SaveDirectoryStep />);
 
@@ -474,5 +486,336 @@ describe('When SaveDirectoryStep is rendered with a detected directory', () => {
       expect(useWizardStore.getState().stepValidity.saveDirectory).toBe(true);
     });
     expect(screen.queryByText('No save directory detected')).not.toBeInTheDocument();
+  });
+});
+
+describe('When SaveDirectoryStep validates the selected folder', () => {
+  const originalElectronAPI = window.electronAPI;
+  let electronAPI: MockElectronAPI;
+  let reloadData: ReturnType<typeof vi.fn>;
+
+  const getStepValidity = () => useWizardStore.getState().stepValidity.saveDirectory;
+
+  const renderStep = async () => {
+    render(<SaveDirectoryStep />);
+    await waitFor(() => expect(screen.getByDisplayValue(CURRENT_DIR)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Browse' })).toBeEnabled());
+  };
+
+  const typePath = (value: string) => {
+    fireEvent.change(screen.getByLabelText('Save Directory Path'), { target: { value } });
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    useWizardStore.setState({ stepValidity: {} });
+    reloadData = vi.fn().mockResolvedValue(undefined);
+    mockUseGrailStore.mockReturnValue({
+      settings: { saveDir: CURRENT_DIR },
+      reloadData,
+    } as unknown as ReturnType<typeof useGrailStore>);
+    electronAPI = createElectronAPI({ hasUserData: false });
+    installElectronAPI(electronAPI);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    useWizardStore.setState({ stepValidity: {} });
+    installElectronAPI(originalElectronAPI);
+  });
+
+  describe('If the applied folder has no character files', () => {
+    it('Then the step stays blocked and a warning is shown', async () => {
+      // Arrange & Act
+      await renderStep();
+
+      // Assert
+      expect(screen.getByText('No character files found')).toBeInTheDocument();
+      expect(getStepValidity()).toBe(false);
+    });
+
+    it('Then ticking Continue anyway unblocks the step and unticking blocks it again', async () => {
+      // Arrange
+      await renderStep();
+      const continueAnyway = screen.getByRole('checkbox', {
+        name: 'Continue anyway without character files',
+      });
+
+      // Act
+      fireEvent.click(continueAnyway);
+
+      // Assert
+      await waitFor(() => expect(getStepValidity()).toBe(true));
+
+      // Act
+      fireEvent.click(continueAnyway);
+
+      // Assert
+      await waitFor(() => expect(getStepValidity()).toBe(false));
+    });
+
+    it('Then a folder that does not exist is reported as such', async () => {
+      // Arrange
+      electronAPI.saveFile.inspectDirectory.mockResolvedValue({
+        status: 'notFound',
+        saveFileCount: 0,
+      });
+
+      // Act
+      await renderStep();
+
+      // Assert
+      expect(
+        await screen.findByText("This folder doesn't exist", undefined, {
+          timeout: INSPECTION_TIMEOUT_MS,
+        }),
+      ).toBeInTheDocument();
+      expect(electronAPI.saveFile.inspectDirectory).toHaveBeenCalledWith(CURRENT_DIR);
+    });
+  });
+
+  describe('If the applied folder has character files', () => {
+    it('Then Continue anyway is not offered and the folder is not re-inspected', async () => {
+      // Arrange
+      electronAPI.saveFile.getSaveFiles.mockResolvedValue([SAVE_FILE]);
+
+      // Act
+      await renderStep();
+
+      // Assert
+      await waitFor(() => expect(getStepValidity()).toBe(true));
+      expect(screen.getByText('Found 1 character file')).toBeInTheDocument();
+      expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
+      await new Promise((resolve) =>
+        setTimeout(resolve, SAVE_DIRECTORY_INSPECTION_DEBOUNCE_MS + 50),
+      );
+      expect(electronAPI.saveFile.inspectDirectory).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('If the user types or pastes a path', () => {
+    it('Then the path is inspected once after typing stops and the step is blocked until it is applied', async () => {
+      // Arrange
+      electronAPI.saveFile.getSaveFiles.mockResolvedValue([SAVE_FILE]);
+      electronAPI.saveFile.inspectDirectory.mockResolvedValue({
+        status: 'hasSaveFiles',
+        saveFileCount: 3,
+      });
+      await renderStep();
+      await waitFor(() => expect(getStepValidity()).toBe(true));
+
+      // Act
+      typePath('/typed');
+      typePath('/typed/save');
+      typePath(TYPED_DIR);
+
+      // Assert
+      expect(getStepValidity()).toBe(false);
+      expect(screen.getByText('Checking folder...')).toBeInTheDocument();
+      expect(
+        await screen.findByText('Found 3 character files', undefined, {
+          timeout: INSPECTION_TIMEOUT_MS,
+        }),
+      ).toBeInTheDocument();
+      expect(electronAPI.saveFile.inspectDirectory).toHaveBeenCalledTimes(1);
+      expect(electronAPI.saveFile.inspectDirectory).toHaveBeenCalledWith(TYPED_DIR);
+      expect(electronAPI.saveFile.updateSaveDirectory).not.toHaveBeenCalled();
+      expect(getStepValidity()).toBe(false);
+    });
+
+    it('Then Use This Folder applies the typed path and validates the step', async () => {
+      // Arrange
+      electronAPI.saveFile.getSaveFiles.mockResolvedValueOnce([]).mockResolvedValue([SAVE_FILE]);
+      electronAPI.saveFile.inspectDirectory.mockResolvedValue({
+        status: 'hasSaveFiles',
+        saveFileCount: 1,
+      });
+      await renderStep();
+      typePath(TYPED_DIR);
+      const useButton = screen.getByRole('button', { name: 'Use This Folder' });
+      await waitFor(() => expect(useButton).toBeEnabled(), { timeout: INSPECTION_TIMEOUT_MS });
+
+      // Act
+      fireEvent.click(useButton);
+
+      // Assert
+      await waitFor(() =>
+        expect(electronAPI.saveFile.updateSaveDirectory).toHaveBeenCalledWith(TYPED_DIR),
+      );
+      await waitFor(() => expect(getStepValidity()).toBe(true));
+      expect(reloadData).toHaveBeenCalledTimes(1);
+      expect(screen.queryByRole('button', { name: 'Use This Folder' })).not.toBeInTheDocument();
+    });
+
+    it('Then pressing Enter applies the typed path once it has been validated', async () => {
+      // Arrange
+      await renderStep();
+      typePath(TYPED_DIR);
+      await waitFor(
+        () => expect(screen.getByRole('button', { name: 'Use This Folder' })).toBeEnabled(),
+        { timeout: INSPECTION_TIMEOUT_MS },
+      );
+
+      // Act
+      fireEvent.keyDown(screen.getByLabelText('Save Directory Path'), { key: 'Enter' });
+
+      // Assert
+      await waitFor(() =>
+        expect(electronAPI.saveFile.updateSaveDirectory).toHaveBeenCalledWith(TYPED_DIR),
+      );
+    });
+
+    it('Then a path that does not exist cannot be applied', async () => {
+      // Arrange
+      electronAPI.saveFile.inspectDirectory.mockResolvedValue({
+        status: 'notFound',
+        saveFileCount: 0,
+      });
+      await renderStep();
+
+      // Act
+      typePath(TYPED_DIR);
+
+      // Assert
+      expect(
+        await screen.findByText("This folder doesn't exist", undefined, {
+          timeout: INSPECTION_TIMEOUT_MS,
+        }),
+      ).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Use This Folder' })).toBeDisabled();
+      expect(screen.getByLabelText('Save Directory Path')).toHaveAttribute('aria-invalid', 'true');
+      fireEvent.keyDown(screen.getByLabelText('Save Directory Path'), { key: 'Enter' });
+      expect(electronAPI.saveFile.updateSaveDirectory).not.toHaveBeenCalled();
+    });
+
+    it('Then a relative path is reported as invalid', async () => {
+      // Arrange
+      electronAPI.saveFile.inspectDirectory.mockResolvedValue({
+        status: 'invalidPath',
+        saveFileCount: 0,
+      });
+      await renderStep();
+
+      // Act
+      typePath('Saved Games');
+
+      // Assert
+      expect(
+        await screen.findByText('Enter a full folder path', undefined, {
+          timeout: INSPECTION_TIMEOUT_MS,
+        }),
+      ).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Use This Folder' })).toBeDisabled();
+    });
+
+    it('Then progress is still protected by the destructive confirmation', async () => {
+      // Arrange
+      electronAPI = createElectronAPI({ hasUserData: true });
+      electronAPI.saveFile.inspectDirectory.mockResolvedValue({
+        status: 'hasSaveFiles',
+        saveFileCount: 1,
+      });
+      installElectronAPI(electronAPI);
+      await renderStep();
+      typePath(TYPED_DIR);
+      const useButton = screen.getByRole('button', { name: 'Use This Folder' });
+      await waitFor(() => expect(useButton).toBeEnabled(), { timeout: INSPECTION_TIMEOUT_MS });
+
+      // Act
+      fireEvent.click(useButton);
+
+      // Assert
+      const dialog = await screen.findByRole('alertdialog');
+      expect(
+        within(dialog).getByText(
+          'This action will permanently delete all characters and progress data.',
+        ),
+      ).toBeInTheDocument();
+      expect(electronAPI.saveFile.updateSaveDirectory).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('If the chosen folder looks like the parent or a subfolder of the save folder', () => {
+    it('Then the save folder is suggested and one click applies it', async () => {
+      // Arrange
+      electronAPI.saveFile.inspectDirectory.mockResolvedValue({
+        status: 'noSaveFiles',
+        saveFileCount: 0,
+        suggestedDirectory: SUGGESTED_DIR,
+      });
+      electronAPI.saveFile.getSaveFiles.mockResolvedValueOnce([]).mockResolvedValue([SAVE_FILE]);
+      await renderStep();
+      const useSuggestion = await screen.findByRole(
+        'button',
+        { name: 'Use Suggested Folder' },
+        { timeout: INSPECTION_TIMEOUT_MS },
+      );
+      expect(screen.getByText('Did you mean this folder?')).toBeInTheDocument();
+      expect(screen.getByText(SUGGESTED_DIR)).toBeInTheDocument();
+
+      // Act
+      fireEvent.click(useSuggestion);
+
+      // Assert
+      await waitFor(() =>
+        expect(electronAPI.saveFile.updateSaveDirectory).toHaveBeenCalledWith(SUGGESTED_DIR),
+      );
+      await waitFor(() => expect(screen.getByDisplayValue(SUGGESTED_DIR)).toBeInTheDocument());
+      await waitFor(() => expect(getStepValidity()).toBe(true));
+      expect(
+        screen.queryByRole('button', { name: 'Use Suggested Folder' }),
+      ).not.toBeInTheDocument();
+    });
+
+    it('Then a suggestion for a typed path is offered too', async () => {
+      // Arrange
+      electronAPI.saveFile.getSaveFiles.mockResolvedValue([SAVE_FILE]);
+      electronAPI.saveFile.inspectDirectory.mockResolvedValue({
+        status: 'noSaveFiles',
+        saveFileCount: 0,
+        suggestedDirectory: SUGGESTED_DIR,
+      });
+      await renderStep();
+
+      // Act
+      typePath('/Users/me/Saved Games');
+
+      // Assert
+      expect(
+        await screen.findByRole(
+          'button',
+          { name: 'Use Suggested Folder' },
+          { timeout: INSPECTION_TIMEOUT_MS },
+        ),
+      ).toBeInTheDocument();
+      expect(screen.getByText('No character files found')).toBeInTheDocument();
+      expect(electronAPI.saveFile.inspectDirectory).toHaveBeenCalledWith('/Users/me/Saved Games');
+    });
+  });
+
+  describe('If inspecting the folder fails', () => {
+    it('Then the typed path cannot be applied and no suggestion is shown', async () => {
+      // Arrange
+      electronAPI.saveFile.inspectDirectory.mockRejectedValue(new Error('ipc failed'));
+      await renderStep();
+
+      // Act
+      typePath(TYPED_DIR);
+
+      // Assert
+      await waitFor(
+        () => expect(screen.queryByText('Checking folder...')).not.toBeInTheDocument(),
+        {
+          timeout: INSPECTION_TIMEOUT_MS,
+        },
+      );
+      expect(electronAPI.saveFile.inspectDirectory).toHaveBeenCalledWith(TYPED_DIR);
+      expect(screen.getByRole('button', { name: 'Use This Folder' })).toBeDisabled();
+      expect(
+        screen.queryByRole('button', { name: 'Use Suggested Folder' }),
+      ).not.toBeInTheDocument();
+      expect(getStepValidity()).toBe(false);
+    });
   });
 });
