@@ -112,6 +112,32 @@ describe('When ItemCard is rendered', () => {
     });
   });
 
+  describe('If the item name tooltip is opened', () => {
+    it.each(['grid', 'list'] as const)(
+      'Then the %s card shows the translated category and sub-category',
+      async (viewMode) => {
+        // Arrange
+        const item = HolyGrailItemBuilder.new()
+          .withName('Windforce')
+          .withCategory('weapons')
+          .withWeaponSubCategory('2h_swords')
+          .build();
+        render(<ItemCard item={item} viewMode={viewMode} />);
+
+        // Act
+        fireEvent.focus(
+          screen.getByText('Windforce').closest('[data-slot="tooltip-trigger"]') as Element,
+        );
+
+        // Assert
+        const label = await screen.findByText('Weapons • Two-Handed Swords');
+        expect(label).toBeInTheDocument();
+        expect(screen.queryByText(/2h swords/i)).not.toBeInTheDocument();
+        expect(screen.queryByText(/weapons • 2h/i)).not.toBeInTheDocument();
+      },
+    );
+  });
+
   describe('If item has no progress', () => {
     it('Then does not render attribution', () => {
       // Arrange
@@ -588,7 +614,7 @@ describe('When ItemCard is rendered', () => {
       'Then the %s card does not dim the item name with opacity',
       (viewMode) => {
         // Arrange
-        const item = HolyGrailItemBuilder.new().withName('Missing Item').build();
+        const item = HolyGrailItemBuilder.new().withType('unique').withName('Missing Item').build();
 
         // Act
         render(<ItemCard item={item} viewMode={viewMode} onClick={vi.fn()} />);
@@ -600,7 +626,7 @@ describe('When ItemCard is rendered', () => {
           if (/(^|\s)opacity-\d+/.test(element.className)) ancestorsWithOpacity.push(element);
         }
         expect(ancestorsWithOpacity).toHaveLength(0);
-        expect(name).toHaveClass('text-foreground');
+        expect(name).toHaveClass('text-item-unique');
       },
     );
 
@@ -662,6 +688,80 @@ describe('When ItemCard is rendered', () => {
       expect(surface).toHaveClass('border-solid', 'bg-card', 'border-item-unique');
       expect(screen.getByTestId('item-artwork')).not.toHaveClass('grayscale');
     });
+  });
+
+  describe('If the item has a quality type', () => {
+    it.each([
+      ['grid', 'unique', 'text-item-unique'],
+      ['grid', 'set', 'text-item-set'],
+      ['grid', 'rune', 'text-item-rune'],
+      ['grid', 'runeword', 'text-item-runeword'],
+      ['list', 'unique', 'text-item-unique'],
+      ['list', 'set', 'text-item-set'],
+      ['list', 'rune', 'text-item-rune'],
+      ['list', 'runeword', 'text-item-runeword'],
+    ] as const)('Then the %s card colors a %s item name with %s', (viewMode, type, expected) => {
+      // Arrange
+      const item = HolyGrailItemBuilder.new().withType(type).withName('Quality Item').build();
+
+      // Act
+      render(<ItemCard item={item} viewMode={viewMode} />);
+
+      // Assert
+      const name = screen.getByRole('heading', { name: 'Quality Item' });
+      expect(name).toHaveClass(expected);
+      expect(name).not.toHaveClass('text-foreground');
+    });
+
+    it('Then the grid card does not scale on hover, so it never overlaps its gutters', () => {
+      // Arrange
+      const item = HolyGrailItemBuilder.new().withType('unique').withName('Steady').build();
+
+      // Act
+      render(<ItemCard item={item} onClick={vi.fn()} />);
+
+      // Assert
+      const card = screen.getByRole('button', { name: 'Steady, Not Found' });
+      const surface = card.querySelector('[data-found]');
+      expect(card.className).not.toMatch(/scale-/);
+      expect(surface?.className).not.toMatch(/scale-/);
+      expect(surface).toHaveClass('hover:ring-item-unique/40');
+    });
+
+    it.each(['grid', 'list'] as const)(
+      'Then the non-clickable %s card has no hover ring or shadow, so it does not look interactive',
+      (viewMode) => {
+        // Arrange
+        const item = HolyGrailItemBuilder.new().withType('unique').withName('Static').build();
+
+        // Act
+        const { container } = render(<ItemCard item={item} viewMode={viewMode} />);
+
+        // Assert
+        const surface = container.querySelector('[data-found]');
+        expect(surface).toBeInTheDocument();
+        expect(surface?.className).not.toMatch(/hover:/);
+        expect(surface?.className).not.toMatch(/transition/);
+        expect(screen.queryByRole('button', { name: 'Static, Not Found' })).not.toBeInTheDocument();
+      },
+    );
+
+    it.each(['grid', 'list'] as const)(
+      'Then the clickable %s card keeps its hover ring and focus styling',
+      (viewMode) => {
+        // Arrange
+        const item = HolyGrailItemBuilder.new().withType('unique').withName('Clickable').build();
+
+        // Act
+        render(<ItemCard item={item} viewMode={viewMode} onClick={vi.fn()} />);
+
+        // Assert
+        const card = screen.getByRole('button', { name: 'Clickable, Not Found' });
+        const surface = viewMode === 'grid' ? card.querySelector('[data-found]') : card;
+        expect(surface).toHaveClass('hover:ring-2', 'hover:ring-item-unique/40');
+        expect(card).toHaveClass('cursor-pointer', 'focus-visible:ring-[3px]');
+      },
+    );
   });
 
   describe('If > 2 discovering characters', () => {

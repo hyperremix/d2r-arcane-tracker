@@ -37,7 +37,7 @@ export function D2RInstallationStep() {
   const d2rPathInputId = useId();
   const pathHintId = useId();
   const validationId = useId();
-  const { settings, setSettings } = useGrailStore();
+  const { settings, hydrateSettings } = useGrailStore();
 
   const [d2rPath, setD2rPath] = useState<string>(settings.d2rInstallPath || '');
   const [hasLoaded, setHasLoaded] = useState(false);
@@ -80,15 +80,18 @@ export function D2RInstallationStep() {
   }, [applyValidation]);
 
   /**
-   * Saves the path to the main process and settings.
+   * Saves the path via the main process, which persists it, and mirrors it into the store.
    * @returns {Promise<boolean>} Whether the path was saved
    */
   const savePath = useCallback(
     async (trimmedPath: string, requestId: number): Promise<boolean> => {
       savingPathRef.current = trimmedPath;
       try {
+        // The main process persists the path to the database and updates the icon service,
+        // so the store is only hydrated afterwards. A second save could fail after the path
+        // is already persisted and would leave the store, service and database disagreeing.
         await window.electronAPI?.icon.setD2RPath(trimmedPath);
-        await setSettings({ d2rInstallPath: trimmedPath });
+        hydrateSettings({ d2rInstallPath: trimmedPath });
         savedPathRef.current = trimmedPath;
         return true;
       } catch (error) {
@@ -104,7 +107,7 @@ export function D2RInstallationStep() {
         }
       }
     },
-    [applyValidation, setSettings],
+    [applyValidation, hydrateSettings],
   );
 
   const persistPath = useCallback(
@@ -309,14 +312,14 @@ export function D2RInstallationStep() {
             </p>
           )}
           {validation === 'valid' && (
-            <p className="flex items-center gap-2 text-accent-green text-sm">
+            <p className="flex items-center gap-2 text-sm text-success">
               <CheckCircle className="h-4 w-4" />
               {t(translations.wizard.d2rInstallation.valid)}
             </p>
           )}
           {validation === 'invalid' && (
             <div className="flex items-start gap-2 rounded-lg border p-3">
-              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-accent-yellow" />
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
               <div className="space-y-1">
                 <p className="font-medium text-sm">
                   {t(translations.wizard.d2rInstallation.invalid)}

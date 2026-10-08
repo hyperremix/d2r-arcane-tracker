@@ -1,9 +1,9 @@
 import { runes } from 'electron/items/runes';
-import { useEffect, useId, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
 import { translations } from '@/i18n/translations';
 import { cn } from '@/lib/utils';
 
@@ -17,10 +17,6 @@ interface RuneFiltersProps {
   onRuneSelectionChange: (runeIds: string[]) => void;
   /** Available rune counts from save files */
   availableRunes: Record<string, number>;
-  /** Whether to show partially complete runewords */
-  showPartial: boolean;
-  /** Callback when show partial toggle changes */
-  onShowPartialChange: (showPartial: boolean) => void;
   /** Optional className for styling */
   className?: string;
 }
@@ -28,18 +24,15 @@ interface RuneFiltersProps {
 /**
  * RuneFilters component that displays checkboxes for filtering by runes.
  * Shows all 33 runes with their images, available counts, and highlights runes with 0 count.
- * Includes a toggle to show/hide partially complete runewords.
+ * Runewords must contain all selected runes to match; a button clears the selection.
  */
 export function RuneFilters({
   selectedRunes,
   onRuneSelectionChange,
   availableRunes,
-  showPartial,
-  onShowPartialChange,
   className,
 }: RuneFiltersProps) {
   const { t } = useTranslation();
-  const showPartialId = useId();
   const [runeImages, setRuneImages] = useState<Map<string, string>>(new Map());
   const [imagesLoading, setImagesLoading] = useState(true);
 
@@ -89,15 +82,25 @@ export function RuneFilters({
 
   return (
     <div className="space-y-4">
-      {/* Header with Show Partial toggle */}
-      <div className="flex items-center justify-between border-border border-b pb-3">
-        <h3 className="font-semibold text-lg">{t(translations.runeword.filters.filterByRunes)}</h3>
-        <div className="flex items-center gap-2">
-          <Label htmlFor={showPartialId} className="text-sm">
-            {t(translations.runeword.filters.showPartial)}
-          </Label>
-          <Switch id={showPartialId} checked={showPartial} onCheckedChange={onShowPartialChange} />
+      {/* Header with match-all hint and Clear selection */}
+      <div className="space-y-1 border-border border-b pb-3">
+        <div className="flex items-center justify-between gap-2">
+          <h3 className="font-semibold text-lg">
+            {t(translations.runeword.filters.filterByRunes)}
+          </h3>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            disabled={selectedRunes.length === 0}
+            onClick={() => onRuneSelectionChange([])}
+          >
+            {t(translations.runeword.filters.clearSelection)}
+          </Button>
         </div>
+        <p className="text-muted-foreground text-xs">
+          {t(translations.runeword.filters.matchAllHint)}
+        </p>
       </div>
 
       {/* Rune checkboxes in a scrollable grid */}
@@ -160,10 +163,7 @@ export function RuneFilters({
       {/* Selection summary */}
       {selectedRunes.length > 0 && (
         <div className="border-border border-t pt-3 text-muted-foreground text-sm">
-          {t(translations.runeword.filters.runesSelected, {
-            count: selectedRunes.length,
-            plural: selectedRunes.length !== 1 ? 's' : '',
-          })}
+          {t(translations.runeword.filters.runesSelected, { count: selectedRunes.length })}
         </div>
       )}
     </div>

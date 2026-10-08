@@ -1,7 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  formatClockDuration,
   formatDate,
   formatDuration,
+  formatLocalizedDate,
   formatLongDate,
   formatShortDate,
   formatTime,
@@ -9,6 +11,26 @@ import {
   formatTimestamp,
   isRecentFind,
 } from './date';
+
+describe('formatClockDuration', () => {
+  it('If the duration is missing or negative, Then it shows zero time', () => {
+    // Arrange & Act & Assert
+    expect(formatClockDuration(undefined)).toBe('0:00');
+    expect(formatClockDuration(-500)).toBe('0:00');
+  });
+
+  it('When the duration is under an hour, Then it shows minutes and zero-padded seconds', () => {
+    // Arrange & Act & Assert
+    expect(formatClockDuration(5_000)).toBe('0:05');
+    expect(formatClockDuration(754_999)).toBe('12:34');
+  });
+
+  it('When the duration is an hour or longer, Then it shows hours with padded minutes and seconds', () => {
+    // Arrange & Act & Assert
+    expect(formatClockDuration(3_723_000)).toBe('1:02:03');
+    expect(formatClockDuration(26 * 3_600_000)).toBe('26:00:00');
+  });
+});
 
 describe('formatDuration', () => {
   it('should return "0s" for undefined input', () => {
@@ -37,6 +59,39 @@ describe('formatDuration', () => {
 
   it('should format hours and seconds correctly (no minutes)', () => {
     expect(formatDuration(3605000)).toBe('1h 5s');
+  });
+
+  it('When the duration is exactly 24 hours, then it shows total hours instead of wrapping to 0s', () => {
+    // Arrange
+    const durationMs = 24 * 60 * 60 * 1000;
+
+    // Act
+    const result = formatDuration(durationMs);
+
+    // Assert
+    expect(result).toBe('24h');
+  });
+
+  it('When the duration is longer than a day, then it keeps the days as part of the hours', () => {
+    // Arrange
+    const durationMs = (25 * 3600 + 2 * 60 + 3) * 1000;
+
+    // Act
+    const result = formatDuration(durationMs);
+
+    // Assert
+    expect(result).toBe('25h 2m 3s');
+  });
+
+  it('When the duration is longer than a month, then it still shows total hours', () => {
+    // Arrange
+    const durationMs = (31 * 24 + 1) * 60 * 60 * 1000;
+
+    // Act
+    const result = formatDuration(durationMs);
+
+    // Assert
+    expect(result).toBe('745h');
   });
 });
 
@@ -90,6 +145,41 @@ describe('formatShortDate', () => {
     const date = new Date('2024-01-15T12:00:00Z');
     const result = formatShortDate(date);
     expect(result).toBe('Jan 15, 2024');
+  });
+});
+
+describe('formatLocalizedDate', () => {
+  it('When the date is undefined, Then it returns a dash', () => {
+    expect(formatLocalizedDate(undefined, 'en')).toBe('-');
+  });
+
+  it('When the date is invalid, Then it returns a dash', () => {
+    expect(formatLocalizedDate('not a date', 'en')).toBe('-');
+  });
+
+  it('When a locale is given, Then the date is formatted for that locale', () => {
+    // Arrange
+    const date = new Date('2024-01-15T12:00:00Z');
+
+    // Act
+    const english = formatLocalizedDate(date, 'en', { dateStyle: 'medium', timeZone: 'UTC' });
+    const german = formatLocalizedDate(date, 'de', { dateStyle: 'medium', timeZone: 'UTC' });
+
+    // Assert
+    expect(english).toBe('Jan 15, 2024');
+    expect(german).toBe('15.01.2024');
+  });
+
+  it('If the locale is not a valid language tag, Then it falls back to the default locale', () => {
+    // Arrange
+    const date = new Date('2024-01-15T12:00:00Z');
+    const options: Intl.DateTimeFormatOptions = { dateStyle: 'medium', timeZone: 'UTC' };
+
+    // Act
+    const result = formatLocalizedDate(date, 'not_a_locale!', options);
+
+    // Assert
+    expect(result).toBe(new Intl.DateTimeFormat(undefined, options).format(date));
   });
 });
 

@@ -14,12 +14,12 @@ import {
 import type { KeyboardEvent } from 'react';
 import { useCallback, useEffect, useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { SaveDirectoryChangeAction } from '@/components/settings/SaveDirectoryChangeDialog';
 import { SaveDirectoryChangeDialog } from '@/components/settings/SaveDirectoryChangeDialog';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import type { SaveDirectoryChangeAction } from '@/hooks/useSaveDirectoryChange';
 import { translations } from '@/i18n/translations';
 import { useGrailStore } from '@/stores/grailStore';
 import { useWizardStore } from '@/stores/wizardStore';

@@ -416,7 +416,7 @@ export class IconService {
         {},
         {
           surfaceToUI: true,
-          userMessage: 'Sprite conversion failed',
+          code: 'spriteConversionFailed',
         },
       );
       result.success = false;

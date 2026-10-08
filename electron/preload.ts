@@ -3,6 +3,7 @@ import type {
   Character,
   D2SaveFile,
   FileReaderResponse,
+  GlobalHotkeyStatus,
   GrailProgress,
   Item,
   MonitoringStatus,
@@ -320,25 +321,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
      * @param callback - Function to call when service errors are received.
      * @returns Cleanup function to remove the listener.
      */
-    onServiceError: (
-      callback: (payload: {
-        service: string;
-        operation: string;
-        severity: 'error' | 'warn';
-        message: string;
-        timestamp: number;
-      }) => void,
-    ) => {
-      const listener = (
-        _event: Electron.IpcRendererEvent,
-        value: {
-          service: string;
-          operation: string;
-          severity: 'error' | 'warn';
-          message: string;
-          timestamp: number;
-        },
-      ) => callback(value);
+    onServiceError: (callback: (payload: unknown) => void) => {
+      const listener = (_event: Electron.IpcRendererEvent, value: unknown) => callback(value);
       ipcRenderer.on('service-error', listener);
       return () => ipcRenderer.removeListener('service-error', listener);
     },
@@ -496,6 +480,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
      */
     updateOpacity: (opacity: number): Promise<{ success: boolean; error?: string }> =>
       ipcRenderer.invoke('widget:update-opacity', opacity),
+
+    /**
+     * Locks or unlocks the widget window. A locked widget is click-through and cannot be focused,
+     * dragged or resized.
+     * @param {boolean} locked - Whether the widget should be locked.
+     * @returns {Promise<{ success: boolean; error?: string }>} Success indicator.
+     */
+    setLocked: (locked: boolean): Promise<{ success: boolean; error?: string }> =>
+      ipcRenderer.invoke('widget:set-locked', locked),
 
     /**
      * Updates the widget window size.
@@ -751,6 +744,25 @@ contextBridge.exposeInMainWorld('electronAPI', {
      */
     getMemoryStatus: (): Promise<{ available: boolean; reason: string | null }> =>
       ipcRenderer.invoke('run-tracker:get-memory-status'),
+
+    /**
+     * Gets the registration status of the run tracker global hotkeys.
+     * @returns {Promise<GlobalHotkeyStatus>} A promise that resolves with the hotkey status.
+     */
+    getGlobalHotkeyStatus: (): Promise<GlobalHotkeyStatus> =>
+      ipcRenderer.invoke('run-tracker:get-global-hotkey-status'),
+
+    /**
+     * Registers a callback for global hotkey status changes.
+     * @param {(status: GlobalHotkeyStatus) => void} callback - Called with the new status.
+     * @returns {() => void} Cleanup function to remove the listener.
+     */
+    onGlobalHotkeyStatus: (callback: (status: GlobalHotkeyStatus) => void) => {
+      const listener = (_event: Electron.IpcRendererEvent, value: GlobalHotkeyStatus) =>
+        callback(value);
+      ipcRenderer.on('run-tracker:global-hotkey-status', listener);
+      return () => ipcRenderer.removeListener('run-tracker:global-hotkey-status', listener);
+    },
 
     /**
      * Manually adds a run item to a run.

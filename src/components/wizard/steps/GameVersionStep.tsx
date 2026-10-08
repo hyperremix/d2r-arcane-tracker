@@ -10,6 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { useWizardSettingsSave, WizardSaveError } from '@/components/wizard/wizardSettingsSave';
 import { translations } from '@/i18n/translations';
 import { gameVersionDescriptionKeys, gameVersionLabelKeys } from '@/lib/labelKeys';
 import { useGrailStore } from '@/stores/grailStore';
@@ -48,12 +49,13 @@ export function GameVersionStep() {
   const { t } = useTranslation();
   const gameVersionId = useId();
   const headingId = useId();
-  const { settings, setSettings } = useGrailStore();
+  const { settings } = useGrailStore();
+  const { saveSettings, saveFailed } = useWizardSettingsSave();
   const gameVersion = settings.gameVersion || GameVersion.Resurrected;
   const selectedVersion = gameVersions.find((version) => version.value === gameVersion);
 
   const handleGameVersionChange = (value: GameVersion) => {
-    setSettings({ gameVersion: value });
+    saveSettings({ gameVersion: value });
   };
 
   return (
@@ -96,6 +98,8 @@ export function GameVersionStep() {
             </SelectContent>
           </Select>
         </div>
+
+        <WizardSaveError visible={saveFailed} />
 
         <div className="rounded-lg bg-info/10 p-4">
           <p className="text-info text-sm">

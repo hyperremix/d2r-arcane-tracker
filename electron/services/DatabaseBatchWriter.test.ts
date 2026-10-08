@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CharacterBuilder, GrailProgressBuilder } from '@/fixtures';
 import type { Character, GrailProgress, RunItem } from '../types/grail';
+import { setErrorForwarder } from '../utils/serviceLogger';
 import { DatabaseBatchWriter } from './DatabaseBatchWriter';
 
 // Mock database interface
@@ -327,6 +328,42 @@ describe('When DatabaseBatchWriter is used', () => {
 
       // Assert - items dropped after max retries
       expect(batchWriter.getCharacterQueueSize()).toBe(0);
+    });
+
+    it('Then should surface a databaseWriteFailed error with technical detail after max consecutive failures', () => {
+      // Arrange
+      const forwarder = vi.fn();
+      setErrorForwarder(forwarder);
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {
+        // Silence expected error logs
+      });
+      batchWriter.queueCharacter(CharacterBuilder.new().withId('char-1').build());
+      mockDatabase.upsertCharactersBatch.mockImplementation(() => {
+        throw new Error('SQLITE_BUSY: database is locked');
+      });
+
+      // Act
+      batchWriter.flush();
+      batchWriter.flush();
+      const callsBeforeLastAttempt = forwarder.mock.calls.length;
+      batchWriter.flush();
+
+      // Assert
+      expect(callsBeforeLastAttempt).toBe(0);
+      expect(forwarder).toHaveBeenCalledTimes(1);
+      expect(forwarder).toHaveBeenCalledWith(
+        expect.objectContaining({
+          service: 'DatabaseBatchWriter',
+          operation: 'flush',
+          severity: 'error',
+          code: 'databaseWriteFailed',
+          detail: expect.stringContaining('SQLITE_BUSY: database is locked'),
+        }),
+      );
+      setErrorForwarder(() => {
+        // Reset forwarder
+      });
+      consoleSpy.mockRestore();
     });
   });
 

@@ -10,6 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { useWizardSettingsSave, WizardSaveError } from '@/components/wizard/wizardSettingsSave';
 import { translations } from '@/i18n/translations';
 import { gameModeDescriptionKeys, gameModeLabelKeys } from '@/lib/labelKeys';
 import { useGrailStore } from '@/stores/grailStore';
@@ -63,12 +64,13 @@ export function GameModeStep() {
   const { t } = useTranslation();
   const gameModeId = useId();
   const headingId = useId();
-  const { settings, setSettings } = useGrailStore();
+  const { settings } = useGrailStore();
+  const { saveSettings, saveFailed } = useWizardSettingsSave();
   const gameMode = settings.gameMode || GameMode.Both;
   const selectedMode = gameModes.find((mode) => mode.value === gameMode);
 
   const handleGameModeChange = (value: GameMode) => {
-    setSettings({ gameMode: value });
+    saveSettings({ gameMode: value });
   };
 
   return (
@@ -109,6 +111,8 @@ export function GameModeStep() {
             </SelectContent>
           </Select>
         </div>
+
+        <WizardSaveError visible={saveFailed} />
 
         <div className="rounded-lg bg-info/10 p-4">
           <p className="text-info text-sm">

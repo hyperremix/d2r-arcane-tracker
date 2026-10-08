@@ -3,6 +3,8 @@ import { Database, Info, Monitor, Settings2, Sparkles, Trophy } from 'lucide-rea
 import type { ReactNode } from 'react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { PageHeader } from '@/components/layout/PageHeader';
+import { PageShell } from '@/components/layout/PageShell';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { TooltipProvider } from '@/components/ui/tooltip';
@@ -369,34 +371,36 @@ export function Settings() {
           </ul>
         </nav>
 
-        <div
+        <PageShell
           ref={scrollContainerRef}
-          className="flex-1 overflow-y-auto"
+          contentClassName="space-y-10"
           data-testid="settings-scroll-container"
         >
-          <div className="space-y-10 p-6">
-            {settingsSections.map((section) => (
-              <section
-                key={section.id}
-                id={getSectionDomId(section.id)}
-                aria-labelledby={getSectionHeadingId(section.id)}
-                className="scroll-mt-6 space-y-4"
-              >
-                <div className="space-y-1">
-                  <h2
-                    id={getSectionHeadingId(section.id)}
-                    tabIndex={-1}
-                    className="font-semibold text-xl outline-none"
-                  >
-                    {t(section.titleKey)}
-                  </h2>
-                  <p className="text-muted-foreground text-sm">{t(section.descriptionKey)}</p>
-                </div>
-                <div className="space-y-6">{renderSectionContent(section.id)}</div>
-              </section>
-            ))}
-          </div>
-        </div>
+          <PageHeader
+            title={t(translations.settings.title)}
+            description={t(translations.settings.description)}
+          />
+          {settingsSections.map((section) => (
+            <section
+              key={section.id}
+              id={getSectionDomId(section.id)}
+              aria-labelledby={getSectionHeadingId(section.id)}
+              className="scroll-mt-6 space-y-4"
+            >
+              <div className="space-y-1">
+                <h2
+                  id={getSectionHeadingId(section.id)}
+                  tabIndex={-1}
+                  className="font-semibold text-xl outline-none"
+                >
+                  {t(section.titleKey)}
+                </h2>
+                <p className="text-muted-foreground text-sm">{t(section.descriptionKey)}</p>
+              </div>
+              <div className="space-y-6">{renderSectionContent(section.id)}</div>
+            </section>
+          ))}
+        </PageShell>
       </div>
     </TooltipProvider>
   );
