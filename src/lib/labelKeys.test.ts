@@ -38,13 +38,11 @@ describe('When item label key maps are used', () => {
       const entries = Object.entries(labelKeys);
 
       // Act
-      // Single-word English labels (e.g. "Bows") legitimately equal their raw value ignoring case,
-      // so only compare case-insensitively for multi-word values, where the raw form has underscores.
+      // The comparison with the raw value is case-sensitive so capitalised labels (e.g. "Bows")
+      // pass while an untranslated lowercase fallback (e.g. "bows") is flagged.
       const untranslated = entries.filter(([value, key]) => {
         const label = i18n.t(key);
-        const isRawMultiWordValue =
-          value.includes('_') && label.toLowerCase() === value.toLowerCase();
-        return label === '' || label === key || label.includes('_') || isRawMultiWordValue;
+        return label === '' || label === key || label === value || label.includes('_');
       });
 
       // Assert
