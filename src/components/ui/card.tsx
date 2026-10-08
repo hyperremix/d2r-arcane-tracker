@@ -29,7 +29,12 @@ function CardHeader({ className, ...props }: React.ComponentProps<'div'>) {
 }
 
 interface CardTitleProps extends React.ComponentProps<'div'> {
-  /** `display` is the Cinzel heading; `label` is a small Inter caption such as a stat tile name. */
+  /**
+   * `display` is the Cinzel heading; `label` is a small Inter caption such as a stat tile name.
+   * Use `label` to get the UI font on a title: a `font-ui` className does not cleanly replace the
+   * display style (the `tracking-wide` spacing is kept), so inline content inside a display title
+   * should opt out with its own `font-ui` wrapper instead.
+   */
   variant?: 'display' | 'label';
 }
 

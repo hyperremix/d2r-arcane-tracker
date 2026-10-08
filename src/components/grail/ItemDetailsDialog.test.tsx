@@ -419,6 +419,19 @@ describe('When ItemDetailsDialog is rendered', () => {
       expect(screen.getByRole('button', { name: /Next/ })).toBeEnabled();
     });
 
+    it('Then the pagination range opts out of the display title font with font-ui', () => {
+      // Arrange
+      const item = HolyGrailItemBuilder.new().withId('item-1').build();
+      const characters = CharacterBuilder.new().withId('char').withName('Char').buildMany(7);
+      setupStoreMock({ items: [item], characters });
+
+      // Act
+      render(<ItemDetailsDialog itemId="item-1" open={true} onOpenChange={vi.fn()} />);
+
+      // Assert
+      expect(screen.getByText(/1-5 of 7/)).toHaveClass('font-ui', 'font-normal');
+    });
+
     it('Then Next click advances page', () => {
       // Arrange
       const item = HolyGrailItemBuilder.new().withId('item-1').build();

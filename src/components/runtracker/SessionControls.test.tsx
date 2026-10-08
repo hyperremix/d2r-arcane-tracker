@@ -145,6 +145,30 @@ describe('SessionControls', () => {
       expect(cardTitle).toBeDefined();
     });
 
+    it.each([
+      { isPaused: false, label: 'Running' },
+      { isPaused: true, label: 'Paused' },
+    ])(
+      'If the run is $label, Then the status wrapper opts out of the display title font with font-ui',
+      ({ isPaused, label }) => {
+        // Arrange
+        mockUseRunTrackerStore.mockReturnValue({
+          ...defaultStoreState,
+          activeSession: mockSession,
+          activeRun: mockRun,
+          isTracking: true,
+          isPaused,
+        });
+
+        // Act
+        render(<SessionControls />);
+
+        // Assert
+        const wrapper = screen.getByText(label).parentElement;
+        expect(wrapper).toHaveClass('font-ui', 'font-normal');
+      },
+    );
+
     it('shows resume button when run is paused', () => {
       mockUseRunTrackerStore.mockReturnValue({
         ...defaultStoreState,
