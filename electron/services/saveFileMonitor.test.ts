@@ -68,9 +68,12 @@ vi.mock('../utils/grailItemUtils', () => ({
 }));
 
 import { existsSync, readdirSync } from 'node:fs';
-import { readFile, stat } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import * as d2s from '@dschu012/d2s';
 import * as d2stash from '@dschu012/d2s/lib/d2/stash';
+import chokidar from 'chokidar';
 import { app } from 'electron';
 import { D2SaveFileBuilder } from '@/fixtures';
 import { isRuneId } from '../items/indexes';
@@ -95,6 +98,11 @@ describe('When SaveFileMonitor is used', () => {
   let monitor: SaveFileMonitor;
   let mockDatabase: MockGrailDatabase;
   let eventBus: EventBus;
+  const tempDirs: string[] = [];
+
+  afterEach(async () => {
+    await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })));
+  });
 
   beforeEach(() => {
     // Clear all mocks
@@ -225,6 +233,46 @@ describe('When SaveFileMonitor is used', () => {
       });
     });
 
+    it('Then should watch an existing directory that has no save files yet', async () => {
+      // Arrange
+      const emptyDir = await mkdtemp(join(tmpdir(), 'arcane-empty-'));
+      tempDirs.push(emptyDir);
+      vi.mocked(mockDatabase.getAllSettings).mockReturnValue({
+        saveDir: emptyDir,
+        gameMode: GameMode.Softcore,
+      });
+      const watchSpy = vi.fn(() => ({ on: vi.fn().mockReturnThis(), close: vi.fn() }));
+      (chokidar as any).watch = watchSpy;
+      const startedSpy = vi.fn();
+      eventBus.on('monitoring-started', startedSpy);
+
+      // Act
+      await monitor.startMonitoring();
+
+      // Assert
+      expect(watchSpy).toHaveBeenCalledTimes(1);
+      expect(monitor.isCurrentlyMonitoring()).toBe(true);
+      expect(startedSpy).toHaveBeenCalledWith(expect.objectContaining({ saveFileCount: 0 }));
+    });
+
+    it('Then should not watch a directory that does not exist', async () => {
+      // Arrange
+      const missingDir = join(tmpdir(), 'arcane-missing-dir-that-does-not-exist');
+      vi.mocked(mockDatabase.getAllSettings).mockReturnValue({
+        saveDir: missingDir,
+        gameMode: GameMode.Softcore,
+      });
+      const watchSpy = vi.fn();
+      (chokidar as any).watch = watchSpy;
+
+      // Act
+      await monitor.startMonitoring();
+
+      // Assert
+      expect(watchSpy).not.toHaveBeenCalled();
+      expect(monitor.isCurrentlyMonitoring()).toBe(false);
+    });
+
     it('Then should not start monitoring if already monitoring', async () => {
       // Arrange
       // Mock the monitor to think it's already monitoring
@@ -277,6 +325,32 @@ describe('When SaveFileMonitor is used', () => {
 
       // Assert
       expect(files).toEqual([]);
+    });
+
+    it('Then should include .d2s files regardless of extension case', async () => {
+      // Arrange
+      const saveDir = await mkdtemp(join(tmpdir(), 'arcane-saves-'));
+      tempDirs.push(saveDir);
+      await Promise.all(
+        ['Hero.D2S', 'Other.d2s', 'notes.txt'].map((name) =>
+          writeFile(join(saveDir, name), 'content'),
+        ),
+      );
+      vi.mocked(mockDatabase.getAllSettings).mockReturnValue({
+        saveDir,
+        gameMode: GameMode.Softcore,
+      });
+      await (monitor as any).initializeSaveDirectories();
+      const parseSpy = vi
+        .spyOn(monitor as any, 'parseSaveFile')
+        .mockImplementation(async (filePath: unknown) => ({ name: String(filePath) }));
+
+      // Act
+      const files = await monitor.getSaveFiles();
+
+      // Assert
+      expect(files).toHaveLength(2);
+      expect(parseSpy).toHaveBeenCalledTimes(2);
     });
 
     it('Then should handle parsing errors gracefully', async () => {
