@@ -390,6 +390,14 @@ export interface ElectronAPI {
     updateOpacity(opacity: number): Promise<{ success: boolean; error?: string }>
 
     /**
+     * Locks or unlocks the widget window. A locked widget is click-through and cannot be focused,
+     * dragged or resized.
+     * @param {boolean} locked - Whether the widget should be locked.
+     * @returns {Promise<{ success: boolean; error?: string }>} A promise that resolves with a success indicator.
+     */
+    setLocked(locked: boolean): Promise<{ success: boolean; error?: string }>
+
+    /**
      * Updates the widget window size.
      * @param {'overall' | 'split' | 'all' | 'run-only'} display - The display mode for the size.
      * @param {{ width: number; height: number }} size - The new size for the widget.

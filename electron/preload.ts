@@ -467,6 +467,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.invoke('widget:update-opacity', opacity),
 
     /**
+     * Locks or unlocks the widget window. A locked widget is click-through and cannot be focused,
+     * dragged or resized.
+     * @param {boolean} locked - Whether the widget should be locked.
+     * @returns {Promise<{ success: boolean; error?: string }>} Success indicator.
+     */
+    setLocked: (locked: boolean): Promise<{ success: boolean; error?: string }> =>
+      ipcRenderer.invoke('widget:set-locked', locked),
+
+    /**
      * Updates the widget window size.
      * @param {'overall' | 'split' | 'all' | 'run-only'} display - The display mode for the size.
      * @param {{ width: number; height: number }} size - The new size for the widget.

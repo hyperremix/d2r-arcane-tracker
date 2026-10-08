@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import i18n from 'i18next';
 import { toast } from 'sonner';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, type MockInstance, vi } from 'vitest';
 import { resetSettingsWriteTracking, useGrailStore } from '@/stores/grailStore';
 import { WidgetSettings } from './WidgetSettings';
 
@@ -429,6 +429,203 @@ describe('WidgetSettings', () => {
       expect(screen.getByRole('radio', { name: 'Split' })).toBeDisabled();
       expect(screen.getByRole('radio', { name: 'All' })).toBeDisabled();
       expect(screen.getByRole('radio', { name: 'Overall' })).toBeEnabled();
+    });
+  });
+
+  describe('When the widget lock, size and opacity controls are used', () => {
+    const mockSetSettings = vi.fn().mockResolvedValue({ success: true });
+    const setLocked = vi.fn().mockResolvedValue({ success: true });
+    let toastError: MockInstance<typeof toast.error>;
+    const updateOpacity = vi.fn().mockResolvedValue({ success: true });
+    const updateDisplay = vi.fn().mockResolvedValue({ success: true });
+    const resetSize = vi
+      .fn()
+      .mockResolvedValue({ success: true, size: { width: 270, height: 320 } });
+
+    beforeEach(() => {
+      for (const mock of [mockSetSettings, setLocked, updateOpacity, updateDisplay, resetSize]) {
+        mock.mockClear();
+      }
+      setLocked.mockResolvedValue({ success: true });
+      toastError = vi.spyOn(toast, 'error').mockImplementation(() => 'toast-id');
+      Object.defineProperty(window, 'electronAPI', {
+        value: { widget: { setLocked, updateOpacity, updateDisplay, resetSize } },
+        configurable: true,
+        writable: true,
+      });
+      useGrailStore.setState((state) => ({
+        setSettings: mockSetSettings,
+        settings: {
+          ...state.settings,
+          widgetEnabled: true,
+          widgetDisplay: 'run-only',
+          widgetOpacity: 0.9,
+          widgetLocked: false,
+          widgetRunOnlyShowItems: true,
+        },
+      }));
+    });
+
+    afterEach(() => {
+      toastError.mockRestore();
+    });
+
+    it('Then the lock switch is labelled and described', () => {
+      // Arrange & Act
+      render(<WidgetSettings />);
+
+      // Assert
+      const lockSwitch = screen.getByLabelText('Lock Widget (Click-Through)');
+      expect(lockSwitch).toHaveAttribute('role', 'switch');
+      expect(lockSwitch).toHaveAccessibleDescription(/Clicks pass through the widget to the game/);
+    });
+
+    it('If the lock switch is turned on, Then the setting is saved and the window is locked', async () => {
+      // Arrange
+      render(<WidgetSettings />);
+
+      // Act
+      await act(async () => {
+        fireEvent.click(screen.getByLabelText('Lock Widget (Click-Through)'));
+      });
+
+      // Assert
+      expect(mockSetSettings).toHaveBeenCalledWith(
+        { widgetLocked: true },
+        { onSaved: expect.any(Function) },
+      );
+      expect(setLocked).toHaveBeenCalledWith(true);
+    });
+
+    it('If saving the lock fails, Then the window lock is reverted', async () => {
+      // Arrange
+      mockSetSettings.mockResolvedValueOnce({ success: false, error: new Error('db locked') });
+      render(<WidgetSettings />);
+
+      // Act
+      await act(async () => {
+        fireEvent.click(screen.getByLabelText('Lock Widget (Click-Through)'));
+      });
+
+      // Assert
+      expect(setLocked).toHaveBeenNthCalledWith(1, true);
+      expect(setLocked).toHaveBeenNthCalledWith(2, false);
+    });
+
+    it('If the lock is saved later by Retry, Then the window lock is applied again', async () => {
+      // Arrange
+      render(<WidgetSettings />);
+      await act(async () => {
+        fireEvent.click(screen.getByLabelText('Lock Widget (Click-Through)'));
+      });
+      const options = mockSetSettings.mock.calls[0]?.[1] as { onSaved: () => Promise<void> };
+      setLocked.mockClear();
+
+      // Act
+      await act(async () => {
+        await options.onSaved();
+      });
+
+      // Assert
+      expect(setLocked).toHaveBeenCalledWith(true);
+    });
+
+    it('If the window rejects the lock, Then the setting is not saved and an error toast is shown', async () => {
+      // Arrange
+      setLocked.mockResolvedValue({ success: false, error: 'No widget window' });
+      const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+      render(<WidgetSettings />);
+
+      // Act
+      await act(async () => {
+        fireEvent.click(screen.getByLabelText('Lock Widget (Click-Through)'));
+      });
+
+      // Assert
+      expect(setLocked).toHaveBeenCalledWith(true);
+      expect(mockSetSettings).not.toHaveBeenCalled();
+      expect(toastError).toHaveBeenCalledWith(
+        'Could not change the widget lock. Please try again.',
+      );
+      expect(screen.getByLabelText('Lock Widget (Click-Through)')).not.toBeChecked();
+      consoleError.mockRestore();
+    });
+
+    it('If applying the lock throws, Then the setting is not saved and an error toast is shown', async () => {
+      // Arrange
+      setLocked.mockRejectedValue(new Error('IPC failed'));
+      const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+      render(<WidgetSettings />);
+
+      // Act
+      await act(async () => {
+        fireEvent.click(screen.getByLabelText('Lock Widget (Click-Through)'));
+      });
+
+      // Assert
+      expect(mockSetSettings).not.toHaveBeenCalled();
+      expect(toastError).toHaveBeenCalledWith(
+        'Could not change the widget lock. Please try again.',
+      );
+      consoleError.mockRestore();
+    });
+
+    it('If the size is reset in run-only mode, Then the default is stored under the run-only key', async () => {
+      // Arrange
+      render(<WidgetSettings />);
+
+      // Act
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: 'Reset Size' }));
+      });
+
+      // Assert
+      expect(resetSize).toHaveBeenCalledWith('run-only');
+      expect(mockSetSettings).toHaveBeenCalledWith({
+        widgetSizeRunOnly: { width: 270, height: 320 },
+      });
+    });
+
+    it('If the run item list is hidden in run-only mode, Then the compact default size is applied', async () => {
+      // Arrange
+      render(<WidgetSettings />);
+
+      // Act
+      await act(async () => {
+        fireEvent.click(screen.getByLabelText('Show Run Item List'));
+      });
+
+      // Assert
+      expect(mockSetSettings).toHaveBeenCalledWith({
+        widgetRunOnlyShowItems: false,
+        widgetSizeRunOnly: { width: 270, height: 190 },
+      });
+      expect(updateDisplay).toHaveBeenCalledWith('run-only', expect.any(Object));
+    });
+
+    it('If the opacity is changed, Then it is saved and sent to the widget exactly once', async () => {
+      // Arrange
+      render(<WidgetSettings />);
+      const opacityInput = screen.getByRole('slider', { hidden: true });
+
+      // Act
+      await act(async () => {
+        fireEvent.change(opacityInput, { target: { value: '0.5' } });
+      });
+
+      // Assert
+      expect(mockSetSettings).toHaveBeenCalledTimes(1);
+      expect(mockSetSettings).toHaveBeenCalledWith({ widgetOpacity: 0.5 });
+      expect(updateOpacity).toHaveBeenCalledTimes(1);
+      expect(updateOpacity).toHaveBeenCalledWith(0.5);
+    });
+
+    it('Then the fullscreen tip recommends the Windowed (Fullscreen) display mode', () => {
+      // Arrange & Act
+      render(<WidgetSettings />);
+
+      // Assert
+      expect(screen.getByText(/Windowed \(Fullscreen\)/)).toBeInTheDocument();
     });
   });
 });

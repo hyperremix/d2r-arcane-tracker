@@ -6,9 +6,9 @@ import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
 import { useWizardSettingsSave, WizardSaveError } from '@/components/wizard/wizardSettingsSave';
+import { useWidgetControls } from '@/hooks/useWidgetControls';
 import { translations } from '@/i18n/translations';
-import { clampWidgetOpacity, MAX_WIDGET_OPACITY, MIN_WIDGET_OPACITY } from '@/lib/widget';
-import { useGrailStore } from '@/stores/grailStore';
+import { MAX_WIDGET_OPACITY, MIN_WIDGET_OPACITY } from '@/lib/widget';
 
 /**
  * WidgetStep component - Overlay widget section of the wizard Preferences step.
@@ -19,14 +19,19 @@ export function WidgetStep() {
   const { t } = useTranslation();
   const opacitySliderId = useId();
   const headingId = useId();
-  const { settings } = useGrailStore();
   const { saveSettings, saveFailed } = useWizardSettingsSave();
+  const {
+    settings,
+    widgetEnabled,
+    widgetOpacity,
+    widgetRunOnlyShowItems,
+    previewOpacity,
+    commitOpacity,
+    toggleRunOnlyItems,
+  } = useWidgetControls(saveSettings);
 
-  const widgetEnabled = settings.widgetEnabled ?? false;
   const widgetDisplay = settings.widgetDisplay || 'overall';
-  const widgetOpacity = clampWidgetOpacity(settings.widgetOpacity);
   const grailEthereal = settings.grailEthereal ?? false;
-  const widgetRunOnlyShowItems = settings.widgetRunOnlyShowItems ?? true;
 
   const toggleWidget = useCallback(
     async (checked: boolean) => {
@@ -50,27 +55,6 @@ export function WidgetStep() {
       await window.electronAPI?.widget.updateDisplay(display, settings);
     },
     [saveSettings, settings],
-  );
-
-  const handleOpacityChange = useCallback(
-    async (value: number | readonly number[]) => {
-      const values = Array.isArray(value) ? value : [value];
-      const opacity = clampWidgetOpacity(values[0]);
-      const result = await saveSettings({ widgetOpacity: opacity });
-      if (!result.success) {
-        return;
-      }
-      // Update widget opacity via IPC
-      await window.electronAPI?.widget.updateOpacity(opacity);
-    },
-    [saveSettings],
-  );
-
-  const handleRunOnlyItemsChange = useCallback(
-    async (checked: boolean) => {
-      await saveSettings({ widgetRunOnlyShowItems: checked });
-    },
-    [saveSettings],
   );
 
   return (
@@ -168,7 +152,7 @@ export function WidgetStep() {
           <Switch
             aria-label={t(translations.settings.widget.showRunItemList)}
             checked={widgetRunOnlyShowItems}
-            onCheckedChange={handleRunOnlyItemsChange}
+            onCheckedChange={toggleRunOnlyItems}
             disabled={!widgetEnabled}
           />
         </div>
@@ -189,7 +173,8 @@ export function WidgetStep() {
             max={MAX_WIDGET_OPACITY}
             step={0.05}
             value={[widgetOpacity]}
-            onValueChange={handleOpacityChange}
+            onValueChange={previewOpacity}
+            onValueCommitted={commitOpacity}
             disabled={!widgetEnabled}
             className="w-full"
           />

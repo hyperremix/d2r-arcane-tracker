@@ -484,6 +484,9 @@
       "splitAllRequireEthereal": "(Split & All require Ethereal tracking)",
       "showRunItemList": "Show Run Item List",
       "showRunItemListDescription": "In Run Only mode, show a compact text list of grail-relevant items found each run.",
+      "lockWidget": "Lock Widget (Click-Through)",
+      "lockWidgetDescription": "Clicks pass through the widget to the game, and it can't be focused, dragged or resized. Turn this off here to move or resize it again.",
+      "lockWidgetFailed": "Could not change the widget lock. Please try again.",
       "opacity": "Opacity",
       "opacityDescription": "Adjust widget background opacity ({{min}}% to 100%)",
       "positionAndSize": "Position & Size",
@@ -496,7 +499,8 @@
       "featureDrag": "Drag to reposition, resize by edges/corners",
       "featureSnap": "Auto-snaps to screen edges and corners",
       "featureSizePersists": "Size persists per display mode",
-      "featureRealtime": "Updates in real-time with grail progress"
+      "featureRealtime": "Updates in real-time with grail progress",
+      "fullscreenTip": "To see the widget over the game, set D2R's display mode to \"Windowed (Fullscreen)\". Always-on-top windows can't appear over exclusive \"Fullscreen\" mode."
     },
     "itemIcons": {
       "title": "Item Icon Management",
@@ -745,7 +749,7 @@
     },
     "widget": {
       "description": "Configure the optional overlay widget that displays your grail progress.",
-      "tip": "The widget is great for monitoring progress while playing in fullscreen mode. You can always enable it later from settings!"
+      "tip": "To see the widget while playing, set D2R's display mode to \"Windowed (Fullscreen)\". Overlays can't appear over exclusive \"Fullscreen\" mode. You can always enable the widget later from settings!"
     },
     "completion": {
       "title": "You're All Set!",

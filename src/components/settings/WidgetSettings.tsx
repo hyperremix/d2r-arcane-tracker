@@ -2,19 +2,16 @@ import type { Settings } from 'electron/types/grail';
 import { Layers, RotateCcw } from 'lucide-react';
 import { useCallback, useEffect, useId, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
+import { toast } from 'sonner';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
+import { useWidgetControls } from '@/hooks/useWidgetControls';
 import { translations } from '@/i18n/translations';
 import { cn } from '@/lib/utils';
-import {
-  clampWidgetOpacity,
-  MAX_WIDGET_OPACITY,
-  MIN_WIDGET_OPACITY,
-  resolveWidgetDisplayMode,
-} from '@/lib/widget';
+import { getWidgetSizeSettingKey, MAX_WIDGET_OPACITY, MIN_WIDGET_OPACITY } from '@/lib/widget';
 import { useGrailStore } from '@/stores/grailStore';
 
 type WidgetDisplayMode = NonNullable<Settings['widgetDisplay']>;
@@ -32,13 +29,25 @@ interface DisplayModeOption {
  */
 export function WidgetSettings() {
   const { t } = useTranslation();
-  const { settings, setSettings } = useGrailStore();
+  const {
+    settings,
+    setSettings,
+    widgetEnabled,
+    widgetOpacity,
+    widgetRunOnlyShowItems,
+    effectiveDisplay,
+    previewOpacity,
+    commitOpacity,
+    toggleRunOnlyItems,
+  } = useWidgetControls();
   const enableWidgetLabelId = useId();
   const enableWidgetDescriptionId = useId();
   const displayModeName = useId();
   const displayModeDescriptionId = useId();
   const runItemsLabelId = useId();
   const runItemsDescriptionId = useId();
+  const lockLabelId = useId();
+  const lockDescriptionId = useId();
   const opacityLabelId = useId();
 
   const toggleWidget = useCallback(
@@ -78,18 +87,34 @@ export function WidgetSettings() {
     [setSettings, settings],
   );
 
-  const updateOpacity = useCallback(
-    async (value: number | readonly number[]) => {
-      const values = Array.isArray(value) ? value : [value];
-      const opacity = clampWidgetOpacity(values[0]);
-      const result = await setSettings({ widgetOpacity: opacity });
-      if (!result.success) {
-        return;
+  const toggleLock = useCallback(
+    async (checked: boolean) => {
+      try {
+        // Apply click-through to the widget window first so the saved state never claims a lock
+        // the window doesn't have
+        const result = await window.electronAPI?.widget.setLocked(checked);
+        if (result && !result.success) {
+          throw new Error(result.error ?? 'Failed to update widget lock state');
+        }
+        const saveResult = await setSettings(
+          { widgetLocked: checked },
+          {
+            // Re-applies the lock when the error toast's Retry saves the setting later
+            onSaved: async () => {
+              await window.electronAPI?.widget.setLocked(checked);
+            },
+          },
+        );
+        if (!saveResult.success) {
+          // The store already shows the save error; undo the window change so both agree
+          await window.electronAPI?.widget.setLocked(!checked);
+        }
+      } catch (error) {
+        console.error('Failed to update widget lock state:', error);
+        toast.error(t(translations.settings.widget.lockWidgetFailed));
       }
-      // Update widget opacity via IPC
-      await window.electronAPI?.widget.updateOpacity(opacity);
     },
-    [setSettings],
+    [setSettings, t],
   );
 
   const resetPosition = useCallback(async () => {
@@ -100,23 +125,13 @@ export function WidgetSettings() {
   }, [setSettings]);
 
   const widgetDisplay = settings.widgetDisplay || 'overall';
-  const widgetOpacity = clampWidgetOpacity(settings.widgetOpacity);
-  const widgetEnabled = settings.widgetEnabled ?? false;
-  const widgetRunOnlyShowItems = settings.widgetRunOnlyShowItems ?? true;
-
-  // The window size follows the mode the widget actually renders (split/all need ethereal tracking)
-  const effectiveDisplay = resolveWidgetDisplayMode(widgetDisplay, settings.grailEthereal);
+  const widgetLocked = settings.widgetLocked ?? false;
 
   const resetSize = useCallback(async () => {
     const result = await window.electronAPI?.widget.resetSize(effectiveDisplay);
     if (result?.success && result.size) {
-      // Clear the custom size for this display mode
-      const sizeKey =
-        `widgetSize${effectiveDisplay.charAt(0).toUpperCase()}${effectiveDisplay.slice(1)}` as
-          | 'widgetSizeOverall'
-          | 'widgetSizeSplit'
-          | 'widgetSizeAll';
-      await setSettings({ [sizeKey]: undefined });
+      // Store the default size the window was reset to for this display mode
+      await setSettings({ [getWidgetSizeSettingKey(effectiveDisplay)]: result.size });
     }
   }, [setSettings, effectiveDisplay]);
 
@@ -137,13 +152,6 @@ export function WidgetSettings() {
       console.error('Failed to switch the widget display mode:', error);
     });
   }, [settings.grailEthereal, widgetDisplay, updateDisplay]);
-
-  const toggleRunOnlyItems = useCallback(
-    async (checked: boolean) => {
-      await setSettings({ widgetRunOnlyShowItems: checked });
-    },
-    [setSettings],
-  );
 
   const displayModeOptions = useMemo<DisplayModeOption[]>(
     () => [
@@ -259,6 +267,25 @@ export function WidgetSettings() {
             />
           </div>
 
+          {/* Lock (click-through) Toggle */}
+          <div className="flex items-center justify-between">
+            <div>
+              <h4 id={lockLabelId} className="font-medium text-sm">
+                {t(translations.settings.widget.lockWidget)}
+              </h4>
+              <p id={lockDescriptionId} className="text-muted-foreground text-xs">
+                {t(translations.settings.widget.lockWidgetDescription)}
+              </p>
+            </div>
+            <Switch
+              checked={widgetLocked}
+              onCheckedChange={toggleLock}
+              disabled={!widgetEnabled}
+              aria-labelledby={lockLabelId}
+              aria-describedby={lockDescriptionId}
+            />
+          </div>
+
           {/* Opacity Slider */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
@@ -275,7 +302,8 @@ export function WidgetSettings() {
               max={MAX_WIDGET_OPACITY}
               step={0.05}
               value={[widgetOpacity]}
-              onValueChange={updateOpacity}
+              onValueChange={previewOpacity}
+              onValueCommitted={commitOpacity}
               disabled={!widgetEnabled}
               className="w-full"
             />
@@ -328,6 +356,10 @@ export function WidgetSettings() {
               <br />• {t(translations.settings.widget.featureSnap)}
               <br />• {t(translations.settings.widget.featureSizePersists)}
               <br />• {t(translations.settings.widget.featureRealtime)}
+              <br />
+              <br />
+              <strong>{t(translations.wizard.tip)}</strong>{' '}
+              {t(translations.settings.widget.fullscreenTip)}
             </p>
           </div>
         </div>

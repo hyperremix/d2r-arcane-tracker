@@ -30,6 +30,8 @@ import { initializeTerrorZoneHandlers } from './ipc-handlers/terrorZoneHandlers'
 import { initializeUpdateHandlers } from './ipc-handlers/updateHandlers';
 import { initializeWidgetHandlers } from './ipc-handlers/widgetHandlers';
 import type { Settings } from './types/grail';
+import type { WidgetDisplayMode, WidgetSize } from './utils/widgetDisplay';
+import { getWidgetSizeSettingKey } from './utils/widgetDisplay';
 import { isPositionOnScreen } from './utils/windowSnapping';
 import { getMainWindowThemeColors } from './window/mainWindowTheme';
 import { closeWidgetWindow, showWidgetWindow } from './window/widgetWindow';
@@ -302,10 +304,7 @@ app.whenReady().then(() => {
   // Debounce timer for widget size changes
   let widgetSizeChangeTimeout: NodeJS.Timeout | null = null;
 
-  const onWidgetSizeChange = (
-    display: 'overall' | 'split' | 'all' | 'run-only',
-    size: { width: number; height: number },
-  ) => {
+  const onWidgetSizeChange = (display: WidgetDisplayMode, size: WidgetSize) => {
     // Debounce widget size changes to avoid excessive database writes during resize
     if (widgetSizeChangeTimeout) {
       clearTimeout(widgetSizeChangeTimeout);
@@ -313,17 +312,7 @@ app.whenReady().then(() => {
 
     widgetSizeChangeTimeout = setTimeout(() => {
       try {
-        // 'run-only' mode doesn't have a custom size setting - it always uses the default
-        if (display === 'run-only') {
-          return;
-        }
-        // Convert display type to setting key format
-        const displayKey = display.charAt(0).toUpperCase() + display.slice(1);
-        const settingKey = `widgetSize${displayKey}` as
-          | 'widgetSizeOverall'
-          | 'widgetSizeSplit'
-          | 'widgetSizeAll';
-        grailDatabase.setSetting(settingKey, JSON.stringify(size));
+        grailDatabase.setSetting(getWidgetSizeSettingKey(display), JSON.stringify(size));
       } catch (error) {
         console.error('Failed to save widget size:', error);
       }
