@@ -12,26 +12,28 @@ vi.mock('@/stores/grailStore');
 const mockUseRunTrackerStore = vi.mocked(useRunTrackerStore);
 const mockUseGrailStore = vi.mocked(useGrailStore);
 
-// Mock document methods. Test files share one jsdom (isolate: false), so the originals are
-// restored after this file; otherwise later suites' document listeners would never fire.
-const originalAddEventListener = document.addEventListener;
-const originalRemoveEventListener = document.removeEventListener;
+// Mock document methods. Test files share one jsdom (isolate: false), so the mocks are removed
+// after this file to fall back to EventTarget.prototype; otherwise later suites' document
+// listeners would never fire. Don't vi.spyOn these: a later suite's vi.restoreAllMocks() would
+// re-create the mocked own properties.
 const mockAddEventListener = vi.fn();
 const mockRemoveEventListener = vi.fn();
 
 Object.defineProperty(document, 'addEventListener', {
   value: mockAddEventListener,
   writable: true,
+  configurable: true,
 });
 
 Object.defineProperty(document, 'removeEventListener', {
   value: mockRemoveEventListener,
   writable: true,
+  configurable: true,
 });
 
 afterAll(() => {
-  document.addEventListener = originalAddEventListener;
-  document.removeEventListener = originalRemoveEventListener;
+  Reflect.deleteProperty(document, 'addEventListener');
+  Reflect.deleteProperty(document, 'removeEventListener');
 });
 
 // Mock data
@@ -560,12 +562,6 @@ describe('SessionControls', () => {
   });
 
   describe('Keyboard Shortcuts', () => {
-    beforeEach(() => {
-      // Mock document.addEventListener and removeEventListener
-      vi.spyOn(document, 'addEventListener').mockImplementation(mockAddEventListener);
-      vi.spyOn(document, 'removeEventListener').mockImplementation(mockRemoveEventListener);
-    });
-
     it('sets up keyboard event listeners on mount', () => {
       mockUseRunTrackerStore.mockReturnValue(defaultStoreState);
 
