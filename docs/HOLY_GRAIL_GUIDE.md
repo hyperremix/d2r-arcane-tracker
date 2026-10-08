@@ -35,7 +35,9 @@ The setup wizard opens on first launch. You can run it again from **Settings →
 
 All of these can be changed later in **Settings**.
 
-> **Warning:** changing the monitored save folder deletes all characters and progress in the app. Back up first (**Settings → Database → Backup**).
+> **Warning:** switching the monitored save folder to a different folder deletes all characters and progress in the app. Back up first (**Settings → Database → Backup**).
+
+In **Settings → Save File Monitoring**, **Change Directory** opens a folder picker and **Restore Default** uses the platform default folder. If the chosen folder is the one already monitored, nothing changes and nothing is deleted. If it's a different folder and the app has characters or progress, a confirmation shows the current and new folder and offers **Back up first** before anything is deleted.
 
 ## Choosing what to track
 
