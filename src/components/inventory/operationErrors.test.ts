@@ -1,26 +1,23 @@
-import type { toast as sonnerToast } from 'sonner';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { toast } from 'sonner';
+import { afterEach, beforeEach, describe, expect, it, type MockInstance, vi } from 'vitest';
 import { translations } from '@/i18n/translations';
-import type { showInventoryOperationErrorToast as showToast } from './operationErrors';
-
-vi.mock('sonner', () => ({
-  toast: { error: vi.fn() },
-}));
+import { showInventoryOperationErrorToast } from './operationErrors';
 
 const messages = translations.inventoryBrowser.operationErrors;
 // Tags every translated key so the tests prove each message is passed through `t(...)`.
 const t = (key: string) => `t:${key}`;
 
-let toast: typeof sonnerToast;
-let showInventoryOperationErrorToast: typeof showToast;
+// Spy on the real toast instead of mocking 'sonner': test files share one module registry
+// (isolate: false), so a private sonner mock would leak into modules other suites load.
+let toastError: MockInstance<typeof toast.error>;
 
 describe('When showInventoryOperationErrorToast is called', () => {
-  beforeEach(async () => {
-    // Vitest runs with isolate: false, so re-import the module to bind it to this file's sonner mock.
-    vi.resetModules();
-    vi.clearAllMocks();
-    ({ toast } = await import('sonner'));
-    ({ showInventoryOperationErrorToast } = await import('./operationErrors'));
+  beforeEach(() => {
+    toastError = vi.spyOn(toast, 'error').mockImplementation(() => 'toast-id');
+  });
+
+  afterEach(() => {
+    toastError.mockRestore();
   });
 
   describe.each([
@@ -82,8 +79,8 @@ describe('When showInventoryOperationErrorToast is called', () => {
       showInventoryOperationErrorToast(error, translate);
 
       // Assert
-      expect(toast.error).toHaveBeenCalledTimes(1);
-      expect(toast.error).toHaveBeenCalledWith(`t:${expectedKey}`);
+      expect(toastError).toHaveBeenCalledTimes(1);
+      expect(toastError).toHaveBeenCalledWith(`t:${expectedKey}`);
       expect(translate).toHaveBeenCalledWith(expectedKey);
     });
   });
@@ -97,7 +94,7 @@ describe('When showInventoryOperationErrorToast is called', () => {
       showInventoryOperationErrorToast(error, t);
 
       // Assert
-      expect(toast.error).toHaveBeenCalledWith(`t:${messages.gameRunning}`);
+      expect(toastError).toHaveBeenCalledWith(`t:${messages.gameRunning}`);
     });
   });
 
@@ -110,7 +107,7 @@ describe('When showInventoryOperationErrorToast is called', () => {
       showInventoryOperationErrorToast(error, t);
 
       // Assert
-      expect(toast.error).toHaveBeenCalledWith(`t:${messages.failed}`);
+      expect(toastError).toHaveBeenCalledWith(`t:${messages.failed}`);
     });
   });
 });

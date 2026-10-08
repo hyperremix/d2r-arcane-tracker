@@ -1,26 +1,31 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { runes } from 'electron/items/runes';
 import type { Item } from 'electron/types/grail';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { toast } from 'sonner';
+import { afterEach, beforeEach, describe, expect, it, type MockInstance, vi } from 'vitest';
 import { serializeVaultTextPayload, VAULT_DRAG_MIME } from '@/components/inventory/dragPayloads';
 import { useGrailStore } from '@/stores/grailStore';
 import { CharacterInventoryBrowser } from './CharacterInventoryBrowser';
 
-const { toastErrorMock, toastInfoMock, toastSuccessMock, toastWarningMock } = vi.hoisted(() => ({
-  toastErrorMock: vi.fn(),
-  toastInfoMock: vi.fn(),
-  toastSuccessMock: vi.fn(),
-  toastWarningMock: vi.fn(),
-}));
+// Spy on the real toast instead of mocking 'sonner': test files share one module registry
+// (isolate: false), so a private sonner mock would leak into the grail store other suites use.
+let toastErrorMock: MockInstance<typeof toast.error>;
+let toastInfoMock: MockInstance<typeof toast.info>;
+let toastSuccessMock: MockInstance<typeof toast.success>;
+let toastWarningMock: MockInstance<typeof toast.warning>;
 
-vi.mock('sonner', () => ({
-  toast: {
-    error: toastErrorMock,
-    info: toastInfoMock,
-    success: toastSuccessMock,
-    warning: toastWarningMock,
-  },
-}));
+beforeEach(() => {
+  toastErrorMock = vi.spyOn(toast, 'error').mockImplementation(() => 'toast-id');
+  toastInfoMock = vi.spyOn(toast, 'info').mockImplementation(() => 'toast-id');
+  toastSuccessMock = vi.spyOn(toast, 'success').mockImplementation(() => 'toast-id');
+  toastWarningMock = vi.spyOn(toast, 'warning').mockImplementation(() => 'toast-id');
+});
+
+afterEach(() => {
+  for (const spy of [toastErrorMock, toastInfoMock, toastSuccessMock, toastWarningMock]) {
+    spy.mockRestore();
+  }
+});
 
 const searchAllMock = vi.fn();
 const moveInventoryItemMock = vi.fn();
