@@ -1,6 +1,6 @@
 import type { Settings } from 'electron/types/grail';
 import { Layers, RotateCcw } from 'lucide-react';
-import { useCallback, useEffect, useId, useMemo } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -57,10 +57,11 @@ export function WidgetSettings() {
     async (display: WidgetDisplayMode) => {
       const result = await setSettings({ widgetDisplay: display });
       if (!result.success) {
-        return;
+        return false;
       }
       // Update widget display mode via IPC
       await window.electronAPI?.widget.updateDisplay(display, settings);
+      return true;
     },
     [setSettings, settings],
   );
@@ -107,11 +108,29 @@ export function WidgetSettings() {
     }
   }, [setSettings, effectiveDisplay]);
 
+  // Display mode whose auto-switch to 'overall' failed to save. A failed save is reverted, which
+  // changes `settings` (and so `updateDisplay`) and would otherwise re-run the effect below
+  // forever. It is cleared once the switch succeeds or ethereal tracking is enabled again.
+  const failedAutoSwitchRef = useRef<WidgetDisplayMode | undefined>(undefined);
+
   // Auto-switch to 'overall' mode if ethereal tracking is disabled and user is in split/all mode
   useEffect(() => {
-    if (!settings.grailEthereal && (widgetDisplay === 'split' || widgetDisplay === 'all')) {
-      updateDisplay('overall');
+    if (settings.grailEthereal) {
+      failedAutoSwitchRef.current = undefined;
+      return;
     }
+    if (widgetDisplay !== 'split' && widgetDisplay !== 'all') {
+      return;
+    }
+    if (failedAutoSwitchRef.current === widgetDisplay) {
+      return;
+    }
+    failedAutoSwitchRef.current = widgetDisplay;
+    updateDisplay('overall').then((switched) => {
+      if (switched) {
+        failedAutoSwitchRef.current = undefined;
+      }
+    });
   }, [settings.grailEthereal, widgetDisplay, updateDisplay]);
 
   const toggleRunOnlyItems = useCallback(

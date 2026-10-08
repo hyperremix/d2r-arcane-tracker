@@ -10,10 +10,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { useWizardSettingsSave, WizardSaveError } from '@/components/wizard/wizardSettingsSave';
 import { translations } from '@/i18n/translations';
 import { themeLabelKeys } from '@/lib/labelKeys';
 import { useGrailStore } from '@/stores/grailStore';
-import { useWizardSettingsSave, WizardSaveError } from '../wizardSettingsSave';
 
 /**
  * A selectable theme with its icon; labels come from the shared theme label keys.

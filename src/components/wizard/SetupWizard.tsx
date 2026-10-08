@@ -16,6 +16,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Progress } from '@/components/ui/progress';
+import { WizardSaveError } from '@/components/wizard/wizardSettingsSave';
 import { translations } from '@/i18n/translations';
 import { useGrailStore } from '@/stores/grailStore';
 import { useWizardStore } from '@/stores/wizardStore';
@@ -222,11 +223,10 @@ export function SetupWizard() {
           </p>
         )}
 
-        {saveFailed && (
-          <p role="alert" className="text-destructive text-sm">
-            {t(translations.wizard.saveError)}
-          </p>
-        )}
+        {/* Wizard-level failure (Skip Setup / Finish). A step shows its own inline alert for its
+            settings, so both can only appear together when Skip Setup fails while a step's save
+            failure is still displayed; each then reports a distinct failed save. */}
+        <WizardSaveError visible={saveFailed} />
 
         {/* Navigation Buttons */}
         <div className="flex items-center justify-between border-t pt-4">

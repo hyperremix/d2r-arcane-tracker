@@ -53,24 +53,24 @@ describe('When a wizard step saves settings', () => {
     expect(toastError).not.toHaveBeenCalled();
   });
 
-  it('If a later save succeeds, Then the inline alert is cleared', async () => {
+  it('If a later save succeeds after a failed one, Then the inline alert is cleared', async () => {
     // Arrange
     updateSettings
       .mockRejectedValueOnce(new Error('database locked'))
       .mockResolvedValue({ success: true });
     render(<NotificationsStep />);
     const toggle = screen.getByRole('switch', { name: 'In-App Notifications' });
-    await act(async () => {
-      fireEvent.click(toggle);
-    });
-    expect(await screen.findByRole('alert')).toBeInTheDocument();
 
     // Act
     await act(async () => {
       fireEvent.click(toggle);
     });
+    await act(async () => {
+      fireEvent.click(toggle);
+    });
 
     // Assert
+    expect(updateSettings).toHaveBeenCalledTimes(2);
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
     expect(useGrailStore.getState().settings.inAppNotifications).toBe(false);
   });

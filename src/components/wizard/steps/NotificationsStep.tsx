@@ -4,9 +4,9 @@ import { useTranslation } from 'react-i18next';
 import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
+import { useWizardSettingsSave, WizardSaveError } from '@/components/wizard/wizardSettingsSave';
 import { translations } from '@/i18n/translations';
 import { useGrailStore } from '@/stores/grailStore';
-import { useWizardSettingsSave, WizardSaveError } from '../wizardSettingsSave';
 
 /**
  * NotificationsStep component - Notifications section of the wizard Preferences step.

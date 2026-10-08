@@ -6,6 +6,12 @@ import { useWizardStore } from '@/stores/wizardStore';
 import { SetupWizard, wizardSteps } from './SetupWizard';
 
 vi.mock('@/stores/grailStore');
+// Stubbed for the same reason: the real module imports grailStore and would be cached bound to
+// this file's mock for wizardSettingsSave.test.tsx (the real component is covered there).
+vi.mock('@/components/wizard/wizardSettingsSave', () => ({
+  WizardSaveError: ({ visible }: { visible: boolean }) =>
+    visible ? <p role="alert">Your setup could not be saved. Please try again.</p> : null,
+}));
 vi.mock('./steps/WelcomeStep', () => ({ WelcomeStep: () => <div>WelcomeContent</div> }));
 // Stubbed so this file's grailStore mock isn't baked into the shared module cache
 // (vitest runs with isolate: false) that SaveDirectoryStep.test.tsx also relies on.
@@ -282,7 +288,7 @@ describe('When SetupWizard is open', () => {
       await waitFor(() => expect(useWizardStore.getState().isOpen).toBe(false));
     });
 
-    it('Then a failed save keeps the wizard open with an error that clears on a successful retry', async () => {
+    it('Then a failed save keeps the wizard open with an error', async () => {
       // Arrange
       setSettings.mockResolvedValueOnce({ success: false, error: new Error('disk full') });
       render(<SetupWizard />);
@@ -298,15 +304,29 @@ describe('When SetupWizard is open', () => {
         'Your setup could not be saved. Please try again.',
       );
       expect(useWizardStore.getState().isOpen).toBe(true);
+    });
+
+    it('If Finish is clicked again after a failed save, Then the wizard closes and the error is gone', async () => {
+      // Arrange
+      setSettings
+        .mockResolvedValueOnce({ success: false, error: new Error('disk full') })
+        .mockResolvedValue({ success: true });
+      render(<SetupWizard />);
+      const wizard = await screen.findByRole('dialog');
+      const finish = within(wizard).getByRole('button', { name: 'Finish' });
 
       // Act
       await act(async () => {
-        fireEvent.click(within(wizard).getByRole('button', { name: 'Finish' }));
+        fireEvent.click(finish);
+      });
+      await act(async () => {
+        fireEvent.click(finish);
       });
 
       // Assert
       await waitFor(() => expect(useWizardStore.getState().isOpen).toBe(false));
       expect(setSettings).toHaveBeenCalledTimes(2);
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
     });
   });
 

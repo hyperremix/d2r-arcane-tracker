@@ -206,7 +206,8 @@ let lastWriteToken = 0;
 /**
  * Keys whose failed save was reverted and offered for Retry on the shared error toast, with
  * the value the failed save attempted. A key is dropped as soon as it is written or hydrated
- * again, so a stale Retry can never overwrite a newer value.
+ * again, so a stale Retry can never overwrite a newer value, and the whole map is dropped when
+ * the toast closes, so an abandoned change is never re-applied by a later failure's Retry.
  */
 const revertedSettings = new Map<keyof Settings, Settings[keyof Settings]>();
 
@@ -318,18 +319,30 @@ const notifySettingsSaveFailed = (
   for (const key of Object.keys(reverted) as Array<keyof Settings>) {
     revertedSettings.set(key, attempted[key]);
   }
-  toast.error(i18n.t(translations.settings.saveError.title), {
-    id: SETTINGS_SAVE_ERROR_TOAST_ID,
-    description: i18n.t(translations.settings.saveError.description),
-    action: {
-      label: i18n.t(translations.common.retry),
-      onClick: () => {
-        if (revertedSettings.size > 0) {
-          void save(Object.fromEntries(revertedSettings) as Partial<Settings>);
-        }
+  // Once the toast closes (timeout or dismiss) its Retry is gone, so the abandoned changes must
+  // not be re-applied by the Retry of a later, unrelated failure
+  const forgetAbandonedRetry = (): void => {
+    revertedSettings.clear();
+  };
+  // Reporting is best effort: a failing toast or translation must not make setSettings reject
+  try {
+    toast.error(i18n.t(translations.settings.saveError.title), {
+      id: SETTINGS_SAVE_ERROR_TOAST_ID,
+      description: i18n.t(translations.settings.saveError.description),
+      action: {
+        label: i18n.t(translations.common.retry),
+        onClick: () => {
+          if (revertedSettings.size > 0) {
+            void save(Object.fromEntries(revertedSettings) as Partial<Settings>);
+          }
+        },
       },
-    },
-  });
+      onDismiss: forgetAbandonedRetry,
+      onAutoClose: forgetAbandonedRetry,
+    });
+  } catch (error) {
+    console.error('Failed to show the settings save error notification:', error);
+  }
 };
 
 /**

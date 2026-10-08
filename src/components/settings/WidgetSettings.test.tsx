@@ -1,7 +1,8 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import i18n from 'i18next';
+import { toast } from 'sonner';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { useGrailStore } from '@/stores/grailStore';
+import { resetSettingsWriteTracking, useGrailStore } from '@/stores/grailStore';
 import { WidgetSettings } from './WidgetSettings';
 
 describe('WidgetSettings', () => {
@@ -112,6 +113,91 @@ describe('WidgetSettings', () => {
     // Assert
     expect(resetSize).toHaveBeenCalledTimes(1);
     expect(resetSize).toHaveBeenCalledWith('overall');
+  });
+
+  describe('If split is stored while ethereal tracking is off and saving keeps failing', () => {
+    const updateSettingsFailures: readonly [string, () => Promise<unknown>][] = [
+      ['rejects', () => Promise.reject(new Error('database locked'))],
+      ['reports success: false', () => Promise.resolve({ success: false })],
+    ];
+
+    const spies: Array<{ mockRestore: () => void }> = [];
+
+    beforeEach(() => {
+      spies.push(
+        vi.spyOn(console, 'error').mockImplementation(() => undefined),
+        vi.spyOn(toast, 'error').mockImplementation(() => 'toast-id'),
+      );
+      resetSettingsWriteTracking();
+      useGrailStore.setState((state) => ({
+        settings: { ...state.settings, widgetDisplay: 'split', grailEthereal: false },
+      }));
+    });
+
+    afterEach(() => {
+      // Restore only these spies: restoreAllMocks would also reset sibling suites' vi.fn mocks
+      for (const spy of spies.splice(0)) {
+        spy.mockRestore();
+      }
+      resetSettingsWriteTracking();
+    });
+
+    it.each(updateSettingsFailures)(
+      'When updateSettings %s, Then the auto-switch to overall is attempted once and the component settles',
+      async (_name, failUpdateSettings) => {
+        // Arrange
+        const updateSettings = vi.fn(failUpdateSettings);
+        const updateDisplay = vi.fn().mockResolvedValue({ success: true });
+        Object.defineProperty(window, 'electronAPI', {
+          value: { grail: { updateSettings }, widget: { updateDisplay } },
+          configurable: true,
+          writable: true,
+        });
+
+        // Act
+        render(<WidgetSettings />);
+        for (let tick = 0; tick < 10; tick += 1) {
+          await act(async () => {
+            await Promise.resolve();
+          });
+        }
+
+        // Assert
+        expect(updateSettings).toHaveBeenCalledTimes(1);
+        expect(updateSettings).toHaveBeenCalledWith({ widgetDisplay: 'overall' });
+        expect(updateDisplay).not.toHaveBeenCalled();
+        expect(useGrailStore.getState().settings.widgetDisplay).toBe('split');
+      },
+    );
+
+    it('If a failed auto-switch is followed by ethereal tracking being enabled and disabled again, Then the auto-switch is attempted again', async () => {
+      // Arrange
+      const updateSettings = vi.fn().mockRejectedValue(new Error('database locked'));
+      Object.defineProperty(window, 'electronAPI', {
+        value: { grail: { updateSettings }, widget: { updateDisplay: vi.fn() } },
+        configurable: true,
+        writable: true,
+      });
+      render(<WidgetSettings />);
+      await act(async () => {
+        await Promise.resolve();
+      });
+      expect(updateSettings).toHaveBeenCalledTimes(1);
+
+      // Act
+      act(() => {
+        useGrailStore.getState().hydrateSettings({ grailEthereal: true });
+      });
+      act(() => {
+        useGrailStore.getState().hydrateSettings({ grailEthereal: false });
+      });
+      await act(async () => {
+        await Promise.resolve();
+      });
+
+      // Assert
+      expect(updateSettings).toHaveBeenCalledTimes(2);
+    });
   });
 
   describe('When the widget is enabled with ethereal tracking', () => {

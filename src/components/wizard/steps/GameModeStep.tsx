@@ -10,10 +10,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { useWizardSettingsSave, WizardSaveError } from '@/components/wizard/wizardSettingsSave';
 import { translations } from '@/i18n/translations';
 import { gameModeDescriptionKeys, gameModeLabelKeys } from '@/lib/labelKeys';
 import { useGrailStore } from '@/stores/grailStore';
-import { useWizardSettingsSave, WizardSaveError } from '../wizardSettingsSave';
 
 /**
  * A selectable game mode with its label/description translation keys and icon.

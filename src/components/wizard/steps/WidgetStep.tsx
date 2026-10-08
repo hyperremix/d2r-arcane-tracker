@@ -5,10 +5,10 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
+import { useWizardSettingsSave, WizardSaveError } from '@/components/wizard/wizardSettingsSave';
 import { translations } from '@/i18n/translations';
 import { clampWidgetOpacity, MAX_WIDGET_OPACITY, MIN_WIDGET_OPACITY } from '@/lib/widget';
 import { useGrailStore } from '@/stores/grailStore';
-import { useWizardSettingsSave, WizardSaveError } from '../wizardSettingsSave';
 
 /**
  * WidgetStep component - Overlay widget section of the wizard Preferences step.

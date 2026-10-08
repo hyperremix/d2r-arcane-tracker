@@ -669,6 +669,59 @@ describe('When useGrailStore is used', () => {
       expect(useGrailStore.getState().settings.theme).toBe('light');
     });
 
+    it.each(['onDismiss', 'onAutoClose'] as const)(
+      'If the error toast closes via %s, Then a later unrelated failure Retry does not re-apply the abandoned change',
+      async (closeCallback) => {
+        // Arrange
+        const toastError = vi.spyOn(toast, 'error');
+        mockElectronAPI.grail.updateSettings
+          .mockRejectedValueOnce(new Error('database locked'))
+          .mockRejectedValueOnce(new Error('database locked'))
+          .mockResolvedValue({ success: true });
+        await act(async () => {
+          await useGrailStore.getState().setSettings({ theme: 'dark' });
+        });
+        const firstOptions = toastError.mock.calls[0]?.[1] as
+          | Record<string, (() => void) | undefined>
+          | undefined;
+        firstOptions?.[closeCallback]?.();
+        await act(async () => {
+          await useGrailStore.getState().setSettings({ showItemIcons: true });
+        });
+        const retry = retryActionOf(toastError, 1);
+
+        // Act
+        await act(async () => {
+          retry();
+        });
+
+        // Assert
+        expect(mockElectronAPI.grail.updateSettings).toHaveBeenLastCalledWith({
+          showItemIcons: true,
+        });
+        expect(useGrailStore.getState().settings.theme).toBe('system');
+        expect(useGrailStore.getState().settings.showItemIcons).toBe(true);
+      },
+    );
+
+    it('If showing the error toast throws, Then setSettings still resolves with the failure and the change stays reverted', async () => {
+      // Arrange
+      vi.spyOn(toast, 'error').mockImplementation(() => {
+        throw new Error('toaster unavailable');
+      });
+      mockElectronAPI.grail.updateSettings.mockRejectedValue(new Error('database locked'));
+
+      // Act
+      let result: SettingsSaveResult | undefined;
+      await act(async () => {
+        result = await useGrailStore.getState().setSettings({ theme: 'dark' });
+      });
+
+      // Assert
+      expect(result?.success).toBe(false);
+      expect(useGrailStore.getState().settings.theme).toBe('system');
+    });
+
     it('If settings are hydrated while a save of the same key is in flight and a later save fails, Then the key returns to the hydrated value', async () => {
       // Arrange
       vi.spyOn(toast, 'error');

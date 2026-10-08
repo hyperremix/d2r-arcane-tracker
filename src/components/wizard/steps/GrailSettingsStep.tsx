@@ -3,9 +3,9 @@ import { useId } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
+import { useWizardSettingsSave, WizardSaveError } from '@/components/wizard/wizardSettingsSave';
 import { translations } from '@/i18n/translations';
 import { useGrailStore } from '@/stores/grailStore';
-import { useWizardSettingsSave, WizardSaveError } from '../wizardSettingsSave';
 
 /**
  * GrailSettingsStep component - Step for configuring Holy Grail tracking options.
@@ -107,9 +107,9 @@ export function GrailSettingsStep() {
           </div>
         </div>
 
-        {/* Information Box */}
         <WizardSaveError visible={saveFailed} />
 
+        {/* Information Box */}
         <div className="rounded-lg bg-info/10 p-4">
           <p className="text-info text-sm">
             <strong>{t(translations.wizard.tip)}</strong> {t(translations.wizard.grail.tip)}
