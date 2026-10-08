@@ -117,9 +117,10 @@ export const ItemGrid = memo(function ItemGrid() {
   // Create a lookup map for progress data including both normal and ethereal versions
   const progressLookup = useProgressLookup(displayItems, progress, settings);
 
-  // Reset group mode to 'none' if ethereal grouping is selected but ethereal items are enabled
+  // Reset group mode to 'none' if ethereal grouping is selected but ethereal tracking is disabled,
+  // since the "By Ethereal" option is only offered while ethereal tracking is enabled
   useEffect(() => {
-    if (groupMode === 'ethereal' && settings.grailEthereal) {
+    if (groupMode === 'ethereal' && !settings.grailEthereal) {
       setGroupMode('none');
     }
   }, [groupMode, settings.grailEthereal, setGroupMode]);
