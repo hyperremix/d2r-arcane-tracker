@@ -34,7 +34,7 @@ export function D2RInstallationStep() {
   const d2rPathInputId = useId();
   const pathHintId = useId();
   const validationId = useId();
-  const { settings, setSettings } = useGrailStore();
+  const { settings, hydrateSettings } = useGrailStore();
 
   const [d2rPath, setD2rPath] = useState<string>(settings.d2rInstallPath || '');
   const [hasLoaded, setHasLoaded] = useState(false);
@@ -75,19 +75,18 @@ export function D2RInstallationStep() {
   }, [applyValidation]);
 
   /**
-   * Saves the path to the main process and settings.
+   * Saves the path via the main process, which persists it, and mirrors it into the store.
    * @returns {Promise<boolean>} Whether the path was saved
    */
   const savePath = useCallback(
     async (trimmedPath: string, requestId: number): Promise<boolean> => {
       savingPathRef.current = trimmedPath;
       try {
+        // The main process persists the path to the database and updates the icon service,
+        // so the store is only hydrated afterwards. A second save could fail after the path
+        // is already persisted and would leave the store, service and database disagreeing.
         await window.electronAPI?.icon.setD2RPath(trimmedPath);
-        // This step shows its own inline error, so the store's toast is suppressed
-        const result = await setSettings({ d2rInstallPath: trimmedPath }, { notifyOnError: false });
-        if (!result.success) {
-          throw result.error;
-        }
+        hydrateSettings({ d2rInstallPath: trimmedPath });
         savedPathRef.current = trimmedPath;
         return true;
       } catch (error) {
@@ -103,7 +102,7 @@ export function D2RInstallationStep() {
         }
       }
     },
-    [applyValidation, setSettings],
+    [applyValidation, hydrateSettings],
   );
 
   const persistPath = useCallback(

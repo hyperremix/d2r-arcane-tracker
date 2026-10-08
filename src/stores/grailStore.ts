@@ -179,23 +179,81 @@ const GRAIL_FILTER_SETTING_KEYS: ReadonlyArray<keyof Settings> = [
 const SETTINGS_SAVE_ERROR_TOAST_ID = 'settings-save-error';
 
 /**
- * Builds the rollback for a failed settings update. Only keys that still hold the optimistic
- * value are reverted, so a newer update to the same key made while the save was in flight
- * is never clobbered.
- * @param {Settings} currentSettings - The settings as they are now
- * @param {Settings} previousSettings - The settings before the failed update was applied
- * @param {Partial<Settings>} settingsUpdate - The update that failed to persist
- * @returns {Partial<Settings>} The previous values of the keys that should be reverted
+ * Bookkeeping for the saves of a single settings key that are currently in flight.
  */
-const buildSettingsRollback = (
+interface SettingKeyWrites {
+  /** Token of the most recently started save for this key; it owns the optimistic value. */
+  latestToken: number;
+  /** Number of saves for this key that have not settled yet. */
+  inFlight: number;
+  /** Last value known to be persisted, which a failed latest save rolls back to. */
+  persisted: Settings[keyof Settings];
+}
+
+const settingKeyWrites = new Map<keyof Settings, SettingKeyWrites>();
+let lastWriteToken = 0;
+
+/**
+ * Registers a settings save as in flight. Must run before the optimistic update is applied so
+ * the value being replaced can be remembered as the last persisted one.
+ * @param {Settings} currentSettings - The settings before the optimistic update
+ * @param {Partial<Settings>} settingsUpdate - The update about to be saved
+ * @returns {number} Token identifying this save
+ */
+const beginSettingsWrite = (
   currentSettings: Settings,
-  previousSettings: Settings,
   settingsUpdate: Partial<Settings>,
+): number => {
+  lastWriteToken += 1;
+  for (const key of Object.keys(settingsUpdate) as Array<keyof Settings>) {
+    const entry = settingKeyWrites.get(key) ?? {
+      latestToken: lastWriteToken,
+      inFlight: 0,
+      persisted: currentSettings[key],
+    };
+    entry.latestToken = lastWriteToken;
+    entry.inFlight += 1;
+    settingKeyWrites.set(key, entry);
+  }
+  return lastWriteToken;
+};
+
+/**
+ * Settles an in-flight settings save and, on failure, builds the rollback. Writes are tracked
+ * per key so a failure only reverts keys this save still owns: if a newer save for the same key
+ * started in the meantime, that save owns the value (and reverts to the last persisted value
+ * itself if it fails too), regardless of whether the values happen to be equal. Keys whose
+ * value was changed by something else since are left alone.
+ * @param {number} token - Token returned by `beginSettingsWrite`
+ * @param {Settings} currentSettings - The settings as they are now
+ * @param {Partial<Settings>} settingsUpdate - The update that was saved
+ * @param {boolean} succeeded - Whether the save was persisted
+ * @returns {Partial<Settings>} The persisted values of the keys that should be reverted
+ */
+const settleSettingsWrite = (
+  token: number,
+  currentSettings: Settings,
+  settingsUpdate: Partial<Settings>,
+  succeeded: boolean,
 ): Partial<Settings> => {
   const rollback: Partial<Settings> = {};
   for (const key of Object.keys(settingsUpdate) as Array<keyof Settings>) {
-    if (Object.is(currentSettings[key], settingsUpdate[key])) {
-      Object.assign(rollback, { [key]: previousSettings[key] });
+    const entry = settingKeyWrites.get(key);
+    if (!entry) {
+      continue;
+    }
+    if (succeeded) {
+      // Saves are handled in order by the main process, so the latest settled save wins
+      entry.persisted = settingsUpdate[key];
+    } else if (
+      entry.latestToken === token &&
+      Object.is(currentSettings[key], settingsUpdate[key])
+    ) {
+      Object.assign(rollback, { [key]: entry.persisted });
+    }
+    entry.inFlight -= 1;
+    if (entry.inFlight <= 0) {
+      settingKeyWrites.delete(key);
     }
   }
   return rollback;
@@ -285,7 +343,7 @@ export const useGrailStore = create<GrailState>((set, get) => ({
   setProgress: (progress) => set({ progress }),
   setStatistics: (statistics) => set({ statistics }),
   setSettings: async (settingsUpdate, options) => {
-    const previousSettings = get().settings;
+    const writeToken = beginSettingsWrite(get().settings, settingsUpdate);
 
     // Update local state optimistically
     set((state) => withSettingsUpdate(state, settingsUpdate));
@@ -299,7 +357,7 @@ export const useGrailStore = create<GrailState>((set, get) => ({
     } catch (error) {
       console.error('Failed to update settings:', error);
 
-      const rollback = buildSettingsRollback(get().settings, previousSettings, settingsUpdate);
+      const rollback = settleSettingsWrite(writeToken, get().settings, settingsUpdate, false);
       const revertedKeys = Object.keys(rollback) as Array<keyof Settings>;
       // Nothing to revert or report if every key was already superseded by a newer update
       if (revertedKeys.length > 0) {
@@ -312,6 +370,7 @@ export const useGrailStore = create<GrailState>((set, get) => ({
 
       return { success: false, error };
     }
+    settleSettingsWrite(writeToken, get().settings, settingsUpdate, true);
 
     // The setting is saved at this point; a failed reload only leaves stale item data and
     // must not roll the setting back.

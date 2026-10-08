@@ -472,6 +472,84 @@ describe('When useGrailStore is used', () => {
       expect(useGrailStore.getState().settings.theme).toBe('light');
     });
 
+    /**
+     * Queues a pending updateSettings call that the test settles manually.
+     */
+    const queueDeferredSave = () => {
+      const deferred: {
+        resolve: (value: { success: boolean }) => void;
+        reject: (error: Error) => void;
+      } = { resolve: () => undefined, reject: () => undefined };
+      mockElectronAPI.grail.updateSettings.mockImplementationOnce(
+        () =>
+          new Promise((resolve, reject) => {
+            deferred.resolve = resolve;
+            deferred.reject = reject;
+          }),
+      );
+      return deferred;
+    };
+
+    it('If two overlapping saves of the same key both fail, Then the key returns to the last persisted value', async () => {
+      // Arrange
+      vi.spyOn(toast, 'error');
+      const firstSave = queueDeferredSave();
+      const secondSave = queueDeferredSave();
+
+      // Act
+      await act(async () => {
+        const first = useGrailStore.getState().setSettings({ theme: 'dark' });
+        const second = useGrailStore.getState().setSettings({ theme: 'light' });
+        firstSave.reject(new Error('database locked'));
+        await first;
+        secondSave.reject(new Error('database locked'));
+        await second;
+      });
+
+      // Assert
+      expect(useGrailStore.getState().settings.theme).toBe('system');
+    });
+
+    it('If an older save of a value fails while a newer save of the same value succeeds, Then the value is kept', async () => {
+      // Arrange
+      vi.spyOn(toast, 'error');
+      const firstSave = queueDeferredSave();
+      const secondSave = queueDeferredSave();
+
+      // Act
+      await act(async () => {
+        const first = useGrailStore.getState().setSettings({ theme: 'dark' });
+        const second = useGrailStore.getState().setSettings({ theme: 'dark' });
+        firstSave.reject(new Error('database locked'));
+        await first;
+        secondSave.resolve({ success: true });
+        await second;
+      });
+
+      // Assert
+      expect(useGrailStore.getState().settings.theme).toBe('dark');
+    });
+
+    it('If an older save succeeds and the newer save of the same key fails, Then the key returns to the older saved value', async () => {
+      // Arrange
+      vi.spyOn(toast, 'error');
+      const firstSave = queueDeferredSave();
+      const secondSave = queueDeferredSave();
+
+      // Act
+      await act(async () => {
+        const first = useGrailStore.getState().setSettings({ theme: 'dark' });
+        const second = useGrailStore.getState().setSettings({ theme: 'light' });
+        firstSave.resolve({ success: true });
+        await first;
+        secondSave.reject(new Error('database locked'));
+        await second;
+      });
+
+      // Assert
+      expect(useGrailStore.getState().settings.theme).toBe('dark');
+    });
+
     it('If the caller disables error notifications, Then a failed save is reverted without a toast', async () => {
       // Arrange
       const toastError = vi.spyOn(toast, 'error');

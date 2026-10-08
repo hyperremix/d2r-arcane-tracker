@@ -86,7 +86,8 @@ describe('D2RInstallationStep', () => {
 
     // Assert
     expect(api.icon.setD2RPath).toHaveBeenCalledWith(SUGGESTED_PATH);
-    expect(api.grail.updateSettings).toHaveBeenCalledWith({ d2rInstallPath: SUGGESTED_PATH });
+    expect(useGrailStore.getState().settings.d2rInstallPath).toBe(SUGGESTED_PATH);
+    expect(api.grail.updateSettings).not.toHaveBeenCalled();
     expect(api.icon.validatePath).toHaveBeenCalled();
     expect(screen.getByLabelText('Installation Path')).toHaveValue(SUGGESTED_PATH);
     expect(await screen.findByText('Game files found at this location')).toBeInTheDocument();
@@ -309,11 +310,10 @@ describe('D2RInstallationStep', () => {
     expect(api.icon.setD2RPath).not.toHaveBeenCalled();
   });
 
-  it('If persisting the path setting fails, Then only the inline save error is shown and the path is reverted', async () => {
+  it('When the icon IPC persists the path, Then the store is hydrated without a second save that could fail', async () => {
     // Arrange
     const api = createElectronApiMock(null);
     api.grail.updateSettings.mockRejectedValue(new Error('database locked'));
-    consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     const toastError = vi.spyOn(toast, 'error');
     installElectronApi(api);
     render(<D2RInstallationStep />);
@@ -327,11 +327,13 @@ describe('D2RInstallationStep', () => {
     });
 
     // Assert
+    expect(api.icon.setD2RPath).toHaveBeenCalledWith('D:\\D2R');
+    expect(api.grail.updateSettings).not.toHaveBeenCalled();
+    expect(useGrailStore.getState().settings.d2rInstallPath).toBe('D:\\D2R');
+    expect(api.icon.validatePath).toHaveBeenCalledTimes(1);
     expect(
-      await screen.findByText('Could not save the installation path. Please try again.'),
-    ).toBeInTheDocument();
-    expect(useGrailStore.getState().settings.d2rInstallPath).toBeUndefined();
-    expect(api.icon.validatePath).not.toHaveBeenCalled();
+      screen.queryByText('Could not save the installation path. Please try again.'),
+    ).not.toBeInTheDocument();
     expect(toastError).not.toHaveBeenCalled();
     toastError.mockRestore();
   });
@@ -359,6 +361,7 @@ describe('D2RInstallationStep', () => {
     expect(message.closest('[aria-live="polite"]')).not.toBeNull();
     expect(input).toHaveAttribute('aria-invalid', 'true');
     expect(api.icon.validatePath).not.toHaveBeenCalled();
+    expect(useGrailStore.getState().settings.d2rInstallPath).toBeUndefined();
     expect(screen.queryByText('Checking installation path...')).not.toBeInTheDocument();
     expect(screen.queryByText('Game files found at this location')).not.toBeInTheDocument();
     expect(
