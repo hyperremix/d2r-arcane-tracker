@@ -92,7 +92,7 @@ The main screen lists every grail item with its found status. The search and fil
 
 - Search by name, with optional fuzzy matching.
 - Filter by status (all, found, missing), category (weapons, armor, jewelry, charms) and type (unique, set, rune, runeword).
-- Group by category, type or ethereal status (available when ethereal tracking is on), and switch between grid and list views.
+- Group by category, type or ethereal status (available when ethereal tracking is on), and switch between grid and list views. In the grid, each group has a header with its found count, followed by its items in rows that read left to right and wrap to the next row, using the same number of columns as the ungrouped grid.
 - Sort by name, category, type or found date.
 
 As in the game, an item's name color shows its quality: gold for uniques, green for sets, orange for runes and purple for runewords. Found items have a solid frame in that color. Missing items have a dashed frame and grayed-out artwork.

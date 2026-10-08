@@ -2,7 +2,7 @@ import { runes } from 'electron/items/runes';
 import { X } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { translations } from '@/i18n/translations';
 import type { RunewordCompletionStatus } from '@/lib/runeword-utils';
 import { cn } from '@/lib/utils';
@@ -121,33 +121,31 @@ export function RuneImages({
   };
 
   return (
-    <TooltipProvider>
-      <div
-        className={cn(
-          'grid gap-1',
-          viewMode === 'grid' && 'grid-cols-3',
-          viewMode === 'list' && getListGridCols(runeIds.length),
-          className,
-        )}
-      >
-        {runeIds.map((runeId, index) => {
-          return (
-            <RuneImage
-              key={`${runeId}-${
-                // biome-ignore lint/suspicious/noArrayIndexKey: Using index is necessary here to handle duplicate runes
-                index
-              }`}
-              imageUrl={runeImages.get(runeId)}
-              runeName={getRuneName(runeId)}
-              isLoading={isLoading}
-              showRuneName={showRuneNames}
-              isMissing={missingRuneIndices.has(index)}
-              focusableTriggers={focusableTriggers}
-            />
-          );
-        })}
-      </div>
-    </TooltipProvider>
+    <div
+      className={cn(
+        'grid gap-1',
+        viewMode === 'grid' && 'grid-cols-3',
+        viewMode === 'list' && getListGridCols(runeIds.length),
+        className,
+      )}
+    >
+      {runeIds.map((runeId, index) => {
+        return (
+          <RuneImage
+            key={`${runeId}-${
+              // biome-ignore lint/suspicious/noArrayIndexKey: Using index is necessary here to handle duplicate runes
+              index
+            }`}
+            imageUrl={runeImages.get(runeId)}
+            runeName={getRuneName(runeId)}
+            isLoading={isLoading}
+            showRuneName={showRuneNames}
+            isMissing={missingRuneIndices.has(index)}
+            focusableTriggers={focusableTriggers}
+          />
+        );
+      })}
+    </div>
   );
 }
 

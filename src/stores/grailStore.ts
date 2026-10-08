@@ -887,7 +887,11 @@ const sortItems = (
  * @returns {Item[]} Array of filtered and sorted Holy Grail items
  */
 export const useFilteredItems = () => {
-  const { items, progress, filter, advancedFilter } = useGrailStore();
+  // Individual selectors so the item grid only re-renders when these slices change
+  const items = useGrailStore((state) => state.items);
+  const progress = useGrailStore((state) => state.progress);
+  const filter = useGrailStore((state) => state.filter);
+  const advancedFilter = useGrailStore((state) => state.advancedFilter);
 
   return useMemo(() => {
     // Build lookup maps once for O(1) access during filtering and sorting
@@ -1202,7 +1206,11 @@ function calculateTypeStats(items: Item[], foundProgress: GrailProgress[], setti
  * @returns {Object} Comprehensive statistics object with multiple data points
  */
 export const useGrailStatistics = () => {
-  const { items, progress, characters, settings } = useGrailStore();
+  // Individual selectors so consumers only re-render when these slices change
+  const items = useGrailStore((state) => state.items);
+  const progress = useGrailStore((state) => state.progress);
+  const characters = useGrailStore((state) => state.characters);
+  const settings = useGrailStore((state) => state.settings);
 
   // Note: items are filtered based on grail settings (grailNormal, grailEthereal, grailRunes, grailRunewords)
   // at the database level. Progress contains ALL progress data, but statistics calculations only consider
