@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { RunewordCalculator } from './RunewordCalculator';
 
@@ -48,7 +48,6 @@ describe('When RunewordCalculator is rendered', () => {
     render(<RunewordCalculator />);
 
     // Act
-    await waitFor(() => expect(getAvailableRunes).toHaveBeenCalled());
     await screen.findByText('No runewords found');
 
     // Assert

@@ -165,7 +165,7 @@ describe('When GrailTracker is rendered', () => {
 });
 
 describe('When GrailTracker is rendered as a page', () => {
-  it('Then exactly one level-1 heading is present', () => {
+  it('If the statistics are loaded, Then exactly one level-1 heading is present', () => {
     // Arrange
     setupStatistics();
 
