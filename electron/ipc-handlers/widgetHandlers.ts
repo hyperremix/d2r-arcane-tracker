@@ -1,7 +1,7 @@
 import { ipcMain } from 'electron';
 import { grailDatabase } from '../database/database';
 import type { Settings } from '../types/grail';
-import type { WidgetDisplayMode } from '../utils/widgetDisplay';
+import type { WidgetDisplayMode, WidgetSize } from '../utils/widgetDisplay';
 import { isWidgetDisplayMode } from '../utils/widgetDisplay';
 import {
   closeWidgetWindow,
@@ -15,7 +15,7 @@ import {
 } from '../window/widgetWindow';
 
 /**
- * Builds the settings used to create and size the widget window. The custom window sizes, the
+ * Builds the settings used to create, size and lock the widget window. The custom window sizes, the
  * run-only item list flag (which decides the run-only default size) and the lock state are read
  * from the database because the renderer's settings snapshot can be stale (sizes are saved without
  * being broadcast); only the ethereal flag, which decides the resolved display mode, comes from the
@@ -24,7 +24,7 @@ import {
  * @param rendererSettings - Settings snapshot sent by the renderer
  * @returns Settings to create or size the widget window with
  */
-function getSettingsForWidgetSizing(rendererSettings: Partial<Settings>): Partial<Settings> {
+function getSettingsForWidgetWindow(rendererSettings: Partial<Settings>): Partial<Settings> {
   try {
     const persisted = grailDatabase.getAllSettings();
     return {
@@ -41,7 +41,7 @@ function getSettingsForWidgetSizing(rendererSettings: Partial<Settings>): Partia
           : persisted.grailEthereal,
     };
   } catch (error) {
-    console.error('Failed to read persisted widget sizes:', error);
+    console.error('Failed to read persisted widget window settings:', error);
     return rendererSettings;
   }
 }
@@ -61,7 +61,7 @@ export function initializeWidgetHandlers(
   viteDevServerUrl?: string,
   rendererDist?: string,
   onPositionChange?: (position: { x: number; y: number }) => void,
-  onSizeChange?: (display: WidgetDisplayMode, size: { width: number; height: number }) => void,
+  onSizeChange?: (display: WidgetDisplayMode, size: WidgetSize) => void,
 ): void {
   /**
    * Toggle widget visibility based on settings.
@@ -70,7 +70,7 @@ export function initializeWidgetHandlers(
     try {
       if (enabled) {
         showWidgetWindow(
-          getSettingsForWidgetSizing(settings),
+          getSettingsForWidgetWindow(settings),
           __dirname,
           viteDevServerUrl,
           rendererDist,
@@ -129,7 +129,7 @@ export function initializeWidgetHandlers(
         if (!isWidgetDisplayMode(display)) {
           return { success: false, error: 'Invalid widget display mode' };
         }
-        updateWidgetWindowSize(display, getSettingsForWidgetSizing(settings));
+        updateWidgetWindowSize(display, getSettingsForWidgetWindow(settings));
         return { success: true };
       } catch (error) {
         console.error('Failed to update widget display mode:', error);
@@ -193,7 +193,7 @@ export function initializeWidgetHandlers(
     async (
       _event,
       display: unknown, // Renderer-provided: validated below
-      size: { width: number; height: number },
+      size: WidgetSize,
     ) => {
       try {
         if (!isWidgetDisplayMode(display)) {
@@ -220,7 +220,7 @@ export function initializeWidgetHandlers(
       }
       const defaultSize = resetWidgetWindowSize(
         display,
-        getSettingsForWidgetSizing({}).widgetRunOnlyShowItems,
+        getSettingsForWidgetWindow({}).widgetRunOnlyShowItems,
       );
       if (defaultSize && onSizeChange) {
         onSizeChange(display, defaultSize);

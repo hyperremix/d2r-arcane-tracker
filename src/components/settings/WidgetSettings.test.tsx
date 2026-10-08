@@ -1,8 +1,16 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import i18n from 'i18next';
+import { toast } from 'sonner';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useGrailStore } from '@/stores/grailStore';
 import { WidgetSettings } from './WidgetSettings';
+
+vi.mock('sonner', () => ({
+  toast: {
+    success: vi.fn(),
+    error: vi.fn(),
+  },
+}));
 
 describe('WidgetSettings', () => {
   const originalSettings = useGrailStore.getState().settings;
@@ -241,6 +249,8 @@ describe('WidgetSettings', () => {
       for (const mock of [mockSetSettings, setLocked, updateOpacity, updateDisplay, resetSize]) {
         mock.mockClear();
       }
+      setLocked.mockResolvedValue({ success: true });
+      vi.mocked(toast.error).mockClear();
       Object.defineProperty(window, 'electronAPI', {
         value: { widget: { setLocked, updateOpacity, updateDisplay, resetSize } },
         configurable: true,
@@ -281,6 +291,46 @@ describe('WidgetSettings', () => {
       // Assert
       expect(mockSetSettings).toHaveBeenCalledWith({ widgetLocked: true });
       expect(setLocked).toHaveBeenCalledWith(true);
+    });
+
+    it('If the window rejects the lock, Then the setting is not saved and an error toast is shown', async () => {
+      // Arrange
+      setLocked.mockResolvedValue({ success: false, error: 'No widget window' });
+      const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+      render(<WidgetSettings />);
+
+      // Act
+      await act(async () => {
+        fireEvent.click(screen.getByLabelText('Lock Widget (Click-Through)'));
+      });
+
+      // Assert
+      expect(setLocked).toHaveBeenCalledWith(true);
+      expect(mockSetSettings).not.toHaveBeenCalled();
+      expect(toast.error).toHaveBeenCalledWith(
+        'Could not change the widget lock. Please try again.',
+      );
+      expect(screen.getByLabelText('Lock Widget (Click-Through)')).not.toBeChecked();
+      consoleError.mockRestore();
+    });
+
+    it('If applying the lock throws, Then the setting is not saved and an error toast is shown', async () => {
+      // Arrange
+      setLocked.mockRejectedValue(new Error('IPC failed'));
+      const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+      render(<WidgetSettings />);
+
+      // Act
+      await act(async () => {
+        fireEvent.click(screen.getByLabelText('Lock Widget (Click-Through)'));
+      });
+
+      // Assert
+      expect(mockSetSettings).not.toHaveBeenCalled();
+      expect(toast.error).toHaveBeenCalledWith(
+        'Could not change the widget lock. Please try again.',
+      );
+      consoleError.mockRestore();
     });
 
     it('If the size is reset in run-only mode, Then the default is stored under the run-only key', async () => {

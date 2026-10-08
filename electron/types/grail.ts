@@ -1,4 +1,5 @@
 import type * as d2s from '@dschu012/d2s';
+import type { WidgetSize } from '../utils/widgetDisplay';
 
 /**
  * Type representing the different categories of items in Diablo 2.
@@ -538,10 +539,10 @@ export type Settings = {
   widgetDisplay?: 'overall' | 'split' | 'all' | 'run-only'; // Widget display mode (overall only, normal+ethereal, all three, or run counter only)
   widgetPosition?: { x: number; y: number }; // Widget position on screen
   widgetOpacity?: number; // Widget opacity (0.0 to 1.0)
-  widgetSizeOverall?: { width: number; height: number }; // Custom size for overall mode
-  widgetSizeSplit?: { width: number; height: number }; // Custom size for split mode
-  widgetSizeAll?: { width: number; height: number }; // Custom size for all mode
-  widgetSizeRunOnly?: { width: number; height: number }; // Custom size for run-only mode
+  widgetSizeOverall?: WidgetSize; // Custom size for overall mode
+  widgetSizeSplit?: WidgetSize; // Custom size for split mode
+  widgetSizeAll?: WidgetSize; // Custom size for all mode
+  widgetSizeRunOnly?: WidgetSize; // Custom size for run-only mode
   /**
    * When true, the widget is locked in place: clicks pass through it to the game, it cannot be
    * focused, dragged or resized. Unlock it again from the widget settings. Defaults to false.

@@ -364,6 +364,7 @@
       "showRunItemListDescription": "In Run Only mode, show a compact text list of grail-relevant items found each run.",
       "lockWidget": "Lock Widget (Click-Through)",
       "lockWidgetDescription": "Clicks pass through the widget to the game, and it can't be focused, dragged or resized. Turn this off here to move or resize it again.",
+      "lockWidgetFailed": "Could not change the widget lock. Please try again.",
       "opacity": "Opacity",
       "opacityDescription": "Adjust widget background opacity ({{min}}% to 100%)",
       "positionAndSize": "Position & Size",

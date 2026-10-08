@@ -1,9 +1,5 @@
 // Shared with the main process so the native window size matches what the renderer draws
-export type {
-  WidgetDisplayMode,
-  WidgetSize,
-  WidgetSizeSettingKey,
-} from 'electron/utils/widgetDisplay';
+export type { WidgetDisplayMode } from 'electron/utils/widgetDisplay';
 export {
   getDefaultWidgetSize,
   getWidgetSizeSettingKey,

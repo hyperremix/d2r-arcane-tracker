@@ -17,7 +17,7 @@ import { initializeShellHandlers } from './ipc-handlers/shellHandlers';
 import { initializeTerrorZoneHandlers } from './ipc-handlers/terrorZoneHandlers';
 import { initializeUpdateHandlers } from './ipc-handlers/updateHandlers';
 import { initializeWidgetHandlers } from './ipc-handlers/widgetHandlers';
-import type { WidgetDisplayMode } from './utils/widgetDisplay';
+import type { WidgetDisplayMode, WidgetSize } from './utils/widgetDisplay';
 import { getWidgetSizeSettingKey } from './utils/widgetDisplay';
 import { isPositionOnScreen } from './utils/windowSnapping';
 import { closeWidgetWindow, showWidgetWindow } from './window/widgetWindow';
@@ -281,10 +281,7 @@ app.whenReady().then(() => {
   // Debounce timer for widget size changes
   let widgetSizeChangeTimeout: NodeJS.Timeout | null = null;
 
-  const onWidgetSizeChange = (
-    display: WidgetDisplayMode,
-    size: { width: number; height: number },
-  ) => {
+  const onWidgetSizeChange = (display: WidgetDisplayMode, size: WidgetSize) => {
     // Debounce widget size changes to avoid excessive database writes during resize
     if (widgetSizeChangeTimeout) {
       clearTimeout(widgetSizeChangeTimeout);

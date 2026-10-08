@@ -2,6 +2,7 @@ import { eq } from 'drizzle-orm';
 import { NUMERIC_TO_STRING_ZONE_ID } from '../data/terrorZoneNames';
 import type { Settings } from '../types/grail';
 import { GameMode, GameVersion } from '../types/grail';
+import type { WidgetSize } from '../utils/widgetDisplay';
 import { schema } from './drizzle';
 import type { DatabaseContext } from './types';
 
@@ -141,19 +142,13 @@ export function getAllSettings(ctx: DatabaseContext): Settings {
       'widgetPosition',
     ),
     widgetOpacity: parseFloatSetting(settingsMap.widgetOpacity, 0.9) ?? 0.9,
-    widgetSizeOverall: parseJSONSetting<{ width: number; height: number }>(
+    widgetSizeOverall: parseJSONSetting<WidgetSize>(
       settingsMap.widgetSizeOverall,
       'widgetSizeOverall',
     ),
-    widgetSizeSplit: parseJSONSetting<{ width: number; height: number }>(
-      settingsMap.widgetSizeSplit,
-      'widgetSizeSplit',
-    ),
-    widgetSizeAll: parseJSONSetting<{ width: number; height: number }>(
-      settingsMap.widgetSizeAll,
-      'widgetSizeAll',
-    ),
-    widgetSizeRunOnly: parseJSONSetting<{ width: number; height: number }>(
+    widgetSizeSplit: parseJSONSetting<WidgetSize>(settingsMap.widgetSizeSplit, 'widgetSizeSplit'),
+    widgetSizeAll: parseJSONSetting<WidgetSize>(settingsMap.widgetSizeAll, 'widgetSizeAll'),
+    widgetSizeRunOnly: parseJSONSetting<WidgetSize>(
       settingsMap.widgetSizeRunOnly,
       'widgetSizeRunOnly',
     ),

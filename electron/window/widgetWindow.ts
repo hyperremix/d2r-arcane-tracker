@@ -82,7 +82,7 @@ export function createWidgetWindow(
   viteDevServerUrl?: string,
   rendererDist?: string,
   onPositionChange?: (position: { x: number; y: number }) => void,
-  onSizeChange?: (display: WidgetDisplayMode, size: { width: number; height: number }) => void,
+  onSizeChange?: (display: WidgetDisplayMode, size: WidgetSize) => void,
 ): BrowserWindow {
   const displayMode = resolveWidgetDisplayMode(settings.widgetDisplay, settings.grailEthereal);
   const size = getWidgetSize(displayMode, settings);
@@ -239,7 +239,7 @@ export function showWidgetWindow(
   viteDevServerUrl?: string,
   rendererDist?: string,
   onPositionChange?: (position: { x: number; y: number }) => void,
-  onSizeChange?: (display: WidgetDisplayMode, size: { width: number; height: number }) => void,
+  onSizeChange?: (display: WidgetDisplayMode, size: WidgetSize) => void,
 ): void {
   if (widgetWindow) {
     if (widgetLocked) {

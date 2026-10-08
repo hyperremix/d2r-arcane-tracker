@@ -1,23 +1,17 @@
 import type { Settings } from 'electron/types/grail';
 import { Layers, RotateCcw } from 'lucide-react';
-import { useCallback, useEffect, useId, useMemo, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
+import { toast } from 'sonner';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
+import { useWidgetControls } from '@/hooks/useWidgetControls';
 import { translations } from '@/i18n/translations';
 import { cn } from '@/lib/utils';
-import {
-  clampWidgetOpacity,
-  getDefaultWidgetSize,
-  getWidgetSizeSettingKey,
-  MAX_WIDGET_OPACITY,
-  MIN_WIDGET_OPACITY,
-  resolveWidgetDisplayMode,
-} from '@/lib/widget';
-import { useGrailStore } from '@/stores/grailStore';
+import { getWidgetSizeSettingKey, MAX_WIDGET_OPACITY, MIN_WIDGET_OPACITY } from '@/lib/widget';
 
 type WidgetDisplayMode = NonNullable<Settings['widgetDisplay']>;
 
@@ -34,7 +28,17 @@ interface DisplayModeOption {
  */
 export function WidgetSettings() {
   const { t } = useTranslation();
-  const { settings, setSettings } = useGrailStore();
+  const {
+    settings,
+    setSettings,
+    widgetEnabled,
+    widgetOpacity,
+    widgetRunOnlyShowItems,
+    effectiveDisplay,
+    previewOpacity,
+    commitOpacity,
+    toggleRunOnlyItems,
+  } = useWidgetControls();
   const enableWidgetLabelId = useId();
   const enableWidgetDescriptionId = useId();
   const displayModeName = useId();
@@ -44,8 +48,6 @@ export function WidgetSettings() {
   const lockLabelId = useId();
   const lockDescriptionId = useId();
   const opacityLabelId = useId();
-  // Opacity shown while the slider is dragged; it is only saved once the drag is committed
-  const [draftOpacity, setDraftOpacity] = useState<number | undefined>(undefined);
 
   const toggleWidget = useCallback(
     async (checked: boolean) => {
@@ -65,33 +67,22 @@ export function WidgetSettings() {
     [setSettings, settings],
   );
 
-  const previewOpacity = useCallback((value: number | readonly number[]) => {
-    const values = Array.isArray(value) ? value : [value];
-    setDraftOpacity(clampWidgetOpacity(values[0]));
-  }, []);
-
-  const commitOpacity = useCallback(
-    async (value: number | readonly number[]) => {
-      const values = Array.isArray(value) ? value : [value];
-      const opacity = clampWidgetOpacity(values[0]);
-      try {
-        await setSettings({ widgetOpacity: opacity });
-        // Update widget opacity via IPC
-        await window.electronAPI?.widget.updateOpacity(opacity);
-      } finally {
-        setDraftOpacity(undefined);
-      }
-    },
-    [setSettings],
-  );
-
   const toggleLock = useCallback(
     async (checked: boolean) => {
-      await setSettings({ widgetLocked: checked });
-      // Apply click-through to the widget window via IPC
-      await window.electronAPI?.widget.setLocked(checked);
+      try {
+        // Apply click-through to the widget window first so the saved state never claims a lock
+        // the window doesn't have
+        const result = await window.electronAPI?.widget.setLocked(checked);
+        if (result && !result.success) {
+          throw new Error(result.error ?? 'Failed to update widget lock state');
+        }
+        await setSettings({ widgetLocked: checked });
+      } catch (error) {
+        console.error('Failed to update widget lock state:', error);
+        toast.error(t(translations.settings.widget.lockWidgetFailed));
+      }
     },
-    [setSettings],
+    [setSettings, t],
   );
 
   const resetPosition = useCallback(async () => {
@@ -102,13 +93,7 @@ export function WidgetSettings() {
   }, [setSettings]);
 
   const widgetDisplay = settings.widgetDisplay || 'overall';
-  const widgetOpacity = draftOpacity ?? clampWidgetOpacity(settings.widgetOpacity);
-  const widgetEnabled = settings.widgetEnabled ?? false;
-  const widgetRunOnlyShowItems = settings.widgetRunOnlyShowItems ?? true;
   const widgetLocked = settings.widgetLocked ?? false;
-
-  // The window size follows the mode the widget actually renders (split/all need ethereal tracking)
-  const effectiveDisplay = resolveWidgetDisplayMode(widgetDisplay, settings.grailEthereal);
 
   const resetSize = useCallback(async () => {
     const result = await window.electronAPI?.widget.resetSize(effectiveDisplay);
@@ -124,20 +109,6 @@ export function WidgetSettings() {
       updateDisplay('overall');
     }
   }, [settings.grailEthereal, widgetDisplay, updateDisplay]);
-
-  const toggleRunOnlyItems = useCallback(
-    async (checked: boolean) => {
-      // The item list changes how tall the run-only widget needs to be, so switch to its default size
-      await setSettings({
-        widgetRunOnlyShowItems: checked,
-        widgetSizeRunOnly: getDefaultWidgetSize('run-only', checked),
-      });
-      if (widgetEnabled && effectiveDisplay === 'run-only') {
-        await window.electronAPI?.widget.updateDisplay('run-only', settings);
-      }
-    },
-    [effectiveDisplay, setSettings, settings, widgetEnabled],
-  );
 
   const displayModeOptions = useMemo<DisplayModeOption[]>(
     () => [

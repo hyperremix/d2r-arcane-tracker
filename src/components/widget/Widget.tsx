@@ -37,6 +37,11 @@ interface WidgetProps {
 type WidgetRootStyle = CSSProperties & { WebkitAppRegion: 'drag' | 'no-drag' };
 
 /**
+ * Marks an interactive area inside the drag region so clicks reach it instead of dragging the window.
+ */
+const NO_DRAG_STYLE: WidgetRootStyle = { WebkitAppRegion: 'no-drag' };
+
+/**
  * Props for the RunOnlyDisplay component.
  */
 interface RunOnlyDisplayProps {
@@ -265,10 +270,7 @@ function RunOnlyDisplay({
                   onKeyDown={handleKeyDown}
                   disabled={addingItem || !hasRuns}
                   className="h-7 flex-1 border-white/30 bg-black/40 text-white text-xs placeholder:text-white/60"
-                  style={{
-                    // @ts-expect-error - WebkitAppRegion is an Electron-specific CSS property
-                    WebkitAppRegion: 'no-drag',
-                  }}
+                  style={NO_DRAG_STYLE}
                 />
               </div>
             </div>
@@ -277,10 +279,7 @@ function RunOnlyDisplay({
           {runItemsByRun.length > 0 && (
             <div
               className="mt-2 flex min-h-0 flex-col gap-1 overflow-y-auto text-white/95 text-xs"
-              style={{
-                // @ts-expect-error - WebkitAppRegion is an Electron-specific CSS property
-                WebkitAppRegion: 'no-drag',
-              }}
+              style={NO_DRAG_STYLE}
             >
               {runItemsByRun.map((run) => {
                 if (run.items.length === 0) {
