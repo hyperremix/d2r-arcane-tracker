@@ -286,14 +286,14 @@ export function D2RInstallationStep() {
             </p>
           )}
           {validation === 'valid' && (
-            <p className="flex items-center gap-2 text-accent-green text-sm">
+            <p className="flex items-center gap-2 text-sm text-success">
               <CheckCircle className="h-4 w-4" />
               {t(translations.wizard.d2rInstallation.valid)}
             </p>
           )}
           {validation === 'invalid' && (
             <div className="flex items-start gap-2 rounded-lg border p-3">
-              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-accent-yellow" />
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
               <div className="space-y-1">
                 <p className="font-medium text-sm">
                   {t(translations.wizard.d2rInstallation.invalid)}
