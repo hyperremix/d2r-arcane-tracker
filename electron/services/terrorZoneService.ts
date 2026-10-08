@@ -203,7 +203,7 @@ export class TerrorZoneService {
     } catch (error) {
       log.error('writeZonesToFile', error, undefined, {
         surfaceToUI: true,
-        userMessage: 'Failed to update terror zone configuration',
+        code: 'terrorZoneWriteFailed',
       });
       throw error;
     }

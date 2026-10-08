@@ -189,7 +189,7 @@ export function CharacterProgressTable({
           <User className="h-5 w-5" />
           {t(translations.grail.itemDetails.characterProgress)}
           {totalPages > 1 && (
-            <span className="ml-auto font-normal text-muted-foreground text-sm">
+            <span className="ml-auto font-normal font-ui text-muted-foreground text-sm">
               {t(translations.common.paginationRange, {
                 start: startIndex + 1,
                 end: Math.min(endIndex, sortedCharacters.length),

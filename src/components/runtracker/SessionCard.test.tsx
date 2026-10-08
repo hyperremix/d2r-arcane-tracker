@@ -1,16 +1,19 @@
 import '@testing-library/jest-dom';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import type { Session } from 'electron/types/grail';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { Run, RunItem, Session } from 'electron/types/grail';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { useGrailStore } from '@/stores/grailStore';
 import { useRunTrackerStore } from '@/stores/runTrackerStore';
 import { SessionCard } from './SessionCard';
 
 vi.mock('@/stores/runTrackerStore');
+vi.mock('@/stores/grailStore');
 vi.mock('./ExportDialog', () => ({
   ExportDialog: () => null,
 }));
 
 const mockUseRunTrackerStore = vi.mocked(useRunTrackerStore);
+const mockUseGrailStore = vi.mocked(useGrailStore);
 
 const mockSession: Session = {
   id: 'session-1',
@@ -34,6 +37,7 @@ const createStoreState = (overrides: Record<string, unknown> = {}) =>
     activeRun: null,
     pendingActions: {},
     runs: new Map(),
+    runItems: new Map(),
     archiveSession: mockArchiveSession,
     endSession: mockEndSession,
     startSession: mockStartSession,
@@ -46,6 +50,13 @@ describe('SessionCard', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockUseRunTrackerStore.mockReturnValue(createStoreState());
+    mockUseGrailStore.mockReturnValue({ items: [], progress: [] } as unknown as ReturnType<
+      typeof useGrailStore
+    >);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   describe('When an active session is shown', () => {
@@ -120,18 +131,199 @@ describe('SessionCard', () => {
     });
   });
 
-  describe('If starting a session is in flight', () => {
-    it('Then the Start New Session button is disabled', () => {
+  describe('If no session is active', () => {
+    it('Then the card renders nothing because starting a session lives in the session controls', () => {
       // Arrange
+      mockUseRunTrackerStore.mockReturnValue(createStoreState({ activeSession: null }));
+
+      // Act
+      const { container } = render(<SessionCard session={null} />);
+
+      // Assert
+      expect(container).toBeEmptyDOMElement();
+    });
+  });
+
+  describe('When efficiency is calculated for a live session', () => {
+    it('If no run has finished yet, Then the in-progress run already counts towards efficiency', () => {
+      // Arrange
+      vi.useFakeTimers({ toFake: ['Date'] });
+      vi.setSystemTime(new Date('2024-01-01T10:20:00Z'));
+      const freshSession: Session = {
+        ...mockSession,
+        totalRunTime: 0,
+        totalSessionTime: 0,
+        runCount: 1,
+      };
+      const activeRun: Run = {
+        id: 'run-1',
+        sessionId: 'session-1',
+        runNumber: 1,
+        startTime: new Date('2024-01-01T10:10:00Z'),
+        created: new Date('2024-01-01T10:10:00Z'),
+        lastUpdated: new Date('2024-01-01T10:10:00Z'),
+      };
       mockUseRunTrackerStore.mockReturnValue(
-        createStoreState({ activeSession: null, pendingActions: { startSession: true } }),
+        createStoreState({ activeSession: freshSession, activeRun }),
       );
 
       // Act
-      render(<SessionCard session={null} />);
+      render(<SessionCard session={freshSession} />);
 
       // Assert
-      expect(screen.getByRole('button', { name: 'Start New Session' })).toBeDisabled();
+      expect(screen.getByText('50.0%')).toBeInTheDocument();
+      expect(screen.getByText('20m')).toBeInTheDocument();
+    });
+
+    it('If runs have finished, Then efficiency uses the live session time instead of the last backend snapshot', () => {
+      // Arrange
+      vi.useFakeTimers({ toFake: ['Date'] });
+      vi.setSystemTime(new Date('2024-01-01T10:20:00Z'));
+      // Backend snapshot from the last run end: 5m of 10m, but 20m have elapsed by now
+      mockUseRunTrackerStore.mockReturnValue(createStoreState({ activeRun: null }));
+
+      // Act
+      render(<SessionCard session={mockSession} />);
+
+      // Assert
+      expect(screen.getByText('25.0%')).toBeInTheDocument();
+    });
+  });
+
+  describe('When the active session has finished runs', () => {
+    const makeRun = (runNumber: number, overrides: Partial<Run> = {}): Run => ({
+      id: `run-${runNumber}`,
+      sessionId: 'session-1',
+      runNumber,
+      startTime: new Date('2024-01-01T10:00:00Z'),
+      endTime: new Date('2024-01-01T10:01:00Z'),
+      duration: 60000 + runNumber * 1000,
+      created: new Date('2024-01-01T10:00:00Z'),
+      lastUpdated: new Date('2024-01-01T10:01:00Z'),
+      ...overrides,
+    });
+
+    const makeItem = (runId: string, name: string): RunItem => ({
+      id: `${runId}-${name}`,
+      runId,
+      name,
+      foundTime: new Date('2024-01-01T10:00:30Z'),
+      created: new Date('2024-01-01T10:00:30Z'),
+    });
+
+    it('Then the five most recent runs are listed newest first with duration and found items', () => {
+      // Arrange
+      const sessionRuns = [
+        ...Array.from({ length: 7 }, (_, index) => makeRun(index + 1)),
+        makeRun(8, { endTime: undefined, duration: undefined }),
+      ];
+      const runItems = new Map([['run-7', [makeItem('run-7', 'Shako'), makeItem('run-7', 'Ber')]]]);
+      mockUseRunTrackerStore.mockReturnValue(
+        createStoreState({ runs: new Map([['session-1', sessionRuns]]), runItems }),
+      );
+
+      // Act
+      render(<SessionCard session={mockSession} />);
+
+      // Assert
+      const list = screen.getByRole('region', { name: 'Recent Runs' });
+      const rows = within(list).getAllByRole('listitem');
+      expect(rows.map((row) => within(row).getByText(/^Run #/).textContent)).toEqual([
+        'Run #7',
+        'Run #6',
+        'Run #5',
+        'Run #4',
+        'Run #3',
+      ]);
+      expect(within(rows[0]).getByText('1m 7s')).toBeInTheDocument();
+      expect(within(rows[0]).getByText('2 items')).toBeInTheDocument();
+      expect(within(rows[0]).getByText('Shako, Ber')).toBeInTheDocument();
+      expect(within(rows[1]).getByText('No items')).toBeInTheDocument();
+    });
+
+    it('If an item was detected from save files, Then its grail item name is shown and unresolved items are labelled', () => {
+      // Arrange
+      const detectedItem: RunItem = {
+        id: 'item-1',
+        runId: 'run-1',
+        grailProgressId: 'progress-1',
+        foundTime: new Date('2024-01-01T10:00:30Z'),
+        created: new Date('2024-01-01T10:00:30Z'),
+      };
+      const unresolvedItem: RunItem = { ...detectedItem, id: 'item-2', grailProgressId: undefined };
+      mockUseGrailStore.mockReturnValue({
+        items: [{ id: 'harlequin-crest', name: 'Harlequin Crest' }],
+        progress: [{ id: 'progress-1', itemId: 'harlequin-crest' }],
+      } as unknown as ReturnType<typeof useGrailStore>);
+      mockUseRunTrackerStore.mockReturnValue(
+        createStoreState({
+          runs: new Map([['session-1', [makeRun(1)]]]),
+          runItems: new Map([['run-1', [detectedItem, unresolvedItem]]]),
+        }),
+      );
+
+      // Act
+      render(<SessionCard session={mockSession} />);
+
+      // Assert
+      expect(screen.getByText('Harlequin Crest, Unknown Item')).toBeInTheDocument();
+    });
+
+    it('If no View all runs handler is given, Then the action is not shown', () => {
+      // Arrange
+      mockUseRunTrackerStore.mockReturnValue(
+        createStoreState({ runs: new Map([['session-1', [makeRun(1)]]]) }),
+      );
+
+      // Act
+      render(<SessionCard session={mockSession} />);
+
+      // Assert
+      expect(screen.queryByRole('button', { name: 'View all runs' })).not.toBeInTheDocument();
+    });
+
+    it('When View all runs is clicked, Then the full run history is requested', () => {
+      // Arrange
+      const onViewAllRuns = vi.fn();
+      mockUseRunTrackerStore.mockReturnValue(
+        createStoreState({ runs: new Map([['session-1', [makeRun(1)]]]) }),
+      );
+      render(<SessionCard session={mockSession} onViewAllRuns={onViewAllRuns} />);
+
+      // Act
+      fireEvent.click(screen.getByRole('button', { name: 'View all runs' }));
+
+      // Assert
+      expect(onViewAllRuns).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('If no run has finished yet', () => {
+    it('Then the recent runs list explains that completed runs will appear', () => {
+      // Arrange & Act
+      render(<SessionCard session={mockSession} />);
+
+      // Assert
+      expect(
+        screen.getByText('No finished runs yet. Completed runs will appear here.'),
+      ).toBeInTheDocument();
+    });
+  });
+
+  describe('When session notes are shown', () => {
+    it('Then they start collapsed and expand from the Session Notes toggle', async () => {
+      // Arrange
+      render(<SessionCard session={mockSession} />);
+      const toggle = screen.getByRole('button', { name: 'Session Notes' });
+      expect(toggle).toHaveAttribute('aria-expanded', 'false');
+      expect(screen.queryByRole('textbox', { name: 'Session Notes' })).not.toBeInTheDocument();
+
+      // Act
+      fireEvent.click(toggle);
+
+      // Assert
+      expect(await screen.findByRole('textbox', { name: 'Session Notes' })).toBeInTheDocument();
+      expect(toggle).toHaveAttribute('aria-expanded', 'true');
     });
   });
 

@@ -50,7 +50,11 @@ import { ipcMain } from 'electron';
 import { GrailProgressBuilder, HolyGrailItemBuilder } from '@/fixtures';
 import { GrailDatabase, grailDatabase } from '../database/database';
 import type { Character, Settings } from '../types/grail';
-import { closeGrailDatabase, initializeGrailHandlers } from './grailHandlers';
+import {
+  addSettingsUpdatedListener,
+  closeGrailDatabase,
+  initializeGrailHandlers,
+} from './grailHandlers';
 
 function getUpdateProgressHandler() {
   return vi
@@ -719,6 +723,98 @@ describe('When grailHandlers is used', () => {
       expect(grailDatabase.setSetting).toHaveBeenCalledWith('saveDir', '/new/path/to/saves');
       expect(result).toEqual({ success: true });
     });
+
+    it('When settings are updated, Then registered main-process listeners are notified', async () => {
+      // Arrange
+      const listener = vi.fn();
+      const removeListener = addSettingsUpdatedListener(listener);
+      const handler = vi
+        .mocked(ipcMain.handle)
+        .mock.calls.find((call) => call[0] === 'grail:updateSettings')?.[1] as any;
+
+      // Act
+      await handler(null, { runTrackerGlobalHotkeys: true });
+      removeListener();
+      await handler(null, { runTrackerGlobalHotkeys: false });
+
+      // Assert
+      expect(grailDatabase.setSetting).toHaveBeenCalledWith('runTrackerGlobalHotkeys', 'true');
+      expect(listener).toHaveBeenCalledTimes(1);
+      expect(listener).toHaveBeenCalledWith({ runTrackerGlobalHotkeys: true });
+    });
+
+    it('If runTrackerGlobalHotkeys is not a boolean, Then the update is rejected', async () => {
+      // Arrange
+      const handler = vi
+        .mocked(ipcMain.handle)
+        .mock.calls.find((call) => call[0] === 'grail:updateSettings')?.[1] as any;
+      const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+      // Act & Assert
+      await expect(handler(null, { runTrackerGlobalHotkeys: 'yes' })).rejects.toThrow(
+        'Invalid runTrackerGlobalHotkeys setting',
+      );
+      expect(grailDatabase.setSetting).not.toHaveBeenCalled();
+      consoleError.mockRestore();
+    });
+
+    it('If runTrackerShortcuts is a valid mapping, Then the update is persisted', async () => {
+      // Arrange
+      const handler = vi
+        .mocked(ipcMain.handle)
+        .mock.calls.find((call) => call[0] === 'grail:updateSettings')?.[1] as any;
+      const runTrackerShortcuts = {
+        startRun: 'Ctrl+1',
+        pauseRun: 'Ctrl+2',
+        endRun: 'Ctrl+3',
+        endSession: 'Ctrl+Shift+4',
+      };
+
+      // Act
+      const result = await handler(null, { runTrackerShortcuts });
+
+      // Assert
+      expect(grailDatabase.setSetting).toHaveBeenCalledWith(
+        'runTrackerShortcuts',
+        JSON.stringify(runTrackerShortcuts),
+      );
+      expect(result).toEqual({ success: true });
+    });
+
+    it.each([
+      ['a string', 'Ctrl+R'],
+      ['null', null],
+      ['an array', ['Ctrl+R']],
+      ['missing an action', { startRun: 'Ctrl+1', pauseRun: 'Ctrl+2', endRun: 'Ctrl+3' }],
+      [
+        'a non-string action value',
+        { startRun: 'Ctrl+1', pauseRun: 2, endRun: 'Ctrl+3', endSession: 'Ctrl+Shift+4' },
+      ],
+      [
+        'a blank action value',
+        { startRun: 'Ctrl+1', pauseRun: '  ', endRun: 'Ctrl+3', endSession: 'Ctrl+Shift+4' },
+      ],
+    ])(
+      'If runTrackerShortcuts is %s, Then the update is rejected before any setting is written',
+      async (_label, runTrackerShortcuts) => {
+        // Arrange
+        const handler = vi
+          .mocked(ipcMain.handle)
+          .mock.calls.find((call) => call[0] === 'grail:updateSettings')?.[1] as any;
+        const listener = vi.fn();
+        const removeListener = addSettingsUpdatedListener(listener);
+        const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+        // Act & Assert
+        await expect(
+          handler(null, { runTrackerGlobalHotkeys: true, runTrackerShortcuts }),
+        ).rejects.toThrow('Invalid runTrackerShortcuts setting');
+        expect(grailDatabase.setSetting).not.toHaveBeenCalled();
+        expect(listener).not.toHaveBeenCalled();
+        removeListener();
+        consoleError.mockRestore();
+      },
+    );
 
     it('Then settings handlers should handle errors properly', async () => {
       // Arrange

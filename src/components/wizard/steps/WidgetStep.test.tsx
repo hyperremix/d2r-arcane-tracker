@@ -7,7 +7,7 @@ describe('WidgetStep', () => {
   const originalSettings = useGrailStore.getState().settings;
   const originalSetSettings = useGrailStore.getState().setSettings;
   const originalElectronAPI = window.electronAPI;
-  const mockSetSettings = vi.fn().mockResolvedValue(undefined);
+  const mockSetSettings = vi.fn().mockResolvedValue({ success: true });
   const toggle = vi.fn().mockResolvedValue({ success: true });
   const updateOpacity = vi.fn().mockResolvedValue({ success: true });
   const updateDisplay = vi.fn().mockResolvedValue({ success: true });
@@ -66,7 +66,7 @@ describe('WidgetStep', () => {
 
     // Assert
     expect(mockSetSettings).toHaveBeenCalledTimes(1);
-    expect(mockSetSettings).toHaveBeenCalledWith({ widgetOpacity: 0.5 });
+    expect(mockSetSettings).toHaveBeenCalledWith({ widgetOpacity: 0.5 }, { notifyOnError: false });
     expect(updateOpacity).toHaveBeenCalledTimes(1);
     expect(updateOpacity).toHaveBeenCalledWith(0.5);
   });
@@ -84,10 +84,13 @@ describe('WidgetStep', () => {
     });
 
     // Assert
-    expect(mockSetSettings).toHaveBeenCalledWith({
-      widgetRunOnlyShowItems: false,
-      widgetSizeRunOnly: { width: 270, height: 190 },
-    });
+    expect(mockSetSettings).toHaveBeenCalledWith(
+      {
+        widgetRunOnlyShowItems: false,
+        widgetSizeRunOnly: { width: 270, height: 190 },
+      },
+      { notifyOnError: false },
+    );
     expect(updateDisplay).toHaveBeenCalledWith('run-only', expect.any(Object));
   });
 
@@ -128,7 +131,10 @@ describe('WidgetStep', () => {
     });
 
     // Assert
-    expect(mockSetSettings).toHaveBeenCalledWith({ widgetEnabled: false });
+    expect(mockSetSettings).toHaveBeenCalledWith(
+      { widgetEnabled: false },
+      { notifyOnError: false },
+    );
     expect(toggle).toHaveBeenCalledWith(false, expect.any(Object));
   });
 });

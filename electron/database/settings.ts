@@ -182,6 +182,7 @@ export function getAllSettings(ctx: DatabaseContext): Settings {
       settingsMap.runTrackerShortcuts,
       'runTrackerShortcuts',
     ),
+    runTrackerGlobalHotkeys: parseBooleanSetting(settingsMap.runTrackerGlobalHotkeys),
   };
 
   return typedSettings;

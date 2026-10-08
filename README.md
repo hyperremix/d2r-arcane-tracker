@@ -50,6 +50,7 @@ The app checks for updates on startup and installs them when you confirm.
 - **Items don't update**: D2R only writes save files when you leave a game, so new items show up after you exit to the menu.
 - **Antivirus blocks the app**: add an exception for the install folder. Unsigned Electron apps sometimes cause false positives.
 - **Run detection stopped after a game patch**: see [Run Tracker troubleshooting](docs/RUN_TRACKER.md#troubleshooting).
+- **A page shows "Something went wrong"**: see [Error screen](docs/HOLY_GRAIL_GUIDE.md#error-screen).
 
 If that doesn't help, search the [issues](https://github.com/hyperremix/d2r-arcane-tracker/issues) or open a new one, or ask in [Discussions](https://github.com/hyperremix/d2r-arcane-tracker/discussions).
 

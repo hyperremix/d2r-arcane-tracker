@@ -16,6 +16,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Progress } from '@/components/ui/progress';
+import { WizardSaveError } from '@/components/wizard/wizardSettingsSave';
 import { translations } from '@/i18n/translations';
 import { useGrailStore } from '@/stores/grailStore';
 import { useWizardStore } from '@/stores/wizardStore';
@@ -100,6 +101,8 @@ export function SetupWizard() {
   } = useWizardStore();
   const { setSettings } = useGrailStore();
   const [showSkipConfirm, setShowSkipConfirm] = useState(false);
+  // Set when persisting the wizard outcome fails; the wizard then stays open so it can be retried
+  const [saveFailed, setSaveFailed] = useState(false);
 
   const step = wizardSteps[currentStep];
   const CurrentStepComponent = step?.component;
@@ -121,12 +124,14 @@ export function SetupWizard() {
 
   const handleNext = useCallback(() => {
     if (!isLastStep && canProceed) {
+      setSaveFailed(false);
       nextStep();
     }
   }, [isLastStep, canProceed, nextStep]);
 
   const handleBack = useCallback(() => {
     if (!isFirstStep) {
+      setSaveFailed(false);
       previousStep();
     }
   }, [isFirstStep, previousStep]);
@@ -137,8 +142,17 @@ export function SetupWizard() {
 
   const handleConfirmSkip = useCallback(async () => {
     setShowSkipConfirm(false);
-    // Mark wizard as skipped (preserving any settings already made)
-    await setSettings({ wizardSkipped: true, wizardCompleted: false });
+    // Mark wizard as skipped (preserving any settings already made). The error is shown
+    // inline because a toast outside the modal wizard could not be interacted with.
+    const result = await setSettings(
+      { wizardSkipped: true, wizardCompleted: false },
+      { notifyOnError: false },
+    );
+    if (!result.success) {
+      setSaveFailed(true);
+      return;
+    }
+    setSaveFailed(false);
     skip();
   }, [setSettings, skip]);
 
@@ -151,18 +165,18 @@ export function SetupWizard() {
   }, []);
 
   const handleFinish = useCallback(async () => {
-    try {
-      // Mark wizard as completed
-      await setSettings({
-        wizardCompleted: true,
-        wizardSkipped: false,
-      });
-
-      // Close the wizard
-      closeWizard();
-    } catch (error) {
-      console.error('Failed to mark wizard as completed:', error);
+    // Mark wizard as completed; keep it open on failure so it does not silently reappear
+    // on the next launch
+    const result = await setSettings(
+      { wizardCompleted: true, wizardSkipped: false },
+      { notifyOnError: false },
+    );
+    if (!result.success) {
+      setSaveFailed(true);
+      return;
     }
+    setSaveFailed(false);
+    closeWizard();
   }, [setSettings, closeWizard]);
 
   return (
@@ -208,6 +222,9 @@ export function SetupWizard() {
             {t(step.validationMessageKey)}
           </p>
         )}
+
+        {/* Skip Setup / Finish failure; steps show their own inline alert for their settings */}
+        <WizardSaveError visible={saveFailed} />
 
         {/* Navigation Buttons */}
         <div className="flex items-center justify-between border-t pt-4">

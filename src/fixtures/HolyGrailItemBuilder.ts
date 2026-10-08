@@ -138,6 +138,22 @@ export class HolyGrailItemBuilder {
   }
 
   /**
+   * Set the base item name (e.g. "Shako")
+   */
+  withItemBase(itemBase: string): this {
+    this.item.itemBase = itemBase;
+    return this;
+  }
+
+  /**
+   * Set the runes a runeword is made of
+   */
+  withRunes(runes: string[]): this {
+    this.item.runes = runes;
+    return this;
+  }
+
+  /**
    * Remove the set name (for non-set items)
    */
   withoutSetName(): this {

@@ -3,6 +3,7 @@ import type {
   D2Item,
   D2SaveFile,
   FileReaderResponse,
+  GlobalHotkeyStatus,
   GrailProgress,
   Item,
   MonitoringStatus,
@@ -15,8 +16,6 @@ import type {
   UpdateInfo,
   UpdateStatus,
 } from './grail'
-
-import type { ServiceErrorPayload } from '../utils/serviceLogger'
 
 /**
  * Main interface defining the Electron API available to the renderer process.
@@ -469,10 +468,11 @@ export interface ElectronAPI {
 
     /**
      * Registers a callback for service error events from the main process.
-     * @param {(payload: ServiceErrorPayload) => void} callback - Function to call when service errors occur.
+     * The payload is untrusted IPC data and must be validated by the caller.
+     * @param {(payload: unknown) => void} callback - Function to call when service errors occur.
      * @returns {() => void} Cleanup function to remove the listener.
      */
-    onServiceError(callback: (payload: ServiceErrorPayload) => void): () => void
+    onServiceError(callback: (payload: unknown) => void): () => void
   }
 
   /**
@@ -635,6 +635,19 @@ export interface ElectronAPI {
      * @returns {Promise<{ available: boolean; reason: string | null }>} A promise that resolves with memory status.
      */
     getMemoryStatus(): Promise<{ available: boolean; reason: string | null }>
+
+    /**
+     * Gets the registration status of the run tracker global hotkeys.
+     * @returns {Promise<GlobalHotkeyStatus>} A promise that resolves with the hotkey status.
+     */
+    getGlobalHotkeyStatus(): Promise<GlobalHotkeyStatus>
+
+    /**
+     * Registers a callback for global hotkey status changes.
+     * @param {(status: GlobalHotkeyStatus) => void} callback - Called with the new status.
+     * @returns {() => void} Cleanup function to remove the listener.
+     */
+    onGlobalHotkeyStatus(callback: (status: GlobalHotkeyStatus) => void): () => void
   }
 
   /**

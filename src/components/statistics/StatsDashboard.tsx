@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useProgressLookup } from '@/hooks/useProgressLookup';
 import { translations } from '@/i18n/translations';
+import { itemCategoryLabelKeys } from '@/lib/labelKeys';
 import { formatTimeAgo } from '@/lib/utils';
 import { useGrailStatistics, useGrailStore } from '@/stores/grailStore';
 
@@ -158,7 +159,9 @@ export const StatsDashboard = memo(function StatsDashboard() {
                 <div key={category.category} className="space-y-2">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <span className="font-medium capitalize">{category.category}</span>
+                      <span className="font-medium">
+                        {t(itemCategoryLabelKeys[category.category])}
+                      </span>
                       {category.recent > 0 && (
                         <Badge variant="secondary" className="text-xs">
                           {t(translations.statistics.dashboard.recentBadge, {
@@ -172,7 +175,7 @@ export const StatsDashboard = memo(function StatsDashboard() {
                     current={category.found}
                     total={category.total}
                     label={t(translations.statistics.dashboard.categoryProgress, {
-                      category: category.category,
+                      category: t(itemCategoryLabelKeys[category.category]),
                     })}
                     className="h-4"
                   />

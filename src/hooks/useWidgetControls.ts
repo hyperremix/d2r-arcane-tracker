@@ -1,14 +1,24 @@
+import type { Settings } from 'electron/types/grail';
 import { useCallback, useState } from 'react';
 import { clampWidgetOpacity, getDefaultWidgetSize, resolveWidgetDisplayMode } from '@/lib/widget';
-import { useGrailStore } from '@/stores/grailStore';
+import { type SettingsSaveResult, useGrailStore } from '@/stores/grailStore';
+
+/**
+ * Persists a settings update and reports whether it was saved.
+ */
+export type SaveWidgetSettings = (update: Partial<Settings>) => Promise<SettingsSaveResult>;
 
 /**
  * Shared widget controls for the settings page and the setup wizard: the opacity slider
  * (previewed while dragging, saved once committed) and the run-only item list toggle.
+ * The widget window is only updated once the setting was saved.
+ * @param {SaveWidgetSettings} [save] - How settings are saved; defaults to the store's
+ *   `setSettings` (error toast with Retry). The setup wizard passes its own inline-error save.
  * @returns The derived widget values and the handlers to wire to the controls
  */
-export function useWidgetControls() {
+export function useWidgetControls(save?: SaveWidgetSettings) {
   const { settings, setSettings } = useGrailStore();
+  const saveSettings: SaveWidgetSettings = save ?? setSettings;
   // Opacity shown while the slider is dragged; it is only saved once the drag is committed
   const [draftOpacity, setDraftOpacity] = useState<number | undefined>(undefined);
 
@@ -28,28 +38,34 @@ export function useWidgetControls() {
       const values = Array.isArray(value) ? value : [value];
       const opacity = clampWidgetOpacity(values[0]);
       try {
-        await setSettings({ widgetOpacity: opacity });
+        const result = await saveSettings({ widgetOpacity: opacity });
+        if (!result.success) {
+          return;
+        }
         // Update widget opacity via IPC
         await window.electronAPI?.widget.updateOpacity(opacity);
       } finally {
         setDraftOpacity(undefined);
       }
     },
-    [setSettings],
+    [saveSettings],
   );
 
   const toggleRunOnlyItems = useCallback(
     async (checked: boolean) => {
       // The item list changes how tall the run-only widget needs to be, so switch to its default size
-      await setSettings({
+      const result = await saveSettings({
         widgetRunOnlyShowItems: checked,
         widgetSizeRunOnly: getDefaultWidgetSize('run-only', checked),
       });
+      if (!result.success) {
+        return;
+      }
       if (widgetEnabled && effectiveDisplay === 'run-only') {
         await window.electronAPI?.widget.updateDisplay('run-only', settings);
       }
     },
-    [effectiveDisplay, setSettings, settings, widgetEnabled],
+    [effectiveDisplay, saveSettings, settings, widgetEnabled],
   );
 
   return {

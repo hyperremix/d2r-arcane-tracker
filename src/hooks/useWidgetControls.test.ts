@@ -7,7 +7,7 @@ describe('useWidgetControls', () => {
   const originalSettings = useGrailStore.getState().settings;
   const originalSetSettings = useGrailStore.getState().setSettings;
   const originalElectronAPI = window.electronAPI;
-  const mockSetSettings = vi.fn().mockResolvedValue(undefined);
+  const mockSetSettings = vi.fn().mockResolvedValue({ success: true });
   const updateOpacity = vi.fn().mockResolvedValue({ success: true });
   const updateDisplay = vi.fn().mockResolvedValue({ success: true });
 
@@ -86,6 +86,40 @@ describe('useWidgetControls', () => {
     expect(mockSetSettings).toHaveBeenCalledWith({ widgetOpacity: 0.5 });
     expect(updateOpacity).toHaveBeenCalledWith(0.5);
     expect(result.current.widgetOpacity).toBe(0.9);
+  });
+
+  it('If the opacity save reports a failure, Then it is not sent to the widget and the draft is cleared', async () => {
+    // Arrange
+    mockSetSettings.mockResolvedValueOnce({ success: false, error: new Error('db locked') });
+    const { result } = renderHook(() => useWidgetControls());
+    act(() => {
+      result.current.previewOpacity(0.5);
+    });
+
+    // Act
+    await act(async () => {
+      await result.current.commitOpacity(0.5);
+    });
+
+    // Assert
+    expect(updateOpacity).not.toHaveBeenCalled();
+    expect(result.current.widgetOpacity).toBe(0.9);
+  });
+
+  it('If a custom save function is passed, Then it is used instead of the store save', async () => {
+    // Arrange
+    const save = vi.fn().mockResolvedValue({ success: true });
+    const { result } = renderHook(() => useWidgetControls(save));
+
+    // Act
+    await act(async () => {
+      await result.current.commitOpacity(0.5);
+    });
+
+    // Assert
+    expect(save).toHaveBeenCalledWith({ widgetOpacity: 0.5 });
+    expect(mockSetSettings).not.toHaveBeenCalled();
+    expect(updateOpacity).toHaveBeenCalledWith(0.5);
   });
 
   it('If saving the opacity fails, Then the draft is still cleared', async () => {
