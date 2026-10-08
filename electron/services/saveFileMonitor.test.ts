@@ -255,6 +255,36 @@ describe('When SaveFileMonitor is used', () => {
       expect(startedSpy).toHaveBeenCalledWith(expect.objectContaining({ saveFileCount: 0 }));
     });
 
+    it('Then should not watch a directory that cannot be read', async () => {
+      // Arrange
+      // A regular file used as the save directory exists but cannot be listed (readdir throws).
+      const unreadableDir = await mkdtemp(join(tmpdir(), 'arcane-unreadable-'));
+      tempDirs.push(unreadableDir);
+      const notADirectory = join(unreadableDir, 'not-a-directory');
+      await writeFile(notADirectory, 'content');
+      vi.mocked(mockDatabase.getAllSettings).mockReturnValue({
+        saveDir: notADirectory,
+        gameMode: GameMode.Softcore,
+      });
+      const watchSpy = vi.fn();
+      (chokidar as any).watch = watchSpy;
+      const errorSpy = vi.fn();
+      eventBus.on('monitoring-error', errorSpy);
+
+      // Act
+      await monitor.startMonitoring();
+
+      // Assert
+      expect(watchSpy).not.toHaveBeenCalled();
+      expect(monitor.isCurrentlyMonitoring()).toBe(false);
+      expect(errorSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'directory-read-error',
+          directory: notADirectory,
+        }),
+      );
+    });
+
     it('Then should not watch a directory that does not exist', async () => {
       // Arrange
       const missingDir = join(tmpdir(), 'arcane-missing-dir-that-does-not-exist');
@@ -1011,6 +1041,49 @@ describe('When SaveFileMonitor is used', () => {
 
         // Assert
         expect(result).toBe('MyCharacter');
+      });
+    });
+
+    describe('If getSaveNameFromPath is called with an uppercase extension', () => {
+      it('Then should strip the extension case-insensitively', () => {
+        // Arrange
+        const filePath = '/test/Hero.D2S';
+
+        // Act
+        const result = (monitor as any).getSaveNameFromPath(filePath);
+
+        // Assert
+        expect(result).toBe('Hero');
+      });
+    });
+
+    describe('If parseSaveFile is called with an uppercase .D2S extension', () => {
+      it('Then should use the filename without extension as the character name', async () => {
+        // Arrange
+        const saveDir = await mkdtemp(join(tmpdir(), 'arcane-case-'));
+        tempDirs.push(saveDir);
+        const filePath = join(saveDir, 'Hero.D2S');
+        await writeFile(filePath, 'content');
+
+        // Act
+        const result = await (monitor as any).parseSaveFile(filePath);
+
+        // Assert
+        expect(result.name).toBe('Hero');
+      });
+
+      it('Then should keep naming lowercase .d2s files unchanged', async () => {
+        // Arrange
+        const saveDir = await mkdtemp(join(tmpdir(), 'arcane-case-'));
+        tempDirs.push(saveDir);
+        const filePath = join(saveDir, 'Hero.d2s');
+        await writeFile(filePath, 'content');
+
+        // Act
+        const result = await (monitor as any).parseSaveFile(filePath);
+
+        // Assert
+        expect(result.name).toBe('Hero');
       });
     });
 

@@ -745,10 +745,10 @@ class SaveFileMonitor {
   private getSaveNameFromPath(filePath: string, isHardcore?: boolean): string {
     const extension = extname(filePath).toLowerCase();
     let saveName = basename(filePath)
-      .replace('.d2s', '')
-      .replace('.sss', '')
-      .replace('.d2x', '')
-      .replace('.d2i', '');
+      .replace(/\.d2s/i, '')
+      .replace(/\.sss/i, '')
+      .replace(/\.d2x/i, '')
+      .replace(/\.d2i/i, '');
 
     // Use friendly names for shared stash files
     if (extension === '.d2i') {
@@ -1161,7 +1161,9 @@ class SaveFileMonitor {
       }
 
       // Basic D2 save file parsing (simplified)
-      const fileName = basename(filePath, '.d2s');
+      // Strip the extension case-insensitively (e.g. Hero.D2S), matching getSaveNameFromPath
+      const fileName =
+        extension === '.d2s' ? basename(filePath, extname(filePath)) : basename(filePath);
 
       // Character name is typically the filename
       const characterName = fileName;
