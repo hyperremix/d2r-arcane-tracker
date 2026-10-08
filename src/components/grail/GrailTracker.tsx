@@ -1,5 +1,8 @@
 import { useEffect, useLayoutEffect } from 'react';
+import { useTranslation } from 'react-i18next';
+import { PageHeader } from '@/components/layout/PageHeader';
 import { TooltipProvider } from '@/components/ui/tooltip';
+import { translations } from '@/i18n/translations';
 import { startLoad, useGrailStatistics, useGrailStore } from '@/stores/grailStore';
 import { AdvancedSearch } from './AdvancedSearch';
 import { ItemGrid } from './ItemGrid';
@@ -17,6 +20,7 @@ function getSettledValue<T>(result: PromiseSettledResult<T>, label: string): T |
  * @returns {JSX.Element} The main grail tracker interface with statistics and item grid
  */
 export function GrailTracker() {
+  const { t } = useTranslation();
   const { setCharacters, setItems, setProgress, hydrateSettings, settings } = useGrailStore();
 
   const statistics = useGrailStatistics();
@@ -95,6 +99,9 @@ export function GrailTracker() {
   return (
     <TooltipProvider>
       <div className="flex h-full flex-col gap-4 p-6">
+        {/* Page heading for assistive technology; the dense toolbar provides the visual context */}
+        <PageHeader title={t(translations.grail.title)} visuallyHidden />
+
         {/* Progress summary */}
         {statistics && (
           <ProgressSummary statistics={statistics} showEtherealBreakdown={settings.grailEthereal} />

@@ -112,6 +112,32 @@ describe('When ItemCard is rendered', () => {
     });
   });
 
+  describe('If the item name tooltip is opened', () => {
+    it.each(['grid', 'list'] as const)(
+      'Then the %s card shows the translated category and sub-category',
+      async (viewMode) => {
+        // Arrange
+        const item = HolyGrailItemBuilder.new()
+          .withName('Windforce')
+          .withCategory('weapons')
+          .withWeaponSubCategory('2h_swords')
+          .build();
+        render(<ItemCard item={item} viewMode={viewMode} />);
+
+        // Act
+        fireEvent.focus(
+          screen.getByText('Windforce').closest('[data-slot="tooltip-trigger"]') as Element,
+        );
+
+        // Assert
+        const label = await screen.findByText('Weapons • Two-Handed Swords');
+        expect(label).toBeInTheDocument();
+        expect(screen.queryByText(/2h swords/i)).not.toBeInTheDocument();
+        expect(screen.queryByText(/weapons • 2h/i)).not.toBeInTheDocument();
+      },
+    );
+  });
+
   describe('If item has no progress', () => {
     it('Then does not render attribution', () => {
       // Arrange

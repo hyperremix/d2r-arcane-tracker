@@ -2,6 +2,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { setErrorForwarder } from '../utils/serviceLogger';
 import { TerrorZoneService } from './terrorZoneService';
 
 let mockUserDataPath = '';
@@ -188,6 +189,37 @@ describe('TerrorZoneService', () => {
 
       // Assert
       expect(result).toMatchObject({ valid: false, errorCode: 'corruptedFile' });
+    });
+  });
+
+  describe('When writing zones fails', () => {
+    it('If the game file does not exist, Then surfaces a terrorZoneWriteFailed error to the UI', async () => {
+      // Arrange
+      const forwarder = vi.fn();
+      setErrorForwarder(forwarder);
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {
+        // Silence expected error logs
+      });
+      const missingFile = path.join(tempDir, 'missing', 'desecratedzones.json');
+
+      // Act
+      const write = service.writeZonesToFile(missingFile, [], new Set());
+
+      // Assert
+      await expect(write).rejects.toThrow('Game file does not exist');
+      expect(forwarder).toHaveBeenCalledWith(
+        expect.objectContaining({
+          service: 'TerrorZoneService',
+          operation: 'writeZonesToFile',
+          severity: 'error',
+          code: 'terrorZoneWriteFailed',
+          detail: 'Game file does not exist',
+        }),
+      );
+      setErrorForwarder(() => {
+        // Reset forwarder
+      });
+      consoleSpy.mockRestore();
     });
   });
 });

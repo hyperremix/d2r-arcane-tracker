@@ -34,7 +34,7 @@ export function ProgressStatusSection({
         <div className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-3">
           {/* Overall Status */}
           <span className="font-medium">{t(translations.grail.itemDetails.overallStatus)}</span>
-          <Badge variant={isFound ? 'default' : 'secondary'} className="w-fit capitalize">
+          <Badge variant={isFound ? 'found' : 'missing'} className="w-fit">
             {isFound ? t(translations.common.found) : t(translations.common.notFound)}
           </Badge>
 
@@ -42,7 +42,7 @@ export function ProgressStatusSection({
           {item.etherealType !== 'none' && (
             <>
               <span className="font-medium">{t(translations.grail.itemDetails.normalStatus)}</span>
-              <Badge variant={normalFound ? 'default' : 'secondary'} className="w-fit capitalize">
+              <Badge variant={normalFound ? 'found' : 'missing'} className="w-fit">
                 {normalFound ? t(translations.common.found) : t(translations.common.notFound)}
               </Badge>
             </>
@@ -54,7 +54,7 @@ export function ProgressStatusSection({
               <span className="font-medium">
                 {t(translations.grail.itemDetails.etherealStatus)}
               </span>
-              <Badge variant={etherealFound ? 'default' : 'secondary'} className="w-fit capitalize">
+              <Badge variant={etherealFound ? 'found' : 'missing'} className="w-fit">
                 {etherealFound ? t(translations.common.found) : t(translations.common.notFound)}
               </Badge>
             </>

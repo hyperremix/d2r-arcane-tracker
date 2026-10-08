@@ -9,8 +9,11 @@ import {
   type Item,
   type Settings,
 } from 'electron/types/grail';
+import i18n from 'i18next';
 import { useMemo } from 'react';
+import { toast } from 'sonner';
 import { create } from 'zustand';
+import { translations } from '@/i18n/translations';
 import { canItemBeEthereal, canItemBeNormal } from '@/lib/ethereal';
 import { isRecentFind } from '@/lib/utils';
 
@@ -25,6 +28,32 @@ export interface ManualProgressInput {
 }
 
 /**
+ * Outcome of a settings save. `setSettings` never rejects; callers that need to react to a
+ * failed save (e.g. keep a dialog open) inspect `success` instead.
+ */
+export type SettingsSaveResult = { success: true } | { success: false; error: unknown };
+
+/**
+ * Options controlling how `setSettings` reports a failed save.
+ */
+export interface SetSettingsOptions {
+  /**
+   * Show an error toast with a Retry action when the save fails. Defaults to `true`.
+   * Disable when the caller presents its own inline error (e.g. inside a modal dialog).
+   */
+  notifyOnError?: boolean;
+  /**
+   * Follow-up to run once the update was saved (e.g. an IPC call that applies the setting to a
+   * window). The error toast's Retry runs it again for the keys it re-applies, so the follow-up
+   * is not lost when the first attempt failed. A throwing follow-up is logged and never makes
+   * `setSettings` reject.
+   */
+  onSaved?: () => void | Promise<void>;
+}
+
+type SettingsSavedCallback = NonNullable<SetSettingsOptions['onSaved']>;
+
+/**
  * Interface defining the complete state structure and actions for the Grail store.
  * Manages Holy Grail data, UI state, and provides actions for data manipulation.
  */
@@ -35,6 +64,8 @@ interface GrailState {
   progress: GrailProgress[];
   statistics: GrailStatistics | null;
   settings: Settings;
+  /** True once settings (or an explicit theme choice) are known; until then `settings` holds defaults. */
+  settingsHydrated: boolean;
 
   // UI State
   filter: GrailFilter;
@@ -51,7 +82,10 @@ interface GrailState {
   setItems: (items: Item[]) => void;
   setProgress: (progress: GrailProgress[]) => void;
   setStatistics: (statistics: GrailStatistics) => void;
-  setSettings: (settings: Partial<Settings>) => Promise<void>;
+  setSettings: (
+    settings: Partial<Settings>,
+    options?: SetSettingsOptions,
+  ) => Promise<SettingsSaveResult>;
   hydrateSettings: (settings: Partial<Settings>) => void;
   setFilter: (filter: Partial<GrailFilter>) => void;
   setAdvancedFilter: (filter: Partial<AdvancedGrailFilter>) => void;
@@ -144,6 +178,282 @@ const withSettingsUpdate = (
   };
 };
 
+/** Settings whose change requires reloading the (filtered) items and progress. */
+const GRAIL_FILTER_SETTING_KEYS: ReadonlyArray<keyof Settings> = [
+  'grailNormal',
+  'grailEthereal',
+  'grailRunes',
+  'grailRunewords',
+];
+
+/**
+ * Whether an update changes a setting that requires reloading the filtered grail data.
+ * @param {Partial<Settings>} settingsUpdate - The saved update
+ * @returns {boolean} True if items and progress must be reloaded
+ */
+const affectsGrailFilter = (settingsUpdate: Partial<Settings>): boolean =>
+  Object.keys(settingsUpdate).some((key) =>
+    GRAIL_FILTER_SETTING_KEYS.includes(key as keyof Settings),
+  );
+
+/** Prefix of the id of the settings error toast; see `activeErrorToastId`. */
+const SETTINGS_SAVE_ERROR_TOAST_ID_PREFIX = 'settings-save-error';
+
+/**
+ * Bookkeeping for the saves of a single settings key that are currently in flight.
+ */
+interface SettingKeyWrites {
+  /** Token of the most recently started save for this key; it owns the optimistic value. */
+  latestToken: number;
+  /** Number of saves for this key that have not settled yet. */
+  inFlight: number;
+  /** Last value known to be persisted, which a failed latest save rolls back to. */
+  persisted: Settings[keyof Settings];
+}
+
+const settingKeyWrites = new Map<keyof Settings, SettingKeyWrites>();
+let lastWriteToken = 0;
+
+/** A reverted key: the value its failed save attempted and the follow-up to run once saved. */
+interface RevertedSetting {
+  value: Settings[keyof Settings];
+  onSaved?: SettingsSavedCallback;
+}
+
+/**
+ * Runs a save follow-up. Failures are logged only: the setting itself was saved.
+ * @param {SettingsSavedCallback | undefined} onSaved - The follow-up, if any
+ */
+const runOnSaved = async (onSaved: SettingsSavedCallback | undefined): Promise<void> => {
+  try {
+    await onSaved?.();
+  } catch (error) {
+    console.error('Failed to apply a saved setting:', error);
+  }
+};
+
+/**
+ * Keys whose failed save was reverted and offered for Retry on the shared error toast, with
+ * the value the failed save attempted. A key is dropped as soon as it is written or hydrated
+ * again, so a stale Retry can never overwrite a newer value, and the whole map is dropped when
+ * the toast closes, so an abandoned change is never re-applied by a later failure's Retry.
+ */
+const revertedSettings = new Map<keyof Settings, RevertedSetting>();
+
+/**
+ * Id of the error toast currently on screen, if any. Failures while it is showing update it in
+ * place (so e.g. dragging a slider does not stack toasts); once it is gone, the next failure
+ * gets a fresh id. sonner removes toasts by id on its own timers after a dismissal, so reusing
+ * the id of a toast that was just dismissed would let those stale timers remove the new toast.
+ */
+let activeErrorToastId: string | undefined;
+let errorToastCount = 0;
+
+/**
+ * Clears all write tracking. Only intended for tests, which share this module state.
+ */
+export const resetSettingsWriteTracking = (): void => {
+  settingKeyWrites.clear();
+  revertedSettings.clear();
+  activeErrorToastId = undefined;
+  errorToastCount = 0;
+  lastWriteToken = 0;
+};
+
+/**
+ * Stops offering Retry for keys that were written or hydrated since their save failed.
+ * @param {Array<keyof Settings>} keys - The keys that were just written
+ */
+const forgetRevertedSettings = (keys: Array<keyof Settings>): void => {
+  for (const key of keys) {
+    revertedSettings.delete(key);
+  }
+};
+
+/**
+ * Dismisses the error toast once nothing is left to retry. Called when a save succeeded or
+ * settings were hydrated, never at the start of a save: that save may still fail and must then
+ * keep updating the same toast.
+ */
+const dismissErrorToastIfNothingToRetry = (): void => {
+  if (revertedSettings.size > 0 || activeErrorToastId === undefined) {
+    return;
+  }
+  const toastId = activeErrorToastId;
+  activeErrorToastId = undefined;
+  try {
+    toast.dismiss(toastId);
+  } catch (error) {
+    console.error('Failed to dismiss the settings save error notification:', error);
+  }
+};
+
+/**
+ * Registers a settings save as in flight. Must run before the optimistic update is applied so
+ * the value being replaced can be remembered as the last persisted one.
+ * @param {Settings} currentSettings - The settings before the optimistic update
+ * @param {Partial<Settings>} settingsUpdate - The update about to be saved
+ * @returns {number} Token identifying this save
+ */
+const beginSettingsWrite = (
+  currentSettings: Settings,
+  settingsUpdate: Partial<Settings>,
+): number => {
+  lastWriteToken += 1;
+  const keys = Object.keys(settingsUpdate) as Array<keyof Settings>;
+  forgetRevertedSettings(keys);
+  for (const key of keys) {
+    const entry = settingKeyWrites.get(key) ?? {
+      latestToken: lastWriteToken,
+      inFlight: 0,
+      persisted: currentSettings[key],
+    };
+    entry.latestToken = lastWriteToken;
+    entry.inFlight += 1;
+    settingKeyWrites.set(key, entry);
+  }
+  return lastWriteToken;
+};
+
+/**
+ * Settles an in-flight settings save and, on failure, builds the rollback. Writes are tracked
+ * per key so a failure only reverts keys this save still owns: if a newer save for the same key
+ * started in the meantime, that save owns the value (and reverts to the last persisted value
+ * itself if it fails too), regardless of whether the values happen to be equal. Keys whose
+ * value was changed by something else since are left alone.
+ * @param {number} token - Token returned by `beginSettingsWrite`
+ * @param {Settings} currentSettings - The settings as they are now
+ * @param {Partial<Settings>} settingsUpdate - The update that was saved
+ * @param {boolean} succeeded - Whether the save was persisted
+ * @returns {Partial<Settings>} The persisted values of the keys that should be reverted
+ */
+const settleSettingsWrite = (
+  token: number,
+  currentSettings: Settings,
+  settingsUpdate: Partial<Settings>,
+  succeeded: boolean,
+): Partial<Settings> => {
+  const rollback: Partial<Settings> = {};
+  for (const key of Object.keys(settingsUpdate) as Array<keyof Settings>) {
+    const entry = settingKeyWrites.get(key);
+    if (!entry) {
+      continue;
+    }
+    if (succeeded) {
+      // Saves are handled in order by the main process, so the latest settled save wins
+      entry.persisted = settingsUpdate[key];
+    } else if (
+      entry.latestToken === token &&
+      Object.is(currentSettings[key], settingsUpdate[key])
+    ) {
+      Object.assign(rollback, { [key]: entry.persisted });
+    }
+    entry.inFlight -= 1;
+    if (entry.inFlight <= 0) {
+      settingKeyWrites.delete(key);
+    }
+  }
+  return rollback;
+};
+
+/**
+ * Shows the error toast for a failed settings save with a Retry action. The toast is shared,
+ * so Retry re-applies every key still waiting in `revertedSettings` (not just the keys of this
+ * failure) and skips keys that were written since.
+ * @param {Partial<Settings>} reverted - The persisted values the failed keys were reverted to
+ * @param {Partial<Settings>} attempted - The update whose save failed
+ * @param {SettingsSavedCallback | undefined} onSaved - Follow-up of the failed save, re-run by Retry
+ * @param {(update: Partial<Settings>, options?: SetSettingsOptions) => Promise<SettingsSaveResult>} save - Saves an update
+ */
+const notifySettingsSaveFailed = (
+  reverted: Partial<Settings>,
+  attempted: Partial<Settings>,
+  onSaved: SettingsSavedCallback | undefined,
+  save: (update: Partial<Settings>, options?: SetSettingsOptions) => Promise<SettingsSaveResult>,
+): void => {
+  for (const key of Object.keys(reverted) as Array<keyof Settings>) {
+    revertedSettings.set(key, { value: attempted[key], onSaved });
+  }
+  const toastId =
+    activeErrorToastId ?? `${SETTINGS_SAVE_ERROR_TOAST_ID_PREFIX}-${++errorToastCount}`;
+  activeErrorToastId = toastId;
+  // Once the toast closes (timeout or dismiss) its Retry is gone, so the abandoned changes must
+  // not be re-applied by the Retry of a later, unrelated failure. A stale callback of an older
+  // toast must not wipe the state of a newer one.
+  const forgetAbandonedRetry = (): void => {
+    if (activeErrorToastId === toastId) {
+      activeErrorToastId = undefined;
+      revertedSettings.clear();
+    }
+  };
+  // Reporting is best effort: a failing toast or translation must not make setSettings reject
+  try {
+    toast.error(i18n.t(translations.settings.saveError.title), {
+      id: toastId,
+      description: i18n.t(translations.settings.saveError.description),
+      action: {
+        label: i18n.t(translations.common.retry),
+        onClick: (event) => {
+          // Keep the toast until the retry settles: sonner would otherwise remove it by id a
+          // moment later, taking a toast shown for a failed retry with it. A successful retry
+          // dismisses it, a failed one updates it in place.
+          event.preventDefault();
+          if (revertedSettings.size === 0) {
+            return;
+          }
+          const update: Partial<Settings> = {};
+          const followUps = new Set<SettingsSavedCallback>();
+          for (const [key, entry] of revertedSettings) {
+            Object.assign(update, { [key]: entry.value });
+            if (entry.onSaved) {
+              followUps.add(entry.onSaved);
+            }
+          }
+          const retryOnSaved: SettingsSavedCallback | undefined =
+            followUps.size > 0
+              ? async () => {
+                  for (const followUp of followUps) {
+                    await runOnSaved(followUp);
+                  }
+                }
+              : undefined;
+          void save(update, { onSaved: retryOnSaved });
+        },
+      },
+      onDismiss: forgetAbandonedRetry,
+      onAutoClose: forgetAbandonedRetry,
+    });
+  } catch (error) {
+    console.error('Failed to show the settings save error notification:', error);
+    forgetAbandonedRetry();
+  }
+};
+
+/**
+ * Reloads items and progress after a grail filter setting changed. Failures are logged only:
+ * the setting itself was saved, so it must not be rolled back.
+ * @param {(partial: Pick<GrailState, 'items'> | Pick<GrailState, 'progress'>) => void} set - Store setter
+ */
+const reloadFilteredGrailData = async (
+  set: (partial: Pick<GrailState, 'items'> | Pick<GrailState, 'progress'>) => void,
+): Promise<void> => {
+  try {
+    const items = await window.electronAPI?.grail.getItems();
+    if (items) {
+      set({ items });
+      console.log(`Reloaded ${items.length} filtered Holy Grail items from database`);
+    }
+
+    const progressData = await window.electronAPI?.grail.getProgress();
+    if (progressData) {
+      set({ progress: progressData });
+      console.log(`Reloaded ${progressData.length} filtered progress entries from database`);
+    }
+  } catch (error) {
+    console.error('Failed to reload grail data after updating settings:', error);
+  }
+};
+
 /**
  * Zustand store for managing Holy Grail state including items, progress, characters, and settings.
  * Provides actions for data manipulation and persistence to the Electron backend.
@@ -155,6 +465,7 @@ export const useGrailStore = create<GrailState>((set, get) => ({
   progress: [],
   statistics: null,
   settings: defaultSettings,
+  settingsHydrated: false,
   filter: defaultFilter,
   filterResetCount: 0,
   advancedFilter: defaultAdvancedFilter,
@@ -168,42 +479,70 @@ export const useGrailStore = create<GrailState>((set, get) => ({
   setItems: (items) => set({ items }),
   setProgress: (progress) => set({ progress }),
   setStatistics: (statistics) => set({ statistics }),
-  setSettings: async (settingsUpdate) => {
-    // Update local state
-    set((state) => withSettingsUpdate(state, settingsUpdate));
+  setSettings: async (settingsUpdate, options) => {
+    const writeToken = beginSettingsWrite(get().settings, settingsUpdate);
+
+    // Update local state optimistically. An explicit theme choice is a real value even if the
+    // initial settings load failed, so mark settings as hydrated to let the theme be applied and cached.
+    set((state) => ({
+      ...withSettingsUpdate(state, settingsUpdate),
+      ...(settingsUpdate.theme !== undefined ? { settingsHydrated: true } : {}),
+    }));
 
     // Persist to database
     try {
-      await window.electronAPI?.grail.updateSettings(settingsUpdate);
-
-      // Reload data if grail-related settings changed
-      const grailSettingsChanged = Object.keys(settingsUpdate).some((key) =>
-        ['grailNormal', 'grailEthereal', 'grailRunes', 'grailRunewords'].includes(key),
-      );
-
-      if (grailSettingsChanged) {
-        // Reload items and progress to apply filtering
-        const items = await window.electronAPI?.grail.getItems();
-        if (items) {
-          set({ items });
-          console.log(`Reloaded ${items.length} filtered Holy Grail items from database`);
-        }
-
-        const progressData = await window.electronAPI?.grail.getProgress();
-        if (progressData) {
-          set({ progress: progressData });
-          console.log(`Reloaded ${progressData.length} filtered progress entries from database`);
-        }
+      const result = await window.electronAPI?.grail.updateSettings(settingsUpdate);
+      if (result && !result.success) {
+        throw new Error('Settings update was not persisted');
       }
     } catch (error) {
       console.error('Failed to update settings:', error);
+
+      const rollback = settleSettingsWrite(writeToken, get().settings, settingsUpdate, false);
+      const revertedKeys = Object.keys(rollback) as Array<keyof Settings>;
+      // Nothing to revert or report if every key was already superseded by a newer update
+      if (revertedKeys.length > 0) {
+        set((state) => withSettingsUpdate(state, rollback));
+        if (options?.notifyOnError !== false) {
+          notifySettingsSaveFailed(
+            rollback,
+            settingsUpdate,
+            options?.onSaved,
+            (update, retryOptions) => get().setSettings(update, retryOptions),
+          );
+        }
+      }
+
+      return { success: false, error };
     }
+    settleSettingsWrite(writeToken, get().settings, settingsUpdate, true);
+    dismissErrorToastIfNothingToRetry();
+    await runOnSaved(options?.onSaved);
+
+    // The setting is saved at this point; a failed reload only leaves stale item data and
+    // must not roll the setting back.
+    if (affectsGrailFilter(settingsUpdate)) {
+      await reloadFilteredGrailData(set);
+    }
+
+    return { success: true };
   },
   hydrateSettings: (settingsUpdate) => {
     // Update local state only, without persisting to database
     // This is used when loading settings from the database to avoid triggering
     // settings-updated events that would cause unwanted side effects (e.g., widget resize)
-    set((state) => withSettingsUpdate(state, settingsUpdate));
+    const keys = Object.keys(settingsUpdate) as Array<keyof Settings>;
+    forgetRevertedSettings(keys);
+    dismissErrorToastIfNothingToRetry();
+    // The hydrated value is what the database holds, so it is also what a failed in-flight
+    // save of that key must roll back to
+    for (const key of keys) {
+      const entry = settingKeyWrites.get(key);
+      if (entry) {
+        entry.persisted = settingsUpdate[key];
+      }
+    }
+    set((state) => ({ ...withSettingsUpdate(state, settingsUpdate), settingsHydrated: true }));
   },
   setFilter: (filterUpdate) =>
     set((state) => ({
@@ -279,7 +618,7 @@ export const useGrailStore = create<GrailState>((set, get) => ({
       // Load settings first
       const settingsData = await window.electronAPI?.grail.getSettings();
       if (settingsData) {
-        set((state) => withSettingsUpdate(state, settingsData));
+        set((state) => ({ ...withSettingsUpdate(state, settingsData), settingsHydrated: true }));
         console.log('Reloaded settings from database');
       }
 

@@ -164,6 +164,20 @@ describe('When GrailTracker is rendered', () => {
   });
 });
 
+describe('When GrailTracker is rendered as a page', () => {
+  it('If the statistics are loaded, Then exactly one level-1 heading is present', () => {
+    // Arrange
+    setupStatistics();
+
+    // Act
+    render(<GrailTracker />);
+
+    // Assert
+    expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
+    expect(screen.getByRole('heading', { level: 1, name: 'Holy Grail' })).toBeInTheDocument();
+  });
+});
+
 describe('When GrailTracker mounts', () => {
   describe('If the initial data load is pending and then resolves', () => {
     it('Then the store loading flag is true during the load and false afterwards', async () => {
