@@ -181,7 +181,20 @@ export function RunewordCalculator() {
     }
   };
 
-  const nextAvailability = broaderAvailability[availability];
+  // Only suggest a broader tier when it would reveal results under the active search and rune filters.
+  const nextAvailability = useMemo(() => {
+    const next = broaderAvailability[availability];
+    if (!next) {
+      return undefined;
+    }
+    const byName = filterRunewordsByName(allRunewords, searchTerm);
+    const hasResults =
+      filterRunewordsByRunes(byName, selectedRunes, next, availableRunes).length > 0;
+    return hasResults ? next : undefined;
+  }, [allRunewords, searchTerm, selectedRunes, availability, availableRunes]);
+
+  // "Nothing craftable" is only a valid diagnosis when no search or rune filter narrows the list.
+  const hasActiveFilters = searchTerm.trim() !== '' || selectedRunes.length > 0;
 
   return (
     <div className="flex h-full gap-6 p-6">
@@ -269,7 +282,7 @@ export function RunewordCalculator() {
         {!isLoading && filteredRunewords.length === 0 && (
           <div className="py-12 text-center">
             <p className="text-lg text-muted-foreground">
-              {availability === 'craftable'
+              {availability === 'craftable' && !hasActiveFilters
                 ? t(translations.runeword.calculator.noCraftable)
                 : t(translations.runeword.calculator.noRunewordsFound)}
             </p>

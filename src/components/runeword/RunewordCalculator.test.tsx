@@ -151,6 +151,65 @@ describe('RunewordCalculator', () => {
     });
   });
 
+  describe('filtered empty state', () => {
+    it('If a search hides every craftable runeword, then the generic empty state is shown instead of claiming nothing is craftable', async () => {
+      // Arrange
+      stubElectronApi();
+      await renderCalculator();
+
+      // Act
+      fireEvent.change(screen.getByPlaceholderText('Search runewords...'), {
+        target: { value: 'Enigma' },
+      });
+
+      // Assert
+      expect(screen.getByText('No runewords found')).toBeInTheDocument();
+      expect(
+        screen.queryByText("You can't craft any runeword with your current runes"),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.getByRole('button', { name: 'Show runewords missing at most 1 rune' }),
+      ).toBeInTheDocument();
+    });
+
+    it('If a search matches nothing in any tier, then the empty state offers no broader tier', async () => {
+      // Arrange
+      stubElectronApi();
+      await renderCalculator();
+
+      // Act
+      fireEvent.change(screen.getByPlaceholderText('Search runewords...'), {
+        target: { value: 'zzz' },
+      });
+
+      // Assert
+      expect(screen.getByText('No runewords found')).toBeInTheDocument();
+      expect(
+        screen.queryByRole('button', { name: 'Show runewords missing at most 1 rune' }),
+      ).not.toBeInTheDocument();
+    });
+
+    it('If a search leaves no runewords missing at most 1 rune, then Show all is only offered when it would reveal results', async () => {
+      // Arrange
+      stubElectronApi();
+      await renderCalculator();
+      fireEvent.click(screen.getByRole('button', { name: 'Missing ≤ 1' }));
+      const search = screen.getByPlaceholderText('Search runewords...');
+
+      // Act
+      fireEvent.change(search, { target: { value: 'zzz' } });
+
+      // Assert
+      expect(screen.queryByRole('button', { name: 'Show all runewords' })).not.toBeInTheDocument();
+
+      // Act
+      fireEvent.change(search, { target: { value: 'Infinity' } });
+
+      // Assert
+      expect(screen.getByRole('button', { name: 'Show all runewords' })).toBeInTheDocument();
+    });
+  });
+
   describe('rune selection', () => {
     it('When several runes are selected, then only runewords using all of them show', async () => {
       // Arrange
