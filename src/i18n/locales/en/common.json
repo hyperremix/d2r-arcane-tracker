@@ -669,8 +669,7 @@
       "availabilityLegend": "Show runewords",
       "availability": {
         "craftable": "Craftable now",
-        "missingOne": "Missing ≤ 1",
-        "all": "All"
+        "missingOne": "Missing ≤ 1"
       },
       "refreshRunes": "Refresh runes",
       "refreshFailed": "Failed to refresh runes from save files",
@@ -683,7 +682,6 @@
       "allRunesAvailable": "All runes available",
       "runesOwned": "{{available}}/{{total}} runes",
       "runesOwnedLabel": "{{available}} of {{total}} runes available",
-      "missingRune": "Missing",
       "missingRuneTooltip": "{{rune}} (missing)"
     },
     "filters": {

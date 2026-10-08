@@ -173,7 +173,7 @@ function RuneImage({
 }: RuneImageProps) {
   const { t } = useTranslation();
   const missingTooltip = t(translations.runeword.card.missingRuneTooltip, { rune: runeName });
-  const missingLabel = t(translations.runeword.card.missingRune);
+  const missingLabel = t(translations.grail.advancedSearch.statusMissing);
 
   return (
     <Tooltip>
