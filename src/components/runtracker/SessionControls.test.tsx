@@ -407,6 +407,8 @@ describe('SessionControls', () => {
           platform: 'win32',
           runTracker: {
             getMemoryStatus: vi.fn().mockResolvedValue({ available: true, reason: null }),
+            getGlobalHotkeyStatus: vi.fn().mockResolvedValue({ enabled: false, registrations: [] }),
+            onGlobalHotkeyStatus: vi.fn(() => vi.fn()),
           },
         },
         writable: true,
@@ -703,6 +705,8 @@ describe('SessionControls', () => {
           platform: 'win32',
           runTracker: {
             getMemoryStatus: vi.fn().mockResolvedValue({ available: true, reason: null }),
+            getGlobalHotkeyStatus: vi.fn().mockResolvedValue({ enabled: false, registrations: [] }),
+            onGlobalHotkeyStatus: vi.fn(() => vi.fn()),
           },
         },
         writable: true,

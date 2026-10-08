@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { RunTrackerService } from '../services/runTracker';
 import type { Settings } from '../types/grail';
 
 const mocks = vi.hoisted(() => ({
@@ -63,6 +64,8 @@ const { closeGlobalHotkeys, initializeGlobalHotkeyHandlers } = await import(
   './globalHotkeyHandlers'
 );
 
+const runTracker = {} as RunTrackerService;
+
 function createMainWindow(focused: boolean) {
   return { isDestroyed: () => false, isFocused: vi.fn(() => focused) };
 }
@@ -95,7 +98,7 @@ describe('When the global hotkey handlers are initialized', () => {
     const mainWindow = createMainWindow(false);
 
     // Act
-    initializeGlobalHotkeyHandlers(null, () => mainWindow as never);
+    initializeGlobalHotkeyHandlers(runTracker, () => mainWindow as never);
     const status = await mocks.handlers.get('run-tracker:get-global-hotkey-status')?.({});
 
     // Assert
@@ -108,7 +111,7 @@ describe('When the global hotkey handlers are initialized', () => {
     // Arrange
     let focused = false;
     const mainWindow = { isDestroyed: () => false, isFocused: () => focused };
-    initializeGlobalHotkeyHandlers(null, () => mainWindow as never);
+    initializeGlobalHotkeyHandlers(runTracker, () => mainWindow as never);
 
     // Act
     focused = true;
@@ -124,7 +127,7 @@ describe('When the global hotkey handlers are initialized', () => {
 
   it('When the global hotkeys setting is turned off, Then the hotkeys are unregistered', () => {
     // Arrange
-    initializeGlobalHotkeyHandlers(null, () => null);
+    initializeGlobalHotkeyHandlers(runTracker, () => null);
 
     // Act
     mocks.settings = { runTrackerGlobalHotkeys: false };
@@ -140,7 +143,7 @@ describe('When the global hotkey handlers are initialized', () => {
 
   it('If an unrelated setting changes, Then the hotkeys are not re-registered', async () => {
     // Arrange
-    initializeGlobalHotkeyHandlers(null, () => null);
+    initializeGlobalHotkeyHandlers(runTracker, () => null);
     const { globalShortcut } = await import('electron');
     vi.mocked(globalShortcut.register).mockClear();
 
@@ -153,7 +156,7 @@ describe('When the global hotkey handlers are initialized', () => {
 
   it('When the hotkeys are closed on quit, Then hotkeys, IPC handlers and listeners are removed', () => {
     // Arrange
-    initializeGlobalHotkeyHandlers(null, () => null);
+    initializeGlobalHotkeyHandlers(runTracker, () => null);
 
     // Act
     closeGlobalHotkeys();
@@ -164,5 +167,33 @@ describe('When the global hotkey handlers are initialized', () => {
     expect(mocks.appListeners.get('browser-window-focus')?.size).toBe(0);
     expect(mocks.appListeners.get('browser-window-blur')?.size).toBe(0);
     expect(mocks.settingsListeners.size).toBe(0);
+  });
+
+  it('If the run tracker is unavailable, Then no hotkeys are registered and the status stays disabled', async () => {
+    // Arrange
+    const mainWindow = createMainWindow(false);
+
+    // Act
+    initializeGlobalHotkeyHandlers(undefined, () => mainWindow as never);
+    const status = await mocks.handlers.get('run-tracker:get-global-hotkey-status')?.({});
+
+    // Assert
+    expect(mocks.registered.size).toBe(0);
+    expect(status).toEqual({ enabled: false, registrations: [] });
+    expect(mocks.settingsListeners.size).toBe(0);
+    expect(mocks.appListeners.get('browser-window-blur')?.size ?? 0).toBe(0);
+  });
+
+  it('If the run tracker is unavailable and the setting changes, Then the status handler is still removed on close', () => {
+    // Arrange
+    initializeGlobalHotkeyHandlers(undefined, () => null);
+    emitSettingsUpdated({ runTrackerGlobalHotkeys: true });
+
+    // Act
+    closeGlobalHotkeys();
+
+    // Assert
+    expect(mocks.registered.size).toBe(0);
+    expect(mocks.handlers.has('run-tracker:get-global-hotkey-status')).toBe(false);
   });
 });

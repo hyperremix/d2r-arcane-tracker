@@ -5,21 +5,14 @@ import type {
   RunTrackerShortcutAction,
   Settings,
 } from '../types/grail';
-import { RUN_TRACKER_SHORTCUT_ACTIONS } from '../utils/runTrackerShortcuts';
+import {
+  DEFAULT_RUN_TRACKER_SHORTCUTS,
+  RUN_TRACKER_SHORTCUT_ACTIONS,
+} from '../utils/runTrackerShortcuts';
 import { createServiceLogger } from '../utils/serviceLogger';
 import type { RunTrackerService } from './runTracker';
 
 const log = createServiceLogger('GlobalHotkeyService');
-
-/**
- * Default run tracker shortcuts (kept in sync with the renderer defaults).
- */
-export const DEFAULT_RUN_TRACKER_SHORTCUTS: Readonly<Record<RunTrackerShortcutAction, string>> = {
-  startRun: 'Ctrl+R',
-  pauseRun: 'Ctrl+Space',
-  endRun: 'Ctrl+E',
-  endSession: 'Ctrl+Shift+E',
-};
 
 type AcceleratorModifier = 'CommandOrControl' | 'Alt' | 'Shift';
 
@@ -39,6 +32,7 @@ const MODIFIER_TOKENS: Record<string, AcceleratorModifier> = {
 
 const NAMED_KEYS: Record<string, string> = {
   space: 'Space',
+  plus: 'Plus',
   spacebar: 'Space',
   esc: 'Escape',
   escape: 'Escape',
@@ -99,7 +93,9 @@ export function shortcutToAccelerator(shortcut: unknown): string | undefined {
     return undefined;
   }
 
-  const tokens = shortcut
+  // A trailing "+" that follows a separator (e.g. "Ctrl++") is the plus key itself, not a separator
+  const normalizedShortcut = shortcut.replace(/(^|\+)(\s*)\+\s*$/, '$1$2plus');
+  const tokens = normalizedShortcut
     .split('+')
     .map((token) => token.replace(/\s+/g, '').toLowerCase())
     .filter(Boolean);
@@ -194,7 +190,7 @@ export interface GlobalHotkeyServiceOptions {
   /** Reads the current settings from the database. */
   getSettings: () => Settings;
   /** Returns the run tracker service, if it was initialized. */
-  getRunTracker: () => GlobalHotkeyRunTracker | null;
+  getRunTracker: () => GlobalHotkeyRunTracker | undefined;
   /** Whether the main app window is focused (its own keyboard listener handles shortcuts then). */
   isAppFocused: () => boolean;
   /** Called whenever the registration status changes. */

@@ -249,7 +249,7 @@ export function RunTrackerSettings() {
 
           {failedGlobalHotkeys.length > 0 && (
             <Alert variant="destructive">
-              <AlertCircle className="h-4 w-4" />
+              <AlertCircle className="h-4 w-4" aria-hidden="true" />
               <AlertDescription className="text-xs">
                 <strong>
                   {t(translations.settings.runTracker.globalHotkeysRegistrationFailed)}

@@ -24,13 +24,13 @@ export function useGlobalHotkeyStatus(): GlobalHotkeyStatus | undefined {
     let cancelled = false;
     let receivedUpdate = false;
 
-    const unsubscribe = runTrackerApi?.onGlobalHotkeyStatus?.((nextStatus) => {
+    const unsubscribe = runTrackerApi?.onGlobalHotkeyStatus((nextStatus) => {
       receivedUpdate = true;
       setStatus(nextStatus);
     });
 
     runTrackerApi
-      ?.getGlobalHotkeyStatus?.()
+      ?.getGlobalHotkeyStatus()
       .then((initialStatus) => {
         // A pushed update is newer than the initial query result
         if (!cancelled && !receivedUpdate) {

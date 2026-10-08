@@ -44,7 +44,7 @@ function createRunTracker(
 
 function createService(overrides: {
   settings?: Partial<Settings>;
-  runTracker?: MockRunTracker | null;
+  runTracker?: MockRunTracker;
   focused?: boolean;
   platform?: NodeJS.Platform;
 }) {
@@ -53,7 +53,7 @@ function createService(overrides: {
   const onStatusChange = vi.fn<(status: GlobalHotkeyStatus) => void>();
   const options: GlobalHotkeyServiceOptions = {
     getSettings: () => settings,
-    getRunTracker: () => (overrides.runTracker ?? null) as GlobalHotkeyRunTracker | null,
+    getRunTracker: () => overrides.runTracker as GlobalHotkeyRunTracker | undefined,
     isAppFocused: () => focused,
     onStatusChange,
     platform: overrides.platform ?? 'win32',
@@ -87,11 +87,15 @@ describe('When converting a stored shortcut to an Electron accelerator', () => {
     ['Shift+Alt+Ctrl+1', 'CommandOrControl+Alt+Shift+1'],
     ['Alt+ArrowUp', 'Alt+Up'],
     ['Ctrl+Esc', 'CommandOrControl+Escape'],
+    ['Ctrl++', 'CommandOrControl+Plus'],
+    ['Ctrl+Shift++', 'CommandOrControl+Shift+Plus'],
+    ['Alt + +', 'Alt+Plus'],
+    ['Ctrl+Plus', 'CommandOrControl+Plus'],
     ['Ctrl+Pageup', 'CommandOrControl+PageUp'],
     ['F5', 'F5'],
     ['Shift+F12', 'Shift+F12'],
     ['ctrl + /', 'CommandOrControl+/'],
-  ])('Then "%s" becomes "%s"', (shortcut, expected) => {
+  ])('If the shortcut is "%s", Then it becomes "%s"', (shortcut, expected) => {
     // Arrange & Act
     const accelerator = shortcutToAccelerator(shortcut);
 
@@ -104,6 +108,8 @@ describe('When converting a stored shortcut to an Electron accelerator', () => {
     ['Shift+R'],
     ['Space'],
     ['Ctrl+'],
+    ['Shift++'],
+    ['+'],
     ['Ctrl+Shift'],
     ['Ctrl+R+E'],
     ['Ctrl+MediaPlay'],

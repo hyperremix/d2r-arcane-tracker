@@ -26,6 +26,8 @@ describe('When RunTrackerSettings is rendered on Windows with auto mode enabled'
       platform: 'win32',
       runTracker: {
         getMemoryStatus: vi.fn().mockResolvedValue({ available: true, reason: null }),
+        getGlobalHotkeyStatus: vi.fn().mockResolvedValue({ enabled: false, registrations: [] }),
+        onGlobalHotkeyStatus: vi.fn(() => vi.fn()),
       },
     } as unknown as typeof window.electronAPI;
     setupGrailStore({

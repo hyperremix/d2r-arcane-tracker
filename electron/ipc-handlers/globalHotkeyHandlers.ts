@@ -13,7 +13,7 @@ const HOTKEY_SETTING_KEYS: readonly (keyof Settings)[] = [
   'runTrackerShortcuts',
 ];
 
-let service: GlobalHotkeyService | null = null;
+let service: GlobalHotkeyService | undefined;
 const cleanups: Array<() => void> = [];
 
 function broadcastStatus(status: GlobalHotkeyStatus): void {
@@ -27,14 +27,25 @@ function broadcastStatus(status: GlobalHotkeyStatus): void {
 /**
  * Initializes the run tracker global hotkeys and their IPC handlers.
  * Must be called after the app is ready.
- * @param runTracker - The run tracker service, or null if it failed to initialize
+ * @param runTracker - The run tracker service, or undefined if it failed to initialize. Without it
+ *   no hotkeys are registered (they would swallow key presses without being able to act on them).
  * @param getMainWindow - Returns the current main window (it can be re-created on macOS)
  */
 export function initializeGlobalHotkeyHandlers(
-  runTracker: RunTrackerService | null,
+  runTracker: RunTrackerService | undefined,
   getMainWindow: () => BrowserWindow | null,
 ): void {
   closeGlobalHotkeys();
+
+  if (!runTracker) {
+    console.error('[globalHotkeys] Run tracker unavailable, global hotkeys are not registered');
+    ipcMain.handle(
+      'run-tracker:get-global-hotkey-status',
+      (): GlobalHotkeyStatus => ({ enabled: false, registrations: [] }),
+    );
+    cleanups.push(() => ipcMain.removeHandler('run-tracker:get-global-hotkey-status'));
+    return;
+  }
 
   const hotkeys = new GlobalHotkeyService({
     getSettings: () => grailDatabase.getAllSettings(),
@@ -79,5 +90,5 @@ export function closeGlobalHotkeys(): void {
   cleanups.length = 0;
 
   service?.dispose();
-  service = null;
+  service = undefined;
 }

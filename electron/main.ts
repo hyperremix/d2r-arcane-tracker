@@ -265,7 +265,7 @@ app.whenReady().then(() => {
   }
 
   // Opt-in global hotkeys for the run tracker (work while D2R is focused)
-  initializeGlobalHotkeyHandlers(runTracker ?? null, () => mainWindow);
+  initializeGlobalHotkeyHandlers(runTracker, () => mainWindow);
 
   initializeDialogHandlers();
   initializeShellHandlers();
