@@ -243,14 +243,17 @@ describe('When useTheme hook is used', () => {
       });
       renderHook(() => useTheme());
       expect(document.documentElement.classList.contains('dark')).toBe(false);
+      if (!changeHandler) {
+        throw new Error('Expected the OS preference change handler to be registered');
+      }
+      const handler = changeHandler;
 
       // Act
       act(() => {
-        changeHandler?.({ matches: true } as MediaQueryListEvent);
+        handler({ matches: true } as MediaQueryListEvent);
       });
 
       // Assert
-      expect(changeHandler).toBeDefined();
       expect(document.documentElement.classList.contains('dark')).toBe(true);
     });
   });

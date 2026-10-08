@@ -1,4 +1,6 @@
 import type { Settings } from 'electron/types/grail';
+import type { MainWindowThemeColors } from 'electron/window/mainWindowTheme';
+import { MAIN_WINDOW_THEME_COLORS } from 'electron/window/mainWindowTheme';
 
 /**
  * A theme preference that has been resolved to a concrete appearance.
@@ -18,14 +20,10 @@ export const THEME_PREFERENCE_STORAGE_KEY = 'd2r-arcane-tracker:theme-preference
 
 /**
  * Window chrome colors (Windows title bar overlay) per resolved theme.
+ * Shared with the main process so the window background and the title bar overlay can't drift.
  */
-export const THEME_CHROME_COLORS: Record<
-  ResolvedTheme,
-  { backgroundColor: string; symbolColor: string }
-> = {
-  dark: { backgroundColor: '#09090b', symbolColor: '#ffffff' },
-  light: { backgroundColor: '#ffffff', symbolColor: '#000000' },
-};
+export const THEME_CHROME_COLORS: Record<ResolvedTheme, MainWindowThemeColors> =
+  MAIN_WINDOW_THEME_COLORS;
 
 /**
  * Resolves a theme preference to a concrete light/dark appearance.
@@ -38,6 +36,20 @@ export function resolveTheme(theme: Settings['theme'], systemPrefersDark: boolea
     return systemPrefersDark ? 'dark' : 'light';
   }
   return theme;
+}
+
+/**
+ * Resolves a possibly missing cached preference against the current OS preference, so `system`
+ * follows OS changes made while the app was closed. Defaults to `system` when nothing is cached.
+ * @param {Settings['theme'] | undefined} cachedPreference - The preference cached by a previous session
+ * @param {boolean} systemPrefersDark - Whether the OS currently prefers a dark color scheme
+ * @returns {ResolvedTheme} The best-guess theme before settings have loaded
+ */
+export function resolveCachedTheme(
+  cachedPreference: Settings['theme'] | undefined,
+  systemPrefersDark: boolean,
+): ResolvedTheme {
+  return resolveTheme(cachedPreference ?? 'system', systemPrefersDark);
 }
 
 /**
@@ -96,21 +108,12 @@ export function applyThemeClass(
 }
 
 /**
- * Gets the theme to use before settings have loaded: the cached preference resolved against the
- * current OS preference (so `system` follows OS changes made while the app was closed), defaulting
- * to `system` when nothing is cached.
- * @returns {ResolvedTheme} The best-guess theme for startup
- */
-export function getInitialResolvedTheme(): ResolvedTheme {
-  return resolveTheme(readCachedThemePreference() ?? 'system', getSystemPrefersDark());
-}
-
-/**
- * Applies the startup theme synchronously, before React mounts, to avoid a light flash.
+ * Applies the startup theme synchronously, before React mounts, to avoid a light flash. Uses the
+ * cached preference resolved against the current OS preference.
  * @returns {ResolvedTheme} The theme that was applied
  */
 export function applyInitialTheme(): ResolvedTheme {
-  const theme = getInitialResolvedTheme();
+  const theme = resolveCachedTheme(readCachedThemePreference(), getSystemPrefersDark());
   applyThemeClass(theme);
   return theme;
 }

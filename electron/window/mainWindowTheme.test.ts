@@ -4,8 +4,11 @@ import { getMainWindowThemeColors, MAIN_WINDOW_THEME_COLORS } from './mainWindow
 describe('When getMainWindowThemeColors is called', () => {
   describe('If the stored theme is dark', () => {
     it('Then should use the dark colors even if the OS prefers light', () => {
-      // Arrange / Act
-      const colors = getMainWindowThemeColors('dark', false);
+      // Arrange
+      const osPrefersDark = false;
+
+      // Act
+      const colors = getMainWindowThemeColors('dark', osPrefersDark);
 
       // Assert
       expect(colors).toEqual(MAIN_WINDOW_THEME_COLORS.dark);
@@ -14,8 +17,11 @@ describe('When getMainWindowThemeColors is called', () => {
 
   describe('If the stored theme is light', () => {
     it('Then should use the light colors even if the OS prefers dark', () => {
-      // Arrange / Act
-      const colors = getMainWindowThemeColors('light', true);
+      // Arrange
+      const osPrefersDark = true;
+
+      // Act
+      const colors = getMainWindowThemeColors('light', osPrefersDark);
 
       // Assert
       expect(colors).toEqual(MAIN_WINDOW_THEME_COLORS.light);
@@ -24,20 +30,26 @@ describe('When getMainWindowThemeColors is called', () => {
 
   describe('If the stored theme is system', () => {
     it('Then should follow the OS preference', () => {
-      // Arrange / Act
-      const prefersDark = getMainWindowThemeColors('system', true);
-      const prefersLight = getMainWindowThemeColors('system', false);
+      // Arrange
+      const storedTheme = 'system';
+
+      // Act
+      const prefersDark = getMainWindowThemeColors(storedTheme, true);
+      const prefersLight = getMainWindowThemeColors(storedTheme, false);
 
       // Assert
-      expect(prefersDark.backgroundColor).toBe('#09090b');
-      expect(prefersLight.backgroundColor).toBe('#ffffff');
+      expect(prefersDark).toEqual(MAIN_WINDOW_THEME_COLORS.dark);
+      expect(prefersLight).toEqual(MAIN_WINDOW_THEME_COLORS.light);
     });
   });
 
   describe('If the stored theme could not be read', () => {
     it('Then should fall back to the OS preference', () => {
-      // Arrange / Act
-      const colors = getMainWindowThemeColors(undefined, true);
+      // Arrange
+      const storedTheme = undefined;
+
+      // Act
+      const colors = getMainWindowThemeColors(storedTheme, true);
 
       // Assert
       expect(colors).toEqual(MAIN_WINDOW_THEME_COLORS.dark);

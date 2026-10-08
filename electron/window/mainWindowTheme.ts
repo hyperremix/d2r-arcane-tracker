@@ -2,7 +2,8 @@ import type { Settings } from '../types/grail';
 
 /**
  * Window colors matching the renderer's `--background` token per resolved theme.
- * Kept in sync with the title bar overlay colors applied by the renderer's `useTheme` hook.
+ * Also imported by the renderer (`THEME_CHROME_COLORS`) for the title bar overlay colors applied
+ * by its `useTheme` hook, so both processes use one table.
  */
 export const MAIN_WINDOW_THEME_COLORS = {
   dark: { backgroundColor: '#09090b', symbolColor: '#ffffff' },

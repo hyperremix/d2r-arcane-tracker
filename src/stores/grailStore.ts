@@ -35,7 +35,7 @@ interface GrailState {
   progress: GrailProgress[];
   statistics: GrailStatistics | null;
   settings: Settings;
-  /** True once settings have been loaded from the database (until then `settings` holds defaults). */
+  /** True once settings (or an explicit theme choice) are known; until then `settings` holds defaults. */
   settingsHydrated: boolean;
 
   // UI State
@@ -172,8 +172,12 @@ export const useGrailStore = create<GrailState>((set, get) => ({
   setProgress: (progress) => set({ progress }),
   setStatistics: (statistics) => set({ statistics }),
   setSettings: async (settingsUpdate) => {
-    // Update local state
-    set((state) => withSettingsUpdate(state, settingsUpdate));
+    // Update local state. An explicit theme choice is a real value even if the initial settings
+    // load failed, so mark settings as hydrated to let the theme be applied and cached.
+    set((state) => ({
+      ...withSettingsUpdate(state, settingsUpdate),
+      ...(settingsUpdate.theme !== undefined ? { settingsHydrated: true } : {}),
+    }));
 
     // Persist to database
     try {
@@ -282,7 +286,7 @@ export const useGrailStore = create<GrailState>((set, get) => ({
       // Load settings first
       const settingsData = await window.electronAPI?.grail.getSettings();
       if (settingsData) {
-        set((state) => withSettingsUpdate(state, settingsData));
+        set((state) => ({ ...withSettingsUpdate(state, settingsData), settingsHydrated: true }));
         console.log('Reloaded settings from database');
       }
 

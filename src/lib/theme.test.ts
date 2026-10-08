@@ -1,3 +1,4 @@
+import { MAIN_WINDOW_THEME_COLORS } from 'electron/window/mainWindowTheme';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   applyInitialTheme,
@@ -5,16 +6,22 @@ import {
   cacheThemePreference,
   getSystemPrefersDark,
   readCachedThemePreference,
+  resolveCachedTheme,
   resolveTheme,
+  THEME_CHROME_COLORS,
   THEME_PREFERENCE_STORAGE_KEY,
 } from './theme';
 
 describe('When resolveTheme is called', () => {
   describe('If the preference is light or dark', () => {
     it('Then should return it regardless of the OS preference', () => {
-      // Arrange / Act
-      const light = resolveTheme('light', true);
-      const dark = resolveTheme('dark', false);
+      // Arrange
+      const systemPrefersDarkForLight = true;
+      const systemPrefersDarkForDark = false;
+
+      // Act
+      const light = resolveTheme('light', systemPrefersDarkForLight);
+      const dark = resolveTheme('dark', systemPrefersDarkForDark);
 
       // Assert
       expect(light).toBe('light');
@@ -24,13 +31,79 @@ describe('When resolveTheme is called', () => {
 
   describe('If the preference is system', () => {
     it('Then should follow the OS preference', () => {
-      // Arrange / Act
-      const prefersDark = resolveTheme('system', true);
-      const prefersLight = resolveTheme('system', false);
+      // Arrange
+      const systemPreferences = { dark: true, light: false };
+
+      // Act
+      const prefersDark = resolveTheme('system', systemPreferences.dark);
+      const prefersLight = resolveTheme('system', systemPreferences.light);
 
       // Assert
       expect(prefersDark).toBe('dark');
       expect(prefersLight).toBe('light');
+    });
+  });
+});
+
+describe('When resolveCachedTheme is called', () => {
+  describe('If an explicit preference was cached', () => {
+    it('Then should return it regardless of the OS preference', () => {
+      // Arrange
+      const cachedDark = 'dark';
+      const cachedLight = 'light';
+
+      // Act
+      const dark = resolveCachedTheme(cachedDark, false);
+      const light = resolveCachedTheme(cachedLight, true);
+
+      // Assert
+      expect(dark).toBe('dark');
+      expect(light).toBe('light');
+    });
+  });
+
+  describe('If system was cached', () => {
+    it('Then should re-resolve it against the current OS preference', () => {
+      // Arrange
+      const cached = 'system';
+
+      // Act
+      const prefersDark = resolveCachedTheme(cached, true);
+      const prefersLight = resolveCachedTheme(cached, false);
+
+      // Assert
+      expect(prefersDark).toBe('dark');
+      expect(prefersLight).toBe('light');
+    });
+  });
+
+  describe('If nothing was cached', () => {
+    it('Then should follow the OS preference', () => {
+      // Arrange
+      const cached = undefined;
+
+      // Act
+      const prefersDark = resolveCachedTheme(cached, true);
+      const prefersLight = resolveCachedTheme(cached, false);
+
+      // Assert
+      expect(prefersDark).toBe('dark');
+      expect(prefersLight).toBe('light');
+    });
+  });
+});
+
+describe('When the window chrome colors are read', () => {
+  describe('If the renderer and main process tables are compared', () => {
+    it('Then should be the single table shared with the main window', () => {
+      // Arrange
+      const rendererColors = THEME_CHROME_COLORS;
+
+      // Act
+      const mainColors = MAIN_WINDOW_THEME_COLORS;
+
+      // Assert
+      expect(rendererColors).toEqual(mainColors);
     });
   });
 });
@@ -60,8 +133,11 @@ describe('When the theme preference cache is used', () => {
 
   describe('If nothing was cached', () => {
     it('Then should return undefined', () => {
-      // Arrange / Act
-      const cached = readCachedThemePreference();
+      // Arrange
+      const storage = localStorage;
+
+      // Act
+      const cached = readCachedThemePreference(storage);
 
       // Assert
       expect(cached).toBeUndefined();

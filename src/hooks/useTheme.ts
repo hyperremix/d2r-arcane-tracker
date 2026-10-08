@@ -5,6 +5,7 @@ import {
   cacheThemePreference,
   getSystemPrefersDark,
   readCachedThemePreference,
+  resolveCachedTheme,
   resolveTheme,
   SYSTEM_DARK_QUERY,
   THEME_CHROME_COLORS,
@@ -44,7 +45,7 @@ export function useResolvedTheme(): ResolvedTheme {
   }, [theme]);
 
   if (!settingsHydrated) {
-    return resolveTheme(cachedPreference ?? 'system', systemPrefersDark);
+    return resolveCachedTheme(cachedPreference, systemPrefersDark);
   }
   return resolveTheme(theme, systemPrefersDark);
 }
