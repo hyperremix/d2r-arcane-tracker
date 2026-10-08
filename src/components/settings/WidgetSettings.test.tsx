@@ -242,6 +242,82 @@ describe('WidgetSettings', () => {
     });
   });
 
+  describe('If enabling the widget fails to save and the toast Retry succeeds', () => {
+    const spies: Array<{ mockRestore: () => void }> = [];
+
+    beforeEach(() => {
+      spies.push(vi.spyOn(console, 'error').mockImplementation(() => undefined));
+      resetSettingsWriteTracking();
+      useGrailStore.setState((state) => ({
+        settings: { ...state.settings, widgetEnabled: false, grailEthereal: true },
+      }));
+    });
+
+    afterEach(() => {
+      for (const spy of spies.splice(0)) {
+        spy.mockRestore();
+      }
+      resetSettingsWriteTracking();
+    });
+
+    it('Then the widget window is opened by the Retry, not only by the first attempt', async () => {
+      // Arrange
+      const toastError = vi.spyOn(toast, 'error').mockImplementation(() => 'toast-id');
+      spies.push(toastError);
+      const updateSettings = vi
+        .fn()
+        .mockRejectedValueOnce(new Error('database locked'))
+        .mockResolvedValue({ success: true });
+      const toggle = vi.fn().mockResolvedValue({ success: true });
+      Object.defineProperty(window, 'electronAPI', {
+        value: { grail: { updateSettings }, widget: { toggle, updateDisplay: vi.fn() } },
+        configurable: true,
+        writable: true,
+      });
+      render(<WidgetSettings />);
+      await act(async () => {
+        fireEvent.click(screen.getByRole('switch', { name: 'Enable Widget' }));
+      });
+      const options = toastError.mock.calls[0]?.[1] as {
+        action?: { onClick: (event: { preventDefault: () => void }) => void };
+      };
+
+      // Act
+      await act(async () => {
+        options.action?.onClick({ preventDefault: vi.fn() });
+      });
+
+      // Assert
+      expect(updateSettings).toHaveBeenCalledTimes(2);
+      expect(toggle).toHaveBeenCalledTimes(1);
+      expect(toggle).toHaveBeenCalledWith(true, expect.objectContaining({ widgetEnabled: true }));
+    });
+
+    it('If the first attempt fails, Then the widget window is not toggled', async () => {
+      // Arrange
+      vi.spyOn(toast, 'error').mockImplementation(() => 'toast-id');
+      const toggle = vi.fn().mockResolvedValue({ success: true });
+      Object.defineProperty(window, 'electronAPI', {
+        value: {
+          grail: { updateSettings: vi.fn().mockRejectedValue(new Error('database locked')) },
+          widget: { toggle, updateDisplay: vi.fn() },
+        },
+        configurable: true,
+        writable: true,
+      });
+      render(<WidgetSettings />);
+
+      // Act
+      await act(async () => {
+        fireEvent.click(screen.getByRole('switch', { name: 'Enable Widget' }));
+      });
+
+      // Assert
+      expect(toggle).not.toHaveBeenCalled();
+      expect(useGrailStore.getState().settings.widgetEnabled).toBe(false);
+    });
+  });
+
   describe('When the widget is enabled with ethereal tracking', () => {
     const mockSetSettings = vi.fn().mockResolvedValue({ success: true });
 

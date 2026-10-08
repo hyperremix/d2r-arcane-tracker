@@ -43,14 +43,20 @@ export function WidgetSettings() {
 
   const toggleWidget = useCallback(
     async (checked: boolean) => {
-      const result = await setSettings({ widgetEnabled: checked });
-      if (!result.success) {
-        return;
-      }
-      // Toggle widget visibility via IPC
-      await window.electronAPI?.widget.toggle(checked, settings);
+      // The widget window is only created or closed through IPC, so this follow-up must also run
+      // when the error toast's Retry re-applies the change (hence `onSaved`, not code after the
+      // await). Display mode and opacity need no such hook: the widget window applies them itself
+      // when it receives `settings-updated`.
+      await setSettings(
+        { widgetEnabled: checked },
+        {
+          onSaved: async () => {
+            await window.electronAPI?.widget.toggle(checked, useGrailStore.getState().settings);
+          },
+        },
+      );
     },
-    [settings, setSettings],
+    [setSettings],
   );
 
   // Display mode whose auto-switch to 'overall' failed to save. A failed save is reverted, which

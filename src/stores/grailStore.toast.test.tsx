@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { toast } from 'sonner';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Toaster } from '@/components/ui/sonner';
@@ -57,39 +57,78 @@ describe('When a settings save fails and the real Toaster is mounted', () => {
     consoleError?.mockRestore();
   });
 
-  it.each([0, 300])(
-    'If Retry fails again after %i ms, Then the error toast stays visible with a working Retry',
-    async (retryFailureDelayMs) => {
-      // Arrange
-      updateSettings
-        .mockRejectedValueOnce(new Error('database locked'))
-        .mockImplementationOnce(
-          () =>
-            new Promise((_, reject) => {
-              setTimeout(() => reject(new Error('database locked')), retryFailureDelayMs);
-            }),
-        )
-        .mockResolvedValue({ success: true });
-      render(<Toaster />);
-      await act(async () => {
-        await useGrailStore.getState().setSettings({ theme: 'dark' });
-      });
-      fireEvent.click(await screen.findByRole('button', { name: 'Retry' }));
-      await waitFor(() => expect(updateSettings).toHaveBeenCalledTimes(2));
+  const failSave = (key: 'theme' | 'showItemIcons', value: string | boolean) =>
+    act(async () => {
+      await useGrailStore.getState().setSettings({ [key]: value });
+    });
 
-      // Act: let sonner's own removal timers for the clicked toast run out
-      await wait(retryFailureDelayMs + 500);
+  const clickRetry = async () => {
+    fireEvent.click(await screen.findByRole('button', { name: 'Retry' }));
+  };
 
-      // Assert: the failed retry left a visible toast whose Retry still re-applies the change
-      expect(screen.getByText(TOAST_TITLE)).toBeInTheDocument();
-      expect(useGrailStore.getState().settings.theme).toBe('system');
-      fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
-      await waitFor(() => expect(useGrailStore.getState().settings.theme).toBe('dark'));
-      expect(updateSettings).toHaveBeenCalledTimes(3);
-      expect(updateSettings).toHaveBeenLastCalledWith({ theme: 'dark' });
-      await waitFor(() => expect(screen.queryByText(TOAST_TITLE)).not.toBeInTheDocument());
-    },
-  );
+  it('If Retry fails again right away, Then the error toast is still shown after sonner removal delay', async () => {
+    // Arrange
+    updateSettings.mockRejectedValue(new Error('database locked'));
+    render(<Toaster />);
+    await failSave('theme', 'dark');
+    await screen.findByText(TOAST_TITLE);
+
+    // Act
+    await clickRetry();
+    await waitFor(() => expect(updateSettings).toHaveBeenCalledTimes(2));
+    await wait(500);
+
+    // Assert
+    expect(screen.getByText(TOAST_TITLE)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
+    expect(useGrailStore.getState().settings.theme).toBe('system');
+  });
+
+  it('If a failed Retry is clicked again and succeeds, Then the change is applied and the toast is removed', async () => {
+    // Arrange
+    updateSettings
+      .mockRejectedValueOnce(new Error('database locked'))
+      .mockRejectedValueOnce(new Error('database locked'))
+      .mockResolvedValue({ success: true });
+    render(<Toaster />);
+
+    // Act
+    await failSave('theme', 'dark');
+    await clickRetry();
+    await waitFor(() => expect(updateSettings).toHaveBeenCalledTimes(2));
+    await wait(500);
+    await clickRetry();
+    await waitFor(() => expect(updateSettings).toHaveBeenCalledTimes(3));
+
+    // Assert
+    expect(updateSettings).toHaveBeenLastCalledWith({ theme: 'dark' });
+    expect(useGrailStore.getState().settings.theme).toBe('dark');
+    await waitFor(() => expect(screen.queryByText(TOAST_TITLE)).not.toBeInTheDocument());
+  });
+
+  it('If a successful Retry is followed by a new failure within 250 ms, Then the new error toast stays visible', async () => {
+    // Arrange
+    updateSettings
+      .mockRejectedValueOnce(new Error('database locked'))
+      .mockResolvedValueOnce({ success: true })
+      .mockRejectedValueOnce(new Error('database locked'));
+    render(<Toaster />);
+
+    // Act
+    await failSave('theme', 'dark');
+    await clickRetry();
+    await waitFor(() => expect(useGrailStore.getState().settings.theme).toBe('dark'));
+    await failSave('showItemIcons', true);
+    await wait(500);
+
+    // Assert: sonner keeps a removed toast in the DOM (data-removed) until it unmounts it
+    const shownToasts = document.querySelectorAll('[data-sonner-toast][data-removed="false"]');
+    expect(shownToasts).toHaveLength(1);
+    expect(within(shownToasts[0] as HTMLElement).getByText(TOAST_TITLE)).toBeInTheDocument();
+    expect(
+      within(shownToasts[0] as HTMLElement).getByRole('button', { name: 'Retry' }),
+    ).toBeInTheDocument();
+  });
 
   it('If the failed key is saved again by hand and fails again, Then the error toast stays visible with a working Retry', async () => {
     // Arrange
@@ -98,21 +137,16 @@ describe('When a settings save fails and the real Toaster is mounted', () => {
       .mockRejectedValueOnce(new Error('database locked'))
       .mockResolvedValue({ success: true });
     render(<Toaster />);
-    await act(async () => {
-      await useGrailStore.getState().setSettings({ theme: 'dark' });
-    });
-    await screen.findByText(TOAST_TITLE);
 
     // Act
-    await act(async () => {
-      await useGrailStore.getState().setSettings({ theme: 'dark' });
-    });
+    await failSave('theme', 'dark');
+    await screen.findByText(TOAST_TITLE);
+    await failSave('theme', 'dark');
     await wait(500);
+    await clickRetry();
+    await waitFor(() => expect(useGrailStore.getState().settings.theme).toBe('dark'));
 
     // Assert
-    expect(screen.getByText(TOAST_TITLE)).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
-    await waitFor(() => expect(useGrailStore.getState().settings.theme).toBe('dark'));
     await waitFor(() => expect(screen.queryByText(TOAST_TITLE)).not.toBeInTheDocument());
   });
 
@@ -123,23 +157,19 @@ describe('When a settings save fails and the real Toaster is mounted', () => {
       .mockRejectedValueOnce(new Error('database locked'))
       .mockResolvedValue({ success: true });
     render(<Toaster />);
-    await act(async () => {
-      await useGrailStore.getState().setSettings({ theme: 'dark' });
-    });
+
+    // Act
+    await failSave('theme', 'dark');
     await screen.findByText(TOAST_TITLE);
     act(() => {
       toast.dismiss();
     });
     await waitFor(() => expect(screen.queryByText(TOAST_TITLE)).not.toBeInTheDocument());
-
-    // Act
-    await act(async () => {
-      await useGrailStore.getState().setSettings({ showItemIcons: true });
-    });
-    fireEvent.click(await screen.findByRole('button', { name: 'Retry' }));
+    await failSave('showItemIcons', true);
+    await clickRetry();
+    await waitFor(() => expect(updateSettings).toHaveBeenCalledTimes(3));
 
     // Assert
-    await waitFor(() => expect(updateSettings).toHaveBeenCalledTimes(3));
     expect(updateSettings).toHaveBeenLastCalledWith({ showItemIcons: true });
     expect(useGrailStore.getState().settings.theme).toBe('system');
   });

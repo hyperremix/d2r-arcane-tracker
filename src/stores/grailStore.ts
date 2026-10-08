@@ -42,7 +42,16 @@ export interface SetSettingsOptions {
    * Disable when the caller presents its own inline error (e.g. inside a modal dialog).
    */
   notifyOnError?: boolean;
+  /**
+   * Follow-up to run once the update was saved (e.g. an IPC call that applies the setting to a
+   * window). The error toast's Retry runs it again for the keys it re-applies, so the follow-up
+   * is not lost when the first attempt failed. A throwing follow-up is logged and never makes
+   * `setSettings` reject.
+   */
+  onSaved?: () => void | Promise<void>;
 }
+
+type SettingsSavedCallback = NonNullable<SetSettingsOptions['onSaved']>;
 
 /**
  * Interface defining the complete state structure and actions for the Grail store.
@@ -203,13 +212,31 @@ interface SettingKeyWrites {
 const settingKeyWrites = new Map<keyof Settings, SettingKeyWrites>();
 let lastWriteToken = 0;
 
+/** A reverted key: the value its failed save attempted and the follow-up to run once saved. */
+interface RevertedSetting {
+  value: Settings[keyof Settings];
+  onSaved?: SettingsSavedCallback;
+}
+
+/**
+ * Runs a save follow-up. Failures are logged only: the setting itself was saved.
+ * @param {SettingsSavedCallback | undefined} onSaved - The follow-up, if any
+ */
+const runOnSaved = async (onSaved: SettingsSavedCallback | undefined): Promise<void> => {
+  try {
+    await onSaved?.();
+  } catch (error) {
+    console.error('Failed to apply a saved setting:', error);
+  }
+};
+
 /**
  * Keys whose failed save was reverted and offered for Retry on the shared error toast, with
  * the value the failed save attempted. A key is dropped as soon as it is written or hydrated
  * again, so a stale Retry can never overwrite a newer value, and the whole map is dropped when
  * the toast closes, so an abandoned change is never re-applied by a later failure's Retry.
  */
-const revertedSettings = new Map<keyof Settings, Settings[keyof Settings]>();
+const revertedSettings = new Map<keyof Settings, RevertedSetting>();
 
 /**
  * Id of the error toast currently on screen, if any. Failures while it is showing update it in
@@ -333,15 +360,17 @@ const settleSettingsWrite = (
  * failure) and skips keys that were written since.
  * @param {Partial<Settings>} reverted - The persisted values the failed keys were reverted to
  * @param {Partial<Settings>} attempted - The update whose save failed
- * @param {(update: Partial<Settings>) => Promise<SettingsSaveResult>} save - Saves an update
+ * @param {SettingsSavedCallback | undefined} onSaved - Follow-up of the failed save, re-run by Retry
+ * @param {(update: Partial<Settings>, options?: SetSettingsOptions) => Promise<SettingsSaveResult>} save - Saves an update
  */
 const notifySettingsSaveFailed = (
   reverted: Partial<Settings>,
   attempted: Partial<Settings>,
-  save: (update: Partial<Settings>) => Promise<SettingsSaveResult>,
+  onSaved: SettingsSavedCallback | undefined,
+  save: (update: Partial<Settings>, options?: SetSettingsOptions) => Promise<SettingsSaveResult>,
 ): void => {
   for (const key of Object.keys(reverted) as Array<keyof Settings>) {
-    revertedSettings.set(key, attempted[key]);
+    revertedSettings.set(key, { value: attempted[key], onSaved });
   }
   const toastId =
     activeErrorToastId ?? `${SETTINGS_SAVE_ERROR_TOAST_ID_PREFIX}-${++errorToastCount}`;
@@ -367,9 +396,26 @@ const notifySettingsSaveFailed = (
           // moment later, taking a toast shown for a failed retry with it. A successful retry
           // dismisses it, a failed one updates it in place.
           event.preventDefault();
-          if (revertedSettings.size > 0) {
-            void save(Object.fromEntries(revertedSettings) as Partial<Settings>);
+          if (revertedSettings.size === 0) {
+            return;
           }
+          const update: Partial<Settings> = {};
+          const followUps = new Set<SettingsSavedCallback>();
+          for (const [key, entry] of revertedSettings) {
+            Object.assign(update, { [key]: entry.value });
+            if (entry.onSaved) {
+              followUps.add(entry.onSaved);
+            }
+          }
+          const retryOnSaved: SettingsSavedCallback | undefined =
+            followUps.size > 0
+              ? async () => {
+                  for (const followUp of followUps) {
+                    await runOnSaved(followUp);
+                  }
+                }
+              : undefined;
+          void save(update, { onSaved: retryOnSaved });
         },
       },
       onDismiss: forgetAbandonedRetry,
@@ -451,7 +497,12 @@ export const useGrailStore = create<GrailState>((set, get) => ({
       if (revertedKeys.length > 0) {
         set((state) => withSettingsUpdate(state, rollback));
         if (options?.notifyOnError !== false) {
-          notifySettingsSaveFailed(rollback, settingsUpdate, (update) => get().setSettings(update));
+          notifySettingsSaveFailed(
+            rollback,
+            settingsUpdate,
+            options?.onSaved,
+            (update, retryOptions) => get().setSettings(update, retryOptions),
+          );
         }
       }
 
@@ -459,6 +510,7 @@ export const useGrailStore = create<GrailState>((set, get) => ({
     }
     settleSettingsWrite(writeToken, get().settings, settingsUpdate, true);
     dismissErrorToastIfNothingToRetry();
+    await runOnSaved(options?.onSaved);
 
     // The setting is saved at this point; a failed reload only leaves stale item data and
     // must not roll the setting back.
