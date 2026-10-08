@@ -493,6 +493,9 @@ describe('When createListRows is called', () => {
 // Component tests
 // ============================================================================
 
+// Records the groupedItems prop of every GroupedMasonryGrid render
+const groupedGridRenders = vi.hoisted(() => ({ groupedItems: [] as unknown[] }));
+
 // Mock dependencies for component tests
 vi.mock('@/stores/grailStore', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/stores/grailStore')>()),
@@ -526,9 +529,21 @@ vi.mock('./MasonryItemGrid', () => ({
   ),
   GroupedMasonryGrid: ({
     groupedItems,
+    onItemClick,
   }: {
     groupedItems: Array<{ title: string; items: Item[] }>;
-  }) => <div data-testid="grouped-masonry-grid">{groupedItems.length} groups</div>,
+    onItemClick: (itemId: string) => void;
+  }) => {
+    groupedGridRenders.groupedItems.push(groupedItems);
+    return (
+      <div data-testid="grouped-masonry-grid">
+        {groupedItems.length} groups
+        <button type="button" onClick={() => onItemClick('some-item')}>
+          select item
+        </button>
+      </div>
+    );
+  },
 }));
 
 // Import after mocks
@@ -584,6 +599,7 @@ function setupComponentMocks(
 describe('When ItemGrid component is rendered', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    groupedGridRenders.groupedItems.length = 0;
     setupComponentMocks();
   });
 
@@ -612,6 +628,24 @@ describe('When ItemGrid component is rendered', () => {
 
       // Assert
       expect(screen.getByTestId('grouped-masonry-grid')).toBeInTheDocument();
+    });
+  });
+
+  describe('If viewMode "grid" and groupMode "category" and an unrelated ItemGrid state changes', () => {
+    it('Then passes the same grouped items to GroupedMasonryGrid', () => {
+      // Arrange
+      const items = HolyGrailItemBuilder.new().buildMany(3);
+      setupComponentMocks({ filteredItems: items, viewMode: 'grid', groupMode: 'category' });
+      render(<ItemGrid />);
+      const rendersAfterMount = groupedGridRenders.groupedItems.length;
+
+      // Act — selecting an item only changes the selected item id of ItemGrid
+      fireEvent.click(screen.getByRole('button', { name: 'select item' }));
+
+      // Assert
+      expect(screen.getByTestId('item-details-dialog')).toBeInTheDocument();
+      expect(groupedGridRenders.groupedItems.length).toBeGreaterThan(rendersAfterMount);
+      expect(new Set(groupedGridRenders.groupedItems).size).toBe(1);
     });
   });
 

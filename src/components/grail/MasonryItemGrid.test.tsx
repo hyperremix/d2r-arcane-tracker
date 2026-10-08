@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import type { Character, GrailProgress, Item } from 'electron/types/grail';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
@@ -681,6 +681,88 @@ describe('GroupedMasonryGrid Virtualization', () => {
       expect(screen.getByText('Unique Armor')).toBeInTheDocument();
       expect(screen.getByTestId('item-card-item-0')).toBeInTheDocument();
       expect(screen.queryByTestId('item-card-item-49')).not.toBeInTheDocument();
+    });
+  });
+});
+
+describe('GroupedMasonryGrid Row Measurement', () => {
+  const resizeCallbacks: ResizeObserverCallback[] = [];
+  let containerWidth = 0;
+
+  beforeEach(() => {
+    resizeCallbacks.length = 0;
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        constructor(callback: ResizeObserverCallback) {
+          resizeCallbacks.push(callback);
+        }
+        observe = vi.fn();
+        unobserve = vi.fn();
+        disconnect = vi.fn();
+      },
+    );
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  /**
+   * Stubs layout so that every row is as tall as the number of cards it holds (100px per card plus
+   * 20px row padding, 50px per header), like a real browser where wider rows are taller.
+   */
+  function stubRowHeights() {
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockImplementation(() => containerWidth);
+    vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockImplementation(() => containerWidth);
+    vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockImplementation(function (
+      this: HTMLElement,
+    ) {
+      if (this.dataset.index === undefined) return 600;
+      const cardCount = this.querySelectorAll('[data-testid^="item-card-"]').length;
+      return cardCount > 0 ? cardCount * 100 + 20 : 50;
+    });
+  }
+
+  describe('When the container is resized so that the column count changes', () => {
+    describe('If rows were measured at the previous column count', () => {
+      it('Then the rows are measured again instead of reusing the cached heights', () => {
+        // Arrange
+        containerWidth = widthForColumns(1);
+        stubRowHeights();
+        const groupedItems = [
+          {
+            title: 'Unique Armor',
+            items: Array.from({ length: 7 }, (_, n) =>
+              createMockItem({ id: `item-${n}`, name: `Item ${n}` }),
+            ),
+            foundCount: 0,
+          },
+        ];
+        const { container } = render(
+          <GroupedMasonryGrid
+            groupedItems={groupedItems}
+            progressLookup={createMockProgressLookup()}
+            characters={[]}
+            onItemClick={vi.fn()}
+          />,
+        );
+        const content = container.querySelector<HTMLElement>('div[style*="position: relative"]');
+        // 50px header + 7 rows with one card each
+        expect(content?.style.height).toBe(`${50 + 7 * 120}px`);
+
+        // Act
+        containerWidth = widthForColumns(3);
+        act(() => {
+          for (const callback of resizeCallbacks) callback([], {} as ResizeObserver);
+        });
+
+        // Assert
+        expect(screen.getAllByTestId('grouped-grid-row')).toHaveLength(3);
+        // 50px header + two rows with three cards and one row with a single card
+        expect(content?.style.height).toBe(`${50 + 2 * 320 + 120}px`);
+      });
     });
   });
 });

@@ -263,6 +263,10 @@ export type GroupedGridRow =
 /**
  * Flattens grouped items into virtual rows: one header row per group followed by
  * rows of at most `columnCount` items.
+ *
+ * Row keys identify what a row shows (its group, column count and item ids) rather than its
+ * position. The virtualizer caches measured heights by key, so a row whose content or column count
+ * changes gets a new key and is measured again instead of inheriting a stale height.
  */
 export function createGroupedGridRows(
   groupedItems: Array<{ title: string; items: Item[]; foundCount: number }>,
@@ -274,7 +278,7 @@ export function createGroupedGridRows(
   for (const [groupIndex, group] of groupedItems.entries()) {
     rows.push({
       type: 'header',
-      key: `header-${groupIndex}`,
+      key: `header-${groupIndex}-${group.title}`,
       title: group.title,
       itemCount: group.items.length,
       foundCount: group.foundCount,
@@ -282,10 +286,11 @@ export function createGroupedGridRows(
     });
 
     for (let start = 0; start < group.items.length; start += itemsPerRow) {
+      const rowItems = group.items.slice(start, start + itemsPerRow);
       rows.push({
         type: 'items',
-        key: `items-${groupIndex}-${start / itemsPerRow}`,
-        items: group.items.slice(start, start + itemsPerRow),
+        key: `items-${groupIndex}-${itemsPerRow}-${rowItems.map((item) => item.id).join(',')}`,
+        items: rowItems,
       });
     }
   }
@@ -344,14 +349,22 @@ export const GroupedMasonryGrid = memo(function GroupedMasonryGrid({
     [groupedItems, columnCount],
   );
 
-  const rowVirtualizer = useVirtualizer({
-    count: rows.length,
-    getScrollElement: () => scrollRef.current,
-    estimateSize: (index) =>
+  // Stable callbacks: the virtualizer recomputes its measurements when these options change
+  const getScrollElement = useCallback(() => scrollRef.current, []);
+  const estimateSize = useCallback(
+    (index: number) =>
       rows[index]?.type === 'header'
         ? GROUP_HEADER_HEIGHT_ESTIMATE
         : GROUP_ITEM_ROW_HEIGHT_ESTIMATE,
-    getItemKey: (index) => rows[index]?.key ?? index,
+    [rows],
+  );
+  const getItemKey = useCallback((index: number) => rows[index]?.key ?? index, [rows]);
+
+  const rowVirtualizer = useVirtualizer({
+    count: rows.length,
+    getScrollElement,
+    estimateSize,
+    getItemKey,
     overscan: 3,
   });
 

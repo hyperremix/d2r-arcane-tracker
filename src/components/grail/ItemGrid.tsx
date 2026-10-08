@@ -448,6 +448,46 @@ function ListVirtualizedContainer({
 }
 
 /**
+ * Props for the GroupedGridContainer component.
+ */
+interface GroupedGridContainerProps {
+  groupedItems: Array<{ title: string; items: Item[] }>;
+  progressLookup: ReturnType<typeof useProgressLookup>;
+  characters: Character[];
+  handleItemClick: (itemId: string) => void;
+}
+
+/**
+ * GroupedGridContainer component that renders grouped items in the virtualized grouped grid.
+ * The groups with their found counts are memoized so the memoized grid (and its row model) is
+ * only recomputed when the groups or the progress change, not on unrelated ItemGrid renders.
+ */
+function GroupedGridContainer({
+  groupedItems,
+  progressLookup,
+  characters,
+  handleItemClick,
+}: GroupedGridContainerProps) {
+  const groupsWithFoundCount = useMemo(
+    () =>
+      groupedItems.map((group) => ({
+        ...group,
+        foundCount: calculateGroupFoundCount(group.items, progressLookup),
+      })),
+    [groupedItems, progressLookup],
+  );
+
+  return (
+    <GroupedMasonryGrid
+      groupedItems={groupsWithFoundCount}
+      progressLookup={progressLookup}
+      characters={characters}
+      onItemClick={handleItemClick}
+    />
+  );
+}
+
+/**
  * VirtualizedItemsContainer component that renders all items with virtual scrolling.
  * For grid views, uses masonry layout. For list view, uses row-based virtualization.
  * @param {VirtualizedItemsContainerProps} props - Component props
@@ -476,16 +516,12 @@ function VirtualizedItemsContainer({
 
   // For grouped grid view, use row-based virtualization with group headers
   if (viewMode === 'grid') {
-    const groupsWithFoundCount = groupedItems.map((group) => ({
-      ...group,
-      foundCount: calculateGroupFoundCount(group.items, progressLookup),
-    }));
     return (
-      <GroupedMasonryGrid
-        groupedItems={groupsWithFoundCount}
+      <GroupedGridContainer
+        groupedItems={groupedItems}
         progressLookup={progressLookup}
         characters={characters}
-        onItemClick={handleItemClick}
+        handleItemClick={handleItemClick}
       />
     );
   }
