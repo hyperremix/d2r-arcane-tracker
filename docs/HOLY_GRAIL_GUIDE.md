@@ -145,3 +145,16 @@ You can limit the terror zone rotation to zones you choose. See the [Terror Zone
 ### Backups
 
 **Settings → Database** creates a backup of the database or restores one. Restoring replaces all current data.
+
+### Error screen
+
+If a page crashes, the app shows a **Something went wrong** screen instead of going blank. The title bar stays usable, so you can switch to another page. From the error screen:
+
+- **Try to Recover** loads the page again.
+- **Reload Application** reloads the app window.
+- **Copy Error Details** copies the app version, error message, stack trace and (when available) component stack to the clipboard.
+- **Report Issue** opens the GitHub issue tracker in your browser. If it can't be opened, a message appears under the buttons; open the [issues](https://github.com/hyperremix/d2r-arcane-tracker/issues) page yourself instead.
+
+If the app layout itself fails, the same screen fills the whole window without the title bar, so use **Reload Application** to recover.
+
+If the error keeps happening, paste the copied details into a new issue.

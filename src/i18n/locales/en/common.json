@@ -649,9 +649,17 @@
     "errorDetails": "Error Details",
     "errorMessage": "Error Message:",
     "componentStack": "Component Stack:",
+    "stackTrace": "Stack Trace:",
+    "appVersion": "App Version:",
+    "pageDescription": "This page ran into an unexpected error. Try again, reload the application, or switch to another page from the title bar.",
     "tryToRecover": "Try to Recover",
     "reloadApplication": "Reload Application",
-    "persistHelp": "If this error persists, please report it with the error details shown above."
+    "copyDetails": "Copy Error Details",
+    "copySuccess": "Error details copied to clipboard",
+    "copyFailed": "Couldn't copy the error details",
+    "reportIssue": "Report Issue",
+    "reportFailed": "Couldn't open the issue tracker",
+    "persistHelp": "If this error persists, copy the error details and paste them into a new issue on GitHub."
   },
   "runeword": {
     "calculator": {
