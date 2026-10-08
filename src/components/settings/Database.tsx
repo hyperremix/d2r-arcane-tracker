@@ -313,7 +313,7 @@ export function DatabaseCard() {
                   {t(translations.settings.database.keepCurrentWarning)}
                 </span>
                 {backedUpBeforeRestore && (
-                  <output className="mt-2 block text-green-600 text-sm">
+                  <output className="mt-2 block text-sm text-success">
                     {t(translations.settings.database.backupCreatedContinue)}
                   </output>
                 )}
