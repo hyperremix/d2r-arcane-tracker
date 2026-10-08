@@ -910,7 +910,6 @@
     "loadingData": "Loading run tracker data...",
     "errorLoading": "Error Loading Run Tracker",
     "sessionCard": {
-      "title": "Session Card",
       "noActiveSession": "No active session",
       "startSessionPrompt": "Start a session to begin tracking your runs and items.",
       "startNewSession": "Start New Session",
@@ -926,7 +925,14 @@
       "notesPlaceholder": "Add notes about this session...",
       "archiveSession": "Archive Session",
       "noRunsToExport": "No runs to export",
-      "exportSessionData": "Export session data"
+      "exportSessionData": "Export session data",
+      "recentRuns": "Recent Runs",
+      "viewAllRuns": "View all runs",
+      "noFinishedRuns": "No finished runs yet. Completed runs will appear here.",
+      "runItems_one": "{{count}} item",
+      "runItems_other": "{{count}} items",
+      "noItems": "No items",
+      "runNumber": "Run #{{number}}"
     },
     "exportDialog": {
       "title": "Export Session Data",
@@ -957,9 +963,14 @@
       "generateFailed": "Failed to generate export content"
     },
     "controls": {
-      "sessionControls": "Session Controls",
       "paused": "Paused",
       "running": "Running",
+      "liveSession": "Live Session",
+      "idle": "Idle",
+      "noSession": "No Session",
+      "noRunInProgress": "No run in progress",
+      "autoTracking": "Runs are tracked automatically",
+      "autoTrackingDescription": "Runs start and end as you enter and leave games. Turn off Auto Mode to control runs manually.",
       "autoMode": "Auto Mode",
       "memoryReading": "(Memory Reading)",
       "startRun": "Start Run",

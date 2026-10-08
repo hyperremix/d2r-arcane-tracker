@@ -214,10 +214,13 @@ export function RunTracker() {
         // Detail view for selected session
         <SessionDetailView sessionId={selectedSessionId} onBack={handleBackToMain} />
       ) : (
-        // Main view with active session and sessions list
+        // Main view: live session first, then its summary and the sessions list
         <>
-          <SessionCard session={activeSession} />
           <SessionControls />
+          <SessionCard
+            session={activeSession}
+            onViewAllRuns={activeSession ? () => handleSessionSelect(activeSession.id) : undefined}
+          />
           <SessionsList onSessionSelect={handleSessionSelect} />
         </>
       )}

@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  formatClockDuration,
   formatDate,
   formatDuration,
   formatLocalizedDate,
@@ -10,6 +11,26 @@ import {
   formatTimestamp,
   isRecentFind,
 } from './date';
+
+describe('formatClockDuration', () => {
+  it('If the duration is missing or negative, Then it shows zero time', () => {
+    // Arrange & Act & Assert
+    expect(formatClockDuration(undefined)).toBe('0:00');
+    expect(formatClockDuration(-500)).toBe('0:00');
+  });
+
+  it('When the duration is under an hour, Then it shows minutes and zero-padded seconds', () => {
+    // Arrange & Act & Assert
+    expect(formatClockDuration(5_000)).toBe('0:05');
+    expect(formatClockDuration(754_999)).toBe('12:34');
+  });
+
+  it('When the duration is an hour or longer, Then it shows hours with padded minutes and seconds', () => {
+    // Arrange & Act & Assert
+    expect(formatClockDuration(3_723_000)).toBe('1:02:03');
+    expect(formatClockDuration(26 * 3_600_000)).toBe('26:00:00');
+  });
+});
 
 describe('formatDuration', () => {
   it('should return "0s" for undefined input', () => {
