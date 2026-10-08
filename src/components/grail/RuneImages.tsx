@@ -6,7 +6,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { translations } from '@/i18n/translations';
 import type { RunewordCompletionStatus } from '@/lib/runeword-utils';
 import { cn } from '@/lib/utils';
-import placeholderUrl from '/images/placeholder-item.png';
+import placeholderUrl from '/images/placeholder-item.svg';
 import { getTooltipTriggerRender } from './tooltipTriggerRender';
 
 interface RuneImagesProps {
@@ -231,7 +231,7 @@ function MissingRuneMarker({ label }: MissingRuneMarkerProps) {
       <span
         aria-hidden="true"
         data-testid="missing-rune-marker"
-        className="-top-1 -right-1 absolute flex h-4 w-4 items-center justify-center rounded-full bg-missing text-missing-foreground"
+        className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-missing text-missing-foreground"
       >
         <X className="h-3 w-3" strokeWidth={3} />
       </span>

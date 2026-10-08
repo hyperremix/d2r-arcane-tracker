@@ -1,5 +1,5 @@
 import { existsSync, readdirSync } from 'node:fs';
-import { readFile } from 'node:fs/promises';
+import { readFile, stat } from 'node:fs/promises';
 import { basename, dirname, extname, join } from 'node:path';
 import * as d2s from '@dschu012/d2s';
 import * as d2stash from '@dschu012/d2s/lib/d2/stash';
@@ -12,93 +12,107 @@ import type { GrailDatabase } from '../database/database';
 import { isRuneId, runewordsByNameSimple } from '../items/indexes';
 import type {
   AvailableRunes,
+  CharacterInventorySnapshot,
   D2SaveFile,
+  D2SItem,
   FileReaderResponse,
+  InventorySearchResult,
   ItemDetails,
+  ParsedInventoryItem,
   SaveFileEvent,
   SaveFileItem,
   SaveFileState,
+  StashTabKind,
+  VaultLocationContext,
+  VaultSourceFileType,
 } from '../types/grail';
 import { GameMode } from '../types/grail';
 import { getGrailItemId } from '../utils/grailItemUtils';
-import { isRune, simplifyItemName } from '../utils/objects';
+import { normalizeIconFilename, resolveCanonicalIconFilename } from '../utils/iconFilenameResolver';
+import { isRune } from '../utils/objects';
 import { createServiceLogger } from '../utils/serviceLogger';
+import { resolveSpatialLocation } from '../utils/spatialLocationResolver';
+import { createVaultPresenceKey } from '../utils/vaultPresence';
 import type { EventBus } from './EventBus';
+import { parseModernStash } from './modernStashParser';
+import { readD2iHeaderVersion, readD2iMetadata } from './stashFormat';
 
 const log = createServiceLogger('SaveFileMonitor');
-
 /**
- * Processes an item to determine its item ID from the flat items list.
- * @param {d2s.types.IItem} item - The D2S item to process.
- * @returns {string} The item ID or simplified name as fallback.
+ * How much of a save file a parse really read.
+ * - 'parsed': the whole file was read.
+ * - 'partial': only some of the file could be read (a damaged .d2i sector); the items found so far are kept.
+ * - 'skipped': filtered out by the configured game mode.
+ * - 'errored': a parse error was swallowed.
+ * Only 'parsed' proves which items are gone from a file; every other status yields no or only some items.
  */
-const processItemName = (item: d2s.types.IItem): string => {
-  // Try to get the item ID from our centralized logic
+type SaveParseStatus = 'parsed' | 'partial' | 'skipped' | 'errored';
+
+interface FileParseSuccess {
+  saveName: string;
+  success: true;
+  inventorySnapshot: CharacterInventorySnapshot;
+}
+
+/** A complete parse: the only result vault reconciliation may act on. */
+interface CompleteFileParseResult extends FileParseSuccess {
+  parseStatus: 'parsed';
+  /** Fingerprints of every item in the file, including socketed ones the snapshot omits. */
+  presentFingerprints: string[];
+  /** Location-independent identity of each item, parallel to `presentFingerprints`. */
+  presentIdentityKeys: string[];
+}
+
+/** A parse that read no items or only some of them; it must never mark vault rows as missing. */
+interface IncompleteFileParseResult extends FileParseSuccess {
+  parseStatus: Exclude<SaveParseStatus, 'parsed'>;
+}
+
+interface FailedFileParseResult {
+  saveName: string;
+  success: false;
+}
+
+type SingleFileParseResult =
+  | CompleteFileParseResult
+  | IncompleteFileParseResult
+  | FailedFileParseResult;
+
+const SUPPORTED_SAVE_EXTENSIONS = new Set(['.d2s', '.sss', '.d2x', '.d2i']);
+const MODERN_STASH_MIN_VERSION = 105;
+
+const processItemName = (item: D2SItem): string => {
   const itemId = getGrailItemId(item);
   if (itemId) {
     return itemId;
   }
 
-  // Fallback to simplified name for items not in our list
-  // Note: rare items (rare_name/rare_name2) are excluded - they have randomly
-  // generated names that can match real grail items (e.g., "Doom Collar")
   let name = item.unique_name || item.set_name || '';
   name = name.toLowerCase().replace(/[^a-z0-9]/gi, '');
-
-  if (isRune(item)) {
-    // For runes, use the simplified name as fallback
-    return name;
-  }
-
-  if (item.type === 'runeword') {
-    return simplifyItemName(item.runeword_name || '');
-  }
 
   return name;
 };
 
-/**
- * Determines if an item should be skipped during processing.
- * @param {string} name - The item name/ID.
- * @param {d2s.types.IItem} item - The D2S item.
- * @returns {boolean} True if the item should be skipped, false otherwise.
- */
-const shouldSkipItem = (name: string): boolean => {
-  if (name === '') {
-    return true;
-  }
-  return false;
-};
+const shouldSkipItem = (name: string): boolean => name === '';
 
-/**
- * Creates a saved item details object from a D2S item.
- * @param {d2s.types.IItem} item - The D2S item to create details from.
- * @returns {ItemDetails} The created item details object.
- */
-const createSavedItem = (item: d2s.types.IItem): ItemDetails => {
-  return {
-    ethereal: !!item.ethereal,
-    ilevel: item.level,
-    socketed: !!item.socketed,
-    d2sItem: item,
-  };
-};
+/** True when a save's softcore/hardcore status is excluded by the configured game mode. */
+const isGameModeMismatch = (gameMode: GameMode | undefined, isHardcore: boolean): boolean =>
+  (gameMode === GameMode.Softcore && isHardcore) || (gameMode === GameMode.Hardcore && !isHardcore);
 
-/**
- * Adds an item to the results object.
- * @param {FileReaderResponse} results - The results object to add the item to.
- * @param {string} name - The item name/ID.
- * @param {ItemDetails} savedItem - The item details.
- * @param {string} saveName - The save file name.
- * @param {d2s.types.IItem} item - The D2S item.
- * @param {boolean} isEthereal - Whether the item is ethereal.
- */
+const createSavedItem = (item: D2SItem, quantity?: number): ItemDetails => ({
+  ethereal: !!item.ethereal,
+  ilevel: item.level ?? null,
+  socketed: !!item.socketed,
+  quantity,
+  d2sItem: item as d2s.types.IItem,
+});
+
 const addItemToResults = (
   results: FileReaderResponse,
   name: string,
   savedItem: ItemDetails,
   saveName: string,
-  item: d2s.types.IItem,
+  item: D2SItem,
   isEthereal: boolean,
 ): void => {
   const key: 'items' | 'ethItems' = isEthereal ? 'ethItems' : 'items';
@@ -112,26 +126,18 @@ const addItemToResults = (
     results[key][name] = {
       name,
       inSaves: {},
-      type: item.type,
+      type: item.type ?? 'unknown',
     };
     results[key][name].inSaves[saveName] = [savedItem];
   }
 };
 
-/**
- * Adds a rune to the available runes in the results object.
- * @param {FileReaderResponse} results - The results object to add the rune to.
- * @param {string} name - The rune name.
- * @param {ItemDetails} savedItem - The rune details.
- * @param {string} saveName - The save file name.
- * @param {d2s.types.IItem} item - The D2S item.
- */
 const addRuneToAvailableRunes = (
   results: FileReaderResponse,
   name: string,
   savedItem: ItemDetails,
   saveName: string,
-  item: d2s.types.IItem,
+  item: D2SItem,
 ): void => {
   if (results.availableRunes[name]) {
     if (!results.availableRunes[name].inSaves[saveName]) {
@@ -142,93 +148,174 @@ const addRuneToAvailableRunes = (
     results.availableRunes[name] = {
       name,
       inSaves: {},
-      type: item.type,
+      type: item.type ?? 'unknown',
     };
     results.availableRunes[name].inSaves[saveName] = [savedItem];
   }
 };
 
-/**
- * Determines if an item should be included in parsing based on its properties.
- * @param {d2s.types.IItem} item - The D2S item to check.
- * @returns {boolean} True if the item should be included, false otherwise.
- */
-const shouldIncludeItem = (item: d2s.types.IItem): boolean => {
-  // Only include unique and set items - rare items have randomly generated names
-  // that can match real grail items (e.g., "Doom Collar" matching "Doom" runeword)
-  return !!((item.unique_name || item.set_name) && getGrailItemId(item));
-};
-
-/**
- * Processes unique or set items and adds them to the items array.
- * @param {d2s.types.IItem} item - The D2S item to process.
- * @param {d2s.types.IItem[]} items - The array to add the item to.
- */
-const processUniqueOrSetItem = (item: d2s.types.IItem, items: d2s.types.IItem[]): void => {
-  items.push(item);
-};
-
-/**
- * Processes rune items and adds them to the items array.
- * @param {d2s.types.IItem} item - The D2S item to process.
- * @param {d2s.types.IItem[]} items - The array to add the item to.
- * @param {boolean} isEmbed - Whether the rune is embedded in another item.
- */
-const processRuneItem = (
-  item: d2s.types.IItem,
-  items: d2s.types.IItem[],
-  isEmbed: boolean,
-): void => {
-  if (isRune(item)) {
-    if (isEmbed) {
-      item.socketed = 1; // the "socketed" in Rune item types will indicated that *it* sits inside socket
-    }
-    items.push(item);
-  }
-};
-
-/**
- * Processes runeword items and adds them to the items array.
- * Validates runeword names against known runewords to prevent false positives
- * from D2S parser bugs or corrupted item data.
- * @param {d2s.types.IItem} item - The D2S item to process.
- * @param {d2s.types.IItem[]} items - The array to add the item to.
- */
-const processRunewordItem = (item: d2s.types.IItem, items: d2s.types.IItem[]): void => {
+const getValidatedRunewordName = (item: D2SItem): string | null => {
   if (!item.runeword_name) {
-    return;
+    return null;
   }
 
-  // Skip if item has unique or set name - runewords cannot be unique/set items
-  // This catches false positives from corrupted save files or modded games
-  if (item.unique_name || item.set_name) {
-    log.warn(
-      'processRunewordItem',
-      `Skipping "${item.runeword_name}" - has conflicting unique/set: ${item.unique_name || item.set_name}`,
-    );
-    return;
+  const normalized = item.runeword_name === 'Love' ? 'Lore' : item.runeword_name;
+  const simplified = normalized.toLowerCase().replace(/[^a-z0-9]/gi, '');
+
+  if (!runewordsByNameSimple[simplified]) {
+    return null;
   }
 
-  // Fix known parser bug: "Love" should be "Lore"
-  if (item.runeword_name === 'Love') {
-    item.runeword_name = 'Lore';
-  }
-
-  // Validate runeword name against known runewords to prevent false positives
-  // from D2S parser bugs or corrupted item data
-  const simplifiedName = simplifyItemName(item.runeword_name);
-  if (!runewordsByNameSimple[simplifiedName]) {
-    log.warn('processRunewordItem', `Ignoring unknown runeword name: ${item.runeword_name}`);
-    return;
-  }
-
-  // we push Runewords as "items" for easier displaying in a list
-  const newItem = {
-    runeword_name: item.runeword_name,
-    type: 'runeword',
-  } as d2s.types.IItem;
-  items.push(newItem);
+  return normalized;
 };
+
+const mapQualityValue = (quality: number | undefined): string => {
+  switch (quality) {
+    case 1:
+      return 'normal';
+    case 2:
+      return 'magic';
+    case 3:
+      return 'rare';
+    case 4:
+      return 'set';
+    case 5:
+      return 'unique';
+    case 6:
+      return 'crafted';
+    default:
+      return 'normal';
+  }
+};
+
+function toDisplayString(value: unknown): string | undefined {
+  if (typeof value !== 'string') {
+    return undefined;
+  }
+
+  const normalized = value.replace(/\0/g, '').trim();
+  return normalized.length > 0 ? normalized : undefined;
+}
+
+function resolveFallbackItemName(item: D2SItem): string {
+  const candidates = [
+    item.name,
+    item.unique_name,
+    item.set_name,
+    item.type_name,
+    item.type,
+    item.code,
+    'unknown',
+  ];
+
+  for (const candidate of candidates) {
+    if (typeof candidate === 'string' && candidate.trim()) {
+      return candidate;
+    }
+  }
+
+  return 'unknown';
+}
+
+function resolveMagicOrRareDisplayName(item: D2SItem): string | undefined {
+  const rareParts = [toDisplayString(item.rare_name), toDisplayString(item.rare_name2)].filter(
+    (part): part is string => Boolean(part),
+  );
+  if (rareParts.length > 0) {
+    return rareParts.join(' ');
+  }
+
+  const prefix = toDisplayString(item.magic_prefix_name);
+  const suffix = toDisplayString(item.magic_suffix_name);
+  if (!prefix && !suffix) {
+    return undefined;
+  }
+
+  const baseName =
+    toDisplayString(item.type_name) ??
+    toDisplayString(item.name) ??
+    toDisplayString(item.type) ??
+    toDisplayString(item.code);
+
+  return [prefix, baseName, suffix].filter((part): part is string => Boolean(part)).join(' ');
+}
+
+function resolveParsedItemName(item: D2SItem, runewordName: string | null): string {
+  const candidates = [
+    toDisplayString(runewordName),
+    toDisplayString(item.unique_name),
+    toDisplayString(item.set_name),
+    resolveMagicOrRareDisplayName(item),
+    toDisplayString(resolveFallbackItemName(item)),
+  ];
+
+  for (const candidate of candidates) {
+    if (candidate) {
+      return candidate;
+    }
+  }
+
+  return 'unknown';
+}
+
+function resolveSocketCount(item: D2SItem): number {
+  if (Array.isArray(item.gems)) {
+    return item.gems.length;
+  }
+
+  if (typeof item.socket_count === 'number') {
+    return item.socket_count;
+  }
+
+  return typeof item.socketed === 'number' ? item.socketed : 0;
+}
+
+function resolveParsedItemType(
+  item: D2SItem,
+  quality: string,
+  runewordName: string | null,
+): string {
+  if (runewordName) {
+    return 'runeword';
+  }
+
+  if (isRune(item as d2s.types.IItem)) {
+    return 'rune';
+  }
+
+  if (quality === 'unique' || quality === 'set') {
+    return quality;
+  }
+
+  return item.type ?? 'other';
+}
+
+type ParsedItemSpatialMetadata = Pick<
+  ParsedInventoryItem,
+  | 'gridX'
+  | 'gridY'
+  | 'gridWidth'
+  | 'gridHeight'
+  | 'equippedSlotId'
+  | 'iconFileName'
+  | 'isSocketedItem'
+>;
+
+function resolveParsedItemSpatialMetadata(
+  resolvedSpatial: ReturnType<typeof resolveSpatialLocation>,
+  isSocketedItem: boolean,
+  iconFileName: string | undefined,
+): ParsedItemSpatialMetadata {
+  return {
+    gridX: resolvedSpatial.gridX,
+    gridY: resolvedSpatial.gridY,
+    gridWidth: resolvedSpatial.gridWidth,
+    gridHeight: resolvedSpatial.gridHeight,
+    equippedSlotId: resolvedSpatial.equippedSlotId,
+    iconFileName,
+    isSocketedItem,
+  };
+}
 
 /**
  * Service for monitoring Diablo 2 save files and extracting item data.
@@ -237,6 +324,7 @@ const processRunewordItem = (item: d2s.types.IItem, items: d2s.types.IItem[]): v
  */
 class SaveFileMonitor {
   private currentData: FileReaderResponse;
+  private inventorySnapshots: CharacterInventorySnapshot[] = [];
   private fileWatcher: FSWatcher | null;
   private watchPath: string | null;
   private fileChangeCounter: number = 0;
@@ -493,9 +581,7 @@ class SaveFileMonitor {
     this.fileWatcher = chokidar
       .watch(this.saveDirectory, {
         // Only watch files with save file extensions
-        ignored: (path, stats) =>
-          !!stats?.isFile() &&
-          !['.d2s', '.sss', '.d2x', '.d2i'].includes(extname(path).toLowerCase()),
+        ignored: (path, stats) => !!stats?.isFile() && !this.shouldIncludeSaveFile(basename(path)),
         followSymlinks: false,
         ignoreInitial: true,
         depth: 0,
@@ -599,9 +685,7 @@ class SaveFileMonitor {
     for (const dir of directories) {
       try {
         const allFilesInDir = readdirSync(dir);
-        const files = allFilesInDir.filter(
-          (file) => ['.d2s', '.sss', '.d2x', '.d2i'].indexOf(extname(file).toLowerCase()) !== -1,
-        );
+        const files = allFilesInDir.filter((file) => this.shouldIncludeSaveFile(file));
         allFiles.push(...files.map((file) => join(dir, file)));
       } catch (error) {
         log.error('parseAllSaveDirectories', error, { directory: dir });
@@ -643,9 +727,7 @@ class SaveFileMonitor {
     try {
       const allFilesInDir = readdirSync(directory);
 
-      const files = allFilesInDir.filter(
-        (file) => ['.d2s', '.sss', '.d2x', '.d2i'].indexOf(extname(file).toLowerCase()) !== -1,
-      );
+      const files = allFilesInDir.filter((file) => this.shouldIncludeSaveFile(file));
 
       const allFiles = files.map((file) => join(directory, file));
 
@@ -679,6 +761,52 @@ class SaveFileMonitor {
     }
   }
 
+  private shouldIncludeSaveFile(fileName: string): boolean {
+    const extension = extname(fileName).toLowerCase();
+    if (!SUPPORTED_SAVE_EXTENSIONS.has(extension)) {
+      return false;
+    }
+
+    if (extension !== '.d2i') {
+      return true;
+    }
+
+    return !this.isBackupLikeStashFile(fileName);
+  }
+
+  private isBackupLikeStashFile(fileName: string): boolean {
+    const lowerFileName = fileName.toLowerCase();
+    if (!lowerFileName.endsWith('.d2i')) {
+      return false;
+    }
+
+    const stem = lowerFileName.slice(0, -'.d2i'.length);
+    return (
+      stem.includes('_backup') ||
+      stem.endsWith('.bak') ||
+      stem.endsWith('_bak') ||
+      stem.endsWith('-bak')
+    );
+  }
+
+  private resolveSharedStashName(
+    isHardcore: boolean,
+    sourceFileVersion?: number,
+  ):
+    | 'Shared Stash Hardcore'
+    | 'Shared Stash Softcore'
+    | 'Modern Shared Stash Hardcore'
+    | 'Modern Shared Stash Softcore' {
+    const isModern =
+      sourceFileVersion !== undefined && sourceFileVersion >= MODERN_STASH_MIN_VERSION;
+
+    if (isModern) {
+      return isHardcore ? 'Modern Shared Stash Hardcore' : 'Modern Shared Stash Softcore';
+    }
+
+    return isHardcore ? 'Shared Stash Hardcore' : 'Shared Stash Softcore';
+  }
+
   /**
    * Checks if a save file should be parsed based on modification time.
    * @private
@@ -692,7 +820,7 @@ class SaveFileMonitor {
     }
 
     try {
-      const stats = await import('node:fs/promises').then((fs) => fs.stat(filePath));
+      const stats = await stat(filePath);
       const fileState = this.grailDatabase?.getSaveFileState(filePath);
 
       if (!fileState) {
@@ -740,9 +868,14 @@ class SaveFileMonitor {
    * @private
    * @param {string} filePath - The file path to extract the name from.
    * @param {boolean} [isHardcore] - Optional hardcore status (for shared stash files). If not provided, falls back to filename detection.
+   * @param {number} [sourceFileVersion] - Optional d2i source file version for modern stash naming.
    * @returns {string} The character/save name.
    */
-  private getSaveNameFromPath(filePath: string, isHardcore?: boolean): string {
+  private getSaveNameFromPath(
+    filePath: string,
+    isHardcore?: boolean,
+    sourceFileVersion?: number,
+  ): string {
     const extension = extname(filePath).toLowerCase();
     let saveName = basename(filePath)
       .replace(/\.d2s/i, '')
@@ -755,7 +888,7 @@ class SaveFileMonitor {
       // Use provided hardcore status if available, otherwise fall back to filename
       const hardcore =
         isHardcore !== undefined ? isHardcore : saveName.toLowerCase().includes('hardcore');
-      saveName = hardcore ? 'Shared Stash Hardcore' : 'Shared Stash Softcore';
+      saveName = this.resolveSharedStashName(hardcore, sourceFileVersion);
     }
 
     return saveName;
@@ -789,38 +922,212 @@ class SaveFileMonitor {
     return extractedItems;
   }
 
+  private getFingerprintFieldValue<K extends keyof ParsedInventoryItem['fingerprintInputs']>(
+    item: ParsedInventoryItem,
+    key: K,
+  ): ParsedInventoryItem['fingerprintInputs'][K] {
+    const itemValue = item[key as keyof ParsedInventoryItem];
+    if (itemValue !== undefined) {
+      return itemValue as ParsedInventoryItem['fingerprintInputs'][K];
+    }
+
+    return item.fingerprintInputs[key];
+  }
+
+  private createFingerprint(item: ParsedInventoryItem): string {
+    const stashTab = this.getFingerprintFieldValue(item, 'stashTab');
+    const gridX = this.getFingerprintFieldValue(item, 'gridX');
+    const gridY = this.getFingerprintFieldValue(item, 'gridY');
+    const gridWidth = this.getFingerprintFieldValue(item, 'gridWidth');
+    const gridHeight = this.getFingerprintFieldValue(item, 'gridHeight');
+    const equippedSlotId = this.getFingerprintFieldValue(item, 'equippedSlotId');
+    const iconFileName = item.fingerprintInputs.iconFileName ?? item.iconFileName ?? '';
+    const isSocketedItem = this.getFingerprintFieldValue(item, 'isSocketedItem') ?? false;
+    const itemCode = this.getFingerprintFieldValue(item, 'itemCode') ?? '';
+    const itemName = this.getFingerprintFieldValue(item, 'itemName');
+    const stash = stashTab !== undefined ? String(stashTab) : '';
+
+    return [
+      this.getFingerprintFieldValue(item, 'sourceFileType'),
+      this.getFingerprintFieldValue(item, 'characterName'),
+      this.getFingerprintFieldValue(item, 'locationContext'),
+      itemCode,
+      this.getFingerprintFieldValue(item, 'quality'),
+      String(this.getFingerprintFieldValue(item, 'ethereal')),
+      String(this.getFingerprintFieldValue(item, 'socketCount')),
+      stash,
+      gridX ?? '',
+      gridY ?? '',
+      gridWidth ?? '',
+      gridHeight ?? '',
+      equippedSlotId ?? '',
+      iconFileName,
+      String(isSocketedItem),
+      itemName,
+    ].join('|');
+  }
+
+  /**
+   * Describes an item without its position, location or character, so presence matching can still
+   * recognise an item after it moved inside its save (which changes its fingerprint).
+   */
+  private createPresenceIdentityKey(item: ParsedInventoryItem): string {
+    return createVaultPresenceKey({
+      sourceFileType: item.sourceFileType,
+      itemCode: item.itemCode,
+      quality: item.quality,
+      ethereal: item.ethereal,
+      socketCount: item.socketCount,
+      itemName: item.itemName,
+      isSocketedItem: item.isSocketedItem,
+      itemUid: item.rawParsedItem?.id,
+    });
+  }
+
+  private createParsedInventoryItem(params: {
+    filePath: string;
+    saveName: string;
+    sourceFileType: VaultSourceFileType;
+    item: D2SItem;
+    fallbackLocation: VaultLocationContext;
+    stashTab?: number;
+    stashTabKind?: StashTabKind;
+    stackCount?: number;
+    isSocketedItem?: boolean;
+  }): ParsedInventoryItem {
+    const resolvedSpatialLocation = resolveSpatialLocation({
+      item: params.item,
+      sourceFileType: params.sourceFileType,
+      fallbackLocation: params.fallbackLocation,
+      fallbackStashTab: params.stashTab,
+    });
+    const locationContext = resolvedSpatialLocation.locationContext;
+    const stashTab = resolvedSpatialLocation.stashTab;
+    const quality = mapQualityValue(params.item.quality);
+    const runewordName = getValidatedRunewordName(params.item);
+    const isSocketedItem = params.isSocketedItem ?? false;
+    const itemName = resolveParsedItemName(params.item, runewordName);
+    const socketCount = resolveSocketCount(params.item);
+    const parsedType = resolveParsedItemType(params.item, quality, runewordName);
+    const grailItemId = getGrailItemId(params.item as d2s.types.IItem) ?? undefined;
+    const legacyParserIconFileName = normalizeIconFilename(params.item.inv_file);
+    const resolvedIconFileName = resolveCanonicalIconFilename({
+      grailItemId,
+      itemCode: params.item.code ?? params.item.type,
+      itemName,
+      uniqueName: params.item.unique_name,
+      setName: params.item.set_name,
+      parsedName: params.item.name,
+      typeName: params.item.type_name,
+      rawIconFileName: params.item.inv_file,
+    });
+    const spatialMetadata = resolveParsedItemSpatialMetadata(
+      resolvedSpatialLocation,
+      isSocketedItem,
+      resolvedIconFileName ?? legacyParserIconFileName,
+    );
+
+    const parsed: ParsedInventoryItem = {
+      fingerprint: '',
+      fingerprintInputs: {
+        sourceFileType: params.sourceFileType,
+        characterName: params.saveName,
+        locationContext,
+        itemCode: params.item.code ?? params.item.type ?? undefined,
+        quality,
+        ethereal: !!params.item.ethereal,
+        socketCount,
+        stashTab,
+        gridX: spatialMetadata.gridX,
+        gridY: spatialMetadata.gridY,
+        gridWidth: spatialMetadata.gridWidth,
+        gridHeight: spatialMetadata.gridHeight,
+        equippedSlotId: spatialMetadata.equippedSlotId,
+        iconFileName: legacyParserIconFileName,
+        isSocketedItem: spatialMetadata.isSocketedItem,
+        itemName,
+      },
+      characterName: params.saveName,
+      sourceFileType: params.sourceFileType,
+      sourceFilePath: params.filePath,
+      locationContext,
+      stashTab,
+      stashTabKind: params.stashTabKind,
+      ...spatialMetadata,
+      itemName,
+      itemCode: params.item.code ?? params.item.type ?? undefined,
+      quality,
+      type: parsedType,
+      ethereal: !!params.item.ethereal,
+      socketCount,
+      stackCount: params.stackCount,
+      grailItemId,
+      rawItemJson: JSON.stringify(params.item),
+      rawParsedItem: params.item as d2s.types.IItem,
+      seenAt: new Date(),
+    };
+
+    parsed.fingerprint = this.createFingerprint(parsed);
+    return parsed;
+  }
+
   /**
    * Processes a single save file and updates results.
    * @private
    * @param {string} filePath - Path to the save file.
    * @param {FileReaderResponse} results - Results object to update.
-   * @returns {Promise<{saveName: string, success: boolean}>} Parse result with save name and success status.
+   * @returns {Promise<SingleFileParseResult>} Parse result with save name, success status and snapshot data.
    */
   private async processSingleFile(
     filePath: string,
     results: FileReaderResponse,
-  ): Promise<{ saveName: string; success: boolean }> {
-    const saveName = this.getSaveNameFromPath(filePath);
+  ): Promise<SingleFileParseResult> {
+    let saveName = this.getSaveNameFromPath(filePath);
 
     try {
       const buffer = await readFile(filePath);
       const extension = extname(filePath).toLowerCase();
-      const parsedItems = await this.parseSave(saveName, buffer, extension);
+      let sourceFileVersion: number | undefined;
+
+      if (extension === '.d2i') {
+        try {
+          const metadata = readD2iMetadata(buffer);
+          sourceFileVersion = metadata.version;
+          saveName = this.getSaveNameFromPath(filePath, metadata.hardcore, metadata.version);
+        } catch (error) {
+          log.warn('processSingleFile', `Failed to read .d2i metadata: ${error}`);
+        }
+      }
+
+      const { items: inventoryItems, status: parseStatus } = await this.parseSave(
+        saveName,
+        filePath,
+        buffer,
+        extension,
+      );
+      const characterId = this.grailDatabase?.getCharacterByName(saveName)?.id;
+      const inventoryItemsWithCharacter = inventoryItems.map((inventoryItem) => ({
+        ...inventoryItem,
+        characterId,
+      }));
+      const snapshotItems = inventoryItemsWithCharacter.filter((item) => !item.isSocketedItem);
 
       results.stats[saveName] = 0;
 
-      for (const item of parsedItems) {
+      for (const inventoryItem of inventoryItemsWithCharacter) {
+        const item = inventoryItem.rawParsedItem;
         const name = processItemName(item);
 
         if (shouldSkipItem(name)) {
           continue;
         }
 
-        const savedItem = createSavedItem(item);
+        const savedItem = createSavedItem(item, inventoryItem.stackCount);
         const isEthereal = !!item.ethereal;
         addItemToResults(results, name, savedItem, saveName, item, isEthereal);
 
-        if (isRune(item) && !item.socketed) {
+        // Runes sitting in another item's sockets are used up and not available for runewords.
+        if (isRune(item) && !item.socketed && !inventoryItem.isSocketedItem) {
           addRuneToAvailableRunes(results, name, savedItem, saveName, item);
         }
 
@@ -830,7 +1137,33 @@ class SaveFileMonitor {
       // Update save file state after successful parsing
       await this.updateSaveFileState(filePath);
 
-      return { saveName, success: true };
+      const inventorySnapshot: CharacterInventorySnapshot = {
+        snapshotId: `${saveName}-${Date.now()}`,
+        characterName: saveName,
+        characterId,
+        sourceFileType: extension.replace('.', '') as VaultSourceFileType,
+        sourceFilePath: filePath,
+        sourceFileVersion,
+        readOnly: false,
+        capturedAt: new Date(),
+        items: snapshotItems,
+      };
+
+      if (parseStatus !== 'parsed') {
+        return { saveName, success: true, parseStatus, inventorySnapshot };
+      }
+
+      return {
+        saveName,
+        success: true,
+        parseStatus,
+        // Includes socketed items, which the snapshot omits, so vault reconciliation sees every item.
+        presentFingerprints: inventoryItemsWithCharacter.map((item) => item.fingerprint),
+        presentIdentityKeys: inventoryItemsWithCharacter.map((item) =>
+          this.createPresenceIdentityKey(item),
+        ),
+        inventorySnapshot,
+      };
     } catch (error) {
       log.error('processSingleFile', error, { filePath });
       results.stats[saveName] = null;
@@ -845,7 +1178,7 @@ class SaveFileMonitor {
    */
   private async updateSaveFileState(filePath: string): Promise<void> {
     try {
-      const stats = await import('node:fs/promises').then((fs) => fs.stat(filePath));
+      const stats = await stat(filePath);
 
       // Check if state already exists and reuse its ID
       const existingState = this.grailDatabase?.getSaveFileState(filePath);
@@ -874,18 +1207,17 @@ class SaveFileMonitor {
    * @param {FileReaderResponse} results - The parsing results.
    */
   private async emitSaveFileEvents(
-    filePaths: string[],
+    parsedFiles: Array<{ filePath: string; saveName: string }>,
     results: FileReaderResponse,
   ): Promise<void> {
-    log.info('emitSaveFileEvents', `Emitting events for ${filePaths.length} files`);
-    for (const filePath of filePaths) {
+    log.info('emitSaveFileEvents', `Emitting events for ${parsedFiles.length} files`);
+    for (const { filePath, saveName } of parsedFiles) {
       try {
         const saveFile = await this.parseSaveFile(filePath);
         if (!saveFile) {
           continue;
         }
 
-        const saveName = this.getSaveNameFromPath(filePath);
         const extractedItems = this.collectExtractedItems(results, saveName);
 
         // Set silent flag to prevent notification spam during:
@@ -976,8 +1308,16 @@ class SaveFileMonitor {
       return;
     }
 
+    await this.markOrphanedVaultRowsMissing(filePaths);
+
     // Filter files that need parsing based on modification time
-    const filesToParse = await this.filterFilesToParse(filePaths);
+    let filesToParse = await this.filterFilesToParse(filePaths);
+
+    // On startup, snapshots are empty and must be fully rebuilt to avoid a partial inventory view.
+    if (this.inventorySnapshots.length === 0 && filePaths.length > 0) {
+      log.info('parseFiles', 'Inventory snapshots are empty, forcing full parse of all files');
+      filesToParse = filePaths;
+    }
 
     log.info(
       'parseFiles',
@@ -986,6 +1326,7 @@ class SaveFileMonitor {
 
     if (filesToParse.length === 0) {
       log.info('parseFiles', 'No files to parse, exiting early');
+      this.inventorySnapshots = this.mergeInventorySnapshots(filePaths, [], []);
       return;
     }
 
@@ -1000,8 +1341,20 @@ class SaveFileMonitor {
     });
 
     const parseResults = await this.executeConcurrently(tasks, this.MAX_CONCURRENT_PARSES);
+    const successfulParseResults = parseResults
+      .map((result, index) => ({ result, filePath: filesToParse[index] }))
+      .filter(
+        (
+          entry,
+        ): entry is { result: NonNullable<(typeof parseResults)[number]>; filePath: string } =>
+          Boolean(entry.result?.success && entry.result.saveName),
+      );
 
     const failedFiles = parseResults.filter((r) => r && !r.success);
+    const successfulSnapshots = parseResults.flatMap((r) =>
+      r?.success ? [r.inventorySnapshot] : [],
+    );
+    this.reconcileVaultPresence(parseResults);
     if (failedFiles.length > 0) {
       log.warn(
         'parseFiles',
@@ -1028,10 +1381,121 @@ class SaveFileMonitor {
 
     // Update current data
     this.currentData = results;
+    this.inventorySnapshots = this.mergeInventorySnapshots(
+      filePaths,
+      filesToParse,
+      successfulSnapshots,
+    );
 
     // Emit save file events for each file that was actually parsed
-    await this.emitSaveFileEvents(filesToParse, results);
+    await this.emitSaveFileEvents(
+      successfulParseResults.map((entry) => ({
+        filePath: entry.filePath,
+        saveName: entry.result.saveName,
+      })),
+      results,
+    );
     log.info('parseFiles', `Complete - processed ${filesToParse.length} files`);
+  }
+
+  /**
+   * Clears the "present in latest scan" flag of vault rows whose source save file was deleted or
+   * renamed. Without this, such rows would stay present forever because only files that are still
+   * scanned get reconciled.
+   *
+   * Only presence flags change (see `markVaultItemsMissingForSourceFiles`). A file counts as gone
+   * only when it is not part of this scan and `stat` reports it missing (ENOENT/ENOTDIR) while its
+   * directory is still readable; any other error, or an unavailable directory (an unmounted drive,
+   * a moved save folder), is treated as unknown and leaves the rows alone. When no save file is
+   * found at all the scan aborts earlier and nothing is changed, because that is more likely a
+   * misconfigured directory than every file being deleted.
+   *
+   * Rows that were vaulted out of their file or that share a `#uuid` fingerprint with another row
+   * are not special-cased: they are handled like every other row of their file.
+   * @private
+   */
+  private async markOrphanedVaultRowsMissing(scannedFilePaths: string[]): Promise<void> {
+    if (!this.grailDatabase) {
+      return;
+    }
+
+    try {
+      const scanned = new Set(scannedFilePaths);
+      const candidates = this.grailDatabase
+        .getVaultSourceFilePathsPresentInLatestScan()
+        .filter((path) => !scanned.has(path));
+      const deletedFiles: string[] = [];
+
+      for (const path of candidates) {
+        if (await this.isSaveFileDeleted(path)) {
+          deletedFiles.push(path);
+        }
+      }
+
+      if (deletedFiles.length > 0) {
+        log.info('markOrphanedVaultRowsMissing', `Source files deleted: ${deletedFiles.length}`);
+        this.grailDatabase.markVaultItemsMissingForSourceFiles(deletedFiles);
+      }
+    } catch (error) {
+      log.error('markOrphanedVaultRowsMissing', error);
+    }
+  }
+
+  /** True only when the file is verifiably absent while its directory can still be read. */
+  private async isSaveFileDeleted(filePath: string): Promise<boolean> {
+    try {
+      await stat(filePath);
+      return false;
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException | undefined)?.code;
+      if (code !== 'ENOENT' && code !== 'ENOTDIR') {
+        return false;
+      }
+    }
+
+    try {
+      return (await stat(dirname(filePath))).isDirectory();
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Updates the "present in latest scan" flag of vault rows for every save file that was parsed
+   * successfully in this scan.
+   *
+   * Only parsed files are reconciled (a failed or skipped file keeps its previous flags), and each
+   * reconciliation is scoped to that one file, so it can never mark rows from other files as
+   * missing. It only touches presence flags: vaulted state and item data are never modified.
+   * Errors are logged and swallowed so a database problem cannot break save file scanning.
+   *
+   * Fingerprints include the character name and item position, so an item that moved inside its
+   * file gets a new fingerprint. The database therefore also matches rows by a location-independent
+   * identity key (`presentIdentityKeys`), and a moved item stays present. A renamed character is a
+   * different file and is not covered.
+   * @private
+   */
+  private reconcileVaultPresence(parseResults: Array<SingleFileParseResult | undefined>): void {
+    for (const result of parseResults) {
+      // Only a completed parse proves which items are gone. A skipped (game mode), errored or
+      // partial parse yields no or only some items, and must not mark vault rows of the file as missing.
+      if (result?.success !== true || result.parseStatus !== 'parsed') {
+        continue;
+      }
+
+      const snapshot = result.inventorySnapshot;
+      try {
+        this.grailDatabase?.reconcileVaultItemsForScan({
+          sourceFileType: snapshot.sourceFileType,
+          sourceFilePath: snapshot.sourceFilePath,
+          presentFingerprints: result.presentFingerprints,
+          presentIdentityKeys: result.presentIdentityKeys,
+          lastSeenAt: snapshot.capturedAt,
+        });
+      } catch (error) {
+        log.error('reconcileVaultPresence', error, { filePath: snapshot.sourceFilePath });
+      }
+    }
   }
 
   /**
@@ -1040,85 +1504,158 @@ class SaveFileMonitor {
    * @param {string} saveName - The name of the save file.
    * @param {Buffer} content - The binary content of the save file.
    * @param {string} extension - The file extension (.d2s, .sss, .d2x, .d2i).
-   * @returns {Promise<d2s.types.IItem[]>} A promise that resolves with an array of extracted items.
+   * @returns A promise that resolves with the extracted items and whether the file was really parsed.
+   * A game-mode mismatch or a swallowed parse error yields no items without being a successful
+   * scan, so callers (vault reconciliation) must not read "no items" as "every item left the file".
    */
   private async parseSave(
-    _saveName: string,
-    content: Buffer,
-    extension: string,
-  ): Promise<d2s.types.IItem[]> {
-    const items: d2s.types.IItem[] = [];
+    saveName: string,
+    filePathOrContent: string | Buffer,
+    contentOrExtension: Buffer | string,
+    extensionArg?: string,
+  ): Promise<{ items: ParsedInventoryItem[]; status: SaveParseStatus }> {
+    const items: ParsedInventoryItem[] = [];
 
-    const parseItems = (itemList: d2s.types.IItem[], isEmbed: boolean = false) => {
+    const legacyCall = Buffer.isBuffer(filePathOrContent);
+    const filePath = legacyCall ? `${saveName}.d2s` : filePathOrContent;
+    const content = (legacyCall ? filePathOrContent : contentOrExtension) as Buffer;
+    const extension = (legacyCall ? contentOrExtension : extensionArg) as string;
+
+    const sourceFileType = extension.replace('.', '') as VaultSourceFileType;
+
+    const parseItems = (
+      itemList: D2SItem[],
+      fallbackLocation: VaultLocationContext,
+      stashTab?: number,
+      stashTabKind?: StashTabKind,
+      stackCount?: number,
+      isSocketedItem: boolean = false,
+    ) => {
       itemList.forEach((item) => {
-        if (shouldIncludeItem(item)) {
-          processUniqueOrSetItem(item, items);
-        }
-
-        processRuneItem(item, items, isEmbed);
-        processRunewordItem(item, items);
+        items.push(
+          this.createParsedInventoryItem({
+            filePath,
+            saveName,
+            sourceFileType,
+            item,
+            fallbackLocation,
+            stashTab,
+            stashTabKind,
+            stackCount,
+            isSocketedItem,
+          }),
+        );
 
         if (item.socketed_items?.length) {
-          parseItems(item.socketed_items, true);
+          parseItems(
+            item.socketed_items,
+            fallbackLocation,
+            stashTab,
+            stashTabKind,
+            undefined,
+            true,
+          );
         }
       });
     };
 
-    const parseD2S = (response: d2s.types.ID2S) => {
+    // Each parser reports how much of the file it really read, so no shared mutable status is needed.
+    const parseD2S = (response: d2s.types.ID2S): SaveParseStatus => {
       if (!this.grailDatabase) {
-        return [];
+        return 'skipped';
       }
 
       const settings = this.grailDatabase.getAllSettings();
       const isHardcore = response.header.status.hardcore;
 
-      if (settings.gameMode === GameMode.Softcore && isHardcore) {
-        return [];
+      if (isGameModeMismatch(settings.gameMode, isHardcore)) {
+        return 'skipped';
       }
-      if (settings.gameMode === GameMode.Hardcore && !isHardcore) {
-        return [];
-      }
-      const items = response.items || [];
-      const mercItems = response.merc_items || [];
-      const corpseItems = response.corpse_items || [];
-      const itemList = [...items, ...mercItems, ...corpseItems];
-      parseItems(itemList);
+      const inventoryItems = (response.items || []) as D2SItem[];
+      const mercItems = (response.merc_items || []) as D2SItem[];
+      const corpseItems = (response.corpse_items || []) as D2SItem[];
+      parseItems(inventoryItems, 'inventory');
+      parseItems(mercItems, 'mercenary');
+      parseItems(corpseItems, 'corpse');
+      return 'parsed';
     };
 
-    const parseStash = (response: d2s.types.IStash) => {
+    const parseStash = (response: d2s.types.IStash): SaveParseStatus => {
       if (!this.grailDatabase) {
-        return [];
+        return 'skipped';
       }
 
       const settings = this.grailDatabase.getAllSettings();
       // Use hardcore flag from parsed stash header instead of filename
       const isHardcore = response.hardcore;
 
-      if (settings.gameMode === GameMode.Softcore && isHardcore) {
-        return [];
-      }
-      if (settings.gameMode === GameMode.Hardcore && !isHardcore) {
-        return [];
+      if (isGameModeMismatch(settings.gameMode, isHardcore)) {
+        return 'skipped';
       }
 
-      response.pages.forEach((page) => {
-        parseItems(page.items);
+      response.pages.forEach((page, pageIndex) => {
+        parseItems(page.items as D2SItem[], 'stash', pageIndex);
       });
+      return 'parsed';
     };
 
-    switch (extension) {
-      case '.sss':
-      case '.d2x':
-        await d2stash.read(content, constants96).then(parseStash);
-        break;
-      case '.d2i':
-        await d2stash.read(content, constants99).then(parseStash);
-        break;
-      default:
-        await d2s.read(content).then(parseD2S);
-    }
+    const parseModernD2i = async (): Promise<SaveParseStatus> => {
+      if (!this.grailDatabase) {
+        return 'skipped';
+      }
 
-    return items;
+      const modern = await parseModernStash(content);
+      const settings = this.grailDatabase.getAllSettings();
+      const isHardcore = modern.hardcore;
+
+      if (isGameModeMismatch(settings.gameMode, isHardcore)) {
+        return 'skipped';
+      }
+
+      modern.items.forEach((entry) => {
+        parseItems([entry.item], 'stash', entry.stashTab, entry.stashTabKind, entry.stackCount);
+      });
+      // A damaged sector leaves its items out: keep what was read, but do not call it a full scan.
+      return modern.partial ? 'partial' : 'parsed';
+    };
+
+    const parseD2i = async (): Promise<SaveParseStatus> => {
+      let d2iVersion: number | undefined;
+      try {
+        const metadata = readD2iMetadata(content);
+        d2iVersion = metadata.version;
+        if (metadata.version >= 105) {
+          return await parseModernD2i();
+        }
+        return await d2stash.read(content, constants99).then(parseStash);
+      } catch {
+        // Only fall back to classic stash parsing for pre-105 format files.
+        // Calling d2stash.read on a v105+ .d2i file would fail or produce
+        // garbage because the formats are incompatible. A v105+ file cut off inside a
+        // sector throws before the metadata version is known, so read it from the header.
+        d2iVersion ??= readD2iHeaderVersion(content);
+        if (d2iVersion === undefined || d2iVersion < 105) {
+          return await d2stash.read(content, constants99).then(parseStash);
+        }
+        // The swallowed error leaves the item list empty or partial: not a complete scan.
+        return 'errored';
+      }
+    };
+
+    const parseByExtension = (): Promise<SaveParseStatus> => {
+      switch (extension) {
+        case '.sss':
+        case '.d2x':
+          return d2stash.read(content, constants96).then(parseStash);
+        case '.d2i':
+          return parseD2i();
+        default:
+          return d2s.read(content).then(parseD2S);
+      }
+    };
+
+    const status = await parseByExtension();
+    return { items, status };
   }
 
   /**
@@ -1129,28 +1666,57 @@ class SaveFileMonitor {
    */
   private async parseSaveFile(filePath: string): Promise<D2SaveFile | null> {
     try {
-      const stats = await import('node:fs/promises').then((fs) => fs.stat(filePath));
+      const stats = await stat(filePath);
       const buffer = await readFile(filePath);
       const extension = extname(filePath).toLowerCase();
 
       // Handle shared stash files (.d2i)
       if (extension === '.d2i') {
-        // Parse the stash file header to extract hardcore status
         let isHardcore = false;
+        let sourceFileVersion: number | undefined;
         try {
-          const stashData = await d2stash.read(buffer, constants99);
-          isHardcore = stashData.hardcore;
-          log.info('parseSaveFile', `Parsed .d2i file, hardcore: ${isHardcore}`);
+          const metadata = readD2iMetadata(buffer);
+          isHardcore = metadata.hardcore;
+          sourceFileVersion = metadata.version;
+          log.info(
+            'parseSaveFile',
+            `Parsed .d2i metadata, hardcore: ${isHardcore}, version: ${sourceFileVersion}`,
+          );
         } catch (_parseError) {
-          log.warn('parseSaveFile', 'Failed to parse .d2i file header, falling back to filename');
+          log.warn('parseSaveFile', 'Failed to parse .d2i metadata, falling back to filename');
           // Fallback to filename if parsing fails
           isHardcore = basename(filePath).toLowerCase().includes('hardcore');
         }
 
-        const characterName = this.getSaveNameFromPath(filePath, isHardcore);
+        const characterName = this.getSaveNameFromPath(filePath, isHardcore, sourceFileVersion);
 
         return {
           name: characterName,
+          path: filePath,
+          lastModified: stats.mtime,
+          characterClass: 'shared_stash',
+          level: 1,
+          hardcore: isHardcore,
+          expansion: true,
+          sourceFileVersion,
+        };
+      }
+
+      // Legacy shared stash files (.sss/.d2x) have no character header: reading one as a .d2s would
+      // produce an invalid character class that the characters table rejects.
+      if (extension === '.sss' || extension === '.d2x') {
+        let isHardcore = basename(filePath).toLowerCase().includes('hardcore');
+        try {
+          isHardcore = (await d2stash.read(buffer, constants96)).hardcore;
+        } catch (_parseError) {
+          log.warn(
+            'parseSaveFile',
+            'Failed to parse legacy stash header, falling back to filename',
+          );
+        }
+
+        return {
+          name: this.getSaveNameFromPath(filePath),
           path: filePath,
           lastModified: stats.mtime,
           characterClass: 'shared_stash',
@@ -1312,6 +1878,51 @@ class SaveFileMonitor {
     return this.currentData;
   }
 
+  getInventorySearchResult(): InventorySearchResult {
+    return {
+      snapshots: this.inventorySnapshots,
+      totalSnapshots: this.inventorySnapshots.length,
+      totalItems: this.inventorySnapshots.reduce((sum, snapshot) => sum + snapshot.items.length, 0),
+    };
+  }
+
+  private mergeInventorySnapshots(
+    allFilePaths: string[],
+    parsedFilePaths: string[],
+    successfulSnapshots: CharacterInventorySnapshot[],
+  ): CharacterInventorySnapshot[] {
+    const knownFilePathSet = new Set(allFilePaths);
+    const parsedFilePathSet = new Set(parsedFilePaths);
+    const successfulSnapshotKeySet = new Set(
+      successfulSnapshots.map(
+        (snapshot) => `${snapshot.sourceFileType}:${snapshot.sourceFilePath}`,
+      ),
+    );
+    const mergedByKey = new Map<string, CharacterInventorySnapshot>();
+
+    for (const snapshot of this.inventorySnapshots) {
+      if (!knownFilePathSet.has(snapshot.sourceFilePath)) {
+        continue;
+      }
+
+      const snapshotKey = `${snapshot.sourceFileType}:${snapshot.sourceFilePath}`;
+      if (
+        parsedFilePathSet.has(snapshot.sourceFilePath) &&
+        successfulSnapshotKeySet.has(snapshotKey)
+      ) {
+        continue;
+      }
+
+      mergedByKey.set(snapshotKey, snapshot);
+    }
+
+    for (const snapshot of successfulSnapshots) {
+      mergedByKey.set(`${snapshot.sourceFileType}:${snapshot.sourceFilePath}`, snapshot);
+    }
+
+    return [...mergedByKey.values()];
+  }
+
   /**
    * Fills in available runes from the current item data.
    * This method populates the availableRunes section of the current data.
@@ -1357,7 +1968,7 @@ class SaveFileMonitor {
       let totalCount = 0;
       // Sum up rune counts across all save files
       for (const itemsArray of Object.values(saveFileItem.inSaves)) {
-        totalCount += itemsArray.length;
+        totalCount += itemsArray.reduce((sum, item) => sum + (item.quantity ?? 1), 0);
       }
       runeCounts[runeId] = totalCount;
     }
@@ -1489,25 +2100,28 @@ class SaveFileMonitor {
     // Capture current counter before processing (in case new changes arrive during processing)
     const counterAtStartOfProcessing = this.fileChangeCounter;
 
-    const directories = await this.findExistingSaveDirectories();
-    await this.parseAllSaveDirectories(directories);
+    try {
+      const directories = await this.findExistingSaveDirectories();
+      await this.parseAllSaveDirectories(directories);
 
-    // Update last processed counter to what we started processing
-    // If new changes arrived during processing, they'll be caught on next tick
-    this.lastProcessedChangeCounter = counterAtStartOfProcessing;
+      // Update last processed counter to what we started processing
+      // If new changes arrived during processing, they'll be caught on next tick
+      this.lastProcessedChangeCounter = counterAtStartOfProcessing;
 
-    this.readingFiles = false;
-    log.info(
-      'tickReader',
-      `Done processing file changes (processed up to counter ${counterAtStartOfProcessing})`,
-    );
-
-    // Check if new changes arrived during processing
-    if (this.fileChangeCounter > counterAtStartOfProcessing) {
       log.info(
         'tickReader',
-        `New changes detected during processing (counter now ${this.fileChangeCounter}), will process on next tick`,
+        `Done processing file changes (processed up to counter ${counterAtStartOfProcessing})`,
       );
+
+      // Check if new changes arrived during processing
+      if (this.fileChangeCounter > counterAtStartOfProcessing) {
+        log.info(
+          'tickReader',
+          `New changes detected during processing (counter now ${this.fileChangeCounter}), will process on next tick`,
+        );
+      }
+    } finally {
+      this.readingFiles = false;
     }
   };
 

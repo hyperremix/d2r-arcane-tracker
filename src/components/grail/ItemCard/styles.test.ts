@@ -65,22 +65,22 @@ describe('When getCardStateClasses is called', () => {
     expect(classes).not.toContain('inset-ring-1');
   });
 
-  it.each([true, false])(
-    'If found is %s and the card is interactive, Then hover uses a quality glow instead of scaling',
-    (isFound) => {
-      // Arrange
-      const type: ItemType = 'runeword';
+  it.each([
+    true,
+    false,
+  ])('If found is %s and the card is interactive, Then hover uses a quality glow instead of scaling', (isFound) => {
+    // Arrange
+    const type: ItemType = 'runeword';
 
-      // Act
-      const classes = getCardStateClasses(type, isFound, true);
+    // Act
+    const classes = getCardStateClasses(type, isFound, true);
 
-      // Assert
-      expect(classes).toContain('hover:ring-2');
-      expect(classes).toContain('hover:ring-item-runeword/40');
-      expect(classes).not.toMatch(/scale-/);
-      expect(classes).not.toMatch(/(^|\s)transition-all/);
-    },
-  );
+    // Assert
+    expect(classes).toContain('hover:ring-2');
+    expect(classes).toContain('hover:ring-item-runeword/40');
+    expect(classes).not.toMatch(/scale-/);
+    expect(classes).not.toMatch(/(^|\s)transition-all/);
+  });
 
   it('If a found card is interactive, Then it also lifts its shadow on hover', () => {
     // Arrange
@@ -93,21 +93,21 @@ describe('When getCardStateClasses is called', () => {
     expect(classes).toContain('hover:shadow-md');
   });
 
-  it.each([true, false])(
-    'If found is %s and the card is not interactive, Then it has no hover or transition classes',
-    (isFound) => {
-      // Arrange
-      const type: ItemType = 'set';
+  it.each([
+    true,
+    false,
+  ])('If found is %s and the card is not interactive, Then it has no hover or transition classes', (isFound) => {
+    // Arrange
+    const type: ItemType = 'set';
 
-      // Act
-      const classes = getCardStateClasses(type, isFound);
+    // Act
+    const classes = getCardStateClasses(type, isFound);
 
-      // Assert
-      expect(classes).not.toMatch(/hover:/);
-      expect(classes).not.toMatch(/transition/);
-      expect(classes).toContain('border-item-set');
-    },
-  );
+    // Assert
+    expect(classes).not.toMatch(/hover:/);
+    expect(classes).not.toMatch(/transition/);
+    expect(classes).toContain('border-item-set');
+  });
 
   it('If the card is interactive, Then the hover transition only runs when motion is allowed', () => {
     // Arrange

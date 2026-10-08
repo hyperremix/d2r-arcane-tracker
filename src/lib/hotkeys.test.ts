@@ -43,30 +43,24 @@ describe('hotkeys helpers', () => {
       ['Ctrl+Shift++', { ctrl: true, shift: true, alt: false, key: '+' }],
       ['ctrl + +', { ctrl: true, shift: false, alt: false, key: '+' }],
       ['+', { ctrl: false, shift: false, alt: false, key: '+' }],
-    ])(
-      'If the shortcut %j ends in the plus key, Then the plus key is parsed',
-      (input, expected) => {
-        // Arrange & Act
-        const result = parseShortcut(input);
+    ])('If the shortcut %j ends in the plus key, Then the plus key is parsed', (input, expected) => {
+      // Arrange & Act
+      const result = parseShortcut(input);
 
-        // Assert
-        expect(result).toEqual(expected);
-      },
-    );
+      // Assert
+      expect(result).toEqual(expected);
+    });
 
     it.each([
       ['Ctrl+', { ctrl: true, shift: false, alt: false, key: '' }],
       ['Ctrl+R', { ctrl: true, shift: false, alt: false, key: 'r' }],
-    ])(
-      'If the shortcut %j has no trailing plus key, Then behaviour is unchanged',
-      (input, expected) => {
-        // Arrange & Act
-        const result = parseShortcut(input);
+    ])('If the shortcut %j has no trailing plus key, Then behaviour is unchanged', (input, expected) => {
+      // Arrange & Act
+      const result = parseShortcut(input);
 
-        // Assert
-        expect(result).toEqual(expected);
-      },
-    );
+      // Assert
+      expect(result).toEqual(expected);
+    });
   });
 
   describe('shortcutFromEvent', () => {

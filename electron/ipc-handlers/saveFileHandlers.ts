@@ -42,6 +42,14 @@ let processMonitor: ProcessMonitor | undefined;
 let memoryReader: MemoryReader | undefined;
 const eventUnsubscribers: Array<() => void> = [];
 
+function isSharedStashCharacterName(characterName: string): boolean {
+  return characterName.toLowerCase().includes('shared stash');
+}
+
+function isSharedStashHardcore(characterName: string): boolean {
+  return /hardcore/i.test(characterName);
+}
+
 /**
  * Finds or creates a character by name.
  * @param characterName - Name of the character to find or create
@@ -61,8 +69,7 @@ function findOrCreateCharacter(
   if (!character) {
     const characterId = `char_${characterName}_${Date.now()}`;
     // Determine if this is a shared stash based on the character name
-    const isSharedStash =
-      characterName === 'Shared Stash Softcore' || characterName === 'Shared Stash Hardcore';
+    const isSharedStash = isSharedStashCharacterName(characterName);
     const defaultCharacterClass = isSharedStash ? 'shared_stash' : characterClass || 'barbarian';
 
     character = {
@@ -70,7 +77,7 @@ function findOrCreateCharacter(
       name: characterName,
       characterClass: defaultCharacterClass, // Use shared_stash for shared stash files, will be updated from save file data for regular characters
       level: level || 1,
-      hardcore: characterName === 'Shared Stash Hardcore',
+      hardcore: isSharedStash ? isSharedStashHardcore(characterName) : false,
       expansion: true,
       saveFilePath: undefined,
       lastUpdated: new Date(),
@@ -734,6 +741,10 @@ export function initializeSaveFileHandlers(): void {
  */
 export function getRunTracker(): RunTrackerService | undefined {
   return runTracker;
+}
+
+export function getSaveFileMonitor(): SaveFileMonitor | undefined {
+  return saveFileMonitor;
 }
 
 export function closeSaveFileMonitor(): void {

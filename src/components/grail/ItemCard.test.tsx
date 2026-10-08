@@ -10,7 +10,7 @@ vi.mock('@/stores/grailStore');
 vi.mock('@/hooks/useItemIcon', () => ({
   useItemIcon: () => ({ iconUrl: '/mock-icon.png', isLoading: false, error: null }),
 }));
-vi.mock('/images/placeholder-item.png', () => ({ default: '/mock-placeholder.png' }));
+vi.mock('/images/placeholder-item.svg', () => ({ default: '/mock-placeholder.png' }));
 vi.mock('./RuneImages', () => ({
   RuneImages: ({
     runeIds,
@@ -113,29 +113,29 @@ describe('When ItemCard is rendered', () => {
   });
 
   describe('If the item name tooltip is opened', () => {
-    it.each(['grid', 'list'] as const)(
-      'Then the %s card shows the translated category and sub-category',
-      async (viewMode) => {
-        // Arrange
-        const item = HolyGrailItemBuilder.new()
-          .withName('Windforce')
-          .withCategory('weapons')
-          .withWeaponSubCategory('2h_swords')
-          .build();
-        render(<ItemCard item={item} viewMode={viewMode} />);
+    it.each([
+      'grid',
+      'list',
+    ] as const)('Then the %s card shows the translated category and sub-category', async (viewMode) => {
+      // Arrange
+      const item = HolyGrailItemBuilder.new()
+        .withName('Windforce')
+        .withCategory('weapons')
+        .withWeaponSubCategory('2h_swords')
+        .build();
+      render(<ItemCard item={item} viewMode={viewMode} />);
 
-        // Act
-        fireEvent.focus(
-          screen.getByText('Windforce').closest('[data-slot="tooltip-trigger"]') as Element,
-        );
+      // Act
+      fireEvent.focus(
+        screen.getByText('Windforce').closest('[data-slot="tooltip-trigger"]') as Element,
+      );
 
-        // Assert
-        const label = await screen.findByText('Weapons • Two-Handed Swords');
-        expect(label).toBeInTheDocument();
-        expect(screen.queryByText(/2h swords/i)).not.toBeInTheDocument();
-        expect(screen.queryByText(/weapons • 2h/i)).not.toBeInTheDocument();
-      },
-    );
+      // Assert
+      const label = await screen.findByText('Weapons • Two-Handed Swords');
+      expect(label).toBeInTheDocument();
+      expect(screen.queryByText(/2h swords/i)).not.toBeInTheDocument();
+      expect(screen.queryByText(/weapons • 2h/i)).not.toBeInTheDocument();
+    });
   });
 
   describe('If item has no progress', () => {
@@ -319,165 +319,165 @@ describe('When ItemCard is rendered', () => {
       expect(onClick).toHaveBeenCalledTimes(1);
     });
 
-    it.each(['grid', 'list'] as const)(
-      'Then the %s card is a focusable button labeled with name and found status',
-      (viewMode) => {
-        // Arrange
-        const item = HolyGrailItemBuilder.new().withId('item-1').withName('Focusable').build();
-        const normalProgress = GrailProgressBuilder.new()
-          .withCharacterId('char-1')
-          .withItemId('item-1')
-          .asNormal()
-          .build();
-        render(
-          <ItemCard
-            item={item}
-            normalProgress={[normalProgress]}
-            onClick={vi.fn()}
-            viewMode={viewMode}
-          />,
-        );
-        const card = screen.getByRole('button', { name: 'Focusable, Found' });
+    it.each([
+      'grid',
+      'list',
+    ] as const)('Then the %s card is a focusable button labeled with name and found status', (viewMode) => {
+      // Arrange
+      const item = HolyGrailItemBuilder.new().withId('item-1').withName('Focusable').build();
+      const normalProgress = GrailProgressBuilder.new()
+        .withCharacterId('char-1')
+        .withItemId('item-1')
+        .asNormal()
+        .build();
+      render(
+        <ItemCard
+          item={item}
+          normalProgress={[normalProgress]}
+          onClick={vi.fn()}
+          viewMode={viewMode}
+        />,
+      );
+      const card = screen.getByRole('button', { name: 'Focusable, Found' });
 
-        // Act
-        card.focus();
+      // Act
+      card.focus();
 
-        // Assert
-        expect(card).toHaveAttribute('tabindex', '0');
-        expect(card).toHaveFocus();
-        expect(card.className).toContain('focus-visible:ring-[3px]');
-      },
-    );
+      // Assert
+      expect(card).toHaveAttribute('tabindex', '0');
+      expect(card).toHaveFocus();
+      expect(card.className).toContain('focus-visible:ring-[3px]');
+    });
 
-    it.each(['grid', 'list'] as const)(
-      'Then the %s card calls onClick once when Enter is pressed',
-      (viewMode) => {
-        // Arrange
-        const onClick = vi.fn();
-        const item = HolyGrailItemBuilder.new().withName('Pressable').build();
-        render(<ItemCard item={item} onClick={onClick} viewMode={viewMode} />);
-        const card = screen.getByRole('button', { name: 'Pressable, Not Found' });
+    it.each([
+      'grid',
+      'list',
+    ] as const)('Then the %s card calls onClick once when Enter is pressed', (viewMode) => {
+      // Arrange
+      const onClick = vi.fn();
+      const item = HolyGrailItemBuilder.new().withName('Pressable').build();
+      render(<ItemCard item={item} onClick={onClick} viewMode={viewMode} />);
+      const card = screen.getByRole('button', { name: 'Pressable, Not Found' });
 
-        // Act
-        fireEvent.keyDown(card, { key: 'Enter' });
+      // Act
+      fireEvent.keyDown(card, { key: 'Enter' });
 
-        // Assert
-        expect(onClick).toHaveBeenCalledTimes(1);
-      },
-    );
+      // Assert
+      expect(onClick).toHaveBeenCalledTimes(1);
+    });
 
-    it.each(['grid', 'list'] as const)(
-      'Then the %s card calls onClick once when Space is released',
-      (viewMode) => {
-        // Arrange
-        const onClick = vi.fn();
-        const item = HolyGrailItemBuilder.new().withName('Pressable').build();
-        render(<ItemCard item={item} onClick={onClick} viewMode={viewMode} />);
-        const card = screen.getByRole('button', { name: 'Pressable, Not Found' });
+    it.each([
+      'grid',
+      'list',
+    ] as const)('Then the %s card calls onClick once when Space is released', (viewMode) => {
+      // Arrange
+      const onClick = vi.fn();
+      const item = HolyGrailItemBuilder.new().withName('Pressable').build();
+      render(<ItemCard item={item} onClick={onClick} viewMode={viewMode} />);
+      const card = screen.getByRole('button', { name: 'Pressable, Not Found' });
 
-        // Act
-        fireEvent.keyDown(card, { key: ' ' });
-        fireEvent.keyUp(card, { key: ' ' });
+      // Act
+      fireEvent.keyDown(card, { key: ' ' });
+      fireEvent.keyUp(card, { key: ' ' });
 
-        // Assert
-        expect(onClick).toHaveBeenCalledTimes(1);
-      },
-    );
+      // Assert
+      expect(onClick).toHaveBeenCalledTimes(1);
+    });
 
-    it.each(['grid', 'list'] as const)(
-      'Then the %s card does not call onClick on Space keydown alone and prevents page scroll',
-      (viewMode) => {
-        // Arrange
-        const onClick = vi.fn();
-        const item = HolyGrailItemBuilder.new().withName('Pressable').build();
-        render(<ItemCard item={item} onClick={onClick} viewMode={viewMode} />);
-        const card = screen.getByRole('button', { name: 'Pressable, Not Found' });
+    it.each([
+      'grid',
+      'list',
+    ] as const)('Then the %s card does not call onClick on Space keydown alone and prevents page scroll', (viewMode) => {
+      // Arrange
+      const onClick = vi.fn();
+      const item = HolyGrailItemBuilder.new().withName('Pressable').build();
+      render(<ItemCard item={item} onClick={onClick} viewMode={viewMode} />);
+      const card = screen.getByRole('button', { name: 'Pressable, Not Found' });
 
-        // Act
-        const notPrevented = fireEvent.keyDown(card, { key: ' ' });
+      // Act
+      const notPrevented = fireEvent.keyDown(card, { key: ' ' });
 
-        // Assert
-        expect(onClick).not.toHaveBeenCalled();
-        expect(notPrevented).toBe(false);
-      },
-    );
+      // Assert
+      expect(onClick).not.toHaveBeenCalled();
+      expect(notPrevented).toBe(false);
+    });
 
-    it.each(['grid', 'list'] as const)(
-      'Then the %s card does not call onClick when Enter or Space bubble from a nested element',
-      (viewMode) => {
-        // Arrange
-        const onClick = vi.fn();
-        const item = HolyGrailItemBuilder.new().withName('Nested Key').build();
-        render(<ItemCard item={item} onClick={onClick} viewMode={viewMode} />);
-        const card = screen.getByRole('button', { name: 'Nested Key, Not Found' });
-        const nested = screen.getByText('Nested Key');
-        expect(card).not.toBe(nested);
-        expect(card).toContainElement(nested);
+    it.each([
+      'grid',
+      'list',
+    ] as const)('Then the %s card does not call onClick when Enter or Space bubble from a nested element', (viewMode) => {
+      // Arrange
+      const onClick = vi.fn();
+      const item = HolyGrailItemBuilder.new().withName('Nested Key').build();
+      render(<ItemCard item={item} onClick={onClick} viewMode={viewMode} />);
+      const card = screen.getByRole('button', { name: 'Nested Key, Not Found' });
+      const nested = screen.getByText('Nested Key');
+      expect(card).not.toBe(nested);
+      expect(card).toContainElement(nested);
 
-        // Act
-        fireEvent.keyDown(nested, { key: 'Enter' });
-        fireEvent.keyDown(nested, { key: ' ' });
-        fireEvent.keyUp(nested, { key: ' ' });
+      // Act
+      fireEvent.keyDown(nested, { key: 'Enter' });
+      fireEvent.keyDown(nested, { key: ' ' });
+      fireEvent.keyUp(nested, { key: ' ' });
 
-        // Assert
-        expect(onClick).not.toHaveBeenCalled();
-      },
-    );
+      // Assert
+      expect(onClick).not.toHaveBeenCalled();
+    });
 
-    it.each(['grid', 'list'] as const)(
-      'Then the %s card ignores a stray Space keyup without a prior keydown on the card',
-      (viewMode) => {
-        // Arrange
-        const onClick = vi.fn();
-        const item = HolyGrailItemBuilder.new().withName('Stray Key').build();
-        render(<ItemCard item={item} onClick={onClick} viewMode={viewMode} />);
-        const card = screen.getByRole('button', { name: 'Stray Key, Not Found' });
+    it.each([
+      'grid',
+      'list',
+    ] as const)('Then the %s card ignores a stray Space keyup without a prior keydown on the card', (viewMode) => {
+      // Arrange
+      const onClick = vi.fn();
+      const item = HolyGrailItemBuilder.new().withName('Stray Key').build();
+      render(<ItemCard item={item} onClick={onClick} viewMode={viewMode} />);
+      const card = screen.getByRole('button', { name: 'Stray Key, Not Found' });
 
-        // Act
-        fireEvent.keyUp(card, { key: ' ' });
+      // Act
+      fireEvent.keyUp(card, { key: ' ' });
 
-        // Assert
-        expect(onClick).not.toHaveBeenCalled();
-      },
-    );
+      // Assert
+      expect(onClick).not.toHaveBeenCalled();
+    });
 
-    it.each(['grid', 'list'] as const)(
-      'Then the %s card activates only once per Space press and ignores a second keyup',
-      (viewMode) => {
-        // Arrange
-        const onClick = vi.fn();
-        const item = HolyGrailItemBuilder.new().withName('Once Key').build();
-        render(<ItemCard item={item} onClick={onClick} viewMode={viewMode} />);
-        const card = screen.getByRole('button', { name: 'Once Key, Not Found' });
+    it.each([
+      'grid',
+      'list',
+    ] as const)('Then the %s card activates only once per Space press and ignores a second keyup', (viewMode) => {
+      // Arrange
+      const onClick = vi.fn();
+      const item = HolyGrailItemBuilder.new().withName('Once Key').build();
+      render(<ItemCard item={item} onClick={onClick} viewMode={viewMode} />);
+      const card = screen.getByRole('button', { name: 'Once Key, Not Found' });
 
-        // Act
-        fireEvent.keyDown(card, { key: ' ' });
-        fireEvent.keyUp(card, { key: ' ' });
-        fireEvent.keyUp(card, { key: ' ' });
+      // Act
+      fireEvent.keyDown(card, { key: ' ' });
+      fireEvent.keyUp(card, { key: ' ' });
+      fireEvent.keyUp(card, { key: ' ' });
 
-        // Assert
-        expect(onClick).toHaveBeenCalledTimes(1);
-      },
-    );
+      // Assert
+      expect(onClick).toHaveBeenCalledTimes(1);
+    });
 
-    it.each(['grid', 'list'] as const)(
-      'Then the %s card ignores a Space keyup after focus left the card mid-press',
-      (viewMode) => {
-        // Arrange
-        const onClick = vi.fn();
-        const item = HolyGrailItemBuilder.new().withName('Blur Key').build();
-        render(<ItemCard item={item} onClick={onClick} viewMode={viewMode} />);
-        const card = screen.getByRole('button', { name: 'Blur Key, Not Found' });
-        fireEvent.keyDown(card, { key: ' ' });
+    it.each([
+      'grid',
+      'list',
+    ] as const)('Then the %s card ignores a Space keyup after focus left the card mid-press', (viewMode) => {
+      // Arrange
+      const onClick = vi.fn();
+      const item = HolyGrailItemBuilder.new().withName('Blur Key').build();
+      render(<ItemCard item={item} onClick={onClick} viewMode={viewMode} />);
+      const card = screen.getByRole('button', { name: 'Blur Key, Not Found' });
+      fireEvent.keyDown(card, { key: ' ' });
 
-        // Act
-        fireEvent.blur(card);
-        fireEvent.keyUp(card, { key: ' ' });
+      // Act
+      fireEvent.blur(card);
+      fireEvent.keyUp(card, { key: ' ' });
 
-        // Assert
-        expect(onClick).not.toHaveBeenCalled();
-      },
-    );
+      // Assert
+      expect(onClick).not.toHaveBeenCalled();
+    });
 
     it('Then does not call onClick when Enter is released', () => {
       // Arrange
@@ -561,37 +561,37 @@ describe('When ItemCard is rendered', () => {
       expect(screen.queryByRole('button', { name: 'Static, Not Found' })).not.toBeInTheDocument();
     });
 
-    it.each(['grid', 'list'] as const)(
-      'Then the %s card keeps item, status and character tooltip triggers keyboard focusable',
-      (viewMode) => {
-        // Arrange
-        const item = HolyGrailItemBuilder.new().withId('item-1').withName('Static').build();
-        const normalProgress = GrailProgressBuilder.new()
-          .withCharacterId('char-1')
-          .withItemId('item-1')
-          .withFoundDate(new Date('2020-01-01T00:00:00Z'))
-          .asNormal()
-          .build();
-        const characters = [CharacterBuilder.new().withId('char-1').withName('Char').build()];
+    it.each([
+      'grid',
+      'list',
+    ] as const)('Then the %s card keeps item, status and character tooltip triggers keyboard focusable', (viewMode) => {
+      // Arrange
+      const item = HolyGrailItemBuilder.new().withId('item-1').withName('Static').build();
+      const normalProgress = GrailProgressBuilder.new()
+        .withCharacterId('char-1')
+        .withItemId('item-1')
+        .withFoundDate(new Date('2020-01-01T00:00:00Z'))
+        .asNormal()
+        .build();
+      const characters = [CharacterBuilder.new().withId('char-1').withName('Char').build()];
 
-        // Act
-        const { container } = render(
-          <ItemCard
-            item={item}
-            normalProgress={[normalProgress]}
-            characters={characters}
-            viewMode={viewMode}
-          />,
-        );
+      // Act
+      const { container } = render(
+        <ItemCard
+          item={item}
+          normalProgress={[normalProgress]}
+          characters={characters}
+          viewMode={viewMode}
+        />,
+      );
 
-        // Assert
-        const triggerTagNames = Array.from(
-          container.querySelectorAll('[data-slot="tooltip-trigger"]'),
-          (trigger) => trigger.tagName,
-        );
-        expect(triggerTagNames).toEqual(['BUTTON', 'BUTTON', 'BUTTON']);
-      },
-    );
+      // Assert
+      const triggerTagNames = Array.from(
+        container.querySelectorAll('[data-slot="tooltip-trigger"]'),
+        (trigger) => trigger.tagName,
+      );
+      expect(triggerTagNames).toEqual(['BUTTON', 'BUTTON', 'BUTTON']);
+    });
 
     it('Then rune tooltip triggers stay focusable on a runeword card', () => {
       // Arrange
@@ -610,40 +610,40 @@ describe('When ItemCard is rendered', () => {
   });
 
   describe('If item is missing', () => {
-    it.each(['grid', 'list'] as const)(
-      'Then the %s card does not dim the item name with opacity',
-      (viewMode) => {
-        // Arrange
-        const item = HolyGrailItemBuilder.new().withType('unique').withName('Missing Item').build();
+    it.each([
+      'grid',
+      'list',
+    ] as const)('Then the %s card does not dim the item name with opacity', (viewMode) => {
+      // Arrange
+      const item = HolyGrailItemBuilder.new().withType('unique').withName('Missing Item').build();
 
-        // Act
-        render(<ItemCard item={item} viewMode={viewMode} onClick={vi.fn()} />);
+      // Act
+      render(<ItemCard item={item} viewMode={viewMode} onClick={vi.fn()} />);
 
-        // Assert
-        const name = screen.getByText('Missing Item');
-        const ancestorsWithOpacity = [];
-        for (let element: HTMLElement | null = name; element; element = element.parentElement) {
-          if (/(^|\s)opacity-\d+/.test(element.className)) ancestorsWithOpacity.push(element);
-        }
-        expect(ancestorsWithOpacity).toHaveLength(0);
-        expect(name).toHaveClass('text-item-unique');
-      },
-    );
+      // Assert
+      const name = screen.getByText('Missing Item');
+      const ancestorsWithOpacity = [];
+      for (let element: HTMLElement | null = name; element; element = element.parentElement) {
+        if (/(^|\s)opacity-\d+/.test(element.className)) ancestorsWithOpacity.push(element);
+      }
+      expect(ancestorsWithOpacity).toHaveLength(0);
+      expect(name).toHaveClass('text-item-unique');
+    });
 
-    it.each(['grid', 'list'] as const)(
-      'Then the %s card shows grayscale, dimmed artwork',
-      (viewMode) => {
-        // Arrange
-        setupStoreMock({ showItemIcons: true });
-        const item = HolyGrailItemBuilder.new().withType('unique').build();
+    it.each([
+      'grid',
+      'list',
+    ] as const)('Then the %s card shows grayscale, dimmed artwork', (viewMode) => {
+      // Arrange
+      setupStoreMock({ showItemIcons: true });
+      const item = HolyGrailItemBuilder.new().withType('unique').build();
 
-        // Act
-        render(<ItemCard item={item} viewMode={viewMode} />);
+      // Act
+      render(<ItemCard item={item} viewMode={viewMode} />);
 
-        // Assert
-        expect(screen.getByTestId('item-artwork')).toHaveClass('grayscale', 'opacity-50');
-      },
-    );
+      // Assert
+      expect(screen.getByTestId('item-artwork')).toHaveClass('grayscale', 'opacity-50');
+    });
 
     it('Then the card uses a neutral muted surface with a dashed type border', () => {
       // Arrange
@@ -728,40 +728,40 @@ describe('When ItemCard is rendered', () => {
       expect(surface).toHaveClass('hover:ring-item-unique/40');
     });
 
-    it.each(['grid', 'list'] as const)(
-      'Then the non-clickable %s card has no hover ring or shadow, so it does not look interactive',
-      (viewMode) => {
-        // Arrange
-        const item = HolyGrailItemBuilder.new().withType('unique').withName('Static').build();
+    it.each([
+      'grid',
+      'list',
+    ] as const)('Then the non-clickable %s card has no hover ring or shadow, so it does not look interactive', (viewMode) => {
+      // Arrange
+      const item = HolyGrailItemBuilder.new().withType('unique').withName('Static').build();
 
-        // Act
-        const { container } = render(<ItemCard item={item} viewMode={viewMode} />);
+      // Act
+      const { container } = render(<ItemCard item={item} viewMode={viewMode} />);
 
-        // Assert
-        const surface = container.querySelector('[data-found]');
-        expect(surface).toBeInTheDocument();
-        expect(surface?.className).not.toMatch(/hover:/);
-        expect(surface?.className).not.toMatch(/transition/);
-        expect(screen.queryByRole('button', { name: 'Static, Not Found' })).not.toBeInTheDocument();
-      },
-    );
+      // Assert
+      const surface = container.querySelector('[data-found]');
+      expect(surface).toBeInTheDocument();
+      expect(surface?.className).not.toMatch(/hover:/);
+      expect(surface?.className).not.toMatch(/transition/);
+      expect(screen.queryByRole('button', { name: 'Static, Not Found' })).not.toBeInTheDocument();
+    });
 
-    it.each(['grid', 'list'] as const)(
-      'Then the clickable %s card keeps its hover ring and focus styling',
-      (viewMode) => {
-        // Arrange
-        const item = HolyGrailItemBuilder.new().withType('unique').withName('Clickable').build();
+    it.each([
+      'grid',
+      'list',
+    ] as const)('Then the clickable %s card keeps its hover ring and focus styling', (viewMode) => {
+      // Arrange
+      const item = HolyGrailItemBuilder.new().withType('unique').withName('Clickable').build();
 
-        // Act
-        render(<ItemCard item={item} viewMode={viewMode} onClick={vi.fn()} />);
+      // Act
+      render(<ItemCard item={item} viewMode={viewMode} onClick={vi.fn()} />);
 
-        // Assert
-        const card = screen.getByRole('button', { name: 'Clickable, Not Found' });
-        const surface = viewMode === 'grid' ? card.querySelector('[data-found]') : card;
-        expect(surface).toHaveClass('hover:ring-2', 'hover:ring-item-unique/40');
-        expect(card).toHaveClass('cursor-pointer', 'focus-visible:ring-[3px]');
-      },
-    );
+      // Assert
+      const card = screen.getByRole('button', { name: 'Clickable, Not Found' });
+      const surface = viewMode === 'grid' ? card.querySelector('[data-found]') : card;
+      expect(surface).toHaveClass('hover:ring-2', 'hover:ring-item-unique/40');
+      expect(card).toHaveClass('cursor-pointer', 'focus-visible:ring-[3px]');
+    });
   });
 
   describe('If > 2 discovering characters', () => {

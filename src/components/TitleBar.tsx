@@ -5,6 +5,7 @@ import {
   ChevronLeft,
   ChevronRight,
   MapPinned,
+  PackageSearch,
   Settings,
   Timer,
   Trophy,
@@ -38,6 +39,11 @@ const NAVIGATION_ITEMS: NavigationItem[] = [
   { to: '/statistics', labelKey: translations.titleBar.statistics, icon: BarChart3 },
   { to: '/runs', labelKey: translations.titleBar.runs, icon: Timer },
   { to: '/runewords', labelKey: translations.titleBar.runewords, icon: Calculator },
+  {
+    to: '/inventory-browser',
+    labelKey: translations.titleBar.inventoryBrowser,
+    icon: PackageSearch,
+  },
   { to: '/terror-zones', labelKey: translations.titleBar.terrorZones, icon: MapPinned },
   { to: '/settings', labelKey: translations.titleBar.settings, icon: Settings },
 ];

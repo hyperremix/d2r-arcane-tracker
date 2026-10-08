@@ -39,6 +39,7 @@ The app checks for updates on startup and installs them when you confirm.
 | Guide | Covers |
 | --- | --- |
 | [Holy Grail Guide](docs/HOLY_GRAIL_GUIDE.md) | The challenge, setup, tracking options, how detection works, and the other app features |
+| [Inventory Browser Guide](docs/INVENTORY_BROWSER_GUIDE.md) | Browsing, moving and vaulting items in your save files, and the safety rules |
 | [Run Tracker Guide](docs/RUN_TRACKER.md) | Sessions, runs, auto mode, shortcuts and exports |
 | [Terror Zone Configuration](docs/TERROR_ZONE_CONFIGURATION.md) | Changing the terror zone rotation |
 | [Extracting Game Files](docs/EXTRACTING_GAME_FILES.md) | CASC extraction, needed for item icons and terror zones |

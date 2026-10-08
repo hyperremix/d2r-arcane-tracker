@@ -746,33 +746,30 @@ describe('When ItemGrid component is rendered', () => {
     ['grid', 'none'],
     ['grid', 'category'],
     ['list', 'none'],
-  ])(
-    'If viewMode "%s", groupMode "%s" and active filters match no items',
-    (viewMode, groupMode) => {
-      it('Then renders the no-matches empty state instead of the items container', () => {
-        // Arrange
-        setupComponentMocks({
-          filteredItems: [],
-          items: HolyGrailItemBuilder.new().buildMany(3),
-          filter: { foundStatus: 'all', searchTerm: 'does-not-exist' },
-          viewMode,
-          groupMode,
-        });
-
-        // Act
-        render(<ItemGrid />);
-
-        // Assert
-        expect(screen.getByTestId('item-grid-empty-state')).toHaveAttribute(
-          'data-variant',
-          'noMatches',
-        );
-        expect(screen.getByText('No items match your filters')).toBeInTheDocument();
-        expect(screen.queryByTestId('masonry-item-grid')).not.toBeInTheDocument();
-        expect(screen.queryByTestId('grouped-masonry-grid')).not.toBeInTheDocument();
+  ])('If viewMode "%s", groupMode "%s" and active filters match no items', (viewMode, groupMode) => {
+    it('Then renders the no-matches empty state instead of the items container', () => {
+      // Arrange
+      setupComponentMocks({
+        filteredItems: [],
+        items: HolyGrailItemBuilder.new().buildMany(3),
+        filter: { foundStatus: 'all', searchTerm: 'does-not-exist' },
+        viewMode,
+        groupMode,
       });
-    },
-  );
+
+      // Act
+      render(<ItemGrid />);
+
+      // Assert
+      expect(screen.getByTestId('item-grid-empty-state')).toHaveAttribute(
+        'data-variant',
+        'noMatches',
+      );
+      expect(screen.getByText('No items match your filters')).toBeInTheDocument();
+      expect(screen.queryByTestId('masonry-item-grid')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('grouped-masonry-grid')).not.toBeInTheDocument();
+    });
+  });
 
   describe('If active filters match no items and the user clicks Clear filters', () => {
     it('Then resets the store filters', () => {

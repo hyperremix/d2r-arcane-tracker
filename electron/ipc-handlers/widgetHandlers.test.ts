@@ -77,20 +77,17 @@ describe('widget IPC handlers display mode validation', () => {
     ['a prototype key', 'constructor'],
     ['a non-string', 42],
     ['undefined', undefined],
-  ])(
-    'If widget:reset-size receives %s, Then it is rejected without touching the window',
-    async (_name, display) => {
-      // Arrange: the invalid display mode comes from the test table
+  ])('If widget:reset-size receives %s, Then it is rejected without touching the window', async (_name, display) => {
+    // Arrange: the invalid display mode comes from the test table
 
-      // Act
-      const result = await invoke('widget:reset-size', display);
+    // Act
+    const result = await invoke('widget:reset-size', display);
 
-      // Assert
-      expect(result).toMatchObject({ success: false, size: null });
-      expect(resetWidgetWindowSize).not.toHaveBeenCalled();
-      expect(onSizeChange).not.toHaveBeenCalled();
-    },
-  );
+    // Assert
+    expect(result).toMatchObject({ success: false, size: null });
+    expect(resetWidgetWindowSize).not.toHaveBeenCalled();
+    expect(onSizeChange).not.toHaveBeenCalled();
+  });
 
   it('If widget:update-display receives an invalid display mode, Then it is rejected', async () => {
     // Arrange
@@ -199,38 +196,35 @@ describe('widget IPC handlers lock (click-through)', () => {
     consoleError.mockRestore();
   });
 
-  it.each([true, false])(
-    'When widget:set-locked receives %s, Then the lock state is applied to the window',
-    async (locked) => {
-      // Arrange: the lock state comes from the test table
+  it.each([
+    true,
+    false,
+  ])('When widget:set-locked receives %s, Then the lock state is applied to the window', async (locked) => {
+    // Arrange: the lock state comes from the test table
 
-      // Act
-      const result = await invoke('widget:set-locked', locked);
+    // Act
+    const result = await invoke('widget:set-locked', locked);
 
-      // Assert
-      expect(result).toEqual({ success: true });
-      expect(setWidgetWindowLocked).toHaveBeenCalledWith(locked);
-    },
-  );
+    // Assert
+    expect(result).toEqual({ success: true });
+    expect(setWidgetWindowLocked).toHaveBeenCalledWith(locked);
+  });
 
   it.each([
     ['a string', 'true'],
     ['a number', 1],
     ['undefined', undefined],
     ['an object', { locked: true }],
-  ])(
-    'If widget:set-locked receives %s, Then it is rejected without touching the window',
-    async (_name, locked) => {
-      // Arrange: the invalid lock state comes from the test table
+  ])('If widget:set-locked receives %s, Then it is rejected without touching the window', async (_name, locked) => {
+    // Arrange: the invalid lock state comes from the test table
 
-      // Act
-      const result = await invoke('widget:set-locked', locked);
+    // Act
+    const result = await invoke('widget:set-locked', locked);
 
-      // Assert
-      expect(result).toMatchObject({ success: false });
-      expect(setWidgetWindowLocked).not.toHaveBeenCalled();
-    },
-  );
+    // Assert
+    expect(result).toMatchObject({ success: false });
+    expect(setWidgetWindowLocked).not.toHaveBeenCalled();
+  });
 
   it('When the widget is toggled on, Then it is created with the persisted lock state and sizes', async () => {
     // Arrange

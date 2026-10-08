@@ -98,6 +98,8 @@
   --color-item-set: var(--item-set);
   --color-item-rune: var(--item-rune);
   --color-item-runeword: var(--item-runeword);
+  --color-item-magic: var(--item-magic);
+  --color-item-rare: var(--item-rare);
 }
 
 /*
@@ -152,13 +154,15 @@
   --ethereal: oklch(0.48 0.12 240);
   --ethereal-foreground: oklch(0.985 0 0);
   /*
-   * Item qualities (D2: unique gold, set green, rune orange, runeword purple).
+   * Item qualities (D2: unique gold, set green, rune orange, runeword purple, magic blue, rare yellow).
    * Also used as item name text color, so they must stay >= 4.5:1 on card, muted and background.
    */
   --item-unique: oklch(0.52 0.11 75);
   --item-set: oklch(0.48 0.14 145);
   --item-rune: oklch(0.52 0.15 50);
   --item-runeword: oklch(0.48 0.2 300);
+  --item-magic: oklch(0.48 0.16 260);
+  --item-rare: oklch(0.52 0.11 95);
 }
 
 /* The widget overlay always renders on a black backdrop, so it always uses the dark tokens. */
@@ -210,6 +214,8 @@ body.widget {
   --item-set: oklch(0.78 0.18 145);
   --item-rune: oklch(0.75 0.16 55);
   --item-runeword: oklch(0.72 0.16 300);
+  --item-magic: oklch(0.74 0.13 255);
+  --item-rare: oklch(0.86 0.15 100);
 }
 
 @layer base {

@@ -3,7 +3,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { useItemIcon } from '@/hooks/useItemIcon';
 import { cn } from '@/lib/utils';
 import { useGrailStore } from '@/stores/grailStore';
-import placeholderUrl from '/images/placeholder-item.png';
+import placeholderUrl from '/images/placeholder-item.svg';
 import { RuneImages } from '../RuneImages';
 import { ItemTypeIcon } from '../StatusIcons';
 import { getTooltipTriggerRender } from '../tooltipTriggerRender';
@@ -56,7 +56,7 @@ function ListArtwork({ item, isFound, showItemIcons, focusableTriggers }: ListAr
         <div data-testid="item-artwork" className={cn(!isFound && missingArtworkStyles)}>
           <RuneImages runeIds={item.runes} viewMode="list" focusableTriggers={focusableTriggers} />
         </div>
-        <ItemTypeIcon type={item.type} className="-right-2 -bottom-1 absolute h-4 w-4" />
+        <ItemTypeIcon type={item.type} className="absolute -right-2 -bottom-1 h-4 w-4" />
       </div>
     );
   }

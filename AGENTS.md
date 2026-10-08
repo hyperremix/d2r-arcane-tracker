@@ -22,6 +22,7 @@ If any command fails, fix the issue and re-run from the failing step onward.
 - Preserve existing architecture and naming conventions unless the task explicitly requires refactoring.
 - Update tests when behavior changes.
 - Update the matching guide in `docs/` when user-facing behavior changes; link to existing docs instead of duplicating them.
+- Always use `git rebase` instead of `git merge` to integrate changes from the base branch; this keeps a linear commit history.
 
 ## Coding conventions agents must follow
 - Use TypeScript and prefer named exports for components/utilities.

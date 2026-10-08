@@ -6,6 +6,7 @@ import type {
   RunItem,
   SaveFileState,
   Session,
+  VaultItem,
 } from '../types/grail';
 import type {
   DbCharacter,
@@ -15,6 +16,7 @@ import type {
   DbRunItem,
   DbSaveFileState,
   DbSession,
+  DbVaultItem,
 } from './drizzle';
 
 export function toISOString(date: Date | undefined | null): string | null {
@@ -152,5 +154,45 @@ export function dbRunItemToRunItem(dbRunItem: DbRunItem): RunItem {
     name: dbRunItem.name ?? undefined,
     foundTime: new Date(dbRunItem.foundTime),
     created: new Date(dbRunItem.createdAt ?? new Date().toISOString()),
+  };
+}
+
+function extractVaultItemSpatialFields(dbItem: DbVaultItem) {
+  return {
+    stashTab: dbItem.stashTab ?? undefined,
+    gridX: dbItem.gridX ?? undefined,
+    gridY: dbItem.gridY ?? undefined,
+    gridWidth: dbItem.gridWidth ?? undefined,
+    gridHeight: dbItem.gridHeight ?? undefined,
+    equippedSlotId: dbItem.equippedSlotId ?? undefined,
+  };
+}
+
+export function dbVaultItemToVaultItem(dbItem: DbVaultItem): VaultItem {
+  return {
+    id: dbItem.id,
+    fingerprint: dbItem.fingerprint,
+    itemName: dbItem.itemName,
+    itemCode: dbItem.itemCode ?? undefined,
+    quality: dbItem.quality,
+    ethereal: dbItem.ethereal,
+    socketCount: dbItem.socketCount ?? undefined,
+    stackCount: dbItem.stackCount ?? 1,
+    rawItemJson: dbItem.rawItemJson,
+    sourceCharacterId: dbItem.sourceCharacterId ?? undefined,
+    sourceCharacterName: dbItem.sourceCharacterName ?? undefined,
+    sourceFileType: dbItem.sourceFileType,
+    sourceFilePath: dbItem.sourceFilePath ?? undefined,
+    locationContext: dbItem.locationContext,
+    ...extractVaultItemSpatialFields(dbItem),
+    iconFileName: dbItem.iconFileName ?? undefined,
+    isSocketedItem: dbItem.isSocketedItem ?? false,
+    grailItemId: dbItem.grailItemId ?? undefined,
+    isPresentInLatestScan: dbItem.isPresentInLatestScan,
+    lastSeenAt: fromISOString(dbItem.lastSeenAt),
+    vaultedAt: fromISOString(dbItem.vaultedAt),
+    unvaultedAt: fromISOString(dbItem.unvaultedAt),
+    created: new Date(dbItem.createdAt ?? new Date().toISOString()),
+    lastUpdated: new Date(dbItem.updatedAt ?? new Date().toISOString()),
   };
 }

@@ -26,7 +26,7 @@ beforeEach(async () => {
       },
     };
   });
-  vi.doMock('/images/placeholder-item.png', () => ({ default: '/mock-placeholder.png' }));
+  vi.doMock('/images/placeholder-item.svg', () => ({ default: '/mock-placeholder.png' }));
   ({ useGrailStore } = await import('@/stores/grailStore'));
   ({ ItemCard } = await import('./ItemCard'));
 
@@ -39,7 +39,7 @@ beforeEach(async () => {
 afterEach(() => {
   useGrailStore.setState(initialStoreState, true);
   vi.doUnmock('@/hooks/useItemIcon');
-  vi.doUnmock('/images/placeholder-item.png');
+  vi.doUnmock('/images/placeholder-item.svg');
   vi.resetModules();
 });
 

@@ -5,6 +5,10 @@ import type {
   FileReaderResponse,
   GlobalHotkeyStatus,
   GrailProgress,
+  InventoryItemMoveInput,
+  InventorySearchResult,
+  InventorySnapshotWindowTarget,
+  InventoryStackSplitInput,
   Item,
   MonitoringStatus,
   Run,
@@ -15,6 +19,12 @@ import type {
   TerrorZone,
   TerrorZoneValidationResult,
   UpdateStatus,
+  VaultItem,
+  VaultItemFilter,
+  VaultItemSearchResult,
+  VaultItemUpsertInput,
+  VaultLocationContext,
+  VaultSourceFileType,
 } from './types/grail';
 
 /**
@@ -255,6 +265,44 @@ contextBridge.exposeInMainWorld('electronAPI', {
      */
     refreshSaveFiles: (): Promise<{ success: boolean }> =>
       ipcRenderer.invoke('saveFile:refreshSaveFiles'),
+  },
+
+  vault: {
+    addItem: (item: VaultItemUpsertInput): Promise<VaultItem> =>
+      ipcRenderer.invoke('vault:addItem', item),
+    removeItem: (itemId: string): Promise<{ success: boolean }> =>
+      ipcRenderer.invoke('vault:removeItem', itemId),
+    search: (filter?: VaultItemFilter): Promise<VaultItemSearchResult> =>
+      ipcRenderer.invoke('vault:search', filter),
+    unvaultItem: (
+      itemId: string,
+      targetOptions?: {
+        targetFilePath: string;
+        targetFileType: VaultSourceFileType;
+        targetLocationContext: VaultLocationContext;
+        targetStashTab?: number;
+        targetGridX: number;
+        targetGridY: number;
+        targetEquippedSlotId?: number;
+      },
+      withdrawCount?: number,
+    ): Promise<{ success: boolean }> =>
+      ipcRenderer.invoke('vault:unvaultItem', itemId, targetOptions, withdrawCount),
+  },
+
+  inventory: {
+    searchAll: (
+      filter?: VaultItemFilter,
+    ): Promise<{
+      inventory: InventorySearchResult;
+      vault: VaultItemSearchResult;
+    }> => ipcRenderer.invoke('inventory:searchAll', filter),
+    openSnapshotWindow: (target: InventorySnapshotWindowTarget): Promise<{ success: boolean }> =>
+      ipcRenderer.invoke('inventory:openSnapshotWindow', target),
+    moveItem: (input: InventoryItemMoveInput): Promise<{ success: boolean }> =>
+      ipcRenderer.invoke('inventory:moveItem', input),
+    splitStack: (input: InventoryStackSplitInput): Promise<{ success: boolean }> =>
+      ipcRenderer.invoke('inventory:splitStack', input),
   },
 
   /**

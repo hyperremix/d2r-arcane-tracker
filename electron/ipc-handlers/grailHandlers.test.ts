@@ -794,27 +794,24 @@ describe('When grailHandlers is used', () => {
         'a blank action value',
         { startRun: 'Ctrl+1', pauseRun: '  ', endRun: 'Ctrl+3', endSession: 'Ctrl+Shift+4' },
       ],
-    ])(
-      'If runTrackerShortcuts is %s, Then the update is rejected before any setting is written',
-      async (_label, runTrackerShortcuts) => {
-        // Arrange
-        const handler = vi
-          .mocked(ipcMain.handle)
-          .mock.calls.find((call) => call[0] === 'grail:updateSettings')?.[1] as any;
-        const listener = vi.fn();
-        const removeListener = addSettingsUpdatedListener(listener);
-        const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    ])('If runTrackerShortcuts is %s, Then the update is rejected before any setting is written', async (_label, runTrackerShortcuts) => {
+      // Arrange
+      const handler = vi
+        .mocked(ipcMain.handle)
+        .mock.calls.find((call) => call[0] === 'grail:updateSettings')?.[1] as any;
+      const listener = vi.fn();
+      const removeListener = addSettingsUpdatedListener(listener);
+      const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
 
-        // Act & Assert
-        await expect(
-          handler(null, { runTrackerGlobalHotkeys: true, runTrackerShortcuts }),
-        ).rejects.toThrow('Invalid runTrackerShortcuts setting');
-        expect(grailDatabase.setSetting).not.toHaveBeenCalled();
-        expect(listener).not.toHaveBeenCalled();
-        removeListener();
-        consoleError.mockRestore();
-      },
-    );
+      // Act & Assert
+      await expect(
+        handler(null, { runTrackerGlobalHotkeys: true, runTrackerShortcuts }),
+      ).rejects.toThrow('Invalid runTrackerShortcuts setting');
+      expect(grailDatabase.setSetting).not.toHaveBeenCalled();
+      expect(listener).not.toHaveBeenCalled();
+      removeListener();
+      consoleError.mockRestore();
+    });
 
     it('Then settings handlers should handle errors properly', async () => {
       // Arrange

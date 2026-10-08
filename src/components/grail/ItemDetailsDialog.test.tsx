@@ -6,13 +6,16 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { CharacterBuilder, GrailProgressBuilder, HolyGrailItemBuilder } from '@/fixtures';
 import { ItemDetailsDialog } from './ItemDetailsDialog';
 
+const { toastErrorMock } = vi.hoisted(() => ({ toastErrorMock: vi.fn() }));
+
 // Mock dependencies
+vi.mock('sonner', () => ({ toast: { error: toastErrorMock } }));
 vi.mock('@/stores/grailStore');
 vi.mock('@/hooks/useProgressLookup');
 vi.mock('@/hooks/useItemIcon', () => ({
   useItemIcon: () => ({ iconUrl: '/mock-icon.png', isLoading: false, error: null }),
 }));
-vi.mock('/images/placeholder-item.png', () => ({ default: '/mock-placeholder.png' }));
+vi.mock('/images/placeholder-item.svg', () => ({ default: '/mock-placeholder.png' }));
 vi.mock('./RuneImages', () => ({
   RuneImages: ({ runeIds }: { runeIds: string[] }) => (
     <div data-testid="rune-images">{runeIds.join(',')}</div>
@@ -50,6 +53,10 @@ const defaultSettings: Settings = {
 
 const mockAddManualProgress = vi.fn();
 const mockRemoveProgress = vi.fn();
+
+const mockVaultSearch = vi.fn();
+const mockVaultAddItem = vi.fn();
+const mockVaultRemoveItem = vi.fn();
 
 function setupStoreMock(
   overrides: {
@@ -95,6 +102,18 @@ function setupProgressLookup(
 describe('When ItemDetailsDialog is rendered', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    Object.defineProperty(window, 'electronAPI', {
+      configurable: true,
+      writable: true,
+      value: {
+        vault: {
+          search: mockVaultSearch,
+          addItem: mockVaultAddItem,
+          removeItem: mockVaultRemoveItem,
+        },
+      },
+    });
+    mockVaultSearch.mockResolvedValue({ items: [], total: 0, page: 1, pageSize: 20 });
     setupStoreMock();
     setupProgressLookup();
   });
@@ -183,25 +202,26 @@ describe('When ItemDetailsDialog is rendered', () => {
       { etherealType: 'none', label: 'Cannot Be Ethereal', variantClass: 'bg-secondary' },
       { etherealType: 'optional', label: 'Can Be Ethereal', variantClass: 'text-ethereal' },
       { etherealType: 'only', label: 'Ethereal Only', variantClass: 'text-ethereal' },
-    ] as const)(
-      'Then renders the $etherealType ethereal type as $label without destructive styling',
-      ({ etherealType, label, variantClass }) => {
-        // Arrange
-        const item = HolyGrailItemBuilder.new()
-          .withId('item-1')
-          .withEtherealType(etherealType)
-          .build();
-        setupStoreMock({ items: [item] });
+    ] as const)('Then renders the $etherealType ethereal type as $label without destructive styling', ({
+      etherealType,
+      label,
+      variantClass,
+    }) => {
+      // Arrange
+      const item = HolyGrailItemBuilder.new()
+        .withId('item-1')
+        .withEtherealType(etherealType)
+        .build();
+      setupStoreMock({ items: [item] });
 
-        // Act
-        render(<ItemDetailsDialog itemId="item-1" open={true} onOpenChange={vi.fn()} />);
+      // Act
+      render(<ItemDetailsDialog itemId="item-1" open={true} onOpenChange={vi.fn()} />);
 
-        // Assert
-        const badge = screen.getByText(label);
-        expect(badge).toHaveClass(variantClass);
-        expect(badge).not.toHaveClass('text-destructive');
-      },
-    );
+      // Assert
+      const badge = screen.getByText(label);
+      expect(badge).toHaveClass(variantClass);
+      expect(badge).not.toHaveClass('text-destructive');
+    });
   });
 
   describe('If item has code', () => {
@@ -369,44 +389,43 @@ describe('When ItemDetailsDialog is rendered', () => {
       { normalFound: false, etherealFound: true, normal: missing, ethereal: found },
       { normalFound: true, etherealFound: true, normal: found, ethereal: found },
       { normalFound: false, etherealFound: false, normal: missing, ethereal: missing },
-    ])(
-      'Then Normal found=$normalFound and Ethereal found=$etherealFound use the matching status badge',
-      ({ normalFound, etherealFound, normal, ethereal }) => {
-        // Arrange
-        const item = HolyGrailItemBuilder.new()
-          .withId('item-1')
-          .withEtherealType('optional')
-          .build();
-        setupStoreMock({ items: [item] });
-        setupProgressLookup(
-          new Map([
-            [
-              'item-1',
-              {
-                normalFound,
-                etherealFound,
-                overallFound: normalFound || etherealFound,
-                normalProgress: [],
-                etherealProgress: [],
-              },
-            ],
-          ]),
-        );
+    ])('Then Normal found=$normalFound and Ethereal found=$etherealFound use the matching status badge', ({
+      normalFound,
+      etherealFound,
+      normal,
+      ethereal,
+    }) => {
+      // Arrange
+      const item = HolyGrailItemBuilder.new().withId('item-1').withEtherealType('optional').build();
+      setupStoreMock({ items: [item] });
+      setupProgressLookup(
+        new Map([
+          [
+            'item-1',
+            {
+              normalFound,
+              etherealFound,
+              overallFound: normalFound || etherealFound,
+              normalProgress: [],
+              etherealProgress: [],
+            },
+          ],
+        ]),
+      );
 
-        // Act
-        render(<ItemDetailsDialog itemId="item-1" open={true} onOpenChange={vi.fn()} />);
+      // Act
+      render(<ItemDetailsDialog itemId="item-1" open={true} onOpenChange={vi.fn()} />);
 
-        // Assert
-        const normalBadge = screen.getByText('Normal:').nextElementSibling;
-        const etherealBadge = screen.getByText('Ethereal:').nextElementSibling;
-        expect(normalBadge).toHaveTextContent(normal.text);
-        expect(normalBadge).toHaveClass(normal.present);
-        expect(normalBadge).not.toHaveClass(normal.absent);
-        expect(etherealBadge).toHaveTextContent(ethereal.text);
-        expect(etherealBadge).toHaveClass(ethereal.present);
-        expect(etherealBadge).not.toHaveClass(ethereal.absent);
-      },
-    );
+      // Assert
+      const normalBadge = screen.getByText('Normal:').nextElementSibling;
+      const etherealBadge = screen.getByText('Ethereal:').nextElementSibling;
+      expect(normalBadge).toHaveTextContent(normal.text);
+      expect(normalBadge).toHaveClass(normal.present);
+      expect(normalBadge).not.toHaveClass(normal.absent);
+      expect(etherealBadge).toHaveTextContent(ethereal.text);
+      expect(etherealBadge).toHaveClass(ethereal.present);
+      expect(etherealBadge).not.toHaveClass(ethereal.absent);
+    });
   });
 
   describe('If "Close" clicked', () => {
@@ -425,7 +444,8 @@ describe('When ItemDetailsDialog is rendered', () => {
         (btn) => btn.getAttribute('data-slot') !== 'dialog-close',
       );
       expect(footerClose).toBeTruthy();
-      fireEvent.click(footerClose as Element);
+      if (!footerClose) throw new Error('Expected footer close button');
+      fireEvent.click(footerClose);
 
       // Assert
       expect(onOpenChange).toHaveBeenCalledWith(false);
@@ -636,6 +656,372 @@ describe('When ItemDetailsDialog is rendered', () => {
 
       // Assert
       expect(screen.getByText('Auto')).toBeInTheDocument();
+    });
+  });
+
+  describe('If a bookmark exists for the item', () => {
+    it('Then it shows the bookmarked status badge', async () => {
+      // Arrange
+      const item = HolyGrailItemBuilder.new().withId('item-1').withName('Windforce').build();
+      setupStoreMock({ items: [item] });
+      mockVaultSearch.mockResolvedValue({
+        items: [
+          {
+            id: 'vault-1',
+            fingerprint: 'grail:item-1',
+            itemName: 'Windforce',
+            quality: 'unique',
+            ethereal: false,
+            rawItemJson: '{}',
+            sourceFileType: 'd2s',
+            locationContext: 'unknown',
+            grailItemId: 'item-1',
+            isPresentInLatestScan: false,
+            created: new Date('2024-01-01T00:00:00.000Z'),
+            lastUpdated: new Date('2024-01-01T00:00:00.000Z'),
+          },
+        ],
+        total: 1,
+        page: 1,
+        pageSize: 20,
+      });
+
+      // Act
+      render(<ItemDetailsDialog itemId="item-1" open={true} onOpenChange={vi.fn()} />);
+
+      // Assert
+      expect(await screen.findByText('Bookmarked')).toBeInTheDocument();
+    });
+  });
+
+  describe('If the item is not bookmarked', () => {
+    it('Then clicking Bookmark calls vault addItem API', async () => {
+      // Arrange
+      const item = HolyGrailItemBuilder.new().withId('item-1').withName('Windforce').build();
+      setupStoreMock({ items: [item] });
+
+      // Act
+      render(<ItemDetailsDialog itemId="item-1" open={true} onOpenChange={vi.fn()} />);
+      const bookmarkButton = await screen.findByRole('button', { name: 'Bookmark' });
+      fireEvent.click(bookmarkButton);
+
+      // Assert
+      expect(mockVaultAddItem).toHaveBeenCalledTimes(1);
+      expect(mockVaultAddItem.mock.calls[0]?.[0]?.grailItemId).toBe('item-1');
+    });
+  });
+
+  describe('If the item is bookmarked', () => {
+    it('Then clicking Remove Bookmark calls vault removeItem API for the bookmark row', async () => {
+      // Arrange
+      const item = HolyGrailItemBuilder.new().withId('item-1').withName('Windforce').build();
+      setupStoreMock({ items: [item] });
+      mockVaultSearch.mockResolvedValue({
+        items: [
+          {
+            id: 'bookmark-1',
+            fingerprint: 'grail:item-1',
+            itemName: 'Windforce',
+            quality: 'unique',
+            ethereal: false,
+            rawItemJson: '{}',
+            sourceFileType: 'd2s',
+            locationContext: 'unknown',
+            grailItemId: 'item-1',
+            isPresentInLatestScan: false,
+            created: new Date('2024-01-01T00:00:00.000Z'),
+            lastUpdated: new Date('2024-01-01T00:00:00.000Z'),
+          },
+        ],
+        total: 1,
+        page: 1,
+        pageSize: 20,
+      });
+      mockVaultRemoveItem.mockResolvedValue(undefined);
+      render(<ItemDetailsDialog itemId="item-1" open={true} onOpenChange={vi.fn()} />);
+      const removeButton = await screen.findByRole('button', { name: 'Remove Bookmark' });
+
+      // Act
+      fireEvent.click(removeButton);
+
+      // Assert
+      await waitFor(() => expect(mockVaultRemoveItem).toHaveBeenCalledWith('bookmark-1'));
+      expect(mockVaultAddItem).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('If a real vaulted item shares the grail item id', () => {
+    it('Then the dialog never links or deletes that vault row', async () => {
+      // Arrange
+      const item = HolyGrailItemBuilder.new().withId('item-1').withName('Windforce').build();
+      setupStoreMock({ items: [item] });
+      mockVaultSearch.mockResolvedValue({
+        items: [
+          {
+            id: 'real-vault-row',
+            fingerprint: 'd2s|Sorc|stash|unique|Windforce|0,0',
+            itemName: 'Windforce',
+            quality: 'unique',
+            ethereal: false,
+            rawItemJson: '{"id":42}',
+            sourceFileType: 'd2s',
+            sourceFilePath: '/saves/Sorc.d2s',
+            locationContext: 'stash',
+            grailItemId: 'item-1',
+            isPresentInLatestScan: true,
+            vaultedAt: new Date('2024-01-01T00:00:00.000Z'),
+            created: new Date('2024-01-01T00:00:00.000Z'),
+            lastUpdated: new Date('2024-01-01T00:00:00.000Z'),
+          },
+        ],
+        total: 1,
+        page: 1,
+        pageSize: 20,
+      });
+
+      // Act
+      render(<ItemDetailsDialog itemId="item-1" open={true} onOpenChange={vi.fn()} />);
+      const bookmarkButton = await screen.findByRole('button', { name: 'Bookmark' });
+      fireEvent.click(bookmarkButton);
+
+      // Assert
+      expect(screen.queryByText('Bookmarked')).not.toBeInTheDocument();
+      expect(mockVaultRemoveItem).not.toHaveBeenCalled();
+      expect(mockVaultAddItem).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('If loading the bookmark metadata rejects', () => {
+    it('Then the rejection is handled, logged and surfaced as an error toast', async () => {
+      // Arrange
+      const item = HolyGrailItemBuilder.new().withId('item-1').withName('Windforce').build();
+      setupStoreMock({ items: [item] });
+      const failure = new Error('ipc failed');
+      mockVaultSearch.mockRejectedValue(failure);
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+      const unhandledRejections: unknown[] = [];
+      const onUnhandledRejection = (reason: unknown) => {
+        unhandledRejections.push(reason);
+      };
+      process.on('unhandledRejection', onUnhandledRejection);
+
+      // Act
+      render(<ItemDetailsDialog itemId="item-1" open={true} onOpenChange={vi.fn()} />);
+      await waitFor(() =>
+        expect(toastErrorMock).toHaveBeenCalledWith('Failed to load bookmark status.'),
+      );
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      process.off('unhandledRejection', onUnhandledRejection);
+
+      // Assert
+      expect(consoleErrorSpy).toHaveBeenCalledWith('Failed to load bookmark metadata', failure);
+      expect(unhandledRejections).toEqual([]);
+      consoleErrorSpy.mockRestore();
+    });
+  });
+
+  describe('If the bookmark action fails', () => {
+    it('Then the error is logged and surfaced as an error toast', async () => {
+      // Arrange
+      const item = HolyGrailItemBuilder.new().withId('item-1').withName('Windforce').build();
+      setupStoreMock({ items: [item] });
+      const failure = new Error('write failed');
+      mockVaultAddItem.mockRejectedValue(failure);
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+      render(<ItemDetailsDialog itemId="item-1" open={true} onOpenChange={vi.fn()} />);
+      const bookmarkButton = await screen.findByRole('button', { name: 'Bookmark' });
+
+      // Act
+      fireEvent.click(bookmarkButton);
+
+      // Assert
+      await waitFor(() =>
+        expect(toastErrorMock).toHaveBeenCalledWith(
+          'Failed to update the bookmark. Nothing was changed.',
+        ),
+      );
+      expect(consoleErrorSpy).toHaveBeenCalledWith('Failed to update bookmark', failure);
+      expect(screen.queryByText('Bookmarked')).not.toBeInTheDocument();
+      consoleErrorSpy.mockRestore();
+    });
+  });
+  describe('If the bookmark write succeeds but refreshing the bookmark metadata fails', () => {
+    it('Then the item stays bookmarked and only the load error is shown', async () => {
+      // Arrange
+      const item = HolyGrailItemBuilder.new().withId('item-1').withName('Windforce').build();
+      setupStoreMock({ items: [item] });
+      const bookmark = {
+        id: 'vault-1',
+        fingerprint: 'grail:item-1',
+        itemName: 'Windforce',
+      };
+      mockVaultAddItem.mockResolvedValue(bookmark);
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+      render(<ItemDetailsDialog itemId="item-1" open={true} onOpenChange={vi.fn()} />);
+      const bookmarkButton = await screen.findByRole('button', { name: 'Bookmark' });
+      mockVaultSearch.mockRejectedValue(new Error('refresh failed'));
+
+      // Act
+      fireEvent.click(bookmarkButton);
+
+      // Assert
+      await waitFor(() =>
+        expect(toastErrorMock).toHaveBeenCalledWith('Failed to load bookmark status.'),
+      );
+      expect(toastErrorMock).not.toHaveBeenCalledWith(
+        'Failed to update the bookmark. Nothing was changed.',
+      );
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        'Failed to refresh bookmark metadata',
+        expect.any(Error),
+      );
+      consoleErrorSpy.mockRestore();
+    });
+  });
+
+  describe('If a bookmarked item is closed and another item is opened', () => {
+    it('Then the second item does not inherit the first bookmark when the lookup fails', async () => {
+      // Arrange
+      const itemA = HolyGrailItemBuilder.new().withId('item-a').withName('Windforce').build();
+      const itemB = HolyGrailItemBuilder.new().withId('item-b').withName('Arachnid Mesh').build();
+      setupStoreMock({ items: [itemA, itemB] });
+      mockVaultSearch.mockResolvedValueOnce({
+        items: [{ id: 'bm-a', fingerprint: 'grail:item-a', itemName: 'Windforce' }],
+        total: 1,
+        page: 1,
+        pageSize: 100,
+      });
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+      const { rerender } = render(
+        <ItemDetailsDialog itemId="item-a" open={true} onOpenChange={vi.fn()} />,
+      );
+      await screen.findByRole('button', { name: 'Remove Bookmark' });
+
+      // Act
+      rerender(<ItemDetailsDialog itemId="item-a" open={false} onOpenChange={vi.fn()} />);
+      mockVaultSearch.mockRejectedValue(new Error('ipc failed'));
+      rerender(<ItemDetailsDialog itemId="item-b" open={true} onOpenChange={vi.fn()} />);
+      await waitFor(() =>
+        expect(toastErrorMock).toHaveBeenCalledWith('Failed to load bookmark status.'),
+      );
+
+      // Assert
+      expect(screen.queryByText('Bookmarked')).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Remove Bookmark' })).not.toBeInTheDocument();
+      expect(mockVaultRemoveItem).not.toHaveBeenCalled();
+      consoleErrorSpy.mockRestore();
+    });
+
+    it('Then the second item is not shown as bookmarked while its lookup is pending', async () => {
+      // Arrange
+      const itemA = HolyGrailItemBuilder.new().withId('item-a').withName('Windforce').build();
+      const itemB = HolyGrailItemBuilder.new().withId('item-b').withName('Arachnid Mesh').build();
+      setupStoreMock({ items: [itemA, itemB] });
+      mockVaultSearch.mockResolvedValueOnce({
+        items: [{ id: 'bm-a', fingerprint: 'grail:item-a', itemName: 'Windforce' }],
+        total: 1,
+        page: 1,
+        pageSize: 100,
+      });
+      const { rerender } = render(
+        <ItemDetailsDialog itemId="item-a" open={true} onOpenChange={vi.fn()} />,
+      );
+      await screen.findByRole('button', { name: 'Remove Bookmark' });
+      mockVaultSearch.mockReturnValue(new Promise(() => undefined));
+
+      // Act
+      rerender(<ItemDetailsDialog itemId="item-b" open={true} onOpenChange={vi.fn()} />);
+
+      // Assert
+      expect(screen.queryByText('Bookmarked')).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Bookmark' })).toBeInTheDocument();
+    });
+  });
+
+  describe('If a bookmark lookup for one item resolves after another item was opened', () => {
+    it('Then the late response is not applied to the other item', async () => {
+      // Arrange
+      const itemA = HolyGrailItemBuilder.new().withId('item-a').withName('Windforce').build();
+      const itemB = HolyGrailItemBuilder.new().withId('item-b').withName('Arachnid Mesh').build();
+      setupStoreMock({ items: [itemA, itemB] });
+      let resolveLookupForA: (value: unknown) => void = () => undefined;
+      mockVaultSearch.mockReturnValueOnce(
+        new Promise((resolve) => {
+          resolveLookupForA = resolve;
+        }),
+      );
+      const { rerender } = render(
+        <ItemDetailsDialog itemId="item-a" open={true} onOpenChange={vi.fn()} />,
+      );
+      mockVaultSearch.mockResolvedValue({ items: [], total: 0, page: 1, pageSize: 100 });
+      rerender(<ItemDetailsDialog itemId="item-b" open={true} onOpenChange={vi.fn()} />);
+      await screen.findByRole('button', { name: 'Bookmark' });
+
+      // Act
+      resolveLookupForA({
+        items: [{ id: 'bm-a', fingerprint: 'grail:item-a', itemName: 'Windforce' }],
+        total: 1,
+        page: 1,
+        pageSize: 100,
+      });
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      // Assert
+      expect(screen.queryByText('Bookmarked')).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Remove Bookmark' })).not.toBeInTheDocument();
+    });
+  });
+
+  describe('If the bookmark is not on the first page of name matches', () => {
+    it('Then the lookup keeps paging until it finds the bookmark by fingerprint', async () => {
+      // Arrange
+      const item = HolyGrailItemBuilder.new().withId('item-1').withName('El').build();
+      setupStoreMock({ items: [item] });
+      const otherRows = Array.from({ length: 100 }, (_, index) => ({
+        id: `real-${index}`,
+        fingerprint: `d2s|real|${index}`,
+        itemName: 'El Rune',
+      }));
+      mockVaultSearch
+        .mockResolvedValueOnce({ items: otherRows, total: 101, page: 1, pageSize: 100 })
+        .mockResolvedValueOnce({
+          items: [{ id: 'bm-1', fingerprint: 'grail:item-1', itemName: 'El' }],
+          total: 101,
+          page: 2,
+          pageSize: 100,
+        });
+
+      // Act
+      render(<ItemDetailsDialog itemId="item-1" open={true} onOpenChange={vi.fn()} />);
+
+      // Assert
+      expect(await screen.findByText('Bookmarked')).toBeInTheDocument();
+      expect(mockVaultSearch.mock.calls.map(([filter]) => filter.page)).toEqual([1, 2]);
+    });
+  });
+
+  describe('If an item is bookmarked', () => {
+    it.each([
+      ['unique', 'unique'],
+      ['set', 'set'],
+      ['rune', 'normal'],
+      ['runeword', 'normal'],
+    ] as const)('Then a %s item is stored with quality %s', async (type, expectedQuality) => {
+      // Arrange
+      const item = HolyGrailItemBuilder.new().withId('item-1').withType(type).build();
+      setupStoreMock({ items: [item] });
+      mockVaultAddItem.mockResolvedValue({ id: 'bm-1', fingerprint: 'grail:item-1' });
+      render(<ItemDetailsDialog itemId="item-1" open={true} onOpenChange={vi.fn()} />);
+
+      // Act
+      fireEvent.click(await screen.findByRole('button', { name: 'Bookmark' }));
+
+      // Assert
+      await waitFor(() => expect(mockVaultAddItem).toHaveBeenCalledTimes(1));
+      expect(mockVaultAddItem.mock.calls[0]?.[0]).toMatchObject({
+        type,
+        quality: expectedQuality,
+      });
     });
   });
 

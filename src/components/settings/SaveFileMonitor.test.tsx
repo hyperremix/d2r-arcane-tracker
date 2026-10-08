@@ -174,22 +174,19 @@ describe('SaveFileMonitor', () => {
       ['created', 'Created'],
       ['modified', 'Modified'],
       ['deleted', 'Deleted'],
-    ])(
-      'When a "%s" save file event arrives, then the event type is shown as "%s"',
-      async (type, label) => {
-        // Arrange
-        mockGameMode(GameMode.Both);
-        render(<SaveFileMonitor />);
-        await waitFor(() => expect(window.electronAPI?.saveFile.getSaveFiles).toHaveBeenCalled());
+    ])('When a "%s" save file event arrives, then the event type is shown as "%s"', async (type, label) => {
+      // Arrange
+      mockGameMode(GameMode.Both);
+      render(<SaveFileMonitor />);
+      await waitFor(() => expect(window.electronAPI?.saveFile.getSaveFiles).toHaveBeenCalled());
 
-        // Act
-        emitSaveFileEvent(type);
+      // Act
+      emitSaveFileEvent(type);
 
-        // Assert
-        expect(screen.getByText(label)).toBeInTheDocument();
-        expect(screen.queryByText(type)).not.toBeInTheDocument();
-      },
-    );
+      // Assert
+      expect(screen.getByText(label)).toBeInTheDocument();
+      expect(screen.queryByText(type)).not.toBeInTheDocument();
+    });
 
     it('If the event type is unrecognized, then a translated fallback is shown', async () => {
       // Arrange
@@ -418,25 +415,22 @@ describe('SaveFileMonitor', () => {
         'rejects',
         () => getElectronAPI().saveFile.getDefaultDirectory.mockRejectedValue(new Error('boom')),
       ],
-    ])(
-      'If the default directory lookup returns %s, then a restore error toast is shown and nothing changes',
-      async (_name, arrange) => {
-        // Arrange
-        arrangeMonitoredDirectory(true);
-        arrange();
-        await renderWithLoadedDirectory();
+    ])('If the default directory lookup returns %s, then a restore error toast is shown and nothing changes', async (_name, arrange) => {
+      // Arrange
+      arrangeMonitoredDirectory(true);
+      arrange();
+      await renderWithLoadedDirectory();
 
-        // Act
-        fireEvent.click(screen.getByRole('button', { name: 'Restore Default' }));
+      // Act
+      fireEvent.click(screen.getByRole('button', { name: 'Restore Default' }));
 
-        // Assert
-        await waitFor(() =>
-          expect(toast.error).toHaveBeenCalledWith('Failed to restore default directory'),
-        );
-        expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
-        expect(getElectronAPI().saveFile.restoreDefaultDirectory).not.toHaveBeenCalled();
-      },
-    );
+      // Assert
+      await waitFor(() =>
+        expect(toast.error).toHaveBeenCalledWith('Failed to restore default directory'),
+      );
+      expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+      expect(getElectronAPI().saveFile.restoreDefaultDirectory).not.toHaveBeenCalled();
+    });
 
     it('If checking for existing data fails, then the confirmation is shown to be safe', async () => {
       // Arrange

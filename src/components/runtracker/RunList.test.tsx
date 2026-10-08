@@ -207,7 +207,8 @@ describe('When RunList is rendered', () => {
       // The items column shows "-" when there are no items
       const row = screen.getByText('#1').closest('tr');
       expect(row).toBeTruthy();
-      expect(within(row as HTMLElement).getAllByText('-').length).toBeGreaterThan(0);
+      if (!row) throw new Error('Expected run row');
+      expect(within(row).getAllByText('-').length).toBeGreaterThan(0);
     });
   });
 
@@ -227,7 +228,8 @@ describe('When RunList is rendered', () => {
       // Assert
       const row = screen.getByText('#1').closest('tr');
       expect(row).toBeTruthy();
-      const dashes = within(row as HTMLElement).getAllByText('-');
+      if (!row) throw new Error('Expected run row');
+      const dashes = within(row).getAllByText('-');
       expect(dashes.length).toBeGreaterThanOrEqual(2);
     });
   });
@@ -367,7 +369,8 @@ describe('When RunList is rendered', () => {
       // Act
       const row = screen.getByText('#1').closest('tr');
       expect(row).toBeTruthy();
-      fireEvent.click(row as HTMLElement);
+      if (!row) throw new Error('Expected run row');
+      fireEvent.click(row);
 
       // Assert — dialog should open with run title
       expect(screen.getByText('Run #1')).toBeInTheDocument();
@@ -381,7 +384,8 @@ describe('When RunList is rendered', () => {
       // Act
       const row = screen.getByText('#1').closest('tr');
       expect(row).toBeTruthy();
-      fireEvent.click(row as HTMLElement);
+      if (!row) throw new Error('Expected run row');
+      fireEvent.click(row);
 
       // Assert
       expect(mockLoadRunItems).toHaveBeenCalledWith('run-1');
@@ -397,7 +401,8 @@ describe('When RunList is rendered', () => {
       // Act
       const row = screen.getByText('#1').closest('tr');
       expect(row).toBeTruthy();
-      fireEvent.keyDown(row as HTMLElement, { key: 'Enter' });
+      if (!row) throw new Error('Expected run row');
+      fireEvent.keyDown(row, { key: 'Enter' });
 
       // Assert
       expect(screen.getByText('Run #1')).toBeInTheDocument();
@@ -413,7 +418,8 @@ describe('When RunList is rendered', () => {
       // Act
       const row = screen.getByText('#1').closest('tr');
       expect(row).toBeTruthy();
-      fireEvent.keyDown(row as HTMLElement, { key: ' ' });
+      if (!row) throw new Error('Expected run row');
+      fireEvent.keyDown(row, { key: ' ' });
 
       // Assert
       expect(screen.getByText('Run #1')).toBeInTheDocument();
@@ -438,7 +444,8 @@ describe('When RunDetailsDialog is rendered', () => {
       // Act — open dialog
       const row = screen.getByText('#1').closest('tr');
       expect(row).toBeTruthy();
-      fireEvent.click(row as HTMLElement);
+      if (!row) throw new Error('Expected run row');
+      fireEvent.click(row);
 
       // Assert
       expect(screen.getByText('No items found in this run.')).toBeInTheDocument();
@@ -470,7 +477,8 @@ describe('When RunDetailsDialog is rendered', () => {
       // Act — open dialog
       const row = screen.getByText('#1').closest('tr');
       expect(row).toBeTruthy();
-      fireEvent.click(row as HTMLElement);
+      if (!row) throw new Error('Expected run row');
+      fireEvent.click(row);
 
       // Assert
       expect(screen.getByTestId('item-card')).toBeInTheDocument();
@@ -495,7 +503,8 @@ describe('When RunDetailsDialog is rendered', () => {
       // Act — open dialog
       const row = screen.getByText('#1').closest('tr');
       expect(row).toBeTruthy();
-      fireEvent.click(row as HTMLElement);
+      if (!row) throw new Error('Expected run row');
+      fireEvent.click(row);
 
       // Assert
       expect(screen.getByText('Manual Item')).toBeInTheDocument();
@@ -512,7 +521,8 @@ describe('When RunDetailsDialog is rendered', () => {
       // Act — open dialog
       const row = screen.getByText('#1').closest('tr');
       expect(row).toBeTruthy();
-      fireEvent.click(row as HTMLElement);
+      if (!row) throw new Error('Expected run row');
+      fireEvent.click(row);
 
       // Assert — skeleton elements have specific class
       const dialog = screen.getByText('Run #1').closest('[role="dialog"]');

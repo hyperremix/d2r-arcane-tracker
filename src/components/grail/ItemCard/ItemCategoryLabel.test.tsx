@@ -8,17 +8,18 @@ describe('When ItemCategoryLabel is rendered', () => {
     { category: 'armor', subCategory: 'body_armor', expected: 'Armor • Body Armor' },
     { category: 'charms', subCategory: 'small_charms', expected: 'Charms • Small Charms' },
     { category: 'armor', subCategory: 'necromancer', expected: 'Armor • Necromancer' },
-  ] as const)(
-    'If the item is $category / $subCategory, then it shows $expected',
-    ({ category, subCategory, expected }) => {
-      // Arrange
-      const item = { category, subCategory };
+  ] as const)('If the item is $category / $subCategory, then it shows $expected', ({
+    category,
+    subCategory,
+    expected,
+  }) => {
+    // Arrange
+    const item = { category, subCategory };
 
-      // Act
-      const { container } = render(<ItemCategoryLabel item={item} />);
+    // Act
+    const { container } = render(<ItemCategoryLabel item={item} />);
 
-      // Assert
-      expect(container.textContent).toBe(expected);
-    },
-  );
+    // Assert
+    expect(container.textContent).toBe(expected);
+  });
 });

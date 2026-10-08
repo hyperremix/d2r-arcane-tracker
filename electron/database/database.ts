@@ -13,6 +13,10 @@ import type {
   Session,
   SessionStats,
   Settings,
+  VaultItem,
+  VaultItemFilter,
+  VaultItemSearchResult,
+  VaultItemUpsertInput,
 } from '../types/grail';
 import * as charactersModule from './characters';
 import { createDrizzleDb, type DrizzleDb } from './drizzle';
@@ -26,6 +30,7 @@ import * as schemaModule from './schema';
 import * as sessionsModule from './sessions';
 import * as settingsModule from './settings';
 import * as statisticsModule from './statistics';
+import * as vaultItemsModule from './vault-items';
 
 /**
  * Main database class for managing Holy Grail tracking data.
@@ -253,6 +258,32 @@ class GrailDatabase {
   }
   deleteRunItem(itemId: string): void {
     runItemsModule.deleteRunItem(this, itemId);
+  }
+
+  // Vault items
+  getVaultItemById(itemId: string): VaultItem | undefined {
+    return vaultItemsModule.getVaultItemById(this, itemId);
+  }
+  addVaultItemWithUndo(item: VaultItemUpsertInput): vaultItemsModule.VaultAddResult {
+    return vaultItemsModule.addVaultItemWithUndo(this, item);
+  }
+  removeVaultItem(itemId: string): void {
+    vaultItemsModule.removeVaultItem(this, itemId);
+  }
+  searchVaultItems(filter: VaultItemFilter): VaultItemSearchResult {
+    return vaultItemsModule.searchVaultItems(this, filter);
+  }
+  reconcileVaultItemsForScan(scan: vaultItemsModule.VaultScanReconciliationInput): void {
+    vaultItemsModule.reconcileVaultItemsForScan(this, scan);
+  }
+  getVaultSourceFilePathsPresentInLatestScan(): string[] {
+    return vaultItemsModule.getVaultSourceFilePathsPresentInLatestScan(this);
+  }
+  markVaultItemsMissingForSourceFiles(sourceFilePaths: string[]): void {
+    vaultItemsModule.markVaultItemsMissingForSourceFiles(this, sourceFilePaths);
+  }
+  unvaultVaultItem(itemId: string, withdrawCount?: number): void {
+    vaultItemsModule.unvaultVaultItem(this, itemId, withdrawCount);
   }
 
   // Management

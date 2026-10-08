@@ -357,7 +357,7 @@ export function NotificationButton() {
           <Badge
             variant="destructive"
             aria-hidden="true"
-            className="-right-2 -top-2 absolute h-5 w-5 rounded-full p-0 text-xs"
+            className="absolute -top-2 -right-2 h-5 w-5 rounded-full p-0 text-xs"
           >
             {unseenCount}
           </Badge>

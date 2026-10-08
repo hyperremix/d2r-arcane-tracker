@@ -675,40 +675,40 @@ describe('When useGrailStore is used', () => {
       expect(useGrailStore.getState().settings.theme).toBe('light');
     });
 
-    it.each(['onDismiss', 'onAutoClose'] as const)(
-      'If the error toast closes via %s, Then a later unrelated failure Retry does not re-apply the abandoned change',
-      async (closeCallback) => {
-        // Arrange
-        const toastError = vi.spyOn(toast, 'error');
-        mockElectronAPI.grail.updateSettings
-          .mockRejectedValueOnce(new Error('database locked'))
-          .mockRejectedValueOnce(new Error('database locked'))
-          .mockResolvedValue({ success: true });
-        await act(async () => {
-          await useGrailStore.getState().setSettings({ theme: 'dark' });
-        });
-        const firstOptions = toastError.mock.calls[0]?.[1] as
-          | Record<string, (() => void) | undefined>
-          | undefined;
-        firstOptions?.[closeCallback]?.();
-        await act(async () => {
-          await useGrailStore.getState().setSettings({ showItemIcons: true });
-        });
-        const retry = retryActionOf(toastError, 1);
+    it.each([
+      'onDismiss',
+      'onAutoClose',
+    ] as const)('If the error toast closes via %s, Then a later unrelated failure Retry does not re-apply the abandoned change', async (closeCallback) => {
+      // Arrange
+      const toastError = vi.spyOn(toast, 'error');
+      mockElectronAPI.grail.updateSettings
+        .mockRejectedValueOnce(new Error('database locked'))
+        .mockRejectedValueOnce(new Error('database locked'))
+        .mockResolvedValue({ success: true });
+      await act(async () => {
+        await useGrailStore.getState().setSettings({ theme: 'dark' });
+      });
+      const firstOptions = toastError.mock.calls[0]?.[1] as
+        | Record<string, (() => void) | undefined>
+        | undefined;
+      firstOptions?.[closeCallback]?.();
+      await act(async () => {
+        await useGrailStore.getState().setSettings({ showItemIcons: true });
+      });
+      const retry = retryActionOf(toastError, 1);
 
-        // Act
-        await act(async () => {
-          retry();
-        });
+      // Act
+      await act(async () => {
+        retry();
+      });
 
-        // Assert
-        expect(mockElectronAPI.grail.updateSettings).toHaveBeenLastCalledWith({
-          showItemIcons: true,
-        });
-        expect(useGrailStore.getState().settings.theme).toBe('system');
-        expect(useGrailStore.getState().settings.showItemIcons).toBe(true);
-      },
-    );
+      // Assert
+      expect(mockElectronAPI.grail.updateSettings).toHaveBeenLastCalledWith({
+        showItemIcons: true,
+      });
+      expect(useGrailStore.getState().settings.theme).toBe('system');
+      expect(useGrailStore.getState().settings.showItemIcons).toBe(true);
+    });
 
     it('If a stale callback of a closed error toast fires after a newer failure, Then the newer toast keeps its Retry state', async () => {
       // Arrange
@@ -1663,30 +1663,31 @@ describe('When filterAndSortItems is called', () => {
     ['exact', false],
     ['fuzzy', true],
   ])('If fuzzy search is %s', (_mode, fuzzySearch) => {
-    it.each(['龙', '???', "'"])(
-      'Then a search term "%s" without searchable characters matches nothing',
-      (searchTerm) => {
-        // Arrange
-        const items = [
-          HolyGrailItemBuilder.new().withId('shako').withName('Harlequin Crest').build(),
-          HolyGrailItemBuilder.new().withId('sword').withName('Windforce').build(),
-        ];
+    it.each([
+      '龙',
+      '???',
+      "'",
+    ])('Then a search term "%s" without searchable characters matches nothing', (searchTerm) => {
+      // Arrange
+      const items = [
+        HolyGrailItemBuilder.new().withId('shako').withName('Harlequin Crest').build(),
+        HolyGrailItemBuilder.new().withId('sword').withName('Windforce').build(),
+      ];
 
-        // Act
-        const result = filterAndSortItems(
-          items,
-          [],
-          { ...noFilter, searchTerm },
-          {
-            ...defaultSort,
-            fuzzySearch,
-          },
-        );
+      // Act
+      const result = filterAndSortItems(
+        items,
+        [],
+        { ...noFilter, searchTerm },
+        {
+          ...defaultSort,
+          fuzzySearch,
+        },
+      );
 
-        // Assert
-        expect(result).toEqual([]);
-      },
-    );
+      // Assert
+      expect(result).toEqual([]);
+    });
 
     it('Then a whitespace-only search term still matches every item', () => {
       // Arrange

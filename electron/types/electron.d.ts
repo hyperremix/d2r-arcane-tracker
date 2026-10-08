@@ -5,6 +5,10 @@ import type {
   FileReaderResponse,
   GlobalHotkeyStatus,
   GrailProgress,
+  InventoryItemMoveInput,
+  InventorySearchResult,
+  InventorySnapshotWindowTarget,
+  InventoryStackSplitInput,
   Item,
   MonitoringStatus,
   Run,
@@ -12,6 +16,12 @@ import type {
   SaveDirectoryInspection,
   Session,
   Settings,
+  VaultLocationContext,
+  VaultItem,
+  VaultItemFilter,
+  VaultItemSearchResult,
+  VaultSourceFileType,
+  VaultItemUpsertInput,
   TerrorZone,
   TerrorZoneValidationResult,
   UpdateInfo,
@@ -662,6 +672,46 @@ export interface ElectronAPI {
      * @returns {() => void} Cleanup function to remove the listener.
      */
     onGlobalHotkeyStatus(callback: (status: GlobalHotkeyStatus) => void): () => void
+  }
+
+
+  /**
+   * Vault API methods.
+   */
+  vault: {
+    addItem(item: VaultItemUpsertInput): Promise<VaultItem>
+    removeItem(itemId: string): Promise<{ success: boolean }>
+    search(filter?: VaultItemFilter): Promise<VaultItemSearchResult>
+    unvaultItem(
+      itemId: string,
+      targetOptions?: {
+        targetFilePath: string
+        targetFileType: VaultSourceFileType
+        targetLocationContext: VaultLocationContext
+        targetStashTab?: number
+        targetGridX: number
+        targetGridY: number
+        targetEquippedSlotId?: number
+      },
+      withdrawCount?: number,
+    ): Promise<{ success: boolean }>
+  }
+
+  /**
+   * Inventory API methods.
+   */
+  inventory: {
+    searchAll(filter?: VaultItemFilter): Promise<{
+      inventory: InventorySearchResult
+      vault: VaultItemSearchResult
+    }>
+    openSnapshotWindow(
+      target: InventorySnapshotWindowTarget,
+    ): Promise<{
+      success: boolean
+    }>
+    moveItem(input: InventoryItemMoveInput): Promise<{ success: boolean }>
+    splitStack(input: InventoryStackSplitInput): Promise<{ success: boolean }>
   }
 
   /**

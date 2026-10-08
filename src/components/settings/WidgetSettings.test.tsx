@@ -161,25 +161,24 @@ describe('WidgetSettings', () => {
       resetSettingsWriteTracking();
     });
 
-    it.each(updateSettingsFailures)(
-      'When updateSettings %s, Then the auto-switch to overall is attempted once and the component settles',
-      async (_name, failUpdateSettings) => {
-        // Arrange
-        const updateSettings = vi.fn(failUpdateSettings);
-        const updateDisplay = vi.fn().mockResolvedValue({ success: true });
-        installElectronAPI(updateSettings, updateDisplay);
+    it.each(
+      updateSettingsFailures,
+    )('When updateSettings %s, Then the auto-switch to overall is attempted once and the component settles', async (_name, failUpdateSettings) => {
+      // Arrange
+      const updateSettings = vi.fn(failUpdateSettings);
+      const updateDisplay = vi.fn().mockResolvedValue({ success: true });
+      installElectronAPI(updateSettings, updateDisplay);
 
-        // Act
-        render(<WidgetSettings />);
-        await settle();
+      // Act
+      render(<WidgetSettings />);
+      await settle();
 
-        // Assert
-        expect(updateSettings).toHaveBeenCalledTimes(1);
-        expect(updateSettings).toHaveBeenCalledWith({ widgetDisplay: 'overall' });
-        expect(updateDisplay).not.toHaveBeenCalled();
-        expect(useGrailStore.getState().settings.widgetDisplay).toBe('split');
-      },
-    );
+      // Assert
+      expect(updateSettings).toHaveBeenCalledTimes(1);
+      expect(updateSettings).toHaveBeenCalledWith({ widgetDisplay: 'overall' });
+      expect(updateDisplay).not.toHaveBeenCalled();
+      expect(useGrailStore.getState().settings.widgetDisplay).toBe('split');
+    });
 
     it('If a failed auto-switch is followed by ethereal tracking being enabled and disabled again, Then the auto-switch is attempted again', async () => {
       // Arrange

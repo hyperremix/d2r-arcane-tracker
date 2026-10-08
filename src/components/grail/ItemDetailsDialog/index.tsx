@@ -14,13 +14,15 @@ import { useProgressLookup } from '@/hooks/useProgressLookup';
 import { translations } from '@/i18n/translations';
 import { cn } from '@/lib/utils';
 import { useGrailStore } from '@/stores/grailStore';
-import placeholderUrl from '/images/placeholder-item.png';
+import placeholderUrl from '/images/placeholder-item.svg';
 import { getItemQualityTextClass } from '../ItemCard/styles';
 import { RuneImages } from '../RuneImages';
+import { BookmarkAction, BookmarkStatusSection } from './BookmarkControls';
 import { CharacterProgressTable } from './CharacterProgressTable';
 import { ItemInfoSection } from './ItemInfoSection';
 import { MarkAsFoundDialog } from './MarkAsFoundDialog';
 import { ProgressStatusSection } from './ProgressStatusSection';
+import { useGrailBookmark } from './useGrailBookmark';
 
 interface ItemDetailsDialogProps {
   itemId: string | null;
@@ -86,6 +88,9 @@ export function ItemDetailsDialog({ itemId, open, onOpenChange }: ItemDetailsDia
   };
   const { iconUrl, isLoading } = useItemIcon(item || placeholderItem);
 
+  // Hook must be called before early return
+  const { linkedBookmark, isBookmarkActionPending, toggleBookmark } = useGrailBookmark(item, open);
+
   if (!item) {
     return null;
   }
@@ -138,6 +143,9 @@ export function ItemDetailsDialog({ itemId, open, onOpenChange }: ItemDetailsDia
           <div className="grid grid-cols-1 gap-4 px-6">
             <ItemInfoSection item={item} />
             <ProgressStatusSection item={item} itemProgress={itemProgress} />
+
+            <BookmarkStatusSection linkedBookmark={linkedBookmark} />
+
             {characters.length > 0 && (
               <CharacterProgressTable
                 characters={characters}
@@ -150,6 +158,11 @@ export function ItemDetailsDialog({ itemId, open, onOpenChange }: ItemDetailsDia
         </div>
 
         <DialogFooter>
+          <BookmarkAction
+            linkedBookmark={linkedBookmark}
+            isPending={isBookmarkActionPending}
+            onToggle={toggleBookmark}
+          />
           <MarkAsFoundAction key={item.id} item={item} />
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             {t(translations.common.close)}

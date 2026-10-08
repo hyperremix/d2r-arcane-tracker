@@ -154,7 +154,7 @@ function WidgetDragGrip() {
     <GripHorizontal
       aria-hidden="true"
       data-testid="widget-drag-grip"
-      className="-translate-x-1/2 pointer-events-none absolute top-1 left-1/2 h-4 w-4 text-white opacity-30 transition-opacity duration-200 group-hover:opacity-80"
+      className="pointer-events-none absolute top-1 left-1/2 h-4 w-4 -translate-x-1/2 text-white opacity-30 transition-opacity duration-200 group-hover:opacity-80"
     />
   );
 }
