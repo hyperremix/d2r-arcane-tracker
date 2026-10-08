@@ -90,10 +90,20 @@ In **Manual Entry** mode, or for finds the app can't see (another PC, older find
 
 The main screen lists every grail item with its found status. The search and filter bar lets you:
 
-- Search by name, with optional fuzzy matching.
-- Filter by status (all, found, missing), category (weapons, armor, jewelry, charms) and type (unique, set, rune, runeword).
+- Search by item name, base item ("Shako", "Diadem"), set name ("Tal Rasha") or, for runewords, rune ("Ber"). Every word you type must match, so "tal lidless" narrows the results further. Turn on fuzzy search (the wand icon) to also find items when you abbreviate words ("hrlqn") or make a small typo ("windfroce").
+- Filter by status (all, found, missing) and by type with the colored Unique, Set, Rune and Runeword toggles. Rune and runeword toggles only appear when you track them.
+- Open **Filters** to narrow by category (weapons, armor, jewelry, charms) and sub-category, such as helms, body armor or class-specific items, grouped by category.
 - Group by category, type or ethereal status (available when ethereal tracking is on), and switch between grid and list views. In the grid, each group has a header with its found count, followed by its items in rows that read left to right and wrap to the next row, using the same number of columns as the ungrouped grid.
-- Sort by name, category, type or found date.
+- Sort by name, category, type or found date. Items with the same value, such as all missing items when sorting by found date, are listed alphabetically.
+
+The count under the bar shows how many items match your filters out of all tracked items.
+
+Keyboard shortcuts:
+
+| Key | Action |
+| --- | --- |
+| `/` or Ctrl+F (Cmd+F on macOS) | Focus the search field |
+| Esc (in the search field) | Clear the search; press again to leave the field |
 
 As in the game, an item's name color shows its quality: gold for uniques, green for sets, orange for runes and purple for runewords. Found items have a solid frame in that color. Missing items have a dashed frame and grayed-out artwork.
 

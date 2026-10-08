@@ -899,7 +899,7 @@ describe('When ItemGrid component is rendered', () => {
       // Act
       render(<ItemGrid />);
 
-      // Assert — the component filters to only normal items via filterSingleGrailType
+      // Assert — the component filters to only normal items via filterItemsByTrackedVersions
       // MasonryItemGrid receives only the filtered items
       expect(screen.getByTestId('masonry-item-grid')).toHaveTextContent('1 items');
     });

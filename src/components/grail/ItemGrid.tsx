@@ -6,8 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { useProgressLookup } from '@/hooks/useProgressLookup';
 import { translations } from '@/i18n/translations';
 import {
-  canItemBeEthereal,
-  canItemBeNormal,
+  filterItemsByTrackedVersions,
   shouldShowEtherealStatus,
   shouldShowNormalStatus,
 } from '@/lib/ethereal';
@@ -89,30 +88,15 @@ export const ItemGrid = memo(function ItemGrid() {
   const filteredItems = useFilteredItems(); // This uses DB items as base and applies all filters
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
 
-  // Helper function to filter items when only one grail type is enabled
-  const filterSingleGrailType = useCallback(
-    (items: Item[]) => {
-      if (settings.grailNormal && !settings.grailEthereal) {
-        return items.filter((item) => canItemBeNormal(item));
-      }
-      if (!settings.grailNormal && settings.grailEthereal) {
-        return items.filter((item) => canItemBeEthereal(item));
-      }
-      return []; // Neither enabled
-    },
-    [settings.grailNormal, settings.grailEthereal],
+  // Keep only items with a tracked version (normal and/or ethereal) according to grail settings
+  const displayItems = useMemo(
+    () =>
+      filterItemsByTrackedVersions(filteredItems, {
+        grailNormal: settings.grailNormal,
+        grailEthereal: settings.grailEthereal,
+      }),
+    [filteredItems, settings.grailNormal, settings.grailEthereal],
   );
-
-  // Filter items based on grail settings
-  const displayItems = useMemo(() => {
-    // If only one of normal/ethereal is enabled, use simple filtering
-    if (!settings.grailNormal || !settings.grailEthereal) {
-      return filterSingleGrailType(filteredItems);
-    }
-
-    // Both normal and ethereal are enabled - return all items (no deduplication needed)
-    return filteredItems;
-  }, [filteredItems, settings.grailNormal, settings.grailEthereal, filterSingleGrailType]);
 
   // Create a lookup map for progress data including both normal and ethereal versions
   const progressLookup = useProgressLookup(displayItems, progress, settings);

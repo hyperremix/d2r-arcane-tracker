@@ -14,7 +14,8 @@ import { useMemo } from 'react';
 import { toast } from 'sonner';
 import { create } from 'zustand';
 import { translations } from '@/i18n/translations';
-import { canItemBeEthereal, canItemBeNormal } from '@/lib/ethereal';
+import { canItemBeEthereal, canItemBeNormal, filterItemsByTrackedVersions } from '@/lib/ethereal';
+import { itemMatchesSearch, tokenizeSearchQuery } from '@/lib/itemSearch';
 import { isRecentFind } from '@/lib/utils';
 
 /**
@@ -683,6 +684,7 @@ export const countActiveFilters = (filter: GrailFilter): number => {
   let count = 0;
   if (filter.searchTerm) count++;
   if (filter.categories && filter.categories.length > 0) count++;
+  if (filter.subCategories && filter.subCategories.length > 0) count++;
   if (filter.types && filter.types.length > 0) count++;
   if (filter.foundStatus && filter.foundStatus !== 'all') count++;
   return count;
@@ -699,13 +701,47 @@ const matchesCategories = (item: Item, categories?: string[]): boolean => {
 };
 
 /**
- * Checks if an item matches the specified subcategories filter.
+ * Builds the category-qualified sub-category filter value, e.g. `weapons:sorceress`.
+ * Some sub-categories (such as `sorceress`) exist under more than one category, so the filters
+ * popover stores qualified values to keep each selection specific to its category.
+ * @param {string} category - The item category
+ * @param {string} subCategory - The item sub-category
+ * @returns {string} The qualified sub-category filter value
+ */
+export const toSubCategoryFilterValue = (category: string, subCategory: string): string =>
+  `${category}:${subCategory}`;
+
+/**
+ * Splits a sub-category filter value into its parts; the inverse of {@link toSubCategoryFilterValue}.
+ * Bare sub-category values have no category.
+ * @param {string} value - A bare or category-qualified sub-category filter value
+ * @returns {{ category: string | undefined; subCategory: string }} The category (if qualified) and sub-category
+ */
+export const parseSubCategoryFilterValue = (
+  value: string,
+): { category: string | undefined; subCategory: string } => {
+  const separatorIndex = value.indexOf(':');
+  if (separatorIndex === -1) return { category: undefined, subCategory: value };
+  return {
+    category: value.slice(0, separatorIndex),
+    subCategory: value.slice(separatorIndex + 1),
+  };
+};
+
+/**
+ * Checks if an item matches the specified subcategories filter. Entries may be bare
+ * sub-categories (matching that sub-category in every category) or category-qualified values
+ * created by {@link toSubCategoryFilterValue} (matching only the given category).
  * @param {Item} item - The item to check
  * @param {string[]} [subCategories] - Optional array of subcategories to match
  * @returns {boolean} True if item matches (or no filter applied), false otherwise
  */
 const matchesSubCategories = (item: Item, subCategories?: string[]): boolean => {
-  return !subCategories || subCategories.length === 0 || subCategories.includes(item.subCategory);
+  if (!subCategories || subCategories.length === 0) return true;
+  return (
+    subCategories.includes(item.subCategory) ||
+    subCategories.includes(toSubCategoryFilterValue(item.category, item.subCategory))
+  );
 };
 
 /**
@@ -760,67 +796,6 @@ const matchesFoundStatus = (
 };
 
 /**
- * Checks if an item matches the specified search term.
- * @param {Item} item - The item to check
- * @param {string} [searchTerm] - Optional search term to match against item name
- * @param {boolean} [fuzzySearch] - Whether to use fuzzy matching with Levenshtein distance
- * @returns {boolean} True if item matches the search term, false otherwise
- */
-const matchesSearchTerm = (item: Item, searchTerm?: string, fuzzySearch?: boolean): boolean => {
-  if (!searchTerm) return true;
-
-  const term = searchTerm.toLowerCase();
-  const name = item.name.toLowerCase();
-
-  if (fuzzySearch) {
-    // Fuzzy search with Levenshtein distance
-    return calculateSimilarity(name, term) > 0.6 || name.includes(term.slice(0, 3)); // Partial match
-  }
-
-  return name.includes(term);
-};
-
-/**
- * Calculates the similarity between two strings using Levenshtein distance.
- * @param {string} str1 - First string to compare
- * @param {string} str2 - Second string to compare
- * @returns {number} Similarity score between 0 and 1 (1 being identical)
- */
-const calculateSimilarity = (str1: string, str2: string): number => {
-  const distance = levenshteinDistance(str1, str2);
-  const maxLength = Math.max(str1.length, str2.length);
-  return 1 - distance / maxLength;
-};
-
-/**
- * Calculates the Levenshtein distance between two strings.
- * @param {string} str1 - First string to compare
- * @param {string} str2 - Second string to compare
- * @returns {number} The minimum number of single-character edits required to change str1 into str2
- */
-const levenshteinDistance = (str1: string, str2: string): number => {
-  const matrix = Array(str2.length + 1)
-    .fill(null)
-    .map(() => Array(str1.length + 1).fill(null));
-
-  for (let i = 0; i <= str1.length; i++) matrix[0][i] = i;
-  for (let j = 0; j <= str2.length; j++) matrix[j][0] = j;
-
-  for (let j = 1; j <= str2.length; j++) {
-    for (let i = 1; i <= str1.length; i++) {
-      const indicator = str1[i - 1] === str2[j - 1] ? 0 : 1;
-      matrix[j][i] = Math.min(
-        matrix[j][i - 1] + 1, // deletion
-        matrix[j - 1][i] + 1, // insertion
-        matrix[j - 1][i - 1] + indicator, // substitution
-      );
-    }
-  }
-
-  return matrix[str2.length][str1.length];
-};
-
-/**
  * Builds a map of item ID to latest found date timestamp for efficient sorting.
  * @param {GrailProgress[]} progress - Progress records to index
  * @returns {Map<string, number>} Map with item IDs as keys and latest found date timestamps as values
@@ -840,7 +815,39 @@ const buildFoundDateMap = (progress: GrailProgress[]): Map<string, number> => {
 };
 
 /**
+ * Collator used for name comparisons. Reusing one instance is much faster than calling
+ * `String.prototype.localeCompare` for every comparison.
+ */
+const nameCollator = new Intl.Collator();
+
+/**
+ * Compares two items by the given sort key only.
+ * @returns {number} Negative, zero or positive like any sort comparator
+ */
+const compareBySortKey = (
+  a: Item,
+  b: Item,
+  sortBy: string,
+  foundDateMap?: Map<string, number>,
+): number => {
+  switch (sortBy) {
+    case 'name':
+      return nameCollator.compare(a.name, b.name);
+    case 'category':
+      return a.category.localeCompare(b.category);
+    case 'type':
+      return a.type.localeCompare(b.type);
+    case 'found_date':
+      return (foundDateMap?.get(a.id) ?? 0) - (foundDateMap?.get(b.id) ?? 0);
+    default:
+      return 0;
+  }
+};
+
+/**
  * Sorts items based on the specified criteria and order.
+ * Items with equal sort keys (e.g. all missing items when sorting by found date) are ordered
+ * by name A–Z and then by ID, regardless of the sort order, so the result is always stable.
  * @param {Item[]} items - Array of items to sort
  * @param {string} sortBy - Property to sort by ('name', 'category', 'type', 'found_date')
  * @param {string} sortOrder - Sort order ('asc' or 'desc')
@@ -853,37 +860,100 @@ const sortItems = (
   sortOrder: string,
   foundDateMap?: Map<string, number>,
 ): Item[] => {
+  const direction = sortOrder === 'desc' ? -1 : 1;
   return [...items].sort((a, b) => {
-    let comparison = 0;
-
-    switch (sortBy) {
-      case 'name':
-        comparison = a.name.localeCompare(b.name);
-        break;
-      case 'category':
-        comparison = a.category.localeCompare(b.category);
-        break;
-      case 'type':
-        comparison = a.type.localeCompare(b.type);
-        break;
-      case 'found_date': {
-        const aDate = foundDateMap?.get(a.id) ?? 0;
-        const bDate = foundDateMap?.get(b.id) ?? 0;
-        comparison = aDate - bDate;
-        break;
-      }
-      default:
-        comparison = 0;
-    }
-
-    return sortOrder === 'desc' ? -comparison : comparison;
+    const comparison = compareBySortKey(a, b, sortBy, foundDateMap);
+    if (comparison !== 0) return comparison * direction;
+    const nameComparison = sortBy === 'name' ? 0 : nameCollator.compare(a.name, b.name);
+    if (nameComparison !== 0) return nameComparison;
+    return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
   });
 };
 
 /**
+ * Filters and sorts items according to the given filter and sort settings.
+ * Uses pre-built lookup maps for O(1) access instead of O(N) array searches, and tokenizes the
+ * search query once per call instead of once per item.
+ * @param {Item[]} items - All Holy Grail items
+ * @param {GrailProgress[]} progress - All progress records
+ * @param {GrailFilter} filter - The active filter
+ * @param {AdvancedGrailFilter} advancedFilter - The active sort and search options
+ * @returns {Item[]} The filtered and sorted items
+ */
+export const filterAndSortItems = (
+  items: Item[],
+  progress: GrailProgress[],
+  filter: GrailFilter,
+  advancedFilter: AdvancedGrailFilter,
+): Item[] => {
+  // Build lookup maps once for O(1) access during filtering and sorting
+  const progressMap = buildProgressMap(progress);
+  const foundDateMap =
+    advancedFilter.sortBy === 'found_date' ? buildFoundDateMap(progress) : undefined;
+  const searchTerm = filter.searchTerm ?? '';
+  const searchTokens = tokenizeSearchQuery(searchTerm);
+  // A query made only of unsearchable characters (e.g. "龙" or "???") can never match an item;
+  // only a blank query means "no search".
+  if (searchTerm.trim() !== '' && searchTokens.length === 0) return [];
+
+  const filtered = items.filter((item) => {
+    return (
+      matchesCategories(item, filter.categories) &&
+      matchesSubCategories(item, filter.subCategories) &&
+      matchesTypes(item, filter.types) &&
+      matchesFoundStatus(item, filter.foundStatus, progressMap) &&
+      itemMatchesSearch(item, searchTokens, advancedFilter.fuzzySearch)
+    );
+  });
+
+  return sortItems(filtered, advancedFilter.sortBy, advancedFilter.sortOrder, foundDateMap);
+};
+
+/**
+ * Inputs and result of the most recent {@link filterAndSortItems} call made through
+ * {@link useFilteredItems}. Several components (the item grid and the toolbar result count)
+ * read the filtered items; sharing the last result means the list is only computed once per
+ * store change instead of once per component.
+ */
+let lastFilteredItems:
+  | {
+      items: Item[];
+      progress: GrailProgress[];
+      filter: GrailFilter;
+      advancedFilter: AdvancedGrailFilter;
+      result: Item[];
+    }
+  | undefined;
+
+/**
+ * Returns the filtered and sorted items, reusing the previous result if the inputs are unchanged.
+ */
+const getFilteredItems = (
+  items: Item[],
+  progress: GrailProgress[],
+  filter: GrailFilter,
+  advancedFilter: AdvancedGrailFilter,
+): Item[] => {
+  const cached = lastFilteredItems;
+  if (
+    cached &&
+    cached.items === items &&
+    cached.progress === progress &&
+    cached.filter === filter &&
+    cached.advancedFilter === advancedFilter
+  ) {
+    return cached.result;
+  }
+
+  const result = filterAndSortItems(items, progress, filter, advancedFilter);
+  lastFilteredItems = { items, progress, filter, advancedFilter, result };
+  return result;
+};
+
+/**
  * Custom hook that returns filtered and sorted items based on current filter and sort settings.
- * Memoized to avoid recalculating on every render when dependencies haven't changed.
- * Uses pre-built lookup maps for O(1) access instead of O(N) array searches.
+ * The result is shared between all components using the hook and only recalculated when the
+ * items, progress, filter or sort settings change.
  * @returns {Item[]} Array of filtered and sorted Holy Grail items
  */
 export const useFilteredItems = () => {
@@ -892,25 +962,39 @@ export const useFilteredItems = () => {
   const progress = useGrailStore((state) => state.progress);
   const filter = useGrailStore((state) => state.filter);
   const advancedFilter = useGrailStore((state) => state.advancedFilter);
+  return getFilteredItems(items, progress, filter, advancedFilter);
+};
+
+/**
+ * Number of items currently shown out of all tracked items.
+ */
+export interface ItemResultCount {
+  shown: number;
+  total: number;
+}
+
+/**
+ * Custom hook that returns how many items the current filters show out of all tracked items.
+ * Both numbers only include items with a tracked version (normal and/or ethereal), matching
+ * what the item grid displays.
+ * @returns {ItemResultCount} The shown and total item counts
+ */
+export const useItemResultCount = (): ItemResultCount => {
+  const items = useGrailStore((state) => state.items);
+  const progress = useGrailStore((state) => state.progress);
+  const filter = useGrailStore((state) => state.filter);
+  const advancedFilter = useGrailStore((state) => state.advancedFilter);
+  const grailNormal = useGrailStore((state) => state.settings.grailNormal);
+  const grailEthereal = useGrailStore((state) => state.settings.grailEthereal);
+  const filteredItems = getFilteredItems(items, progress, filter, advancedFilter);
 
   return useMemo(() => {
-    // Build lookup maps once for O(1) access during filtering and sorting
-    const progressMap = buildProgressMap(progress);
-    const foundDateMap =
-      advancedFilter.sortBy === 'found_date' ? buildFoundDateMap(progress) : undefined;
-
-    const filtered = items.filter((item) => {
-      return (
-        matchesCategories(item, filter.categories) &&
-        matchesSubCategories(item, filter.subCategories) &&
-        matchesTypes(item, filter.types) &&
-        matchesFoundStatus(item, filter.foundStatus, progressMap) &&
-        matchesSearchTerm(item, filter.searchTerm, advancedFilter.fuzzySearch)
-      );
-    });
-
-    return sortItems(filtered, advancedFilter.sortBy, advancedFilter.sortOrder, foundDateMap);
-  }, [items, progress, filter, advancedFilter]);
+    const settings = { grailNormal, grailEthereal };
+    return {
+      shown: filterItemsByTrackedVersions(filteredItems, settings).length,
+      total: filterItemsByTrackedVersions(items, settings).length,
+    };
+  }, [filteredItems, items, grailNormal, grailEthereal]);
 };
 
 /**

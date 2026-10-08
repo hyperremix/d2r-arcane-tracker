@@ -9,6 +9,58 @@ import type {
 import { GameMode, GameVersion } from 'electron/types/grail';
 import { translations } from '@/i18n/translations';
 
+const filterSubCategoryKeys = translations.grail.advancedSearch.subCategory;
+
+/**
+ * Translation keys for the short item sub-category labels used in the search filters
+ * (e.g. "Helms", "1H Swords", "Amazon").
+ */
+export const subCategoryLabelKeys: Record<ItemSubCategory, string> = {
+  '1h_swords': filterSubCategoryKeys['1h_swords'],
+  '2h_swords': filterSubCategoryKeys['2h_swords'],
+  '1h_axes': filterSubCategoryKeys['1h_axes'],
+  '2h_axes': filterSubCategoryKeys['2h_axes'],
+  '1h_maces': filterSubCategoryKeys['1h_maces'],
+  '2h_maces': filterSubCategoryKeys['2h_maces'],
+  '1h_clubs': filterSubCategoryKeys['1h_clubs'],
+  bows: filterSubCategoryKeys.bows,
+  crossbows: filterSubCategoryKeys.crossbows,
+  daggers: filterSubCategoryKeys.daggers,
+  javelins: filterSubCategoryKeys.javelins,
+  polearms: filterSubCategoryKeys.polearms,
+  scepters: filterSubCategoryKeys.scepters,
+  spears: filterSubCategoryKeys.spears,
+  staves: filterSubCategoryKeys.staves,
+  throwing: filterSubCategoryKeys.throwing,
+  wands: filterSubCategoryKeys.wands,
+  hammers: filterSubCategoryKeys.hammers,
+  mauls: filterSubCategoryKeys.mauls,
+  maces: filterSubCategoryKeys.maces,
+  helms: filterSubCategoryKeys.helms,
+  body_armor: filterSubCategoryKeys.body_armor,
+  shields: filterSubCategoryKeys.shields,
+  gloves: filterSubCategoryKeys.gloves,
+  boots: filterSubCategoryKeys.boots,
+  belts: filterSubCategoryKeys.belts,
+  amulets: filterSubCategoryKeys.amulets,
+  rings: filterSubCategoryKeys.rings,
+  rainbow_facets: filterSubCategoryKeys.rainbow_facets,
+  dies: filterSubCategoryKeys.dies,
+  small_charms: filterSubCategoryKeys.small_charms,
+  large_charms: filterSubCategoryKeys.large_charms,
+  grand_charms: filterSubCategoryKeys.grand_charms,
+  runes: filterSubCategoryKeys.runes,
+  runewords: filterSubCategoryKeys.runewords,
+  amazon: filterSubCategoryKeys.amazon,
+  assassin: filterSubCategoryKeys.assassin,
+  barbarian: filterSubCategoryKeys.barbarian,
+  druid: filterSubCategoryKeys.druid,
+  necromancer: filterSubCategoryKeys.necromancer,
+  paladin: filterSubCategoryKeys.paladin,
+  sorceress: filterSubCategoryKeys.sorceress,
+  shared_stash: filterSubCategoryKeys.shared_stash,
+};
+
 /**
  * Translation keys for the game mode labels, shared by the wizard and settings.
  */
