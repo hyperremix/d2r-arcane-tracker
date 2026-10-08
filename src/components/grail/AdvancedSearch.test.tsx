@@ -614,6 +614,13 @@ describe('When AdvancedSearch toolbar is rendered', () => {
   });
 
   describe('If user presses a focus-search shortcut', () => {
+    beforeEach(() => {
+      // Suites share one jsdom (isolate: false), and another suite can leave a modal portal and
+      // its body scroll lock behind. These tests assert behaviour with no dialog open.
+      document.body.innerHTML = '';
+      document.body.removeAttribute('style');
+    });
+
     it.each([
       ['/', {}],
       ['Ctrl+F', { key: 'f', ctrlKey: true }],
