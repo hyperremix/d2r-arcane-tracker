@@ -5,14 +5,20 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { translations } from '@/i18n/translations';
 
+interface BookmarkStatusSectionProps {
+  linkedBookmark: VaultItem | undefined;
+}
+
+interface BookmarkActionProps {
+  linkedBookmark: VaultItem | undefined;
+  isPending: boolean;
+  onToggle: () => Promise<void>;
+}
+
 /**
  * Shows whether the item currently has a grail bookmark.
  */
-export function BookmarkStatusSection({
-  linkedBookmark,
-}: {
-  linkedBookmark: VaultItem | undefined;
-}) {
+export function BookmarkStatusSection({ linkedBookmark }: BookmarkStatusSectionProps) {
   const { t } = useTranslation();
 
   return (
@@ -34,15 +40,7 @@ export function BookmarkStatusSection({
 /**
  * Adds or removes the item's grail bookmark.
  */
-export function BookmarkAction({
-  linkedBookmark,
-  isPending,
-  onToggle,
-}: {
-  linkedBookmark: VaultItem | undefined;
-  isPending: boolean;
-  onToggle: () => Promise<void>;
-}) {
+export function BookmarkAction({ linkedBookmark, isPending, onToggle }: BookmarkActionProps) {
   const { t } = useTranslation();
 
   return (

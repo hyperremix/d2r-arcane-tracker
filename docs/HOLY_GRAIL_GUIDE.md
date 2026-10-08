@@ -76,7 +76,7 @@ Things to know:
 
 - **D2R only writes save files when you leave a game**, so new finds show up after you exit to the menu, not when you pick them up.
 - **You don't need mule characters.** Once an item is recorded you can sell, drop or use it.
-- Shared stash finds are attributed to the shared stash, not a character.
+- Shared stash finds are attributed to the shared stash, not a character. Shared stashes in the newer v105+ `.d2i` format are listed as **Modern Shared Stash Softcore** or **Modern Shared Stash Hardcore**, the older format as **Shared Stash Softcore** or **Shared Stash Hardcore**.
 
 ### Manual entry
 
@@ -93,6 +93,10 @@ The main screen lists every grail item with its found status. The search and fil
 
 Click an item to see its details, which characters found it and when, and links to [diablo2.io](https://diablo2.io/) or [d2runewizard](https://d2runewizard.com/).
 
+### Bookmarks
+
+The item dialog also has a **Bookmark** button (**Remove Bookmark** once set) and a **Bookmark Status** badge. A bookmark only records the item as one you care about in the app's own database. It never reads or changes a save file, and it doesn't count as finding the item. Bookmarks are not shown in the [Inventory Browser](INVENTORY_BROWSER_GUIDE.md).
+
 ### Item icons
 
 To show the game's own item icons:
@@ -108,6 +112,10 @@ Conversion only reads game files and is safe to run again. The PNGs are stored i
 ### Statistics
 
 The **Statistics** page shows overall and per-category progress, recent finds, find streaks, a comparison between characters, and run analytics from the [Run Tracker](RUN_TRACKER.md).
+
+### Inventory Browser
+
+The **Inventory Browser** lists the items in every character and shared stash, and can move items between them or vault them. See the [Inventory Browser guide](INVENTORY_BROWSER_GUIDE.md), including its safety rules (backups, and writes refused while the game is running on Windows).
 
 ### Runeword Calculator
 

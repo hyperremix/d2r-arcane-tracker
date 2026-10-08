@@ -55,11 +55,9 @@ export function ItemDetailsDialog({ itemId, open, onOpenChange }: ItemDetailsDia
   const { t } = useTranslation();
   const { items, progress, characters, removeProgress, settings } = useGrailStore();
 
+  // Find the item by ID
   const item = useMemo(() => {
-    if (!itemId) {
-      return null;
-    }
-
+    if (!itemId) return null;
     return items.find((i) => i.id === itemId) || null;
   }, [items, itemId]);
 
@@ -70,6 +68,8 @@ export function ItemDetailsDialog({ itemId, open, onOpenChange }: ItemDetailsDia
     [item, progressLookup],
   );
 
+  // Get icon for the item (must be called before early return)
+  // Create a placeholder item for the hook when item is null
   const placeholderItem: Item = {
     id: '',
     name: '',
@@ -82,6 +82,7 @@ export function ItemDetailsDialog({ itemId, open, onOpenChange }: ItemDetailsDia
   };
   const { iconUrl, isLoading } = useItemIcon(item || placeholderItem);
 
+  // Hook must be called before early return
   const { linkedBookmark, isBookmarkActionPending, toggleBookmark } = useGrailBookmark(item, open);
 
   if (!item) {
@@ -93,6 +94,7 @@ export function ItemDetailsDialog({ itemId, open, onOpenChange }: ItemDetailsDia
       <DialogContent>
         <DialogHeader>
           <div className="flex justify-between gap-4">
+            {/* Item Icon or Rune Images */}
             {item.type === 'runeword' && item.runes && item.runes.length > 0 ? (
               <div className="flex items-center">
                 <RuneImages runeIds={item.runes} viewMode="grid" />
@@ -123,6 +125,7 @@ export function ItemDetailsDialog({ itemId, open, onOpenChange }: ItemDetailsDia
           </div>
         </DialogHeader>
 
+        {/* Item Information and Progress Status */}
         <div className="-mx-6 max-h-[60vh] overflow-y-auto">
           <div className="grid grid-cols-1 gap-4 px-6">
             <ItemInfoSection item={item} />

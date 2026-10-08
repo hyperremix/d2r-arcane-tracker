@@ -1385,6 +1385,42 @@ describe('When vault adds could overwrite or lose already vaulted items', () => 
     });
   });
 
+  describe('If a grail bookmark is added while a real rune stack of the same code is vaulted', () => {
+    it('Then the real stack keeps its count and a separate bookmark row is returned', () => {
+      // Arrange
+      const realStack = addVaultItem(ctx, {
+        ...baseInput,
+        fingerprint: 'd2i|stash|r01',
+        itemName: 'El Rune',
+        itemCode: 'r01',
+        rawItemJson: JSON.stringify({ code: 'r01', quantity: 3 }),
+      });
+      const bookmarkInput = {
+        fingerprint: 'grail:el',
+        itemName: 'El Rune',
+        itemCode: 'r01',
+        quality: 'rune',
+        ethereal: false,
+        rawItemJson: JSON.stringify({ id: 'el', code: 'r01', type: 'rune' }),
+        sourceFileType: 'd2s' as const,
+        locationContext: 'unknown' as const,
+        grailItemId: 'el',
+        isPresentInLatestScan: false,
+      };
+
+      // Act
+      const bookmark = addVaultItem(ctx, bookmarkInput);
+      const bookmarkAgain = addVaultItem(ctx, bookmarkInput);
+
+      // Assert
+      expect(bookmark.id).not.toBe(realStack.id);
+      expect(bookmark.fingerprint).toBe('grail:el');
+      expect(bookmarkAgain.id).toBe(bookmark.id);
+      expect(getVaultItemById(ctx, realStack.id)?.stackCount).toBe(3);
+      expect(searchVaultItems(ctx, { vaultedState: 'all' }).total).toBe(2);
+    });
+  });
+
   describe('If a gem stack and a gem of the same code are vaulted', () => {
     it('Then their counts are summed in a single row', () => {
       // Arrange

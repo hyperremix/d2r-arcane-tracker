@@ -8,7 +8,11 @@ import type {
 } from '../types/grail';
 import { isResourceStackFromRawJson, resolveStackCountFromRawJson } from '../utils/stackableItems';
 import { createVaultPresenceKey, readItemUidFromRawJson } from '../utils/vaultPresence';
-import { GRAIL_BOOKMARK_FINGERPRINT_PREFIX, isCurrentlyVaulted } from '../utils/vaultState';
+import {
+  GRAIL_BOOKMARK_FINGERPRINT_PREFIX,
+  isCurrentlyVaulted,
+  isGrailBookmark,
+} from '../utils/vaultState';
 import { dbVaultItemToVaultItem, fromISOString, toISOString } from './converters';
 import { type DbVaultItem, schema } from './drizzle';
 import type { DatabaseContext } from './types';
@@ -248,8 +252,13 @@ export function addVaultItemWithUndo(
 
   // Stack merge: if incoming item is a resource stack (runes / resource-stash stacks) and one
   // already exists in the vault under the same item code, increment its count instead of creating
-  // a duplicate row.
-  if (input.itemCode && isResourceStackFromRawJson(input.rawItemJson, input.itemCode)) {
+  // a duplicate row. Grail bookmarks hold no item, so they must never merge into (or count towards)
+  // a real stack.
+  if (
+    input.itemCode &&
+    !isGrailBookmark(input) &&
+    isResourceStackFromRawJson(input.rawItemJson, input.itemCode)
+  ) {
     const incomingCount = input.stackCount ?? resolveStackCountFromRawJson(input.rawItemJson);
     const existing = findExistingStackableVaultItem(ctx, input.itemCode);
 

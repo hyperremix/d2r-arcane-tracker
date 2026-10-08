@@ -779,6 +779,152 @@ describe('When ItemDetailsDialog is rendered', () => {
     });
   });
 
+  describe('If a bookmarked item is closed and another item is opened', () => {
+    it('Then the second item does not inherit the first bookmark when the lookup fails', async () => {
+      // Arrange
+      const itemA = HolyGrailItemBuilder.new().withId('item-a').withName('Windforce').build();
+      const itemB = HolyGrailItemBuilder.new().withId('item-b').withName('Arachnid Mesh').build();
+      setupStoreMock({ items: [itemA, itemB] });
+      mockVaultSearch.mockResolvedValueOnce({
+        items: [{ id: 'bm-a', fingerprint: 'grail:item-a', itemName: 'Windforce' }],
+        total: 1,
+        page: 1,
+        pageSize: 100,
+      });
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+      const { rerender } = render(
+        <ItemDetailsDialog itemId="item-a" open={true} onOpenChange={vi.fn()} />,
+      );
+      await screen.findByRole('button', { name: 'Remove Bookmark' });
+
+      // Act
+      rerender(<ItemDetailsDialog itemId="item-a" open={false} onOpenChange={vi.fn()} />);
+      mockVaultSearch.mockRejectedValue(new Error('ipc failed'));
+      rerender(<ItemDetailsDialog itemId="item-b" open={true} onOpenChange={vi.fn()} />);
+      await waitFor(() =>
+        expect(toastErrorMock).toHaveBeenCalledWith('Failed to load bookmark status.'),
+      );
+
+      // Assert
+      expect(screen.queryByText('Bookmarked')).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Remove Bookmark' })).not.toBeInTheDocument();
+      expect(mockVaultRemoveItem).not.toHaveBeenCalled();
+      consoleErrorSpy.mockRestore();
+    });
+
+    it('Then the second item is not shown as bookmarked while its lookup is pending', async () => {
+      // Arrange
+      const itemA = HolyGrailItemBuilder.new().withId('item-a').withName('Windforce').build();
+      const itemB = HolyGrailItemBuilder.new().withId('item-b').withName('Arachnid Mesh').build();
+      setupStoreMock({ items: [itemA, itemB] });
+      mockVaultSearch.mockResolvedValueOnce({
+        items: [{ id: 'bm-a', fingerprint: 'grail:item-a', itemName: 'Windforce' }],
+        total: 1,
+        page: 1,
+        pageSize: 100,
+      });
+      const { rerender } = render(
+        <ItemDetailsDialog itemId="item-a" open={true} onOpenChange={vi.fn()} />,
+      );
+      await screen.findByRole('button', { name: 'Remove Bookmark' });
+      mockVaultSearch.mockReturnValue(new Promise(() => undefined));
+
+      // Act
+      rerender(<ItemDetailsDialog itemId="item-b" open={true} onOpenChange={vi.fn()} />);
+
+      // Assert
+      expect(screen.queryByText('Bookmarked')).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Bookmark' })).toBeInTheDocument();
+    });
+  });
+
+  describe('If a bookmark lookup for one item resolves after another item was opened', () => {
+    it('Then the late response is not applied to the other item', async () => {
+      // Arrange
+      const itemA = HolyGrailItemBuilder.new().withId('item-a').withName('Windforce').build();
+      const itemB = HolyGrailItemBuilder.new().withId('item-b').withName('Arachnid Mesh').build();
+      setupStoreMock({ items: [itemA, itemB] });
+      let resolveLookupForA: (value: unknown) => void = () => undefined;
+      mockVaultSearch.mockReturnValueOnce(
+        new Promise((resolve) => {
+          resolveLookupForA = resolve;
+        }),
+      );
+      const { rerender } = render(
+        <ItemDetailsDialog itemId="item-a" open={true} onOpenChange={vi.fn()} />,
+      );
+      mockVaultSearch.mockResolvedValue({ items: [], total: 0, page: 1, pageSize: 100 });
+      rerender(<ItemDetailsDialog itemId="item-b" open={true} onOpenChange={vi.fn()} />);
+      await screen.findByRole('button', { name: 'Bookmark' });
+
+      // Act
+      resolveLookupForA({
+        items: [{ id: 'bm-a', fingerprint: 'grail:item-a', itemName: 'Windforce' }],
+        total: 1,
+        page: 1,
+        pageSize: 100,
+      });
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      // Assert
+      expect(screen.queryByText('Bookmarked')).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Remove Bookmark' })).not.toBeInTheDocument();
+    });
+  });
+
+  describe('If the bookmark is not on the first page of name matches', () => {
+    it('Then the lookup keeps paging until it finds the bookmark by fingerprint', async () => {
+      // Arrange
+      const item = HolyGrailItemBuilder.new().withId('item-1').withName('El').build();
+      setupStoreMock({ items: [item] });
+      const otherRows = Array.from({ length: 100 }, (_, index) => ({
+        id: `real-${index}`,
+        fingerprint: `d2s|real|${index}`,
+        itemName: 'El Rune',
+      }));
+      mockVaultSearch
+        .mockResolvedValueOnce({ items: otherRows, total: 101, page: 1, pageSize: 100 })
+        .mockResolvedValueOnce({
+          items: [{ id: 'bm-1', fingerprint: 'grail:item-1', itemName: 'El' }],
+          total: 101,
+          page: 2,
+          pageSize: 100,
+        });
+
+      // Act
+      render(<ItemDetailsDialog itemId="item-1" open={true} onOpenChange={vi.fn()} />);
+
+      // Assert
+      expect(await screen.findByText('Bookmarked')).toBeInTheDocument();
+      expect(mockVaultSearch.mock.calls.map(([filter]) => filter.page)).toEqual([1, 2]);
+    });
+  });
+
+  describe('If an item is bookmarked', () => {
+    it.each([
+      ['unique', 'unique'],
+      ['set', 'set'],
+      ['rune', 'normal'],
+      ['runeword', 'normal'],
+    ] as const)('Then a %s item is stored with quality %s', async (type, expectedQuality) => {
+      // Arrange
+      const item = HolyGrailItemBuilder.new().withId('item-1').withType(type).build();
+      setupStoreMock({ items: [item] });
+      mockVaultAddItem.mockResolvedValue({ id: 'bm-1', fingerprint: 'grail:item-1' });
+      render(<ItemDetailsDialog itemId="item-1" open={true} onOpenChange={vi.fn()} />);
+
+      // Act
+      fireEvent.click(await screen.findByRole('button', { name: 'Bookmark' }));
+
+      // Assert
+      await waitFor(() => expect(mockVaultAddItem).toHaveBeenCalledTimes(1));
+      expect(mockVaultAddItem.mock.calls[0]?.[0]).toMatchObject({
+        type,
+        quality: expectedQuality,
+      });
+    });
+  });
+
   describe('If the item is shown without any found records', () => {
     it('Then the Mark as Found action is always available', () => {
       // Arrange
