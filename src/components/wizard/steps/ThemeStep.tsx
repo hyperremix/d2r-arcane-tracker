@@ -13,6 +13,7 @@ import {
 import { translations } from '@/i18n/translations';
 import { themeLabelKeys } from '@/lib/labelKeys';
 import { useGrailStore } from '@/stores/grailStore';
+import { useWizardSettingsSave, WizardSaveError } from '../wizardSettingsSave';
 
 /**
  * A selectable theme with its icon; labels come from the shared theme label keys.
@@ -37,11 +38,12 @@ export function ThemeStep() {
   const { t } = useTranslation();
   const themeId = useId();
   const headingId = useId();
-  const { settings, setSettings } = useGrailStore();
+  const { settings } = useGrailStore();
+  const { saveSettings, saveFailed } = useWizardSettingsSave();
   const theme = settings.theme || 'system';
 
   const handleThemeChange = (value: 'light' | 'dark' | 'system') => {
-    setSettings({ theme: value });
+    saveSettings({ theme: value });
   };
 
   const getThemeIcon = () => {
@@ -114,6 +116,8 @@ export function ThemeStep() {
             </div>
           </div>
         </div>
+
+        <WizardSaveError visible={saveFailed} />
 
         <div className="rounded-lg bg-info/10 p-4">
           <p className="text-info text-sm">

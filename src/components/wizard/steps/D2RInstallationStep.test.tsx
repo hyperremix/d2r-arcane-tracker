@@ -38,6 +38,7 @@ describe('D2RInstallationStep', () => {
   const originalElectronAPI = window.electronAPI;
   const originalSettings = useGrailStore.getState().settings;
   let consoleError: MockInstance | undefined;
+  let toastError: MockInstance | undefined;
 
   beforeEach(() => {
     useGrailStore.setState((state) => ({
@@ -48,6 +49,8 @@ describe('D2RInstallationStep', () => {
   afterEach(() => {
     consoleError?.mockRestore();
     consoleError = undefined;
+    toastError?.mockRestore();
+    toastError = undefined;
     useGrailStore.setState({ settings: originalSettings });
     Object.defineProperty(window, 'electronAPI', {
       value: originalElectronAPI,
@@ -314,7 +317,7 @@ describe('D2RInstallationStep', () => {
     // Arrange
     const api = createElectronApiMock(null);
     api.grail.updateSettings.mockRejectedValue(new Error('database locked'));
-    const toastError = vi.spyOn(toast, 'error');
+    toastError = vi.spyOn(toast, 'error');
     installElectronApi(api);
     render(<D2RInstallationStep />);
     await screen.findByRole('button', { name: 'Use this' });
@@ -335,7 +338,6 @@ describe('D2RInstallationStep', () => {
       screen.queryByText('Could not save the installation path. Please try again.'),
     ).not.toBeInTheDocument();
     expect(toastError).not.toHaveBeenCalled();
-    toastError.mockRestore();
   });
 
   it('If saving the path fails, Then a save error is shown and the path is not validated', async () => {

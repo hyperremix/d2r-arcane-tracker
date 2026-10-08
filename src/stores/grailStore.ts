@@ -175,6 +175,16 @@ const GRAIL_FILTER_SETTING_KEYS: ReadonlyArray<keyof Settings> = [
   'grailRunewords',
 ];
 
+/**
+ * Whether an update changes a setting that requires reloading the filtered grail data.
+ * @param {Partial<Settings>} settingsUpdate - The saved update
+ * @returns {boolean} True if items and progress must be reloaded
+ */
+const affectsGrailFilter = (settingsUpdate: Partial<Settings>): boolean =>
+  Object.keys(settingsUpdate).some((key) =>
+    GRAIL_FILTER_SETTING_KEYS.includes(key as keyof Settings),
+  );
+
 /** Stable toast id so repeated failures (e.g. while dragging a slider) replace one another. */
 const SETTINGS_SAVE_ERROR_TOAST_ID = 'settings-save-error';
 
@@ -194,6 +204,37 @@ const settingKeyWrites = new Map<keyof Settings, SettingKeyWrites>();
 let lastWriteToken = 0;
 
 /**
+ * Keys whose failed save was reverted and offered for Retry on the shared error toast, with
+ * the value the failed save attempted. A key is dropped as soon as it is written or hydrated
+ * again, so a stale Retry can never overwrite a newer value.
+ */
+const revertedSettings = new Map<keyof Settings, Settings[keyof Settings]>();
+
+/**
+ * Clears all write tracking. Only intended for tests, which share this module state.
+ */
+export const resetSettingsWriteTracking = (): void => {
+  settingKeyWrites.clear();
+  revertedSettings.clear();
+  lastWriteToken = 0;
+};
+
+/**
+ * Stops offering Retry for keys that were written or hydrated since their save failed, and
+ * dismisses the error toast once nothing is left to retry.
+ * @param {Array<keyof Settings>} keys - The keys that were just written
+ */
+const forgetRevertedSettings = (keys: Array<keyof Settings>): void => {
+  let changed = false;
+  for (const key of keys) {
+    changed = revertedSettings.delete(key) || changed;
+  }
+  if (changed && revertedSettings.size === 0) {
+    toast.dismiss(SETTINGS_SAVE_ERROR_TOAST_ID);
+  }
+};
+
+/**
  * Registers a settings save as in flight. Must run before the optimistic update is applied so
  * the value being replaced can be remembered as the last persisted one.
  * @param {Settings} currentSettings - The settings before the optimistic update
@@ -205,7 +246,9 @@ const beginSettingsWrite = (
   settingsUpdate: Partial<Settings>,
 ): number => {
   lastWriteToken += 1;
-  for (const key of Object.keys(settingsUpdate) as Array<keyof Settings>) {
+  const keys = Object.keys(settingsUpdate) as Array<keyof Settings>;
+  forgetRevertedSettings(keys);
+  for (const key of keys) {
     const entry = settingKeyWrites.get(key) ?? {
       latestToken: lastWriteToken,
       inFlight: 0,
@@ -260,34 +303,30 @@ const settleSettingsWrite = (
 };
 
 /**
- * Picks the given keys from a settings update.
- * @param {Partial<Settings>} settingsUpdate - The original update
- * @param {Array<keyof Settings>} keys - The keys to keep
- * @returns {Partial<Settings>} The update restricted to `keys`
+ * Shows the error toast for a failed settings save with a Retry action. The toast is shared,
+ * so Retry re-applies every key still waiting in `revertedSettings` (not just the keys of this
+ * failure) and skips keys that were written since.
+ * @param {Partial<Settings>} reverted - The persisted values the failed keys were reverted to
+ * @param {Partial<Settings>} attempted - The update whose save failed
+ * @param {(update: Partial<Settings>) => Promise<SettingsSaveResult>} save - Saves an update
  */
-const pickSettings = (
-  settingsUpdate: Partial<Settings>,
-  keys: Array<keyof Settings>,
-): Partial<Settings> => {
-  const picked: Partial<Settings> = {};
-  for (const key of keys) {
-    Object.assign(picked, { [key]: settingsUpdate[key] });
+const notifySettingsSaveFailed = (
+  reverted: Partial<Settings>,
+  attempted: Partial<Settings>,
+  save: (update: Partial<Settings>) => Promise<SettingsSaveResult>,
+): void => {
+  for (const key of Object.keys(reverted) as Array<keyof Settings>) {
+    revertedSettings.set(key, attempted[key]);
   }
-  return picked;
-};
-
-/**
- * Shows the error toast for a failed settings save with a Retry action.
- * @param {() => Promise<SettingsSaveResult>} retry - Re-applies the reverted update
- */
-const notifySettingsSaveFailed = (retry: () => Promise<SettingsSaveResult>): void => {
   toast.error(i18n.t(translations.settings.saveError.title), {
     id: SETTINGS_SAVE_ERROR_TOAST_ID,
     description: i18n.t(translations.settings.saveError.description),
     action: {
       label: i18n.t(translations.common.retry),
       onClick: () => {
-        void retry();
+        if (revertedSettings.size > 0) {
+          void save(Object.fromEntries(revertedSettings) as Partial<Settings>);
+        }
       },
     },
   });
@@ -363,8 +402,7 @@ export const useGrailStore = create<GrailState>((set, get) => ({
       if (revertedKeys.length > 0) {
         set((state) => withSettingsUpdate(state, rollback));
         if (options?.notifyOnError !== false) {
-          const retryUpdate = pickSettings(settingsUpdate, revertedKeys);
-          notifySettingsSaveFailed(() => get().setSettings(retryUpdate, options));
+          notifySettingsSaveFailed(rollback, settingsUpdate, (update) => get().setSettings(update));
         }
       }
 
@@ -374,10 +412,7 @@ export const useGrailStore = create<GrailState>((set, get) => ({
 
     // The setting is saved at this point; a failed reload only leaves stale item data and
     // must not roll the setting back.
-    const grailSettingsChanged = Object.keys(settingsUpdate).some((key) =>
-      GRAIL_FILTER_SETTING_KEYS.includes(key as keyof Settings),
-    );
-    if (grailSettingsChanged) {
+    if (affectsGrailFilter(settingsUpdate)) {
       await reloadFilteredGrailData(set);
     }
 
@@ -387,6 +422,16 @@ export const useGrailStore = create<GrailState>((set, get) => ({
     // Update local state only, without persisting to database
     // This is used when loading settings from the database to avoid triggering
     // settings-updated events that would cause unwanted side effects (e.g., widget resize)
+    const keys = Object.keys(settingsUpdate) as Array<keyof Settings>;
+    forgetRevertedSettings(keys);
+    // The hydrated value is what the database holds, so it is also what a failed in-flight
+    // save of that key must roll back to
+    for (const key of keys) {
+      const entry = settingKeyWrites.get(key);
+      if (entry) {
+        entry.persisted = settingsUpdate[key];
+      }
+    }
     set((state) => withSettingsUpdate(state, settingsUpdate));
   },
   setFilter: (filterUpdate) =>

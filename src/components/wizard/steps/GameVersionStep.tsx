@@ -13,6 +13,7 @@ import {
 import { translations } from '@/i18n/translations';
 import { gameVersionDescriptionKeys, gameVersionLabelKeys } from '@/lib/labelKeys';
 import { useGrailStore } from '@/stores/grailStore';
+import { useWizardSettingsSave, WizardSaveError } from '../wizardSettingsSave';
 
 /**
  * A selectable game version with its label and description translation keys.
@@ -47,12 +48,13 @@ const gameVersions: GameVersionOption[] = [
 export function GameVersionStep() {
   const { t } = useTranslation();
   const gameVersionId = useId();
-  const { settings, setSettings } = useGrailStore();
+  const { settings } = useGrailStore();
+  const { saveSettings, saveFailed } = useWizardSettingsSave();
   const gameVersion = settings.gameVersion || GameVersion.Resurrected;
   const selectedVersion = gameVersions.find((version) => version.value === gameVersion);
 
   const handleGameVersionChange = (value: GameVersion) => {
-    setSettings({ gameVersion: value });
+    saveSettings({ gameVersion: value });
   };
 
   return (
@@ -91,6 +93,8 @@ export function GameVersionStep() {
             </SelectContent>
           </Select>
         </div>
+
+        <WizardSaveError visible={saveFailed} />
 
         <div className="rounded-lg bg-info/10 p-4">
           <p className="text-info text-sm">

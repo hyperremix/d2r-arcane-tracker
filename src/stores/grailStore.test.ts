@@ -4,6 +4,7 @@ import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vites
 import { CharacterBuilder, GrailProgressBuilder, HolyGrailItemBuilder } from '@/fixtures';
 import {
   countActiveFilters,
+  resetSettingsWriteTracking,
   type SettingsSaveResult,
   startLoad,
   useFilteredItems,
@@ -65,6 +66,7 @@ const resetStoreState = () => {
  * Tests share module state (isolate: false), so leaked state must be cleared explicitly.
  */
 const resetFullStoreState = () => {
+  resetSettingsWriteTracking();
   act(() => {
     useGrailStore.setState({
       characters: [],
@@ -548,6 +550,146 @@ describe('When useGrailStore is used', () => {
 
       // Assert
       expect(useGrailStore.getState().settings.theme).toBe('dark');
+    });
+
+    /**
+     * Returns the onClick handler of the Retry action of the n-th error toast.
+     */
+    const retryActionOf = (toastError: { mock: { calls: unknown[][] } }, callIndex: number) => {
+      const options = toastError.mock.calls[callIndex]?.[1] as
+        | { action?: { onClick: (event: unknown) => void } }
+        | undefined;
+      return () => options?.action?.onClick({});
+    };
+
+    it('If the failed key is saved again before Retry is clicked, Then Retry does not overwrite the newer value', async () => {
+      // Arrange
+      const toastError = vi.spyOn(toast, 'error');
+      mockElectronAPI.grail.updateSettings
+        .mockRejectedValueOnce(new Error('database locked'))
+        .mockResolvedValueOnce({ success: true });
+      await act(async () => {
+        await useGrailStore.getState().setSettings({ theme: 'dark' });
+      });
+      await act(async () => {
+        await useGrailStore.getState().setSettings({ theme: 'light' });
+      });
+      const retry = retryActionOf(toastError, 0);
+
+      // Act
+      await act(async () => {
+        retry();
+      });
+
+      // Assert
+      expect(mockElectronAPI.grail.updateSettings).toHaveBeenCalledTimes(2);
+      expect(useGrailStore.getState().settings.theme).toBe('light');
+    });
+
+    it('If a second key fails after the first, Then Retry re-applies both reverted keys', async () => {
+      // Arrange
+      const toastError = vi.spyOn(toast, 'error');
+      mockElectronAPI.grail.updateSettings
+        .mockRejectedValueOnce(new Error('database locked'))
+        .mockRejectedValueOnce(new Error('database locked'))
+        .mockResolvedValueOnce({ success: true });
+      await act(async () => {
+        await useGrailStore.getState().setSettings({ theme: 'dark' });
+      });
+      await act(async () => {
+        await useGrailStore.getState().setSettings({ showItemIcons: true });
+      });
+      const retry = retryActionOf(toastError, 1);
+
+      // Act
+      await act(async () => {
+        retry();
+      });
+
+      // Assert
+      expect(toastError).toHaveBeenCalledTimes(2);
+      expect(mockElectronAPI.grail.updateSettings).toHaveBeenLastCalledWith({
+        theme: 'dark',
+        showItemIcons: true,
+      });
+      expect(useGrailStore.getState().settings.theme).toBe('dark');
+      expect(useGrailStore.getState().settings.showItemIcons).toBe(true);
+    });
+
+    it('If one of two reverted keys is saved again, Then Retry only re-applies the other key', async () => {
+      // Arrange
+      const toastError = vi.spyOn(toast, 'error');
+      mockElectronAPI.grail.updateSettings
+        .mockRejectedValueOnce(new Error('database locked'))
+        .mockRejectedValueOnce(new Error('database locked'))
+        .mockResolvedValue({ success: true });
+      await act(async () => {
+        await useGrailStore.getState().setSettings({ theme: 'dark' });
+      });
+      await act(async () => {
+        await useGrailStore.getState().setSettings({ showItemIcons: true });
+      });
+      await act(async () => {
+        await useGrailStore.getState().setSettings({ theme: 'light' });
+      });
+      const retry = retryActionOf(toastError, 1);
+
+      // Act
+      await act(async () => {
+        retry();
+      });
+
+      // Assert
+      expect(mockElectronAPI.grail.updateSettings).toHaveBeenLastCalledWith({
+        showItemIcons: true,
+      });
+      expect(useGrailStore.getState().settings.theme).toBe('light');
+      expect(useGrailStore.getState().settings.showItemIcons).toBe(true);
+    });
+
+    it('If the failed key is hydrated before Retry is clicked, Then Retry does not overwrite the hydrated value', async () => {
+      // Arrange
+      const toastError = vi.spyOn(toast, 'error');
+      mockElectronAPI.grail.updateSettings.mockRejectedValueOnce(new Error('database locked'));
+      await act(async () => {
+        await useGrailStore.getState().setSettings({ theme: 'dark' });
+      });
+      const retry = retryActionOf(toastError, 0);
+      act(() => {
+        useGrailStore.getState().hydrateSettings({ theme: 'light' });
+      });
+
+      // Act
+      await act(async () => {
+        retry();
+      });
+
+      // Assert
+      expect(mockElectronAPI.grail.updateSettings).toHaveBeenCalledTimes(1);
+      expect(useGrailStore.getState().settings.theme).toBe('light');
+    });
+
+    it('If settings are hydrated while a save of the same key is in flight and a later save fails, Then the key returns to the hydrated value', async () => {
+      // Arrange
+      vi.spyOn(toast, 'error');
+      const firstSave = queueDeferredSave();
+      const secondSave = queueDeferredSave();
+
+      // Act
+      await act(async () => {
+        const first = useGrailStore.getState().setSettings({ theme: 'dark' });
+        act(() => {
+          useGrailStore.getState().hydrateSettings({ theme: 'light' });
+        });
+        const second = useGrailStore.getState().setSettings({ theme: 'dark' });
+        secondSave.reject(new Error('database locked'));
+        await second;
+        firstSave.resolve({ success: false });
+        await first;
+      });
+
+      // Assert
+      expect(useGrailStore.getState().settings.theme).toBe('light');
     });
 
     it('If the caller disables error notifications, Then a failed save is reverted without a toast', async () => {
