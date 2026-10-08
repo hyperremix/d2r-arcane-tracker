@@ -121,7 +121,7 @@ export function ListView({
         className={cn(
           'relative flex w-full items-center gap-3 p-3',
           'rounded-lg border-2',
-          getCardStateClasses(item.type, isFound),
+          getCardStateClasses(item.type, isFound, !!interactiveProps),
           interactiveProps && interactiveCardStyles,
           className,
         )}

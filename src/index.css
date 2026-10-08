@@ -42,6 +42,12 @@
   }
 }
 
+/* Opts inline content (counts, toggles, meta text) out of the display serif a heading wrapper such as CardTitle sets */
+@utility font-ui {
+  font-family: var(--font-sans);
+  letter-spacing: normal;
+}
+
 @theme inline {
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);

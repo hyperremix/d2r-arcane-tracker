@@ -131,7 +131,10 @@ export function GridView({
       >
         <Card
           data-found={isFound}
-          className={cn('relative rounded-lg border-2', getCardStateClasses(item.type, isFound))}
+          className={cn(
+            'relative rounded-lg border-2',
+            getCardStateClasses(item.type, isFound, !!interactiveProps),
+          )}
         >
           {/* Status indicators overlay */}
           {!withoutStatusIndicators && (

@@ -28,13 +28,19 @@ function CardHeader({ className, ...props }: React.ComponentProps<'div'>) {
   );
 }
 
-function CardTitle({ className, ...props }: React.ComponentProps<'div'>) {
+interface CardTitleProps extends React.ComponentProps<'div'> {
+  /** `display` is the Cinzel heading; `label` is a small Inter caption such as a stat tile name. */
+  variant?: 'display' | 'label';
+}
+
+const cardTitleVariants = {
+  display: 'font-display font-semibold leading-none tracking-wide',
+  label: 'font-medium font-ui text-sm leading-none',
+} as const;
+
+function CardTitle({ className, variant = 'display', ...props }: CardTitleProps) {
   return (
-    <div
-      data-slot="card-title"
-      className={cn('font-display font-semibold leading-none tracking-wide', className)}
-      {...props}
-    />
+    <div data-slot="card-title" className={cn(cardTitleVariants[variant], className)} {...props} />
   );
 }
 

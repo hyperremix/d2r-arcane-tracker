@@ -701,6 +701,41 @@ describe('When ItemCard is rendered', () => {
       expect(surface?.className).not.toMatch(/scale-/);
       expect(surface).toHaveClass('hover:ring-item-unique/40');
     });
+
+    it.each(['grid', 'list'] as const)(
+      'Then the non-clickable %s card has no hover ring or shadow, so it does not look interactive',
+      (viewMode) => {
+        // Arrange
+        const item = HolyGrailItemBuilder.new().withType('unique').withName('Static').build();
+
+        // Act
+        const { container } = render(<ItemCard item={item} viewMode={viewMode} />);
+
+        // Assert
+        const surface = container.querySelector('[data-found]');
+        expect(surface).toBeInTheDocument();
+        expect(surface?.className).not.toMatch(/hover:/);
+        expect(surface?.className).not.toMatch(/transition/);
+        expect(screen.queryByRole('button', { name: 'Static, Not Found' })).not.toBeInTheDocument();
+      },
+    );
+
+    it.each(['grid', 'list'] as const)(
+      'Then the clickable %s card keeps its hover ring and focus styling',
+      (viewMode) => {
+        // Arrange
+        const item = HolyGrailItemBuilder.new().withType('unique').withName('Clickable').build();
+
+        // Act
+        render(<ItemCard item={item} viewMode={viewMode} onClick={vi.fn()} />);
+
+        // Assert
+        const card = screen.getByRole('button', { name: 'Clickable, Not Found' });
+        const surface = viewMode === 'grid' ? card.querySelector('[data-found]') : card;
+        expect(surface).toHaveClass('hover:ring-2', 'hover:ring-item-unique/40');
+        expect(card).toHaveClass('cursor-pointer', 'focus-visible:ring-[3px]');
+      },
+    );
   });
 
   describe('If > 2 discovering characters', () => {

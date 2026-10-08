@@ -59,7 +59,7 @@ const typeFrameStyles: Record<ItemType, { found: string; missing: string; hover:
  * Opacity is never applied to the whole card so the item name keeps full text contrast.
  */
 const foundStateStyles = {
-  found: 'border-solid bg-card shadow-sm hover:shadow-md',
+  found: 'border-solid bg-card shadow-sm',
   missing: 'border-dashed bg-muted/40 shadow-none dark:bg-muted/20',
 } as const;
 
@@ -71,13 +71,29 @@ const cardTransitionStyles =
   'motion-safe:transition-[box-shadow,border-color,background-color] motion-safe:duration-200';
 
 /**
- * Returns the frame, surface and hover classes for an item card.
+ * Returns the frame, surface and, for interactive cards only, hover classes for an item card.
+ * Non-interactive cards (for example the statistics "last find" card) get no hover affordance,
+ * so they do not look clickable.
  */
-export function getCardStateClasses(itemType: ItemType, isFound: boolean): string {
+export function getCardStateClasses(
+  itemType: ItemType,
+  isFound: boolean,
+  isInteractive = false,
+): string {
   const state = isFound ? 'found' : 'missing';
   const frame = typeFrameStyles[itemType];
-  const frameClasses = frame ? `${frame[state]} ${frame.hover}` : 'border-border';
-  return `${frameClasses} ${foundStateStyles[state]} ${cardTransitionStyles}`;
+  const frameClasses = frame ? frame[state] : 'border-border';
+  const classes = [frameClasses, foundStateStyles[state]];
+  if (isInteractive) {
+    if (frame) {
+      classes.push(frame.hover);
+    }
+    if (isFound) {
+      classes.push('hover:shadow-md');
+    }
+    classes.push(cardTransitionStyles);
+  }
+  return classes.join(' ');
 }
 
 /**

@@ -176,7 +176,7 @@ export function RunAnalytics() {
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="font-medium font-sans text-sm tracking-normal">
+            <CardTitle variant="label">
               {t(translations.statistics.runAnalytics.totalSessions)}
             </CardTitle>
             <Trophy className="h-4 w-4 text-muted-foreground" />
@@ -191,7 +191,7 @@ export function RunAnalytics() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="font-medium font-sans text-sm tracking-normal">
+            <CardTitle variant="label">
               {t(translations.statistics.runAnalytics.totalTime)}
             </CardTitle>
             <Clock className="h-4 w-4 text-muted-foreground" />
@@ -206,7 +206,7 @@ export function RunAnalytics() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="font-medium font-sans text-sm tracking-normal">
+            <CardTitle variant="label">
               {t(translations.statistics.runAnalytics.avgRunDuration)}
             </CardTitle>
             <Target className="h-4 w-4 text-muted-foreground" />
@@ -223,7 +223,7 @@ export function RunAnalytics() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="font-medium font-sans text-sm tracking-normal">
+            <CardTitle variant="label">
               {t(translations.statistics.runAnalytics.itemsPerRun)}
             </CardTitle>
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
