@@ -2,7 +2,7 @@ import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import type { Item, Settings } from 'electron/types/grail';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { HolyGrailItemBuilder } from '@/fixtures/HolyGrailItemBuilder';
-import { useGrailStore } from '@/stores/grailStore';
+import { filterAndSortItems, useGrailStore } from '@/stores/grailStore';
 import { AdvancedSearch } from './AdvancedSearch';
 
 const SEARCH_DEBOUNCE_MS = 150;
@@ -285,7 +285,40 @@ describe('When AdvancedSearch toolbar is rendered', () => {
       fireEvent.click(await screen.findByLabelText('Helms'));
 
       // Assert
-      expect(useGrailStore.getState().filter.subCategories).toEqual(['helms']);
+      expect(useGrailStore.getState().filter.subCategories).toEqual(['armor:helms']);
+    });
+
+    it('Then a sub-category present in two categories is selected for only the clicked category', async () => {
+      // Arrange
+      const weaponSorceress: Item = {
+        ...HolyGrailItemBuilder.new().withId('lidlesseye').withCategory('weapons').build(),
+        subCategory: 'sorceress',
+      };
+      const armorSorceress: Item = {
+        ...HolyGrailItemBuilder.new().withId('oculus').withCategory('armor').build(),
+        subCategory: 'sorceress',
+      };
+      useGrailStore.setState({ items: [weaponSorceress, armorSorceress] });
+      render(<AdvancedSearch />);
+      openFiltersPopover();
+      const subCategories = await screen.findByRole('group', { name: 'Sub-categories' });
+      const weaponGroup = within(subCategories).getByRole('group', { name: 'Weapons' });
+      const armorGroup = within(subCategories).getByRole('group', { name: 'Armor' });
+
+      // Act
+      fireEvent.click(within(weaponGroup).getByLabelText('Sorceress'));
+
+      // Assert
+      const { filter, advancedFilter, items } = useGrailStore.getState();
+      expect(filter.subCategories).toEqual(['weapons:sorceress']);
+      expect(within(weaponGroup).getByLabelText('Sorceress')).toBeChecked();
+      expect(within(armorGroup).getByLabelText('Sorceress')).not.toBeChecked();
+      expect(filterAndSortItems(items, [], filter, advancedFilter).map((item) => item.id)).toEqual([
+        'lidlesseye',
+      ]);
+      expect(
+        screen.getByRole('button', { name: 'Remove filter: Weapons: Sorceress' }),
+      ).toBeInTheDocument();
     });
   });
 
@@ -351,7 +384,7 @@ describe('When AdvancedSearch toolbar is rendered', () => {
       // Arrange
       useGrailStore.getState().setFilter({
         categories: ['armor', 'weapons'],
-        subCategories: ['helms'],
+        subCategories: ['armor:helms'],
         types: ['set'],
       });
 
@@ -367,16 +400,16 @@ describe('When AdvancedSearch toolbar is rendered', () => {
       // Arrange
       useGrailStore
         .getState()
-        .setFilter({ categories: ['armor'], subCategories: ['helms'], types: ['set'] });
+        .setFilter({ categories: ['armor'], subCategories: ['armor:helms'], types: ['set'] });
       render(<AdvancedSearch />);
       const chips = screen.getByRole('list', { name: 'Active filters' });
       expect(within(chips).getByText('Armor')).toBeInTheDocument();
-      expect(within(chips).getByText('Helms')).toBeInTheDocument();
+      expect(within(chips).getByText('Armor: Helms')).toBeInTheDocument();
       expect(within(chips).getByText('Set')).toBeInTheDocument();
 
       // Act
       fireEvent.click(screen.getByRole('button', { name: 'Remove filter: Armor' }));
-      fireEvent.click(screen.getByRole('button', { name: 'Remove filter: Helms' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Remove filter: Armor: Helms' }));
 
       // Assert
       expect(useGrailStore.getState().filter.categories).toEqual([]);

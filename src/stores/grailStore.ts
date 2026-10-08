@@ -362,13 +362,30 @@ const matchesCategories = (item: Item, categories?: string[]): boolean => {
 };
 
 /**
- * Checks if an item matches the specified subcategories filter.
+ * Builds the category-qualified sub-category filter value, e.g. `weapons:sorceress`.
+ * Some sub-categories (such as `sorceress`) exist under more than one category, so the filters
+ * popover stores qualified values to keep each selection specific to its category.
+ * @param {string} category - The item category
+ * @param {string} subCategory - The item sub-category
+ * @returns {string} The qualified sub-category filter value
+ */
+export const toSubCategoryFilterValue = (category: string, subCategory: string): string =>
+  `${category}:${subCategory}`;
+
+/**
+ * Checks if an item matches the specified subcategories filter. Entries may be bare
+ * sub-categories (matching that sub-category in every category) or category-qualified values
+ * created by {@link toSubCategoryFilterValue} (matching only the given category).
  * @param {Item} item - The item to check
  * @param {string[]} [subCategories] - Optional array of subcategories to match
  * @returns {boolean} True if item matches (or no filter applied), false otherwise
  */
 const matchesSubCategories = (item: Item, subCategories?: string[]): boolean => {
-  return !subCategories || subCategories.length === 0 || subCategories.includes(item.subCategory);
+  if (!subCategories || subCategories.length === 0) return true;
+  return (
+    subCategories.includes(item.subCategory) ||
+    subCategories.includes(toSubCategoryFilterValue(item.category, item.subCategory))
+  );
 };
 
 /**

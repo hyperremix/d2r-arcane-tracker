@@ -842,6 +842,31 @@ describe('When filterAndSortItems is called', () => {
     });
   });
 
+  describe('If a category-qualified sub-category is selected', () => {
+    it('Then only items of that category and sub-category are returned', () => {
+      // Arrange
+      const weaponSorceress = {
+        ...HolyGrailItemBuilder.new().withId('weapon').withCategory('weapons').build(),
+        subCategory: 'sorceress' as const,
+      };
+      const armorSorceress = {
+        ...HolyGrailItemBuilder.new().withId('armor').withCategory('armor').build(),
+        subCategory: 'sorceress' as const,
+      };
+
+      // Act
+      const result = filterAndSortItems(
+        [weaponSorceress, armorSorceress],
+        [],
+        { ...noFilter, subCategories: ['weapons:sorceress'] },
+        { ...defaultSort, sortBy: 'name', sortOrder: 'asc' },
+      );
+
+      // Assert
+      expect(result.map((item) => item.id)).toEqual(['weapon']);
+    });
+  });
+
   describe('If the search term is a base item name', () => {
     it('Then returns the items with that base', () => {
       // Arrange

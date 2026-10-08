@@ -45,7 +45,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { translations } from '@/i18n/translations';
 import { subCategoryLabelKeys } from '@/lib/labelKeys';
 import { cn } from '@/lib/utils';
-import { useGrailStore, useItemResultCount } from '@/stores/grailStore';
+import { toSubCategoryFilterValue, useGrailStore, useItemResultCount } from '@/stores/grailStore';
 
 type FoundStatus = 'all' | 'found' | 'missing';
 type SortBy = AdvancedGrailFilter['sortBy'];
@@ -186,14 +186,30 @@ function getSubCategoryLabel(subCategory: string, t: TFunction): string {
 }
 
 /**
+ * Returns the label of an active sub-category filter value. Category-qualified values (e.g.
+ * `weapons:sorceress`) include the category so same-named sub-categories stay distinguishable.
+ */
+function getSubCategoryFilterLabel(value: string, t: TFunction): string {
+  const separatorIndex = value.indexOf(':');
+  if (separatorIndex === -1) return getSubCategoryLabel(value, t);
+
+  const category = value.slice(0, separatorIndex);
+  const subCategory = value.slice(separatorIndex + 1);
+  return t(translations.grail.advancedSearch.subCategoryChip, {
+    category: t(categoryLabelKeys[category as ItemCategory] ?? category),
+    subCategory: getSubCategoryLabel(subCategory, t),
+  });
+}
+
+/**
  * Orders sub-category options alphabetically, with character class sub-categories last.
  */
 function compareSubCategoryOptions(
-  a: { value: string; label: string },
-  b: { value: string; label: string },
+  a: { subCategory: string; label: string },
+  b: { subCategory: string; label: string },
 ): number {
   const classOrder =
-    Number(classSubCategories.has(a.value)) - Number(classSubCategories.has(b.value));
+    Number(classSubCategories.has(a.subCategory)) - Number(classSubCategories.has(b.subCategory));
   return classOrder || a.label.localeCompare(b.label);
 }
 
@@ -344,7 +360,7 @@ function buildActiveFilterChips({
   for (const subCategory of subCategories) {
     chips.push({
       key: `subCategory-${subCategory}`,
-      label: getSubCategoryLabel(subCategory, t),
+      label: getSubCategoryFilterLabel(subCategory, t),
       onRemove: () => onToggleSubCategory(subCategory),
     });
   }
@@ -525,7 +541,11 @@ function FiltersPopover({
                 legend={t(categoryLabelKeys[group.category] ?? group.category)}
                 idPrefix={`${idPrefix}-subcategory-${group.category}`}
                 options={group.subCategories
-                  .map((value) => ({ value, label: getSubCategoryLabel(value, t) }))
+                  .map((subCategory) => ({
+                    value: toSubCategoryFilterValue(group.category, subCategory),
+                    subCategory,
+                    label: getSubCategoryLabel(subCategory, t),
+                  }))
                   .sort(compareSubCategoryOptions)}
                 selected={selectedSubCategories}
                 onToggle={onToggleSubCategory}

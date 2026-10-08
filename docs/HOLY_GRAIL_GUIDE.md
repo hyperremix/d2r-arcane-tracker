@@ -86,7 +86,7 @@ In **Manual Entry** mode, or for finds the app can't see (another PC, older find
 
 The main screen lists every grail item with its found status. The search and filter bar lets you:
 
-- Search by item name, base item ("Shako", "Diadem"), set name ("Tal Rasha") or, for runewords, rune ("Ber"). Every word you type must match, so "tal armor" narrows the results further. Turn on fuzzy search (the wand icon) to also find items when you abbreviate words ("hrlqn") or make a small typo ("windfroce").
+- Search by item name, base item ("Shako", "Diadem"), set name ("Tal Rasha") or, for runewords, rune ("Ber"). Every word you type must match, so "tal lidless" narrows the results further. Turn on fuzzy search (the wand icon) to also find items when you abbreviate words ("hrlqn") or make a small typo ("windfroce").
 - Filter by status (all, found, missing) and by type with the colored Unique, Set, Rune and Runeword toggles. Rune and runeword toggles only appear when you track them.
 - Open **Filters** to narrow by category (weapons, armor, jewelry, charms) and sub-category, such as helms, body armor or class-specific items, grouped by category.
 - Group by category, type or ethereal status, and switch between grid and list views.

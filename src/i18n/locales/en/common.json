@@ -160,6 +160,7 @@
       "viewMode": "View Mode",
       "sortOrderValue": "Sort order: {{order}}",
       "subCategories": "Sub-categories",
+      "subCategoryChip": "{{category}}: {{subCategory}}",
       "resultCount_one": "{{shown}} of {{count}} item",
       "resultCount_other": "{{shown}} of {{count}} items",
       "subCategory": {

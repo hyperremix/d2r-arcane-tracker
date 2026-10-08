@@ -1,3 +1,4 @@
+import { items as grailItems } from 'electron/items';
 import { describe, expect, it } from 'vitest';
 import { HolyGrailItemBuilder } from '@/fixtures/HolyGrailItemBuilder';
 import { itemMatchesSearch, normalizeSearchText, tokenizeSearchQuery } from './itemSearch';
@@ -209,6 +210,29 @@ describe('When itemMatchesSearch is used in fuzzy mode', () => {
 
       // Assert
       expect(result).toEqual([]);
+    });
+  });
+});
+
+describe('When the Holy Grail guide documents search examples', () => {
+  describe('If the query is an example from the guide', () => {
+    it.each([
+      { query: 'Shako', fuzzy: false },
+      { query: 'Diadem', fuzzy: false },
+      { query: 'Tal Rasha', fuzzy: false },
+      { query: 'Ber', fuzzy: false },
+      { query: 'tal lidless', fuzzy: false },
+      { query: 'hrlqn', fuzzy: true },
+      { query: 'windfroce', fuzzy: true },
+    ])('Then "$query" returns at least one real grail item', ({ query, fuzzy }) => {
+      // Arrange
+      const tokens = tokenizeSearchQuery(query);
+
+      // Act
+      const matches = grailItems.filter((item) => itemMatchesSearch(item, tokens, fuzzy));
+
+      // Assert
+      expect(matches.length).toBeGreaterThan(0);
     });
   });
 });
