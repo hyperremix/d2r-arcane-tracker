@@ -6,12 +6,8 @@ import { useWizardStore } from '@/stores/wizardStore';
 import { SetupWizard, wizardSteps } from './SetupWizard';
 
 vi.mock('@/stores/grailStore');
-// Stubbed for the same reason: the real module imports grailStore and would be cached bound to
-// this file's mock for wizardSettingsSave.test.tsx (the real component is covered there).
-vi.mock('@/components/wizard/wizardSettingsSave', () => ({
-  WizardSaveError: ({ visible }: { visible: boolean }) =>
-    visible ? <p role="alert">Your setup could not be saved. Please try again.</p> : null,
-}));
+// The real module imports grailStore, so it would be cached bound to this file's mock
+vi.mock('@/components/wizard/wizardSettingsSave', () => import('@/test/wizardSettingsSaveStub'));
 vi.mock('./steps/WelcomeStep', () => ({ WelcomeStep: () => <div>WelcomeContent</div> }));
 // Stubbed so this file's grailStore mock isn't baked into the shared module cache
 // (vitest runs with isolate: false) that SaveDirectoryStep.test.tsx also relies on.

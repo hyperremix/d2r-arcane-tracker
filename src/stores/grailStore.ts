@@ -185,8 +185,8 @@ const affectsGrailFilter = (settingsUpdate: Partial<Settings>): boolean =>
     GRAIL_FILTER_SETTING_KEYS.includes(key as keyof Settings),
   );
 
-/** Stable toast id so repeated failures (e.g. while dragging a slider) replace one another. */
-const SETTINGS_SAVE_ERROR_TOAST_ID = 'settings-save-error';
+/** Prefix of the id of the settings error toast; see `activeErrorToastId`. */
+const SETTINGS_SAVE_ERROR_TOAST_ID_PREFIX = 'settings-save-error';
 
 /**
  * Bookkeeping for the saves of a single settings key that are currently in flight.
@@ -212,26 +212,50 @@ let lastWriteToken = 0;
 const revertedSettings = new Map<keyof Settings, Settings[keyof Settings]>();
 
 /**
+ * Id of the error toast currently on screen, if any. Failures while it is showing update it in
+ * place (so e.g. dragging a slider does not stack toasts); once it is gone, the next failure
+ * gets a fresh id. sonner removes toasts by id on its own timers after a dismissal, so reusing
+ * the id of a toast that was just dismissed would let those stale timers remove the new toast.
+ */
+let activeErrorToastId: string | undefined;
+let errorToastCount = 0;
+
+/**
  * Clears all write tracking. Only intended for tests, which share this module state.
  */
 export const resetSettingsWriteTracking = (): void => {
   settingKeyWrites.clear();
   revertedSettings.clear();
+  activeErrorToastId = undefined;
+  errorToastCount = 0;
   lastWriteToken = 0;
 };
 
 /**
- * Stops offering Retry for keys that were written or hydrated since their save failed, and
- * dismisses the error toast once nothing is left to retry.
+ * Stops offering Retry for keys that were written or hydrated since their save failed.
  * @param {Array<keyof Settings>} keys - The keys that were just written
  */
 const forgetRevertedSettings = (keys: Array<keyof Settings>): void => {
-  let changed = false;
   for (const key of keys) {
-    changed = revertedSettings.delete(key) || changed;
+    revertedSettings.delete(key);
   }
-  if (changed && revertedSettings.size === 0) {
-    toast.dismiss(SETTINGS_SAVE_ERROR_TOAST_ID);
+};
+
+/**
+ * Dismisses the error toast once nothing is left to retry. Called when a save succeeded or
+ * settings were hydrated, never at the start of a save: that save may still fail and must then
+ * keep updating the same toast.
+ */
+const dismissErrorToastIfNothingToRetry = (): void => {
+  if (revertedSettings.size > 0 || activeErrorToastId === undefined) {
+    return;
+  }
+  const toastId = activeErrorToastId;
+  activeErrorToastId = undefined;
+  try {
+    toast.dismiss(toastId);
+  } catch (error) {
+    console.error('Failed to dismiss the settings save error notification:', error);
   }
 };
 
@@ -319,19 +343,30 @@ const notifySettingsSaveFailed = (
   for (const key of Object.keys(reverted) as Array<keyof Settings>) {
     revertedSettings.set(key, attempted[key]);
   }
+  const toastId =
+    activeErrorToastId ?? `${SETTINGS_SAVE_ERROR_TOAST_ID_PREFIX}-${++errorToastCount}`;
+  activeErrorToastId = toastId;
   // Once the toast closes (timeout or dismiss) its Retry is gone, so the abandoned changes must
-  // not be re-applied by the Retry of a later, unrelated failure
+  // not be re-applied by the Retry of a later, unrelated failure. A stale callback of an older
+  // toast must not wipe the state of a newer one.
   const forgetAbandonedRetry = (): void => {
-    revertedSettings.clear();
+    if (activeErrorToastId === toastId) {
+      activeErrorToastId = undefined;
+      revertedSettings.clear();
+    }
   };
   // Reporting is best effort: a failing toast or translation must not make setSettings reject
   try {
     toast.error(i18n.t(translations.settings.saveError.title), {
-      id: SETTINGS_SAVE_ERROR_TOAST_ID,
+      id: toastId,
       description: i18n.t(translations.settings.saveError.description),
       action: {
         label: i18n.t(translations.common.retry),
-        onClick: () => {
+        onClick: (event) => {
+          // Keep the toast until the retry settles: sonner would otherwise remove it by id a
+          // moment later, taking a toast shown for a failed retry with it. A successful retry
+          // dismisses it, a failed one updates it in place.
+          event.preventDefault();
           if (revertedSettings.size > 0) {
             void save(Object.fromEntries(revertedSettings) as Partial<Settings>);
           }
@@ -342,6 +377,7 @@ const notifySettingsSaveFailed = (
     });
   } catch (error) {
     console.error('Failed to show the settings save error notification:', error);
+    forgetAbandonedRetry();
   }
 };
 
@@ -422,6 +458,7 @@ export const useGrailStore = create<GrailState>((set, get) => ({
       return { success: false, error };
     }
     settleSettingsWrite(writeToken, get().settings, settingsUpdate, true);
+    dismissErrorToastIfNothingToRetry();
 
     // The setting is saved at this point; a failed reload only leaves stale item data and
     // must not roll the setting back.
@@ -437,6 +474,7 @@ export const useGrailStore = create<GrailState>((set, get) => ({
     // settings-updated events that would cause unwanted side effects (e.g., widget resize)
     const keys = Object.keys(settingsUpdate) as Array<keyof Settings>;
     forgetRevertedSettings(keys);
+    dismissErrorToastIfNothingToRetry();
     // The hydrated value is what the database holds, so it is also what a failed in-flight
     // save of that key must roll back to
     for (const key of keys) {

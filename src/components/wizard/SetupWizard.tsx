@@ -223,9 +223,7 @@ export function SetupWizard() {
           </p>
         )}
 
-        {/* Wizard-level failure (Skip Setup / Finish). A step shows its own inline alert for its
-            settings, so both can only appear together when Skip Setup fails while a step's save
-            failure is still displayed; each then reports a distinct failed save. */}
+        {/* Skip Setup / Finish failure; steps show their own inline alert for their settings */}
         <WizardSaveError visible={saveFailed} />
 
         {/* Navigation Buttons */}

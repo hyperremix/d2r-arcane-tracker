@@ -115,17 +115,36 @@ describe('WidgetSettings', () => {
     expect(resetSize).toHaveBeenCalledWith('overall');
   });
 
-  describe('If split is stored while ethereal tracking is off and saving keeps failing', () => {
+  describe('If split is stored while ethereal tracking is off', () => {
     const updateSettingsFailures: readonly [string, () => Promise<unknown>][] = [
       ['rejects', () => Promise.reject(new Error('database locked'))],
       ['reports success: false', () => Promise.resolve({ success: false })],
     ];
 
     const spies: Array<{ mockRestore: () => void }> = [];
+    let consoleError: ReturnType<typeof vi.spyOn>;
+
+    const installElectronAPI = (
+      updateSettings: () => Promise<unknown>,
+      updateDisplay = vi.fn(),
+    ) => {
+      Object.defineProperty(window, 'electronAPI', {
+        value: { grail: { updateSettings }, widget: { updateDisplay } },
+        configurable: true,
+        writable: true,
+      });
+    };
+
+    /** Lets pending promises and the renders they trigger run, so a retry loop would show up. */
+    const settle = () =>
+      act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      });
 
     beforeEach(() => {
+      consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
       spies.push(
-        vi.spyOn(console, 'error').mockImplementation(() => undefined),
+        consoleError,
         vi.spyOn(toast, 'error').mockImplementation(() => 'toast-id'),
       );
       resetSettingsWriteTracking();
@@ -148,19 +167,11 @@ describe('WidgetSettings', () => {
         // Arrange
         const updateSettings = vi.fn(failUpdateSettings);
         const updateDisplay = vi.fn().mockResolvedValue({ success: true });
-        Object.defineProperty(window, 'electronAPI', {
-          value: { grail: { updateSettings }, widget: { updateDisplay } },
-          configurable: true,
-          writable: true,
-        });
+        installElectronAPI(updateSettings, updateDisplay);
 
         // Act
         render(<WidgetSettings />);
-        for (let tick = 0; tick < 10; tick += 1) {
-          await act(async () => {
-            await Promise.resolve();
-          });
-        }
+        await settle();
 
         // Assert
         expect(updateSettings).toHaveBeenCalledTimes(1);
@@ -173,30 +184,61 @@ describe('WidgetSettings', () => {
     it('If a failed auto-switch is followed by ethereal tracking being enabled and disabled again, Then the auto-switch is attempted again', async () => {
       // Arrange
       const updateSettings = vi.fn().mockRejectedValue(new Error('database locked'));
-      Object.defineProperty(window, 'electronAPI', {
-        value: { grail: { updateSettings }, widget: { updateDisplay: vi.fn() } },
-        configurable: true,
-        writable: true,
-      });
+      installElectronAPI(updateSettings);
       render(<WidgetSettings />);
-      await act(async () => {
-        await Promise.resolve();
-      });
-      expect(updateSettings).toHaveBeenCalledTimes(1);
 
       // Act
+      await settle();
       act(() => {
         useGrailStore.getState().hydrateSettings({ grailEthereal: true });
       });
       act(() => {
         useGrailStore.getState().hydrateSettings({ grailEthereal: false });
       });
-      await act(async () => {
-        await Promise.resolve();
-      });
+      await settle();
 
       // Assert
       expect(updateSettings).toHaveBeenCalledTimes(2);
+    });
+
+    it('If a failed auto-switch is followed by a manual display change that succeeds, Then a split mode arriving later is switched again', async () => {
+      // Arrange
+      const updateSettings = vi
+        .fn()
+        .mockRejectedValueOnce(new Error('database locked'))
+        .mockResolvedValue({ success: true });
+      installElectronAPI(updateSettings);
+      render(<WidgetSettings />);
+
+      // Act
+      await settle();
+      fireEvent.click(screen.getByRole('radio', { name: 'Run Only' }));
+      await settle();
+      act(() => {
+        useGrailStore.getState().hydrateSettings({ widgetDisplay: 'split' });
+      });
+      await settle();
+
+      // Assert
+      expect(updateSettings).toHaveBeenCalledTimes(3);
+      expect(updateSettings).toHaveBeenLastCalledWith({ widgetDisplay: 'overall' });
+    });
+
+    it('If the widget IPC rejects after the auto-switch was saved, Then the error is logged and not left unhandled', async () => {
+      // Arrange
+      const ipcError = new Error('ipc failed');
+      const updateSettings = vi.fn().mockResolvedValue({ success: true });
+      installElectronAPI(updateSettings, vi.fn().mockRejectedValue(ipcError));
+
+      // Act
+      render(<WidgetSettings />);
+      await settle();
+
+      // Assert
+      expect(consoleError).toHaveBeenCalledWith(
+        'Failed to switch the widget display mode:',
+        ipcError,
+      );
     });
   });
 

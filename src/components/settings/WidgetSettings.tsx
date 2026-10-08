@@ -53,15 +53,20 @@ export function WidgetSettings() {
     [settings, setSettings],
   );
 
+  // Display mode whose auto-switch to 'overall' failed to save. A failed save is reverted, which
+  // changes `settings` (and so `updateDisplay`) and would otherwise re-run the auto-switch effect
+  // forever. It is cleared by any successful display change or when ethereal tracking is enabled.
+  const failedAutoSwitchRef = useRef<WidgetDisplayMode | undefined>(undefined);
+
   const updateDisplay = useCallback(
     async (display: WidgetDisplayMode) => {
       const result = await setSettings({ widgetDisplay: display });
       if (!result.success) {
-        return false;
+        return;
       }
+      failedAutoSwitchRef.current = undefined;
       // Update widget display mode via IPC
       await window.electronAPI?.widget.updateDisplay(display, settings);
-      return true;
     },
     [setSettings, settings],
   );
@@ -108,11 +113,6 @@ export function WidgetSettings() {
     }
   }, [setSettings, effectiveDisplay]);
 
-  // Display mode whose auto-switch to 'overall' failed to save. A failed save is reverted, which
-  // changes `settings` (and so `updateDisplay`) and would otherwise re-run the effect below
-  // forever. It is cleared once the switch succeeds or ethereal tracking is enabled again.
-  const failedAutoSwitchRef = useRef<WidgetDisplayMode | undefined>(undefined);
-
   // Auto-switch to 'overall' mode if ethereal tracking is disabled and user is in split/all mode
   useEffect(() => {
     if (settings.grailEthereal) {
@@ -126,10 +126,8 @@ export function WidgetSettings() {
       return;
     }
     failedAutoSwitchRef.current = widgetDisplay;
-    updateDisplay('overall').then((switched) => {
-      if (switched) {
-        failedAutoSwitchRef.current = undefined;
-      }
+    updateDisplay('overall').catch((error) => {
+      console.error('Failed to switch the widget display mode:', error);
     });
   }, [settings.grailEthereal, widgetDisplay, updateDisplay]);
 

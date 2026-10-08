@@ -3,12 +3,8 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('@/stores/grailStore');
-// Stubbed for the same reason: the real module imports grailStore and would be cached bound to
-// this file's mock for wizardSettingsSave.test.tsx (the real component is covered there).
-vi.mock('@/components/wizard/wizardSettingsSave', () => ({
-  WizardSaveError: ({ visible }: { visible: boolean }) =>
-    visible ? <p role="alert">Your setup could not be saved. Please try again.</p> : null,
-}));
+// The real module imports grailStore, so it would be cached bound to this file's mock
+vi.mock('@/components/wizard/wizardSettingsSave', () => import('@/test/wizardSettingsSaveStub'));
 // Only SaveDirectoryStep is rendered for real. The other steps are stubbed so they aren't cached
 // bound to this file's grailStore mock in the shared (non-isolated) module registry.
 vi.mock('./steps/WelcomeStep', () => ({ WelcomeStep: () => null }));

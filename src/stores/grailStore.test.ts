@@ -420,12 +420,12 @@ describe('When useGrailStore is used', () => {
         await useGrailStore.getState().setSettings({ theme: 'dark' });
       });
       const options = toastError.mock.calls[0]?.[1] as
-        | { action?: { onClick: (event: unknown) => void } }
+        | { action?: { onClick: (event: { preventDefault: () => void }) => void } }
         | undefined;
 
       // Act
       await act(async () => {
-        options?.action?.onClick({});
+        options?.action?.onClick({ preventDefault: vi.fn() });
       });
 
       // Assert
@@ -462,11 +462,11 @@ describe('When useGrailStore is used', () => {
       expect(useGrailStore.getState().settings.theme).toBe('light');
       expect(useGrailStore.getState().settings.showItemIcons).toBe(false);
       const options = toastError.mock.calls[0]?.[1] as
-        | { action?: { onClick: (event: unknown) => void } }
+        | { action?: { onClick: (event: { preventDefault: () => void }) => void } }
         | undefined;
       mockElectronAPI.grail.updateSettings.mockResolvedValueOnce({ success: true });
       await act(async () => {
-        options?.action?.onClick({});
+        options?.action?.onClick({ preventDefault: vi.fn() });
       });
       expect(mockElectronAPI.grail.updateSettings).toHaveBeenLastCalledWith({
         showItemIcons: true,
@@ -557,9 +557,9 @@ describe('When useGrailStore is used', () => {
      */
     const retryActionOf = (toastError: { mock: { calls: unknown[][] } }, callIndex: number) => {
       const options = toastError.mock.calls[callIndex]?.[1] as
-        | { action?: { onClick: (event: unknown) => void } }
+        | { action?: { onClick: (event: { preventDefault: () => void }) => void } }
         | undefined;
-      return () => options?.action?.onClick({});
+      return () => options?.action?.onClick({ preventDefault: vi.fn() });
     };
 
     it('If the failed key is saved again before Retry is clicked, Then Retry does not overwrite the newer value', async () => {
@@ -703,6 +703,98 @@ describe('When useGrailStore is used', () => {
         expect(useGrailStore.getState().settings.showItemIcons).toBe(true);
       },
     );
+
+    it('If a stale callback of a closed error toast fires after a newer failure, Then the newer toast keeps its Retry state', async () => {
+      // Arrange
+      const toastError = vi.spyOn(toast, 'error');
+      mockElectronAPI.grail.updateSettings
+        .mockRejectedValueOnce(new Error('database locked'))
+        .mockRejectedValueOnce(new Error('database locked'))
+        .mockResolvedValue({ success: true });
+      await act(async () => {
+        await useGrailStore.getState().setSettings({ theme: 'dark' });
+      });
+      const firstOptions = toastError.mock.calls[0]?.[1] as { id?: string; onDismiss?: () => void };
+      firstOptions.onDismiss?.();
+      await act(async () => {
+        await useGrailStore.getState().setSettings({ showItemIcons: true });
+      });
+      const secondOptions = toastError.mock.calls[1]?.[1] as { id?: string };
+      const retry = retryActionOf(toastError, 1);
+
+      // Act
+      firstOptions.onDismiss?.();
+      await act(async () => {
+        retry();
+      });
+
+      // Assert
+      expect(secondOptions.id).not.toBe(firstOptions.id);
+      expect(mockElectronAPI.grail.updateSettings).toHaveBeenLastCalledWith({
+        showItemIcons: true,
+      });
+    });
+
+    it('If a second failure arrives while the first toast is showing, Then the same toast is updated in place', async () => {
+      // Arrange
+      const toastError = vi.spyOn(toast, 'error');
+      mockElectronAPI.grail.updateSettings.mockRejectedValue(new Error('database locked'));
+
+      // Act
+      await act(async () => {
+        await useGrailStore.getState().setSettings({ theme: 'dark' });
+        await useGrailStore.getState().setSettings({ showItemIcons: true });
+      });
+
+      // Assert
+      const ids = toastError.mock.calls.map((call) => (call[1] as { id?: string }).id);
+      expect(ids).toHaveLength(2);
+      expect(ids[0]).toBe(ids[1]);
+    });
+
+    it('When Retry is clicked, Then the click default is prevented so the toast is not removed before the retry settles', async () => {
+      // Arrange
+      const toastError = vi.spyOn(toast, 'error');
+      mockElectronAPI.grail.updateSettings
+        .mockRejectedValueOnce(new Error('database locked'))
+        .mockResolvedValue({ success: true });
+      await act(async () => {
+        await useGrailStore.getState().setSettings({ theme: 'dark' });
+      });
+      const options = toastError.mock.calls[0]?.[1] as {
+        action?: { onClick: (event: { preventDefault: () => void }) => void };
+      };
+      const event = { preventDefault: vi.fn() };
+
+      // Act
+      await act(async () => {
+        options.action?.onClick(event);
+      });
+
+      // Assert
+      expect(event.preventDefault).toHaveBeenCalledTimes(1);
+    });
+
+    it('If a retry succeeds, Then the error toast is dismissed by id', async () => {
+      // Arrange
+      const toastError = vi.spyOn(toast, 'error');
+      const toastDismiss = vi.spyOn(toast, 'dismiss');
+      mockElectronAPI.grail.updateSettings
+        .mockRejectedValueOnce(new Error('database locked'))
+        .mockResolvedValue({ success: true });
+      await act(async () => {
+        await useGrailStore.getState().setSettings({ theme: 'dark' });
+      });
+      const toastId = (toastError.mock.calls[0]?.[1] as { id?: string }).id;
+
+      // Act
+      await act(async () => {
+        retryActionOf(toastError, 0)();
+      });
+
+      // Assert
+      expect(toastDismiss).toHaveBeenCalledWith(toastId);
+    });
 
     it('If showing the error toast throws, Then setSettings still resolves with the failure and the change stays reverted', async () => {
       // Arrange
