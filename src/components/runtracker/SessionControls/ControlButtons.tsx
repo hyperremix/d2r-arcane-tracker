@@ -1,6 +1,7 @@
-import { Loader2, Pause, Play, Square, StopCircle, Timer } from 'lucide-react';
+import { Globe, Loader2, Pause, Play, Square, StopCircle, Timer } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { translations } from '@/i18n/translations';
@@ -231,15 +232,17 @@ export function ControlButtons({
 
 interface ShortcutsInfoProps {
   shortcuts: RunTrackerShortcuts;
+  /** Whether the shortcuts are registered as OS-wide hotkeys (work while D2R is focused). */
+  globalHotkeysActive?: boolean;
 }
 
 /**
  * Compact reminder of the configured run tracker keyboard shortcuts.
  */
-export function ShortcutsInfo({ shortcuts }: ShortcutsInfoProps) {
+export function ShortcutsInfo({ shortcuts, globalHotkeysActive = false }: ShortcutsInfoProps) {
   const { t } = useTranslation();
   return (
-    <div className="rounded-md bg-muted p-3">
+    <div className="flex flex-wrap items-center gap-2 rounded-md bg-muted p-3">
       <p className="text-muted-foreground text-xs">
         <strong>{t(translations.runTracker.controls.shortcutsInfo)}</strong>{' '}
         {t(translations.runTracker.controls.shortcutsDetail, {
@@ -249,6 +252,12 @@ export function ShortcutsInfo({ shortcuts }: ShortcutsInfoProps) {
           endSession: shortcuts.endSession,
         })}
       </p>
+      {globalHotkeysActive && (
+        <Badge variant="outline">
+          <Globe aria-hidden="true" />
+          {t(translations.runTracker.controls.globalHotkeysActive)}
+        </Badge>
+      )}
     </div>
   );
 }

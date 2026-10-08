@@ -577,7 +577,42 @@ export type Settings = {
     endRun: string; // default: 'Ctrl+E'
     endSession: string; // default: 'Ctrl+Shift+E'
   };
+  runTrackerGlobalHotkeys?: boolean; // Whether run tracker shortcuts also work while other apps are focused (default: false)
 };
+
+/**
+ * Run tracker actions that can be bound to a keyboard shortcut.
+ */
+export type RunTrackerShortcutAction = 'startRun' | 'pauseRun' | 'endRun' | 'endSession';
+
+/**
+ * Outcome of registering a run tracker shortcut as a global hotkey.
+ * - `registered`: the hotkey is registered with the operating system.
+ * - `conflict`: another application (or another action) already uses the combination.
+ * - `unsupported`: the combination cannot be used globally (e.g. no Ctrl/Alt modifier).
+ */
+export type GlobalHotkeyRegistrationState = 'registered' | 'conflict' | 'unsupported';
+
+/**
+ * Registration result for a single run tracker shortcut.
+ */
+export interface GlobalHotkeyRegistration {
+  action: RunTrackerShortcutAction;
+  shortcut: string;
+  state: GlobalHotkeyRegistrationState;
+}
+
+/**
+ * Current state of the run tracker global hotkeys.
+ */
+export interface GlobalHotkeyStatus {
+  /** Whether the user enabled global hotkeys in the settings. */
+  enabled: boolean;
+  /** Result of the most recent registration attempt per action (empty when disabled). */
+  registrations: GlobalHotkeyRegistration[];
+  /** True when the run tracker service is unavailable, so no global hotkeys can be registered. */
+  unavailable?: boolean;
+}
 
 /**
  * Type representing a setting as stored in the database.

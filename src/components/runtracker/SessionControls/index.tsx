@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
+import { isGlobalHotkeysActive, useGlobalHotkeyStatus } from '@/hooks/useGlobalHotkeyStatus';
 import { useNow } from '@/hooks/useNow';
 import { translations } from '@/i18n/translations';
 import { matchesShortcut } from '@/lib/hotkeys';
@@ -119,6 +120,7 @@ export function SessionControls() {
 
   const isWindows = window.electronAPI?.platform === 'win32';
   const autoModeEnabled = (settings.runTrackerMemoryReading ?? false) && isWindows;
+  const globalHotkeysActive = isGlobalHotkeysActive(useGlobalHotkeyStatus());
 
   const [showEndRunDialog, setShowEndRunDialog] = useState(false);
   const [showEndSessionDialog, setShowEndSessionDialog] = useState(false);
@@ -126,6 +128,10 @@ export function SessionControls() {
     available: boolean;
     reason: string | null;
   } | null>(null);
+
+  // Runs are only tracked automatically while memory reading is not known to be unavailable;
+  // otherwise the manual run controls stay usable so the user is not left without a way to track runs
+  const autoTrackingActive = autoModeEnabled && memoryStatus?.available !== false;
 
   // Fetch memory status on mount
   useEffect(() => {
@@ -204,21 +210,21 @@ export function SessionControls() {
     [activeSession, activeRun, runs],
   );
 
-  // Keyboard shortcut handlers
+  // Keyboard shortcut handlers (gated on auto mode like the buttons; End Session stays allowed)
   const handleStartRunShortcut = useCallback(
     (event: KeyboardEvent) => {
       event.preventDefault();
-      if (activeSession && !activeRun && !controlsBusy) {
+      if (activeSession && !activeRun && !controlsBusy && !autoTrackingActive) {
         handleStartRun();
       }
     },
-    [activeSession, activeRun, controlsBusy, handleStartRun],
+    [activeSession, activeRun, controlsBusy, autoTrackingActive, handleStartRun],
   );
 
   const handlePauseResumeShortcut = useCallback(
     (event: KeyboardEvent) => {
       event.preventDefault();
-      if (activeRun && !controlsBusy) {
+      if (activeRun && !controlsBusy && !autoTrackingActive) {
         if (isPaused) {
           handleResumeRun();
         } else {
@@ -226,17 +232,17 @@ export function SessionControls() {
         }
       }
     },
-    [activeRun, isPaused, controlsBusy, handlePauseRun, handleResumeRun],
+    [activeRun, isPaused, controlsBusy, autoTrackingActive, handlePauseRun, handleResumeRun],
   );
 
   const handleEndRunShortcut = useCallback(
     (event: KeyboardEvent) => {
       event.preventDefault();
-      if (activeRun && !controlsBusy) {
+      if (activeRun && !controlsBusy && !autoTrackingActive) {
         setShowEndRunDialog(true);
       }
     },
-    [activeRun, controlsBusy],
+    [activeRun, controlsBusy, autoTrackingActive],
   );
 
   const handleEndSessionShortcut = useCallback(
@@ -292,10 +298,6 @@ export function SessionControls() {
       document.removeEventListener('keydown', handleKeyDown);
     };
   }, [handleKeyDown]);
-
-  // Runs are only tracked automatically while memory reading is not known to be unavailable;
-  // otherwise the manual run controls stay usable so the user is not left without a way to track runs
-  const autoTrackingActive = autoModeEnabled && memoryStatus?.available !== false;
 
   // Determine button states
   const canStartRun = Boolean(activeSession && !activeRun && !controlsBusy && !autoTrackingActive);
@@ -395,7 +397,7 @@ export function SessionControls() {
               />
             )}
 
-            <ShortcutsInfo shortcuts={shortcuts} />
+            <ShortcutsInfo shortcuts={shortcuts} globalHotkeysActive={globalHotkeysActive} />
           </div>
         </CardContent>
       </Card>

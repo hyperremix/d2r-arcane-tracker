@@ -1,11 +1,82 @@
 import { ipcMain, webContents } from 'electron';
 import { type GrailDatabase, grailDatabase } from '../database/database';
 import type { Difficulty, GrailProgress, Item, Settings } from '../types/grail';
+import { RUN_TRACKER_SHORTCUT_ACTIONS } from '../utils/runTrackerShortcuts';
 
 /**
  * Global database instance for grail operations.
  */
 let grailDB: GrailDatabase;
+
+/**
+ * Main-process listeners notified after settings were persisted via IPC.
+ */
+const settingsUpdatedListeners = new Set<(settings: Partial<Settings>) => void>();
+
+/**
+ * Registers a main-process listener that is called after settings are updated from the renderer.
+ * @param listener - Called with the partial settings that were saved
+ * @returns Function that removes the listener
+ */
+export function addSettingsUpdatedListener(
+  listener: (settings: Partial<Settings>) => void,
+): () => void {
+  settingsUpdatedListeners.add(listener);
+  return () => {
+    settingsUpdatedListeners.delete(listener);
+  };
+}
+
+/**
+ * Notifies main-process listeners about saved settings; a failing listener does not affect others.
+ * @param settings - The partial settings that were saved
+ */
+function notifySettingsUpdatedListeners(settings: Partial<Settings>): void {
+  for (const listener of settingsUpdatedListeners) {
+    try {
+      listener(settings);
+    } catch (error) {
+      console.error('Settings updated listener failed:', error);
+    }
+  }
+}
+
+/**
+ * Validates renderer-provided settings whose type affects main-process behavior.
+ * @param settings - The partial settings received over IPC
+ * @throws Error if a validated setting has an invalid type
+ */
+function validateSettingsUpdate(settings: Partial<Settings>): void {
+  if (
+    settings.runTrackerGlobalHotkeys !== undefined &&
+    typeof settings.runTrackerGlobalHotkeys !== 'boolean'
+  ) {
+    throw new Error('Invalid runTrackerGlobalHotkeys setting: expected a boolean');
+  }
+
+  if (
+    settings.runTrackerShortcuts !== undefined &&
+    !isValidRunTrackerShortcuts(settings.runTrackerShortcuts)
+  ) {
+    throw new Error(
+      'Invalid runTrackerShortcuts setting: expected an object with a non-empty string for each shortcut action',
+    );
+  }
+}
+
+/**
+ * Checks that a renderer-provided shortcut mapping has a non-empty string for every action.
+ * @param value - The untrusted runTrackerShortcuts value received over IPC
+ * @returns True if the value is a complete shortcut mapping
+ */
+function isValidRunTrackerShortcuts(value: unknown): boolean {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    return false;
+  }
+
+  const shortcuts = value as Record<string, unknown>;
+  return RUN_TRACKER_SHORTCUT_ACTIONS.every((action) => isNonEmptyString(shortcuts[action]));
+}
 
 /**
  * Converts a setting value to a string suitable for database storage.
@@ -309,6 +380,8 @@ export function initializeGrailHandlers(): void {
    */
   ipcMain.handle('grail:updateSettings', async (_, settings: Partial<Settings>) => {
     try {
+      validateSettingsUpdate(settings);
+
       for (const key in settings) {
         const settingsKey = key as keyof Settings;
         const value = settings[settingsKey];
@@ -327,6 +400,8 @@ export function initializeGrailHandlers(): void {
           wc.send('settings-updated', settings);
         }
       }
+
+      notifySettingsUpdatedListeners(settings);
 
       return { success: true };
     } catch (error) {

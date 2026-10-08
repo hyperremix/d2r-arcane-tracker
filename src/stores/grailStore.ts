@@ -134,6 +134,7 @@ const defaultSettings: Settings = {
     endRun: 'Ctrl+E',
     endSession: 'Ctrl+Shift+E',
   },
+  runTrackerGlobalHotkeys: false,
 };
 
 /**

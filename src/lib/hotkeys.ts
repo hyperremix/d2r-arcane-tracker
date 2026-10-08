@@ -11,6 +11,9 @@ interface ParsedShortcut {
 
 const MODIFIER_KEYS = new Set(['control', 'shift', 'alt', 'meta']);
 const PRIMARY_MODIFIER_LABEL = 'Ctrl';
+// A trailing "+" after the start or a separator (e.g. "Ctrl++") is the plus key, not a separator.
+// Mirrors the conversion in electron/services/globalHotkeys.ts.
+const TRAILING_PLUS_KEY_PATTERN = /(^|\+)(\s*)\+\s*$/;
 
 const SPECIAL_KEY_ALIASES: Record<string, string> = {
   space: ' ',
@@ -123,7 +126,8 @@ const eventHasPrimaryModifier = (event: KeyboardEventLike, isMac: boolean) =>
   isMac ? event.metaKey : event.ctrlKey;
 
 export const parseShortcut = (shortcut: string): ParsedShortcut => {
-  const parts = shortcut
+  const hasTrailingPlusKey = TRAILING_PLUS_KEY_PATTERN.test(shortcut);
+  const parts = (hasTrailingPlusKey ? shortcut.replace(TRAILING_PLUS_KEY_PATTERN, '$1') : shortcut)
     .split('+')
     .map((part) => normalizeToken(part))
     .filter(Boolean);
@@ -145,6 +149,10 @@ export const parseShortcut = (shortcut: string): ParsedShortcut => {
     if (!key) {
       key = normalizeShortcutKeyToken(part);
     }
+  }
+
+  if (!key && hasTrailingPlusKey) {
+    key = '+';
   }
 
   return {
