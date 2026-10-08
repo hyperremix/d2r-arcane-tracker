@@ -42,6 +42,16 @@ const TAILWIND_PALETTE = [
   'stone',
 ];
 
+const RAW_PALETTE_PATTERN = new RegExp(
+  `${CLASS_START}${COLOR_UTILITY_PREFIX}-(?:${TAILWIND_PALETTE.join('|')})-\\d{2,3}(?:\\/\\d+)?${CLASS_END}`,
+  'g',
+);
+
+const ARBITRARY_HEX_PATTERN = new RegExp(
+  `${CLASS_START}${COLOR_UTILITY_PREFIX}-\\[#[0-9a-fA-F]{3,8}\\]`,
+  'g',
+);
+
 interface Violation {
   location: string;
   className: string;
@@ -53,27 +63,32 @@ function collectSourceFiles(dir: string): string[] {
     if (entry.isDirectory()) {
       return collectSourceFiles(fullPath);
     }
-    const isSource = /\.tsx?$/.test(entry.name) && !/\.test\.tsx?$/.test(entry.name);
+    const isSource = /\.(?:tsx?|css)$/.test(entry.name) && !/\.test\.tsx?$/.test(entry.name);
     return isSource ? [fullPath] : [];
   });
 }
 
-function findViolations(pattern: RegExp, isViolation: (match: RegExpMatchArray) => boolean) {
+function findViolationsInText(
+  text: string,
+  location: string,
+  pattern: RegExp,
+  isViolation: (match: RegExpMatchArray) => boolean,
+) {
   const violations: Violation[] = [];
-  for (const file of collectSourceFiles(srcDir)) {
-    const lines = readFileSync(file, 'utf8').split('\n');
-    lines.forEach((line, index) => {
-      for (const match of line.matchAll(pattern)) {
-        if (isViolation(match)) {
-          violations.push({
-            location: `${relative(srcDir, file)}:${index + 1}`,
-            className: match[0],
-          });
-        }
+  text.split('\n').forEach((line, index) => {
+    for (const match of line.matchAll(pattern)) {
+      if (isViolation(match)) {
+        violations.push({ location: `${location}:${index + 1}`, className: match[0] });
       }
-    });
-  }
+    }
+  });
   return violations;
+}
+
+function findViolations(pattern: RegExp, isViolation: (match: RegExpMatchArray) => boolean) {
+  return collectSourceFiles(srcDir).flatMap((file) =>
+    findViolationsInText(readFileSync(file, 'utf8'), relative(srcDir, file), pattern, isViolation),
+  );
 }
 
 function getDefinedThemeColors(): Set<string> {
@@ -82,15 +97,22 @@ function getDefinedThemeColors(): Set<string> {
 }
 
 describe('When scanning renderer source files for color utilities', () => {
-  it('If a class sets a color, Then it does not use a raw Tailwind palette color', () => {
+  it('If stylesheets exist in the renderer, Then they are included in the scan', () => {
     // Arrange
-    const pattern = new RegExp(
-      `${CLASS_START}${COLOR_UTILITY_PREFIX}-(?:${TAILWIND_PALETTE.join('|')})-\\d{2,3}(?:\\/\\d+)?${CLASS_END}`,
-      'g',
-    );
+    const expected = join(srcDir, 'index.css');
 
     // Act
-    const violations = findViolations(pattern, () => true);
+    const files = collectSourceFiles(srcDir);
+
+    // Assert
+    expect(files).toContain(expected);
+  });
+
+  it('If a class sets a color, Then it does not use a raw Tailwind palette color', () => {
+    // Arrange
+
+    // Act
+    const violations = findViolations(RAW_PALETTE_PATTERN, () => true);
 
     // Assert
     expect(violations).toEqual([]);
@@ -98,13 +120,9 @@ describe('When scanning renderer source files for color utilities', () => {
 
   it('If a class sets a color, Then it does not use an arbitrary hex value', () => {
     // Arrange
-    const pattern = new RegExp(
-      `${CLASS_START}${COLOR_UTILITY_PREFIX}-\\[#[0-9a-fA-F]{3,8}\\]`,
-      'g',
-    );
 
     // Act
-    const violations = findViolations(pattern, () => true);
+    const violations = findViolations(ARBITRARY_HEX_PATTERN, () => true);
 
     // Assert
     expect(violations).toEqual([]);
@@ -128,6 +146,48 @@ describe('When scanning renderer source files for color utilities', () => {
 
     // Assert
     expect(definedColors.has('success')).toBe(true);
+    expect(violations).toEqual([]);
+  });
+});
+
+describe('When scanning stylesheet text for color utilities', () => {
+  it('If an @apply directive uses a raw palette utility, Then it is reported', () => {
+    // Arrange
+    const css = '.card {\n  @apply bg-muted text-red-500 hover:bg-blue-600/50;\n}';
+
+    // Act
+    const violations = findViolationsInText(css, 'sample.css', RAW_PALETTE_PATTERN, () => true);
+
+    // Assert
+    expect(violations).toEqual([
+      { location: 'sample.css:2', className: 'text-red-500' },
+      { location: 'sample.css:2', className: 'bg-blue-600/50' },
+    ]);
+  });
+
+  it('If an @apply directive uses an arbitrary hex value, Then it is reported', () => {
+    // Arrange
+    const css = '.card {\n  @apply border-[#ff0000];\n}';
+
+    // Act
+    const violations = findViolationsInText(css, 'sample.css', ARBITRARY_HEX_PATTERN, () => true);
+
+    // Assert
+    expect(violations).toEqual([{ location: 'sample.css:2', className: 'border-[#ff0000]' }]);
+  });
+
+  it('If a stylesheet defines theme color variables or uses theme tokens, Then nothing is reported', () => {
+    // Arrange
+    const css =
+      ':root {\n  --color-gray-500: #6b7280;\n}\n.card {\n  @apply bg-muted text-foreground/80;\n}';
+
+    // Act
+    const violations = [
+      ...findViolationsInText(css, 'sample.css', RAW_PALETTE_PATTERN, () => true),
+      ...findViolationsInText(css, 'sample.css', ARBITRARY_HEX_PATTERN, () => true),
+    ];
+
+    // Assert
     expect(violations).toEqual([]);
   });
 });
