@@ -26,7 +26,7 @@ export interface ErrorFallbackProps {
   className?: string;
 }
 
-type CopyStatus = 'idle' | 'copied' | 'failed';
+type ActionStatus = 'idle' | 'copied' | 'copyFailed' | 'reportFailed';
 
 /**
  * Converts any thrown value into displayable error details.
@@ -94,7 +94,7 @@ export function ErrorFallback({
 }: ErrorFallbackProps) {
   const { t } = useTranslation();
   const headingRef = useRef<HTMLHeadingElement>(null);
-  const [copyStatus, setCopyStatus] = useState<CopyStatus>('idle');
+  const [actionStatus, setActionStatus] = useState<ActionStatus>('idle');
 
   // Move focus to the heading so keyboard and screen reader users land on the error.
   useEffect(() => {
@@ -105,18 +105,26 @@ export function ErrorFallback({
     try {
       const appVersion = await getAppVersion();
       await navigator.clipboard.writeText(buildErrorReport(t, details, appVersion));
-      setCopyStatus('copied');
+      setActionStatus('copied');
     } catch (error) {
       console.error('Failed to copy error details:', error);
-      setCopyStatus('failed');
+      setActionStatus('copyFailed');
     }
   }, [t, details]);
 
   const handleReport = useCallback(async () => {
     try {
-      await window.electronAPI?.shell.openExternal(ISSUE_TRACKER_URL);
+      // The main process resolves `{ success: false }` instead of rejecting when the URL can't be opened.
+      const result = await window.electronAPI?.shell.openExternal(ISSUE_TRACKER_URL);
+      if (!result?.success) {
+        console.error('Failed to open issue tracker:', result?.error);
+        setActionStatus('reportFailed');
+        return;
+      }
+      setActionStatus('idle');
     } catch (error) {
       console.error('Failed to open issue tracker:', error);
+      setActionStatus('reportFailed');
     }
   }, []);
 
@@ -204,11 +212,14 @@ export function ErrorFallback({
             aria-live="polite"
             className={cn(
               'block min-h-4 text-center text-xs',
-              copyStatus === 'failed' ? 'text-destructive' : 'text-muted-foreground',
+              actionStatus === 'copyFailed' || actionStatus === 'reportFailed'
+                ? 'text-destructive'
+                : 'text-muted-foreground',
             )}
           >
-            {copyStatus === 'copied' && t(translations.errorBoundary.copySuccess)}
-            {copyStatus === 'failed' && t(translations.errorBoundary.copyFailed)}
+            {actionStatus === 'copied' && t(translations.errorBoundary.copySuccess)}
+            {actionStatus === 'copyFailed' && t(translations.errorBoundary.copyFailed)}
+            {actionStatus === 'reportFailed' && t(translations.errorBoundary.reportFailed)}
           </output>
 
           <p className="text-center text-muted-foreground text-xs">

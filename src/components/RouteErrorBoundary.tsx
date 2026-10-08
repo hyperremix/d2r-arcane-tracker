@@ -1,9 +1,9 @@
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { isRouteErrorResponse, useLocation, useNavigate, useRouteError } from 'react-router';
+import { type ErrorDetails, ErrorFallback, toErrorDetails } from '@/components/ErrorFallback';
 import { translations } from '@/i18n/translations';
 import { cn } from '@/lib/utils';
-import { type ErrorDetails, ErrorFallback, toErrorDetails } from './ErrorFallback';
 
 export interface RouteErrorBoundaryProps {
   /** Fill the whole window instead of the page area (used when the layout itself failed). */

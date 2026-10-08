@@ -105,6 +105,42 @@ describe('When a component outside the router throws', () => {
     );
   });
 
+  it('If the main process reports the issue tracker could not be opened, Then a failure message is shown', async () => {
+    // Arrange
+    mockElectronAPI.shell.openExternal.mockResolvedValue({ success: false, error: 'no browser' });
+    renderBoundary();
+
+    // Act
+    fireEvent.click(screen.getByRole('button', { name: 'Report Issue' }));
+
+    // Assert
+    expect(await screen.findByText("Couldn't open the issue tracker")).toBeInTheDocument();
+  });
+
+  it('If opening the issue tracker rejects, Then a failure message is shown', async () => {
+    // Arrange
+    mockElectronAPI.shell.openExternal.mockRejectedValue(new Error('ipc failed'));
+    renderBoundary();
+
+    // Act
+    fireEvent.click(screen.getByRole('button', { name: 'Report Issue' }));
+
+    // Assert
+    expect(await screen.findByText("Couldn't open the issue tracker")).toBeInTheDocument();
+  });
+
+  it('If the Electron bridge is unavailable, Then reporting shows a failure message', async () => {
+    // Arrange
+    setElectronAPI(undefined);
+    renderBoundary();
+
+    // Act
+    fireEvent.click(screen.getByRole('button', { name: 'Report Issue' }));
+
+    // Assert
+    expect(await screen.findByText("Couldn't open the issue tracker")).toBeInTheDocument();
+  });
+
   it('If the cause is fixed and the user tries to recover, Then the children render again', () => {
     // Arrange
     renderBoundary();

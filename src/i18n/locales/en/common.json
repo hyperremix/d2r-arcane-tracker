@@ -660,6 +660,7 @@
     "copySuccess": "Error details copied to clipboard",
     "copyFailed": "Couldn't copy the error details",
     "reportIssue": "Report Issue",
+    "reportFailed": "Couldn't open the issue tracker",
     "persistHelp": "If this error persists, copy the error details and paste them into a new issue on GitHub."
   },
   "runeword": {
