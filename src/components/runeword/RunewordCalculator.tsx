@@ -48,12 +48,16 @@ async function loadAvailableRunes(): Promise<Record<string, number>> {
 
 type BroaderAvailability = Exclude<RunewordAvailabilityFilter, 'craftable'>;
 
-const broaderAvailabilityFilters: BroaderAvailability[] = ['missingOne', 'all'];
+const availabilityFilters: RunewordAvailabilityFilter[] = ['craftable', 'missingOne', 'all'];
 
-const availabilityFilters: RunewordAvailabilityFilter[] = [
-  'craftable',
-  ...broaderAvailabilityFilters,
-];
+/**
+ * Tiers broader than each availability filter, in the order they are suggested.
+ */
+const broaderAvailabilityTiers: Record<RunewordAvailabilityFilter, BroaderAvailability[]> = {
+  craftable: ['missingOne', 'all'],
+  missingOne: ['all'],
+  all: [],
+};
 
 const availabilityLabelKeys: Record<RunewordAvailabilityFilter, string> = {
   craftable: translations.runeword.calculator.availability.craftable,
@@ -179,11 +183,8 @@ export function RunewordCalculator() {
 
   // Suggest the first broader tier that would reveal results under the active search and rune filters.
   const nextAvailability = useMemo(() => {
-    const broaderTiers = broaderAvailabilityFilters.slice(
-      availabilityFilters.indexOf(availability),
-    );
     const byName = filterRunewordsByName(allRunewords, searchTerm);
-    return broaderTiers.find(
+    return broaderAvailabilityTiers[availability].find(
       (tier) => filterRunewordsByRunes(byName, selectedRunes, tier, availableRunes).length > 0,
     );
   }, [allRunewords, searchTerm, selectedRunes, availability, availableRunes]);

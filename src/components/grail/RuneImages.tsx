@@ -182,7 +182,10 @@ function RuneImage({
         className="relative flex items-center justify-center"
       >
         {isLoading ? (
-          <div className="absolute inset-0 animate-pulse rounded bg-muted" />
+          <>
+            <div className="absolute inset-0 animate-pulse rounded bg-muted" />
+            {isMissing && <span className="sr-only">{missingLabel}</span>}
+          </>
         ) : imageUrl ? (
           <div className={cn('relative', isMissing && 'rounded-lg bg-missing/50 p-1')}>
             <div className="flex flex-col items-center justify-center">
@@ -217,10 +220,14 @@ function RuneImage({
   );
 }
 
+interface MissingRuneMarkerProps {
+  label: string;
+}
+
 /**
  * Non-color indicator for a missing rune: a cross icon plus screen-reader text.
  */
-function MissingRuneMarker({ label }: { label: string }) {
+function MissingRuneMarker({ label }: MissingRuneMarkerProps) {
   return (
     <>
       <span

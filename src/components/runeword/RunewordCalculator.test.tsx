@@ -1,6 +1,7 @@
 import '@testing-library/jest-dom';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import type { Item } from 'electron/types/grail';
+import { toast } from 'sonner';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { RunewordCalculator } from './RunewordCalculator';
 
@@ -295,6 +296,26 @@ describe('RunewordCalculator', () => {
     });
   });
 
+  describe('missing runes', () => {
+    it('When a runeword card lacks a rune, then the missing rune shows a marker and Missing text inside that card', async () => {
+      // Arrange
+      stubElectronApi({ availableRunes: { jah: 1, ith: 1 } });
+      await renderCalculator();
+
+      // Act
+      fireEvent.click(screen.getByRole('button', { name: 'Missing ≤ 1' }));
+
+      // Assert
+      const enigmaCard = screen
+        .getByRole('heading', { name: 'Enigma' })
+        .closest('[data-slot="card"]') as HTMLElement;
+      await waitFor(() =>
+        expect(within(enigmaCard).getAllByTestId('missing-rune-marker')).toHaveLength(1),
+      );
+      expect(within(enigmaCard).getByText('Missing')).toHaveClass('sr-only');
+    });
+  });
+
   describe('refresh', () => {
     it('When Refresh runes is clicked, then save files are rescanned and rune counts reloaded', async () => {
       // Arrange
@@ -308,6 +329,54 @@ describe('RunewordCalculator', () => {
       // Assert
       await waitFor(() => expect(getCardTitles()).toEqual(['Filter by Runes', 'Steel']));
       expect(api.saveFile.refreshSaveFiles).toHaveBeenCalledTimes(2);
+    });
+
+    it('While a refresh is pending, then current results stay visible and the button is busy until it resolves', async () => {
+      // Arrange
+      const api = stubElectronApi();
+      await renderCalculator();
+      let resolveRefresh: (value: { success: boolean }) => void = () => undefined;
+      api.saveFile.refreshSaveFiles.mockReturnValue(
+        new Promise((resolve) => {
+          resolveRefresh = resolve;
+        }),
+      );
+
+      // Act
+      fireEvent.click(screen.getByRole('button', { name: 'Refresh runes' }));
+
+      // Assert
+      const refreshButton = screen.getByRole('button', { name: 'Refresh runes' });
+      expect(refreshButton).toBeDisabled();
+      expect(refreshButton).toHaveAttribute('aria-busy', 'true');
+      expect(getCardTitles()).toEqual(['Filter by Runes', 'Stealth', 'Steel']);
+
+      // Act
+      resolveRefresh({ success: true });
+
+      // Assert
+      await waitFor(() => expect(refreshButton).toBeEnabled());
+      expect(refreshButton).toHaveAttribute('aria-busy', 'false');
+      expect(getCardTitles()).toEqual(['Filter by Runes', 'Stealth', 'Steel']);
+    });
+
+    it('If a refresh fails, then an error toast is shown, the button is re-enabled and results remain', async () => {
+      // Arrange
+      const api = stubElectronApi();
+      await renderCalculator();
+      const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+      api.saveFile.refreshSaveFiles.mockRejectedValue(new Error('scan failed'));
+
+      // Act
+      fireEvent.click(screen.getByRole('button', { name: 'Refresh runes' }));
+
+      // Assert
+      await waitFor(() =>
+        expect(toast.error).toHaveBeenCalledWith('Failed to refresh runes from save files'),
+      );
+      expect(screen.getByRole('button', { name: 'Refresh runes' })).toBeEnabled();
+      expect(getCardTitles()).toEqual(['Filter by Runes', 'Stealth', 'Steel']);
+      consoleError.mockRestore();
     });
   });
 });
