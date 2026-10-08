@@ -49,7 +49,6 @@ describe.each(['grid', 'list'] as const)('When an ItemCard is rendered in %s vie
       // Arrange
       const item = HolyGrailItemBuilder.new().withName('Windforce').build();
       render(<ItemCard item={item} viewMode={viewMode} />);
-      expect(screen.getByText('Windforce')).toBeInTheDocument();
       const rendersAfterMount = renderCounter.itemIconCalls;
 
       // Act
@@ -63,6 +62,7 @@ describe.each(['grid', 'list'] as const)('When an ItemCard is rendered in %s vie
       });
 
       // Assert
+      expect(screen.getByText('Windforce')).toBeInTheDocument();
       expect(rendersAfterMount).toBeGreaterThan(0);
       expect(renderCounter.itemIconCalls).toBe(rendersAfterMount);
     });

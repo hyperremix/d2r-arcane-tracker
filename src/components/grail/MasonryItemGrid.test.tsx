@@ -710,8 +710,10 @@ describe('When GroupedMasonryGrid rows are measured', () => {
   });
 
   /**
-   * Stubs layout so that every row is as tall as the number of cards it holds (100px per card plus
-   * 20px row padding, 50px per header), like a real browser where wider rows are taller.
+   * Stubs layout with a deliberately artificial height model: a row's height is proportional to the
+   * number of cards it holds (100px per card plus 20px row padding, 50px per header). A real CSS
+   * grid row is only as tall as its tallest card; this model is chosen so that a column-count
+   * change yields a distinguishable total height.
    */
   function stubRowHeights() {
     vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockImplementation(() => containerWidth);
