@@ -7,7 +7,7 @@ vi.mock('@/stores/grailStore', () => ({
   useGrailStore: vi.fn(),
 }));
 
-import { RESOLVED_THEME_STORAGE_KEY } from '@/lib/theme';
+import { THEME_PREFERENCE_STORAGE_KEY } from '@/lib/theme';
 import { useGrailStore } from '@/stores/grailStore';
 import { useResolvedTheme, useTheme } from './useTheme';
 
@@ -45,7 +45,7 @@ describe('When useTheme hook is used', () => {
   beforeEach(() => {
     // Reset document classes and the startup theme cache
     document.documentElement.className = '';
-    localStorage.removeItem(RESOLVED_THEME_STORAGE_KEY);
+    localStorage.removeItem(THEME_PREFERENCE_STORAGE_KEY);
 
     // Setup event listener mocks
     mockAddEventListener = vi.fn();
@@ -59,7 +59,7 @@ describe('When useTheme hook is used', () => {
 
   afterEach(() => {
     vi.clearAllMocks();
-    localStorage.removeItem(RESOLVED_THEME_STORAGE_KEY);
+    localStorage.removeItem(THEME_PREFERENCE_STORAGE_KEY);
     // Tests share one window (isolate: false), so don't leak the mock to other files
     window.matchMedia = originalMatchMedia;
   });
@@ -255,8 +255,8 @@ describe('When useTheme hook is used', () => {
     });
   });
 
-  describe('If settings have loaded', () => {
-    it('Then should cache the resolved theme for the next startup', () => {
+  describe('If settings have loaded with an explicit theme', () => {
+    it('Then should cache that preference for the next startup', () => {
       // Arrange
       mockStore('dark');
 
@@ -264,14 +264,29 @@ describe('When useTheme hook is used', () => {
       renderHook(() => useTheme());
 
       // Assert
-      expect(localStorage.getItem(RESOLVED_THEME_STORAGE_KEY)).toBe('dark');
+      expect(localStorage.getItem(THEME_PREFERENCE_STORAGE_KEY)).toBe('dark');
     });
   });
 
-  describe('If settings have not loaded yet and a theme was cached', () => {
+  describe('If settings have loaded with the system theme and the OS prefers dark', () => {
+    it('Then should cache system rather than the resolved dark theme', () => {
+      // Arrange
+      mockStore('system');
+      mockSystemPrefersDark(true);
+
+      // Act
+      renderHook(() => useTheme());
+
+      // Assert
+      expect(document.documentElement.classList.contains('dark')).toBe(true);
+      expect(localStorage.getItem(THEME_PREFERENCE_STORAGE_KEY)).toBe('system');
+    });
+  });
+
+  describe('If settings have not loaded yet and an explicit theme was cached', () => {
     it('Then should keep the cached theme instead of the default and not overwrite the cache', () => {
       // Arrange
-      localStorage.setItem(RESOLVED_THEME_STORAGE_KEY, 'dark');
+      localStorage.setItem(THEME_PREFERENCE_STORAGE_KEY, 'dark');
       mockStore('system', false);
       mockSystemPrefersDark(false);
 
@@ -280,7 +295,24 @@ describe('When useTheme hook is used', () => {
 
       // Assert
       expect(document.documentElement.classList.contains('dark')).toBe(true);
-      expect(localStorage.getItem(RESOLVED_THEME_STORAGE_KEY)).toBe('dark');
+      expect(localStorage.getItem(THEME_PREFERENCE_STORAGE_KEY)).toBe('dark');
+    });
+  });
+
+  describe('If settings have not loaded yet and system was cached while the OS now prefers light', () => {
+    it('Then should re-resolve against the current OS preference', () => {
+      // Arrange
+      localStorage.setItem(THEME_PREFERENCE_STORAGE_KEY, 'system');
+      document.documentElement.classList.add('dark');
+      mockStore('system', false);
+      mockSystemPrefersDark(false);
+
+      // Act
+      renderHook(() => useTheme());
+
+      // Assert
+      expect(document.documentElement.classList.contains('dark')).toBe(false);
+      expect(localStorage.getItem(THEME_PREFERENCE_STORAGE_KEY)).toBe('system');
     });
   });
 
@@ -295,14 +327,14 @@ describe('When useTheme hook is used', () => {
 
       // Assert
       expect(document.documentElement.classList.contains('dark')).toBe(true);
-      expect(localStorage.getItem(RESOLVED_THEME_STORAGE_KEY)).toBeNull();
+      expect(localStorage.getItem(THEME_PREFERENCE_STORAGE_KEY)).toBeNull();
     });
   });
 
   describe('If settings load after startup with a different theme than cached', () => {
     it('Then should switch to the loaded theme and update the cache', () => {
       // Arrange
-      localStorage.setItem(RESOLVED_THEME_STORAGE_KEY, 'dark');
+      localStorage.setItem(THEME_PREFERENCE_STORAGE_KEY, 'dark');
       mockStore('system', false);
       const { rerender } = renderHook(() => useTheme());
       expect(document.documentElement.classList.contains('dark')).toBe(true);
@@ -313,7 +345,7 @@ describe('When useTheme hook is used', () => {
 
       // Assert
       expect(document.documentElement.classList.contains('dark')).toBe(false);
-      expect(localStorage.getItem(RESOLVED_THEME_STORAGE_KEY)).toBe('light');
+      expect(localStorage.getItem(THEME_PREFERENCE_STORAGE_KEY)).toBe('light');
     });
   });
 
@@ -349,7 +381,7 @@ describe('When useResolvedTheme hook is used', () => {
   const originalMatchMedia = window.matchMedia;
 
   beforeEach(() => {
-    localStorage.removeItem(RESOLVED_THEME_STORAGE_KEY);
+    localStorage.removeItem(THEME_PREFERENCE_STORAGE_KEY);
     window.matchMedia = vi.fn().mockReturnValue({
       matches: true,
       addEventListener: vi.fn(),

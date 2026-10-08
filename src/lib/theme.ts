@@ -11,9 +11,10 @@ export type ResolvedTheme = 'light' | 'dark';
 export const SYSTEM_DARK_QUERY = '(prefers-color-scheme: dark)';
 
 /**
- * localStorage key holding the last resolved theme, used to apply the theme before settings load.
+ * localStorage key holding the last theme preference, used to apply the theme before settings load.
+ * The preference (not the resolved theme) is cached so `system` can be re-resolved on each startup.
  */
-export const RESOLVED_THEME_STORAGE_KEY = 'd2r-arcane-tracker:resolved-theme';
+export const THEME_PREFERENCE_STORAGE_KEY = 'd2r-arcane-tracker:theme-preference';
 
 /**
  * Window chrome colors (Windows title bar overlay) per resolved theme.
@@ -51,32 +52,32 @@ export function getSystemPrefersDark(): boolean {
 }
 
 /**
- * Reads the last resolved theme cached by a previous session.
+ * Reads the theme preference cached by a previous session.
  * @param {Pick<Storage, 'getItem'>} [storage] - Storage to read from (defaults to localStorage)
- * @returns {ResolvedTheme | undefined} The cached theme, or undefined if missing, invalid or unreadable
+ * @returns {Settings['theme'] | undefined} The cached preference, or undefined if missing, invalid or unreadable
  */
-export function readCachedResolvedTheme(
+export function readCachedThemePreference(
   storage: Pick<Storage, 'getItem'> | undefined = getLocalStorage(),
-): ResolvedTheme | undefined {
+): Settings['theme'] | undefined {
   try {
-    const value = storage?.getItem(RESOLVED_THEME_STORAGE_KEY);
-    return value === 'light' || value === 'dark' ? value : undefined;
+    const value = storage?.getItem(THEME_PREFERENCE_STORAGE_KEY);
+    return value === 'light' || value === 'dark' || value === 'system' ? value : undefined;
   } catch {
     return undefined;
   }
 }
 
 /**
- * Caches the resolved theme so the next startup can apply it before settings load.
- * @param {ResolvedTheme} theme - The resolved theme to cache
+ * Caches the theme preference so the next startup can apply it before settings load.
+ * @param {Settings['theme']} theme - The theme preference to cache
  * @param {Pick<Storage, 'setItem'>} [storage] - Storage to write to (defaults to localStorage)
  */
-export function cacheResolvedTheme(
-  theme: ResolvedTheme,
+export function cacheThemePreference(
+  theme: Settings['theme'],
   storage: Pick<Storage, 'setItem'> | undefined = getLocalStorage(),
 ): void {
   try {
-    storage?.setItem(RESOLVED_THEME_STORAGE_KEY, theme);
+    storage?.setItem(THEME_PREFERENCE_STORAGE_KEY, theme);
   } catch {
     // Storage may be unavailable or full; the theme still applies, only the startup cache is lost
   }
@@ -95,11 +96,13 @@ export function applyThemeClass(
 }
 
 /**
- * Gets the theme to use before settings have loaded: the cached theme, else the OS preference.
+ * Gets the theme to use before settings have loaded: the cached preference resolved against the
+ * current OS preference (so `system` follows OS changes made while the app was closed), defaulting
+ * to `system` when nothing is cached.
  * @returns {ResolvedTheme} The best-guess theme for startup
  */
 export function getInitialResolvedTheme(): ResolvedTheme {
-  return readCachedResolvedTheme() ?? resolveTheme('system', getSystemPrefersDark());
+  return resolveTheme(readCachedThemePreference() ?? 'system', getSystemPrefersDark());
 }
 
 /**

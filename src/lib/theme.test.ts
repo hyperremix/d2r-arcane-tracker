@@ -2,11 +2,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   applyInitialTheme,
   applyThemeClass,
-  cacheResolvedTheme,
+  cacheThemePreference,
   getSystemPrefersDark,
-  RESOLVED_THEME_STORAGE_KEY,
-  readCachedResolvedTheme,
+  readCachedThemePreference,
   resolveTheme,
+  THEME_PREFERENCE_STORAGE_KEY,
 } from './theme';
 
 describe('When resolveTheme is called', () => {
@@ -35,33 +35,33 @@ describe('When resolveTheme is called', () => {
   });
 });
 
-describe('When the resolved theme cache is used', () => {
+describe('When the theme preference cache is used', () => {
   beforeEach(() => {
-    localStorage.removeItem(RESOLVED_THEME_STORAGE_KEY);
+    localStorage.removeItem(THEME_PREFERENCE_STORAGE_KEY);
   });
 
   afterEach(() => {
-    localStorage.removeItem(RESOLVED_THEME_STORAGE_KEY);
+    localStorage.removeItem(THEME_PREFERENCE_STORAGE_KEY);
   });
 
-  describe('If a theme was cached', () => {
-    it('Then should read the same theme back', () => {
+  describe('If a preference was cached', () => {
+    it.each(['light', 'dark', 'system'] as const)('Then should read %s back', (preference) => {
       // Arrange
-      cacheResolvedTheme('dark');
+      cacheThemePreference(preference);
 
       // Act
-      const cached = readCachedResolvedTheme();
+      const cached = readCachedThemePreference();
 
       // Assert
-      expect(localStorage.getItem(RESOLVED_THEME_STORAGE_KEY)).toBe('dark');
-      expect(cached).toBe('dark');
+      expect(localStorage.getItem(THEME_PREFERENCE_STORAGE_KEY)).toBe(preference);
+      expect(cached).toBe(preference);
     });
   });
 
   describe('If nothing was cached', () => {
     it('Then should return undefined', () => {
       // Arrange / Act
-      const cached = readCachedResolvedTheme();
+      const cached = readCachedThemePreference();
 
       // Assert
       expect(cached).toBeUndefined();
@@ -71,10 +71,10 @@ describe('When the resolved theme cache is used', () => {
   describe('If the cached value is invalid', () => {
     it('Then should return undefined', () => {
       // Arrange
-      localStorage.setItem(RESOLVED_THEME_STORAGE_KEY, 'purple');
+      localStorage.setItem(THEME_PREFERENCE_STORAGE_KEY, 'purple');
 
       // Act
-      const cached = readCachedResolvedTheme();
+      const cached = readCachedThemePreference();
 
       // Assert
       expect(cached).toBeUndefined();
@@ -94,8 +94,8 @@ describe('When the resolved theme cache is used', () => {
       };
 
       // Act / Assert
-      expect(readCachedResolvedTheme(failingStorage)).toBeUndefined();
-      expect(() => cacheResolvedTheme('dark', failingStorage)).not.toThrow();
+      expect(readCachedThemePreference(failingStorage)).toBeUndefined();
+      expect(() => cacheThemePreference('dark', failingStorage)).not.toThrow();
     });
   });
 });
@@ -112,19 +112,19 @@ describe('When the theme is applied before React mounts', () => {
 
   beforeEach(() => {
     document.documentElement.className = '';
-    localStorage.removeItem(RESOLVED_THEME_STORAGE_KEY);
+    localStorage.removeItem(THEME_PREFERENCE_STORAGE_KEY);
   });
 
   afterEach(() => {
     document.documentElement.className = '';
-    localStorage.removeItem(RESOLVED_THEME_STORAGE_KEY);
+    localStorage.removeItem(THEME_PREFERENCE_STORAGE_KEY);
     window.matchMedia = originalMatchMedia;
   });
 
   describe('If dark was cached and the OS prefers light', () => {
     it('Then should add the dark class from the cache', () => {
       // Arrange
-      localStorage.setItem(RESOLVED_THEME_STORAGE_KEY, 'dark');
+      localStorage.setItem(THEME_PREFERENCE_STORAGE_KEY, 'dark');
       mockSystemPrefersDark(false);
 
       // Act
@@ -136,10 +136,55 @@ describe('When the theme is applied before React mounts', () => {
     });
   });
 
+  describe('If system was cached and the OS now prefers light', () => {
+    it('Then should re-resolve to light instead of reusing the previous dark result', () => {
+      // Arrange
+      localStorage.setItem(THEME_PREFERENCE_STORAGE_KEY, 'system');
+      document.documentElement.classList.add('dark');
+      mockSystemPrefersDark(false);
+
+      // Act
+      const applied = applyInitialTheme();
+
+      // Assert
+      expect(applied).toBe('light');
+      expect(document.documentElement.classList.contains('dark')).toBe(false);
+    });
+  });
+
+  describe('If system was cached and the OS now prefers dark', () => {
+    it('Then should re-resolve to dark', () => {
+      // Arrange
+      localStorage.setItem(THEME_PREFERENCE_STORAGE_KEY, 'system');
+      mockSystemPrefersDark(true);
+
+      // Act
+      const applied = applyInitialTheme();
+
+      // Assert
+      expect(applied).toBe('dark');
+      expect(document.documentElement.classList.contains('dark')).toBe(true);
+    });
+  });
+
+  describe('If the cached value is invalid and the OS prefers dark', () => {
+    it('Then should ignore it and follow the OS preference', () => {
+      // Arrange
+      localStorage.setItem(THEME_PREFERENCE_STORAGE_KEY, 'purple');
+      mockSystemPrefersDark(true);
+
+      // Act
+      const applied = applyInitialTheme();
+
+      // Assert
+      expect(applied).toBe('dark');
+    });
+  });
+
   describe('If light was cached and the OS prefers dark', () => {
     it('Then should not add the dark class', () => {
       // Arrange
-      localStorage.setItem(RESOLVED_THEME_STORAGE_KEY, 'light');
+      localStorage.setItem(THEME_PREFERENCE_STORAGE_KEY, 'light');
       mockSystemPrefersDark(true);
 
       // Act
