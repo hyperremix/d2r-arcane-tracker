@@ -216,7 +216,8 @@ class ItemDetectionService {
         { saveFile: saveFile.name },
         {
           surfaceToUI: true,
-          userMessage: `Failed to parse save file: ${saveFile.name}`,
+          code: 'saveFileParseFailed',
+          params: { fileName: saveFile.name },
         },
       );
       return []; // Return empty array after exhausting retries

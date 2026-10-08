@@ -137,6 +137,8 @@ You can limit the terror zone rotation to zones you choose. See the [Terror Zone
 - **In-App Notifications**: cards inside the app. Recent finds are also listed under the bell icon.
 - **Native Notifications**: OS notifications, which also appear while the app is minimized.
 
+If a background task fails, for example a save file can't be read or a database write fails, an error message appears in the bottom-left corner. It stays open until you close it, and a repeated failure of the same kind updates that one message with the most recent file name and details instead of adding new ones. Errors you can fix in the settings have an **Open Settings** button. The others have **Copy details**, which copies the technical details for a bug report.
+
 ### Widget
 
 **Settings → Widget Settings** enables an always-on-top overlay that you can drag, resize and set to any opacity. It snaps to screen edges. Display modes:

@@ -733,6 +733,31 @@
     "reportFailed": "Couldn't open the issue tracker",
     "persistHelp": "If this error persists, copy the error details and paste them into a new issue on GitHub."
   },
+  "serviceErrors": {
+    "copyDetails": "Copy details",
+    "copySuccess": "Details copied to clipboard",
+    "copyFailed": "Failed to copy details to clipboard",
+    "unknown": {
+      "title": "A background task failed",
+      "description": "Something went wrong in the background. Copy the details to report the problem."
+    },
+    "saveFileParseFailed": {
+      "title": "Could not read save file",
+      "description": "\"{{fileName}}\" could not be parsed, so its items were not updated. Check your save file directory in Settings."
+    },
+    "databaseWriteFailed": {
+      "title": "Database write failed",
+      "description": "Some item data could not be saved and was lost. Copy the details to report the problem."
+    },
+    "terrorZoneWriteFailed": {
+      "title": "Could not update terror zones",
+      "description": "The terror zone configuration file could not be written. Check that the game files are extracted and not read-only."
+    },
+    "spriteConversionFailed": {
+      "title": "Item icon conversion failed",
+      "description": "Item icons could not be converted. Check your D2R installation path in Settings."
+    }
+  },
   "runeword": {
     "calculator": {
       "title": "Runeword Calculator",

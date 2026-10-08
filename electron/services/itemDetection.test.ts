@@ -22,6 +22,7 @@ import { read } from '@dschu012/d2s';
 import { D2SaveFileBuilder, D2SItemBuilder, HolyGrailItemBuilder } from '@/fixtures';
 import type { D2Item, D2SItem, Item } from '../types/grail';
 import { isGrailTrackable } from '../utils/grailItemUtils';
+import { setErrorForwarder } from '../utils/serviceLogger';
 import { EventBus } from './EventBus';
 import { ItemDetectionService } from './itemDetection';
 
@@ -282,6 +283,39 @@ describe('When ItemDetectionService is used', () => {
         expect.any(Error),
         { saveFile: mockSaveFile.name },
       );
+      consoleSpy.mockRestore();
+    });
+
+    it('Then should surface a saveFileParseFailed error with the file name to the UI', async () => {
+      // Arrange
+      const mockSaveFile = D2SaveFileBuilder.new()
+        .withName('TestCharacter')
+        .withPath('/path/to/save.d2s')
+        .withLastModified(new Date())
+        .build();
+      vi.mocked(readFile).mockRejectedValue(new Error('Parse error'));
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {
+        // Mock implementation
+      });
+      const forwarder = vi.fn();
+      setErrorForwarder(forwarder);
+
+      // Act
+      await (service as any).extractItemsFromSaveFile(mockSaveFile);
+
+      // Assert
+      expect(forwarder).toHaveBeenCalledWith({
+        service: 'ItemDetection',
+        operation: 'extractItemsFromSaveFile',
+        severity: 'error',
+        code: 'saveFileParseFailed',
+        params: { fileName: 'TestCharacter' },
+        detail: 'Parse error',
+        timestamp: expect.any(Number),
+      });
+      setErrorForwarder(() => {
+        // Reset forwarder
+      });
       consoleSpy.mockRestore();
     });
   });
