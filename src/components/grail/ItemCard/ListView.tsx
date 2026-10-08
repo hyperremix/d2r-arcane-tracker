@@ -10,7 +10,12 @@ import { getTooltipTriggerRender } from '../tooltipTriggerRender';
 import type { InteractiveCardProps } from './GridView';
 import { ItemCategoryLabel } from './ItemCategoryLabel';
 import { DiscoveryAttribution, DiscoveryInfo, StatusIndicators, VersionCounts } from './indicators';
-import { getCardStateClasses, interactiveCardStyles, missingArtworkStyles } from './styles';
+import {
+  getCardStateClasses,
+  getItemQualityTextClass,
+  interactiveCardStyles,
+  missingArtworkStyles,
+} from './styles';
 
 /**
  * Props interface for the ListView component.
@@ -115,9 +120,9 @@ export function ListView({
         {...interactiveProps}
         data-found={isFound}
         className={cn(
-          'relative flex w-full items-center gap-3 p-3 transition-all duration-200',
+          'relative flex w-full items-center gap-3 p-3',
           'rounded-lg border-2',
-          getCardStateClasses(item.type, isFound),
+          getCardStateClasses(item.type, isFound, !!interactiveProps),
           interactiveProps && interactiveCardStyles,
           className,
         )}
@@ -142,13 +147,17 @@ export function ListView({
           />
         )}
 
-        {/* Item Name (always full contrast, regardless of found state) */}
+        {/* Item Name (quality colored, never dimmed regardless of found state) */}
         <Tooltip>
           <TooltipTrigger
             render={getTooltipTriggerRender(focusableTriggers)}
             className="block flex-1 truncate text-left"
           >
-            <h3 className="truncate font-semibold text-foreground text-sm">{item.name}</h3>
+            <h3
+              className={cn('truncate font-semibold text-sm', getItemQualityTextClass(item.type))}
+            >
+              {item.name}
+            </h3>
           </TooltipTrigger>
           <TooltipContent side="top" className="max-w-sm">
             <div className="space-y-1">

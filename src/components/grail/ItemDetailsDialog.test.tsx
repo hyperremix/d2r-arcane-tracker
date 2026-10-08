@@ -139,6 +139,25 @@ describe('When ItemDetailsDialog is rendered', () => {
       expect(screen.getByText('Windforce')).toBeInTheDocument();
     });
 
+    it('Then renders the title in the display font, colored by item quality', () => {
+      // Arrange
+      const item = HolyGrailItemBuilder.new()
+        .withId('item-1')
+        .withType('set')
+        .withName("Tal Rasha's Guardianship")
+        .build();
+      setupStoreMock({ items: [item] });
+
+      // Act
+      render(<ItemDetailsDialog itemId="item-1" open={true} onOpenChange={vi.fn()} />);
+
+      // Assert
+      expect(screen.getByText("Tal Rasha's Guardianship")).toHaveClass(
+        'font-display',
+        'text-item-set',
+      );
+    });
+
     it('Then renders translated type, category and treasure class badges', () => {
       // Arrange
       const item = HolyGrailItemBuilder.new()
@@ -466,6 +485,19 @@ describe('When ItemDetailsDialog is rendered', () => {
       expect(screen.getByText(/1-5 of 7/)).toBeInTheDocument();
       expect(screen.getByRole('button', { name: /Previous/ })).toBeDisabled();
       expect(screen.getByRole('button', { name: /Next/ })).toBeEnabled();
+    });
+
+    it('Then the pagination range opts out of the display title font with font-ui', () => {
+      // Arrange
+      const item = HolyGrailItemBuilder.new().withId('item-1').build();
+      const characters = CharacterBuilder.new().withId('char').withName('Char').buildMany(7);
+      setupStoreMock({ items: [item], characters });
+
+      // Act
+      render(<ItemDetailsDialog itemId="item-1" open={true} onOpenChange={vi.fn()} />);
+
+      // Assert
+      expect(screen.getByText(/1-5 of 7/)).toHaveClass('font-ui', 'font-normal');
     });
 
     it('Then Next click advances page', () => {

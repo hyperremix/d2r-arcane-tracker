@@ -95,6 +95,8 @@ The main screen lists every grail item with its found status. The search and fil
 - Group by category, type or ethereal status (available when ethereal tracking is on), and switch between grid and list views.
 - Sort by name, category, type or found date.
 
+As in the game, an item's name color shows its quality: gold for uniques, green for sets, orange for runes and purple for runewords. Found items have a solid frame in that color. Missing items have a dashed frame and grayed-out artwork.
+
 Click an item to see its details, which characters found it and when, and links to [diablo2.io](https://diablo2.io/) or [d2runewizard](https://d2runewizard.com/).
 
 ### Item icons
