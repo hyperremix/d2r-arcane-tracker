@@ -75,6 +75,7 @@ const resetFullStoreState = () => {
       groupMode: 'none',
       loading: false,
       error: null,
+      settingsHydrated: false,
       settings: {
         ...useGrailStore.getState().settings,
         grailNormal: true,
@@ -317,6 +318,69 @@ describe('When useGrailStore is used', () => {
 
       // Assert
       expect(useGrailStore.getState().filter).toBe(filterBefore);
+    });
+  });
+
+  describe('If settings were never hydrated because the initial load failed', () => {
+    it('Then setSettings with a theme marks settings as hydrated', async () => {
+      // Arrange
+      expect(useGrailStore.getState().settingsHydrated).toBe(false);
+
+      // Act
+      await act(async () => {
+        await useGrailStore.getState().setSettings({ theme: 'dark' });
+      });
+
+      // Assert
+      expect(useGrailStore.getState().settings.theme).toBe('dark');
+      expect(useGrailStore.getState().settingsHydrated).toBe(true);
+    });
+
+    it('Then setSettings without a theme leaves settings unhydrated so the default theme is not cached', async () => {
+      // Arrange
+      expect(useGrailStore.getState().settingsHydrated).toBe(false);
+
+      // Act
+      await act(async () => {
+        await useGrailStore.getState().setSettings({ grailNormal: true });
+      });
+
+      // Assert
+      expect(useGrailStore.getState().settingsHydrated).toBe(false);
+    });
+
+    it('Then reloadData with loaded settings marks settings as hydrated', async () => {
+      // Arrange
+      mockElectronAPI.grail.getSettings.mockResolvedValue({ theme: 'light' });
+      mockElectronAPI.grail.getCharacters.mockResolvedValue([]);
+      mockElectronAPI.grail.getItems.mockResolvedValue([]);
+      mockElectronAPI.grail.getProgress.mockResolvedValue([]);
+      expect(useGrailStore.getState().settingsHydrated).toBe(false);
+
+      // Act
+      await act(async () => {
+        await useGrailStore.getState().reloadData();
+      });
+
+      // Assert
+      expect(useGrailStore.getState().settings.theme).toBe('light');
+      expect(useGrailStore.getState().settingsHydrated).toBe(true);
+    });
+
+    it('Then reloadData that returns no settings leaves settings unhydrated', async () => {
+      // Arrange
+      mockElectronAPI.grail.getSettings.mockResolvedValue(undefined);
+      mockElectronAPI.grail.getCharacters.mockResolvedValue([]);
+      mockElectronAPI.grail.getItems.mockResolvedValue([]);
+      mockElectronAPI.grail.getProgress.mockResolvedValue([]);
+
+      // Act
+      await act(async () => {
+        await useGrailStore.getState().reloadData();
+      });
+
+      // Assert
+      expect(useGrailStore.getState().settingsHydrated).toBe(false);
     });
   });
 

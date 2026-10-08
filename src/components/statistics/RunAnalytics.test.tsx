@@ -163,3 +163,72 @@ describe('When exporting run analytics', () => {
     expect(toast.success).not.toHaveBeenCalled();
   });
 });
+
+describe('When displaying run analytics', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    setElectronAPI(mockElectronAPI);
+  });
+
+  afterAll(() => {
+    setElectronAPI(originalElectronAPI);
+  });
+
+  it('If no runs have been tracked, Then the empty state is shown instead of zeroed statistics', async () => {
+    // Arrange
+    mockElectronAPI.runTracker.getOverallStatistics.mockResolvedValue({
+      totalSessions: 1,
+      totalRuns: 0,
+      totalTime: 0,
+      averageRunDuration: 0,
+      itemsPerRun: 0,
+    } satisfies RunStatistics);
+
+    // Act
+    render(<RunAnalytics />);
+
+    // Assert
+    expect(await screen.findByRole('heading', { name: 'No Data Available' })).toBeInTheDocument();
+    expect(
+      screen.getByText('Start tracking runs to see analytics and statistics.'),
+    ).toBeInTheDocument();
+    expect(screen.queryByText('Fastest Run')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Export Data/i })).not.toBeInTheDocument();
+  });
+
+  it('If runs exist but none has been completed, Then the performance highlights are hidden', async () => {
+    // Arrange
+    mockElectronAPI.runTracker.getOverallStatistics.mockResolvedValue({
+      ...mockStats,
+      totalRuns: 1,
+      averageRunDuration: 0,
+      fastestRun: undefined,
+      slowestRun: undefined,
+    } satisfies RunStatistics);
+
+    // Act
+    render(<RunAnalytics />);
+
+    // Assert
+    expect(await screen.findByText('Total Sessions')).toBeInTheDocument();
+    expect(screen.queryByText('Performance Highlights')).not.toBeInTheDocument();
+    expect(screen.queryByText('Fastest Run')).not.toBeInTheDocument();
+  });
+
+  it('If runs have been completed, Then the fastest and slowest runs are shown without a duplicate efficiency card', async () => {
+    // Arrange
+    mockElectronAPI.runTracker.getOverallStatistics.mockResolvedValue(mockStats);
+
+    // Act
+    render(<RunAnalytics />);
+
+    // Assert
+    expect(await screen.findByText('Performance Highlights')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Fastest Run' })).toBeInTheDocument();
+    expect(screen.getByText('1:00')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Slowest Run' })).toBeInTheDocument();
+    expect(screen.getByText('3:00')).toBeInTheDocument();
+    expect(screen.getByText('1.50')).toBeInTheDocument();
+    expect(screen.queryByText('Overall Efficiency')).not.toBeInTheDocument();
+  });
+});

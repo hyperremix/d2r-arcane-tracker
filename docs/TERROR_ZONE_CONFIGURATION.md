@@ -13,13 +13,15 @@ Terror zones are areas that rotate on a schedule, with monsters scaled up and be
 
 ## Usage
 
-Open **Terror Zone Configuration** from the title bar. The page checks your installation path and the game file, then lists every zone with a switch.
+Open **Terror Zone Configuration** from the title bar. The page checks your installation path and the game file, then lists every zone with a switch. Once the page is set up, a short reminder at the top lists the launch flags and links back to this guide.
 
-- Toggle zones one at a time, or use **Enable All** or **Disable All**.
+- Toggle zones one at a time, or use **Enable All** or **Disable All**. **Disable All** asks for confirmation first, because it saves a game file with no terror zones.
 - Search zones by name. The counter shows how many are enabled.
 - **Restore Original** puts back the original game file and clears your selection.
 
-Changes are written to the game file immediately. Restart D2R with `-direct -txt` for them to take effect.
+Each change is written to the game file right away. The switch you toggled shows a spinner until the write finishes, while the other switches stay usable. A *Terror zones saved* notification confirms each save. If a save fails, the switch goes back to its previous state and an error is shown. The error clears after the next successful save.
+
+Changes don't reach a running game. Restart D2R with `-direct -txt` for them to take effect.
 
 ## How it works
 
