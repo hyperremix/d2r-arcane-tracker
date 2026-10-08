@@ -204,7 +204,7 @@ function RuneImage({
             {isMissing && <MissingRuneMarker label={missingLabel} />}
           </div>
         ) : (
-          <div className={cn('relative', isMissing && 'rounded-lg bg-missing/50 p-1')}>
+          <div className={cn(isMissing && 'relative rounded-lg bg-missing/50 p-1')}>
             <div className={cn('text-center text-xs', isMissing && 'line-through')}>{runeName}</div>
             {isMissing && <MissingRuneMarker label={missingLabel} />}
           </div>

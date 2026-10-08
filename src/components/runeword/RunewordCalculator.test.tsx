@@ -149,6 +149,25 @@ describe('RunewordCalculator', () => {
       );
       expect(getCardTitles()).toEqual(['Filter by Runes', 'Enigma']);
     });
+
+    it('If nothing is craftable or missing at most 1 rune, then the empty state offers Show all and applies it', async () => {
+      // Arrange
+      stubElectronApi({ availableRunes: {} });
+      await renderCalculator();
+      expect(
+        screen.getByText("You can't craft any runeword with your current runes"),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByRole('button', { name: 'Show runewords missing at most 1 rune' }),
+      ).not.toBeInTheDocument();
+
+      // Act
+      fireEvent.click(screen.getByRole('button', { name: 'Show all runewords' }));
+
+      // Assert
+      expect(screen.getByRole('button', { name: 'All' })).toHaveAttribute('aria-pressed', 'true');
+      expect(screen.getByText('Showing 4 of 4 runewords')).toBeInTheDocument();
+    });
   });
 
   describe('filtered empty state', () => {

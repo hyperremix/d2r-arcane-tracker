@@ -690,7 +690,6 @@
       "matchAllHint": "Shows runewords that use all selected runes",
       "clearSelection": "Clear selection",
       "filterByRunes": "Filter by Runes",
-      "showPartial": "Show Partial",
       "runesSelected": "{{count}} rune{{plural}} selected"
     }
   },

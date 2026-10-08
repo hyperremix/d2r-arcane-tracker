@@ -57,15 +57,6 @@ const availabilityLabelKeys: Record<RunewordAvailabilityFilter, string> = {
 type BroaderAvailability = Exclude<RunewordAvailabilityFilter, 'craftable'>;
 
 /**
- * The next, broader availability tier suggested when the current one has no results.
- */
-const broaderAvailability: Record<RunewordAvailabilityFilter, BroaderAvailability | undefined> = {
-  craftable: 'missingOne',
-  missingOne: 'all',
-  all: undefined,
-};
-
-/**
  * Label keys for the empty-state button that switches to a broader availability tier.
  */
 const showAvailabilityLabelKeys: Record<BroaderAvailability, string> = {
@@ -181,16 +172,15 @@ export function RunewordCalculator() {
     }
   };
 
-  // Only suggest a broader tier when it would reveal results under the active search and rune filters.
+  // Suggest the first broader tier that would reveal results under the active search and rune filters.
   const nextAvailability = useMemo(() => {
-    const next = broaderAvailability[availability];
-    if (!next) {
-      return undefined;
-    }
+    const broaderTiers = availabilityFilters.slice(availabilityFilters.indexOf(availability) + 1);
     const byName = filterRunewordsByName(allRunewords, searchTerm);
-    const hasResults =
-      filterRunewordsByRunes(byName, selectedRunes, next, availableRunes).length > 0;
-    return hasResults ? next : undefined;
+    return broaderTiers.find(
+      (tier): tier is BroaderAvailability =>
+        tier !== 'craftable' &&
+        filterRunewordsByRunes(byName, selectedRunes, tier, availableRunes).length > 0,
+    );
   }, [allRunewords, searchTerm, selectedRunes, availability, availableRunes]);
 
   // "Nothing craftable" is only a valid diagnosis when no search or rune filter narrows the list.
