@@ -35,6 +35,8 @@ interface GrailState {
   progress: GrailProgress[];
   statistics: GrailStatistics | null;
   settings: Settings;
+  /** True once settings (or an explicit theme choice) are known; until then `settings` holds defaults. */
+  settingsHydrated: boolean;
 
   // UI State
   filter: GrailFilter;
@@ -155,6 +157,7 @@ export const useGrailStore = create<GrailState>((set, get) => ({
   progress: [],
   statistics: null,
   settings: defaultSettings,
+  settingsHydrated: false,
   filter: defaultFilter,
   filterResetCount: 0,
   advancedFilter: defaultAdvancedFilter,
@@ -169,8 +172,12 @@ export const useGrailStore = create<GrailState>((set, get) => ({
   setProgress: (progress) => set({ progress }),
   setStatistics: (statistics) => set({ statistics }),
   setSettings: async (settingsUpdate) => {
-    // Update local state
-    set((state) => withSettingsUpdate(state, settingsUpdate));
+    // Update local state. An explicit theme choice is a real value even if the initial settings
+    // load failed, so mark settings as hydrated to let the theme be applied and cached.
+    set((state) => ({
+      ...withSettingsUpdate(state, settingsUpdate),
+      ...(settingsUpdate.theme !== undefined ? { settingsHydrated: true } : {}),
+    }));
 
     // Persist to database
     try {
@@ -203,7 +210,7 @@ export const useGrailStore = create<GrailState>((set, get) => ({
     // Update local state only, without persisting to database
     // This is used when loading settings from the database to avoid triggering
     // settings-updated events that would cause unwanted side effects (e.g., widget resize)
-    set((state) => withSettingsUpdate(state, settingsUpdate));
+    set((state) => ({ ...withSettingsUpdate(state, settingsUpdate), settingsHydrated: true }));
   },
   setFilter: (filterUpdate) =>
     set((state) => ({
@@ -279,7 +286,7 @@ export const useGrailStore = create<GrailState>((set, get) => ({
       // Load settings first
       const settingsData = await window.electronAPI?.grail.getSettings();
       if (settingsData) {
-        set((state) => withSettingsUpdate(state, settingsData));
+        set((state) => ({ ...withSettingsUpdate(state, settingsData), settingsHydrated: true }));
         console.log('Reloaded settings from database');
       }
 
