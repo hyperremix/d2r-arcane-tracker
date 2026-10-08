@@ -62,6 +62,14 @@ const TERROR_ZONE_GUIDE_URL =
 type BulkAction = 'enableAll' | 'disableAll';
 
 /**
+ * A write that has been queued but has not started yet. Changes made while it waits share it.
+ */
+interface QueuedWrite {
+  zoneIds: Set<string>;
+  promise: Promise<void>;
+}
+
+/**
  * Builds a configuration with an explicit enabled state for every zone.
  */
 function buildConfig(
@@ -100,13 +108,18 @@ export function TerrorZoneConfiguration() {
   const persistedConfigRef = useRef<Record<string, boolean>>({});
   // Writes replace the whole game file, so they run one after another.
   const writeQueueRef = useRef<Promise<void>>(Promise.resolve());
+  const queuedWriteRef = useRef<QueuedWrite | undefined>(undefined);
 
   const applyConfig = useCallback((nextConfig: Record<string, boolean>) => {
     desiredConfigRef.current = nextConfig;
     setConfig(nextConfig);
   }, []);
 
-  const loadData = useCallback(async () => {
+  /**
+   * Loads the validation status, zones and configuration.
+   * Resolves to `false` when loading failed (the load error is shown), otherwise `true`.
+   */
+  const loadData = useCallback(async (): Promise<boolean> => {
     try {
       setIsLoading(true);
       setError(undefined);
@@ -117,7 +130,7 @@ export function TerrorZoneConfiguration() {
 
       if (!validation.valid) {
         // Don't set error state for path validation issues - they're shown in the validation alert
-        return;
+        return true;
       }
 
       // Load zones and config in parallel
@@ -132,9 +145,11 @@ export function TerrorZoneConfiguration() {
       setZones(zonesData);
       persistedConfigRef.current = loadedConfig;
       applyConfig(loadedConfig);
+      return true;
     } catch (err) {
       console.error('Failed to load terror zone data:', err);
       setError(t(translations.terrorZone.errors.loadFailed));
+      return false;
     } finally {
       setIsLoading(false);
     }
@@ -146,21 +161,47 @@ export function TerrorZoneConfiguration() {
   }, [loadData]);
 
   /**
-   * Queues a write of the current desired configuration to the game file.
+   * Queues a write of the desired configuration to the game file for the given zones.
+   * The configuration is read when the write starts, so changes made while an earlier write is
+   * running share the next queued write and its result. If that write fails, the zones it covered
+   * are rolled back to their last saved state before the next write starts.
    * Resolves once the write succeeds and rejects if it fails.
    */
-  const persistDesiredConfig = useCallback((): Promise<void> => {
-    const write = writeQueueRef.current.then(async () => {
-      const snapshot = desiredConfigRef.current;
-      const result = await window.electronAPI.terrorZone.updateConfig(snapshot);
-      if (!result.success) {
-        throw new Error('Failed to update terror zone configuration');
+  const persistDesiredConfig = useCallback(
+    (zoneIds: string[]): Promise<void> => {
+      const queued = queuedWriteRef.current;
+      if (queued) {
+        for (const zoneId of zoneIds) {
+          queued.zoneIds.add(zoneId);
+        }
+        return queued.promise;
       }
-      persistedConfigRef.current = snapshot;
-    });
-    writeQueueRef.current = write.catch(() => undefined);
-    return write;
-  }, []);
+
+      const coveredZoneIds = new Set(zoneIds);
+      const promise = writeQueueRef.current.then(async () => {
+        queuedWriteRef.current = undefined;
+        const snapshot = desiredConfigRef.current;
+        try {
+          const result = await window.electronAPI.terrorZone.updateConfig(snapshot);
+          if (!result.success) {
+            throw new Error('Failed to update terror zone configuration');
+          }
+          persistedConfigRef.current = snapshot;
+        } catch (err) {
+          const rolledBack = { ...desiredConfigRef.current };
+          for (const zoneId of coveredZoneIds) {
+            rolledBack[zoneId] = persistedConfigRef.current[zoneId] ?? true;
+          }
+          applyConfig(rolledBack);
+          throw err;
+        }
+      });
+      queuedWriteRef.current = { zoneIds: coveredZoneIds, promise };
+      writeQueueRef.current = promise.catch(() => undefined);
+      return promise;
+    },
+    [applyConfig],
+  );
 
   const handleSaveSuccess = useCallback(
     (title: string) => {
@@ -179,16 +220,11 @@ export function TerrorZoneConfiguration() {
       applyConfig({ ...desiredConfigRef.current, [zoneId]: enabled });
 
       try {
-        await persistDesiredConfig();
+        await persistDesiredConfig([zoneId]);
         handleSaveSuccess(t(translations.terrorZone.feedback.saved));
       } catch (err) {
         console.error('Failed to update zone:', err);
         setError(t(translations.terrorZone.errors.updateFailed));
-        // Revert only this zone to its last saved state
-        applyConfig({
-          ...desiredConfigRef.current,
-          [zoneId]: persistedConfigRef.current[zoneId] ?? true,
-        });
       } finally {
         setPendingZoneIds((previous) => {
           const next = new Set(previous);
@@ -207,7 +243,7 @@ export function TerrorZoneConfiguration() {
       applyConfig(buildConfig(zones, () => enabled));
 
       try {
-        await persistDesiredConfig();
+        await persistDesiredConfig(zones.map((zone) => zone.id));
         handleSaveSuccess(t(translations.terrorZone.feedback.saved));
       } catch (err) {
         console.error(`Failed to ${enabled ? 'enable' : 'disable'} all zones:`, err);
@@ -218,7 +254,6 @@ export function TerrorZoneConfiguration() {
               : translations.terrorZone.errors.disableAllFailed,
           ),
         );
-        applyConfig(persistedConfigRef.current);
       } finally {
         setBulkAction(undefined);
       }
@@ -241,10 +276,12 @@ export function TerrorZoneConfiguration() {
         throw new Error('Failed to restore original file');
       }
 
-      // Reload data after restore
-      await loadData();
+      // Reload data after restore; a failed reload keeps its own load error instead of a success
+      const reloaded = await loadData();
       setShowRestoreDialog(false);
-      handleSaveSuccess(t(translations.terrorZone.feedback.restored));
+      if (reloaded) {
+        handleSaveSuccess(t(translations.terrorZone.feedback.restored));
+      }
     } catch (err) {
       console.error('Failed to restore original:', err);
       setError(t(translations.terrorZone.errors.restoreFailed));

@@ -42,6 +42,8 @@ function setupValidTerrorZoneApi(overrides: Record<string, unknown> = {}) {
   return { ...terrorZone, shell };
 }
 
+const threeZones = [...zones, { id: '3', name: 'Rogue Encampment', levels: [] }];
+
 interface Deferred<T> {
   promise: Promise<T>;
   resolve: (value: T) => void;
@@ -253,6 +255,54 @@ describe('When TerrorZoneConfiguration lists zones', () => {
       );
     });
   });
+
+  describe('If the file is restored but reloading the zones fails', () => {
+    it('Then the load failure is kept and no success toast is shown', async () => {
+      // Arrange
+      vi.mocked(toast.success).mockClear();
+      const getZones = vi
+        .fn()
+        .mockResolvedValueOnce(zones)
+        .mockRejectedValueOnce(new Error('EIO: raw failure'));
+      const terrorZone = setupValidTerrorZoneApi({ getZones });
+      render(<TerrorZoneConfiguration />);
+      await screen.findByRole('switch', { name: 'Blood Moor' });
+      fireEvent.click(screen.getByRole('button', { name: 'Restore Original' }));
+      const dialog = await screen.findByRole('alertdialog');
+
+      // Act
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Restore Original' }));
+
+      // Assert
+      expect(await screen.findByText('Failed to load terror zone data')).toBeInTheDocument();
+      expect(terrorZone.restoreOriginal).toHaveBeenCalledTimes(1);
+      expect(toast.success).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('If the file is restored and reloading succeeds', () => {
+    it('Then the restored toast is shown and a previous error is cleared', async () => {
+      // Arrange
+      vi.mocked(toast.success).mockClear();
+      setupValidTerrorZoneApi({
+        updateConfig: vi.fn().mockRejectedValueOnce(new Error('EBUSY')),
+      });
+      render(<TerrorZoneConfiguration />);
+      fireEvent.click(await screen.findByRole('switch', { name: 'Cold Plains' }));
+      await screen.findByText('Failed to update terror zone configuration');
+      fireEvent.click(screen.getByRole('button', { name: 'Restore Original' }));
+      const dialog = await screen.findByRole('alertdialog');
+
+      // Act
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Restore Original' }));
+
+      // Assert
+      await waitFor(() => expect(toast.success).toHaveBeenCalledTimes(1));
+      expect(
+        screen.queryByText('Failed to update terror zone configuration'),
+      ).not.toBeInTheDocument();
+    });
+  });
 });
 
 describe('When TerrorZoneConfiguration saves changes', () => {
@@ -387,6 +437,69 @@ describe('When TerrorZoneConfiguration saves changes', () => {
       expect(updateConfig).toHaveBeenNthCalledWith(1, { '1': true, '2': true });
       expect(updateConfig).toHaveBeenNthCalledWith(2, { '1': false, '2': true });
     });
+
+    it('Then changes queued behind it share one write that includes all of them', async () => {
+      // Arrange
+      const firstWrite = createDeferred<typeof saveSuccess>();
+      const updateConfig = vi
+        .fn()
+        .mockReturnValueOnce(firstWrite.promise)
+        .mockResolvedValue(saveSuccess);
+      setupValidTerrorZoneApi({
+        getZones: vi.fn().mockResolvedValue(threeZones),
+        getConfig: vi.fn().mockResolvedValue({ '1': true, '2': true, '3': true }),
+        updateConfig,
+      });
+      render(<TerrorZoneConfiguration />);
+      const bloodMoor = await screen.findByRole('switch', { name: 'Blood Moor' });
+      const coldPlains = screen.getByRole('switch', { name: 'Cold Plains' });
+      const rogueEncampment = screen.getByRole('switch', { name: 'Rogue Encampment' });
+      fireEvent.click(bloodMoor);
+      await waitFor(() => expect(updateConfig).toHaveBeenCalledTimes(1));
+
+      // Act
+      fireEvent.click(coldPlains);
+      fireEvent.click(rogueEncampment);
+      firstWrite.resolve(saveSuccess);
+
+      // Assert
+      await waitFor(() => expect(rogueEncampment).not.toHaveAttribute('data-disabled'));
+      expect(updateConfig).toHaveBeenCalledTimes(2);
+      expect(updateConfig).toHaveBeenNthCalledWith(1, { '1': false, '2': true, '3': true });
+      expect(updateConfig).toHaveBeenNthCalledWith(2, { '1': false, '2': false, '3': false });
+    });
+
+    it('Then a failed shared write rolls back every zone it covered but keeps earlier saves', async () => {
+      // Arrange
+      const firstWrite = createDeferred<typeof saveSuccess>();
+      const updateConfig = vi
+        .fn()
+        .mockReturnValueOnce(firstWrite.promise)
+        .mockRejectedValueOnce(new Error('EBUSY'));
+      setupValidTerrorZoneApi({
+        getZones: vi.fn().mockResolvedValue(threeZones),
+        getConfig: vi.fn().mockResolvedValue({ '1': true, '2': true, '3': true }),
+        updateConfig,
+      });
+      render(<TerrorZoneConfiguration />);
+      const bloodMoor = await screen.findByRole('switch', { name: 'Blood Moor' });
+      const coldPlains = screen.getByRole('switch', { name: 'Cold Plains' });
+      const rogueEncampment = screen.getByRole('switch', { name: 'Rogue Encampment' });
+      fireEvent.click(bloodMoor);
+      await waitFor(() => expect(updateConfig).toHaveBeenCalledTimes(1));
+      fireEvent.click(coldPlains);
+      fireEvent.click(rogueEncampment);
+
+      // Act
+      firstWrite.resolve(saveSuccess);
+
+      // Assert
+      await screen.findByText('Failed to update terror zone configuration');
+      await waitFor(() => expect(coldPlains).toBeChecked());
+      expect(rogueEncampment).toBeChecked();
+      expect(bloodMoor).not.toBeChecked();
+      expect(updateConfig).toHaveBeenCalledTimes(2);
+    });
   });
 });
 
@@ -454,6 +567,44 @@ describe('When TerrorZoneConfiguration disables all zones', () => {
       );
       await waitFor(() => expect(toast.success).toHaveBeenCalledTimes(1));
       expect(bloodMoor).not.toBeChecked();
+    });
+  });
+});
+
+describe('When TerrorZoneConfiguration filters zones by search', () => {
+  afterEach(() => {
+    window.electronAPI = originalElectronAPI;
+    vi.restoreAllMocks();
+  });
+
+  describe('If the search matches a zone id', () => {
+    it('Then only that zone is listed', async () => {
+      // Arrange
+      setupValidTerrorZoneApi();
+      render(<TerrorZoneConfiguration />);
+      await screen.findByRole('switch', { name: 'Blood Moor' });
+
+      // Act
+      fireEvent.change(screen.getByRole('textbox'), { target: { value: '2' } });
+
+      // Assert
+      expect(screen.getByRole('switch', { name: 'Cold Plains' })).toBeInTheDocument();
+      expect(screen.queryByRole('switch', { name: 'Blood Moor' })).not.toBeInTheDocument();
+    });
+  });
+
+  describe('If the search matches no zone', () => {
+    it('Then the empty search message is shown', async () => {
+      // Arrange
+      setupValidTerrorZoneApi();
+      render(<TerrorZoneConfiguration />);
+      await screen.findByRole('switch', { name: 'Blood Moor' });
+
+      // Act
+      fireEvent.change(screen.getByRole('textbox'), { target: { value: 'zzz' } });
+
+      // Assert
+      expect(screen.getByText('No zones found matching "zzz"')).toBeInTheDocument();
     });
   });
 });
