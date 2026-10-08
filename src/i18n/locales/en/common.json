@@ -722,7 +722,6 @@
     "loadingData": "Loading run tracker data...",
     "errorLoading": "Error Loading Run Tracker",
     "sessionCard": {
-      "title": "Session Card",
       "noActiveSession": "No active session",
       "startSessionPrompt": "Start a session to begin tracking your runs and items.",
       "startNewSession": "Start New Session",
