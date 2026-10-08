@@ -6,6 +6,8 @@ import { useWizardStore } from '@/stores/wizardStore';
 import { SetupWizard, wizardSteps } from './SetupWizard';
 
 vi.mock('@/stores/grailStore');
+// The real module imports grailStore, so it would be cached bound to this file's mock
+vi.mock('@/components/wizard/wizardSettingsSave', () => import('@/test/wizardSettingsSaveStub'));
 vi.mock('./steps/WelcomeStep', () => ({ WelcomeStep: () => <div>WelcomeContent</div> }));
 // Stubbed so this file's grailStore mock isn't baked into the shared module cache
 // (vitest runs with isolate: false) that SaveDirectoryStep.test.tsx also relies on.
@@ -16,13 +18,7 @@ vi.mock('./steps/SaveDirectoryStep', () => ({
 vi.mock('./steps/D2RInstallationStep', () => ({
   D2RInstallationStep: () => <div>D2RInstallationContent</div>,
 }));
-vi.mock('./steps/GameModeStep', () => ({ GameModeStep: () => <div>GameModeContent</div> }));
-vi.mock('./steps/GameVersionStep', () => ({
-  GameVersionStep: () => <div>GameVersionContent</div>,
-}));
-vi.mock('./steps/GrailSettingsStep', () => ({
-  GrailSettingsStep: () => <div>GrailSettingsContent</div>,
-}));
+vi.mock('./steps/TrackingStep', () => ({ TrackingStep: () => <div>TrackingContent</div> }));
 vi.mock('./steps/PreferencesStep', () => ({
   PreferencesStep: () => <div>PreferencesContent</div>,
 }));
@@ -41,7 +37,7 @@ describe('SetupWizard', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockUseGrailStore.mockReturnValue({
-      setSettings: vi.fn().mockResolvedValue(undefined),
+      setSettings: vi.fn().mockResolvedValue({ success: true }),
     } as unknown as ReturnType<typeof useGrailStore>);
     useWizardStore.setState({ isOpen: false, currentStep: 0, stepValidity: {} });
   });
@@ -58,9 +54,9 @@ describe('SetupWizard', () => {
     render(<SetupWizard />);
 
     // Assert
-    expect(wizardSteps).toHaveLength(8);
+    expect(wizardSteps).toHaveLength(6);
     expect(useWizardStore.getState().totalSteps).toBe(wizardSteps.length);
-    expect(screen.getByText('Step 1 of 8')).toBeInTheDocument();
+    expect(screen.getByText('Step 1 of 6')).toBeInTheDocument();
     expect(screen.getByText('WelcomeContent')).toBeInTheDocument();
   });
 
@@ -76,10 +72,11 @@ describe('SetupWizard', () => {
     expect(nextButton).toBeDisabled();
     expect(
       screen.getByText(
-        'Select your save directory to continue, or skip setup to configure it later.',
+        'Choose the folder that contains your .d2s character files to continue, or skip setup to configure it later.',
       ),
     ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Skip Setup' })).toBeEnabled();
+    expect(screen.queryByRole('button', { name: 'Skip Optional Steps' })).not.toBeInTheDocument();
   });
 
   it('If the save directory step reports a directory, Then Next is enabled and advances', () => {
@@ -94,14 +91,41 @@ describe('SetupWizard', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Next' }));
 
     // Assert
-    expect(screen.getByText('D2RInstallationContent')).toBeInTheDocument();
-    expect(screen.getByText('Step 3 of 8')).toBeInTheDocument();
+    expect(screen.getByText('TrackingContent')).toBeInTheDocument();
+    expect(screen.getByText('Step 3 of 6')).toBeInTheDocument();
   });
 
-  it('When advancing past grail settings, Then a single optional Preferences step precedes completion', () => {
+  it('When the flow is configured, Then only the save folder is required and everything after What to Track is optional', () => {
+    // Arrange & Act
+    const flow = wizardSteps.map((wizardStep) => ({
+      id: wizardStep.id,
+      optional: Boolean(wizardStep.optional),
+      requiresValidation: Boolean(wizardStep.requiresValidation),
+    }));
+
+    // Assert
+    expect(flow).toEqual([
+      { id: 'welcome', optional: false, requiresValidation: false },
+      { id: 'saveDirectory', optional: false, requiresValidation: true },
+      { id: 'tracking', optional: false, requiresValidation: false },
+      { id: 'd2rInstallation', optional: true, requiresValidation: false },
+      { id: 'preferences', optional: true, requiresValidation: false },
+      { id: 'complete', optional: false, requiresValidation: false },
+    ]);
+  });
+
+  it('When advancing past What to Track, Then the optional D2R installation and Preferences steps precede completion', () => {
     // Arrange
-    openWizardAt(5);
+    openWizardAt(2);
     render(<SetupWizard />);
+
+    // Act
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+
+    // Assert
+    expect(screen.getByText('D2RInstallationContent')).toBeInTheDocument();
+    expect(screen.getByText('Optional')).toBeInTheDocument();
+    expect(screen.getByText('Step 4 of 6')).toBeInTheDocument();
 
     // Act
     fireEvent.click(screen.getByRole('button', { name: 'Next' }));
@@ -109,8 +133,9 @@ describe('SetupWizard', () => {
     // Assert
     expect(screen.getByText('PreferencesContent')).toBeInTheDocument();
     expect(screen.getByText('Optional')).toBeInTheDocument();
-    expect(screen.getByText('Step 7 of 8')).toBeInTheDocument();
-    expect(screen.queryByText('ThemeContent')).not.toBeInTheDocument();
+    expect(screen.getByText('Step 5 of 6')).toBeInTheDocument();
+    // Only the summary is left, so there is nothing optional to skip
+    expect(screen.queryByRole('button', { name: 'Skip Optional Steps' })).not.toBeInTheDocument();
 
     // Act
     fireEvent.click(screen.getByRole('button', { name: 'Next' }));
@@ -119,6 +144,33 @@ describe('SetupWizard', () => {
     expect(screen.getByText('CompletionContent')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Finish' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Skip Setup' })).not.toBeInTheDocument();
+  });
+
+  it('When the user skips optional steps from What to Track, Then the wizard jumps straight to the summary', () => {
+    // Arrange
+    openWizardAt(2);
+    render(<SetupWizard />);
+
+    // Act
+    fireEvent.click(screen.getByRole('button', { name: 'Skip Optional Steps' }));
+
+    // Assert
+    expect(screen.getByText('CompletionContent')).toBeInTheDocument();
+    expect(screen.getByText('Step 6 of 6')).toBeInTheDocument();
+    expect(screen.queryByText('D2RInstallationContent')).not.toBeInTheDocument();
+    expect(screen.queryByText('PreferencesContent')).not.toBeInTheDocument();
+  });
+
+  it('If the save directory step is valid, Then optional steps cannot be skipped yet because What to Track follows', () => {
+    // Arrange
+    openWizardAt(1, { saveDirectory: true });
+
+    // Act
+    render(<SetupWizard />);
+
+    // Assert
+    expect(screen.getByRole('button', { name: 'Next' })).toBeEnabled();
+    expect(screen.queryByRole('button', { name: 'Skip Optional Steps' })).not.toBeInTheDocument();
   });
 
   it('When Skip Setup is confirmed on an invalid step, Then the wizard closes', async () => {
@@ -143,7 +195,7 @@ describe('When SetupWizard is open', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    setSettings = vi.fn().mockResolvedValue(undefined);
+    setSettings = vi.fn().mockResolvedValue({ success: true });
     mockUseGrailStore.mockReturnValue({ setSettings } as unknown as ReturnType<
       typeof useGrailStore
     >);
@@ -234,7 +286,10 @@ describe('When SetupWizard is open', () => {
 
       // Assert
       await waitFor(() =>
-        expect(setSettings).toHaveBeenCalledWith({ wizardSkipped: true, wizardCompleted: false }),
+        expect(setSettings).toHaveBeenCalledWith(
+          { wizardSkipped: true, wizardCompleted: false },
+          { notifyOnError: false },
+        ),
       );
       await waitFor(() => expect(useWizardStore.getState().isOpen).toBe(false));
     });
@@ -252,6 +307,93 @@ describe('When SetupWizard is open', () => {
       // Assert
       await waitFor(() => expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument());
       expect(setSettings).not.toHaveBeenCalled();
+      expect(useWizardStore.getState().isOpen).toBe(true);
+    });
+  });
+
+  describe('If the user clicks Finish on the last step', () => {
+    beforeEach(() => {
+      openWizardAt(wizardSteps.length - 1);
+    });
+
+    it('Then the wizard is marked as completed and closes', async () => {
+      // Arrange
+      render(<SetupWizard />);
+      const wizard = await screen.findByRole('dialog');
+
+      // Act
+      await act(async () => {
+        fireEvent.click(within(wizard).getByRole('button', { name: 'Finish' }));
+      });
+
+      // Assert
+      expect(setSettings).toHaveBeenCalledWith(
+        { wizardCompleted: true, wizardSkipped: false },
+        { notifyOnError: false },
+      );
+      await waitFor(() => expect(useWizardStore.getState().isOpen).toBe(false));
+    });
+
+    it('Then a failed save keeps the wizard open with an error', async () => {
+      // Arrange
+      setSettings.mockResolvedValueOnce({ success: false, error: new Error('disk full') });
+      render(<SetupWizard />);
+      const wizard = await screen.findByRole('dialog');
+
+      // Act
+      await act(async () => {
+        fireEvent.click(within(wizard).getByRole('button', { name: 'Finish' }));
+      });
+
+      // Assert
+      expect(await screen.findByRole('alert')).toHaveTextContent(
+        'Your setup could not be saved. Please try again.',
+      );
+      expect(useWizardStore.getState().isOpen).toBe(true);
+    });
+
+    it('If Finish is clicked again after a failed save, Then the wizard closes and the error is gone', async () => {
+      // Arrange
+      setSettings
+        .mockResolvedValueOnce({ success: false, error: new Error('disk full') })
+        .mockResolvedValue({ success: true });
+      render(<SetupWizard />);
+      const wizard = await screen.findByRole('dialog');
+      const finish = within(wizard).getByRole('button', { name: 'Finish' });
+
+      // Act
+      await act(async () => {
+        fireEvent.click(finish);
+      });
+      await act(async () => {
+        fireEvent.click(finish);
+      });
+
+      // Assert
+      await waitFor(() => expect(useWizardStore.getState().isOpen).toBe(false));
+      expect(setSettings).toHaveBeenCalledTimes(2);
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    });
+  });
+
+  describe('If confirming Skip Setup fails to save', () => {
+    it('Then the wizard stays open with an error', async () => {
+      // Arrange
+      setSettings.mockResolvedValueOnce({ success: false, error: new Error('disk full') });
+      render(<SetupWizard />);
+      const wizard = await screen.findByRole('dialog');
+      fireEvent.click(within(wizard).getByRole('button', { name: 'Skip Setup' }));
+      const confirm = await screen.findByRole('alertdialog');
+
+      // Act
+      await act(async () => {
+        fireEvent.click(within(confirm).getByRole('button', { name: 'Skip Setup' }));
+      });
+
+      // Assert
+      expect(await screen.findByRole('alert')).toHaveTextContent(
+        'Your setup could not be saved. Please try again.',
+      );
       expect(useWizardStore.getState().isOpen).toBe(true);
     });
   });

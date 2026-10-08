@@ -5,6 +5,7 @@ import { HolyGrailItemBuilder } from '@/fixtures';
 import {
   canItemBeEthereal,
   canItemBeNormal,
+  filterItemsByTrackedVersions,
   getEtherealTypeDescription,
   isEtherealOnly,
   shouldShowEtherealStatus,
@@ -366,6 +367,28 @@ describe('When testing function relationships', () => {
 
       // Assert
       expect(result).toBe(false);
+    });
+  });
+});
+
+describe('When filterItemsByTrackedVersions is called', () => {
+  const normalOnly = HolyGrailItemBuilder.new().withId('n').withEtherealType('none').build();
+  const optional = HolyGrailItemBuilder.new().withId('o').withEtherealType('optional').build();
+  const etherealOnly = HolyGrailItemBuilder.new().withId('e').withEtherealType('only').build();
+  const items = [normalOnly, optional, etherealOnly];
+
+  describe.each([
+    ['both normal and ethereal are tracked', true, true, ['n', 'o', 'e']],
+    ['only normal is tracked', true, false, ['n', 'o']],
+    ['only ethereal is tracked', false, true, ['o', 'e']],
+    ['neither is tracked', false, false, []],
+  ])('If %s', (_label, grailNormal, grailEthereal, expectedIds) => {
+    it('Then keeps only the items with a tracked version', () => {
+      // Arrange & Act
+      const result = filterItemsByTrackedVersions(items, { grailNormal, grailEthereal });
+
+      // Assert
+      expect(result.map((item) => item.id)).toEqual(expectedIds);
     });
   });
 });

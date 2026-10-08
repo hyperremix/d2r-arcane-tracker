@@ -10,6 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { useWizardSettingsSave, WizardSaveError } from '@/components/wizard/wizardSettingsSave';
 import { translations } from '@/i18n/translations';
 import { gameModeDescriptionKeys, gameModeLabelKeys } from '@/lib/labelKeys';
 import { useGrailStore } from '@/stores/grailStore';
@@ -55,26 +56,32 @@ const gameModes: GameModeOption[] = [
 ];
 
 /**
- * GameModeStep component - Step for selecting the game mode.
+ * GameModeStep component - Game mode section of the wizard "What to track" step.
  * Allows users to choose between Both, Softcore, Hardcore, or Manual tracking.
- * @returns {JSX.Element} Game mode selection step content
+ * @returns {JSX.Element} Game mode selection section content
  */
 export function GameModeStep() {
   const { t } = useTranslation();
   const gameModeId = useId();
-  const { settings, setSettings } = useGrailStore();
+  const headingId = useId();
+  const { settings } = useGrailStore();
+  const { saveSettings, saveFailed } = useWizardSettingsSave();
   const gameMode = settings.gameMode || GameMode.Both;
   const selectedMode = gameModes.find((mode) => mode.value === gameMode);
 
   const handleGameModeChange = (value: GameMode) => {
-    setSettings({ gameMode: value });
+    saveSettings({ gameMode: value });
   };
 
   return (
-    <div className="space-y-6">
-      <div className="space-y-2">
-        <h2 className="font-bold text-2xl">{t(translations.settings.gameMode.title)}</h2>
-        <p className="text-muted-foreground">{t(translations.wizard.gameMode.description)}</p>
+    <section aria-labelledby={headingId} className="space-y-4">
+      <div className="space-y-1">
+        <h3 id={headingId} className="font-semibold text-lg">
+          {t(translations.settings.gameMode.title)}
+        </h3>
+        <p className="text-muted-foreground text-sm">
+          {t(translations.wizard.gameMode.description)}
+        </p>
       </div>
 
       <div className="space-y-4">
@@ -105,12 +112,14 @@ export function GameModeStep() {
           </Select>
         </div>
 
+        <WizardSaveError visible={saveFailed} />
+
         <div className="rounded-lg bg-info/10 p-4">
           <p className="text-info text-sm">
             <strong>{t(translations.common.note)}</strong> {t(translations.settings.gameMode.note)}
           </p>
         </div>
       </div>
-    </div>
+    </section>
   );
 }

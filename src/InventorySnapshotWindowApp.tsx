@@ -50,7 +50,7 @@ function SnapshotTitleBar({ title }: { title: string }): JSX.Element {
 
   return (
     <div
-      className="titlebar flex h-12 min-h-12 w-full select-none items-center border-gray-200 border-b px-4 dark:border-gray-800"
+      className="titlebar flex h-12 min-h-12 w-full select-none items-center border-border border-b px-4"
       style={
         {
           WebkitAppRegion: 'drag',

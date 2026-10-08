@@ -3,13 +3,14 @@ import { useId } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
+import { useWizardSettingsSave, WizardSaveError } from '@/components/wizard/wizardSettingsSave';
 import { translations } from '@/i18n/translations';
 import { useGrailStore } from '@/stores/grailStore';
 
 /**
- * GrailSettingsStep component - Step for configuring Holy Grail tracking options.
+ * GrailSettingsStep component - Grail contents section of the wizard "What to track" step.
  * Allows users to toggle tracking of normal, ethereal, runes, and runewords.
- * @returns {JSX.Element} Grail settings configuration step content
+ * @returns {JSX.Element} Grail settings configuration section content
  */
 export function GrailSettingsStep() {
   const { t } = useTranslation();
@@ -17,7 +18,9 @@ export function GrailSettingsStep() {
   const grailEtherealId = useId();
   const grailRunesId = useId();
   const grailRunewordsId = useId();
-  const { settings, setSettings } = useGrailStore();
+  const headingId = useId();
+  const { settings } = useGrailStore();
+  const { saveSettings, saveFailed } = useWizardSettingsSave();
 
   const grailNormal = settings.grailNormal ?? true;
   const grailEthereal = settings.grailEthereal ?? false;
@@ -25,13 +28,15 @@ export function GrailSettingsStep() {
   const grailRunewords = settings.grailRunewords ?? false;
 
   return (
-    <div className="space-y-6">
-      <div className="space-y-2">
+    <section aria-labelledby={headingId} className="space-y-4">
+      <div className="space-y-1">
         <div className="flex items-center gap-2">
-          <Trophy className="h-6 w-6" />
-          <h2 className="font-bold text-2xl">{t(translations.settings.grail.title)}</h2>
+          <Trophy className="h-5 w-5" aria-hidden="true" />
+          <h3 id={headingId} className="font-semibold text-lg">
+            {t(translations.settings.grail.title)}
+          </h3>
         </div>
-        <p className="text-muted-foreground">{t(translations.wizard.grail.description)}</p>
+        <p className="text-muted-foreground text-sm">{t(translations.wizard.grail.description)}</p>
       </div>
 
       <div className="space-y-6">
@@ -49,7 +54,7 @@ export function GrailSettingsStep() {
             <Switch
               id={grailNormalId}
               checked={grailNormal}
-              onCheckedChange={(checked) => setSettings({ grailNormal: checked })}
+              onCheckedChange={(checked) => saveSettings({ grailNormal: checked })}
             />
           </div>
 
@@ -65,7 +70,7 @@ export function GrailSettingsStep() {
             <Switch
               id={grailEtherealId}
               checked={grailEthereal}
-              onCheckedChange={(checked) => setSettings({ grailEthereal: checked })}
+              onCheckedChange={(checked) => saveSettings({ grailEthereal: checked })}
             />
           </div>
         </div>
@@ -84,7 +89,7 @@ export function GrailSettingsStep() {
             <Switch
               id={grailRunesId}
               checked={grailRunes}
-              onCheckedChange={(checked) => setSettings({ grailRunes: checked })}
+              onCheckedChange={(checked) => saveSettings({ grailRunes: checked })}
             />
           </div>
 
@@ -100,10 +105,12 @@ export function GrailSettingsStep() {
             <Switch
               id={grailRunewordsId}
               checked={grailRunewords}
-              onCheckedChange={(checked) => setSettings({ grailRunewords: checked })}
+              onCheckedChange={(checked) => saveSettings({ grailRunewords: checked })}
             />
           </div>
         </div>
+
+        <WizardSaveError visible={saveFailed} />
 
         {/* Information Box */}
         <div className="rounded-lg bg-info/10 p-4">
@@ -112,6 +119,6 @@ export function GrailSettingsStep() {
           </p>
         </div>
       </div>
-    </div>
+    </section>
   );
 }

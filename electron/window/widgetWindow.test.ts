@@ -2,9 +2,17 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Settings } from '../types/grail';
 
 interface MockWindow {
-  options: { width: number; height: number };
+  options: { width: number; height: number; focusable?: boolean; show?: boolean };
   handlers: Map<string, (...args: unknown[]) => void>;
   setBounds: ReturnType<typeof vi.fn>;
+  setIgnoreMouseEvents: ReturnType<typeof vi.fn>;
+  setFocusable: ReturnType<typeof vi.fn>;
+  setSkipTaskbar: ReturnType<typeof vi.fn>;
+  setAlwaysOnTop: ReturnType<typeof vi.fn>;
+  show: ReturnType<typeof vi.fn>;
+  showInactive: ReturnType<typeof vi.fn>;
+  isFocused: ReturnType<typeof vi.fn>;
+  blur: ReturnType<typeof vi.fn>;
 }
 
 const created = vi.hoisted(() => ({ windows: [] as unknown[] }));
@@ -15,6 +23,14 @@ vi.mock('electron', () => {
     handlers = new Map<string, (...args: unknown[]) => void>();
     setBounds = vi.fn();
     setAlwaysOnTop = vi.fn();
+    setIgnoreMouseEvents = vi.fn();
+    setFocusable = vi.fn();
+    setSkipTaskbar = vi.fn();
+    show = vi.fn();
+    showInactive = vi.fn();
+    isFocused = vi.fn(() => false);
+    blur = vi.fn();
+    close = vi.fn();
     loadURL = vi.fn();
     loadFile = vi.fn();
     getBounds = vi.fn(() => ({ x: 10, y: 20, width: 111, height: 222 }));
@@ -43,10 +59,19 @@ vi.mock('electron', () => {
   };
 });
 
-import { createWidgetWindow, resetWidgetWindowSize, updateWidgetWindowSize } from './widgetWindow';
+import {
+  closeWidgetWindow,
+  createWidgetWindow,
+  resetWidgetWindowSize,
+  setWidgetWindowLocked,
+  showWidgetWindow,
+  updateWidgetWindowSize,
+} from './widgetWindow';
 
 const overallSize = { width: 250, height: 250 };
 const splitSize = { width: 350, height: 250 };
+const runOnlyWithItemsSize = { width: 270, height: 320 };
+const runOnlyStatsOnlySize = { width: 270, height: 190 };
 
 describe('widgetWindow display mode resolution', () => {
   beforeEach(() => {
@@ -231,5 +256,185 @@ describe('widgetWindow display mode resolution', () => {
 
     // Assert
     expect(onSizeChange).toHaveBeenLastCalledWith('all', { width: 111, height: 222 });
+  });
+});
+
+describe('widgetWindow run-only sizing', () => {
+  beforeEach(() => {
+    created.windows.length = 0;
+  });
+
+  it('If run-only mode shows the item list and no size is saved, Then the taller default is used', () => {
+    // Arrange
+    const settings: Partial<Settings> = { widgetDisplay: 'run-only' };
+
+    // Act
+    createWidgetWindow(settings, '/app');
+
+    // Assert
+    const window = created.windows[0] as MockWindow;
+    expect(window.options.width).toBe(runOnlyWithItemsSize.width);
+    expect(window.options.height).toBe(runOnlyWithItemsSize.height);
+  });
+
+  it('If run-only mode hides the item list and no size is saved, Then the compact default is used', () => {
+    // Arrange
+    const settings: Partial<Settings> = {
+      widgetDisplay: 'run-only',
+      widgetRunOnlyShowItems: false,
+    };
+
+    // Act
+    createWidgetWindow(settings, '/app');
+
+    // Assert
+    const window = created.windows[0] as MockWindow;
+    expect(window.options.width).toBe(runOnlyStatsOnlySize.width);
+    expect(window.options.height).toBe(runOnlyStatsOnlySize.height);
+  });
+
+  it('If a run-only size is saved, Then the window uses it', () => {
+    // Arrange
+    const settings: Partial<Settings> = {
+      widgetDisplay: 'run-only',
+      widgetSizeRunOnly: { width: 300, height: 410 },
+    };
+
+    // Act
+    createWidgetWindow(settings, '/app');
+
+    // Assert
+    const window = created.windows[0] as MockWindow;
+    expect(window.options.width).toBe(300);
+    expect(window.options.height).toBe(410);
+  });
+
+  it('When the run-only window is resized, Then the size is saved under run-only', () => {
+    // Arrange
+    const onSizeChange = vi.fn();
+    createWidgetWindow(
+      { widgetDisplay: 'run-only' },
+      '/app',
+      undefined,
+      undefined,
+      undefined,
+      onSizeChange,
+    );
+    const window = created.windows[0] as MockWindow;
+
+    // Act
+    window.handlers.get('resize')?.();
+
+    // Assert
+    expect(onSizeChange).toHaveBeenCalledWith('run-only', { width: 111, height: 222 });
+  });
+
+  it('When the run-only size is reset without the item list, Then the compact default is applied', () => {
+    // Arrange
+    createWidgetWindow({ widgetDisplay: 'run-only' }, '/app');
+    const window = created.windows[0] as MockWindow;
+
+    // Act
+    const size = resetWidgetWindowSize('run-only', false);
+
+    // Assert
+    expect(size).toEqual(runOnlyStatsOnlySize);
+    expect(window.setBounds).toHaveBeenCalledWith({ x: 10, y: 20, ...runOnlyStatsOnlySize });
+  });
+});
+
+describe('widgetWindow lock (click-through)', () => {
+  beforeEach(() => {
+    created.windows.length = 0;
+    closeWidgetWindow();
+  });
+
+  it('If the widget is stored as locked, Then it is created click-through, unfocusable and shown inactive', () => {
+    // Arrange
+    const settings: Partial<Settings> = { widgetDisplay: 'overall', widgetLocked: true };
+
+    // Act
+    createWidgetWindow(settings, '/app');
+
+    // Assert
+    const window = created.windows[0] as MockWindow;
+    expect(window.options.focusable).toBe(false);
+    expect(window.options.show).toBe(false);
+    expect(window.setIgnoreMouseEvents).toHaveBeenCalledWith(true, { forward: true });
+    expect(window.setFocusable).toHaveBeenCalledWith(false);
+    expect(window.showInactive).toHaveBeenCalledTimes(1);
+  });
+
+  it('If the widget is not locked, Then it is created focusable and receives mouse events', () => {
+    // Arrange
+    const settings: Partial<Settings> = { widgetDisplay: 'overall' };
+
+    // Act
+    createWidgetWindow(settings, '/app');
+
+    // Assert
+    const window = created.windows[0] as MockWindow;
+    expect(window.options.focusable).toBe(true);
+    expect(window.options.show).toBe(true);
+    expect(window.setIgnoreMouseEvents).not.toHaveBeenCalled();
+    expect(window.showInactive).not.toHaveBeenCalled();
+  });
+
+  it('When the widget is locked while open, Then clicks pass through and it gives up focus', () => {
+    // Arrange
+    createWidgetWindow({ widgetDisplay: 'overall' }, '/app');
+    const window = created.windows[0] as MockWindow;
+    window.isFocused.mockReturnValue(true);
+
+    // Act
+    const applied = setWidgetWindowLocked(true);
+
+    // Assert
+    expect(applied).toBe(true);
+    expect(window.setIgnoreMouseEvents).toHaveBeenCalledWith(true, { forward: true });
+    expect(window.setFocusable).toHaveBeenCalledWith(false);
+    expect(window.blur).toHaveBeenCalledTimes(1);
+    expect(window.setSkipTaskbar).toHaveBeenCalledWith(true);
+    expect(window.setAlwaysOnTop).toHaveBeenLastCalledWith(true, 'screen-saver');
+  });
+
+  it('When the widget is unlocked, Then mouse events and focus are restored', () => {
+    // Arrange
+    createWidgetWindow({ widgetDisplay: 'overall', widgetLocked: true }, '/app');
+    const window = created.windows[0] as MockWindow;
+    window.setIgnoreMouseEvents.mockClear();
+    window.setFocusable.mockClear();
+
+    // Act
+    const applied = setWidgetWindowLocked(false);
+
+    // Assert
+    expect(applied).toBe(true);
+    expect(window.setIgnoreMouseEvents).toHaveBeenCalledWith(false);
+    expect(window.setFocusable).toHaveBeenCalledWith(true);
+  });
+
+  it('If an existing locked widget is shown again, Then it is shown without taking focus', () => {
+    // Arrange
+    createWidgetWindow({ widgetDisplay: 'overall', widgetLocked: true }, '/app');
+    const window = created.windows[0] as MockWindow;
+    window.showInactive.mockClear();
+
+    // Act
+    showWidgetWindow({ widgetDisplay: 'overall', widgetLocked: true }, '/app');
+
+    // Assert
+    expect(window.showInactive).toHaveBeenCalledTimes(1);
+    expect(window.show).not.toHaveBeenCalled();
+  });
+
+  it('If no widget window is open, Then locking reports that nothing was applied', () => {
+    // Arrange: the window was closed in beforeEach
+
+    // Act
+    const applied = setWidgetWindowLocked(true);
+
+    // Assert
+    expect(applied).toBe(false);
   });
 });

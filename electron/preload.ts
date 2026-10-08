@@ -3,6 +3,7 @@ import type {
   Character,
   D2SaveFile,
   FileReaderResponse,
+  GlobalHotkeyStatus,
   GrailProgress,
   InventoryItemMoveInput,
   InventorySearchResult,
@@ -12,6 +13,7 @@ import type {
   MonitoringStatus,
   Run,
   RunItem,
+  SaveDirectoryInspection,
   Session,
   Settings,
   TerrorZone,
@@ -239,6 +241,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
     updateSaveDirectory: (saveDir: string): Promise<{ success: boolean }> =>
       ipcRenderer.invoke('saveFile:updateSaveDirectory', saveDir),
     /**
+     * Inspects a candidate save directory without applying it.
+     * @param {string} directory - The candidate directory path.
+     * @returns {Promise<SaveDirectoryInspection>} A promise that resolves with the inspection result.
+     */
+    inspectDirectory: (directory: string): Promise<SaveDirectoryInspection> =>
+      ipcRenderer.invoke('saveFile:inspectDirectory', directory),
+    /**
      * Restores the default save directory for the current platform.
      * @returns {Promise<{ success: boolean; defaultDirectory: string }>} A promise that resolves with success and default directory.
      */
@@ -360,25 +369,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
      * @param callback - Function to call when service errors are received.
      * @returns Cleanup function to remove the listener.
      */
-    onServiceError: (
-      callback: (payload: {
-        service: string;
-        operation: string;
-        severity: 'error' | 'warn';
-        message: string;
-        timestamp: number;
-      }) => void,
-    ) => {
-      const listener = (
-        _event: Electron.IpcRendererEvent,
-        value: {
-          service: string;
-          operation: string;
-          severity: 'error' | 'warn';
-          message: string;
-          timestamp: number;
-        },
-      ) => callback(value);
+    onServiceError: (callback: (payload: unknown) => void) => {
+      const listener = (_event: Electron.IpcRendererEvent, value: unknown) => callback(value);
       ipcRenderer.on('service-error', listener);
       return () => ipcRenderer.removeListener('service-error', listener);
     },
@@ -400,6 +392,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
      * @returns {Promise<string | null>} D2R path or null if not set.
      */
     getD2RPath: (): Promise<string | null> => ipcRenderer.invoke('icon:getD2RPath'),
+
+    /**
+     * Gets the default D2R installation path for this platform, if it exists on disk.
+     * @returns {Promise<string | undefined>} The existing default path, or undefined.
+     */
+    getSuggestedD2RPath: (): Promise<string | undefined> =>
+      ipcRenderer.invoke('icon:getSuggestedD2RPath'),
 
     /**
      * Converts all sprite files from D2R installation to PNGs.
@@ -529,6 +528,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
      */
     updateOpacity: (opacity: number): Promise<{ success: boolean; error?: string }> =>
       ipcRenderer.invoke('widget:update-opacity', opacity),
+
+    /**
+     * Locks or unlocks the widget window. A locked widget is click-through and cannot be focused,
+     * dragged or resized.
+     * @param {boolean} locked - Whether the widget should be locked.
+     * @returns {Promise<{ success: boolean; error?: string }>} Success indicator.
+     */
+    setLocked: (locked: boolean): Promise<{ success: boolean; error?: string }> =>
+      ipcRenderer.invoke('widget:set-locked', locked),
 
     /**
      * Updates the widget window size.
@@ -784,6 +792,25 @@ contextBridge.exposeInMainWorld('electronAPI', {
      */
     getMemoryStatus: (): Promise<{ available: boolean; reason: string | null }> =>
       ipcRenderer.invoke('run-tracker:get-memory-status'),
+
+    /**
+     * Gets the registration status of the run tracker global hotkeys.
+     * @returns {Promise<GlobalHotkeyStatus>} A promise that resolves with the hotkey status.
+     */
+    getGlobalHotkeyStatus: (): Promise<GlobalHotkeyStatus> =>
+      ipcRenderer.invoke('run-tracker:get-global-hotkey-status'),
+
+    /**
+     * Registers a callback for global hotkey status changes.
+     * @param {(status: GlobalHotkeyStatus) => void} callback - Called with the new status.
+     * @returns {() => void} Cleanup function to remove the listener.
+     */
+    onGlobalHotkeyStatus: (callback: (status: GlobalHotkeyStatus) => void) => {
+      const listener = (_event: Electron.IpcRendererEvent, value: GlobalHotkeyStatus) =>
+        callback(value);
+      ipcRenderer.on('run-tracker:global-hotkey-status', listener);
+      return () => ipcRenderer.removeListener('run-tracker:global-hotkey-status', listener);
+    },
 
     /**
      * Manually adds a run item to a run.

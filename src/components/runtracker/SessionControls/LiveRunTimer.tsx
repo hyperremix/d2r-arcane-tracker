@@ -1,0 +1,45 @@
+import { useTranslation } from 'react-i18next';
+import { translations } from '@/i18n/translations';
+import { cn, formatClockDuration } from '@/lib/utils';
+
+interface LiveRunTimerProps {
+  /** Elapsed time of the in-progress run in milliseconds, or undefined when no run is active. */
+  elapsedMs: number | undefined;
+  /** Number of the in-progress run, if any. */
+  runNumber?: number;
+}
+
+/**
+ * Large, glanceable current-run timer with tabular numerals so digits do not shift while ticking.
+ * The timer is intentionally not a live region; state changes are announced by the session state badge.
+ */
+export function LiveRunTimer({ elapsedMs, runNumber }: LiveRunTimerProps) {
+  const { t } = useTranslation();
+  const hasRun = elapsedMs !== undefined;
+
+  return (
+    <div className="flex flex-col gap-1">
+      <p className="font-medium text-muted-foreground text-sm">
+        {t(translations.runTracker.sessionCard.currentRun)}
+        {hasRun && runNumber !== undefined && (
+          <span className="ml-2 font-normal">
+            {t(translations.runTracker.sessionCard.runNumber, { number: runNumber })}
+          </span>
+        )}
+      </p>
+      <p
+        className={cn(
+          'font-mono font-semibold text-5xl tabular-nums leading-none tracking-tight',
+          !hasRun && 'text-muted-foreground/60',
+        )}
+      >
+        {formatClockDuration(elapsedMs ?? 0)}
+      </p>
+      {!hasRun && (
+        <p className="text-muted-foreground text-xs">
+          {t(translations.runTracker.controls.noRunInProgress)}
+        </p>
+      )}
+    </div>
+  );
+}

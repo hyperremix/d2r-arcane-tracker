@@ -13,13 +13,16 @@ import { useGrailStore } from '@/stores/grailStore';
 type PathValidationState = 'idle' | 'validating' | 'valid' | 'invalid';
 
 /**
- * Returns the most common D2R installation directory for the current platform.
- * Used only as a suggestion; it is never saved unless the user accepts it.
- * @returns {string} Platform-specific suggested installation path
+ * Returns the default D2R installation directory for the current platform (the Battle.net
+ * default on Windows). Used as the input placeholder and the browse dialog's start folder.
+ * Kept in sync with WINDOWS_DEFAULT_D2R_INSTALL_PATH / MAC_DEFAULT_D2R_INSTALL_PATH in
+ * electron/services/iconService.ts; the renderer cannot import main-process modules, and this
+ * value is needed synchronously even when the main process finds no existing installation.
+ * @returns {string} Platform-specific default installation path
  */
-function getSuggestedD2RPath(): string {
+function getDefaultD2RPath(): string {
   return window.electronAPI?.platform === 'win32'
-    ? 'C:\\Games\\Diablo II Resurrected'
+    ? 'C:\\Program Files (x86)\\Diablo II Resurrected'
     : '/Applications/Diablo II Resurrected.app';
 }
 
@@ -34,10 +37,12 @@ export function D2RInstallationStep() {
   const d2rPathInputId = useId();
   const pathHintId = useId();
   const validationId = useId();
-  const { settings, setSettings } = useGrailStore();
+  const { settings, hydrateSettings } = useGrailStore();
 
   const [d2rPath, setD2rPath] = useState<string>(settings.d2rInstallPath || '');
   const [hasLoaded, setHasLoaded] = useState(false);
+  // Default install path, only set if the main process confirmed it exists on disk
+  const [suggestedPath, setSuggestedPath] = useState<string | undefined>(undefined);
   const [validation, setValidation] = useState<PathValidationState>('idle');
   // Saving the path failed; shown instead of any validation status until the next attempt
   const [saveFailed, setSaveFailed] = useState(false);
@@ -49,7 +54,7 @@ export function D2RInstallationStep() {
   const validationStateRef = useRef<PathValidationState>('idle');
   // Path currently being saved, so Enter followed by blur does not save it twice
   const savingPathRef = useRef<string | undefined>(undefined);
-  const suggestedPath = getSuggestedD2RPath();
+  const defaultPath = getDefaultD2RPath();
 
   const applyValidation = useCallback((state: PathValidationState) => {
     validationStateRef.current = state;
@@ -75,15 +80,18 @@ export function D2RInstallationStep() {
   }, [applyValidation]);
 
   /**
-   * Saves the path to the main process and settings.
+   * Saves the path via the main process, which persists it, and mirrors it into the store.
    * @returns {Promise<boolean>} Whether the path was saved
    */
   const savePath = useCallback(
     async (trimmedPath: string, requestId: number): Promise<boolean> => {
       savingPathRef.current = trimmedPath;
       try {
+        // The main process persists the path to the database and updates the icon service,
+        // so the store is only hydrated afterwards. A second save could fail after the path
+        // is already persisted and would leave the store, service and database disagreeing.
         await window.electronAPI?.icon.setD2RPath(trimmedPath);
-        await setSettings({ d2rInstallPath: trimmedPath });
+        hydrateSettings({ d2rInstallPath: trimmedPath });
         savedPathRef.current = trimmedPath;
         return true;
       } catch (error) {
@@ -99,7 +107,7 @@ export function D2RInstallationStep() {
         }
       }
     },
-    [applyValidation, setSettings],
+    [applyValidation, hydrateSettings],
   );
 
   const persistPath = useCallback(
@@ -158,6 +166,14 @@ export function D2RInstallationStep() {
         }
       } catch (error) {
         console.error('Failed to load D2R path:', error);
+      }
+
+      try {
+        // Only suggest the default location if it actually exists
+        const suggestion = await window.electronAPI?.icon.getSuggestedD2RPath();
+        setSuggestedPath(suggestion || undefined);
+      } catch (error) {
+        console.error('Failed to get suggested D2R path:', error);
       } finally {
         setHasLoaded(true);
       }
@@ -170,7 +186,7 @@ export function D2RInstallationStep() {
     try {
       const result = await window.electronAPI?.dialog.showOpenDialog({
         title: t(translations.wizard.d2rInstallation.dialogTitle),
-        defaultPath: d2rPath || suggestedPath,
+        defaultPath: d2rPath || suggestedPath || defaultPath,
         properties: ['openDirectory'],
       });
 
@@ -180,7 +196,7 @@ export function D2RInstallationStep() {
     } catch (error) {
       console.error('Failed to browse directory:', error);
     }
-  }, [d2rPath, persistPath, suggestedPath, t]);
+  }, [d2rPath, defaultPath, persistPath, suggestedPath, t]);
 
   const handlePathChange = useCallback(
     (newPath: string) => {
@@ -202,7 +218,7 @@ export function D2RInstallationStep() {
     [persistPath],
   );
 
-  const showSuggestion = hasLoaded && !d2rPath;
+  const isNotDetected = hasLoaded && !d2rPath;
   const describedBy = [pathHintId, validation !== 'idle' || saveFailed ? validationId : undefined]
     .filter(Boolean)
     .join(' ');
@@ -232,7 +248,7 @@ export function D2RInstallationStep() {
               onChange={(e) => handlePathChange(e.target.value)}
               onBlur={(e) => void persistPath(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder={suggestedPath}
+              placeholder={defaultPath}
               aria-invalid={validation === 'invalid' || saveFailed || undefined}
               aria-describedby={describedBy}
               className="flex-1"
@@ -252,22 +268,32 @@ export function D2RInstallationStep() {
           </p>
         </div>
 
-        {/* Suggestion when no installation path was detected */}
-        {showSuggestion && (
+        {/* Not detected: suggest the default location only if it exists */}
+        {isNotDetected && (
           <div className="flex items-start gap-3 rounded-lg border border-dashed bg-muted/50 p-4">
             <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-muted-foreground" />
             <div className="flex-1 space-y-2">
               <p className="font-medium text-sm">
                 {t(translations.wizard.d2rInstallation.notDetectedTitle)}
               </p>
-              <p className="text-muted-foreground text-xs">
-                {t(translations.wizard.d2rInstallation.suggestion)}
-              </p>
-              <p className="break-all font-mono text-xs">{suggestedPath}</p>
+              {suggestedPath ? (
+                <>
+                  <p className="text-muted-foreground text-xs">
+                    {t(translations.wizard.d2rInstallation.suggestion)}
+                  </p>
+                  <p className="break-all font-mono text-xs">{suggestedPath}</p>
+                </>
+              ) : (
+                <p className="text-muted-foreground text-xs">
+                  {t(translations.wizard.d2rInstallation.notDetectedHint)}
+                </p>
+              )}
               <div className="flex flex-wrap gap-2">
-                <Button size="sm" variant="outline" onClick={() => persistPath(suggestedPath)}>
-                  {t(translations.wizard.d2rInstallation.useSuggestion)}
-                </Button>
+                {suggestedPath && (
+                  <Button size="sm" variant="outline" onClick={() => persistPath(suggestedPath)}>
+                    {t(translations.wizard.d2rInstallation.useSuggestion)}
+                  </Button>
+                )}
                 <Button size="sm" variant="ghost" onClick={handleBrowseDirectory}>
                   <FolderOpen className="mr-2 h-4 w-4" />
                   {t(translations.settings.d2rInstallation.browseForDirectory)}
@@ -286,14 +312,14 @@ export function D2RInstallationStep() {
             </p>
           )}
           {validation === 'valid' && (
-            <p className="flex items-center gap-2 text-accent-green text-sm">
+            <p className="flex items-center gap-2 text-sm text-success">
               <CheckCircle className="h-4 w-4" />
               {t(translations.wizard.d2rInstallation.valid)}
             </p>
           )}
           {validation === 'invalid' && (
             <div className="flex items-start gap-2 rounded-lg border p-3">
-              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-accent-yellow" />
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
               <div className="space-y-1">
                 <p className="font-medium text-sm">
                   {t(translations.wizard.d2rInstallation.invalid)}

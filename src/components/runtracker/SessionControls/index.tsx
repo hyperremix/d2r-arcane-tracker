@@ -1,4 +1,4 @@
-import { AlertCircle, Loader2, Timer } from 'lucide-react';
+import { AlertTriangle, Loader2, Timer } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -12,15 +12,20 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardAction, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
+import { isGlobalHotkeysActive, useGlobalHotkeyStatus } from '@/hooks/useGlobalHotkeyStatus';
+import { useNow } from '@/hooks/useNow';
 import { translations } from '@/i18n/translations';
 import { matchesShortcut } from '@/lib/hotkeys';
 import { useGrailStore } from '@/stores/grailStore';
 import type { RunTrackerAction } from '@/stores/runTrackerStore';
 import { useRunTrackerStore } from '@/stores/runTrackerStore';
+import { getLiveSessionState } from '../liveSession';
+import { SessionStateBadge } from '../SessionStateBadge';
 import type { ControlButtonsPending } from './ControlButtons';
-import { ControlButtons } from './ControlButtons';
+import { ControlButtons, ShortcutsInfo } from './ControlButtons';
+import { LiveRunTimer } from './LiveRunTimer';
 import { ManualItemEntry } from './ManualItemEntry';
 
 // Helper function to check if user is typing in input fields
@@ -75,6 +80,7 @@ function _getControlsPending(
   pendingActions: Partial<Record<RunTrackerAction, boolean>>,
 ): ControlButtonsPending {
   return {
+    startSession: Boolean(pendingActions.startSession),
     startRun: Boolean(pendingActions.startRun),
     pauseResume: Boolean(pendingActions.pauseRun || pendingActions.resumeRun),
     endRun: Boolean(pendingActions.endRun),
@@ -83,15 +89,15 @@ function _getControlsPending(
 }
 
 /**
- * SessionControls component that provides controls for managing run tracking.
- * Includes buttons for start, pause, resume, end run, and end session with keyboard shortcuts.
+ * SessionControls component that renders the live session area: a large current-run timer,
+ * a session state badge and the state-dependent run actions (with keyboard shortcuts),
+ * plus auto mode and manual item entry.
  */
 export function SessionControls() {
   const { t } = useTranslation();
   const {
     activeSession,
     activeRun,
-    isTracking,
     isPaused,
     pendingActions,
     runs,
@@ -100,6 +106,7 @@ export function SessionControls() {
     pauseRun,
     resumeRun,
     endSession,
+    startSession,
     addManualRunItem,
   } = useRunTrackerStore();
 
@@ -113,6 +120,7 @@ export function SessionControls() {
 
   const isWindows = window.electronAPI?.platform === 'win32';
   const autoModeEnabled = (settings.runTrackerMemoryReading ?? false) && isWindows;
+  const globalHotkeysActive = isGlobalHotkeysActive(useGlobalHotkeyStatus());
 
   const [showEndRunDialog, setShowEndRunDialog] = useState(false);
   const [showEndSessionDialog, setShowEndSessionDialog] = useState(false);
@@ -120,6 +128,10 @@ export function SessionControls() {
     available: boolean;
     reason: string | null;
   } | null>(null);
+
+  // Runs are only tracked automatically while memory reading is not known to be unavailable;
+  // otherwise the manual run controls stay usable so the user is not left without a way to track runs
+  const autoTrackingActive = autoModeEnabled && memoryStatus?.available !== false;
 
   // Fetch memory status on mount
   useEffect(() => {
@@ -136,6 +148,14 @@ export function SessionControls() {
   );
 
   // Button click handlers
+  const handleStartSession = useCallback(async () => {
+    try {
+      await startSession();
+    } catch (error) {
+      console.error('Failed to start session:', error);
+    }
+  }, [startSession]);
+
   const handleStartRun = useCallback(async () => {
     try {
       // Manual run start - no character association
@@ -190,21 +210,21 @@ export function SessionControls() {
     [activeSession, activeRun, runs],
   );
 
-  // Keyboard shortcut handlers
+  // Keyboard shortcut handlers (gated on auto mode like the buttons; End Session stays allowed)
   const handleStartRunShortcut = useCallback(
     (event: KeyboardEvent) => {
       event.preventDefault();
-      if (activeSession && !activeRun && !controlsBusy) {
+      if (activeSession && !activeRun && !controlsBusy && !autoTrackingActive) {
         handleStartRun();
       }
     },
-    [activeSession, activeRun, controlsBusy, handleStartRun],
+    [activeSession, activeRun, controlsBusy, autoTrackingActive, handleStartRun],
   );
 
   const handlePauseResumeShortcut = useCallback(
     (event: KeyboardEvent) => {
       event.preventDefault();
-      if (activeRun && !controlsBusy) {
+      if (activeRun && !controlsBusy && !autoTrackingActive) {
         if (isPaused) {
           handleResumeRun();
         } else {
@@ -212,17 +232,17 @@ export function SessionControls() {
         }
       }
     },
-    [activeRun, isPaused, controlsBusy, handlePauseRun, handleResumeRun],
+    [activeRun, isPaused, controlsBusy, autoTrackingActive, handlePauseRun, handleResumeRun],
   );
 
   const handleEndRunShortcut = useCallback(
     (event: KeyboardEvent) => {
       event.preventDefault();
-      if (activeRun && !controlsBusy) {
+      if (activeRun && !controlsBusy && !autoTrackingActive) {
         setShowEndRunDialog(true);
       }
     },
-    [activeRun, controlsBusy],
+    [activeRun, controlsBusy, autoTrackingActive],
   );
 
   const handleEndSessionShortcut = useCallback(
@@ -280,32 +300,67 @@ export function SessionControls() {
   }, [handleKeyDown]);
 
   // Determine button states
-  const canStartRun = Boolean(activeSession && !activeRun && !controlsBusy && !autoModeEnabled);
-  const canPauseResume = Boolean(activeRun && !controlsBusy && !autoModeEnabled);
-  const canEndRun = Boolean(activeRun && !controlsBusy && !autoModeEnabled);
+  const canStartRun = Boolean(activeSession && !activeRun && !controlsBusy && !autoTrackingActive);
+  const canPauseResume = Boolean(activeRun && !controlsBusy && !autoTrackingActive);
+  const canEndRun = Boolean(activeRun && !controlsBusy && !autoTrackingActive);
   // End Session stays available in auto mode so tracked sessions can still be stopped by mouse
   const canEndSession = Boolean(activeSession && !controlsBusy);
+  const canStartSession = Boolean(!activeSession && !controlsBusy);
+
+  // Live current-run timer; only ticks while a run is in progress
+  const now = useNow(Boolean(activeRun));
+  const runElapsed = activeRun ? Math.max(0, now - activeRun.startTime.getTime()) : undefined;
+  const liveState = getLiveSessionState({
+    hasSession: Boolean(activeSession),
+    hasActiveRun: Boolean(activeRun),
+    isPaused,
+  });
+  // Only warn about unavailable memory reading when the user actually relies on auto mode
+  const showAutoModeUnavailable = Boolean(
+    autoModeEnabled && activeSession && memoryStatus && !memoryStatus.available,
+  );
 
   return (
     <>
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            {t(translations.runTracker.controls.sessionControls)}
-            {isTracking && (
-              <div className="flex items-center gap-1">
-                <div className={`h-2 w-2 rounded-full ${isPaused ? 'bg-warning' : 'bg-success'}`} />
-                <span className="text-muted-foreground text-sm">
-                  {isPaused
-                    ? t(translations.runTracker.controls.paused)
-                    : t(translations.runTracker.controls.running)}
-                </span>
-              </div>
-            )}
-          </CardTitle>
+          <CardTitle>{t(translations.runTracker.controls.liveSession)}</CardTitle>
+          <CardAction>
+            <SessionStateBadge state={liveState} />
+          </CardAction>
         </CardHeader>
         <CardContent>
-          <div className="flex flex-col gap-8">
+          <div className="flex flex-col gap-6">
+            {/* Live top row: current run timer and the state-dependent actions */}
+            <div className="flex flex-wrap items-end justify-between gap-4">
+              <LiveRunTimer elapsedMs={runElapsed} runNumber={activeRun?.runNumber} />
+              <ControlButtons
+                shortcuts={shortcuts}
+                hasSession={Boolean(activeSession)}
+                hasActiveRun={Boolean(activeRun)}
+                autoModeEnabled={autoTrackingActive}
+                canStartSession={canStartSession}
+                canStartRun={canStartRun}
+                canPauseResume={canPauseResume}
+                canEndRun={canEndRun}
+                canEndSession={canEndSession}
+                isPaused={isPaused}
+                pending={pending}
+                onStartSession={handleStartSession}
+                onStartRun={handleStartRun}
+                onPauseRun={handlePauseRun}
+                onResumeRun={handleResumeRun}
+                onEndRun={() => setShowEndRunDialog(true)}
+                onEndSession={() => setShowEndSessionDialog(true)}
+              />
+            </div>
+
+            {!activeSession && (
+              <p className="text-muted-foreground text-sm">
+                {t(translations.runTracker.sessionCard.startSessionPrompt)}
+              </p>
+            )}
+
             {/* Auto Mode Toggle - Windows only */}
             {isWindows && activeSession && (
               <div className="flex items-center justify-between rounded-md border p-3">
@@ -322,10 +377,10 @@ export function SessionControls() {
               </div>
             )}
 
-            {/* Warning when memory reading is unavailable */}
-            {isWindows && memoryStatus && !memoryStatus.available && (
-              <Alert variant="destructive">
-                <AlertCircle className="h-4 w-4" />
+            {/* Warning when auto mode is on but memory reading is unavailable */}
+            {showAutoModeUnavailable && (
+              <Alert variant="warning" live="polite">
+                <AlertTriangle className="h-4 w-4" aria-hidden="true" />
                 <AlertDescription className="text-xs">
                   <strong>{t(translations.settings.runTracker.autoModeUnavailable)}</strong>{' '}
                   {t(translations.settings.runTracker.autoModeUnavailableDescription)}
@@ -333,27 +388,16 @@ export function SessionControls() {
               </Alert>
             )}
 
-            <ControlButtons
-              shortcuts={shortcuts}
-              canStartRun={canStartRun}
-              canPauseResume={canPauseResume}
-              canEndRun={canEndRun}
-              canEndSession={canEndSession}
-              isPaused={isPaused}
-              pending={pending}
-              onStartRun={handleStartRun}
-              onPauseRun={handlePauseRun}
-              onResumeRun={handleResumeRun}
-              onEndRun={() => setShowEndRunDialog(true)}
-              onEndSession={() => setShowEndSessionDialog(true)}
-            />
-
             {/* Manual Item Entry */}
-            <ManualItemEntry
-              hasRuns={hasRuns}
-              loading={Boolean(pendingActions.addManualRunItem)}
-              addManualRunItem={addManualRunItem}
-            />
+            {activeSession && (
+              <ManualItemEntry
+                hasRuns={hasRuns}
+                loading={Boolean(pendingActions.addManualRunItem)}
+                addManualRunItem={addManualRunItem}
+              />
+            )}
+
+            <ShortcutsInfo shortcuts={shortcuts} globalHotkeysActive={globalHotkeysActive} />
           </div>
         </CardContent>
       </Card>

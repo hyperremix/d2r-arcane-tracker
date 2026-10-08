@@ -92,6 +92,19 @@ export function initializeIconHandlers(): void {
   });
 
   /**
+   * Gets the platform's default D2R installation path if it exists on disk.
+   * Used by the setup wizard so it only suggests a path that is actually there.
+   */
+  ipcMain.handle('icon:getSuggestedD2RPath', async (): Promise<string | undefined> => {
+    try {
+      return iconService.getSuggestedD2RPath();
+    } catch (error) {
+      console.error('Failed to get suggested D2R path:', error);
+      return undefined;
+    }
+  });
+
+  /**
    * Converts all sprite files from D2R installation to PNGs
    */
   ipcMain.handle('icon:convertSprites', async (): Promise<ConversionResult> => {

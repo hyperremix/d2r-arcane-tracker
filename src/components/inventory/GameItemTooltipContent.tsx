@@ -8,20 +8,20 @@ interface GameItemTooltipContentProps {
 
 function getNameColorClass(model: GameItemTooltipModel): string {
   if (model.isRuneword) {
-    return 'text-amber-500 dark:text-amber-300';
+    return 'text-item-unique';
   }
 
   switch (model.quality.toLowerCase()) {
     case 'unique':
-      return 'text-yellow-500 dark:text-yellow-300';
+      return 'text-item-unique';
     case 'set':
-      return 'text-emerald-600 dark:text-green-300';
+      return 'text-item-set';
     case 'magic':
-      return 'text-blue-600 dark:text-blue-300';
+      return 'text-item-magic';
     case 'rare':
-      return 'text-amber-600 dark:text-yellow-200';
+      return 'text-item-rare';
     case 'crafted':
-      return 'text-orange-600 dark:text-orange-300';
+      return 'text-item-rune';
     default:
       return 'text-popover-foreground';
   }
@@ -36,9 +36,9 @@ function GameItemTooltipSocketRow({ entry }: GameItemTooltipSocketRowProps) {
 
   if (entry.isOpenSocket) {
     return (
-      <div className="flex items-center gap-2 text-amber-700 dark:text-amber-300">
-        <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-[2px] border border-amber-600/80 bg-black/30 dark:border-amber-300/70">
-          <div className="h-2 w-2 rounded-full border border-amber-500/90 dark:border-amber-200/90" />
+      <div className="flex items-center gap-2 text-warning">
+        <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-[2px] border border-warning/80 bg-black/30">
+          <div className="h-2 w-2 rounded-full border border-warning/90" />
         </div>
         <span>{entry.name}</span>
       </div>
@@ -74,7 +74,7 @@ export function GameItemTooltipContent({ model }: GameItemTooltipContentProps) {
       ))}
 
       {model.affixLines.map((line) => (
-        <div key={line} className="text-sky-600 dark:text-sky-300">
+        <div key={line} className="text-item-magic">
           {line}
         </div>
       ))}

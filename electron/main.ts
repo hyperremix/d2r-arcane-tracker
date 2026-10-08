@@ -1,9 +1,21 @@
 import { createRequire } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { app, BrowserWindow, type IpcMainEvent, ipcMain, screen, session } from 'electron';
+import {
+  app,
+  BrowserWindow,
+  type IpcMainEvent,
+  ipcMain,
+  nativeTheme,
+  screen,
+  session,
+} from 'electron';
 import { grailDatabase } from './database/database';
 import { initializeDialogHandlers } from './ipc-handlers/dialogHandlers';
+import {
+  closeGlobalHotkeys,
+  initializeGlobalHotkeyHandlers,
+} from './ipc-handlers/globalHotkeyHandlers';
 import { closeGrailDatabase, initializeGrailHandlers } from './ipc-handlers/grailHandlers';
 import { initializeIconHandlers } from './ipc-handlers/iconHandlers';
 import { initializeInventoryWindowHandlers } from './ipc-handlers/inventoryWindowHandlers';
@@ -21,11 +33,15 @@ import { initializeUpdateHandlers } from './ipc-handlers/updateHandlers';
 import { initializeVaultHandlers } from './ipc-handlers/vaultHandlers';
 import { initializeWidgetHandlers } from './ipc-handlers/widgetHandlers';
 import { configureSaveFileBackups } from './services/saveFileBackup';
+import type { Settings } from './types/grail';
+import type { WidgetDisplayMode, WidgetSize } from './utils/widgetDisplay';
+import { getWidgetSizeSettingKey } from './utils/widgetDisplay';
 import { isPositionOnScreen } from './utils/windowSnapping';
 import {
   closeInventorySnapshotWindows,
   setInventorySnapshotWindowsTitleBarOverlay,
 } from './window/inventorySnapshotWindow';
+import { getMainWindowThemeColors } from './window/mainWindowTheme';
 import { closeWidgetWindow, showWidgetWindow } from './window/widgetWindow';
 
 createRequire(import.meta.url);
@@ -111,8 +127,10 @@ function createWindow() {
     x: undefined as number | undefined,
     y: undefined as number | undefined,
   };
+  let storedTheme: Settings['theme'] | undefined;
   try {
     const settings = grailDatabase.getAllSettings();
+    storedTheme = settings.theme;
 
     if (settings.mainWindowBounds) {
       const { x, y, width, height } = settings.mainWindowBounds;
@@ -130,6 +148,9 @@ function createWindow() {
     console.error('Failed to load main window bounds from settings:', error);
   }
 
+  // Match the renderer's theme so the window doesn't flash the wrong color before it paints
+  const themeColors = getMainWindowThemeColors(storedTheme, nativeTheme.shouldUseDarkColors);
+
   mainWindow = new BrowserWindow({
     width: windowBounds.width,
     height: windowBounds.height,
@@ -139,6 +160,7 @@ function createWindow() {
       ? { x: windowBounds.x, y: windowBounds.y }
       : {}),
     icon: iconPath,
+    backgroundColor: themeColors.backgroundColor,
     // Custom title bar configuration
     titleBarStyle: 'hidden',
     // Position macOS traffic lights to be vertically centered in 48px title bar
@@ -147,8 +169,8 @@ function createWindow() {
       : {
           // Expose window controls on Windows/Linux with custom styling
           titleBarOverlay: {
-            color: '#09090b', // Dark background matching title bar
-            symbolColor: '#ffffff', // Light gray symbols
+            color: themeColors.backgroundColor, // Background matching the title bar
+            symbolColor: themeColors.symbolColor,
             height: 47, // Match title bar height (h-12 = 48px)
           },
         }),
@@ -272,6 +294,9 @@ app.whenReady().then(() => {
     console.error('[main] Check the logs above for any RunTrackerService creation errors');
   }
 
+  // Opt-in global hotkeys for the run tracker (work while D2R is focused)
+  initializeGlobalHotkeyHandlers(runTracker, () => mainWindow);
+
   initializeDialogHandlers();
   initializeShellHandlers();
   initializeIconHandlers();
@@ -297,10 +322,7 @@ app.whenReady().then(() => {
   // Debounce timer for widget size changes
   let widgetSizeChangeTimeout: NodeJS.Timeout | null = null;
 
-  const onWidgetSizeChange = (
-    display: 'overall' | 'split' | 'all' | 'run-only',
-    size: { width: number; height: number },
-  ) => {
+  const onWidgetSizeChange = (display: WidgetDisplayMode, size: WidgetSize) => {
     // Debounce widget size changes to avoid excessive database writes during resize
     if (widgetSizeChangeTimeout) {
       clearTimeout(widgetSizeChangeTimeout);
@@ -308,17 +330,7 @@ app.whenReady().then(() => {
 
     widgetSizeChangeTimeout = setTimeout(() => {
       try {
-        // 'run-only' mode doesn't have a custom size setting - it always uses the default
-        if (display === 'run-only') {
-          return;
-        }
-        // Convert display type to setting key format
-        const displayKey = display.charAt(0).toUpperCase() + display.slice(1);
-        const settingKey = `widgetSize${displayKey}` as
-          | 'widgetSizeOverall'
-          | 'widgetSizeSplit'
-          | 'widgetSizeAll';
-        grailDatabase.setSetting(settingKey, JSON.stringify(size));
+        grailDatabase.setSetting(getWidgetSizeSettingKey(display), JSON.stringify(size));
       } catch (error) {
         console.error('Failed to save widget size:', error);
       }
@@ -396,6 +408,11 @@ app.on('before-quit', () => {
   closeRunTracker();
   closeWidgetWindow();
   closeInventorySnapshotWindows();
+});
+
+// Release OS-wide hotkeys so other applications can use the key combinations again
+app.on('will-quit', () => {
+  closeGlobalHotkeys();
 });
 
 /**

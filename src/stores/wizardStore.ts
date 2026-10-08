@@ -31,7 +31,7 @@ export const useWizardStore = create<WizardState>((set) => ({
   // Initial state
   isOpen: false,
   currentStep: 0,
-  totalSteps: 8, // Welcome, Save Dir, D2R Installation, Game Mode, Game Version, Grail, Preferences, Completion
+  totalSteps: 6, // Welcome, Save Dir, What to Track, D2R Installation, Preferences, Completion
   stepValidity: {},
 
   // Actions

@@ -3,9 +3,22 @@ import type {
   TerrorZoneValidationErrorCode,
   TerrorZoneValidationResult,
 } from 'electron/types/grail';
-import { AlertCircle, AlertTriangle, RotateCcw, Search, XCircle } from 'lucide-react';
-import { useCallback, useEffect, useId, useState } from 'react';
+import {
+  AlertCircle,
+  AlertTriangle,
+  ExternalLink,
+  Info,
+  Loader2,
+  RotateCcw,
+  Search,
+  XCircle,
+} from 'lucide-react';
+import type { MouseEvent } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { toast } from 'sonner';
+import { PageHeader } from '@/components/layout/PageHeader';
+import { PageShell } from '@/components/layout/PageShell';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import {
   AlertDialog,
@@ -18,7 +31,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
@@ -38,6 +51,37 @@ const validationErrorKeys: Record<TerrorZoneValidationErrorCode, string> = {
 };
 
 /**
+ * Sonner toast id shared by all successful writes so repeated saves update one toast.
+ */
+const SAVE_TOAST_ID = 'terror-zone-config-saved';
+
+/**
+ * User guide for this page, opened in the system browser.
+ */
+const TERROR_ZONE_GUIDE_URL =
+  'https://github.com/hyperremix/d2r-arcane-tracker/blob/main/docs/TERROR_ZONE_CONFIGURATION.md';
+
+type BulkAction = 'enableAll' | 'disableAll';
+
+/**
+ * A write that has been queued but has not started yet. Changes made while it waits share it.
+ */
+interface QueuedWrite {
+  zoneIds: Set<string>;
+  promise: Promise<void>;
+}
+
+/**
+ * Builds a configuration with an explicit enabled state for every zone.
+ */
+function buildConfig(
+  zones: TerrorZone[],
+  isEnabled: (zone: TerrorZone) => boolean,
+): Record<string, boolean> {
+  return Object.fromEntries(zones.map((zone) => [zone.id, isEnabled(zone)]));
+}
+
+/**
  * TerrorZoneConfiguration component that serves as the main terror zone configuration page.
  * Allows users to enable/disable specific terror zones by modifying the game's desecratedzones.json file.
  * @returns {JSX.Element} The main terror zone configuration interface
@@ -50,18 +94,37 @@ export function TerrorZoneConfiguration() {
   const [config, setConfig] = useState<Record<string, boolean>>({});
   const [searchTerm, setSearchTerm] = useState('');
   const [isLoading, setIsLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
+  const [pendingZoneIds, setPendingZoneIds] = useState<ReadonlySet<string>>(() => new Set());
+  const [bulkAction, setBulkAction] = useState<BulkAction | undefined>(undefined);
+  const [isRestoring, setIsRestoring] = useState(false);
   const [validationStatus, setValidationStatus] = useState<TerrorZoneValidationResult>({
     valid: false,
     errorCode: 'pathNotConfigured',
   });
   const [showRestoreDialog, setShowRestoreDialog] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [showDisableAllDialog, setShowDisableAllDialog] = useState(false);
+  const [error, setError] = useState<string | undefined>(undefined);
 
-  const loadData = useCallback(async () => {
+  // The configuration the user wants (shown optimistically) and the last one written successfully.
+  const desiredConfigRef = useRef<Record<string, boolean>>({});
+  const persistedConfigRef = useRef<Record<string, boolean>>({});
+  // Writes replace the whole game file, so they run one after another.
+  const writeQueueRef = useRef<Promise<void>>(Promise.resolve());
+  const queuedWriteRef = useRef<QueuedWrite | undefined>(undefined);
+
+  const applyConfig = useCallback((nextConfig: Record<string, boolean>) => {
+    desiredConfigRef.current = nextConfig;
+    setConfig(nextConfig);
+  }, []);
+
+  /**
+   * Loads the validation status, zones and configuration.
+   * Resolves to `false` when loading failed (the load error is shown), otherwise `true`.
+   */
+  const loadData = useCallback(async (): Promise<boolean> => {
     try {
       setIsLoading(true);
-      setError(null);
+      setError(undefined);
 
       // Validate path first
       const validation = await window.electronAPI.terrorZone.validatePath();
@@ -69,7 +132,7 @@ export function TerrorZoneConfiguration() {
 
       if (!validation.valid) {
         // Don't set error state for path validation issues - they're shown in the validation alert
-        return;
+        return true;
       }
 
       // Load zones and config in parallel
@@ -78,106 +141,162 @@ export function TerrorZoneConfiguration() {
         window.electronAPI.terrorZone.getConfig(),
       ]);
 
+      // Store an explicit state for every zone: the main process only keeps zones marked `true`,
+      // while zones without a stored flag are enabled in the game file.
+      const loadedConfig = buildConfig(zonesData, (zone) => configData[zone.id] ?? true);
       setZones(zonesData);
-      setConfig(configData);
+      persistedConfigRef.current = loadedConfig;
+      applyConfig(loadedConfig);
+      return true;
     } catch (err) {
       console.error('Failed to load terror zone data:', err);
       setError(t(translations.terrorZone.errors.loadFailed));
+      return false;
     } finally {
       setIsLoading(false);
     }
-  }, [t]);
+  }, [applyConfig, t]);
 
   // Load zones and configuration on mount
   useEffect(() => {
     loadData();
   }, [loadData]);
 
-  const handleZoneToggle = useCallback(
-    async (zoneId: string, enabled: boolean) => {
-      try {
-        setIsSaving(true);
-        const newConfig = { ...config, [zoneId]: enabled };
-        setConfig(newConfig);
-
-        const result = await window.electronAPI.terrorZone.updateConfig(newConfig);
-        if (!result.success) {
-          throw new Error('Failed to update terror zone configuration');
+  /**
+   * Queues a write of the desired configuration to the game file for the given zones.
+   * The configuration is read when the write starts, so changes made while an earlier write is
+   * running share the next queued write and its result. If that write fails, the zones it covered
+   * are rolled back to their last saved state before the next write starts.
+   * Resolves once the write succeeds and rejects if it fails.
+   */
+  const persistDesiredConfig = useCallback(
+    (zoneIds: string[]): Promise<void> => {
+      const queued = queuedWriteRef.current;
+      if (queued) {
+        for (const zoneId of zoneIds) {
+          queued.zoneIds.add(zoneId);
         }
-      } catch (err) {
-        console.error('Failed to update zone:', err);
-        setError(t(translations.terrorZone.errors.updateFailed));
-        // Revert the change
-        setConfig(config);
-      } finally {
-        setIsSaving(false);
+        return queued.promise;
       }
+
+      const coveredZoneIds = new Set(zoneIds);
+      const promise = writeQueueRef.current.then(async () => {
+        queuedWriteRef.current = undefined;
+        const snapshot = desiredConfigRef.current;
+        try {
+          const result = await window.electronAPI.terrorZone.updateConfig(snapshot);
+          if (!result.success) {
+            throw new Error('Failed to update terror zone configuration');
+          }
+          persistedConfigRef.current = snapshot;
+        } catch (err) {
+          console.error('Failed to update terror zone configuration:', err);
+          const rolledBack = { ...desiredConfigRef.current };
+          for (const zoneId of coveredZoneIds) {
+            rolledBack[zoneId] = persistedConfigRef.current[zoneId] ?? true;
+          }
+          applyConfig(rolledBack);
+          throw err;
+        }
+      });
+      queuedWriteRef.current = { zoneIds: coveredZoneIds, promise };
+      writeQueueRef.current = promise.catch(() => undefined);
+      return promise;
     },
-    [config, t],
+    [applyConfig],
   );
 
-  const handleEnableAll = useCallback(async () => {
-    try {
-      setIsSaving(true);
-      const newConfig: Record<string, boolean> = {};
-      zones.forEach((zone) => {
-        newConfig[zone.id] = true;
+  const handleSaveSuccess = useCallback(
+    (title: string) => {
+      setError(undefined);
+      toast.success(title, {
+        id: SAVE_TOAST_ID,
+        description: t(translations.terrorZone.feedback.restartToApply, {
+          flags: t(translations.terrorZone.flagsValue),
+        }),
       });
-      setConfig(newConfig);
+    },
+    [t],
+  );
 
-      const result = await window.electronAPI.terrorZone.updateConfig(newConfig);
-      if (!result.success) {
-        throw new Error('Failed to enable all zones');
+  const handleZoneToggle = useCallback(
+    async (zoneId: string, enabled: boolean) => {
+      setPendingZoneIds((previous) => new Set(previous).add(zoneId));
+      applyConfig({ ...desiredConfigRef.current, [zoneId]: enabled });
+
+      try {
+        await persistDesiredConfig([zoneId]);
+        handleSaveSuccess(t(translations.terrorZone.feedback.saved));
+      } catch {
+        setError(t(translations.terrorZone.errors.updateFailed));
+      } finally {
+        setPendingZoneIds((previous) => {
+          const next = new Set(previous);
+          next.delete(zoneId);
+          return next;
+        });
       }
-    } catch (err) {
-      console.error('Failed to enable all zones:', err);
-      setError(t(translations.terrorZone.errors.enableAllFailed));
-      setConfig(config);
-    } finally {
-      setIsSaving(false);
-    }
-  }, [zones, config, t]);
+    },
+    [applyConfig, handleSaveSuccess, persistDesiredConfig, t],
+  );
 
-  const handleDisableAll = useCallback(async () => {
-    try {
-      setIsSaving(true);
-      const newConfig: Record<string, boolean> = {};
-      zones.forEach((zone) => {
-        newConfig[zone.id] = false;
-      });
-      setConfig(newConfig);
+  const runBulkUpdate = useCallback(
+    async (action: BulkAction) => {
+      const enabled = action === 'enableAll';
+      setBulkAction(action);
+      applyConfig(buildConfig(zones, () => enabled));
 
-      const result = await window.electronAPI.terrorZone.updateConfig(newConfig);
-      if (!result.success) {
-        throw new Error('Failed to disable all zones');
+      try {
+        await persistDesiredConfig(zones.map((zone) => zone.id));
+        handleSaveSuccess(t(translations.terrorZone.feedback.saved));
+      } catch {
+        setError(
+          t(
+            enabled
+              ? translations.terrorZone.errors.enableAllFailed
+              : translations.terrorZone.errors.disableAllFailed,
+          ),
+        );
+      } finally {
+        setBulkAction(undefined);
       }
-    } catch (err) {
-      console.error('Failed to disable all zones:', err);
-      setError(t(translations.terrorZone.errors.disableAllFailed));
-      setConfig(config);
-    } finally {
-      setIsSaving(false);
-    }
-  }, [zones, config, t]);
+    },
+    [applyConfig, handleSaveSuccess, persistDesiredConfig, t, zones],
+  );
+
+  const handleEnableAll = useCallback(() => runBulkUpdate('enableAll'), [runBulkUpdate]);
+
+  const handleConfirmDisableAll = useCallback(() => {
+    setShowDisableAllDialog(false);
+    return runBulkUpdate('disableAll');
+  }, [runBulkUpdate]);
 
   const handleRestoreOriginal = useCallback(async () => {
     try {
-      setIsSaving(true);
+      setIsRestoring(true);
       const result = await window.electronAPI.terrorZone.restoreOriginal();
       if (!result.success) {
         throw new Error('Failed to restore original file');
       }
 
-      // Reload data after restore
-      await loadData();
+      // Reload data after restore; a failed reload keeps its own load error instead of a success
+      const reloaded = await loadData();
       setShowRestoreDialog(false);
+      if (reloaded) {
+        handleSaveSuccess(t(translations.terrorZone.feedback.restored));
+      }
     } catch (err) {
       console.error('Failed to restore original:', err);
       setError(t(translations.terrorZone.errors.restoreFailed));
     } finally {
-      setIsSaving(false);
+      setIsRestoring(false);
     }
-  }, [loadData, t]);
+  }, [handleSaveSuccess, loadData, t]);
+
+  const handleOpenGuide = useCallback((event: MouseEvent<HTMLAnchorElement>) => {
+    event.preventDefault();
+    void window.electronAPI?.shell.openExternal(TERROR_ZONE_GUIDE_URL);
+  }, []);
 
   // Filter zones based on search term
   const filteredZones = zones.filter(
@@ -196,44 +315,42 @@ export function TerrorZoneConfiguration() {
     ? undefined
     : t(validationErrorKeys[validationStatus.errorCode]);
   const showExtractionGuide = validationStatus.errorCode === 'gameFileNotFound';
+  const isBulkSaving = bulkAction !== undefined;
+  const isWriteInProgress = isBulkSaving || isRestoring || pendingZoneIds.size > 0;
+  const areActionsDisabled = isWriteInProgress || !validationStatus.valid;
+
+  const pageHeader = (
+    <PageHeader
+      title={t(translations.terrorZone.title)}
+      description={t(translations.terrorZone.description)}
+    />
+  );
 
   if (isLoading) {
     return (
       <TooltipProvider>
-        <div className="flex-1 overflow-y-auto">
-          <div className="space-y-6 p-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-lg">
-                  <AlertTriangle className="h-5 w-5" />
-                  {t(translations.terrorZone.title)}
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center justify-center py-8">
-                  <div className="text-muted-foreground">
-                    {t(translations.terrorZone.loadingTerrorZones)}
-                  </div>
+        <PageShell>
+          {pageHeader}
+          <Card>
+            <CardContent>
+              <div className="flex items-center justify-center py-8">
+                <div className="text-muted-foreground">
+                  {t(translations.terrorZone.loadingTerrorZones)}
                 </div>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
+              </div>
+            </CardContent>
+          </Card>
+        </PageShell>
       </TooltipProvider>
     );
   }
 
   return (
     <TooltipProvider>
-      <div className="flex-1 overflow-y-auto">
+      <PageShell padded={false}>
         <div className="space-y-6 p-6">
+          {pageHeader}
           <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-lg">
-                <AlertTriangle className="h-5 w-5" />
-                {t(translations.terrorZone.title)}
-              </CardTitle>
-            </CardHeader>
             <CardContent className="space-y-4">
               {/* Warning Alert */}
               <Alert>
@@ -243,6 +360,35 @@ export function TerrorZoneConfiguration() {
                   {t(translations.terrorZone.warning)}
                 </AlertDescription>
               </Alert>
+
+              {/* Requirements for changes to take effect in game */}
+              {validationStatus.valid && (
+                <Alert live="polite">
+                  <Info className="h-4 w-4" />
+                  <AlertTitle>{t(translations.terrorZone.requirements.title)}</AlertTitle>
+                  <AlertDescription>
+                    <ul className="ml-4 list-disc space-y-1">
+                      <li>
+                        {t(translations.terrorZone.requirements.launchWithFlags)}{' '}
+                        <code className="rounded bg-muted px-1 text-foreground">
+                          {t(translations.terrorZone.flagsValue)}
+                        </code>
+                      </li>
+                      <li>{t(translations.terrorZone.requirements.restartAfterChanges)}</li>
+                    </ul>
+                    <a
+                      href={TERROR_ZONE_GUIDE_URL}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={handleOpenGuide}
+                      className="inline-flex items-center gap-1 text-primary underline-offset-4 hover:underline"
+                    >
+                      {t(translations.terrorZone.requirements.openGuide)}
+                      <ExternalLink className="h-3 w-3" aria-hidden="true" />
+                    </a>
+                  </AlertDescription>
+                </Alert>
+              )}
 
               {/* Validation Status */}
               {!validationStatus.valid && (
@@ -342,23 +488,29 @@ export function TerrorZoneConfiguration() {
                       variant="outline"
                       size="sm"
                       onClick={handleEnableAll}
-                      disabled={isSaving || !validationStatus.valid}
+                      disabled={areActionsDisabled}
                     >
+                      {bulkAction === 'enableAll' && (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
+                      )}
                       {t(translations.terrorZone.enableAll)}
                     </Button>
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={handleDisableAll}
-                      disabled={isSaving || !validationStatus.valid}
+                      onClick={() => setShowDisableAllDialog(true)}
+                      disabled={areActionsDisabled}
                     >
+                      {bulkAction === 'disableAll' && (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
+                      )}
                       {t(translations.terrorZone.disableAll)}
                     </Button>
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={() => setShowRestoreDialog(true)}
-                      disabled={isSaving || !validationStatus.valid}
+                      disabled={areActionsDisabled}
                     >
                       <RotateCcw className="mr-2 h-4 w-4" />
                       {t(translations.terrorZone.restoreOriginal)}
@@ -369,24 +521,34 @@ export function TerrorZoneConfiguration() {
 
               {/* Zone List */}
               <div className="grid grid-cols-2 gap-4 lg:grid-cols-3 xl:grid-cols-4">
-                {filteredZones.map((zone) => (
-                  <div key={zone.id} className="flex flex-1 items-center gap-4">
-                    <Switch
-                      id={`${zoneSwitchIdPrefix}-${zone.id}`}
-                      aria-labelledby={`${zoneLabelIdPrefix}-${zone.id}`}
-                      checked={config[zone.id] ?? true}
-                      onCheckedChange={(checked: boolean) => handleZoneToggle(zone.id, checked)}
-                      disabled={isSaving || !validationStatus.valid}
-                    />
-                    <Label
-                      id={`${zoneLabelIdPrefix}-${zone.id}`}
-                      htmlFor={`${zoneSwitchIdPrefix}-${zone.id}`}
-                      className="font-medium"
-                    >
-                      {zone.name}
-                    </Label>
-                  </div>
-                ))}
+                {filteredZones.map((zone) => {
+                  const isPending = isBulkSaving || pendingZoneIds.has(zone.id);
+                  return (
+                    <div key={zone.id} className="flex flex-1 items-center gap-4">
+                      <Switch
+                        id={`${zoneSwitchIdPrefix}-${zone.id}`}
+                        aria-labelledby={`${zoneLabelIdPrefix}-${zone.id}`}
+                        aria-busy={isPending || undefined}
+                        checked={config[zone.id] ?? true}
+                        onCheckedChange={(checked: boolean) => handleZoneToggle(zone.id, checked)}
+                        disabled={isPending || isRestoring || !validationStatus.valid}
+                      />
+                      <Label
+                        id={`${zoneLabelIdPrefix}-${zone.id}`}
+                        htmlFor={`${zoneSwitchIdPrefix}-${zone.id}`}
+                        className="font-medium"
+                      >
+                        {zone.name}
+                      </Label>
+                      {isPending && (
+                        <Loader2
+                          className="h-3.5 w-3.5 shrink-0 animate-spin text-muted-foreground"
+                          aria-hidden="true"
+                        />
+                      )}
+                    </div>
+                  );
+                })}
               </div>
 
               {filteredZones.length === 0 && searchTerm && (
@@ -413,22 +575,42 @@ export function TerrorZoneConfiguration() {
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel disabled={isSaving}>
+              <AlertDialogCancel disabled={isRestoring}>
                 {t(translations.common.cancel)}
               </AlertDialogCancel>
               <AlertDialogAction
                 onClick={handleRestoreOriginal}
-                disabled={isSaving}
+                disabled={isRestoring}
                 variant="destructive"
               >
-                {isSaving
+                {isRestoring
                   ? t(translations.terrorZone.restoring)
                   : t(translations.terrorZone.restoreOriginal)}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
-      </div>
+
+        {/* Disable All Confirmation Dialog */}
+        <AlertDialog open={showDisableAllDialog} onOpenChange={setShowDisableAllDialog}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>
+                {t(translations.terrorZone.disableAllDialog.title)}
+              </AlertDialogTitle>
+              <AlertDialogDescription>
+                {t(translations.terrorZone.disableAllDialog.description)}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>{t(translations.common.cancel)}</AlertDialogCancel>
+              <AlertDialogAction onClick={handleConfirmDisableAll} variant="destructive">
+                {t(translations.terrorZone.disableAll)}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </PageShell>
     </TooltipProvider>
   );
 }

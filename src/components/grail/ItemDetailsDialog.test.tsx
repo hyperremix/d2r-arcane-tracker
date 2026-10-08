@@ -158,12 +158,12 @@ describe('When ItemDetailsDialog is rendered', () => {
       expect(screen.getByText('Windforce')).toBeInTheDocument();
     });
 
-    it('Then renders ItemInfoSection with type and category badges', () => {
+    it('Then renders the title in the display font, colored by item quality', () => {
       // Arrange
       const item = HolyGrailItemBuilder.new()
         .withId('item-1')
-        .withType('unique')
-        .withCategory('weapons')
+        .withType('set')
+        .withName("Tal Rasha's Guardianship")
         .build();
       setupStoreMock({ items: [item] });
 
@@ -171,25 +171,61 @@ describe('When ItemDetailsDialog is rendered', () => {
       render(<ItemDetailsDialog itemId="item-1" open={true} onOpenChange={vi.fn()} />);
 
       // Assert
-      expect(screen.getByText('unique')).toBeInTheDocument();
-      expect(screen.getByText('weapons')).toBeInTheDocument();
+      expect(screen.getByText("Tal Rasha's Guardianship")).toHaveClass(
+        'font-display',
+        'text-item-set',
+      );
     });
 
-    it('Then renders ethereal type badge', () => {
+    it('Then renders translated type, category and treasure class badges', () => {
       // Arrange
-      const item = HolyGrailItemBuilder.new().withId('item-1').withEtherealType('optional').build();
+      const item = HolyGrailItemBuilder.new()
+        .withId('item-1')
+        .withType('runeword')
+        .withCategory('runewords')
+        .build();
+      item.treasureClass = 'exceptional';
       setupStoreMock({ items: [item] });
 
       // Act
       render(<ItemDetailsDialog itemId="item-1" open={true} onOpenChange={vi.fn()} />);
 
       // Assert
-      expect(screen.getByText('optional')).toBeInTheDocument();
+      expect(screen.getByText('Runeword')).toBeInTheDocument();
+      expect(screen.getByText('Runewords')).toBeInTheDocument();
+      expect(screen.getByText('Exceptional')).toBeInTheDocument();
+      expect(screen.queryByText('runeword')).not.toBeInTheDocument();
+      expect(screen.queryByText('exceptional')).not.toBeInTheDocument();
+    });
+
+    it.each([
+      { etherealType: 'none', label: 'Cannot Be Ethereal', variantClass: 'bg-secondary' },
+      { etherealType: 'optional', label: 'Can Be Ethereal', variantClass: 'text-ethereal' },
+      { etherealType: 'only', label: 'Ethereal Only', variantClass: 'text-ethereal' },
+    ] as const)('Then renders the $etherealType ethereal type as $label without destructive styling', ({
+      etherealType,
+      label,
+      variantClass,
+    }) => {
+      // Arrange
+      const item = HolyGrailItemBuilder.new()
+        .withId('item-1')
+        .withEtherealType(etherealType)
+        .build();
+      setupStoreMock({ items: [item] });
+
+      // Act
+      render(<ItemDetailsDialog itemId="item-1" open={true} onOpenChange={vi.fn()} />);
+
+      // Assert
+      const badge = screen.getByText(label);
+      expect(badge).toHaveClass(variantClass);
+      expect(badge).not.toHaveClass('text-destructive');
     });
   });
 
   describe('If item has code', () => {
-    it('Then shows code value', () => {
+    it('Then does not show the internal code', () => {
       // Arrange
       const item = HolyGrailItemBuilder.new().withId('item-1').build();
       item.code = 'abc';
@@ -199,7 +235,8 @@ describe('When ItemDetailsDialog is rendered', () => {
       render(<ItemDetailsDialog itemId="item-1" open={true} onOpenChange={vi.fn()} />);
 
       // Assert
-      expect(screen.getByText('abc')).toBeInTheDocument();
+      expect(screen.queryByText('abc')).not.toBeInTheDocument();
+      expect(screen.queryByText('Code:')).not.toBeInTheDocument();
     });
   });
 
@@ -309,7 +346,9 @@ describe('When ItemDetailsDialog is rendered', () => {
       render(<ItemDetailsDialog itemId="item-1" open={true} onOpenChange={vi.fn()} />);
 
       // Assert
-      expect(screen.getByText('Found')).toBeInTheDocument();
+      const badge = screen.getByText('Found');
+      expect(badge).toHaveClass('text-found');
+      expect(badge).not.toHaveClass('bg-primary');
     });
   });
 
@@ -337,7 +376,55 @@ describe('When ItemDetailsDialog is rendered', () => {
       render(<ItemDetailsDialog itemId="item-1" open={true} onOpenChange={vi.fn()} />);
 
       // Assert
-      expect(screen.getByText('Not Found')).toBeInTheDocument();
+      expect(screen.getByText('Not Found')).toHaveClass('text-missing');
+    });
+  });
+
+  describe('If an item with optional ethereal type has per-version progress', () => {
+    const found = { text: 'Found', present: 'text-found', absent: 'text-missing' };
+    const missing = { text: 'Not Found', present: 'text-missing', absent: 'text-found' };
+
+    it.each([
+      { normalFound: true, etherealFound: false, normal: found, ethereal: missing },
+      { normalFound: false, etherealFound: true, normal: missing, ethereal: found },
+      { normalFound: true, etherealFound: true, normal: found, ethereal: found },
+      { normalFound: false, etherealFound: false, normal: missing, ethereal: missing },
+    ])('Then Normal found=$normalFound and Ethereal found=$etherealFound use the matching status badge', ({
+      normalFound,
+      etherealFound,
+      normal,
+      ethereal,
+    }) => {
+      // Arrange
+      const item = HolyGrailItemBuilder.new().withId('item-1').withEtherealType('optional').build();
+      setupStoreMock({ items: [item] });
+      setupProgressLookup(
+        new Map([
+          [
+            'item-1',
+            {
+              normalFound,
+              etherealFound,
+              overallFound: normalFound || etherealFound,
+              normalProgress: [],
+              etherealProgress: [],
+            },
+          ],
+        ]),
+      );
+
+      // Act
+      render(<ItemDetailsDialog itemId="item-1" open={true} onOpenChange={vi.fn()} />);
+
+      // Assert
+      const normalBadge = screen.getByText('Normal:').nextElementSibling;
+      const etherealBadge = screen.getByText('Ethereal:').nextElementSibling;
+      expect(normalBadge).toHaveTextContent(normal.text);
+      expect(normalBadge).toHaveClass(normal.present);
+      expect(normalBadge).not.toHaveClass(normal.absent);
+      expect(etherealBadge).toHaveTextContent(ethereal.text);
+      expect(etherealBadge).toHaveClass(ethereal.present);
+      expect(etherealBadge).not.toHaveClass(ethereal.absent);
     });
   });
 
@@ -418,6 +505,19 @@ describe('When ItemDetailsDialog is rendered', () => {
       expect(screen.getByText(/1-5 of 7/)).toBeInTheDocument();
       expect(screen.getByRole('button', { name: /Previous/ })).toBeDisabled();
       expect(screen.getByRole('button', { name: /Next/ })).toBeEnabled();
+    });
+
+    it('Then the pagination range opts out of the display title font with font-ui', () => {
+      // Arrange
+      const item = HolyGrailItemBuilder.new().withId('item-1').build();
+      const characters = CharacterBuilder.new().withId('char').withName('Char').buildMany(7);
+      setupStoreMock({ items: [item], characters });
+
+      // Act
+      render(<ItemDetailsDialog itemId="item-1" open={true} onOpenChange={vi.fn()} />);
+
+      // Assert
+      expect(screen.getByText(/1-5 of 7/)).toHaveClass('font-ui', 'font-normal');
     });
 
     it('Then Next click advances page', () => {

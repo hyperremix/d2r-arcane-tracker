@@ -10,6 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { useWizardSettingsSave, WizardSaveError } from '@/components/wizard/wizardSettingsSave';
 import { translations } from '@/i18n/translations';
 import { gameVersionDescriptionKeys, gameVersionLabelKeys } from '@/lib/labelKeys';
 import { useGrailStore } from '@/stores/grailStore';
@@ -40,26 +41,32 @@ const gameVersions: GameVersionOption[] = [
 ];
 
 /**
- * GameVersionStep component - Step for selecting the game version.
+ * GameVersionStep component - Game version section of the wizard "What to track" step.
  * Allows users to choose between Resurrected or Classic.
- * @returns {JSX.Element} Game version selection step content
+ * @returns {JSX.Element} Game version selection section content
  */
 export function GameVersionStep() {
   const { t } = useTranslation();
   const gameVersionId = useId();
-  const { settings, setSettings } = useGrailStore();
+  const headingId = useId();
+  const { settings } = useGrailStore();
+  const { saveSettings, saveFailed } = useWizardSettingsSave();
   const gameVersion = settings.gameVersion || GameVersion.Resurrected;
   const selectedVersion = gameVersions.find((version) => version.value === gameVersion);
 
   const handleGameVersionChange = (value: GameVersion) => {
-    setSettings({ gameVersion: value });
+    saveSettings({ gameVersion: value });
   };
 
   return (
-    <div className="space-y-6">
-      <div className="space-y-2">
-        <h2 className="font-bold text-2xl">{t(translations.settings.gameVersion.title)}</h2>
-        <p className="text-muted-foreground">{t(translations.wizard.gameVersion.description)}</p>
+    <section aria-labelledby={headingId} className="space-y-4">
+      <div className="space-y-1">
+        <h3 id={headingId} className="font-semibold text-lg">
+          {t(translations.settings.gameVersion.title)}
+        </h3>
+        <p className="text-muted-foreground text-sm">
+          {t(translations.wizard.gameVersion.description)}
+        </p>
       </div>
 
       <div className="space-y-4">
@@ -92,6 +99,8 @@ export function GameVersionStep() {
           </Select>
         </div>
 
+        <WizardSaveError visible={saveFailed} />
+
         <div className="rounded-lg bg-info/10 p-4">
           <p className="text-info text-sm">
             <strong>{t(translations.common.note)}</strong>{' '}
@@ -99,6 +108,6 @@ export function GameVersionStep() {
           </p>
         </div>
       </div>
-    </div>
+    </section>
   );
 }

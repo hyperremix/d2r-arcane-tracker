@@ -29,4 +29,16 @@ describe('Alert', () => {
     expect(screen.getByRole('status')).toBeInTheDocument();
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
+
+  it('When the warning variant is used, then warning theme tokens are applied', () => {
+    // Arrange & Act
+    render(
+      <Alert variant="warning" live="polite">
+        <AlertDescription>Heads up</AlertDescription>
+      </Alert>,
+    );
+
+    // Assert
+    expect(screen.getByRole('status')).toHaveClass('border-warning/50', 'text-warning');
+  });
 });

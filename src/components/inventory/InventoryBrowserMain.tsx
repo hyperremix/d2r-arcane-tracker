@@ -145,7 +145,7 @@ function MainVaultTile({ item, iconLookup, selected, onSelect }: MainVaultTilePr
       })}
       className={cn(
         'relative h-16 w-16 overflow-hidden rounded-[2px] border bg-card/75 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70',
-        selected ? 'border-primary ring-1 ring-primary/70' : 'border-emerald-500/60',
+        selected ? 'border-primary ring-1 ring-primary/70' : 'border-success/60',
       )}
       onClick={() => onSelect(item)}
       onDragStart={(event) => {

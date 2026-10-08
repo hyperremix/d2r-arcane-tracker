@@ -92,6 +92,14 @@ describe('When TitleBar is rendered', () => {
     ]);
   });
 
+  it('Then the app name uses the display font', () => {
+    // Arrange & Act
+    renderTitleBar();
+
+    // Assert
+    expect(screen.getByText('D2R Arcane Tracker')).toHaveClass('font-display');
+  });
+
   it('If there is no history, then the labeled back and forward buttons are disabled', () => {
     // Arrange & Act
     renderTitleBar();

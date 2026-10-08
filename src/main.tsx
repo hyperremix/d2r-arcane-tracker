@@ -7,6 +7,11 @@ import WidgetApp from './WidgetApp';
 import './i18n';
 import './index.css';
 import logoUrl from '/logo.png';
+import { applyInitialTheme } from './lib/theme';
+
+// Apply the last-used theme before React mounts so dark-theme users don't see a light flash
+// while settings load from the main process
+applyInitialTheme();
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {

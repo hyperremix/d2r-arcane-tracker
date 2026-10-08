@@ -1,12 +1,29 @@
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
-import type { Settings } from 'electron/types/grail';
+import type { Item, Settings } from 'electron/types/grail';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { useGrailStore } from '@/stores/grailStore';
+import { HolyGrailItemBuilder } from '@/fixtures/HolyGrailItemBuilder';
+import { filterAndSortItems, useGrailStore } from '@/stores/grailStore';
 import { AdvancedSearch } from './AdvancedSearch';
 
 const SEARCH_DEBOUNCE_MS = 150;
 
-const initialStoreState = useGrailStore.getState();
+const subCategoryItems: Item[] = [
+  HolyGrailItemBuilder.new().withId('shako').withArmorSubCategory('helms').build(),
+  HolyGrailItemBuilder.new().withId('arkaines').withArmorSubCategory('body_armor').build(),
+  {
+    ...HolyGrailItemBuilder.new().withId('arreats').withCategory('armor').build(),
+    subCategory: 'barbarian',
+  },
+  HolyGrailItemBuilder.new().withId('azurewrath').withWeaponSubCategory('1h_swords').build(),
+  HolyGrailItemBuilder.new()
+    .withId('enigma')
+    .withType('runeword')
+    .withRunewordSubCategory('runewords')
+    .build(),
+  HolyGrailItemBuilder.new().withId('annihilus').withCharmSubCategory('small_charms').build(),
+];
+
+const initialStoreState = useGrailStore.getInitialState();
 
 function resetStore(settings: Partial<Settings> = {}) {
   useGrailStore.setState(
@@ -42,7 +59,10 @@ describe('When AdvancedSearch toolbar is rendered', () => {
       render(<AdvancedSearch />);
 
       // Assert
-      expect(screen.getByLabelText('Search')).toHaveAttribute('placeholder', 'Search items...');
+      expect(screen.getByLabelText('Search')).toHaveAttribute(
+        'placeholder',
+        'Search name, base, set or rune...',
+      );
       expect(screen.getByRole('group', { name: 'Status' })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Filters' })).toBeInTheDocument();
       expect(screen.getByLabelText('Sort By')).toBeInTheDocument();
@@ -191,7 +211,7 @@ describe('When AdvancedSearch toolbar is rendered', () => {
   });
 
   describe('If user opens the filters popover', () => {
-    it('Then shows category and type checkboxes', async () => {
+    it('Then shows category checkboxes but no type checkboxes', async () => {
       // Arrange
       render(<AdvancedSearch />);
 
@@ -203,23 +223,44 @@ describe('When AdvancedSearch toolbar is rendered', () => {
       expect(screen.getByLabelText('Armor')).toBeInTheDocument();
       expect(screen.getByLabelText('Jewelry')).toBeInTheDocument();
       expect(screen.getByLabelText('Charms')).toBeInTheDocument();
-      expect(screen.getByLabelText('Unique')).toBeInTheDocument();
-      expect(screen.getByLabelText('Set')).toBeInTheDocument();
-      expect(screen.queryByLabelText('Rune')).not.toBeInTheDocument();
-      expect(screen.queryByLabelText('Runeword')).not.toBeInTheDocument();
+      expect(screen.queryByLabelText('Unique')).not.toBeInTheDocument();
+      expect(screen.queryByLabelText('Set')).not.toBeInTheDocument();
     });
 
-    it('Then includes rune and runeword types if they are tracked', async () => {
+    it('Then shows the sub-categories of the loaded items grouped by category', async () => {
       // Arrange
-      resetStore({ grailRunes: true, grailRunewords: true });
+      useGrailStore.setState({ items: subCategoryItems });
       render(<AdvancedSearch />);
 
       // Act
       openFiltersPopover();
 
       // Assert
-      expect(await screen.findByLabelText('Rune')).toBeInTheDocument();
-      expect(screen.getByLabelText('Runeword')).toBeInTheDocument();
+      const subCategories = await screen.findByRole('group', { name: 'Sub-categories' });
+      const armorGroup = within(subCategories).getByRole('group', { name: 'Armor' });
+      const weaponGroup = within(subCategories).getByRole('group', { name: 'Weapons' });
+      expect(within(armorGroup).getByLabelText('Helms')).toBeInTheDocument();
+      expect(within(armorGroup).getByLabelText('Barbarian')).toBeInTheDocument();
+      expect(within(weaponGroup).getByLabelText('1H Swords')).toBeInTheDocument();
+      expect(within(subCategories).queryByRole('group', { name: 'Jewelry' })).toBeNull();
+      expect(within(subCategories).queryByLabelText('Runewords')).toBeNull();
+    });
+
+    it('Then lists regular sub-categories alphabetically before class sub-categories', async () => {
+      // Arrange
+      useGrailStore.setState({ items: subCategoryItems });
+      render(<AdvancedSearch />);
+
+      // Act
+      openFiltersPopover();
+
+      // Assert
+      const subCategories = await screen.findByRole('group', { name: 'Sub-categories' });
+      const armorGroup = within(subCategories).getByRole('group', { name: 'Armor' });
+      const labels = within(armorGroup)
+        .getAllByRole('checkbox')
+        .map((checkbox) => checkbox.parentElement?.textContent);
+      expect(labels).toEqual(['Body Armor', 'Helms', 'Barbarian']);
     });
 
     it('Then toggling a category updates the store categories', async () => {
@@ -234,23 +275,118 @@ describe('When AdvancedSearch toolbar is rendered', () => {
       expect(useGrailStore.getState().filter.categories).toEqual(['armor']);
     });
 
-    it('Then toggling a type updates the store types', async () => {
+    it('Then toggling a sub-category updates the store sub-categories', async () => {
       // Arrange
+      useGrailStore.setState({ items: subCategoryItems });
       render(<AdvancedSearch />);
       openFiltersPopover();
 
       // Act
-      fireEvent.click(await screen.findByLabelText('Set'));
+      fireEvent.click(await screen.findByLabelText('Helms'));
 
       // Assert
-      expect(useGrailStore.getState().filter.types).toEqual(['set']);
+      expect(useGrailStore.getState().filter.subCategories).toEqual(['armor:helms']);
+    });
+
+    it('Then a sub-category present in two categories is selected for only the clicked category', async () => {
+      // Arrange
+      const weaponSorceress: Item = {
+        ...HolyGrailItemBuilder.new().withId('lidlesseye').withCategory('weapons').build(),
+        subCategory: 'sorceress',
+      };
+      const armorSorceress: Item = {
+        ...HolyGrailItemBuilder.new().withId('oculus').withCategory('armor').build(),
+        subCategory: 'sorceress',
+      };
+      useGrailStore.setState({ items: [weaponSorceress, armorSorceress] });
+      render(<AdvancedSearch />);
+      openFiltersPopover();
+      const subCategories = await screen.findByRole('group', { name: 'Sub-categories' });
+      const weaponGroup = within(subCategories).getByRole('group', { name: 'Weapons' });
+      const armorGroup = within(subCategories).getByRole('group', { name: 'Armor' });
+
+      // Act
+      fireEvent.click(within(weaponGroup).getByLabelText('Sorceress'));
+
+      // Assert
+      const { filter, advancedFilter, items } = useGrailStore.getState();
+      expect(filter.subCategories).toEqual(['weapons:sorceress']);
+      expect(within(weaponGroup).getByLabelText('Sorceress')).toBeChecked();
+      expect(within(armorGroup).getByLabelText('Sorceress')).not.toBeChecked();
+      expect(filterAndSortItems(items, [], filter, advancedFilter).map((item) => item.id)).toEqual([
+        'lidlesseye',
+      ]);
+      expect(
+        screen.getByRole('button', { name: 'Remove filter: Weapons: Sorceress' }),
+      ).toBeInTheDocument();
     });
   });
 
-  describe('If categories and types are selected', () => {
-    it('Then the filters trigger shows the active filter count', () => {
+  describe('If the toolbar shows the item type toggles', () => {
+    it('Then shows Unique and Set but hides untracked rune and runeword types', () => {
+      // Arrange & Act
+      render(<AdvancedSearch />);
+
+      // Assert
+      const types = screen.getByRole('group', { name: 'Types' });
+      expect(within(types).getByRole('button', { name: 'Unique' })).toHaveAttribute(
+        'aria-pressed',
+        'false',
+      );
+      expect(within(types).getByRole('button', { name: 'Set' })).toBeInTheDocument();
+      expect(within(types).queryByRole('button', { name: 'Rune' })).not.toBeInTheDocument();
+      expect(within(types).queryByRole('button', { name: 'Runeword' })).not.toBeInTheDocument();
+    });
+
+    it('Then includes rune and runeword types if they are tracked', () => {
       // Arrange
-      useGrailStore.getState().setFilter({ categories: ['armor', 'weapons'], types: ['set'] });
+      resetStore({ grailRunes: true, grailRunewords: true });
+
+      // Act
+      render(<AdvancedSearch />);
+
+      // Assert
+      const types = screen.getByRole('group', { name: 'Types' });
+      expect(within(types).getByRole('button', { name: 'Rune' })).toBeInTheDocument();
+      expect(within(types).getByRole('button', { name: 'Runeword' })).toBeInTheDocument();
+    });
+
+    it('Then clicking a type toggles it in the store and marks it as pressed', () => {
+      // Arrange
+      render(<AdvancedSearch />);
+      const setToggle = screen.getByRole('button', { name: 'Set' });
+
+      // Act
+      fireEvent.click(setToggle);
+
+      // Assert
+      expect(useGrailStore.getState().filter.types).toEqual(['set']);
+      expect(setToggle).toHaveAttribute('aria-pressed', 'true');
+    });
+
+    it('Then clicking a pressed type removes it from the store again', () => {
+      // Arrange
+      useGrailStore.getState().setFilter({ types: ['set'] });
+      render(<AdvancedSearch />);
+      const setToggle = screen.getByRole('button', { name: 'Set' });
+
+      // Act
+      fireEvent.click(setToggle);
+
+      // Assert
+      expect(useGrailStore.getState().filter.types).toEqual([]);
+      expect(setToggle).toHaveAttribute('aria-pressed', 'false');
+    });
+  });
+
+  describe('If categories, sub-categories and types are selected', () => {
+    it('Then the filters trigger counts only the filters inside the popover', () => {
+      // Arrange
+      useGrailStore.getState().setFilter({
+        categories: ['armor', 'weapons'],
+        subCategories: ['armor:helms'],
+        types: ['set'],
+      });
 
       // Act
       render(<AdvancedSearch />);
@@ -262,18 +398,51 @@ describe('When AdvancedSearch toolbar is rendered', () => {
 
     it('Then shows removable chips that update the store when removed', () => {
       // Arrange
-      useGrailStore.getState().setFilter({ categories: ['armor'], types: ['set'] });
+      useGrailStore
+        .getState()
+        .setFilter({ categories: ['armor'], subCategories: ['armor:helms'], types: ['set'] });
       render(<AdvancedSearch />);
       const chips = screen.getByRole('list', { name: 'Active filters' });
       expect(within(chips).getByText('Armor')).toBeInTheDocument();
+      expect(within(chips).getByText('Armor: Helms')).toBeInTheDocument();
       expect(within(chips).getByText('Set')).toBeInTheDocument();
 
       // Act
       fireEvent.click(screen.getByRole('button', { name: 'Remove filter: Armor' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Remove filter: Armor: Helms' }));
 
       // Assert
       expect(useGrailStore.getState().filter.categories).toEqual([]);
+      expect(useGrailStore.getState().filter.subCategories).toEqual([]);
       expect(useGrailStore.getState().filter.types).toEqual(['set']);
+    });
+  });
+
+  describe('If items are loaded', () => {
+    it('Then shows a polite live count of the shown items out of all items', () => {
+      // Arrange
+      useGrailStore.setState({ items: subCategoryItems });
+      render(<AdvancedSearch />);
+      const count = screen.getByText('6 of 6 items');
+
+      // Act
+      act(() => {
+        useGrailStore.getState().setFilter({ subCategories: ['helms'] });
+      });
+
+      // Assert
+      expect(count).toHaveAttribute('aria-live', 'polite');
+      expect(count).toHaveTextContent('1 of 6 items');
+    });
+  });
+
+  describe('If no items are loaded yet', () => {
+    it('Then the result count is empty', () => {
+      // Arrange & Act
+      render(<AdvancedSearch />);
+
+      // Assert
+      expect(screen.queryByText(/of \d+ items?/)).not.toBeInTheDocument();
     });
   });
 
@@ -425,12 +594,12 @@ describe('When AdvancedSearch toolbar is rendered', () => {
   });
 
   describe('If a selected type becomes unavailable because its tracking setting is disabled', () => {
-    it('Then the type is removed from the filter, the chips and the active filter count', () => {
+    it('Then the type is removed from the filter, the type toggles and the chips', () => {
       // Arrange
       resetStore({ grailRunes: true });
       useGrailStore.getState().setFilter({ types: ['rune'] });
       render(<AdvancedSearch />);
-      expect(screen.getByRole('button', { name: 'Filters (1 active)' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Rune' })).toHaveAttribute('aria-pressed', 'true');
 
       // Act
       act(() => {
@@ -439,8 +608,143 @@ describe('When AdvancedSearch toolbar is rendered', () => {
 
       // Assert
       expect(useGrailStore.getState().filter.types).toEqual([]);
-      expect(screen.getByRole('button', { name: 'Filters' })).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Rune' })).not.toBeInTheDocument();
       expect(screen.queryByRole('list', { name: 'Active filters' })).not.toBeInTheDocument();
+    });
+  });
+
+  describe('If user presses a focus-search shortcut', () => {
+    beforeEach(() => {
+      // Suites share one jsdom (isolate: false), and another suite can leave a modal portal and
+      // its body scroll lock behind. These tests assert behaviour with no dialog open.
+      document.body.innerHTML = '';
+      document.body.removeAttribute('style');
+    });
+
+    it.each([
+      ['/', {}],
+      ['Ctrl+F', { key: 'f', ctrlKey: true }],
+      ['Cmd+F', { key: 'f', metaKey: true }],
+    ])('Then %s focuses the search input', (_label, init) => {
+      // Arrange
+      render(<AdvancedSearch />);
+      const input = screen.getByLabelText('Search');
+      const eventInit = { key: '/', ...init };
+
+      // Act
+      const notPrevented = fireEvent.keyDown(document.body, eventInit);
+
+      // Assert
+      expect(input).toHaveFocus();
+      expect(notPrevented).toBe(false);
+    });
+
+    it('Then does not steal focus while typing in another input', () => {
+      // Arrange
+      render(
+        <>
+          <input aria-label="Other field" />
+          <AdvancedSearch />
+        </>,
+      );
+      const otherField = screen.getByLabelText('Other field');
+      otherField.focus();
+
+      // Act
+      const notPrevented = fireEvent.keyDown(otherField, { key: '/' });
+
+      // Assert
+      expect(otherField).toHaveFocus();
+      expect(notPrevented).toBe(true);
+    });
+
+    it('Then does not focus the search input while a dialog is open', () => {
+      // Arrange
+      render(
+        <>
+          <div role="dialog" aria-label="Item details" />
+          <AdvancedSearch />
+        </>,
+      );
+
+      // Act
+      fireEvent.keyDown(document.body, { key: 'f', ctrlKey: true });
+
+      // Assert
+      expect(screen.getByLabelText('Search')).not.toHaveFocus();
+    });
+
+    it('Then does not focus the search input while a select listbox is open', () => {
+      // Arrange
+      render(
+        <>
+          <div role="listbox" aria-label="Options" />
+          <AdvancedSearch />
+        </>,
+      );
+
+      // Act
+      fireEvent.keyDown(document.body, { key: '/' });
+
+      // Assert
+      expect(screen.getByLabelText('Search')).not.toHaveFocus();
+    });
+
+    it('Then typing "/" in the search input is not intercepted', () => {
+      // Arrange
+      render(<AdvancedSearch />);
+      const input = screen.getByLabelText('Search');
+      input.focus();
+
+      // Act
+      const notPrevented = fireEvent.keyDown(input, { key: '/' });
+
+      // Assert
+      expect(notPrevented).toBe(true);
+    });
+
+    it('Then the shortcut listener is removed when the toolbar unmounts', () => {
+      // Arrange
+      const removeListenerSpy = vi.spyOn(document, 'removeEventListener');
+      const { unmount } = render(<AdvancedSearch />);
+
+      // Act
+      unmount();
+
+      // Assert
+      expect(removeListenerSpy).toHaveBeenCalledWith('keydown', expect.any(Function));
+      removeListenerSpy.mockRestore();
+    });
+  });
+
+  describe('If user presses Escape in the search input', () => {
+    it('Then clears the search input and the store search term', () => {
+      // Arrange
+      useGrailStore.getState().setFilter({ searchTerm: 'Shako' });
+      render(<AdvancedSearch />);
+      const input = screen.getByLabelText('Search');
+      input.focus();
+
+      // Act
+      fireEvent.keyDown(input, { key: 'Escape' });
+
+      // Assert
+      expect(input).toHaveValue('');
+      expect(useGrailStore.getState().filter.searchTerm).toBe('');
+      expect(input).toHaveFocus();
+    });
+
+    it('Then leaves the field if it is already empty', () => {
+      // Arrange
+      render(<AdvancedSearch />);
+      const input = screen.getByLabelText('Search');
+      input.focus();
+
+      // Act
+      fireEvent.keyDown(input, { key: 'Escape' });
+
+      // Assert
+      expect(input).not.toHaveFocus();
     });
   });
 });

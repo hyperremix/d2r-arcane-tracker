@@ -21,6 +21,7 @@ vi.mock('../window/widgetWindow', () => ({
   closeWidgetWindow: vi.fn(),
   getWidgetWindowPosition: vi.fn(),
   resetWidgetWindowSize: vi.fn(() => ({ width: 250, height: 250 })),
+  setWidgetWindowLocked: vi.fn(() => true),
   showWidgetWindow: vi.fn(),
   updateWidgetWindowOpacity: vi.fn(),
   updateWidgetWindowSize: vi.fn(),
@@ -28,7 +29,12 @@ vi.mock('../window/widgetWindow', () => ({
 }));
 
 import { grailDatabase } from '../database/database';
-import { resetWidgetWindowSize, updateWidgetWindowSize } from '../window/widgetWindow';
+import {
+  resetWidgetWindowSize,
+  setWidgetWindowLocked,
+  showWidgetWindow,
+  updateWidgetWindowSize,
+} from '../window/widgetWindow';
 import { initializeWidgetHandlers } from './widgetHandlers';
 
 const invoke = (channel: string, ...args: unknown[]) =>
@@ -61,7 +67,7 @@ describe('widget IPC handlers display mode validation', () => {
     const result = await invoke('widget:reset-size', display);
 
     // Assert
-    expect(resetWidgetWindowSize).toHaveBeenCalledWith('split');
+    expect(resetWidgetWindowSize).toHaveBeenCalledWith('split', undefined);
     expect(onSizeChange).toHaveBeenCalledWith('split', { width: 250, height: 250 });
     expect(result).toEqual({ success: true, size: { width: 250, height: 250 } });
   });
@@ -156,5 +162,95 @@ describe('widget IPC handlers display mode validation', () => {
     // Assert
     expect(result).toEqual({ success: true });
     expect(updateWidgetWindowSize).toHaveBeenCalledWith('split', rendererSettings);
+  });
+
+  it('When widget:reset-size resets run-only, Then the stored item list flag picks the default size', async () => {
+    // Arrange
+    vi.mocked(grailDatabase.getAllSettings).mockReturnValue({
+      widgetRunOnlyShowItems: false,
+    } as ReturnType<typeof grailDatabase.getAllSettings>);
+
+    // Act
+    await invoke('widget:reset-size', 'run-only');
+
+    // Assert
+    expect(resetWidgetWindowSize).toHaveBeenCalledWith('run-only', false);
+  });
+});
+
+describe('widget IPC handlers lock (click-through)', () => {
+  let consoleError: MockInstance;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(grailDatabase.getAllSettings).mockReset();
+    vi.mocked(grailDatabase.getAllSettings).mockReturnValue(
+      {} as ReturnType<typeof grailDatabase.getAllSettings>,
+    );
+    handlers.clear();
+    consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    initializeWidgetHandlers('/app');
+  });
+
+  afterEach(() => {
+    consoleError.mockRestore();
+  });
+
+  it.each([
+    true,
+    false,
+  ])('When widget:set-locked receives %s, Then the lock state is applied to the window', async (locked) => {
+    // Arrange: the lock state comes from the test table
+
+    // Act
+    const result = await invoke('widget:set-locked', locked);
+
+    // Assert
+    expect(result).toEqual({ success: true });
+    expect(setWidgetWindowLocked).toHaveBeenCalledWith(locked);
+  });
+
+  it.each([
+    ['a string', 'true'],
+    ['a number', 1],
+    ['undefined', undefined],
+    ['an object', { locked: true }],
+  ])('If widget:set-locked receives %s, Then it is rejected without touching the window', async (_name, locked) => {
+    // Arrange: the invalid lock state comes from the test table
+
+    // Act
+    const result = await invoke('widget:set-locked', locked);
+
+    // Assert
+    expect(result).toMatchObject({ success: false });
+    expect(setWidgetWindowLocked).not.toHaveBeenCalled();
+  });
+
+  it('When the widget is toggled on, Then it is created with the persisted lock state and sizes', async () => {
+    // Arrange
+    const persistedRunOnly = { width: 280, height: 400 };
+    vi.mocked(grailDatabase.getAllSettings).mockReturnValue({
+      widgetLocked: true,
+      widgetSizeRunOnly: persistedRunOnly,
+    } as ReturnType<typeof grailDatabase.getAllSettings>);
+    const staleSettings = { widgetDisplay: 'run-only' as const, widgetLocked: false };
+
+    // Act
+    const result = await invoke('widget:toggle', true, staleSettings);
+
+    // Assert
+    expect(result).toEqual({ success: true });
+    expect(showWidgetWindow).toHaveBeenCalledWith(
+      expect.objectContaining({
+        widgetDisplay: 'run-only',
+        widgetLocked: true,
+        widgetSizeRunOnly: persistedRunOnly,
+      }),
+      '/app',
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+    );
   });
 });

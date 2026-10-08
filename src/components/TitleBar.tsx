@@ -212,7 +212,7 @@ export function TitleBar() {
       <div className="flex min-w-0 flex-1 items-center justify-center">
         <div className="hidden min-w-0 items-center gap-2 min-[1180px]:flex">
           <img src={logoUrl} alt="" className="h-5 w-5 shrink-0" />
-          <span className="truncate font-semibold text-sm tracking-wide">
+          <span className="truncate font-display font-semibold text-sm tracking-wide">
             {t(translations.app.title)}
           </span>
         </div>

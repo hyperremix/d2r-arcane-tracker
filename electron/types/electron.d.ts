@@ -3,6 +3,7 @@ import type {
   D2Item,
   D2SaveFile,
   FileReaderResponse,
+  GlobalHotkeyStatus,
   GrailProgress,
   InventoryItemMoveInput,
   InventorySearchResult,
@@ -12,6 +13,7 @@ import type {
   MonitoringStatus,
   Run,
   RunItem,
+  SaveDirectoryInspection,
   Session,
   Settings,
   VaultLocationContext,
@@ -25,8 +27,6 @@ import type {
   UpdateInfo,
   UpdateStatus,
 } from './grail'
-
-import type { ServiceErrorPayload } from '../utils/serviceLogger'
 
 /**
  * Main interface defining the Electron API available to the renderer process.
@@ -177,6 +177,13 @@ export interface ElectronAPI {
      */
     updateSaveDirectory(saveDir: string): Promise<{ success: boolean }>
     /**
+     * Inspects a candidate save directory without applying it: checks that it exists,
+     * counts its character save files and suggests a nearby D2R save folder if needed.
+     * @param {string} directory - The candidate directory path.
+     * @returns {Promise<SaveDirectoryInspection>} A promise that resolves with the inspection result.
+     */
+    inspectDirectory(directory: string): Promise<SaveDirectoryInspection>
+    /**
      * Restores the default save directory for the current platform.
      * @returns {Promise<{ success: boolean; defaultDirectory: string }>} A promise that resolves with success indicator and default directory path.
      */
@@ -211,6 +218,12 @@ export interface ElectronAPI {
      * @returns {Promise<string | null>} D2R path or null if not set.
      */
     getD2RPath(): Promise<string | null>
+
+    /**
+     * Gets the default D2R installation path for this platform, if it exists on disk.
+     * @returns {Promise<string | undefined>} The existing default path, or undefined.
+     */
+    getSuggestedD2RPath(): Promise<string | undefined>
 
     /**
      * Converts all sprite files from D2R installation to PNGs.
@@ -401,6 +414,14 @@ export interface ElectronAPI {
     updateOpacity(opacity: number): Promise<{ success: boolean; error?: string }>
 
     /**
+     * Locks or unlocks the widget window. A locked widget is click-through and cannot be focused,
+     * dragged or resized.
+     * @param {boolean} locked - Whether the widget should be locked.
+     * @returns {Promise<{ success: boolean; error?: string }>} A promise that resolves with a success indicator.
+     */
+    setLocked(locked: boolean): Promise<{ success: boolean; error?: string }>
+
+    /**
      * Updates the widget window size.
      * @param {'overall' | 'split' | 'all' | 'run-only'} display - The display mode for the size.
      * @param {{ width: number; height: number }} size - The new size for the widget.
@@ -471,10 +492,11 @@ export interface ElectronAPI {
 
     /**
      * Registers a callback for service error events from the main process.
-     * @param {(payload: ServiceErrorPayload) => void} callback - Function to call when service errors occur.
+     * The payload is untrusted IPC data and must be validated by the caller.
+     * @param {(payload: unknown) => void} callback - Function to call when service errors occur.
      * @returns {() => void} Cleanup function to remove the listener.
      */
-    onServiceError(callback: (payload: ServiceErrorPayload) => void): () => void
+    onServiceError(callback: (payload: unknown) => void): () => void
   }
 
   /**
@@ -637,6 +659,19 @@ export interface ElectronAPI {
      * @returns {Promise<{ available: boolean; reason: string | null }>} A promise that resolves with memory status.
      */
     getMemoryStatus(): Promise<{ available: boolean; reason: string | null }>
+
+    /**
+     * Gets the registration status of the run tracker global hotkeys.
+     * @returns {Promise<GlobalHotkeyStatus>} A promise that resolves with the hotkey status.
+     */
+    getGlobalHotkeyStatus(): Promise<GlobalHotkeyStatus>
+
+    /**
+     * Registers a callback for global hotkey status changes.
+     * @param {(status: GlobalHotkeyStatus) => void} callback - Called with the new status.
+     * @returns {() => void} Cleanup function to remove the listener.
+     */
+    onGlobalHotkeyStatus(callback: (status: GlobalHotkeyStatus) => void): () => void
   }
 
 

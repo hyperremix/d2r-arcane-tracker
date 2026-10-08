@@ -3357,7 +3357,7 @@ describe('When CharacterInventoryBrowser is rendered', () => {
 
       // Assert
       await waitFor(() => {
-        expect(inventoryBoard.querySelector('.border-emerald-400')).not.toBeNull();
+        expect(inventoryBoard.querySelector('.border-success')).not.toBeNull();
       });
       getComputedStyleSpy.mockRestore();
       Object.defineProperty(window, 'ipcRenderer', {

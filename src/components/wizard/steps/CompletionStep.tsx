@@ -1,5 +1,6 @@
 import { GameMode, GameVersion } from 'electron/types/grail';
 import { CheckCircle2, Sparkles } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { translations } from '@/i18n/translations';
 import { gameModeLabelKeys, gameVersionLabelKeys, themeLabelKeys } from '@/lib/labelKeys';
@@ -11,6 +12,57 @@ import { useGrailStore } from '@/stores/grailStore';
 interface SummaryRow {
   labelKey: string;
   value: string;
+  /** Render the value as a (possibly long) file system path. */
+  isPath?: boolean;
+}
+
+/**
+ * Save directory currently monitored and the number of character files found in it.
+ */
+interface SaveDirectorySummary {
+  directory?: string;
+  characterCount?: number;
+}
+
+/**
+ * Loads the monitored save directory and its character file count for the summary.
+ * Falls back to the stored setting if the monitoring status is unavailable.
+ * @param {string | undefined} storedSaveDir - Save directory from settings
+ * @returns {SaveDirectorySummary} The directory and character count, once loaded
+ */
+function useSaveDirectorySummary(storedSaveDir: string | undefined): SaveDirectorySummary {
+  const [summary, setSummary] = useState<SaveDirectorySummary>({ directory: storedSaveDir });
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadSummary = async () => {
+      let directory = storedSaveDir;
+      let characterCount: number | undefined;
+      try {
+        const status = await window.electronAPI?.saveFile.getMonitoringStatus();
+        directory = status?.directory || storedSaveDir;
+      } catch (error) {
+        console.error('Failed to load monitoring status for summary:', error);
+      }
+      try {
+        const files = await window.electronAPI?.saveFile.getSaveFiles();
+        characterCount = files?.length;
+      } catch (error) {
+        console.error('Failed to load save files for summary:', error);
+      }
+      if (!cancelled) {
+        setSummary({ directory, characterCount });
+      }
+    };
+
+    void loadSummary();
+    return () => {
+      cancelled = true;
+    };
+  }, [storedSaveDir]);
+
+  return summary;
 }
 
 /**
@@ -21,6 +73,7 @@ interface SummaryRow {
 export function CompletionStep() {
   const { t } = useTranslation();
   const { settings } = useGrailStore();
+  const saveDirectorySummary = useSaveDirectorySummary(settings.saveDir || undefined);
 
   const enabledLabel = (enabled: boolean) =>
     enabled
@@ -30,10 +83,17 @@ export function CompletionStep() {
   const summaryRows: SummaryRow[] = [
     {
       labelKey: translations.wizard.completion.saveDirectory,
-      value: settings.saveDir
-        ? t(translations.wizard.completion.configured)
-        : t(translations.wizard.completion.notSet),
+      value: saveDirectorySummary.directory || t(translations.wizard.completion.notSet),
+      isPath: Boolean(saveDirectorySummary.directory),
     },
+    ...(saveDirectorySummary.directory && saveDirectorySummary.characterCount !== undefined
+      ? [
+          {
+            labelKey: translations.wizard.completion.characterFiles,
+            value: String(saveDirectorySummary.characterCount),
+          },
+        ]
+      : []),
     {
       labelKey: translations.wizard.completion.gameMode,
       value: t(gameModeLabelKeys[settings.gameMode || GameMode.Both]),
@@ -98,9 +158,15 @@ export function CompletionStep() {
         </h3>
         <dl className="space-y-2 text-sm">
           {summaryRows.map((row) => (
-            <div key={row.labelKey} className="flex justify-between">
-              <dt className="text-muted-foreground">{t(row.labelKey)}</dt>
-              <dd className="font-medium">{row.value}</dd>
+            <div key={row.labelKey} className="flex justify-between gap-4">
+              <dt className="shrink-0 text-muted-foreground">{t(row.labelKey)}</dt>
+              <dd
+                className={
+                  row.isPath ? 'min-w-0 break-all text-right font-medium font-mono' : 'font-medium'
+                }
+              >
+                {row.value}
+              </dd>
             </div>
           ))}
         </dl>

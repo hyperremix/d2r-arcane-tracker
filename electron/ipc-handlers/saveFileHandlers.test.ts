@@ -940,6 +940,32 @@ describe('When saveFileHandlers is used', () => {
       expect(grailDatabase.truncateUserData).not.toHaveBeenCalled();
     });
 
+    it('Then saveFile:inspectDirectory should reject non-string input without touching settings', async () => {
+      // Arrange
+      const handler = getHandler('saveFile:inspectDirectory');
+
+      // Act & Assert
+      await expect(handler(null, { path: '/new/save/dir' })).rejects.toThrow(
+        'Invalid save directory: expected a string',
+      );
+      expect(grailDatabase.setSetting).not.toHaveBeenCalled();
+      expect(mockSaveFileMonitor.updateSaveDirectory).not.toHaveBeenCalled();
+    });
+
+    it('Then saveFile:inspectDirectory should report a relative path as invalid without applying it', async () => {
+      // Arrange
+      const handler = getHandler('saveFile:inspectDirectory');
+
+      // Act
+      const result = await handler(null, 'relative/save/dir');
+
+      // Assert
+      expect(result).toEqual({ status: 'invalidPath', saveFileCount: 0 });
+      expect(grailDatabase.setSetting).not.toHaveBeenCalled();
+      expect(grailDatabase.truncateUserData).not.toHaveBeenCalled();
+      expect(mockSaveFileMonitor.updateSaveDirectory).not.toHaveBeenCalled();
+    });
+
     it('Then saveFile:updateSaveDirectory should truncate user data when the directory changes', async () => {
       // Arrange
       const newSaveDir = '/new/save/dir';

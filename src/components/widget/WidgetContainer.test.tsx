@@ -155,4 +155,15 @@ describe('WidgetContainer native window sizing', () => {
     // Assert
     expect(updateDisplay).not.toHaveBeenCalled();
   });
+
+  it('If a settings update changes the opacity, Then the widget does not send it back to the main process', async () => {
+    // Arrange
+    await renderWithSettings({ widgetDisplay: 'overall', grailEthereal: false });
+
+    // Act
+    await emitSettings({ widgetOpacity: 0.5 });
+
+    // Assert
+    expect(updateOpacity).not.toHaveBeenCalled();
+  });
 });

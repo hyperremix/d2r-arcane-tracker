@@ -285,13 +285,13 @@ function ItemSocketOverlaySlot({ entry, compact }: ItemSocketOverlaySlotProps) {
       <div
         data-testid="item-socket-overlay-open-slot"
         className={cn(
-          'flex items-center justify-center rounded-[2px] border border-amber-500/90 bg-black/30',
+          'flex items-center justify-center rounded-[2px] border border-warning/90 bg-black/30',
           sizeClass,
         )}
       >
         <div
           className={cn(
-            'rounded-full border border-amber-300/90',
+            'rounded-full border border-warning/70',
             compact ? 'h-1.5 w-1.5' : 'h-2 w-2',
           )}
         />
@@ -385,7 +385,7 @@ function VaultedItemTile({
             })}
             className={cn(
               'relative h-16 w-16 overflow-hidden rounded-[2px] border bg-card/75 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70',
-              selected ? 'border-primary ring-1 ring-primary/70' : 'border-emerald-500/60',
+              selected ? 'border-primary ring-1 ring-primary/70' : 'border-success/60',
             )}
             onClick={() => onSelect(item)}
             onDragStart={(event) => {
@@ -1627,8 +1627,8 @@ function InventoryTile({
             className={cn(
               'relative h-full w-full overflow-hidden rounded-[2px] border bg-card/75 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70',
               selected ? 'border-primary ring-1 ring-primary/70' : 'border-border/70',
-              isVaultPresent === true ? 'border-emerald-500/60' : '',
-              isVaultPresent === false ? 'border-amber-500/60' : '',
+              isVaultPresent === true ? 'border-success/60' : '',
+              isVaultPresent === false ? 'border-warning/60' : '',
             )}
             onClick={() => onSelect(item)}
             onDragStart={(event) => {
@@ -2092,8 +2092,8 @@ function InventoryGridSection({
             className={cn(
               'pointer-events-none z-20 rounded-sm border-2',
               previewPlacement.valid
-                ? 'border-emerald-400 bg-emerald-400/20'
-                : 'border-red-500 bg-red-500/20',
+                ? 'border-success bg-success/20'
+                : 'border-destructive bg-destructive/20',
             )}
             style={{
               gridColumn: `${previewPlacement.x + 1} / span ${activePreviewDimensions.gridWidth}`,
@@ -2102,7 +2102,7 @@ function InventoryGridSection({
           >
             {!previewPlacement.valid && (
               <div className="flex h-full w-full items-center justify-center">
-                <X className="h-1/2 w-1/2 text-red-500" />
+                <X className="h-1/2 w-1/2 text-destructive" />
               </div>
             )}
           </div>
@@ -2294,10 +2294,10 @@ function EquipmentSection({
                   'relative z-[1] rounded border border-border/80 bg-black/10',
                   slotItem ? 'border-border/80' : '',
                   dragPreviewSlot?.slotKey === slotKey && dragPreviewSlot.valid
-                    ? 'border-emerald-400 bg-emerald-400/20'
+                    ? 'border-success bg-success/20'
                     : '',
                   dragPreviewSlot?.slotKey === slotKey && !dragPreviewSlot.valid
-                    ? 'border-red-500 bg-red-500/20'
+                    ? 'border-destructive bg-destructive/20'
                     : '',
                 )}
                 style={{
@@ -2335,7 +2335,7 @@ function EquipmentSection({
                 )}
                 {dragPreviewSlot?.slotKey === slotKey && !dragPreviewSlot.valid && (
                   <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center">
-                    <X className="h-1/2 w-1/2 text-red-500" />
+                    <X className="h-1/2 w-1/2 text-destructive" />
                   </div>
                 )}
               </div>

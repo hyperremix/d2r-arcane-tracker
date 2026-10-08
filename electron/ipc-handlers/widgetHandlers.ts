@@ -1,12 +1,13 @@
 import { ipcMain } from 'electron';
 import { grailDatabase } from '../database/database';
 import type { Settings } from '../types/grail';
-import type { WidgetDisplayMode } from '../utils/widgetDisplay';
+import type { WidgetDisplayMode, WidgetSize } from '../utils/widgetDisplay';
 import { isWidgetDisplayMode } from '../utils/widgetDisplay';
 import {
   closeWidgetWindow,
   getWidgetWindowPosition,
   resetWidgetWindowSize,
+  setWidgetWindowLocked,
   showWidgetWindow,
   updateWidgetWindowOpacity,
   updateWidgetWindowSize,
@@ -14,15 +15,16 @@ import {
 } from '../window/widgetWindow';
 
 /**
- * Builds the settings used to size the widget window. The custom window sizes are read from the
- * database because the renderer's settings snapshot can be stale (sizes are saved without being
- * broadcast); only the ethereal flag, which decides the resolved display mode, comes from the
+ * Builds the settings used to create, size and lock the widget window. The custom window sizes, the
+ * run-only item list flag (which decides the run-only default size) and the lock state are read
+ * from the database because the renderer's settings snapshot can be stale (sizes are saved without
+ * being broadcast); only the ethereal flag, which decides the resolved display mode, comes from the
  * renderer. Falls back to the renderer-provided settings if the database cannot be read.
  *
  * @param rendererSettings - Settings snapshot sent by the renderer
- * @returns Settings to size the widget window with
+ * @returns Settings to create or size the widget window with
  */
-function getSettingsForWidgetSizing(rendererSettings: Partial<Settings>): Partial<Settings> {
+function getSettingsForWidgetWindow(rendererSettings: Partial<Settings>): Partial<Settings> {
   try {
     const persisted = grailDatabase.getAllSettings();
     return {
@@ -30,13 +32,16 @@ function getSettingsForWidgetSizing(rendererSettings: Partial<Settings>): Partia
       widgetSizeOverall: persisted.widgetSizeOverall,
       widgetSizeSplit: persisted.widgetSizeSplit,
       widgetSizeAll: persisted.widgetSizeAll,
+      widgetSizeRunOnly: persisted.widgetSizeRunOnly,
+      widgetRunOnlyShowItems: persisted.widgetRunOnlyShowItems,
+      widgetLocked: persisted.widgetLocked,
       grailEthereal:
         typeof rendererSettings?.grailEthereal === 'boolean'
           ? rendererSettings.grailEthereal
           : persisted.grailEthereal,
     };
   } catch (error) {
-    console.error('Failed to read persisted widget sizes:', error);
+    console.error('Failed to read persisted widget window settings:', error);
     return rendererSettings;
   }
 }
@@ -56,7 +61,7 @@ export function initializeWidgetHandlers(
   viteDevServerUrl?: string,
   rendererDist?: string,
   onPositionChange?: (position: { x: number; y: number }) => void,
-  onSizeChange?: (display: WidgetDisplayMode, size: { width: number; height: number }) => void,
+  onSizeChange?: (display: WidgetDisplayMode, size: WidgetSize) => void,
 ): void {
   /**
    * Toggle widget visibility based on settings.
@@ -65,7 +70,7 @@ export function initializeWidgetHandlers(
     try {
       if (enabled) {
         showWidgetWindow(
-          settings,
+          getSettingsForWidgetWindow(settings),
           __dirname,
           viteDevServerUrl,
           rendererDist,
@@ -124,7 +129,7 @@ export function initializeWidgetHandlers(
         if (!isWidgetDisplayMode(display)) {
           return { success: false, error: 'Invalid widget display mode' };
         }
-        updateWidgetWindowSize(display, getSettingsForWidgetSizing(settings));
+        updateWidgetWindowSize(display, getSettingsForWidgetWindow(settings));
         return { success: true };
       } catch (error) {
         console.error('Failed to update widget display mode:', error);
@@ -147,6 +152,28 @@ export function initializeWidgetHandlers(
   });
 
   /**
+   * Lock or unlock the widget (click-through mode).
+   */
+  ipcMain.handle(
+    'widget:set-locked',
+    async (
+      _event,
+      locked: unknown, // Renderer-provided: validated below
+    ) => {
+      try {
+        if (typeof locked !== 'boolean') {
+          return { success: false, error: 'Invalid widget lock state' };
+        }
+        setWidgetWindowLocked(locked);
+        return { success: true };
+      } catch (error) {
+        console.error('Failed to update widget lock state:', error);
+        return { success: false, error: String(error) };
+      }
+    },
+  );
+
+  /**
    * Check if widget is currently open.
    */
   ipcMain.handle('widget:is-open', async () => {
@@ -166,7 +193,7 @@ export function initializeWidgetHandlers(
     async (
       _event,
       display: unknown, // Renderer-provided: validated below
-      size: { width: number; height: number },
+      size: WidgetSize,
     ) => {
       try {
         if (!isWidgetDisplayMode(display)) {
@@ -191,7 +218,10 @@ export function initializeWidgetHandlers(
       if (!isWidgetDisplayMode(display)) {
         return { success: false, error: 'Invalid widget display mode', size: null };
       }
-      const defaultSize = resetWidgetWindowSize(display);
+      const defaultSize = resetWidgetWindowSize(
+        display,
+        getSettingsForWidgetWindow({}).widgetRunOnlyShowItems,
+      );
       if (defaultSize && onSizeChange) {
         onSizeChange(display, defaultSize);
       }
