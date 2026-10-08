@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { translations } from '@/i18n/translations';
+import { ISSUE_TRACKER_URL } from '@/lib/links';
 
 /**
  * ReportIssues component that provides a link to report bugs on GitHub.
@@ -14,9 +15,7 @@ export function ReportIssues() {
   const { t } = useTranslation();
 
   const handleOpenIssues = useCallback(async () => {
-    await window.electronAPI?.shell.openExternal(
-      'https://github.com/hyperremix/d2r-arcane-tracker/issues',
-    );
+    await window.electronAPI?.shell.openExternal(ISSUE_TRACKER_URL);
   }, []);
 
   return (

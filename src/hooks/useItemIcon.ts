@@ -14,8 +14,8 @@ const PLACEHOLDER = placeholderUrl;
  * @returns Object containing the icon URL and loading state
  */
 export function useItemIcon(item: Item) {
-  const { settings } = useGrailStore();
-  const iconsEnabled = settings.showItemIcons;
+  // Narrow selector: this hook runs in every item card, so it must not re-render on unrelated store updates
+  const iconsEnabled = useGrailStore((state) => state.settings.showItemIcons);
 
   // Use item ID as cache key (more reliable than name)
   const cacheKey = item.id;

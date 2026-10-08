@@ -1,5 +1,5 @@
 import { useVirtualizer } from '@tanstack/react-virtual';
-import type { Character, GrailProgress, Item, Settings } from 'electron/types/grail';
+import type { Character, Item, Settings } from 'electron/types/grail';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Badge } from '@/components/ui/badge';
@@ -10,11 +10,11 @@ import {
   shouldShowEtherealStatus,
   shouldShowNormalStatus,
 } from '@/lib/ethereal';
+import { itemCategoryLabelKeys, itemTypeLabelKeys } from '@/lib/labelKeys';
 import { countActiveFilters, useFilteredItems, useGrailStore } from '@/stores/grailStore';
-import { ItemCard } from './ItemCard';
 import { ItemDetailsDialog } from './ItemDetailsDialog';
 import { getItemGridEmptyStateVariant, ItemGridEmptyState } from './ItemGridEmptyState';
-import { GroupedMasonryGrid, MasonryItemGrid } from './MasonryItemGrid';
+import { GroupedMasonryGrid, ItemCardCell, MasonryItemGrid } from './MasonryItemGrid';
 
 /**
  * Determines the ethereal grouping key for an item based on its ethereal status and progress.
@@ -101,9 +101,10 @@ export const ItemGrid = memo(function ItemGrid() {
   // Create a lookup map for progress data including both normal and ethereal versions
   const progressLookup = useProgressLookup(displayItems, progress, settings);
 
-  // Reset group mode to 'none' if ethereal grouping is selected but ethereal items are enabled
+  // Reset group mode to 'none' if ethereal grouping is selected but ethereal tracking is disabled,
+  // since the "By Ethereal" option is only offered while ethereal tracking is enabled
   useEffect(() => {
-    if (groupMode === 'ethereal' && settings.grailEthereal) {
+    if (groupMode === 'ethereal' && !settings.grailEthereal) {
       setGroupMode('none');
     }
   }, [groupMode, settings.grailEthereal, setGroupMode]);
@@ -120,10 +121,10 @@ export const ItemGrid = memo(function ItemGrid() {
 
       switch (groupMode) {
         case 'category':
-          groupKey = itemData.category;
+          groupKey = t(itemCategoryLabelKeys[itemData.category]);
           break;
         case 'type':
-          groupKey = itemData.type;
+          groupKey = t(itemTypeLabelKeys[itemData.type]);
           break;
         case 'ethereal': {
           // For consolidated view, group by whether either version is found
@@ -144,10 +145,7 @@ export const ItemGrid = memo(function ItemGrid() {
       }
     });
 
-    return Array.from(groups.entries()).map(([title, items]) => ({
-      title: title.charAt(0).toUpperCase() + title.slice(1),
-      items,
-    }));
+    return Array.from(groups.entries()).map(([title, items]) => ({ title, items }));
   }, [displayItems, groupMode, progressLookup, settings, t]);
 
   const handleItemClick = useCallback((itemId: string) => {
@@ -163,10 +161,15 @@ export const ItemGrid = memo(function ItemGrid() {
     loading,
   });
 
+  // The root fills the bounded height given by its parent so the grid/list container below is the
+  // single scroll container; that bounded height is what lets the virtualizers mount only the
+  // cards near the viewport instead of every card.
   return (
-    <div>
+    <div className="flex min-h-0 flex-1 flex-col">
       {emptyStateVariant ? (
-        <ItemGridEmptyState variant={emptyStateVariant} />
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          <ItemGridEmptyState variant={emptyStateVariant} />
+        </div>
       ) : (
         /* Items Grid with Virtual Scrolling */
         <VirtualizedItemsContainer
@@ -221,9 +224,6 @@ function createListRows(items: Item[], groupIndex: number): VirtualRowType[] {
     groupIndex,
   }));
 }
-
-// Stable empty arrays to avoid breaking memoization
-const EMPTY_PROGRESS_ARRAY: GrailProgress[] = [];
 
 /**
  * Calculates the number of items found in a group.
@@ -292,10 +292,6 @@ function renderVirtualRow({
   const item = row.items[0];
   if (!item) return null;
 
-  const itemProgressData = progressLookup.get(item.id);
-  const normalProgress = itemProgressData?.normalProgress ?? EMPTY_PROGRESS_ARRAY;
-  const etherealProgress = itemProgressData?.etherealProgress ?? EMPTY_PROGRESS_ARRAY;
-
   return (
     <div
       key={virtualRow.key}
@@ -308,12 +304,11 @@ function renderVirtualRow({
         transform: `translateY(${virtualRow.start}px)`,
       }}
     >
-      <ItemCard
+      <ItemCardCell
         item={item}
-        normalProgress={normalProgress}
-        etherealProgress={etherealProgress}
+        progressLookup={progressLookup}
         characters={characters}
-        onClick={() => handleItemClick(item.id)}
+        onItemClick={handleItemClick}
         viewMode="list"
       />
     </div>
@@ -343,7 +338,7 @@ function MasonryGridContainer({
   const listRef = useRef<HTMLDivElement>(null);
 
   return (
-    <div ref={listRef} className="h-full w-full overflow-auto p-4">
+    <div ref={listRef} className="min-h-0 w-full flex-1 overflow-auto p-4">
       <MasonryItemGrid
         items={items}
         progressLookup={progressLookup}
@@ -413,7 +408,7 @@ function ListVirtualizedContainer({
   });
 
   return (
-    <div ref={listRef} className="h-full w-full overflow-auto p-4">
+    <div ref={listRef} className="min-h-0 w-full flex-1 overflow-auto p-4">
       <div
         style={{
           height: `${rowVirtualizer.getTotalSize()}px`,
@@ -432,6 +427,46 @@ function ListVirtualizedContainer({
         )}
       </div>
     </div>
+  );
+}
+
+/**
+ * Props for the GroupedGridContainer component.
+ */
+interface GroupedGridContainerProps {
+  groupedItems: Array<{ title: string; items: Item[] }>;
+  progressLookup: ReturnType<typeof useProgressLookup>;
+  characters: Character[];
+  handleItemClick: (itemId: string) => void;
+}
+
+/**
+ * GroupedGridContainer component that renders grouped items in the virtualized grouped grid.
+ * The groups with their found counts are memoized so the memoized grid (and its row model) is
+ * only recomputed when the groups or the progress change, not on unrelated ItemGrid renders.
+ */
+function GroupedGridContainer({
+  groupedItems,
+  progressLookup,
+  characters,
+  handleItemClick,
+}: GroupedGridContainerProps) {
+  const groupsWithFoundCount = useMemo(
+    () =>
+      groupedItems.map((group) => ({
+        ...group,
+        foundCount: calculateGroupFoundCount(group.items, progressLookup),
+      })),
+    [groupedItems, progressLookup],
+  );
+
+  return (
+    <GroupedMasonryGrid
+      groupedItems={groupsWithFoundCount}
+      progressLookup={progressLookup}
+      characters={characters}
+      onItemClick={handleItemClick}
+    />
   );
 }
 
@@ -462,18 +497,14 @@ function VirtualizedItemsContainer({
     );
   }
 
-  // For grouped grid view, use CSS columns-based masonry with headers
+  // For grouped grid view, use row-based virtualization with group headers
   if (viewMode === 'grid') {
-    const groupsWithFoundCount = groupedItems.map((group) => ({
-      ...group,
-      foundCount: calculateGroupFoundCount(group.items, progressLookup),
-    }));
     return (
-      <GroupedMasonryGrid
-        groupedItems={groupsWithFoundCount}
+      <GroupedGridContainer
+        groupedItems={groupedItems}
         progressLookup={progressLookup}
         characters={characters}
-        onItemClick={handleItemClick}
+        handleItemClick={handleItemClick}
       />
     );
   }

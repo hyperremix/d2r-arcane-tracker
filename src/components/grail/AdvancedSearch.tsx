@@ -43,7 +43,7 @@ import {
 } from '@/components/ui/select';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { translations } from '@/i18n/translations';
-import { subCategoryLabelKeys } from '@/lib/labelKeys';
+import { itemCategoryLabelKeys, itemTypeLabelKeys, subCategoryLabelKeys } from '@/lib/labelKeys';
 import { cn } from '@/lib/utils';
 import {
   parseSubCategoryFilterValue,
@@ -101,26 +101,6 @@ const sortLabelKeys: Record<SortBy, string> = {
   category: translations.grail.advancedSearch.sortCategory,
   type: translations.grail.advancedSearch.sortType,
   found_date: translations.grail.advancedSearch.sortFoundDate,
-};
-
-/**
- * Translation keys for the category filters offered in the filters popover.
- */
-const categoryLabelKeys: Partial<Record<ItemCategory, string>> = {
-  weapons: translations.grail.advancedSearch.categoryWeapons,
-  armor: translations.grail.advancedSearch.categoryArmor,
-  jewelry: translations.grail.advancedSearch.categoryJewelry,
-  charms: translations.grail.advancedSearch.categoryCharms,
-};
-
-/**
- * Translation keys for the item type filters.
- */
-const typeLabelKeys: Record<ItemType, string> = {
-  unique: translations.grail.advancedSearch.typeUnique,
-  set: translations.grail.advancedSearch.typeSet,
-  rune: translations.grail.advancedSearch.typeRune,
-  runeword: translations.grail.advancedSearch.typeRuneword,
 };
 
 /**
@@ -199,7 +179,7 @@ function getSubCategoryFilterLabel(value: string, t: TFunction): string {
   if (category === undefined) return getSubCategoryLabel(subCategory, t);
 
   return t(translations.grail.advancedSearch.subCategoryChip, {
-    category: t(categoryLabelKeys[category as ItemCategory] ?? category),
+    category: t(itemCategoryLabelKeys[category as ItemCategory] ?? category),
     subCategory: getSubCategoryLabel(subCategory, t),
   });
 }
@@ -356,7 +336,7 @@ function buildActiveFilterChips({
   for (const category of categories) {
     chips.push({
       key: `category-${category}`,
-      label: t(categoryLabelKeys[category] ?? category),
+      label: t(itemCategoryLabelKeys[category]),
       onRemove: () => onToggleCategory(category),
     });
   }
@@ -372,7 +352,7 @@ function buildActiveFilterChips({
   for (const type of types) {
     chips.push({
       key: `type-${type}`,
-      label: t(typeLabelKeys[type]),
+      label: t(itemTypeLabelKeys[type]),
       onRemove: () => onToggleType(type),
     });
   }
@@ -528,7 +508,7 @@ function FiltersPopover({
           idPrefix={`${idPrefix}-category`}
           options={categoryValues.map((value) => ({
             value,
-            label: t(categoryLabelKeys[value] ?? value),
+            label: t(itemCategoryLabelKeys[value]),
           }))}
           selected={selectedCategories}
           onToggle={onToggleCategory}
@@ -542,7 +522,7 @@ function FiltersPopover({
             {subCategoryGroups.map((group) => (
               <FilterCheckboxGroup
                 key={group.category}
-                legend={t(categoryLabelKeys[group.category] ?? group.category)}
+                legend={t(itemCategoryLabelKeys[group.category] ?? group.category)}
                 idPrefix={`${idPrefix}-subcategory-${group.category}`}
                 options={group.subCategories
                   .map((subCategory) => ({
@@ -599,7 +579,7 @@ function TypeToggleChips({ typeValues, selectedTypes, onToggleType }: TypeToggle
               aria-hidden="true"
               className={cn('size-2 shrink-0 rounded-full', typeChipStyles[type].dot)}
             />
-            {t(typeLabelKeys[type])}
+            {t(itemTypeLabelKeys[type])}
           </button>
         );
       })}

@@ -1,32 +1,60 @@
 import type { ItemType } from 'electron/types/grail';
 
 /**
- * Border color mapping for different item types, for found and missing items.
- * Item type is conveyed by the border color and the type icon only; the card background
+ * Text color classes for item names. As in Diablo II, the name color is the quality signal
+ * (unique gold, set green, rune orange, runeword purple). The `--item-*` tokens are tuned to
+ * keep WCAG AA contrast on card, muted and background surfaces in both themes.
+ */
+const itemQualityTextClasses: Record<ItemType, string> = {
+  unique: 'text-item-unique',
+  set: 'text-item-set',
+  rune: 'text-item-rune',
+  runeword: 'text-item-runeword',
+};
+
+/**
+ * Returns the quality text color class for an item name, falling back to the foreground color
+ * for unknown item types.
+ */
+export function getItemQualityTextClass(itemType: ItemType): string {
+  return itemQualityTextClasses[itemType] ?? 'text-foreground';
+}
+
+/**
+ * Frame classes per item type:
+ * - found: solid quality border plus a faint inner quality line, like a D2 item frame.
+ * - missing: softened quality border (combined with a dashed style below).
+ * - hover: a quality-tinted ring and shadow glow; neither affects layout, so cards never
+ *   overlap their grid gutters.
+ * Item type is conveyed by the frame, the type icon and the name color; the card background
  * stays neutral so that text keeps full contrast.
  */
-const typeBorderColors: Record<ItemType, { found: string; missing: string }> = {
+const typeFrameStyles: Record<ItemType, { found: string; missing: string; hover: string }> = {
   unique: {
-    found: 'border-item-unique',
+    found: 'border-item-unique inset-ring-1 inset-ring-item-unique/25',
     missing: 'border-item-unique/60',
+    hover: 'hover:ring-2 hover:ring-item-unique/40',
   },
   set: {
-    found: 'border-item-set',
+    found: 'border-item-set inset-ring-1 inset-ring-item-set/25',
     missing: 'border-item-set/60',
+    hover: 'hover:ring-2 hover:ring-item-set/40',
   },
   rune: {
-    found: 'border-item-rune',
+    found: 'border-item-rune inset-ring-1 inset-ring-item-rune/25',
     missing: 'border-item-rune/60',
+    hover: 'hover:ring-2 hover:ring-item-rune/40',
   },
   runeword: {
-    found: 'border-item-runeword',
+    found: 'border-item-runeword inset-ring-1 inset-ring-item-runeword/25',
     missing: 'border-item-runeword/60',
+    hover: 'hover:ring-2 hover:ring-item-runeword/40',
   },
 };
 
 /**
  * Card surface styles depending on whether the item has been found.
- * - Found: neutral card surface with a solid type border and a subtle elevation.
+ * - Found: neutral card surface with a solid type frame and a subtle elevation.
  * - Missing: muted neutral surface with a dashed, softened type border.
  * Opacity is never applied to the whole card so the item name keeps full text contrast.
  */
@@ -36,11 +64,36 @@ const foundStateStyles = {
 } as const;
 
 /**
- * Returns the border and surface classes for an item card.
+ * Transition for the hover glow. Only paint properties are animated, and only when the user
+ * has not asked for reduced motion.
  */
-export function getCardStateClasses(itemType: ItemType, isFound: boolean): string {
+const cardTransitionStyles =
+  'motion-safe:transition-[box-shadow,border-color,background-color] motion-safe:duration-200';
+
+/**
+ * Returns the frame, surface and, for interactive cards only, hover classes for an item card.
+ * Non-interactive cards (for example the statistics "last find" card) get no hover affordance,
+ * so they do not look clickable.
+ */
+export function getCardStateClasses(
+  itemType: ItemType,
+  isFound: boolean,
+  isInteractive = false,
+): string {
   const state = isFound ? 'found' : 'missing';
-  return `${typeBorderColors[itemType]?.[state] ?? 'border-border'} ${foundStateStyles[state]}`;
+  const frame = typeFrameStyles[itemType];
+  const frameClasses = frame ? frame[state] : 'border-border';
+  const classes = [frameClasses, foundStateStyles[state]];
+  if (isInteractive) {
+    if (frame) {
+      classes.push(frame.hover);
+    }
+    if (isFound) {
+      classes.push('hover:shadow-md');
+    }
+    classes.push(cardTransitionStyles);
+  }
+  return classes.join(' ');
 }
 
 /**

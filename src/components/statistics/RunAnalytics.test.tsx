@@ -15,20 +15,18 @@ import {
 import { translations } from '@/i18n/translations';
 import { RunAnalytics } from './RunAnalytics';
 
-vi.mock('sonner', () => ({
-  toast: {
-    success: vi.fn(),
-    error: vi.fn(),
-  },
-}));
+vi.mock('sonner', () => import('@/test/sonnerMock'));
+
+const fastestRunTimestamp = new Date('2024-01-01T00:00:00Z');
+const slowestRunTimestamp = new Date('2024-01-02T00:00:00Z');
 
 const mockStats: RunStatistics = {
   totalSessions: 3,
   totalRuns: 42,
   totalTime: 3_900_000,
   averageRunDuration: 95_000,
-  fastestRun: { runId: 'run-1', duration: 60_000, timestamp: new Date('2024-01-01T00:00:00Z') },
-  slowestRun: { runId: 'run-2', duration: 180_000, timestamp: new Date('2024-01-02T00:00:00Z') },
+  fastestRun: { runId: 'run-1', duration: 60_000, timestamp: fastestRunTimestamp },
+  slowestRun: { runId: 'run-2', duration: 180_000, timestamp: slowestRunTimestamp },
   itemsPerRun: 1.5,
 };
 
@@ -94,7 +92,7 @@ describe('When exporting run analytics', () => {
         'Total Sessions,3',
         'Total Runs,42',
         'Total Time,1h 5m',
-        'Average Run Duration,1:35',
+        'Average Run Duration,1m 35s',
         'Items Per Run,1.50',
       ].join('\n'),
     );
@@ -166,5 +164,102 @@ describe('When exporting run analytics', () => {
       }),
     );
     expect(toast.success).not.toHaveBeenCalled();
+  });
+});
+
+describe('When run analytics are displayed', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockElectronAPI.runTracker.getOverallStatistics.mockResolvedValue(mockStats);
+    setElectronAPI(mockElectronAPI);
+  });
+
+  afterAll(() => {
+    setElectronAPI(originalElectronAPI);
+  });
+
+  it('If statistics are loaded, Then durations use the shared formatter and dates use the app locale', async () => {
+    // Arrange
+    const formatWithAppLocale = (date: Date) =>
+      new Intl.DateTimeFormat(i18n.language, { dateStyle: 'medium' }).format(date);
+
+    // Act
+    render(<RunAnalytics />);
+
+    // Assert
+    expect(await screen.findByText('1m 35s')).toBeInTheDocument();
+    expect(screen.getByText('1m')).toBeInTheDocument();
+    expect(screen.getByText('3m')).toBeInTheDocument();
+    expect(screen.getByText(formatWithAppLocale(fastestRunTimestamp))).toBeInTheDocument();
+    expect(screen.getByText(formatWithAppLocale(slowestRunTimestamp))).toBeInTheDocument();
+  });
+});
+
+describe('When displaying run analytics', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    setElectronAPI(mockElectronAPI);
+  });
+
+  afterAll(() => {
+    setElectronAPI(originalElectronAPI);
+  });
+
+  it('If no runs have been tracked, Then the empty state is shown instead of zeroed statistics', async () => {
+    // Arrange
+    mockElectronAPI.runTracker.getOverallStatistics.mockResolvedValue({
+      totalSessions: 1,
+      totalRuns: 0,
+      totalTime: 0,
+      averageRunDuration: 0,
+      itemsPerRun: 0,
+    } satisfies RunStatistics);
+
+    // Act
+    render(<RunAnalytics />);
+
+    // Assert
+    expect(await screen.findByRole('heading', { name: 'No Data Available' })).toBeInTheDocument();
+    expect(
+      screen.getByText('Start tracking runs to see analytics and statistics.'),
+    ).toBeInTheDocument();
+    expect(screen.queryByText('Fastest Run')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Export Data/i })).not.toBeInTheDocument();
+  });
+
+  it('If runs exist but none has been completed, Then the performance highlights are hidden', async () => {
+    // Arrange
+    mockElectronAPI.runTracker.getOverallStatistics.mockResolvedValue({
+      ...mockStats,
+      totalRuns: 1,
+      averageRunDuration: 0,
+      fastestRun: undefined,
+      slowestRun: undefined,
+    } satisfies RunStatistics);
+
+    // Act
+    render(<RunAnalytics />);
+
+    // Assert
+    expect(await screen.findByText('Total Sessions')).toBeInTheDocument();
+    expect(screen.queryByText('Performance Highlights')).not.toBeInTheDocument();
+    expect(screen.queryByText('Fastest Run')).not.toBeInTheDocument();
+  });
+
+  it('If runs have been completed, Then the fastest and slowest runs are shown without a duplicate efficiency card', async () => {
+    // Arrange
+    mockElectronAPI.runTracker.getOverallStatistics.mockResolvedValue(mockStats);
+
+    // Act
+    render(<RunAnalytics />);
+
+    // Assert
+    expect(await screen.findByText('Performance Highlights')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Fastest Run' })).toBeInTheDocument();
+    expect(screen.getByText('1m')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Slowest Run' })).toBeInTheDocument();
+    expect(screen.getByText('3m')).toBeInTheDocument();
+    expect(screen.getByText('1.50')).toBeInTheDocument();
+    expect(screen.queryByText('Overall Efficiency')).not.toBeInTheDocument();
   });
 });

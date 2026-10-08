@@ -493,6 +493,9 @@ describe('When createListRows is called', () => {
 // Component tests
 // ============================================================================
 
+// Records the groupedItems prop of every GroupedMasonryGrid render
+const groupedGridRenders = vi.hoisted(() => ({ groupedItems: [] as unknown[] }));
+
 // Mock dependencies for component tests
 vi.mock('@/stores/grailStore', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/stores/grailStore')>()),
@@ -520,14 +523,34 @@ vi.mock('./ItemDetailsDialog', () => ({
     open ? <div data-testid="item-details-dialog">{itemId}</div> : null,
 }));
 vi.mock('./MasonryItemGrid', () => ({
+  ItemCardCell: ({ item }: { item: Item }) => <div data-testid="item-card">{item.name}</div>,
   MasonryItemGrid: ({ items }: { items: Item[] }) => (
     <div data-testid="masonry-item-grid">{items.length} items</div>
   ),
   GroupedMasonryGrid: ({
     groupedItems,
+    onItemClick,
   }: {
     groupedItems: Array<{ title: string; items: Item[] }>;
-  }) => <div data-testid="grouped-masonry-grid">{groupedItems.length} groups</div>,
+    onItemClick: (itemId: string) => void;
+  }) => {
+    groupedGridRenders.groupedItems.push(groupedItems);
+    return (
+      <div data-testid="grouped-masonry-grid">
+        {groupedItems.length} groups
+        <ul>
+          {groupedItems.map((group) => (
+            <li key={group.title} data-testid="group">
+              <span data-testid="group-title">{group.title}</span>: {group.items.length}
+            </li>
+          ))}
+        </ul>
+        <button type="button" onClick={() => onItemClick('some-item')}>
+          select item
+        </button>
+      </div>
+    );
+  },
 }));
 
 // Import after mocks
@@ -549,6 +572,7 @@ function setupComponentMocks(
     settings?: Partial<Settings>;
     viewMode?: string;
     groupMode?: string;
+    progressLookup?: Map<string, ProgressLookupData>;
   } = {},
 ) {
   const mergedSettings = { ...defaultSettings, ...overrides.settings };
@@ -576,13 +600,14 @@ function setupComponentMocks(
 
   vi.mocked(useFilteredItems).mockReturnValue(overrides.filteredItems ?? []);
 
-  const progressMap = new Map<string, ProgressLookupData>();
+  const progressMap = overrides.progressLookup ?? new Map<string, ProgressLookupData>();
   vi.mocked(useProgressLookup).mockReturnValue(progressMap);
 }
 
 describe('When ItemGrid component is rendered', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    groupedGridRenders.groupedItems.length = 0;
     setupComponentMocks();
   });
 
@@ -612,6 +637,58 @@ describe('When ItemGrid component is rendered', () => {
       // Assert
       expect(screen.getByTestId('grouped-masonry-grid')).toBeInTheDocument();
     });
+
+    it('Then group titles are translated category labels', () => {
+      // Arrange
+      const items = [
+        HolyGrailItemBuilder.new().withId('a').withCategory('armor').build(),
+        HolyGrailItemBuilder.new().withId('b').withCategory('runewords').build(),
+      ];
+      setupComponentMocks({ filteredItems: items, viewMode: 'grid', groupMode: 'category' });
+
+      // Act
+      render(<ItemGrid />);
+
+      // Assert
+      const titles = screen.getAllByTestId('group-title').map((el) => el.textContent);
+      expect(titles).toEqual(['Armor', 'Runewords']);
+    });
+  });
+
+  describe('If viewMode "grid" and groupMode "type"', () => {
+    it('Then group titles are translated type labels', () => {
+      // Arrange
+      const items = [
+        HolyGrailItemBuilder.new().withId('a').withType('unique').build(),
+        HolyGrailItemBuilder.new().withId('b').withType('runeword').build(),
+      ];
+      setupComponentMocks({ filteredItems: items, viewMode: 'grid', groupMode: 'type' });
+
+      // Act
+      render(<ItemGrid />);
+
+      // Assert
+      const titles = screen.getAllByTestId('group-title').map((el) => el.textContent);
+      expect(titles).toEqual(['Unique', 'Runeword']);
+    });
+  });
+
+  describe('If viewMode "grid" and groupMode "category" and an unrelated ItemGrid state changes', () => {
+    it('Then passes the same grouped items to GroupedMasonryGrid', () => {
+      // Arrange
+      const items = HolyGrailItemBuilder.new().buildMany(3);
+      setupComponentMocks({ filteredItems: items, viewMode: 'grid', groupMode: 'category' });
+      render(<ItemGrid />);
+      const rendersAfterMount = groupedGridRenders.groupedItems.length;
+
+      // Act — selecting an item only changes the selected item id of ItemGrid
+      fireEvent.click(screen.getByRole('button', { name: 'select item' }));
+
+      // Assert
+      expect(screen.getByTestId('item-details-dialog')).toBeInTheDocument();
+      expect(groupedGridRenders.groupedItems.length).toBeGreaterThan(rendersAfterMount);
+      expect(new Set(groupedGridRenders.groupedItems).size).toBe(1);
+    });
   });
 
   describe('If viewMode "list"', () => {
@@ -626,6 +703,42 @@ describe('When ItemGrid component is rendered', () => {
       // Assert — list view uses a div-based virtualized container (no masonry)
       expect(screen.queryByTestId('masonry-item-grid')).not.toBeInTheDocument();
       expect(screen.queryByTestId('grouped-masonry-grid')).not.toBeInTheDocument();
+    });
+  });
+
+  describe.each([
+    ['grid', 'none'],
+    ['list', 'none'],
+  ])('If viewMode "%s", groupMode "%s" and there are items to show', (viewMode, groupMode) => {
+    it('Then the items container is the single scroll container inside a bounded root', () => {
+      // Arrange
+      const items = HolyGrailItemBuilder.new().buildMany(3);
+      setupComponentMocks({ filteredItems: items, viewMode, groupMode });
+
+      // Act
+      const { container } = render(<ItemGrid />);
+
+      // Assert — a bounded root lets the virtualizers measure the visible viewport
+      const root = container.firstElementChild;
+      const scroller = root?.firstElementChild;
+      expect(root).toHaveClass('flex', 'min-h-0', 'flex-1', 'flex-col');
+      expect(root).not.toHaveClass('overflow-auto');
+      expect(root).not.toHaveClass('overflow-y-auto');
+      expect(scroller).toHaveClass('min-h-0', 'flex-1', 'overflow-auto');
+    });
+  });
+
+  describe('If the empty state is shown', () => {
+    it('Then the empty state scrolls inside the bounded root', () => {
+      // Arrange
+      setupComponentMocks({ filteredItems: [], items: [], loading: false });
+
+      // Act
+      render(<ItemGrid />);
+
+      // Assert
+      const emptyState = screen.getByTestId('item-grid-empty-state');
+      expect(emptyState.parentElement).toHaveClass('min-h-0', 'flex-1', 'overflow-y-auto');
     });
   });
 
@@ -815,6 +928,103 @@ describe('When ItemGrid component is rendered', () => {
 
       // Assert
       expect(screen.getByTestId('masonry-item-grid')).toHaveTextContent('1 items');
+    });
+  });
+
+  describe('If ethereal tracking is enabled and group mode is ethereal', () => {
+    it('Then keeps the ethereal group mode and groups items by translated ethereal status', () => {
+      // Arrange
+      const bothFoundItem = HolyGrailItemBuilder.new()
+        .withId('both-found')
+        .withEtherealType('optional')
+        .build();
+      const neitherFoundItem = HolyGrailItemBuilder.new()
+        .withId('neither-found')
+        .withEtherealType('optional')
+        .build();
+      const normalOnlyTypeItem = HolyGrailItemBuilder.new()
+        .withId('normal-type')
+        .withEtherealType('none')
+        .build();
+      const etherealOnlyTypeItem = HolyGrailItemBuilder.new()
+        .withId('eth-type')
+        .withEtherealType('only')
+        .build();
+      const progressLookup = new Map<string, ProgressLookupData>([
+        [
+          'both-found',
+          {
+            normalFound: true,
+            etherealFound: true,
+            normalProgress: [],
+            etherealProgress: [],
+            overallFound: true,
+          },
+        ],
+        [
+          'normal-type',
+          {
+            normalFound: true,
+            etherealFound: false,
+            normalProgress: [],
+            etherealProgress: [],
+            overallFound: true,
+          },
+        ],
+      ]);
+      setupComponentMocks({
+        filteredItems: [bothFoundItem, neitherFoundItem, normalOnlyTypeItem, etherealOnlyTypeItem],
+        settings: { grailNormal: true, grailEthereal: true },
+        viewMode: 'grid',
+        groupMode: 'ethereal',
+        progressLookup,
+      });
+
+      // Act
+      render(<ItemGrid />);
+
+      // Assert
+      expect(mockSetGroupMode).not.toHaveBeenCalled();
+      expect(screen.getAllByTestId('group').map((group) => group.textContent)).toEqual([
+        'Both Found: 1',
+        'Neither Found: 1',
+        'Normal Found: 1',
+        'Ethereal Not Found: 1',
+      ]);
+    });
+  });
+
+  describe('If ethereal tracking is disabled and group mode is ethereal', () => {
+    it('Then resets the group mode to none', () => {
+      // Arrange
+      setupComponentMocks({
+        filteredItems: HolyGrailItemBuilder.new().withEtherealType('none').buildMany(2),
+        settings: { grailNormal: true, grailEthereal: false },
+        groupMode: 'ethereal',
+      });
+
+      // Act
+      render(<ItemGrid />);
+
+      // Assert
+      expect(mockSetGroupMode).toHaveBeenCalledWith('none');
+    });
+  });
+
+  describe('If ethereal tracking is disabled and group mode is not ethereal', () => {
+    it('Then does not change the group mode', () => {
+      // Arrange
+      setupComponentMocks({
+        filteredItems: HolyGrailItemBuilder.new().buildMany(2),
+        settings: { grailNormal: true, grailEthereal: false },
+        groupMode: 'category',
+      });
+
+      // Act
+      render(<ItemGrid />);
+
+      // Assert
+      expect(mockSetGroupMode).not.toHaveBeenCalled();
     });
   });
 });

@@ -293,7 +293,7 @@ export function SessionControls() {
           <CardTitle className="flex items-center gap-2">
             {t(translations.runTracker.controls.sessionControls)}
             {isTracking && (
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-1 font-normal font-ui">
                 <div className={`h-2 w-2 rounded-full ${isPaused ? 'bg-warning' : 'bg-success'}`} />
                 <span className="text-muted-foreground text-sm">
                   {isPaused
