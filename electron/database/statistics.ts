@@ -1,5 +1,5 @@
 import { eq } from 'drizzle-orm';
-import type { RunStatistics, SessionStats, Settings } from '../types/grail';
+import type { RunHighlight, RunStatistics, SessionStats, Settings } from '../types/grail';
 import { schema } from './drizzle';
 import type { DatabaseContext } from './types';
 
@@ -134,18 +134,32 @@ export function getSessionStatistics(ctx: DatabaseContext, sessionId: string): S
   };
 }
 
+interface RunHighlightRow {
+  id: string;
+  duration: number;
+  start_time: string;
+}
+
+function toRunHighlight(row: RunHighlightRow | undefined): RunHighlight | undefined {
+  if (!row) {
+    return undefined;
+  }
+  return { runId: row.id, duration: row.duration, timestamp: new Date(row.start_time) };
+}
+
 export function getOverallRunStatistics(ctx: DatabaseContext): RunStatistics {
-  // Get session and run counts
-  const sessionStatsResult = ctx.rawDb
+  // Session, run and time totals. Each aggregate reads its own table so that joining
+  // sessions to runs cannot multiply a session's time by its number of runs.
+  const totalsResult = ctx.rawDb
     .prepare(
       `
       SELECT
-        COUNT(DISTINCT s.id) as totalSessions,
-        COUNT(r.id) as totalRuns,
-        SUM(s.total_session_time) as totalTime
-      FROM sessions s
-      LEFT JOIN runs r ON s.id = r.session_id
-      WHERE s.archived = 0
+        (SELECT COUNT(*) FROM sessions WHERE archived = 0) as totalSessions,
+        (SELECT COUNT(*)
+           FROM runs r
+           INNER JOIN sessions s ON r.session_id = s.id
+           WHERE s.archived = 0) as totalRuns,
+        (SELECT SUM(total_session_time) FROM sessions WHERE archived = 0) as totalTime
     `,
     )
     .get() as {
@@ -154,24 +168,17 @@ export function getOverallRunStatistics(ctx: DatabaseContext): RunStatistics {
     totalTime: number | null;
   };
 
-  // Get run duration statistics
+  // Average only completed runs; in-progress runs have no duration yet
   const runDurationResult = ctx.rawDb
     .prepare(
       `
-      SELECT
-        AVG(CASE WHEN r.duration IS NOT NULL THEN r.duration ELSE 0 END) as averageRunDuration,
-        MIN(CASE WHEN r.duration IS NOT NULL THEN r.duration ELSE NULL END) as minDuration,
-        MAX(CASE WHEN r.duration IS NOT NULL THEN r.duration ELSE NULL END) as maxDuration
+      SELECT AVG(r.duration) as averageRunDuration
       FROM runs r
       INNER JOIN sessions s ON r.session_id = s.id
-      WHERE s.archived = 0
+      WHERE s.archived = 0 AND r.duration IS NOT NULL
     `,
     )
-    .get() as {
-    averageRunDuration: number | null;
-    minDuration: number | null;
-    maxDuration: number | null;
-  };
+    .get() as { averageRunDuration: number | null };
 
   // Get fastest run details
   const fastestRunResult = ctx.rawDb
@@ -185,7 +192,7 @@ export function getOverallRunStatistics(ctx: DatabaseContext): RunStatistics {
       LIMIT 1
     `,
     )
-    .get() as { id: string; duration: number; start_time: string } | undefined;
+    .get() as RunHighlightRow | undefined;
 
   const slowestRunResult = ctx.rawDb
     .prepare(
@@ -198,48 +205,28 @@ export function getOverallRunStatistics(ctx: DatabaseContext): RunStatistics {
       LIMIT 1
     `,
     )
-    .get() as { id: string; duration: number; start_time: string } | undefined;
+    .get() as RunHighlightRow | undefined;
 
-  // Get items per run average
-  const itemsPerRunResult = ctx.rawDb
+  // Count items found across all runs of non-archived sessions
+  const itemsResult = ctx.rawDb
     .prepare(
       `
-      SELECT
-        COUNT(ri.id) as totalItems,
-        COUNT(DISTINCT r.id) as runsWithItems
-      FROM runs r
+      SELECT COUNT(ri.id) as totalItems
+      FROM run_items ri
+      INNER JOIN runs r ON ri.run_id = r.id
       INNER JOIN sessions s ON r.session_id = s.id
-      LEFT JOIN run_items ri ON r.id = ri.run_id
       WHERE s.archived = 0
     `,
     )
-    .get() as {
-    totalItems: number;
-    runsWithItems: number;
-  };
+    .get() as { totalItems: number };
 
   return {
-    totalSessions: sessionStatsResult.totalSessions,
-    totalRuns: sessionStatsResult.totalRuns,
-    totalTime: sessionStatsResult.totalTime || 0,
+    totalSessions: totalsResult.totalSessions,
+    totalRuns: totalsResult.totalRuns,
+    totalTime: totalsResult.totalTime || 0,
     averageRunDuration: runDurationResult.averageRunDuration || 0,
-    fastestRun: fastestRunResult
-      ? {
-          runId: fastestRunResult.id,
-          duration: fastestRunResult.duration,
-          timestamp: new Date(fastestRunResult.start_time),
-        }
-      : { runId: '', duration: 0, timestamp: new Date() },
-    slowestRun: slowestRunResult
-      ? {
-          runId: slowestRunResult.id,
-          duration: slowestRunResult.duration,
-          timestamp: new Date(slowestRunResult.start_time),
-        }
-      : { runId: '', duration: 0, timestamp: new Date() },
-    itemsPerRun:
-      itemsPerRunResult.runsWithItems > 0
-        ? itemsPerRunResult.totalItems / itemsPerRunResult.runsWithItems
-        : 0,
+    fastestRun: toRunHighlight(fastestRunResult),
+    slowestRun: toRunHighlight(slowestRunResult),
+    itemsPerRun: totalsResult.totalRuns > 0 ? itemsResult.totalItems / totalsResult.totalRuns : 0,
   };
 }

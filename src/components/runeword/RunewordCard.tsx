@@ -1,5 +1,6 @@
 import type { Item } from 'electron/types/grail';
 import { useTranslation } from 'react-i18next';
+import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { translations } from '@/i18n/translations';
 import { getRunewordCompletionStatus } from '@/lib/runeword-utils';
@@ -48,6 +49,26 @@ export function RunewordCard({ runeword, availableRunes, className }: RunewordCa
               </a>
             )}
           </div>
+          <Badge
+            variant={completionStatus.complete ? 'default' : 'outline'}
+            className={cn(
+              'font-mono',
+              completionStatus.complete && 'bg-success text-success-foreground',
+            )}
+          >
+            <span aria-hidden="true">
+              {t(translations.runeword.card.runesOwned, {
+                available: completionStatus.availableCount,
+                total: completionStatus.totalCount,
+              })}
+            </span>
+            <span className="sr-only">
+              {t(translations.runeword.card.runesOwnedLabel, {
+                available: completionStatus.availableCount,
+                total: completionStatus.totalCount,
+              })}
+            </span>
+          </Badge>
         </div>
 
         {/* Required runes */}

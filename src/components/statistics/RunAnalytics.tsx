@@ -135,7 +135,7 @@ export function RunAnalytics() {
     );
   }
 
-  if (!overallStats) {
+  if (!overallStats || overallStats.totalRuns === 0) {
     return (
       <div className="flex items-center justify-center p-8">
         <Card className="w-full max-w-md">
@@ -228,48 +228,44 @@ export function RunAnalytics() {
           </CardContent>
         </Card>
       </div>
-      {/* Performance Highlights */}
-      <Card>
-        <CardHeader>
-          <CardTitle>{t(translations.statistics.runAnalytics.performanceHighlights)}</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            <div className="space-y-2">
-              <h4 className="font-medium">{t(translations.statistics.runAnalytics.fastestRun)}</h4>
-              <div className="flex items-center gap-2">
-                <Badge variant="secondary">
-                  {formatDuration(overallStats.fastestRun.duration)}
-                </Badge>
-                <span className="text-muted-foreground text-sm">
-                  {formatLocalizedDate(overallStats.fastestRun.timestamp, i18n.language)}
-                </span>
+      {/* Performance Highlights (only once at least one run has been completed) */}
+      {overallStats.fastestRun && overallStats.slowestRun && (
+        <Card>
+          <CardHeader>
+            <CardTitle>{t(translations.statistics.runAnalytics.performanceHighlights)}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <h4 className="font-medium">
+                  {t(translations.statistics.runAnalytics.fastestRun)}
+                </h4>
+                <div className="flex items-center gap-2">
+                  <Badge variant="secondary">
+                    {formatDuration(overallStats.fastestRun.duration)}
+                  </Badge>
+                  <span className="text-muted-foreground text-sm">
+                    {formatLocalizedDate(overallStats.fastestRun.timestamp, i18n.language)}
+                  </span>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <h4 className="font-medium">
+                  {t(translations.statistics.runAnalytics.slowestRun)}
+                </h4>
+                <div className="flex items-center gap-2">
+                  <Badge variant="secondary">
+                    {formatDuration(overallStats.slowestRun.duration)}
+                  </Badge>
+                  <span className="text-muted-foreground text-sm">
+                    {formatLocalizedDate(overallStats.slowestRun.timestamp, i18n.language)}
+                  </span>
+                </div>
               </div>
             </div>
-            <div className="space-y-2">
-              <h4 className="font-medium">{t(translations.statistics.runAnalytics.slowestRun)}</h4>
-              <div className="flex items-center gap-2">
-                <Badge variant="secondary">
-                  {formatDuration(overallStats.slowestRun.duration)}
-                </Badge>
-                <span className="text-muted-foreground text-sm">
-                  {formatLocalizedDate(overallStats.slowestRun.timestamp, i18n.language)}
-                </span>
-              </div>
-            </div>
-            <div className="space-y-2">
-              <h4 className="font-medium">
-                {t(translations.statistics.runAnalytics.overallEfficiency)}
-              </h4>
-              <Badge variant="outline">
-                {t(translations.statistics.runAnalytics.itemsPerRunMetric, {
-                  count: Number.parseFloat(overallStats.itemsPerRun.toFixed(2)),
-                })}
-              </Badge>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

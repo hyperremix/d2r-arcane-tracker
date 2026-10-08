@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
+import { useWizardSettingsSave, WizardSaveError } from '@/components/wizard/wizardSettingsSave';
 import { translations } from '@/i18n/translations';
 import { useGrailStore } from '@/stores/grailStore';
 
@@ -16,7 +17,8 @@ export function NotificationsStep() {
   const { t } = useTranslation();
   const volumeSliderId = useId();
   const headingId = useId();
-  const { settings, setSettings } = useGrailStore();
+  const { settings } = useGrailStore();
+  const { saveSettings, saveFailed } = useWizardSettingsSave();
 
   const enableSounds = settings.enableSounds ?? true;
   const notificationVolume = settings.notificationVolume ?? 0.5;
@@ -53,7 +55,7 @@ export function NotificationsStep() {
             <Switch
               aria-label={t(translations.settings.notifications.soundNotifications)}
               checked={enableSounds}
-              onCheckedChange={(checked) => setSettings({ enableSounds: checked })}
+              onCheckedChange={(checked) => saveSettings({ enableSounds: checked })}
             />
           </div>
 
@@ -69,7 +71,7 @@ export function NotificationsStep() {
               value={[enableSounds ? notificationVolume : 0]}
               onValueChange={(value) => {
                 const values = Array.isArray(value) ? value : [value];
-                setSettings({ notificationVolume: values[0] });
+                saveSettings({ notificationVolume: values[0] });
               }}
               className="w-20"
               disabled={!enableSounds}
@@ -95,7 +97,7 @@ export function NotificationsStep() {
             <Switch
               aria-label={t(translations.settings.notifications.inAppNotifications)}
               checked={inAppNotifications}
-              onCheckedChange={(checked) => setSettings({ inAppNotifications: checked })}
+              onCheckedChange={(checked) => saveSettings({ inAppNotifications: checked })}
             />
           </div>
         </div>
@@ -115,10 +117,12 @@ export function NotificationsStep() {
             <Switch
               aria-label={t(translations.settings.notifications.nativeNotifications)}
               checked={nativeNotifications}
-              onCheckedChange={(checked) => setSettings({ nativeNotifications: checked })}
+              onCheckedChange={(checked) => saveSettings({ nativeNotifications: checked })}
             />
           </div>
         </div>
+
+        <WizardSaveError visible={saveFailed} />
 
         <div className="rounded-lg bg-info/10 p-4">
           <p className="text-info text-sm">

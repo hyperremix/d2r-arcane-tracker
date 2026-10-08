@@ -15,8 +15,6 @@ function renderRuneFilters(selectedRunes: string[]) {
       selectedRunes={selectedRunes}
       onRuneSelectionChange={vi.fn()}
       availableRunes={{}}
-      showPartial={true}
-      onShowPartialChange={vi.fn()}
     />,
   );
 }

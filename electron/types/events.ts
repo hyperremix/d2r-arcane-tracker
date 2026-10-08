@@ -1,4 +1,3 @@
-import type { ServiceErrorPayload } from '../utils/serviceLogger';
 import type {
   D2Item,
   GrailProgress,
@@ -7,6 +6,7 @@ import type {
   SaveFileEvent,
   Session,
 } from './grail';
+import type { ServiceErrorPayload } from './serviceError';
 
 /**
  * Payload for monitoring-started event

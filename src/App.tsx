@@ -1,10 +1,12 @@
 import type { JSX } from 'react';
 
 import { useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { RouterProvider } from 'react-router';
 
 import { Toaster } from '@/components/ui/sonner';
 import { SetupWizard } from '@/components/wizard/SetupWizard';
+import { translations } from '@/i18n/translations';
 
 import { useIconPreloader } from './hooks/useItemIcon';
 import { useServiceErrorNotifications } from './hooks/useServiceErrorNotifications';
@@ -14,7 +16,15 @@ import { router } from './router';
 import { useGrailStore } from './stores/grailStore';
 import { useWizardStore } from './stores/wizardStore';
 
+/**
+ * Navigates to the settings page from outside the router tree (e.g. from toast actions).
+ */
+const openSettings = () => {
+  void router.navigate('/settings');
+};
+
 function App(): JSX.Element {
+  const { t } = useTranslation();
   const { hydrateSettings } = useGrailStore();
   const { openWizard } = useWizardStore();
   const hasCheckedWizard = useRef(false);
@@ -29,7 +39,7 @@ function App(): JSX.Element {
   useUpdateNotifications();
 
   // Listen for critical service error notifications
-  useServiceErrorNotifications();
+  useServiceErrorNotifications({ onOpenSettings: openSettings });
 
   // Load settings on app startup and check if wizard should be shown
   useEffect(() => {
@@ -75,7 +85,10 @@ function App(): JSX.Element {
     <>
       <RouterProvider router={router} />
       <SetupWizard />
-      <Toaster position="bottom-left" />
+      <Toaster
+        position="bottom-left"
+        toastOptions={{ closeButtonAriaLabel: t(translations.common.close) }}
+      />
     </>
   );
 }

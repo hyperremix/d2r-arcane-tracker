@@ -11,6 +11,7 @@ import {
   shouldShowEtherealStatus,
   shouldShowNormalStatus,
 } from '@/lib/ethereal';
+import { itemCategoryLabelKeys, itemTypeLabelKeys } from '@/lib/labelKeys';
 import { countActiveFilters, useFilteredItems, useGrailStore } from '@/stores/grailStore';
 import { ItemCard } from './ItemCard';
 import { ItemDetailsDialog } from './ItemDetailsDialog';
@@ -117,9 +118,10 @@ export const ItemGrid = memo(function ItemGrid() {
   // Create a lookup map for progress data including both normal and ethereal versions
   const progressLookup = useProgressLookup(displayItems, progress, settings);
 
-  // Reset group mode to 'none' if ethereal grouping is selected but ethereal items are enabled
+  // Reset group mode to 'none' if ethereal grouping is selected but ethereal tracking is disabled,
+  // since the "By Ethereal" option is only offered while ethereal tracking is enabled
   useEffect(() => {
-    if (groupMode === 'ethereal' && settings.grailEthereal) {
+    if (groupMode === 'ethereal' && !settings.grailEthereal) {
       setGroupMode('none');
     }
   }, [groupMode, settings.grailEthereal, setGroupMode]);
@@ -136,10 +138,10 @@ export const ItemGrid = memo(function ItemGrid() {
 
       switch (groupMode) {
         case 'category':
-          groupKey = itemData.category;
+          groupKey = t(itemCategoryLabelKeys[itemData.category]);
           break;
         case 'type':
-          groupKey = itemData.type;
+          groupKey = t(itemTypeLabelKeys[itemData.type]);
           break;
         case 'ethereal': {
           // For consolidated view, group by whether either version is found
@@ -160,10 +162,7 @@ export const ItemGrid = memo(function ItemGrid() {
       }
     });
 
-    return Array.from(groups.entries()).map(([title, items]) => ({
-      title: title.charAt(0).toUpperCase() + title.slice(1),
-      items,
-    }));
+    return Array.from(groups.entries()).map(([title, items]) => ({ title, items }));
   }, [displayItems, groupMode, progressLookup, settings, t]);
 
   const handleItemClick = useCallback((itemId: string) => {
