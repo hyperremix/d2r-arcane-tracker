@@ -15,14 +15,15 @@ vi.mock('electron', () => ({
   },
 }));
 
-import { globalShortcut } from 'electron';
-import {
-  type GlobalHotkeyRunTracker,
-  GlobalHotkeyService,
-  type GlobalHotkeyServiceOptions,
-  resolveRunTrackerShortcuts,
-  shortcutToAccelerator,
-} from './globalHotkeys';
+import type { GlobalHotkeyRunTracker, GlobalHotkeyServiceOptions } from './globalHotkeys';
+
+// The vitest config disables module isolation, so a cached globalHotkeys module could stay bound
+// to the electron mock of another test file. Reset the registry so it binds to the mock above.
+vi.resetModules();
+const { globalShortcut } = await import('electron');
+const { GlobalHotkeyService, resolveRunTrackerShortcuts, shortcutToAccelerator } = await import(
+  './globalHotkeys'
+);
 
 type MockRunTracker = { [K in keyof GlobalHotkeyRunTracker]: ReturnType<typeof vi.fn> };
 

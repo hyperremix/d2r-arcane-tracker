@@ -1,6 +1,7 @@
 import { ipcMain, webContents } from 'electron';
 import { type GrailDatabase, grailDatabase } from '../database/database';
 import type { Difficulty, GrailProgress, Item, Settings } from '../types/grail';
+import { RUN_TRACKER_SHORTCUT_ACTIONS } from '../utils/runTrackerShortcuts';
 
 /**
  * Global database instance for grail operations.
@@ -52,6 +53,29 @@ function validateSettingsUpdate(settings: Partial<Settings>): void {
   ) {
     throw new Error('Invalid runTrackerGlobalHotkeys setting: expected a boolean');
   }
+
+  if (
+    settings.runTrackerShortcuts !== undefined &&
+    !isValidRunTrackerShortcuts(settings.runTrackerShortcuts)
+  ) {
+    throw new Error(
+      'Invalid runTrackerShortcuts setting: expected an object with a non-empty string for each shortcut action',
+    );
+  }
+}
+
+/**
+ * Checks that a renderer-provided shortcut mapping has a non-empty string for every action.
+ * @param value - The untrusted runTrackerShortcuts value received over IPC
+ * @returns True if the value is a complete shortcut mapping
+ */
+function isValidRunTrackerShortcuts(value: unknown): boolean {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    return false;
+  }
+
+  const shortcuts = value as Record<string, unknown>;
+  return RUN_TRACKER_SHORTCUT_ACTIONS.every((action) => isNonEmptyString(shortcuts[action]));
 }
 
 /**

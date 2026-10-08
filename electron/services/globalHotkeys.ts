@@ -5,20 +5,11 @@ import type {
   RunTrackerShortcutAction,
   Settings,
 } from '../types/grail';
+import { RUN_TRACKER_SHORTCUT_ACTIONS } from '../utils/runTrackerShortcuts';
 import { createServiceLogger } from '../utils/serviceLogger';
 import type { RunTrackerService } from './runTracker';
 
 const log = createServiceLogger('GlobalHotkeyService');
-
-/**
- * Run tracker shortcut actions in registration order.
- */
-export const RUN_TRACKER_SHORTCUT_ACTIONS: readonly RunTrackerShortcutAction[] = [
-  'startRun',
-  'pauseRun',
-  'endRun',
-  'endSession',
-];
 
 /**
  * Default run tracker shortcuts (kept in sync with the renderer defaults).

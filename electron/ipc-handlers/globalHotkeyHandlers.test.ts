@@ -56,7 +56,12 @@ vi.mock('./grailHandlers', () => ({
   }),
 }));
 
-import { closeGlobalHotkeys, initializeGlobalHotkeyHandlers } from './globalHotkeyHandlers';
+// The vitest config disables module isolation, so cached modules could stay bound to the mocks of
+// another test file. Reset the registry so the handlers and service bind to the mocks above.
+vi.resetModules();
+const { closeGlobalHotkeys, initializeGlobalHotkeyHandlers } = await import(
+  './globalHotkeyHandlers'
+);
 
 function createMainWindow(focused: boolean) {
   return { isDestroyed: () => false, isFocused: vi.fn(() => focused) };
