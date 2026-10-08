@@ -209,6 +209,31 @@ describe('SessionControls', () => {
       }
     });
 
+    it.each([
+      { isPaused: false, label: 'Running' },
+      { isPaused: true, label: 'Paused' },
+    ])(
+      'If the run is $label, Then the status badge uses the UI font outside the display-font title',
+      ({ isPaused, label }) => {
+        // Arrange
+        mockUseRunTrackerStore.mockReturnValue({
+          ...defaultStoreState,
+          activeSession: mockSession,
+          activeRun: mockRun,
+          isTracking: true,
+          isPaused,
+        });
+
+        // Act
+        render(<SessionControls />);
+
+        // Assert
+        const status = screen.getByText(label);
+        expect(status).toHaveClass('font-ui');
+        expect(status.closest('[data-slot="card-title"]')).toBeNull();
+      },
+    );
+
     it('shows resume button when run is paused', () => {
       mockUseRunTrackerStore.mockReturnValue({
         ...defaultStoreState,

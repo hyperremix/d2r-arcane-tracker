@@ -1,20 +1,22 @@
-/**
- * Payload sent to the renderer process for UI-surfaced errors.
- */
-export interface ServiceErrorPayload {
-  service: string;
-  operation: string;
-  severity: 'error' | 'warn';
-  message: string;
-  timestamp: number;
-}
+import type {
+  ServiceErrorCode,
+  ServiceErrorParams,
+  ServiceErrorPayload,
+  ServiceErrorSeverity,
+} from '../types/serviceError';
 
 /**
  * Options for controlling whether an error is surfaced to the UI.
+ * The renderer translates the `code` (+ `params`) into user-facing copy.
  */
 interface SurfaceOptions {
   surfaceToUI: true;
-  userMessage?: string;
+  /** Stable error code the renderer maps to translated copy and an action. */
+  code: ServiceErrorCode;
+  /** Interpolation parameters for the translated copy (e.g. a file name). */
+  params?: ServiceErrorParams;
+  /** Technical detail override; defaults to the logged error's message. */
+  detail?: string;
 }
 
 type ErrorForwarder = (payload: ServiceErrorPayload) => void;
@@ -44,7 +46,7 @@ function extractMessage(error: unknown): string {
 function forwardToUI(
   service: string,
   operation: string,
-  severity: 'error' | 'warn',
+  severity: ServiceErrorSeverity,
   error: unknown,
   surfaceOptions?: SurfaceOptions,
 ): void {
@@ -56,7 +58,9 @@ function forwardToUI(
     service,
     operation,
     severity,
-    message: surfaceOptions.userMessage || extractMessage(error),
+    code: surfaceOptions.code,
+    ...(surfaceOptions.params && { params: surfaceOptions.params }),
+    detail: surfaceOptions.detail ?? extractMessage(error),
     timestamp: Date.now(),
   });
 }
@@ -85,7 +89,7 @@ export interface ServiceLogger {
  * @example
  * const log = createServiceLogger('SaveFileMonitor');
  * log.error('parseSaveFile', error, { filePath });
- * log.error('flush', error, { attempt }, { surfaceToUI: true, userMessage: 'Database write failed' });
+ * log.error('flush', error, { attempt }, { surfaceToUI: true, code: 'databaseWriteFailed' });
  * log.warn('validate', 'Invalid interval');
  * log.info('startMonitoring', 'Started', { directory });
  */

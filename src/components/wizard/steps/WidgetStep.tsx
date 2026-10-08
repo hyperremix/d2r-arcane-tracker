@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
+import { useWizardSettingsSave, WizardSaveError } from '@/components/wizard/wizardSettingsSave';
 import { translations } from '@/i18n/translations';
 import { clampWidgetOpacity, MAX_WIDGET_OPACITY, MIN_WIDGET_OPACITY } from '@/lib/widget';
 import { useGrailStore } from '@/stores/grailStore';
@@ -18,7 +19,8 @@ export function WidgetStep() {
   const { t } = useTranslation();
   const opacitySliderId = useId();
   const headingId = useId();
-  const { settings, setSettings } = useGrailStore();
+  const { settings } = useGrailStore();
+  const { saveSettings, saveFailed } = useWizardSettingsSave();
 
   const widgetEnabled = settings.widgetEnabled ?? false;
   const widgetDisplay = settings.widgetDisplay || 'overall';
@@ -28,38 +30,47 @@ export function WidgetStep() {
 
   const toggleWidget = useCallback(
     async (checked: boolean) => {
-      await setSettings({ widgetEnabled: checked });
+      const result = await saveSettings({ widgetEnabled: checked });
+      if (!result.success) {
+        return;
+      }
       // Toggle widget visibility via IPC
       await window.electronAPI?.widget.toggle(checked, settings);
     },
-    [settings, setSettings],
+    [settings, saveSettings],
   );
 
   const handleDisplayChange = useCallback(
     async (display: 'overall' | 'split' | 'all' | 'run-only') => {
-      await setSettings({ widgetDisplay: display });
+      const result = await saveSettings({ widgetDisplay: display });
+      if (!result.success) {
+        return;
+      }
       // Update widget display mode via IPC
       await window.electronAPI?.widget.updateDisplay(display, settings);
     },
-    [setSettings, settings],
+    [saveSettings, settings],
   );
 
   const handleOpacityChange = useCallback(
     async (value: number | readonly number[]) => {
       const values = Array.isArray(value) ? value : [value];
       const opacity = clampWidgetOpacity(values[0]);
-      await setSettings({ widgetOpacity: opacity });
+      const result = await saveSettings({ widgetOpacity: opacity });
+      if (!result.success) {
+        return;
+      }
       // Update widget opacity via IPC
       await window.electronAPI?.widget.updateOpacity(opacity);
     },
-    [setSettings],
+    [saveSettings],
   );
 
   const handleRunOnlyItemsChange = useCallback(
     async (checked: boolean) => {
-      await setSettings({ widgetRunOnlyShowItems: checked });
+      await saveSettings({ widgetRunOnlyShowItems: checked });
     },
-    [setSettings],
+    [saveSettings],
   );
 
   return (
@@ -188,6 +199,8 @@ export function WidgetStep() {
             })}
           </p>
         </div>
+
+        <WizardSaveError visible={saveFailed} />
 
         {/* Widget Preview Description */}
         <div className="rounded-lg bg-info/10 p-3">

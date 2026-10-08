@@ -59,7 +59,7 @@ Use the export button on the active session card or in a session's detail view:
 - **JSON**: for scripts and other tools.
 - **Text**: a summary, basic or detailed.
 
-You can include or leave out per-run items, and either save to a file or copy to the clipboard. The **Statistics** page shows analytics across all sessions.
+You can include or leave out per-run items, and either save to a file or copy to the clipboard. The **Statistics** page shows analytics across all sessions that aren't archived. Average, fastest and slowest run only count completed runs, so a run in progress doesn't skew them. Until you've tracked a run, the page shows an empty state instead.
 
 ## Troubleshooting
 

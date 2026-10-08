@@ -29,6 +29,7 @@
     "allItems": "All Items"
   },
   "grail": {
+    "title": "Holy Grail",
     "tracker": {
       "totalProgress": "Total Progress",
       "normalItems": "Normal Items",
@@ -67,7 +68,6 @@
       "set": "Set:",
       "requiredRunes": "Required Runes:",
       "etherealType": "Ethereal Type:",
-      "code": "Code:",
       "link": "Link:",
       "viewOnDiablo2io": "View on diablo2.io",
       "viewOnD2runewizard": "View on d2runewizard",
@@ -94,6 +94,62 @@
       "removeRecordTitle": "Remove found record?",
       "removeRecordDescription": "This removes the manually added {{version}} record of {{item}} for {{character}}. This cannot be undone.",
       "removeRecordError": "Could not remove this record. Please try again."
+    },
+    "itemLabels": {
+      "treasureClasses": {
+        "normal": "Normal",
+        "exceptional": "Exceptional",
+        "elite": "Elite"
+      },
+      "etherealTypes": {
+        "none": "Cannot Be Ethereal",
+        "optional": "Can Be Ethereal"
+      },
+      "subCategories": {
+        "oneHandedSwords": "One-Handed Swords",
+        "twoHandedSwords": "Two-Handed Swords",
+        "oneHandedAxes": "One-Handed Axes",
+        "twoHandedAxes": "Two-Handed Axes",
+        "oneHandedMaces": "One-Handed Maces",
+        "twoHandedMaces": "Two-Handed Maces",
+        "oneHandedClubs": "One-Handed Clubs",
+        "bows": "Bows",
+        "crossbows": "Crossbows",
+        "daggers": "Daggers",
+        "javelins": "Javelins",
+        "polearms": "Polearms",
+        "scepters": "Scepters",
+        "spears": "Spears",
+        "staves": "Staves",
+        "throwing": "Throwing Weapons",
+        "wands": "Wands",
+        "hammers": "Hammers",
+        "mauls": "Mauls",
+        "maces": "Maces",
+        "helms": "Helms",
+        "bodyArmor": "Body Armor",
+        "shields": "Shields",
+        "gloves": "Gloves",
+        "boots": "Boots",
+        "belts": "Belts",
+        "amulets": "Amulets",
+        "rings": "Rings",
+        "rainbowFacets": "Rainbow Facets (Level-up)",
+        "dies": "Rainbow Facets (Death)",
+        "smallCharms": "Small Charms",
+        "largeCharms": "Large Charms",
+        "grandCharms": "Grand Charms",
+        "runes": "Runes",
+        "runewords": "Runewords",
+        "amazon": "Amazon",
+        "assassin": "Assassin",
+        "barbarian": "Barbarian",
+        "druid": "Druid",
+        "necromancer": "Necromancer",
+        "paladin": "Paladin",
+        "sorceress": "Sorceress",
+        "sharedStash": "Shared Stash"
+      }
     },
     "itemGrid": {
       "notApplicable": "Not Applicable",
@@ -124,7 +180,7 @@
       "grid": "Grid",
       "list": "List",
       "searchLabel": "Search",
-      "searchPlaceholder": "Search items...",
+      "searchPlaceholder": "Search name, base, set or rune...",
       "fuzzySearch": "Fuzzy Search",
       "status": "Status",
       "foundOnly": "Found Only",
@@ -134,6 +190,8 @@
       "categoryArmor": "Armor",
       "categoryJewelry": "Jewelry",
       "categoryCharms": "Charms",
+      "categoryRunes": "Runes",
+      "categoryRunewords": "Runewords",
       "types": "Types",
       "typeUnique": "Unique",
       "typeSet": "Set",
@@ -158,7 +216,56 @@
       "clearAll": "Clear all",
       "groupBy": "Group By",
       "viewMode": "View Mode",
-      "sortOrderValue": "Sort order: {{order}}"
+      "sortOrderValue": "Sort order: {{order}}",
+      "subCategories": "Sub-categories",
+      "subCategoryChip": "{{category}}: {{subCategory}}",
+      "resultCount_one": "{{shown}} of {{count}} item",
+      "resultCount_other": "{{shown}} of {{count}} items",
+      "subCategory": {
+        "1h_swords": "1H Swords",
+        "2h_swords": "2H Swords",
+        "1h_axes": "1H Axes",
+        "2h_axes": "2H Axes",
+        "1h_maces": "1H Maces",
+        "2h_maces": "2H Maces",
+        "1h_clubs": "Clubs",
+        "bows": "Bows",
+        "crossbows": "Crossbows",
+        "daggers": "Daggers",
+        "javelins": "Javelins",
+        "polearms": "Polearms",
+        "scepters": "Scepters",
+        "spears": "Spears",
+        "staves": "Staves",
+        "throwing": "Throwing Weapons",
+        "wands": "Wands",
+        "hammers": "Hammers",
+        "mauls": "Mauls",
+        "maces": "Maces",
+        "helms": "Helms",
+        "body_armor": "Body Armor",
+        "shields": "Shields",
+        "gloves": "Gloves",
+        "boots": "Boots",
+        "belts": "Belts",
+        "amulets": "Amulets",
+        "rings": "Rings",
+        "rainbow_facets": "Rainbow Facets (Level-up)",
+        "dies": "Rainbow Facets (Death)",
+        "small_charms": "Small Charms",
+        "large_charms": "Large Charms",
+        "grand_charms": "Grand Charms",
+        "runes": "Runes",
+        "runewords": "Runewords",
+        "amazon": "Amazon",
+        "assassin": "Assassin",
+        "barbarian": "Barbarian",
+        "druid": "Druid",
+        "necromancer": "Necromancer",
+        "paladin": "Paladin",
+        "sorceress": "Sorceress",
+        "shared_stash": "Shared Stash"
+      }
     },
     "notifications": {
       "recentNotifications": "Recent Notifications",
@@ -175,6 +282,11 @@
   },
   "settings": {
     "title": "Settings",
+    "description": "Configure save file monitoring, tracking, display and data options",
+    "saveError": {
+      "title": "Couldn't save your settings",
+      "description": "Your change has been undone. Please try again."
+    },
     "nav": {
       "label": "Settings sections",
       "general": "General",
@@ -261,6 +373,9 @@
       "restoreDefault": "Restore Default",
       "noDirectorySelected": "No directory selected",
       "latestActivity": "Latest Activity:",
+      "eventCreated": "Created",
+      "eventModified": "Modified",
+      "eventDeleted": "Deleted",
       "levelClass": "Level {{level}} {{characterClass}}",
       "hc": "(HC)",
       "detectedCharacters": "Detected Characters ({{count}}):",
@@ -275,7 +390,14 @@
       "selectSaveFileDirectory": "Select Save File Directory",
       "changeDirectoryFailed": "Failed to change directory",
       "restoreDirectoryFailed": "Failed to restore default directory",
-      "unknownError": "Unknown error occurred"
+      "unknownError": "Unknown error occurred",
+      "currentDirectoryLabel": "Current folder",
+      "newDirectoryLabel": "New folder",
+      "backupCreatedContinue": "Backup created. You can now continue with the directory change.",
+      "directoryUnchanged": "Save folder unchanged",
+      "directoryUnchangedDescription": "{{directory}} is already the monitored folder.",
+      "directoryChanged": "Save folder updated",
+      "directoryChangedDescription": "Now monitoring {{directory}}"
     },
     "database": {
       "title": "Database",
@@ -457,6 +579,7 @@
     }
   },
   "statistics": {
+    "description": "Your Holy Grail progress and run performance at a glance",
     "grailStatistics": "Grail Statistics",
     "runStatistics": "Run Statistics",
     "dashboard": {
@@ -506,9 +629,7 @@
       "averageEfficiency": "Average efficiency",
       "performanceHighlights": "Performance Highlights",
       "fastestRun": "Fastest Run",
-      "slowestRun": "Slowest Run",
-      "overallEfficiency": "Overall Efficiency",
-      "itemsPerRunMetric": "{{count}} items/run"
+      "slowestRun": "Slowest Run"
     }
   },
   "titleBar": {
@@ -546,6 +667,7 @@
     "finish": "Finish",
     "tip": "Tip:",
     "saveDirectoryRequired": "Select your save directory to continue, or skip setup to configure it later.",
+    "saveError": "Your setup could not be saved. Please try again.",
     "welcome": {
       "title": "Welcome to D2R Arcane Tracker!",
       "description": "Track your Diablo II: Resurrected Holy Grail progress with automatic save file monitoring and real-time item detection.",
@@ -651,9 +773,42 @@
     "errorDetails": "Error Details",
     "errorMessage": "Error Message:",
     "componentStack": "Component Stack:",
+    "stackTrace": "Stack Trace:",
+    "appVersion": "App Version:",
+    "pageDescription": "This page ran into an unexpected error. Try again, reload the application, or switch to another page from the title bar.",
     "tryToRecover": "Try to Recover",
     "reloadApplication": "Reload Application",
-    "persistHelp": "If this error persists, please report it with the error details shown above."
+    "copyDetails": "Copy Error Details",
+    "copySuccess": "Error details copied to clipboard",
+    "copyFailed": "Couldn't copy the error details",
+    "reportIssue": "Report Issue",
+    "reportFailed": "Couldn't open the issue tracker",
+    "persistHelp": "If this error persists, copy the error details and paste them into a new issue on GitHub."
+  },
+  "serviceErrors": {
+    "copyDetails": "Copy details",
+    "copySuccess": "Details copied to clipboard",
+    "copyFailed": "Failed to copy details to clipboard",
+    "unknown": {
+      "title": "A background task failed",
+      "description": "Something went wrong in the background. Copy the details to report the problem."
+    },
+    "saveFileParseFailed": {
+      "title": "Could not read save file",
+      "description": "\"{{fileName}}\" could not be parsed, so its items were not updated. Check your save file directory in Settings."
+    },
+    "databaseWriteFailed": {
+      "title": "Database write failed",
+      "description": "Some item data could not be saved and was lost. Copy the details to report the problem."
+    },
+    "terrorZoneWriteFailed": {
+      "title": "Could not update terror zones",
+      "description": "The terror zone configuration file could not be written. Check that the game files are extracted and not read-only."
+    },
+    "spriteConversionFailed": {
+      "title": "Item icon conversion failed",
+      "description": "Item icons could not be converted. Check your D2R installation path in Settings."
+    }
   },
   "runeword": {
     "calculator": {
@@ -665,20 +820,36 @@
       "loadingRuneData": "Loading rune data...",
       "thisMayTake": "This may take a few moments",
       "noRunewordsFound": "No runewords found",
-      "adjustFilters": "Try adjusting your filters or search term"
+      "adjustFilters": "Try adjusting your filters or search term",
+      "availabilityLegend": "Show runewords",
+      "availability": {
+        "craftable": "Craftable now",
+        "missingOne": "Missing ≤ 1"
+      },
+      "refreshRunes": "Refresh runes",
+      "refreshFailed": "Failed to refresh runes from save files",
+      "noCraftable": "You can't craft any runeword with your current runes",
+      "showMissingOne": "Show runewords missing at most 1 rune",
+      "showAll": "Show all runewords"
     },
     "card": {
       "viewDetails": "View details",
-      "allRunesAvailable": "All runes available"
+      "allRunesAvailable": "All runes available",
+      "runesOwned": "{{available}}/{{total}} runes",
+      "runesOwnedLabel": "{{available}} of {{total}} runes available",
+      "missingRuneTooltip": "{{rune}} (missing)"
     },
     "filters": {
+      "matchAllHint": "Shows runewords that use all selected runes",
+      "clearSelection": "Clear selection",
       "filterByRunes": "Filter by Runes",
-      "showPartial": "Show Partial",
-      "runesSelected": "{{count}} rune{{plural}} selected"
+      "runesSelected_one": "{{count}} rune selected",
+      "runesSelected_other": "{{count}} runes selected"
     }
   },
   "terrorZone": {
     "title": "Terror Zone Configuration",
+    "description": "Choose which terror zones can appear in your game",
     "loadingTerrorZones": "Loading terror zones...",
     "warning": "This feature modifies game files in your D2R installation. Any issues related to these changes are your own responsibility. Changes require a game restart to take effect.",
     "pathNotConfigured": "D2R installation path is not configured",
@@ -703,6 +874,21 @@
     "restoreOriginalFile": "Restore Original File",
     "restoreDescription": "This will restore the original desecratedzones.json file from backup and clear your current configuration. This action cannot be undone. Are you sure you want to continue?",
     "restoring": "Restoring...",
+    "requirements": {
+      "title": "Before your changes show up in game",
+      "launchWithFlags": "Launch D2R with",
+      "restartAfterChanges": "Restart D2R after saving. A running game does not pick up changes.",
+      "openGuide": "Read the terror zone guide"
+    },
+    "feedback": {
+      "saved": "Terror zones saved",
+      "restored": "Original terror zone file restored",
+      "restartToApply": "Restart D2R with {{flags}} to apply."
+    },
+    "disableAllDialog": {
+      "title": "Disable all terror zones?",
+      "description": "This saves a game file with no terror zones, so D2R has none to rotate through. Enable at least one zone or restore the original file to bring them back."
+    },
     "validationErrors": {
       "directoryNotFound": "D2R installation directory does not exist",
       "gameFileNotFound": "desecratedzones.json file not found in D2R installation",
@@ -719,6 +905,8 @@
     }
   },
   "runTracker": {
+    "title": "Run Tracker",
+    "description": "Track your sessions and runs and review past sessions",
     "loadingData": "Loading run tracker data...",
     "errorLoading": "Error Loading Run Tracker",
     "sessionCard": {
