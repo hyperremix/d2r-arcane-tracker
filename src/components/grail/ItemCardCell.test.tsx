@@ -1,9 +1,8 @@
 import { render } from '@testing-library/react';
 import type { Character, GrailProgress } from 'electron/types/grail';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { HolyGrailItemBuilder } from '@/fixtures';
 import type { ProgressLookupData } from '@/hooks/useProgressLookup';
-import { ItemCardCell } from './MasonryItemGrid';
 
 interface RenderedItemCardProps {
   normalProgress: GrailProgress[];
@@ -12,15 +11,11 @@ interface RenderedItemCardProps {
 }
 
 // Records the props of every ItemCard render
-const itemCardRenders = vi.hoisted(() => ({ props: [] as RenderedItemCardProps[] }));
+const itemCardRenders = { props: [] as RenderedItemCardProps[] };
 
-// Not memoized, so every render of ItemCardCell that reaches ItemCard is recorded
-vi.mock('./ItemCard', () => ({
-  ItemCard: (props: RenderedItemCardProps) => {
-    itemCardRenders.props.push(props);
-    return <div data-testid="item-card" />;
-  },
-}));
+// Loaded per test: the suite shares one module cache across files (isolate: false), so a cached
+// MasonryItemGrid from another file would keep that file's ItemCard mock instead of this one
+let ItemCardCell: typeof import('./MasonryItemGrid').ItemCardCell;
 
 function createProgress(itemId: string): GrailProgress {
   return {
@@ -49,8 +44,23 @@ function createLookup(entries: Record<string, GrailProgress[]> = {}) {
 const item = HolyGrailItemBuilder.new().withId('item-1').withName('Windforce').build();
 const characters: Character[] = [];
 
-beforeEach(() => {
+beforeEach(async () => {
   itemCardRenders.props.length = 0;
+  vi.resetModules();
+  // Not memoized, so every render of ItemCardCell that reaches ItemCard is recorded
+  vi.doMock('./ItemCard', () => ({
+    ItemCard: (props: RenderedItemCardProps) => {
+      itemCardRenders.props.push(props);
+      return <div data-testid="item-card" />;
+    },
+  }));
+  ({ ItemCardCell } = await import('./MasonryItemGrid'));
+});
+
+afterEach(() => {
+  // Do not leak this file's ItemCard mock or MasonryItemGrid instance into other test files
+  vi.doUnmock('./ItemCard');
+  vi.resetModules();
 });
 
 describe('When an ItemCardCell is re-rendered by its parent', () => {
@@ -65,19 +75,18 @@ describe('When an ItemCardCell is re-rendered by its parent', () => {
         viewMode: 'grid' as const,
       };
       const { rerender } = render(<ItemCardCell {...props} />);
-      expect(itemCardRenders.props).toHaveLength(1);
 
       // Act
       rerender(<ItemCardCell {...props} />);
       rerender(<ItemCardCell {...props} />);
 
-      // Assert
+      // Assert — only the initial mount reached ItemCard
       expect(itemCardRenders.props).toHaveLength(1);
     });
   });
 
   describe('If the progress lookup changes only for other items', () => {
-    it('Then ItemCard keeps receiving the same progress arrays and click handler', () => {
+    it('Then the next ItemCard render receives referentially equal progress arrays and click handler', () => {
       // Arrange
       const props = { item, characters, onItemClick: vi.fn(), viewMode: 'list' as const };
       const { rerender } = render(<ItemCardCell {...props} progressLookup={createLookup()} />);
@@ -90,7 +99,7 @@ describe('When an ItemCardCell is re-rendered by its parent', () => {
         />,
       );
 
-      // Assert — the memoized ItemCard skips because its props are referentially stable
+      // Assert — equal references are what lets the real, memoized ItemCard skip this render
       const [first, second] = itemCardRenders.props;
       expect(itemCardRenders.props).toHaveLength(2);
       expect(second.normalProgress).toBe(first.normalProgress);

@@ -651,12 +651,12 @@ describe('GroupedMasonryGrid Column Sizing', () => {
   });
 });
 
-describe('GroupedMasonryGrid Virtualization', () => {
+describe('When GroupedMasonryGrid renders a group with far more items than fit into the viewport', () => {
   afterEach(() => {
     vi.restoreAllMocks();
   });
 
-  describe('When a group has far more items than fit into the viewport', () => {
+  describe('If the scroll container is at the top', () => {
     it('Then only the rows near the top of the scroll container are mounted', () => {
       // Arrange
       stubLayout({ height: 600 });
@@ -685,7 +685,7 @@ describe('GroupedMasonryGrid Virtualization', () => {
   });
 });
 
-describe('GroupedMasonryGrid Row Measurement', () => {
+describe('When GroupedMasonryGrid rows are measured', () => {
   const resizeCallbacks: ResizeObserverCallback[] = [];
   let containerWidth = 0;
 
@@ -725,44 +725,44 @@ describe('GroupedMasonryGrid Row Measurement', () => {
     });
   }
 
-  describe('When the container is resized so that the column count changes', () => {
-    describe('If rows were measured at the previous column count', () => {
-      it('Then the rows are measured again instead of reusing the cached heights', () => {
-        // Arrange
-        containerWidth = widthForColumns(1);
-        stubRowHeights();
-        const groupedItems = [
-          {
-            title: 'Unique Armor',
-            items: Array.from({ length: 7 }, (_, n) =>
-              createMockItem({ id: `item-${n}`, name: `Item ${n}` }),
-            ),
-            foundCount: 0,
-          },
-        ];
-        const { container } = render(
-          <GroupedMasonryGrid
-            groupedItems={groupedItems}
-            progressLookup={createMockProgressLookup()}
-            characters={[]}
-            onItemClick={vi.fn()}
-          />,
-        );
-        const content = container.querySelector<HTMLElement>('div[style*="position: relative"]');
-        // 50px header + 7 rows with one card each
-        expect(content?.style.height).toBe(`${50 + 7 * 120}px`);
+  describe('If the container is resized so that the column count changes', () => {
+    it('Then rows measured at the previous column count are measured again instead of reusing cached heights', () => {
+      // Arrange
+      containerWidth = widthForColumns(1);
+      stubRowHeights();
+      const groupedItems = [
+        {
+          title: 'Unique Armor',
+          items: Array.from({ length: 7 }, (_, n) =>
+            createMockItem({ id: `item-${n}`, name: `Item ${n}` }),
+          ),
+          foundCount: 0,
+        },
+      ];
+      const { container } = render(
+        <GroupedMasonryGrid
+          groupedItems={groupedItems}
+          progressLookup={createMockProgressLookup()}
+          characters={[]}
+          onItemClick={vi.fn()}
+        />,
+      );
+      // The scroll container wraps the content element whose height is the virtualizer total size
+      const content = container.firstElementChild?.firstElementChild as HTMLElement;
+      const heightAtOneColumn = content.style.height;
 
-        // Act
-        containerWidth = widthForColumns(3);
-        act(() => {
-          for (const callback of resizeCallbacks) callback([], {} as ResizeObserver);
-        });
-
-        // Assert
-        expect(screen.getAllByTestId('grouped-grid-row')).toHaveLength(3);
-        // 50px header + two rows with three cards and one row with a single card
-        expect(content?.style.height).toBe(`${50 + 2 * 320 + 120}px`);
+      // Act
+      containerWidth = widthForColumns(3);
+      act(() => {
+        for (const callback of resizeCallbacks) callback([], {} as ResizeObserver);
       });
+
+      // Assert
+      // 50px header + 7 rows with one card each
+      expect(heightAtOneColumn).toBe(`${50 + 7 * 120}px`);
+      expect(screen.getAllByTestId('grouped-grid-row')).toHaveLength(3);
+      // 50px header + two rows with three cards and one row with a single card
+      expect(content.style.height).toBe(`${50 + 2 * 320 + 120}px`);
     });
   });
 });
