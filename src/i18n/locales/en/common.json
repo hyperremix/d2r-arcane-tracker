@@ -701,6 +701,21 @@
     "restoreOriginalFile": "Restore Original File",
     "restoreDescription": "This will restore the original desecratedzones.json file from backup and clear your current configuration. This action cannot be undone. Are you sure you want to continue?",
     "restoring": "Restoring...",
+    "requirements": {
+      "title": "Before your changes show up in game",
+      "launchWithFlags": "Launch D2R with",
+      "restartAfterChanges": "Restart D2R after saving. A running game does not pick up changes.",
+      "openGuide": "Read the terror zone guide"
+    },
+    "feedback": {
+      "saved": "Terror zones saved",
+      "restored": "Original terror zone file restored",
+      "restartToApply": "Restart D2R with {{flags}} to apply."
+    },
+    "disableAllDialog": {
+      "title": "Disable all terror zones?",
+      "description": "This saves a game file with no terror zones, so D2R has none to rotate through. Enable at least one zone or restore the original file to bring them back."
+    },
     "validationErrors": {
       "directoryNotFound": "D2R installation directory does not exist",
       "gameFileNotFound": "desecratedzones.json file not found in D2R installation",
