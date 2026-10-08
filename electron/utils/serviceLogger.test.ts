@@ -52,7 +52,7 @@ describe('When createServiceLogger is called', () => {
   });
 
   describe('If error is called with surfaceToUI option', () => {
-    it('Then should call error forwarder', () => {
+    it('Then should forward the error code and the error message as detail', () => {
       // Arrange
       const mockForwarder = vi.fn();
       setErrorForwarder(mockForwarder);
@@ -60,57 +60,86 @@ describe('When createServiceLogger is called', () => {
       const error = new Error('flush failed');
 
       // Act
-      log.error('flush', error, { attempt: 3 }, { surfaceToUI: true });
+      log.error('flush', error, { attempt: 3 }, { surfaceToUI: true, code: 'databaseWriteFailed' });
+
+      // Assert
+      expect(mockForwarder).toHaveBeenCalledWith({
+        service: 'DatabaseBatchWriter',
+        operation: 'flush',
+        severity: 'error',
+        code: 'databaseWriteFailed',
+        detail: 'flush failed',
+        timestamp: expect.any(Number),
+      });
+    });
+  });
+
+  describe('If error is called with surfaceToUI and params', () => {
+    it('Then should forward the params for translated copy', () => {
+      // Arrange
+      const mockForwarder = vi.fn();
+      setErrorForwarder(mockForwarder);
+      const log = createServiceLogger('ItemDetection');
+
+      // Act
+      log.error(
+        'extractItemsFromSaveFile',
+        new Error('Unexpected end of buffer'),
+        {},
+        { surfaceToUI: true, code: 'saveFileParseFailed', params: { fileName: 'Sorc.d2s' } },
+      );
 
       // Assert
       expect(mockForwarder).toHaveBeenCalledWith(
         expect.objectContaining({
-          service: 'DatabaseBatchWriter',
-          operation: 'flush',
-          severity: 'error',
-          message: 'flush failed',
+          code: 'saveFileParseFailed',
+          params: { fileName: 'Sorc.d2s' },
+          detail: 'Unexpected end of buffer',
         }),
       );
     });
   });
 
-  describe('If error is called with surfaceToUI and userMessage', () => {
-    it('Then should use userMessage for UI display', () => {
+  describe('If error is called with surfaceToUI and a detail override', () => {
+    it('Then should forward the override instead of the error message', () => {
       // Arrange
       const mockForwarder = vi.fn();
       setErrorForwarder(mockForwarder);
       const log = createServiceLogger('DatabaseBatchWriter');
-      const error = new Error('SQLITE_BUSY: database is locked');
 
       // Act
-      log.error('flush', error, {}, { surfaceToUI: true, userMessage: 'Database write failed' });
+      log.error(
+        'flush',
+        'Max retries exceeded',
+        {},
+        { surfaceToUI: true, code: 'databaseWriteFailed', detail: 'SQLITE_BUSY' },
+      );
 
       // Assert
       expect(mockForwarder).toHaveBeenCalledWith(
-        expect.objectContaining({
-          message: 'Database write failed',
-        }),
+        expect.objectContaining({ code: 'databaseWriteFailed', detail: 'SQLITE_BUSY' }),
       );
     });
   });
 
-  describe('If error is called with surfaceToUI but no userMessage', () => {
-    it('Then should fall back to error message', () => {
+  describe('If error is called with surfaceToUI', () => {
+    it('Then should not forward any user-facing message', () => {
       // Arrange
       const mockForwarder = vi.fn();
       setErrorForwarder(mockForwarder);
       const log = createServiceLogger('IconService');
-      const error = new Error('Sprite directory not found');
 
       // Act
-      log.error('convertAllSprites', error, {}, { surfaceToUI: true });
+      log.error(
+        'convertAllSprites',
+        new Error('Sprite directory not found'),
+        {},
+        { surfaceToUI: true, code: 'spriteConversionFailed' },
+      );
 
       // Assert
-      expect(mockForwarder).toHaveBeenCalledWith(
-        expect.objectContaining({
-          message: 'Sprite directory not found',
-        }),
-      );
+      expect(mockForwarder.mock.calls[0][0]).not.toHaveProperty('message');
+      expect(mockForwarder.mock.calls[0][0]).not.toHaveProperty('params');
     });
   });
 
@@ -171,19 +200,19 @@ describe('When createServiceLogger is called', () => {
   });
 
   describe('If non-Error value is passed as error', () => {
-    it('Then should stringify the value for UI message', () => {
+    it('Then should stringify the value as detail', () => {
       // Arrange
       const mockForwarder = vi.fn();
       setErrorForwarder(mockForwarder);
       const log = createServiceLogger('TestService');
 
       // Act
-      log.error('op', 'string error', {}, { surfaceToUI: true });
+      log.error('op', 'string error', {}, { surfaceToUI: true, code: 'terrorZoneWriteFailed' });
 
       // Assert
       expect(mockForwarder).toHaveBeenCalledWith(
         expect.objectContaining({
-          message: 'string error',
+          detail: 'string error',
         }),
       );
     });

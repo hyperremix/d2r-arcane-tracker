@@ -1,6 +1,8 @@
 import type { Run, Session } from 'electron/types/grail';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { PageHeader } from '@/components/layout/PageHeader';
+import { PageShell } from '@/components/layout/PageShell';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { translations } from '@/i18n/translations';
@@ -37,6 +39,13 @@ export function RunTracker() {
     retryLastAction,
     loadRunItems,
   } = useRunTrackerStore();
+
+  const pageHeader = (
+    <PageHeader
+      title={t(translations.runTracker.title)}
+      description={t(translations.runTracker.description)}
+    />
+  );
 
   // Navigation state
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
@@ -132,40 +141,46 @@ export function RunTracker() {
   // Full-page spinner only until the first data load has completed
   if (initialLoadStatus === 'idle' || initialLoadStatus === 'loading') {
     return (
-      <div className="flex items-center justify-center p-8">
-        <Card className="w-full max-w-md">
-          <CardContent className="flex flex-col items-center gap-4 p-6">
-            <div className="h-8 w-8 animate-spin rounded-full border-primary border-b-2" />
-            <p className="text-muted-foreground">{t(translations.runTracker.loadingData)}</p>
-          </CardContent>
-        </Card>
-      </div>
+      <PageShell>
+        {pageHeader}
+        <div className="flex items-center justify-center p-8">
+          <Card className="w-full max-w-md">
+            <CardContent className="flex flex-col items-center gap-4 p-6">
+              <div className="h-8 w-8 animate-spin rounded-full border-primary border-b-2" />
+              <p className="text-muted-foreground">{t(translations.runTracker.loadingData)}</p>
+            </CardContent>
+          </Card>
+        </div>
+      </PageShell>
     );
   }
 
   // Full-page error only when the first data load failed
   if (initialLoadStatus === 'error') {
     return (
-      <div className="flex items-center justify-center p-8">
-        <Card className="w-full max-w-md">
-          <CardContent className="flex flex-col items-center gap-4 p-6">
-            <div className="text-center text-destructive">
-              <h3 className="mb-2 font-semibold">{t(translations.runTracker.errorLoading)}</h3>
-              <p className="mb-4 text-muted-foreground text-sm">{initialLoadError}</p>
-              <Button
-                onClick={() => {
-                  loadInitialData().catch((err) => {
-                    console.error('[RunTracker] Error retrying initial data load:', err);
-                  });
-                }}
-                variant="outline"
-              >
-                {t(translations.common.retry)}
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      <PageShell>
+        {pageHeader}
+        <div className="flex items-center justify-center p-8">
+          <Card className="w-full max-w-md">
+            <CardContent className="flex flex-col items-center gap-4 p-6">
+              <div className="text-center text-destructive">
+                <h3 className="mb-2 font-semibold">{t(translations.runTracker.errorLoading)}</h3>
+                <p className="mb-4 text-muted-foreground text-sm">{initialLoadError}</p>
+                <Button
+                  onClick={() => {
+                    loadInitialData().catch((err) => {
+                      console.error('[RunTracker] Error retrying initial data load:', err);
+                    });
+                  }}
+                  variant="outline"
+                >
+                  {t(translations.common.retry)}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </PageShell>
     );
   }
 
@@ -182,7 +197,9 @@ export function RunTracker() {
 
   // Main layout with conditional rendering
   return (
-    <div className="max-h-[94vh] space-y-6 overflow-y-auto p-6">
+    <PageShell>
+      {pageHeader}
+
       {/* Inline error for failed actions and background refreshes */}
       <ErrorDisplay
         error={error}
@@ -197,13 +214,16 @@ export function RunTracker() {
         // Detail view for selected session
         <SessionDetailView sessionId={selectedSessionId} onBack={handleBackToMain} />
       ) : (
-        // Main view with active session and sessions list
+        // Main view: live session first, then its summary and the sessions list
         <>
-          <SessionCard session={activeSession} />
           <SessionControls />
+          <SessionCard
+            session={activeSession}
+            onViewAllRuns={activeSession ? () => handleSessionSelect(activeSession.id) : undefined}
+          />
           <SessionsList onSessionSelect={handleSessionSelect} />
         </>
       )}
-    </div>
+    </PageShell>
   );
 }

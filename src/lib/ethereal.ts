@@ -62,3 +62,20 @@ export function shouldShowEtherealStatus(item: Item, settings: Settings): boolea
 export function shouldShowNormalStatus(item: Item, settings: Settings): boolean {
   return settings.grailNormal && canItemBeNormal(item);
 }
+
+/**
+ * Keeps only the items that have at least one tracked version. When both normal and ethereal
+ * items are tracked every item is kept; when neither is tracked no item is kept.
+ * @param {Item[]} items - The items to filter
+ * @param {Pick<Settings, 'grailNormal' | 'grailEthereal'>} settings - The grail tracking settings
+ * @returns {Item[]} The items that are part of the tracked grail
+ */
+export function filterItemsByTrackedVersions(
+  items: Item[],
+  settings: Pick<Settings, 'grailNormal' | 'grailEthereal'>,
+): Item[] {
+  if (settings.grailNormal && settings.grailEthereal) return items;
+  if (settings.grailNormal) return items.filter(canItemBeNormal);
+  if (settings.grailEthereal) return items.filter(canItemBeEthereal);
+  return [];
+}

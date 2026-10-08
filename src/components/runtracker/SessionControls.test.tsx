@@ -1,6 +1,6 @@
 import '@testing-library/jest-dom';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useGrailStore } from '@/stores/grailStore';
 import { useRunTrackerStore } from '@/stores/runTrackerStore';
 import { SessionControls } from './SessionControls';
@@ -12,18 +12,28 @@ vi.mock('@/stores/grailStore');
 const mockUseRunTrackerStore = vi.mocked(useRunTrackerStore);
 const mockUseGrailStore = vi.mocked(useGrailStore);
 
-// Mock document methods
+// Mock document methods. Test files share one jsdom (isolate: false), so the mocks are removed
+// after this file to fall back to EventTarget.prototype; otherwise later suites' document
+// listeners would never fire. Don't vi.spyOn these: a later suite's vi.restoreAllMocks() would
+// re-create the mocked own properties.
 const mockAddEventListener = vi.fn();
 const mockRemoveEventListener = vi.fn();
 
 Object.defineProperty(document, 'addEventListener', {
   value: mockAddEventListener,
   writable: true,
+  configurable: true,
 });
 
 Object.defineProperty(document, 'removeEventListener', {
   value: mockRemoveEventListener,
   writable: true,
+  configurable: true,
+});
+
+afterAll(() => {
+  Reflect.deleteProperty(document, 'addEventListener');
+  Reflect.deleteProperty(document, 'removeEventListener');
 });
 
 // Mock data
@@ -51,6 +61,7 @@ const mockRun = {
 };
 
 const mockStoreActions = {
+  startSession: vi.fn(),
   startRun: vi.fn(),
   endRun: vi.fn(),
   pauseRun: vi.fn(),
@@ -92,30 +103,50 @@ describe('SessionControls', () => {
   });
 
   describe('Rendering', () => {
-    it('renders session controls card', () => {
+    it('renders the live session card', () => {
       mockUseRunTrackerStore.mockReturnValue(defaultStoreState);
 
       render(<SessionControls />);
 
-      expect(screen.getByText('Session Controls')).toBeDefined();
+      expect(screen.getByText('Live Session')).toBeDefined();
     });
 
-    it('renders all control buttons', () => {
+    it('When a run is active, Then End Run is the primary action next to Pause and End Session', () => {
+      // Arrange
       mockUseRunTrackerStore.mockReturnValue({
         ...defaultStoreState,
         activeSession: mockSession,
         activeRun: mockRun,
       });
 
+      // Act
       render(<SessionControls />);
 
-      expect(screen.getByText('Start Run')).toBeDefined();
-      expect(screen.getByText('Pause')).toBeDefined();
-      expect(screen.getByText('End Run')).toBeDefined();
-      expect(screen.getByText('End Session')).toBeDefined();
+      // Assert
+      expect(screen.getByRole('button', { name: 'End Run' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Pause' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'End Session' })).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Start Run' })).not.toBeInTheDocument();
     });
 
-    it('shows running state indicator when active run exists', () => {
+    it('When a session has no active run, Then Start Run is the primary action and Pause is hidden', () => {
+      // Arrange
+      mockUseRunTrackerStore.mockReturnValue({
+        ...defaultStoreState,
+        activeSession: mockSession,
+      });
+
+      // Act
+      render(<SessionControls />);
+
+      // Assert
+      expect(screen.getByRole('button', { name: 'Start Run' })).toBeEnabled();
+      expect(screen.queryByRole('button', { name: 'Pause' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'End Run' })).not.toBeInTheDocument();
+    });
+
+    it('When a run is active, Then the state badge politely reports Running', () => {
+      // Arrange
       mockUseRunTrackerStore.mockReturnValue({
         ...defaultStoreState,
         activeSession: mockSession,
@@ -123,14 +154,17 @@ describe('SessionControls', () => {
         isPaused: false,
       });
 
+      // Act
       render(<SessionControls />);
 
-      // Check for visual indicator (green dot for running) - the component shows status in the title
-      const cardTitle = screen.getByText('Session Controls');
-      expect(cardTitle).toBeDefined();
+      // Assert
+      const badge = screen.getByRole('status');
+      expect(badge).toHaveTextContent('Running');
+      expect(badge).toHaveAttribute('aria-live', 'polite');
     });
 
-    it('shows paused state indicator when run is paused', () => {
+    it('When the run is paused, Then the state badge reports Paused', () => {
+      // Arrange
       mockUseRunTrackerStore.mockReturnValue({
         ...defaultStoreState,
         activeSession: mockSession,
@@ -138,12 +172,77 @@ describe('SessionControls', () => {
         isPaused: true,
       });
 
+      // Act
       render(<SessionControls />);
 
-      // Check for visual indicator (yellow dot for paused) - the component shows status in the title
-      const cardTitle = screen.getByText('Session Controls');
-      expect(cardTitle).toBeDefined();
+      // Assert
+      expect(screen.getByRole('status')).toHaveTextContent('Paused');
     });
+
+    it('When a session has no active run, Then the state badge reports Idle and no run is in progress', () => {
+      // Arrange
+      mockUseRunTrackerStore.mockReturnValue({
+        ...defaultStoreState,
+        activeSession: mockSession,
+      });
+
+      // Act
+      render(<SessionControls />);
+
+      // Assert
+      expect(screen.getByRole('status')).toHaveTextContent('Idle');
+      expect(screen.getByText('No run in progress')).toBeInTheDocument();
+      expect(screen.getByText('0:00')).toBeInTheDocument();
+    });
+
+    it('When a run is active, Then the large timer shows its elapsed time outside the live region', () => {
+      // Arrange
+      vi.useFakeTimers({ toFake: ['Date'] });
+      vi.setSystemTime(new Date('2024-01-01T00:12:34Z'));
+      mockUseRunTrackerStore.mockReturnValue({
+        ...defaultStoreState,
+        activeSession: mockSession,
+        activeRun: { ...mockRun, runNumber: 7 },
+      });
+
+      try {
+        // Act
+        render(<SessionControls />);
+
+        // Assert
+        const timer = screen.getByText('12:34');
+        expect(timer).toHaveClass('tabular-nums');
+        expect(screen.getByText('Run #7')).toBeInTheDocument();
+        expect(screen.getByRole('status')).not.toContainElement(timer);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it.each([
+      { isPaused: false, label: 'Running' },
+      { isPaused: true, label: 'Paused' },
+    ])(
+      'If the run is $label, Then the status badge uses the UI font outside the display-font title',
+      ({ isPaused, label }) => {
+        // Arrange
+        mockUseRunTrackerStore.mockReturnValue({
+          ...defaultStoreState,
+          activeSession: mockSession,
+          activeRun: mockRun,
+          isTracking: true,
+          isPaused,
+        });
+
+        // Act
+        render(<SessionControls />);
+
+        // Assert
+        const status = screen.getByText(label);
+        expect(status).toHaveClass('font-ui');
+        expect(status.closest('[data-slot="card-title"]')).toBeNull();
+      },
+    );
 
     it('shows resume button when run is paused', () => {
       mockUseRunTrackerStore.mockReturnValue({
@@ -160,20 +259,44 @@ describe('SessionControls', () => {
   });
 
   describe('Button States', () => {
-    it('disables all buttons when no active session', () => {
+    it('If no session is active, Then only Start New Session is offered and the badge reports No Session', () => {
+      // Arrange
       mockUseRunTrackerStore.mockReturnValue(defaultStoreState);
 
+      // Act
       render(<SessionControls />);
 
-      const startButton = screen.getByText('Start Run');
-      const pauseButton = screen.getByText('Pause');
-      const endRunButton = screen.getByText('End Run');
-      const endSessionButton = screen.getByText('End Session');
+      // Assert
+      expect(screen.getByRole('button', { name: 'Start New Session' })).toBeEnabled();
+      expect(screen.queryByRole('button', { name: 'Start Run' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'End Session' })).not.toBeInTheDocument();
+      expect(screen.getByRole('status')).toHaveTextContent('No Session');
+    });
 
-      expect(startButton).toBeDisabled();
-      expect(pauseButton).toBeDisabled();
-      expect(endRunButton).toBeDisabled();
-      expect(endSessionButton).toBeDisabled();
+    it('If no session is active, When Start New Session is clicked, Then a session is started', () => {
+      // Arrange
+      mockUseRunTrackerStore.mockReturnValue(defaultStoreState);
+      render(<SessionControls />);
+
+      // Act
+      fireEvent.click(screen.getByRole('button', { name: 'Start New Session' }));
+
+      // Assert
+      expect(mockStoreActions.startSession).toHaveBeenCalledTimes(1);
+    });
+
+    it('If starting a session is in flight, Then the Start New Session button is disabled', () => {
+      // Arrange
+      mockUseRunTrackerStore.mockReturnValue({
+        ...defaultStoreState,
+        pendingActions: { startSession: true },
+      });
+
+      // Act
+      render(<SessionControls />);
+
+      // Assert
+      expect(screen.getByRole('button', { name: 'Start New Session' })).toBeDisabled();
     });
 
     it('enables start run button when session exists but no active run', () => {
@@ -238,12 +361,10 @@ describe('SessionControls', () => {
 
       render(<SessionControls />);
 
-      const startButton = screen.getByText('Start Run');
       const pauseButton = screen.getByText('Pause');
       const endRunButton = screen.getByText('End Run');
       const endSessionButton = screen.getByText('End Session');
 
-      expect(startButton).toBeDisabled();
       expect(pauseButton).toBeDisabled();
       expect(endRunButton).toBeDisabled();
       expect(endSessionButton).toBeDisabled();
@@ -399,7 +520,7 @@ describe('SessionControls', () => {
       expect(within(dialog).getByRole('button', { name: 'Cancel' })).toBeDisabled();
     });
 
-    it('If auto mode is enabled, Then End Session stays enabled while manual run controls are disabled', async () => {
+    it('If auto mode is enabled, Then End Session stays enabled and manual run controls are replaced by an automatic tracking notice', async () => {
       // Arrange
       const originalElectronAPI = window.electronAPI;
       Object.defineProperty(window, 'electronAPI', {
@@ -427,7 +548,8 @@ describe('SessionControls', () => {
       render(<SessionControls />);
 
       // Assert
-      expect(screen.getByRole('button', { name: 'Start Run' })).toBeDisabled();
+      expect(screen.queryByRole('button', { name: 'Start Run' })).not.toBeInTheDocument();
+      expect(screen.getByText('Runs are tracked automatically')).toBeInTheDocument();
       const endSessionButton = screen.getByRole('button', { name: 'End Session' });
       expect(endSessionButton).toBeEnabled();
       fireEvent.click(endSessionButton);
@@ -442,12 +564,6 @@ describe('SessionControls', () => {
   });
 
   describe('Keyboard Shortcuts', () => {
-    beforeEach(() => {
-      // Mock document.addEventListener and removeEventListener
-      vi.spyOn(document, 'addEventListener').mockImplementation(mockAddEventListener);
-      vi.spyOn(document, 'removeEventListener').mockImplementation(mockRemoveEventListener);
-    });
-
     it('sets up keyboard event listeners on mount', () => {
       mockUseRunTrackerStore.mockReturnValue(defaultStoreState);
 
@@ -698,8 +814,6 @@ describe('SessionControls', () => {
     const originalElectronAPI = window.electronAPI;
 
     beforeEach(() => {
-      vi.spyOn(document, 'addEventListener').mockImplementation(mockAddEventListener);
-      vi.spyOn(document, 'removeEventListener').mockImplementation(mockRemoveEventListener);
       Object.defineProperty(window, 'electronAPI', {
         value: {
           platform: 'win32',
@@ -786,6 +900,43 @@ describe('SessionControls', () => {
       const dialog = await screen.findByRole('alertdialog');
       expect(within(dialog).getByText('End Current Session')).toBeInTheDocument();
     });
+
+    it('If auto mode is enabled but memory reading is unavailable, Then the start run shortcut works like the restored button', async () => {
+      // Arrange
+      const getMemoryStatus = vi
+        .fn()
+        .mockResolvedValue({ available: false, reason: 'Unknown D2R build' });
+      window.electronAPI = {
+        ...window.electronAPI,
+        runTracker: { ...window.electronAPI?.runTracker, getMemoryStatus },
+      } as typeof window.electronAPI;
+      mockUseRunTrackerStore.mockReturnValue({
+        ...defaultStoreState,
+        activeSession: mockSession,
+        activeRun: null,
+      });
+      render(<SessionControls />);
+      await waitFor(() => expect(getMemoryStatus).toHaveBeenCalled());
+      await act(async () => {
+        await Promise.resolve();
+      });
+      const keydownHandlers = mockAddEventListener.mock.calls.filter(
+        (call) => call[0] === 'keydown',
+      );
+      const latestHandler = keydownHandlers[keydownHandlers.length - 1]?.[1] as (
+        event: KeyboardEvent,
+      ) => void;
+      const event = new KeyboardEvent('keydown', { key: 'r', ctrlKey: true });
+      Object.defineProperty(event, 'target', { value: document.body });
+
+      // Act
+      act(() => {
+        latestHandler(event);
+      });
+
+      // Assert
+      expect(mockStoreActions.startRun).toHaveBeenCalled();
+    });
   });
 
   describe('Global Hotkeys Indicator', () => {
@@ -871,6 +1022,89 @@ describe('SessionControls', () => {
     });
   });
 
+  describe('Auto mode availability', () => {
+    const originalElectronAPI = window.electronAPI;
+
+    const setUnavailableMemoryReading = () => {
+      Object.defineProperty(window, 'electronAPI', {
+        value: {
+          platform: 'win32',
+          runTracker: {
+            getMemoryStatus: vi
+              .fn()
+              .mockResolvedValue({ available: false, reason: 'Unknown D2R build' }),
+            getGlobalHotkeyStatus: vi.fn().mockResolvedValue({ enabled: false, registrations: [] }),
+            onGlobalHotkeyStatus: vi.fn(() => vi.fn()),
+          },
+        },
+        writable: true,
+        configurable: true,
+      });
+    };
+
+    afterEach(() => {
+      Object.defineProperty(window, 'electronAPI', {
+        value: originalElectronAPI,
+        writable: true,
+        configurable: true,
+      });
+    });
+
+    it('If auto mode is off, Then the unavailable warning is not shown', async () => {
+      // Arrange
+      setUnavailableMemoryReading();
+      mockUseRunTrackerStore.mockReturnValue({ ...defaultStoreState, activeSession: mockSession });
+
+      // Act
+      render(<SessionControls />);
+      await waitFor(() => {
+        expect(window.electronAPI?.runTracker.getMemoryStatus).toHaveBeenCalled();
+      });
+
+      // Assert
+      expect(screen.queryByText('Auto mode temporarily unavailable.')).not.toBeInTheDocument();
+    });
+
+    it('If auto mode is on and memory reading is unavailable, Then a polite warning is shown', async () => {
+      // Arrange
+      setUnavailableMemoryReading();
+      mockUseGrailStore.mockReturnValue({
+        ...defaultGrailStoreState,
+        settings: { ...defaultGrailStoreState.settings, runTrackerMemoryReading: true },
+      });
+      mockUseRunTrackerStore.mockReturnValue({ ...defaultStoreState, activeSession: mockSession });
+
+      // Act
+      render(<SessionControls />);
+
+      // Assert
+      const warningText = await screen.findByText('Auto mode temporarily unavailable.');
+      const warning = warningText.closest('[data-slot="alert"]');
+      expect(warning).toHaveAttribute('role', 'status');
+      expect(warning).toHaveClass('text-warning');
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    });
+
+    it('If auto mode is on and memory reading is unavailable, Then the automatic tracking notice is hidden and manual run controls and the switch stay usable', async () => {
+      // Arrange
+      setUnavailableMemoryReading();
+      mockUseGrailStore.mockReturnValue({
+        ...defaultGrailStoreState,
+        settings: { ...defaultGrailStoreState.settings, runTrackerMemoryReading: true },
+      });
+      mockUseRunTrackerStore.mockReturnValue({ ...defaultStoreState, activeSession: mockSession });
+
+      // Act
+      render(<SessionControls />);
+      await screen.findByText('Auto mode temporarily unavailable.');
+
+      // Assert
+      expect(screen.queryByText('Runs are tracked automatically')).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Start Run' })).toBeEnabled();
+      expect(screen.getByRole('switch')).toBeInTheDocument();
+    });
+  });
+
   describe('Tooltips', () => {
     it('renders tooltip triggers for all buttons', () => {
       mockUseRunTrackerStore.mockReturnValue({
@@ -883,7 +1117,7 @@ describe('SessionControls', () => {
 
       // Check that tooltip triggers are present (they have data-slot="tooltip-trigger")
       const tooltipTriggers = screen.getAllByRole('button');
-      expect(tooltipTriggers).toHaveLength(5); // Start Run, Pause/Resume, End Run, End Session, Add Item
+      expect(tooltipTriggers).toHaveLength(4); // End Run, Pause/Resume, End Session, Add Item
     });
   });
 });

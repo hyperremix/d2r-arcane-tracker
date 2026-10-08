@@ -7,7 +7,7 @@ import { twMerge } from 'tailwind-merge';
  * @param {...ClassValue[]} inputs - Class names or conditional class objects to merge
  * @returns {string} Merged and deduplicated class names string
  * @example
- * cn('px-2 py-1', condition && 'bg-blue-500', { 'font-bold': isActive })
+ * cn('px-2 py-1', condition && 'bg-primary', { 'font-bold': isActive })
  */
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -15,6 +15,7 @@ export function cn(...inputs: ClassValue[]) {
 
 // Re-export date utilities from date.ts for backward compatibility
 export {
+  formatClockDuration,
   formatDate,
   formatDuration,
   formatLongDate,

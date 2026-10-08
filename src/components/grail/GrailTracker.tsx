@@ -1,5 +1,8 @@
 import { useEffect, useLayoutEffect } from 'react';
+import { useTranslation } from 'react-i18next';
+import { PageHeader } from '@/components/layout/PageHeader';
 import { TooltipProvider } from '@/components/ui/tooltip';
+import { translations } from '@/i18n/translations';
 import { startLoad, useGrailStatistics, useGrailStore } from '@/stores/grailStore';
 import { AdvancedSearch } from './AdvancedSearch';
 import { ItemGrid } from './ItemGrid';
@@ -17,7 +20,13 @@ function getSettledValue<T>(result: PromiseSettledResult<T>, label: string): T |
  * @returns {JSX.Element} The main grail tracker interface with statistics and item grid
  */
 export function GrailTracker() {
-  const { setCharacters, setItems, setProgress, hydrateSettings, settings } = useGrailStore();
+  const { t } = useTranslation();
+  // Narrow selectors so unrelated store updates (filters, view mode, ...) don't re-render the page
+  const setCharacters = useGrailStore((state) => state.setCharacters);
+  const setItems = useGrailStore((state) => state.setItems);
+  const setProgress = useGrailStore((state) => state.setProgress);
+  const hydrateSettings = useGrailStore((state) => state.hydrateSettings);
+  const grailEthereal = useGrailStore((state) => state.settings.grailEthereal);
 
   const statistics = useGrailStatistics();
 
@@ -95,16 +104,20 @@ export function GrailTracker() {
   return (
     <TooltipProvider>
       <div className="flex h-full flex-col gap-4 p-6">
+        {/* Page heading for assistive technology; the dense toolbar provides the visual context */}
+        <PageHeader title={t(translations.grail.title)} visuallyHidden />
+
         {/* Progress summary */}
         {statistics && (
-          <ProgressSummary statistics={statistics} showEtherealBreakdown={settings.grailEthereal} />
+          <ProgressSummary statistics={statistics} showEtherealBreakdown={grailEthereal} />
         )}
 
         {/* Toolbar: search, filters, sorting, grouping and view mode */}
         <AdvancedSearch />
 
-        {/* Item Grid - full content width */}
-        <div className="-mx-4 flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto">
+        {/* Item Grid - full content width. This wrapper only bounds the height; the grid's own
+            container is the scroll element so its virtualization can measure the viewport. */}
+        <div className="-mx-4 flex min-h-0 min-w-0 flex-1 flex-col">
           <ItemGrid />
         </div>
       </div>

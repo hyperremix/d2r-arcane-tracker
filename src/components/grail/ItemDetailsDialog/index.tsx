@@ -15,6 +15,7 @@ import { translations } from '@/i18n/translations';
 import { cn } from '@/lib/utils';
 import { useGrailStore } from '@/stores/grailStore';
 import placeholderUrl from '/images/placeholder-item.png';
+import { getItemQualityTextClass } from '../ItemCard/styles';
 import { RuneImages } from '../RuneImages';
 import { CharacterProgressTable } from './CharacterProgressTable';
 import { ItemInfoSection } from './ItemInfoSection';
@@ -51,7 +52,12 @@ function MarkAsFoundAction({ item }: { item: Item }) {
  */
 export function ItemDetailsDialog({ itemId, open, onOpenChange }: ItemDetailsDialogProps) {
   const { t } = useTranslation();
-  const { items, progress, characters, removeProgress, settings } = useGrailStore();
+  // Narrow selectors so unrelated store updates (filters, view mode, ...) don't re-render the dialog
+  const items = useGrailStore((state) => state.items);
+  const progress = useGrailStore((state) => state.progress);
+  const characters = useGrailStore((state) => state.characters);
+  const removeProgress = useGrailStore((state) => state.removeProgress);
+  const settings = useGrailStore((state) => state.settings);
 
   // Find the item by ID
   const item = useMemo(() => {
@@ -111,7 +117,14 @@ export function ItemDetailsDialog({ itemId, open, onOpenChange }: ItemDetailsDia
             ) : null}
 
             <div>
-              <DialogTitle className="font-bold text-2xl">{item.name}</DialogTitle>
+              <DialogTitle
+                className={cn(
+                  'font-bold font-display text-2xl',
+                  getItemQualityTextClass(item.type),
+                )}
+              >
+                {item.name}
+              </DialogTitle>
             </div>
             {((item.type === 'runeword' && item.runes && item.runes.length > 0) ||
               (settings.showItemIcons && item.type !== 'runeword')) && (

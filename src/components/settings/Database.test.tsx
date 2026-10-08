@@ -13,12 +13,7 @@ import {
 import { useGrailStore } from '@/stores/grailStore';
 import { DatabaseCard } from './Database';
 
-vi.mock('sonner', () => ({
-  toast: {
-    success: vi.fn(),
-    error: vi.fn(),
-  },
-}));
+vi.mock('sonner', () => import('@/test/sonnerMock'));
 
 vi.mock('@/stores/grailStore');
 

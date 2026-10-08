@@ -1,9 +1,7 @@
 import dayjs from 'dayjs';
-import duration from 'dayjs/plugin/duration';
 import relativeTime from 'dayjs/plugin/relativeTime';
 
 // Extend dayjs with plugins
-dayjs.extend(duration);
 dayjs.extend(relativeTime);
 
 /**
@@ -14,10 +12,11 @@ dayjs.extend(relativeTime);
 export function formatDuration(durationMs?: number): string {
   if (durationMs === undefined || durationMs === null || durationMs < 0) return '0s';
 
-  const d = dayjs.duration(durationMs);
-  const hours = d.hours();
-  const minutes = d.minutes();
-  const seconds = d.seconds();
+  // Use total hours: dayjs duration components wrap at day/month boundaries (24h would become 0).
+  const totalSeconds = Math.floor(durationMs / 1000);
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
 
   const parts: string[] = [];
 
@@ -34,6 +33,26 @@ export function formatDuration(durationMs?: number): string {
   }
 
   return parts.join(' ');
+}
+
+/**
+ * Formats a duration in milliseconds as a stopwatch-style clock string.
+ * Uses fixed-width segments so the value does not jump around while it ticks.
+ * @param {number} durationMs - Duration in milliseconds
+ * @returns {string} Clock string (e.g., "0:05", "12:34", "1:02:03")
+ */
+export function formatClockDuration(durationMs?: number): string {
+  const totalSeconds =
+    durationMs === undefined || durationMs < 0 ? 0 : Math.floor(durationMs / 1000);
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  const paddedSeconds = String(seconds).padStart(2, '0');
+
+  if (hours > 0) {
+    return `${hours}:${String(minutes).padStart(2, '0')}:${paddedSeconds}`;
+  }
+  return `${minutes}:${paddedSeconds}`;
 }
 
 /**
@@ -68,6 +87,31 @@ export function formatDate(
 export function formatShortDate(date: Date | string | number | undefined): string {
   if (!date) return 'Never';
   return dayjs(date).format('MMM D, YYYY');
+}
+
+/**
+ * Formats a date as a localized date string using the given locale
+ * (e.g. "Jan 15, 2024" for "en", "15.01.2024" for "de").
+ * Falls back to the runtime default locale if the given locale is not supported.
+ * @param {Date | string | number | undefined} date - The date to format
+ * @param {string} [locale] - BCP 47 locale to format with (e.g. the app's `i18n.language`)
+ * @param {Intl.DateTimeFormatOptions} [options={ dateStyle: 'medium' }] - Intl formatting options
+ * @returns {string} Localized date string or "-" if the date is undefined or invalid
+ */
+export function formatLocalizedDate(
+  date: Date | string | number | undefined,
+  locale?: string,
+  options: Intl.DateTimeFormatOptions = { dateStyle: 'medium' },
+): string {
+  if (date === undefined) return '-';
+  const value = date instanceof Date ? date : new Date(date);
+  if (Number.isNaN(value.getTime())) return '-';
+
+  try {
+    return new Intl.DateTimeFormat(locale, options).format(value);
+  } catch {
+    return new Intl.DateTimeFormat(undefined, options).format(value);
+  }
 }
 
 /**

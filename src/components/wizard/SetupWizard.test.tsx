@@ -6,6 +6,8 @@ import { useWizardStore } from '@/stores/wizardStore';
 import { SetupWizard, wizardSteps } from './SetupWizard';
 
 vi.mock('@/stores/grailStore');
+// The real module imports grailStore, so it would be cached bound to this file's mock
+vi.mock('@/components/wizard/wizardSettingsSave', () => import('@/test/wizardSettingsSaveStub'));
 vi.mock('./steps/WelcomeStep', () => ({ WelcomeStep: () => <div>WelcomeContent</div> }));
 // Stubbed so this file's grailStore mock isn't baked into the shared module cache
 // (vitest runs with isolate: false) that SaveDirectoryStep.test.tsx also relies on.
@@ -41,7 +43,7 @@ describe('SetupWizard', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockUseGrailStore.mockReturnValue({
-      setSettings: vi.fn().mockResolvedValue(undefined),
+      setSettings: vi.fn().mockResolvedValue({ success: true }),
     } as unknown as ReturnType<typeof useGrailStore>);
     useWizardStore.setState({ isOpen: false, currentStep: 0, stepValidity: {} });
   });
@@ -143,7 +145,7 @@ describe('When SetupWizard is open', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    setSettings = vi.fn().mockResolvedValue(undefined);
+    setSettings = vi.fn().mockResolvedValue({ success: true });
     mockUseGrailStore.mockReturnValue({ setSettings } as unknown as ReturnType<
       typeof useGrailStore
     >);
@@ -234,7 +236,10 @@ describe('When SetupWizard is open', () => {
 
       // Assert
       await waitFor(() =>
-        expect(setSettings).toHaveBeenCalledWith({ wizardSkipped: true, wizardCompleted: false }),
+        expect(setSettings).toHaveBeenCalledWith(
+          { wizardSkipped: true, wizardCompleted: false },
+          { notifyOnError: false },
+        ),
       );
       await waitFor(() => expect(useWizardStore.getState().isOpen).toBe(false));
     });
@@ -252,6 +257,93 @@ describe('When SetupWizard is open', () => {
       // Assert
       await waitFor(() => expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument());
       expect(setSettings).not.toHaveBeenCalled();
+      expect(useWizardStore.getState().isOpen).toBe(true);
+    });
+  });
+
+  describe('If the user clicks Finish on the last step', () => {
+    beforeEach(() => {
+      openWizardAt(wizardSteps.length - 1);
+    });
+
+    it('Then the wizard is marked as completed and closes', async () => {
+      // Arrange
+      render(<SetupWizard />);
+      const wizard = await screen.findByRole('dialog');
+
+      // Act
+      await act(async () => {
+        fireEvent.click(within(wizard).getByRole('button', { name: 'Finish' }));
+      });
+
+      // Assert
+      expect(setSettings).toHaveBeenCalledWith(
+        { wizardCompleted: true, wizardSkipped: false },
+        { notifyOnError: false },
+      );
+      await waitFor(() => expect(useWizardStore.getState().isOpen).toBe(false));
+    });
+
+    it('Then a failed save keeps the wizard open with an error', async () => {
+      // Arrange
+      setSettings.mockResolvedValueOnce({ success: false, error: new Error('disk full') });
+      render(<SetupWizard />);
+      const wizard = await screen.findByRole('dialog');
+
+      // Act
+      await act(async () => {
+        fireEvent.click(within(wizard).getByRole('button', { name: 'Finish' }));
+      });
+
+      // Assert
+      expect(await screen.findByRole('alert')).toHaveTextContent(
+        'Your setup could not be saved. Please try again.',
+      );
+      expect(useWizardStore.getState().isOpen).toBe(true);
+    });
+
+    it('If Finish is clicked again after a failed save, Then the wizard closes and the error is gone', async () => {
+      // Arrange
+      setSettings
+        .mockResolvedValueOnce({ success: false, error: new Error('disk full') })
+        .mockResolvedValue({ success: true });
+      render(<SetupWizard />);
+      const wizard = await screen.findByRole('dialog');
+      const finish = within(wizard).getByRole('button', { name: 'Finish' });
+
+      // Act
+      await act(async () => {
+        fireEvent.click(finish);
+      });
+      await act(async () => {
+        fireEvent.click(finish);
+      });
+
+      // Assert
+      await waitFor(() => expect(useWizardStore.getState().isOpen).toBe(false));
+      expect(setSettings).toHaveBeenCalledTimes(2);
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    });
+  });
+
+  describe('If confirming Skip Setup fails to save', () => {
+    it('Then the wizard stays open with an error', async () => {
+      // Arrange
+      setSettings.mockResolvedValueOnce({ success: false, error: new Error('disk full') });
+      render(<SetupWizard />);
+      const wizard = await screen.findByRole('dialog');
+      fireEvent.click(within(wizard).getByRole('button', { name: 'Skip Setup' }));
+      const confirm = await screen.findByRole('alertdialog');
+
+      // Act
+      await act(async () => {
+        fireEvent.click(within(confirm).getByRole('button', { name: 'Skip Setup' }));
+      });
+
+      // Assert
+      expect(await screen.findByRole('alert')).toHaveTextContent(
+        'Your setup could not be saved. Please try again.',
+      );
       expect(useWizardStore.getState().isOpen).toBe(true);
     });
   });

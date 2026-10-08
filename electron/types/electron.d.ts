@@ -17,8 +17,6 @@ import type {
   UpdateStatus,
 } from './grail'
 
-import type { ServiceErrorPayload } from '../utils/serviceLogger'
-
 /**
  * Main interface defining the Electron API available to the renderer process.
  * This interface provides type-safe access to all Electron main process functionality
@@ -462,10 +460,11 @@ export interface ElectronAPI {
 
     /**
      * Registers a callback for service error events from the main process.
-     * @param {(payload: ServiceErrorPayload) => void} callback - Function to call when service errors occur.
+     * The payload is untrusted IPC data and must be validated by the caller.
+     * @param {(payload: unknown) => void} callback - Function to call when service errors occur.
      * @returns {() => void} Cleanup function to remove the listener.
      */
-    onServiceError(callback: (payload: ServiceErrorPayload) => void): () => void
+    onServiceError(callback: (payload: unknown) => void): () => void
   }
 
   /**
