@@ -13,12 +13,7 @@ import {
 import { formatSessionAsCSV } from './formatters';
 import { ExportDialog } from './index';
 
-vi.mock('sonner', () => ({
-  toast: {
-    success: vi.fn(),
-    error: vi.fn(),
-  },
-}));
+vi.mock('sonner', () => import('@/test/sonnerMock'));
 
 vi.mock('./formatters', () => ({
   formatSessionAsCSV: vi.fn(() => 'csv-content'),
