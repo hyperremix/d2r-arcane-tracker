@@ -44,9 +44,7 @@ export function formatDuration(durationMs?: number): string {
  */
 export function formatClockDuration(durationMs?: number): string {
   const totalSeconds =
-    durationMs === undefined || durationMs === null || durationMs < 0
-      ? 0
-      : Math.floor(durationMs / 1000);
+    durationMs === undefined || durationMs < 0 ? 0 : Math.floor(durationMs / 1000);
   const hours = Math.floor(totalSeconds / 3600);
   const minutes = Math.floor((totalSeconds % 3600) / 60);
   const seconds = totalSeconds % 60;

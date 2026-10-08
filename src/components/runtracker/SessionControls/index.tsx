@@ -293,10 +293,14 @@ export function SessionControls() {
     };
   }, [handleKeyDown]);
 
+  // Runs are only tracked automatically while memory reading is not known to be unavailable;
+  // otherwise the manual run controls stay usable so the user is not left without a way to track runs
+  const autoTrackingActive = autoModeEnabled && memoryStatus?.available !== false;
+
   // Determine button states
-  const canStartRun = Boolean(activeSession && !activeRun && !controlsBusy && !autoModeEnabled);
-  const canPauseResume = Boolean(activeRun && !controlsBusy && !autoModeEnabled);
-  const canEndRun = Boolean(activeRun && !controlsBusy && !autoModeEnabled);
+  const canStartRun = Boolean(activeSession && !activeRun && !controlsBusy && !autoTrackingActive);
+  const canPauseResume = Boolean(activeRun && !controlsBusy && !autoTrackingActive);
+  const canEndRun = Boolean(activeRun && !controlsBusy && !autoTrackingActive);
   // End Session stays available in auto mode so tracked sessions can still be stopped by mouse
   const canEndSession = Boolean(activeSession && !controlsBusy);
   const canStartSession = Boolean(!activeSession && !controlsBusy);
@@ -332,7 +336,7 @@ export function SessionControls() {
                 shortcuts={shortcuts}
                 hasSession={Boolean(activeSession)}
                 hasActiveRun={Boolean(activeRun)}
-                autoModeEnabled={autoModeEnabled}
+                autoModeEnabled={autoTrackingActive}
                 canStartSession={canStartSession}
                 canStartRun={canStartRun}
                 canPauseResume={canPauseResume}

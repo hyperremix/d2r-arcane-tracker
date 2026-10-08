@@ -865,6 +865,25 @@ describe('SessionControls', () => {
       expect(warning).toHaveClass('text-warning');
       expect(screen.queryByRole('alert')).not.toBeInTheDocument();
     });
+
+    it('If auto mode is on and memory reading is unavailable, Then the automatic tracking notice is hidden and manual run controls and the switch stay usable', async () => {
+      // Arrange
+      setUnavailableMemoryReading();
+      mockUseGrailStore.mockReturnValue({
+        ...defaultGrailStoreState,
+        settings: { ...defaultGrailStoreState.settings, runTrackerMemoryReading: true },
+      });
+      mockUseRunTrackerStore.mockReturnValue({ ...defaultStoreState, activeSession: mockSession });
+
+      // Act
+      render(<SessionControls />);
+      await screen.findByText('Auto mode temporarily unavailable.');
+
+      // Assert
+      expect(screen.queryByText('Runs are tracked automatically')).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Start Run' })).toBeEnabled();
+      expect(screen.getByRole('switch')).toBeInTheDocument();
+    });
   });
 
   describe('Tooltips', () => {

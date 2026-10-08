@@ -40,16 +40,20 @@ describe('useNow', () => {
     expect(result.current).toBe(start);
   });
 
-  it('When unmounted, Then the interval is cleared', () => {
+  it('When unmounted, Then the interval is cleared and no further ticks are scheduled', () => {
     // Arrange
     const clearIntervalSpy = vi.spyOn(globalThis, 'clearInterval');
     const { unmount } = renderHook(() => useNow(true));
+    const pendingTimersBeforeUnmount = vi.getTimerCount();
 
     // Act
     unmount();
+    vi.advanceTimersByTime(3000);
 
     // Assert
+    expect(pendingTimersBeforeUnmount).toBe(1);
     expect(clearIntervalSpy).toHaveBeenCalled();
+    expect(vi.getTimerCount()).toBe(0);
     clearIntervalSpy.mockRestore();
   });
 });

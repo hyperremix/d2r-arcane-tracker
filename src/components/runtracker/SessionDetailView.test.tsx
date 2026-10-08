@@ -191,6 +191,7 @@ describe('SessionDetailView', () => {
       expect(screen.getByRole('button', { name: 'Go Back' })).toBeInTheDocument();
     });
   });
+
   describe('When the active session is not in the loaded sessions list yet', () => {
     it('Then the active session details are shown instead of the not-found state', () => {
       // Arrange
@@ -233,8 +234,9 @@ describe('SessionDetailView', () => {
       render(<SessionDetailView sessionId="session-live" onBack={vi.fn()} />);
 
       // Assert
-      expect(screen.getByText('7')).toBeInTheDocument();
-      expect(screen.queryByText('3')).not.toBeInTheDocument();
+      const runCountStat = screen.getByText('Run Count').parentElement as HTMLElement;
+      expect(within(runCountStat).getByText('7')).toBeInTheDocument();
+      expect(within(runCountStat).queryByText('3')).not.toBeInTheDocument();
       expect(screen.getByText('90.0%')).toBeInTheDocument();
       expect(screen.getByLabelText('Session Notes')).toHaveValue('live notes');
     });
