@@ -7,7 +7,8 @@ vi.mock('@/stores/grailStore', () => ({
   useGrailStore: vi.fn(),
 }));
 
-import { THEME_PREFERENCE_STORAGE_KEY } from '@/lib/theme';
+import type { ResolvedTheme } from '@/lib/theme';
+import { THEME_CHROME_COLORS, THEME_PREFERENCE_STORAGE_KEY } from '@/lib/theme';
 import { useGrailStore } from '@/stores/grailStore';
 import { useResolvedTheme, useTheme } from './useTheme';
 
@@ -232,15 +233,18 @@ describe('When useTheme hook is used', () => {
   describe('If OS theme preference changes while on system theme', () => {
     it('Then should update dark class to match OS preference', () => {
       // Arrange
-      let changeHandler: ((e: MediaQueryListEvent) => void) | undefined;
+      let changeHandler: (() => void) | undefined;
+      let osPrefersDark = false;
       mockStore('system');
-      mockMatchMedia.mockReturnValue({
-        matches: false,
+      mockMatchMedia.mockImplementation(() => ({
+        get matches() {
+          return osPrefersDark;
+        },
         addEventListener: vi.fn((_event, handler) => {
-          changeHandler = handler as (e: MediaQueryListEvent) => void;
+          changeHandler = handler as () => void;
         }),
         removeEventListener: mockRemoveEventListener,
-      });
+      }));
       renderHook(() => useTheme());
       expect(document.documentElement.classList.contains('dark')).toBe(false);
       if (!changeHandler) {
@@ -249,8 +253,9 @@ describe('When useTheme hook is used', () => {
       const handler = changeHandler;
 
       // Act
+      osPrefersDark = true;
       act(() => {
-        handler({ matches: true } as MediaQueryListEvent);
+        handler();
       });
 
       // Assert
@@ -372,10 +377,7 @@ describe('When useTheme hook is used', () => {
       renderHook(() => useTheme());
 
       // Assert
-      expect(updateTitleBarOverlay).toHaveBeenCalledWith({
-        backgroundColor: '#ffffff',
-        symbolColor: '#000000',
-      });
+      expect(updateTitleBarOverlay).toHaveBeenCalledWith(THEME_CHROME_COLORS.light);
     });
   });
 });
@@ -420,6 +422,38 @@ describe('When useResolvedTheme hook is used', () => {
 
       // Assert
       expect(result.current).toBe('light');
+    });
+  });
+
+  describe('If the OS preference changed while an explicit theme was set and the user switches to system', () => {
+    it('Then should resolve the current OS preference on the first render', () => {
+      // Arrange
+      const matchMedia = vi.mocked(window.matchMedia);
+      matchMedia.mockReturnValue({
+        matches: false,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      } as unknown as MediaQueryList);
+      mockStore('light');
+      const resolvedThemes: ResolvedTheme[] = [];
+      const { rerender } = renderHook(() => {
+        const resolved = useResolvedTheme();
+        resolvedThemes.push(resolved);
+        return resolved;
+      });
+      matchMedia.mockReturnValue({
+        matches: true,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      } as unknown as MediaQueryList);
+      mockStore('system');
+      resolvedThemes.length = 0;
+
+      // Act
+      rerender();
+
+      // Assert
+      expect(resolvedThemes[0]).toBe('dark');
     });
   });
 

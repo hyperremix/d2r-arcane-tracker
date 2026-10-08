@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
 import type { ResolvedTheme } from '@/lib/theme';
 import {
   applyThemeClass,
@@ -23,26 +23,27 @@ import { useGrailStore } from '@/stores/grailStore';
 export function useResolvedTheme(): ResolvedTheme {
   const theme = useGrailStore((state) => state.settings.theme);
   const settingsHydrated = useGrailStore((state) => state.settingsHydrated);
-  const [systemPrefersDark, setSystemPrefersDark] = useState(getSystemPrefersDark);
   const [cachedPreference] = useState(readCachedThemePreference);
 
-  useEffect(() => {
-    if (theme !== 'system' || typeof window.matchMedia !== 'function') {
-      return;
-    }
+  // Read the live OS preference on every render so a switch to "system" never resolves a stale
+  // value; the subscription only schedules a re-render when the OS preference changes.
+  const subscribeToSystemTheme = useCallback(
+    (onSystemThemeChange: () => void) => {
+      if (theme !== 'system' || typeof window.matchMedia !== 'function') {
+        return () => {
+          // Nothing was subscribed, so there is nothing to clean up
+        };
+      }
 
-    const systemThemeQuery = window.matchMedia(SYSTEM_DARK_QUERY);
-    setSystemPrefersDark(systemThemeQuery.matches);
-
-    const handleSystemThemeChange = (event: MediaQueryListEvent) => {
-      setSystemPrefersDark(event.matches);
-    };
-
-    systemThemeQuery.addEventListener('change', handleSystemThemeChange);
-    return () => {
-      systemThemeQuery.removeEventListener('change', handleSystemThemeChange);
-    };
-  }, [theme]);
+      const systemThemeQuery = window.matchMedia(SYSTEM_DARK_QUERY);
+      systemThemeQuery.addEventListener('change', onSystemThemeChange);
+      return () => {
+        systemThemeQuery.removeEventListener('change', onSystemThemeChange);
+      };
+    },
+    [theme],
+  );
+  const systemPrefersDark = useSyncExternalStore(subscribeToSystemTheme, getSystemPrefersDark);
 
   if (!settingsHydrated) {
     return resolveCachedTheme(cachedPreference, systemPrefersDark);
