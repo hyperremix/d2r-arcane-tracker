@@ -1,8 +1,6 @@
-import dayjs from 'dayjs';
 import { AlertTriangle, Database, Download, Upload } from 'lucide-react';
 import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { toast } from 'sonner';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
   AlertDialog,
@@ -16,6 +14,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useDatabaseBackup } from '@/hooks/useDatabaseBackup';
 import { translations } from '@/i18n/translations';
 import { getFileName } from '@/lib/path';
 import { useGrailStore } from '@/stores/grailStore';
@@ -29,8 +28,7 @@ import { useGrailStore } from '@/stores/grailStore';
 export function DatabaseCard() {
   const { t } = useTranslation();
   // Backup state
-  const [isBackingUp, setIsBackingUp] = useState(false);
-  const [lastBackupPath, setLastBackupPath] = useState<string | null>(null);
+  const { isBackingUp, lastBackupPath, backup: handleBackup } = useDatabaseBackup();
 
   // Restore state
   const [isRestoring, setIsRestoring] = useState(false);
@@ -42,57 +40,6 @@ export function DatabaseCard() {
   const [restoreSuccess, setRestoreSuccess] = useState(false);
   const [backedUpBeforeRestore, setBackedUpBeforeRestore] = useState(false);
   const { reloadData } = useGrailStore();
-
-  // Backup functionality
-  /**
-   * Prompts for a backup location and backs up the database.
-   * @returns {Promise<boolean>} True if a backup was written, false if canceled or failed
-   */
-  const handleBackup = async (): Promise<boolean> => {
-    try {
-      setIsBackingUp(true);
-
-      // Show save dialog to let user choose backup location
-      const result = await window.electronAPI?.dialog.showSaveDialog({
-        title: t(translations.settings.database.backupDatabase),
-        defaultPath: `holy-grail-backup-${dayjs().format('YYYY-MM-DD')}.db`,
-        filters: [
-          { name: t(translations.settings.database.sqliteDatabaseFilter), extensions: ['db'] },
-          { name: t(translations.common.allFiles), extensions: ['*'] },
-        ],
-        properties: ['createDirectory'],
-      });
-
-      if (result?.canceled || !result?.filePath) {
-        return false;
-      }
-
-      // Perform the backup
-      const backupResult = await window.electronAPI?.grail.backup(result.filePath);
-
-      if (backupResult?.success) {
-        setLastBackupPath(result.filePath);
-        toast.success(t(translations.settings.database.backupSuccess), {
-          description: t(translations.settings.database.backupSuccessDescription, {
-            filename: getFileName(result.filePath),
-          }),
-        });
-        return true;
-      }
-
-      console.error('Backup failed');
-      toast.error(t(translations.settings.database.backupFailed));
-      return false;
-    } catch (error) {
-      console.error('Failed to backup database:', error);
-      toast.error(t(translations.settings.database.backupFailed), {
-        description: error instanceof Error ? error.message : undefined,
-      });
-      return false;
-    } finally {
-      setIsBackingUp(false);
-    }
-  };
 
   const handleBackupBeforeRestore = async () => {
     const backedUp = await handleBackup();
@@ -313,7 +260,7 @@ export function DatabaseCard() {
                   {t(translations.settings.database.keepCurrentWarning)}
                 </span>
                 {backedUpBeforeRestore && (
-                  <output className="mt-2 block text-green-600 text-sm">
+                  <output className="mt-2 block text-sm text-success">
                     {t(translations.settings.database.backupCreatedContinue)}
                   </output>
                 )}

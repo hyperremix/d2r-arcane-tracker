@@ -8,6 +8,7 @@ import { RuneImages } from '../RuneImages';
 import { ItemTypeIcon } from '../StatusIcons';
 import { getTooltipTriggerRender } from '../tooltipTriggerRender';
 import type { InteractiveCardProps } from './GridView';
+import { ItemCategoryLabel } from './ItemCategoryLabel';
 import { DiscoveryAttribution, DiscoveryInfo, StatusIndicators, VersionCounts } from './indicators';
 import { getCardStateClasses, interactiveCardStyles, missingArtworkStyles } from './styles';
 
@@ -156,7 +157,7 @@ export function ListView({
                 {item.itemBase && ` • ${item.itemBase}`}
               </p>
               <p className="text-muted-foreground text-xs">
-                {item.category} • {item.subCategory.replace('_', ' ')}
+                <ItemCategoryLabel item={item} />
               </p>
 
               <DiscoveryInfo allProgress={allProgress} characters={characters} />
