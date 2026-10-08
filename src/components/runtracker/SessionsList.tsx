@@ -310,7 +310,7 @@ export function SessionsList({ onSessionSelect }: SessionsListProps) {
       <CardHeader>
         <CardTitle className="flex items-center justify-between">
           <span>{t(translations.runTracker.sessionsList.title)}</span>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 font-normal font-ui">
             <span id={showArchivedLabelId} className="text-muted-foreground text-sm">
               {t(translations.runTracker.sessionsList.showArchived)}
             </span>

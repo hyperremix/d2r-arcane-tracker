@@ -61,6 +61,15 @@ describe('When SessionsList is rendered with previous sessions', () => {
     expect(screen.getByLabelText('Show archived')).toHaveAttribute('role', 'switch');
   });
 
+  it('Then the show archived wrapper opts out of the display title font with font-ui', () => {
+    // Arrange & Act
+    render(<SessionsList onSessionSelect={vi.fn()} />);
+
+    // Assert
+    const wrapper = screen.getByText('Show archived').parentElement;
+    expect(wrapper).toHaveClass('font-ui', 'font-normal');
+  });
+
   it('Then only the Date column sorts by start time, avoiding duplicate indicators', () => {
     // Arrange & Act
     render(<SessionsList onSessionSelect={vi.fn()} />);

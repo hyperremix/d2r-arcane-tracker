@@ -538,6 +538,13 @@ vi.mock('./MasonryItemGrid', () => ({
     return (
       <div data-testid="grouped-masonry-grid">
         {groupedItems.length} groups
+        <ul>
+          {groupedItems.map((group) => (
+            <li key={group.title} data-testid="group">
+              <span data-testid="group-title">{group.title}</span>: {group.items.length}
+            </li>
+          ))}
+        </ul>
         <button type="button" onClick={() => onItemClick('some-item')}>
           select item
         </button>
@@ -565,6 +572,7 @@ function setupComponentMocks(
     settings?: Partial<Settings>;
     viewMode?: string;
     groupMode?: string;
+    progressLookup?: Map<string, ProgressLookupData>;
   } = {},
 ) {
   const mergedSettings = { ...defaultSettings, ...overrides.settings };
@@ -592,7 +600,7 @@ function setupComponentMocks(
 
   vi.mocked(useFilteredItems).mockReturnValue(overrides.filteredItems ?? []);
 
-  const progressMap = new Map<string, ProgressLookupData>();
+  const progressMap = overrides.progressLookup ?? new Map<string, ProgressLookupData>();
   vi.mocked(useProgressLookup).mockReturnValue(progressMap);
 }
 
@@ -628,6 +636,40 @@ describe('When ItemGrid component is rendered', () => {
 
       // Assert
       expect(screen.getByTestId('grouped-masonry-grid')).toBeInTheDocument();
+    });
+
+    it('Then group titles are translated category labels', () => {
+      // Arrange
+      const items = [
+        HolyGrailItemBuilder.new().withId('a').withCategory('armor').build(),
+        HolyGrailItemBuilder.new().withId('b').withCategory('runewords').build(),
+      ];
+      setupComponentMocks({ filteredItems: items, viewMode: 'grid', groupMode: 'category' });
+
+      // Act
+      render(<ItemGrid />);
+
+      // Assert
+      const titles = screen.getAllByTestId('group-title').map((el) => el.textContent);
+      expect(titles).toEqual(['Armor', 'Runewords']);
+    });
+  });
+
+  describe('If viewMode "grid" and groupMode "type"', () => {
+    it('Then group titles are translated type labels', () => {
+      // Arrange
+      const items = [
+        HolyGrailItemBuilder.new().withId('a').withType('unique').build(),
+        HolyGrailItemBuilder.new().withId('b').withType('runeword').build(),
+      ];
+      setupComponentMocks({ filteredItems: items, viewMode: 'grid', groupMode: 'type' });
+
+      // Act
+      render(<ItemGrid />);
+
+      // Assert
+      const titles = screen.getAllByTestId('group-title').map((el) => el.textContent);
+      expect(titles).toEqual(['Unique', 'Runeword']);
     });
   });
 
@@ -886,6 +928,103 @@ describe('When ItemGrid component is rendered', () => {
 
       // Assert
       expect(screen.getByTestId('masonry-item-grid')).toHaveTextContent('1 items');
+    });
+  });
+
+  describe('If ethereal tracking is enabled and group mode is ethereal', () => {
+    it('Then keeps the ethereal group mode and groups items by translated ethereal status', () => {
+      // Arrange
+      const bothFoundItem = HolyGrailItemBuilder.new()
+        .withId('both-found')
+        .withEtherealType('optional')
+        .build();
+      const neitherFoundItem = HolyGrailItemBuilder.new()
+        .withId('neither-found')
+        .withEtherealType('optional')
+        .build();
+      const normalOnlyTypeItem = HolyGrailItemBuilder.new()
+        .withId('normal-type')
+        .withEtherealType('none')
+        .build();
+      const etherealOnlyTypeItem = HolyGrailItemBuilder.new()
+        .withId('eth-type')
+        .withEtherealType('only')
+        .build();
+      const progressLookup = new Map<string, ProgressLookupData>([
+        [
+          'both-found',
+          {
+            normalFound: true,
+            etherealFound: true,
+            normalProgress: [],
+            etherealProgress: [],
+            overallFound: true,
+          },
+        ],
+        [
+          'normal-type',
+          {
+            normalFound: true,
+            etherealFound: false,
+            normalProgress: [],
+            etherealProgress: [],
+            overallFound: true,
+          },
+        ],
+      ]);
+      setupComponentMocks({
+        filteredItems: [bothFoundItem, neitherFoundItem, normalOnlyTypeItem, etherealOnlyTypeItem],
+        settings: { grailNormal: true, grailEthereal: true },
+        viewMode: 'grid',
+        groupMode: 'ethereal',
+        progressLookup,
+      });
+
+      // Act
+      render(<ItemGrid />);
+
+      // Assert
+      expect(mockSetGroupMode).not.toHaveBeenCalled();
+      expect(screen.getAllByTestId('group').map((group) => group.textContent)).toEqual([
+        'Both Found: 1',
+        'Neither Found: 1',
+        'Normal Found: 1',
+        'Ethereal Not Found: 1',
+      ]);
+    });
+  });
+
+  describe('If ethereal tracking is disabled and group mode is ethereal', () => {
+    it('Then resets the group mode to none', () => {
+      // Arrange
+      setupComponentMocks({
+        filteredItems: HolyGrailItemBuilder.new().withEtherealType('none').buildMany(2),
+        settings: { grailNormal: true, grailEthereal: false },
+        groupMode: 'ethereal',
+      });
+
+      // Act
+      render(<ItemGrid />);
+
+      // Assert
+      expect(mockSetGroupMode).toHaveBeenCalledWith('none');
+    });
+  });
+
+  describe('If ethereal tracking is disabled and group mode is not ethereal', () => {
+    it('Then does not change the group mode', () => {
+      // Arrange
+      setupComponentMocks({
+        filteredItems: HolyGrailItemBuilder.new().buildMany(2),
+        settings: { grailNormal: true, grailEthereal: false },
+        groupMode: 'category',
+      });
+
+      // Act
+      render(<ItemGrid />);
+
+      // Assert
+      expect(mockSetGroupMode).not.toHaveBeenCalled();
     });
   });
 });

@@ -35,7 +35,11 @@ The setup wizard opens on first launch. You can run it again from **Settings →
 
 All of these can be changed later in **Settings**.
 
-> **Warning:** changing the monitored save folder deletes all characters and progress in the app. Back up first (**Settings → Database → Backup**).
+Settings are saved as soon as you change them. If a change can't be saved, the app undoes it and shows an error with a **Retry** button. Inside the setup wizard, a setting that can't be saved is undone and an error appears in the step instead; if the wizard can't save when you click **Finish** or **Skip Setup**, it stays open and shows an error so you can try again.
+
+> **Warning:** switching the monitored save folder to a different folder deletes all characters and progress in the app. Back up first (**Settings → Database → Backup**).
+
+In **Settings → Save File Monitoring**, **Change Directory** opens a folder picker and **Restore Default** uses the platform default folder. If the chosen folder is the one already monitored, nothing changes and nothing is deleted. If it's a different folder and the app has characters or progress, a confirmation shows the current and new folder and offers **Back up first** before anything is deleted.
 
 ## Choosing what to track
 
@@ -88,8 +92,10 @@ The main screen lists every grail item with its found status. The search and fil
 
 - Search by name, with optional fuzzy matching.
 - Filter by status (all, found, missing), category (weapons, armor, jewelry, charms) and type (unique, set, rune, runeword).
-- Group by category, type or ethereal status, and switch between grid and list views. In the grid, each group has a header with its found count, followed by its items in rows that read left to right and wrap to the next row, using the same number of columns as the ungrouped grid.
+- Group by category, type or ethereal status (available when ethereal tracking is on), and switch between grid and list views. In the grid, each group has a header with its found count, followed by its items in rows that read left to right and wrap to the next row, using the same number of columns as the ungrouped grid.
 - Sort by name, category, type or found date.
+
+As in the game, an item's name color shows its quality: gold for uniques, green for sets, orange for runes and purple for runewords. Found items have a solid frame in that color. Missing items have a dashed frame and grayed-out artwork.
 
 Click an item to see its details, which characters found it and when, and links to [diablo2.io](https://diablo2.io/) or [d2runewizard](https://d2runewizard.com/).
 
@@ -107,15 +113,17 @@ Conversion only reads game files and is safe to run again. The PNGs are stored i
 
 ### Statistics
 
-The **Statistics** page shows overall and per-category progress, recent finds, find streaks, a comparison between characters, and run analytics from the [Run Tracker](RUN_TRACKER.md).
+The **Statistics** page shows overall and per-category progress, recent finds, find streaks, a comparison between characters, and run analytics from the [Run Tracker](RUN_TRACKER.md). The selected tab (**Grail Statistics** or **Run Statistics**) is kept in the page address, so going back to the page with the browser's back button restores it.
 
 ### Runeword Calculator
 
-The **Runeword Calculator** reads the runes in your save files and shows all 93 runewords:
+The **Runeword Calculator** reads the runes in your save files and shows which runewords you can make:
 
-- Search by name, or select runes in the sidebar to filter runewords that use them. The sidebar also shows how many of each rune you have.
-- Turn **Show Partial** off to see only runewords you can make right now.
-- Each card shows which runes you have and which are missing, including when a runeword needs the same rune more than once.
+- Choose what to show: **Craftable now** (the default) shows runewords you can make with the runes you have. **Missing ≤ 1** also shows runewords that need one more rune, and **All** shows every runeword. If nothing matches the current view, the page offers the next broader view that has results.
+- Results are sorted with craftable runewords first, then by the fewest missing runes, then by name.
+- Search by name, or select runes in the sidebar to show only runewords that use **all** of the selected runes. **Clear selection** removes them. The sidebar also shows how many of each rune you have.
+- **Refresh runes** rescans your save files after you pick up or use runes in the game.
+- Each card shows how many of its runes you have (for example, "3/4 runes") and marks missing runes with a cross, including when a runeword needs the same rune more than once.
 
 The calculator works whether or not you track runewords in your grail.
 
@@ -131,6 +139,8 @@ You can limit the terror zone rotation to zones you choose. See the [Terror Zone
 - **In-App Notifications**: cards inside the app. Recent finds are also listed under the bell icon.
 - **Native Notifications**: OS notifications, which also appear while the app is minimized.
 
+If a background task fails, for example a save file can't be read or a database write fails, an error message appears in the bottom-left corner. It stays open until you close it, and a repeated failure of the same kind updates that one message with the most recent file name and details instead of adding new ones. Errors you can fix in the settings have an **Open Settings** button. The others have **Copy details**, which copies the technical details for a bug report.
+
 ### Widget
 
 **Settings → Widget Settings** enables an always-on-top overlay that you can drag, resize and set to any opacity. It snaps to screen edges. Display modes:
@@ -143,3 +153,16 @@ You can limit the terror zone rotation to zones you choose. See the [Terror Zone
 ### Backups
 
 **Settings → Database** creates a backup of the database or restores one. Restoring replaces all current data.
+
+### Error screen
+
+If a page crashes, the app shows a **Something went wrong** screen instead of going blank. The title bar stays usable, so you can switch to another page. From the error screen:
+
+- **Try to Recover** loads the page again.
+- **Reload Application** reloads the app window.
+- **Copy Error Details** copies the app version, error message, stack trace and (when available) component stack to the clipboard.
+- **Report Issue** opens the GitHub issue tracker in your browser. If it can't be opened, a message appears under the buttons; open the [issues](https://github.com/hyperremix/d2r-arcane-tracker/issues) page yourself instead.
+
+If the app layout itself fails, the same screen fills the whole window without the title bar, so use **Reload Application** to recover.
+
+If the error keeps happening, paste the copied details into a new issue.

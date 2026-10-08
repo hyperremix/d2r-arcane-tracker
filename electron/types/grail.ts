@@ -364,6 +364,15 @@ export interface SessionStats {
 }
 
 /**
+ * Interface representing a single highlighted run (e.g. the fastest or slowest one).
+ */
+export interface RunHighlight {
+  runId: string;
+  duration: number;
+  timestamp: Date;
+}
+
+/**
  * Interface representing overall run statistics across all sessions.
  */
 export interface RunStatistics {
@@ -371,8 +380,10 @@ export interface RunStatistics {
   totalRuns: number;
   totalTime: number;
   averageRunDuration: number;
-  fastestRun: { runId: string; duration: number; timestamp: Date };
-  slowestRun: { runId: string; duration: number; timestamp: Date };
+  /** Shortest completed run, or `undefined` if no run has been completed yet. */
+  fastestRun?: RunHighlight;
+  /** Longest completed run, or `undefined` if no run has been completed yet. */
+  slowestRun?: RunHighlight;
   itemsPerRun: number;
 }
 

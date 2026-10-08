@@ -77,6 +77,8 @@ describe('Settings', () => {
     render(ui);
 
     // Assert
+    expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
+    expect(screen.getByRole('heading', { level: 1, name: 'Settings' })).toBeInTheDocument();
     const nav = screen.getByRole('navigation', { name: 'Settings sections' });
     const navButtons = within(nav).getAllByRole('button');
     expect(navButtons.map((button) => button.textContent)).toEqual(sectionNames);

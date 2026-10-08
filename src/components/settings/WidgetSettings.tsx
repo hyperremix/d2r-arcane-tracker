@@ -1,6 +1,6 @@
 import type { Settings } from 'electron/types/grail';
 import { Layers, RotateCcw } from 'lucide-react';
-import { useCallback, useEffect, useId, useMemo } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -43,16 +43,35 @@ export function WidgetSettings() {
 
   const toggleWidget = useCallback(
     async (checked: boolean) => {
-      await setSettings({ widgetEnabled: checked });
-      // Toggle widget visibility via IPC
-      await window.electronAPI?.widget.toggle(checked, settings);
+      // The widget window is only created or closed through IPC, so this follow-up must also run
+      // when the error toast's Retry re-applies the change (hence `onSaved`, not code after the
+      // await). Display mode and opacity have no such hook for Retry: the widget window applies
+      // them itself when it receives `settings-updated` (their handlers still call the IPC after
+      // a successful save).
+      await setSettings(
+        { widgetEnabled: checked },
+        {
+          onSaved: async () => {
+            await window.electronAPI?.widget.toggle(checked, useGrailStore.getState().settings);
+          },
+        },
+      );
     },
-    [settings, setSettings],
+    [setSettings],
   );
+
+  // Display mode whose auto-switch to 'overall' failed to save. A failed save is reverted, which
+  // changes `settings` (and so `updateDisplay`) and would otherwise re-run the auto-switch effect
+  // forever. It is cleared by any successful display change or when ethereal tracking is enabled.
+  const failedAutoSwitchRef = useRef<WidgetDisplayMode | undefined>(undefined);
 
   const updateDisplay = useCallback(
     async (display: WidgetDisplayMode) => {
-      await setSettings({ widgetDisplay: display });
+      const result = await setSettings({ widgetDisplay: display });
+      if (!result.success) {
+        return;
+      }
+      failedAutoSwitchRef.current = undefined;
       // Update widget display mode via IPC
       await window.electronAPI?.widget.updateDisplay(display, settings);
     },
@@ -63,7 +82,10 @@ export function WidgetSettings() {
     async (value: number | readonly number[]) => {
       const values = Array.isArray(value) ? value : [value];
       const opacity = clampWidgetOpacity(values[0]);
-      await setSettings({ widgetOpacity: opacity });
+      const result = await setSettings({ widgetOpacity: opacity });
+      if (!result.success) {
+        return;
+      }
       // Update widget opacity via IPC
       await window.electronAPI?.widget.updateOpacity(opacity);
     },
@@ -100,9 +122,20 @@ export function WidgetSettings() {
 
   // Auto-switch to 'overall' mode if ethereal tracking is disabled and user is in split/all mode
   useEffect(() => {
-    if (!settings.grailEthereal && (widgetDisplay === 'split' || widgetDisplay === 'all')) {
-      updateDisplay('overall');
+    if (settings.grailEthereal) {
+      failedAutoSwitchRef.current = undefined;
+      return;
     }
+    if (widgetDisplay !== 'split' && widgetDisplay !== 'all') {
+      return;
+    }
+    if (failedAutoSwitchRef.current === widgetDisplay) {
+      return;
+    }
+    failedAutoSwitchRef.current = widgetDisplay;
+    updateDisplay('overall').catch((error) => {
+      console.error('Failed to switch the widget display mode:', error);
+    });
   }, [settings.grailEthereal, widgetDisplay, updateDisplay]);
 
   const toggleRunOnlyItems = useCallback(

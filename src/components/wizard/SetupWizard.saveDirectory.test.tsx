@@ -3,6 +3,8 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('@/stores/grailStore');
+// The real module imports grailStore, so it would be cached bound to this file's mock
+vi.mock('@/components/wizard/wizardSettingsSave', () => import('@/test/wizardSettingsSaveStub'));
 // Only SaveDirectoryStep is rendered for real. The other steps are stubbed so they aren't cached
 // bound to this file's grailStore mock in the shared (non-isolated) module registry.
 vi.mock('./steps/WelcomeStep', () => ({ WelcomeStep: () => null }));
@@ -41,7 +43,7 @@ describe('When the real SaveDirectoryStep is rendered inside SetupWizard', () =>
     ({ useWizardStore } = await import('@/stores/wizardStore'));
     ({ SetupWizard } = await import('./SetupWizard'));
     const mockUseGrailStore = vi.mocked(useGrailStore);
-    setSettings = vi.fn().mockResolvedValue(undefined);
+    setSettings = vi.fn().mockResolvedValue({ success: true });
     updateSaveDirectory = vi.fn().mockResolvedValue({ success: true });
     restoreDefaultDirectory = vi.fn().mockResolvedValue({ success: true });
     mockUseGrailStore.mockReturnValue({

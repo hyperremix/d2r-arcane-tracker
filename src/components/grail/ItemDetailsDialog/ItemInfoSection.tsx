@@ -5,6 +5,12 @@ import { useTranslation } from 'react-i18next';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { translations } from '@/i18n/translations';
+import {
+  etherealTypeLabelKeys,
+  itemCategoryLabelKeys,
+  itemTreasureClassLabelKeys,
+  itemTypeLabelKeys,
+} from '@/lib/labelKeys';
 
 // Component for item information section
 export function ItemInfoSection({ item }: { item: Item }) {
@@ -22,27 +28,27 @@ export function ItemInfoSection({ item }: { item: Item }) {
         <div className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-3">
           {/* Type */}
           <span className="font-medium">{t(translations.grail.itemDetails.type)}</span>
-          <Badge variant="secondary" className="w-fit capitalize">
-            {item.type}
+          <Badge variant="secondary" className="w-fit">
+            {t(itemTypeLabelKeys[item.type])}
           </Badge>
 
           {/* Category */}
           <span className="font-medium">{t(translations.grail.itemDetails.category)}</span>
-          <Badge variant="secondary" className="w-fit capitalize">
-            {item.category}
+          <Badge variant="secondary" className="w-fit">
+            {t(itemCategoryLabelKeys[item.category])}
           </Badge>
 
           {/* Treasure Class */}
           <span className="font-medium">{t(translations.grail.itemDetails.treasureClass)}</span>
-          <Badge variant="secondary" className="w-fit capitalize">
-            {item.treasureClass}
+          <Badge variant="secondary" className="w-fit">
+            {t(itemTreasureClassLabelKeys[item.treasureClass])}
           </Badge>
 
           {/* Item Base */}
           {item.itemBase && (
             <>
               <span className="font-medium">{t(translations.grail.itemDetails.base)}</span>
-              <Badge variant="secondary" className="w-fit capitalize">
+              <Badge variant="secondary" className="w-fit">
                 {item.itemBase}
               </Badge>
             </>
@@ -52,7 +58,7 @@ export function ItemInfoSection({ item }: { item: Item }) {
           {item.setName && (
             <>
               <span className="font-medium">{t(translations.grail.itemDetails.set)}</span>
-              <Badge variant="secondary" className="w-fit capitalize">
+              <Badge variant="secondary" className="w-fit">
                 {item.setName}
               </Badge>
             </>
@@ -78,27 +84,11 @@ export function ItemInfoSection({ item }: { item: Item }) {
           {/* Ethereal Type */}
           <span className="font-medium">{t(translations.grail.itemDetails.etherealType)}</span>
           <Badge
-            variant={
-              item.etherealType === 'only'
-                ? 'destructive'
-                : item.etherealType === 'optional'
-                  ? 'default'
-                  : 'secondary'
-            }
-            className="w-fit capitalize"
+            variant={item.etherealType === 'none' ? 'secondary' : 'ethereal'}
+            className="w-fit"
           >
-            {item.etherealType}
+            {t(etherealTypeLabelKeys[item.etherealType])}
           </Badge>
-
-          {/* Code */}
-          {item.code && (
-            <>
-              <span className="font-medium">{t(translations.grail.itemDetails.code)}</span>
-              <code className="w-fit rounded bg-muted px-2 py-1 font-mono text-sm">
-                {item.code}
-              </code>
-            </>
-          )}
 
           {/* Link */}
           {item.link && (

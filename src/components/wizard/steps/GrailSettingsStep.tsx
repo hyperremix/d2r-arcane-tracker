@@ -3,6 +3,7 @@ import { useId } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
+import { useWizardSettingsSave, WizardSaveError } from '@/components/wizard/wizardSettingsSave';
 import { translations } from '@/i18n/translations';
 import { useGrailStore } from '@/stores/grailStore';
 
@@ -17,7 +18,8 @@ export function GrailSettingsStep() {
   const grailEtherealId = useId();
   const grailRunesId = useId();
   const grailRunewordsId = useId();
-  const { settings, setSettings } = useGrailStore();
+  const { settings } = useGrailStore();
+  const { saveSettings, saveFailed } = useWizardSettingsSave();
 
   const grailNormal = settings.grailNormal ?? true;
   const grailEthereal = settings.grailEthereal ?? false;
@@ -49,7 +51,7 @@ export function GrailSettingsStep() {
             <Switch
               id={grailNormalId}
               checked={grailNormal}
-              onCheckedChange={(checked) => setSettings({ grailNormal: checked })}
+              onCheckedChange={(checked) => saveSettings({ grailNormal: checked })}
             />
           </div>
 
@@ -65,7 +67,7 @@ export function GrailSettingsStep() {
             <Switch
               id={grailEtherealId}
               checked={grailEthereal}
-              onCheckedChange={(checked) => setSettings({ grailEthereal: checked })}
+              onCheckedChange={(checked) => saveSettings({ grailEthereal: checked })}
             />
           </div>
         </div>
@@ -84,7 +86,7 @@ export function GrailSettingsStep() {
             <Switch
               id={grailRunesId}
               checked={grailRunes}
-              onCheckedChange={(checked) => setSettings({ grailRunes: checked })}
+              onCheckedChange={(checked) => saveSettings({ grailRunes: checked })}
             />
           </div>
 
@@ -100,10 +102,12 @@ export function GrailSettingsStep() {
             <Switch
               id={grailRunewordsId}
               checked={grailRunewords}
-              onCheckedChange={(checked) => setSettings({ grailRunewords: checked })}
+              onCheckedChange={(checked) => saveSettings({ grailRunewords: checked })}
             />
           </div>
         </div>
+
+        <WizardSaveError visible={saveFailed} />
 
         {/* Information Box */}
         <div className="rounded-lg bg-info/10 p-4">
