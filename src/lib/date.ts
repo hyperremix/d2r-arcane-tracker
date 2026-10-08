@@ -14,10 +14,11 @@ dayjs.extend(relativeTime);
 export function formatDuration(durationMs?: number): string {
   if (durationMs === undefined || durationMs === null || durationMs < 0) return '0s';
 
-  const d = dayjs.duration(durationMs);
-  const hours = d.hours();
-  const minutes = d.minutes();
-  const seconds = d.seconds();
+  // Use total hours: dayjs duration components wrap at day/month boundaries (24h would become 0).
+  const totalSeconds = Math.floor(durationMs / 1000);
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
 
   const parts: string[] = [];
 

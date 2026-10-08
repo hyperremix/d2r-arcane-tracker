@@ -39,6 +39,39 @@ describe('formatDuration', () => {
   it('should format hours and seconds correctly (no minutes)', () => {
     expect(formatDuration(3605000)).toBe('1h 5s');
   });
+
+  it('When the duration is exactly 24 hours, then it shows total hours instead of wrapping to 0s', () => {
+    // Arrange
+    const durationMs = 24 * 60 * 60 * 1000;
+
+    // Act
+    const result = formatDuration(durationMs);
+
+    // Assert
+    expect(result).toBe('24h');
+  });
+
+  it('When the duration is longer than a day, then it keeps the days as part of the hours', () => {
+    // Arrange
+    const durationMs = (25 * 3600 + 2 * 60 + 3) * 1000;
+
+    // Act
+    const result = formatDuration(durationMs);
+
+    // Assert
+    expect(result).toBe('25h 2m 3s');
+  });
+
+  it('When the duration is longer than a month, then it still shows total hours', () => {
+    // Arrange
+    const durationMs = (31 * 24 + 1) * 60 * 60 * 1000;
+
+    // Act
+    const result = formatDuration(durationMs);
+
+    // Assert
+    expect(result).toBe('745h');
+  });
 });
 
 describe('formatTimeAgo', () => {
