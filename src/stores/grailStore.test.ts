@@ -5,7 +5,9 @@ import { CharacterBuilder, GrailProgressBuilder, HolyGrailItemBuilder } from '@/
 import {
   countActiveFilters,
   filterAndSortItems,
+  parseSubCategoryFilterValue,
   startLoad,
+  toSubCategoryFilterValue,
   useFilteredItems,
   useGrailStatistics,
   useGrailStore,
@@ -893,6 +895,83 @@ describe('When filterAndSortItems is called', () => {
 
       // Assert
       expect(result.map((item) => item.id)).toEqual(['harlequincrest']);
+    });
+  });
+
+  describe.each([
+    ['exact', false],
+    ['fuzzy', true],
+  ])('If fuzzy search is %s', (_mode, fuzzySearch) => {
+    it.each(['龙', '???', "'"])(
+      'Then a search term "%s" without searchable characters matches nothing',
+      (searchTerm) => {
+        // Arrange
+        const items = [
+          HolyGrailItemBuilder.new().withId('shako').withName('Harlequin Crest').build(),
+          HolyGrailItemBuilder.new().withId('sword').withName('Windforce').build(),
+        ];
+
+        // Act
+        const result = filterAndSortItems(
+          items,
+          [],
+          { ...noFilter, searchTerm },
+          {
+            ...defaultSort,
+            fuzzySearch,
+          },
+        );
+
+        // Assert
+        expect(result).toEqual([]);
+      },
+    );
+
+    it('Then a whitespace-only search term still matches every item', () => {
+      // Arrange
+      const items = [
+        HolyGrailItemBuilder.new().withId('shako').withName('Harlequin Crest').build(),
+        HolyGrailItemBuilder.new().withId('sword').withName('Windforce').build(),
+      ];
+
+      // Act
+      const result = filterAndSortItems(
+        items,
+        [],
+        { ...noFilter, searchTerm: '   ' },
+        {
+          ...defaultSort,
+          fuzzySearch,
+        },
+      );
+
+      // Assert
+      expect(result).toHaveLength(2);
+    });
+  });
+});
+
+describe('When toSubCategoryFilterValue and parseSubCategoryFilterValue are used', () => {
+  describe('If a qualified value is parsed', () => {
+    it('Then returns the category and sub-category it was built from', () => {
+      // Arrange
+      const value = toSubCategoryFilterValue('weapons', 'sorceress');
+
+      // Act
+      const parsed = parseSubCategoryFilterValue(value);
+
+      // Assert
+      expect(parsed).toEqual({ category: 'weapons', subCategory: 'sorceress' });
+    });
+  });
+
+  describe('If a bare sub-category is parsed', () => {
+    it('Then returns no category', () => {
+      // Arrange & Act
+      const parsed = parseSubCategoryFilterValue('helms');
+
+      // Assert
+      expect(parsed).toEqual({ category: undefined, subCategory: 'helms' });
     });
   });
 });

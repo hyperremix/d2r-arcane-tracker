@@ -667,6 +667,22 @@ describe('When AdvancedSearch toolbar is rendered', () => {
       expect(screen.getByLabelText('Search')).not.toHaveFocus();
     });
 
+    it('Then does not focus the search input while a select listbox is open', () => {
+      // Arrange
+      render(
+        <>
+          <div role="listbox" aria-label="Options" />
+          <AdvancedSearch />
+        </>,
+      );
+
+      // Act
+      fireEvent.keyDown(document.body, { key: '/' });
+
+      // Assert
+      expect(screen.getByLabelText('Search')).not.toHaveFocus();
+    });
+
     it('Then typing "/" in the search input is not intercepted', () => {
       // Arrange
       render(<AdvancedSearch />);

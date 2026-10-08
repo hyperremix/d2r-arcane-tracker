@@ -45,7 +45,12 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { translations } from '@/i18n/translations';
 import { subCategoryLabelKeys } from '@/lib/labelKeys';
 import { cn } from '@/lib/utils';
-import { toSubCategoryFilterValue, useGrailStore, useItemResultCount } from '@/stores/grailStore';
+import {
+  parseSubCategoryFilterValue,
+  toSubCategoryFilterValue,
+  useGrailStore,
+  useItemResultCount,
+} from '@/stores/grailStore';
 
 type FoundStatus = 'all' | 'found' | 'missing';
 type SortBy = AdvancedGrailFilter['sortBy'];
@@ -190,11 +195,9 @@ function getSubCategoryLabel(subCategory: string, t: TFunction): string {
  * `weapons:sorceress`) include the category so same-named sub-categories stay distinguishable.
  */
 function getSubCategoryFilterLabel(value: string, t: TFunction): string {
-  const separatorIndex = value.indexOf(':');
-  if (separatorIndex === -1) return getSubCategoryLabel(value, t);
+  const { category, subCategory } = parseSubCategoryFilterValue(value);
+  if (category === undefined) return getSubCategoryLabel(subCategory, t);
 
-  const category = value.slice(0, separatorIndex);
-  const subCategory = value.slice(separatorIndex + 1);
   return t(translations.grail.advancedSearch.subCategoryChip, {
     category: t(categoryLabelKeys[category as ItemCategory] ?? category),
     subCategory: getSubCategoryLabel(subCategory, t),
@@ -224,10 +227,11 @@ function isEditableTarget(target: EventTarget | null): boolean {
 }
 
 /**
- * Checks whether a dialog, alert dialog or popover is currently open.
+ * Checks whether a dialog, alert dialog or an open select listbox is currently displayed.
+ * The filters popover is itself a dialog, so it counts as open too.
  */
 function isDialogOpen(): boolean {
-  return document.querySelector('[role="dialog"], [role="alertdialog"]') !== null;
+  return document.querySelector('[role="dialog"], [role="alertdialog"], [role="listbox"]') !== null;
 }
 
 /**

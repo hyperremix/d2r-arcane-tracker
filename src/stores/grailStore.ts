@@ -373,6 +373,23 @@ export const toSubCategoryFilterValue = (category: string, subCategory: string):
   `${category}:${subCategory}`;
 
 /**
+ * Splits a sub-category filter value into its parts; the inverse of {@link toSubCategoryFilterValue}.
+ * Bare sub-category values have no category.
+ * @param {string} value - A bare or category-qualified sub-category filter value
+ * @returns {{ category: string | undefined; subCategory: string }} The category (if qualified) and sub-category
+ */
+export const parseSubCategoryFilterValue = (
+  value: string,
+): { category: string | undefined; subCategory: string } => {
+  const separatorIndex = value.indexOf(':');
+  if (separatorIndex === -1) return { category: undefined, subCategory: value };
+  return {
+    category: value.slice(0, separatorIndex),
+    subCategory: value.slice(separatorIndex + 1),
+  };
+};
+
+/**
  * Checks if an item matches the specified subcategories filter. Entries may be bare
  * sub-categories (matching that sub-category in every category) or category-qualified values
  * created by {@link toSubCategoryFilterValue} (matching only the given category).
@@ -534,7 +551,11 @@ export const filterAndSortItems = (
   const progressMap = buildProgressMap(progress);
   const foundDateMap =
     advancedFilter.sortBy === 'found_date' ? buildFoundDateMap(progress) : undefined;
-  const searchTokens = tokenizeSearchQuery(filter.searchTerm ?? '');
+  const searchTerm = filter.searchTerm ?? '';
+  const searchTokens = tokenizeSearchQuery(searchTerm);
+  // A query made only of unsearchable characters (e.g. "龙" or "???") can never match an item;
+  // only a blank query means "no search".
+  if (searchTerm.trim() !== '' && searchTokens.length === 0) return [];
 
   const filtered = items.filter((item) => {
     return (
