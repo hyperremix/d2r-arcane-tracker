@@ -140,6 +140,49 @@ describe('RunTracker', () => {
     ).toBeDefined();
   });
 
+  describe('When the page is rendered', () => {
+    it('Then exactly one level-1 heading is present in the main state', () => {
+      // Arrange
+      mockUseRunTrackerStore.mockReturnValue({ ...defaultStoreState, activeSession: mockSession });
+
+      // Act
+      render(<RunTracker />);
+
+      // Assert
+      expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
+      expect(screen.getByRole('heading', { level: 1, name: 'Run Tracker' })).toBeDefined();
+    });
+
+    it('Then exactly one level-1 heading is present while loading', () => {
+      // Arrange
+      mockUseRunTrackerStore.mockReturnValue({
+        ...defaultStoreState,
+        initialLoadStatus: 'loading',
+      });
+
+      // Act
+      render(<RunTracker />);
+
+      // Assert
+      expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
+    });
+
+    it('Then exactly one level-1 heading is present when the initial load failed', () => {
+      // Arrange
+      mockUseRunTrackerStore.mockReturnValue({
+        ...defaultStoreState,
+        initialLoadStatus: 'error',
+        initialLoadError: 'Failed to load data',
+      });
+
+      // Act
+      render(<RunTracker />);
+
+      // Assert
+      expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
+    });
+  });
+
   describe('When the initial load has not completed yet', () => {
     it('Then a full-page loading state is shown', () => {
       // Arrange

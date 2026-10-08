@@ -448,7 +448,7 @@
       "runTracking": "Run Tracking:"
     },
     "shortcutRecorder": {
-      "recording": "Recording…",
+      "recording": "Recording\u2026",
       "pressKeyCombination": "Press desired key combination (Esc to cancel)",
       "includeNonModifier": "Include a non-modifier key in the shortcut."
     },
