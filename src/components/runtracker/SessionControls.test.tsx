@@ -1,6 +1,6 @@
 import '@testing-library/jest-dom';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useGrailStore } from '@/stores/grailStore';
 import { useRunTrackerStore } from '@/stores/runTrackerStore';
 import { SessionControls } from './SessionControls';
@@ -12,7 +12,10 @@ vi.mock('@/stores/grailStore');
 const mockUseRunTrackerStore = vi.mocked(useRunTrackerStore);
 const mockUseGrailStore = vi.mocked(useGrailStore);
 
-// Mock document methods
+// Mock document methods. Test files share one jsdom (isolate: false), so the originals are
+// restored after this file; otherwise later suites' document listeners would never fire.
+const originalAddEventListener = document.addEventListener;
+const originalRemoveEventListener = document.removeEventListener;
 const mockAddEventListener = vi.fn();
 const mockRemoveEventListener = vi.fn();
 
@@ -24,6 +27,11 @@ Object.defineProperty(document, 'addEventListener', {
 Object.defineProperty(document, 'removeEventListener', {
   value: mockRemoveEventListener,
   writable: true,
+});
+
+afterAll(() => {
+  document.addEventListener = originalAddEventListener;
+  document.removeEventListener = originalRemoveEventListener;
 });
 
 // Mock data
