@@ -341,6 +341,55 @@ describe('When ItemDetailsDialog is rendered', () => {
     });
   });
 
+  describe('If an item with optional ethereal type has per-version progress', () => {
+    const found = { text: 'Found', present: 'text-found', absent: 'text-missing' };
+    const missing = { text: 'Not Found', present: 'text-missing', absent: 'text-found' };
+
+    it.each([
+      { normalFound: true, etherealFound: false, normal: found, ethereal: missing },
+      { normalFound: false, etherealFound: true, normal: missing, ethereal: found },
+      { normalFound: true, etherealFound: true, normal: found, ethereal: found },
+      { normalFound: false, etherealFound: false, normal: missing, ethereal: missing },
+    ])(
+      'Then Normal found=$normalFound and Ethereal found=$etherealFound use the matching status badge',
+      ({ normalFound, etherealFound, normal, ethereal }) => {
+        // Arrange
+        const item = HolyGrailItemBuilder.new()
+          .withId('item-1')
+          .withEtherealType('optional')
+          .build();
+        setupStoreMock({ items: [item] });
+        setupProgressLookup(
+          new Map([
+            [
+              'item-1',
+              {
+                normalFound,
+                etherealFound,
+                overallFound: normalFound || etherealFound,
+                normalProgress: [],
+                etherealProgress: [],
+              },
+            ],
+          ]),
+        );
+
+        // Act
+        render(<ItemDetailsDialog itemId="item-1" open={true} onOpenChange={vi.fn()} />);
+
+        // Assert
+        const normalBadge = screen.getByText('Normal:').nextElementSibling;
+        const etherealBadge = screen.getByText('Ethereal:').nextElementSibling;
+        expect(normalBadge).toHaveTextContent(normal.text);
+        expect(normalBadge).toHaveClass(normal.present);
+        expect(normalBadge).not.toHaveClass(normal.absent);
+        expect(etherealBadge).toHaveTextContent(ethereal.text);
+        expect(etherealBadge).toHaveClass(ethereal.present);
+        expect(etherealBadge).not.toHaveClass(ethereal.absent);
+      },
+    );
+  });
+
   describe('If "Close" clicked', () => {
     it('Then calls onOpenChange(false)', () => {
       // Arrange
