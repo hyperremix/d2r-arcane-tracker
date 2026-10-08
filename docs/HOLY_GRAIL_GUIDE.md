@@ -35,6 +35,8 @@ The setup wizard opens on first launch. You can run it again from **Settings →
 
 All of these can be changed later in **Settings**.
 
+Settings are saved as soon as you change them. If a change can't be saved, the app undoes it and shows an error with a **Retry** button. Inside the setup wizard, a setting that can't be saved is undone and an error appears in the step instead; if the wizard can't save when you click **Finish** or **Skip Setup**, it stays open and shows an error so you can try again.
+
 > **Warning:** switching the monitored save folder to a different folder deletes all characters and progress in the app. Back up first (**Settings → Database → Backup**).
 
 In **Settings → Save File Monitoring**, **Change Directory** opens a folder picker and **Restore Default** uses the platform default folder. If the chosen folder is the one already monitored, nothing changes and nothing is deleted. If it's a different folder and the app has characters or progress, a confirmation shows the current and new folder and offers **Back up first** before anything is deleted.
