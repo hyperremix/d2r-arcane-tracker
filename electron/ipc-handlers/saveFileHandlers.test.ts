@@ -981,6 +981,36 @@ describe('When saveFileHandlers is used', () => {
       expect(result).toEqual({ success: true });
     });
 
+    it('Then saveFile:updateSaveDirectory should save the setting only after user data was truncated', async () => {
+      // Arrange
+      const handler = getHandler('saveFile:updateSaveDirectory');
+
+      // Act
+      await handler(null, '/new/save/dir');
+
+      // Assert
+      const truncateOrder = vi.mocked(grailDatabase.truncateUserData).mock.invocationCallOrder[0];
+      const setSettingOrder = vi.mocked(grailDatabase.setSetting).mock.invocationCallOrder[0];
+      expect(truncateOrder).toBeLessThan(setSettingOrder);
+    });
+
+    it('Then saveFile:updateSaveDirectory should keep the old setting and monitor if truncating fails', async () => {
+      // Arrange
+      vi.mocked(grailDatabase.truncateUserData).mockImplementationOnce(() => {
+        throw new Error('FOREIGN KEY constraint failed');
+      });
+      silenceConsole('error');
+      const handler = getHandler('saveFile:updateSaveDirectory');
+
+      // Act
+      const act = handler(null, '/new/save/dir');
+
+      // Assert
+      await expect(act).rejects.toThrow('FOREIGN KEY constraint failed');
+      expect(grailDatabase.setSetting).not.toHaveBeenCalled();
+      expect(mockSaveFileMonitor.updateSaveDirectory).not.toHaveBeenCalled();
+    });
+
     it('Then saveFile:updateSaveDirectory should not truncate user data when the directory is unchanged', async () => {
       // Arrange
       vi.mocked(grailDatabase.getAllSettings).mockReturnValue({
