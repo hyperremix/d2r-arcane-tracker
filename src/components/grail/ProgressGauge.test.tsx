@@ -31,22 +31,35 @@ describe('ProgressGauge', () => {
     expect(screen.getByText('40.0%').className).toContain('text-white');
   });
 
-  it('When rendered, Then the progress stroke reflects the value and animates only if motion is allowed', () => {
+  it('When rendered, Then the progress stroke dasharray reflects the value', () => {
     // Arrange
     const props = { label: 'Overall', current: 4, total: 10 };
 
     // Act
     const { container } = render(<ProgressGauge {...props} />);
+    const fill = container.querySelector('circle.text-ethereal');
 
     // Assert
-    const fill = container.querySelectorAll('circle')[1];
-    expect(fill.getAttribute('stroke-dasharray')).toBe('30 100');
+    expect(fill?.getAttribute('stroke-dasharray')).toBe('30 100');
+  });
+
+  it('If rendered, Then the transition and starting-style classes are gated by motion-safe', () => {
+    // Arrange
+    const props = { label: 'Overall', current: 4, total: 10 };
+
+    // Act
+    const { container } = render(<ProgressGauge {...props} />);
+    const fill = container.querySelector('circle.text-ethereal');
     const animationClasses = fill
-      .getAttribute('class')
+      ?.getAttribute('class')
       ?.split(' ')
-      .filter((cls) => cls.includes('transition') || cls.includes('starting'));
+      .filter((cls) => /transition|duration|ease|starting/.test(cls));
+
+    // Assert
     expect(animationClasses).toEqual([
       'motion-safe:transition-[stroke-dasharray]',
+      'motion-safe:duration-1500',
+      'motion-safe:ease-in-out',
       'motion-safe:starting:[stroke-dasharray:0_100]',
     ]);
   });
