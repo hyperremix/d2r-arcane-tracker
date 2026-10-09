@@ -10,12 +10,9 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: ['./src/test/setup.ts'],
     pool: 'threads',
-    poolOptions: {
-      threads: {
-        singleThread: true,
-        isolate: false,
-      },
-    },
+    // Vitest 4+ replaced `poolOptions.threads.singleThread` with these top-level options
+    maxWorkers: 1,
+    isolate: false,
     coverage: {
       provider: 'v8',
       reporter: ['text', 'lcov', 'html'],

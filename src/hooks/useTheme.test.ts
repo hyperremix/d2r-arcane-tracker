@@ -1,5 +1,6 @@
 import { act, renderHook } from '@testing-library/react';
 import type { Settings } from 'electron/types/grail';
+import type { Mock } from 'vitest';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Mock the grail store
@@ -27,10 +28,10 @@ function mockStore(theme: Settings['theme'], settingsHydrated = true): void {
 }
 
 describe('When useTheme hook is used', () => {
-  let mockMatchMedia: ReturnType<typeof vi.fn>;
+  let mockMatchMedia: Mock<(query: string) => Partial<MediaQueryList>>;
   const originalMatchMedia = window.matchMedia;
-  let mockAddEventListener: ReturnType<typeof vi.fn>;
-  let mockRemoveEventListener: ReturnType<typeof vi.fn>;
+  let mockAddEventListener: Mock<MediaQueryList['addEventListener']>;
+  let mockRemoveEventListener: Mock<MediaQueryList['removeEventListener']>;
 
   /**
    * Makes matchMedia report the given OS dark preference.
@@ -54,7 +55,7 @@ describe('When useTheme hook is used', () => {
 
     // Setup matchMedia mock
     mockMatchMedia = vi.fn();
-    window.matchMedia = mockMatchMedia;
+    window.matchMedia = mockMatchMedia as unknown as typeof window.matchMedia;
     mockSystemPrefersDark(false);
   });
 

@@ -1,10 +1,11 @@
+import type { Mock } from 'vitest';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { D2I_SECTOR_HEADER_SIZE } from '../stashFormat';
 
 type SaveFileEditorModule = typeof import('./index');
 
 let mockReadFile: ReturnType<typeof vi.fn>;
-let mockWriteFile: ReturnType<typeof vi.fn>;
+let mockWriteFile: Mock<(filePath: string, data: Buffer) => unknown>;
 let mockD2sRead: ReturnType<typeof vi.fn>;
 let mockD2sWrite: ReturnType<typeof vi.fn>;
 let mockD2stashRead: ReturnType<typeof vi.fn>;

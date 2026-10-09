@@ -1,5 +1,6 @@
 // @vitest-environment node
 import type { Database as DatabaseType } from 'better-sqlite3';
+import type { Mock } from 'vitest';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   CharacterBuilder,
@@ -63,7 +64,7 @@ describe('When a parsed save file is recorded in the database', () => {
   let database: GrailProgressDatabase;
   let eventBus: EventBus;
   let broadcastToRenderers: ReturnType<typeof vi.fn>;
-  let runTracker: { getActiveRun: ReturnType<typeof vi.fn> };
+  let runTracker: { getActiveRun: Mock<() => Run | null> };
   let service: GrailProgressService;
   let consoleError: ReturnType<typeof vi.spyOn>;
 
@@ -88,7 +89,7 @@ describe('When a parsed save file is recorded in the database', () => {
     };
     eventBus = new EventBus();
     broadcastToRenderers = vi.fn();
-    runTracker = { getActiveRun: vi.fn(() => null) };
+    runTracker = { getActiveRun: vi.fn<() => Run | null>(() => null) };
     service = new GrailProgressService({
       database,
       eventBus,
@@ -374,7 +375,7 @@ describe('When the progress of found items is announced', () => {
       upsertProgress: vi.fn(),
     };
     const eventBus = { emit: vi.fn() };
-    const runTracker = { getActiveRun: vi.fn(() => null) };
+    const runTracker = { getActiveRun: vi.fn<() => Run | null>(() => null) };
     const broadcastToRenderers = vi.fn();
     const service = new GrailProgressService({
       database: database as unknown as GrailProgressDatabase,
