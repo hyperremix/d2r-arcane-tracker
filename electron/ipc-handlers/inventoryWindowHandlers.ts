@@ -1,6 +1,8 @@
 import { BrowserWindow, ipcMain } from 'electron';
+import { type EventArgs, sendToRenderer } from '../ipc/broadcast';
 import {
   type ActiveDragStateSnapshot,
+  type EventPayload,
   INVENTORY_DRAG_STATE_CHANNEL,
   type InventoryDragStatePayload,
   VAULT_DRAG_STATE_CHANNEL,
@@ -137,18 +139,20 @@ function normalizeInventoryDragStatePayload(
   };
 }
 
-function relayDragState(
+type DragStateChannel = typeof VAULT_DRAG_STATE_CHANNEL | typeof INVENTORY_DRAG_STATE_CHANNEL;
+
+function relayDragState<C extends DragStateChannel>(
   event: { sender: { id: number } },
-  channel: string,
-  payload: VaultDragStatePayload | InventoryDragStatePayload,
+  channel: C,
+  payload: EventPayload<C>,
 ): void {
   for (const window of BrowserWindow.getAllWindows()) {
     const { webContents } = window;
-    if (webContents.isDestroyed() || webContents.id === event.sender.id) {
+    if (webContents.id === event.sender.id) {
       continue;
     }
 
-    webContents.send(channel, payload);
+    sendToRenderer(webContents, channel, ...([payload] as EventArgs<C>));
   }
 }
 
@@ -188,11 +192,11 @@ function sendActiveDragStateSnapshot(window: BrowserWindow): void {
 
   const activeDragState = getActiveDragStateSnapshot();
   if (activeDragState.vault) {
-    webContents.send(VAULT_DRAG_STATE_CHANNEL, activeDragState.vault);
+    sendToRenderer(webContents, VAULT_DRAG_STATE_CHANNEL, activeDragState.vault);
   }
 
   if (activeDragState.inventory) {
-    webContents.send(INVENTORY_DRAG_STATE_CHANNEL, activeDragState.inventory);
+    sendToRenderer(webContents, INVENTORY_DRAG_STATE_CHANNEL, activeDragState.inventory);
   }
 }
 

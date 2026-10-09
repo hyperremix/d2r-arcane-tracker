@@ -1,10 +1,14 @@
 import { app, type BrowserWindow, ipcMain, webContents } from 'electron';
 import { grailDatabase } from '../database/database';
+import { createRendererBroadcaster } from '../ipc/broadcast';
 import { createIpcMainRegistry } from '../ipc/handle';
 import { GlobalHotkeyService } from '../services/globalHotkeys';
 import type { RunTrackerService } from '../services/runTracker';
 import type { GlobalHotkeyStatus, Settings } from '../types/grail';
 import { addSettingsUpdatedListener } from './grailHandlers';
+
+/** Sends an event from the IPC contract to every renderer window. */
+const broadcastToRenderers = createRendererBroadcaster(() => webContents.getAllWebContents());
 
 /**
  * Settings that require the global hotkeys to be re-registered when they change.
@@ -18,11 +22,7 @@ let service: GlobalHotkeyService | undefined;
 const cleanups: Array<() => void> = [];
 
 function broadcastStatus(status: GlobalHotkeyStatus): void {
-  for (const wc of webContents.getAllWebContents()) {
-    if (!wc.isDestroyed() && wc.getType() === 'window') {
-      wc.send('run-tracker:global-hotkey-status', status);
-    }
-  }
+  broadcastToRenderers('run-tracker:global-hotkey-status', status);
 }
 
 /**

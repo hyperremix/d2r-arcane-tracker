@@ -2,6 +2,7 @@ import { isAbsolute, resolve } from 'node:path';
 import { ipcMain, webContents } from 'electron';
 import type { GrailDatabase } from '../database/database';
 import { grailDatabase } from '../database/database';
+import { createRendererBroadcaster } from '../ipc/broadcast';
 import { createIpcMainRegistry } from '../ipc/handle';
 import { DatabaseBatchWriter } from '../services/DatabaseBatchWriter';
 import { EventBus } from '../services/EventBus';
@@ -23,18 +24,16 @@ import type {
 } from '../types/grail';
 import { setErrorForwarder } from '../utils/serviceLogger';
 
+/** Sends an event from the IPC contract to every renderer window. */
+const broadcastToRenderers = createRendererBroadcaster(() => webContents.getAllWebContents());
+
 /**
  * Global service instances for save file monitoring and item detection.
  */
 export const eventBus = new EventBus();
 const batchWriter = new DatabaseBatchWriter(grailDatabase, () => {
   // Emit grail-progress-updated event to all renderer windows after batch flush
-  const allWebContents = webContents.getAllWebContents();
-  for (const wc of allWebContents) {
-    if (!wc.isDestroyed() && wc.getType() === 'window') {
-      wc.send('grail-progress-updated');
-    }
-  }
+  broadcastToRenderers('grail-progress-updated');
 });
 let saveFileMonitor: SaveFileMonitor;
 let itemDetectionService: ItemDetectionService;
@@ -144,18 +143,13 @@ function emitGrailProgressUpdate(
   event: ItemDetectionEvent,
   grailProgress: GrailProgress,
 ): void {
-  const allWebContents = webContents.getAllWebContents();
-  for (const wc of allWebContents) {
-    if (!wc.isDestroyed()) {
-      wc.send('grail-progress-updated', {
-        character: character,
-        item: event.item,
-        progress: grailProgress,
-        autoDetected: true,
-        firstTimeDiscovery: true,
-      });
-    }
-  }
+  broadcastToRenderers('grail-progress-updated', {
+    character: character,
+    item: event.item,
+    progress: grailProgress,
+    autoDetected: true,
+    firstTimeDiscovery: true,
+  });
 }
 
 export type HandleAutomaticGrailProgressDependencies = {
@@ -440,16 +434,9 @@ export function initializeSaveFileHandlers(): void {
   // Wire up service error forwarding to renderer processes
   setErrorForwarder((payload) => {
     try {
-      const allWebContents = webContents.getAllWebContents();
-      if (Array.isArray(allWebContents)) {
-        for (const wc of allWebContents) {
-          if (!wc.isDestroyed() && wc.getType() === 'window') {
-            wc.send('service-error', payload);
-          }
-        }
-      }
+      broadcastToRenderers('service-error', payload);
     } catch {
-      // Silently fail if webContents is not available (e.g., in test environment)
+      // Forwarding must never break logging (e.g. webContents is unavailable in tests)
     }
   });
 
@@ -488,15 +475,9 @@ export function initializeSaveFileHandlers(): void {
   // Set up event forwarding to renderer process
   const unsubscribeSaveFileEvent = eventBus.on('save-file-event', async (event: SaveFileEvent) => {
     // Forward save file events to renderer processes
-    // Filter to only 'window' type to exclude DevTools, background pages, etc.
     // The parsed items stay in the main process; renderers only need the file header.
     const { parsedItems, ...rendererEvent } = event;
-    const allWebContents = webContents.getAllWebContents();
-    for (const wc of allWebContents) {
-      if (!wc.isDestroyed() && wc.getType() === 'window') {
-        wc.send('save-file-event', rendererEvent);
-      }
-    }
+    broadcastToRenderers('save-file-event', rendererEvent);
 
     // Update character information from save file
     updateCharacterFromSaveFile(event.file);
@@ -517,13 +498,7 @@ export function initializeSaveFileHandlers(): void {
   // Set up item detection event forwarding and automatic grail progress updates
   const unsubscribeItemDetection = eventBus.on('item-detection', (event: ItemDetectionEvent) => {
     // Forward event to renderer processes
-    // Filter to only 'window' type to exclude DevTools, background pages, etc.
-    const allWebContents = webContents.getAllWebContents();
-    for (const wc of allWebContents) {
-      if (!wc.isDestroyed() && wc.getType() === 'window') {
-        wc.send('item-detection-event', event);
-      }
-    }
+    broadcastToRenderers('item-detection-event', event);
 
     // Handle automatic grail progress updates for found items
     if (event.type === 'item-found' && event.item) {
@@ -536,46 +511,28 @@ export function initializeSaveFileHandlers(): void {
     console.log(
       `Save file monitoring started for directory: ${data.directory} - Found ${data.saveFileCount} save files`,
     );
-    // Filter to only 'window' type to exclude DevTools, background pages, etc.
-    const allWebContents = webContents.getAllWebContents();
-    for (const wc of allWebContents) {
-      if (!wc.isDestroyed() && wc.getType() === 'window') {
-        wc.send('monitoring-status-changed', {
-          status: 'started',
-          directory: data.directory,
-          saveFileCount: data.saveFileCount,
-        });
-      }
-    }
+    broadcastToRenderers('monitoring-status-changed', {
+      status: 'started',
+      directory: data.directory,
+      saveFileCount: data.saveFileCount,
+    });
   });
   eventUnsubscribers.push(unsubscribeMonitoringStarted);
 
   const unsubscribeMonitoringStopped = eventBus.on('monitoring-stopped', () => {
     console.log('Save file monitoring stopped');
-    // Filter to only 'window' type to exclude DevTools, background pages, etc.
-    const allWebContents = webContents.getAllWebContents();
-    for (const wc of allWebContents) {
-      if (!wc.isDestroyed() && wc.getType() === 'window') {
-        wc.send('monitoring-status-changed', { status: 'stopped' });
-      }
-    }
+    broadcastToRenderers('monitoring-status-changed', { status: 'stopped' });
   });
   eventUnsubscribers.push(unsubscribeMonitoringStopped);
 
   const unsubscribeMonitoringError = eventBus.on('monitoring-error', (error) => {
-    // Filter to only 'window' type to exclude DevTools, background pages, etc.
-    const allWebContents = webContents.getAllWebContents();
-    for (const wc of allWebContents) {
-      if (!wc.isDestroyed() && wc.getType() === 'window') {
-        wc.send('monitoring-status-changed', {
-          status: 'error',
-          error: error.message,
-          errorType: error.type,
-          directory: error.directory,
-          saveFileCount: error.saveFileCount || 0,
-        });
-      }
-    }
+    broadcastToRenderers('monitoring-status-changed', {
+      status: 'error',
+      error: error.message,
+      errorType: error.type,
+      directory: error.directory,
+      saveFileCount: error.saveFileCount || 0,
+    });
   });
   eventUnsubscribers.push(unsubscribeMonitoringError);
 

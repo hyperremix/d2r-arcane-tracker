@@ -1,4 +1,5 @@
 import { ipcMain } from 'electron';
+import { sendToRenderer } from '../ipc/broadcast';
 import { createIpcMainRegistry } from '../ipc/handle';
 import { mainWindow } from '../main';
 import { updateService } from '../services/updateService';
@@ -16,7 +17,9 @@ export function initializeUpdateHandlers() {
 
     // Register status change callback to send updates to renderer
     updateService.setStatusCallback((status: UpdateStatus) => {
-      mainWindow?.webContents.send('update:status', status);
+      if (mainWindow) {
+        sendToRenderer(mainWindow.webContents, 'update:status', status);
+      }
     });
   }
 

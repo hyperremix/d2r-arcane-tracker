@@ -1,8 +1,12 @@
 import { ipcMain, webContents } from 'electron';
 import { type GrailDatabase, grailDatabase } from '../database/database';
+import { createRendererBroadcaster } from '../ipc/broadcast';
 import { createIpcMainRegistry } from '../ipc/handle';
 import type { Difficulty, GrailProgress, Settings } from '../types/grail';
 import { RUN_TRACKER_SHORTCUT_ACTIONS } from '../utils/runTrackerShortcuts';
+
+/** Sends an event from the IPC contract to every renderer window. */
+const broadcastToRenderers = createRendererBroadcaster(() => webContents.getAllWebContents());
 
 /**
  * Global database instance for grail operations.
@@ -186,12 +190,7 @@ function assertManualProgressAllowed(progress: GrailProgress): void {
  * Notifies all renderer windows that grail progress changed so they can reload it.
  */
 function notifyProgressUpdated(): void {
-  const allWebContents = webContents.getAllWebContents();
-  for (const wc of allWebContents) {
-    if (!wc.isDestroyed() && wc.getType() === 'window') {
-      wc.send('grail-progress-updated');
-    }
-  }
+  broadcastToRenderers('grail-progress-updated');
 }
 
 /**
@@ -336,12 +335,7 @@ export function initializeGrailHandlers(): void {
     }
 
     // Emit event to all renderer windows to notify them of settings changes
-    const allWebContents = webContents.getAllWebContents();
-    for (const wc of allWebContents) {
-      if (!wc.isDestroyed() && wc.getType() === 'window') {
-        wc.send('settings-updated', settings);
-      }
-    }
+    broadcastToRenderers('settings-updated', settings);
 
     notifySettingsUpdatedListeners(settings);
 

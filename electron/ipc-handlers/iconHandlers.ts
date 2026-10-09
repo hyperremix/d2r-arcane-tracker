@@ -1,5 +1,6 @@
 import { BrowserWindow, ipcMain } from 'electron';
 import { grailDatabase } from '../database/database';
+import { sendToRenderer } from '../ipc/broadcast';
 import { createIpcMainRegistry } from '../ipc/handle';
 import type { ConversionResult, ConversionStatus } from '../services/iconService';
 import { iconService } from '../services/iconService';
@@ -123,7 +124,7 @@ export function initializeIconHandlers(): void {
         // Send progress update to renderer
         const window = BrowserWindow.getAllWindows()[0];
         if (window) {
-          window.webContents.send('icon:conversionProgress', { current, total });
+          sendToRenderer(window.webContents, 'icon:conversionProgress', { current, total });
         }
 
         // Update settings

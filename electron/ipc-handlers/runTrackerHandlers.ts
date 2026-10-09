@@ -1,8 +1,12 @@
 import { ipcMain, webContents } from 'electron';
+import { createRendererBroadcaster } from '../ipc/broadcast';
 import { createIpcMainRegistry } from '../ipc/handle';
 import type { EventBus } from '../services/EventBus';
 import type { RunTrackerService } from '../services/runTracker';
 import type { RunItem } from '../types/grail';
+
+/** Sends an event from the IPC contract to every renderer window. */
+const broadcastToRenderers = createRendererBroadcaster(() => webContents.getAllWebContents());
 
 let runTracker: RunTrackerService | null = null;
 const eventUnsubscribers: Array<() => void> = [];
@@ -200,75 +204,38 @@ export function initializeRunTrackerHandlers(
   // Set up event forwarding to renderer processes
   // Session events
   const unsubscribeSessionStarted = eventBus.on('session-started', (payload) => {
-    const allWebContents = webContents.getAllWebContents();
-    for (const wc of allWebContents) {
-      // Only send to window type (not background pages, webviews, etc.)
-      // Dev tools have type 'window' but belong to a parent window, so they'll receive events naturally
-      if (!wc.isDestroyed() && wc.getType() === 'window') {
-        wc.send('run-tracker:session-started', payload);
-      }
-    }
+    broadcastToRenderers('run-tracker:session-started', payload);
   });
   eventUnsubscribers.push(unsubscribeSessionStarted);
 
   const unsubscribeSessionEnded = eventBus.on('session-ended', (payload) => {
-    const allWebContents = webContents.getAllWebContents();
-    for (const wc of allWebContents) {
-      if (!wc.isDestroyed() && wc.getType() === 'window') {
-        wc.send('run-tracker:session-ended', payload);
-      }
-    }
+    broadcastToRenderers('run-tracker:session-ended', payload);
   });
   eventUnsubscribers.push(unsubscribeSessionEnded);
 
   // Run events
   const unsubscribeRunStarted = eventBus.on('run-started', (payload) => {
-    const allWebContents = webContents.getAllWebContents();
-    for (const wc of allWebContents) {
-      if (!wc.isDestroyed() && wc.getType() === 'window') {
-        wc.send('run-tracker:run-started', payload);
-      }
-    }
+    broadcastToRenderers('run-tracker:run-started', payload);
   });
   eventUnsubscribers.push(unsubscribeRunStarted);
 
   const unsubscribeRunEnded = eventBus.on('run-ended', (payload) => {
-    const allWebContents = webContents.getAllWebContents();
-    for (const wc of allWebContents) {
-      if (!wc.isDestroyed() && wc.getType() === 'window') {
-        wc.send('run-tracker:run-ended', payload);
-      }
-    }
+    broadcastToRenderers('run-tracker:run-ended', payload);
   });
   eventUnsubscribers.push(unsubscribeRunEnded);
 
   const unsubscribeRunPaused = eventBus.on('run-paused', (payload) => {
-    const allWebContents = webContents.getAllWebContents();
-    for (const wc of allWebContents) {
-      if (!wc.isDestroyed() && wc.getType() === 'window') {
-        wc.send('run-tracker:run-paused', payload);
-      }
-    }
+    broadcastToRenderers('run-tracker:run-paused', payload);
   });
   eventUnsubscribers.push(unsubscribeRunPaused);
 
   const unsubscribeRunResumed = eventBus.on('run-resumed', (payload) => {
-    const allWebContents = webContents.getAllWebContents();
-    for (const wc of allWebContents) {
-      if (!wc.isDestroyed() && wc.getType() === 'window') {
-        wc.send('run-tracker:run-resumed', payload);
-      }
-    }
+    broadcastToRenderers('run-tracker:run-resumed', payload);
   });
   eventUnsubscribers.push(unsubscribeRunResumed);
 
   const unsubscribeRunItemAdded = eventBus.on('run-item-added', (payload) => {
-    const allWebContents = webContents.getAllWebContents();
-    for (const wc of allWebContents) {
-      if (!wc.isDestroyed() && wc.getType() === 'window') {
-        wc.send('run-tracker:run-item-added', payload);
-      }
-    }
+    broadcastToRenderers('run-tracker:run-item-added', payload);
   });
   eventUnsubscribers.push(unsubscribeRunItemAdded);
 
