@@ -1,6 +1,11 @@
 import { EventEmitter } from 'node:events';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { AppLifecycle, closeWindowAndWait, deferQuitUntilShutdown } from './lifecycle';
+import {
+  AppLifecycle,
+  closeWindowAndWait,
+  deferQuitUntilShutdown,
+  shutdownWhenStarted,
+} from './lifecycle';
 
 describe('When the app lifecycle shuts down', () => {
   let consoleError: ReturnType<typeof vi.spyOn>;
@@ -166,6 +171,106 @@ describe('When the app is asked to quit', () => {
 
     // Assert
     expect(finalRequest.preventDefault).not.toHaveBeenCalled();
+  });
+});
+
+describe('When the app is asked to stop while it is still starting', () => {
+  let consoleError: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+  });
+
+  afterEach(() => {
+    consoleError.mockRestore();
+  });
+
+  it('If the startup is still pending, Then the shutdown waits for it and then stops the started app', async () => {
+    // Arrange
+    const calls: string[] = [];
+    const startedApp = {
+      shutdown: vi.fn(async () => {
+        calls.push('app.shutdown');
+      }),
+    };
+    let finishStartup!: (app: typeof startedApp) => void;
+    const startup = new Promise<typeof startedApp>((resolve) => {
+      finishStartup = resolve;
+    });
+
+    // Act
+    const stopped = shutdownWhenStarted(startup).then(() => calls.push('stopped'));
+    await Promise.resolve();
+    const shutdownBeforeStartupFinished = startedApp.shutdown.mock.calls.length;
+    calls.push('startup.finished');
+    finishStartup(startedApp);
+    await stopped;
+
+    // Assert
+    expect(shutdownBeforeStartupFinished).toBe(0);
+    expect(calls).toEqual(['startup.finished', 'app.shutdown', 'stopped']);
+  });
+
+  it('If the startup already finished, Then the started app is stopped once', async () => {
+    // Arrange
+    const startedApp = { shutdown: vi.fn(() => Promise.resolve()) };
+
+    // Act
+    await shutdownWhenStarted(Promise.resolve(startedApp));
+
+    // Assert
+    expect(startedApp.shutdown).toHaveBeenCalledTimes(1);
+  });
+
+  it('If the startup failed or never began, Then there is nothing to stop and it resolves', async () => {
+    // Arrange / Act / Assert
+    await expect(shutdownWhenStarted(Promise.resolve(undefined))).resolves.toBeUndefined();
+    await expect(shutdownWhenStarted(undefined)).resolves.toBeUndefined();
+  });
+
+  it('If waiting for the startup rejects, Then the error is logged and the shutdown still resolves', async () => {
+    // Arrange
+    const failure = new Error('startup rejected');
+
+    // Act
+    await expect(shutdownWhenStarted(Promise.reject(failure))).resolves.toBeUndefined();
+
+    // Assert
+    expect(consoleError).toHaveBeenCalledWith(expect.stringContaining('[shutdown]'), failure);
+  });
+
+  it('If a quit is requested while the startup is pending, Then the app quits only after the started app stopped', async () => {
+    // Arrange
+    const calls: string[] = [];
+    const startedApp = {
+      shutdown: vi.fn(async () => {
+        calls.push('app.shutdown');
+      }),
+    };
+    let finishStartup!: (app: typeof startedApp) => void;
+    const startup = new Promise<typeof startedApp>((resolve) => {
+      finishStartup = resolve;
+    });
+    const emitter = new EventEmitter();
+    const app = {
+      on: (event: 'before-quit', listener: (event: { preventDefault(): void }) => void) =>
+        emitter.on(event, listener),
+      quit: vi.fn(() => {
+        calls.push('app.quit');
+      }),
+    };
+    deferQuitUntilShutdown(app, () => shutdownWhenStarted(startup));
+
+    // Act
+    emitter.emit('before-quit', { preventDefault: vi.fn() });
+    await Promise.resolve();
+    const quitBeforeStartupFinished = app.quit.mock.calls.length;
+    finishStartup(startedApp);
+    await vi.waitFor(() => expect(app.quit).toHaveBeenCalledTimes(1));
+
+    // Assert
+    expect(quitBeforeStartupFinished).toBe(0);
+    expect(calls).toEqual(['app.shutdown', 'app.quit']);
   });
 });
 

@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, type MockInstance, vi } from 'vitest';
 import type { ExecFileFunction } from '../d2rProcess';
 
 const win32 = vi.hoisted(() => ({
@@ -26,14 +26,20 @@ function createExecFile(stdout: string, error: Error | null = null) {
 
 describe('When the Win32 process memory reader is used', () => {
   const originalPlatform = process.platform;
+  let consoleError: MockInstance<typeof console.error>;
+  let consoleWarn: MockInstance<typeof console.warn>;
 
   beforeEach(() => {
     vi.clearAllMocks();
     Object.defineProperty(process, 'platform', { value: 'win32', configurable: true });
+    consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    consoleWarn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
   });
 
   afterEach(() => {
     Object.defineProperty(process, 'platform', { value: originalPlatform, configurable: true });
+    consoleError.mockRestore();
+    consoleWarn.mockRestore();
   });
 
   describe('If the module info of a running process is requested', () => {
@@ -62,14 +68,12 @@ describe('When the Win32 process memory reader is used', () => {
       // Arrange
       const execFile = createExecFile('', new Error('powershell not found'));
       const reader = new WindowsMemoryReaderImpl(execFile);
-      const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
 
       // Act
       const moduleInfo = await reader.getModuleInfo(1234, 'D2R.exe');
 
       // Assert
       expect(moduleInfo).toBeNull();
-      consoleError.mockRestore();
     });
   });
 
@@ -78,7 +82,6 @@ describe('When the Win32 process memory reader is used', () => {
       // Arrange
       const execFile = createExecFile('');
       const reader = new WindowsMemoryReaderImpl(execFile);
-      const consoleWarn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
 
       // Act
       const moduleInfo = await reader.getModuleInfo(1234, "D2R.exe'; Remove-Item x; '");
@@ -86,7 +89,6 @@ describe('When the Win32 process memory reader is used', () => {
       // Assert
       expect(moduleInfo).toBeNull();
       expect(execFile).not.toHaveBeenCalled();
-      consoleWarn.mockRestore();
     });
   });
 
@@ -109,7 +111,6 @@ describe('When the Win32 process memory reader is used', () => {
       // Arrange
       win32.OpenProcess.mockReturnValue(0);
       const reader = new WindowsMemoryReaderImpl(createExecFile(''));
-      const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
 
       // Act
       const handle = await reader.openProcess(999_999);
@@ -117,7 +118,10 @@ describe('When the Win32 process memory reader is used', () => {
       // Assert
       expect(handle).toBeNull();
       expect(win32.GetLastError).toHaveBeenCalled();
-      consoleError.mockRestore();
+      expect(consoleError).toHaveBeenCalledWith(
+        expect.stringContaining('openProcess'),
+        expect.stringContaining('PID 999999'),
+      );
     });
   });
 });
