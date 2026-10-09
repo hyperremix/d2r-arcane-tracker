@@ -1,6 +1,6 @@
 import type { Mock } from 'vitest';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { D2I_SECTOR_HEADER_SIZE } from '../stashFormat';
+import { D2I_SECTOR_HEADER_SIZE, readD2iHeaderVersion } from '../stashFormat';
 
 type SaveFileEditorModule = typeof import('./index');
 
@@ -98,6 +98,7 @@ beforeAll(async () => {
 
   vi.doMock('../stashFormat', () => ({
     D2I_SECTOR_HEADER_SIZE,
+    readD2iHeaderVersion,
     readD2iMetadata: mockReadD2iMetadata,
   }));
 
@@ -436,6 +437,36 @@ describe('When removeItemFromSaveFile is called', () => {
           gridX: 2,
           gridY: 1,
         }),
+      );
+
+      // Assert
+      expect(message).toContain('not found');
+      expect(mockD2stashRead).not.toHaveBeenCalled();
+      expect(mockD2stashWrite).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('If the file has an upper-case .D2I extension', () => {
+    it('Then a pre-105 stash is edited with the v99 codec like a .d2i file', async () => {
+      // Arrange
+      const stashData = makeStashData([[{ id: 11 }]]);
+      mockD2stashRead.mockResolvedValue(stashData);
+
+      // Act
+      await removeItemFromSaveFile('/path/to/FILE.D2I', 'd2i', 11);
+
+      // Assert
+      expect(mockD2stashRead).toHaveBeenCalledWith(fakeBuffer, constants99);
+      expect(mockD2stashWrite).toHaveBeenCalledWith(stashData, constants99, 99);
+    });
+
+    it('Then a v105 stash is detected as modern and not decoded whole', async () => {
+      // Arrange
+      mockReadD2iMetadata.mockReturnValue({ version: 105, hardcore: false, sectors: [] });
+
+      // Act
+      const message = await rejectionMessage(
+        removeItemFromSaveFile('/path/to/FILE.D2I', 'd2i', 11),
       );
 
       // Assert
@@ -1193,6 +1224,61 @@ describe('When addItemToSaveFile is called', () => {
     });
   });
 
+  describe('If sourceFileType is d2i and format is pre-105', () => {
+    it('Then an add to a shared tab (0-4) still uses the modern sector-splicing writer', async () => {
+      // Arrange — deferred follow-up: pre-105 .d2i adds keep the sector writer, as on main
+      const { buffer, sectors } = createModernD2iTestBuffer([createModernSectorPayload(0)]);
+      mockReadD2iMetadata.mockReturnValue({ version: 99, hardcore: false, sectors });
+      mockReadFile.mockResolvedValue(buffer);
+      mockWriteItem.mockResolvedValue(new Uint8Array([0xaa]));
+
+      // Act
+      await addItemToSaveFile({
+        filePath: '/path/to/file.d2i',
+        fileType: 'd2i',
+        item: testItem,
+        locationContext: 'stash',
+        stashTab: 0,
+        targetGridX: 1,
+        targetGridY: 1,
+      });
+
+      // Assert
+      expect(mockWriteFile).toHaveBeenCalledTimes(1);
+      const writtenBuffer = mockWriteFile.mock.calls[0]?.[1] as Buffer;
+      const writtenPayload = writtenBuffer.subarray(D2I_SECTOR_HEADER_SIZE);
+      expect(writtenPayload.toString('ascii', 0, 2)).toBe('JM');
+      expect(writtenPayload.readUInt16LE(2)).toBe(1);
+      expect([...writtenPayload.subarray(4)]).toEqual([0xaa]);
+      expect(mockD2stashRead).not.toHaveBeenCalled();
+      expect(mockD2stashWrite).not.toHaveBeenCalled();
+    });
+
+    it('Then an add to a shared tab of an upper-case .D2I file takes the same writer', async () => {
+      // Arrange
+      const { buffer, sectors } = createModernD2iTestBuffer([createModernSectorPayload(0)]);
+      mockReadD2iMetadata.mockReturnValue({ version: 99, hardcore: false, sectors });
+      mockReadFile.mockResolvedValue(buffer);
+      mockWriteItem.mockResolvedValue(new Uint8Array([0xaa]));
+
+      // Act
+      await addItemToSaveFile({
+        filePath: '/path/to/FILE.D2I',
+        fileType: 'd2i',
+        item: testItem,
+        locationContext: 'stash',
+        stashTab: 0,
+        targetGridX: 1,
+        targetGridY: 1,
+      });
+
+      // Assert
+      expect(mockWriteFile).toHaveBeenCalledTimes(1);
+      expect(mockD2stashRead).not.toHaveBeenCalled();
+      expect(mockD2stashWrite).not.toHaveBeenCalled();
+    });
+  });
+
   describe('If sourceFileType is d2i and format is modern v105', () => {
     it('Then it refuses items that do not belong in a resource stash tab (>= 5)', async () => {
       // Arrange — resource tabs only accept their own item kinds; shared tabs (0–4) use sector patching
@@ -1433,6 +1519,52 @@ describe('When moveItemBetweenSaveFiles is called', () => {
         '/path/to/source.d2s',
         Buffer.from(fakeResultBuffer),
       );
+    });
+
+    it('Then a pre-105 .d2i target shared tab is still written by the modern sector writer', async () => {
+      // Arrange
+      const sourceItem = {
+        id: 88,
+        location_id: 0,
+        alt_position_id: 1,
+        position_x: 1,
+        position_y: 1,
+      } as unknown as import('@dschu012/d2s').types.IItem;
+      const { buffer, sectors } = createModernD2iTestBuffer([createModernSectorPayload(0)]);
+      mockReadD2iMetadata.mockReturnValue({ version: 99, hardcore: false, sectors });
+      mockReadFile.mockImplementation(async (filePath: string) =>
+        filePath.endsWith('.d2i') ? buffer : fakeBuffer,
+      );
+      mockWriteItem.mockResolvedValue(new Uint8Array([0xaa]));
+      // Reads: find source, read source for removal, verify source write.
+      mockD2sRead
+        .mockResolvedValueOnce(makeD2sData([sourceItem]))
+        .mockResolvedValueOnce(makeD2sData([sourceItem]))
+        .mockResolvedValueOnce(makeD2sData([]));
+
+      // Act
+      await moveItemBetweenSaveFiles({
+        sourceFilePath: '/path/to/source.d2s',
+        sourceFileType: 'd2s',
+        sourceItemId: 88,
+        targetFilePath: '/path/to/target.d2i',
+        targetFileType: 'd2i',
+        targetLocationContext: 'stash',
+        targetStashTab: 0,
+        targetGridX: 2,
+        targetGridY: 2,
+      });
+
+      // Assert
+      expect(mockWriteFile).toHaveBeenCalledTimes(2);
+      expect(mockWriteFile.mock.calls[0]?.[0]).toBe('/path/to/target.d2i');
+      const writtenPayload = (mockWriteFile.mock.calls[0]?.[1] as Buffer).subarray(
+        D2I_SECTOR_HEADER_SIZE,
+      );
+      expect(writtenPayload.readUInt16LE(2)).toBe(1);
+      expect(mockWriteFile.mock.calls[1]?.[0]).toBe('/path/to/source.d2s');
+      expect(mockD2stashRead).not.toHaveBeenCalled();
+      expect(mockD2stashWrite).not.toHaveBeenCalled();
     });
 
     it('Then it attempts modern stash path instead of rejecting with MODERN_STASH_READ_ONLY', async () => {
@@ -1746,6 +1878,71 @@ describe('When splitStackInSaveFile is called for modern resource stacks', () =>
     };
     expect(reducedSourceItemDefined.quantity).toBe(3);
     expect(reducedSourceItemDefined.magic_attributes).toEqual([{ id: 381, values: [3] }]);
+  });
+});
+
+describe('When a modern resource stack is split into another, pre-105 .d2i file', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockWriteFile.mockResolvedValue(undefined);
+    mockWriteItem.mockResolvedValue(new Uint8Array([0xaa]));
+    mockReadItem.mockReset();
+  });
+
+  it('Then the copy is written to the target by the modern sector writer', async () => {
+    // Arrange
+    const source = createModernD2iTestBuffer([
+      createModernSectorPayload(0),
+      createModernSectorPayload(0),
+      createModernSectorPayload(0),
+      createModernSectorPayload(0),
+      createModernSectorPayload(0),
+      createModernSectorPayload(1, [0xff]),
+    ]);
+    const target = createModernD2iTestBuffer([createModernSectorPayload(0)]);
+    mockReadD2iMetadata.mockImplementation((buffer: Buffer) =>
+      buffer === target.buffer
+        ? { version: 99, hardcore: false, sectors: target.sectors }
+        : { version: 105, hardcore: false, sectors: source.sectors },
+    );
+    mockReadFile.mockImplementation(async (filePath: string) =>
+      filePath === '/path/to/target.d2i' ? target.buffer : source.buffer,
+    );
+    mockReadItem.mockImplementation(async (reader: { offset: number }) => {
+      reader.offset += 8;
+      return { type: 'r19', code: 'r19', quantity: 5 };
+    });
+
+    // Act
+    await splitStackInSaveFile({
+      sourceFilePath: '/path/to/modern.d2i',
+      sourceFileType: 'd2i',
+      sourceStashTab: 7,
+      sourceItemCode: 'r19',
+      sourceRawItemJson: JSON.stringify({ type: 'r19', code: 'r19', quantity: 5 }),
+      splitCount: 1,
+      targets: [
+        {
+          targetFilePath: '/path/to/target.d2i',
+          targetFileType: 'd2i',
+          targetLocationContext: 'stash',
+          targetStashTab: 0,
+          targetGridX: 1,
+          targetGridY: 1,
+        },
+      ],
+    });
+
+    // Assert
+    expect(mockWriteFile.mock.calls[0]?.[0]).toBe('/path/to/target.d2i');
+    const writtenPayload = (mockWriteFile.mock.calls[0]?.[1] as Buffer).subarray(
+      D2I_SECTOR_HEADER_SIZE,
+    );
+    expect(writtenPayload.toString('ascii', 0, 2)).toBe('JM');
+    expect(writtenPayload.readUInt16LE(2)).toBe(1);
+    expect(mockWriteFile.mock.calls[1]?.[0]).toBe('/path/to/modern.d2i');
+    expect(mockD2stashRead).not.toHaveBeenCalled();
+    expect(mockD2stashWrite).not.toHaveBeenCalled();
   });
 });
 

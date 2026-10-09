@@ -43,7 +43,9 @@ export function assertSaveFilePathAllowed(
   }
 
   if (!SAVE_FILE_EXTENSIONS.has(extname(filePath).toLowerCase())) {
-    throw new Error(`${fieldName} must point to a Diablo II save file (.d2s, .d2i, .sss, .d2x)`);
+    throw new Error(
+      `${fieldName} must point to a Diablo II save file (${[...SAVE_FILE_EXTENSIONS].join(', ')})`,
+    );
   }
 
   if (typeof saveDirectory !== 'string' || saveDirectory.trim().length === 0) {

@@ -33,7 +33,7 @@ describe('When saveFileTypeFromExtension is called', () => {
 
   it('Then the save file extensions are the dotted file types', () => {
     // Arrange
-    const expected = ['.d2s', '.sss', '.d2x', '.d2i'];
+    const expected = ['.d2s', '.d2i', '.sss', '.d2x'];
 
     // Act
     const extensions = [...SAVE_FILE_EXTENSIONS];

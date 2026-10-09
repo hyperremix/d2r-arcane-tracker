@@ -11,7 +11,7 @@ import type { VaultSourceFileType } from '../types/grail';
  * Save file types the app reads and writes: the lower-case file extension without its dot.
  * Character saves (.d2s), legacy shared stashes (.sss/.d2x) and D2R shared stashes (.d2i).
  */
-export const SAVE_FILE_TYPES: readonly VaultSourceFileType[] = ['d2s', 'sss', 'd2x', 'd2i'];
+export const SAVE_FILE_TYPES: readonly VaultSourceFileType[] = ['d2s', 'd2i', 'sss', 'd2x'];
 
 /** File extensions (lower-case, with the dot) of the save files the app reads and writes. */
 export const SAVE_FILE_EXTENSIONS: ReadonlySet<string> = new Set(
