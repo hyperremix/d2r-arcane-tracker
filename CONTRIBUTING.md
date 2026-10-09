@@ -13,7 +13,7 @@ bun install
 bun run dev       # start Vite and Electron
 ```
 
-The native modules (`better-sqlite3` and `koffi`) ship Node-API prebuilds that load in both Node (tests) and any Electron version, so no manual native rebuild or C++ toolchain is needed and `NODE_MODULE_VERSION` mismatches do not occur. The `rebuild` scripts that `bun run dev` and the test scripts still call are kept for now. For how the native modules are packaged, see [docs/RELEASE.md](docs/RELEASE.md).
+The native modules (`better-sqlite3` and `koffi`) ship Node-API prebuilds that load in both Node (tests) and any Electron version, so no manual native rebuild or C++ toolchain is needed and `NODE_MODULE_VERSION` mismatches do not occur. For how the native modules are packaged, see [docs/RELEASE.md](docs/RELEASE.md).
 
 For attaching a debugger, see [docs/DEBUGGING.md](docs/DEBUGGING.md).
 
