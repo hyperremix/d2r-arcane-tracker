@@ -3,12 +3,11 @@ import type { Character, GrailProgress, Item } from 'electron/types/grail';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   COLUMN_GUTTER,
-  calculateColumnWidth,
-  createGroupedGridRows,
-  GroupedMasonryGrid,
+  createGridRows,
   getColumnCount,
   MIN_COLUMN_WIDTH,
-} from './MasonryItemGrid';
+  VirtualItemGrid,
+} from './VirtualItemGrid';
 
 // Mock the ItemCard component to simplify testing
 vi.mock('./ItemCard', () => ({
@@ -96,7 +95,7 @@ function createMockProgressLookup(
   return map;
 }
 
-describe('MasonryItemGrid Column Count Calculation', () => {
+describe('VirtualItemGrid Column Count Calculation', () => {
   describe('When getColumnCount is called', () => {
     describe('If the container is narrower than two minimum-width columns', () => {
       it('Then should return 1 column', () => {
@@ -141,9 +140,10 @@ describe('MasonryItemGrid Column Count Calculation', () => {
         }
 
         // Act
-        const columnWidths = containerWidths.map((width) =>
-          calculateColumnWidth(width, getColumnCount(width)),
-        );
+        const columnWidths = containerWidths.map((width) => {
+          const columns = getColumnCount(width);
+          return (width - (columns - 1) * COLUMN_GUTTER) / columns;
+        });
 
         // Assert
         expect(Math.min(...columnWidths)).toBeGreaterThanOrEqual(MIN_COLUMN_WIDTH);
@@ -170,80 +170,6 @@ describe('MasonryItemGrid Column Count Calculation', () => {
   });
 });
 
-describe('MasonryItemGrid Column Width Calculation', () => {
-  describe('When calculateColumnWidth is called', () => {
-    describe('If column count is 1', () => {
-      it('Then should return full container width', () => {
-        // Arrange
-        const containerWidth = 500;
-        const columnCount = 1;
-
-        // Act
-        const result = calculateColumnWidth(containerWidth, columnCount);
-
-        // Assert
-        expect(result).toBe(containerWidth);
-      });
-    });
-
-    describe('If column count is greater than 1', () => {
-      it('Then should calculate width accounting for gutters', () => {
-        // Arrange
-        const containerWidth = 1000;
-        const columnCount = 4;
-        // Formula: columnWidth = (containerWidth - (cols - 1) * gutter) / cols
-        // = (1000 - 3 * 16) / 4 = (1000 - 48) / 4 = 952 / 4 = 238
-
-        // Act
-        const result = calculateColumnWidth(containerWidth, columnCount);
-
-        // Assert
-        expect(result).toBe(238);
-      });
-
-      it('Then should work correctly for 6 columns', () => {
-        // Arrange
-        const containerWidth = 1504; // typical for 1536px viewport with 32px padding
-        const columnCount = 6;
-        // Formula: (1504 - 5 * 16) / 6 = (1504 - 80) / 6 = 1424 / 6 = 237.33 -> 237
-
-        // Act
-        const result = calculateColumnWidth(containerWidth, columnCount);
-
-        // Assert
-        expect(result).toBe(237);
-      });
-
-      it('Then should work correctly for 2 columns', () => {
-        // Arrange
-        const containerWidth = 608; // typical for 640px viewport with 32px padding
-        const columnCount = 2;
-        // Formula: (608 - 1 * 16) / 2 = (608 - 16) / 2 = 592 / 2 = 296
-
-        // Act
-        const result = calculateColumnWidth(containerWidth, columnCount);
-
-        // Assert
-        expect(result).toBe(296);
-      });
-    });
-
-    describe('If container width varies', () => {
-      it('Then column width should scale proportionally', () => {
-        // Arrange
-        const columnCount = 4;
-
-        // Act
-        const width1 = calculateColumnWidth(800, columnCount);
-        const width2 = calculateColumnWidth(1200, columnCount);
-
-        // Assert - larger container = larger columns
-        expect(width2).toBeGreaterThan(width1);
-      });
-    });
-  });
-});
-
 /**
  * jsdom has no layout engine, so every element reports a size of 0 and the virtualizer would
  * render nothing. Stub the sizes the virtualizer and the column measurement read.
@@ -261,14 +187,14 @@ function widthForColumns(columns: number) {
   return columns * MIN_COLUMN_WIDTH + (columns - 1) * COLUMN_GUTTER;
 }
 
-describe('When createGroupedGridRows is called', () => {
+describe('When createGridRows is called', () => {
   describe('If a group has more items than fit into one row', () => {
     it('Then emits a header followed by rows of at most columnCount items', () => {
       // Arrange
       const items = [1, 2, 3, 4, 5].map((n) => createMockItem({ id: `item-${n}` }));
 
       // Act
-      const rows = createGroupedGridRows([{ title: 'Helms', items, foundCount: 2 }], 2);
+      const rows = createGridRows([{ title: 'Helms', items, foundCount: 2 }], 2);
 
       // Assert
       expect(rows.map((row) => row.type)).toEqual(['header', 'items', 'items', 'items']);
@@ -291,7 +217,7 @@ describe('When createGroupedGridRows is called', () => {
       ];
 
       // Act
-      const rows = createGroupedGridRows(groupedItems, 3);
+      const rows = createGridRows(groupedItems, 3);
 
       // Assert
       const headers = rows.filter((row) => row.type === 'header');
@@ -306,17 +232,33 @@ describe('When createGroupedGridRows is called', () => {
       const items = [createMockItem({ id: 'a' }), createMockItem({ id: 'b' })];
 
       // Act
-      const zeroRows = createGroupedGridRows([{ title: 'G', items, foundCount: 0 }], 0);
-      const nanRows = createGroupedGridRows([{ title: 'G', items, foundCount: 0 }], Number.NaN);
+      const zeroRows = createGridRows([{ title: 'G', items, foundCount: 0 }], 0);
+      const nanRows = createGridRows([{ title: 'G', items, foundCount: 0 }], Number.NaN);
 
       // Assert
       expect(zeroRows.filter((row) => row.type === 'items')).toHaveLength(2);
       expect(nanRows.filter((row) => row.type === 'items')).toHaveLength(2);
     });
   });
+
+  describe('If group headers are hidden', () => {
+    it('Then emits only item rows in item order', () => {
+      // Arrange
+      const items = [1, 2, 3].map((n) => createMockItem({ id: `item-${n}` }));
+
+      // Act
+      const rows = createGridRows([{ title: 'All Items', items, foundCount: 1 }], 2, false);
+
+      // Assert
+      expect(rows.map((row) => row.type)).toEqual(['items', 'items']);
+      expect(
+        rows.flatMap((row) => (row.type === 'items' ? row.items.map((item) => item.id) : [])),
+      ).toEqual(['item-1', 'item-2', 'item-3']);
+    });
+  });
 });
 
-describe('GroupedMasonryGrid Component', () => {
+describe('VirtualItemGrid Component', () => {
   beforeEach(() => {
     stubLayout();
   });
@@ -325,7 +267,7 @@ describe('GroupedMasonryGrid Component', () => {
     vi.restoreAllMocks();
   });
 
-  describe('When GroupedMasonryGrid is rendered', () => {
+  describe('When VirtualItemGrid is rendered', () => {
     describe('If groupedItems is empty', () => {
       it('Then should render an empty scroll container without rows', () => {
         // Arrange
@@ -335,8 +277,9 @@ describe('GroupedMasonryGrid Component', () => {
 
         // Act
         const { container } = render(
-          <GroupedMasonryGrid
+          <VirtualItemGrid
             groupedItems={[]}
+            showGroupHeaders
             progressLookup={progressLookup}
             characters={characters}
             onItemClick={onItemClick}
@@ -344,8 +287,8 @@ describe('GroupedMasonryGrid Component', () => {
         );
 
         // Assert
-        expect(container.firstElementChild).toHaveClass('overflow-auto');
-        expect(screen.queryAllByTestId('grouped-grid-row')).toHaveLength(0);
+        expect(container.firstElementChild).toHaveClass('min-h-0', 'flex-1', 'overflow-auto');
+        expect(screen.queryAllByTestId('item-grid-row')).toHaveLength(0);
       });
     });
 
@@ -365,8 +308,9 @@ describe('GroupedMasonryGrid Component', () => {
 
         // Act
         render(
-          <GroupedMasonryGrid
+          <VirtualItemGrid
             groupedItems={groupedItems}
+            showGroupHeaders
             progressLookup={progressLookup}
             characters={characters}
             onItemClick={onItemClick}
@@ -395,8 +339,9 @@ describe('GroupedMasonryGrid Component', () => {
 
         // Act
         render(
-          <GroupedMasonryGrid
+          <VirtualItemGrid
             groupedItems={groupedItems}
+            showGroupHeaders
             progressLookup={progressLookup}
             characters={characters}
             onItemClick={onItemClick}
@@ -425,8 +370,9 @@ describe('GroupedMasonryGrid Component', () => {
 
         // Act
         render(
-          <GroupedMasonryGrid
+          <VirtualItemGrid
             groupedItems={groupedItems}
+            showGroupHeaders
             progressLookup={progressLookup}
             characters={characters}
             onItemClick={onItemClick}
@@ -460,8 +406,9 @@ describe('GroupedMasonryGrid Component', () => {
 
         // Act
         render(
-          <GroupedMasonryGrid
+          <VirtualItemGrid
             groupedItems={groupedItems}
+            showGroupHeaders
             progressLookup={progressLookup}
             characters={characters}
             onItemClick={onItemClick}
@@ -493,8 +440,9 @@ describe('GroupedMasonryGrid Component', () => {
 
         // Act
         render(
-          <GroupedMasonryGrid
+          <VirtualItemGrid
             groupedItems={groupedItems}
+            showGroupHeaders
             progressLookup={progressLookup}
             characters={characters}
             onItemClick={onItemClick}
@@ -523,8 +471,9 @@ describe('GroupedMasonryGrid Component', () => {
 
         // Act
         render(
-          <GroupedMasonryGrid
+          <VirtualItemGrid
             groupedItems={groupedItems}
+            showGroupHeaders
             progressLookup={progressLookup}
             characters={characters}
             onItemClick={onItemClick}
@@ -567,8 +516,9 @@ describe('GroupedMasonryGrid Component', () => {
 
         // Act
         render(
-          <GroupedMasonryGrid
+          <VirtualItemGrid
             groupedItems={groupedItems}
+            showGroupHeaders
             progressLookup={progressLookup}
             characters={characters}
             onItemClick={onItemClick}
@@ -598,8 +548,9 @@ describe('GroupedMasonryGrid Component', () => {
 
         // Act
         render(
-          <GroupedMasonryGrid
+          <VirtualItemGrid
             groupedItems={groupedItems}
+            showGroupHeaders
             progressLookup={progressLookup}
             characters={characters}
             onItemClick={onItemClick}
@@ -613,13 +564,113 @@ describe('GroupedMasonryGrid Component', () => {
   });
 });
 
-describe('GroupedMasonryGrid Column Sizing', () => {
+describe('When VirtualItemGrid is rendered without group headers', () => {
   afterEach(() => {
     vi.restoreAllMocks();
   });
 
-  describe('When GroupedMasonryGrid renders a group in a container that fits three columns', () => {
-    it('Then rows use the same column count and gutter as the masonry grid', () => {
+  describe('If it shows a single group of items that fits two columns', () => {
+    it('Then renders the items in rows without a group header', () => {
+      // Arrange
+      stubLayout({ width: widthForColumns(2) });
+      const groupedItems = [
+        {
+          title: 'All Items',
+          items: [1, 2, 3].map((n) => createMockItem({ id: `item-${n}`, name: `Item ${n}` })),
+          foundCount: 1,
+        },
+      ];
+
+      // Act
+      render(
+        <VirtualItemGrid
+          groupedItems={groupedItems}
+          showGroupHeaders={false}
+          progressLookup={createMockProgressLookup()}
+          characters={[]}
+          onItemClick={vi.fn()}
+        />,
+      );
+
+      // Assert
+      expect(screen.queryByText('All Items')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('badge')).not.toBeInTheDocument();
+      const rows = screen.getAllByTestId('item-grid-row');
+      expect(rows).toHaveLength(2);
+      expect(rows[0].style.gridTemplateColumns).toBe('repeat(2, minmax(0, 1fr))');
+      expect(screen.getAllByTestId(/^item-card-/).map((card) => card.textContent)).toEqual([
+        'Item 1',
+        'Item 2',
+        'Item 3',
+      ]);
+    });
+  });
+
+  describe('If an item card is clicked', () => {
+    it('Then calls onItemClick with the item id', () => {
+      // Arrange
+      stubLayout();
+      const onItemClick = vi.fn();
+      render(
+        <VirtualItemGrid
+          groupedItems={[
+            {
+              title: 'All Items',
+              items: [createMockItem({ id: 'item-1', name: 'Harlequin Crest' })],
+              foundCount: 0,
+            },
+          ]}
+          showGroupHeaders={false}
+          progressLookup={createMockProgressLookup()}
+          characters={[]}
+          onItemClick={onItemClick}
+        />,
+      );
+
+      // Act
+      screen.getByTestId('item-card-item-1').click();
+
+      // Assert
+      expect(onItemClick).toHaveBeenCalledWith('item-1');
+    });
+  });
+
+  describe('If the group has far more items than fit into the viewport', () => {
+    it('Then only the rows near the top of the scroll container are mounted', () => {
+      // Arrange
+      stubLayout({ height: 600 });
+      const items = Array.from({ length: 50 }, (_, n) =>
+        createMockItem({ id: `item-${n}`, name: `Item ${n}` }),
+      );
+
+      // Act
+      render(
+        <VirtualItemGrid
+          groupedItems={[{ title: 'All Items', items, foundCount: 0 }]}
+          showGroupHeaders={false}
+          progressLookup={createMockProgressLookup()}
+          characters={[]}
+          onItemClick={vi.fn()}
+        />,
+      );
+
+      // Assert
+      const renderedCards = screen.getAllByTestId(/^item-card-/);
+      expect(renderedCards.length).toBeGreaterThan(0);
+      expect(renderedCards.length).toBeLessThan(items.length);
+      expect(screen.getByTestId('item-card-item-0')).toBeInTheDocument();
+      expect(screen.queryByTestId('item-card-item-49')).not.toBeInTheDocument();
+    });
+  });
+});
+
+describe('VirtualItemGrid Column Sizing', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  describe('When VirtualItemGrid renders a group in a container that fits three columns', () => {
+    it('Then rows use the fitting column count and the column gutter', () => {
       // Arrange
       stubLayout({ width: widthForColumns(3) });
       const groupedItems = [
@@ -632,8 +683,9 @@ describe('GroupedMasonryGrid Column Sizing', () => {
 
       // Act
       render(
-        <GroupedMasonryGrid
+        <VirtualItemGrid
           groupedItems={groupedItems}
+          showGroupHeaders
           progressLookup={createMockProgressLookup()}
           characters={[]}
           onItemClick={vi.fn()}
@@ -641,7 +693,7 @@ describe('GroupedMasonryGrid Column Sizing', () => {
       );
 
       // Assert
-      const rows = screen.getAllByTestId('grouped-grid-row');
+      const rows = screen.getAllByTestId('item-grid-row');
       expect(rows).toHaveLength(2);
       expect(rows[0].style.gridTemplateColumns).toBe('repeat(3, minmax(0, 1fr))');
       expect(rows[0].style.columnGap).toBe(`${COLUMN_GUTTER}px`);
@@ -651,7 +703,7 @@ describe('GroupedMasonryGrid Column Sizing', () => {
   });
 });
 
-describe('When GroupedMasonryGrid renders a group with far more items than fit into the viewport', () => {
+describe('When VirtualItemGrid renders a group with far more items than fit into the viewport', () => {
   afterEach(() => {
     vi.restoreAllMocks();
   });
@@ -666,8 +718,9 @@ describe('When GroupedMasonryGrid renders a group with far more items than fit i
 
       // Act
       render(
-        <GroupedMasonryGrid
+        <VirtualItemGrid
           groupedItems={[{ title: 'Unique Armor', items, foundCount: 0 }]}
+          showGroupHeaders
           progressLookup={createMockProgressLookup()}
           characters={[]}
           onItemClick={vi.fn()}
@@ -685,7 +738,7 @@ describe('When GroupedMasonryGrid renders a group with far more items than fit i
   });
 });
 
-describe('When GroupedMasonryGrid rows are measured', () => {
+describe('When VirtualItemGrid rows are measured', () => {
   const resizeCallbacks: ResizeObserverCallback[] = [];
   let containerWidth = 0;
 
@@ -742,8 +795,9 @@ describe('When GroupedMasonryGrid rows are measured', () => {
         },
       ];
       const { container } = render(
-        <GroupedMasonryGrid
+        <VirtualItemGrid
           groupedItems={groupedItems}
+          showGroupHeaders
           progressLookup={createMockProgressLookup()}
           characters={[]}
           onItemClick={vi.fn()}
@@ -762,7 +816,7 @@ describe('When GroupedMasonryGrid rows are measured', () => {
       // Assert
       // 50px header + 7 rows with one card each
       expect(heightAtOneColumn).toBe(`${50 + 7 * 120}px`);
-      expect(screen.getAllByTestId('grouped-grid-row')).toHaveLength(3);
+      expect(screen.getAllByTestId('item-grid-row')).toHaveLength(3);
       // 50px header + two rows with three cards and one row with a single card
       expect(content.style.height).toBe(`${50 + 2 * 320 + 120}px`);
     });
