@@ -26,6 +26,7 @@ import { isModernStashVersion } from '../utils/d2rFormat';
 import { isRune } from '../utils/objects';
 import { createServiceLogger } from '../utils/serviceLogger';
 import { createVaultPresenceKey } from '../utils/vaultPresence';
+import { ensureD2sConstants } from './d2s/constants';
 import type { EventBus } from './EventBus';
 import { normalizeItemsWithSocketedItems, resolveGrailLookupName } from './itemNormalizer';
 import { parseModernStash } from './modernStashParser';
@@ -160,7 +161,7 @@ class SaveFileMonitor {
     this.readingFiles = false;
 
     // Initialize D2S constants
-    this.initializeD2SConstants();
+    ensureD2sConstants();
     log.info('constructor', 'D2S constants initialized');
 
     // Initialize save directories
@@ -170,23 +171,6 @@ class SaveFileMonitor {
     const tickInterval = this.getTickReaderInterval();
     this.tickReaderInterval = setInterval(this.tickReader, tickInterval);
     log.info('constructor', `Tick reader started (interval: ${tickInterval}ms)`);
-  }
-
-  /**
-   * Initializes D2S library constants for different game versions.
-   * @private
-   */
-  private initializeD2SConstants(): void {
-    const constantVersions = [96, 97, 98, 99, 0, 1, 2];
-
-    for (const version of constantVersions) {
-      try {
-        d2s.getConstantData(version);
-      } catch (_e) {
-        const constants = version === 99 ? constants99 : constants96;
-        d2s.setConstantData(version, constants);
-      }
-    }
   }
 
   /**

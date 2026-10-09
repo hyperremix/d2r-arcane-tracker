@@ -194,17 +194,6 @@ describe('When SaveFileMonitor is used', () => {
       expect(newMonitor).toBeInstanceOf(SaveFileMonitor);
       expect(newMonitor.isCurrentlyMonitoring()).toBe(false);
     });
-
-    it('Then should initialize D2S constants', () => {
-      // Assert
-      expect(d2s.getConstantData).toHaveBeenCalledWith(96);
-      expect(d2s.getConstantData).toHaveBeenCalledWith(97);
-      expect(d2s.getConstantData).toHaveBeenCalledWith(98);
-      expect(d2s.getConstantData).toHaveBeenCalledWith(99);
-      expect(d2s.getConstantData).toHaveBeenCalledWith(0);
-      expect(d2s.getConstantData).toHaveBeenCalledWith(1);
-      expect(d2s.getConstantData).toHaveBeenCalledWith(2);
-    });
   });
 
   describe('If getDefaultDirectory is called', () => {

@@ -71,6 +71,8 @@ beforeAll(async () => {
   vi.doMock('@dschu012/d2s', () => ({
     read: mockD2sRead,
     write: mockD2sWrite,
+    getConstantData: vi.fn(),
+    setConstantData: vi.fn(),
   }));
 
   vi.doMock('@dschu012/d2s/lib/d2/stash', () => ({

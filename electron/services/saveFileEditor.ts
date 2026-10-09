@@ -20,6 +20,7 @@ import {
   SHARED_TAB_COUNT,
 } from '../utils/d2rFormat';
 import { createBoundedBitReader } from './boundedBitReader';
+import { ensureD2sConstants } from './d2s/constants';
 import { constants105Extended } from './modernStashParser';
 import { backupSaveFile } from './saveFileBackup';
 import { D2I_SECTOR_HEADER_SIZE, readD2iMetadata } from './stashFormat';
@@ -897,6 +898,7 @@ export async function readSaveFileItem(
   fileType: VaultSourceFileType,
   itemLocator: number | SaveFileItemLocator,
 ): Promise<d2sTypes.IItem | undefined> {
+  ensureD2sConstants();
   const { itemId, itemCode, stashTab, gridX, gridY } = normalizeSaveFileItemLocator(itemLocator);
 
   if (fileType === 'd2i' && extname(filePath) === '.d2i') {
@@ -2615,6 +2617,7 @@ async function moveItemBetweenSaveFilesUnlocked(options: MoveSaveFileItemOptions
 let saveFileMutationQueue: Promise<unknown> = Promise.resolve();
 
 function runExclusively<T>(operation: () => Promise<T>): Promise<T> {
+  ensureD2sConstants();
   const run = saveFileMutationQueue.then(operation, operation);
   saveFileMutationQueue = run.catch(() => undefined);
   return run;
