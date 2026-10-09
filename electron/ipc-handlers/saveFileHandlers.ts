@@ -22,7 +22,9 @@ import type {
   RunItem,
   SaveDirectoryInspection,
 } from '../types/grail';
+import { GameMode } from '../types/grail';
 import { setErrorForwarder } from '../utils/serviceLogger';
+import { addSettingsUpdatedListener } from './grailHandlers';
 
 /** Sends an event from the IPC contract to every renderer window. */
 const broadcastToRenderers = createRendererBroadcaster(() => webContents.getAllWebContents());
@@ -41,6 +43,35 @@ let runTracker: RunTrackerService | undefined;
 let processMonitor: ProcessMonitor | undefined;
 let memoryReader: MemoryReader | undefined;
 const eventUnsubscribers: Array<() => void> = [];
+let pendingMonitoringStart: Promise<void> | undefined;
+
+/**
+ * Checks whether the persisted game mode is Manual, where save file monitoring must stay off.
+ * @returns True if the game mode is Manual; false otherwise or if settings cannot be read
+ */
+function isManualGameMode(): boolean {
+  try {
+    return grailDatabase.getAllSettings().gameMode === GameMode.Manual;
+  } catch (error) {
+    console.warn('[isManualGameMode] Failed to read game mode from settings:', error);
+    return false;
+  }
+}
+
+/**
+ * Starts save file monitoring, sharing one in-flight start between concurrent callers
+ * (startup, explicit IPC start, and game mode changes) so only one file watcher is created.
+ */
+function startMonitoringOnce(): Promise<void> {
+  pendingMonitoringStart ??= (async () => {
+    try {
+      await saveFileMonitor.startMonitoring();
+    } finally {
+      pendingMonitoringStart = undefined;
+    }
+  })();
+  return pendingMonitoringStart;
+}
 
 function isSharedStashCharacterName(characterName: string): boolean {
   return characterName.toLowerCase().includes('shared stash');
@@ -549,21 +580,48 @@ export function initializeSaveFileHandlers(): void {
     console.error('Failed to load grail items into detection service:', error);
   }
 
-  // Automatically start monitoring
+  // Automatically start monitoring, unless Manual mode keeps it off
   setTimeout(async () => {
     try {
-      await saveFileMonitor.startMonitoring();
+      if (isManualGameMode()) {
+        console.log(
+          '[initializeSaveFileHandlers] Manual mode active, not auto-starting monitoring',
+        );
+        return;
+      }
+      await startMonitoringOnce();
     } catch (error) {
       console.error('Failed to auto-start save file monitoring:', error);
     }
   }, 1000); // Short delay to ensure everything is initialized
+
+  // Keep monitoring in sync with game mode changes from any renderer view (e.g. the setup wizard)
+  let manualModeActive = isManualGameMode();
+  eventUnsubscribers.push(
+    addSettingsUpdatedListener(async (settings) => {
+      if (settings.gameMode === undefined) {
+        return;
+      }
+      const wasManual = manualModeActive;
+      manualModeActive = settings.gameMode === GameMode.Manual;
+      try {
+        if (manualModeActive && saveFileMonitor.isCurrentlyMonitoring()) {
+          await saveFileMonitor.stopMonitoring();
+        } else if (wasManual && !manualModeActive) {
+          await startMonitoringOnce();
+        }
+      } catch (error) {
+        console.error('Failed to update save file monitoring for the game mode:', error);
+      }
+    }),
+  );
 
   /**
    * IPC handler for starting save file monitoring (e.g. when leaving Manual mode).
    * Starting while already monitoring is a no-op in the monitor service.
    */
   handle('saveFile:startMonitoring', async (): Promise<{ success: boolean }> => {
-    await saveFileMonitor.startMonitoring();
+    await startMonitoringOnce();
     return { success: true };
   });
 

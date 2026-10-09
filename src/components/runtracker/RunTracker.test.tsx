@@ -1,4 +1,5 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import type { EventChannel } from 'electron/ipc/contract';
 import type { Run, Session } from 'electron/types/grail';
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useRunTrackerStore } from '@/stores/runTrackerStore';
@@ -365,7 +366,7 @@ describe('RunTracker', () => {
   it('When the component unmounts, Then every IPC event listener is removed', () => {
     // Arrange
     const { unmount } = render(<RunTracker />);
-    const channels = [
+    const channels: EventChannel[] = [
       'run-tracker:session-started',
       'run-tracker:session-ended',
       'run-tracker:run-started',

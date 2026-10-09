@@ -7,6 +7,15 @@ function validate(channel: InvokeChannel, ...rawArgs: unknown[]): unknown[] {
   return invokeArgValidators[channel](rawArgs);
 }
 
+function captureError(run: () => unknown): unknown {
+  try {
+    run();
+  } catch (error) {
+    return error;
+  }
+  return undefined;
+}
+
 describe('When renderer arguments are validated against the IPC contract', () => {
   it.each<[InvokeChannel, unknown[], string]>([
     ['grail:getProgressByItem', [''], 'Invalid item ID'],
@@ -59,9 +68,12 @@ describe('When renderer arguments are validated against the IPC contract', () =>
     // Arrange
     const run = () => validate(channel, ...rawArgs);
 
-    // Act & Assert
-    expect(run).toThrow(IpcValidationError);
-    expect(run).toThrow(message);
+    // Act
+    const error = captureError(run);
+
+    // Assert
+    expect(error).toBeInstanceOf(IpcValidationError);
+    expect((error as IpcValidationError).message).toContain(message);
   });
 
   it('Then valid arguments are returned in contract order and extra arguments are dropped', () => {
@@ -109,17 +121,28 @@ describe('When the renderer updates settings', () => {
     // Arrange
     const run = () => validate('grail:updateSettings', { [key]: 'value' });
 
-    // Act & Assert
-    expect(run).toThrow(`Setting cannot be changed through grail:updateSettings: ${key}`);
-    expect(isRendererWritableSetting(key)).toBe(false);
+    // Act
+    const error = captureError(run);
+    const writable = isRendererWritableSetting(key);
+
+    // Assert
+    expect((error as Error).message).toContain(
+      `Setting cannot be changed through grail:updateSettings: ${key}`,
+    );
+    expect(writable).toBe(false);
   });
 
   it('If the update contains a key that is not a setting, Then it is rejected', () => {
     // Arrange
     const run = () => validate('grail:updateSettings', { theme: 'dark', toString: 'x' });
 
-    // Act & Assert
-    expect(run).toThrow('Setting cannot be changed through grail:updateSettings: toString');
+    // Act
+    const error = captureError(run);
+
+    // Assert
+    expect((error as Error).message).toContain(
+      'Setting cannot be changed through grail:updateSettings: toString',
+    );
   });
 
   it('Then settings the settings pages write are accepted unchanged', () => {

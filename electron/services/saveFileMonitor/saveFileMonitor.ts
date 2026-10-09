@@ -775,6 +775,20 @@ class SaveFileMonitor {
   }
 
   /**
+   * Checks whether the persisted game mode is Manual (no save file monitoring).
+   * @private
+   * @returns {boolean} True if the game mode is Manual, false otherwise or if settings are unavailable.
+   */
+  private isManualGameMode(): boolean {
+    try {
+      return this.grailDatabase?.getAllSettings().gameMode === GameMode.Manual;
+    } catch (error) {
+      log.warn('isManualGameMode', `Failed to read game mode from settings: ${error}`);
+      return false;
+    }
+  }
+
+  /**
    * Updates the save directory and restarts monitoring if it was active.
    * @returns {Promise<void>} A promise that resolves when the update is complete.
    */
@@ -797,7 +811,14 @@ class SaveFileMonitor {
       log.info('updateSaveDirectory', 'Re-initializing save directories');
       this.initializeSaveDirectories();
 
-      // Always start monitoring after directory change - user explicitly wants to use this directory
+      // Manual mode never monitors save files; the new directory is used when leaving Manual mode
+      if (this.isManualGameMode()) {
+        log.info('updateSaveDirectory', 'Manual mode active, not starting monitoring');
+        log.info('updateSaveDirectory', 'Complete');
+        return;
+      }
+
+      // Start monitoring after directory change - user explicitly wants to use this directory
       log.info('updateSaveDirectory', 'Starting monitoring for new directory');
       await this.startMonitoring();
     } finally {

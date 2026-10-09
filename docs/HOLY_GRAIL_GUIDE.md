@@ -54,7 +54,7 @@ In **Settings → Save File Monitoring**, **Change Directory** opens a folder pi
 | Hardcore Only | Only hardcore characters count |
 | Manual Entry | Save files are not rescanned and you mark items yourself |
 
-Switching modes changes which finds count toward progress. No data is deleted. Switching from Manual Entry back to another mode resumes save file monitoring.
+Switching modes changes which finds count toward progress. No data is deleted. Manual Entry stays in effect after a restart or a save folder change; switching from Manual Entry back to another mode resumes save file monitoring.
 
 ### Game version (Settings → Game Version)
 

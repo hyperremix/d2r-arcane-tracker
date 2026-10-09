@@ -531,6 +531,41 @@ describe('When SaveFileMonitor is used', () => {
       expect(stopSpy).toHaveBeenCalledOnce();
       expect(startSpy).toHaveBeenCalledOnce();
     });
+
+    it('When the game mode is Manual, Then should not start monitoring', async () => {
+      // Arrange
+      mockDatabase.getAllSettings.mockReturnValue({
+        saveDir: '/test/save/dir',
+        gameMode: GameMode.Manual,
+      });
+      const startSpy = vi.spyOn(monitor, 'startMonitoring');
+
+      // Act
+      await monitor.updateSaveDirectory();
+
+      // Assert
+      expect(startSpy).not.toHaveBeenCalled();
+      expect(monitor.isCurrentlyMonitoring()).toBe(false);
+      expect(monitor.getSaveDirectory()).toBe('/test/save/dir');
+    });
+
+    it('When the game mode is Manual and monitoring is active, Then should stop it without restarting', async () => {
+      // Arrange
+      mockDatabase.getAllSettings.mockReturnValue({
+        saveDir: '/test/save/dir',
+        gameMode: GameMode.Manual,
+      });
+      const stopSpy = vi.spyOn(monitor, 'stopMonitoring');
+      const startSpy = vi.spyOn(monitor, 'startMonitoring');
+      (monitor as any).isMonitoring = true;
+
+      // Act
+      await monitor.updateSaveDirectory();
+
+      // Assert
+      expect(stopSpy).toHaveBeenCalledOnce();
+      expect(startSpy).not.toHaveBeenCalled();
+    });
   });
 
   describe('If shutdown is called', () => {
