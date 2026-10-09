@@ -26,7 +26,7 @@ For attaching a debugger, see [docs/DEBUGGING.md](docs/DEBUGGING.md).
 | --- | --- |
 | Windows | `%APPDATA%\@hyperremix\d2r-arcane-tracker\grail.db` |
 | macOS | `~/Library/Application Support/@hyperremix/d2r-arcane-tracker/grail.db` |
-| Linux | `~/.config/@hyperremix/d2r-arcane-tracker/grail.db` |
+| Linux | `$XDG_CONFIG_HOME/@hyperremix/d2r-arcane-tracker/grail.db`, or `~/.config/@hyperremix/d2r-arcane-tracker/grail.db` if `XDG_CONFIG_HOME` is unset |
 
 Delete the file to start fresh. The schema is migrated and item data is seeded on startup, so any database works. Don't commit changes to `grail.db` unless you're updating the sample data on purpose.
 
@@ -44,6 +44,7 @@ electron/            Main process
   items/             Holy Grail item data
   config/            D2R build and memory pattern tables
 scripts/             debugging and memory-research helpers
+config/              shared build-tool config (d2s source aliases for Vite and Vitest)
 docs/                user guides, developer docs, GitHub Pages site
 ```
 

@@ -22,7 +22,7 @@
  *   Database: the development database path for the current OS (see CONTRIBUTING.md)
  */
 
-import { execSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import { createRequire } from 'node:module';
 import * as os from 'node:os';
@@ -33,17 +33,25 @@ import * as d2stash from '@dschu012/d2s/lib/d2/stash';
 const APP_DATA_DIR_NAME = path.join('@hyperremix', 'd2r-arcane-tracker');
 
 /**
+ * Read an environment variable, treating an empty string the same as unset.
+ */
+function readEnv(name: string): string | undefined {
+  const value = process.env[name];
+  return value ? value : undefined;
+}
+
+/**
  * Resolve the per-user application data directory Electron uses for `app.getPath('userData')`.
  */
 function resolveAppDataRoot(): string {
   const home = os.homedir();
   switch (process.platform) {
     case 'win32':
-      return process.env.APPDATA ?? path.join(home, 'AppData', 'Roaming');
+      return readEnv('APPDATA') ?? path.join(home, 'AppData', 'Roaming');
     case 'darwin':
       return path.join(home, 'Library', 'Application Support');
     default:
-      return process.env.XDG_CONFIG_HOME ?? path.join(home, '.config');
+      return readEnv('XDG_CONFIG_HOME') ?? path.join(home, '.config');
   }
 }
 
@@ -52,8 +60,7 @@ function resolveAppDataRoot(): string {
  */
 function resolveDefaultDbPath(): string {
   return (
-    process.env.D2R_TRACKER_DB_PATH ??
-    path.join(resolveAppDataRoot(), APP_DATA_DIR_NAME, 'grail.db')
+    readEnv('D2R_TRACKER_DB_PATH') ?? path.join(resolveAppDataRoot(), APP_DATA_DIR_NAME, 'grail.db')
   );
 }
 
@@ -61,12 +68,8 @@ function resolveDefaultDbPath(): string {
  * Default D2R save directory, overridable via D2R_SAVE_DIR or --save-dir.
  */
 function resolveDefaultSaveDir(): string {
-  return (
-    process.env.D2R_SAVE_DIR ?? path.join(os.homedir(), 'Saved Games', 'Diablo II Resurrected')
-  );
+  return readEnv('D2R_SAVE_DIR') ?? path.join(os.homedir(), 'Saved Games', 'Diablo II Resurrected');
 }
-
-let dbPath = resolveDefaultDbPath();
 
 // Use require for loading d2s constants
 const require = createRequire(import.meta.url);
@@ -95,12 +98,28 @@ interface GrailItem {
   subCategory: string;
 }
 
+interface ParsedArgs {
+  itemId?: string;
+  list: boolean;
+  saveDir: string;
+  dbPath: string;
+  dryRun: boolean;
+}
+
 /**
- * Run a sqlite3 query and return results as JSON
+ * Escape a value for use inside a single-quoted SQL string literal.
  */
-function runQuery(query: string): string {
+function escapeSqlString(value: string): string {
+  return value.replace(/'/g, "''");
+}
+
+/**
+ * Run a sqlite3 query against the given database and return results as JSON.
+ * Arguments are passed as an array (no shell), so paths are never shell-interpreted.
+ */
+function runQuery(dbPath: string, query: string): string {
   try {
-    const result = execSync(`sqlite3 -json "${dbPath}" "${query.replace(/"/g, '\\"')}"`, {
+    const result = execFileSync('sqlite3', ['-json', dbPath, query], {
       encoding: 'utf-8',
       maxBuffer: 10 * 1024 * 1024,
     });
@@ -113,7 +132,7 @@ function runQuery(query: string): string {
 /**
  * Get unfound unique/set items from the database
  */
-function getUnfoundItems(): GrailItem[] {
+function getUnfoundItems(dbPath: string): GrailItem[] {
   const query = `
     SELECT id, name, code, type, category, sub_category as subCategory
     FROM items
@@ -122,19 +141,19 @@ function getUnfoundItems(): GrailItem[] {
       AND id NOT IN (SELECT item_id FROM grail_progress)
     ORDER BY category, sub_category, name
   `;
-  const result = runQuery(query);
+  const result = runQuery(dbPath, query);
   return result ? JSON.parse(result) : [];
 }
 
 /**
  * Get a specific item by ID
  */
-function getItemById(itemId: string): GrailItem | null {
+function getItemById(dbPath: string, itemId: string): GrailItem | null {
   const query = `
     SELECT id, name, code, type, category, sub_category as subCategory
-    FROM items WHERE id = '${itemId}'
+    FROM items WHERE id = '${escapeSqlString(itemId)}'
   `;
-  const result = runQuery(query);
+  const result = runQuery(dbPath, query);
   const items = result ? JSON.parse(result) : [];
   return items[0] || null;
 }
@@ -142,9 +161,9 @@ function getItemById(itemId: string): GrailItem | null {
 /**
  * Check if item is already found
  */
-function isItemFound(itemId: string): boolean {
-  const query = `SELECT COUNT(*) as count FROM grail_progress WHERE item_id = '${itemId}'`;
-  const result = runQuery(query);
+function isItemFound(dbPath: string, itemId: string): boolean {
+  const query = `SELECT COUNT(*) as count FROM grail_progress WHERE item_id = '${escapeSqlString(itemId)}'`;
+  const result = runQuery(dbPath, query);
   const rows = result ? JSON.parse(result) : [];
   return rows[0]?.count > 0;
 }
@@ -350,8 +369,8 @@ function createD2SItem(grailItem: GrailItem, x: number, y: number): d2s.types.II
 /**
  * List unfound items grouped by category
  */
-function listUnfoundItems(): void {
-  const unfoundItems = getUnfoundItems();
+function listUnfoundItems(dbPath: string): void {
+  const unfoundItems = getUnfoundItems(dbPath);
 
   if (unfoundItems.length === 0) {
     console.log('🎉 Congratulations! All unique and set items have been found!');
@@ -385,18 +404,12 @@ function listUnfoundItems(): void {
 /**
  * Parse command line arguments
  */
-function parseArgs(): {
-  itemId?: string;
-  list: boolean;
-  saveDir: string;
-  dbPath: string;
-  dryRun: boolean;
-} {
+function parseArgs(): ParsedArgs {
   const args = process.argv.slice(2);
   let itemId: string | undefined;
   let list = false;
   let saveDir = resolveDefaultSaveDir();
-  let db = resolveDefaultDbPath();
+  let dbPath = resolveDefaultDbPath();
   let dryRun = false;
 
   for (let i = 0; i < args.length; i++) {
@@ -408,7 +421,7 @@ function parseArgs(): {
     } else if (arg === '--save-dir') {
       saveDir = args[++i];
     } else if (arg === '--db') {
-      db = args[++i];
+      dbPath = args[++i];
     } else if (arg === '--dry-run') {
       dryRun = true;
     } else if (arg === '--help') {
@@ -440,7 +453,7 @@ Examples:
     }
   }
 
-  return { itemId, list, saveDir, dbPath: db, dryRun };
+  return { itemId, list, saveDir, dbPath, dryRun };
 }
 
 /**
@@ -497,9 +510,7 @@ async function main(): Promise<void> {
   // Initialize d2s constants
   initializeD2SConstants();
 
-  const args = parseArgs();
-  const { itemId, list, saveDir, dryRun } = args;
-  dbPath = args.dbPath;
+  const { itemId, list, saveDir, dbPath, dryRun } = parseArgs();
 
   // Check if database exists
   if (!fs.existsSync(dbPath)) {
@@ -511,7 +522,7 @@ async function main(): Promise<void> {
 
   // List mode
   if (list) {
-    listUnfoundItems();
+    listUnfoundItems(dbPath);
     return;
   }
 
@@ -519,19 +530,19 @@ async function main(): Promise<void> {
   let item: GrailItem | null;
 
   if (itemId) {
-    item = getItemById(itemId);
+    item = getItemById(dbPath, itemId);
     if (!item) {
       console.error(`❌ Item not found: ${itemId}`);
       console.error('   Use --list to see available items.');
       process.exit(1);
     }
-    if (isItemFound(itemId)) {
+    if (isItemFound(dbPath, itemId)) {
       console.warn(`⚠️  Warning: ${item.name} is already found in grail progress.`);
       console.warn('   The app may not show a notification for this item.');
     }
   } else {
     // Get a random unfound item
-    const unfoundItems = getUnfoundItems();
+    const unfoundItems = getUnfoundItems(dbPath);
     if (unfoundItems.length === 0) {
       console.log('🎉 All unique and set items have been found!');
       return;
