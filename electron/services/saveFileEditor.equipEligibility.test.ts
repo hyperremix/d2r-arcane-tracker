@@ -42,6 +42,9 @@ beforeAll(async () => {
   vi.doMock('@dschu012/d2s', () => ({
     read: mockD2sRead,
     write: mockD2sWrite,
+    // ensureD2sConstants() only registers versions that getConstantData cannot find.
+    getConstantData: vi.fn(() => ({})),
+    setConstantData: vi.fn(),
   }));
 
   const module = await import('./saveFileEditor');
@@ -82,16 +85,13 @@ async function tryEquip(
   const item = { id: 1, code, type: code } as unknown as D2sItem;
 
   try {
-    await addItemToSaveFile(
-      '/path/to/char.d2s',
-      'd2s',
+    await addItemToSaveFile({
+      filePath: '/path/to/char.d2s',
+      fileType: 'd2s',
       item,
-      'equipped',
-      undefined,
-      undefined,
-      undefined,
-      targetSlotId,
-    );
+      locationContext: 'equipped',
+      targetEquippedSlotId: targetSlotId,
+    });
     return undefined;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
