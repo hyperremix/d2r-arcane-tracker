@@ -1,6 +1,3 @@
-import { gems } from 'electron/items/gems';
-import { materials } from 'electron/items/materials';
-import { runes } from 'electron/items/runes';
 import type {
   CharacterInventorySnapshot,
   ParsedInventoryItem,
@@ -8,54 +5,30 @@ import type {
   VaultItem,
   VaultSourceFileType,
 } from 'electron/types/grail';
+import {
+  isModernStashVersion,
+  isResourceCodeOfKind,
+  isResourceItemCode,
+  RESOURCE_STASH_TAB_BY_KIND,
+  resolveResourceStashTabKind,
+  SHARED_TAB_COUNT,
+} from 'electron/utils/d2rFormat';
 import { getSortedStashTabs, sortByGridPosition } from '@/components/inventory/spatialLayout';
 import { translations } from '@/i18n/translations';
 
 const STASH_SOURCE_FILE_TYPES = new Set<VaultSourceFileType>(['sss', 'd2x', 'd2i']);
-const MODERN_STASH_MIN_VERSION = 105;
-const MODERN_STASH_TAB_ORDER = [0, 1, 2, 3, 4, 5, 6, 7] as const;
-const MODERN_GEMS_TAB_INDEX = 5;
-const MODERN_MATERIALS_TAB_INDEX = 6;
-const MODERN_RUNES_TAB_INDEX = 7;
-const GEM_ITEM_CODES = new Set(gems.map((gem) => gem.code.toLowerCase()));
-const MATERIAL_ITEM_CODES = new Set(materials.map((material) => material.code.toLowerCase()));
-const RUNE_ITEM_CODES = new Set(
-  runes
-    .map((rune) => (typeof rune.code === 'string' ? rune.code.toLowerCase() : undefined))
-    .filter((code): code is string => code !== undefined),
-);
+const MODERN_STASH_TAB_ORDER: readonly number[] = [
+  ...Array.from({ length: SHARED_TAB_COUNT }, (_, stashTab) => stashTab),
+  ...Object.values(RESOURCE_STASH_TAB_BY_KIND),
+];
 
-export function normalizeResourceItemCode(value: unknown): string | undefined {
-  if (typeof value !== 'string') {
-    return undefined;
-  }
-
-  const normalized = value.trim().toLowerCase();
-  return normalized.length > 0 ? normalized : undefined;
-}
-
-export function canDropItemCodeInModernResourceTab(itemCode: string, stashTab: number): boolean {
-  if (stashTab === MODERN_GEMS_TAB_INDEX) {
-    return GEM_ITEM_CODES.has(itemCode);
-  }
-  if (stashTab === MODERN_MATERIALS_TAB_INDEX) {
-    return MATERIAL_ITEM_CODES.has(itemCode);
-  }
-  if (stashTab === MODERN_RUNES_TAB_INDEX) {
-    return RUNE_ITEM_CODES.has(itemCode);
-  }
-
-  return false;
-}
-
-function isResourceStackItemCode(itemCode: unknown): boolean {
-  const normalizedCode = normalizeResourceItemCode(itemCode);
-  return (
-    normalizedCode !== undefined &&
-    [MODERN_GEMS_TAB_INDEX, MODERN_MATERIALS_TAB_INDEX, MODERN_RUNES_TAB_INDEX].some((stashTab) =>
-      canDropItemCodeInModernResourceTab(normalizedCode, stashTab),
-    )
-  );
+/**
+ * True when an item with this code may be dropped on the given modern stash tab: the tab must be
+ * a resource tab (gems, materials, runes) and the code must belong to that tab.
+ */
+export function canDropItemCodeInModernResourceTab(itemCode: unknown, stashTab: number): boolean {
+  const kind = resolveResourceStashTabKind(stashTab);
+  return kind !== undefined && isResourceCodeOfKind(itemCode, kind);
 }
 
 /**
@@ -70,7 +43,7 @@ export function resolveWithdrawCountForGridDrop(
     return undefined;
   }
 
-  return isResourceStackItemCode(vaultItem.itemCode) ? 1 : undefined;
+  return isResourceItemCode(vaultItem.itemCode) ? 1 : undefined;
 }
 
 export function isStashSourceFileType(sourceFileType: VaultSourceFileType): boolean {
@@ -109,20 +82,11 @@ export function getStashSectionTitle(
 }
 
 function resolveModernStashTabKindByIndex(stashTab: number): StashTabKind | undefined {
-  if (stashTab >= 0 && stashTab <= 4) {
+  if (stashTab >= 0 && stashTab < SHARED_TAB_COUNT) {
     return 'shared';
   }
-  if (stashTab === 5) {
-    return 'gems';
-  }
-  if (stashTab === 6) {
-    return 'materials';
-  }
-  if (stashTab === 7) {
-    return 'runes';
-  }
 
-  return undefined;
+  return resolveResourceStashTabKind(stashTab);
 }
 
 export interface StashTabsToRenderEntry {
@@ -136,8 +100,7 @@ export function buildStashTabsToRender(
   stashByTab: Map<number, ParsedInventoryItem[]>,
 ): StashTabsToRenderEntry[] {
   const isModernStashSnapshot =
-    snapshot.sourceFileType === 'd2i' &&
-    (snapshot.sourceFileVersion ?? 0) >= MODERN_STASH_MIN_VERSION;
+    snapshot.sourceFileType === 'd2i' && isModernStashVersion(snapshot.sourceFileVersion);
 
   if (isModernStashSnapshot) {
     return MODERN_STASH_TAB_ORDER.map((stashTab) => ({
