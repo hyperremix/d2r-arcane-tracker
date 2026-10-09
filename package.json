@@ -23,7 +23,6 @@
   },
   "scripts": {
     "dev": "vite",
-    "dev:debug": "node scripts/dev-with-debug.js",
     "build": "bun run typecheck && vite build && electron-builder --win",
     "db:generate": "drizzle-kit generate",
     "typecheck": "concurrently \"tsc -p tsconfig.json --noEmit\" \"tsc -p tsconfig.node.json --noEmit\"",
@@ -40,8 +39,6 @@
     "test:run": "vitest run",
     "test:coverage": "vitest run --coverage",
     "prepare": "husky",
-    "debug:url": "node scripts/get-cdp-url.js",
-    "debug:update": "node scripts/update-cursor-debug.js",
     "version:major": "bun pm version major && git push --follow-tags",
     "version:minor": "bun pm version minor && git push --follow-tags",
     "version:patch": "bun pm version patch && git push --follow-tags"

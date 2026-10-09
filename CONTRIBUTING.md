@@ -43,7 +43,7 @@ electron/            Main process
   database/          SQLite (better-sqlite3 + drizzle-orm)
   items/             Holy Grail item data
   config/            D2R build and memory pattern tables
-scripts/             debugging and memory-research helpers
+scripts/             test-item injection and memory-research helpers
 config/              shared build-tool config (d2s source aliases for Vite and Vitest)
 docs/                user guides, developer docs, GitHub Pages site
 ```
@@ -54,8 +54,7 @@ Stack: Electron 44, React 18, TypeScript, Vite, Tailwind CSS v4, shadcn/ui (Base
 
 | Command | Purpose |
 | --- | --- |
-| `bun run dev` | Run the app in development |
-| `bun run dev:debug` | Same, plus debugger setup ([DEBUGGING.md](docs/DEBUGGING.md)) |
+| `bun run dev` | Run the app in development, with the debugger port open ([DEBUGGING.md](docs/DEBUGGING.md)) |
 | `bun run typecheck` | TypeScript, renderer and main |
 | `bun run lint` / `lint:fix` | Biome lint |
 | `bun run format` / `format:fix` | Biome format |
