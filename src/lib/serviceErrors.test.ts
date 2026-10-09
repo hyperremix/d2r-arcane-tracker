@@ -8,11 +8,10 @@ import {
 } from './serviceErrors';
 
 const validPayload = {
-  service: 'ItemDetection',
-  operation: 'extractItemsFromSaveFile',
+  service: 'IconService',
+  operation: 'convertAllSprites',
   severity: 'error',
-  code: 'saveFileParseFailed',
-  params: { fileName: 'Sorceress.d2s' },
+  code: 'spriteConversionFailed',
   detail: 'Unexpected end of buffer',
   timestamp: 1_700_000_000_000,
 };
@@ -119,7 +118,6 @@ describe('When resolving copy and actions for a code', () => {
 
   it('If the code points to a settings problem, Then offers to open the settings', () => {
     // Act & Assert
-    expect(getServiceErrorAction('saveFileParseFailed')).toBe('openSettings');
     expect(getServiceErrorAction('spriteConversionFailed')).toBe('openSettings');
   });
 
@@ -143,12 +141,12 @@ describe('When building toast id and details', () => {
     const id = payload && getServiceErrorToastId(payload);
 
     // Assert
-    expect(id).toBe('ItemDetection.extractItemsFromSaveFile');
+    expect(id).toBe('IconService.convertAllSprites');
   });
 
   it('If a payload has params and detail, Then the details include them', () => {
     // Arrange
-    const payload = parseServiceErrorPayload(validPayload);
+    const payload = parseServiceErrorPayload({ ...validPayload, params: { fileName: 'a.d2s' } });
 
     // Act
     const details = payload && formatServiceErrorDetails(payload);
@@ -156,9 +154,9 @@ describe('When building toast id and details', () => {
     // Assert
     expect(details).toBe(
       [
-        '[ItemDetection.extractItemsFromSaveFile] saveFileParseFailed (error)',
+        '[IconService.convertAllSprites] spriteConversionFailed (error)',
         'Time: 2023-11-14T22:13:20.000Z',
-        'Params: {"fileName":"Sorceress.d2s"}',
+        'Params: {"fileName":"a.d2s"}',
         'Detail: Unexpected end of buffer',
       ].join('\n'),
     );

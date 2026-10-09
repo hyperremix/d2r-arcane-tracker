@@ -2,6 +2,16 @@ import { enhanceItems } from '@dschu012/d2s';
 import { readItem } from '@dschu012/d2s/lib/d2/items';
 import { constants as constants105 } from '@dschu012/d2s/lib/data/versions/105_constant_data';
 import type { D2SItem, StashTabKind } from '../types/grail';
+import {
+  isRuneCode,
+  MODERN_STASH_MIN_VERSION,
+  normalizeItemCode,
+  RESOURCE_STASH_STACK_ATTR_ID,
+  RESOURCE_STASH_TAB_BY_KIND,
+  resolveStackCount,
+  SHARED_TAB_COUNT,
+  toFiniteNumber,
+} from '../utils/d2rFormat';
 import { createBoundedBitReader } from './boundedBitReader';
 import { type D2iMetadata, readD2iMetadata } from './stashFormat';
 
@@ -19,7 +29,7 @@ export const constants105Extended = {
         bias?: number;
       }>),
     ];
-    while (arr.length < 381) {
+    while (arr.length < RESOURCE_STASH_STACK_ATTR_ID) {
       arr.push({ s: `unknown_${arr.length}`, sB: 0 });
     }
     arr.push({ s: 'item_quantity_r', sB: 9 }); // index 381
@@ -27,18 +37,10 @@ export const constants105Extended = {
   })(),
 };
 
-const MODERN_STASH_MIN_VERSION = 105;
-export const SHARED_TAB_COUNT = 5;
 const STASH_GRID_WIDTH = 10;
 const STASH_GRID_HEIGHT = 10;
 
 type ReadonlyConstants = typeof constants105;
-
-const RESOURCE_STASH_TAB_BY_KIND = {
-  gems: 5,
-  materials: 6,
-  runes: 7,
-} as const;
 
 export interface ModernStashParsedItem {
   item: D2SItem;
@@ -85,15 +87,6 @@ interface PendingResourceItem {
 
 interface ItemWithCategories extends D2SItem {
   categories?: string[];
-}
-
-function normalizeItemCode(value: unknown): string | undefined {
-  if (typeof value !== 'string') {
-    return undefined;
-  }
-
-  const normalized = value.trim().replace(/\0/g, '');
-  return normalized.length > 0 ? normalized : undefined;
 }
 
 function resolveDimension(primary: unknown, fallback: unknown): number | undefined {
@@ -178,8 +171,7 @@ function isOccupiedModernItem(item: D2SItem): boolean {
 }
 
 function isRuneItem(item: D2SItem): boolean {
-  const normalized = normalizeItemCode(item.code ?? item.type);
-  return normalized !== undefined && /^r[0-3][0-9]$/i.test(normalized);
+  return isRuneCode(item.code ?? item.type);
 }
 
 function hasCategory(categories: unknown, category: string): boolean {
@@ -204,28 +196,6 @@ function resolveResourceKind(item: D2SItem): Exclude<StashTabKind, 'shared'> {
     return 'gems';
   }
   return 'materials';
-}
-
-export function resolveStackCount(item: D2SItem): number {
-  // D2R resource stash encodes stack count as magic attribute 381.
-  // Check this first — it is authoritative for resource-sector items and
-  // must take priority over the classic stackable quantity field.
-  const attrs = item.magic_attributes as Array<{ id: number; values: number[] }> | undefined;
-  const attr381 = attrs?.find((a) => a.id === 381);
-  if (attr381 && typeof attr381.values[0] === 'number' && attr381.values[0] >= 1) {
-    return attr381.values[0];
-  }
-
-  if (
-    typeof item.quantity === 'number' &&
-    Number.isInteger(item.quantity) &&
-    item.quantity >= 1 &&
-    item.quantity <= 511
-  ) {
-    return item.quantity;
-  }
-
-  return 1;
 }
 
 async function readSectorItems(payload: Uint8Array, version: number): Promise<SectorItemsResult> {
@@ -286,10 +256,6 @@ async function readSectorItems(payload: Uint8Array, version: number): Promise<Se
   }
 
   return { items: normalizedItems, complete };
-}
-
-function toFiniteNumber(value: unknown): number | undefined {
-  return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
 }
 
 function isResourcePlacementValid(items: PendingResourceItem[]): boolean {

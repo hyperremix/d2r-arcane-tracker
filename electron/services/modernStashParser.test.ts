@@ -5,7 +5,7 @@ import { BitReader } from '@dschu012/d2s/lib/binary/bitreader';
 import { _readMagicProperties, writeItem } from '@dschu012/d2s/lib/d2/items';
 import { constants as constants105 } from '@dschu012/d2s/lib/data/versions/105_constant_data';
 import { describe, expect, it } from 'vitest';
-import { constants105Extended, parseModernStash, resolveStackCount } from './modernStashParser';
+import { constants105Extended, parseModernStash } from './modernStashParser';
 import { D2I_SECTOR_HEADER_SIZE, readD2iMetadata } from './stashFormat';
 
 const FIXTURE_PATH = resolve(
@@ -152,66 +152,6 @@ describe('When _readMagicProperties processes a resource-stash binary stream', (
     expect(attrs[0].id).toBe(381);
     expect(attrs[0].values[0]).toBe(5);
     expect(attrs[0].name).toBe('item_quantity_r');
-  });
-});
-
-describe('When resolveStackCount reads a simple_item resource with quantity set by the v105 field', () => {
-  it('Then it returns the item.quantity value as the stack count', () => {
-    // Arrange: simple resource items have simple_item=1, no magic_attributes.
-    // The d2s v105 conditional field populates item.quantity for these items.
-    const simpleRuneWithCount = {
-      type: 'r05',
-      quantity: 7,
-    } as unknown as Parameters<typeof resolveStackCount>[0];
-
-    const simpleRuneWithMaxCount = {
-      type: 'r20',
-      quantity: 255,
-    } as unknown as Parameters<typeof resolveStackCount>[0];
-
-    // Act
-    const countFromQuantity = resolveStackCount(simpleRuneWithCount);
-    const countFromMaxQuantity = resolveStackCount(simpleRuneWithMaxCount);
-
-    // Assert
-    expect(countFromQuantity).toBe(7);
-    expect(countFromMaxQuantity).toBe(255);
-  });
-});
-
-describe('When resolveStackCount checks stackable sources', () => {
-  it('Then it only accepts explicit quantity values for modern stash', () => {
-    // Arrange
-    const fromQuantity = {
-      type: 'r01',
-      quantity: 9,
-    };
-    const fallbackToOne = {
-      type: 'r03',
-      magic_attributes: [{ id: 381, name: 'unknown_381', values: [0] }],
-    } as unknown as Parameters<typeof resolveStackCount>[0];
-    const fromMagicAttr = {
-      type: 'r01',
-      magic_attributes: [{ id: 381, name: 'item_quantity_r', values: [42] }],
-    } as unknown as Parameters<typeof resolveStackCount>[0];
-
-    const attr381TakesPriorityOverQuantity = {
-      type: 'key', // 'key' IS in stackables — quantity would normally be used
-      quantity: 3,
-      magic_attributes: [{ id: 381, name: 'item_quantity_r', values: [42] }],
-    } as unknown as Parameters<typeof resolveStackCount>[0];
-
-    // Act
-    const quantityCount = resolveStackCount(fromQuantity);
-    const fallbackCount = resolveStackCount(fallbackToOne);
-    const magicAttrCount = resolveStackCount(fromMagicAttr);
-    const priorityCount = resolveStackCount(attr381TakesPriorityOverQuantity);
-
-    // Assert
-    expect(quantityCount).toBe(9);
-    expect(fallbackCount).toBe(1);
-    expect(magicAttrCount).toBe(42);
-    expect(priorityCount).toBe(42);
   });
 });
 

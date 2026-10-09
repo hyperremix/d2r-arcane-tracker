@@ -1,19 +1,12 @@
 import { itemsByNameSimple, runesByCode, runewordsByNameSimple } from '../items/indexes';
 import type { D2SItem } from '../types/grail';
+import { isRuneCode, normalizeItemCodeKey } from './d2rFormat';
 import { simplifyItemName } from './objects';
-
-/**
- * Checks if a D2S item is grail-trackable (unique, set, rune, or runeword).
- * Single source of truth.
- */
-export function isGrailTrackable(item: D2SItem): boolean {
-  return getGrailItemId(item) !== null;
-}
 
 /**
  * Resolves the specific Rainbow Facet name based on magic attributes.
  */
-function resolveRainbowFacetName(item: D2SItem, simpleName: string): string {
+export function resolveRainbowFacetName(item: D2SItem, simpleName: string): string {
   let type = '';
   let skill = '';
 
@@ -50,9 +43,9 @@ function resolveRainbowFacetName(item: D2SItem, simpleName: string): string {
 export function getGrailItemId(d2sItem: unknown): string | null {
   const item = d2sItem as D2SItem; // Type assertion for D2S item structure
 
-  // Handle runes by code
-  if (item?.type && typeof item.type === 'string' && item.type.match(/^r[0-3][0-9]$/)) {
-    const rune = runesByCode[item.type];
+  // Handle runes by code; the lookup uses the same normalized code the predicate matched
+  if (typeof item?.type === 'string' && isRuneCode(item.type)) {
+    const rune = runesByCode[normalizeItemCodeKey(item.type) ?? ''];
     return rune?.id || null;
   }
 
@@ -82,8 +75,3 @@ export function getGrailItemId(d2sItem: unknown): string | null {
 
   return null;
 }
-
-/**
- * Legacy alias for backward compatibility during refactor
- */
-export const getItemIdForD2SItem = getGrailItemId;

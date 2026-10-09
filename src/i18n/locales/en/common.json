@@ -982,10 +982,6 @@
       "title": "A background task failed",
       "description": "Something went wrong in the background. Copy the details to report the problem."
     },
-    "saveFileParseFailed": {
-      "title": "Could not read save file",
-      "description": "\"{{fileName}}\" could not be parsed, so its items were not updated. Check your save file directory in Settings."
-    },
     "databaseWriteFailed": {
       "title": "Database write failed",
       "description": "Some item data could not be saved and was lost. Copy the details to report the problem."

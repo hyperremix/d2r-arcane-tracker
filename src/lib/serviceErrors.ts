@@ -105,10 +105,6 @@ export function parseServiceErrorPayload(value: unknown): IncomingServiceError |
 }
 
 const SERVICE_ERROR_COPY: Record<ServiceErrorCode, ServiceErrorCopy> = {
-  saveFileParseFailed: {
-    titleKey: translations.serviceErrors.saveFileParseFailed.title,
-    descriptionKey: translations.serviceErrors.saveFileParseFailed.description,
-  },
   databaseWriteFailed: {
     titleKey: translations.serviceErrors.databaseWriteFailed.title,
     descriptionKey: translations.serviceErrors.databaseWriteFailed.description,
@@ -129,8 +125,6 @@ const UNKNOWN_SERVICE_ERROR_COPY: ServiceErrorCopy = {
 };
 
 const SERVICE_ERROR_ACTIONS: Record<ServiceErrorCode, ServiceErrorAction> = {
-  // Usually a wrong save directory or an unsupported file in it
-  saveFileParseFailed: 'openSettings',
   // Sprites are read from the D2R installation path configured in settings
   spriteConversionFailed: 'openSettings',
   databaseWriteFailed: 'copyDetails',

@@ -1,15 +1,6 @@
-import { createRequire } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import {
-  app,
-  BrowserWindow,
-  type IpcMainEvent,
-  ipcMain,
-  nativeTheme,
-  screen,
-  session,
-} from 'electron';
+import { app, BrowserWindow, ipcMain, nativeTheme, screen, session } from 'electron';
 import { grailDatabase } from './database/database';
 import { initializeDialogHandlers } from './ipc-handlers/dialogHandlers';
 import {
@@ -44,7 +35,6 @@ import {
 import { getMainWindowThemeColors } from './window/mainWindowTheme';
 import { closeWidgetWindow, showWidgetWindow } from './window/widgetWindow';
 
-createRequire(import.meta.url);
 /**
  * The directory name of the current module.
  */
@@ -68,10 +58,6 @@ process.env.APP_ROOT = path.join(__dirname, '..');
  * Vite development server URL (only available in development mode).
  */
 export const VITE_DEV_SERVER_URL = process.env.VITE_DEV_SERVER_URL;
-/**
- * Path to the main process distribution folder.
- */
-export const MAIN_DIST = path.join(process.env.APP_ROOT, 'dist-electron');
 /**
  * Path to the renderer process distribution folder.
  */
@@ -414,15 +400,3 @@ app.on('before-quit', () => {
 app.on('will-quit', () => {
   closeGlobalHotkeys();
 });
-
-/**
- * Event object for IPC communication replies.
- */
-export let eventToReply: IpcMainEvent | null;
-/**
- * Sets the event object for IPC communication replies.
- * @param {IpcMainEvent} e - The IPC event to set for replies.
- */
-export function setEventToReply(e: IpcMainEvent) {
-  eventToReply = e;
-}

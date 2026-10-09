@@ -51,27 +51,6 @@ vi.mock('electron', () => ({
   },
 }));
 
-// Mock items indexes
-vi.mock('../items/indexes', () => ({
-  isRuneId: vi.fn(),
-  runewordsByNameSimple: {
-    lore: { id: 'lore', name: 'Lore' },
-    enigma: { id: 'enigma', name: 'Enigma' },
-    beast: { id: 'beast', name: 'Beast' },
-    infinity: { id: 'infinity', name: 'Infinity' },
-  },
-}));
-
-// Mock utils
-vi.mock('../utils/objects', () => ({
-  isRune: vi.fn(),
-  simplifyItemName: vi.fn(),
-}));
-
-vi.mock('../utils/grailItemUtils', () => ({
-  getGrailItemId: vi.fn(),
-}));
-
 import {
   chmodSync,
   existsSync,
@@ -79,6 +58,7 @@ import {
   readdirSync,
   readFileSync,
   rmSync,
+  utimesSync,
   writeFileSync,
 } from 'node:fs';
 import { mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
@@ -89,11 +69,9 @@ import * as d2stash from '@dschu012/d2s/lib/d2/stash';
 import chokidar from 'chokidar';
 import { app } from 'electron';
 import { D2SaveFileBuilder } from '@/fixtures';
-import { isRuneId } from '../items/indexes';
-import { GameMode } from '../types/grail';
-import { getGrailItemId } from '../utils/grailItemUtils';
-import { isRune, simplifyItemName } from '../utils/objects';
+import { GameMode, type ParsedInventoryItem, type SaveFileEvent } from '../types/grail';
 import { EventBus } from './EventBus';
+import { createItemFingerprint, normalizeInventoryItem } from './itemNormalizer';
 import * as modernStashParser from './modernStashParser';
 import { SaveFileMonitor } from './saveFileMonitor';
 
@@ -175,10 +153,6 @@ describe('When SaveFileMonitor is used', () => {
       hardcore: false,
       pages: [{ items: [] }],
     } as any);
-    vi.mocked(getGrailItemId).mockReturnValue('test-item-id');
-    vi.mocked(isRuneId).mockReturnValue(false);
-    vi.mocked(isRune).mockReturnValue(false);
-    vi.mocked(simplifyItemName).mockReturnValue('test-item');
 
     // Create mock database
     mockDatabase = createMockDatabase();
@@ -459,44 +433,6 @@ describe('When SaveFileMonitor is used', () => {
     });
   });
 
-  describe('If getItems is called', () => {
-    it('Then should return current data', () => {
-      // Act
-      const items = monitor.getItems();
-
-      // Assert
-      expect(items).toEqual({
-        items: {},
-        ethItems: {},
-        stats: {},
-        availableRunes: {},
-      });
-    });
-  });
-
-  describe('If fillInAvailableRunes is called', () => {
-    it('Then should call the method without errors', () => {
-      // Act & Assert
-      expect(() => monitor.fillInAvailableRunes()).not.toThrow();
-    });
-  });
-
-  describe('If createManualItem is called', () => {
-    it('Then should create manual item with specified count', () => {
-      // Act
-      const item = monitor.createManualItem(3);
-
-      // Assert
-      expect(item).toEqual({
-        inSaves: {
-          'Manual entry': [{}, {}, {}],
-        },
-        name: '',
-        type: '',
-      });
-    });
-  });
-
   describe('If shutdown is called', () => {
     it('Then should stop monitoring', async () => {
       // Arrange
@@ -756,10 +692,10 @@ describe('When SaveFileMonitor is used', () => {
       (monitor as any).lastProcessedChangeCounter = 0;
       (monitor as any).lastFileChangeTime = Date.now();
       (monitor as any).watchPath = '/test/saves';
-      (monitor as any).forceParseAll = true; // Set force parse flag
+      (monitor as any).isMonitoring = true;
 
-      // Act - advance time by only 500ms (less than debounce)
-      await vi.advanceTimersByTimeAsync(500);
+      // Act - request a forced parse without advancing time
+      await monitor.refreshSaveFiles();
 
       // Assert - should parse immediately despite debounce
       expect(parseAllSpy).toHaveBeenCalled();
@@ -813,6 +749,373 @@ describe('When SaveFileMonitor is used', () => {
 
       // Assert - should have parsed TWICE (once for initial change, once for change during processing)
       expect(parseAllSpy).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe('When a manual refresh is requested', () => {
+    let monitor: SaveFileMonitor;
+    let mockDatabase: MockGrailDatabase;
+    let eventBus: EventBus;
+
+    const startWatching = (target: SaveFileMonitor) => {
+      (target as any).isMonitoring = true;
+      (target as any).watchPath = '/test/saves';
+    };
+
+    // Mirrors startMonitoring's tick reader; the monitor's shutdown() in afterEach clears it.
+    const startTickReader = (target: SaveFileMonitor) => {
+      (target as any).tickReaderInterval = setInterval(() => {
+        void (target as any).tickReader();
+      }, 500);
+    };
+
+    beforeEach(() => {
+      vi.useFakeTimers();
+      eventBus = new EventBus();
+      mockDatabase = createMockDatabase();
+      mockDatabase.getAllSettings.mockReturnValue({
+        gameMode: GameMode.Softcore,
+        saveDir: '/test/saves',
+      });
+      mockDatabase.getAllSaveFileStates.mockReturnValue([]);
+      monitor = new SaveFileMonitor(eventBus, mockDatabase as any);
+      vi.spyOn(monitor as any, 'findExistingSaveDirectories').mockResolvedValue(['/test/saves']);
+    });
+
+    afterEach(async () => {
+      await monitor.shutdown();
+      vi.useRealTimers();
+    });
+
+    describe('If manual game mode is active', () => {
+      it('Then the refresh resolves without parsing and does not leave the force flag set', async () => {
+        // Arrange
+        mockDatabase.getAllSettings.mockReturnValue({
+          gameMode: GameMode.Manual,
+          saveDir: '/test/saves',
+        });
+        const parseAllSpy = vi.spyOn(monitor as any, 'parseAllSaveDirectories');
+        startWatching(monitor);
+
+        // Act
+        await monitor.refreshSaveFiles();
+
+        // Assert
+        expect(parseAllSpy).not.toHaveBeenCalled();
+        expect((monitor as any).forceParseAll).toBe(false);
+        expect((monitor as any).pendingForcedParse).toBeUndefined();
+      });
+    });
+
+    describe('If manual mode is left after a skipped refresh', () => {
+      it('Then the next change-driven parse is not forced', async () => {
+        // Arrange
+        mockDatabase.getAllSettings.mockReturnValue({
+          gameMode: GameMode.Manual,
+          saveDir: '/test/saves',
+        });
+        startWatching(monitor);
+        await monitor.refreshSaveFiles();
+        mockDatabase.getAllSettings.mockReturnValue({
+          gameMode: GameMode.Softcore,
+          saveDir: '/test/saves',
+        });
+        const forcedDuringParse: boolean[] = [];
+        vi.spyOn(monitor as any, 'parseAllSaveDirectories').mockImplementation(async () => {
+          forcedDuringParse.push((monitor as any).forceParseAll);
+          return true;
+        });
+        (monitor as any).fileChangeCounter++;
+        (monitor as any).lastFileChangeTime = Date.now();
+
+        // Act
+        await vi.advanceTimersByTimeAsync(1500);
+
+        // Assert
+        expect(forcedDuringParse).toEqual([false]);
+      });
+    });
+
+    describe('If the save directory holds no save files', () => {
+      it('Then the refresh resolves and the force flag is reset', async () => {
+        // Arrange
+        const emptyDir = mkdtempSync(join(tmpdir(), 'arcane-refresh-empty-'));
+        tempDirs.push(emptyDir);
+        vi.spyOn(monitor as any, 'findExistingSaveDirectories').mockResolvedValue([emptyDir]);
+        const parseFilesSpy = vi.spyOn(monitor as any, 'parseFiles');
+        startWatching(monitor);
+
+        // Act
+        await monitor.refreshSaveFiles();
+
+        // Assert
+        expect(parseFilesSpy).not.toHaveBeenCalled();
+        expect((monitor as any).forceParseAll).toBe(false);
+        expect((monitor as any).readingFiles).toBe(false);
+      });
+    });
+
+    describe('If no grail database is available', () => {
+      it('Then the refresh resolves without parsing', async () => {
+        // Arrange
+        const monitorWithoutDatabase = new SaveFileMonitor(eventBus);
+        const parseAllSpy = vi.spyOn(monitorWithoutDatabase as any, 'parseAllSaveDirectories');
+        startWatching(monitorWithoutDatabase);
+
+        // Act
+        await monitorWithoutDatabase.refreshSaveFiles();
+
+        // Assert
+        expect(parseAllSpy).not.toHaveBeenCalled();
+        expect((monitorWithoutDatabase as any).forceParseAll).toBe(false);
+        await monitorWithoutDatabase.shutdown();
+      });
+    });
+
+    describe('If the forced parse fails', () => {
+      it('Then the refresh rejects and the monitor can parse again', async () => {
+        // Arrange
+        vi.spyOn(monitor as any, 'parseAllSaveDirectories').mockRejectedValue(
+          new Error('disk error'),
+        );
+        startWatching(monitor);
+
+        // Act
+        const refresh = monitor.refreshSaveFiles();
+
+        // Assert
+        await expect(refresh).rejects.toThrow('disk error');
+        expect((monitor as any).forceParseAll).toBe(false);
+        expect((monitor as any).readingFiles).toBe(false);
+      });
+    });
+
+    describe('If the forced parse succeeds', () => {
+      it('Then every file is parsed as forced and the emitted events are not silent', async () => {
+        // Arrange
+        const saveDir = mkdtempSync(join(tmpdir(), 'arcane-refresh-'));
+        tempDirs.push(saveDir);
+        const heroPath = join(saveDir, 'Hero.d2s');
+        writeFileSync(heroPath, Buffer.from('mock'));
+        vi.spyOn(monitor as any, 'findExistingSaveDirectories').mockResolvedValue([saveDir]);
+        // The stored state is newer than the file, so only a forced parse reads it again.
+        mockDatabase.getSaveFileState.mockReturnValue({
+          lastModified: new Date('2999-01-01'),
+        });
+        (monitor as any).inventorySnapshots = [{ sourceFilePath: heroPath }];
+        const forcedDuringParse: boolean[] = [];
+        const parseFiles = (monitor as any).parseFiles.bind(monitor);
+        vi.spyOn(monitor as any, 'parseFiles').mockImplementation(async (...args: unknown[]) => {
+          forcedDuringParse.push((monitor as any).forceParseAll);
+          return parseFiles(...args);
+        });
+        const events: Array<{ silent?: boolean }> = [];
+        eventBus.on('save-file-event', (event) => {
+          events.push(event);
+        });
+        startWatching(monitor);
+
+        // Act
+        await monitor.refreshSaveFiles();
+
+        // Assert
+        expect(forcedDuringParse).toEqual([true]);
+        expect(events).toHaveLength(1);
+        expect(events[0].silent).toBe(false);
+        expect((monitor as any).forceParseAll).toBe(false);
+      });
+    });
+
+    describe('If reading the settings fails before the parse starts', () => {
+      it('Then the refresh rejects instead of waiting forever', async () => {
+        // Arrange
+        startWatching(monitor);
+        mockDatabase.getAllSettings.mockImplementation(() => {
+          throw new Error('database is locked');
+        });
+
+        // Act
+        const refresh = monitor.refreshSaveFiles();
+
+        // Assert
+        await expect(refresh).rejects.toThrow('database is locked');
+        expect((monitor as any).pendingForcedParse).toBeUndefined();
+      });
+    });
+
+    describe('If a refresh is requested while files are already being read', () => {
+      it('Then the refresh waits for its own forced parse after the running one', async () => {
+        // Arrange
+        let finishRunningParse: () => void = () => undefined;
+        const forcedDuringParse: boolean[] = [];
+        vi.spyOn(monitor as any, 'parseAllSaveDirectories').mockImplementation(async () => {
+          forcedDuringParse.push((monitor as any).forceParseAll);
+          if (forcedDuringParse.length === 1) {
+            await new Promise<void>((resolve) => {
+              finishRunningParse = resolve;
+            });
+          }
+          return true;
+        });
+        startWatching(monitor);
+        (monitor as any).fileChangeCounter++;
+        await vi.advanceTimersByTimeAsync(1500);
+        let refreshed = false;
+
+        // Act
+        const refresh = monitor.refreshSaveFiles().then(() => {
+          refreshed = true;
+        });
+        await vi.advanceTimersByTimeAsync(0);
+        const refreshedBeforeRunningParseEnded = refreshed;
+        finishRunningParse();
+        await vi.advanceTimersByTimeAsync(1000);
+        await refresh;
+
+        // Assert
+        expect(refreshedBeforeRunningParseEnded).toBe(false);
+        expect(forcedDuringParse).toEqual([false, true]);
+      });
+    });
+
+    describe('If the monitor shuts down before a requested refresh runs', () => {
+      it('Then the refresh resolves', async () => {
+        // Arrange
+        startWatching(monitor);
+        (monitor as any).readingFiles = true;
+        const refresh = monitor.refreshSaveFiles();
+
+        // Act
+        await monitor.shutdown();
+
+        // Assert
+        await expect(refresh).resolves.toBeUndefined();
+      });
+    });
+
+    describe('If a refresh is requested while the file watcher is closing during shutdown', () => {
+      it('Then the refresh still settles once the shutdown completes', async () => {
+        // Arrange
+        let finishClosing: () => void = () => undefined;
+        const closing = new Promise<void>((resolve) => {
+          finishClosing = resolve;
+        });
+        (monitor as any).fileWatcher = { close: vi.fn(() => closing) };
+        startWatching(monitor);
+        (monitor as any).readingFiles = true;
+        let refreshSettled = false;
+
+        // Act
+        const shutdown = monitor.shutdown();
+        const refresh = monitor.refreshSaveFiles().then(
+          () => {
+            refreshSettled = true;
+          },
+          () => {
+            refreshSettled = true;
+          },
+        );
+        finishClosing();
+        await shutdown;
+        await vi.advanceTimersByTimeAsync(1000);
+
+        // Assert
+        expect(refreshSettled).toBe(true);
+        await refresh;
+        expect((monitor as any).pendingForcedParse).toBeUndefined();
+      });
+    });
+
+    describe('If the file watcher fails to close during shutdown while a refresh is queued', () => {
+      it('Then the refresh still settles and the shutdown rejects with the close error', async () => {
+        // Arrange
+        const closeError = new Error('watcher close failed');
+        (monitor as any).fileWatcher = {
+          close: vi.fn().mockRejectedValueOnce(closeError).mockResolvedValue(undefined),
+        };
+        startWatching(monitor);
+        (monitor as any).readingFiles = true;
+        let refreshSettled = false;
+
+        // Act
+        const shutdown = monitor.shutdown();
+        const shutdownOutcome = shutdown.then(
+          () => undefined,
+          (error: unknown) => error,
+        );
+        const refresh = monitor.refreshSaveFiles().then(
+          () => {
+            refreshSettled = true;
+          },
+          () => {
+            refreshSettled = true;
+          },
+        );
+        const error = await shutdownOutcome;
+        await vi.advanceTimersByTimeAsync(1000);
+
+        // Assert
+        expect(error).toBe(closeError);
+        expect(refreshSettled).toBe(true);
+        await refresh;
+        expect((monitor as any).pendingForcedParse).toBeUndefined();
+      });
+    });
+
+    describe('If monitoring is stopped while a refresh is queued behind a running read', () => {
+      it('Then the refresh resolves on the next tick without parsing', async () => {
+        // Arrange
+        const parseAllSpy = vi.spyOn(monitor as any, 'parseAllSaveDirectories');
+        startWatching(monitor);
+        (monitor as any).readingFiles = true;
+        startTickReader(monitor);
+        let refreshed = false;
+        const refresh = monitor.refreshSaveFiles().then(() => {
+          refreshed = true;
+        });
+        await vi.advanceTimersByTimeAsync(0);
+        const refreshedWhileMonitoring = refreshed;
+
+        // Act
+        await monitor.stopMonitoring();
+        await vi.advanceTimersByTimeAsync(500);
+        await refresh;
+
+        // Assert
+        expect(refreshedWhileMonitoring).toBe(false);
+        expect(refreshed).toBe(true);
+        expect(parseAllSpy).not.toHaveBeenCalled();
+        expect((monitor as any).pendingForcedParse).toBeUndefined();
+      });
+    });
+
+    describe('If refreshes are requested concurrently behind a running read', () => {
+      it('Then they share one forced parse request and both settle after a single forced parse', async () => {
+        // Arrange
+        const forcedDuringParse: boolean[] = [];
+        vi.spyOn(monitor as any, 'parseAllSaveDirectories').mockImplementation(async () => {
+          forcedDuringParse.push((monitor as any).forceParseAll);
+          return true;
+        });
+        startWatching(monitor);
+        (monitor as any).readingFiles = true;
+        startTickReader(monitor);
+
+        // Act
+        const first = monitor.refreshSaveFiles();
+        const requestAfterFirst = (monitor as any).pendingForcedParse;
+        const second = monitor.refreshSaveFiles();
+        const requestAfterSecond = (monitor as any).pendingForcedParse;
+        (monitor as any).readingFiles = false;
+        await vi.advanceTimersByTimeAsync(500);
+        await Promise.all([first, second]);
+
+        // Assert
+        expect(requestAfterFirst).toBeDefined();
+        expect(requestAfterSecond).toBe(requestAfterFirst);
+        expect(forcedDuringParse).toEqual([true]);
+        expect((monitor as any).pendingForcedParse).toBeUndefined();
+      });
     });
   });
 
@@ -1219,11 +1522,6 @@ describe('When SaveFileMonitor is used', () => {
     beforeEach(() => {
       vi.clearAllMocks();
 
-      // Setup simplifyItemName to return lowercase with no spaces
-      vi.mocked(simplifyItemName).mockImplementation((name: string) =>
-        name.toLowerCase().replace(/[^a-z0-9]/gi, ''),
-      );
-
       eventBus = new EventBus();
       mockDatabase = createMockDatabase();
       mockDatabase.getAllSettings.mockReturnValue({
@@ -1252,7 +1550,12 @@ describe('When SaveFileMonitor is used', () => {
       } as any);
 
       // Act
-      const { items } = await (monitor as any).parseSave('TestChar', Buffer.from('test'), '.d2s');
+      const { items } = await (monitor as any).parseSave(
+        'TestChar',
+        'TestChar.d2s',
+        Buffer.from('test'),
+        '.d2s',
+      );
 
       // Assert
       const runewordItems = items.filter((item: any) => item.type === 'runeword');
@@ -1280,7 +1583,12 @@ describe('When SaveFileMonitor is used', () => {
       } as any);
 
       // Act
-      const { items } = await (monitor as any).parseSave('TestChar', Buffer.from('test'), '.d2s');
+      const { items } = await (monitor as any).parseSave(
+        'TestChar',
+        'TestChar.d2s',
+        Buffer.from('test'),
+        '.d2s',
+      );
 
       // Assert
       const runewordItems = items.filter((item: any) => item.type === 'runeword');
@@ -1308,7 +1616,12 @@ describe('When SaveFileMonitor is used', () => {
       } as any);
 
       // Act
-      const { items } = await (monitor as any).parseSave('TestChar', Buffer.from('test'), '.d2s');
+      const { items } = await (monitor as any).parseSave(
+        'TestChar',
+        'TestChar.d2s',
+        Buffer.from('test'),
+        '.d2s',
+      );
 
       // Assert
       const runewordItems = items.filter((item: any) => item.type === 'runeword');
@@ -1334,7 +1647,12 @@ describe('When SaveFileMonitor is used', () => {
       } as any);
 
       // Act
-      const { items } = await (monitor as any).parseSave('TestChar', Buffer.from('test'), '.d2s');
+      const { items } = await (monitor as any).parseSave(
+        'TestChar',
+        'TestChar.d2s',
+        Buffer.from('test'),
+        '.d2s',
+      );
 
       // Assert - should have no runeword items
       const runewordItems = items.filter((item: any) => item.type === 'runeword');
@@ -1345,9 +1663,9 @@ describe('When SaveFileMonitor is used', () => {
   describe('If spatial inventory parsing is executed', () => {
     it('Then createParsedInventoryItem maps spatial metadata and prefers canonical grail filename over parser inv_file', () => {
       // Arrange
-      vi.mocked(getGrailItemId).mockReturnValue('harlequincrest');
       const item = {
         name: 'Battle Hammer',
+        unique_name: 'Harlequin Crest',
         type: 'mace',
         code: 'uap',
         quality: 5,
@@ -1363,7 +1681,7 @@ describe('When SaveFileMonitor is used', () => {
       } as any;
 
       // Act
-      const parsed = (monitor as any).createParsedInventoryItem({
+      const parsed = normalizeInventoryItem({
         filePath: '/tmp/TestChar.d2s',
         saveName: 'TestChar',
         sourceFileType: 'd2s',
@@ -1386,7 +1704,6 @@ describe('When SaveFileMonitor is used', () => {
 
     it('Then canonical code-based icon is preferred over parser inv_file when both exist', () => {
       // Arrange
-      vi.mocked(getGrailItemId).mockReturnValue(null);
       const item = {
         name: 'Shako',
         type: 'helm',
@@ -1396,7 +1713,7 @@ describe('When SaveFileMonitor is used', () => {
       } as any;
 
       // Act
-      const parsed = (monitor as any).createParsedInventoryItem({
+      const parsed = normalizeInventoryItem({
         filePath: '/tmp/TestChar.d2s',
         saveName: 'TestChar',
         sourceFileType: 'd2s',
@@ -1411,7 +1728,6 @@ describe('When SaveFileMonitor is used', () => {
 
     it('Then magic items keep their generated prefix/suffix display name', () => {
       // Arrange
-      vi.mocked(getGrailItemId).mockReturnValue(null);
       const item = {
         name: 'Ring',
         type_name: 'Ring',
@@ -1423,7 +1739,7 @@ describe('When SaveFileMonitor is used', () => {
       } as any;
 
       // Act
-      const parsed = (monitor as any).createParsedInventoryItem({
+      const parsed = normalizeInventoryItem({
         filePath: '/tmp/TestChar.d2s',
         saveName: 'TestChar',
         sourceFileType: 'd2s',
@@ -1437,7 +1753,6 @@ describe('When SaveFileMonitor is used', () => {
 
     it('Then rare items keep their generated rare name parts', () => {
       // Arrange
-      vi.mocked(getGrailItemId).mockReturnValue(null);
       const item = {
         name: 'Ring',
         type_name: 'Ring',
@@ -1449,7 +1764,7 @@ describe('When SaveFileMonitor is used', () => {
       } as any;
 
       // Act
-      const parsed = (monitor as any).createParsedInventoryItem({
+      const parsed = normalizeInventoryItem({
         filePath: '/tmp/TestChar.d2s',
         saveName: 'TestChar',
         sourceFileType: 'd2s',
@@ -1463,7 +1778,6 @@ describe('When SaveFileMonitor is used', () => {
 
     it('Then location_id 2 maps to unknown belt coordinates in a 4x4 belt board space', () => {
       // Arrange
-      vi.mocked(getGrailItemId).mockReturnValue(null);
       const item = {
         name: 'Super Healing Potion',
         type: 'potion',
@@ -1477,7 +1791,7 @@ describe('When SaveFileMonitor is used', () => {
       } as any;
 
       // Act
-      const parsed = (monitor as any).createParsedInventoryItem({
+      const parsed = normalizeInventoryItem({
         filePath: '/tmp/TestChar.d2s',
         saveName: 'TestChar',
         sourceFileType: 'd2s',
@@ -1495,7 +1809,6 @@ describe('When SaveFileMonitor is used', () => {
 
     it('Then d2s location_id 0 alt_position_id 5 maps to personal stash tab 0', () => {
       // Arrange
-      vi.mocked(getGrailItemId).mockReturnValue(null);
       const item = {
         name: 'Grand Charm',
         type: 'charm',
@@ -1510,7 +1823,7 @@ describe('When SaveFileMonitor is used', () => {
       } as any;
 
       // Act
-      const parsed = (monitor as any).createParsedInventoryItem({
+      const parsed = normalizeInventoryItem({
         filePath: '/tmp/TestChar.d2s',
         saveName: 'TestChar',
         sourceFileType: 'd2s',
@@ -1525,7 +1838,6 @@ describe('When SaveFileMonitor is used', () => {
 
     it('Then d2s alt_position_id 1 remains inventory even when outside canonical bounds', () => {
       // Arrange
-      vi.mocked(getGrailItemId).mockReturnValue(null);
       const inBoundsItem = {
         name: 'Tome of Town Portal',
         type: 'book',
@@ -1552,14 +1864,14 @@ describe('When SaveFileMonitor is used', () => {
       } as any;
 
       // Act
-      const inBoundsParsed = (monitor as any).createParsedInventoryItem({
+      const inBoundsParsed = normalizeInventoryItem({
         filePath: '/tmp/TestChar.d2s',
         saveName: 'TestChar',
         sourceFileType: 'd2s',
         item: inBoundsItem,
         fallbackLocation: 'inventory',
       });
-      const outOfBoundsParsed = (monitor as any).createParsedInventoryItem({
+      const outOfBoundsParsed = normalizeInventoryItem({
         filePath: '/tmp/TestChar.d2s',
         saveName: 'TestChar',
         sourceFileType: 'd2s',
@@ -1576,7 +1888,6 @@ describe('When SaveFileMonitor is used', () => {
 
     it('Then unknown items derive a snake_case filename fallback from type_name when parser icon is absent', () => {
       // Arrange
-      vi.mocked(getGrailItemId).mockReturnValue(null);
       const item = {
         type: 'misc',
         quality: 1,
@@ -1584,7 +1895,7 @@ describe('When SaveFileMonitor is used', () => {
       } as any;
 
       // Act
-      const parsed = (monitor as any).createParsedInventoryItem({
+      const parsed = normalizeInventoryItem({
         filePath: '/tmp/TestChar.d2s',
         saveName: 'TestChar',
         sourceFileType: 'd2s',
@@ -1598,7 +1909,7 @@ describe('When SaveFileMonitor is used', () => {
 
     it('Then socketed child items can be excluded from UI snapshot arrays', () => {
       // Arrange
-      const createParsedInventoryItem = (monitor as any).createParsedInventoryItem.bind(monitor);
+      const createParsedInventoryItem = normalizeInventoryItem;
       const parent = createParsedInventoryItem({
         filePath: '/tmp/TestChar.d2s',
         saveName: 'TestChar',
@@ -1760,13 +2071,10 @@ describe('When SaveFileMonitor is used', () => {
 
       // Assert
       expect((executeSpy.mock.calls[0]?.[0] as unknown[]).length).toBe(2);
-      expect(emitSpy).toHaveBeenCalledWith(
-        [
-          { filePath: '/test/save/dir/a.d2s', saveName: 'A' },
-          { filePath: '/test/save/dir/b.d2s', saveName: 'B' },
-        ],
-        expect.any(Object),
-      );
+      expect(emitSpy).toHaveBeenCalledWith([
+        expect.objectContaining({ saveName: 'A' }),
+        expect.objectContaining({ saveName: 'B' }),
+      ]);
       expect((monitor as any).inventorySnapshots).toHaveLength(2);
     });
 
@@ -1897,12 +2205,7 @@ describe('When SaveFileMonitor is used', () => {
       vi.spyOn(monitor as any, 'updateSaveFileState').mockResolvedValue(undefined);
 
       // Act
-      const parseResult = await (monitor as any).processSingleFile(savePath, {
-        items: {},
-        ethItems: {},
-        stats: {},
-        availableRunes: {},
-      });
+      const parseResult = await (monitor as any).processSingleFile(savePath);
       rmSync(saveDir, { recursive: true, force: true });
 
       // Assert
@@ -1912,7 +2215,6 @@ describe('When SaveFileMonitor is used', () => {
 
     it('Then a moved item keeps its presence identity while its fingerprint changes', () => {
       // Arrange
-      vi.mocked(getGrailItemId).mockReturnValue(null);
       const itemAt = (x: number, y: number) =>
         ({
           name: 'Ring of Fire',
@@ -1928,7 +2230,7 @@ describe('When SaveFileMonitor is used', () => {
           inv_height: 1,
         }) as any;
       const parse = (item: any) =>
-        (monitor as any).createParsedInventoryItem({
+        normalizeInventoryItem({
           filePath: '/tmp/SharedStash.d2i',
           saveName: 'Shared',
           sourceFileType: 'd2i',
@@ -1950,7 +2252,6 @@ describe('When SaveFileMonitor is used', () => {
 
     it('Then items that differ only by their game item id have different presence identities', () => {
       // Arrange
-      vi.mocked(getGrailItemId).mockReturnValue(null);
       const ring = (id: number) =>
         ({
           name: 'Ring of Fire',
@@ -1964,7 +2265,7 @@ describe('When SaveFileMonitor is used', () => {
           inv_height: 1,
         }) as any;
       const parse = (item: any) =>
-        (monitor as any).createParsedInventoryItem({
+        normalizeInventoryItem({
           filePath: '/tmp/SharedStash.d2i',
           saveName: 'Shared',
           sourceFileType: 'd2i',
@@ -2015,12 +2316,7 @@ describe('When SaveFileMonitor is used', () => {
       vi.spyOn(monitor as any, 'updateSaveFileState').mockResolvedValue(undefined);
 
       // Act
-      const parseResult = await (monitor as any).processSingleFile(savePath, {
-        items: {},
-        ethItems: {},
-        stats: {},
-        availableRunes: {},
-      });
+      const parseResult = await (monitor as any).processSingleFile(savePath);
       rmSync(saveDir, { recursive: true, force: true });
 
       // Assert
@@ -2030,7 +2326,7 @@ describe('When SaveFileMonitor is used', () => {
       expect(parseResult.presentIdentityKeys).toHaveLength(parseResult.presentFingerprints.length);
     });
 
-    it('Then createFingerprint returns deterministic output for the same inputs', () => {
+    it('Then createItemFingerprint returns deterministic output for the same inputs', () => {
       // Arrange
       const item = {
         fingerprintInputs: {
@@ -2044,11 +2340,11 @@ describe('When SaveFileMonitor is used', () => {
           stashTab: 1,
           itemName: 'Shako',
         },
-      };
+      } as unknown as ParsedInventoryItem;
 
       // Act
-      const first = (monitor as any).createFingerprint(item);
-      const second = (monitor as any).createFingerprint(item);
+      const first = createItemFingerprint(item);
+      const second = createItemFingerprint(item);
 
       // Assert
       expect(first).toBe(second);
@@ -2098,12 +2394,7 @@ describe('When SaveFileMonitor is used', () => {
       vi.mocked(readFile).mockResolvedValue(fixtureBuffer);
 
       // Act
-      const parseResult = await (monitor as any).processSingleFile(MODERN_STASH_FIXTURE_PATH, {
-        items: {},
-        ethItems: {},
-        stats: {},
-        availableRunes: {},
-      });
+      const parseResult = await (monitor as any).processSingleFile(MODERN_STASH_FIXTURE_PATH);
 
       // Assert
       expect(parseResult.success).toBe(true);
@@ -2133,12 +2424,7 @@ describe('When SaveFileMonitor is used', () => {
       vi.spyOn(monitor as any, 'updateSaveFileState').mockResolvedValue(undefined);
 
       // Act
-      const parseResult = await (monitor as any).processSingleFile(savePath, {
-        items: {},
-        ethItems: {},
-        stats: {},
-        availableRunes: {},
-      });
+      const parseResult = await (monitor as any).processSingleFile(savePath);
       rmSync(saveDir, { recursive: true, force: true });
 
       // Assert
@@ -2470,21 +2756,138 @@ describe('When SaveFileMonitor is used', () => {
   describe('When item counts are read from parsed saves', () => {
     it('Then getAvailableRunesCount sums rune quantities instead of entry counts', () => {
       // Arrange
-      (monitor as any).currentData.availableRunes = {
-        elrune: {
-          name: 'elrune',
-          type: 'rune',
-          inSaves: {
-            'Shared Stash Softcore': [{ quantity: 3 }, { quantity: 2 }, {}],
-          },
-        },
-      };
+      const runeEntry = (stackCount?: number) => ({
+        rawParsedItem: { type: 'r01' },
+        isSocketedItem: false,
+        stackCount,
+      });
+      (monitor as any).inventorySnapshots = [
+        { items: [runeEntry(3), runeEntry(2)] },
+        { items: [runeEntry()] },
+      ];
 
       // Act
       const counts = monitor.getAvailableRunesCount();
 
       // Assert
-      expect(counts.elrune).toBe(6);
+      expect(counts).toEqual({ el: 6 });
+    });
+  });
+
+  describe('When parsed save files are announced', () => {
+    let saveDir: string;
+    let events: SaveFileEvent[];
+
+    beforeEach(() => {
+      saveDir = mkdtempSync(join(tmpdir(), 'save-monitor-events-'));
+      events = [];
+      eventBus.on('save-file-event', (event) => {
+        events.push(event);
+      });
+      mockDatabase.getAllSettings.mockReturnValue({
+        saveDir,
+        gameMode: GameMode.Both,
+      });
+    });
+
+    afterEach(() => {
+      rmSync(saveDir, { recursive: true, force: true });
+    });
+
+    describe('If a character save is parsed', () => {
+      it('Then the event carries the parsed items and the header read from the same content', async () => {
+        // Arrange
+        const header = Buffer.alloc(800);
+        header.writeUInt8(0x24, 36); // hardcore + expansion
+        header.writeUInt8(1, 40); // sorceress
+        header.writeUInt8(85, 43);
+        const filePath = join(saveDir, 'Hero.d2s');
+        writeFileSync(filePath, header);
+        vi.mocked(d2s.read).mockResolvedValue({
+          header: { status: { hardcore: true } },
+          items: [{ type: 'uap', unique_name: 'Shako' }],
+          merc_items: [],
+          corpse_items: [],
+        } as any);
+        const parseSaveFileSpy = vi.spyOn(monitor as any, 'parseSaveFile');
+
+        // Act
+        await (monitor as any).parseFiles([filePath], false);
+
+        // Assert
+        expect(parseSaveFileSpy).not.toHaveBeenCalled();
+        expect(events).toHaveLength(1);
+        expect(events[0].file).toEqual(
+          expect.objectContaining({
+            name: 'Hero',
+            path: filePath,
+            characterClass: 'sorceress',
+            level: 85,
+            hardcore: true,
+            expansion: true,
+          }),
+        );
+        expect(events[0].parsedItems?.map((item) => item.rawParsedItem.unique_name)).toEqual([
+          'Shako',
+        ]);
+      });
+
+      it('Then the stored modification time is the one of the content that was parsed', async () => {
+        // Arrange
+        const filePath = join(saveDir, 'Hero.d2s');
+        writeFileSync(filePath, Buffer.alloc(800));
+        const contentTime = new Date('2024-05-01T10:00:00.000Z');
+        utimesSync(filePath, contentTime, contentTime);
+
+        // Act
+        await (monitor as any).parseFiles([filePath], false);
+
+        // Assert
+        expect(mockDatabase.upsertSaveFileState).toHaveBeenCalledWith(
+          expect.objectContaining({ filePath, lastModified: contentTime }),
+        );
+        expect(events[0].file.lastModified).toEqual(contentTime);
+      });
+    });
+
+    describe('If a legacy shared stash is parsed', () => {
+      it('Then the hardcore flag of the event comes from the parsed stash header', async () => {
+        // Arrange
+        const filePath = join(saveDir, 'SharedStash.sss');
+        writeFileSync(filePath, Buffer.alloc(1024));
+        vi.mocked(d2stash.read).mockResolvedValue({ hardcore: true, pages: [] } as any);
+
+        // Act
+        await (monitor as any).parseFiles([filePath], false);
+
+        // Assert
+        expect(vi.mocked(d2stash.read)).toHaveBeenCalledTimes(1);
+        expect(events[0].file).toEqual(
+          expect.objectContaining({ characterClass: 'shared_stash', hardcore: true }),
+        );
+      });
+    });
+
+    describe('If a modern shared stash is parsed', () => {
+      it('Then the event describes the stash with its version and carries its items', async () => {
+        // Arrange
+        const filePath = join(saveDir, 'ModernSharedStashSoftCoreV2.d2i');
+        writeFileSync(filePath, readFileSync(MODERN_STASH_FIXTURE_PATH));
+
+        // Act
+        await (monitor as any).parseFiles([filePath], false);
+
+        // Assert
+        expect(events[0].file).toEqual(
+          expect.objectContaining({
+            name: 'Modern Shared Stash Softcore',
+            characterClass: 'shared_stash',
+            hardcore: false,
+            sourceFileVersion: 105,
+          }),
+        );
+        expect(events[0].parsedItems?.length).toBeGreaterThan(0);
+      });
     });
   });
 
@@ -2506,14 +2909,6 @@ describe('When SaveFileMonitor is used', () => {
           saveDir: '/test/save/dir',
           gameMode: GameMode.Both,
         });
-        vi.mocked(isRune).mockImplementation((item) => /^r\d\d$/.test(item.type ?? ''));
-        vi.mocked(getGrailItemId).mockImplementation((item) =>
-          (item as { type?: string }).type === 'r01'
-            ? 'el'
-            : (item as { type?: string }).type === 'r02'
-              ? 'eld'
-              : null,
-        );
         vi.mocked(d2s.read).mockResolvedValue({
           header: { status: { hardcore: false } },
           items: [
@@ -2532,14 +2927,18 @@ describe('When SaveFileMonitor is used', () => {
         writeFileSync(filePath, Buffer.from('mock'));
         vi.spyOn(monitor as any, 'filterFilesToParse').mockResolvedValue([filePath]);
         vi.spyOn(monitor as any, 'updateSaveFileState').mockResolvedValue(undefined);
-        vi.spyOn(monitor as any, 'emitSaveFileEvents').mockResolvedValue(undefined);
+        const events: SaveFileEvent[] = [];
+        eventBus.on('save-file-event', (event) => {
+          events.push(event);
+        });
 
         // Act
         await (monitor as any).parseFiles([filePath], false);
 
         // Assert
         expect(monitor.getAvailableRunesCount()).toEqual({ el: 1 });
-        expect(Object.keys((monitor as any).currentData.items)).toContain('eld');
+        const eventItemCodes = events[0]?.parsedItems?.map((item) => item.rawParsedItem.type);
+        expect(eventItemCodes).toEqual(['r01', 'armor', 'r02']);
       });
     });
   });

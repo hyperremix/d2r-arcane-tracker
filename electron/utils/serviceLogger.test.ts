@@ -79,20 +79,22 @@ describe('When createServiceLogger is called', () => {
       // Arrange
       const mockForwarder = vi.fn();
       setErrorForwarder(mockForwarder);
-      const log = createServiceLogger('ItemDetection');
+      const log = createServiceLogger('IconService');
 
       // Act
+      // No current emitter passes params; this exercises the generic forwarding of the one
+      // renderer-allowed param key (`fileName`) for any surfaced code.
       log.error(
-        'extractItemsFromSaveFile',
+        'convertAllSprites',
         new Error('Unexpected end of buffer'),
         {},
-        { surfaceToUI: true, code: 'saveFileParseFailed', params: { fileName: 'Sorc.d2s' } },
+        { surfaceToUI: true, code: 'spriteConversionFailed', params: { fileName: 'Sorc.d2s' } },
       );
 
       // Assert
       expect(mockForwarder).toHaveBeenCalledWith(
         expect.objectContaining({
-          code: 'saveFileParseFailed',
+          code: 'spriteConversionFailed',
           params: { fileName: 'Sorc.d2s' },
           detail: 'Unexpected end of buffer',
         }),
