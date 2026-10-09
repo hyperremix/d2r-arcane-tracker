@@ -27,6 +27,7 @@ import {
   ensure,
   type FieldValidator,
   finiteNumber,
+  IpcValidationError,
   isPlainObject,
   noArgs,
   nonEmptyString,
@@ -90,11 +91,6 @@ const titleBarOverlayColors: FieldValidator<TitleBarOverlayColors> = (value) => 
   return { backgroundColor: value.backgroundColor, symbolColor: value.symbolColor };
 };
 
-const byteArray: FieldValidator<Uint8Array> = (value) => {
-  ensure(value instanceof Uint8Array, 'Invalid backup data: expected a byte array');
-  return value;
-};
-
 const terrorZoneConfig: FieldValidator<Record<string, boolean>> = (value) => {
   ensure(
     isPlainObject(value) && Object.values(value).every((enabled) => typeof enabled === 'boolean'),
@@ -123,6 +119,143 @@ const addRunItemInput: FieldValidator<AddRunItemInput> = (value) => {
 const sessionId = nonEmptyString('Invalid session ID');
 
 /**
+ * Whether the renderer may write a setting through `grail:updateSettings`. The mapped type forces a
+ * decision for every new setting. Settings with a dedicated flow (and its own validation) or that
+ * only the main process maintains are not writable here:
+ * - `saveDir`: `saveFile:updateSaveDirectory` validates the path, truncates data of the previous
+ *   directory and restarts monitoring; the value is also a fallback root for save file writes.
+ * - `d2rInstallPath`: `icon:setD2RPath` also updates the icon service.
+ * - `terrorZoneConfig`, `terrorZoneBackupCreated`: written by the terror zone handlers together
+ *   with the game file.
+ * - `iconConversionStatus`, `iconConversionProgress`, `mainWindowBounds`, `needsSeeding`:
+ *   maintained by the main process.
+ */
+const RENDERER_WRITABLE_SETTINGS: Record<keyof Settings, boolean> = {
+  saveDir: false,
+  lang: true,
+  gameMode: true,
+  grailNormal: true,
+  grailEthereal: true,
+  grailRunes: true,
+  grailRunewords: true,
+  gameVersion: true,
+  enableSounds: true,
+  notificationVolume: true,
+  inAppNotifications: true,
+  nativeNotifications: true,
+  needsSeeding: false,
+  theme: true,
+  showItemIcons: true,
+  d2rInstallPath: false,
+  iconConversionStatus: false,
+  iconConversionProgress: false,
+  tickReaderIntervalMs: true,
+  chokidarPollingIntervalMs: true,
+  fileStabilityThresholdMs: true,
+  fileChangeDebounceMs: true,
+  widgetEnabled: true,
+  widgetDisplay: true,
+  widgetPosition: true,
+  widgetOpacity: true,
+  widgetSizeOverall: true,
+  widgetSizeSplit: true,
+  widgetSizeAll: true,
+  widgetSizeRunOnly: true,
+  widgetLocked: true,
+  widgetRunOnlyShowItems: true,
+  mainWindowBounds: false,
+  wizardCompleted: true,
+  wizardSkipped: true,
+  terrorZoneConfig: false,
+  terrorZoneBackupCreated: false,
+  runTrackerAutoStart: true,
+  runTrackerEndThreshold: true,
+  runTrackerMemoryReading: true,
+  runTrackerMemoryPollingInterval: true,
+  runTrackerShortcuts: true,
+  runTrackerGlobalHotkeys: true,
+};
+
+const rendererWritableSettingKeys: ReadonlySet<string> = new Set(
+  Object.entries(RENDERER_WRITABLE_SETTINGS)
+    .filter(([, writable]) => writable)
+    .map(([key]) => key),
+);
+
+/**
+ * Checks whether the renderer may write a setting through `grail:updateSettings`.
+ * @param key - Untrusted setting key
+ * @returns True for settings without a dedicated flow
+ */
+export function isRendererWritableSetting(key: string): key is keyof Settings {
+  return rendererWritableSettingKeys.has(key);
+}
+
+const settingsUpdate: FieldValidator<Partial<Settings>> = (value) => {
+  ensure(isPlainObject(value), 'Invalid settings: expected an object');
+  for (const key of Object.keys(value)) {
+    ensure(
+      isRendererWritableSetting(key),
+      `Setting cannot be changed through grail:updateSettings: ${key}`,
+    );
+  }
+  return value as Partial<Settings>;
+};
+
+/** Largest database backup accepted from the renderer. */
+export const MAX_RESTORE_BACKUP_BYTES = 256 * 1024 * 1024;
+
+/** Every SQLite database file starts with this 16-byte header. */
+const SQLITE_HEADER = 'SQLite format 3\0';
+
+/**
+ * Checks for a Uint8Array (or Buffer), also when it was created in another realm.
+ * @param value - Value to check
+ * @returns True for byte arrays
+ */
+function isByteArray(value: unknown): value is Uint8Array {
+  return Object.prototype.toString.call(value) === '[object Uint8Array]';
+}
+
+const sqliteBackup: FieldValidator<Uint8Array> = (value) => {
+  ensure(isByteArray(value), 'Invalid backup data: expected a byte array');
+  ensure(
+    value.byteLength <= MAX_RESTORE_BACKUP_BYTES,
+    `Invalid backup data: larger than ${MAX_RESTORE_BACKUP_BYTES / (1024 * 1024)} MB`,
+  );
+  const header = String.fromCharCode(...value.subarray(0, SQLITE_HEADER.length));
+  ensure(header === SQLITE_HEADER, 'Invalid backup data: not a SQLite database');
+  return value;
+};
+
+/**
+ * Icon file names may contain folders but must stay inside the icon directory.
+ */
+const iconFilename: FieldValidator<string> = (value) => {
+  ensure(
+    typeof value === 'string' && !/(^|[\\/])\.\.([\\/]|$)/.test(value),
+    'Invalid icon filename',
+  );
+  return value;
+};
+
+/**
+ * Only web links may be opened in the system browser; other protocols (file:, custom app
+ * handlers) could launch local programs.
+ */
+const externalUrl: FieldValidator<string> = (value) => {
+  ensure(typeof value === 'string', 'Invalid URL');
+  let protocol: string;
+  try {
+    protocol = new URL(value).protocol;
+  } catch {
+    throw new IpcValidationError('Invalid URL');
+  }
+  ensure(protocol === 'https:' || protocol === 'http:', 'Only http(s) URLs can be opened');
+  return value;
+};
+
+/**
  * Argument validators for every invoke channel of the contract.
  *
  * The mapped type makes a missing or extra channel a compile error. Arguments marked
@@ -134,16 +267,14 @@ export const invokeArgValidators: { [C in InvokeChannel]: ArgsValidator<InvokeAr
   'grail:getItems': noArgs,
   'grail:getAllRunewords': noArgs,
   'grail:getProgress': args(optionalString('Invalid character ID')),
-  'grail:getProgressByItem': args(string('Invalid item ID')),
+  'grail:getProgressByItem': args(nonEmptyString('Invalid item ID')),
   'grail:updateProgress': args(validatedByHandler<GrailProgress>()),
   'grail:deleteProgress': args(nonEmptyString('Invalid progress ID')),
   'grail:getSettings': noArgs,
-  'grail:updateSettings': args(
-    plainObject<Partial<Settings>>('Invalid settings: expected an object'),
-  ),
+  'grail:updateSettings': args(settingsUpdate),
   'grail:backup': args(nonEmptyString('Invalid backup path')),
   'grail:restore': args(nonEmptyString('Invalid backup path')),
-  'grail:restoreFromBuffer': args(byteArray),
+  'grail:restoreFromBuffer': args(sqliteBackup),
 
   // Save files
   'saveFile:startMonitoring': noArgs,
@@ -185,7 +316,7 @@ export const invokeArgValidators: { [C in InvokeChannel]: ArgsValidator<InvokeAr
   'icon:getSuggestedD2RPath': noArgs,
   'icon:convertSprites': noArgs,
   'icon:getConversionStatus': noArgs,
-  'icon:getByFilename': args(string('Invalid icon filename')),
+  'icon:getByFilename': args(iconFilename),
   'icon:validatePath': noArgs,
 
   // Widget (display modes and the lock state are validated by the handlers, which report
@@ -214,7 +345,7 @@ export const invokeArgValidators: { [C in InvokeChannel]: ArgsValidator<InvokeAr
   'update:getUpdateInfo': noArgs,
 
   // Shell
-  'shell:openExternal': args(string('Invalid URL')),
+  'shell:openExternal': args(externalUrl),
 
   // Run tracker
   'run-tracker:start-session': noArgs,

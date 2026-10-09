@@ -46,6 +46,7 @@ vi.mock('../database/database', () => {
 import { ipcMain } from 'electron';
 import { GrailProgressBuilder } from '@/fixtures';
 import { GrailDatabase, grailDatabase } from '../database/database';
+import { MAX_RESTORE_BACKUP_BYTES } from '../ipc/validators';
 import type { Character, Settings } from '../types/grail';
 import {
   addSettingsUpdatedListener,
@@ -665,7 +666,7 @@ describe('When grailHandlers is used', () => {
       // Arrange
       const settingsUpdates = {
         grailEthereal: true,
-        saveDir: '/new/path/to/saves',
+        widgetPosition: { x: 10, y: 20 },
       };
 
       const handler = vi
@@ -677,8 +678,46 @@ describe('When grailHandlers is used', () => {
 
       // Assert
       expect(grailDatabase.setSetting).toHaveBeenCalledWith('grailEthereal', 'true');
-      expect(grailDatabase.setSetting).toHaveBeenCalledWith('saveDir', '/new/path/to/saves');
+      expect(grailDatabase.setSetting).toHaveBeenCalledWith(
+        'widgetPosition',
+        JSON.stringify({ x: 10, y: 20 }),
+      );
       expect(result).toEqual({ success: true });
+    });
+
+    it.each([
+      ['saveDir', '/other/saves'],
+      ['d2rInstallPath', '/games/d2r'],
+      ['terrorZoneConfig', { 'zone-1': true }],
+      ['mainWindowBounds', { x: 0, y: 0, width: 1, height: 1 }],
+    ])('If the update contains %s, which has a dedicated flow, Then nothing is written', async (key, value) => {
+      // Arrange
+      const handler = vi
+        .mocked(ipcMain.handle)
+        .mock.calls.find((call) => call[0] === 'grail:updateSettings')?.[1] as any;
+
+      // Act
+      const result = handler(null, { grailEthereal: true, [key]: value });
+
+      // Assert
+      await expect(result).rejects.toThrow(
+        `Setting cannot be changed through grail:updateSettings: ${key}`,
+      );
+      expect(grailDatabase.setSetting).not.toHaveBeenCalled();
+    });
+
+    it('If the update contains an unknown key, Then nothing is written', async () => {
+      // Arrange
+      const handler = vi
+        .mocked(ipcMain.handle)
+        .mock.calls.find((call) => call[0] === 'grail:updateSettings')?.[1] as any;
+
+      // Act
+      const result = handler(null, { theme: 'dark', __proto__polluted: true });
+
+      // Assert
+      await expect(result).rejects.toThrow('__proto__polluted');
+      expect(grailDatabase.setSetting).not.toHaveBeenCalled();
     });
 
     it('When settings are updated, Then registered main-process listeners are notified', async () => {
@@ -853,7 +892,13 @@ describe('When grailHandlers is used', () => {
 
     it('Then grail:restoreFromBuffer should restore from buffer', async () => {
       // Arrange
-      const backupBuffer = new Uint8Array([1, 2, 3, 4]);
+      const backupBuffer = new Uint8Array([
+        ...new TextEncoder().encode('SQLite format 3\0'),
+        1,
+        2,
+        3,
+        4,
+      ]);
 
       const handler = vi
         .mocked(ipcMain.handle)
@@ -865,6 +910,51 @@ describe('When grailHandlers is used', () => {
       // Assert
       expect(grailDatabase.restoreFromBuffer).toHaveBeenCalledWith(Buffer.from(backupBuffer));
       expect(result).toEqual({ success: true });
+    });
+
+    it('If the restore buffer is not a SQLite database, Then the database is not replaced', async () => {
+      // Arrange
+      const handler = vi
+        .mocked(ipcMain.handle)
+        .mock.calls.find((call) => call[0] === 'grail:restoreFromBuffer')?.[1] as any;
+      const notADatabase = new TextEncoder().encode('{"characters":[],"progress":[]}');
+
+      // Act
+      const result = handler(null, notADatabase);
+
+      // Assert
+      await expect(result).rejects.toThrow('Invalid backup data: not a SQLite database');
+      expect(grailDatabase.restoreFromBuffer).not.toHaveBeenCalled();
+    });
+
+    it('If the restore buffer exceeds the size cap, Then the database is not replaced', async () => {
+      // Arrange
+      const handler = vi
+        .mocked(ipcMain.handle)
+        .mock.calls.find((call) => call[0] === 'grail:restoreFromBuffer')?.[1] as any;
+      const oversized = new TextEncoder().encode('SQLite format 3\0');
+      Object.defineProperty(oversized, 'byteLength', { value: MAX_RESTORE_BACKUP_BYTES + 1 });
+
+      // Act
+      const result = handler(null, oversized);
+
+      // Assert
+      await expect(result).rejects.toThrow('Invalid backup data: larger than 256 MB');
+      expect(grailDatabase.restoreFromBuffer).not.toHaveBeenCalled();
+    });
+
+    it('If the restore payload is not a byte array, Then the database is not replaced', async () => {
+      // Arrange
+      const handler = vi
+        .mocked(ipcMain.handle)
+        .mock.calls.find((call) => call[0] === 'grail:restoreFromBuffer')?.[1] as any;
+
+      // Act
+      const result = handler(null, 'SQLite format 3');
+
+      // Assert
+      await expect(result).rejects.toThrow('Invalid backup data: expected a byte array');
+      expect(grailDatabase.restoreFromBuffer).not.toHaveBeenCalled();
     });
 
     it('Then backup handlers should handle errors properly', async () => {
