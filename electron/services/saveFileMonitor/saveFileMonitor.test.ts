@@ -70,6 +70,7 @@ import chokidar from 'chokidar';
 import { app } from 'electron';
 import { D2SaveFileBuilder } from '@/fixtures';
 import { GameMode, type ParsedInventoryItem, type SaveFileEvent } from '../../types/grail';
+import * as d2sConstants from '../d2s/constants';
 import { EventBus } from '../EventBus';
 import { createItemFingerprint, normalizeInventoryItem } from '../itemNormalizer';
 import * as modernStashParser from '../modernStashParser';
@@ -206,6 +207,20 @@ describe('When SaveFileMonitor is used', () => {
       // Assert
       expect(newMonitor).toBeInstanceOf(SaveFileMonitor);
       expect(newMonitor.isCurrentlyMonitoring()).toBe(false);
+    });
+
+    it('Then should ensure the D2S constants are registered', () => {
+      // Arrange
+      // Spies on the shared constants module instead of the mocked d2s registry: which registry
+      // the module is bound to depends on which test file loaded it first (isolate:false).
+      const ensureSpy = vi.spyOn(d2sConstants, 'ensureD2sConstants');
+
+      // Act
+      const newMonitor = new SaveFileMonitor(new EventBus(), mockDatabase as any);
+
+      // Assert
+      expect(newMonitor).toBeInstanceOf(SaveFileMonitor);
+      expect(ensureSpy).toHaveBeenCalledTimes(1);
     });
   });
 

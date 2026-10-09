@@ -12,10 +12,12 @@ let mockD2stashWrite: ReturnType<typeof vi.fn>;
 let mockReadD2iMetadata: ReturnType<typeof vi.fn>;
 let mockReadItem: ReturnType<typeof vi.fn>;
 let mockWriteItem: ReturnType<typeof vi.fn>;
+let mockEnsureD2sConstants: ReturnType<typeof vi.fn>;
 let removeItemFromSaveFile: SaveFileEditorModule['removeItemFromSaveFile'];
 let addItemToSaveFile: SaveFileEditorModule['addItemToSaveFile'];
 let moveItemBetweenSaveFiles: SaveFileEditorModule['moveItemBetweenSaveFiles'];
 let splitStackInSaveFile: SaveFileEditorModule['splitStackInSaveFile'];
+let readSaveFileItem: SaveFileEditorModule['readSaveFileItem'];
 
 const equipValidationConstantData = {
   other_items: {
@@ -51,6 +53,7 @@ beforeAll(async () => {
   mockReadD2iMetadata = vi.fn();
   mockReadItem = vi.fn();
   mockWriteItem = vi.fn();
+  mockEnsureD2sConstants = vi.fn();
 
   vi.resetModules();
 
@@ -58,6 +61,10 @@ beforeAll(async () => {
     default: { readFile: mockReadFile, writeFile: mockWriteFile },
     readFile: mockReadFile,
     writeFile: mockWriteFile,
+  }));
+
+  vi.doMock('../d2s/constants', () => ({
+    ensureD2sConstants: mockEnsureD2sConstants,
   }));
 
   vi.doMock('../saveFileBackup', () => ({
@@ -113,12 +120,14 @@ beforeAll(async () => {
   addItemToSaveFile = module.addItemToSaveFile;
   moveItemBetweenSaveFiles = module.moveItemBetweenSaveFiles;
   splitStackInSaveFile = module.splitStackInSaveFile;
+  readSaveFileItem = module.readSaveFileItem;
 });
 
 // With isolate:false, doMock registrations and the module cache are shared across test files.
 // Remove them so later files (e.g. saveFileEditor.integration.test.ts) load the real modules.
 const doMockedModules = [
   'node:fs/promises',
+  '../d2s/constants',
   '../saveFileBackup',
   '../../utils/atomicWrite',
   '@dschu012/d2s',
@@ -1957,6 +1966,139 @@ describe('When items could be lost by a move or split', () => {
       // Assert
       expect(mockWriteFile).toHaveBeenCalledTimes(1);
       expect(stash.pages[0].items).toHaveLength(3);
+    });
+  });
+});
+
+describe('When a public editor operation starts', () => {
+  /**
+   * The d2s library reads its constants from a registry shared by the whole library, so
+   * `ensureD2sConstants` must have run before the first read or write of any save file.
+   */
+  function expectConstantsEnsuredBeforeFirstRead(): void {
+    expect(mockEnsureD2sConstants).toHaveBeenCalled();
+    const readOrders = [mockReadFile, mockD2sRead, mockD2stashRead].flatMap(
+      (read) => read.mock.invocationCallOrder,
+    );
+    expect(readOrders.length).toBeGreaterThan(0);
+    expect(mockEnsureD2sConstants.mock.invocationCallOrder[0]).toBeLessThan(
+      Math.min(...readOrders),
+    );
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockReadD2iMetadata.mockReturnValue({
+      version: 99,
+      hardcore: false,
+      sectors: [],
+    });
+    mockReadFile.mockResolvedValue(fakeBuffer);
+    mockWriteFile.mockResolvedValue(undefined);
+    mockD2sWrite.mockResolvedValue(fakeResultBuffer);
+    mockD2stashWrite.mockResolvedValue(fakeResultBuffer);
+  });
+
+  describe('If it is removeItemFromSaveFile', () => {
+    it('Then the d2s constants are ensured before the save file is read', async () => {
+      // Arrange
+      mockD2sRead.mockResolvedValue(makeD2sData([{ id: 42 }]));
+
+      // Act
+      await removeItemFromSaveFile('/path/to/char.d2s', 'd2s', 42);
+
+      // Assert
+      expectConstantsEnsuredBeforeFirstRead();
+    });
+  });
+
+  describe('If it is addItemToSaveFile', () => {
+    it('Then the d2s constants are ensured before the save file is read', async () => {
+      // Arrange
+      mockD2sRead.mockResolvedValue(makeD2sData([]));
+
+      // Act
+      await addItemToSaveFile({
+        filePath: '/path/to/char.d2s',
+        fileType: 'd2s',
+        item: makeD2sItem(123, 'uap'),
+        locationContext: 'inventory',
+      });
+
+      // Assert
+      expectConstantsEnsuredBeforeFirstRead();
+    });
+  });
+
+  describe('If it is moveItemBetweenSaveFiles', () => {
+    it('Then the d2s constants are ensured before the save file is read', async () => {
+      // Arrange
+      mockD2sRead.mockResolvedValue(
+        makeD2sData([makeD2sItem(77, 'uap', { location_id: 0, alt_position_id: 1 })]),
+      );
+
+      // Act
+      await moveItemBetweenSaveFiles({
+        sourceFilePath: '/path/to/char.d2s',
+        sourceFileType: 'd2s',
+        sourceItemId: 77,
+        targetFilePath: '/path/to/char.d2s',
+        targetFileType: 'd2s',
+        targetLocationContext: 'inventory',
+        targetGridX: 3,
+        targetGridY: 2,
+      });
+
+      // Assert
+      expectConstantsEnsuredBeforeFirstRead();
+    });
+  });
+
+  describe('If it is splitStackInSaveFile', () => {
+    it('Then the d2s constants are ensured before the save file is read', async () => {
+      // Arrange
+      const stash = makeStashData([[]]);
+      stash.pages[0].items.push(
+        makeD2sItem(1, 'key', { quantity: 4, position_x: 0, position_y: 0 }) as unknown as {
+          id: number;
+        },
+      );
+      mockD2stashRead.mockResolvedValue(stash);
+
+      // Act
+      await splitStackInSaveFile({
+        sourceFilePath: '/saves/stash.sss',
+        sourceFileType: 'sss',
+        sourceStashTab: 0,
+        sourceItemCode: 'key',
+        splitCount: 1,
+        targets: [
+          {
+            targetFilePath: '/saves/stash.sss',
+            targetFileType: 'sss',
+            targetLocationContext: 'stash',
+            targetStashTab: 0,
+            targetGridX: 3,
+            targetGridY: 3,
+          },
+        ],
+      });
+
+      // Assert
+      expectConstantsEnsuredBeforeFirstRead();
+    });
+  });
+
+  describe('If it is readSaveFileItem', () => {
+    it('Then the d2s constants are ensured before the save file is read', async () => {
+      // Arrange
+      mockD2sRead.mockResolvedValue(makeD2sData([{ id: 42 }]));
+
+      // Act
+      await readSaveFileItem('/path/to/char.d2s', 'd2s', 42);
+
+      // Assert
+      expectConstantsEnsuredBeforeFirstRead();
     });
   });
 });
