@@ -128,7 +128,7 @@ describe('When buildGameItemTooltipModel is called', () => {
       // Act
       const result = buildGameItemTooltipModel({
         rawItemJson,
-        itemName: 'fallback-name',
+        itemName: 'Jagged Mace of Fire',
         quality: 'magic',
         type: 'magic',
         t,
@@ -147,7 +147,7 @@ describe('When buildGameItemTooltipModel is called', () => {
       // Act
       const result = buildGameItemTooltipModel({
         rawItemJson,
-        itemName: 'fallback-name',
+        itemName: 'Bonesnap',
         quality: 'unique',
         type: 'unique',
         t,
@@ -166,7 +166,7 @@ describe('When buildGameItemTooltipModel is called', () => {
       // Act
       const result = buildGameItemTooltipModel({
         rawItemJson,
-        itemName: 'fallback-name',
+        itemName: 'Bonesnap',
         quality: 'unique',
         type: 'unique',
         t,
@@ -200,7 +200,7 @@ describe('When buildGameItemTooltipModel is called', () => {
       // Act
       const result = buildGameItemTooltipModel({
         rawItemJson,
-        itemName: 'fallback-name',
+        itemName: 'Sturdy Helm of the Whale',
         quality: 'magic',
         type: 'magic',
         t,
@@ -231,7 +231,7 @@ describe('When buildGameItemTooltipModel is called', () => {
       // Act
       const result = buildGameItemTooltipModel({
         rawItemJson,
-        itemName: 'fallback-name',
+        itemName: 'Crystal Sword',
         quality: 'normal',
         type: 'normal',
         t,
@@ -281,7 +281,7 @@ describe('When buildGameItemTooltipModel is called', () => {
       // Act
       const result = buildGameItemTooltipModel({
         rawItemJson,
-        itemName: 'fallback-name',
+        itemName: 'Cap',
         quality: 'normal',
         type: 'normal',
         t,
@@ -316,7 +316,7 @@ describe('When buildGameItemTooltipModel is called', () => {
       // Act
       const result = buildGameItemTooltipModel({
         rawItemJson,
-        itemName: 'fallback-name',
+        itemName: 'Flail',
         quality: 'runeword',
         type: 'runeword',
         t,
