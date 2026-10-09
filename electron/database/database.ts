@@ -160,21 +160,6 @@ class GrailDatabase {
   }
 
   // Statistics
-  getFilteredGrailStatistics(
-    userSettings: Settings,
-    characterId?: string,
-  ): {
-    totalItems: number;
-    foundItems: number;
-    uniqueItems: number;
-    setItems: number;
-    runes: number;
-    foundUnique: number;
-    foundSet: number;
-    foundRunes: number;
-  } {
-    return statisticsModule.getFilteredGrailStatistics(this, userSettings, characterId);
-  }
   getSessionStatistics(sessionId: string): SessionStats | null {
     return statisticsModule.getSessionStatistics(this, sessionId);
   }

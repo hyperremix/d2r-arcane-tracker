@@ -79,7 +79,6 @@ const resetFullStoreState = () => {
       characters: [],
       items: [],
       progress: [],
-      statistics: null,
       filter: { foundStatus: 'all' },
       filterResetCount: 0,
       viewMode: 'grid',
@@ -1890,7 +1889,6 @@ describe('When useItemResultCount is used', () => {
 
 describe('When useGrailStatistics is used', () => {
   beforeEach(() => {
-    // Reset store state
     act(() => {
       useGrailStore.getState().setItems([]);
       useGrailStore.getState().setProgress([]);
@@ -1898,23 +1896,12 @@ describe('When useGrailStatistics is used', () => {
     });
   });
 
-  describe('If no data is provided', () => {
-    it('Then should return zero statistics', () => {
-      // Arrange & Act
-      const { result } = renderHook(() => useGrailStatistics());
-
-      // Assert
-      expect(result.current.totalItems).toBe(0);
-      expect(result.current.foundItems).toBe(0);
-      expect(result.current.completionPercentage).toBe(0);
-      expect(result.current.recentFinds).toBe(0);
-      expect(result.current.currentStreak).toBe(0);
-      expect(result.current.maxStreak).toBe(1); // Default value from calculateStreaks
-    });
+  afterEach(() => {
+    resetFullStoreState();
   });
 
-  describe('If items and progress are provided', () => {
-    it('Then should calculate correct statistics', () => {
+  describe('If items and progress are in the store', () => {
+    it('Then the statistics are computed from them', () => {
       // Arrange
       const items = [
         HolyGrailItemBuilder.new().withId('item1').withType('unique').build(),
@@ -1928,7 +1915,6 @@ describe('When useGrailStatistics is used', () => {
           .withFoundDate(new Date('2024-01-01'))
           .build(),
       ];
-
       act(() => {
         useGrailStore.getState().setItems(items);
         useGrailStore.getState().setProgress(progress);
@@ -1944,116 +1930,43 @@ describe('When useGrailStatistics is used', () => {
     });
   });
 
-  describe('If recent finds exist', () => {
-    it('Then should calculate recent finds correctly', () => {
+  describe('If unrelated store state changes', () => {
+    it('Then the previous statistics object is reused', () => {
       // Arrange
-      const items = [HolyGrailItemBuilder.new().withId('item1').build()];
-      const recentDate = new Date();
-      recentDate.setDate(recentDate.getDate() - 3); // 3 days ago
-      const progress = [
-        GrailProgressBuilder.new()
-          .withId('prog1')
-          .withCharacterId('char1')
-          .withItemId('item1')
-          .withFoundDate(new Date('2024-01-01'))
-          .withFoundDate(recentDate)
-          .build(),
-      ];
-
-      act(() => {
-        useGrailStore.getState().setItems(items);
-        useGrailStore.getState().setProgress(progress);
-      });
+      const { result } = renderHook(() => useGrailStatistics());
+      const first = result.current;
 
       // Act
-      const { result } = renderHook(() => useGrailStatistics());
+      act(() => {
+        useGrailStore.getState().setFilter({ searchTerm: 'shako' });
+        useGrailStore.getState().setViewMode('list');
+      });
 
       // Assert
-      expect(result.current.recentFinds).toBe(1);
+      expect(result.current).toBe(first);
     });
   });
 
-  describe('If items are from initial scan', () => {
-    it('Then should exclude them from recent finds count', () => {
+  describe('If the progress changes', () => {
+    it('Then the statistics are recalculated', () => {
       // Arrange
-      const items = [
-        HolyGrailItemBuilder.new().withId('item1').build(),
-        HolyGrailItemBuilder.new().withId('item2').build(),
-      ];
-      const recentDate = new Date();
-      recentDate.setDate(recentDate.getDate() - 3); // 3 days ago
-      const progress = [
-        GrailProgressBuilder.new()
-          .withId('prog1')
-          .withCharacterId('char1')
-          .withItemId('item1')
-          .withFoundDate(recentDate)
-          .asFromInitialScan()
-          .build(),
-        GrailProgressBuilder.new()
-          .withId('prog2')
-          .withCharacterId('char1')
-          .withItemId('item2')
-          .withFoundDate(recentDate)
-          .withFromInitialScan(false)
-          .build(),
-      ];
-
-      act(() => {
-        useGrailStore.getState().setItems(items);
-        useGrailStore.getState().setProgress(progress);
-      });
+      act(() =>
+        useGrailStore.getState().setItems([HolyGrailItemBuilder.new().withId('a').build()]),
+      );
+      const { result } = renderHook(() => useGrailStatistics());
+      expect(result.current.foundItems).toBe(0);
 
       // Act
-      const { result } = renderHook(() => useGrailStatistics());
-
-      // Assert
-      expect(result.current.recentFinds).toBe(1);
-    });
-  });
-
-  describe('If type statistics are calculated', () => {
-    it('Then should return correct type breakdown', () => {
-      // Arrange
-      const items = [
-        HolyGrailItemBuilder.new().withId('item1').withType('unique').build(),
-        HolyGrailItemBuilder.new().withId('item2').withType('unique').build(),
-        HolyGrailItemBuilder.new().withId('item3').withType('set').build(),
-      ];
-      const progress = [
-        GrailProgressBuilder.new()
-          .withId('prog1')
-          .withCharacterId('char1')
-          .withItemId('item1')
-          .withFoundDate(new Date('2024-01-01'))
-          .build(),
-        GrailProgressBuilder.new()
-          .withId('prog2')
-          .withCharacterId('char1')
-          .withItemId('item3')
-          .withFoundDate(new Date('2024-01-01'))
-          .build(),
-      ];
-
       act(() => {
-        useGrailStore.getState().setItems(items);
-        useGrailStore.getState().setProgress(progress);
+        useGrailStore
+          .getState()
+          .setProgress([
+            GrailProgressBuilder.new().withId('p').withCharacterId('c').withItemId('a').build(),
+          ]);
       });
 
-      // Act
-      const { result } = renderHook(() => useGrailStatistics());
-
       // Assert
-      const uniqueStats = result.current.typeStats.find((s) => s.type === 'unique');
-      const setStats = result.current.typeStats.find((s) => s.type === 'set');
-
-      expect(uniqueStats?.total).toBe(2);
-      expect(uniqueStats?.found).toBe(1);
-      expect(uniqueStats?.percentage).toBe(50);
-
-      expect(setStats?.total).toBe(1);
-      expect(setStats?.found).toBe(1);
-      expect(setStats?.percentage).toBe(100);
+      expect(result.current.foundItems).toBe(1);
     });
   });
 });

@@ -1,23 +1,33 @@
-import type { GrailProgress, GrailStatistics, Item, Settings } from 'electron/types/grail';
-import { useEffect, useRef, useState } from 'react';
-import { canItemBeEthereal, canItemBeNormal } from '@/lib/ethereal';
+import type { Settings } from 'electron/types/grail';
+import { useEffect, useRef } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { combineUnsubscribers, onMainEvent } from '@/lib/ipcEvents';
 import type { WidgetDisplayMode } from '@/lib/widget';
 import { resolveWidgetDisplayMode } from '@/lib/widget';
-import { useGrailStore } from '@/stores/grailStore';
+import {
+  affectsGrailFilter,
+  initGrailData,
+  useGrailStatistics,
+  useGrailStore,
+} from '@/stores/grailStore';
 import { useRunTrackerStore } from '@/stores/runTrackerStore';
 import { Widget } from './Widget';
 
+const NO_SETTINGS: Partial<Settings> = {};
+
 /**
  * Container component for the widget that handles data loading and state management.
- * Loads grail data from the Electron API and listens for updates.
+ * Loads the grail data into the store, computes the shared grail statistics from it and listens
+ * for updates from the main process.
  */
 export function WidgetContainer() {
-  const [statistics, setStatistics] = useState<GrailStatistics | null>(null);
-  const [settings, setSettings] = useState<Partial<Settings>>({});
-
-  // Share grail data with the global store so the widget can resolve run item names
-  const { setItems, setProgress, hydrateSettings: hydrateGrailSettings } = useGrailStore();
+  const storedSettings = useGrailStore((state) => state.settings);
+  const settingsLoaded = useGrailStore((state) => state.settingsHydrated);
+  const grailStatistics = useGrailStatistics();
+  // Until the stored settings are loaded the widget renders without settings or statistics,
+  // instead of briefly showing the defaults
+  const settings = settingsLoaded ? storedSettings : NO_SETTINGS;
+  const statistics = settingsLoaded ? grailStatistics : null;
 
   // Get run tracker store actions to handle IPC events
   const {
@@ -29,40 +39,22 @@ export function WidgetContainer() {
     loadSessionRuns,
     activeSession,
     loadRunItems,
-  } = useRunTrackerStore();
+  } = useRunTrackerStore(
+    useShallow((state) => ({
+      handleSessionStarted: state.handleSessionStarted,
+      handleSessionEnded: state.handleSessionEnded,
+      handleRunStarted: state.handleRunStarted,
+      handleRunEnded: state.handleRunEnded,
+      refreshActiveRun: state.refreshActiveRun,
+      loadSessionRuns: state.loadSessionRuns,
+      activeSession: state.activeSession,
+      loadRunItems: state.loadRunItems,
+    })),
+  );
 
-  // Load initial data and calculate statistics
-  // biome-ignore lint/correctness/useExhaustiveDependencies: Zustand actions are stable
-  useEffect(() => {
-    const loadData = async () => {
-      try {
-        // Load settings
-        const settingsData = await window.electronAPI?.grail.getSettings();
-        if (settingsData) {
-          setSettings(settingsData);
-          // Hydrate global grail settings so hooks like useTheme and Widget can use them
-          hydrateGrailSettings(settingsData);
-        }
-
-        // Load items and progress to calculate statistics
-        const items = await window.electronAPI?.grail.getItems();
-        const progress = await window.electronAPI?.grail.getProgress();
-
-        if (items && progress && settingsData) {
-          const stats = computeStatistics(items, progress, settingsData);
-          setStatistics(stats);
-
-          // Hydrate global grail data so run-only widget mode can resolve item names
-          setItems(items);
-          setProgress(progress);
-        }
-      } catch (error) {
-        console.error('Failed to load widget data:', error);
-      }
-    };
-
-    loadData();
-  }, []);
+  // Load the grail data (settings, items, progress) and keep the progress in sync. The run-only
+  // mode also uses it to resolve run item names.
+  useEffect(() => initGrailData(), []);
 
   // Load run tracker data on mount
   // biome-ignore lint/correctness/useExhaustiveDependencies: Zustand actions are stable
@@ -88,37 +80,9 @@ export function WidgetContainer() {
     loadRunTrackerData();
   }, [activeSession?.id]); // Re-run when active session changes
 
-  // Listen for grail progress updates
-  useEffect(() => {
-    const handleProgressUpdate = async () => {
-      try {
-        const [items, progress, settingsData] = await Promise.all([
-          window.electronAPI?.grail.getItems(),
-          window.electronAPI?.grail.getProgress(),
-          window.electronAPI?.grail.getSettings(),
-        ]);
-
-        if (items && progress && settingsData) {
-          const stats = computeStatistics(items, progress, settingsData);
-          setStatistics(stats);
-
-          // Hydrate grail store so run-only widget mode can resolve item names for runs
-          setItems(items);
-          setProgress(progress);
-        }
-      } catch (error) {
-        console.error('Failed to update widget statistics:', error);
-      }
-    };
-
-    // Listen for progress updates from the main process
-    return onMainEvent('grail-progress-updated', handleProgressUpdate);
-  }, [setItems, setProgress]);
-
   // Resize the native window whenever the mode the widget actually renders changes. That covers
   // display mode changes and ethereal tracking toggles (which switch split/all to overall)
   const effectiveDisplay = resolveWidgetDisplayMode(settings.widgetDisplay, settings.grailEthereal);
-  const settingsLoaded = settings.widgetDisplay !== undefined;
   const appliedDisplayRef = useRef<WidgetDisplayMode | undefined>(undefined);
   useEffect(() => {
     if (!settingsLoaded) {
@@ -135,34 +99,19 @@ export function WidgetContainer() {
     });
   }, [effectiveDisplay, settings, settingsLoaded]);
 
-  // Listen for settings updates
+  // Apply settings saved in the main window; a change of the tracked item types also changes
+  // which items count, so the grail data is reloaded
   useEffect(() => {
-    const handleSettingsUpdate = async (updatedSettings: Partial<Settings>) => {
+    return onMainEvent('settings-updated', (updatedSettings) => {
       // Opacity is applied by the widget's CSS from these settings; the settings UI already notifies
       // the main process, so no IPC is sent from here
-      setSettings((prev) => ({ ...prev, ...updatedSettings }));
-
-      // Recalculate statistics if grail settings changed
-      if (
-        updatedSettings.grailNormal !== undefined ||
-        updatedSettings.grailEthereal !== undefined ||
-        updatedSettings.grailRunes !== undefined ||
-        updatedSettings.grailRunewords !== undefined
-      ) {
-        const items = await window.electronAPI?.grail.getItems();
-        const progress = await window.electronAPI?.grail.getProgress();
-        if (items && progress) {
-          const stats = computeStatistics(items, progress, {
-            ...settings,
-            ...updatedSettings,
-          });
-          setStatistics(stats);
-        }
+      const { hydrateSettings, reloadData } = useGrailStore.getState();
+      hydrateSettings(updatedSettings);
+      if (affectsGrailFilter(updatedSettings)) {
+        void reloadData();
       }
-    };
-
-    return onMainEvent('settings-updated', handleSettingsUpdate);
-  }, [settings]);
+    });
+  }, []);
 
   // Listen for run tracker events for real-time updates
   useEffect(() => {
@@ -215,142 +164,4 @@ export function WidgetContainer() {
       onDragEnd={handleDragEnd}
     />
   );
-}
-
-/**
- * Checks if a progress entry is a recent find (within last 7 days).
- */
-function isRecentFind(progress: GrailProgress, sevenDaysAgo: Date): boolean {
-  if (!progress.foundDate) {
-    return false;
-  }
-  // Exclude items from initial scan from recent finds statistics
-  if (progress.fromInitialScan) {
-    return false;
-  }
-  const foundDate = new Date(progress.foundDate);
-  return foundDate >= sevenDaysAgo;
-}
-
-/**
- * Processes an item in separate tracking mode (grailEthereal enabled).
- */
-function processSeparateTracking(
-  item: Item,
-  progressMap: Map<string, GrailProgress>,
-  sevenDaysAgo: Date,
-  stats: {
-    totalItems: number;
-    foundItems: number;
-    normalTotal: number;
-    normalFound: number;
-    etherealTotal: number;
-    etherealFound: number;
-    recentFinds: number;
-  },
-): void {
-  if (canItemBeNormal(item)) {
-    stats.normalTotal++;
-    stats.totalItems++;
-    const normalProgress = progressMap.get(`${item.id}-false`);
-    if (normalProgress) {
-      stats.normalFound++;
-      stats.foundItems++;
-      if (isRecentFind(normalProgress, sevenDaysAgo)) {
-        stats.recentFinds++;
-      }
-    }
-  }
-
-  if (canItemBeEthereal(item)) {
-    stats.etherealTotal++;
-    stats.totalItems++;
-    const etherealProgress = progressMap.get(`${item.id}-true`);
-    if (etherealProgress) {
-      stats.etherealFound++;
-      stats.foundItems++;
-      if (isRecentFind(etherealProgress, sevenDaysAgo)) {
-        stats.recentFinds++;
-      }
-    }
-  }
-}
-
-/**
- * Processes an item in combined tracking mode (grailEthereal disabled).
- */
-function processCombinedTracking(
-  item: Item,
-  progressMap: Map<string, GrailProgress>,
-  sevenDaysAgo: Date,
-  stats: {
-    totalItems: number;
-    foundItems: number;
-    recentFinds: number;
-  },
-): void {
-  stats.totalItems++;
-  const normalProgress = progressMap.get(`${item.id}-false`);
-  const etherealProgress = progressMap.get(`${item.id}-true`);
-
-  if (normalProgress || etherealProgress) {
-    stats.foundItems++;
-    const latestProgress = normalProgress || etherealProgress;
-    if (latestProgress && isRecentFind(latestProgress, sevenDaysAgo)) {
-      stats.recentFinds++;
-    }
-  }
-}
-
-/**
- * Computes grail statistics from items and progress data.
- */
-function computeStatistics(
-  items: Item[],
-  progress: GrailProgress[],
-  settings: Partial<Settings>,
-): GrailStatistics {
-  const foundProgress = progress.filter((p) => p.foundDate !== undefined);
-  const progressMap = new Map(foundProgress.map((p) => [`${p.itemId}-${p.isEthereal}`, p]));
-
-  const stats = {
-    totalItems: 0,
-    foundItems: 0,
-    normalTotal: 0,
-    normalFound: 0,
-    etherealTotal: 0,
-    etherealFound: 0,
-    recentFinds: 0,
-  };
-
-  const sevenDaysAgo = new Date();
-  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-
-  for (const item of items) {
-    if (settings.grailEthereal) {
-      processSeparateTracking(item, progressMap, sevenDaysAgo, stats);
-    } else {
-      processCombinedTracking(item, progressMap, sevenDaysAgo, stats);
-    }
-  }
-
-  const completionPercentage =
-    stats.totalItems > 0 ? (stats.foundItems / stats.totalItems) * 100 : 0;
-
-  return {
-    totalItems: stats.totalItems,
-    foundItems: stats.foundItems,
-    completionPercentage,
-    normalItems: {
-      total: stats.normalTotal,
-      found: stats.normalFound,
-    },
-    etherealItems: {
-      total: stats.etherealTotal,
-      found: stats.etherealFound,
-    },
-    recentFinds: stats.recentFinds,
-    currentStreak: 0, // Not calculated in widget
-    maxStreak: 0, // Not calculated in widget
-  };
 }
