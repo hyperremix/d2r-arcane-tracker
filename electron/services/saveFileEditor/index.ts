@@ -30,7 +30,7 @@ interface StashConstants {
   version: number;
 }
 
-interface MoveSaveFileItemOptions {
+export interface MoveSaveFileItemOptions {
   sourceFilePath: string;
   sourceFileType: VaultSourceFileType;
   sourceItemId: number | undefined;
@@ -1129,12 +1129,6 @@ async function removeItemFromSaveFileUnlocked(
 // Byte offset within the sector header where the total sector size (header + payload) is stored.
 const D2I_SECTOR_SIZE_FIELD_OFFSET = 16;
 
-/**
- * Appends one item to a shared stash sector (tabs 0–4) inside a modern .d2i file.
- * The sector payload is a standard JM item list. We binary-splice: reuse existing
- * item bytes unchanged and only serialize the new item, then patch the count field
- * and sector size and rebuild the file buffer.
- */
 // Byte offsets within a JM item-list header.
 const JM_ITEM_COUNT_OFFSET = 2; // bytes 2-3 = LE uint16 item count
 const JM_ITEM_DATA_OFFSET = 4; // item bytes start at byte 4
@@ -1568,6 +1562,12 @@ function pickGridSpan(item: d2sTypes.IItem): Partial<d2sTypes.IItem> {
   return { inv_width, inv_height } as Partial<d2sTypes.IItem>;
 }
 
+/**
+ * Appends one item to a shared stash sector (tabs 0–4) inside a modern .d2i file.
+ * The sector payload is a standard JM item list. We binary-splice: reuse existing
+ * item bytes unchanged and only serialize the new item, then patch the count field
+ * and sector size and rebuild the file buffer.
+ */
 async function addItemToModernStashSharedPageBuffer(
   buffer: Buffer,
   item: d2sTypes.IItem,
@@ -1835,7 +1835,7 @@ async function addItemToSaveFileUnlocked(
   await writeClassicStashFile(filePath, data, { constants, version });
 }
 
-interface SplitStackTarget {
+export interface SplitStackTarget {
   targetFilePath: string;
   targetFileType: VaultSourceFileType;
   targetLocationContext: VaultLocationContext;
@@ -1844,7 +1844,7 @@ interface SplitStackTarget {
   targetGridY: number;
 }
 
-interface SplitStackOptions {
+export interface SplitStackOptions {
   sourceFilePath: string;
   sourceFileType: VaultSourceFileType;
   sourceStashTab: number;
@@ -1891,14 +1891,6 @@ function withReducedQuantity(item: d2sTypes.IItem, reduceBy: number): d2sTypes.I
   return { ...item, quantity: next };
 }
 
-/**
- * Reduces the quantity of a stackable item in a modern stash resource sector (runes/gems/materials).
- * Removes the item entirely if its quantity reaches zero.
- *
- * Searches ALL resource sectors (JM sectors at index >= SHARED_TAB_COUNT) for the best matching
- * source entry by item code and optional source hints. Uses binary splice: only the modified item
- * is re-serialized; all other items keep their original raw bytes, avoiding round-trip data loss.
- */
 interface ModernResourceSector {
   sectorIndex: number;
   offset: number;
@@ -2159,6 +2151,14 @@ async function addItemToModernStashResourceSector(
   await writeSaveFile(filePath, nextBuffer);
 }
 
+/**
+ * Reduces the quantity of a stackable item in a modern stash resource sector (runes/gems/materials).
+ * Removes the item entirely if its quantity reaches zero.
+ *
+ * Searches ALL resource sectors (JM sectors at index >= SHARED_TAB_COUNT) for the best matching
+ * source entry by item code and optional source hints. Uses binary splice: only the modified item
+ * is re-serialized; all other items keep their original raw bytes, avoiding round-trip data loss.
+ */
 async function reduceItemInModernStashResourceSector(
   filePath: string,
   itemCode: string,
@@ -2178,9 +2178,13 @@ async function reduceItemInModernStashResourceSector(
 }
 
 /**
- * Splits `splitCount` items off a stack in a classic stash or character save file.
+ * Splits `splitCount` items off a stack and places one item at each target.
  *
- * Modern stash files (d2i v105+) are read-only and will throw MODERN_STASH_READ_ONLY.
+ * Character saves (.d2s) and classic stashes (.sss/.d2x and pre-v105 .d2i) are edited through the
+ * d2s library. A modern stash (.d2i v105+) source needs `sourceRawItemJson`: its resource-tab stack
+ * (runes/gems/materials) is reduced and the copies go to the writable shared tabs (0–4) or to other
+ * save files. A modern stash source without `sourceRawItemJson`, or a modern stash target outside
+ * the shared tabs, throws MODERN_STASH_READ_ONLY.
  */
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: This function coordinates d2s, classic stash, and multi-target file writes in a single operation. Splitting further would require passing complex partial state between helpers.
 async function splitStackInSaveFileUnlocked(options: SplitStackOptions): Promise<void> {
