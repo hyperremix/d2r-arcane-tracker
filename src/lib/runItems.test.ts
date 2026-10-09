@@ -67,3 +67,23 @@ describe('When run items are resolved', () => {
     });
   });
 });
+
+describe('When several records share an id', () => {
+  describe('If the run item links to a duplicated progress or item id', () => {
+    it('Then the first record wins, like the Array.find lookups it replaced', () => {
+      // Arrange
+      const firstItem = { id: 'dup-item', name: 'First' } as Item;
+      const secondItem = { id: 'dup-item', name: 'Second' } as Item;
+      const firstProgress = { id: 'dup-progress', itemId: 'dup-item' } as GrailProgress;
+      const secondProgress = { id: 'dup-progress', itemId: 'other' } as GrailProgress;
+      const lookup = createRunItemLookup([firstItem, secondItem], [firstProgress, secondProgress]);
+
+      // Act
+      const resolved = resolveRunItem(makeRunItem({ grailProgressId: 'dup-progress' }), lookup);
+
+      // Assert
+      expect(resolved.progress).toBe(firstProgress);
+      expect(resolved.item).toBe(firstItem);
+    });
+  });
+});

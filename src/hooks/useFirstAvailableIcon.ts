@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { getCachedIcon, isIconMissing, loadFirstIcon } from '@/lib/iconLoader';
 import placeholderUrl from '/images/placeholder-item.svg';
 
@@ -41,13 +41,19 @@ export function useFirstAvailableIcon(
   // A string key keeps the effect stable when callers pass a new array with the same candidates
   const key = candidates.join('\n');
   const [loaded, setLoaded] = useState<LoadedIcon | undefined>(undefined);
+  // Key the hook settled on straight from the cache, without loading anything. Once settled, the
+  // hook keeps that answer even if forgetMissingIcons() later removes it from the cache; it only
+  // asks again for another key or after a remount.
+  const settledFromCacheKey = useRef<string | undefined>(undefined);
 
   useEffect(() => {
+    settledFromCacheKey.current = undefined;
     if (!enabled) {
       return;
     }
     const requested = key === '' ? [] : key.split('\n');
     if (resolveFromCache(requested) !== undefined) {
+      settledFromCacheKey.current = key;
       return;
     }
 
@@ -71,6 +77,9 @@ export function useFirstAvailableIcon(
   }
   if (loaded?.key === key) {
     return { iconUrl: loaded.iconUrl, isLoading: false };
+  }
+  if (settledFromCacheKey.current === key) {
+    return { iconUrl: PLACEHOLDER_ICON_URL, isLoading: false };
   }
   return { iconUrl: PLACEHOLDER_ICON_URL, isLoading: true };
 }

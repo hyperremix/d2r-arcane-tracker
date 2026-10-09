@@ -22,16 +22,26 @@ export interface ResolvedRunItem {
 }
 
 /**
+ * Indexes records by id. With duplicate ids the first record wins, like `Array.find` did.
+ */
+function indexById<T extends { id: string }>(records: readonly T[]): Map<string, T> {
+  const byId = new Map<string, T>();
+  for (const record of records) {
+    if (!byId.has(record.id)) {
+      byId.set(record.id, record);
+    }
+  }
+  return byId;
+}
+
+/**
  * Indexes grail items and progress records by id. Build it once per data change (e.g. in a
  * `useMemo`) and reuse it for every run item.
  * @param items - All grail items
  * @param progress - All grail progress records
  */
 export function createRunItemLookup(items: Item[], progress: GrailProgress[]): RunItemLookup {
-  return {
-    itemsById: new Map(items.map((item) => [item.id, item])),
-    progressById: new Map(progress.map((entry) => [entry.id, entry])),
-  };
+  return { itemsById: indexById(items), progressById: indexById(progress) };
 }
 
 /**

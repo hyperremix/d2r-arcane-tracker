@@ -1,6 +1,7 @@
 import { renderHook, waitFor } from '@testing-library/react';
 import type { Item } from 'electron/types/grail';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { forgetMissingIcons, loadIconByFilename } from '@/lib/iconLoader';
 import { mockStoreState } from '@/test/storeMock';
 import { useItemIcon } from './useItemIcon';
 import { useSpriteIcon } from './useSpriteIcon';
@@ -14,6 +15,7 @@ vi.mock('@/stores/grailStore', () => ({
 const windowGlobals = window as unknown as { electronAPI: unknown };
 const originalElectronAPI = windowGlobals.electronAPI;
 const getByFilename = vi.fn<(filename: string) => Promise<string | null>>();
+let consoleErrorSpy: ReturnType<typeof vi.spyOn> | undefined;
 
 const makeItem = (overrides: Partial<Item> = {}): Item =>
   ({ id: 'shako', name: 'Harlequin Crest', imageFilename: 'shako.png', ...overrides }) as Item;
@@ -32,6 +34,8 @@ describe('When useItemIcon is used', () => {
 
   afterEach(() => {
     windowGlobals.electronAPI = originalElectronAPI;
+    consoleErrorSpy?.mockRestore();
+    consoleErrorSpy = undefined;
   });
 
   describe('If item icons are disabled in settings', () => {
@@ -99,7 +103,7 @@ describe('When useItemIcon is used', () => {
   describe('If loading the icon fails', () => {
     it('Then it falls back to the placeholder and finishes loading', async () => {
       // Arrange
-      vi.spyOn(console, 'error').mockImplementation(() => undefined);
+      consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
       getByFilename.mockRejectedValue(new Error('read failed'));
 
       // Act
@@ -108,7 +112,39 @@ describe('When useItemIcon is used', () => {
       // Assert
       await waitFor(() => expect(result.current.isLoading).toBe(false));
       expect(result.current.iconUrl).toMatch(/placeholder-item\.svg|data:image\/svg\+xml/);
-      vi.mocked(console.error).mockRestore();
+    });
+  });
+
+  describe('If the icon was known to be missing when the hook mounted', () => {
+    it('Then forgetting the missing icons does not flip the mounted hook back to loading', async () => {
+      // Arrange
+      getByFilename.mockResolvedValue(null);
+      await loadIconByFilename('shako.png');
+      const { result, rerender } = renderHook(() => useItemIcon(makeItem()));
+      expect(result.current.isLoading).toBe(false);
+
+      // Act
+      forgetMissingIcons();
+      rerender();
+
+      // Assert
+      expect(result.current.isLoading).toBe(false);
+      expect(result.current.iconUrl).toMatch(/placeholder-item\.svg|data:image\/svg\+xml/);
+      expect(getByFilename).toHaveBeenCalledTimes(1);
+    });
+
+    it('Then a hook that mounts after forgetting the missing icons asks again', async () => {
+      // Arrange
+      getByFilename.mockResolvedValueOnce(null).mockResolvedValueOnce('data:shako');
+      await loadIconByFilename('shako.png');
+      forgetMissingIcons();
+
+      // Act
+      const { result } = renderHook(() => useItemIcon(makeItem()));
+
+      // Assert
+      await waitFor(() => expect(result.current.iconUrl).toBe('data:shako'));
+      expect(getByFilename).toHaveBeenCalledTimes(2);
     });
   });
 });

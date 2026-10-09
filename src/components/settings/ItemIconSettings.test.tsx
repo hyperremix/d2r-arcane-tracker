@@ -56,7 +56,7 @@ describe('When a sprite conversion is started from the item icon settings', () =
   });
 
   describe('If the conversion succeeds', () => {
-    it('Then icons that were missing before are requested again', async () => {
+    it('Then icons that were missing before are no longer remembered as missing', async () => {
       // Arrange
       getByFilename.mockResolvedValue(null);
       await loadIconByFilename('ber.png');
@@ -78,7 +78,7 @@ describe('When a sprite conversion is started from the item icon settings', () =
   });
 
   describe('If the conversion reports failure', () => {
-    it('Then icons that were missing before are requested again', async () => {
+    it('Then icons that were missing before are no longer remembered as missing', async () => {
       // Arrange
       getByFilename.mockResolvedValue(null);
       await loadIconByFilename('ber.png');
@@ -100,7 +100,7 @@ describe('When a sprite conversion is started from the item icon settings', () =
   });
 
   describe('If the conversion throws part-way', () => {
-    it('Then icons that were missing before are requested again', async () => {
+    it('Then icons that were missing before are no longer remembered as missing', async () => {
       // Arrange
       vi.spyOn(console, 'error').mockImplementation(() => undefined);
       getByFilename.mockResolvedValue(null);
