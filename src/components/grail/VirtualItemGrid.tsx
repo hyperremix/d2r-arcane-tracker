@@ -154,7 +154,7 @@ export function createGridRows(
  * Tracks how many grid columns fit into the element's width, updating on resize.
  * Only the column count is stored, so resizes that keep the same count do not re-render.
  */
-function useElementColumnCount(elementRef: React.RefObject<HTMLDivElement | null>): number {
+export function useElementColumnCount(elementRef: React.RefObject<HTMLDivElement | null>): number {
   const [columnCount, setColumnCount] = useState(1);
 
   useLayoutEffect(() => {
@@ -212,7 +212,7 @@ export const VirtualItemGrid = memo(function VirtualItemGrid({
       rows[index]?.type === 'header' ? HEADER_ROW_HEIGHT_ESTIMATE : ITEM_ROW_HEIGHT_ESTIMATE,
     [rows],
   );
-  const getItemKey = useCallback((index: number) => rows[index]?.key ?? index, [rows]);
+  const getItemKey = useCallback((index: number) => rows[index].key, [rows]);
 
   const rowVirtualizer = useVirtualizer({
     count: rows.length,
@@ -234,7 +234,6 @@ export const VirtualItemGrid = memo(function VirtualItemGrid({
       >
         {rowVirtualizer.getVirtualItems().map((virtualRow) => {
           const row = rows[virtualRow.index];
-          if (!row) return null;
 
           return (
             <div
@@ -265,10 +264,11 @@ export const VirtualItemGrid = memo(function VirtualItemGrid({
               ) : (
                 <div
                   data-testid="item-grid-row"
-                  className="grid items-start pb-4"
+                  className="grid items-start"
                   style={{
                     gridTemplateColumns: `repeat(${columnCount}, minmax(0, 1fr))`,
                     columnGap: COLUMN_GUTTER,
+                    paddingBottom: COLUMN_GUTTER,
                   }}
                 >
                   {row.items.map((item) => (

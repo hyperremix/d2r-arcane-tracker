@@ -1,4 +1,4 @@
-import { act, render, screen } from '@testing-library/react';
+import { act, render, renderHook, screen } from '@testing-library/react';
 import type { Character, GrailProgress, Item } from 'electron/types/grail';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
@@ -6,6 +6,7 @@ import {
   createGridRows,
   getColumnCount,
   MIN_COLUMN_WIDTH,
+  useElementColumnCount,
   VirtualItemGrid,
 } from './VirtualItemGrid';
 
@@ -102,18 +103,26 @@ describe('VirtualItemGrid Column Count Calculation', () => {
         // Arrange
         const twoColumnThreshold = 2 * MIN_COLUMN_WIDTH + COLUMN_GUTTER;
 
-        // Act & Assert
-        expect(getColumnCount(320)).toBe(1);
-        expect(getColumnCount(twoColumnThreshold - 1)).toBe(1);
+        // Act
+        const narrowColumnCount = getColumnCount(320);
+        const justBelowThresholdColumnCount = getColumnCount(twoColumnThreshold - 1);
+
+        // Assert
+        expect(narrowColumnCount).toBe(1);
+        expect(justBelowThresholdColumnCount).toBe(1);
       });
     });
 
     describe('If the container width is zero, negative or not a number', () => {
       it('Then should fall back to 1 column', () => {
-        // Arrange & Act & Assert
-        expect(getColumnCount(0)).toBe(1);
-        expect(getColumnCount(-100)).toBe(1);
-        expect(getColumnCount(Number.NaN)).toBe(1);
+        // Arrange
+        const invalidWidths = [0, -100, Number.NaN];
+
+        // Act
+        const columnCounts = invalidWidths.map((width) => getColumnCount(width));
+
+        // Assert
+        expect(columnCounts).toEqual([1, 1, 1]);
       });
     });
 
@@ -123,11 +132,16 @@ describe('VirtualItemGrid Column Count Calculation', () => {
         const widthFor = (columns: number) =>
           columns * MIN_COLUMN_WIDTH + (columns - 1) * COLUMN_GUTTER;
 
-        // Act & Assert
-        expect(getColumnCount(widthFor(2))).toBe(2);
-        expect(getColumnCount(widthFor(3))).toBe(3);
-        expect(getColumnCount(widthFor(6))).toBe(6);
-        expect(getColumnCount(widthFor(6) - 1)).toBe(5);
+        // Act
+        const columnCounts = [
+          getColumnCount(widthFor(2)),
+          getColumnCount(widthFor(3)),
+          getColumnCount(widthFor(6)),
+          getColumnCount(widthFor(6) - 1),
+        ];
+
+        // Assert
+        expect(columnCounts).toEqual([2, 3, 6, 5]);
       });
     });
 
@@ -634,42 +648,14 @@ describe('When VirtualItemGrid is rendered without group headers', () => {
       expect(onItemClick).toHaveBeenCalledWith('item-1');
     });
   });
-
-  describe('If the group has far more items than fit into the viewport', () => {
-    it('Then only the rows near the top of the scroll container are mounted', () => {
-      // Arrange
-      stubLayout({ height: 600 });
-      const items = Array.from({ length: 50 }, (_, n) =>
-        createMockItem({ id: `item-${n}`, name: `Item ${n}` }),
-      );
-
-      // Act
-      render(
-        <VirtualItemGrid
-          groupedItems={[{ title: 'All Items', items, foundCount: 0 }]}
-          showGroupHeaders={false}
-          progressLookup={createMockProgressLookup()}
-          characters={[]}
-          onItemClick={vi.fn()}
-        />,
-      );
-
-      // Assert
-      const renderedCards = screen.getAllByTestId(/^item-card-/);
-      expect(renderedCards.length).toBeGreaterThan(0);
-      expect(renderedCards.length).toBeLessThan(items.length);
-      expect(screen.getByTestId('item-card-item-0')).toBeInTheDocument();
-      expect(screen.queryByTestId('item-card-item-49')).not.toBeInTheDocument();
-    });
-  });
 });
 
-describe('VirtualItemGrid Column Sizing', () => {
+describe('When VirtualItemGrid is sized to its container', () => {
   afterEach(() => {
     vi.restoreAllMocks();
   });
 
-  describe('When VirtualItemGrid renders a group in a container that fits three columns', () => {
+  describe('If the container fits three columns', () => {
     it('Then rows use the fitting column count and the column gutter', () => {
       // Arrange
       stubLayout({ width: widthForColumns(3) });
@@ -697,6 +683,7 @@ describe('VirtualItemGrid Column Sizing', () => {
       expect(rows).toHaveLength(2);
       expect(rows[0].style.gridTemplateColumns).toBe('repeat(3, minmax(0, 1fr))');
       expect(rows[0].style.columnGap).toBe(`${COLUMN_GUTTER}px`);
+      expect(rows[0].style.paddingBottom).toBe(`${COLUMN_GUTTER}px`);
       expect(rows[0].children).toHaveLength(3);
       expect(rows[1].children).toHaveLength(1);
     });
@@ -708,7 +695,10 @@ describe('When VirtualItemGrid renders a group with far more items than fit into
     vi.restoreAllMocks();
   });
 
-  describe('If the scroll container is at the top', () => {
+  describe.each([
+    { showGroupHeaders: true },
+    { showGroupHeaders: false },
+  ])('If the group headers are shown: $showGroupHeaders', ({ showGroupHeaders }) => {
     it('Then only the rows near the top of the scroll container are mounted', () => {
       // Arrange
       stubLayout({ height: 600 });
@@ -720,7 +710,7 @@ describe('When VirtualItemGrid renders a group with far more items than fit into
       render(
         <VirtualItemGrid
           groupedItems={[{ title: 'Unique Armor', items, foundCount: 0 }]}
-          showGroupHeaders
+          showGroupHeaders={showGroupHeaders}
           progressLookup={createMockProgressLookup()}
           characters={[]}
           onItemClick={vi.fn()}
@@ -731,9 +721,63 @@ describe('When VirtualItemGrid renders a group with far more items than fit into
       const renderedCards = screen.getAllByTestId(/^item-card-/);
       expect(renderedCards.length).toBeGreaterThan(0);
       expect(renderedCards.length).toBeLessThan(items.length);
-      expect(screen.getByText('Unique Armor')).toBeInTheDocument();
       expect(screen.getByTestId('item-card-item-0')).toBeInTheDocument();
       expect(screen.queryByTestId('item-card-item-49')).not.toBeInTheDocument();
+      expect(screen.queryByText('Unique Armor') !== null).toBe(showGroupHeaders);
+    });
+  });
+});
+
+describe('When useElementColumnCount is used', () => {
+  describe('If the ref is not attached to an element', () => {
+    it('Then keeps the single-column fallback', () => {
+      // Arrange
+      const detachedRef = { current: null };
+
+      // Act
+      const { result } = renderHook(() => useElementColumnCount(detachedRef));
+
+      // Assert
+      expect(result.current).toBe(1);
+    });
+  });
+});
+
+describe('When the items of a rendered VirtualItemGrid shrink to fewer rows', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  describe('If the grid is re-rendered with a shorter list', () => {
+    it('Then only the remaining rows are rendered', () => {
+      // Arrange
+      stubLayout({ height: 600, width: widthForColumns(1) });
+      const createGroups = (count: number) => [
+        {
+          title: 'Unique Armor',
+          items: Array.from({ length: count }, (_, n) =>
+            createMockItem({ id: `item-${n}`, name: `Item ${n}` }),
+          ),
+          foundCount: 0,
+        },
+      ];
+      const renderGrid = (count: number) => (
+        <VirtualItemGrid
+          groupedItems={createGroups(count)}
+          showGroupHeaders
+          progressLookup={createMockProgressLookup()}
+          characters={[]}
+          onItemClick={vi.fn()}
+        />
+      );
+      const { rerender } = render(renderGrid(20));
+
+      // Act
+      rerender(renderGrid(2));
+
+      // Assert
+      expect(screen.getAllByTestId('item-grid-row')).toHaveLength(2);
+      expect(screen.queryByTestId('item-card-item-2')).not.toBeInTheDocument();
     });
   });
 });

@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import type { GrailFilter, Item, Settings } from 'electron/types/grail';
 import { GameMode, GameVersion } from 'electron/types/grail';
+import { useEffect } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { HolyGrailItemBuilder } from '@/fixtures';
 import type { ProgressLookupData } from '@/hooks/useProgressLookup';
@@ -493,8 +494,8 @@ describe('When createListRows is called', () => {
 // Component tests
 // ============================================================================
 
-// Records the groupedItems prop of every VirtualItemGrid render
-const groupedGridRenders = vi.hoisted(() => ({ groupedItems: [] as unknown[] }));
+// Records the groupedItems prop of every VirtualItemGrid render and how often it is mounted
+const groupedGridRenders = vi.hoisted(() => ({ groupedItems: [] as unknown[], mounts: 0 }));
 
 // Mock dependencies for component tests
 vi.mock('@/stores/grailStore', async (importOriginal) => ({
@@ -534,6 +535,9 @@ vi.mock('./VirtualItemGrid', () => ({
     onItemClick: (itemId: string) => void;
   }) => {
     groupedGridRenders.groupedItems.push(groupedItems);
+    useEffect(() => {
+      groupedGridRenders.mounts += 1;
+    }, []);
     const itemCount = groupedItems.reduce((count, group) => count + group.items.length, 0);
     return (
       <div data-testid="virtual-item-grid" data-show-group-headers={String(showGroupHeaders)}>
@@ -608,6 +612,7 @@ describe('When ItemGrid component is rendered', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     groupedGridRenders.groupedItems.length = 0;
+    groupedGridRenders.mounts = 0;
     setupComponentMocks();
   });
 
@@ -676,6 +681,70 @@ describe('When ItemGrid component is rendered', () => {
       // Assert
       const titles = screen.getAllByTestId('group-title').map((el) => el.textContent);
       expect(titles).toEqual(['Unique', 'Runeword']);
+    });
+  });
+
+  describe('If viewMode "grid" and the groupMode switches between "none" and a grouping', () => {
+    it('Then the grid is remounted, but not when switching between two groupings', () => {
+      // Arrange
+      const items = HolyGrailItemBuilder.new().buildMany(3);
+      setupComponentMocks({ filteredItems: items, viewMode: 'grid', groupMode: 'none' });
+      render(<ItemGrid />);
+      const mountsAfterUngroupedRender = groupedGridRenders.mounts;
+      // ItemGrid is memoized and reads the mocked store, so a state change (selecting an item)
+      // is what makes it render again with the updated group mode
+      const renderWithGroupMode = (groupMode: string) => {
+        setupComponentMocks({ filteredItems: items, viewMode: 'grid', groupMode });
+        fireEvent.click(screen.getByRole('button', { name: 'select item' }));
+      };
+
+      // Act
+      renderWithGroupMode('category');
+      const mountsAfterGroupedRender = groupedGridRenders.mounts;
+      renderWithGroupMode('type');
+
+      // Assert
+      expect(mountsAfterUngroupedRender).toBe(1);
+      expect(mountsAfterGroupedRender).toBe(2);
+      expect(groupedGridRenders.mounts).toBe(2);
+    });
+  });
+
+  describe('If viewMode "grid" and an item is found', () => {
+    it('Then only counts found items per group while group headers are shown', () => {
+      // Arrange
+      const items = [HolyGrailItemBuilder.new().withId('found').build()];
+      const progressLookup = new Map<string, ProgressLookupData>([
+        [
+          'found',
+          {
+            normalFound: true,
+            etherealFound: false,
+            normalProgress: [],
+            etherealProgress: [],
+            overallFound: true,
+          },
+        ],
+      ]);
+      const lastFoundCount = () =>
+        (
+          groupedGridRenders.groupedItems[groupedGridRenders.groupedItems.length - 1] as Array<{
+            foundCount: number;
+          }>
+        )[0].foundCount;
+
+      // Act
+      setupComponentMocks({ filteredItems: items, groupMode: 'category', progressLookup });
+      const { unmount } = render(<ItemGrid />);
+      const groupedFoundCount = lastFoundCount();
+      unmount();
+      setupComponentMocks({ filteredItems: items, groupMode: 'none', progressLookup });
+      render(<ItemGrid />);
+      const ungroupedFoundCount = lastFoundCount();
+
+      // Assert
+      expect(groupedFoundCount).toBe(1);
+      expect(ungroupedFoundCount).toBe(0);
     });
   });
 

@@ -14,6 +14,7 @@ import { itemCategoryLabelKeys, itemTypeLabelKeys } from '@/lib/labelKeys';
 import { countActiveFilters, useFilteredItems, useGrailStore } from '@/stores/grailStore';
 import { ItemDetailsDialog } from './ItemDetailsDialog';
 import { getItemGridEmptyStateVariant, ItemGridEmptyState } from './ItemGridEmptyState';
+import type { ItemGridGroup } from './VirtualItemGrid';
 import { ItemCardCell, VirtualItemGrid } from './VirtualItemGrid';
 
 /**
@@ -66,6 +67,11 @@ type ViewMode = 'grid' | 'list';
  * Type representing the available grouping modes for organizing items.
  */
 type GroupMode = 'none' | 'category' | 'type' | 'ethereal';
+
+/**
+ * A group of items before its found count is known (the count is added for the grid).
+ */
+type ItemGroup = Omit<ItemGridGroup, 'foundCount'>;
 
 /**
  * ItemGrid component that displays Holy Grail items in a filterable, sortable, and groupable grid or list view.
@@ -203,7 +209,7 @@ type VirtualRowType =
  * Props interface for VirtualizedItemsContainer component.
  */
 interface VirtualizedItemsContainerProps {
-  groupedItems: Array<{ title: string; items: Item[] }>;
+  groupedItems: ItemGroup[];
   viewMode: ViewMode;
   groupMode: GroupMode;
   progressLookup: ReturnType<typeof useProgressLookup>;
@@ -319,7 +325,7 @@ function renderVirtualRow({
  * Props for the ListVirtualizedContainer component.
  */
 interface ListVirtualizedContainerProps {
-  groupedItems: Array<{ title: string; items: Item[] }>;
+  groupedItems: ItemGroup[];
   groupMode: GroupMode;
   progressLookup: ReturnType<typeof useProgressLookup>;
   characters: Character[];
@@ -399,7 +405,7 @@ function ListVirtualizedContainer({
  * Props for the GridContainer component.
  */
 interface GridContainerProps {
-  groupedItems: Array<{ title: string; items: Item[] }>;
+  groupedItems: ItemGroup[];
   showGroupHeaders: boolean;
   progressLookup: ReturnType<typeof useProgressLookup>;
   characters: Character[];
@@ -422,9 +428,10 @@ function GridContainer({
     () =>
       groupedItems.map((group) => ({
         ...group,
-        foundCount: calculateGroupFoundCount(group.items, progressLookup),
+        // The found count is only shown in group headers, so skip counting when they are hidden
+        foundCount: showGroupHeaders ? calculateGroupFoundCount(group.items, progressLookup) : 0,
       })),
-    [groupedItems, progressLookup],
+    [groupedItems, progressLookup, showGroupHeaders],
   );
 
   return (
