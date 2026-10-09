@@ -12,6 +12,7 @@ import {
   resolveTargetEquippedSlotId,
 } from '@/components/inventory/equipValidation';
 import { EQUIPPED_SLOT_IDS, type PaperDollSlotKey } from '@/components/inventory/spatialLayout';
+import { REPRESENTATIVE_ITEM_CODES } from '@/test/equipRepresentativeItems';
 
 interface ItemTable {
   c?: unknown;
@@ -26,43 +27,6 @@ interface ConstantTables {
 /** The save file editor looks item codes up in the v99 and v96 tables. */
 const MAIN_PROCESS_METADATA = buildItemEquipMetadataByCode([constants99, constants96]);
 
-/** Representative items of every slot family, including class-specific and two-handed items. */
-const REPRESENTATIVE_ITEM_CODES = [
-  'cap', // Cap (helm)
-  'uap', // Shako (helm)
-  'ci0', // Circlet
-  'ci3', // Diadem
-  'dr1', // Wolf Head (druid pelt)
-  'ba1', // Jawbone Cap (barbarian helm)
-  'uh9', // Bone Visage
-  'qui', // Quilted Armor
-  'uui', // Dusk Shroud
-  'lgl', // Leather Gloves
-  'hgl', // Gauntlets
-  'lbt', // Boots
-  'uvb', // Scarabshell Boots
-  'lbl', // Sash
-  'vbl', // Light Belt
-  'buc', // Buckler
-  'lrg', // Large Shield
-  'pa1', // Targe (paladin shield)
-  'ne1', // Preserved Head (necromancer shield)
-  'ssd', // Short Sword
-  '2hs', // Two-Handed Sword
-  '7gd', // Colossus Blade
-  '7wa', // Berserker Axe
-  'ktr', // Katar (assassin claw)
-  'ob1', // Eagle Orb (sorceress)
-  'am1', // Stag Bow (amazon)
-  'sbw', // Short Bow
-  '6cs', // Elder Staff
-  'jav', // Javelin
-  'rin', // Ring
-  'amu', // Amulet
-  'r01', // El Rune (not equippable)
-  'gsv', // Amethyst (not equippable)
-];
-
 function findItemTable(constants: ConstantTables, code: string): ItemTable | undefined {
   return constants.armor_items[code] ?? constants.weapon_items[code] ?? constants.other_items[code];
 }
@@ -76,26 +40,40 @@ function mainProcessSlotIds(code: string): number[] {
   return [...(slots ?? [])].sort((left, right) => left - right);
 }
 
-describe('When the browser highlights equipment slots for a dragged item', () => {
-  it.each([
+/**
+ * Data plumbing parity only: the d2s item table categories (which the save file editor reads) and
+ * the categories d2s stores on a parsed item (`rawItemJson.categories`, which the browser reads)
+ * must resolve to the same slots. Both sides use the shared `resolveEligibleEquippedSlotIds`, so
+ * this does not test the rules themselves; the editor's real accept/reject behavior is covered by
+ * `saveFileEditor.equipEligibility.test.ts`.
+ */
+describe('When the item table categories and the parsed item categories resolve equip slots', () => {
+  const versions = [
     ['v99', constants99 as unknown as ConstantTables],
     ['v105', constants105 as unknown as ConstantTables],
-  ])('Then it allows exactly the slots the save file editor accepts (%s parse)', (_version, constants) => {
-    for (const code of REPRESENTATIVE_ITEM_CODES) {
-      // Arrange: d2s stores the item type categories of its constant data on the parsed item.
-      const rawItemJson = JSON.stringify({
-        type: code,
-        categories: findItemTable(constants, code)?.c,
-      });
+  ] as const;
+  const cases = versions.flatMap(([version, constants]) =>
+    REPRESENTATIVE_ITEM_CODES.map((code) => [version, code, constants] as const),
+  );
 
-      // Act
-      const rendererSlots = toPaperDollSlotIds(resolveEligibleEquipmentSlots({ rawItemJson }));
+  it.each(
+    cases,
+  )('Then the %s parse of item %s allows the slots of its table entry', (_version, code, constants) => {
+    // Arrange: d2s stores the item type categories of its constant data on the parsed item.
+    const rawItemJson = JSON.stringify({
+      type: code,
+      categories: findItemTable(constants, code)?.c,
+    });
 
-      // Assert
-      expect({ code, slots: rendererSlots }).toEqual({ code, slots: mainProcessSlotIds(code) });
-    }
+    // Act
+    const rendererSlots = toPaperDollSlotIds(resolveEligibleEquipmentSlots({ rawItemJson }));
+
+    // Assert
+    expect(rendererSlots).toEqual(mainProcessSlotIds(code));
   });
+});
 
+describe('When the browser highlights equipment slots for a dragged item', () => {
   it.each([
     ['uap', ['head']],
     ['dr1', ['head']],
