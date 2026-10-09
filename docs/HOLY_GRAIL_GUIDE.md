@@ -93,7 +93,7 @@ The main screen lists every grail item with its found status. The search and fil
 - Search by item name, base item ("Shako", "Diadem"), set name ("Tal Rasha") or, for runewords, rune ("Ber"). Every word you type must match, so "tal lidless" narrows the results further. Turn on fuzzy search (the wand icon) to also find items when you abbreviate words ("hrlqn") or make a small typo ("windfroce").
 - Filter by status (all, found, missing) and by type with the colored Unique, Set, Rune and Runeword toggles. Rune and runeword toggles only appear when you track them.
 - Open **Filters** to narrow by category (weapons, armor, jewelry, charms) and sub-category, such as helms, body armor or class-specific items, grouped by category.
-- Group by category, type or ethereal status (available when ethereal tracking is on), and switch between grid and list views. In the grid, each group has a header with its found count, followed by its items in rows that read left to right and wrap to the next row, using the same number of columns as the ungrouped grid.
+- Group by category, type or ethereal status (available when ethereal tracking is on), and switch between grid and list views. In the grid, items are shown in rows that read left to right and wrap to the next row, with as many columns as fit the window width; when grouped, each group has a header with its found count above its rows.
 - Sort by name, category, type or found date. Items with the same value, such as all missing items when sorting by found date, are listed alphabetically.
 
 The count under the bar shows how many items match your filters out of all tracked items.
