@@ -7,6 +7,7 @@ import type {
   VaultItemFilter,
   VaultItemUpsertInput,
 } from '../types/grail';
+import { MAX_SESSION_NOTES_LENGTH } from '../utils/sessionNotes';
 import type { WidgetDisplayMode } from '../utils/widgetDisplay';
 import {
   type AddRunItemInput,
@@ -117,9 +118,6 @@ const addRunItemInput: FieldValidator<AddRunItemInput> = (value) => {
 };
 
 const sessionId = nonEmptyString('Invalid session ID');
-
-/** Longest session notes the renderer may save. */
-export const MAX_SESSION_NOTES_LENGTH = 10_000;
 
 const sessionNotes: FieldValidator<string> = (value) => {
   const notes = string('Invalid session notes')(value);

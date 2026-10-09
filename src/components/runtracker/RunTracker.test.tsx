@@ -218,7 +218,7 @@ describe('RunTracker', () => {
       mockStoreState(mockUseRunTrackerStore, {
         ...defaultStoreState,
         activeSession: mockSession,
-        error: { code: 'endSessionFailed', detail: 'boom' },
+        error: { code: 'endSessionFailed' },
         errorType: 'unknown',
       });
 
@@ -229,7 +229,6 @@ describe('RunTracker', () => {
       expect(
         screen.getByText('Failed to end session. Your progress has been saved.', { exact: false }),
       ).toBeDefined();
-      expect(screen.getByText('boom')).toBeDefined();
       expect(screen.queryByText('Error Loading Run Tracker')).toBeNull();
       expect(screen.getByTestId('session-card')).toBeDefined();
       expect(screen.getByTestId('session-controls')).toBeDefined();
@@ -241,7 +240,7 @@ describe('RunTracker', () => {
       const retryLastAction = vi.fn();
       mockStoreState(mockUseRunTrackerStore, {
         ...defaultStoreState,
-        error: { code: 'endSessionFailed', detail: 'boom' },
+        error: { code: 'endSessionFailed' },
         errorType: 'unknown',
         lastFailedAction: vi.fn(),
         retryLastAction,

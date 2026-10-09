@@ -1,6 +1,7 @@
 import { act, renderHook } from '@testing-library/react';
 import type { EventChannel } from 'electron/ipc/contract';
 import type { Run, RunItem, Session } from 'electron/types/grail';
+import { MAX_SESSION_NOTES_LENGTH } from 'electron/utils/sessionNotes';
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { GrailProgressBuilder, HolyGrailItemBuilder } from '@/fixtures';
 import { createMainEventsMock } from '@/test/mainEventsMock';
@@ -11,6 +12,8 @@ import {
   useSessionStats,
   useSessionStatsLookup,
 } from './runTrackerStore';
+
+type RunTrackerStore = ReturnType<typeof useRunTrackerStore.getState>;
 
 const mainEvents = createMainEventsMock();
 
@@ -622,7 +625,7 @@ describe('runTrackerStore loading and error state', () => {
       const state = useRunTrackerStore.getState();
       expect(state.initialLoadStatus).toBe('success');
       expect(state.initialLoadError).toBeUndefined();
-      expect(state.error).toEqual({ code: 'loadFailed', detail: 'Database offline' });
+      expect(state.error).toEqual({ code: 'loadFailed' });
     });
   });
 
@@ -700,7 +703,7 @@ describe('runTrackerStore loading and error state', () => {
 
       // Assert
       const state = useRunTrackerStore.getState();
-      expect(state.error).toEqual({ code: 'pauseRunFailed', detail: 'IPC failed' });
+      expect(state.error).toEqual({ code: 'pauseRunFailed' });
       expect(state.errorType).toBe('unknown');
       expect(state.pendingActions.pauseRun).toBe(false);
       expect(state.initialLoadStatus).toBe('success');
@@ -747,8 +750,55 @@ describe('runTrackerStore loading and error state', () => {
       // Assert
       expect(mockElectronAPI.runTracker.endSession).toHaveBeenCalledTimes(2);
       const state = useRunTrackerStore.getState();
-      expect(state.error).toEqual({ code: 'endSessionFailed', detail: 'IPC failed' });
+      expect(state.error).toEqual({ code: 'endSessionFailed' });
       expect(state.lastFailedAction).toBeDefined();
+    });
+  });
+
+  describe('If a background load fails after a user action failed', () => {
+    it.each([
+      ['loadSessions', 'getAllSessions', (store: RunTrackerStore) => store.loadSessions()],
+      ['loadAllSessions', 'getAllSessions', (store: RunTrackerStore) => store.loadAllSessions()],
+      ['loadSessionById', 'getSessionById', (store: RunTrackerStore) => store.loadSessionById('s')],
+      [
+        'loadSessionRuns',
+        'getRunsBySession',
+        (store: RunTrackerStore) => store.loadSessionRuns('s'),
+      ],
+      ['loadRunItems', 'getRunItems', (store: RunTrackerStore) => store.loadRunItems('run-1')],
+      ['refreshActiveRun', 'getState', (store: RunTrackerStore) => store.refreshActiveRun()],
+      [
+        'a background loadInitialData',
+        'getAllSessions',
+        (store: RunTrackerStore) => store.loadInitialData(),
+      ],
+    ])('Then %s drops the retry of the failed action', async (_name, failingApi, load) => {
+      // Arrange
+      useRunTrackerStore.setState({ initialLoadStatus: 'success' });
+      mockElectronAPI.runTracker.endSession.mockRejectedValue(new Error('IPC failed'));
+      mockElectronAPI.runTracker.getState.mockResolvedValue(undefined);
+      const loadApi =
+        mockElectronAPI.runTracker[failingApi as keyof typeof mockElectronAPI.runTracker];
+      loadApi.mockRejectedValue(new Error('Database offline'));
+      await act(async () => {
+        await useRunTrackerStore.getState().endSession();
+      });
+      const failedActionState = useRunTrackerStore.getState();
+
+      // Act
+      await act(async () => {
+        await load(useRunTrackerStore.getState());
+      });
+      await act(async () => {
+        await useRunTrackerStore.getState().retryLastAction();
+      });
+
+      // Assert
+      expect(failedActionState.lastFailedAction).toBeDefined();
+      const state = useRunTrackerStore.getState();
+      expect(state.error).toEqual({ code: 'loadFailed' });
+      expect(state.lastFailedAction).toBeUndefined();
+      expect(mockElectronAPI.runTracker.endSession).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -870,8 +920,64 @@ describe('When session notes are updated', () => {
     expect(saved).toBe(false);
     const state = useRunTrackerStore.getState();
     expect(state.sessions[0].notes).toBeUndefined();
-    expect(state.error).toEqual({ code: 'updateSessionNotesFailed', detail: 'IPC failed' });
+    expect(state.error).toEqual({ code: 'updateSessionNotesFailed' });
     expect(state.lastFailedAction).toBeDefined();
+  });
+
+  it('If the main process returns no saved session, Then saving is reported as failed and can be retried', async () => {
+    // Arrange
+    mockElectronAPI.runTracker.updateSessionNotes.mockResolvedValue(undefined);
+
+    // Act
+    let saved = true;
+    await act(async () => {
+      saved = await useRunTrackerStore.getState().updateSessionNotes('session-1', 'Cow runs');
+    });
+
+    // Assert
+    expect(saved).toBe(false);
+    const state = useRunTrackerStore.getState();
+    expect(state.sessions[0].notes).toBeUndefined();
+    expect(state.error).toEqual({ code: 'updateSessionNotesFailed' });
+    expect(state.errorType).toBe('unknown');
+    expect(state.lastFailedAction).toBeDefined();
+  });
+
+  it('If the notes have exactly the maximum length, Then they are saved', async () => {
+    // Arrange
+    const notes = 'x'.repeat(MAX_SESSION_NOTES_LENGTH);
+    mockElectronAPI.runTracker.updateSessionNotes.mockResolvedValue({ ...savedSession, notes });
+
+    // Act
+    let saved = false;
+    await act(async () => {
+      saved = await useRunTrackerStore.getState().updateSessionNotes('session-1', notes);
+    });
+
+    // Assert
+    expect(saved).toBe(true);
+    expect(mockElectronAPI.runTracker.updateSessionNotes).toHaveBeenCalledWith('session-1', notes);
+    expect(useRunTrackerStore.getState().error).toBeNull();
+  });
+
+  it('If the notes are longer than the maximum, Then a validation error is reported that cannot be retried', async () => {
+    // Arrange
+    const notes = 'x'.repeat(MAX_SESSION_NOTES_LENGTH + 1);
+
+    // Act
+    let saved = true;
+    await act(async () => {
+      saved = await useRunTrackerStore.getState().updateSessionNotes('session-1', notes);
+    });
+
+    // Assert
+    expect(saved).toBe(false);
+    expect(mockElectronAPI.runTracker.updateSessionNotes).not.toHaveBeenCalled();
+    const state = useRunTrackerStore.getState();
+    expect(state.error).toEqual({ code: 'sessionNotesTooLong' });
+    expect(state.errorType).toBe('validation');
+    expect(state.lastFailedAction).toBeUndefined();
+    expect(state.pendingActions.updateSessionNotes).toBe(false);
   });
 });
 

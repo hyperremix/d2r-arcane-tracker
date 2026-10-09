@@ -1,6 +1,7 @@
 import '@testing-library/jest-dom';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import type { Session } from 'electron/types/grail';
+import { MAX_SESSION_NOTES_LENGTH } from 'electron/utils/sessionNotes';
 import i18n from 'i18next';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useRunTrackerStore, useSessionStats } from '@/stores/runTrackerStore';
@@ -245,6 +246,22 @@ describe('SessionDetailView', () => {
         expect(textarea).toHaveValue('');
       });
       expect(updateSessionNotes).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('When the notes editor is shown', () => {
+    it('Then it limits the notes to the maximum length the main process accepts', () => {
+      // Arrange
+      mockStoreState(mockUseRunTrackerStore, createStoreState());
+
+      // Act
+      render(<SessionDetailView sessionId="session-1" onBack={vi.fn()} />);
+
+      // Assert
+      expect(screen.getByLabelText('Session Notes')).toHaveAttribute(
+        'maxlength',
+        String(MAX_SESSION_NOTES_LENGTH),
+      );
     });
   });
 

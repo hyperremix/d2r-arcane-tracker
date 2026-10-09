@@ -1,6 +1,7 @@
 import '@testing-library/jest-dom';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import type { Run, RunItem, Session, SessionStats } from 'electron/types/grail';
+import { MAX_SESSION_NOTES_LENGTH } from 'electron/utils/sessionNotes';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useGrailStore } from '@/stores/grailStore';
 import { useRunTrackerStore, useSessionStats } from '@/stores/runTrackerStore';
@@ -359,6 +360,60 @@ describe('SessionCard', () => {
       // Assert
       expect(await screen.findByRole('textbox', { name: 'Session Notes' })).toBeInTheDocument();
       expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    });
+  });
+
+  describe('When edited session notes lose focus', () => {
+    const openNotes = async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Session Notes' }));
+      return screen.findByRole('textbox', { name: 'Session Notes' });
+    };
+
+    it('Then the notes are saved for the session', async () => {
+      // Arrange
+      const updateSessionNotes = vi.fn().mockResolvedValue(true);
+      mockStoreState(mockUseRunTrackerStore, createStoreState({ updateSessionNotes }));
+      render(<SessionCard session={mockSession} />);
+      const textarea = await openNotes();
+
+      // Act
+      fireEvent.change(textarea, { target: { value: 'Cow runs' } });
+      fireEvent.blur(textarea);
+
+      // Assert
+      await waitFor(() => {
+        expect(updateSessionNotes).toHaveBeenCalledWith('session-1', 'Cow runs');
+      });
+      expect(textarea).toHaveValue('Cow runs');
+    });
+
+    it('If saving fails, Then the saved notes are shown again', async () => {
+      // Arrange
+      const updateSessionNotes = vi.fn().mockResolvedValue(false);
+      mockStoreState(mockUseRunTrackerStore, createStoreState({ updateSessionNotes }));
+      render(<SessionCard session={mockSession} />);
+      const textarea = await openNotes();
+
+      // Act
+      fireEvent.change(textarea, { target: { value: 'Cow runs' } });
+      fireEvent.blur(textarea);
+
+      // Assert
+      await waitFor(() => {
+        expect(textarea).toHaveValue('');
+      });
+      expect(updateSessionNotes).toHaveBeenCalledTimes(1);
+    });
+
+    it('Then the editor limits the notes to the maximum length the main process accepts', async () => {
+      // Arrange
+      render(<SessionCard session={mockSession} />);
+
+      // Act
+      const textarea = await openNotes();
+
+      // Assert
+      expect(textarea).toHaveAttribute('maxlength', String(MAX_SESSION_NOTES_LENGTH));
     });
   });
 

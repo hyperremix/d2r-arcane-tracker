@@ -8,7 +8,7 @@ describe('When ErrorDisplay is rendered with a retryable error', () => {
     const onDismiss = vi.fn();
     render(
       <ErrorDisplay
-        error={{ code: 'endSessionFailed', detail: 'Connection lost' }}
+        error={{ code: 'endSessionFailed' }}
         errorType="unknown"
         canRetry
         loading={false}
@@ -24,11 +24,11 @@ describe('When ErrorDisplay is rendered with a retryable error', () => {
     expect(onDismiss).toHaveBeenCalledTimes(1);
   });
 
-  it('Then the error code is translated and the technical detail is shown', () => {
+  it('Then the error code is translated', () => {
     // Arrange & Act
     render(
       <ErrorDisplay
-        error={{ code: 'endSessionFailed', detail: 'Connection lost' }}
+        error={{ code: 'endSessionFailed' }}
         errorType="unknown"
         canRetry
         loading={false}
@@ -41,7 +41,6 @@ describe('When ErrorDisplay is rendered with a retryable error', () => {
     expect(
       screen.getByText('Failed to end session. Your progress has been saved.', { exact: false }),
     ).toBeInTheDocument();
-    expect(screen.getByText('Connection lost')).toBeInTheDocument();
   });
 
   it('Then clicking the translated retry button retries the action', () => {

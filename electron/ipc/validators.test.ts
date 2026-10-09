@@ -1,11 +1,8 @@
 import { describe, expect, it } from 'vitest';
+import { MAX_SESSION_NOTES_LENGTH } from '../utils/sessionNotes';
 import type { InvokeChannel } from './contract';
 import { IpcValidationError } from './validation';
-import {
-  invokeArgValidators,
-  isRendererWritableSetting,
-  MAX_SESSION_NOTES_LENGTH,
-} from './validators';
+import { invokeArgValidators, isRendererWritableSetting } from './validators';
 
 function validate(channel: InvokeChannel, ...rawArgs: unknown[]): unknown[] {
   return invokeArgValidators[channel](rawArgs);
@@ -85,6 +82,17 @@ describe('When renderer arguments are validated against the IPC contract', () =>
     // Assert
     expect(error).toBeInstanceOf(IpcValidationError);
     expect((error as IpcValidationError).message).toContain(message);
+  });
+
+  it('If the session notes have exactly the maximum length, Then they are accepted', () => {
+    // Arrange
+    const notes = 'x'.repeat(MAX_SESSION_NOTES_LENGTH);
+
+    // Act
+    const result = validate('run-tracker:update-session-notes', 'session-1', notes);
+
+    // Assert
+    expect(result).toEqual(['session-1', notes]);
   });
 
   it('Then valid arguments are returned in contract order and extra arguments are dropped', () => {

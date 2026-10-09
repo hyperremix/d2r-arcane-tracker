@@ -1253,7 +1253,8 @@
       "loadFailed": "Failed to load run tracker data",
       "itemNameEmpty": "Item name cannot be empty",
       "noRunForManualItem": "No active run or finished run found. Please start a run first.",
-      "addManualRunItemFailed": "Failed to add manual run item"
+      "addManualRunItemFailed": "Failed to add manual run item",
+      "sessionNotesTooLong": "Session notes are too long to save"
     }
   },
   "widget": {

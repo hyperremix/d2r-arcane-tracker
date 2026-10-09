@@ -34,7 +34,6 @@ export function ErrorDisplay({
         <div className="flex-1">
           <AlertDescription className="text-sm">
             {t(translations.runTracker.errors[error.code])}
-            {error.detail && <span className="ml-2 text-muted-foreground">{error.detail}</span>}
           </AlertDescription>
         </div>
         <div className="flex items-center gap-2">

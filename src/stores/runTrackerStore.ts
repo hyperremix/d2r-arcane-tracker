@@ -1,4 +1,5 @@
 import type { GrailProgress, Run, RunItem, Session, SessionStats } from 'electron/types/grail';
+import { MAX_SESSION_NOTES_LENGTH } from 'electron/utils/sessionNotes';
 import { useCallback, useMemo } from 'react';
 import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
@@ -31,6 +32,7 @@ export type RunTrackerErrorCode =
   | 'endSessionFailed'
   | 'archiveSessionFailed'
   | 'updateSessionNotesFailed'
+  | 'sessionNotesTooLong'
   | 'startRunFailed'
   | 'endRunFailed'
   | 'pauseRunFailed'
@@ -46,11 +48,12 @@ export type RunTrackerErrorCode =
  */
 export type RunTrackerErrorType = 'validation' | 'unknown';
 
-/** An inline run tracker error. */
+/**
+ * An inline run tracker error. Only the code is stored: technical details of a failure are logged
+ * to the console, never shown, so the banner stays fully translated.
+ */
 export interface RunTrackerError {
   code: RunTrackerErrorCode;
-  /** Technical detail of the failure (e.g. the message of the main-process error), if any. */
-  detail?: string;
 }
 
 /**
@@ -110,7 +113,6 @@ interface RunTrackerState {
   addManualRunItem: (name: string) => Promise<void>;
 
   // Actions - State Management
-  setError: (error: RunTrackerError | null, errorType?: RunTrackerErrorType) => void;
   clearError: () => void;
   retryLastAction: () => Promise<void>;
 
@@ -267,10 +269,12 @@ function toErrorMessage(error: unknown): string {
 }
 
 /**
- * Returns the state update that reports a failed data load inline.
+ * Returns the state update that reports a failed data load inline. A load has no retry of its own,
+ * so the update also drops the retry of an earlier failed user action, which the banner no longer
+ * describes.
  */
-function loadFailed(error: unknown): Pick<RunTrackerState, 'error' | 'errorType'> {
-  return { error: { code: 'loadFailed', detail: toErrorMessage(error) }, errorType: 'unknown' };
+function loadFailed(): Pick<RunTrackerState, 'error' | 'errorType' | 'lastFailedAction'> {
+  return { error: { code: 'loadFailed' }, errorType: 'unknown', lastFailedAction: undefined };
 }
 
 // Tracks the first (blocking) initial load so overlapping calls share one request
@@ -332,9 +336,13 @@ export const useRunTrackerStore = create<RunTrackerState>()(
 
     updateSessionNotes: (sessionId, notes) =>
       runAction('updateSessionNotes', 'updateSessionNotesFailed', async () => {
+        if (notes.length > MAX_SESSION_NOTES_LENGTH) {
+          // The main process would reject these notes; resubmitting them can never succeed
+          throw new RunTrackerActionError('sessionNotesTooLong', 'validation');
+        }
         const updated = await window.electronAPI?.runTracker.updateSessionNotes(sessionId, notes);
         if (!updated) {
-          return;
+          throw new RunTrackerActionError('updateSessionNotesFailed', 'unknown');
         }
         const { sessions, activeSession } = get();
         set({
@@ -411,7 +419,7 @@ export const useRunTrackerStore = create<RunTrackerState>()(
           console.log(`[RunTrackerStore] Loaded ${sessions.length} sessions`);
         }
       } catch (error) {
-        set(loadFailed(error));
+        set(loadFailed());
         console.error('[RunTrackerStore] Error loading sessions:', error);
       } finally {
         set({ sessionsLoading: false });
@@ -428,7 +436,7 @@ export const useRunTrackerStore = create<RunTrackerState>()(
           console.log(`[RunTrackerStore] Loaded ${sessions.length} sessions (all characters)`);
         }
       } catch (error) {
-        set(loadFailed(error));
+        set(loadFailed());
         console.error('[RunTrackerStore] Error loading all sessions:', error);
       } finally {
         set({ sessionsLoading: false });
@@ -447,7 +455,7 @@ export const useRunTrackerStore = create<RunTrackerState>()(
           }
         }
       } catch (error) {
-        set(loadFailed(error));
+        set(loadFailed());
         console.error('[RunTrackerStore] Error loading session by ID:', error);
       }
     },
@@ -536,7 +544,7 @@ export const useRunTrackerStore = create<RunTrackerState>()(
         const { loadingSessions: currentLoadingSessions } = get();
         const newLoadingSessions = new Set(currentLoadingSessions);
         newLoadingSessions.delete(sessionId);
-        set({ ...loadFailed(error), loadingSessions: newLoadingSessions });
+        set({ ...loadFailed(), loadingSessions: newLoadingSessions });
         console.error('[RunTrackerStore] Error loading session runs:', error);
       }
     },
@@ -555,7 +563,7 @@ export const useRunTrackerStore = create<RunTrackerState>()(
           console.log(`[RunTrackerStore] Loaded ${items.length} items for run:`, runId);
         }
       } catch (error) {
-        set(loadFailed(error));
+        set(loadFailed());
         console.error('[RunTrackerStore] Error loading run items:', error);
       } finally {
         const newLoadingRunItems = new Set(get().loadingRunItems);
@@ -577,7 +585,7 @@ export const useRunTrackerStore = create<RunTrackerState>()(
           console.log('[RunTrackerStore] Active run refreshed');
         }
       } catch (error) {
-        set(loadFailed(error));
+        set(loadFailed());
         console.error('[RunTrackerStore] Error refreshing active run:', error);
       }
     },
@@ -702,10 +710,6 @@ export const useRunTrackerStore = create<RunTrackerState>()(
     },
 
     // Error handling methods
-    setError: (error, errorType = 'unknown') => {
-      set({ error, errorType, lastFailedAction: undefined });
-    },
-
     clearError: () => {
       set({ error: null, errorType: null, lastFailedAction: undefined });
     },
@@ -753,7 +757,7 @@ async function runAction(
     } else {
       console.error(`[RunTrackerStore] Action ${action} failed:`, error);
       set({
-        error: { code: failureCode, detail: toErrorMessage(error) },
+        error: { code: failureCode },
         errorType: 'unknown',
         lastFailedAction: retry,
       });
@@ -827,7 +831,7 @@ async function runInitialLoad(isFirstLoad: boolean): Promise<void> {
             initialLoadError: toErrorMessage(error),
             sessionsLoading: false,
           }
-        : { ...loadFailed(error), sessionsLoading: false },
+        : { ...loadFailed(), sessionsLoading: false },
     );
     return;
   }

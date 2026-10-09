@@ -284,10 +284,9 @@ export class RunTrackerService {
    * @throws If no session with the ID exists
    */
   updateSessionNotes(sessionId: string, notes: string): Session {
-    if (!this.database.updateSessionNotes(sessionId, notes)) {
-      throw new Error(`Session not found: ${sessionId}`);
-    }
-    const session = this.database.getSessionById(sessionId);
+    const session = this.database.updateSessionNotes(sessionId, notes)
+      ? this.database.getSessionById(sessionId)
+      : undefined;
     if (!session) {
       throw new Error(`Session not found: ${sessionId}`);
     }

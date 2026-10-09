@@ -1,4 +1,5 @@
 import type { Session } from 'electron/types/grail';
+import { MAX_SESSION_NOTES_LENGTH } from 'electron/utils/sessionNotes';
 import { Archive, ArrowLeft, FileDown, Loader2 } from 'lucide-react';
 import { useCallback, useEffect, useId, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -15,6 +16,7 @@ import { ArchiveSessionDialog } from './ArchiveSessionDialog';
 import { ExportDialog } from './ExportDialog';
 import { RunList } from './RunList';
 import { SessionControls } from './SessionControls';
+import { useSessionNotes } from './useSessionNotes';
 
 interface SessionDetailViewProps {
   sessionId: string;
@@ -55,8 +57,6 @@ export function SessionDetailView({ sessionId, onBack }: SessionDetailViewProps)
     })),
   );
 
-  const [notes, setNotes] = useState<string>('');
-  const [isSavingNotes, setIsSavingNotes] = useState<boolean>(false);
   const [showExportDialog, setShowExportDialog] = useState<boolean>(false);
   const [showArchiveDialog, setShowArchiveDialog] = useState<boolean>(false);
   const notesId = useId();
@@ -76,6 +76,10 @@ export function SessionDetailView({ sessionId, onBack }: SessionDetailViewProps)
   }, [activeSession?.id, sessionId]);
 
   const sessionStats = useSessionStats(session);
+  const { notes, isSavingNotes, handleNotesChange, handleNotesBlur } = useSessionNotes(
+    session,
+    updateSessionNotes,
+  );
 
   // Get runs for this session
   const sessionRuns = useMemo(() => {
@@ -91,13 +95,6 @@ export function SessionDetailView({ sessionId, onBack }: SessionDetailViewProps)
       loadSessionRuns(sessionId);
     }
   }, [sessionId, loadSessionRuns, runs]);
-
-  // Update notes when session changes
-  useEffect(() => {
-    if (session?.notes !== undefined) {
-      setNotes(session.notes || '');
-    }
-  }, [session?.notes]);
 
   // Calculate session duration
   const getSessionDuration = useCallback((session: Session) => {
@@ -118,24 +115,6 @@ export function SessionDetailView({ sessionId, onBack }: SessionDetailViewProps)
     if (!sessionStats || sessionStats.totalRuns === 0) return 0;
     return sessionStats.averageRunDuration;
   }, [sessionStats]);
-
-  // Handle notes change
-  const handleNotesChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setNotes(e.target.value);
-  }, []);
-
-  // Handle notes save
-  const handleNotesBlur = useCallback(async () => {
-    if (!session || notes === (session.notes || '')) return;
-
-    setIsSavingNotes(true);
-    const saved = await updateSessionNotes(session.id, notes);
-    setIsSavingNotes(false);
-    // The store reports the failure inline (with a retry); show the saved notes again
-    if (!saved) {
-      setNotes(session.notes || '');
-    }
-  }, [session, notes, updateSessionNotes]);
 
   // Handle archive session
   const handleArchiveSession = useCallback(async () => {
@@ -330,6 +309,7 @@ export function SessionDetailView({ sessionId, onBack }: SessionDetailViewProps)
                 value={notes}
                 onChange={handleNotesChange}
                 onBlur={handleNotesBlur}
+                maxLength={MAX_SESSION_NOTES_LENGTH}
                 className="min-h-[80px] resize-none"
                 disabled={session.archived}
               />
