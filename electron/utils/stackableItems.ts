@@ -3,19 +3,16 @@
  * These work on raw JSON strings as stored in vault_items.raw_item_json.
  */
 
-import { gems } from '../items/gems';
-import { materials } from '../items/materials';
+import {
+  getResourceStackAttributeValue,
+  isResourceItemCode,
+  resolveStackCount,
+  type StackCountSource,
+} from './d2rFormat';
 
-const RUNE_CODE_PATTERN = /^r[0-3][0-9]$/i;
-const GEM_AND_MATERIAL_CODES = new Set(
-  [...gems, ...materials].map((entry) => entry.code.trim().toLowerCase()),
-);
-
-interface RawItemJson {
+interface RawItemJson extends StackCountSource {
   code?: unknown;
   type?: unknown;
-  quantity?: unknown;
-  magic_attributes?: Array<{ id?: unknown; values?: unknown[] }>;
 }
 
 function parseRawItem(rawItemJson: string): RawItemJson | undefined {
@@ -30,17 +27,6 @@ function parseRawItem(rawItemJson: string): RawItemJson | undefined {
   return undefined;
 }
 
-function getAttr381Value(parsed: RawItemJson): number | undefined {
-  if (!Array.isArray(parsed.magic_attributes)) {
-    return undefined;
-  }
-  const attr = parsed.magic_attributes.find((a) => a.id === 381);
-  if (attr && Array.isArray(attr.values) && typeof attr.values[0] === 'number') {
-    return attr.values[0];
-  }
-  return undefined;
-}
-
 /**
  * True for items that live as a counted stack in the vault: runes, gems, materials and anything
  * carrying the D2R resource-stash count attribute. Only these may be merged into one vault row,
@@ -49,11 +35,7 @@ function getAttr381Value(parsed: RawItemJson): number | undefined {
  * stack limit.
  */
 export function isResourceStackFromRawJson(rawItemJson: string, itemCode?: string): boolean {
-  const isResourceCode = (code: string | undefined): boolean =>
-    code !== undefined &&
-    (RUNE_CODE_PATTERN.test(code) || GEM_AND_MATERIAL_CODES.has(code.trim().toLowerCase()));
-
-  if (isResourceCode(itemCode)) {
+  if (isResourceItemCode(itemCode)) {
     return true;
   }
 
@@ -68,34 +50,15 @@ export function isResourceStackFromRawJson(rawItemJson: string, itemCode?: strin
       : typeof parsed.type === 'string'
         ? parsed.type
         : undefined;
-  if (isResourceCode(code)) {
+  if (isResourceItemCode(code)) {
     return true;
   }
 
-  const attr381 = getAttr381Value(parsed);
-  return attr381 !== undefined && attr381 >= 1;
+  const stackAttributeValue = getResourceStackAttributeValue(parsed);
+  return stackAttributeValue !== undefined && stackAttributeValue >= 1;
 }
 
 export function resolveStackCountFromRawJson(rawItemJson: string): number {
   const parsed = parseRawItem(rawItemJson);
-  if (!parsed) {
-    return 1;
-  }
-
-  // Attr 381 takes priority (D2R resource stash encoding)
-  const attr381 = getAttr381Value(parsed);
-  if (attr381 !== undefined && attr381 >= 1) {
-    return attr381;
-  }
-
-  if (
-    typeof parsed.quantity === 'number' &&
-    Number.isInteger(parsed.quantity) &&
-    parsed.quantity >= 1 &&
-    parsed.quantity <= 511
-  ) {
-    return parsed.quantity;
-  }
-
-  return 1;
+  return parsed ? resolveStackCount(parsed) : 1;
 }

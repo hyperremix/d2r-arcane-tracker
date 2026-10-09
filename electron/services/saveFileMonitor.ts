@@ -25,6 +25,7 @@ import type {
   VaultSourceFileType,
 } from '../types/grail';
 import { GameMode } from '../types/grail';
+import { isModernStashVersion } from '../utils/d2rFormat';
 import { getGrailItemId } from '../utils/grailItemUtils';
 import { normalizeIconFilename, resolveCanonicalIconFilename } from '../utils/iconFilenameResolver';
 import { isRune } from '../utils/objects';
@@ -94,7 +95,6 @@ function createForcedParseRequest(): ForcedParseRequest {
 }
 
 const SUPPORTED_SAVE_EXTENSIONS = new Set(['.d2s', '.sss', '.d2x', '.d2i']);
-const MODERN_STASH_MIN_VERSION = 105;
 
 const processItemName = (item: D2SItem): string => {
   const itemId = getGrailItemId(item);
@@ -790,8 +790,7 @@ class SaveFileMonitor {
     | 'Shared Stash Softcore'
     | 'Modern Shared Stash Hardcore'
     | 'Modern Shared Stash Softcore' {
-    const isModern =
-      sourceFileVersion !== undefined && sourceFileVersion >= MODERN_STASH_MIN_VERSION;
+    const isModern = isModernStashVersion(sourceFileVersion);
 
     if (isModern) {
       return isHardcore ? 'Modern Shared Stash Hardcore' : 'Modern Shared Stash Softcore';
@@ -1599,7 +1598,7 @@ class SaveFileMonitor {
       try {
         const metadata = readD2iMetadata(content);
         d2iVersion = metadata.version;
-        if (metadata.version >= 105) {
+        if (isModernStashVersion(metadata.version)) {
           return await parseModernD2i();
         }
         return await d2stash.read(content, constants99).then(parseStash);
@@ -1609,7 +1608,7 @@ class SaveFileMonitor {
         // garbage because the formats are incompatible. A v105+ file cut off inside a
         // sector throws before the metadata version is known, so read it from the header.
         d2iVersion ??= readD2iHeaderVersion(content);
-        if (d2iVersion === undefined || d2iVersion < 105) {
+        if (!isModernStashVersion(d2iVersion)) {
           return await d2stash.read(content, constants99).then(parseStash);
         }
         // The swallowed error leaves the item list empty or partial: not a complete scan.

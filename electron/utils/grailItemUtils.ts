@@ -1,5 +1,6 @@
 import { itemsByNameSimple, runesByCode, runewordsByNameSimple } from '../items/indexes';
 import type { D2SItem } from '../types/grail';
+import { isRuneCode } from './d2rFormat';
 import { simplifyItemName } from './objects';
 
 /**
@@ -43,7 +44,7 @@ export function getGrailItemId(d2sItem: unknown): string | null {
   const item = d2sItem as D2SItem; // Type assertion for D2S item structure
 
   // Handle runes by code
-  if (item?.type && typeof item.type === 'string' && item.type.match(/^r[0-3][0-9]$/)) {
+  if (typeof item?.type === 'string' && isRuneCode(item.type)) {
     const rune = runesByCode[item.type];
     return rune?.id || null;
   }

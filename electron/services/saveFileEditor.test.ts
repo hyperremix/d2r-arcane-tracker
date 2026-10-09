@@ -97,24 +97,6 @@ beforeAll(async () => {
   // need the real readD2iMetadata implementation.
   vi.doMock('./modernStashParser', () => ({
     constants105Extended: {},
-    SHARED_TAB_COUNT: 5,
-    resolveStackCount: (item: {
-      magic_attributes?: Array<{ id?: unknown; values?: number[] }>;
-      quantity?: unknown;
-    }) => {
-      const attr381 = item.magic_attributes?.find((attribute) => attribute?.id === 381);
-      if (attr381 && typeof attr381.values?.[0] === 'number' && attr381.values[0] >= 1) {
-        return attr381.values[0];
-      }
-      if (
-        typeof item.quantity === 'number' &&
-        Number.isInteger(item.quantity) &&
-        item.quantity >= 1
-      ) {
-        return item.quantity;
-      }
-      return 1;
-    },
   }));
 
   // Mock d2/items so modern stash binary-splice code can be exercised without

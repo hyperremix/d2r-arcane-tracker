@@ -1,4 +1,5 @@
 import type { D2SItem, VaultLocationContext, VaultSourceFileType } from '../types/grail';
+import { toFiniteNumber } from './d2rFormat';
 
 export interface ResolvedSpatialLocation {
   locationContext: VaultLocationContext;
@@ -13,10 +14,6 @@ export interface ResolvedSpatialLocation {
 const INVENTORY_COLUMNS = 10;
 const INVENTORY_ROWS = 4;
 const BELT_COLUMNS = 4;
-
-function toFiniteNumber(value: unknown): number | undefined {
-  return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
-}
 
 function hasPositiveDimensions(width: number | undefined, height: number | undefined): boolean {
   return typeof width === 'number' && width > 0 && typeof height === 'number' && height > 0;

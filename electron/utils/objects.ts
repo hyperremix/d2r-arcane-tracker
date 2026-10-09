@@ -1,3 +1,5 @@
+import { isRuneCode } from './d2rFormat';
+
 /**
  * Simplifies an item name by removing all non-alphanumeric characters and converting to lowercase.
  * @param {string} name - The item name to simplify.
@@ -13,5 +15,4 @@ export const simplifyItemName = (name: string): string =>
  * @param {{ type?: string }} item - The item to check.
  * @returns {boolean} True if the item is a rune (type matches pattern r01-r33), false otherwise.
  */
-export const isRune = (item: { type?: string }): boolean =>
-  !!item.type && /^r[0-3][0-9]$/.test(item.type);
+export const isRune = (item: { type?: string }): boolean => isRuneCode(item.type);
