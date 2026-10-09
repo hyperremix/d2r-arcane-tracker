@@ -61,8 +61,6 @@
     "drizzle-orm": "^0.45.1",
     "electron-updater": "^6.6.2",
     "i18next": "^25.4.2",
-    "i18next-browser-languagedetector": "^8.2.0",
-    "i18next-resources-to-backend": "^1.2.1",
     "lucide-react": "^0.542.0",
     "motion": "^12.23.24",
     "pngjs": "^7.0.0",

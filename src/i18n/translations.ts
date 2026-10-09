@@ -1,40 +1,36 @@
-//@ts-nocheck
 import en from './locales/en/common.json';
 import type { ConvertedToObjectType, TranslationJsonType } from './types';
+
+/** Nested translation keys; every leaf is the full dotted key path. */
+interface TranslationKeyTree {
+  [key: string]: string | TranslationKeyTree;
+}
+
+const PLURAL_SUFFIX_PATTERN = /_(zero|one|two|few|many|other)$/;
+
+/**
+ * Recursively converts a language JSON object to the same structure in which each leaf string is
+ * replaced with its full key path, for type-safe translation access.
+ * @param json - The (nested) translation JSON object
+ * @param prefix - Key path of `json` (used for recursion)
+ * @returns The key path tree
+ */
+function toKeyPaths(json: object, prefix?: string): TranslationKeyTree {
+  const tree: TranslationKeyTree = {};
+  for (const [key, value] of Object.entries(json)) {
+    if (value !== null && typeof value === 'object') {
+      tree[key] = toKeyPaths(value, prefix ? `${prefix}.${key}` : key);
+    } else {
+      // Plural variants (`key_one`, `key_other`, ...) share the base key so t(key, { count }) resolves them
+      const baseKey = key.replace(PLURAL_SUFFIX_PATTERN, '');
+      tree[baseKey] = prefix ? `${prefix}.${baseKey}` : baseKey;
+    }
+  }
+  return tree;
+}
 
 /**
  * Translations object containing all translation keys as nested object paths.
  * This is used for type-safe translation key access throughout the application.
  */
-// biome-ignore lint/suspicious/noExplicitAny: ignore this
-export const translations: ConvertedToObjectType<TranslationJsonType> = {} as any;
-
-const PLURAL_SUFFIX_PATTERN = /_(zero|one|two|few|many|other)$/;
-
-/**
- * Recursively converts a language JSON file to a nested object structure.
- * Each leaf string value is replaced with the full key path for type-safe translation access.
- * @param {any} json - The JSON object to convert
- * @param {Object} [objToConvertTo=translations] - The target object to populate
- * @param {string} [current] - The current key path (used for recursion)
- */
-const convertLanguageJsonToObject = (
-  // biome-ignore lint/suspicious/noExplicitAny: ignore this
-  json: any,
-  objToConvertTo = translations,
-  current?: string,
-) => {
-  for (const key in json) {
-    if (typeof json[key] === 'object') {
-      const currentLookupKey = current ? `${current}.${key}` : key;
-      objToConvertTo[key] = {};
-      convertLanguageJsonToObject(json[key], objToConvertTo[key], currentLookupKey);
-    } else {
-      // Plural variants (`key_one`, `key_other`, ...) share the base key so t(key, { count }) resolves them
-      const baseKey = key.replace(PLURAL_SUFFIX_PATTERN, '');
-      objToConvertTo[baseKey] = current ? `${current}.${baseKey}` : baseKey;
-    }
-  }
-};
-
-convertLanguageJsonToObject(en);
+export const translations = toKeyPaths(en) as unknown as ConvertedToObjectType<TranslationJsonType>;

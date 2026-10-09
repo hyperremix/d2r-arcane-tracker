@@ -10,6 +10,7 @@ import { translations } from '@/i18n/translations';
 
 import { useIconPreloader } from './hooks/useItemIcon';
 import { useServiceErrorNotifications } from './hooks/useServiceErrorNotifications';
+import { useSettingsLanguage } from './hooks/useSettingsLanguage';
 import { useTheme } from './hooks/useTheme';
 import { useUpdateNotifications } from './hooks/useUpdateNotifications';
 import { router } from './router';
@@ -34,8 +35,9 @@ function App(): JSX.Element {
   // otherwise the empty store would briefly render the "no items" state before the spinner.
   useLayoutEffect(() => initGrailData(), []);
 
-  // Apply theme based on user settings
+  // Apply theme and language based on user settings
   useTheme();
+  useSettingsLanguage();
 
   // Preload popular item icons
   useIconPreloader();
