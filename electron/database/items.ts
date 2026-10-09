@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { asc, count, eq, getTableColumns, or, sql } from 'drizzle-orm';
+import { asc, count, eq, or, sql } from 'drizzle-orm';
 import { items as grailItems } from '../items';
 import type { Item, Settings } from '../types/grail';
 import { dbItemToItem, itemToDbValues } from './converters';
@@ -73,14 +73,41 @@ export function getFilteredItems(ctx: DatabaseContext, userSettings: Settings): 
   });
 }
 
-const updatableItemColumns = Object.values(getTableColumns(items)).filter(
-  (column) => !['id', 'created_at', 'updated_at'].includes(column.name),
+type ItemDbValues = ReturnType<typeof itemToDbValues>;
+
+const itemValueKeys = [
+  'id',
+  'name',
+  'link',
+  'code',
+  'itemBase',
+  'imageFilename',
+  'type',
+  'category',
+  'subCategory',
+  'treasureClass',
+  'setName',
+  'runes',
+  'etherealType',
+] as const satisfies ReadonlyArray<keyof ItemDbValues>;
+
+type UpdatableItemKey = Exclude<(typeof itemValueKeys)[number], 'id'>;
+const updatableItemKeys = itemValueKeys.filter((key): key is UpdatableItemKey => key !== 'id');
+
+/** Named placeholders for every item column, so one prepared statement serves all items. */
+const itemValuePlaceholders = Object.fromEntries(
+  itemValueKeys.map((key) => [key, sql.placeholder(key)]),
+) as unknown as ItemDbValues;
+
+/** On conflict, take every item column from the proposed row (`excluded`). */
+const excludedItemValues = Object.fromEntries(
+  updatableItemKeys.map((key) => [key, sql`excluded.${sql.identifier(items[key].name)}`]),
 );
 
-/** True when the incoming row (`excluded`) differs from the stored row in any item column. */
+/** True when the proposed row differs from the stored row in any item column. */
 const itemRowChanged = or(
-  ...updatableItemColumns.map(
-    (column) => sql`${column} IS NOT excluded.${sql.identifier(column.name)}`,
+  ...updatableItemKeys.map(
+    (key) => sql`${items[key]} IS NOT excluded.${sql.identifier(items[key].name)}`,
   ),
 );
 
@@ -90,19 +117,16 @@ const itemRowChanged = or(
  * @param ctx - Database context
  * @param itemsToInsert - Items to insert or update
  */
-export function insertItems(ctx: DatabaseContext, itemsToInsert: Item[]): void {
+export function insertItems(ctx: DatabaseContext, itemsToInsert: readonly Item[]): void {
+  const upsert = ctx.db
+    .insert(items)
+    .values(itemValuePlaceholders)
+    .onConflictDoUpdate({ target: items.id, set: excludedItemValues, setWhere: itemRowChanged })
+    .prepare();
   const insertMany = ctx.rawDb.transaction(() => {
     for (const item of itemsToInsert) {
       const values = itemToDbValues(item);
-      ctx.db
-        .insert(items)
-        .values(values)
-        .onConflictDoUpdate({
-          target: items.id,
-          set: values,
-          setWhere: itemRowChanged,
-        })
-        .run();
+      upsert.run({ ...values, link: values.link ?? null });
     }
   });
   insertMany();
@@ -157,7 +181,7 @@ export function syncItemCatalog(
   }
 
   const sync = ctx.rawDb.transaction(() => {
-    insertItems(ctx, [...catalog]);
+    insertItems(ctx, catalog);
     ctx.db
       .insert(settings)
       .values({ key: ITEM_CATALOG_HASH_SETTING, value: catalogHash })
