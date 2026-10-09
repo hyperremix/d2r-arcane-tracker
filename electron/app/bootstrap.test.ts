@@ -133,7 +133,10 @@ vi.mock('../window/mainWindow', () => ({
   getMainWindow: vi.fn(),
 }));
 vi.mock('../window/widgetWindow', () => ({
-  createDebouncedWidgetSizeSaver: vi.fn(() => ({ save: vi.fn(), flush: vi.fn() })),
+  createDebouncedWidgetSizeSaver: vi.fn(() => ({
+    save: vi.fn(),
+    flush: vi.fn(mocks.log('widgetSizeSaver.flush')),
+  })),
   showWidgetWindow: vi.fn(),
 }));
 
@@ -279,6 +282,20 @@ describe('When the app is bootstrapped', () => {
         expect(order(teardown), teardown).toBeLessThan(order('database.close'));
       }
       expect(order('updateHandlers.dispose')).toBeLessThan(order('updateService.dispose'));
+    });
+
+    it('Then a pending widget size is flushed once before the windows close', async () => {
+      // Arrange
+      const runningApp = await startApp(env);
+
+      // Act
+      await runningApp.shutdown();
+
+      // Assert
+      const order = (call: string) => mocks.calls.indexOf(call);
+      expect(mocks.calls.filter((call) => call === 'widgetSizeSaver.flush')).toHaveLength(1);
+      expect(order('widgetSizeSaver.flush')).toBeLessThan(order('window.close'));
+      expect(order('window.close')).toBeLessThan(order('database.close'));
     });
 
     it('If shutdown is requested again, Then nothing is closed twice', async () => {

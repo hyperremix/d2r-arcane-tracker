@@ -142,6 +142,91 @@ describe('When renderer arguments are validated against the IPC contract', () =>
   });
 });
 
+describe('When the renderer sends a grail progress record, save directory or export path', () => {
+  it('If the progress record has unknown fields, Then only the record fields are passed on', () => {
+    // Arrange
+    const foundDate = new Date('2024-05-01');
+    const record = {
+      id: 'p-1',
+      characterId: 'c-1',
+      itemId: 'shako',
+      foundDate,
+      foundBy: 'me',
+      manuallyAdded: true,
+      difficulty: 'hell',
+      notes: 'drop',
+      isEthereal: false,
+      fromInitialScan: false,
+      injected: 'value',
+    };
+
+    // Act
+    const [validated] = validate('grail:updateProgress', record);
+
+    // Assert
+    expect(validated).toEqual({
+      id: 'p-1',
+      characterId: 'c-1',
+      itemId: 'shako',
+      foundDate,
+      foundBy: 'me',
+      manuallyAdded: true,
+      difficulty: 'hell',
+      notes: 'drop',
+      isEthereal: false,
+      fromInitialScan: false,
+    });
+    expect(validated).not.toHaveProperty('injected');
+  });
+
+  it('If the progress record has only the required fields, Then the optional fields stay undefined', () => {
+    // Arrange
+    const record = {
+      id: 'p-1',
+      characterId: 'c-1',
+      itemId: 'shako',
+      manuallyAdded: false,
+      isEthereal: true,
+    };
+
+    // Act
+    const [validated] = validate('grail:updateProgress', record);
+
+    // Assert
+    expect(validated).toEqual({ ...record });
+    expect(validated).toMatchObject({
+      foundDate: undefined,
+      foundBy: undefined,
+      difficulty: undefined,
+      notes: undefined,
+      fromInitialScan: undefined,
+    });
+  });
+
+  it('If the save directory has surrounding whitespace, Then the trimmed absolute path is passed on', () => {
+    // Arrange
+    const directory = '  /Users/hero/Saved Games/Diablo II Resurrected  ';
+
+    // Act
+    const [validated] = validate('saveFile:updateSaveDirectory', directory);
+
+    // Assert
+    expect(validated).toBe('/Users/hero/Saved Games/Diablo II Resurrected');
+  });
+
+  it('If the export path is absolute, Then the path and the content are passed on unchanged', () => {
+    // Arrange
+    const filePath = '/tmp/export.csv';
+    const content = 'a,b\n1,2';
+
+    // Act
+    const validated = validate('dialog:writeFile', filePath, content);
+
+    // Assert
+    expect(validated).toEqual([filePath, content]);
+  });
+});
+
 describe('When the renderer updates settings', () => {
   it.each([
     'saveDir',

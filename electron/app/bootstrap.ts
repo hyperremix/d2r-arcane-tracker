@@ -192,8 +192,6 @@ function startServices(paths: AppPaths, lifecycle: AppLifecycle): RunningApp {
     }
   };
 
-  const onWidgetSizeChange = widgetSizeSaver.save;
-
   // IPC handlers (each returns the teardown that unregisters it)
   lifecycle.onShutdown(
     'grail handlers',
@@ -246,7 +244,7 @@ function startServices(paths: AppPaths, lifecycle: AppLifecycle): RunningApp {
   );
   lifecycle.onShutdown(
     'widget handlers',
-    initializeWidgetHandlers(settings, paths, onWidgetPositionChange, onWidgetSizeChange),
+    initializeWidgetHandlers(settings, paths, onWidgetPositionChange, widgetSizeSaver.save),
   );
   lifecycle.onShutdown(
     'app window handlers',
@@ -266,7 +264,7 @@ function startServices(paths: AppPaths, lifecycle: AppLifecycle): RunningApp {
   try {
     const storedSettings = settings.getAll();
     if (storedSettings.widgetEnabled) {
-      showWidgetWindow(storedSettings, paths, onWidgetPositionChange, onWidgetSizeChange);
+      showWidgetWindow(storedSettings, paths, onWidgetPositionChange, widgetSizeSaver.save);
     }
   } catch (error) {
     console.error('Failed to initialize widget window:', error);
