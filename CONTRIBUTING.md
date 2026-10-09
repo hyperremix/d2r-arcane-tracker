@@ -19,7 +19,7 @@ For attaching a debugger, see [docs/DEBUGGING.md](docs/DEBUGGING.md).
 
 ### Development database
 
-`grail.db` in the repo root holds sample characters and progress. To use it, restore it via **Settings → Database → Restore**, or copy it over the development database while the app is closed:
+`grail.db` in the repo root holds sample characters, grail progress and run history. It has no save folder or D2R install path set, so choose your own in Settings after loading it. To use it, restore it via **Settings → Database → Restore**, or copy it over the development database while the app is closed:
 
 | OS | Development database path |
 | --- | --- |
