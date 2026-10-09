@@ -1,52 +1,20 @@
 import { BrowserWindow, ipcMain } from 'electron';
-import { grailDatabase } from '../database/database';
 import { sendToRenderer } from '../ipc/broadcast';
 import { createIpcMainRegistry } from '../ipc/handle';
-import type { ConversionResult, ConversionStatus } from '../services/iconService';
-import { iconService } from '../services/iconService';
-import type { Settings } from '../types/grail';
+import type { ConversionResult, ConversionStatus, IconService } from '../services/iconService';
+import type { SettingsService } from '../services/settingsService';
 
-/**
- * Converts a setting value to a string suitable for database storage.
- * Handles objects (JSON.stringify), undefined (skip), and primitives (String).
- * @param value - The setting value to convert
- * @returns String representation or null if value should be skipped
- */
-function convertSettingValueToString(value: unknown): string | null {
-  // Skip undefined values - don't save them
-  if (value === undefined) {
-    return null;
-  }
-
-  // Convert complex objects to JSON strings
-  if (typeof value === 'object' && value !== null) {
-    return JSON.stringify(value);
-  }
-
-  // Convert primitives to strings
-  return String(value);
-}
-
-/**
- * Updates multiple settings in the database
- */
-function updateSettings(settings: Partial<Settings>): void {
-  for (const key in settings) {
-    const settingsKey = key as keyof Settings;
-    const value = settings[settingsKey];
-    const stringValue = convertSettingValueToString(value);
-
-    // Skip if value should not be saved (undefined)
-    if (stringValue !== null) {
-      grailDatabase.setSetting(settingsKey, stringValue);
-    }
-  }
+/** Dependencies of the icon IPC handlers. */
+export interface IconHandlerDependencies {
+  iconService: IconService;
+  settings: SettingsService;
 }
 
 /**
  * Initializes IPC handlers for icon-related operations.
+ * @param deps - The icon service and the settings storing the D2R path and conversion status
  */
-export function initializeIconHandlers(): void {
+export function initializeIconHandlers({ iconService, settings }: IconHandlerDependencies): void {
   const { handle } = createIpcMainRegistry(ipcMain);
   /**
    * Sets the D2R installation path
@@ -54,7 +22,7 @@ export function initializeIconHandlers(): void {
   handle('icon:setD2RPath', async (_, d2rPath): Promise<void> => {
     iconService.setD2RPath(d2rPath);
     // Save to settings
-    updateSettings({ d2rInstallPath: d2rPath });
+    settings.update({ d2rInstallPath: d2rPath });
   });
 
   /**
@@ -67,8 +35,7 @@ export function initializeIconHandlers(): void {
 
       // If not set, try to load from settings
       if (!d2rPath) {
-        const settings = grailDatabase.getAllSettings();
-        d2rPath = settings.d2rInstallPath || null;
+        d2rPath = settings.get('d2rInstallPath') || null;
         if (d2rPath) {
           iconService.setD2RPath(d2rPath);
         }
@@ -78,7 +45,7 @@ export function initializeIconHandlers(): void {
       if (!d2rPath) {
         d2rPath = iconService.findD2RInstallation();
         if (d2rPath) {
-          updateSettings({ d2rInstallPath: d2rPath });
+          settings.update({ d2rInstallPath: d2rPath });
         }
       }
 
@@ -114,7 +81,7 @@ export function initializeIconHandlers(): void {
       }
 
       // Update status to in_progress
-      updateSettings({
+      settings.update({
         iconConversionStatus: 'in_progress',
         iconConversionProgress: { current: 0, total: 0 },
       });
@@ -128,7 +95,7 @@ export function initializeIconHandlers(): void {
         }
 
         // Update settings
-        updateSettings({
+        settings.update({
           iconConversionProgress: { current, total },
         });
       };
@@ -137,7 +104,7 @@ export function initializeIconHandlers(): void {
       const result = await iconService.convertAllSprites(d2rPath, onProgress);
 
       // Update final status
-      updateSettings({
+      settings.update({
         iconConversionStatus: result.success ? 'completed' : 'failed',
         iconConversionProgress: { current: result.totalFiles, total: result.totalFiles },
       });
@@ -145,7 +112,7 @@ export function initializeIconHandlers(): void {
       return result;
     } catch (error) {
       console.error('Failed to convert sprites:', error);
-      updateSettings({
+      settings.update({
         iconConversionStatus: 'failed',
       });
       throw error;
@@ -182,8 +149,7 @@ export function initializeIconHandlers(): void {
     'icon:validatePath',
     async (): Promise<{ valid: boolean; path?: string; error?: string }> => {
       try {
-        const settings = grailDatabase.getAllSettings();
-        const d2rInstallPath = settings.d2rInstallPath;
+        const d2rInstallPath = settings.get('d2rInstallPath');
 
         if (!d2rInstallPath) {
           return { valid: false, error: 'D2R installation path is not configured' };

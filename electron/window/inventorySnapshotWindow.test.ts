@@ -50,11 +50,20 @@ vi.mock('electron', () => {
   };
 });
 
+import type { AppPaths } from '../app/paths';
 import {
   closeInventorySnapshotWindows,
   openInventorySnapshotWindow,
   setInventorySnapshotWindowsTitleBarOverlay,
 } from './inventorySnapshotWindow';
+
+const devPaths: AppPaths = {
+  appRoot: '/tmp',
+  mainDist: '/tmp/main',
+  rendererDist: '/tmp/renderer',
+  publicDir: '/tmp/public',
+  viteDevServerUrl: 'http://localhost:5173',
+};
 
 describe('When inventory snapshot windows are managed', () => {
   beforeEach(() => {
@@ -76,9 +85,7 @@ describe('When inventory snapshot windows are managed', () => {
           sourceFileType: 'd2s',
           characterName: 'Sorc',
         },
-        '/tmp/main',
-        'http://localhost:5173',
-        '/tmp/renderer',
+        devPaths,
       );
 
       // Assert
@@ -113,9 +120,7 @@ describe('When inventory snapshot windows are managed', () => {
           sourceFileType: 'd2s',
           characterName: 'Sorc',
         },
-        '/tmp/main',
-        'http://localhost:5173',
-        '/tmp/renderer',
+        devPaths,
       );
 
       // Act
@@ -125,9 +130,7 @@ describe('When inventory snapshot windows are managed', () => {
           sourceFileType: 'd2s',
           characterName: 'Sorc',
         },
-        '/tmp/main',
-        'http://localhost:5173',
-        '/tmp/renderer',
+        devPaths,
       );
 
       // Assert
@@ -147,9 +150,7 @@ describe('When inventory snapshot windows are managed', () => {
           sourceFileType: 'd2s',
           characterName: 'Sorc',
         },
-        '/tmp/main',
-        'http://localhost:5173',
-        '/tmp/renderer',
+        devPaths,
       );
 
       // Act
@@ -159,9 +160,7 @@ describe('When inventory snapshot windows are managed', () => {
           sourceFileType: 'd2i',
           characterName: 'Shared Stash Softcore',
         },
-        '/tmp/main',
-        'http://localhost:5173',
-        '/tmp/renderer',
+        devPaths,
       );
 
       // Assert
@@ -178,9 +177,7 @@ describe('When inventory snapshot windows are managed', () => {
           sourceFileType: 'd2s',
           characterName: 'Sorc',
         },
-        '/tmp/main',
-        'http://localhost:5173',
-        '/tmp/renderer',
+        devPaths,
       );
       openInventorySnapshotWindow(
         {
@@ -188,9 +185,7 @@ describe('When inventory snapshot windows are managed', () => {
           sourceFileType: 'd2i',
           characterName: 'Shared Stash Softcore',
         },
-        '/tmp/main',
-        'http://localhost:5173',
-        '/tmp/renderer',
+        devPaths,
       );
 
       // Act
@@ -211,9 +206,7 @@ describe('When inventory snapshot windows are managed', () => {
           sourceFileType: 'd2s',
           characterName: 'Sorc',
         },
-        '/tmp/main',
-        'http://localhost:5173',
-        '/tmp/renderer',
+        devPaths,
       );
       openInventorySnapshotWindow(
         {
@@ -221,9 +214,7 @@ describe('When inventory snapshot windows are managed', () => {
           sourceFileType: 'd2i',
           characterName: 'Shared Stash Softcore',
         },
-        '/tmp/main',
-        'http://localhost:5173',
-        '/tmp/renderer',
+        devPaths,
       );
 
       // Act

@@ -1,19 +1,24 @@
 import { ipcMain } from 'electron';
-import { grailDatabase } from '../database/database';
 import { createIpcMainRegistry } from '../ipc/handle';
-import { TerrorZoneService } from '../services/terrorZoneService';
+import type { SettingsService } from '../services/settingsService';
+import type { TerrorZoneService } from '../services/terrorZoneService';
 import type { TerrorZone, TerrorZoneValidationResult } from '../types/grail';
 
-/**
- * Global terror zone service instance.
- */
-const terrorZoneService = new TerrorZoneService();
+/** Dependencies of the terror zone IPC handlers. */
+export interface TerrorZoneHandlerDependencies {
+  terrorZoneService: TerrorZoneService;
+  settings: SettingsService;
+}
 
 /**
  * Initializes IPC handlers for terror zone configuration operations.
  * Sets up handlers for reading zones, managing configuration, and file operations.
+ * @param deps - The terror zone service and the settings storing the configuration
  */
-export function initializeTerrorZoneHandlers(): void {
+export function initializeTerrorZoneHandlers({
+  terrorZoneService,
+  settings: settingsService,
+}: TerrorZoneHandlerDependencies): void {
   const { handle } = createIpcMainRegistry(ipcMain);
   console.log('[initializeTerrorZoneHandlers] Starting initialization');
 
@@ -22,7 +27,7 @@ export function initializeTerrorZoneHandlers(): void {
    * @returns Promise resolving to array of terror zones
    */
   handle('terrorZone:getZones', async (): Promise<TerrorZone[]> => {
-    const settings = grailDatabase.getAllSettings();
+    const settings = settingsService.getAll();
     const d2rInstallPath = settings.d2rInstallPath;
 
     if (!d2rInstallPath) {
@@ -38,7 +43,7 @@ export function initializeTerrorZoneHandlers(): void {
    * @returns Promise resolving to zone configuration (zone ID -> enabled state)
    */
   handle('terrorZone:getConfig', async (): Promise<Record<string, boolean>> => {
-    const settings = grailDatabase.getAllSettings();
+    const settings = settingsService.getAll();
     return settings.terrorZoneConfig || {};
   });
 
@@ -52,7 +57,7 @@ export function initializeTerrorZoneHandlers(): void {
   handle(
     'terrorZone:updateConfig',
     async (_, config): Promise<{ success: boolean; requiresRestart: boolean }> => {
-      const settings = grailDatabase.getAllSettings();
+      const settings = settingsService.getAll();
       const d2rInstallPath = settings.d2rInstallPath;
 
       if (!d2rInstallPath) {
@@ -69,7 +74,7 @@ export function initializeTerrorZoneHandlers(): void {
         }
 
         // Mark backup as created in settings
-        grailDatabase.setSetting('terrorZoneBackupCreated', 'true');
+        settingsService.set('terrorZoneBackupCreated', true);
       }
 
       // Read current zones from file
@@ -89,7 +94,7 @@ export function initializeTerrorZoneHandlers(): void {
       await terrorZoneService.writeZonesToFile(gameFilePath, zones, enabledZoneIds);
 
       // Update configuration in database
-      grailDatabase.setSetting('terrorZoneConfig', JSON.stringify(config));
+      settingsService.set('terrorZoneConfig', config);
 
       return { success: true, requiresRestart: true };
     },
@@ -100,7 +105,7 @@ export function initializeTerrorZoneHandlers(): void {
    * @returns Promise resolving to restore result
    */
   handle('terrorZone:restoreOriginal', async (): Promise<{ success: boolean }> => {
-    const settings = grailDatabase.getAllSettings();
+    const settings = settingsService.getAll();
     const d2rInstallPath = settings.d2rInstallPath;
 
     if (!d2rInstallPath) {
@@ -118,7 +123,7 @@ export function initializeTerrorZoneHandlers(): void {
 
     if (result.success) {
       // Clear the configuration from database
-      grailDatabase.setSetting('terrorZoneConfig', '');
+      settingsService.set('terrorZoneConfig', undefined);
     }
 
     return result;
@@ -130,7 +135,7 @@ export function initializeTerrorZoneHandlers(): void {
    */
   handle('terrorZone:validatePath', async (): Promise<TerrorZoneValidationResult> => {
     try {
-      const settings = grailDatabase.getAllSettings();
+      const settings = settingsService.getAll();
       const d2rInstallPath = settings.d2rInstallPath;
 
       if (!d2rInstallPath) {

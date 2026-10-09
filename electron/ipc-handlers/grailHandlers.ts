@@ -1,62 +1,10 @@
-import { ipcMain, webContents } from 'electron';
-import { type GrailDatabase, grailDatabase } from '../database/database';
-import { createRendererBroadcaster } from '../ipc/broadcast';
+import { ipcMain } from 'electron';
+import type { GrailDatabase } from '../database/database';
+import type { BroadcastToRenderers } from '../ipc/broadcast';
 import { createIpcMainRegistry } from '../ipc/handle';
+import type { SettingsService } from '../services/settingsService';
 import type { Difficulty, GrailProgress, Settings } from '../types/grail';
 import { RUN_TRACKER_SHORTCUT_ACTIONS } from '../utils/runTrackerShortcuts';
-
-/** Sends an event from the IPC contract to every renderer window. */
-const broadcastToRenderers = createRendererBroadcaster(() => webContents.getAllWebContents());
-
-/**
- * Global database instance for grail operations.
- */
-let grailDB: GrailDatabase;
-
-/**
- * Main-process listeners notified after settings were persisted via IPC.
- */
-const settingsUpdatedListeners = new Set<(settings: Partial<Settings>) => void>();
-
-/**
- * Registers a main-process listener that is called after settings are updated from the renderer.
- * @param listener - Called with the partial settings that were saved
- * @returns Function that removes the listener
- */
-export function addSettingsUpdatedListener(
-  listener: (settings: Partial<Settings>) => void,
-): () => void {
-  settingsUpdatedListeners.add(listener);
-  return () => {
-    settingsUpdatedListeners.delete(listener);
-  };
-}
-
-/**
- * Notifies main-process listeners about saved settings; a failing listener does not affect others.
- * @param settings - The partial settings that were saved
- */
-function notifySettingsUpdatedListeners(settings: Partial<Settings>): void {
-  for (const listener of settingsUpdatedListeners) {
-    try {
-      listener(settings);
-    } catch (error) {
-      console.error('Settings updated listener failed:', error);
-    }
-  }
-}
-
-/**
- * Notifies main-process listeners with the settings of a freshly restored database, because a
- * restore can change settings (e.g. the game mode) without going through grail:updateSettings.
- */
-function notifyRestoredSettings(): void {
-  try {
-    notifySettingsUpdatedListeners(grailDB.getAllSettings());
-  } catch (error) {
-    console.error('Failed to notify listeners about restored settings:', error);
-  }
-}
 
 /**
  * Validates renderer-provided settings whose type affects main-process behavior.
@@ -93,27 +41,6 @@ function isValidRunTrackerShortcuts(value: unknown): boolean {
 
   const shortcuts = value as Record<string, unknown>;
   return RUN_TRACKER_SHORTCUT_ACTIONS.every((action) => isNonEmptyString(shortcuts[action]));
-}
-
-/**
- * Converts a setting value to a string suitable for database storage.
- * Handles objects (JSON.stringify), undefined (skip), and primitives (String).
- * @param value - The setting value to convert
- * @returns String representation or null if value should be skipped
- */
-function convertSettingValueToString(value: unknown): string | null {
-  // Skip undefined values - don't save them
-  if (value === undefined) {
-    return null;
-  }
-
-  // Convert complex objects to JSON strings
-  if (typeof value === 'object' && value !== null) {
-    return JSON.stringify(value);
-  }
-
-  // Convert primitives to strings
-  return String(value);
 }
 
 const VALID_DIFFICULTIES: readonly Difficulty[] = ['normal', 'nightmare', 'hell'];
@@ -166,7 +93,7 @@ export function isValidGrailProgress(value: unknown): value is GrailProgress {
  * @throws If the record is not manual, references an unknown character, has a future found date,
  *   reuses the ID of an auto-detected record, or duplicates an existing record
  */
-function assertManualProgressAllowed(progress: GrailProgress): void {
+function assertManualProgressAllowed(grailDB: GrailDatabase, progress: GrailProgress): void {
   if (!progress.manuallyAdded) {
     throw new Error('Only manually added progress can be saved');
   }
@@ -198,28 +125,27 @@ function assertManualProgressAllowed(progress: GrailProgress): void {
   }
 }
 
-/**
- * Notifies all renderer windows that grail progress changed so they can reload it.
- */
-function notifyProgressUpdated(): void {
-  broadcastToRenderers('grail-progress-updated');
+/** Dependencies of the grail IPC handlers. */
+export interface GrailHandlerDependencies {
+  database: GrailDatabase;
+  settings: SettingsService;
+  broadcastToRenderers: BroadcastToRenderers;
 }
 
 /**
  * Initializes IPC handlers for Holy Grail tracking operations.
  * Sets up handlers for characters, items, progress, settings, statistics, and backup operations.
- * Initializes the database connection and registers all IPC event handlers.
+ * @param deps - The grail database, the settings service and the renderer broadcast
  */
-export function initializeGrailHandlers(): void {
+export function initializeGrailHandlers({
+  database: grailDB,
+  settings: settingsService,
+  broadcastToRenderers,
+}: GrailHandlerDependencies): void {
   const { handle } = createIpcMainRegistry(ipcMain);
-  // Initialize database using singleton
-  try {
-    // Import the singleton database instance
-    grailDB = grailDatabase;
-  } catch (error) {
-    console.error('Failed to initialize grail database:', error);
-    return;
-  }
+
+  /** Notifies all renderer windows that grail progress changed so they can reload it. */
+  const notifyProgressUpdated = () => broadcastToRenderers('grail-progress-updated');
 
   // Character handlers
   /**
@@ -236,7 +162,7 @@ export function initializeGrailHandlers(): void {
    * Returns items filtered by current settings and maps database format to renderer format.
    */
   handle('grail:getItems', async () => {
-    const settings = grailDB.getAllSettings();
+    const settings = settingsService.getAll();
     return grailDB.getFilteredItems(settings);
   });
 
@@ -283,7 +209,7 @@ export function initializeGrailHandlers(): void {
       throw new Error('Invalid grail progress payload');
     }
 
-    assertManualProgressAllowed(progress);
+    assertManualProgressAllowed(grailDB, progress);
 
     grailDB.upsertProgress(progress);
 
@@ -323,7 +249,7 @@ export function initializeGrailHandlers(): void {
    * IPC handler for retrieving all user settings.
    */
   handle('grail:getSettings', async () => {
-    return grailDB.getAllSettings();
+    return settingsService.getAll();
   });
 
   /**
@@ -335,21 +261,11 @@ export function initializeGrailHandlers(): void {
   handle('grail:updateSettings', async (_, settings) => {
     validateSettingsUpdate(settings);
 
-    for (const key in settings) {
-      const settingsKey = key as keyof Settings;
-      const value = settings[settingsKey];
-      const stringValue = convertSettingValueToString(value);
-
-      // Skip if value should not be saved (undefined)
-      if (stringValue !== null) {
-        grailDB.setSetting(settingsKey, stringValue);
-      }
-    }
+    // Stores the values and notifies main-process listeners (run tracker, global hotkeys)
+    settingsService.update(settings);
 
     // Emit event to all renderer windows to notify them of settings changes
     broadcastToRenderers('settings-updated', settings);
-
-    notifySettingsUpdatedListeners(settings);
 
     return { success: true };
   });
@@ -372,7 +288,7 @@ export function initializeGrailHandlers(): void {
    */
   handle('grail:restore', async (_, backupPath) => {
     grailDB.restore(backupPath);
-    notifyRestoredSettings();
+    settingsService.notifyRestored();
     return { success: true };
   });
 
@@ -383,19 +299,9 @@ export function initializeGrailHandlers(): void {
    */
   handle('grail:restoreFromBuffer', async (_, backupBuffer) => {
     grailDB.restoreFromBuffer(Buffer.from(backupBuffer));
-    notifyRestoredSettings();
+    settingsService.notifyRestored();
     return { success: true };
   });
 
   console.log('Grail IPC handlers initialized');
-}
-
-/**
- * Closes the grail database connection.
- * Should be called when the application is shutting down to properly clean up resources.
- */
-export function closeGrailDatabase(): void {
-  if (grailDB) {
-    grailDB.close();
-  }
 }

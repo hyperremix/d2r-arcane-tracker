@@ -25,7 +25,16 @@ vi.mock('../window/inventorySnapshotWindow', () => ({
   openInventorySnapshotWindow: mocks.openInventorySnapshotWindowMock,
 }));
 
+import type { AppPaths } from '../app/paths';
 import { initializeInventoryWindowHandlers } from './inventoryWindowHandlers';
+
+const devPaths: AppPaths = {
+  appRoot: '/tmp',
+  mainDist: '/tmp/main',
+  rendererDist: '/tmp/renderer',
+  publicDir: '/tmp/public',
+  viteDevServerUrl: 'http://localhost:5173',
+};
 
 describe('When inventory window IPC handlers are initialized', () => {
   beforeEach(() => {
@@ -47,12 +56,7 @@ describe('When inventory window IPC handlers are initialized', () => {
       // Arrange
 
       // Act
-      initializeInventoryWindowHandlers(
-        '/tmp/main',
-        'http://localhost:5173',
-        '/tmp/renderer',
-        () => '/tmp',
-      );
+      initializeInventoryWindowHandlers(devPaths, () => '/tmp');
 
       // Assert
       expect(mocks.handleMock).toHaveBeenCalledWith(
@@ -71,12 +75,7 @@ describe('When inventory window IPC handlers are initialized', () => {
   describe('If inventory:openSnapshotWindow is invoked with valid target', () => {
     it('Then it opens or focuses the requested snapshot window', async () => {
       // Arrange
-      initializeInventoryWindowHandlers(
-        '/tmp/main',
-        'http://localhost:5173',
-        '/tmp/renderer',
-        () => '/tmp',
-      );
+      initializeInventoryWindowHandlers(devPaths, () => '/tmp');
       const handler = mocks.handleMock.mock.calls.find(
         (call) => call[0] === 'inventory:openSnapshotWindow',
       )?.[1];
@@ -95,9 +94,7 @@ describe('When inventory window IPC handlers are initialized', () => {
           sourceFileType: 'd2s',
           characterName: 'Sorc',
         },
-        '/tmp/main',
-        'http://localhost:5173',
-        '/tmp/renderer',
+        devPaths,
       );
       expect(result).toEqual({ success: true });
     });
@@ -106,12 +103,7 @@ describe('When inventory window IPC handlers are initialized', () => {
   describe('If inventory:openSnapshotWindow receives invalid target', () => {
     it('Then it rejects the request', async () => {
       // Arrange
-      initializeInventoryWindowHandlers(
-        '/tmp/main',
-        'http://localhost:5173',
-        '/tmp/renderer',
-        () => '/tmp',
-      );
+      initializeInventoryWindowHandlers(devPaths, () => '/tmp');
       const handler = mocks.handleMock.mock.calls.find(
         (call) => call[0] === 'inventory:openSnapshotWindow',
       )?.[1];
@@ -135,12 +127,7 @@ describe('When inventory window IPC handlers are initialized', () => {
       ['a non-save extension', '/tmp/notes.txt'],
     ])('Then %s is rejected and no window is opened', async (_label, badPath) => {
       // Arrange
-      initializeInventoryWindowHandlers(
-        '/tmp/main',
-        'http://localhost:5173',
-        '/tmp/renderer',
-        () => '/tmp',
-      );
+      initializeInventoryWindowHandlers(devPaths, () => '/tmp');
       const handler = mocks.handleMock.mock.calls.find(
         (call) => call[0] === 'inventory:openSnapshotWindow',
       )?.[1];
@@ -159,7 +146,7 @@ describe('When inventory window IPC handlers are initialized', () => {
 
     it('Then it is rejected when no save directory is configured', async () => {
       // Arrange
-      initializeInventoryWindowHandlers('/tmp/main', 'http://localhost:5173', '/tmp/renderer');
+      initializeInventoryWindowHandlers(devPaths);
       const handler = mocks.handleMock.mock.calls.find(
         (call) => call[0] === 'inventory:openSnapshotWindow',
       )?.[1];
@@ -197,12 +184,7 @@ describe('When inventory window IPC handlers are initialized', () => {
       };
       mocks.getAllWindowsMock.mockReturnValue([senderWindow, receiverWindow]);
 
-      initializeInventoryWindowHandlers(
-        '/tmp/main',
-        'http://localhost:5173',
-        '/tmp/renderer',
-        () => '/tmp',
-      );
+      initializeInventoryWindowHandlers(devPaths, () => '/tmp');
       const listener = mocks.onMock.mock.calls.find(
         (call) => call[0] === 'inventory:vault-drag-state',
       )?.[1];
@@ -232,12 +214,7 @@ describe('When inventory window IPC handlers are initialized', () => {
   describe('If inventory:getActiveDragState is invoked', () => {
     it('Then it returns the latest active drag payload', async () => {
       // Arrange
-      initializeInventoryWindowHandlers(
-        '/tmp/main',
-        'http://localhost:5173',
-        '/tmp/renderer',
-        () => '/tmp',
-      );
+      initializeInventoryWindowHandlers(devPaths, () => '/tmp');
       const vaultDragListener = mocks.onMock.mock.calls.find(
         (call) => call[0] === 'inventory:vault-drag-state',
       )?.[1];
@@ -272,12 +249,7 @@ describe('When inventory window IPC handlers are initialized', () => {
   describe('If inventory:openSnapshotWindow is invoked while drag state is active', () => {
     it('Then current drag state is sent to the opened snapshot window', async () => {
       // Arrange
-      initializeInventoryWindowHandlers(
-        '/tmp/main',
-        'http://localhost:5173',
-        '/tmp/renderer',
-        () => '/tmp',
-      );
+      initializeInventoryWindowHandlers(devPaths, () => '/tmp');
       const vaultDragListener = mocks.onMock.mock.calls.find(
         (call) => call[0] === 'inventory:vault-drag-state',
       )?.[1];
@@ -318,12 +290,7 @@ describe('When inventory window IPC handlers are initialized', () => {
   describe('If inventory:openSnapshotWindow is invoked while stack pickup state is active', () => {
     it('Then current inventory stack pickup state is sent to the opened snapshot window', async () => {
       // Arrange
-      initializeInventoryWindowHandlers(
-        '/tmp/main',
-        'http://localhost:5173',
-        '/tmp/renderer',
-        () => '/tmp',
-      );
+      initializeInventoryWindowHandlers(devPaths, () => '/tmp');
       const inventoryDragListener = mocks.onMock.mock.calls.find(
         (call) => call[0] === 'inventory:item-drag-state',
       )?.[1];
@@ -386,12 +353,7 @@ describe('When inventory window IPC handlers are initialized', () => {
         },
       ]);
 
-      initializeInventoryWindowHandlers(
-        '/tmp/main',
-        'http://localhost:5173',
-        '/tmp/renderer',
-        () => '/tmp',
-      );
+      initializeInventoryWindowHandlers(devPaths, () => '/tmp');
       const listener = mocks.onMock.mock.calls.find(
         (call) => call[0] === 'inventory:vault-drag-state',
       )?.[1];
@@ -434,12 +396,7 @@ describe('When inventory window IPC handlers are initialized', () => {
       };
       mocks.getAllWindowsMock.mockReturnValue([senderWindow, receiverWindow]);
 
-      initializeInventoryWindowHandlers(
-        '/tmp/main',
-        'http://localhost:5173',
-        '/tmp/renderer',
-        () => '/tmp',
-      );
+      initializeInventoryWindowHandlers(devPaths, () => '/tmp');
       const listener = mocks.onMock.mock.calls.find(
         (call) => call[0] === 'inventory:item-drag-state',
       )?.[1];
@@ -491,12 +448,7 @@ describe('When inventory window IPC handlers are initialized', () => {
         },
       ]);
 
-      initializeInventoryWindowHandlers(
-        '/tmp/main',
-        'http://localhost:5173',
-        '/tmp/renderer',
-        () => '/tmp',
-      );
+      initializeInventoryWindowHandlers(devPaths, () => '/tmp');
       const listener = mocks.onMock.mock.calls.find(
         (call) => call[0] === 'inventory:item-drag-state',
       )?.[1];

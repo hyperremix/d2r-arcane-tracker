@@ -1,66 +1,45 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { createGameProcessGuard } from './gameProcessGuard';
 
-const mocks = vi.hoisted(() => ({
-  execFile: vi.fn(),
-}));
-
-vi.mock('node:child_process', () => ({
-  default: { execFile: mocks.execFile },
-  execFile: mocks.execFile,
-}));
-
-import { assertGameNotRunning } from './gameProcessGuard';
-
-function mockTasklist(result: { stdout: string } | Error): void {
-  mocks.execFile.mockImplementation(
-    (
-      _file: string,
-      _args: string[],
-      callback: (error: Error | null, result?: { stdout: string }) => void,
-    ) => {
-      if (result instanceof Error) {
-        callback(result);
-      } else {
-        callback(null, result);
-      }
-    },
-  );
+function createProcessMonitor(state: { monitoring: boolean; running: boolean }) {
+  return {
+    isMonitoring: vi.fn(() => state.monitoring),
+    isRunning: vi.fn(() => state.running),
+  };
 }
 
 describe('When the game process guard checks for D2R', () => {
-  const originalPlatform = process.platform;
   let warnSpy: ReturnType<typeof vi.spyOn> | undefined;
 
-  beforeEach(() => {
-    vi.clearAllMocks();
-    Object.defineProperty(process, 'platform', { value: 'win32' });
-  });
-
   afterEach(() => {
-    // Vitest runs with isolate: false, so a failing assertion must not leak the faked platform.
-    Object.defineProperty(process, 'platform', { value: originalPlatform });
     warnSpy?.mockRestore();
     warnSpy = undefined;
   });
 
-  describe('If tasklist lists D2R.exe', () => {
-    it('Then writes are refused with GAME_RUNNING', async () => {
+  describe('If the process monitor is monitoring', () => {
+    it('Then its state is used without a new process lookup', async () => {
       // Arrange
-      mockTasklist({ stdout: '"D2R.exe","1234","Console","1","1,000 K"\r\n' });
+      const findProcess = vi.fn();
+      const assertGameNotRunning = createGameProcessGuard({
+        processMonitor: createProcessMonitor({ monitoring: true, running: true }),
+        findProcess,
+        platform: 'win32',
+      });
 
       // Act
       const check = assertGameNotRunning();
 
       // Assert
       await expect(check).rejects.toThrow('GAME_RUNNING');
+      expect(findProcess).not.toHaveBeenCalled();
     });
-  });
 
-  describe('If tasklist reports no matching process', () => {
-    it('Then writes are allowed', async () => {
+    it('If it has not seen the game, Then writes are allowed', async () => {
       // Arrange
-      mockTasklist({
-        stdout: 'INFO: No tasks are running which match the specified criteria.\r\n',
+      const assertGameNotRunning = createGameProcessGuard({
+        processMonitor: createProcessMonitor({ monitoring: true, running: false }),
+        findProcess: vi.fn(),
+        platform: 'win32',
       });
 
       // Act
@@ -71,11 +50,45 @@ describe('When the game process guard checks for D2R', () => {
     });
   });
 
-  describe('If tasklist itself fails', () => {
-    it('Then the guard does not block the user', async () => {
+  describe('If the process monitor is not monitoring', () => {
+    it('Then the process is looked up and a running game refuses writes', async () => {
       // Arrange
-      mockTasklist(new Error('tasklist not found'));
+      const findProcess = vi.fn().mockResolvedValue(1234);
+      const assertGameNotRunning = createGameProcessGuard({
+        processMonitor: createProcessMonitor({ monitoring: false, running: false }),
+        findProcess,
+        platform: 'win32',
+      });
+
+      // Act
+      const check = assertGameNotRunning();
+
+      // Assert
+      await expect(check).rejects.toThrow('GAME_RUNNING');
+      expect(findProcess).toHaveBeenCalledTimes(1);
+    });
+
+    it('If the lookup finds no game, Then writes are allowed', async () => {
+      // Arrange
+      const assertGameNotRunning = createGameProcessGuard({
+        findProcess: vi.fn().mockResolvedValue(null),
+        platform: 'win32',
+      });
+
+      // Act
+      const check = assertGameNotRunning();
+
+      // Assert
+      await expect(check).resolves.toBeUndefined();
+    });
+
+    it('If the lookup fails, Then the guard does not block the user', async () => {
+      // Arrange
       warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+      const assertGameNotRunning = createGameProcessGuard({
+        findProcess: vi.fn().mockRejectedValue(new Error('tasklist not found')),
+        platform: 'win32',
+      });
 
       // Act
       const check = assertGameNotRunning();
@@ -89,14 +102,15 @@ describe('When the game process guard checks for D2R', () => {
   describe('If the platform is not Windows', () => {
     it('Then no process lookup is attempted', async () => {
       // Arrange
-      Object.defineProperty(process, 'platform', { value: 'linux' });
+      const findProcess = vi.fn();
+      const assertGameNotRunning = createGameProcessGuard({ findProcess, platform: 'linux' });
 
       // Act
       const check = assertGameNotRunning();
 
       // Assert
       await expect(check).resolves.toBeUndefined();
-      expect(mocks.execFile).not.toHaveBeenCalled();
+      expect(findProcess).not.toHaveBeenCalled();
     });
   });
 });

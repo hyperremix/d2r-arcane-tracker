@@ -299,6 +299,31 @@ describe('When ItemDetectionService is used', () => {
       expect(eventSpy).toHaveBeenCalledTimes(1);
     });
 
+    it('Then the newly found items are returned, and only once', async () => {
+      // Arrange
+      const saveFile = D2SaveFileBuilder.new()
+        .withPath('/test/char.d2s')
+        .withName('TestChar')
+        .build();
+      const d2sItem = D2SItemBuilder.new()
+        .withId('1234')
+        .asUniqueHelm()
+        .withUniqueName('shako') // Must match mockGrailItems ID
+        .build();
+      const eventSpy = vi.fn();
+      eventBus.on('item-detection', eventSpy);
+      service.setGrailItems(mockGrailItems);
+
+      // Act
+      const firstFound = await service.analyzeSaveFile(saveFile, toParsedItems([d2sItem]));
+      const secondFound = await service.analyzeSaveFile(saveFile, toParsedItems([d2sItem]));
+
+      // Assert
+      expect(firstFound).toEqual([eventSpy.mock.calls[0][0]]);
+      expect(firstFound[0]).toMatchObject({ type: 'item-found', grailItem: { id: 'shako' } });
+      expect(secondFound).toEqual([]);
+    });
+
     it('Then should NOT emit event on second detection of same item', async () => {
       // Arrange
       const saveFile = D2SaveFileBuilder.new()

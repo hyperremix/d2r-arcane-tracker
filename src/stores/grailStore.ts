@@ -1,13 +1,12 @@
-import {
-  type AdvancedGrailFilter,
-  type Character,
-  GameMode,
-  GameVersion,
-  type GrailFilter,
-  type GrailProgress,
-  type Item,
-  type Settings,
+import type {
+  AdvancedGrailFilter,
+  Character,
+  GrailFilter,
+  GrailProgress,
+  Item,
+  Settings,
 } from 'electron/types/grail';
+import { createDefaultSettings } from 'electron/utils/settingsCodec';
 import i18n from 'i18next';
 import { useMemo } from 'react';
 import { toast } from 'sonner';
@@ -102,40 +101,9 @@ interface GrailState {
 }
 
 /**
- * Default application settings.
+ * Default application settings, from the settings table shared with the main process.
  */
-const defaultSettings: Settings = {
-  saveDir: '',
-  lang: 'en',
-  gameMode: GameMode.Both,
-  grailNormal: true,
-  grailEthereal: false,
-  grailRunes: false,
-  grailRunewords: false,
-  gameVersion: GameVersion.Resurrected,
-  enableSounds: true,
-  notificationVolume: 0.5,
-  inAppNotifications: true,
-  nativeNotifications: true,
-  needsSeeding: true,
-  theme: 'system',
-  showItemIcons: false,
-  widgetEnabled: false,
-  widgetDisplay: 'overall',
-  widgetOpacity: 0.9,
-  widgetLocked: false,
-  wizardCompleted: false,
-  wizardSkipped: false,
-  runTrackerAutoStart: true,
-  runTrackerEndThreshold: 10,
-  runTrackerShortcuts: {
-    startRun: 'Ctrl+R',
-    pauseRun: 'Ctrl+Space',
-    endRun: 'Ctrl+E',
-    endSession: 'Ctrl+Shift+E',
-  },
-  runTrackerGlobalHotkeys: false,
-};
+const defaultSettings: Settings = createDefaultSettings();
 
 /**
  * Default filter configuration.

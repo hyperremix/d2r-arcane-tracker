@@ -1,6 +1,7 @@
 import { ipcMain } from 'electron';
-import { grailDatabase } from '../database/database';
+import type { AppPaths } from '../app/paths';
 import { createIpcMainRegistry } from '../ipc/handle';
+import type { SettingsService } from '../services/settingsService';
 import type { Settings } from '../types/grail';
 import type { WidgetDisplayMode, WidgetSize } from '../utils/widgetDisplay';
 import { isWidgetDisplayMode } from '../utils/widgetDisplay';
@@ -24,9 +25,12 @@ import {
  * @param rendererSettings - Settings snapshot sent by the renderer
  * @returns Settings to create or size the widget window with
  */
-function getSettingsForWidgetWindow(rendererSettings: Partial<Settings>): Partial<Settings> {
+function getSettingsForWidgetWindow(
+  settingsService: SettingsService,
+  rendererSettings: Partial<Settings>,
+): Partial<Settings> {
   try {
-    const persisted = grailDatabase.getAllSettings();
+    const persisted = settingsService.getAll();
     return {
       ...rendererSettings,
       widgetSizeOverall: persisted.widgetSizeOverall,
@@ -50,16 +54,14 @@ function getSettingsForWidgetWindow(rendererSettings: Partial<Settings>): Partia
  * Initializes IPC handlers for widget window operations.
  * Sets up handlers for toggling, positioning, and updating the widget window.
  *
- * @param __dirname - Directory name for resolving preload script path
- * @param viteDevServerUrl - Vite dev server URL (only in development)
- * @param rendererDist - Path to renderer distribution folder (production)
+ * @param settingsService - Settings service storing the widget settings
+ * @param paths - Locations of the preload script and the renderer
  * @param onPositionChange - Callback when widget position changes (for saving to settings)
  * @param onSizeChange - Callback when widget size changes (for saving to settings)
  */
 export function initializeWidgetHandlers(
-  __dirname: string,
-  viteDevServerUrl?: string,
-  rendererDist?: string,
+  settingsService: SettingsService,
+  paths: AppPaths,
   onPositionChange?: (position: { x: number; y: number }) => void,
   onSizeChange?: (display: WidgetDisplayMode, size: WidgetSize) => void,
 ): void {
@@ -71,10 +73,8 @@ export function initializeWidgetHandlers(
     try {
       if (enabled) {
         showWidgetWindow(
-          getSettingsForWidgetWindow(settings),
-          __dirname,
-          viteDevServerUrl,
-          rendererDist,
+          getSettingsForWidgetWindow(settingsService, settings),
+          paths,
           onPositionChange,
           onSizeChange,
         );
@@ -102,7 +102,7 @@ export function initializeWidgetHandlers(
         if (!isWidgetDisplayMode(display)) {
           return { success: false, error: 'Invalid widget display mode' };
         }
-        updateWidgetWindowSize(display, getSettingsForWidgetWindow(settings));
+        updateWidgetWindowSize(display, getSettingsForWidgetWindow(settingsService, settings));
         return { success: true };
       } catch (error) {
         console.error('Failed to update widget display mode:', error);
@@ -156,7 +156,7 @@ export function initializeWidgetHandlers(
       }
       const defaultSize = resetWidgetWindowSize(
         display,
-        getSettingsForWidgetWindow({}).widgetRunOnlyShowItems,
+        getSettingsForWidgetWindow(settingsService, {}).widgetRunOnlyShowItems,
       );
       if (defaultSize && onSizeChange) {
         onSizeChange(display, defaultSize);

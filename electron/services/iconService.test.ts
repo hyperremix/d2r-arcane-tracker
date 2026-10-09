@@ -6,7 +6,7 @@ import type { ServiceErrorPayload } from '../types/serviceError';
 import { setErrorForwarder } from '../utils/serviceLogger';
 import { IconService } from './iconService';
 
-// Hoisted because iconService.ts instantiates its singleton (calling app.getPath) on import.
+// Hoisted because the IconService constructor calls app.getPath.
 const paths = vi.hoisted(() => ({ userData: '' }));
 vi.mock('electron', () => ({
   app: {

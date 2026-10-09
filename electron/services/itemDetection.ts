@@ -61,14 +61,15 @@ class ItemDetectionService {
    * @param {ParsedInventoryItem[]} parsedItems - Items the save file monitor already parsed from the file.
    * @param {boolean} [silent=false] - If true, suppress notifications for detected items.
    * @param {boolean} [isInitialScan=false] - If true, marks items as being from initial scan for statistics exclusion.
-   * @returns {Promise<void>} A promise that resolves when analysis is complete.
+   * @returns {Promise<ItemDetectionEvent[]>} The items found for the first time (also emitted as `item-detection` events).
    */
   async analyzeSaveFile(
     saveFile: D2SaveFile,
     parsedItems: ParsedInventoryItem[],
     silent: boolean = false,
     isInitialScan: boolean = false,
-  ): Promise<void> {
+  ): Promise<ItemDetectionEvent[]> {
+    const foundItems: ItemDetectionEvent[] = [];
     try {
       // Track items to prevent duplicate notifications globally
       for (const candidate of selectDetectionCandidates(parsedItems)) {
@@ -82,13 +83,15 @@ class ItemDetectionService {
           // Only emit event if this is a NEW item globally
           if (!this.previouslySeenItems.has(itemKey)) {
             log.info('analyzeSaveFile', `New item detected: ${item.name} in ${saveFile.name}`);
-            this.eventBus.emit('item-detection', {
+            const foundItem = {
               type: 'item-found',
               item,
               grailItem: grailMatch,
               silent,
               isInitialScan,
-            } as ItemDetectionEvent);
+            } as ItemDetectionEvent;
+            this.eventBus.emit('item-detection', foundItem);
+            foundItems.push(foundItem);
             this.previouslySeenItems.add(itemKey);
           }
         }
@@ -96,6 +99,7 @@ class ItemDetectionService {
     } catch (error) {
       log.error('analyzeSaveFile', error, { saveFile: saveFile.name });
     }
+    return foundItems;
   }
 
   /**

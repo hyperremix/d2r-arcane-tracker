@@ -1,11 +1,8 @@
-import { exec } from 'node:child_process';
-import { promisify } from 'node:util';
 import { createServiceLogger } from '../utils/serviceLogger';
+import { D2R_PROCESS_NAME, findD2RProcess } from './d2rProcess';
 import type { EventBus } from './EventBus';
 
 const log = createServiceLogger('ProcessMonitor');
-
-const execAsync = promisify(exec);
 
 /**
  * Service for monitoring the Diablo 2 Resurrected process.
@@ -14,11 +11,18 @@ const execAsync = promisify(exec);
 export class ProcessMonitor {
   private checkInterval: NodeJS.Timeout | null = null;
   private d2rProcessId: number | null = null;
-  private isMonitoring = false;
+  private monitoring = false;
   private readonly checkIntervalMs = 2000; // Check every 2 seconds
-  private readonly processName = 'D2R.exe';
+  private readonly processName = D2R_PROCESS_NAME;
 
-  constructor(private eventBus: EventBus) {
+  /**
+   * @param eventBus - Event bus the process start and stop events are emitted on
+   * @param findProcess - Looks up the D2R process ID (null if not running)
+   */
+  constructor(
+    private eventBus: EventBus,
+    private readonly findProcess: () => Promise<number | null> = findD2RProcess,
+  ) {
     log.info('constructor', 'Initialized');
   }
 
@@ -27,7 +31,7 @@ export class ProcessMonitor {
    * Will emit 'd2r-started' when process is detected and 'd2r-stopped' when it disappears.
    */
   startMonitoring(): void {
-    if (this.isMonitoring) {
+    if (this.monitoring) {
       log.info('startMonitoring', 'Already monitoring');
       return;
     }
@@ -38,7 +42,7 @@ export class ProcessMonitor {
       return;
     }
 
-    this.isMonitoring = true;
+    this.monitoring = true;
     log.info('startMonitoring', 'Starting process monitoring');
 
     // Check immediately
@@ -54,11 +58,11 @@ export class ProcessMonitor {
    * Stops monitoring for the D2R process.
    */
   stopMonitoring(): void {
-    if (!this.isMonitoring) {
+    if (!this.monitoring) {
       return;
     }
 
-    this.isMonitoring = false;
+    this.monitoring = false;
 
     if (this.checkInterval) {
       clearInterval(this.checkInterval);
@@ -109,35 +113,14 @@ export class ProcessMonitor {
   }
 
   /**
-   * Finds the D2R.exe process ID using Windows tasklist command.
-   * @returns Process ID if found, null otherwise
+   * Finds the D2R.exe process ID.
+   * @returns Process ID if found, null otherwise (also when the lookup fails)
    * @private
    */
   private async findD2RProcess(): Promise<number | null> {
     try {
-      // Use tasklist command to find D2R.exe process
-      // Format: tasklist /FI "IMAGENAME eq D2R.exe" /FO CSV /NH
-      const command = `tasklist /FI "IMAGENAME eq ${this.processName}" /FO CSV /NH`;
-      const { stdout } = await execAsync(command);
-
-      if (!stdout || stdout.trim() === '' || stdout.includes('No tasks')) {
-        return null;
-      }
-
-      // Parse CSV output: "D2R.exe","12345","Session Name","Session#","Mem Usage"
-      const lines = stdout.trim().split('\n');
-      for (const line of lines) {
-        const match = line.match(/"([^"]+)","(\d+)"/);
-        if (match && match[1] === this.processName) {
-          const pid = Number.parseInt(match[2], 10);
-          if (!Number.isNaN(pid)) {
-            return pid;
-          }
-        }
-      }
-
-      return null;
-    } catch (_error) {
+      return await this.findProcess();
+    } catch {
       // Process not found or error executing command
       return null;
     }
@@ -149,6 +132,13 @@ export class ProcessMonitor {
    */
   getProcessId(): number | null {
     return this.d2rProcessId;
+  }
+
+  /**
+   * Whether the process is being polled. Only then does {@link isRunning} reflect the game state.
+   */
+  isMonitoring(): boolean {
+    return this.monitoring;
   }
 
   /**

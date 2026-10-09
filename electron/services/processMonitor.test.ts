@@ -2,24 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { EventBus } from './EventBus';
 import { ProcessMonitor } from './processMonitor';
 
-// Mock node:child_process
-const mockExecAsync = vi.fn();
-
-vi.mock('node:child_process', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('node:child_process')>();
-  return {
-    ...actual,
-    exec: vi.fn(),
-  };
-});
-
-vi.mock('node:util', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('node:util')>();
-  return {
-    ...actual,
-    promisify: () => mockExecAsync,
-  };
-});
+// Fake D2R process lookup
+const mockFindProcess = vi.fn<() => Promise<number | null>>();
 
 describe('When ProcessMonitor is instantiated', () => {
   let eventBus: EventBus;
@@ -27,10 +11,10 @@ describe('When ProcessMonitor is instantiated', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    mockExecAsync.mockReset();
+    mockFindProcess.mockReset();
 
     eventBus = new EventBus();
-    processMonitor = new ProcessMonitor(eventBus);
+    processMonitor = new ProcessMonitor(eventBus, mockFindProcess);
   });
 
   afterEach(() => {
@@ -74,7 +58,8 @@ describe('When ProcessMonitor is instantiated', () => {
 
       // Assert
       expect(processMonitor.isRunning()).toBe(false);
-      expect(mockExecAsync).not.toHaveBeenCalled();
+      expect(mockFindProcess).not.toHaveBeenCalled();
+      expect(processMonitor.isMonitoring()).toBe(false);
 
       // Cleanup
       Object.defineProperty(process, 'platform', {
@@ -115,6 +100,31 @@ describe('When ProcessMonitor is instantiated', () => {
 
       // Assert
       expect(eventBus.listenerCount('d2r-started')).toBe(1);
+    });
+  });
+
+  describe('If monitoring runs on Windows and D2R starts', () => {
+    const originalPlatform = process.platform;
+
+    afterEach(() => {
+      Object.defineProperty(process, 'platform', { value: originalPlatform, configurable: true });
+    });
+
+    it('Then d2r-started is emitted and the monitor reports the game as running', async () => {
+      // Arrange
+      Object.defineProperty(process, 'platform', { value: 'win32', configurable: true });
+      mockFindProcess.mockResolvedValue(4321);
+      const started = vi.fn();
+      eventBus.on('d2r-started', started);
+
+      // Act
+      processMonitor.startMonitoring();
+      await vi.waitFor(() => expect(started).toHaveBeenCalled());
+
+      // Assert
+      expect(started).toHaveBeenCalledWith({ processId: 4321, processName: 'D2R.exe' });
+      expect(processMonitor.isMonitoring()).toBe(true);
+      expect(processMonitor.isRunning()).toBe(true);
     });
   });
 });

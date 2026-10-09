@@ -13,10 +13,6 @@ vi.mock('electron', () => ({
   },
 }));
 
-vi.mock('../database/database', () => ({
-  grailDatabase: { getAllSettings: vi.fn(() => ({})) },
-}));
-
 vi.mock('../window/widgetWindow', () => ({
   closeWidgetWindow: vi.fn(),
   resetWidgetWindowSize: vi.fn(() => ({ width: 250, height: 250 })),
@@ -27,7 +23,11 @@ vi.mock('../window/widgetWindow', () => ({
   widgetWindow: null,
 }));
 
-import { grailDatabase } from '../database/database';
+import type { AppPaths } from '../app/paths';
+import type { GrailDatabase } from '../database/database';
+import { EventBus } from '../services/EventBus';
+import { SettingsService } from '../services/settingsService';
+import type { Settings } from '../types/grail';
 import {
   resetWidgetWindowSize,
   setWidgetWindowLocked,
@@ -35,6 +35,16 @@ import {
   updateWidgetWindowSize,
 } from '../window/widgetWindow';
 import { initializeWidgetHandlers } from './widgetHandlers';
+
+const grailDatabase = { getAllSettings: vi.fn((): Partial<Settings> => ({})) };
+const database = new SettingsService(grailDatabase as unknown as GrailDatabase, new EventBus());
+
+const testPaths: AppPaths = {
+  appRoot: '/app',
+  mainDist: '/app/dist-electron',
+  rendererDist: '/app/dist',
+  publicDir: '/app/dist',
+};
 
 const invoke = (channel: string, ...args: unknown[]) =>
   (handlers.get(channel) as Handler)({}, ...args);
@@ -51,7 +61,7 @@ describe('widget IPC handlers display mode validation', () => {
     );
     handlers.clear();
     consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
-    initializeWidgetHandlers('/app', undefined, undefined, undefined, onSizeChange);
+    initializeWidgetHandlers(database, testPaths, undefined, onSizeChange);
   });
 
   afterEach(() => {
@@ -176,7 +186,7 @@ describe('widget IPC handlers lock (click-through)', () => {
     );
     handlers.clear();
     consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
-    initializeWidgetHandlers('/app');
+    initializeWidgetHandlers(database, testPaths);
   });
 
   afterEach(() => {
@@ -233,9 +243,7 @@ describe('widget IPC handlers lock (click-through)', () => {
         widgetLocked: true,
         widgetSizeRunOnly: persistedRunOnly,
       }),
-      '/app',
-      undefined,
-      undefined,
+      testPaths,
       undefined,
       undefined,
     );

@@ -1,10 +1,16 @@
 import type { GrailDatabase } from '../database/database';
-import type { Run, Session } from '../types/grail';
+import type { Run, Session, Settings } from '../types/grail';
 import { createServiceLogger } from '../utils/serviceLogger';
 import type { EventBus } from './EventBus';
 import type { MemoryReader } from './memoryReader';
 
 const log = createServiceLogger('RunTrackerService');
+
+/** Settings that change how the run tracker reads the game memory. */
+const RUN_TRACKER_SETTING_KEYS: readonly (keyof Settings)[] = [
+  'runTrackerMemoryReading',
+  'runTrackerMemoryPollingInterval',
+];
 
 /**
  * Service for tracking gaming sessions and runs using memory reading (auto mode).
@@ -40,7 +46,7 @@ export class RunTrackerService {
   }
 
   /**
-   * Sets up event listeners for memory reading events.
+   * Sets up event listeners for memory reading events and settings changes.
    * @private
    */
   private setupEventListeners(): void {
@@ -55,6 +61,15 @@ export class RunTrackerService {
     this.eventUnsubscribers.push(
       this.eventBus.on('game-exited', (payload) => {
         this.handleGameExited(payload.characterId);
+      }),
+    );
+
+    // Start or stop memory reading as soon as auto mode is toggled in the settings
+    this.eventUnsubscribers.push(
+      this.eventBus.on('settings-updated', (changes) => {
+        if (RUN_TRACKER_SETTING_KEYS.some((key) => key in changes)) {
+          this.updateSettings();
+        }
       }),
     );
   }
@@ -116,7 +131,8 @@ export class RunTrackerService {
   }
 
   /**
-   * Updates run tracker settings dynamically.
+   * Re-reads the run tracker settings and starts or stops memory reading when auto mode changed.
+   * Called when the run tracker settings are updated.
    */
   updateSettings(): void {
     const wasAutoModeEnabled = this.autoModeEnabled;
@@ -132,20 +148,6 @@ export class RunTrackerService {
     if (!this.autoModeEnabled && wasAutoModeEnabled && this.memoryReader) {
       log.info('updateSettings', 'Auto mode disabled, stopping memory reader');
       this.memoryReader.stopPolling();
-    }
-  }
-
-  /**
-   * Sets the memory reader instance.
-   * Used for dependency injection when memory reader is created after RunTrackerService.
-   */
-  setMemoryReader(memoryReader: MemoryReader | null): void {
-    this.memoryReader = memoryReader;
-    this.loadSettings();
-
-    // Start memory reading if auto mode is enabled
-    if (this.autoModeEnabled && this.memoryReader) {
-      this.memoryReader.startPolling();
     }
   }
 
@@ -411,13 +413,6 @@ export class RunTrackerService {
    */
   getActiveRun(): Run | null {
     return this.currentRun;
-  }
-
-  /**
-   * Gets the database instance for external access.
-   */
-  getDatabase(): GrailDatabase {
-    return this.database;
   }
 
   /**

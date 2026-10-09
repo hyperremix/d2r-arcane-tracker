@@ -1,1 +1,1 @@
-export { GrailDatabase, grailDatabase } from './database';
+export { GrailDatabase } from './database';

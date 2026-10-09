@@ -1,4 +1,5 @@
 import { BrowserWindow, ipcMain } from 'electron';
+import type { AppPaths } from '../app/paths';
 import { type EventArgs, sendToRenderer } from '../ipc/broadcast';
 import {
   type ActiveDragStateSnapshot,
@@ -231,10 +232,13 @@ function validateSnapshotTarget(
   };
 }
 
+/**
+ * Initializes IPC handlers for the inventory snapshot windows and the drag state they share.
+ * @param paths - Locations of the preload script and the renderer
+ * @param getSaveDirectory - The save directory snapshot windows may show files from
+ */
 export function initializeInventoryWindowHandlers(
-  __dirname: string,
-  viteDevServerUrl?: string,
-  rendererDist?: string,
+  paths: AppPaths,
   getSaveDirectory?: () => string | undefined,
 ): void {
   const { handle, onRendererMessage } = createIpcMainRegistry(ipcMain);
@@ -268,12 +272,7 @@ export function initializeInventoryWindowHandlers(
 
   handle('inventory:openSnapshotWindow', async (_, target): Promise<{ success: boolean }> => {
     const validatedTarget = validateSnapshotTarget(target, getSaveDirectory?.());
-    const snapshotWindow = openInventorySnapshotWindow(
-      validatedTarget,
-      __dirname,
-      viteDevServerUrl,
-      rendererDist,
-    );
+    const snapshotWindow = openInventorySnapshotWindow(validatedTarget, paths);
 
     if (snapshotWindow.webContents.isLoadingMainFrame()) {
       snapshotWindow.webContents.once('did-finish-load', () => {

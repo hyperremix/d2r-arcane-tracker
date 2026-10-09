@@ -1,15 +1,25 @@
-import { ipcMain } from 'electron';
+import { type BrowserWindow, ipcMain } from 'electron';
 import { sendToRenderer } from '../ipc/broadcast';
 import { createIpcMainRegistry } from '../ipc/handle';
-import { mainWindow } from '../main';
-import { updateService } from '../services/updateService';
+import type { UpdateService } from '../services/updateService';
 import type { UpdateStatus } from '../types/grail';
+
+/** Dependencies of the update IPC handlers. */
+export interface UpdateHandlerDependencies {
+  updateService: UpdateService;
+  /** Returns the current main window (it can be re-created on macOS). */
+  getMainWindow: () => BrowserWindow | undefined;
+}
 
 /**
  * Initializes IPC handlers for application update functionality.
  * Sets up handlers for checking updates, downloading, and installing.
+ * @param deps - The update service and the main window the status is sent to
  */
-export function initializeUpdateHandlers() {
+export function initializeUpdateHandlers({
+  updateService,
+  getMainWindow,
+}: UpdateHandlerDependencies) {
   const { handle } = createIpcMainRegistry(ipcMain);
   // Only initialize update service in production
   if (!process.env.VITE_DEV_SERVER_URL) {
@@ -17,6 +27,7 @@ export function initializeUpdateHandlers() {
 
     // Register status change callback to send updates to renderer
     updateService.setStatusCallback((status: UpdateStatus) => {
+      const mainWindow = getMainWindow();
       if (mainWindow) {
         sendToRenderer(mainWindow.webContents, 'update:status', status);
       }

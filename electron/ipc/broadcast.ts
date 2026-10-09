@@ -28,6 +28,12 @@ export function sendToRenderer<C extends EventChannel>(
   target.send(channel, ...args);
 }
 
+/** Sends an event from the IPC contract to every renderer window. */
+export type BroadcastToRenderers = <C extends EventChannel>(
+  channel: C,
+  ...args: EventArgs<C>
+) => void;
+
 /**
  * Creates `broadcastToRenderers`, which sends an event from the IPC contract to every renderer
  * window. Destroyed web contents and non-window contents (DevTools, background pages) are skipped.
@@ -36,7 +42,9 @@ export function sendToRenderer<C extends EventChannel>(
  *   handler modules pass a closure over their own `electron` import
  * @returns The broadcast function
  */
-export function createRendererBroadcaster(getAllWebContents: () => BroadcastTarget[]) {
+export function createRendererBroadcaster(
+  getAllWebContents: () => BroadcastTarget[],
+): BroadcastToRenderers {
   return function broadcastToRenderers<C extends EventChannel>(
     channel: C,
     ...args: EventArgs<C>

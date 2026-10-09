@@ -5,6 +5,7 @@ import type {
   Run,
   SaveFileEvent,
   Session,
+  Settings,
 } from './grail';
 
 /**
@@ -133,7 +134,8 @@ export type AppEvent =
   | { type: 'd2r-started'; payload: D2RStartedPayload }
   | { type: 'd2r-stopped'; payload: D2RStoppedPayload }
   | { type: 'game-entered'; payload: GameEnteredPayload }
-  | { type: 'game-exited'; payload: GameExitedPayload };
+  | { type: 'game-exited'; payload: GameExitedPayload }
+  | { type: 'settings-updated'; payload: Partial<Settings> };
 
 /**
  * Extract event type names

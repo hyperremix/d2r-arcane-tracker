@@ -1,14 +1,7 @@
-import { app, type BrowserWindow, ipcMain, webContents } from 'electron';
-import { grailDatabase } from '../database/database';
-import { createRendererBroadcaster } from '../ipc/broadcast';
+import { app, ipcMain } from 'electron';
 import { createIpcMainRegistry } from '../ipc/handle';
-import { GlobalHotkeyService } from '../services/globalHotkeys';
-import type { RunTrackerService } from '../services/runTracker';
-import type { GlobalHotkeyStatus, Settings } from '../types/grail';
-import { addSettingsUpdatedListener } from './grailHandlers';
-
-/** Sends an event from the IPC contract to every renderer window. */
-const broadcastToRenderers = createRendererBroadcaster(() => webContents.getAllWebContents());
+import type { GlobalHotkeyService } from '../services/globalHotkeys';
+import type { Settings } from '../types/grail';
 
 /**
  * Settings that require the global hotkeys to be re-registered when they change.
@@ -18,47 +11,28 @@ const HOTKEY_SETTING_KEYS: readonly (keyof Settings)[] = [
   'runTrackerShortcuts',
 ];
 
-let service: GlobalHotkeyService | undefined;
-const cleanups: Array<() => void> = [];
-
-function broadcastStatus(status: GlobalHotkeyStatus): void {
-  broadcastToRenderers('run-tracker:global-hotkey-status', status);
+/** Dependencies of the global hotkey IPC handlers. */
+export interface GlobalHotkeyHandlerDependencies {
+  hotkeys: GlobalHotkeyService;
+  /**
+   * Subscribes to persisted settings changes.
+   * @returns Function that removes the listener
+   */
+  onSettingsUpdated: (listener: (settings: Partial<Settings>) => void) => () => void;
 }
 
 /**
- * Initializes the run tracker global hotkeys and their IPC handlers.
- * Must be called after the app is ready.
- * @param runTracker - The run tracker service, or undefined if it failed to initialize. Without it
- *   no hotkeys are registered (they would swallow key presses without being able to act on them).
- * @param getMainWindow - Returns the current main window (it can be re-created on macOS)
+ * Registers the global hotkey status handler and keeps the run tracker global hotkeys in sync with
+ * the app focus and the hotkey settings. Must be called after the app is ready.
+ * @param deps - The global hotkey service and the settings change subscription
+ * @returns Function that removes the handler and the listeners
  */
-export function initializeGlobalHotkeyHandlers(
-  runTracker: RunTrackerService | undefined,
-  getMainWindow: () => BrowserWindow | null,
-): void {
+export function initializeGlobalHotkeyHandlers({
+  hotkeys,
+  onSettingsUpdated,
+}: GlobalHotkeyHandlerDependencies): () => void {
   const { handle, removeHandler } = createIpcMainRegistry(ipcMain);
-  closeGlobalHotkeys();
-
-  if (!runTracker) {
-    console.error('[globalHotkeys] Run tracker unavailable, global hotkeys are not registered');
-    handle(
-      'run-tracker:get-global-hotkey-status',
-      (): GlobalHotkeyStatus => ({ enabled: false, registrations: [], unavailable: true }),
-    );
-    cleanups.push(() => removeHandler('run-tracker:get-global-hotkey-status'));
-    return;
-  }
-
-  const hotkeys = new GlobalHotkeyService({
-    getSettings: () => grailDatabase.getAllSettings(),
-    getRunTracker: () => runTracker,
-    isAppFocused: () => {
-      const mainWindow = getMainWindow();
-      return Boolean(mainWindow && !mainWindow.isDestroyed() && mainWindow.isFocused());
-    },
-    onStatusChange: broadcastStatus,
-  });
-  service = hotkeys;
+  const cleanups: Array<() => void> = [];
 
   handle('run-tracker:get-global-hotkey-status', () => hotkeys.getStatus());
   cleanups.push(() => removeHandler('run-tracker:get-global-hotkey-status'));
@@ -72,7 +46,7 @@ export function initializeGlobalHotkeyHandlers(
   });
 
   cleanups.push(
-    addSettingsUpdatedListener((settings) => {
+    onSettingsUpdated((settings) => {
       if (HOTKEY_SETTING_KEYS.some((key) => key in settings)) {
         hotkeys.sync();
       }
@@ -80,17 +54,10 @@ export function initializeGlobalHotkeyHandlers(
   );
 
   hotkeys.sync();
-}
 
-/**
- * Unregisters all global hotkeys and removes the related listeners.
- */
-export function closeGlobalHotkeys(): void {
-  for (const cleanup of cleanups) {
-    cleanup();
-  }
-  cleanups.length = 0;
-
-  service?.dispose();
-  service = undefined;
+  return () => {
+    for (const cleanup of cleanups) {
+      cleanup();
+    }
+  };
 }

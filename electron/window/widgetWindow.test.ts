@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { AppPaths } from '../app/paths';
 import type { Settings } from '../types/grail';
 
 interface MockWindow {
@@ -68,6 +69,13 @@ import {
   updateWidgetWindowSize,
 } from './widgetWindow';
 
+const testPaths: AppPaths = {
+  appRoot: '/app',
+  mainDist: '/app/dist-electron',
+  rendererDist: '/app/dist',
+  publicDir: '/app/dist',
+};
+
 const overallSize = { width: 250, height: 250 };
 const splitSize = { width: 350, height: 250 };
 const runOnlyWithItemsSize = { width: 270, height: 320 };
@@ -83,7 +91,7 @@ describe('widgetWindow display mode resolution', () => {
     const settings: Partial<Settings> = { widgetDisplay: 'split', grailEthereal: false };
 
     // Act
-    createWidgetWindow(settings, '/app');
+    createWidgetWindow(settings, testPaths);
 
     // Assert
     const window = created.windows[0] as MockWindow;
@@ -96,7 +104,7 @@ describe('widgetWindow display mode resolution', () => {
     const settings: Partial<Settings> = { widgetDisplay: 'split', grailEthereal: true };
 
     // Act
-    createWidgetWindow(settings, '/app');
+    createWidgetWindow(settings, testPaths);
 
     // Assert
     const window = created.windows[0] as MockWindow;
@@ -109,9 +117,7 @@ describe('widgetWindow display mode resolution', () => {
     const onSizeChange = vi.fn();
     createWidgetWindow(
       { widgetDisplay: 'split', grailEthereal: false },
-      '/app',
-      undefined,
-      undefined,
+      testPaths,
       undefined,
       onSizeChange,
     );
@@ -126,7 +132,7 @@ describe('widgetWindow display mode resolution', () => {
 
   it('When the display mode is updated to split without ethereal tracking, Then the overall size is applied', () => {
     // Arrange
-    createWidgetWindow({ widgetDisplay: 'overall', grailEthereal: false }, '/app');
+    createWidgetWindow({ widgetDisplay: 'overall', grailEthereal: false }, testPaths);
     const window = created.windows[0] as MockWindow;
 
     // Act
@@ -138,7 +144,7 @@ describe('widgetWindow display mode resolution', () => {
 
   it('When the size is reset for a known mode, Then the default size of that mode is applied', () => {
     // Arrange
-    createWidgetWindow({ widgetDisplay: 'overall' }, '/app');
+    createWidgetWindow({ widgetDisplay: 'overall' }, testPaths);
     const window = created.windows[0] as MockWindow;
 
     // Act
@@ -151,7 +157,7 @@ describe('widgetWindow display mode resolution', () => {
 
   it('If the size is reset for an unknown mode, Then nothing is applied', () => {
     // Arrange
-    createWidgetWindow({ widgetDisplay: 'overall' }, '/app');
+    createWidgetWindow({ widgetDisplay: 'overall' }, testPaths);
     const window = created.windows[0] as MockWindow;
     const unknownMode = 'constructor' as unknown as Parameters<typeof resetWidgetWindowSize>[0];
 
@@ -168,9 +174,7 @@ describe('widgetWindow display mode resolution', () => {
     const onSizeChange = vi.fn();
     createWidgetWindow(
       { widgetDisplay: 'overall', grailEthereal: true },
-      '/app',
-      undefined,
-      undefined,
+      testPaths,
       undefined,
       onSizeChange,
     );
@@ -188,7 +192,7 @@ describe('widgetWindow display mode resolution', () => {
     // Arrange
     const onSizeChange = vi.fn();
     const stored: Partial<Settings> = { widgetDisplay: 'split', grailEthereal: true };
-    createWidgetWindow(stored, '/app', undefined, undefined, undefined, onSizeChange);
+    createWidgetWindow(stored, testPaths, undefined, onSizeChange);
     const window = created.windows[0] as MockWindow;
     updateWidgetWindowSize('overall', { ...stored, grailEthereal: false });
 
@@ -203,7 +207,7 @@ describe('widgetWindow display mode resolution', () => {
     // Arrange
     const onSizeChange = vi.fn();
     const stored: Partial<Settings> = { widgetDisplay: 'split', grailEthereal: true };
-    createWidgetWindow(stored, '/app', undefined, undefined, undefined, onSizeChange);
+    createWidgetWindow(stored, testPaths, undefined, onSizeChange);
     const window = created.windows[0] as MockWindow;
     updateWidgetWindowSize('overall', { ...stored, grailEthereal: false });
     updateWidgetWindowSize('split', { ...stored, grailEthereal: true });
@@ -220,9 +224,7 @@ describe('widgetWindow display mode resolution', () => {
     const onSizeChange = vi.fn();
     createWidgetWindow(
       { widgetDisplay: 'overall', grailEthereal: true },
-      '/app',
-      undefined,
-      undefined,
+      testPaths,
       undefined,
       onSizeChange,
     );
@@ -242,9 +244,7 @@ describe('widgetWindow display mode resolution', () => {
     const onSizeChange = vi.fn();
     createWidgetWindow(
       { widgetDisplay: 'overall', grailEthereal: true },
-      '/app',
-      undefined,
-      undefined,
+      testPaths,
       undefined,
       onSizeChange,
     );
@@ -269,7 +269,7 @@ describe('widgetWindow run-only sizing', () => {
     const settings: Partial<Settings> = { widgetDisplay: 'run-only' };
 
     // Act
-    createWidgetWindow(settings, '/app');
+    createWidgetWindow(settings, testPaths);
 
     // Assert
     const window = created.windows[0] as MockWindow;
@@ -285,7 +285,7 @@ describe('widgetWindow run-only sizing', () => {
     };
 
     // Act
-    createWidgetWindow(settings, '/app');
+    createWidgetWindow(settings, testPaths);
 
     // Assert
     const window = created.windows[0] as MockWindow;
@@ -301,7 +301,7 @@ describe('widgetWindow run-only sizing', () => {
     };
 
     // Act
-    createWidgetWindow(settings, '/app');
+    createWidgetWindow(settings, testPaths);
 
     // Assert
     const window = created.windows[0] as MockWindow;
@@ -312,14 +312,7 @@ describe('widgetWindow run-only sizing', () => {
   it('When the run-only window is resized, Then the size is saved under run-only', () => {
     // Arrange
     const onSizeChange = vi.fn();
-    createWidgetWindow(
-      { widgetDisplay: 'run-only' },
-      '/app',
-      undefined,
-      undefined,
-      undefined,
-      onSizeChange,
-    );
+    createWidgetWindow({ widgetDisplay: 'run-only' }, testPaths, undefined, onSizeChange);
     const window = created.windows[0] as MockWindow;
 
     // Act
@@ -331,7 +324,7 @@ describe('widgetWindow run-only sizing', () => {
 
   it('When the run-only size is reset without the item list, Then the compact default is applied', () => {
     // Arrange
-    createWidgetWindow({ widgetDisplay: 'run-only' }, '/app');
+    createWidgetWindow({ widgetDisplay: 'run-only' }, testPaths);
     const window = created.windows[0] as MockWindow;
 
     // Act
@@ -354,7 +347,7 @@ describe('widgetWindow lock (click-through)', () => {
     const settings: Partial<Settings> = { widgetDisplay: 'overall', widgetLocked: true };
 
     // Act
-    createWidgetWindow(settings, '/app');
+    createWidgetWindow(settings, testPaths);
 
     // Assert
     const window = created.windows[0] as MockWindow;
@@ -370,7 +363,7 @@ describe('widgetWindow lock (click-through)', () => {
     const settings: Partial<Settings> = { widgetDisplay: 'overall' };
 
     // Act
-    createWidgetWindow(settings, '/app');
+    createWidgetWindow(settings, testPaths);
 
     // Assert
     const window = created.windows[0] as MockWindow;
@@ -382,7 +375,7 @@ describe('widgetWindow lock (click-through)', () => {
 
   it('When the widget is locked while open, Then clicks pass through and it gives up focus', () => {
     // Arrange
-    createWidgetWindow({ widgetDisplay: 'overall' }, '/app');
+    createWidgetWindow({ widgetDisplay: 'overall' }, testPaths);
     const window = created.windows[0] as MockWindow;
     window.isFocused.mockReturnValue(true);
 
@@ -400,7 +393,7 @@ describe('widgetWindow lock (click-through)', () => {
 
   it('When the widget is unlocked, Then mouse events and focus are restored', () => {
     // Arrange
-    createWidgetWindow({ widgetDisplay: 'overall', widgetLocked: true }, '/app');
+    createWidgetWindow({ widgetDisplay: 'overall', widgetLocked: true }, testPaths);
     const window = created.windows[0] as MockWindow;
     window.setIgnoreMouseEvents.mockClear();
     window.setFocusable.mockClear();
@@ -416,12 +409,12 @@ describe('widgetWindow lock (click-through)', () => {
 
   it('If an existing locked widget is shown again, Then it is shown without taking focus', () => {
     // Arrange
-    createWidgetWindow({ widgetDisplay: 'overall', widgetLocked: true }, '/app');
+    createWidgetWindow({ widgetDisplay: 'overall', widgetLocked: true }, testPaths);
     const window = created.windows[0] as MockWindow;
     window.showInactive.mockClear();
 
     // Act
-    showWidgetWindow({ widgetDisplay: 'overall', widgetLocked: true }, '/app');
+    showWidgetWindow({ widgetDisplay: 'overall', widgetLocked: true }, testPaths);
 
     // Assert
     expect(window.showInactive).toHaveBeenCalledTimes(1);
