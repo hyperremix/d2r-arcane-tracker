@@ -55,7 +55,7 @@ Stack: Electron 44, React 18, TypeScript, Vite, Tailwind CSS v4, shadcn/ui (Base
 | Command | Purpose |
 | --- | --- |
 | `bun run dev` | Run the app in development, with the debugger port open ([DEBUGGING.md](docs/DEBUGGING.md)) |
-| `bun run typecheck` | TypeScript, renderer and main |
+| `bun run typecheck` | TypeScript for all projects (`tsc -b`): renderer and tests (`tsconfig.web.json`), main process without DOM types (`tsconfig.main.json`), build configs (`tsconfig.node.json`) |
 | `bun run lint` / `lint:fix` | Biome lint |
 | `bun run format` / `format:fix` | Biome format |
 | `bun run check` / `check:fix` | Biome lint, format and import sorting |
