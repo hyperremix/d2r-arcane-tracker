@@ -16,7 +16,7 @@ import {
 } from '@/components/ui/table';
 import { translations } from '@/i18n/translations';
 import { formatDuration, formatSessionDateRelative, formatTime } from '@/lib/utils';
-import { useRunTrackerStore } from '@/stores/runTrackerStore';
+import { useRunTrackerStore, useSessionStatsLookup } from '@/stores/runTrackerStore';
 import { SortableTableHead, type SortOrder } from './SortableTableHead';
 
 interface SessionsListProps {
@@ -104,8 +104,9 @@ function TableRowSkeleton() {
 export function SessionsList({ onSessionSelect }: SessionsListProps) {
   const { t } = useTranslation();
   const showArchivedLabelId = useId();
-  const { sessions, sessionsLoading, getSessionStats, runs, loadSessionRuns, loadingSessions } =
+  const { sessions, sessionsLoading, runs, loadSessionRuns, loadingSessions } =
     useRunTrackerStore();
+  const getSessionStats = useSessionStatsLookup();
   // Only show the skeleton when there is nothing to display yet; background refreshes keep the list visible
   const showSkeleton = sessionsLoading && sessions.length === 0;
   const [showArchived, setShowArchived] = useState(false);

@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import type { Session } from 'electron/types/grail';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { useRunTrackerStore } from '@/stores/runTrackerStore';
+import { useRunTrackerStore, useSessionStatsLookup } from '@/stores/runTrackerStore';
 import { SessionsList } from './SessionsList';
 
 vi.mock('@/stores/runTrackerStore');
@@ -25,11 +25,11 @@ function setupRunTrackerStore(sessions: Session[]) {
   const storeState = {
     sessions,
     loading: false,
-    getSessionStats: () => ({ itemsFound: 0 }),
     runs: new Map(sessions.map((session) => [session.id, []])),
     loadSessionRuns: vi.fn().mockResolvedValue(undefined),
     loadingSessions: new Set<string>(),
   };
+  vi.mocked(useSessionStatsLookup).mockReturnValue(() => null);
   vi.mocked(useRunTrackerStore).mockImplementation((selector?: unknown) => {
     if (typeof selector === 'function') {
       return (selector as (s: typeof storeState) => unknown)(storeState);

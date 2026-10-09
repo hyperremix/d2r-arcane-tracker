@@ -18,7 +18,7 @@ import { translations } from '@/i18n/translations';
 import { formatDuration } from '@/lib/utils';
 import { clampWidgetOpacity, resolveWidgetDisplayMode } from '@/lib/widget';
 import { useGrailStore } from '@/stores/grailStore';
-import { useRunTrackerStore } from '@/stores/runTrackerStore';
+import { useRunTrackerStore, useSessionStats } from '@/stores/runTrackerStore';
 
 /**
  * Props for the Widget component.
@@ -332,7 +332,6 @@ export function Widget({ statistics, settings, onDragStart, onDragEnd }: WidgetP
     activeSession,
     runs,
     runItems,
-    getSessionStats,
     loadSessionRuns,
     loadRunItems,
     addManualRunItem,
@@ -388,14 +387,9 @@ export function Widget({ statistics, settings, onDragStart, onDragEnd }: WidgetP
     }
   }, [activeSession, displayMode, loadRunItems, loadSessionRuns, runItems, runs]);
 
-  // Calculate session statistics for run-only mode
-  // biome-ignore lint/correctness/useExhaustiveDependencies: runs is needed to trigger recalculation when run data changes
-  const sessionStats = useMemo(() => {
-    if (!activeSession || displayMode !== 'run-only') {
-      return null;
-    }
-    return getSessionStats(activeSession.id);
-  }, [activeSession?.id, displayMode, runs, getSessionStats]);
+  // Session statistics for run-only mode
+  const activeSessionStats = useSessionStats(activeSession);
+  const sessionStats = displayMode === 'run-only' ? activeSessionStats : null;
 
   // Build per-run item list for run-only mode
   const runItemsByRun = useMemo(() => {

@@ -9,7 +9,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
 import { translations } from '@/i18n/translations';
 import { formatDuration, formatSessionDate } from '@/lib/utils';
-import { useRunTrackerStore } from '@/stores/runTrackerStore';
+import { useRunTrackerStore, useSessionStats } from '@/stores/runTrackerStore';
 import { ArchiveSessionDialog } from './ArchiveSessionDialog';
 import { ExportDialog } from './ExportDialog';
 import { RunList } from './RunList';
@@ -41,7 +41,6 @@ export function SessionDetailView({ sessionId, onBack }: SessionDetailViewProps)
     archiveSession,
     updateSessionNotes,
     loadSessionRuns,
-    getSessionStats,
   } = useRunTrackerStore();
 
   const [notes, setNotes] = useState<string>('');
@@ -64,12 +63,7 @@ export function SessionDetailView({ sessionId, onBack }: SessionDetailViewProps)
     return activeSession?.id === sessionId;
   }, [activeSession?.id, sessionId]);
 
-  // Get session stats
-  // biome-ignore lint/correctness/useExhaustiveDependencies: runs is needed to trigger recalculation when run data changes
-  const sessionStats = useMemo(() => {
-    if (!session) return null;
-    return getSessionStats(session.id);
-  }, [session?.id, runs, getSessionStats]);
+  const sessionStats = useSessionStats(session);
 
   // Get runs for this session
   const sessionRuns = useMemo(() => {
@@ -277,11 +271,19 @@ export function SessionDetailView({ sessionId, onBack }: SessionDetailViewProps)
 
           {/* Items Found */}
           {sessionStats && (
-            <div className="space-y-1">
-              <p className="font-medium text-muted-foreground text-sm">
-                {t(translations.runTracker.sessionCard.itemsFound)}
-              </p>
-              <p className="font-semibold text-lg">{sessionStats.itemsFound}</p>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <p className="font-medium text-muted-foreground text-sm">
+                  {t(translations.runTracker.sessionCard.itemsFound)}
+                </p>
+                <p className="font-semibold text-lg">{sessionStats.itemsFound}</p>
+              </div>
+              <div className="space-y-1">
+                <p className="font-medium text-muted-foreground text-sm">
+                  {t(translations.runTracker.sessionCard.newGrailItems)}
+                </p>
+                <p className="font-semibold text-lg">{sessionStats.newGrailItems}</p>
+              </div>
             </div>
           )}
 

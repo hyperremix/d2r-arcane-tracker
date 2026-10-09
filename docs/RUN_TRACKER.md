@@ -15,7 +15,7 @@ Data is stored locally. Closing or crashing the app ends any open session, and y
 Open the Run Tracker from the title bar (the **Run Counter** button). The page is built to be read at a glance between runs:
 
 - **Live session**: a large timer for the current run and a status badge (**Running**, **Paused**, **Idle** or **No Session**). Next to it is one main button that changes with the state: **Start New Session** when no session is active, **Start Run** between runs, and **End Run** during a run. In manual mode, **End Session** sits beside **Start Run** between runs, and **Pause**/**Resume** and **End Session** sit beside **End Run** during a run. With [auto mode](#auto-mode-windows-only) on, the run buttons are replaced and only **End Session** remains. Below are **Auto Mode** (Windows only), **Add Item Manually** and a reminder of your keyboard shortcuts.
-- **Active session**: a compact row of session time, run count, average and fastest run, efficiency and items found, then **Recent Runs** and the session actions. Recent Runs lists the last five finished runs, newest first, with each run's duration and the items found in it. **View all runs** opens the full run history of the active session. **Session Notes** are collapsed by default; select the toggle to open them. Archive and export are at the bottom.
+- **Active session**: a compact row of session time, run count, average and fastest run, efficiency, items found and new grail items, then **Recent Runs** and the session actions. Recent Runs lists the last five finished runs, newest first, with each run's duration and the items found in it. **View all runs** opens the full run history of the active session. **Session Notes** are collapsed by default; select the toggle to open them. Archive and export are at the bottom.
 - **Sessions list**: past sessions. Select one to see its runs, the items in each run, and summary stats.
 
 Efficiency is the share of the session spent in runs. It updates live and counts the run in progress, so it is correct before your first run ends.
@@ -63,7 +63,7 @@ Turn on **Global hotkeys** in **Settings → Run Tracker Settings** to use the s
 
 ## Run items
 
-Grail items detected while a run is active are added to that run automatically. Because D2R only saves when you leave a game, they appear once you exit. Use **Add Item Manually** in the live session card for anything the app didn't detect.
+Grail items detected while a run is active are added to that run automatically. Because D2R only saves when you leave a game, they appear once you exit. **New Grail Items** (on the active session card and in a session's details) counts the items found in the session's runs that weren't in your grail before. Repeat finds and items added manually by name don't count. Use **Add Item Manually** in the live session card for anything the app didn't detect.
 
 ## Exporting
 

@@ -10,7 +10,6 @@ import type {
   RunStatistics,
   SaveFileState,
   Session,
-  SessionStats,
   Settings,
   VaultItem,
   VaultItemFilter,
@@ -160,9 +159,6 @@ class GrailDatabase {
   }
 
   // Statistics
-  getSessionStatistics(sessionId: string): SessionStats | null {
-    return statisticsModule.getSessionStatistics(this, sessionId);
-  }
   getOverallRunStatistics(): RunStatistics {
     return statisticsModule.getOverallRunStatistics(this);
   }

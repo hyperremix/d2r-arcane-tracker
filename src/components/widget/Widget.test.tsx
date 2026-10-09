@@ -6,7 +6,6 @@ import type {
   Run,
   RunItem,
   Session,
-  SessionStats,
   Settings,
 } from 'electron/types/grail';
 import i18n from 'i18next';
@@ -71,42 +70,33 @@ vi.mock('@/stores/runTrackerStore', () => {
   runItems.set(run1.id, [runItem1]);
   runItems.set(run2.id, [runItem2]);
 
-  const sessionStats: SessionStats = {
-    sessionId: session.id,
-    totalRuns: 2,
-    totalTime: 0,
-    totalRunTime: 0,
-    averageRunDuration: 0,
-    fastestRun: 0,
-    slowestRun: 0,
-    itemsFound: 2,
-    newGrailItems: 0,
-  };
-
   const loadSessionRuns = vi.fn();
   const loadRunItems = vi.fn();
 
-  const mockStore = {
-    useRunTrackerStore: () => ({
-      activeRun: null,
-      activeSession: widgetTestState.hideSession ? null : session,
-      runs,
-      runItems,
-      getSessionStats: () => sessionStats,
-      loadSessionRuns,
-      loadRunItems,
-      addManualRunItem: vi.fn().mockResolvedValue(undefined),
-      refreshActiveRun: vi.fn().mockResolvedValue(undefined),
-      handleSessionStarted: vi.fn(),
-      handleSessionEnded: vi.fn(),
-      handleRunStarted: vi.fn(),
-      handleRunEnded: vi.fn(),
-      handleRunPaused: vi.fn(),
-      handleRunResumed: vi.fn(),
-    }),
-  } as const;
+  const getState = () => ({
+    activeRun: null,
+    activeSession: widgetTestState.hideSession ? null : session,
+    sessions: [],
+    runs,
+    runItems,
+    loadSessionRuns,
+    loadRunItems,
+    addManualRunItem: vi.fn().mockResolvedValue(undefined),
+    refreshActiveRun: vi.fn().mockResolvedValue(undefined),
+    handleSessionStarted: vi.fn(),
+    handleSessionEnded: vi.fn(),
+    handleRunStarted: vi.fn(),
+    handleRunEnded: vi.fn(),
+    handleRunPaused: vi.fn(),
+    handleRunResumed: vi.fn(),
+  });
 
-  return mockStore;
+  return {
+    // Selector-aware like the real store hook
+    useRunTrackerStore: (selector?: (state: ReturnType<typeof getState>) => unknown) =>
+      selector ? selector(getState()) : getState(),
+    useSessionStats: () => null,
+  };
 });
 
 vi.mock('@/stores/grailStore', () => {
@@ -150,13 +140,17 @@ vi.mock('@/stores/grailStore', () => {
     },
   ];
 
+  const state = {
+    items,
+    progress,
+    settings: {} as Settings,
+    setSettings: async () => ({}),
+  };
+
   return {
-    useGrailStore: () => ({
-      items,
-      progress,
-      settings: {} as Settings,
-      setSettings: async () => ({}),
-    }),
+    // Selector-aware like the real store hook
+    useGrailStore: (selector?: (current: typeof state) => unknown) =>
+      selector ? selector(state) : state,
   };
 });
 

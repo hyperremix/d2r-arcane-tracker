@@ -1,6 +1,9 @@
-import type { Run, RunItem, Session, SessionStats } from 'electron/types/grail';
+import type { GrailProgress, Run, RunItem, Session, SessionStats } from 'electron/types/grail';
+import { useCallback, useMemo } from 'react';
 import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
+import { computeSessionStats, findFirstDiscoveries } from '@/lib/sessionStats';
+import { useGrailStore } from '@/stores/grailStore';
 
 /**
  * User-initiated run tracker actions whose in-flight state is tracked individually,
@@ -43,7 +46,6 @@ interface RunTrackerState {
   error: string | null;
   errorType: 'network' | 'validation' | 'permission' | 'unknown' | null;
   retryCount: number;
-  sessionStatsCache: Map<string, SessionStats>; // sessionId -> stats
   loadingSessions: Set<string>; // sessionId -> tracks in-flight loads
   loadingRunItems: Set<string>; // runId -> tracks in-flight item loads
 
@@ -89,7 +91,6 @@ interface RunTrackerState {
 
   // Computed/Helper Methods
   getCurrentRunDuration: () => number;
-  getSessionStats: (sessionId: string) => SessionStats | null;
 }
 
 /**
@@ -173,30 +174,6 @@ function upsertRunEntry(sessionRuns: Run[], run: Run): Run[] {
   return updatedRuns.sort((a, b) => a.runNumber - b.runNumber);
 }
 
-/**
- * Helper function to handle post-add operations after successfully adding a manual item.
- */
-async function handleSuccessfulItemAdd(
-  targetRunId: string,
-  getState: () => {
-    loadRunItems: (runId: string) => Promise<void>;
-    activeSession: Session | null;
-    sessionStatsCache: Map<string, SessionStats>;
-  },
-  setState: (state: { sessionStatsCache: Map<string, SessionStats> }) => void,
-): Promise<void> {
-  const state = getState();
-  // Refresh run items for the target run
-  await state.loadRunItems(targetRunId);
-
-  // Invalidate session stats cache if we have an active session
-  if (state.activeSession) {
-    const newCache = new Map(state.sessionStatsCache);
-    newCache.delete(state.activeSession.id);
-    setState({ sessionStatsCache: newCache });
-  }
-}
-
 type InitialDataUpdate = Partial<
   Pick<RunTrackerState, 'sessions' | 'activeSession' | 'activeRun' | 'isTracking' | 'isPaused'>
 >;
@@ -262,7 +239,6 @@ export const useRunTrackerStore = create<RunTrackerState>()(
     error: null,
     errorType: null,
     retryCount: 0,
-    sessionStatsCache: new Map(),
     loadingSessions: new Set(),
     loadingRunItems: new Set(),
 
@@ -520,20 +496,15 @@ export const useRunTrackerStore = create<RunTrackerState>()(
           const {
             runs: currentRuns,
             runItems: currentRunItems,
-            sessionStatsCache,
             loadingSessions: currentLoadingSessions,
           } = get();
           const newRuns = new Map(currentRuns);
           newRuns.set(sessionId, runs);
-          // Invalidate session stats cache since runs have changed
-          const newCache = new Map(sessionStatsCache);
-          newCache.delete(sessionId);
           // Remove from loading set
           const newLoadingSessions = new Set(currentLoadingSessions);
           newLoadingSessions.delete(sessionId);
           set({
             runs: newRuns,
-            sessionStatsCache: newCache,
             loadingSessions: newLoadingSessions,
           });
           console.log(`[RunTrackerStore] Loaded ${runs.length} runs for session:`, sessionId);
@@ -563,16 +534,13 @@ export const useRunTrackerStore = create<RunTrackerState>()(
                   (result): result is { runId: string; items: RunItem[] } => result !== null,
                 );
                 if (validResults.length > 0) {
-                  const { runItems: updatedRunItems, sessionStatsCache } = get();
+                  const { runItems: updatedRunItems } = get();
                   const newRunItems = new Map(updatedRunItems);
                   for (const { runId, items } of validResults) {
                     newRunItems.set(runId, items);
                     console.log(`[RunTrackerStore] Loaded ${items.length} items for run:`, runId);
                   }
-                  // Invalidate session stats cache since items have changed
-                  const newCache = new Map(sessionStatsCache);
-                  newCache.delete(sessionId);
-                  set({ runItems: newRunItems, sessionStatsCache: newCache });
+                  set({ runItems: newRunItems });
                 }
               })
               .catch((error) => {
@@ -664,7 +632,7 @@ export const useRunTrackerStore = create<RunTrackerState>()(
         });
 
         if (result?.success) {
-          await handleSuccessfulItemAdd(targetRunId, get, set);
+          await get().loadRunItems(targetRunId);
           console.log('[RunTrackerStore] Manual run item added:', name);
         } else {
           set({
@@ -713,44 +681,34 @@ export const useRunTrackerStore = create<RunTrackerState>()(
 
     handleRunStarted: (run, session) => {
       // Update the runs Map with the new run (upsert to prevent duplicates)
-      const { runs, sessionStatsCache: oldCache } = get();
+      const { runs } = get();
       const sessionRuns = runs.get(session.id) || [];
 
       const updatedRuns = new Map(runs);
       updatedRuns.set(session.id, upsertRunEntry(sessionRuns, run));
-
-      // Invalidate stats cache since run data changed
-      const newCache = new Map(oldCache);
-      newCache.delete(session.id);
 
       set({
         activeRun: run,
         activeSession: session,
         isPaused: false,
         runs: updatedRuns,
-        sessionStatsCache: newCache,
       });
     },
 
     handleRunEnded: async (run, session) => {
       // Update the runs Map with the ended run (which includes duration from backend)
       // Use upsert to prevent duplicates in case of multiple event firings
-      const { runs, sessionStatsCache: oldCache } = get();
+      const { runs } = get();
       const sessionRuns = runs.get(session.id) || [];
 
       const updatedRuns = new Map(runs);
       updatedRuns.set(session.id, upsertRunEntry(sessionRuns, run));
-
-      // Invalidate stats cache since run data changed
-      const newCache = new Map(oldCache);
-      newCache.delete(session.id);
 
       set({
         activeRun: null,
         activeSession: session,
         isPaused: false,
         runs: updatedRuns,
-        sessionStatsCache: newCache,
       });
 
       // Reload session runs from database to ensure we have the latest data
@@ -758,12 +716,9 @@ export const useRunTrackerStore = create<RunTrackerState>()(
       try {
         const freshRuns = await window.electronAPI?.runTracker.getRunsBySession(session.id);
         if (freshRuns) {
-          const { runs: currentRuns, sessionStatsCache: currentCache } = get();
-          const refreshedRuns = new Map(currentRuns);
+          const refreshedRuns = new Map(get().runs);
           refreshedRuns.set(session.id, freshRuns);
-          const refreshedCache = new Map(currentCache);
-          refreshedCache.delete(session.id);
-          set({ runs: refreshedRuns, sessionStatsCache: refreshedCache });
+          set({ runs: refreshedRuns });
         }
       } catch (error) {
         console.error('[RunTrackerStore] Failed to reload runs after run ended:', error);
@@ -785,62 +740,6 @@ export const useRunTrackerStore = create<RunTrackerState>()(
       const { activeRun } = get();
       if (!activeRun || activeRun.endTime) return 0;
       return Date.now() - activeRun.startTime.getTime();
-    },
-
-    getSessionStats: (sessionId) => {
-      const { sessions, runs, runItems, sessionStatsCache, activeSession } = get();
-
-      // Check cache first
-      const cachedStats = sessionStatsCache.get(sessionId);
-      if (cachedStats) {
-        return cachedStats;
-      }
-
-      const session =
-        sessions.find((s) => s.id === sessionId) ??
-        (activeSession?.id === sessionId ? activeSession : null);
-      if (!session) return null;
-
-      const sessionRuns = runs.get(sessionId) || [];
-      const totalItems = sessionRuns.reduce((total, run) => {
-        const items = runItems.get(run.id) || [];
-        return total + items.length;
-      }, 0);
-
-      const newGrailItems = sessionRuns.reduce((total, _run) => {
-        // Note: RunItem doesn't have isNewGrailItem property, so we'll use 0 for now
-        // This would need to be calculated based on grail progress data
-        return total;
-      }, 0);
-
-      // Calculate run durations
-      const runDurations = sessionRuns
-        .filter((run) => run.duration !== undefined)
-        .map((run) => run.duration as number);
-
-      const averageRunDuration =
-        runDurations.length > 0
-          ? runDurations.reduce((sum, duration) => sum + duration, 0) / runDurations.length
-          : 0;
-
-      const fastestRun = runDurations.length > 0 ? Math.min(...runDurations) : 0;
-      const slowestRun = runDurations.length > 0 ? Math.max(...runDurations) : 0;
-
-      const stats = {
-        sessionId,
-        totalRuns: sessionRuns.length,
-        totalTime: session.totalSessionTime,
-        totalRunTime: session.totalRunTime,
-        averageRunDuration,
-        fastestRun,
-        slowestRun,
-        itemsFound: totalItems,
-        newGrailItems,
-      };
-
-      // Cache the result
-      sessionStatsCache.set(sessionId, stats);
-      return stats;
     },
 
     // Error handling methods
@@ -915,4 +814,89 @@ async function runInitialLoad(isFirstLoad: boolean): Promise<void> {
   }
 
   set({ initialLoadStatus: 'success', initialLoadError: undefined });
+}
+
+/**
+ * Returns the progress records that first added an item to the grail, memoized on the grail data.
+ */
+function useFirstDiscoveries(): ReadonlyMap<string, GrailProgress> {
+  const progress = useGrailStore((state) => state.progress);
+  const items = useGrailStore((state) => state.items);
+  const grailEthereal = useGrailStore((state) => state.settings.grailEthereal);
+  return useMemo(
+    () => findFirstDiscoveries(progress, items, grailEthereal),
+    [progress, items, grailEthereal],
+  );
+}
+
+/**
+ * Finds a session in the loaded sessions, preferring the live active session since the sessions
+ * list entry can be a stale snapshot.
+ */
+function findSession(
+  sessionId: string,
+  sessions: Session[],
+  activeSession: Session | null,
+): Session | undefined {
+  if (activeSession?.id === sessionId) {
+    return activeSession;
+  }
+  return sessions.find((session) => session.id === sessionId);
+}
+
+/**
+ * Returns the statistics of a session, computed from its loaded runs and run items and the grail
+ * progress. Recalculated only when that data changes.
+ * @param session - The session, or null/undefined if there is none
+ * @returns The session statistics, or null without a session
+ */
+export function useSessionStats(session: Session | null | undefined): SessionStats | null {
+  const sessionRuns = useRunTrackerStore((state) =>
+    session ? state.runs.get(session.id) : undefined,
+  );
+  const runItems = useRunTrackerStore((state) => state.runItems);
+  const firstDiscoveries = useFirstDiscoveries();
+
+  return useMemo(
+    () =>
+      session ? computeSessionStats(session, sessionRuns ?? [], runItems, firstDiscoveries) : null,
+    [session, sessionRuns, runItems, firstDiscoveries],
+  );
+}
+
+/**
+ * Returns a function that looks up the statistics of any loaded session, for lists that need
+ * the statistics of many sessions. Each session's statistics are computed at most once until the
+ * run tracker or grail data changes.
+ * @returns Function returning the statistics of a session, or null if it is not loaded
+ */
+export function useSessionStatsLookup(): (sessionId: string) => SessionStats | null {
+  const sessions = useRunTrackerStore((state) => state.sessions);
+  const activeSession = useRunTrackerStore((state) => state.activeSession);
+  const runs = useRunTrackerStore((state) => state.runs);
+  const runItems = useRunTrackerStore((state) => state.runItems);
+  const firstDiscoveries = useFirstDiscoveries();
+
+  // A fresh cache per data snapshot; it is local to this hook and never written to the store
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the cache must be dropped whenever the data it was computed from changes
+  const cache = useMemo(
+    () => new Map<string, SessionStats | null>(),
+    [sessions, activeSession, runs, runItems, firstDiscoveries],
+  );
+
+  return useCallback(
+    (sessionId: string) => {
+      const cached = cache.get(sessionId);
+      if (cached !== undefined) {
+        return cached;
+      }
+      const session = findSession(sessionId, sessions, activeSession);
+      const stats = session
+        ? computeSessionStats(session, runs.get(sessionId) ?? [], runItems, firstDiscoveries)
+        : null;
+      cache.set(sessionId, stats);
+      return stats;
+    },
+    [cache, sessions, activeSession, runs, runItems, firstDiscoveries],
+  );
 }

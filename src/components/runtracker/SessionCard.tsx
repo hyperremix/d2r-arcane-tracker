@@ -1,4 +1,4 @@
-import type { Session } from 'electron/types/grail';
+import type { Run, Session } from 'electron/types/grail';
 import { ChevronDown, FileDownIcon, Loader2 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -9,7 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { useNow } from '@/hooks/useNow';
 import { translations } from '@/i18n/translations';
 import { formatDuration } from '@/lib/utils';
-import { useRunTrackerStore } from '@/stores/runTrackerStore';
+import { useRunTrackerStore, useSessionStats } from '@/stores/runTrackerStore';
 import { ArchiveSessionDialog } from './ArchiveSessionDialog';
 import { ExportDialog } from './ExportDialog';
 import { calculateLiveEfficiency } from './liveSession';
@@ -36,6 +36,63 @@ function CompactStat({ label, value }: CompactStatProps) {
   );
 }
 
+interface SessionStatsRowProps {
+  session: Session;
+  activeRun: Run | null;
+}
+
+// Compact row of the live session statistics
+function SessionStatsRow({ session, activeRun }: SessionStatsRowProps) {
+  const { t } = useTranslation();
+  const sessionStats = useSessionStats(session);
+
+  // Live clock for session time and efficiency while the session is running
+  const isLive = !session.endTime;
+  const now = useNow(isLive);
+  const sessionEnd = session.endTime?.getTime() ?? now;
+  const sessionElapsed = Math.max(0, sessionEnd - session.startTime.getTime());
+  const currentRunElapsed =
+    isLive && activeRun ? Math.max(0, now - activeRun.startTime.getTime()) : 0;
+  const efficiencyPercentage = calculateLiveEfficiency({
+    completedRunTime: session.totalRunTime,
+    currentRunElapsed,
+    sessionElapsed,
+  });
+
+  return (
+    <dl className="grid grid-cols-3 gap-x-4 gap-y-3 sm:grid-cols-4 lg:grid-cols-7">
+      <CompactStat
+        label={t(translations.runTracker.sessionCard.sessionTime)}
+        value={formatDuration(sessionElapsed)}
+      />
+      <CompactStat
+        label={t(translations.runTracker.sessionCard.runCount)}
+        value={String(session.runCount)}
+      />
+      <CompactStat
+        label={t(translations.runTracker.sessionCard.averageRunTime)}
+        value={formatDuration(sessionStats?.averageRunDuration ?? 0)}
+      />
+      <CompactStat
+        label={t(translations.runTracker.sessionCard.fastestRun)}
+        value={formatDuration(sessionStats?.fastestRun ?? 0)}
+      />
+      <CompactStat
+        label={t(translations.runTracker.sessionCard.efficiency)}
+        value={`${efficiencyPercentage.toFixed(1)}%`}
+      />
+      <CompactStat
+        label={t(translations.runTracker.sessionCard.itemsFound)}
+        value={String(sessionStats?.itemsFound ?? 0)}
+      />
+      <CompactStat
+        label={t(translations.runTracker.sessionCard.newGrailItems)}
+        value={String(sessionStats?.newGrailItems ?? 0)}
+      />
+    </dl>
+  );
+}
+
 /**
  * SessionCard component that summarizes the active session: a compact row of live statistics,
  * the most recent runs with their loot, collapsible notes, and archive/export actions.
@@ -44,15 +101,8 @@ function CompactStat({ label, value }: CompactStatProps) {
  */
 export function SessionCard({ session, onViewAllRuns }: SessionCardProps) {
   const { t } = useTranslation();
-  const {
-    activeSession,
-    activeRun,
-    pendingActions,
-    archiveSession,
-    updateSessionNotes,
-    getSessionStats,
-    runs,
-  } = useRunTrackerStore();
+  const { activeSession, activeRun, pendingActions, archiveSession, updateSessionNotes, runs } =
+    useRunTrackerStore();
 
   const [notes, setNotes] = useState<string>(session?.notes || '');
   const [isSavingNotes, setIsSavingNotes] = useState<boolean>(false);
@@ -61,33 +111,11 @@ export function SessionCard({ session, onViewAllRuns }: SessionCardProps) {
   const isArchiving = Boolean(pendingActions.archiveSession);
 
   const currentSession = activeSession || session;
-  // biome-ignore lint/correctness/useExhaustiveDependencies: runs is needed to trigger recalculation when run data changes
-  const sessionStats = useMemo(() => {
-    if (!currentSession) return null;
-    return getSessionStats(currentSession.id);
-  }, [currentSession?.id, runs, getSessionStats]);
 
   const sessionRuns = useMemo(
     () => (currentSession ? (runs.get(currentSession.id) ?? []) : []),
     [currentSession, runs],
   );
-
-  // Live clock for session time and efficiency while the session is running
-  const isLive = Boolean(currentSession && !currentSession.endTime);
-  const now = useNow(isLive);
-  const sessionEnd = currentSession?.endTime?.getTime() ?? now;
-  const sessionElapsed = currentSession
-    ? Math.max(0, sessionEnd - currentSession.startTime.getTime())
-    : 0;
-  const currentRunElapsed =
-    isLive && activeRun ? Math.max(0, now - activeRun.startTime.getTime()) : 0;
-  const efficiencyPercentage = currentSession
-    ? calculateLiveEfficiency({
-        completedRunTime: currentSession.totalRunTime,
-        currentRunElapsed,
-        sessionElapsed,
-      })
-    : 0;
 
   // Update notes when session changes
   useEffect(() => {
@@ -145,33 +173,7 @@ export function SessionCard({ session, onViewAllRuns }: SessionCardProps) {
           <CardTitle>{t(translations.runTracker.sessionCard.activeSession)}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-5">
-          {/* Compact secondary statistics */}
-          <dl className="grid grid-cols-3 gap-x-4 gap-y-3 sm:grid-cols-6">
-            <CompactStat
-              label={t(translations.runTracker.sessionCard.sessionTime)}
-              value={formatDuration(sessionElapsed)}
-            />
-            <CompactStat
-              label={t(translations.runTracker.sessionCard.runCount)}
-              value={String(currentSession.runCount)}
-            />
-            <CompactStat
-              label={t(translations.runTracker.sessionCard.averageRunTime)}
-              value={formatDuration(sessionStats?.averageRunDuration ?? 0)}
-            />
-            <CompactStat
-              label={t(translations.runTracker.sessionCard.fastestRun)}
-              value={formatDuration(sessionStats?.fastestRun ?? 0)}
-            />
-            <CompactStat
-              label={t(translations.runTracker.sessionCard.efficiency)}
-              value={`${efficiencyPercentage.toFixed(1)}%`}
-            />
-            <CompactStat
-              label={t(translations.runTracker.sessionCard.itemsFound)}
-              value={String(sessionStats?.itemsFound ?? 0)}
-            />
-          </dl>
+          <SessionStatsRow session={currentSession} activeRun={activeRun} />
 
           <RecentRuns runs={sessionRuns} onViewAllRuns={onViewAllRuns} />
 
