@@ -715,10 +715,10 @@ describe('When SaveFileMonitor is used', () => {
       (monitor as any).lastProcessedChangeCounter = 0;
       (monitor as any).lastFileChangeTime = Date.now();
       (monitor as any).watchPath = '/test/saves';
-      (monitor as any).forceParseAll = true; // Set force parse flag
+      (monitor as any).isMonitoring = true;
 
-      // Act - advance time by only 500ms (less than debounce)
-      await vi.advanceTimersByTimeAsync(500);
+      // Act - request a forced parse without advancing time
+      await monitor.refreshSaveFiles();
 
       // Assert - should parse immediately despite debounce
       expect(parseAllSpy).toHaveBeenCalled();
@@ -772,6 +772,224 @@ describe('When SaveFileMonitor is used', () => {
 
       // Assert - should have parsed TWICE (once for initial change, once for change during processing)
       expect(parseAllSpy).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe('When a manual refresh is requested', () => {
+    let monitor: SaveFileMonitor;
+    let mockDatabase: MockGrailDatabase;
+    let eventBus: EventBus;
+
+    const startWatching = (target: SaveFileMonitor) => {
+      (target as any).isMonitoring = true;
+      (target as any).watchPath = '/test/saves';
+    };
+
+    beforeEach(() => {
+      vi.useFakeTimers();
+      eventBus = new EventBus();
+      mockDatabase = createMockDatabase();
+      mockDatabase.getAllSettings.mockReturnValue({
+        gameMode: GameMode.Softcore,
+        saveDir: '/test/saves',
+      });
+      mockDatabase.getAllSaveFileStates.mockReturnValue([]);
+      monitor = new SaveFileMonitor(eventBus, mockDatabase as any);
+      vi.spyOn(monitor as any, 'findExistingSaveDirectories').mockResolvedValue(['/test/saves']);
+    });
+
+    afterEach(async () => {
+      await monitor.shutdown();
+      vi.useRealTimers();
+    });
+
+    describe('If manual game mode is active', () => {
+      it('Then the refresh resolves without parsing and does not leave the force flag set', async () => {
+        // Arrange
+        mockDatabase.getAllSettings.mockReturnValue({
+          gameMode: GameMode.Manual,
+          saveDir: '/test/saves',
+        });
+        const parseAllSpy = vi.spyOn(monitor as any, 'parseAllSaveDirectories');
+        startWatching(monitor);
+
+        // Act
+        await monitor.refreshSaveFiles();
+
+        // Assert
+        expect(parseAllSpy).not.toHaveBeenCalled();
+        expect((monitor as any).forceParseAll).toBe(false);
+        expect((monitor as any).pendingForcedParse).toBeUndefined();
+      });
+    });
+
+    describe('If manual mode is left after a skipped refresh', () => {
+      it('Then the next change-driven parse is not forced', async () => {
+        // Arrange
+        mockDatabase.getAllSettings.mockReturnValue({
+          gameMode: GameMode.Manual,
+          saveDir: '/test/saves',
+        });
+        startWatching(monitor);
+        await monitor.refreshSaveFiles();
+        mockDatabase.getAllSettings.mockReturnValue({
+          gameMode: GameMode.Softcore,
+          saveDir: '/test/saves',
+        });
+        const forcedDuringParse: boolean[] = [];
+        vi.spyOn(monitor as any, 'parseAllSaveDirectories').mockImplementation(async () => {
+          forcedDuringParse.push((monitor as any).forceParseAll);
+          return true;
+        });
+        (monitor as any).fileChangeCounter++;
+        (monitor as any).lastFileChangeTime = Date.now();
+
+        // Act
+        await vi.advanceTimersByTimeAsync(1500);
+
+        // Assert
+        expect(forcedDuringParse).toEqual([false]);
+      });
+    });
+
+    describe('If the save directory holds no save files', () => {
+      it('Then the refresh resolves and the force flag is reset', async () => {
+        // Arrange
+        const emptyDir = mkdtempSync(join(tmpdir(), 'arcane-refresh-empty-'));
+        tempDirs.push(emptyDir);
+        vi.spyOn(monitor as any, 'findExistingSaveDirectories').mockResolvedValue([emptyDir]);
+        const parseFilesSpy = vi.spyOn(monitor as any, 'parseFiles');
+        startWatching(monitor);
+
+        // Act
+        await monitor.refreshSaveFiles();
+
+        // Assert
+        expect(parseFilesSpy).not.toHaveBeenCalled();
+        expect((monitor as any).forceParseAll).toBe(false);
+        expect((monitor as any).readingFiles).toBe(false);
+      });
+    });
+
+    describe('If no grail database is available', () => {
+      it('Then the refresh resolves without parsing', async () => {
+        // Arrange
+        const monitorWithoutDatabase = new SaveFileMonitor(eventBus);
+        const parseAllSpy = vi.spyOn(monitorWithoutDatabase as any, 'parseAllSaveDirectories');
+        startWatching(monitorWithoutDatabase);
+
+        // Act
+        await monitorWithoutDatabase.refreshSaveFiles();
+
+        // Assert
+        expect(parseAllSpy).not.toHaveBeenCalled();
+        expect((monitorWithoutDatabase as any).forceParseAll).toBe(false);
+        await monitorWithoutDatabase.shutdown();
+      });
+    });
+
+    describe('If the forced parse fails', () => {
+      it('Then the refresh rejects and the monitor can parse again', async () => {
+        // Arrange
+        vi.spyOn(monitor as any, 'parseAllSaveDirectories').mockRejectedValue(
+          new Error('disk error'),
+        );
+        startWatching(monitor);
+
+        // Act
+        const refresh = monitor.refreshSaveFiles();
+
+        // Assert
+        await expect(refresh).rejects.toThrow('disk error');
+        expect((monitor as any).forceParseAll).toBe(false);
+        expect((monitor as any).readingFiles).toBe(false);
+      });
+    });
+
+    describe('If the forced parse succeeds', () => {
+      it('Then every file is parsed as forced and the emitted events are not silent', async () => {
+        // Arrange
+        const saveDir = mkdtempSync(join(tmpdir(), 'arcane-refresh-'));
+        tempDirs.push(saveDir);
+        const heroPath = join(saveDir, 'Hero.d2s');
+        writeFileSync(heroPath, Buffer.from('mock'));
+        vi.spyOn(monitor as any, 'findExistingSaveDirectories').mockResolvedValue([saveDir]);
+        // The stored state is newer than the file, so only a forced parse reads it again.
+        mockDatabase.getSaveFileState.mockReturnValue({
+          lastModified: new Date('2999-01-01'),
+        });
+        (monitor as any).inventorySnapshots = [{ sourceFilePath: heroPath }];
+        const forcedDuringParse: boolean[] = [];
+        const parseFiles = (monitor as any).parseFiles.bind(monitor);
+        vi.spyOn(monitor as any, 'parseFiles').mockImplementation(async (...args: unknown[]) => {
+          forcedDuringParse.push((monitor as any).forceParseAll);
+          return parseFiles(...args);
+        });
+        const events: Array<{ silent?: boolean }> = [];
+        eventBus.on('save-file-event', (event) => {
+          events.push(event);
+        });
+        startWatching(monitor);
+
+        // Act
+        await monitor.refreshSaveFiles();
+
+        // Assert
+        expect(forcedDuringParse).toEqual([true]);
+        expect(events).toHaveLength(1);
+        expect(events[0].silent).toBe(false);
+        expect((monitor as any).forceParseAll).toBe(false);
+      });
+    });
+
+    describe('If a refresh is requested while files are already being read', () => {
+      it('Then the refresh waits for its own forced parse after the running one', async () => {
+        // Arrange
+        let finishRunningParse: () => void = () => undefined;
+        const forcedDuringParse: boolean[] = [];
+        vi.spyOn(monitor as any, 'parseAllSaveDirectories').mockImplementation(async () => {
+          forcedDuringParse.push((monitor as any).forceParseAll);
+          if (forcedDuringParse.length === 1) {
+            await new Promise<void>((resolve) => {
+              finishRunningParse = resolve;
+            });
+          }
+          return true;
+        });
+        startWatching(monitor);
+        (monitor as any).fileChangeCounter++;
+        await vi.advanceTimersByTimeAsync(1500);
+        let refreshed = false;
+
+        // Act
+        const refresh = monitor.refreshSaveFiles().then(() => {
+          refreshed = true;
+        });
+        await vi.advanceTimersByTimeAsync(0);
+        const refreshedBeforeRunningParseEnded = refreshed;
+        finishRunningParse();
+        await vi.advanceTimersByTimeAsync(1000);
+        await refresh;
+
+        // Assert
+        expect(refreshedBeforeRunningParseEnded).toBe(false);
+        expect(forcedDuringParse).toEqual([false, true]);
+      });
+    });
+
+    describe('If the monitor shuts down before a requested refresh runs', () => {
+      it('Then the refresh resolves', async () => {
+        // Arrange
+        startWatching(monitor);
+        (monitor as any).readingFiles = true;
+        const refresh = monitor.refreshSaveFiles();
+
+        // Act
+        await monitor.shutdown();
+
+        // Assert
+        await expect(refresh).resolves.toBeUndefined();
+      });
     });
   });
 

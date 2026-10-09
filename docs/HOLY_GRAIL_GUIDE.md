@@ -142,7 +142,7 @@ The **Runeword Calculator** reads the runes in your save files and shows which r
 - Choose what to show: **Craftable now** (the default) shows runewords you can make with the runes you have. **Missing ≤ 1** also shows runewords that need one more rune, and **All** shows every runeword. If nothing matches the current view, the page offers the next broader view that has results.
 - Results are sorted with craftable runewords first, then by the fewest missing runes, then by name.
 - Search by name, or select runes in the sidebar to show only runewords that use **all** of the selected runes. **Clear selection** removes them. The sidebar also shows how many of each rune you have.
-- **Refresh runes** rescans your save files after you pick up or use runes in the game.
+- **Refresh runes** rescans your save files after you pick up or use runes in the game. In **Manual Entry** mode save files are not rescanned, so the counts stay as they were at the last scan.
 - Each card shows how many of its runes you have (for example, "3/4 runes") and marks missing runes with a cross, including when a runeword needs the same rune more than once.
 
 The calculator works whether or not you track runewords in your grail.

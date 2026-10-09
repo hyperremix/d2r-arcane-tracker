@@ -1033,15 +1033,17 @@ export type SaveFileEvent = {
   extractedItems?: d2s.types.IItem[];
   /**
    * When true, suppresses all user-facing notifications for this event.
-   * Used during initial startup parsing and user-initiated force re-scans
-   * to prevent notification spam for items that were already found.
+   * Used during initial startup parsing to prevent notification spam for
+   * items that were already found.
    *
    * Set to true when:
-   * - Initial parsing on application startup (isInitialParsing=true)
-   * - User manually triggers "Re-scan all files" (forceParseAll=true)
+   * - Initial parsing on application startup or after a save directory change
+   *   (isInitialParsing=true)
    *
    * Set to false when:
    * - Normal gameplay file changes (user actually found a new item)
+   * - User manually triggers "Re-scan all files": the detection service already
+   *   ignores items it has seen, so only genuinely new items notify
    *
    * Note: Items are ALWAYS saved to database regardless of silent flag.
    * Only notifications are suppressed.

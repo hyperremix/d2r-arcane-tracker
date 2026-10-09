@@ -76,6 +76,23 @@ type SingleFileParseResult =
   | IncompleteFileParseResult
   | FailedFileParseResult;
 
+/** A pending request to re-parse every save file; settled once that parse ran or was skipped. */
+interface ForcedParseRequest {
+  promise: Promise<void>;
+  resolve: () => void;
+  reject: (error: unknown) => void;
+}
+
+function createForcedParseRequest(): ForcedParseRequest {
+  let resolve: () => void = () => undefined;
+  let reject: (error: unknown) => void = () => undefined;
+  const promise = new Promise<void>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+  return { promise, resolve, reject };
+}
+
 const SUPPORTED_SAVE_EXTENSIONS = new Set(['.d2s', '.sss', '.d2x', '.d2i']);
 const MODERN_STASH_MIN_VERSION = 105;
 
@@ -308,7 +325,10 @@ class SaveFileMonitor {
   private isMonitoring = false;
   private grailDatabase: GrailDatabase | null = null;
   private saveDirectory: string | null = null;
+  /** True only while a forced parse runs: every file is parsed regardless of its modification time. */
   private forceParseAll: boolean = false;
+  /** Forced parse requested by `refreshSaveFiles` that the tick reader has not started yet. */
+  private pendingForcedParse: ForcedParseRequest | undefined;
   private isInitialParsing: boolean = false;
   private tickReaderInterval: NodeJS.Timeout | null = null;
   private tickReaderCount: number = 0;
@@ -511,8 +531,12 @@ class SaveFileMonitor {
     log.info('startMonitoring', 'Directory exists, starting initial parsing');
     // Start file parsing to get initial data and file count
     this.isInitialParsing = true;
-    const parsedSuccessfully = await this.parseSaveDirectory(this.saveDirectory);
-    this.isInitialParsing = false;
+    let parsedSuccessfully: boolean;
+    try {
+      parsedSuccessfully = await this.parseSaveDirectory(this.saveDirectory);
+    } finally {
+      this.isInitialParsing = false;
+    }
 
     if (!parsedSuccessfully) {
       log.warn('startMonitoring', 'Initial parsing failed');
@@ -1184,11 +1208,11 @@ class SaveFileMonitor {
 
         const extractedItems = this.collectExtractedItems(results, saveName);
 
-        // Set silent flag to prevent notification spam during:
-        // - Initial parsing: avoid notifications for existing items on app startup
-        // - Force parse all: avoid notifications when user manually re-scans all files
+        // Suppress notifications during initial parsing so items that already exist on app startup
+        // do not spam the user. A manual re-scan is not silent: the detection service already
+        // ignores items it has seen, so only genuinely new items notify.
         // Items are still saved to database, only notifications are suppressed
-        const silent = this.isInitialParsing || this.forceParseAll;
+        const silent = this.isInitialParsing;
 
         // Set isInitialScan flag ONLY during initial parsing (not force re-scan)
         // This marks items for exclusion from statistics like Recent Finds, Streaks, and Avg per Day
@@ -1329,12 +1353,6 @@ class SaveFileMonitor {
       'parseFiles',
       `Concurrent parsing complete: ${filesToParse.length - failedFiles.length} succeeded, ${failedFiles.length} failed`,
     );
-
-    // Reset force parse flag after parsing completes
-    if (this.forceParseAll) {
-      log.info('parseFiles', 'Resetting forceParseAll flag');
-      this.forceParseAll = false;
-    }
 
     // Update save directory if user requested
     if (userRequested && filePaths.length > 0) {
@@ -1816,13 +1834,17 @@ class SaveFileMonitor {
     this.forceParseAll = true;
     this.lastFileChangeTime = 0; // Bypass debounce for force parse
 
-    // Re-initialize directories with the new setting
-    log.info('updateSaveDirectory', 'Re-initializing save directories');
-    await this.initializeSaveDirectories();
+    try {
+      // Re-initialize directories with the new setting
+      log.info('updateSaveDirectory', 'Re-initializing save directories');
+      await this.initializeSaveDirectories();
 
-    // Always start monitoring after directory change - user explicitly wants to use this directory
-    log.info('updateSaveDirectory', 'Starting monitoring for new directory');
-    await this.startMonitoring();
+      // Always start monitoring after directory change - user explicitly wants to use this directory
+      log.info('updateSaveDirectory', 'Starting monitoring for new directory');
+      await this.startMonitoring();
+    } finally {
+      this.forceParseAll = false;
+    }
 
     log.info('updateSaveDirectory', 'Complete');
   }
@@ -1903,6 +1925,8 @@ class SaveFileMonitor {
   /**
    * Triggers a manual refresh/rescan of all save files.
    * This forces a re-parse of all save files to get the latest item data.
+   * Resolves once the forced parse finished, or once it was skipped (manual game mode, no save
+   * files, no database, monitoring stopped); rejects if the parse itself failed.
    * @returns {Promise<void>} A promise that resolves when the refresh is complete.
    */
   async refreshSaveFiles(): Promise<void> {
@@ -1913,32 +1937,33 @@ class SaveFileMonitor {
       throw new Error('Save file monitoring is not active');
     }
 
-    // Set force parse flag and trigger immediate parsing
-    this.forceParseAll = true;
-    this.lastFileChangeTime = 0; // Bypass debounce
-
-    // Increment file change counter to trigger tick reader
-    this.fileChangeCounter++;
+    // Requests made before the tick reader picks one up share the same parse.
+    this.pendingForcedParse ??= createForcedParseRequest();
+    const { promise } = this.pendingForcedParse;
 
     log.info('refreshSaveFiles', 'Triggered force parse, waiting for completion...');
+    // Start right away instead of waiting for the next tick. If files are being read already, the
+    // tick after that read picks the request up.
+    void this.tickReader();
 
-    // Wait for the tick reader to process the changes
-    // Poll until forceParseAll is reset (which happens after parsing completes)
-    const maxWaitTime = 30000; // 30 seconds timeout
-    const pollInterval = 100; // Check every 100ms
-    let elapsed = 0;
-
-    while (this.forceParseAll && elapsed < maxWaitTime) {
-      await new Promise((resolve) => setTimeout(resolve, pollInterval));
-      elapsed += pollInterval;
-    }
-
-    if (this.forceParseAll) {
-      log.info('refreshSaveFiles', 'Timeout waiting for parse to complete');
-      throw new Error('Timeout waiting for save file refresh to complete');
-    }
-
+    await promise;
     log.info('refreshSaveFiles', 'Refresh completed');
+  }
+
+  /**
+   * Settles a pending forced parse request that cannot run, so `refreshSaveFiles` never waits for
+   * a parse that will not happen.
+   * @private
+   */
+  private skipPendingForcedParse(reason: string): void {
+    const request = this.pendingForcedParse;
+    if (!request) {
+      return;
+    }
+
+    log.info('skipPendingForcedParse', `Forced parse skipped: ${reason}`);
+    this.pendingForcedParse = undefined;
+    request.resolve();
   }
 
   /**
@@ -1962,6 +1987,7 @@ class SaveFileMonitor {
 
     if (!this.grailDatabase) {
       log.info('tickReader', 'Skipping: No grail database');
+      this.skipPendingForcedParse('no grail database');
       return;
     }
 
@@ -1969,11 +1995,14 @@ class SaveFileMonitor {
 
     if (!this.watchPath) {
       log.info('tickReader', 'Skipping: No watch path');
+      this.skipPendingForcedParse('not watching a save directory');
       return;
     }
 
+    const hasForcedParseRequest = this.pendingForcedParse !== undefined;
+
     // Check if there are unprocessed file changes
-    if (this.fileChangeCounter === this.lastProcessedChangeCounter) {
+    if (!hasForcedParseRequest && this.fileChangeCounter === this.lastProcessedChangeCounter) {
       // No new changes since last processing
       return;
     }
@@ -1981,7 +2010,7 @@ class SaveFileMonitor {
     // Check if enough time has passed since last file change (debouncing)
     // Skip debounce for initial parsing or force parse
     const timeSinceLastChange = Date.now() - this.lastFileChangeTime;
-    const shouldDebounce = !this.isInitialParsing && !this.forceParseAll;
+    const shouldDebounce = !this.isInitialParsing && !hasForcedParseRequest;
     const debounceDelay = this.validateInterval(
       settings.fileChangeDebounceMs,
       500, // min 500ms
@@ -2002,12 +2031,14 @@ class SaveFileMonitor {
     }
 
     if (this.readingFiles) {
+      // A pending forced parse stays queued and runs on the tick after this read.
       log.info('tickReader', 'Skipping: Already reading files');
       return;
     }
 
     if (settings.gameMode === GameMode.Manual) {
       log.info('tickReader', 'Skipping: Manual mode active');
+      this.skipPendingForcedParse('manual game mode');
       return;
     }
 
@@ -2015,11 +2046,25 @@ class SaveFileMonitor {
       'tickReader',
       `Debounce period elapsed (${timeSinceLastChange}ms), processing file changes...`,
     );
+    await this.processFileChanges();
+  };
+
+  /**
+   * Parses the save directories for the tick reader, taking a pending forced parse request along.
+   * The request is settled once the parse finished; the force flag is always reset afterwards.
+   * @private
+   */
+  private async processFileChanges(): Promise<void> {
     log.info(
-      'tickReader',
+      'processFileChanges',
       `Processing changes: counter=${this.fileChangeCounter}, lastProcessed=${this.lastProcessedChangeCounter}`,
     );
     this.readingFiles = true;
+
+    // Take the forced parse request now: a refresh requested while this parse runs gets its own parse.
+    const forcedParseRequest = this.pendingForcedParse;
+    this.pendingForcedParse = undefined;
+    this.forceParseAll = forcedParseRequest !== undefined;
 
     // Capture current counter before processing (in case new changes arrive during processing)
     const counterAtStartOfProcessing = this.fileChangeCounter;
@@ -2033,21 +2078,27 @@ class SaveFileMonitor {
       this.lastProcessedChangeCounter = counterAtStartOfProcessing;
 
       log.info(
-        'tickReader',
+        'processFileChanges',
         `Done processing file changes (processed up to counter ${counterAtStartOfProcessing})`,
       );
 
       // Check if new changes arrived during processing
       if (this.fileChangeCounter > counterAtStartOfProcessing) {
         log.info(
-          'tickReader',
+          'processFileChanges',
           `New changes detected during processing (counter now ${this.fileChangeCounter}), will process on next tick`,
         );
       }
+
+      forcedParseRequest?.resolve();
+    } catch (error) {
+      log.error('processFileChanges', error);
+      forcedParseRequest?.reject(error);
     } finally {
+      this.forceParseAll = false;
       this.readingFiles = false;
     }
-  };
+  }
 
   /**
    * Cleans up save file states for files that no longer exist.
@@ -2094,6 +2145,7 @@ class SaveFileMonitor {
       clearInterval(this.tickReaderInterval);
       this.tickReaderInterval = null;
     }
+    this.skipPendingForcedParse('monitor shut down');
     await this.stopMonitoring();
     log.info('shutdown', 'Shutdown complete');
   }
