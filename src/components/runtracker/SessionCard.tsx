@@ -10,7 +10,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { Textarea } from '@/components/ui/textarea';
 import { useNow } from '@/hooks/useNow';
 import { translations } from '@/i18n/translations';
-import { formatDuration } from '@/lib/utils';
+import { formatDuration } from '@/lib/date';
 import { useRunTrackerStore, useSessionStats } from '@/stores/runTrackerStore';
 import { ArchiveSessionDialog } from './ArchiveSessionDialog';
 import { ExportDialog } from './ExportDialog';

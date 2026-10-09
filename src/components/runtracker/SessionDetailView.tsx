@@ -10,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
 import { translations } from '@/i18n/translations';
-import { formatDuration, formatSessionDate } from '@/lib/utils';
+import { formatDuration, formatSessionDate } from '@/lib/date';
 import { useRunTrackerStore, useSessionStats } from '@/stores/runTrackerStore';
 import { ArchiveSessionDialog } from './ArchiveSessionDialog';
 import { ExportDialog } from './ExportDialog';

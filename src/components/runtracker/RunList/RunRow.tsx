@@ -4,7 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { TableCell, TableRow } from '@/components/ui/table';
 import { translations } from '@/i18n/translations';
-import { formatDuration } from '@/lib/utils';
+import { formatDuration } from '@/lib/date';
 
 // Skeleton loader for table rows
 export function TableRowSkeleton() {

@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { translations } from '@/i18n/translations';
-import { formatDate } from '@/lib/utils';
+import { formatDate } from '@/lib/date';
 
 // Component for progress status section
 export function ProgressStatusSection({

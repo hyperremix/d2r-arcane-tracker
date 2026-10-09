@@ -54,7 +54,6 @@
     "chokidar": "^4.0.3",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
-    "dayjs": "^1.11.19",
     "dompurify": "^3.3.0",
     "drizzle-orm": "^0.45.1",
     "electron-updater": "^6.8.9",

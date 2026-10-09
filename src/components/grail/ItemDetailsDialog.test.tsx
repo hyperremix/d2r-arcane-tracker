@@ -1,9 +1,9 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import dayjs from 'dayjs';
 import type { Settings } from 'electron/types/grail';
 import { GameMode, GameVersion } from 'electron/types/grail';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { CharacterBuilder, GrailProgressBuilder, HolyGrailItemBuilder } from '@/fixtures';
+import { toLocalIsoDate } from '@/lib/date';
 import { ItemDetailsDialog } from './ItemDetailsDialog';
 
 const { toastErrorMock } = vi.hoisted(() => ({ toastErrorMock: vi.fn() }));
@@ -1066,7 +1066,7 @@ describe('When the user marks an item as found', () => {
 
       // Assert
       expect(within(prompt).getByRole('combobox', { name: 'Character' })).toHaveTextContent('Sorc');
-      expect(within(prompt).getByLabelText('Found Date')).toHaveValue(dayjs().format('YYYY-MM-DD'));
+      expect(within(prompt).getByLabelText('Found Date')).toHaveValue(toLocalIsoDate());
       expect(within(prompt).queryByRole('combobox', { name: 'Version' })).not.toBeInTheDocument();
     });
 
@@ -1088,7 +1088,7 @@ describe('When the user marks an item as found', () => {
       await waitFor(() => expect(mockAddManualProgress).toHaveBeenCalledTimes(1));
       const input = mockAddManualProgress.mock.calls[0][0];
       expect(input).toMatchObject({ itemId: 'item-1', characterId: 'char-1', isEthereal: false });
-      expect(dayjs(input.foundDate).format('YYYY-MM-DD')).toBe('2024-06-15');
+      expect(toLocalIsoDate(input.foundDate)).toBe('2024-06-15');
       await waitFor(() =>
         expect(screen.queryByRole('dialog', { name: 'Mark as Found' })).not.toBeInTheDocument(),
       );
@@ -1101,10 +1101,12 @@ describe('When the user marks an item as found', () => {
       setupStoreMock({ items: [item], characters: [character] });
       render(<ItemDetailsDialog itemId="item-1" open={true} onOpenChange={vi.fn()} />);
       const prompt = openMarkAsFoundPrompt();
+      const now = new Date();
+      const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
 
       // Act
       fireEvent.change(within(prompt).getByLabelText('Found Date'), {
-        target: { value: dayjs().add(1, 'day').format('YYYY-MM-DD') },
+        target: { value: toLocalIsoDate(tomorrow) },
       });
 
       // Assert

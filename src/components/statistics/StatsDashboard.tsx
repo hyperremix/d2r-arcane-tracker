@@ -7,8 +7,8 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useProgressLookup } from '@/hooks/useProgressLookup';
 import { translations } from '@/i18n/translations';
+import { formatTimeAgo } from '@/lib/date';
 import { itemCategoryLabelKeys } from '@/lib/labelKeys';
-import { formatTimeAgo } from '@/lib/utils';
 import { useGrailStatistics, useGrailStore } from '@/stores/grailStore';
 
 /**

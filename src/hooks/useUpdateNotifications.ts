@@ -1,6 +1,9 @@
 import type { UpdateStatus } from 'electron/types/grail';
 import { useCallback, useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
+import { translations } from '@/i18n/translations';
+import { downloadUpdate, installUpdate } from '@/lib/updateActions';
 
 /**
  * Custom hook that manages automatic update notifications.
@@ -9,42 +12,26 @@ import { toast } from 'sonner';
  * appear immediately after startup regardless of which page the user is on.
  */
 export function useUpdateNotifications() {
+  const { t } = useTranslation();
   const updateToastId = useRef<string | number | undefined>();
 
-  const handleDownloadUpdate = useCallback(async () => {
-    // Dismiss the update available toast
+  /** Dismisses the update toast that is currently shown, if any. */
+  const dismissUpdateToast = useCallback(() => {
     if (updateToastId.current) {
       toast.dismiss(updateToastId.current);
       updateToastId.current = undefined;
-    }
-    try {
-      await window.electronAPI.update.downloadUpdate();
-      toast.info('Downloading Update', {
-        description: 'Download started in the background',
-      });
-    } catch (error) {
-      console.error('Failed to download update:', error);
-      toast.error('Download Failed', {
-        description: 'Failed to download update',
-      });
     }
   }, []);
 
+  const handleDownloadUpdate = useCallback(async () => {
+    dismissUpdateToast();
+    await downloadUpdate(t);
+  }, [dismissUpdateToast, t]);
+
   const handleInstallUpdate = useCallback(async () => {
-    // Dismiss the update ready toast
-    if (updateToastId.current) {
-      toast.dismiss(updateToastId.current);
-      updateToastId.current = undefined;
-    }
-    try {
-      await window.electronAPI.update.quitAndInstall();
-    } catch (error) {
-      console.error('Failed to install update:', error);
-      toast.error('Install Failed', {
-        description: 'Failed to install update',
-      });
-    }
-  }, []);
+    dismissUpdateToast();
+    await installUpdate(t);
+  }, [dismissUpdateToast, t]);
 
   const handleAutomaticUpdateStatus = useCallback(
     (status: UpdateStatus) => {
@@ -55,20 +42,17 @@ export function useUpdateNotifications() {
 
       // Show toast when update is available
       if (status.available && !status.downloaded && !status.downloading) {
-        updateToastId.current = toast('Update Available', {
-          description: `Version ${status.info?.version} is ready to download`,
+        updateToastId.current = toast(t(translations.settings.updateDialog.updateAvailable), {
+          description: t(translations.settings.update.versionReadyToDownload, {
+            version: status.info?.version,
+          }),
           action: {
-            label: 'Download',
+            label: t(translations.settings.update.download),
             onClick: handleDownloadUpdate,
           },
           cancel: {
-            label: 'Dismiss',
-            onClick: () => {
-              if (updateToastId.current) {
-                toast.dismiss(updateToastId.current);
-                updateToastId.current = undefined;
-              }
-            },
+            label: t(translations.settings.update.dismiss),
+            onClick: dismissUpdateToast,
           },
           duration: Number.POSITIVE_INFINITY,
         });
@@ -76,20 +60,15 @@ export function useUpdateNotifications() {
 
       // Show toast when update is downloaded
       if (status.downloaded) {
-        updateToastId.current = toast('Update Ready', {
-          description: 'Restart to install the update',
+        updateToastId.current = toast(t(translations.settings.update.updateReady), {
+          description: t(translations.settings.update.restartToInstall),
           action: {
-            label: 'Restart Now',
+            label: t(translations.settings.updateDialog.restartNow),
             onClick: handleInstallUpdate,
           },
           cancel: {
-            label: 'Later',
-            onClick: () => {
-              if (updateToastId.current) {
-                toast.dismiss(updateToastId.current);
-                updateToastId.current = undefined;
-              }
-            },
+            label: t(translations.settings.updateDialog.later),
+            onClick: dismissUpdateToast,
           },
           duration: Number.POSITIVE_INFINITY,
         });
@@ -97,12 +76,12 @@ export function useUpdateNotifications() {
 
       // Show error toast if there's an error
       if (status.error) {
-        toast.error('Update Check Failed', {
+        toast.error(t(translations.settings.update.updateCheckFailed), {
           description: status.error,
         });
       }
     },
-    [handleDownloadUpdate, handleInstallUpdate],
+    [dismissUpdateToast, handleDownloadUpdate, handleInstallUpdate, t],
   );
 
   useEffect(() => {

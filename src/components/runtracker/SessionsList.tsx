@@ -16,7 +16,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { translations } from '@/i18n/translations';
-import { formatDuration, formatSessionDateRelative, formatTime } from '@/lib/utils';
+import { formatDuration, formatSessionDateRelative, formatTime } from '@/lib/date';
 import { useRunTrackerStore, useSessionStatsLookup } from '@/stores/runTrackerStore';
 import { SortableTableHead, type SortOrder } from './SortableTableHead';
 

@@ -1,4 +1,3 @@
-import dayjs from 'dayjs';
 import type { GrailProgress, Item, Settings } from 'electron/types/grail';
 import { type FormEvent, useId, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -22,12 +21,11 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { translations } from '@/i18n/translations';
+import { parseLocalIsoDate, toLocalIsoDate } from '@/lib/date';
 import { canItemBeNormal, shouldShowEtherealStatus, shouldShowNormalStatus } from '@/lib/ethereal';
 import { useGrailStore } from '@/stores/grailStore';
 
 export type ItemVersion = 'normal' | 'ethereal';
-
-const DATE_INPUT_FORMAT = 'YYYY-MM-DD';
 
 /**
  * Returns the item versions a user can record as found, based on the item and grail settings.
@@ -46,8 +44,8 @@ function getRecordableVersions(item: Item, settings: Settings): ItemVersion[] {
  * Today's date keeps the current time so the find is ordered correctly among recent finds.
  */
 function toFoundDate(value: string): Date {
-  const today = dayjs().format(DATE_INPUT_FORMAT);
-  return value === today ? new Date() : dayjs(value).toDate();
+  const today = toLocalIsoDate();
+  return value === today ? new Date() : parseLocalIsoDate(value);
 }
 
 interface SelectOption {
@@ -133,7 +131,7 @@ function MarkAsFoundForm({ item, onDone }: MarkAsFoundFormProps) {
   const messageId = useId();
 
   const versions = useMemo(() => getRecordableVersions(item, settings), [item, settings]);
-  const today = dayjs().format(DATE_INPUT_FORMAT);
+  const today = toLocalIsoDate();
 
   const [characterId, setCharacterId] = useState<string | undefined>(characters[0]?.id);
   const [version, setVersion] = useState<ItemVersion>(versions[0]);

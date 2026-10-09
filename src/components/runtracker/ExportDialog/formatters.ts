@@ -1,6 +1,6 @@
 import type { Run, RunItem, Session } from 'electron/types/grail';
 import { escapeCsvCell } from '@/lib/csv';
-import { formatDate, formatDuration } from '@/lib/utils';
+import { formatDate, formatDuration } from '@/lib/date';
 
 export function formatSessionAsCSV(
   session: Session,

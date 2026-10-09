@@ -25,9 +25,9 @@ import type {
 } from '@/hooks/useSaveDirectoryChange';
 import { useSaveDirectoryChange } from '@/hooks/useSaveDirectoryChange';
 import { translations } from '@/i18n/translations';
+import { formatShortDate } from '@/lib/date';
 import { combineUnsubscribers, onMainEvent } from '@/lib/ipcEvents';
 import { saveFileEventTypeLabelKeys } from '@/lib/labelKeys';
-import { formatShortDate } from '@/lib/utils';
 import { useGrailStore } from '@/stores/grailStore';
 import { SaveDirectoryChangeDialog } from './SaveDirectoryChangeDialog';
 

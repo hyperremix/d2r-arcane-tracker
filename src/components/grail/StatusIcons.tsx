@@ -18,7 +18,8 @@ import {
 import { useTranslation } from 'react-i18next';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { translations } from '@/i18n/translations';
-import { cn, isRecentFind } from '@/lib/utils';
+import { isRecentFind } from '@/lib/date';
+import { cn } from '@/lib/utils';
 import { getTooltipTriggerRender } from './tooltipTriggerRender';
 
 /**
