@@ -4,7 +4,6 @@
  * never send user-facing sentences over IPC.
  */
 export const SERVICE_ERROR_CODES = [
-  'saveFileParseFailed',
   'databaseWriteFailed',
   'terrorZoneWriteFailed',
   'spriteConversionFailed',
@@ -29,9 +28,9 @@ export type ServiceErrorParams = Record<string, string | number>;
  * Payload sent from the main process to the renderer over the `service-error` IPC channel.
  */
 export interface ServiceErrorPayload {
-  /** Name of the emitting service (e.g. `ItemDetection`). */
+  /** Name of the emitting service (e.g. `IconService`). */
   service: string;
-  /** Operation that failed (e.g. `extractItemsFromSaveFile`). */
+  /** Operation that failed (e.g. `convertAllSprites`). */
   operation: string;
   severity: ServiceErrorSeverity;
   /** Stable error code used by the renderer to pick translated copy and an action. */

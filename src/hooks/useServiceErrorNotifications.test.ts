@@ -68,12 +68,11 @@ function lastToastOptions(mock: unknown) {
   };
 }
 
-const parseErrorPayload = {
-  service: 'ItemDetection',
-  operation: 'extractItemsFromSaveFile',
+const spriteErrorPayload = {
+  service: 'IconService',
+  operation: 'convertAllSprites',
   severity: 'error',
-  code: 'saveFileParseFailed',
-  params: { fileName: 'Sorceress.d2s' },
+  code: 'spriteConversionFailed',
   detail: 'Unexpected end of buffer',
   timestamp: Date.UTC(2026, 0, 1),
 };
@@ -107,14 +106,14 @@ describe('When useServiceErrorNotifications is used', () => {
       renderHook(() => useServiceErrorNotifications({ onOpenSettings: vi.fn() }));
 
       // Act
-      emit(parseErrorPayload);
+      emit(spriteErrorPayload);
 
       // Assert
-      expect(toast.error).toHaveBeenCalledWith('Could not read save file', expect.any(Object));
+      expect(toast.error).toHaveBeenCalledWith('Item icon conversion failed', expect.any(Object));
       const options = lastToastOptions(toast.error);
-      expect(options.id).toBe('ItemDetection.extractItemsFromSaveFile');
+      expect(options.id).toBe('IconService.convertAllSprites');
       expect(options.description).toBe(
-        '"Sorceress.d2s" could not be parsed, so its items were not updated. Check your save file directory in Settings.',
+        'Item icons could not be converted. Check your D2R installation path in Settings.',
       );
       expect(options.duration).toBe(Number.POSITIVE_INFINITY);
       expect(options.closeButton).toBe(true);
@@ -125,24 +124,21 @@ describe('When useServiceErrorNotifications is used', () => {
       renderHook(() => useServiceErrorNotifications({ onOpenSettings: vi.fn() }));
 
       // Act
-      emit(parseErrorPayload);
-      emit({ ...parseErrorPayload, params: { fileName: 'Paladin.d2s' }, timestamp: Date.now() });
+      emit(spriteErrorPayload);
+      emit({ ...spriteErrorPayload, timestamp: Date.now() });
 
       // Assert
       const ids = vi.mocked(toast.error).mock.calls.map((call) => (call[1] as { id: string }).id);
-      expect(ids).toEqual([
-        'ItemDetection.extractItemsFromSaveFile',
-        'ItemDetection.extractItemsFromSaveFile',
-      ]);
+      expect(ids).toEqual(['IconService.convertAllSprites', 'IconService.convertAllSprites']);
     });
   });
 
-  describe('If a save file parse error action is clicked', () => {
+  describe('If a sprite conversion error action is clicked', () => {
     it('Then opens the settings', () => {
       // Arrange
       const onOpenSettings = vi.fn();
       renderHook(() => useServiceErrorNotifications({ onOpenSettings }));
-      emit(parseErrorPayload);
+      emit(spriteErrorPayload);
       const { action } = lastToastOptions(toast.error);
 
       // Act
@@ -192,7 +188,7 @@ describe('When useServiceErrorNotifications is used', () => {
       // Arrange
       mockClipboard.writeText.mockRejectedValue(new Error('denied'));
       renderHook(() => useServiceErrorNotifications({ onOpenSettings: vi.fn() }));
-      emit({ ...parseErrorPayload, code: 'databaseWriteFailed', operation: 'flush' });
+      emit({ ...spriteErrorPayload, code: 'databaseWriteFailed', operation: 'flush' });
       const { action } = lastToastOptions(toast.error);
 
       // Act
@@ -210,7 +206,7 @@ describe('When useServiceErrorNotifications is used', () => {
       // Arrange
       mockClipboard.writeText.mockRejectedValue(new Error('denied'));
       renderHook(() => useServiceErrorNotifications({ onOpenSettings: vi.fn() }));
-      emit({ ...parseErrorPayload, code: 'databaseWriteFailed', operation: 'flush' });
+      emit({ ...spriteErrorPayload, code: 'databaseWriteFailed', operation: 'flush' });
       const { action } = lastToastOptions(toast.error);
 
       // Act
@@ -234,7 +230,7 @@ describe('When useServiceErrorNotifications is used', () => {
       renderHook(() => useServiceErrorNotifications({ onOpenSettings: vi.fn() }));
 
       // Act
-      emit({ ...parseErrorPayload, code: 'somethingNew' });
+      emit({ ...spriteErrorPayload, code: 'somethingNew' });
 
       // Assert
       expect(toast.error).toHaveBeenCalledWith('A background task failed', expect.any(Object));
@@ -249,8 +245,8 @@ describe('When useServiceErrorNotifications is used', () => {
         'a legacy message payload',
         { service: 'X', operation: 'y', severity: 'error', message: 'm' },
       ],
-      ['an invalid severity', { ...parseErrorPayload, severity: 'fatal' }],
-      ['an unsupported warn severity', { ...parseErrorPayload, severity: 'warn' }],
+      ['an invalid severity', { ...spriteErrorPayload, severity: 'fatal' }],
+      ['an unsupported warn severity', { ...spriteErrorPayload, severity: 'warn' }],
     ])('Then ignores %s without showing a toast', (_label, payload) => {
       // Arrange
       renderHook(() => useServiceErrorNotifications({ onOpenSettings: vi.fn() }));
