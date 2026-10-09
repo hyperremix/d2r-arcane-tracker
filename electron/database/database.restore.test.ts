@@ -3,28 +3,54 @@ import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import Database from 'better-sqlite3';
-import { afterEach, beforeEach, describe, expect, it, type MockInstance, vi } from 'vitest';
+import {
+  afterAll,
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  type MockInstance,
+  vi,
+} from 'vitest';
 import { BUSY_TIMEOUT_MS } from './connection';
+import { GrailDatabase, grailDatabase as importTimeDatabase } from './database';
 
-type GrailDatabaseModule = typeof import('./database');
+// database.ts opens a singleton on import, so the mocked userData path must exist before the import.
+const userDataState = vi.hoisted(() => ({ userData: '' }));
+const importTimeDir = await vi.hoisted(async () => {
+  const fs = await import('node:fs');
+  const os = await import('node:os');
+  const dir = fs.mkdtempSync(`${os.tmpdir()}/grail-import-time-`);
+  userDataState.userData = dir;
+  return dir;
+});
+
+vi.mock('electron', () => ({ app: { getPath: () => userDataState.userData } }));
+
+afterAll(() => {
+  // Only close the singleton if this file's import created it (it may be cached from another file).
+  if (importTimeDatabase.dbPath.startsWith(importTimeDir) && importTimeDatabase.rawDb.open) {
+    importTimeDatabase.rawDb.close();
+  }
+  rmSync(importTimeDir, { recursive: true, force: true });
+});
 
 describe('When the real GrailDatabase restores a backup', () => {
   let tempDir: string;
-  let grailDatabase: GrailDatabaseModule['grailDatabase'];
+  let grailDatabase: GrailDatabase;
   let logSpy: MockInstance<typeof console.log>;
   let warnSpy: MockInstance<typeof console.warn>;
   let errorSpy: MockInstance<typeof console.error>;
 
-  beforeEach(async () => {
+  beforeEach(() => {
     logSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
     warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     tempDir = mkdtempSync(path.join(tmpdir(), 'grail-real-restore-'));
 
-    // database.ts creates its singleton on import, so load a fresh copy that points at tempDir.
-    vi.resetModules();
-    vi.doMock('electron', () => ({ app: { getPath: () => tempDir } }));
-    ({ grailDatabase } = await import('./database'));
+    userDataState.userData = tempDir;
+    grailDatabase = new GrailDatabase();
     grailDatabase.setSetting('saveDir', '/current/save/dir');
   });
 
@@ -32,8 +58,6 @@ describe('When the real GrailDatabase restores a backup', () => {
     if (grailDatabase.rawDb.open) {
       grailDatabase.rawDb.close();
     }
-    vi.doUnmock('electron');
-    vi.resetModules();
     rmSync(tempDir, { recursive: true, force: true });
     logSpy.mockRestore();
     warnSpy.mockRestore();

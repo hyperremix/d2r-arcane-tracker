@@ -178,7 +178,7 @@ To see the widget over the game, set D2R's display mode to **Windowed (Fullscree
 
 ### Backups
 
-**Settings → Database** creates a backup of the database or restores one. Restoring replaces all current data. The app checks the backup first and refuses files that aren't intact app databases. If the restore fails, your current data is kept.
+**Settings → Database** creates a backup of the database or restores one. Restoring replaces all current data. The app checks the backup first and refuses files that aren't intact app databases. If the restore fails, your current data is kept. If a restore fails and the app also cannot put the previous database back, it keeps that database next to the live one as `grail.db.pre-restore` so the data can still be recovered; the next restore renames it to `grail.db.pre-restore.<timestamp>` instead of overwriting it. These copies are full copies of the database and are never deleted automatically, so delete them from the app data folder once you no longer need them.
 
 ### Error screen
 

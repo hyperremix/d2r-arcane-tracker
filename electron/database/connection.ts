@@ -187,6 +187,8 @@ export function restoreDatabase(target: RestoreTarget, source: RestoreSource): v
 
   try {
     if (existsSync(preRestorePath)) {
+      // These kept copies are full database copies and are not pruned automatically;
+      // the user can delete them from the app data folder (see docs/HOLY_GRAIL_GUIDE.md).
       const keptPath = `${preRestorePath}.${Date.now()}`;
       console.warn(`[Database] Keeping an earlier pre-restore copy at ${keptPath}`);
       moveDatabaseFiles(preRestorePath, keptPath);

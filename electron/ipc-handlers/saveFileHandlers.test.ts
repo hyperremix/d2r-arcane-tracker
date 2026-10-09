@@ -993,13 +993,10 @@ describe('When saveFileHandlers is used', () => {
       expect(grailDatabase.setSetting).not.toHaveBeenCalled();
     });
 
-    it.each([
-      ['truncating', 'FOREIGN KEY constraint failed'],
-      ['writing the setting', 'database or disk is full'],
-    ])('Then saveFile:updateSaveDirectory should keep the old setting and monitor if %s fails', async (_label, message) => {
+    it('Then saveFile:updateSaveDirectory should keep the old setting and monitor if truncating fails', async () => {
       // Arrange
       vi.mocked(grailDatabase.truncateUserData).mockImplementationOnce(() => {
-        throw new Error(message);
+        throw new Error('FOREIGN KEY constraint failed');
       });
       silenceConsole('error');
       const handler = getHandler('saveFile:updateSaveDirectory');
@@ -1008,8 +1005,28 @@ describe('When saveFileHandlers is used', () => {
       const act = handler(null, '/new/save/dir');
 
       // Assert
-      await expect(act).rejects.toThrow(message);
+      await expect(act).rejects.toThrow('FOREIGN KEY constraint failed');
       expect(grailDatabase.setSetting).not.toHaveBeenCalled();
+      expect(mockSaveFileMonitor.updateSaveDirectory).not.toHaveBeenCalled();
+    });
+
+    it('Then saveFile:updateSaveDirectory should not restart the monitor if writing the setting fails for an unchanged directory', async () => {
+      // Arrange
+      vi.mocked(grailDatabase.getAllSettings).mockReturnValue({
+        saveDir: '/test/save/dir',
+      } as any);
+      vi.mocked(grailDatabase.setSetting).mockImplementationOnce(() => {
+        throw new Error('database or disk is full');
+      });
+      silenceConsole('error');
+      const handler = getHandler('saveFile:updateSaveDirectory');
+
+      // Act
+      const act = handler(null, '/test/save/dir/');
+
+      // Assert
+      await expect(act).rejects.toThrow('database or disk is full');
+      expect(grailDatabase.truncateUserData).not.toHaveBeenCalled();
       expect(mockSaveFileMonitor.updateSaveDirectory).not.toHaveBeenCalled();
     });
 
