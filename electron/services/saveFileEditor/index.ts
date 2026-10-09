@@ -1,3 +1,8 @@
+/**
+ * Public API of the save file editor. Every mutation runs through the mutation queue, so two
+ * edits never interleave on the same file.
+ */
+
 import type { VaultSourceFileType } from '../../types/grail';
 import type { SaveFileItemLocator } from './itemLocators';
 import {
@@ -14,11 +19,6 @@ export type { AddItemToSaveFileOptions } from './itemOperations';
 export { readSaveFileItem } from './itemOperations';
 export type { MoveSaveFileItemOptions } from './moveItem';
 export type { SplitStackOptions, SplitStackTarget } from './splitStack';
-
-/**
- * Public API of the save file editor. Every mutation runs through the mutation queue, so two
- * edits never interleave on the same file.
- */
 
 export function removeItemFromSaveFile(
   filePath: string,
