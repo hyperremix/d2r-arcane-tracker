@@ -4,6 +4,7 @@ import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import { defineConfig, type Plugin } from 'vite';
 import electron from 'vite-plugin-electron/simple';
+import { getSourceAliases } from './config/aliases';
 import { getD2sSourceAliases } from './config/d2sAliases';
 
 const d2sSourceAliases = getD2sSourceAliases(__dirname);
@@ -37,11 +38,7 @@ function copyMigrations(): Plugin {
 // https://vitejs.dev/config/
 export default defineConfig({
   resolve: {
-    alias: [
-      { find: '@', replacement: path.resolve(__dirname, './src') },
-      { find: 'electron', replacement: path.resolve(__dirname, './electron') },
-      ...d2sSourceAliases,
-    ],
+    alias: [...getSourceAliases(__dirname), ...d2sSourceAliases],
   },
   plugins: [
     tailwindcss(),

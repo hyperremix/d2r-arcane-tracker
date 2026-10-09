@@ -1,6 +1,7 @@
 import { relative, resolve } from 'node:path';
 import { normalizePath, type Plugin } from 'vite';
 import { defineConfig } from 'vitest/config';
+import { getSourceAliases } from './config/aliases';
 import { getD2sSourceAliases } from './config/d2sAliases';
 import { resolvePublicDirFile } from './config/publicDirAssets';
 
@@ -87,10 +88,6 @@ export default defineConfig({
     reporters: ['verbose', 'junit'],
   },
   resolve: {
-    alias: [
-      { find: '@', replacement: resolve(__dirname, './src') },
-      { find: /^electron\//, replacement: `${resolve(__dirname, './electron')}/` },
-      ...d2sSourceAliases,
-    ],
+    alias: [...getSourceAliases(__dirname), ...d2sSourceAliases],
   },
 });

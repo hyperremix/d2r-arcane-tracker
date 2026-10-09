@@ -44,7 +44,7 @@ electron/            Main process
   items/             Holy Grail item data
   config/            D2R build and memory pattern tables
 scripts/             test-item injection and memory-research helpers
-config/              shared build-tool config (d2s source aliases for Vite and Vitest)
+config/              shared build-tool config (import and d2s source aliases for Vite and Vitest)
 docs/                user guides, developer docs, GitHub Pages site
 ```
 
