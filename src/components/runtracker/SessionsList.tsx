@@ -2,6 +2,7 @@ import type { Session } from 'electron/types/grail';
 import { Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useShallow } from 'zustand/react/shallow';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -16,7 +17,7 @@ import {
 } from '@/components/ui/table';
 import { translations } from '@/i18n/translations';
 import { formatDuration, formatSessionDateRelative, formatTime } from '@/lib/utils';
-import { useRunTrackerStore } from '@/stores/runTrackerStore';
+import { useRunTrackerStore, useSessionStatsLookup } from '@/stores/runTrackerStore';
 import { SortableTableHead, type SortOrder } from './SortableTableHead';
 
 interface SessionsListProps {
@@ -30,7 +31,7 @@ const ITEMS_PER_PAGE = 10;
 interface SessionTableRowProps {
   session: Session;
   onSessionClick: (sessionId: string) => void;
-  getSessionStats: (sessionId: string) => { itemsFound: number } | null;
+  getSessionStats: (sessionId: string) => { itemsFound: number } | undefined;
   getSessionDuration: (session: Session) => number;
   formatSessionDate: (date: Date) => string;
 }
@@ -102,10 +103,18 @@ function TableRowSkeleton() {
  * and the ability to select a session to view its details.
  */
 export function SessionsList({ onSessionSelect }: SessionsListProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const showArchivedLabelId = useId();
-  const { sessions, sessionsLoading, getSessionStats, runs, loadSessionRuns, loadingSessions } =
-    useRunTrackerStore();
+  const { sessions, sessionsLoading, runs, loadSessionRuns, loadingSessions } = useRunTrackerStore(
+    useShallow((state) => ({
+      sessions: state.sessions,
+      sessionsLoading: state.sessionsLoading,
+      runs: state.runs,
+      loadSessionRuns: state.loadSessionRuns,
+      loadingSessions: state.loadingSessions,
+    })),
+  );
+  const getSessionStats = useSessionStatsLookup();
   // Only show the skeleton when there is nothing to display yet; background refreshes keep the list visible
   const showSkeleton = sessionsLoading && sessions.length === 0;
   const [showArchived, setShowArchived] = useState(false);
@@ -278,6 +287,12 @@ export function SessionsList({ onSessionSelect }: SessionsListProps) {
     setCurrentPage(1);
   }, [showArchived]);
 
+  // Localized session day ("Today", "3 days ago", ...)
+  const formatSessionDay = useCallback(
+    (date: Date) => formatSessionDateRelative(date, t, i18n.language),
+    [t, i18n.language],
+  );
+
   // Handle session selection
   const handleSessionClick = useCallback(
     (sessionId: string) => {
@@ -394,7 +409,7 @@ export function SessionsList({ onSessionSelect }: SessionsListProps) {
                     onSessionClick={handleSessionClick}
                     getSessionStats={getSessionStats}
                     getSessionDuration={getSessionDuration}
-                    formatSessionDate={formatSessionDateRelative}
+                    formatSessionDate={formatSessionDay}
                   />
                 ))}
               </TableBody>

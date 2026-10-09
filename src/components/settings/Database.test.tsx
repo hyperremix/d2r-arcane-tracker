@@ -11,6 +11,7 @@ import {
   vi,
 } from 'vitest';
 import { useGrailStore } from '@/stores/grailStore';
+import { mockStoreState } from '@/test/storeMock';
 import { DatabaseCard } from './Database';
 
 vi.mock('sonner', () => import('@/test/sonnerMock'));
@@ -53,7 +54,7 @@ describe('When managing database backups', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
-    vi.mocked(useGrailStore).mockReturnValue({ reloadData: mockReloadData });
+    mockStoreState(vi.mocked(useGrailStore), { reloadData: mockReloadData });
     mockReloadData.mockResolvedValue(undefined);
     setElectronAPI(mockElectronAPI);
   });

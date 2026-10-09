@@ -1,8 +1,9 @@
 import { runes } from 'electron/items/runes';
 import { X } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { useIconsByFilename } from '@/hooks/useIconsByFilename';
 import { translations } from '@/i18n/translations';
 import type { RunewordCompletionStatus } from '@/lib/runeword-utils';
 import { cn } from '@/lib/utils';
@@ -35,8 +36,15 @@ export function RuneImages({
   className,
   focusableTriggers = true,
 }: RuneImagesProps) {
-  const [runeImages, setRuneImages] = useState<Map<string, string>>(new Map());
-  const [isLoading, setIsLoading] = useState(true);
+  const runeFilenames = useMemo(
+    () =>
+      runeIds.flatMap((runeId) => {
+        const imageFilename = runes.find((r) => r.id === runeId)?.imageFilename;
+        return imageFilename ? [imageFilename] : [];
+      }),
+    [runeIds],
+  );
+  const { icons, isLoading } = useIconsByFilename(runeFilenames);
 
   // Create a map tracking which specific indices in runeIds are missing
   const missingRuneIndices = useMemo(() => {
@@ -68,31 +76,10 @@ export function RuneImages({
     return missingSet;
   }, [completionStatus, runeIds]);
 
-  useEffect(() => {
-    // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Image loading with error handling requires complexity
-    async function loadRuneImages() {
-      const imageMap = new Map<string, string>();
-
-      for (const runeId of runeIds) {
-        const rune = runes.find((r) => r.id === runeId);
-        if (rune?.imageFilename) {
-          try {
-            const iconUrl = await window.electronAPI?.icon.getByFilename(rune.imageFilename);
-            if (iconUrl) {
-              imageMap.set(runeId, iconUrl);
-            }
-          } catch (error) {
-            console.error(`Failed to load rune image for ${runeId}:`, error);
-          }
-        }
-      }
-
-      setRuneImages(imageMap);
-      setIsLoading(false);
-    }
-
-    loadRuneImages();
-  }, [runeIds]);
+  const getRuneImage = (runeId: string): string | undefined => {
+    const imageFilename = runes.find((r) => r.id === runeId)?.imageFilename;
+    return imageFilename ? icons.get(imageFilename) : undefined;
+  };
 
   // Get rune name by ID
   const getRuneName = (runeId: string): string => {
@@ -136,7 +123,7 @@ export function RuneImages({
               // biome-ignore lint/suspicious/noArrayIndexKey: Using index is necessary here to handle duplicate runes
               index
             }`}
-            imageUrl={runeImages.get(runeId)}
+            imageUrl={getRuneImage(runeId)}
             runeName={getRuneName(runeId)}
             isLoading={isLoading}
             showRuneName={showRuneNames}

@@ -1,9 +1,10 @@
 import '@testing-library/jest-dom';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import type { Run, RunItem, Session } from 'electron/types/grail';
+import type { Run, RunItem, Session, SessionStats } from 'electron/types/grail';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useGrailStore } from '@/stores/grailStore';
-import { useRunTrackerStore } from '@/stores/runTrackerStore';
+import { useRunTrackerStore, useSessionStats } from '@/stores/runTrackerStore';
+import { mockStoreState } from '@/test/storeMock';
 import { SessionCard } from './SessionCard';
 
 vi.mock('@/stores/runTrackerStore');
@@ -42,17 +43,19 @@ const createStoreState = (overrides: Record<string, unknown> = {}) =>
     endSession: mockEndSession,
     startSession: mockStartSession,
     updateSessionNotes: vi.fn().mockResolvedValue(undefined),
-    getSessionStats: vi.fn().mockReturnValue(null),
     ...overrides,
   }) as unknown as ReturnType<typeof useRunTrackerStore>;
 
 describe('SessionCard', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockUseRunTrackerStore.mockReturnValue(createStoreState());
-    mockUseGrailStore.mockReturnValue({ items: [], progress: [] } as unknown as ReturnType<
-      typeof useGrailStore
-    >);
+    vi.mocked(useSessionStats).mockReturnValue(undefined);
+    mockStoreState(mockUseRunTrackerStore, createStoreState());
+    mockStoreState(mockUseGrailStore, {
+      items: [],
+      progress: [],
+      settings: {},
+    } as unknown as ReturnType<typeof useGrailStore>);
   });
 
   afterEach(() => {
@@ -119,7 +122,8 @@ describe('SessionCard', () => {
   describe('If archiving is in flight', () => {
     it('Then the Archive Session button is disabled', () => {
       // Arrange
-      mockUseRunTrackerStore.mockReturnValue(
+      mockStoreState(
+        mockUseRunTrackerStore,
         createStoreState({ pendingActions: { archiveSession: true } }),
       );
 
@@ -134,7 +138,7 @@ describe('SessionCard', () => {
   describe('If no session is active', () => {
     it('Then the card renders nothing because starting a session lives in the session controls', () => {
       // Arrange
-      mockUseRunTrackerStore.mockReturnValue(createStoreState({ activeSession: null }));
+      mockStoreState(mockUseRunTrackerStore, createStoreState({ activeSession: null }));
 
       // Act
       const { container } = render(<SessionCard session={null} />);
@@ -163,7 +167,8 @@ describe('SessionCard', () => {
         created: new Date('2024-01-01T10:10:00Z'),
         lastUpdated: new Date('2024-01-01T10:10:00Z'),
       };
-      mockUseRunTrackerStore.mockReturnValue(
+      mockStoreState(
+        mockUseRunTrackerStore,
         createStoreState({ activeSession: freshSession, activeRun }),
       );
 
@@ -180,7 +185,7 @@ describe('SessionCard', () => {
       vi.useFakeTimers({ toFake: ['Date'] });
       vi.setSystemTime(new Date('2024-01-01T10:20:00Z'));
       // Backend snapshot from the last run end: 5m of 10m, but 20m have elapsed by now
-      mockUseRunTrackerStore.mockReturnValue(createStoreState({ activeRun: null }));
+      mockStoreState(mockUseRunTrackerStore, createStoreState({ activeRun: null }));
 
       // Act
       render(<SessionCard session={mockSession} />);
@@ -218,7 +223,8 @@ describe('SessionCard', () => {
         makeRun(8, { endTime: undefined, duration: undefined }),
       ];
       const runItems = new Map([['run-7', [makeItem('run-7', 'Shako'), makeItem('run-7', 'Ber')]]]);
-      mockUseRunTrackerStore.mockReturnValue(
+      mockStoreState(
+        mockUseRunTrackerStore,
         createStoreState({ runs: new Map([['session-1', sessionRuns]]), runItems }),
       );
 
@@ -251,11 +257,12 @@ describe('SessionCard', () => {
         created: new Date('2024-01-01T10:00:30Z'),
       };
       const unresolvedItem: RunItem = { ...detectedItem, id: 'item-2', grailProgressId: undefined };
-      mockUseGrailStore.mockReturnValue({
+      mockStoreState(mockUseGrailStore, {
         items: [{ id: 'harlequin-crest', name: 'Harlequin Crest' }],
         progress: [{ id: 'progress-1', itemId: 'harlequin-crest' }],
       } as unknown as ReturnType<typeof useGrailStore>);
-      mockUseRunTrackerStore.mockReturnValue(
+      mockStoreState(
+        mockUseRunTrackerStore,
         createStoreState({
           runs: new Map([['session-1', [makeRun(1)]]]),
           runItems: new Map([['run-1', [detectedItem, unresolvedItem]]]),
@@ -271,7 +278,8 @@ describe('SessionCard', () => {
 
     it('If no View all runs handler is given, Then the action is not shown', () => {
       // Arrange
-      mockUseRunTrackerStore.mockReturnValue(
+      mockStoreState(
+        mockUseRunTrackerStore,
         createStoreState({ runs: new Map([['session-1', [makeRun(1)]]]) }),
       );
 
@@ -285,7 +293,8 @@ describe('SessionCard', () => {
     it('When View all runs is clicked, Then the full run history is requested', () => {
       // Arrange
       const onViewAllRuns = vi.fn();
-      mockUseRunTrackerStore.mockReturnValue(
+      mockStoreState(
+        mockUseRunTrackerStore,
         createStoreState({ runs: new Map([['session-1', [makeRun(1)]]]) }),
       );
       render(<SessionCard session={mockSession} onViewAllRuns={onViewAllRuns} />);
@@ -295,6 +304,32 @@ describe('SessionCard', () => {
 
       // Assert
       expect(onViewAllRuns).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('When items found in the session were new to the grail', () => {
+    it('Then the number of new grail items is shown next to the items found', () => {
+      // Arrange
+      const stats: SessionStats = {
+        sessionId: 'session-1',
+        totalRuns: 1,
+        totalTime: 600000,
+        totalRunTime: 300000,
+        averageRunDuration: 60000,
+        fastestRun: 60000,
+        slowestRun: 60000,
+        itemsFound: 2,
+        newGrailItems: 1,
+      };
+      vi.mocked(useSessionStats).mockReturnValue(stats);
+
+      // Act
+      render(<SessionCard session={mockSession} />);
+
+      // Assert
+      expect(useSessionStats).toHaveBeenCalledWith(mockSession);
+      expect(screen.getByText('Items Found').nextElementSibling).toHaveTextContent('2');
+      expect(screen.getByText('New Grail Items').nextElementSibling).toHaveTextContent('1');
     });
   });
 
@@ -339,7 +374,7 @@ describe('SessionCard', () => {
     it('If the session has no runs, Then the title explains why but the accessible name stays "Export session data"', () => {
       // Arrange
       const emptySession: Session = { ...mockSession, runCount: 0 };
-      mockUseRunTrackerStore.mockReturnValue(createStoreState({ activeSession: emptySession }));
+      mockStoreState(mockUseRunTrackerStore, createStoreState({ activeSession: emptySession }));
 
       // Act
       render(<SessionCard session={emptySession} />);

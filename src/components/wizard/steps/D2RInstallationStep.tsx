@@ -1,6 +1,7 @@
 import { AlertTriangle, CheckCircle, FolderOpen, HardDrive, Loader2 } from 'lucide-react';
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useShallow } from 'zustand/react/shallow';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -37,7 +38,9 @@ export function D2RInstallationStep() {
   const d2rPathInputId = useId();
   const pathHintId = useId();
   const validationId = useId();
-  const { settings, hydrateSettings } = useGrailStore();
+  const { settings, hydrateSettings } = useGrailStore(
+    useShallow((state) => ({ settings: state.settings, hydrateSettings: state.hydrateSettings })),
+  );
 
   const [d2rPath, setD2rPath] = useState<string>(settings.d2rInstallPath || '');
   const [hasLoaded, setHasLoaded] = useState(false);

@@ -2,6 +2,7 @@ import { ArrowLeft, ArrowRight, Check, FastForward } from 'lucide-react';
 import type { ComponentType } from 'react';
 import { useCallback, useId, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useShallow } from 'zustand/react/shallow';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -90,8 +91,20 @@ export function SetupWizard() {
     jumpToStep,
     skip,
     closeWizard,
-  } = useWizardStore();
-  const { setSettings } = useGrailStore();
+  } = useWizardStore(
+    useShallow((state) => ({
+      isOpen: state.isOpen,
+      currentStep: state.currentStep,
+      totalSteps: state.totalSteps,
+      stepValidity: state.stepValidity,
+      nextStep: state.nextStep,
+      previousStep: state.previousStep,
+      jumpToStep: state.jumpToStep,
+      skip: state.skip,
+      closeWizard: state.closeWizard,
+    })),
+  );
+  const setSettings = useGrailStore((state) => state.setSettings);
   const [showSkipConfirm, setShowSkipConfirm] = useState(false);
   // Set when persisting the wizard outcome fails; the wizard then stays open so it can be retried
   const [saveFailed, setSaveFailed] = useState(false);

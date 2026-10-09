@@ -1,7 +1,8 @@
-import type { Character, GrailProgress, ItemDetectionEvent } from 'electron/types/grail';
+import type { GrailProgress, ItemDetectionEvent } from 'electron/types/grail';
 import { Bell, Trophy, X } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useShallow } from 'zustand/react/shallow';
 import { ItemCard } from '@/components/grail/ItemCard';
 import { Badge } from '@/components/ui/badge';
 import { Button, buttonVariants } from '@/components/ui/button';
@@ -35,9 +36,18 @@ export function NotificationButton() {
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [isOpen, setIsOpen] = useState(false);
   const [notificationQueue, setNotificationQueue] = useState<ItemDetectionEvent[]>([]);
-  const [characters, setCharacters] = useState<Character[]>([]);
   const [iconPath, setIconPath] = useState<string>(logoUrl);
-  const { settings } = useGrailStore();
+  // Characters are loaded and kept in sync by the grail store
+  const characters = useGrailStore((state) => state.characters);
+  const { enableSounds, notificationVolume, inAppNotifications, nativeNotifications } =
+    useGrailStore(
+      useShallow((state) => ({
+        enableSounds: state.settings.enableSounds,
+        notificationVolume: state.settings.notificationVolume,
+        inAppNotifications: state.settings.inAppNotifications,
+        nativeNotifications: state.settings.nativeNotifications,
+      })),
+    );
 
   // Use refs to avoid useEffect re-registration on state/callback changes
   const batchTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -45,19 +55,8 @@ export function NotificationButton() {
 
   const BATCH_DELAY = 500; // 0.5 seconds
 
-  // Fetch characters and icon path on mount
+  // Fetch the icon path on mount
   useEffect(() => {
-    const fetchCharacters = async () => {
-      try {
-        const chars = await window.electronAPI?.grail.getCharacters();
-        if (chars) {
-          setCharacters(chars);
-        }
-      } catch (error) {
-        console.error('Failed to fetch characters:', error);
-      }
-    };
-
     const fetchIconPath = async () => {
       try {
         const path = await window.electronAPI?.getIconPath();
@@ -69,21 +68,20 @@ export function NotificationButton() {
       }
     };
 
-    fetchCharacters();
     fetchIconPath();
   }, []);
 
   const playNotificationSound = useCallback(() => {
-    if (settings.enableSounds) {
+    if (enableSounds) {
       try {
         const audio = new Audio(dingSound);
-        audio.volume = settings.notificationVolume;
+        audio.volume = notificationVolume;
 
         // Add detailed logging to diagnose the issue
         console.log('[NotificationButton] Attempting to play sound:', {
           path: dingSound,
           volume: audio.volume,
-          enableSounds: settings.enableSounds,
+          enableSounds,
         });
 
         audio
@@ -107,7 +105,7 @@ export function NotificationButton() {
     } else {
       console.log('[NotificationButton] Sound disabled in settings');
     }
-  }, [settings.enableSounds, settings.notificationVolume]);
+  }, [enableSounds, notificationVolume]);
 
   const showBrowserNotification = useCallback(
     (itemEvent: ItemDetectionEvent) => {
@@ -161,7 +159,7 @@ export function NotificationButton() {
     if (notificationQueue.length === 0) return;
 
     // Add ALL queued items to in-app notifications
-    if (settings.inAppNotifications) {
+    if (inAppNotifications) {
       // Fetch progress data for each item
       const newNotifications = await Promise.all(
         notificationQueue.map(async (itemEvent) => {
@@ -199,11 +197,7 @@ export function NotificationButton() {
     playNotificationSound();
 
     // Show native notification
-    if (
-      settings.nativeNotifications &&
-      'Notification' in window &&
-      Notification.permission === 'granted'
-    ) {
+    if (nativeNotifications && 'Notification' in window && Notification.permission === 'granted') {
       if (notificationQueue.length === 1) {
         // Single item: show detailed notification
         showBrowserNotification(notificationQueue[0]);
@@ -217,8 +211,8 @@ export function NotificationButton() {
     setNotificationQueue([]);
   }, [
     notificationQueue,
-    settings.inAppNotifications,
-    settings.nativeNotifications,
+    inAppNotifications,
+    nativeNotifications,
     playNotificationSound,
     showBrowserNotification,
     showBatchNotification,

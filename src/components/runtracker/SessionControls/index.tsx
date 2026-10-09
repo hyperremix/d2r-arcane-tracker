@@ -1,6 +1,7 @@
 import { AlertTriangle, Loader2, Timer } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useShallow } from 'zustand/react/shallow';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
   AlertDialog,
@@ -108,9 +109,26 @@ export function SessionControls() {
     endSession,
     startSession,
     addManualRunItem,
-  } = useRunTrackerStore();
+  } = useRunTrackerStore(
+    useShallow((state) => ({
+      activeSession: state.activeSession,
+      activeRun: state.activeRun,
+      isPaused: state.isPaused,
+      pendingActions: state.pendingActions,
+      runs: state.runs,
+      startRun: state.startRun,
+      endRun: state.endRun,
+      pauseRun: state.pauseRun,
+      resumeRun: state.resumeRun,
+      endSession: state.endSession,
+      startSession: state.startSession,
+      addManualRunItem: state.addManualRunItem,
+    })),
+  );
 
-  const { settings, setSettings } = useGrailStore();
+  const { settings, setSettings } = useGrailStore(
+    useShallow((state) => ({ settings: state.settings, setSettings: state.setSettings })),
+  );
   const shortcuts = settings.runTrackerShortcuts ?? {
     startRun: 'Ctrl+R',
     pauseRun: 'Ctrl+Space',

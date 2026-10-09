@@ -1,11 +1,16 @@
 import { runes } from 'electron/items/runes';
-import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
+import { useIconsByFilename } from '@/hooks/useIconsByFilename';
 import { translations } from '@/i18n/translations';
 import { cn } from '@/lib/utils';
+
+/** Image filenames of all runes, loaded once for the whole filter list. */
+const RUNE_IMAGE_FILENAMES = runes.flatMap((rune) =>
+  rune.imageFilename ? [rune.imageFilename] : [],
+);
 
 /**
  * Props for the RuneFilters component
@@ -33,34 +38,7 @@ export function RuneFilters({
   className,
 }: RuneFiltersProps) {
   const { t } = useTranslation();
-  const [runeImages, setRuneImages] = useState<Map<string, string>>(new Map());
-  const [imagesLoading, setImagesLoading] = useState(true);
-
-  // Load rune images on mount
-  useEffect(() => {
-    // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Image loading with error handling requires iteration
-    async function loadRuneImages() {
-      const imageMap = new Map<string, string>();
-
-      for (const rune of runes) {
-        if (rune.imageFilename) {
-          try {
-            const iconUrl = await window.electronAPI?.icon.getByFilename(rune.imageFilename);
-            if (iconUrl) {
-              imageMap.set(rune.id, iconUrl);
-            }
-          } catch (error) {
-            console.error(`Failed to load rune image for ${rune.id}:`, error);
-          }
-        }
-      }
-
-      setRuneImages(imageMap);
-      setImagesLoading(false);
-    }
-
-    loadRuneImages();
-  }, []);
+  const { icons: runeImages, isLoading: imagesLoading } = useIconsByFilename(RUNE_IMAGE_FILENAMES);
 
   /**
    * Handles checkbox state change for a specific rune
@@ -109,7 +87,7 @@ export function RuneFilters({
           const count = getRuneCount(rune.id);
           const isSelected = selectedRunes.includes(rune.id);
           const hasNone = count === 0;
-          const imageUrl = runeImages.get(rune.id);
+          const imageUrl = rune.imageFilename ? runeImages.get(rune.imageFilename) : undefined;
 
           return (
             <div

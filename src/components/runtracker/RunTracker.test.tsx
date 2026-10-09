@@ -4,6 +4,7 @@ import type { Run, Session } from 'electron/types/grail';
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useRunTrackerStore } from '@/stores/runTrackerStore';
 import { createMainEventsMock } from '@/test/mainEventsMock';
+import { mockStoreState } from '@/test/storeMock';
 import { RunTracker } from './RunTracker';
 
 // Mock the store
@@ -127,7 +128,7 @@ describe('RunTracker', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mainEvents.reset();
-    mockUseRunTrackerStore.mockReturnValue(defaultStoreState);
+    mockStoreState(mockUseRunTrackerStore, defaultStoreState);
   });
 
   afterEach(() => {
@@ -153,7 +154,7 @@ describe('RunTracker', () => {
       ],
     ])('If %s, Then exactly one level-1 heading is present', (_scenario, storeOverrides) => {
       // Arrange
-      mockUseRunTrackerStore.mockReturnValue({ ...defaultStoreState, ...storeOverrides });
+      mockStoreState(mockUseRunTrackerStore, { ...defaultStoreState, ...storeOverrides });
 
       // Act
       render(<RunTracker />);
@@ -164,7 +165,7 @@ describe('RunTracker', () => {
 
     it('If the main state is shown, Then the level-1 heading is the page title', () => {
       // Arrange
-      mockUseRunTrackerStore.mockReturnValue({ ...defaultStoreState, activeSession: mockSession });
+      mockStoreState(mockUseRunTrackerStore, { ...defaultStoreState, activeSession: mockSession });
 
       // Act
       render(<RunTracker />);
@@ -177,7 +178,7 @@ describe('RunTracker', () => {
   describe('When the initial load has not completed yet', () => {
     it('Then a full-page loading state is shown', () => {
       // Arrange
-      mockUseRunTrackerStore.mockReturnValue({
+      mockStoreState(mockUseRunTrackerStore, {
         ...defaultStoreState,
         initialLoadStatus: 'loading',
       });
@@ -195,7 +196,7 @@ describe('RunTracker', () => {
     it('Then a full-page error with a retry button is shown', () => {
       // Arrange
       const errorMessage = 'Failed to load data';
-      mockUseRunTrackerStore.mockReturnValue({
+      mockStoreState(mockUseRunTrackerStore, {
         ...defaultStoreState,
         initialLoadStatus: 'error',
         initialLoadError: errorMessage,
@@ -214,7 +215,7 @@ describe('RunTracker', () => {
     it('Then clicking retry reloads the initial data', async () => {
       // Arrange
       const mockLoadInitialData = vi.fn().mockResolvedValue(undefined);
-      mockUseRunTrackerStore.mockReturnValue({
+      mockStoreState(mockUseRunTrackerStore, {
         ...defaultStoreState,
         initialLoadStatus: 'error',
         initialLoadError: 'Test error',
@@ -236,7 +237,7 @@ describe('RunTracker', () => {
   describe('If a user action fails after the initial load', () => {
     it('Then the error is shown inline and the page content stays visible', () => {
       // Arrange
-      mockUseRunTrackerStore.mockReturnValue({
+      mockStoreState(mockUseRunTrackerStore, {
         ...defaultStoreState,
         activeSession: mockSession,
         error: 'Failed to end session: boom',
@@ -258,7 +259,7 @@ describe('RunTracker', () => {
   describe('When a user action is in flight', () => {
     it('Then the page content stays visible', () => {
       // Arrange
-      mockUseRunTrackerStore.mockReturnValue({
+      mockStoreState(mockUseRunTrackerStore, {
         ...defaultStoreState,
         activeSession: mockSession,
         pendingActions: { endRun: true },
@@ -278,7 +279,7 @@ describe('RunTracker', () => {
     it('Then run items are refreshed without blanking the page', async () => {
       // Arrange
       const mockLoadRunItems = vi.fn().mockResolvedValue(undefined);
-      mockUseRunTrackerStore.mockReturnValue({
+      mockStoreState(mockUseRunTrackerStore, {
         ...defaultStoreState,
         activeSession: mockSession,
         loadRunItems: mockLoadRunItems,
@@ -290,7 +291,7 @@ describe('RunTracker', () => {
       act(() => {
         handler?.({ runId: 'run-1' });
       });
-      mockUseRunTrackerStore.mockReturnValue({
+      mockStoreState(mockUseRunTrackerStore, {
         ...defaultStoreState,
         activeSession: mockSession,
         loadRunItems: mockLoadRunItems,
@@ -324,7 +325,7 @@ describe('RunTracker', () => {
     const runsMap = new Map();
     runsMap.set('session-1', mockRuns);
 
-    mockUseRunTrackerStore.mockReturnValue({
+    mockStoreState(mockUseRunTrackerStore, {
       ...defaultStoreState,
       activeSession: mockSession,
       runs: runsMap,
@@ -340,7 +341,7 @@ describe('RunTracker', () => {
   it('loads initial data on mount', async () => {
     const mockLoadInitialData = vi.fn().mockResolvedValue(undefined);
 
-    mockUseRunTrackerStore.mockReturnValue({
+    mockStoreState(mockUseRunTrackerStore, {
       ...defaultStoreState,
       loadInitialData: mockLoadInitialData,
     });
@@ -392,7 +393,7 @@ describe('RunTracker', () => {
     const runsMap = new Map();
     runsMap.set('session-1', mockRuns);
 
-    mockUseRunTrackerStore.mockReturnValue({
+    mockStoreState(mockUseRunTrackerStore, {
       ...defaultStoreState,
       activeSession: mockSession,
       runs: runsMap,
@@ -409,7 +410,7 @@ describe('RunTracker', () => {
   describe('When View all runs is used for the active session', () => {
     it('Then the session detail view opens for the active session', () => {
       // Arrange
-      mockUseRunTrackerStore.mockReturnValue({
+      mockStoreState(mockUseRunTrackerStore, {
         ...defaultStoreState,
         activeSession: mockSession,
       });

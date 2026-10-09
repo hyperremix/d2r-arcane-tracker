@@ -17,7 +17,7 @@ export function NotificationsStep() {
   const { t } = useTranslation();
   const volumeSliderId = useId();
   const headingId = useId();
-  const { settings } = useGrailStore();
+  const settings = useGrailStore((state) => state.settings);
   const { saveSettings, saveFailed } = useWizardSettingsSave();
 
   const enableSounds = settings.enableSounds ?? true;

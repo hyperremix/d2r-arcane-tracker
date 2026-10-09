@@ -19,7 +19,7 @@ export function GrailSettingsStep() {
   const grailRunesId = useId();
   const grailRunewordsId = useId();
   const headingId = useId();
-  const { settings } = useGrailStore();
+  const settings = useGrailStore((state) => state.settings);
   const { saveSettings, saveFailed } = useWizardSettingsSave();
 
   const grailNormal = settings.grailNormal ?? true;

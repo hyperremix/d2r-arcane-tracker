@@ -64,7 +64,7 @@ export function GameModeStep() {
   const { t } = useTranslation();
   const gameModeId = useId();
   const headingId = useId();
-  const { settings } = useGrailStore();
+  const settings = useGrailStore((state) => state.settings);
   const { saveSettings, saveFailed } = useWizardSettingsSave();
   const gameMode = settings.gameMode || GameMode.Both;
   const selectedMode = gameModes.find((mode) => mode.value === gameMode);

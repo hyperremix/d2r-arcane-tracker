@@ -12,13 +12,14 @@ import { GripHorizontal } from 'lucide-react';
 import type { ComponentProps, CSSProperties } from 'react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useShallow } from 'zustand/react/shallow';
 import { ProgressGauge } from '@/components/grail/ProgressGauge';
 import { Input } from '@/components/ui/input';
 import { translations } from '@/i18n/translations';
 import { formatDuration } from '@/lib/utils';
 import { clampWidgetOpacity, resolveWidgetDisplayMode } from '@/lib/widget';
 import { useGrailStore } from '@/stores/grailStore';
-import { useRunTrackerStore } from '@/stores/runTrackerStore';
+import { useRunTrackerStore, useSessionStats } from '@/stores/runTrackerStore';
 
 /**
  * Props for the Widget component.
@@ -47,7 +48,7 @@ const NO_DRAG_STYLE: WidgetRootStyle = { WebkitAppRegion: 'no-drag' };
 interface RunOnlyDisplayProps {
   activeSession: Session | null;
   runDuration: number;
-  sessionStats: SessionStats | null;
+  sessionStats: SessionStats | undefined;
   runItemsByRun: RunItemsByRun[];
   showItemList: boolean;
   onAddManualItem?: (name: string) => Promise<void>;
@@ -332,15 +333,26 @@ export function Widget({ statistics, settings, onDragStart, onDragEnd }: WidgetP
     activeSession,
     runs,
     runItems,
-    getSessionStats,
     loadSessionRuns,
     loadRunItems,
     addManualRunItem,
-  } = useRunTrackerStore();
+  } = useRunTrackerStore(
+    useShallow((state) => ({
+      activeRun: state.activeRun,
+      activeSession: state.activeSession,
+      runs: state.runs,
+      runItems: state.runItems,
+      loadSessionRuns: state.loadSessionRuns,
+      loadRunItems: state.loadRunItems,
+      addManualRunItem: state.addManualRunItem,
+    })),
+  );
   const [runDuration, setRunDuration] = useState<number>(0);
 
   // Grail data for resolving item names in run-only mode
-  const { items, progress } = useGrailStore();
+  const { items, progress } = useGrailStore(
+    useShallow((state) => ({ items: state.items, progress: state.progress })),
+  );
 
   // Real-time timer for run duration updates
   useEffect(() => {
@@ -388,14 +400,9 @@ export function Widget({ statistics, settings, onDragStart, onDragEnd }: WidgetP
     }
   }, [activeSession, displayMode, loadRunItems, loadSessionRuns, runItems, runs]);
 
-  // Calculate session statistics for run-only mode
-  // biome-ignore lint/correctness/useExhaustiveDependencies: runs is needed to trigger recalculation when run data changes
-  const sessionStats = useMemo(() => {
-    if (!activeSession || displayMode !== 'run-only') {
-      return null;
-    }
-    return getSessionStats(activeSession.id);
-  }, [activeSession?.id, displayMode, runs, getSessionStats]);
+  // Session statistics for run-only mode
+  const activeSessionStats = useSessionStats(activeSession);
+  const sessionStats = displayMode === 'run-only' ? activeSessionStats : undefined;
 
   // Build per-run item list for run-only mode
   const runItemsByRun = useMemo(() => {

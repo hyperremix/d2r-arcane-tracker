@@ -3,7 +3,8 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import type { Session } from 'electron/types/grail';
 import i18n from 'i18next';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { useRunTrackerStore } from '@/stores/runTrackerStore';
+import { useRunTrackerStore, useSessionStats } from '@/stores/runTrackerStore';
+import { mockStoreState } from '@/test/storeMock';
 import { SessionDetailView } from './SessionDetailView';
 
 vi.mock('@/stores/runTrackerStore');
@@ -44,14 +45,14 @@ const createStoreState = (overrides: Record<string, unknown> = {}) =>
     archiveSession: mockArchiveSession,
     updateSessionNotes: vi.fn().mockResolvedValue(undefined),
     loadSessionRuns: vi.fn().mockResolvedValue(undefined),
-    getSessionStats: vi.fn().mockReturnValue(null),
     ...overrides,
   }) as unknown as ReturnType<typeof useRunTrackerStore>;
 
 describe('SessionDetailView', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockUseRunTrackerStore.mockReturnValue(createStoreState());
+    vi.mocked(useSessionStats).mockReturnValue(undefined);
+    mockStoreState(mockUseRunTrackerStore, createStoreState());
   });
 
   describe('When Archive Session is clicked', () => {
@@ -99,7 +100,8 @@ describe('SessionDetailView', () => {
   describe('If archiving is in flight', () => {
     it('Then the Archive Session button is disabled', () => {
       // Arrange
-      mockUseRunTrackerStore.mockReturnValue(
+      mockStoreState(
+        mockUseRunTrackerStore,
         createStoreState({ pendingActions: { archiveSession: true } }),
       );
 
@@ -125,7 +127,8 @@ describe('SessionDetailView', () => {
     };
 
     beforeEach(() => {
-      mockUseRunTrackerStore.mockReturnValue(
+      mockStoreState(
+        mockUseRunTrackerStore,
         createStoreState({
           sessions: [archivedSession],
           runs: new Map([[archivedSession.id, []]]),
@@ -181,7 +184,7 @@ describe('SessionDetailView', () => {
   describe('When the session is missing', () => {
     it('Then the translated not-found state is shown', () => {
       // Arrange
-      mockUseRunTrackerStore.mockReturnValue(createStoreState({ sessions: [] }));
+      mockStoreState(mockUseRunTrackerStore, createStoreState({ sessions: [] }));
 
       // Act
       render(<SessionDetailView sessionId="missing" onBack={vi.fn()} />);
@@ -196,7 +199,7 @@ describe('SessionDetailView', () => {
     it('Then the active session details are shown instead of the not-found state', () => {
       // Arrange
       const activeSession: Session = { ...mockSession, id: 'session-live', endTime: undefined };
-      mockUseRunTrackerStore.mockReturnValue(createStoreState({ sessions: [], activeSession }));
+      mockStoreState(mockUseRunTrackerStore, createStoreState({ sessions: [], activeSession }));
 
       // Act
       render(<SessionDetailView sessionId="session-live" onBack={vi.fn()} />);
@@ -226,7 +229,8 @@ describe('SessionDetailView', () => {
         totalSessionTime: 1000000,
         notes: 'live notes',
       };
-      mockUseRunTrackerStore.mockReturnValue(
+      mockStoreState(
+        mockUseRunTrackerStore,
         createStoreState({ sessions: [staleSession], activeSession }),
       );
 

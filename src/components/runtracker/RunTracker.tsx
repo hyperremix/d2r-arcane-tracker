@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useShallow } from 'zustand/react/shallow';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { PageShell } from '@/components/layout/PageShell';
 import { Button } from '@/components/ui/button';
@@ -38,7 +39,27 @@ export function RunTracker() {
     clearError,
     retryLastAction,
     loadRunItems,
-  } = useRunTrackerStore();
+  } = useRunTrackerStore(
+    useShallow((state) => ({
+      activeSession: state.activeSession,
+      initialLoadStatus: state.initialLoadStatus,
+      initialLoadError: state.initialLoadError,
+      pendingActions: state.pendingActions,
+      error: state.error,
+      errorType: state.errorType,
+      retryCount: state.retryCount,
+      loadInitialData: state.loadInitialData,
+      handleSessionStarted: state.handleSessionStarted,
+      handleSessionEnded: state.handleSessionEnded,
+      handleRunStarted: state.handleRunStarted,
+      handleRunEnded: state.handleRunEnded,
+      handleRunPaused: state.handleRunPaused,
+      handleRunResumed: state.handleRunResumed,
+      clearError: state.clearError,
+      retryLastAction: state.retryLastAction,
+      loadRunItems: state.loadRunItems,
+    })),
+  );
 
   const pageHeader = (
     <PageHeader

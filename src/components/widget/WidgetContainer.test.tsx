@@ -1,11 +1,21 @@
 import { act, render, waitFor } from '@testing-library/react';
-import type { Settings } from 'electron/types/grail';
+import type { GrailProgress, Item, Settings } from 'electron/types/grail';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { GrailProgressBuilder, HolyGrailItemBuilder } from '@/fixtures';
 import { useGrailStore } from '@/stores/grailStore';
 import { useRunTrackerStore } from '@/stores/runTrackerStore';
 import { WidgetContainer } from './WidgetContainer';
 
-vi.mock('./Widget', () => ({ Widget: () => <div>WidgetStub</div> }));
+const widgetProps = vi.hoisted(() => ({
+  last: undefined as { statistics: { foundItems: number; totalItems: number } | null } | undefined,
+}));
+
+vi.mock('./Widget', () => ({
+  Widget: (props: { statistics: { foundItems: number; totalItems: number } | null }) => {
+    widgetProps.last = props;
+    return <div>WidgetStub</div>;
+  },
+}));
 
 vi.mock('@/stores/runTrackerStore', () => {
   const state = {
@@ -26,21 +36,27 @@ type IpcHandler = (payload: unknown) => Promise<void> | void;
 
 describe('WidgetContainer native window sizing', () => {
   const originalElectronAPI = window.electronAPI;
-  const originalSettings = useGrailStore.getState().settings;
+  const initialGrailState = useGrailStore.getInitialState();
   const handlers = new Map<string, IpcHandler>();
+  let persistedSettings: Partial<Settings> = {};
   const updateDisplay = vi.fn().mockResolvedValue({ success: true });
   const updateOpacity = vi.fn().mockResolvedValue({ success: true });
 
   /**
    * Renders the container with the given stored settings and waits until they are loaded.
    */
-  async function renderWithSettings(stored: Partial<Settings>) {
+  async function renderWithSettings(
+    stored: Partial<Settings>,
+    { items = [] as Item[], progress = [] as GrailProgress[] } = {},
+  ) {
+    persistedSettings = { ...stored };
     Object.defineProperty(window, 'electronAPI', {
       value: {
         grail: {
-          getSettings: vi.fn().mockResolvedValue(stored),
-          getItems: vi.fn().mockResolvedValue([]),
-          getProgress: vi.fn().mockResolvedValue([]),
+          getSettings: vi.fn(async () => ({ ...persistedSettings })),
+          getCharacters: vi.fn().mockResolvedValue([]),
+          getItems: vi.fn().mockResolvedValue(items),
+          getProgress: vi.fn().mockResolvedValue(progress),
         },
         widget: { updateDisplay, updateOpacity },
         on: vi.fn((channel: string, handler: IpcHandler) => {
@@ -56,17 +72,17 @@ describe('WidgetContainer native window sizing', () => {
     const result = render(<WidgetContainer />);
     await waitFor(() => {
       expect(handlers.has('settings-updated')).toBe(true);
-    });
-    await act(async () => {
-      await Promise.resolve();
+      expect(useGrailStore.getState().settingsHydrated).toBe(true);
+      expect(useGrailStore.getState().loading).toBe(false);
     });
     return result;
   }
 
   /**
-   * Simulates the main process broadcasting a settings update.
+   * Simulates the main process saving a settings update and broadcasting it.
    */
   async function emitSettings(update: Partial<Settings>) {
+    persistedSettings = { ...persistedSettings, ...update };
     await act(async () => {
       await handlers.get('settings-updated')?.(update);
     });
@@ -74,12 +90,14 @@ describe('WidgetContainer native window sizing', () => {
 
   beforeEach(() => {
     handlers.clear();
+    widgetProps.last = undefined;
+    useGrailStore.setState(initialGrailState, true);
     updateDisplay.mockClear();
     updateOpacity.mockClear();
   });
 
   afterEach(() => {
-    useGrailStore.setState({ settings: originalSettings });
+    useGrailStore.setState(initialGrailState, true);
     Object.defineProperty(window, 'electronAPI', {
       value: originalElectronAPI,
       configurable: true,
@@ -183,5 +201,48 @@ describe('WidgetContainer native window sizing', () => {
 
     // Assert
     expect(updateOpacity).not.toHaveBeenCalled();
+  });
+
+  it('When the stored grail data is loaded, Then the widget receives the shared grail statistics', async () => {
+    // Arrange
+    const items = [
+      HolyGrailItemBuilder.new().withId('shako').build(),
+      HolyGrailItemBuilder.new().withId('soj').build(),
+    ];
+    const progress = [
+      GrailProgressBuilder.new()
+        .withId('p1')
+        .withCharacterId('c1')
+        .withItemId('shako')
+        .withFoundDate(new Date('2024-01-01'))
+        .build(),
+    ];
+
+    // Act
+    await renderWithSettings(
+      { widgetDisplay: 'overall', grailNormal: true, grailEthereal: false },
+      { items, progress },
+    );
+
+    // Assert
+    await waitFor(() =>
+      expect(widgetProps.last?.statistics).toMatchObject({ foundItems: 1, totalItems: 2 }),
+    );
+  });
+
+  it('If a tracked item type setting changes, Then the grail data is reloaded', async () => {
+    // Arrange
+    await renderWithSettings({ widgetDisplay: 'overall', grailRunes: false });
+    const { getItems } = (
+      window.electronAPI as unknown as { grail: { getItems: ReturnType<typeof vi.fn> } }
+    ).grail;
+    getItems.mockClear();
+
+    // Act
+    await emitSettings({ grailRunes: true });
+
+    // Assert
+    await waitFor(() => expect(getItems).toHaveBeenCalledTimes(1));
+    expect(useGrailStore.getState().settings.grailRunes).toBe(true);
   });
 });

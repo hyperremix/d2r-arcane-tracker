@@ -1,11 +1,13 @@
-import { act, renderHook } from '@testing-library/react';
+import { act, renderHook, waitFor } from '@testing-library/react';
 import type { AdvancedGrailFilter, GrailFilter } from 'electron/types/grail';
 import { toast } from 'sonner';
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CharacterBuilder, GrailProgressBuilder, HolyGrailItemBuilder } from '@/fixtures';
+import { createMainEventsMock } from '@/test/mainEventsMock';
 import {
   countActiveFilters,
   filterAndSortItems,
+  initGrailData,
   parseSubCategoryFilterValue,
   resetSettingsWriteTracking,
   type SettingsSaveResult,
@@ -77,7 +79,6 @@ const resetFullStoreState = () => {
       characters: [],
       items: [],
       progress: [],
-      statistics: null,
       filter: { foundStatus: 'all' },
       filterResetCount: 0,
       viewMode: 'grid',
@@ -1373,6 +1374,101 @@ describe('When useGrailStore is used', () => {
       expect(result.current.error).toBe('Failed to reload data');
       expect(result.current.loading).toBe(false);
     });
+
+    it('Then the data of the calls that succeeded is still applied', async () => {
+      // Arrange
+      vi.spyOn(console, 'error').mockImplementation(() => undefined);
+      const items = [HolyGrailItemBuilder.new().withId('item1').build()];
+      mockElectronAPI.grail.getSettings.mockResolvedValue({ grailEthereal: true });
+      mockElectronAPI.grail.getCharacters.mockResolvedValue([]);
+      mockElectronAPI.grail.getItems.mockRejectedValue(new Error('items failed'));
+      mockElectronAPI.grail.getProgress.mockResolvedValue([]);
+      act(() => useGrailStore.getState().setItems(items));
+
+      // Act
+      await act(async () => {
+        await useGrailStore.getState().reloadData();
+      });
+
+      // Assert
+      expect(useGrailStore.getState().settings.grailEthereal).toBe(true);
+      expect(useGrailStore.getState().items).toBe(items);
+      expect(useGrailStore.getState().error).toBe('Failed to reload data');
+      expect(console.error).toHaveBeenCalledWith('Failed to load items:', expect.any(Error));
+    });
+  });
+
+  describe('If the grail data is initialised for a window', () => {
+    const events = createMainEventsMock();
+    const apiWithEvents = mockElectronAPI as typeof mockElectronAPI & { on?: unknown };
+
+    beforeEach(() => {
+      events.reset();
+      apiWithEvents.on = events.on;
+      mockElectronAPI.grail.getSettings.mockResolvedValue({ grailRunes: true });
+      mockElectronAPI.grail.getCharacters.mockResolvedValue([]);
+      mockElectronAPI.grail.getItems.mockResolvedValue([]);
+      mockElectronAPI.grail.getProgress.mockResolvedValue([]);
+    });
+
+    afterEach(() => {
+      delete apiWithEvents.on;
+    });
+
+    it('Then loading is flagged synchronously and every data set is loaded', async () => {
+      // Arrange
+      const items = [HolyGrailItemBuilder.new().withId('item1').build()];
+      mockElectronAPI.grail.getItems.mockResolvedValue(items);
+
+      // Act
+      let dispose: () => void = () => undefined;
+      act(() => {
+        dispose = initGrailData();
+      });
+
+      // Assert
+      expect(useGrailStore.getState().loading).toBe(true);
+      await waitFor(() => expect(useGrailStore.getState().loading).toBe(false));
+      expect(useGrailStore.getState().items).toEqual(items);
+      expect(useGrailStore.getState().settings.grailRunes).toBe(true);
+      expect(useGrailStore.getState().settingsHydrated).toBe(true);
+      dispose();
+    });
+
+    it('Then a grail progress update reloads progress and characters', async () => {
+      // Arrange
+      const dispose = initGrailData();
+      await waitFor(() => expect(useGrailStore.getState().loading).toBe(false));
+      const progress = [
+        GrailProgressBuilder.new().withId('prog1').withCharacterId('c1').withItemId('i1').build(),
+      ];
+      const characters = [CharacterBuilder.new().withId('c1').withName('Sorc').build()];
+      mockElectronAPI.grail.getProgress.mockResolvedValue(progress);
+      mockElectronAPI.grail.getCharacters.mockResolvedValue(characters);
+
+      // Act
+      await act(async () => {
+        events.emit('grail-progress-updated');
+      });
+
+      // Assert
+      await waitFor(() => expect(useGrailStore.getState().progress).toEqual(progress));
+      expect(useGrailStore.getState().characters).toEqual(characters);
+      dispose();
+    });
+
+    it('Then the cleanup removes the main-process subscription', async () => {
+      // Arrange
+      const dispose = initGrailData();
+      await waitFor(() => expect(useGrailStore.getState().loading).toBe(false));
+      expect(events.listenerCount('grail-progress-updated')).toBe(1);
+
+      // Act
+      dispose();
+
+      // Assert
+      expect(events.listenerCount('grail-progress-updated')).toBe(0);
+    });
   });
 });
 
@@ -1793,7 +1889,6 @@ describe('When useItemResultCount is used', () => {
 
 describe('When useGrailStatistics is used', () => {
   beforeEach(() => {
-    // Reset store state
     act(() => {
       useGrailStore.getState().setItems([]);
       useGrailStore.getState().setProgress([]);
@@ -1801,23 +1896,12 @@ describe('When useGrailStatistics is used', () => {
     });
   });
 
-  describe('If no data is provided', () => {
-    it('Then should return zero statistics', () => {
-      // Arrange & Act
-      const { result } = renderHook(() => useGrailStatistics());
-
-      // Assert
-      expect(result.current.totalItems).toBe(0);
-      expect(result.current.foundItems).toBe(0);
-      expect(result.current.completionPercentage).toBe(0);
-      expect(result.current.recentFinds).toBe(0);
-      expect(result.current.currentStreak).toBe(0);
-      expect(result.current.maxStreak).toBe(1); // Default value from calculateStreaks
-    });
+  afterEach(() => {
+    resetFullStoreState();
   });
 
-  describe('If items and progress are provided', () => {
-    it('Then should calculate correct statistics', () => {
+  describe('If items and progress are in the store', () => {
+    it('Then the statistics are computed from them', () => {
       // Arrange
       const items = [
         HolyGrailItemBuilder.new().withId('item1').withType('unique').build(),
@@ -1831,7 +1915,6 @@ describe('When useGrailStatistics is used', () => {
           .withFoundDate(new Date('2024-01-01'))
           .build(),
       ];
-
       act(() => {
         useGrailStore.getState().setItems(items);
         useGrailStore.getState().setProgress(progress);
@@ -1847,116 +1930,79 @@ describe('When useGrailStatistics is used', () => {
     });
   });
 
-  describe('If recent finds exist', () => {
-    it('Then should calculate recent finds correctly', () => {
+  describe('If unrelated store state changes', () => {
+    it('Then the previous statistics object is reused', () => {
       // Arrange
-      const items = [HolyGrailItemBuilder.new().withId('item1').build()];
-      const recentDate = new Date();
-      recentDate.setDate(recentDate.getDate() - 3); // 3 days ago
-      const progress = [
-        GrailProgressBuilder.new()
-          .withId('prog1')
-          .withCharacterId('char1')
-          .withItemId('item1')
-          .withFoundDate(new Date('2024-01-01'))
-          .withFoundDate(recentDate)
-          .build(),
-      ];
-
-      act(() => {
-        useGrailStore.getState().setItems(items);
-        useGrailStore.getState().setProgress(progress);
-      });
+      const { result } = renderHook(() => useGrailStatistics());
+      const first = result.current;
 
       // Act
-      const { result } = renderHook(() => useGrailStatistics());
+      act(() => {
+        useGrailStore.getState().setFilter({ searchTerm: 'shako' });
+        useGrailStore.getState().setViewMode('list');
+      });
 
       // Assert
-      expect(result.current.recentFinds).toBe(1);
+      expect(result.current).toBe(first);
     });
   });
 
-  describe('If items are from initial scan', () => {
-    it('Then should exclude them from recent finds count', () => {
+  describe('If a find ages out of the recent window after midnight without any data change', () => {
+    it('Then the recent finds are recalculated', () => {
       // Arrange
-      const items = [
-        HolyGrailItemBuilder.new().withId('item1').build(),
-        HolyGrailItemBuilder.new().withId('item2').build(),
-      ];
-      const recentDate = new Date();
-      recentDate.setDate(recentDate.getDate() - 3); // 3 days ago
-      const progress = [
-        GrailProgressBuilder.new()
-          .withId('prog1')
-          .withCharacterId('char1')
-          .withItemId('item1')
-          .withFoundDate(recentDate)
-          .asFromInitialScan()
-          .build(),
-        GrailProgressBuilder.new()
-          .withId('prog2')
-          .withCharacterId('char1')
-          .withItemId('item2')
-          .withFoundDate(recentDate)
-          .withFromInitialScan(false)
-          .build(),
-      ];
+      vi.useFakeTimers();
+      try {
+        vi.setSystemTime(new Date(2024, 5, 15, 23, 59, 0));
+        act(() => {
+          useGrailStore
+            .getState()
+            .setItems([HolyGrailItemBuilder.new().withId('a').withType('unique').build()]);
+          useGrailStore.getState().setProgress([
+            GrailProgressBuilder.new()
+              .withId('p')
+              .withCharacterId('c')
+              .withItemId('a')
+              .withFoundDate(new Date(2024, 5, 8, 23, 59, 30))
+              .withFromInitialScan(false)
+              .build(),
+          ]);
+        });
+        const { result } = renderHook(() => useGrailStatistics());
+        expect(result.current.recentFinds).toBe(1);
 
-      act(() => {
-        useGrailStore.getState().setItems(items);
-        useGrailStore.getState().setProgress(progress);
-      });
+        // Act
+        act(() => {
+          vi.advanceTimersByTime(61_000);
+        });
 
-      // Act
-      const { result } = renderHook(() => useGrailStatistics());
-
-      // Assert
-      expect(result.current.recentFinds).toBe(1);
+        // Assert
+        expect(result.current.recentFinds).toBe(0);
+      } finally {
+        vi.useRealTimers();
+      }
     });
   });
 
-  describe('If type statistics are calculated', () => {
-    it('Then should return correct type breakdown', () => {
+  describe('If the progress changes', () => {
+    it('Then the statistics are recalculated', () => {
       // Arrange
-      const items = [
-        HolyGrailItemBuilder.new().withId('item1').withType('unique').build(),
-        HolyGrailItemBuilder.new().withId('item2').withType('unique').build(),
-        HolyGrailItemBuilder.new().withId('item3').withType('set').build(),
-      ];
-      const progress = [
-        GrailProgressBuilder.new()
-          .withId('prog1')
-          .withCharacterId('char1')
-          .withItemId('item1')
-          .withFoundDate(new Date('2024-01-01'))
-          .build(),
-        GrailProgressBuilder.new()
-          .withId('prog2')
-          .withCharacterId('char1')
-          .withItemId('item3')
-          .withFoundDate(new Date('2024-01-01'))
-          .build(),
-      ];
-
-      act(() => {
-        useGrailStore.getState().setItems(items);
-        useGrailStore.getState().setProgress(progress);
-      });
+      act(() =>
+        useGrailStore.getState().setItems([HolyGrailItemBuilder.new().withId('a').build()]),
+      );
+      const { result } = renderHook(() => useGrailStatistics());
+      expect(result.current.foundItems).toBe(0);
 
       // Act
-      const { result } = renderHook(() => useGrailStatistics());
+      act(() => {
+        useGrailStore
+          .getState()
+          .setProgress([
+            GrailProgressBuilder.new().withId('p').withCharacterId('c').withItemId('a').build(),
+          ]);
+      });
 
       // Assert
-      const uniqueStats = result.current.typeStats.find((s) => s.type === 'unique');
-      const setStats = result.current.typeStats.find((s) => s.type === 'set');
-
-      expect(uniqueStats?.total).toBe(2);
-      expect(uniqueStats?.found).toBe(1);
-      expect(uniqueStats?.percentage).toBe(50);
-
-      expect(setStats?.total).toBe(1);
-      expect(setStats?.found).toBe(1);
-      expect(setStats?.percentage).toBe(100);
+      expect(result.current.foundItems).toBe(1);
     });
   });
 });

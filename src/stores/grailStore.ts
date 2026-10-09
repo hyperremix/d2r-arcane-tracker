@@ -5,7 +5,6 @@ import {
   GameVersion,
   type GrailFilter,
   type GrailProgress,
-  type GrailStatistics,
   type Item,
   type Settings,
 } from 'electron/types/grail';
@@ -13,10 +12,12 @@ import i18n from 'i18next';
 import { useMemo } from 'react';
 import { toast } from 'sonner';
 import { create } from 'zustand';
+import { useCurrentDay } from '@/hooks/useCurrentDay';
 import { translations } from '@/i18n/translations';
-import { canItemBeEthereal, canItemBeNormal, filterItemsByTrackedVersions } from '@/lib/ethereal';
+import { filterItemsByTrackedVersions } from '@/lib/ethereal';
+import { computeGrailStatistics, type GrailStatisticsSummary } from '@/lib/grailStatistics';
+import { onMainEvent } from '@/lib/ipcEvents';
 import { itemMatchesSearch, tokenizeSearchQuery } from '@/lib/itemSearch';
-import { isRecentFind } from '@/lib/utils';
 
 /**
  * Information needed to manually record an item as found.
@@ -63,7 +64,6 @@ interface GrailState {
   characters: Character[];
   items: Item[];
   progress: GrailProgress[];
-  statistics: GrailStatistics | null;
   settings: Settings;
   /** True once settings (or an explicit theme choice) are known; until then `settings` holds defaults. */
   settingsHydrated: boolean;
@@ -82,7 +82,6 @@ interface GrailState {
   setCharacters: (characters: Character[]) => void;
   setItems: (items: Item[]) => void;
   setProgress: (progress: GrailProgress[]) => void;
-  setStatistics: (statistics: GrailStatistics) => void;
   setSettings: (
     settings: Partial<Settings>,
     options?: SetSettingsOptions,
@@ -194,7 +193,7 @@ const GRAIL_FILTER_SETTING_KEYS: ReadonlyArray<keyof Settings> = [
  * @param {Partial<Settings>} settingsUpdate - The saved update
  * @returns {boolean} True if items and progress must be reloaded
  */
-const affectsGrailFilter = (settingsUpdate: Partial<Settings>): boolean =>
+export const affectsGrailFilter = (settingsUpdate: Partial<Settings>): boolean =>
   Object.keys(settingsUpdate).some((key) =>
     GRAIL_FILTER_SETTING_KEYS.includes(key as keyof Settings),
   );
@@ -458,6 +457,20 @@ const reloadFilteredGrailData = async (
 };
 
 /**
+ * Returns the value of a settled promise, logging the failure if it was rejected.
+ * @param {PromiseSettledResult<T>} result - The settled result
+ * @param {string} label - What was loaded, used in the log message
+ * @returns {T | undefined} The value, or undefined if the promise was rejected
+ */
+function getSettledValue<T>(result: PromiseSettledResult<T>, label: string): T | undefined {
+  if (result.status === 'fulfilled') return result.value;
+  console.error(`Failed to load ${label}:`, result.reason);
+  return undefined;
+}
+
+const isRejected = (result: PromiseSettledResult<unknown>): boolean => result.status === 'rejected';
+
+/**
  * Zustand store for managing Holy Grail state including items, progress, characters, and settings.
  * Provides actions for data manipulation and persistence to the Electron backend.
  */
@@ -466,7 +479,6 @@ export const useGrailStore = create<GrailState>((set, get) => ({
   characters: [],
   items: [],
   progress: [],
-  statistics: null,
   settings: defaultSettings,
   settingsHydrated: false,
   filter: defaultFilter,
@@ -481,7 +493,6 @@ export const useGrailStore = create<GrailState>((set, get) => ({
   setCharacters: (characters) => set({ characters }),
   setItems: (items) => set({ items }),
   setProgress: (progress) => set({ progress }),
-  setStatistics: (statistics) => set({ statistics }),
   setSettings: async (settingsUpdate, options) => {
     const writeToken = beginSettingsWrite(get().settings, settingsUpdate);
 
@@ -618,31 +629,42 @@ export const useGrailStore = create<GrailState>((set, get) => ({
     try {
       set({ error: null });
 
-      // Load settings first
-      const settingsData = await window.electronAPI?.grail.getSettings();
+      // Items are filtered by the grail settings in the main process, so nothing here depends on
+      // the settings being applied first. allSettled lets every successful call apply its data
+      // even if another one fails.
+      const api = window.electronAPI?.grail;
+      const [settingsResult, charactersResult, itemsResult, progressResult] =
+        await Promise.allSettled([
+          api?.getSettings(),
+          api?.getCharacters(),
+          api?.getItems(),
+          api?.getProgress(),
+        ]);
+
+      const settingsData = getSettledValue(settingsResult, 'settings');
       if (settingsData) {
         set((state) => ({ ...withSettingsUpdate(state, settingsData), settingsHydrated: true }));
-        console.log('Reloaded settings from database');
       }
 
-      // Load characters
-      const charactersData = await window.electronAPI?.grail.getCharacters();
-      if (charactersData) {
-        set({ characters: charactersData });
+      const characters = getSettledValue(charactersResult, 'characters');
+      if (characters) {
+        set({ characters });
       }
 
-      // Load items from database
-      const items = await window.electronAPI?.grail.getItems();
+      const items = getSettledValue(itemsResult, 'items');
       if (items) {
         set({ items });
-        console.log(`Reloaded ${items.length} Holy Grail items from database`);
+        console.log(`Loaded ${items.length} Holy Grail items from database`);
       }
 
-      // Load progress data
-      const progressData = await window.electronAPI?.grail.getProgress();
-      if (progressData) {
-        set({ progress: progressData });
-        console.log(`Reloaded ${progressData.length} progress entries from database`);
+      const progress = getSettledValue(progressResult, 'progress');
+      if (progress) {
+        set({ progress });
+        console.log(`Loaded ${progress.length} progress entries from database`);
+      }
+
+      if ([settingsResult, charactersResult, itemsResult, progressResult].some(isRejected)) {
+        set({ error: 'Failed to reload data' });
       }
     } catch (error) {
       console.error('Failed to reload grail data:', error);
@@ -674,6 +696,47 @@ export const startLoad = (): (() => void) => {
       useGrailStore.setState({ loading: false });
     }
   };
+};
+
+/**
+ * Reloads progress and characters after the main process reported a grail progress change
+ * (e.g. an automatically detected item, which may also have created a character).
+ */
+const refreshProgressAndCharacters = async (): Promise<void> => {
+  try {
+    const api = window.electronAPI?.grail;
+    const [progressResult, charactersResult] = await Promise.allSettled([
+      api?.getProgress(),
+      api?.getCharacters(),
+    ]);
+
+    const progress = getSettledValue(progressResult, 'progress');
+    if (progress) {
+      useGrailStore.setState({ progress });
+      console.log(`Reloaded ${progress.length} progress entries after a grail progress update`);
+    }
+
+    const characters = getSettledValue(charactersResult, 'characters');
+    if (characters) {
+      useGrailStore.setState({ characters });
+    }
+  } catch (error) {
+    console.error('Failed to reload data after grail progress update:', error);
+  }
+};
+
+/**
+ * Loads the grail data (settings, characters, items and progress) into the store and keeps the
+ * progress in sync with the main process for as long as the returned cleanup was not called.
+ * Started once per window from its root component, so every page sees current data regardless
+ * of which page is mounted.
+ * @returns {() => void} Cleanup that removes the main-process subscription
+ */
+export const initGrailData = (): (() => void) => {
+  void useGrailStore.getState().reloadData();
+  return onMainEvent('grail-progress-updated', () => {
+    void refreshProgressAndCharacters();
+  });
 };
 
 /**
@@ -1000,396 +1063,32 @@ export const useItemResultCount = (): ItemResultCount => {
 };
 
 /**
- * Calculates current and maximum find streaks from an array of find dates.
- * @param {string[]} findDates - Array of date strings representing find dates
- * @returns {Object} Object containing current and maximum streak counts
- * @returns {number} returns.currentStreak - Current consecutive days with finds
- * @returns {number} returns.maxStreak - Maximum consecutive days with finds
+ * Custom hook that returns the Holy Grail statistics (overall progress, recent finds, streaks and
+ * the category and character breakdowns). The result is memoized and only recalculated when the
+ * items, progress, characters or tracked versions change, or the day rolls over.
+ * @returns {GrailStatisticsSummary} The statistics
  */
-function calculateStreaks(findDates: string[]) {
-  let currentStreak = 0;
-  let maxStreak = 0;
-  const today = new Date().toDateString();
-  const yesterday = new Date();
-  yesterday.setDate(yesterday.getDate() - 1);
-
-  if (findDates.includes(today) || findDates.includes(yesterday.toDateString())) {
-    // Calculate current streak
-    const uniqueDates = [...new Set(findDates)].reverse();
-    const currentDate = new Date();
-
-    for (const dateStr of uniqueDates) {
-      const date = new Date(dateStr);
-      const diffDays = Math.floor((currentDate.getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
-
-      if (diffDays <= currentStreak + 1) {
-        currentStreak++;
-      } else {
-        break;
-      }
-    }
-  }
-
-  // Calculate max streak
-  let tempStreak = 1;
-  for (let i = 1; i < findDates.length; i++) {
-    const prev = new Date(findDates[i - 1]);
-    const curr = new Date(findDates[i]);
-    const diffDays = Math.floor((curr.getTime() - prev.getTime()) / (1000 * 60 * 60 * 24));
-
-    if (diffDays <= 1) {
-      tempStreak++;
-    } else {
-      maxStreak = Math.max(maxStreak, tempStreak);
-      tempStreak = 1;
-    }
-  }
-  maxStreak = Math.max(maxStreak, tempStreak);
-
-  return { currentStreak, maxStreak };
-}
-
-/**
- * Helper function to calculate statistics for a single category
- */
-function calculateCategoryStatsForCategory(
-  categoryItems: Item[],
-  foundInCategory: GrailProgress[],
-  recentInCategory: GrailProgress[],
-  settings: Settings,
-) {
-  let categoryTotal = 0;
-  let categoryFound = 0;
-
-  for (const item of categoryItems) {
-    const itemProgress = foundInCategory.filter((p) => p.itemId === item.id);
-    const hasNormal = itemProgress.some((p) => !p.isEthereal);
-    const hasEthereal = itemProgress.some((p) => p.isEthereal);
-
-    if (settings.grailNormal && canItemBeNormal(item)) {
-      categoryTotal++;
-      if (hasNormal) categoryFound++;
-    }
-    if (settings.grailEthereal && canItemBeEthereal(item)) {
-      categoryTotal++;
-      if (hasEthereal) categoryFound++;
-    }
-  }
-
-  return {
-    total: categoryTotal,
-    found: categoryFound,
-    percentage: categoryTotal > 0 ? (categoryFound / categoryTotal) * 100 : 0,
-    recent: recentInCategory.length,
-  };
-}
-
-/**
- * Calculates statistics for each item category.
- * @param {Item[]} items - All Holy Grail items
- * @param {GrailProgress[]} foundProgress - Progress records for found items
- * @param {GrailProgress[]} recentFinds - Recent find progress records
- * @param {Settings} settings - Grail settings to determine what counts as found
- * @returns {Array} Array of category statistics with totals, found counts, and percentages
- */
-function calculateCategoryStats(
-  items: Item[],
-  foundProgress: GrailProgress[],
-  recentFinds: GrailProgress[],
-  settings: Settings,
-) {
-  const categories = [...new Set(items.map((item) => item.category))];
-  return categories.map((category) => {
-    const categoryItems = items.filter((item) => item.category === category);
-    const foundInCategory = foundProgress.filter((p) =>
-      categoryItems.some((item) => item.id === p.itemId),
-    );
-    const recentInCategory = recentFinds.filter((p) =>
-      categoryItems.some((item) => item.id === p.itemId),
-    );
-
-    const stats = calculateCategoryStatsForCategory(
-      categoryItems,
-      foundInCategory,
-      recentInCategory,
-      settings,
-    );
-
-    return {
-      category,
-      ...stats,
-    };
-  });
-}
-
-/**
- * Calculates statistics for each character.
- * @param {Character[]} characters - All characters
- * @param {GrailProgress[]} progress - All progress records
- * @param {Item[]} items - All Holy Grail items
- * @returns {Array} Array of character statistics with finds, favorite category, and activity
- */
-function calculateCharacterStats(
-  characters: Character[],
-  progress: GrailProgress[],
-  items: Item[],
-) {
-  return characters.map((character) => {
-    const charProgress = progress.filter(
-      (p) => p.foundDate !== undefined && p.characterId === character.id,
-    );
-    const sevenDaysAgo = new Date();
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-    // Exclude items from initial scan when calculating recent finds
-    const recentProgress = charProgress.filter((p) => {
-      return p.foundDate && new Date(p.foundDate) > sevenDaysAgo && !p.fromInitialScan;
-    });
-
-    // Find favorite category
-    const categoryCount: Record<string, number> = {};
-    for (const p of charProgress) {
-      const item = items.find((i) => i.id === p.itemId);
-      if (item) {
-        categoryCount[item.category] = (categoryCount[item.category] || 0) + 1;
-      }
-    }
-
-    const favoriteCategory =
-      Object.entries(categoryCount).sort(([, a], [, b]) => b - a)[0]?.[0] || 'None';
-
-    const lastActivity =
-      charProgress.length > 0
-        ? charProgress
-            .filter((p) => p.foundDate)
-            .sort((a, b) => {
-              if (!a.foundDate || !b.foundDate) return 0;
-              return new Date(b.foundDate).getTime() - new Date(a.foundDate).getTime();
-            })[0]?.foundDate || null
-        : null;
-
-    return {
-      character,
-      totalFound: charProgress.length,
-      recentFinds: recentProgress.length,
-      favoriteCategory,
-      lastActivity,
-    };
-  });
-}
-
-/**
- * Calculates timeline statistics for the last 30 days.
- * @param {GrailProgress[]} progress - All progress records
- * @returns {Array} Array of daily statistics with dates, item counts, and character attributions
- */
-function calculateTimelineStats(progress: GrailProgress[]) {
-  const timelineStats = [];
-  // Exclude items from initial scan from timeline statistics
-  const progressForTimeline = progress.filter((p) => !p.fromInitialScan);
-
-  for (let i = 29; i >= 0; i--) {
-    const date = new Date();
-    date.setDate(date.getDate() - i);
-    const dateStr = date.toDateString();
-
-    const dayProgress = progressForTimeline.filter(
-      (p) => p.foundDate !== undefined && new Date(p.foundDate).toDateString() === dateStr,
-    );
-
-    timelineStats.push({
-      date: date.toLocaleDateString(),
-      itemsFound: dayProgress.length,
-      characters: [...new Set(dayProgress.map((p) => p.foundBy || 'Unknown'))],
-    });
-  }
-  return timelineStats;
-}
-
-/**
- * Helper function to calculate item counts based on grail settings
- */
-function calculateItemCounts(items: Item[], foundProgress: GrailProgress[], settings: Settings) {
-  let totalItems = 0;
-  let foundItems = 0;
-  let foundNormalItems = 0;
-  let foundEtherealItems = 0;
-
-  for (const item of items) {
-    const itemProgress = foundProgress.filter((p) => p.itemId === item.id);
-    const hasNormal = itemProgress.some((p) => !p.isEthereal);
-    const hasEthereal = itemProgress.some((p) => p.isEthereal);
-
-    if (settings.grailNormal && canItemBeNormal(item)) {
-      totalItems++;
-      if (hasNormal) {
-        foundItems++;
-        foundNormalItems++;
-      }
-    }
-    if (settings.grailEthereal && canItemBeEthereal(item)) {
-      totalItems++;
-      if (hasEthereal) {
-        foundItems++;
-        foundEtherealItems++;
-      }
-    }
-  }
-
-  return { totalItems, foundItems, foundNormalItems, foundEtherealItems };
-}
-
-/**
- * Helper function to calculate statistics for a single item type
- */
-function calculateTypeStatsForType(
-  typeItems: Item[],
-  foundProgress: GrailProgress[],
-  settings: Settings,
-) {
-  let typeTotal = 0;
-  let typeFound = 0;
-
-  for (const item of typeItems) {
-    const itemProgress = foundProgress.filter((p) => p.itemId === item.id);
-    const hasNormal = itemProgress.some((p) => !p.isEthereal);
-    const hasEthereal = itemProgress.some((p) => p.isEthereal);
-
-    if (settings.grailNormal && canItemBeNormal(item)) {
-      typeTotal++;
-      if (hasNormal) typeFound++;
-    }
-    if (settings.grailEthereal && canItemBeEthereal(item)) {
-      typeTotal++;
-      if (hasEthereal) typeFound++;
-    }
-  }
-
-  return {
-    total: typeTotal,
-    found: typeFound,
-    percentage: typeTotal > 0 ? (typeFound / typeTotal) * 100 : 0,
-  };
-}
-
-/**
- * Helper function to calculate type statistics
- */
-function calculateTypeStats(items: Item[], foundProgress: GrailProgress[], settings: Settings) {
-  return ['unique', 'set', 'rune', 'runeword'].map((type) => {
-    const typeItems = items.filter((item) => item.type === type);
-    const stats = calculateTypeStatsForType(typeItems, foundProgress, settings);
-
-    return {
-      type,
-      ...stats,
-    };
-  });
-}
-
-/**
- * Custom hook that calculates comprehensive Holy Grail statistics.
- * Provides overall progress, type breakdowns, recent finds, streaks, and category/character stats.
- * @returns {Object} Comprehensive statistics object with multiple data points
- */
-export const useGrailStatistics = () => {
+export const useGrailStatistics = (): GrailStatisticsSummary => {
   // Individual selectors so consumers only re-render when these slices change
   const items = useGrailStore((state) => state.items);
   const progress = useGrailStore((state) => state.progress);
   const characters = useGrailStore((state) => state.characters);
-  const settings = useGrailStore((state) => state.settings);
+  const grailNormal = useGrailStore((state) => state.settings.grailNormal);
+  const grailEthereal = useGrailStore((state) => state.settings.grailEthereal);
 
-  // Note: items are filtered based on grail settings (grailNormal, grailEthereal, grailRunes, grailRunewords)
-  // at the database level. Progress contains ALL progress data, but statistics calculations only consider
-  // progress for items that are in the filtered items array. This allows features like the runeword
-  // calculator to access runeword collection counts even when grailRunewords tracking is disabled.
-  const foundProgress = progress.filter((p) => p.foundDate !== undefined);
+  // Recent finds and streaks depend on the current date, so recalculate when the day rolls over
+  // even if the data did not change (e.g. a widget left open overnight)
+  const currentDay = useCurrentDay();
 
-  // Calculate item counts based on grail settings
-  const { totalItems, foundItems, foundNormalItems, foundEtherealItems } = calculateItemCounts(
-    items,
-    foundProgress,
-    settings,
+  // biome-ignore lint/correctness/useExhaustiveDependencies: currentDay only triggers a recalculation with a fresh current time
+  return useMemo(
+    () =>
+      computeGrailStatistics({
+        items,
+        progress,
+        characters,
+        settings: { grailNormal, grailEthereal },
+      }),
+    [items, progress, characters, grailNormal, grailEthereal, currentDay],
   );
-
-  // Calculate ethereal vs normal breakdown
-  // Note: These calculations are based on the already-filtered items array
-  // If grailEthereal is false, etherealItems will be empty
-  // If grailNormal is false, normalItems will be empty
-  const normalItems = items.filter((item) => canItemBeNormal(item));
-  const etherealItems = items.filter((item) => canItemBeEthereal(item));
-
-  // Type breakdown - based on filtered items
-  // If grailRunes is false, rune items will not be in the items array
-  // If grailRunewords is false, runeword items will not be in the items array
-  const typeStats = calculateTypeStats(items, foundProgress, settings);
-
-  // Filter out items from initial scan for statistics calculations
-  // Items from initial scan should not count towards Recent Finds, Streaks, or Avg per Day
-  const progressForStats = foundProgress.filter((p) => !p.fromInitialScan);
-
-  // Recent finds (last 7 days) - excluding items from initial scan
-  const recentFinds = progressForStats.filter((p) => isRecentFind(p.foundDate));
-
-  // Find streak calculation - excluding items from initial scan
-  const findDates = progressForStats
-    .filter((p) => p.foundDate)
-    .map((p) => (p.foundDate ? new Date(p.foundDate).toDateString() : ''))
-    .filter(Boolean)
-    .sort();
-
-  const { currentStreak, maxStreak } = calculateStreaks(findDates);
-
-  // Most active day - excluding items from initial scan
-  const dayCount: Record<string, number> = {};
-  for (const p of progressForStats) {
-    if (p.foundDate) {
-      const day = new Date(p.foundDate).toLocaleDateString('en-US', { weekday: 'long' });
-      dayCount[day] = (dayCount[day] || 0) + 1;
-    }
-  }
-  const mostActiveDay = Object.entries(dayCount).sort(([, a], [, b]) => b - a)[0]?.[0] || 'No data';
-
-  // Last find
-  const lastFind =
-    foundProgress.length > 0
-      ? foundProgress
-          .filter((p) => p.foundDate)
-          .sort((a, b) => {
-            if (!a.foundDate || !b.foundDate) return 0;
-            return new Date(b.foundDate).getTime() - new Date(a.foundDate).getTime();
-          })[0]
-      : null;
-
-  // Calculate complex statistics using helper functions
-  const categoryStats = calculateCategoryStats(items, foundProgress, recentFinds, settings);
-  const characterStats = calculateCharacterStats(characters, progress, items);
-  const timelineStats = calculateTimelineStats(progress);
-
-  return {
-    totalItems,
-    foundItems,
-    completionPercentage: totalItems > 0 ? (foundItems / totalItems) * 100 : 0,
-    normalItems: {
-      total: normalItems.length,
-      found: foundNormalItems,
-      percentage: normalItems.length > 0 ? (foundNormalItems / normalItems.length) * 100 : 0,
-    },
-    etherealItems: {
-      total: etherealItems.length,
-      found: foundEtherealItems,
-      percentage: etherealItems.length > 0 ? (foundEtherealItems / etherealItems.length) * 100 : 0,
-    },
-    typeStats,
-    recentFinds: recentFinds.length,
-    currentStreak,
-    maxStreak,
-    averageItemsPerDay: recentFinds.length / 7,
-    mostActiveDay,
-    lastFind,
-    categoryStats: categoryStats.sort((a, b) => b.percentage - a.percentage),
-    characterStats: characterStats.sort((a, b) => b.totalFound - a.totalFound),
-    timelineStats,
-    totalCharacters: characters.length,
-    totalProgress: foundProgress.length,
-  };
 };

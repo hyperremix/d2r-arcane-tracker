@@ -2,6 +2,7 @@ import { render, screen } from '@testing-library/react';
 import type { ItemCategory } from 'electron/types/grail';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useGrailStatistics, useGrailStore } from '@/stores/grailStore';
+import { mockStoreState } from '@/test/storeMock';
 import { StatsDashboard } from './StatsDashboard';
 
 vi.mock('@/stores/grailStore', () => ({
@@ -16,7 +17,7 @@ vi.mock('@/components/grail/ItemCard', () => ({
 }));
 
 function setupStatistics(categories: ItemCategory[]) {
-  vi.mocked(useGrailStore).mockReturnValue({
+  mockStoreState(vi.mocked(useGrailStore), {
     items: [],
     progress: [],
     characters: [],

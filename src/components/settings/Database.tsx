@@ -39,7 +39,7 @@ export function DatabaseCard() {
   const [restoreError, setRestoreError] = useState<string | null>(null);
   const [restoreSuccess, setRestoreSuccess] = useState(false);
   const [backedUpBeforeRestore, setBackedUpBeforeRestore] = useState(false);
-  const { reloadData } = useGrailStore();
+  const reloadData = useGrailStore((state) => state.reloadData);
 
   const handleBackupBeforeRestore = async () => {
     const backedUp = await handleBackup();

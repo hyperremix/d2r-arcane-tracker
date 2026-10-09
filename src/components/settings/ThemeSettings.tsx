@@ -1,6 +1,7 @@
 import { Monitor, Moon, Sun } from 'lucide-react';
 import { useId } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useShallow } from 'zustand/react/shallow';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import {
@@ -21,7 +22,9 @@ import { useGrailStore } from '@/stores/grailStore';
 export function ThemeSettings() {
   const { t } = useTranslation();
   const themeSelectId = useId();
-  const { settings, setSettings } = useGrailStore();
+  const { settings, setSettings } = useGrailStore(
+    useShallow((state) => ({ settings: state.settings, setSettings: state.setSettings })),
+  );
 
   const updateTheme = async (theme: 'light' | 'dark' | 'system') => {
     await setSettings({ theme });

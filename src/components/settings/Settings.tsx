@@ -133,7 +133,7 @@ const prefersReducedMotion = () =>
  */
 function SetupWizardCard() {
   const { t } = useTranslation();
-  const { openWizard } = useWizardStore();
+  const openWizard = useWizardStore((state) => state.openWizard);
 
   return (
     <Card>

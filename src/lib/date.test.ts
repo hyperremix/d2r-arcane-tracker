@@ -1,3 +1,4 @@
+import i18n from 'i18next';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   formatClockDuration,
@@ -5,6 +6,8 @@ import {
   formatDuration,
   formatLocalizedDate,
   formatLongDate,
+  formatRelativeTime,
+  formatSessionDateRelative,
   formatShortDate,
   formatTime,
   formatTimeAgo,
@@ -95,9 +98,8 @@ describe('formatDuration', () => {
   });
 });
 
-describe('formatTimeAgo', () => {
+describe('When formatTimeAgo is called', () => {
   beforeEach(() => {
-    // Mock dayjs to return a fixed time
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2024-01-15T12:00:00Z'));
   });
@@ -106,14 +108,96 @@ describe('formatTimeAgo', () => {
     vi.useRealTimers();
   });
 
-  it('should return "Never" for undefined input', () => {
-    expect(formatTimeAgo(undefined)).toBe('Never');
+  it('If there is no date, Then the translated "Never" is returned', () => {
+    // Arrange & Act
+    const result = formatTimeAgo(undefined, i18n.t);
+
+    // Assert
+    expect(result).toBe('Never');
   });
 
-  it('should format relative time correctly', () => {
-    const date = new Date('2024-01-15T11:00:00Z'); // 1 hour ago
-    const result = formatTimeAgo(date);
-    expect(result).toContain('hour');
+  it('If the date was an hour ago, Then the relative time is formatted in the locale', () => {
+    // Arrange
+    const date = new Date('2024-01-15T11:00:00Z');
+
+    // Act
+    const english = formatTimeAgo(date, i18n.t, 'en');
+    const german = formatTimeAgo(date, i18n.t, 'de');
+
+    // Assert
+    expect(english).toBe('1 hour ago');
+    expect(german).toBe('vor 1 Stunde');
+  });
+});
+
+describe('When formatRelativeTime is called', () => {
+  const now = new Date('2024-01-15T12:00:00Z').getTime();
+
+  it.each([
+    [new Date('2024-01-15T11:59:30Z'), '30 seconds ago'],
+    [new Date('2024-01-15T11:55:00Z'), '5 minutes ago'],
+    [new Date('2024-01-14T12:00:00Z'), 'yesterday'],
+    [new Date('2024-01-10T12:00:00Z'), '5 days ago'],
+    [new Date('2023-11-15T12:00:00Z'), '2 months ago'],
+    [new Date('2022-01-15T12:00:00Z'), '2 years ago'],
+    [new Date('2024-01-15T15:00:00Z'), 'in 3 hours'],
+  ])('If the date is %s, Then the largest fitting unit is used: %s', (date, expected) => {
+    // Arrange & Act
+    const result = formatRelativeTime(date, 'en', now);
+
+    // Assert
+    expect(result).toBe(expected);
+  });
+
+  it('If the locale is invalid, Then the default locale is used instead of throwing', () => {
+    // Arrange & Act
+    const format = () => formatRelativeTime(new Date(now - 60_000), 'not a locale!', now);
+
+    // Assert
+    expect(format).not.toThrow();
+  });
+});
+
+describe('When formatSessionDateRelative is called', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2024, 0, 15, 12));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('If the session started today, Then the translated "Today" is returned', () => {
+    // Arrange & Act
+    const result = formatSessionDateRelative(new Date(2024, 0, 15, 8), i18n.t, 'en');
+
+    // Assert
+    expect(result).toBe('Today');
+  });
+
+  it('If the session started yesterday, Then the translated "Yesterday" is returned', () => {
+    // Arrange & Act
+    const result = formatSessionDateRelative(new Date(2024, 0, 14, 20), i18n.t, 'en');
+
+    // Assert
+    expect(result).toBe('Yesterday');
+  });
+
+  it('If the session started within the last week, Then the relative time is returned', () => {
+    // Arrange & Act
+    const result = formatSessionDateRelative(new Date(2024, 0, 12, 12), i18n.t, 'en');
+
+    // Assert
+    expect(result).toBe('3 days ago');
+  });
+
+  it('If the session is older than a week, Then the full localized date is returned', () => {
+    // Arrange & Act
+    const result = formatSessionDateRelative(new Date(2024, 0, 1, 12), i18n.t, 'en');
+
+    // Assert
+    expect(result).toBe('Monday, January 1, 2024');
   });
 });
 

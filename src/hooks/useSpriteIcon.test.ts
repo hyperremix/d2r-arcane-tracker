@@ -1,13 +1,10 @@
 import { renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { mockStoreState } from '@/test/storeMock';
 import { useSpriteIcon } from './useSpriteIcon';
 
 const { getByFilenameMock, useGrailStoreMock } = vi.hoisted(() => ({
-  useGrailStoreMock: vi.fn(() => ({
-    settings: {
-      showItemIcons: true,
-    },
-  })),
+  useGrailStoreMock: vi.fn(),
   getByFilenameMock: vi.fn(),
 }));
 
@@ -18,11 +15,7 @@ vi.mock('@/stores/grailStore', () => ({
 describe('When useSpriteIcon is used', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    useGrailStoreMock.mockImplementation(() => ({
-      settings: {
-        showItemIcons: true,
-      },
-    }));
+    mockStoreState(useGrailStoreMock, { settings: { showItemIcons: true } });
 
     Object.defineProperty(window, 'electronAPI', {
       configurable: true,
@@ -38,11 +31,7 @@ describe('When useSpriteIcon is used', () => {
   describe('If item icons are disabled in settings', () => {
     it('Then it returns the placeholder icon without loading filename icons', () => {
       // Arrange
-      useGrailStoreMock.mockReturnValue({
-        settings: {
-          showItemIcons: false,
-        },
-      });
+      mockStoreState(useGrailStoreMock, { settings: { showItemIcons: false } });
 
       // Act
       const { result } = renderHook(() => useSpriteIcon('unused.png'));
@@ -58,11 +47,7 @@ describe('When useSpriteIcon is used', () => {
   describe('If forced mode is used while global icons are disabled', () => {
     it('Then it resolves and returns a sprite icon', async () => {
       // Arrange
-      useGrailStoreMock.mockReturnValue({
-        settings: {
-          showItemIcons: false,
-        },
-      });
+      mockStoreState(useGrailStoreMock, { settings: { showItemIcons: false } });
       const dataUrl = 'data:image/png;base64,forced';
       getByFilenameMock.mockResolvedValue(dataUrl);
 

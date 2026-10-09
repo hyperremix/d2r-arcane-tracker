@@ -2,6 +2,7 @@ import type { GrailProgress, Item, Run, RunItem } from 'electron/types/grail';
 import { ChevronRight } from 'lucide-react';
 import { useId, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useShallow } from 'zustand/react/shallow';
 import { Button } from '@/components/ui/button';
 import { translations } from '@/i18n/translations';
 import { formatDuration } from '@/lib/utils';
@@ -38,8 +39,10 @@ function resolveRunItemName(
 export function RecentRuns({ runs, onViewAllRuns, limit = RECENT_RUNS_LIMIT }: RecentRunsProps) {
   const { t } = useTranslation();
   const headingId = useId();
-  const { runItems } = useRunTrackerStore();
-  const { items, progress } = useGrailStore();
+  const runItems = useRunTrackerStore((state) => state.runItems);
+  const { items, progress } = useGrailStore(
+    useShallow((state) => ({ items: state.items, progress: state.progress })),
+  );
 
   const recentRuns = useMemo(() => getRecentRuns(runs, limit), [runs, limit]);
 

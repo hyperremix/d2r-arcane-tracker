@@ -1,5 +1,6 @@
 import type { Settings } from 'electron/types/grail';
 import { useCallback, useState } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { clampWidgetOpacity, getDefaultWidgetSize, resolveWidgetDisplayMode } from '@/lib/widget';
 import { type SettingsSaveResult, useGrailStore } from '@/stores/grailStore';
 
@@ -17,7 +18,9 @@ export type SaveWidgetSettings = (update: Partial<Settings>) => Promise<Settings
  * @returns The derived widget values and the handlers to wire to the controls
  */
 export function useWidgetControls(save?: SaveWidgetSettings) {
-  const { settings, setSettings } = useGrailStore();
+  const { settings, setSettings } = useGrailStore(
+    useShallow((state) => ({ settings: state.settings, setSettings: state.setSettings })),
+  );
   const saveSettings: SaveWidgetSettings = save ?? setSettings;
   // Opacity shown while the slider is dragged; it is only saved once the drag is committed
   const [draftOpacity, setDraftOpacity] = useState<number | undefined>(undefined);

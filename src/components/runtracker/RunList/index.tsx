@@ -3,6 +3,7 @@ import type { Run, RunItem } from 'electron/types/grail';
 import { ChevronLeft, ChevronRight as ChevronRightIcon } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useShallow } from 'zustand/react/shallow';
 import { SortableTableHead, type SortOrder } from '@/components/runtracker/SortableTableHead';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -31,8 +32,20 @@ const VIRTUAL_SCROLLING_THRESHOLD = 100;
  */
 export function RunList({ runs }: RunListProps) {
   const { t } = useTranslation();
-  const { runItems, loadRunItems, loadingRunItems } = useRunTrackerStore();
-  const { items, progress, characters } = useGrailStore();
+  const { runItems, loadRunItems, loadingRunItems } = useRunTrackerStore(
+    useShallow((state) => ({
+      runItems: state.runItems,
+      loadRunItems: state.loadRunItems,
+      loadingRunItems: state.loadingRunItems,
+    })),
+  );
+  const { items, progress, characters } = useGrailStore(
+    useShallow((state) => ({
+      items: state.items,
+      progress: state.progress,
+      characters: state.characters,
+    })),
+  );
 
   // State management
   const [currentPage, setCurrentPage] = useState(1);

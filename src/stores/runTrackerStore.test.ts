@@ -1,7 +1,9 @@
 import { act, renderHook } from '@testing-library/react';
-import type { Run, Session } from 'electron/types/grail';
+import type { Run, RunItem, Session } from 'electron/types/grail';
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { useRunTrackerStore } from './runTrackerStore';
+import { GrailProgressBuilder, HolyGrailItemBuilder } from '@/fixtures';
+import { useGrailStore } from './grailStore';
+import { useRunTrackerStore, useSessionStats, useSessionStatsLookup } from './runTrackerStore';
 
 // Mock the electron API
 const mockElectronAPI = {
@@ -512,7 +514,6 @@ describe('runTrackerStore loading and error state', () => {
       error: null,
       errorType: null,
       retryCount: 0,
-      sessionStatsCache: new Map(),
       loadingSessions: new Set(),
       loadingRunItems: new Set(),
     });
@@ -691,6 +692,190 @@ describe('runTrackerStore loading and error state', () => {
       expect(state.error).toBe('IPC failed');
       expect(state.pendingActions.pauseRun).toBe(false);
       expect(state.initialLoadStatus).toBe('success');
+    });
+  });
+});
+
+describe('When session statistics are read from the stores', () => {
+  const session: Session = {
+    id: 'stats-session',
+    startTime: new Date(2024, 5, 15, 10),
+    totalRunTime: 120_000,
+    totalSessionTime: 300_000,
+    runCount: 1,
+    archived: false,
+    created: new Date(2024, 5, 15, 10),
+    lastUpdated: new Date(2024, 5, 15, 10),
+  };
+  const run: Run = {
+    id: 'stats-run',
+    sessionId: session.id,
+    runNumber: 1,
+    startTime: new Date(2024, 5, 15, 10, 1),
+    duration: 120_000,
+    created: new Date(2024, 5, 15, 10, 1),
+    lastUpdated: new Date(2024, 5, 15, 10, 3),
+  };
+  const runItem = (id: string, grailProgressId: string): RunItem => ({
+    id,
+    runId: run.id,
+    grailProgressId,
+    foundTime: new Date(2024, 5, 15, 10, 2),
+    created: new Date(2024, 5, 15, 10, 2),
+  });
+  const initialGrailState = useGrailStore.getInitialState();
+  const initialRunTrackerState = useRunTrackerStore.getInitialState();
+
+  beforeEach(() => {
+    act(() => {
+      useGrailStore.setState({
+        items: [
+          HolyGrailItemBuilder.new().withId('shako').build(),
+          HolyGrailItemBuilder.new().withId('soj').build(),
+        ],
+        progress: [
+          GrailProgressBuilder.new()
+            .withId('p-shako')
+            .withCharacterId('c1')
+            .withItemId('shako')
+            .withFoundDate(new Date(2024, 5, 15, 10, 2))
+            .withFromInitialScan(false)
+            .build(),
+          GrailProgressBuilder.new()
+            .withId('p-soj')
+            .withCharacterId('c1')
+            .withItemId('soj')
+            .withFoundDate(new Date(2023, 0, 1))
+            .withFromInitialScan(false)
+            .build(),
+        ],
+      });
+      useRunTrackerStore.setState({
+        sessions: [session],
+        runs: new Map([[session.id, [run]]]),
+        runItems: new Map([[run.id, [runItem('i1', 'p-shako'), runItem('i2', 'p-soj')]]]),
+      });
+    });
+  });
+
+  afterEach(() => {
+    act(() => {
+      useGrailStore.setState(initialGrailState, true);
+      useRunTrackerStore.setState(initialRunTrackerState, true);
+    });
+  });
+
+  describe('If items found in a run were new to the grail', () => {
+    it('Then useSessionStats counts them as new grail items', () => {
+      // Arrange & Act
+      const { result } = renderHook(() => useSessionStats(session));
+
+      // Assert
+      expect(result.current).toMatchObject({ itemsFound: 2, newGrailItems: 1, totalRuns: 1 });
+    });
+  });
+
+  describe('If an ethereal item is found in a run while ethereal tracking is off', () => {
+    it('Then useSessionStats does not count it as a new grail item', () => {
+      // Arrange
+      act(() => {
+        useGrailStore.setState({
+          settings: {
+            ...useGrailStore.getState().settings,
+            grailNormal: true,
+            grailEthereal: false,
+          },
+          progress: [
+            GrailProgressBuilder.new()
+              .withId('p-shako')
+              .withCharacterId('c1')
+              .withItemId('shako')
+              .withFoundDate(new Date(2024, 5, 15, 10, 2))
+              .withFromInitialScan(false)
+              .asEthereal()
+              .build(),
+          ],
+        });
+      });
+
+      // Act
+      const { result } = renderHook(() => useSessionStats(session));
+
+      // Assert
+      expect(result.current).toMatchObject({ newGrailItems: 0 });
+    });
+  });
+
+  describe('If a normal item is found in a run while only ethereal tracking is on', () => {
+    it('Then useSessionStats does not count it as a new grail item', () => {
+      // Arrange
+      act(() => {
+        useGrailStore.setState({
+          settings: {
+            ...useGrailStore.getState().settings,
+            grailNormal: false,
+            grailEthereal: true,
+          },
+          progress: [
+            GrailProgressBuilder.new()
+              .withId('p-shako')
+              .withCharacterId('c1')
+              .withItemId('shako')
+              .withFoundDate(new Date(2024, 5, 15, 10, 2))
+              .withFromInitialScan(false)
+              .asNormal()
+              .build(),
+          ],
+        });
+      });
+
+      // Act
+      const { result } = renderHook(() => useSessionStats(session));
+
+      // Assert
+      expect(result.current).toMatchObject({ newGrailItems: 0 });
+    });
+  });
+
+  describe('If unrelated run tracker state changes', () => {
+    it('Then useSessionStats reuses the previous statistics object', () => {
+      // Arrange
+      const { result } = renderHook(() => useSessionStats(session));
+      const first = result.current;
+
+      // Act
+      act(() => {
+        useRunTrackerStore.setState({ pendingActions: { startRun: true } });
+      });
+
+      // Assert
+      expect(result.current).toBe(first);
+    });
+  });
+
+  describe('If the sessions are reloaded with a new total time', () => {
+    it('Then useSessionStatsLookup returns the new total time', () => {
+      // Arrange
+      const { result } = renderHook(() => useSessionStatsLookup());
+      expect(result.current(session.id)?.totalTime).toBe(300_000);
+
+      // Act
+      act(() => {
+        useRunTrackerStore.setState({ sessions: [{ ...session, totalSessionTime: 600_000 }] });
+      });
+
+      // Assert
+      expect(result.current(session.id)?.totalTime).toBe(600_000);
+    });
+  });
+
+  describe('If a session is not loaded', () => {
+    it('Then useSessionStatsLookup returns undefined for it', () => {
+      // Arrange & Act
+      const { result } = renderHook(() => useSessionStatsLookup());
+
+      // Assert
+      expect(result.current('unknown-session')).toBeUndefined();
     });
   });
 });

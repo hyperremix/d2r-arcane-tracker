@@ -38,7 +38,7 @@ export function ThemeStep() {
   const { t } = useTranslation();
   const themeId = useId();
   const headingId = useId();
-  const { settings } = useGrailStore();
+  const settings = useGrailStore((state) => state.settings);
   const { saveSettings, saveFailed } = useWizardSettingsSave();
   const theme = settings.theme || 'system';
 

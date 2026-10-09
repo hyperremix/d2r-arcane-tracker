@@ -1,6 +1,7 @@
 import '@testing-library/jest-dom';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { mockStoreState } from '@/test/storeMock';
 
 vi.mock('@/stores/grailStore');
 // The real module imports grailStore, so it would be cached bound to this file's mock
@@ -44,7 +45,7 @@ describe('When the real SaveDirectoryStep is rendered inside SetupWizard', () =>
     setSettings = vi.fn().mockResolvedValue({ success: true });
     updateSaveDirectory = vi.fn().mockResolvedValue({ success: true });
     restoreDefaultDirectory = vi.fn().mockResolvedValue({ success: true });
-    mockUseGrailStore.mockReturnValue({
+    mockStoreState(mockUseGrailStore, {
       setSettings,
       settings: { saveDir: CURRENT_DIR },
       reloadData: vi.fn().mockResolvedValue(undefined),

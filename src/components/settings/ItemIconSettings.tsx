@@ -1,6 +1,7 @@
 import { AlertCircle, AlertTriangle, CheckCircle, Image, RefreshCw } from 'lucide-react';
 import { useCallback, useEffect, useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useShallow } from 'zustand/react/shallow';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import {
   AlertDialog,
@@ -29,7 +30,9 @@ import { useGrailStore } from '@/stores/grailStore';
 export function ItemIconSettings() {
   const { t } = useTranslation();
   const itemIconsSwitchId = useId();
-  const { settings, setSettings } = useGrailStore();
+  const { settings, setSettings } = useGrailStore(
+    useShallow((state) => ({ settings: state.settings, setSettings: state.setSettings })),
+  );
 
   const [isConverting, setIsConverting] = useState(false);
   const [conversionProgress, setConversionProgress] = useState({ current: 0, total: 0 });

@@ -1,8 +1,22 @@
 import dayjs from 'dayjs';
-import relativeTime from 'dayjs/plugin/relativeTime';
+import type { TFunction } from 'i18next';
+import { translations } from '@/i18n/translations';
 
-// Extend dayjs with plugins
-dayjs.extend(relativeTime);
+const SECOND_MS = 1000;
+const MINUTE_MS = 60 * SECOND_MS;
+const HOUR_MS = 60 * MINUTE_MS;
+export const DAY_MS = 24 * HOUR_MS;
+const MONTH_MS = 30 * DAY_MS;
+const YEAR_MS = 365 * DAY_MS;
+
+/** Units for relative times, largest first; the largest unit that fits the difference is used. */
+const RELATIVE_TIME_UNITS: readonly [Intl.RelativeTimeFormatUnit, number][] = [
+  ['year', YEAR_MS],
+  ['month', MONTH_MS],
+  ['day', DAY_MS],
+  ['hour', HOUR_MS],
+  ['minute', MINUTE_MS],
+];
 
 /**
  * Formats a duration in milliseconds into a human-readable time string.
@@ -56,13 +70,47 @@ export function formatClockDuration(durationMs?: number): string {
 }
 
 /**
- * Formats a date as a relative time string (e.g., "2 days ago", "5 hours ago").
+ * Formats the time between a date and now in the given locale (e.g. "2 days ago", "in 5 hours",
+ * "yesterday"), using the largest unit that fits.
  * @param {Date | string | number} date - The date to format
- * @returns {string} A human-readable relative time string
+ * @param {string} [locale] - BCP 47 locale to format with (e.g. the app's `i18n.language`)
+ * @param {number} [now=Date.now()] - Reference time
+ * @returns {string} The localized relative time
  */
-export function formatTimeAgo(date: Date | string | number | undefined): string {
-  if (!date) return 'Never';
-  return dayjs(date).fromNow();
+export function formatRelativeTime(
+  date: Date | string | number,
+  locale?: string,
+  now: number = Date.now(),
+): string {
+  const difference = new Date(date).getTime() - now;
+  const [unit, unitMs] = RELATIVE_TIME_UNITS.find(([, size]) => Math.abs(difference) >= size) ?? [
+    'second',
+    SECOND_MS,
+  ];
+  const value = Math.round(difference / unitMs);
+  const options: Intl.RelativeTimeFormatOptions = { numeric: 'auto' };
+
+  try {
+    return new Intl.RelativeTimeFormat(locale, options).format(value, unit);
+  } catch {
+    return new Intl.RelativeTimeFormat(undefined, options).format(value, unit);
+  }
+}
+
+/**
+ * Formats a date as a localized relative time string (e.g. "2 days ago", "5 hours ago").
+ * @param {Date | string | number | undefined} date - The date to format
+ * @param {TFunction} t - Translation function, used when there is no date
+ * @param {string} [locale] - BCP 47 locale to format with (e.g. the app's `i18n.language`)
+ * @returns {string} A human-readable relative time string, or the translated "Never"
+ */
+export function formatTimeAgo(
+  date: Date | string | number | undefined,
+  t: TFunction,
+  locale?: string,
+): string {
+  if (!date) return t(translations.common.never);
+  return formatRelativeTime(date, locale);
 }
 
 /**
@@ -171,17 +219,31 @@ export function isRecentFind(
   return now.diff(found, 'day') < recentThresholdDays;
 }
 
-export function formatSessionDateRelative(date: Date | string | number | undefined): string {
+/**
+ * Formats the day of a session relative to today: "Today", "Yesterday", the relative time within
+ * the last week (e.g. "3 days ago"), and the full localized date before that.
+ * @param {Date | string | number | undefined} date - Start of the session
+ * @param {TFunction} t - Translation function
+ * @param {string} [locale] - BCP 47 locale to format with (e.g. the app's `i18n.language`)
+ * @returns {string} The localized session day
+ */
+export function formatSessionDateRelative(
+  date: Date | string | number | undefined,
+  t: TFunction,
+  locale?: string,
+): string {
+  if (!date) return t(translations.common.never);
   const now = dayjs();
   const sessionDay = dayjs(date);
 
   if (sessionDay.isSame(now, 'day')) {
-    return 'Today';
-  } else if (sessionDay.isSame(now.subtract(1, 'day'), 'day')) {
-    return 'Yesterday';
-  } else if (now.diff(sessionDay, 'day') < 7) {
-    return formatTimeAgo(date);
-  } else {
-    return formatSessionDate(date);
+    return t(translations.common.today);
   }
+  if (sessionDay.isSame(now.subtract(1, 'day'), 'day')) {
+    return t(translations.common.yesterday);
+  }
+  if (now.diff(sessionDay, 'day') < 7) {
+    return formatTimeAgo(date, t, locale);
+  }
+  return formatLocalizedDate(date, locale, { dateStyle: 'full' });
 }
