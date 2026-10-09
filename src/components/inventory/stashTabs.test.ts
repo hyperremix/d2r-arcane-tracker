@@ -80,6 +80,11 @@ describe('When a vaulted item is withdrawn onto a grid', () => {
   });
 
   it.each([
+    ...Array.from({ length: 6 }, (_unused, index) => {
+      const code = `r${34 + index}`;
+      return [`the rune code ${code}`, code];
+    }),
+    ['the lowest rune code', 'r00'],
     ['a rune code at the top of the accepted range', 'r39'],
     ['an upper-case padded rune code', ' R34 '],
   ])('If the vaulted stack holds %s, Then it gives up exactly one unit', (_label, itemCode) => {

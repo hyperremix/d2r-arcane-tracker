@@ -175,9 +175,13 @@ describe('When drag-state payloads from another window are parsed', () => {
     expect(parsed).toBeUndefined();
   });
 
-  it('If the source location context is not a known location, Then the inventory payload is rejected', () => {
+  it.each([
+    ['an unknown location', 'belt'],
+    ['a padded location', ' stash '],
+    ['a wrong-case location', 'Stash'],
+  ])('If the source location context is %s, Then the inventory payload is rejected', (_label, sourceLocationContext) => {
     // Arrange
-    const payload = { ...inventoryDragItem, active: true, sourceLocationContext: 'belt' };
+    const payload = { ...inventoryDragItem, active: true, sourceLocationContext };
 
     // Act
     const parsed = parseInventoryDragStatePayload(payload);
