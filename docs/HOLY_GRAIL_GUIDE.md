@@ -41,6 +41,8 @@ Settings are saved as soon as you change them. If a change can't be saved, the a
 
 In **Settings → Save File Monitoring**, **Change Directory** opens a folder picker and **Restore Default** uses the platform default folder. If the chosen folder is the one already monitored, nothing changes and nothing is deleted. If it's a different folder and the app has characters or progress, a confirmation shows the current and new folder and offers **Back up first** before anything is deleted.
 
+[Run Tracker](RUN_TRACKER.md) sessions and runs are kept when you switch folders, but they are no longer linked to a character. Items in those runs that were found through the deleted progress are removed with it. If the app can't delete the old data or save the new folder, it keeps the old folder and all data.
+
 ## Choosing what to track
 
 ### Game mode (Settings → Game Mode)
@@ -176,7 +178,7 @@ To see the widget over the game, set D2R's display mode to **Windowed (Fullscree
 
 ### Backups
 
-**Settings → Database** creates a backup of the database or restores one. Restoring replaces all current data.
+**Settings → Database** creates a backup of the database or restores one. Restoring replaces all current data. The app checks the backup first and refuses files that aren't intact app databases. If the restore fails, your current data is kept. If a restore fails and the app also cannot put the previous database back, it keeps that database next to the live one as `grail.db.pre-restore` so the data can still be recovered; the next restore renames it to `grail.db.pre-restore.<timestamp>` instead of overwriting it. These copies are full copies of the database and are never deleted automatically, so delete them from the app data folder once you no longer need them.
 
 ### Error screen
 

@@ -1,3 +1,4 @@
+import { sql } from 'drizzle-orm';
 import { index, integer, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
 import { characters } from './characters';
 import { items } from './items';
@@ -40,8 +41,8 @@ export const vaultItems = sqliteTable(
     lastSeenAt: text('last_seen_at'),
     vaultedAt: text('vaulted_at'),
     unvaultedAt: text('unvaulted_at'),
-    createdAt: text('created_at').default('CURRENT_TIMESTAMP'),
-    updatedAt: text('updated_at').default('CURRENT_TIMESTAMP'),
+    createdAt: text('created_at').default(sql`CURRENT_TIMESTAMP`),
+    updatedAt: text('updated_at').default(sql`CURRENT_TIMESTAMP`),
   },
   (table) => [
     uniqueIndex('idx_vault_items_fingerprint').on(table.fingerprint),

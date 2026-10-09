@@ -975,10 +975,59 @@ describe('When saveFileHandlers is used', () => {
       const result = await handler(null, newSaveDir);
 
       // Assert
-      expect(grailDatabase.setSetting).toHaveBeenCalledWith('saveDir', newSaveDir);
       expect(grailDatabase.truncateUserData).toHaveBeenCalledTimes(1);
+      expect(grailDatabase.truncateUserData).toHaveBeenCalledWith(newSaveDir);
       expect(mockSaveFileMonitor.updateSaveDirectory).toHaveBeenCalled();
       expect(result).toEqual({ success: true });
+    });
+
+    it('Then saveFile:updateSaveDirectory should persist the new directory in the truncate call instead of a separate write', async () => {
+      // Arrange
+      const handler = getHandler('saveFile:updateSaveDirectory');
+
+      // Act
+      await handler(null, '/new/save/dir');
+
+      // Assert
+      expect(grailDatabase.truncateUserData).toHaveBeenCalledWith('/new/save/dir');
+      expect(grailDatabase.setSetting).not.toHaveBeenCalled();
+    });
+
+    it('Then saveFile:updateSaveDirectory should keep the old setting and monitor if truncating fails', async () => {
+      // Arrange
+      vi.mocked(grailDatabase.truncateUserData).mockImplementationOnce(() => {
+        throw new Error('FOREIGN KEY constraint failed');
+      });
+      silenceConsole('error');
+      const handler = getHandler('saveFile:updateSaveDirectory');
+
+      // Act
+      const act = handler(null, '/new/save/dir');
+
+      // Assert
+      await expect(act).rejects.toThrow('FOREIGN KEY constraint failed');
+      expect(grailDatabase.setSetting).not.toHaveBeenCalled();
+      expect(mockSaveFileMonitor.updateSaveDirectory).not.toHaveBeenCalled();
+    });
+
+    it('Then saveFile:updateSaveDirectory should not restart the monitor if writing the setting fails for an unchanged directory', async () => {
+      // Arrange
+      vi.mocked(grailDatabase.getAllSettings).mockReturnValue({
+        saveDir: '/test/save/dir',
+      } as any);
+      vi.mocked(grailDatabase.setSetting).mockImplementationOnce(() => {
+        throw new Error('database or disk is full');
+      });
+      silenceConsole('error');
+      const handler = getHandler('saveFile:updateSaveDirectory');
+
+      // Act
+      const act = handler(null, '/test/save/dir/');
+
+      // Assert
+      await expect(act).rejects.toThrow('database or disk is full');
+      expect(grailDatabase.truncateUserData).not.toHaveBeenCalled();
+      expect(mockSaveFileMonitor.updateSaveDirectory).not.toHaveBeenCalled();
     });
 
     it('Then saveFile:updateSaveDirectory should not truncate user data when the directory is unchanged', async () => {
@@ -1089,8 +1138,8 @@ describe('When saveFileHandlers is used', () => {
       const result = await handler();
 
       // Assert
-      expect(grailDatabase.setSetting).toHaveBeenCalledWith('saveDir', defaultDir);
       expect(grailDatabase.truncateUserData).toHaveBeenCalledTimes(1);
+      expect(grailDatabase.truncateUserData).toHaveBeenCalledWith(defaultDir);
       expect(mockSaveFileMonitor.updateSaveDirectory).toHaveBeenCalled();
       expect(result).toEqual({ success: true, defaultDirectory: defaultDir });
     });

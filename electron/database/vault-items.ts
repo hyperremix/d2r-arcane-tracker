@@ -13,7 +13,7 @@ import {
   isCurrentlyVaulted,
   isGrailBookmark,
 } from '../utils/vaultState';
-import { dbVaultItemToVaultItem, fromISOString, toISOString } from './converters';
+import { dbVaultItemToVaultItem, fromDbTimestamp, fromISOString, toISOString } from './converters';
 import { type DbVaultItem, schema } from './drizzle';
 import type { DatabaseContext } from './types';
 
@@ -99,8 +99,8 @@ function mapRawVaultSearchRowToVaultItem(row: RawVaultSearchRow): VaultItem {
     lastSeenAt: fromISOString(row.last_seen_at),
     vaultedAt: fromISOString(row.vaulted_at),
     unvaultedAt: fromISOString(row.unvaulted_at),
-    created: new Date(row.created_at ?? new Date().toISOString()),
-    lastUpdated: new Date(row.updated_at ?? new Date().toISOString()),
+    created: fromDbTimestamp(row.created_at),
+    lastUpdated: fromDbTimestamp(row.updated_at),
   };
 }
 

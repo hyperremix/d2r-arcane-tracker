@@ -1,3 +1,4 @@
+import { sql } from 'drizzle-orm';
 import { index, primaryKey, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 import { vaultCategories } from './vaultCategories';
 import { vaultItems } from './vaultItems';
@@ -11,7 +12,7 @@ export const vaultItemCategories = sqliteTable(
     vaultCategoryId: text('vault_category_id')
       .notNull()
       .references(() => vaultCategories.id, { onDelete: 'cascade' }),
-    createdAt: text('created_at').default('CURRENT_TIMESTAMP'),
+    createdAt: text('created_at').default(sql`CURRENT_TIMESTAMP`),
   },
   (table) => [
     primaryKey({ columns: [table.vaultItemId, table.vaultCategoryId] }),

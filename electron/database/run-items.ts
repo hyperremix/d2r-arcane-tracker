@@ -1,11 +1,10 @@
 import { asc, eq } from 'drizzle-orm';
 import type { RunItem } from '../types/grail';
 import { dbRunItemToRunItem } from './converters';
-import type { DbRunItem } from './drizzle';
 import { schema } from './drizzle';
 import type { DatabaseContext } from './types';
 
-const { runItems } = schema;
+const { runItems, runs } = schema;
 
 export function getRunItems(ctx: DatabaseContext, runId: string): RunItem[] {
   const dbItems = ctx.db
@@ -18,24 +17,14 @@ export function getRunItems(ctx: DatabaseContext, runId: string): RunItem[] {
 }
 
 export function getSessionItems(ctx: DatabaseContext, sessionId: string): RunItem[] {
-  const dbItems = ctx.rawDb
-    .prepare(
-      `
-      SELECT ri.* FROM run_items ri
-      INNER JOIN runs r ON ri.run_id = r.id
-      WHERE r.session_id = ?
-      ORDER BY ri.found_time ASC
-    `,
-    )
-    .all(sessionId) as DbRunItem[];
-  return dbItems.map((item) => ({
-    id: item.id,
-    runId: item.runId,
-    grailProgressId: item.grailProgressId ?? undefined,
-    name: item.name ?? undefined,
-    foundTime: new Date(item.foundTime),
-    created: new Date(item.createdAt ?? new Date().toISOString()),
-  }));
+  const rows = ctx.db
+    .select({ runItem: runItems })
+    .from(runItems)
+    .innerJoin(runs, eq(runItems.runId, runs.id))
+    .where(eq(runs.sessionId, sessionId))
+    .orderBy(asc(runItems.foundTime))
+    .all();
+  return rows.map((row) => dbRunItemToRunItem(row.runItem));
 }
 
 export function addRunItem(ctx: DatabaseContext, runItem: RunItem): void {

@@ -1,3 +1,4 @@
+import { sql } from 'drizzle-orm';
 import { index, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 
 export const saveFileStates = sqliteTable(
@@ -7,8 +8,8 @@ export const saveFileStates = sqliteTable(
     filePath: text('file_path').notNull().unique(),
     lastModified: text('last_modified').notNull(),
     lastParsed: text('last_parsed').notNull(),
-    createdAt: text('created_at').default('CURRENT_TIMESTAMP'),
-    updatedAt: text('updated_at').default('CURRENT_TIMESTAMP'),
+    createdAt: text('created_at').default(sql`CURRENT_TIMESTAMP`),
+    updatedAt: text('updated_at').default(sql`CURRENT_TIMESTAMP`),
   },
   (table) => [
     index('idx_save_file_states_path').on(table.filePath),

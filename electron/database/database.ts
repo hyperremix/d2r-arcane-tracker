@@ -1,6 +1,5 @@
-import { copyFileSync, unlinkSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
-import Database from 'better-sqlite3';
+import type Database from 'better-sqlite3';
 import { app } from 'electron';
 import type {
   Character,
@@ -19,6 +18,7 @@ import type {
   VaultItemUpsertInput,
 } from '../types/grail';
 import * as charactersModule from './characters';
+import { openConnection, type RestoreSource, restoreDatabase } from './connection';
 import { createDrizzleDb, type DrizzleDb } from './drizzle';
 import * as itemsModule from './items';
 import * as managementModule from './management';
@@ -52,10 +52,8 @@ class GrailDatabase {
     const userDataPath = app.getPath('userData');
     this.dbPath = path.join(userDataPath, 'grail.db');
 
-    // Initialize database
-    this.rawDb = new Database(this.dbPath, { timeout: 5000 }); // 5s busy timeout
-    this.rawDb.pragma('journal_mode = WAL');
-    this.rawDb.pragma('foreign_keys = ON');
+    // Initialize database (5s busy timeout, WAL journaling, foreign keys)
+    this.rawDb = openConnection(this.dbPath);
 
     // Create Drizzle instance
     this.db = createDrizzleDb(this.rawDb);
@@ -293,67 +291,54 @@ class GrailDatabase {
   close(): void {
     managementModule.close(this);
   }
-  truncateUserData(): void {
-    managementModule.truncateUserData(this);
+  truncateUserData(newSaveDir?: string): void {
+    managementModule.truncateUserData(this, newSaveDir);
     this.characterMapCache = null;
   }
   getDatabasePath(): string {
     return managementModule.getDatabasePath(this);
   }
 
-  // Restore methods stay as full implementations because they mutate this.rawDb/this.db
   restore(backupPath: string): void {
-    // Save current database so we can recover if the restore fails
-    const tempPath = `${this.dbPath}.pre-restore`;
-    copyFileSync(this.dbPath, tempPath);
-
-    this.rawDb.close();
-    try {
-      copyFileSync(backupPath, this.dbPath);
-    } catch (error) {
-      // Restore original database file from pre-restore backup
-      copyFileSync(tempPath, this.dbPath);
-      this.rawDb = new Database(this.dbPath);
-      this.db = createDrizzleDb(this.rawDb);
-      throw error;
-    } finally {
-      try {
-        unlinkSync(tempPath);
-      } catch {
-        // Ignore cleanup errors
-      }
-    }
-    this.rawDb = new Database(this.dbPath);
-    this.db = createDrizzleDb(this.rawDb);
-    this.characterMapCache = null;
-    this.initializeSchema();
+    this.restoreFrom({ kind: 'file', path: backupPath });
   }
 
   restoreFromBuffer(backupBuffer: Buffer): void {
-    // Save current database so we can recover if the restore fails
-    const tempPath = `${this.dbPath}.pre-restore`;
-    copyFileSync(this.dbPath, tempPath);
+    this.restoreFrom({ kind: 'buffer', data: backupBuffer });
+  }
 
-    this.rawDb.close();
-    try {
-      writeFileSync(this.dbPath, backupBuffer);
-    } catch (error) {
-      // Restore original database file from pre-restore backup
-      copyFileSync(tempPath, this.dbPath);
-      this.rawDb = new Database(this.dbPath);
-      this.db = createDrizzleDb(this.rawDb);
-      throw error;
-    } finally {
-      try {
-        unlinkSync(tempPath);
-      } catch {
-        // Ignore cleanup errors
-      }
-    }
-    this.rawDb = new Database(this.dbPath);
-    this.db = createDrizzleDb(this.rawDb);
+  /**
+   * Validates the backup, swaps it in and reopens the connection with the standard pragmas.
+   * The previous database is restored if anything fails after the swap; if that rollback
+   * fails too, `rawDb` stays closed until the app restarts (the old data is kept as `.pre-restore`).
+   * @param source - The backup to restore
+   */
+  private restoreFrom(source: RestoreSource): void {
+    restoreDatabase(
+      {
+        dbPath: this.dbPath,
+        closeConnection: () => this.rawDb.close(),
+        openConnectionAndInitialize: () => this.openConnectionAndInitialize(),
+      },
+      source,
+    );
+  }
+
+  /**
+   * Opens a new connection on the database file and initializes the schema.
+   * Closes the new connection again if schema initialization fails.
+   */
+  private openConnectionAndInitialize(): void {
+    const rawDb = openConnection(this.dbPath);
+    this.rawDb = rawDb;
+    this.db = createDrizzleDb(rawDb);
     this.characterMapCache = null;
-    this.initializeSchema();
+    try {
+      this.initializeSchema();
+    } catch (error) {
+      rawDb.close();
+      throw error;
+    }
   }
 }
 

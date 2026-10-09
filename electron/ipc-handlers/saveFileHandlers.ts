@@ -390,8 +390,10 @@ function getCurrentSaveDirectory(): string | undefined {
 }
 
 /**
- * Persists a new save directory, truncates user data only when the directory
- * is known to have changed, and restarts save file monitoring.
+ * Truncates user data only when the directory is known to have changed,
+ * then persists the new save directory and restarts save file monitoring.
+ * The truncate and the setting write share one transaction, so a failure of either
+ * leaves the setting, the data and the monitor on the old directory.
  * Fails safe: if the current directory cannot be determined, user data is kept.
  * @param newDirectory - The validated new save directory
  */
@@ -408,12 +410,12 @@ async function applySaveDirectoryChange(newDirectory: string): Promise<void> {
     );
   }
 
-  // Update the database setting
-  grailDatabase.setSetting('saveDir', newDirectory);
-
-  // Only truncate user data when switching away from a known, different directory
+  // Only truncate user data when switching away from a known, different directory;
+  // the new directory is saved in the same transaction as the truncate
   if (directoryChanged) {
-    grailDatabase.truncateUserData();
+    grailDatabase.truncateUserData(newDirectory);
+  } else {
+    grailDatabase.setSetting('saveDir', newDirectory);
   }
 
   // Update the monitor's directories and restart if needed

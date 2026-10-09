@@ -1,3 +1,4 @@
+import { sql } from 'drizzle-orm';
 import { index, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 import type {
   EtherealType,
@@ -34,8 +35,8 @@ export const items = sqliteTable(
     etherealType: text('ethereal_type', { enum: ['none', 'optional', 'only'] })
       .notNull()
       .$type<EtherealType>(),
-    createdAt: text('created_at').default('CURRENT_TIMESTAMP'),
-    updatedAt: text('updated_at').default('CURRENT_TIMESTAMP'),
+    createdAt: text('created_at').default(sql`CURRENT_TIMESTAMP`),
+    updatedAt: text('updated_at').default(sql`CURRENT_TIMESTAMP`),
   },
   (table) => [
     index('idx_items_category').on(table.category),
