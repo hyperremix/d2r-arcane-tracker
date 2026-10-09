@@ -20,7 +20,10 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import type { SaveDirectoryChangeAction } from '@/hooks/useSaveDirectoryChange';
+import {
+  normalizeDirectoryForComparison,
+  type SaveDirectoryChangeAction,
+} from '@/hooks/useSaveDirectoryChange';
 import { translations } from '@/i18n/translations';
 import { useGrailStore } from '@/stores/grailStore';
 import { useWizardStore } from '@/stores/wizardStore';
@@ -61,24 +64,15 @@ interface DirectoryInspection {
 }
 
 /**
- * Normalizes a directory path for a best-effort equality check in the renderer.
- * The main process performs the authoritative comparison before clearing data.
- * @param {string} directory - Directory path to normalize
- * @returns {string} Normalized directory path
- */
-function normalizeDirectory(directory: string): string {
-  const trimmed = directory.trim().replace(/[\\/]+$/, '');
-  return window.electronAPI?.platform === 'win32' ? trimmed.toLowerCase() : trimmed;
-}
-
-/**
  * Checks whether two directory paths refer to the same, non-empty directory.
  * @param {string} a - First directory path
  * @param {string} b - Second directory path
  * @returns {boolean} True if both paths are non-empty and equal after normalization
  */
 function isSameDirectory(a: string, b: string): boolean {
-  return a.trim() !== '' && normalizeDirectory(a) === normalizeDirectory(b);
+  return (
+    a.trim() !== '' && normalizeDirectoryForComparison(a) === normalizeDirectoryForComparison(b)
+  );
 }
 
 /**
