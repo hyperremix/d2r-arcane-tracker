@@ -69,14 +69,14 @@ export function resolveGrailLookupName(item: D2SItem): string {
 }
 
 /** Returns the runeword name when it is a known runeword, fixing the d2s "Love" -> "Lore" bug. */
-function getValidatedRunewordName(item: D2SItem): string | null {
+function getValidatedRunewordName(item: D2SItem): string | undefined {
   if (!item.runeword_name) {
-    return null;
+    return undefined;
   }
 
   const normalized = item.runeword_name === 'Love' ? 'Lore' : item.runeword_name;
   if (!runewordsByNameSimple[simplifyItemName(normalized)]) {
-    return null;
+    return undefined;
   }
 
   return normalized;
@@ -134,7 +134,8 @@ function resolveMagicOrRareDisplayName(item: D2SItem): string | undefined {
   return [prefix, baseName, suffix].filter((part): part is string => Boolean(part)).join(' ');
 }
 
-function resolveParsedItemName(item: D2SItem, runewordName: string | null): string {
+/** Display name of a parsed item: runeword, unique, set, magic/rare name, then a fallback. */
+export function resolveParsedItemName(item: D2SItem, runewordName: string | undefined): string {
   const candidates = [
     toDisplayString(runewordName),
     toDisplayString(item.unique_name),
@@ -155,7 +156,7 @@ function resolveParsedItemName(item: D2SItem, runewordName: string | null): stri
 function resolveParsedItemType(
   item: D2SItem,
   quality: string,
-  runewordName: string | null,
+  runewordName: string | undefined,
 ): string {
   if (runewordName) {
     return 'runeword';

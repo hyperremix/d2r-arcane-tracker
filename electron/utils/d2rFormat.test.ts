@@ -1,13 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import {
   getResourceStackAttributeValue,
+  isGemCode,
+  isMaterialCode,
   isModernStashVersion,
   isResourceCodeOfKind,
   isResourceItemCode,
   isRuneCode,
+  MAX_RESOURCE_STACK_COUNT,
   normalizeItemCode,
   normalizeItemCodeKey,
   RESOURCE_STASH_TAB_BY_KIND,
+  type ResourceStashTabKind,
   resolveResourceStashTabKind,
   resolveStackCount,
   toFiniteNumber,
@@ -77,17 +81,42 @@ describe('When resource item codes are classified', () => {
 
   it('Then each resource tab kind only accepts its own codes', () => {
     // Arrange
-    const checks = [
-      isResourceCodeOfKind('gcr', 'gems'),
-      isResourceCodeOfKind('gcr', 'runes'),
-      isResourceCodeOfKind('pk1', 'materials'),
-      isResourceCodeOfKind('pk1', 'gems'),
-      isResourceCodeOfKind('r10', 'runes'),
-      isResourceCodeOfKind('r10', 'materials'),
+    const cases: [string, ResourceStashTabKind][] = [
+      ['gcr', 'gems'],
+      ['gcr', 'runes'],
+      ['pk1', 'materials'],
+      ['pk1', 'gems'],
+      ['r10', 'runes'],
+      ['r10', 'materials'],
     ];
 
-    // Act & Assert
-    expect(checks).toEqual([true, false, true, false, true, false]);
+    // Act
+    const result = cases.map(([code, kind]) => isResourceCodeOfKind(code, kind));
+
+    // Assert
+    expect(result).toEqual([true, false, true, false, true, false]);
+  });
+
+  it('Then gem codes match case-insensitively and padded, and other codes do not', () => {
+    // Arrange
+    const codes = ['gcr', 'GPW', ' gsb\0', 'r01', 'pk1', '', undefined, 7];
+
+    // Act
+    const result = codes.map((code) => isGemCode(code));
+
+    // Assert
+    expect(result).toEqual([true, true, true, false, false, false, false, false]);
+  });
+
+  it('Then material codes match case-insensitively and padded, and other codes do not', () => {
+    // Arrange
+    const codes = ['pk1', 'RVS', ' xa1\0', 'gcr', 'r01', '', undefined, 7];
+
+    // Act
+    const result = codes.map((code) => isMaterialCode(code));
+
+    // Assert
+    expect(result).toEqual([true, true, true, false, false, false, false, false]);
   });
 });
 
@@ -199,5 +228,30 @@ describe('When resolveStackCount checks stackable sources', () => {
     expect(fallbackCount).toBe(1);
     expect(magicAttrCount).toBe(42);
     expect(priorityCount).toBe(42);
+  });
+});
+
+describe('When resolveStackCount reads quantities at the 9-bit boundaries', () => {
+  it('Then quantities of 0 and above the 9-bit range count as one item and 1 and 511 are kept', () => {
+    // Arrange
+    const quantities = [0, 1, MAX_RESOURCE_STACK_COUNT, MAX_RESOURCE_STACK_COUNT + 1];
+
+    // Act
+    const result = quantities.map((quantity) => resolveStackCount({ quantity }));
+
+    // Assert
+    expect(MAX_RESOURCE_STACK_COUNT).toBe(511);
+    expect(result).toEqual([1, 1, 511, 1]);
+  });
+
+  it('Then fractional, negative and non-numeric quantities count as one item', () => {
+    // Arrange
+    const quantities: unknown[] = [2.5, -3, '7', Number.NaN, undefined];
+
+    // Act
+    const result = quantities.map((quantity) => resolveStackCount({ quantity }));
+
+    // Assert
+    expect(result).toEqual([1, 1, 1, 1, 1]);
   });
 });

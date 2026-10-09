@@ -13,6 +13,6 @@ export const simplifyItemName = (name: string): string =>
 /**
  * Determines if an item is a rune based on its type identifier.
  * @param {{ type?: string }} item - The item to check.
- * @returns {boolean} True if the item is a rune (type matches pattern r01-r33), false otherwise.
+ * @returns {boolean} True if the item is a rune (type matches the r00-r39 rune code pattern, case-insensitive), false otherwise.
  */
 export const isRune = (item: { type?: string }): boolean => isRuneCode(item.type);

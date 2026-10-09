@@ -1,6 +1,6 @@
 import { itemsByNameSimple, runesByCode, runewordsByNameSimple } from '../items/indexes';
 import type { D2SItem } from '../types/grail';
-import { isRuneCode } from './d2rFormat';
+import { isRuneCode, normalizeItemCodeKey } from './d2rFormat';
 import { simplifyItemName } from './objects';
 
 /**
@@ -43,9 +43,9 @@ export function resolveRainbowFacetName(item: D2SItem, simpleName: string): stri
 export function getGrailItemId(d2sItem: unknown): string | null {
   const item = d2sItem as D2SItem; // Type assertion for D2S item structure
 
-  // Handle runes by code
+  // Handle runes by code; the lookup uses the same normalized code the predicate matched
   if (typeof item?.type === 'string' && isRuneCode(item.type)) {
-    const rune = runesByCode[item.type];
+    const rune = runesByCode[normalizeItemCodeKey(item.type) ?? ''];
     return rune?.id || null;
   }
 

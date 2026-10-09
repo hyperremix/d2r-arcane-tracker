@@ -27,7 +27,7 @@ export const RESOURCE_STASH_STACK_ATTR_ID = 381;
 /** Largest stack count the 9-bit resource-stash quantity field can hold. */
 export const MAX_RESOURCE_STACK_COUNT = 511;
 
-/** Rune item codes (r01–r33 in the base game); matched case-insensitively. */
+/** Rune item codes (`r00`-`r39`, which covers the r01-r33 base game runes); matched case-insensitively. */
 const RUNE_CODE_PATTERN = /^r[0-3][0-9]$/i;
 
 const GEM_ITEM_CODES: ReadonlySet<string> = new Set(

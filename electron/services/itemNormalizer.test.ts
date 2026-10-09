@@ -8,9 +8,11 @@ import { EventBus } from './EventBus';
 import { ItemDetectionService } from './itemDetection';
 import {
   mapItemQuality,
+  normalizeInventoryItem,
   normalizeItemsWithSocketedItems,
   resolveDetectionName,
   resolveGrailLookupName,
+  resolveParsedItemName,
   resolveSocketCount,
   selectDetectionCandidates,
   toDetectedItem,
@@ -326,6 +328,181 @@ describe('When resolveGrailLookupName is called', () => {
   });
 });
 
+describe('When resolveParsedItemName is called', () => {
+  it('If a runeword name is given, Then it wins over every other name', () => {
+    // Arrange
+    const item = D2SItemBuilder.new().withUniqueName('Shako').withName('Plain').build();
+
+    // Act
+    const result = resolveParsedItemName(item, 'Enigma');
+
+    // Assert
+    expect(result).toBe('Enigma');
+  });
+
+  it('If the item is unique or set, Then the unique name wins over the set name', () => {
+    // Arrange
+    const unique = D2SItemBuilder.new().withUniqueName('Shako').withSetName('Set Name').build();
+    const set = D2SItemBuilder.new().withSetName('Angelic Raiment').build();
+
+    // Act
+    const names = [unique, set].map((item) => resolveParsedItemName(item, undefined));
+
+    // Assert
+    expect(names).toEqual(['Shako', 'Angelic Raiment']);
+  });
+
+  it('If the item is rare, Then both rare name parts are joined', () => {
+    // Arrange
+    const item = D2SItemBuilder.new().withRareName('Doom').withRareName2('Collar').build();
+
+    // Act
+    const result = resolveParsedItemName(item, undefined);
+
+    // Assert
+    expect(result).toBe('Doom Collar');
+  });
+
+  it('If the item is magic, Then the prefix and suffix surround the base type name', () => {
+    // Arrange
+    const item: D2SItem = {
+      ...D2SItemBuilder.new().withTypeName('Cap').build(),
+      magic_prefix_name: 'Sturdy',
+      magic_suffix_name: 'of the Fox',
+    };
+
+    // Act
+    const result = resolveParsedItemName(item, undefined);
+
+    // Assert
+    expect(result).toBe('Sturdy Cap of the Fox');
+  });
+
+  it('If no special name exists, Then falls back to the parser name and skips blank candidates', () => {
+    // Arrange
+    const named = D2SItemBuilder.new().withName('Regular Sword').build();
+    const blankName = D2SItemBuilder.new().withName('  ').withTypeName('Long Sword').build();
+
+    // Act
+    const names = [named, blankName].map((item) => resolveParsedItemName(item, ' \0 '));
+
+    // Assert
+    expect(names).toEqual(['Regular Sword', 'Long Sword']);
+  });
+
+  it('If the item has no usable name at all, Then returns unknown', () => {
+    // Arrange
+    const item = D2SItemBuilder.new()
+      .withName('')
+      .withoutTypeName()
+      .withoutType()
+      .withoutCode()
+      .build();
+
+    // Act
+    const result = resolveParsedItemName(item, undefined);
+
+    // Assert
+    expect(result).toBe('unknown');
+  });
+});
+
+describe('When normalizeInventoryItem is called', () => {
+  const params = (
+    item: D2SItem,
+    overrides: Partial<Parameters<typeof normalizeInventoryItem>[0]> = {},
+  ) => ({
+    filePath: saveFile.path,
+    saveName: saveFile.name,
+    sourceFileType: 'd2s' as const,
+    fallbackLocation: 'inventory' as const,
+    item,
+    ...overrides,
+  });
+
+  it('If the item is a unique helm, Then reports its identity, source and stack count', () => {
+    // Arrange
+    const item = D2SItemBuilder.new()
+      .withId(7)
+      .asUniqueHelm()
+      .withUniqueName('Harlequin Crest')
+      .asEthereal()
+      .build();
+
+    // Act
+    const parsed = normalizeInventoryItem(params(item, { stackCount: 3 }));
+
+    // Assert
+    expect(parsed).toMatchObject({
+      itemName: 'Harlequin Crest',
+      itemCode: 'armo',
+      quality: 'unique',
+      type: 'unique',
+      ethereal: true,
+      grailItemId: 'harlequincrest',
+      stackCount: 3,
+      isSocketedItem: false,
+      characterName: 'TestChar',
+      sourceFileType: 'd2s',
+      sourceFilePath: '/test/TestChar.d2s',
+    });
+    expect(parsed.rawParsedItem).toBe(item);
+    expect(parsed.rawItemJson).toBe(JSON.stringify(item));
+    expect(parsed.fingerprint).not.toBe('');
+  });
+
+  it('If the item is a rune, Then its type is rune and the grail id is the rune id', () => {
+    // Arrange
+    const item = D2SItemBuilder.new().asRune('r30').build();
+
+    // Act
+    const parsed = normalizeInventoryItem(params(item));
+
+    // Assert
+    expect(parsed.type).toBe('rune');
+    expect(parsed.grailItemId).toBe('ber');
+  });
+
+  it('If the runeword name is the d2s "Love" bug, Then it is repaired to Lore', () => {
+    // Arrange
+    const item = D2SItemBuilder.new().withRunewordName('Love').build();
+
+    // Act
+    const parsed = normalizeInventoryItem(params(item));
+
+    // Assert
+    expect(parsed.type).toBe('runeword');
+    expect(parsed.itemName).toBe('Lore');
+  });
+
+  it('If the runeword name is unknown, Then the item is not treated as a runeword', () => {
+    // Arrange
+    const item = D2SItemBuilder.new().withRunewordName('Not A Runeword').withName('Plain').build();
+
+    // Act
+    const parsed = normalizeInventoryItem(params(item));
+
+    // Assert
+    expect(parsed.type).not.toBe('runeword');
+    expect(parsed.itemName).toBe('Plain');
+  });
+
+  it('If the same item is normalized as a socketed item, Then the fingerprint differs', () => {
+    // Arrange
+    const item = D2SItemBuilder.new().withId(1).asUniqueHelm().build();
+
+    // Act
+    const loose = normalizeInventoryItem(params(item));
+    const looseAgain = normalizeInventoryItem(params(item));
+    const socketed = normalizeInventoryItem(params(item, { isSocketedItem: true }));
+
+    // Assert
+    expect(looseAgain.fingerprint).toBe(loose.fingerprint);
+    expect(socketed.isSocketedItem).toBe(true);
+    expect(socketed.fingerprint).not.toBe(loose.fingerprint);
+  });
+});
+
 describe('When normalizeItemsWithSocketedItems is called', () => {
   it('Then socketed items follow their parent and carry no stack count of their own', () => {
     // Arrange
@@ -369,6 +546,31 @@ describe('When selectDetectionCandidates is called', () => {
 
     // Assert
     expect(keys).toEqual(['el', 'el', 'shako', 'shako+eth']);
+  });
+
+  it('Then ethereal items listed first still come after all non-ethereal ones, each followed by its socketed items', () => {
+    // Arrange
+    const items = toParsedItems([
+      D2SItemBuilder.new()
+        .withId('eth-helm')
+        .asUniqueHelm()
+        .asEthereal()
+        .asSocketed(1)
+        .withSocketedItems([
+          D2SItemBuilder.new().withId('eth-jewel').withName('jewel').withType('jew').build(),
+        ])
+        .build(),
+      D2SItemBuilder.new().withId('eth-bow').asUniqueBow().asEthereal().build(),
+      D2SItemBuilder.new().withId('helm').asUniqueHelm().build(),
+      D2SItemBuilder.new().withId('eth-helm-2').asUniqueHelm().asEthereal().build(),
+      D2SItemBuilder.new().withId('bow').asUniqueBow().build(),
+    ]);
+
+    // Act
+    const ids = selectDetectionCandidates(items).map((item) => item.rawParsedItem.id);
+
+    // Assert
+    expect(ids).toEqual(['helm', 'bow', 'eth-helm', 'eth-jewel', 'eth-helm-2', 'eth-bow']);
   });
 
   it('Then items socketed into a picked item follow it, even without a grail lookup name', () => {
