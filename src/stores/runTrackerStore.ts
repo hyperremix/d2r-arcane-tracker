@@ -335,26 +335,33 @@ export const useRunTrackerStore = create<RunTrackerState>()(
     },
 
     updateSessionNotes: (sessionId, notes) =>
-      runAction('updateSessionNotes', 'updateSessionNotesFailed', async () => {
-        if (notes.length > MAX_SESSION_NOTES_LENGTH) {
-          // The main process would reject these notes; resubmitting them can never succeed
-          throw new RunTrackerActionError('sessionNotesTooLong', 'validation');
-        }
-        const updated = await window.electronAPI?.runTracker.updateSessionNotes(sessionId, notes);
-        if (!updated) {
-          throw new RunTrackerActionError('updateSessionNotesFailed', 'unknown');
-        }
-        const { sessions, activeSession } = get();
-        set({
-          sessions: sessions.map((session) => (session.id === sessionId ? updated : session)),
-          // The active session keeps its live counters; only the notes come from the saved session
-          activeSession:
-            activeSession?.id === sessionId
-              ? { ...activeSession, notes: updated.notes, lastUpdated: updated.lastUpdated }
-              : activeSession,
-        });
-        console.log('[RunTrackerStore] Session notes updated:', sessionId);
-      }),
+      runAction(
+        'updateSessionNotes',
+        'updateSessionNotesFailed',
+        async () => {
+          if (notes.length > MAX_SESSION_NOTES_LENGTH) {
+            // The main process would reject these notes; resubmitting them can never succeed
+            throw new RunTrackerActionError('sessionNotesTooLong', 'validation');
+          }
+          const updated = await window.electronAPI?.runTracker.updateSessionNotes(sessionId, notes);
+          if (!updated) {
+            throw new RunTrackerActionError('updateSessionNotesFailed', 'unknown');
+          }
+          const { sessions, activeSession } = get();
+          set({
+            sessions: sessions.map((session) => (session.id === sessionId ? updated : session)),
+            // The active session keeps its live counters; only the notes come from the saved session
+            activeSession:
+              activeSession?.id === sessionId
+                ? { ...activeSession, notes: updated.notes, lastUpdated: updated.lastUpdated }
+                : activeSession,
+          });
+          console.log('[RunTrackerStore] Session notes updated:', sessionId);
+        },
+        // Retry would replay the captured text, possibly over the notes of a session the user has
+        // since left; the saved notes are shown again and can be edited and saved anew
+        { retryable: false },
+      ),
 
     // Run management actions
     startRun: async (characterId) => {
@@ -726,16 +733,18 @@ export const useRunTrackerStore = create<RunTrackerState>()(
 /**
  * Runs a user action: clears the previous error, marks the action as pending and reports a
  * failure inline. A failure that is not a validation error is recorded so `retryLastAction` can
- * run the same action again.
+ * run the same action again, unless the action is not retryable.
  * @param action - The action, tracked in `pendingActions`
  * @param failureCode - Error code reported when the action throws an unexpected error
  * @param perform - The action itself; throws a `RunTrackerActionError` for expected failures
+ * @param options - `retryable: false` reports a failure without recording it for retry
  * @returns Whether the action succeeded
  */
 async function runAction(
   action: RunTrackerAction,
   failureCode: RunTrackerErrorCode,
   perform: () => Promise<void>,
+  { retryable = true }: { retryable?: boolean } = {},
 ): Promise<boolean> {
   const { setState: set } = useRunTrackerStore;
   const retry = async () => {
@@ -752,14 +761,14 @@ async function runAction(
       set({
         error: { code: error.code },
         errorType: error.errorType,
-        lastFailedAction: error.errorType === 'validation' ? undefined : retry,
+        lastFailedAction: error.errorType === 'validation' || !retryable ? undefined : retry,
       });
     } else {
       console.error(`[RunTrackerStore] Action ${action} failed:`, error);
       set({
         error: { code: failureCode },
         errorType: 'unknown',
-        lastFailedAction: retry,
+        lastFailedAction: retryable ? retry : undefined,
       });
     }
     return false;
@@ -796,11 +805,7 @@ export function initRunTrackerSync(): () => void {
     }),
     onMainEvent('run-tracker:run-item-added', (payload) => {
       // Refresh the items of the affected run so the UI shows newly found items
-      get()
-        .loadRunItems(payload.runId)
-        .catch((error) => {
-          console.error('[RunTrackerStore] Error loading items for run from event:', error);
-        });
+      void get().loadRunItems(payload.runId);
     }),
   ]);
 }

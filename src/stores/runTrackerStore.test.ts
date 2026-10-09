@@ -906,7 +906,7 @@ describe('When session notes are updated', () => {
     expect(state.activeSession?.runCount).toBe(2);
   });
 
-  it('If saving fails, Then the notes are unchanged and the error can be retried', async () => {
+  it('If saving fails, Then the notes are unchanged and the error cannot be retried', async () => {
     // Arrange
     mockElectronAPI.runTracker.updateSessionNotes.mockRejectedValue(new Error('IPC failed'));
 
@@ -921,10 +921,28 @@ describe('When session notes are updated', () => {
     const state = useRunTrackerStore.getState();
     expect(state.sessions[0].notes).toBeUndefined();
     expect(state.error).toEqual({ code: 'updateSessionNotesFailed' });
-    expect(state.lastFailedAction).toBeDefined();
+    expect(state.errorType).toBe('unknown');
+    expect(state.lastFailedAction).toBeUndefined();
   });
 
-  it('If the main process returns no saved session, Then saving is reported as failed and can be retried', async () => {
+  it('If saving fails, Then Retry has nothing to run and the captured notes are not sent again', async () => {
+    // Arrange
+    mockElectronAPI.runTracker.updateSessionNotes.mockRejectedValue(new Error('IPC failed'));
+    await act(async () => {
+      await useRunTrackerStore.getState().updateSessionNotes('session-1', 'Cow runs');
+    });
+    mockElectronAPI.runTracker.updateSessionNotes.mockClear();
+
+    // Act
+    await act(async () => {
+      await useRunTrackerStore.getState().retryLastAction();
+    });
+
+    // Assert
+    expect(mockElectronAPI.runTracker.updateSessionNotes).not.toHaveBeenCalled();
+  });
+
+  it('If the main process returns no saved session, Then saving is reported as failed and cannot be retried', async () => {
     // Arrange
     mockElectronAPI.runTracker.updateSessionNotes.mockResolvedValue(undefined);
 
@@ -940,7 +958,7 @@ describe('When session notes are updated', () => {
     expect(state.sessions[0].notes).toBeUndefined();
     expect(state.error).toEqual({ code: 'updateSessionNotesFailed' });
     expect(state.errorType).toBe('unknown');
-    expect(state.lastFailedAction).toBeDefined();
+    expect(state.lastFailedAction).toBeUndefined();
   });
 
   it('If the notes have exactly the maximum length, Then they are saved', async () => {
@@ -1025,21 +1043,53 @@ describe('When the run tracker sync is started', () => {
     );
   });
 
-  it('Then main-process events update the store', () => {
+  it('Then the session, run, pause and resume events update the store', async () => {
     // Arrange
+    const run: Run = {
+      id: 'run-sync',
+      sessionId: session.id,
+      runNumber: 1,
+      startTime: new Date('2024-01-01T10:01:00Z'),
+      created: new Date('2024-01-01T10:01:00Z'),
+      lastUpdated: new Date('2024-01-01T10:01:00Z'),
+    };
     dispose = initRunTrackerSync();
+    const state = () => useRunTrackerStore.getState();
 
-    // Act
+    // Act and assert: each event applies its change
     act(() => {
       mainEvents.emit('run-tracker:session-started', { session });
+    });
+    expect(state().activeSession).toEqual(session);
+    expect(state().isTracking).toBe(true);
+
+    act(() => {
+      mainEvents.emit('run-tracker:run-started', { run, session });
+    });
+    expect(state().activeRun).toEqual(run);
+    expect(state().runs.get(session.id)).toEqual([run]);
+
+    act(() => {
       mainEvents.emit('run-tracker:run-paused', { session });
     });
+    expect(state().isPaused).toBe(true);
 
-    // Assert
-    const state = useRunTrackerStore.getState();
-    expect(state.activeSession).toEqual(session);
-    expect(state.isTracking).toBe(true);
-    expect(state.isPaused).toBe(true);
+    act(() => {
+      mainEvents.emit('run-tracker:run-resumed', { session });
+    });
+    expect(state().isPaused).toBe(false);
+
+    await act(async () => {
+      mainEvents.emit('run-tracker:run-ended', { run, session });
+    });
+    expect(state().activeRun).toBeNull();
+    expect(state().runs.get(session.id)).toEqual([run]);
+
+    act(() => {
+      mainEvents.emit('run-tracker:session-ended', { session });
+    });
+    expect(state().activeSession).toBeNull();
+    expect(state().isTracking).toBe(false);
   });
 
   it('Then an added run item refreshes the items of its run', async () => {

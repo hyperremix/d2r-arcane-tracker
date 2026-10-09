@@ -3,8 +3,8 @@ import { useCallback, useEffect, useState } from 'react';
 
 /**
  * Editing state of the notes of a session. The notes are saved when the editor loses focus; if
- * saving fails, the store reports the failure inline (with a retry) and the saved notes are shown
- * again.
+ * saving fails, the store reports the failure inline (without a retry, because a retry could
+ * overwrite the notes of another session) and the saved notes are shown again.
  * @param session - The session whose notes are edited, if there is one
  * @param updateSessionNotes - The store action that saves notes; resolves to whether they were saved
  * @returns The current text, whether a save is in flight, and the editor change and blur handlers
