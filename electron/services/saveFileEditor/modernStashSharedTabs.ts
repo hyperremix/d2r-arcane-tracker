@@ -5,8 +5,12 @@ import { readItem, writeItem } from '@dschu012/d2s/lib/d2/items';
 import { normalizeItemCodeKey, SHARED_TAB_COUNT } from '../../utils/d2rFormat';
 import { createBoundedBitReader } from '../boundedBitReader';
 import { constants105Extended } from '../modernStashParser';
-import { readD2iMetadata } from '../stashFormat';
-import { JM_ITEM_COUNT_OFFSET, JM_ITEM_DATA_OFFSET, rebuildD2iBuffer } from './d2iSectors';
+import {
+  JM_ITEM_COUNT_OFFSET,
+  JM_ITEM_DATA_OFFSET,
+  rebuildD2iBuffer,
+  resolveModernJmSectors,
+} from './d2iSectors';
 import { resolveItemCode } from './itemFields';
 import { itemMatchesLocator } from './itemLocators';
 import { assertTargetCellsFree } from './itemPlacement';
@@ -64,12 +68,7 @@ export async function findItemInModernStashSharedPage(
   itemCode?: string,
 ): Promise<d2sTypes.IItem | undefined> {
   const buffer = await readFile(filePath);
-  const metadata = readD2iMetadata(buffer);
-
-  const jmSectors = metadata.sectors
-    .map((sector, index) => ({ sectorIndex: index, ...sector }))
-    .filter((s) => s.payloadSignature === 'JM')
-    .sort((a, b) => a.sectorIndex - b.sectorIndex);
+  const { metadata, jmSectors } = resolveModernJmSectors(buffer);
 
   const config = { extendedStash: false, sortProperties: true };
   const constants = constants105Extended as unknown as d2sTypes.IConstantData;
@@ -159,12 +158,7 @@ export async function removeItemFromModernStashBuffer(
   gridY?: number,
   itemCode?: string,
 ): Promise<Buffer> {
-  const metadata = readD2iMetadata(buffer);
-
-  const jmSectors = metadata.sectors
-    .map((sector, index) => ({ sectorIndex: index, ...sector }))
-    .filter((s) => s.payloadSignature === 'JM')
-    .sort((a, b) => a.sectorIndex - b.sectorIndex);
+  const { metadata, jmSectors } = resolveModernJmSectors(buffer);
 
   const config = { extendedStash: false, sortProperties: true };
   const constants = constants105Extended as unknown as d2sTypes.IConstantData;
@@ -295,12 +289,7 @@ export async function addItemToModernStashSharedPageBuffer(
   stackCount = 1,
   ignoredCell?: GridCell,
 ): Promise<Buffer> {
-  const metadata = readD2iMetadata(buffer);
-
-  const jmSectors = metadata.sectors
-    .map((sector, index) => ({ sectorIndex: index, ...sector }))
-    .filter((s) => s.payloadSignature === 'JM')
-    .sort((a, b) => a.sectorIndex - b.sectorIndex);
+  const { metadata, jmSectors } = resolveModernJmSectors(buffer);
 
   if (Math.min(stashTab, SHARED_TAB_COUNT) >= jmSectors.length) {
     throw new Error(

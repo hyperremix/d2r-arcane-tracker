@@ -1,25 +1,8 @@
-import { readFile } from 'node:fs/promises';
-import { extname } from 'node:path';
 import type { types as d2sTypes } from '@dschu012/d2s';
-import * as d2s from '@dschu012/d2s';
-import * as d2stash from '@dschu012/d2s/lib/d2/stash';
 import type { VaultLocationContext, VaultSourceFileType } from '../../types/grail';
-import { isModernStashVersion, SHARED_TAB_COUNT } from '../../utils/d2rFormat';
+import { SHARED_TAB_COUNT } from '../../utils/d2rFormat';
 import { ensureD2sConstants } from '../d2s/constants';
-import { readD2iMetadata } from '../stashFormat';
-import { resolveTargetCharacterClass } from './equipValidation';
-import {
-  extractItemById,
-  findItemById,
-  normalizeSaveFileItemLocator,
-  type SaveFileItemLocator,
-} from './itemLocators';
-import {
-  assertCharacterGridCellsFree,
-  assertTargetCellsFree,
-  withD2SLocationContext,
-  withTargetCoordinates,
-} from './itemPlacement';
+import { normalizeSaveFileItemLocator, type SaveFileItemLocator } from './itemLocators';
 import { addItemToModernStashResourceSector } from './modernStashResourceSectors';
 import {
   addItemToModernStashSharedPage,
@@ -31,12 +14,7 @@ import {
   isModernResourceTab,
   stripResourceStashStackMetadata,
 } from './resourceStacks';
-import {
-  assertWritableD2iBuffer,
-  getStashConstants,
-  writeClassicStashFile,
-  writeD2sSaveFile,
-} from './saveFileWrites';
+import { decodeSaveFile, describeDecodedSaveFile, openSaveFile } from './saveFileAdapters';
 
 /**
  * Reads, adds and removes a single item in any supported save file.
@@ -47,37 +25,13 @@ export async function findItemInSaveFile(
   fileType: VaultSourceFileType,
   itemId: number,
 ): Promise<d2sTypes.IItem | undefined> {
-  const buffer = await readFile(filePath);
+  const file = await openSaveFile(filePath, fileType);
 
-  if (fileType === 'd2s') {
-    const data = await d2s.read(buffer);
-    return (
-      findItemById(data.items, itemId) ??
-      findItemById(data.corpse_items, itemId) ??
-      findItemById(data.merc_items, itemId)
-    );
+  if (file.format.kind === 'modernStash') {
+    return findItemInModernStashSharedPage(filePath, itemId);
   }
 
-  const ext = extname(filePath);
-
-  if (ext === '.d2i') {
-    const metadata = readD2iMetadata(buffer);
-    if (isModernStashVersion(metadata.version)) {
-      return findItemInModernStashSharedPage(filePath, itemId);
-    }
-  }
-
-  const { constants } = getStashConstants(ext);
-  const data = await d2stash.read(buffer, constants);
-
-  for (const page of data.pages) {
-    const found = findItemById(page.items, itemId);
-    if (found) {
-      return found;
-    }
-  }
-
-  return undefined;
+  return (await decodeSaveFile(file)).findItem(itemId);
 }
 
 /**
@@ -92,19 +46,17 @@ export async function readSaveFileItem(
 ): Promise<d2sTypes.IItem | undefined> {
   ensureD2sConstants();
   const { itemId, itemCode, stashTab, gridX, gridY } = normalizeSaveFileItemLocator(itemLocator);
+  const file = await openSaveFile(filePath, fileType);
 
-  if (fileType === 'd2i' && extname(filePath) === '.d2i') {
-    const metadata = readD2iMetadata(await readFile(filePath));
-    if (isModernStashVersion(metadata.version)) {
-      return findItemInModernStashSharedPage(filePath, itemId, stashTab, gridX, gridY, itemCode);
-    }
+  if (file.format.kind === 'modernStash') {
+    return findItemInModernStashSharedPage(filePath, itemId, stashTab, gridX, gridY, itemCode);
   }
 
   if (itemId === undefined) {
     return undefined;
   }
 
-  return findItemInSaveFile(filePath, fileType, itemId);
+  return (await decodeSaveFile(file)).findItem(itemId);
 }
 
 export async function removeItemFromSaveFileUnlocked(
@@ -113,73 +65,29 @@ export async function removeItemFromSaveFileUnlocked(
   itemLocator: number | SaveFileItemLocator,
 ): Promise<void> {
   const { itemId, itemCode, stashTab, gridX, gridY } = normalizeSaveFileItemLocator(itemLocator);
-  const buffer = await readFile(filePath);
+  const file = await openSaveFile(filePath, fileType);
 
-  if (fileType === 'd2s') {
-    if (itemId === undefined) {
-      throw new Error('itemId is required for d2s removal');
-    }
-
-    const data = await d2s.read(buffer);
-    // Remove exactly one item: ids are not guaranteed to be unique, and removing every match would
-    // silently delete other items that happen to share the id.
-    const removed =
-      extractItemById(data.items, itemId) ??
-      extractItemById(data.corpse_items, itemId) ??
-      extractItemById(data.merc_items, itemId);
-    if (!removed) {
-      throw new Error('Source item not found in save file');
-    }
-    await writeD2sSaveFile(filePath, data);
+  if (file.format.kind === 'modernStash') {
+    await removeItemFromModernStashSharedPage(filePath, itemId, stashTab, gridX, gridY, itemCode);
     return;
   }
 
-  const ext = extname(filePath);
-
-  if (ext === '.d2i') {
-    const metadata = readD2iMetadata(buffer);
-    if (isModernStashVersion(metadata.version)) {
-      await removeItemFromModernStashSharedPage(filePath, itemId, stashTab, gridX, gridY, itemCode);
-      return;
-    }
-  }
-
   if (itemId === undefined) {
-    throw new Error('itemId is required for classic stash removal');
+    throw new Error(
+      file.format.kind === 'character'
+        ? 'itemId is required for d2s removal'
+        : 'itemId is required for classic stash removal',
+    );
   }
 
-  assertWritableD2iBuffer(ext, buffer);
-  const { constants, version } = getStashConstants(ext);
-  const data = await d2stash.read(buffer, constants);
-
-  let removed: d2sTypes.IItem | undefined;
-  for (const page of data.pages) {
-    removed = extractItemById(page.items, itemId);
-    if (removed) {
-      break;
-    }
-  }
-  if (!removed) {
-    throw new Error('Source item not found in stash file');
+  const decoded = await decodeSaveFile(file);
+  // Remove exactly one item: ids are not guaranteed to be unique, and removing every match would
+  // silently delete other items that happen to share the id.
+  if (!decoded.extractItem(itemId)) {
+    throw new Error(`Source item not found in ${describeDecodedSaveFile(decoded)}`);
   }
 
-  await writeClassicStashFile(filePath, data, { constants, version });
-}
-
-function isModernResourceTabTarget(
-  fileType: VaultSourceFileType,
-  ext: string,
-  locationContext: VaultLocationContext,
-  stashTab: number | undefined,
-  buffer: Buffer,
-): boolean {
-  return (
-    fileType === 'd2i' &&
-    ext === '.d2i' &&
-    locationContext === 'stash' &&
-    isModernResourceTab(stashTab) &&
-    isModernStashVersion(readD2iMetadata(buffer).version)
-  );
+  await decoded.write();
 }
 
 /** What `addItemToSaveFile` writes and where. */
@@ -211,15 +119,11 @@ export async function addItemToSaveFileUnlocked({
   targetEquippedSlotId,
   quantity,
 }: AddItemToSaveFileOptions): Promise<void> {
-  const buffer = await readFile(filePath);
-  const ext = extname(filePath);
-  const targetIsModernResourceTab = isModernResourceTabTarget(
-    fileType,
-    ext,
-    locationContext,
-    stashTab,
-    buffer,
-  );
+  const file = await openSaveFile(filePath, fileType);
+  const targetIsModernResourceTab =
+    file.format.kind === 'modernStash' &&
+    locationContext === 'stash' &&
+    isModernResourceTab(stashTab);
 
   const sourceItem = applyWriteQuantity(item, quantity, targetIsModernResourceTab);
 
@@ -234,34 +138,11 @@ export async function addItemToSaveFileUnlocked({
     return;
   }
 
-  const normalizedItem = stripResourceStashStackMetadata(sourceItem);
-
-  if (fileType === 'd2s') {
-    const data = await d2s.read(buffer);
-    const itemToWrite = withD2SLocationContext(
-      withTargetCoordinates(normalizedItem, targetGridX, targetGridY),
-      locationContext,
-      data.items,
-      resolveTargetCharacterClass(data),
-      targetEquippedSlotId,
-    );
-
-    if (locationContext === 'mercenary') {
-      data.merc_items.push(itemToWrite);
-    } else if (locationContext === 'corpse') {
-      data.corpse_items.push(itemToWrite);
-    } else {
-      assertCharacterGridCellsFree(data.items, itemToWrite);
-      data.items.push(itemToWrite);
-    }
-
-    await writeD2sSaveFile(filePath, data);
-    return;
-  }
-
-  // Modern .d2i: shared stash pages (tabs 0–4) are writable via sector patching.
+  // Shared stash pages (tabs 0–4) of a .d2i are written via sector patching. This includes
+  // pre-105 .d2i files, which every other operation edits as classic stashes; kept as it was so
+  // existing writes stay byte-identical.
   if (
-    ext === '.d2i' &&
+    file.format.fileType === 'd2i' &&
     locationContext === 'stash' &&
     typeof stashTab === 'number' &&
     stashTab < SHARED_TAB_COUNT
@@ -276,20 +157,13 @@ export async function addItemToSaveFileUnlocked({
     return;
   }
 
-  assertWritableD2iBuffer(ext, buffer);
-  const { constants, version } = getStashConstants(ext);
-  const data = await d2stash.read(buffer, constants);
-  const itemToWrite = withTargetCoordinates(normalizedItem, targetGridX, targetGridY);
-
-  const targetTab = stashTab ?? 0;
-
-  while (data.pages.length <= targetTab) {
-    data.pages.push({ name: '', type: 0, items: [] });
-    data.pageCount = data.pages.length;
-  }
-
-  assertTargetCellsFree(data.pages[targetTab].items, itemToWrite);
-  data.pages[targetTab].items.push(itemToWrite);
-
-  await writeClassicStashFile(filePath, data, { constants, version });
+  const decoded = await decodeSaveFile(file);
+  decoded.placeItem(stripResourceStashStackMetadata(sourceItem), {
+    locationContext,
+    stashTab,
+    gridX: targetGridX,
+    gridY: targetGridY,
+    equippedSlotId: targetEquippedSlotId,
+  });
+  await decoded.write();
 }

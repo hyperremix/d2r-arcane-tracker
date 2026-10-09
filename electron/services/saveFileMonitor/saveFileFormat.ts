@@ -1,6 +1,6 @@
 import { basename, extname } from 'node:path';
 import type { D2SaveFile } from '../../types/grail';
-import { isModernStashVersion } from '../../utils/d2rFormat';
+import { isModernStashVersion, SAVE_FILE_EXTENSIONS } from '../../utils/d2rFormat';
 import { createServiceLogger } from '../../utils/serviceLogger';
 import { readD2iMetadata } from '../stashFormat';
 
@@ -23,8 +23,6 @@ type SharedStashName =
   | 'Shared Stash Softcore'
   | 'Modern Shared Stash Hardcore'
   | 'Modern Shared Stash Softcore';
-
-const SUPPORTED_SAVE_EXTENSIONS = new Set(['.d2s', '.sss', '.d2x', '.d2i']);
 
 const CHARACTER_CLASSES = [
   'amazon',
@@ -55,7 +53,7 @@ export function isBackupLikeStashFile(fileName: string): boolean {
 /** True when the file is a save file the monitor scans (.d2s/.sss/.d2x/.d2i, without stash backups). */
 export function shouldIncludeSaveFile(fileName: string): boolean {
   const extension = extname(fileName).toLowerCase();
-  if (!SUPPORTED_SAVE_EXTENSIONS.has(extension)) {
+  if (!SAVE_FILE_EXTENSIONS.has(extension)) {
     return false;
   }
 

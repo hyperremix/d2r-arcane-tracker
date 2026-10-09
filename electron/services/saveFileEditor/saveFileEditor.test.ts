@@ -1969,6 +1969,57 @@ describe('When items could be lost by a move or split', () => {
       expect(stash.pages[0].items).toHaveLength(3);
     });
   });
+
+  describe('If a pre-105 .d2i stack is split with its raw item JSON', () => {
+    it('Then it is split as a classic stash with the v99 codec', async () => {
+      // Arrange
+      const sourceItem = makeD2sItem(1, 'key', { quantity: 4, position_x: 0, position_y: 0 });
+      const stash = makeStashData([[]]);
+      stash.pages[0].items.push(sourceItem as unknown as { id: number });
+      mockD2stashRead.mockResolvedValue(stash);
+
+      // Act
+      await splitStackInSaveFile({
+        sourceFilePath: '/saves/stash.d2i',
+        sourceFileType: 'd2i',
+        sourceStashTab: 0,
+        sourceItemCode: 'key',
+        sourceRawItemJson: JSON.stringify(sourceItem),
+        splitCount: 1,
+        targets: [
+          {
+            targetFilePath: '/saves/stash.d2i',
+            targetFileType: 'd2i',
+            targetLocationContext: 'stash',
+            targetStashTab: 0,
+            targetGridX: 3,
+            targetGridY: 3,
+          },
+        ],
+      });
+
+      // Assert
+      expect(mockD2stashWrite).toHaveBeenCalledWith(stash, constants99, 99);
+      expect(mockWriteFile).toHaveBeenCalledTimes(1);
+      expect(stash.pages[0].items).toHaveLength(2);
+    });
+  });
+
+  describe('If the file type does not match the file extension', () => {
+    it('Then the edit is refused before the file is decoded', async () => {
+      // Arrange
+      mockD2sRead.mockResolvedValue(makeD2sData([{ id: 42 }]));
+
+      // Act
+      const message = await rejectionMessage(removeItemFromSaveFile('/saves/Hero.d2s', 'sss', 42));
+
+      // Assert
+      expect(message).toContain("Save file type 'sss' does not match");
+      expect(mockD2sRead).not.toHaveBeenCalled();
+      expect(mockD2stashRead).not.toHaveBeenCalled();
+      expect(mockWriteFile).not.toHaveBeenCalled();
+    });
+  });
 });
 
 describe('When a public editor operation starts', () => {
