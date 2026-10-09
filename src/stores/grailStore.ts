@@ -15,6 +15,7 @@ import { toast } from 'sonner';
 import { create } from 'zustand';
 import { translations } from '@/i18n/translations';
 import { canItemBeEthereal, canItemBeNormal, filterItemsByTrackedVersions } from '@/lib/ethereal';
+import { onMainEvent } from '@/lib/ipcEvents';
 import { itemMatchesSearch, tokenizeSearchQuery } from '@/lib/itemSearch';
 import { isRecentFind } from '@/lib/utils';
 
@@ -458,6 +459,20 @@ const reloadFilteredGrailData = async (
 };
 
 /**
+ * Returns the value of a settled promise, logging the failure if it was rejected.
+ * @param {PromiseSettledResult<T>} result - The settled result
+ * @param {string} label - What was loaded, used in the log message
+ * @returns {T | undefined} The value, or undefined if the promise was rejected
+ */
+function getSettledValue<T>(result: PromiseSettledResult<T>, label: string): T | undefined {
+  if (result.status === 'fulfilled') return result.value;
+  console.error(`Failed to load ${label}:`, result.reason);
+  return undefined;
+}
+
+const isRejected = (result: PromiseSettledResult<unknown>): boolean => result.status === 'rejected';
+
+/**
  * Zustand store for managing Holy Grail state including items, progress, characters, and settings.
  * Provides actions for data manipulation and persistence to the Electron backend.
  */
@@ -618,31 +633,42 @@ export const useGrailStore = create<GrailState>((set, get) => ({
     try {
       set({ error: null });
 
-      // Load settings first
-      const settingsData = await window.electronAPI?.grail.getSettings();
+      // Items are filtered by the grail settings in the main process, so nothing here depends on
+      // the settings being applied first. allSettled lets every successful call apply its data
+      // even if another one fails.
+      const api = window.electronAPI?.grail;
+      const [settingsResult, charactersResult, itemsResult, progressResult] =
+        await Promise.allSettled([
+          api?.getSettings(),
+          api?.getCharacters(),
+          api?.getItems(),
+          api?.getProgress(),
+        ]);
+
+      const settingsData = getSettledValue(settingsResult, 'settings');
       if (settingsData) {
         set((state) => ({ ...withSettingsUpdate(state, settingsData), settingsHydrated: true }));
-        console.log('Reloaded settings from database');
       }
 
-      // Load characters
-      const charactersData = await window.electronAPI?.grail.getCharacters();
-      if (charactersData) {
-        set({ characters: charactersData });
+      const characters = getSettledValue(charactersResult, 'characters');
+      if (characters) {
+        set({ characters });
       }
 
-      // Load items from database
-      const items = await window.electronAPI?.grail.getItems();
+      const items = getSettledValue(itemsResult, 'items');
       if (items) {
         set({ items });
-        console.log(`Reloaded ${items.length} Holy Grail items from database`);
+        console.log(`Loaded ${items.length} Holy Grail items from database`);
       }
 
-      // Load progress data
-      const progressData = await window.electronAPI?.grail.getProgress();
-      if (progressData) {
-        set({ progress: progressData });
-        console.log(`Reloaded ${progressData.length} progress entries from database`);
+      const progress = getSettledValue(progressResult, 'progress');
+      if (progress) {
+        set({ progress });
+        console.log(`Loaded ${progress.length} progress entries from database`);
+      }
+
+      if ([settingsResult, charactersResult, itemsResult, progressResult].some(isRejected)) {
+        set({ error: 'Failed to reload data' });
       }
     } catch (error) {
       console.error('Failed to reload grail data:', error);
@@ -674,6 +700,47 @@ export const startLoad = (): (() => void) => {
       useGrailStore.setState({ loading: false });
     }
   };
+};
+
+/**
+ * Reloads progress and characters after the main process reported a grail progress change
+ * (e.g. an automatically detected item, which may also have created a character).
+ */
+const refreshProgressAndCharacters = async (): Promise<void> => {
+  try {
+    const api = window.electronAPI?.grail;
+    const [progressResult, charactersResult] = await Promise.allSettled([
+      api?.getProgress(),
+      api?.getCharacters(),
+    ]);
+
+    const progress = getSettledValue(progressResult, 'progress');
+    if (progress) {
+      useGrailStore.setState({ progress });
+      console.log(`Reloaded ${progress.length} progress entries after a grail progress update`);
+    }
+
+    const characters = getSettledValue(charactersResult, 'characters');
+    if (characters) {
+      useGrailStore.setState({ characters });
+    }
+  } catch (error) {
+    console.error('Failed to reload data after grail progress update:', error);
+  }
+};
+
+/**
+ * Loads the grail data (settings, characters, items and progress) into the store and keeps the
+ * progress in sync with the main process for as long as the returned cleanup was not called.
+ * Started once per window from its root component, so every page sees current data regardless
+ * of which page is mounted.
+ * @returns {() => void} Cleanup that removes the main-process subscription
+ */
+export const initGrailData = (): (() => void) => {
+  void useGrailStore.getState().reloadData();
+  return onMainEvent('grail-progress-updated', () => {
+    void refreshProgressAndCharacters();
+  });
 };
 
 /**

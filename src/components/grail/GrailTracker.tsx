@@ -1,102 +1,24 @@
-import { useEffect, useLayoutEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { translations } from '@/i18n/translations';
-import { onMainEvent } from '@/lib/ipcEvents';
-import { startLoad, useGrailStatistics, useGrailStore } from '@/stores/grailStore';
+import { useGrailStatistics, useGrailStore } from '@/stores/grailStore';
 import { AdvancedSearch } from './AdvancedSearch';
 import { ItemGrid } from './ItemGrid';
 import { ProgressSummary } from './ProgressSummary';
 
-function getSettledValue<T>(result: PromiseSettledResult<T>, label: string): T | undefined {
-  if (result.status === 'fulfilled') return result.value;
-  console.error(`Failed to load ${label}:`, result.reason);
-  return undefined;
-}
-
 /**
  * GrailTracker component that serves as the main Holy Grail tracking interface.
- * Manages loading of grail data, displays statistics, and provides item tracking interface.
+ * Displays the grail statistics and the item tracking interface.
  * @returns {JSX.Element} The main grail tracker interface with statistics and item grid
  */
 export function GrailTracker() {
   const { t } = useTranslation();
-  // Narrow selectors so unrelated store updates (filters, view mode, ...) don't re-render the page
-  const setCharacters = useGrailStore((state) => state.setCharacters);
-  const setItems = useGrailStore((state) => state.setItems);
-  const setProgress = useGrailStore((state) => state.setProgress);
-  const hydrateSettings = useGrailStore((state) => state.hydrateSettings);
+  // Narrow selector so unrelated store updates (filters, view mode, ...) don't re-render the page.
+  // The grail data itself is loaded and kept in sync by initGrailData, started from App.
   const grailEthereal = useGrailStore((state) => state.settings.grailEthereal);
 
   const statistics = useGrailStatistics();
-
-  // Load initial data. A layout effect is used so the loading flag is set before the first paint;
-  // otherwise the empty store would briefly render the "no items" state before the spinner.
-  useLayoutEffect(() => {
-    const loadData = async () => {
-      try {
-        // Load settings first (other UI may depend on it)
-        const settingsData = await window.electronAPI?.grail.getSettings();
-        if (settingsData) {
-          hydrateSettings(settingsData);
-          console.log('Loaded settings from database');
-        }
-
-        // Load characters, items, and progress in parallel.
-        // Use allSettled so a failure in one call doesn't prevent the others from applying.
-        const [charactersResult, itemsResult, progressResult] = await Promise.allSettled([
-          window.electronAPI?.grail.getCharacters(),
-          window.electronAPI?.grail.getItems(),
-          window.electronAPI?.grail.getProgress(),
-        ]);
-
-        const characters = getSettledValue(charactersResult, 'characters');
-        if (characters) setCharacters(characters);
-
-        const items = getSettledValue(itemsResult, 'items');
-        if (items) {
-          setItems(items);
-          console.log(`Loaded ${items.length} Holy Grail items from database`);
-        }
-
-        const progress = getSettledValue(progressResult, 'progress');
-        if (progress) {
-          setProgress(progress);
-          console.log(`Loaded ${progress.length} progress entries from database`);
-        }
-      } catch (error) {
-        console.error('Failed to load grail data:', error);
-      }
-    };
-
-    const finishLoad = startLoad();
-    loadData().finally(finishLoad);
-  }, [setCharacters, setItems, setProgress, hydrateSettings]);
-
-  // Listen for grail progress updates from automatic detection
-  useEffect(() => {
-    const handleGrailProgressUpdate = async () => {
-      try {
-        // Reload progress data when items are auto-detected
-        const progressData = await window.electronAPI?.grail.getProgress();
-        if (progressData) {
-          setProgress(progressData);
-          console.log(`Reloaded ${progressData.length} progress entries after auto-detection`);
-        }
-
-        // Also reload characters in case new ones were created
-        const charactersData = await window.electronAPI?.grail.getCharacters();
-        if (charactersData) {
-          setCharacters(charactersData);
-        }
-      } catch (error) {
-        console.error('Failed to reload data after grail progress update:', error);
-      }
-    };
-
-    return onMainEvent('grail-progress-updated', handleGrailProgressUpdate);
-  }, [setProgress, setCharacters]);
 
   return (
     <TooltipProvider>

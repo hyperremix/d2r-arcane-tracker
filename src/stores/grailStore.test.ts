@@ -1,11 +1,13 @@
-import { act, renderHook } from '@testing-library/react';
+import { act, renderHook, waitFor } from '@testing-library/react';
 import type { AdvancedGrailFilter, GrailFilter } from 'electron/types/grail';
 import { toast } from 'sonner';
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CharacterBuilder, GrailProgressBuilder, HolyGrailItemBuilder } from '@/fixtures';
+import { createMainEventsMock } from '@/test/mainEventsMock';
 import {
   countActiveFilters,
   filterAndSortItems,
+  initGrailData,
   parseSubCategoryFilterValue,
   resetSettingsWriteTracking,
   type SettingsSaveResult,
@@ -1372,6 +1374,101 @@ describe('When useGrailStore is used', () => {
       // Assert
       expect(result.current.error).toBe('Failed to reload data');
       expect(result.current.loading).toBe(false);
+    });
+
+    it('Then the data of the calls that succeeded is still applied', async () => {
+      // Arrange
+      vi.spyOn(console, 'error').mockImplementation(() => undefined);
+      const items = [HolyGrailItemBuilder.new().withId('item1').build()];
+      mockElectronAPI.grail.getSettings.mockResolvedValue({ grailEthereal: true });
+      mockElectronAPI.grail.getCharacters.mockResolvedValue([]);
+      mockElectronAPI.grail.getItems.mockRejectedValue(new Error('items failed'));
+      mockElectronAPI.grail.getProgress.mockResolvedValue([]);
+      act(() => useGrailStore.getState().setItems(items));
+
+      // Act
+      await act(async () => {
+        await useGrailStore.getState().reloadData();
+      });
+
+      // Assert
+      expect(useGrailStore.getState().settings.grailEthereal).toBe(true);
+      expect(useGrailStore.getState().items).toBe(items);
+      expect(useGrailStore.getState().error).toBe('Failed to reload data');
+      expect(console.error).toHaveBeenCalledWith('Failed to load items:', expect.any(Error));
+    });
+  });
+
+  describe('If the grail data is initialised for a window', () => {
+    const events = createMainEventsMock();
+    const apiWithEvents = mockElectronAPI as typeof mockElectronAPI & { on?: unknown };
+
+    beforeEach(() => {
+      events.reset();
+      apiWithEvents.on = events.on;
+      mockElectronAPI.grail.getSettings.mockResolvedValue({ grailRunes: true });
+      mockElectronAPI.grail.getCharacters.mockResolvedValue([]);
+      mockElectronAPI.grail.getItems.mockResolvedValue([]);
+      mockElectronAPI.grail.getProgress.mockResolvedValue([]);
+    });
+
+    afterEach(() => {
+      delete apiWithEvents.on;
+    });
+
+    it('Then loading is flagged synchronously and every data set is loaded', async () => {
+      // Arrange
+      const items = [HolyGrailItemBuilder.new().withId('item1').build()];
+      mockElectronAPI.grail.getItems.mockResolvedValue(items);
+
+      // Act
+      let dispose: () => void = () => undefined;
+      act(() => {
+        dispose = initGrailData();
+      });
+
+      // Assert
+      expect(useGrailStore.getState().loading).toBe(true);
+      await waitFor(() => expect(useGrailStore.getState().loading).toBe(false));
+      expect(useGrailStore.getState().items).toEqual(items);
+      expect(useGrailStore.getState().settings.grailRunes).toBe(true);
+      expect(useGrailStore.getState().settingsHydrated).toBe(true);
+      dispose();
+    });
+
+    it('Then a grail progress update reloads progress and characters', async () => {
+      // Arrange
+      const dispose = initGrailData();
+      await waitFor(() => expect(useGrailStore.getState().loading).toBe(false));
+      const progress = [
+        GrailProgressBuilder.new().withId('prog1').withCharacterId('c1').withItemId('i1').build(),
+      ];
+      const characters = [CharacterBuilder.new().withId('c1').withName('Sorc').build()];
+      mockElectronAPI.grail.getProgress.mockResolvedValue(progress);
+      mockElectronAPI.grail.getCharacters.mockResolvedValue(characters);
+
+      // Act
+      await act(async () => {
+        events.emit('grail-progress-updated');
+      });
+
+      // Assert
+      await waitFor(() => expect(useGrailStore.getState().progress).toEqual(progress));
+      expect(useGrailStore.getState().characters).toEqual(characters);
+      dispose();
+    });
+
+    it('Then the cleanup removes the main-process subscription', async () => {
+      // Arrange
+      const dispose = initGrailData();
+      await waitFor(() => expect(useGrailStore.getState().loading).toBe(false));
+      expect(events.listenerCount('grail-progress-updated')).toBe(1);
+
+      // Act
+      dispose();
+
+      // Assert
+      expect(events.listenerCount('grail-progress-updated')).toBe(0);
     });
   });
 });
