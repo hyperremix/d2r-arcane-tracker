@@ -1,5 +1,6 @@
 import { act, render, screen } from '@testing-library/react';
 import type { Character, GrailProgress, Item } from 'electron/types/grail';
+import { Profiler } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   COLUMN_GUTTER,
@@ -781,15 +782,22 @@ describe('When the items of a rendered VirtualItemGrid shrink to fewer rows', ()
 
 describe('When VirtualItemGrid rows are measured', () => {
   const resizeCallbacks: ResizeObserverCallback[] = [];
+  const resizeObservers: Array<{
+    callback: ResizeObserverCallback;
+    observe: ReturnType<typeof vi.fn>;
+    disconnect: ReturnType<typeof vi.fn>;
+  }> = [];
   let containerWidth = 0;
 
   beforeEach(() => {
     resizeCallbacks.length = 0;
+    resizeObservers.length = 0;
     vi.stubGlobal(
       'ResizeObserver',
       class {
-        constructor(callback: ResizeObserverCallback) {
+        constructor(readonly callback: ResizeObserverCallback) {
           resizeCallbacks.push(callback);
+          resizeObservers.push(this);
         }
         observe = vi.fn();
         unobserve = vi.fn();
@@ -860,6 +868,93 @@ describe('When VirtualItemGrid rows are measured', () => {
       expect(screen.getAllByTestId('item-grid-row')).toHaveLength(3);
       // 50px header + two rows with three cards and one row with a single card
       expect(content.style.height).toBe(`${50 + 2 * 320 + 120}px`);
+    });
+  });
+
+  /**
+   * Finds the observer that tracks the grid's content element (the one measuring the column count),
+   * as opposed to the observers the virtualizer creates for the scroll container and the rows.
+   */
+  function findContentObserver(content: Element) {
+    const observer = resizeObservers.find((candidate) =>
+      candidate.observe.mock.calls.some(([target]) => target === content),
+    );
+    if (!observer) throw new Error('Expected a ResizeObserver observing the grid content');
+    return observer;
+  }
+
+  describe('If the container is resized without changing the column count', () => {
+    it('Then the grid does not re-render', () => {
+      // Arrange
+      containerWidth = widthForColumns(2);
+      stubRowHeights();
+      const onRender = vi.fn();
+      const { container } = render(
+        <Profiler id="grid" onRender={onRender}>
+          <VirtualItemGrid
+            groupedItems={[
+              {
+                title: 'Unique Armor',
+                items: Array.from({ length: 4 }, (_, n) =>
+                  createMockItem({ id: `item-${n}`, name: `Item ${n}` }),
+                ),
+                foundCount: 0,
+              },
+            ]}
+            showGroupHeaders
+            progressLookup={createMockProgressLookup()}
+            characters={[]}
+            onItemClick={vi.fn()}
+          />
+        </Profiler>,
+      );
+      const content = container.firstElementChild?.firstElementChild as HTMLElement;
+      const contentObserver = findContentObserver(content);
+      const resizeWithinTwoColumns = (width: number) => {
+        containerWidth = width;
+        act(() => {
+          contentObserver.callback([], {} as ResizeObserver);
+        });
+      };
+      // React may re-render a component once more after its first state update before it can
+      // bail out of identical state updates, so settle that one render before counting
+      resizeWithinTwoColumns(widthForColumns(2) + 5);
+      const rendersBeforeResize = onRender.mock.calls.length;
+
+      // Act
+      resizeWithinTwoColumns(widthForColumns(2) + 10);
+
+      // Assert
+      expect(getColumnCount(containerWidth)).toBe(2);
+      expect(rendersBeforeResize).toBeGreaterThan(0);
+      expect(onRender).toHaveBeenCalledTimes(rendersBeforeResize);
+    });
+  });
+
+  describe('If the grid is unmounted', () => {
+    it('Then the resize observer is disconnected', () => {
+      // Arrange
+      containerWidth = widthForColumns(2);
+      stubRowHeights();
+      const { container, unmount } = render(
+        <VirtualItemGrid
+          groupedItems={[{ title: 'Unique Armor', items: [createMockItem()], foundCount: 0 }]}
+          showGroupHeaders
+          progressLookup={createMockProgressLookup()}
+          characters={[]}
+          onItemClick={vi.fn()}
+        />,
+      );
+      const contentObserver = findContentObserver(
+        container.firstElementChild?.firstElementChild as HTMLElement,
+      );
+      expect(contentObserver.disconnect).not.toHaveBeenCalled();
+
+      // Act
+      unmount();
+
+      // Assert
+      expect(contentObserver.disconnect).toHaveBeenCalledTimes(1);
     });
   });
 });

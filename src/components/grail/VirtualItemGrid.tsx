@@ -154,7 +154,8 @@ export function createGridRows(
 /**
  * Tracks how many grid columns fit into an element's width, updating on resize.
  * Returns a callback ref to attach to the measured element and the current column count.
- * The element is kept in state, so measuring starts once it is attached (still before the first paint).
+ * The element is kept in state: the first committed render uses one column, and the real count is
+ * applied by a layout effect once the element is attached, so it lands before the first paint.
  * Only the column count is stored, so resizes that keep the same count do not re-render.
  */
 function useElementColumnCount(): [(element: HTMLDivElement | null) => void, number] {
