@@ -1,13 +1,10 @@
 import { readFile } from 'node:fs/promises';
-import { extname, resolve } from 'node:path';
+import { extname } from 'node:path';
 import type { types as d2sTypes } from '@dschu012/d2s';
 import * as d2s from '@dschu012/d2s';
 import { readItem, writeItem } from '@dschu012/d2s/lib/d2/items';
 import * as d2stash from '@dschu012/d2s/lib/d2/stash';
-import { constants as constants96 } from '@dschu012/d2s/lib/data/versions/96_constant_data';
-import { constants as constants99 } from '@dschu012/d2s/lib/data/versions/99_constant_data';
 import type { VaultLocationContext, VaultSourceFileType } from '../../types/grail';
-import { writeFileAtomic } from '../../utils/atomicWrite';
 import {
   isModernStashVersion,
   normalizeItemCodeKey,
@@ -17,7 +14,6 @@ import {
 import { createBoundedBitReader } from '../boundedBitReader';
 import { ensureD2sConstants } from '../d2s/constants';
 import { constants105Extended } from '../modernStashParser';
-import { backupSaveFile } from '../saveFileBackup';
 import { D2I_SECTOR_HEADER_SIZE, readD2iMetadata } from '../stashFormat';
 import { resolveTargetCharacterClass } from './equipValidation';
 import { resolveItemCode } from './itemFields';
@@ -47,13 +43,18 @@ import {
   withReducedQuantity,
   withUpdatedResourceStackCount,
 } from './resourceStacks';
+import {
+  assertWritableD2iBuffer,
+  assertWritableStashMutationTarget,
+  getStashConstants,
+  isModernD2iFile,
+  isSameSaveFile,
+  writeClassicStashFile,
+  writeD2sSaveFile,
+  writeSaveFile,
+} from './saveFileWrites';
 
 export type { SaveFileItemLocator } from './itemLocators';
-
-interface StashConstants {
-  constants: d2sTypes.IConstantData;
-  version: number;
-}
 
 export interface MoveSaveFileItemOptions {
   sourceFilePath: string;
@@ -71,117 +72,6 @@ export interface MoveSaveFileItemOptions {
   targetGridX?: number;
   targetGridY?: number;
   targetEquippedSlotId?: number;
-}
-
-function getStashConstants(ext: string): StashConstants {
-  if (ext === '.d2i') {
-    return { constants: constants99, version: 99 };
-  }
-
-  return { constants: constants96, version: 96 };
-}
-
-function assertWritableD2iBuffer(ext: string, buffer: Buffer): void {
-  if (ext !== '.d2i') {
-    return;
-  }
-
-  const metadata = readD2iMetadata(buffer);
-  if (isModernStashVersion(metadata.version)) {
-    throw new Error('MODERN_STASH_READ_ONLY');
-  }
-}
-
-async function assertWritableStashMutationTarget(
-  filePath: string,
-  fileType: VaultSourceFileType,
-): Promise<void> {
-  if (fileType !== 'd2i') {
-    return;
-  }
-
-  const buffer = await readFile(filePath);
-  assertWritableD2iBuffer(extname(filePath), buffer);
-}
-
-/** Backs up the existing save file, then atomically replaces it. */
-async function writeSaveFile(filePath: string, data: Buffer): Promise<void> {
-  await backupSaveFile(filePath);
-  await writeFileAtomic(filePath, data);
-}
-
-function normalizeFilePathForComparison(filePath: string): string {
-  const resolved = resolve(filePath);
-  return process.platform === 'win32' ? resolved.toLowerCase() : resolved;
-}
-
-/**
- * True when both paths point at the same file. Paths that differ only by case, separators or
- * relative segments must be treated as the same file: otherwise a "cross-file" move would add the
- * item to the file and then remove it from that same file again, losing it.
- */
-function isSameSaveFile(
-  pathA: string,
-  typeA: VaultSourceFileType,
-  pathB: string,
-  typeB: VaultSourceFileType,
-): boolean {
-  return (
-    typeA === typeB &&
-    normalizeFilePathForComparison(pathA) === normalizeFilePathForComparison(pathB)
-  );
-}
-
-function countD2sItems(data: d2sTypes.ID2S): number {
-  return (
-    (data.items?.length ?? 0) + (data.corpse_items?.length ?? 0) + (data.merc_items?.length ?? 0)
-  );
-}
-
-/**
- * Serializes a character save, re-parses the result and only then replaces the file. Refuses to
- * write when the re-parsed save has a different number of items than the in-memory data, because
- * that means the serializer would silently drop (or invent) items.
- */
-async function writeD2sSaveFile(filePath: string, data: d2sTypes.ID2S): Promise<void> {
-  const expectedItemCount = countD2sItems(data);
-  const bytes = Buffer.from(await d2s.write(data));
-  const reparsed = await d2s.read(bytes);
-  const actualItemCount = countD2sItems(reparsed);
-
-  if (actualItemCount !== expectedItemCount) {
-    throw new Error(
-      `Refusing to write save file: expected ${expectedItemCount} items but serialized data contains ${actualItemCount}`,
-    );
-  }
-
-  await writeSaveFile(filePath, bytes);
-}
-
-function countStashItems(data: d2sTypes.IStash): number {
-  return data.pages.reduce((total, page) => total + page.items.length, 0);
-}
-
-/** Classic stash counterpart of {@link writeD2sSaveFile}. */
-async function writeClassicStashFile(
-  filePath: string,
-  data: d2sTypes.IStash,
-  stashConstants: StashConstants,
-): Promise<void> {
-  const expectedItemCount = countStashItems(data);
-  const bytes = Buffer.from(
-    await d2stash.write(data, stashConstants.constants, stashConstants.version),
-  );
-  const reparsed = await d2stash.read(bytes, stashConstants.constants);
-  const actualItemCount = countStashItems(reparsed);
-
-  if (actualItemCount !== expectedItemCount) {
-    throw new Error(
-      `Refusing to write stash file: expected ${expectedItemCount} items but serialized data contains ${actualItemCount}`,
-    );
-  }
-
-  await writeSaveFile(filePath, bytes);
 }
 
 async function findItemInSaveFile(
@@ -1633,15 +1523,6 @@ async function splitStackInSaveFileUnlocked(options: SplitStackOptions): Promise
   }
 
   await writeClassicStashFile(sourceFilePath, data, { constants, version });
-}
-
-async function isModernD2iFile(filePath: string, fileType: VaultSourceFileType): Promise<boolean> {
-  if (fileType !== 'd2i' || extname(filePath) !== '.d2i') {
-    return false;
-  }
-  const buffer = await readFile(filePath);
-  const metadata = readD2iMetadata(buffer);
-  return isModernStashVersion(metadata.version);
 }
 
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: This move flow intentionally handles same-file vs cross-file logic and modern d2i shared/resource branches in one transactional path.
