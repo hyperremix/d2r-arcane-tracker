@@ -7,18 +7,24 @@ import { createIpcMainRegistry } from '../ipc/handle';
  * Directory of the last file or folder the user picked in a native dialog.
  * Since Electron 43, dialogs without a `defaultPath` open in the Downloads folder instead of
  * letting the OS restore the last-used directory, so the previous behavior is kept here.
+ * It is kept in memory only: it is remembered per session and resets when the app restarts.
  */
 let lastUsedDirectory: string | undefined;
 
 /**
  * Points dialog options at the last-used directory when the caller did not choose a location.
  * A missing `defaultPath` becomes the remembered directory, and a bare file name is placed in it.
- * Options that are not plain objects are returned unchanged so Electron can reject them.
+ * Options that are not plain objects (including arrays) are returned unchanged so Electron can reject them.
  * @param {T} options - Dialog options received from the renderer process.
  * @returns {T} The options with a resolved `defaultPath` when one could be inferred.
  */
 export function applyLastUsedDirectory<T>(options: T): T {
-  if (!lastUsedDirectory || typeof options !== 'object' || options === null) {
+  if (
+    !lastUsedDirectory ||
+    typeof options !== 'object' ||
+    options === null ||
+    Array.isArray(options)
+  ) {
     return options;
   }
 
