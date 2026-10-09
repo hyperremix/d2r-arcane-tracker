@@ -2,6 +2,20 @@ import type { types as d2sTypes } from '@dschu012/d2s';
 import { constants as constants96 } from '@dschu012/d2s/lib/data/versions/96_constant_data';
 import { constants as constants99 } from '@dschu012/d2s/lib/data/versions/99_constant_data';
 import type { CharacterClass } from '../../types/grail';
+import {
+  buildItemEquipMetadataByCode,
+  EQUIP_VALIDATION_PREFIX,
+  type EquipValidationCode,
+  type ItemEquipMetadata,
+  isClawCategorySet,
+  isShieldCategorySet,
+  isSwordCategorySet,
+  isWeaponLikeCategorySet,
+  normalizeOccupiedWeaponSetSlotId,
+  normalizeWeaponSetSlotId,
+  resolveEligibleEquippedSlotIds,
+  resolveRequiredCharacterClass,
+} from '../../utils/equipSlots';
 import { normalizeItemId, resolveItemCode } from './itemFields';
 
 /**
@@ -9,158 +23,12 @@ import { normalizeItemId, resolveItemCode } from './itemFields';
  * two-handed / off-hand constraints. Violations throw `EQUIP_VALIDATION:<code>` errors.
  */
 
-interface ConstantItemDefinition {
-  c?: unknown;
-  mind?: unknown;
-  maxd?: unknown;
-  min2d?: unknown;
-  max2d?: unknown;
-}
-
-interface ConstantDataWithItems {
-  armor_items?: Record<string, ConstantItemDefinition>;
-  weapon_items?: Record<string, ConstantItemDefinition>;
-  other_items?: Record<string, ConstantItemDefinition>;
-}
-
-interface ItemEquipMetadata {
-  categories?: Set<string>;
-  hasOneHandDamage: boolean;
-  hasTwoHandDamage: boolean;
-}
-
-type EquipValidationCode =
-  | 'INVALID_SLOT'
-  | 'CLASS_RESTRICTED'
-  | 'OFFHAND_WEAPON_RESTRICTED'
-  | 'TWO_HANDED_REQUIRES_RIGHT_HAND'
-  | 'TWO_HANDED_OFFHAND_OCCUPIED'
-  | 'OFFHAND_BLOCKED_BY_TWO_HANDED'
-  | 'TARGET_SLOT_OCCUPIED';
-
-const EQUIP_VALIDATION_PREFIX = 'EQUIP_VALIDATION';
 const VALID_EQUIPPED_SLOT_IDS = new Set([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
-const CLASS_SPECIFIC_CATEGORY_TO_CLASS: Record<string, Exclude<CharacterClass, 'shared_stash'>> = {
-  'amazon item': 'amazon',
-  'assassin item': 'assassin',
-  'barbarian item': 'barbarian',
-  'druid item': 'druid',
-  'necromancer item': 'necromancer',
-  'paladin item': 'paladin',
-  'sorceress item': 'sorceress',
-};
 
-function toPositiveNumber(value: unknown): number | undefined {
-  if (typeof value === 'number' && Number.isFinite(value) && value > 0) {
-    return value;
-  }
-
-  if (typeof value === 'string' && value.trim().length > 0) {
-    const parsed = Number.parseFloat(value);
-    if (Number.isFinite(parsed) && parsed > 0) {
-      return parsed;
-    }
-  }
-
-  return undefined;
-}
-
-const ITEM_EQUIP_METADATA_BY_CODE = (() => {
-  const map = new Map<string, ItemEquipMetadata>();
-  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Constant-data normalization covers several table shapes.
-  const addConstantData = (constantData: d2sTypes.IConstantData) => {
-    const typedConstantData = constantData as unknown as ConstantDataWithItems;
-    const entries = [
-      typedConstantData.armor_items,
-      typedConstantData.weapon_items,
-      typedConstantData.other_items,
-    ];
-
-    for (const record of entries) {
-      if (!record) {
-        continue;
-      }
-
-      for (const [code, itemDefinition] of Object.entries(record)) {
-        const normalizedCode = code.toLowerCase();
-        const existing = map.get(normalizedCode) ?? {
-          categories: undefined,
-          hasOneHandDamage: false,
-          hasTwoHandDamage: false,
-        };
-        let categories = existing.categories;
-
-        if (!Array.isArray(itemDefinition.c)) {
-          map.set(normalizedCode, {
-            categories,
-            hasOneHandDamage:
-              existing.hasOneHandDamage ||
-              toPositiveNumber(itemDefinition.mind) !== undefined ||
-              toPositiveNumber(itemDefinition.maxd) !== undefined,
-            hasTwoHandDamage:
-              existing.hasTwoHandDamage ||
-              toPositiveNumber(itemDefinition.min2d) !== undefined ||
-              toPositiveNumber(itemDefinition.max2d) !== undefined,
-          });
-          continue;
-        }
-
-        categories = categories ?? new Set<string>();
-        for (const category of itemDefinition.c) {
-          if (typeof category === 'string') {
-            const normalizedCategory = category.trim().toLowerCase();
-            if (normalizedCategory.length > 0) {
-              categories.add(normalizedCategory);
-            }
-          }
-        }
-
-        map.set(normalizedCode, {
-          categories,
-          hasOneHandDamage:
-            existing.hasOneHandDamage ||
-            toPositiveNumber(itemDefinition.mind) !== undefined ||
-            toPositiveNumber(itemDefinition.maxd) !== undefined,
-          hasTwoHandDamage:
-            existing.hasTwoHandDamage ||
-            toPositiveNumber(itemDefinition.min2d) !== undefined ||
-            toPositiveNumber(itemDefinition.max2d) !== undefined,
-        });
-      }
-    }
-  };
-
-  addConstantData(constants99);
-  addConstantData(constants96);
-  return map;
-})();
+const ITEM_EQUIP_METADATA_BY_CODE = buildItemEquipMetadataByCode([constants99, constants96]);
 
 function createEquipValidationError(code: EquipValidationCode): Error {
   return new Error(`${EQUIP_VALIDATION_PREFIX}:${code}`);
-}
-
-function normalizeOccupiedWeaponSetSlotId(slotId: number): number {
-  if (slotId === 13) {
-    return 11;
-  }
-
-  if (slotId === 14) {
-    return 12;
-  }
-
-  return slotId;
-}
-
-function normalizeWeaponSetSlotId(slotId: number): number {
-  if (slotId === 11 || slotId === 13) {
-    return 4;
-  }
-
-  if (slotId === 12 || slotId === 14) {
-    return 5;
-  }
-
-  return slotId;
 }
 
 function resolveItemEquipMetadata(item: d2sTypes.IItem): ItemEquipMetadata {
@@ -180,54 +48,6 @@ function resolveItemEquipMetadata(item: d2sTypes.IItem): ItemEquipMetadata {
       hasTwoHandDamage: false,
     }
   );
-}
-
-function isWeaponLikeCategorySet(categories: Set<string> | undefined): boolean {
-  if (!categories) {
-    return false;
-  }
-
-  return [...categories].some((category) => category.includes('weapon'));
-}
-
-function isShieldCategorySet(categories: Set<string> | undefined): boolean {
-  if (!categories) {
-    return false;
-  }
-
-  return [...categories].some((category) => category.includes('shield'));
-}
-
-function isSwordCategorySet(categories: Set<string> | undefined): boolean {
-  if (!categories) {
-    return false;
-  }
-
-  return [...categories].some((category) => category.includes('sword'));
-}
-
-function isClawCategorySet(categories: Set<string> | undefined): boolean {
-  if (!categories) {
-    return false;
-  }
-
-  return [...categories].some((category) => category.includes('hand to hand'));
-}
-
-function resolveRequiredCharacterClass(
-  categories: Set<string> | undefined,
-): Exclude<CharacterClass, 'shared_stash'> | undefined {
-  if (!categories) {
-    return undefined;
-  }
-
-  for (const [category, characterClass] of Object.entries(CLASS_SPECIFIC_CATEGORY_TO_CLASS)) {
-    if (categories.has(category)) {
-      return characterClass;
-    }
-  }
-
-  return undefined;
 }
 
 function normalizeCharacterClass(rawClass: unknown): CharacterClass | undefined {
@@ -333,69 +153,9 @@ function isTwoHandedRequiredWeaponForCharacter(
   );
 }
 
-function resolveEligibleEquippedSlots(item: d2sTypes.IItem): Set<number> | undefined {
-  const { categories } = resolveItemEquipMetadata(item);
-  const slots = new Set<number>();
-
-  if (!categories || categories.size === 0) {
-    return undefined;
-  }
-
-  const isRing = categories.has('ring');
-  const isAmulet = categories.has('amulet');
-  const isHelm = categories.has('helm');
-  const isGloves = categories.has('gloves');
-  const isBoots = categories.has('boots');
-  const isBelt = categories.has('belt');
-  const isShield = categories.has('shield') || categories.has('any shield');
-  const isWeaponLike = isWeaponLikeCategorySet(categories);
-  const isBodyArmor = categories.has('armor') || categories.has('any armor');
-  const hasSpecificArmorPieceCategory = isHelm || isGloves || isBoots || isBelt || isShield;
-
-  if (isRing) {
-    slots.add(6);
-    slots.add(7);
-  }
-
-  if (isAmulet) {
-    slots.add(2);
-  }
-
-  if (isHelm) {
-    slots.add(1);
-  }
-
-  if (isGloves) {
-    slots.add(10);
-  }
-
-  if (isBoots) {
-    slots.add(9);
-  }
-
-  if (isBelt) {
-    slots.add(8);
-  }
-
-  if (isShield) {
-    slots.add(5);
-  }
-
-  if (isWeaponLike) {
-    slots.add(4);
-    slots.add(5);
-  }
-
-  if (isBodyArmor && !hasSpecificArmorPieceCategory) {
-    slots.add(3);
-  }
-
-  return slots;
-}
-
 function assertEligibleForEquippedSlot(item: d2sTypes.IItem, targetSlotId: number): void {
   const normalizedTargetSlotId = normalizeWeaponSetSlotId(targetSlotId);
-  const eligibleSlots = resolveEligibleEquippedSlots(item);
+  const eligibleSlots = resolveEligibleEquippedSlotIds(resolveItemEquipMetadata(item).categories);
   if (!eligibleSlots || eligibleSlots.size === 0) {
     throw createEquipValidationError('INVALID_SLOT');
   }

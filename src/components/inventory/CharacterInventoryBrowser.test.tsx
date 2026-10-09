@@ -3815,7 +3815,8 @@ describe('When CharacterInventoryBrowser is rendered', () => {
                   ethereal: false,
                   socketCount: 0,
                   iconFileName: 'amulet.png',
-                  rawItemJson: '{"id":301,"type_name":"Amulet","code":"amu"}',
+                  rawItemJson:
+                    '{"id":301,"type_name":"Amulet","code":"amu","categories":["Amulet","Miscellaneous"]}',
                   rawParsedItem: {},
                   seenAt: new Date('2024-01-01T00:00:00.000Z'),
                 },
@@ -3906,7 +3907,8 @@ describe('When CharacterInventoryBrowser is rendered', () => {
                   ethereal: false,
                   socketCount: 0,
                   iconFileName: 'amulet.png',
-                  rawItemJson: '{"id":302,"type_name":"Amulet","code":"amu"}',
+                  rawItemJson:
+                    '{"id":302,"type_name":"Amulet","code":"amu","categories":["Amulet","Miscellaneous"]}',
                   rawParsedItem: {},
                   seenAt: new Date('2024-01-01T00:00:00.000Z'),
                 },
@@ -4000,7 +4002,8 @@ describe('When CharacterInventoryBrowser is rendered', () => {
                   ethereal: false,
                   socketCount: 0,
                   iconFileName: 'amulet.png',
-                  rawItemJson: '{"id":303,"type_name":"Amulet","code":"amu"}',
+                  rawItemJson:
+                    '{"id":303,"type_name":"Amulet","code":"amu","categories":["Amulet","Miscellaneous"]}',
                   rawParsedItem: {},
                   seenAt: new Date('2024-01-01T00:00:00.000Z'),
                 },
@@ -4045,6 +4048,117 @@ describe('When CharacterInventoryBrowser is rendered', () => {
       });
       expect(refreshSaveFilesMock).not.toHaveBeenCalled();
       expect(searchAllMock).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('If a helm is dragged over equipment slots', () => {
+    function mockHelmSearchResponse(): void {
+      searchAllMock.mockResolvedValue({
+        inventory: {
+          snapshots: [
+            {
+              snapshotId: 'equip-helm-snap',
+              characterName: 'Sorc',
+              characterId: 'char-1',
+              sourceFileType: 'd2s',
+              sourceFilePath: '/tmp/sorc.d2s',
+              capturedAt: new Date('2024-01-01T00:00:00.000Z'),
+              items: [
+                {
+                  fingerprint: 'fp-shako',
+                  fingerprintInputs: {
+                    sourceFileType: 'd2s',
+                    characterName: 'Sorc',
+                    locationContext: 'inventory',
+                    quality: 'unique',
+                    ethereal: false,
+                    socketCount: 0,
+                    gridX: 0,
+                    gridY: 0,
+                    gridWidth: 2,
+                    gridHeight: 2,
+                    isSocketedItem: false,
+                    itemName: 'Harlequin Crest',
+                  },
+                  characterName: 'Sorc',
+                  characterId: 'char-1',
+                  sourceFileType: 'd2s',
+                  sourceFilePath: '/tmp/sorc.d2s',
+                  locationContext: 'inventory',
+                  type: 'unique',
+                  itemCode: 'uap',
+                  gridX: 0,
+                  gridY: 0,
+                  gridWidth: 2,
+                  gridHeight: 2,
+                  isSocketedItem: false,
+                  itemName: 'Harlequin Crest',
+                  quality: 'unique',
+                  ethereal: false,
+                  socketCount: 0,
+                  iconFileName: 'shako.png',
+                  rawItemJson:
+                    '{"id":401,"type_name":"Shako","type":"uap","categories":["Helm","Any Armor"]}',
+                  rawParsedItem: {},
+                  seenAt: new Date('2024-01-01T00:00:00.000Z'),
+                },
+              ],
+            },
+          ],
+          totalSnapshots: 1,
+          totalItems: 1,
+        },
+        vault: {
+          items: [],
+          total: 0,
+          page: 1,
+          pageSize: 20,
+        },
+      });
+    }
+
+    it('Then the head slot accepts the drop with the head slot id', async () => {
+      // Arrange
+      mockHelmSearchResponse();
+      render(<CharacterInventoryBrowser />);
+      const draggedTile = await screen.findByLabelText('Inventory item Harlequin Crest');
+      const headSlot = (await screen.findAllByTestId('equipped-slot-frame'))[0];
+      const dataTransfer = createDragDataTransfer();
+
+      // Act
+      fireEvent.dragStart(draggedTile, { dataTransfer });
+      fireEvent.dragOver(headSlot, { dataTransfer });
+      fireEvent.drop(headSlot, { dataTransfer });
+
+      // Assert
+      await waitFor(() => {
+        expect(moveInventoryItemMock).toHaveBeenCalledWith(
+          expect.objectContaining({
+            targetLocationContext: 'equipped',
+            targetEquippedSlotId: 1,
+          }),
+        );
+      });
+    });
+
+    it('Then the amulet slot is marked invalid and the drop is not sent', async () => {
+      // Arrange
+      mockHelmSearchResponse();
+      render(<CharacterInventoryBrowser />);
+      const draggedTile = await screen.findByLabelText('Inventory item Harlequin Crest');
+      const amuletSlot = (await screen.findAllByTestId('equipped-slot-frame'))[1];
+      const dataTransfer = createDragDataTransfer();
+
+      // Act
+      fireEvent.dragStart(draggedTile, { dataTransfer });
+      fireEvent.dragOver(amuletSlot, { dataTransfer });
+      const slotClassDuringDragOver = amuletSlot.className;
+      fireEvent.drop(amuletSlot, { dataTransfer });
+
+      // Assert
+      expect(slotClassDuringDragOver).toContain('border-destructive');
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(moveInventoryItemMock).not.toHaveBeenCalled();
     });
   });
 

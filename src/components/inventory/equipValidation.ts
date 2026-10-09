@@ -1,89 +1,73 @@
+import {
+  EQUIP_VALIDATION_CODES,
+  EQUIP_VALIDATION_PREFIX,
+  type EquipValidationCode,
+  normalizeEquipCategories,
+  resolveEligibleEquippedSlotIds,
+} from 'electron/utils/equipSlots';
 import { toast } from 'sonner';
 import type { ActiveInventoryDragItem } from '@/components/inventory/dragPayloads';
+import { getErrorMessage } from '@/components/inventory/operationErrors';
 import {
   EQUIPPED_SLOT_IDS,
   type EquippedWeaponSet,
-  PAPER_DOLL_SLOT_ORDER,
   type PaperDollSlotKey,
   resolvePaperDollSlotKey,
 } from '@/components/inventory/spatialLayout';
 import { translations } from '@/i18n/translations';
 
-export type EquipValidationCode =
-  | 'INVALID_SLOT'
-  | 'CLASS_RESTRICTED'
-  | 'OFFHAND_WEAPON_RESTRICTED'
-  | 'TWO_HANDED_REQUIRES_RIGHT_HAND'
-  | 'TWO_HANDED_OFFHAND_OCCUPIED'
-  | 'OFFHAND_BLOCKED_BY_TWO_HANDED'
-  | 'TARGET_SLOT_OCCUPIED';
-const EQUIP_VALIDATION_ERROR_PATTERN = /EQUIP_VALIDATION:([A-Z_]+)/;
-const EQUIP_VALIDATION_CODES = new Set<EquipValidationCode>([
-  'INVALID_SLOT',
-  'CLASS_RESTRICTED',
-  'OFFHAND_WEAPON_RESTRICTED',
-  'TWO_HANDED_REQUIRES_RIGHT_HAND',
-  'TWO_HANDED_OFFHAND_OCCUPIED',
-  'OFFHAND_BLOCKED_BY_TWO_HANDED',
-  'TARGET_SLOT_OCCUPIED',
-]);
+type Translate = (key: string, options?: Record<string, unknown>) => string;
 
-function resolveEquipValidationReasonTranslationKey(code: EquipValidationCode): string {
-  switch (code) {
-    case 'INVALID_SLOT':
-      return translations.inventoryBrowser.equipValidation.reasons.invalidSlot;
-    case 'CLASS_RESTRICTED':
-      return translations.inventoryBrowser.equipValidation.reasons.classRestricted;
-    case 'OFFHAND_WEAPON_RESTRICTED':
-      return translations.inventoryBrowser.equipValidation.reasons.offhandWeaponRestricted;
-    case 'TWO_HANDED_REQUIRES_RIGHT_HAND':
-      return translations.inventoryBrowser.equipValidation.reasons.twoHandedRequiresRightHand;
-    case 'TWO_HANDED_OFFHAND_OCCUPIED':
-      return translations.inventoryBrowser.equipValidation.reasons.twoHandedOffhandOccupied;
-    case 'OFFHAND_BLOCKED_BY_TWO_HANDED':
-      return translations.inventoryBrowser.equipValidation.reasons.offhandBlockedByTwoHanded;
-    case 'TARGET_SLOT_OCCUPIED':
-      return translations.inventoryBrowser.equipValidation.reasons.targetSlotOccupied;
-    default:
-      return translations.inventoryBrowser.equipValidation.reasons.invalidSlot;
-  }
-}
+const EQUIP_VALIDATION_ERROR_PATTERN = new RegExp(`${EQUIP_VALIDATION_PREFIX}:([A-Z_]+)`);
 
+const EQUIP_VALIDATION_REASON_KEYS: Record<EquipValidationCode, string> = {
+  INVALID_SLOT: translations.inventoryBrowser.equipValidation.reasons.invalidSlot,
+  CLASS_RESTRICTED: translations.inventoryBrowser.equipValidation.reasons.classRestricted,
+  OFFHAND_WEAPON_RESTRICTED:
+    translations.inventoryBrowser.equipValidation.reasons.offhandWeaponRestricted,
+  TWO_HANDED_REQUIRES_RIGHT_HAND:
+    translations.inventoryBrowser.equipValidation.reasons.twoHandedRequiresRightHand,
+  TWO_HANDED_OFFHAND_OCCUPIED:
+    translations.inventoryBrowser.equipValidation.reasons.twoHandedOffhandOccupied,
+  OFFHAND_BLOCKED_BY_TWO_HANDED:
+    translations.inventoryBrowser.equipValidation.reasons.offhandBlockedByTwoHanded,
+  TARGET_SLOT_OCCUPIED: translations.inventoryBrowser.equipValidation.reasons.targetSlotOccupied,
+};
+
+/**
+ * Reads the equip validation code from an `EQUIP_VALIDATION:<code>` error of the save file editor.
+ *
+ * @returns The code, or `undefined` for any other error
+ */
 export function parseEquipValidationCode(error: unknown): EquipValidationCode | undefined {
-  const message =
-    typeof error === 'string'
-      ? error
-      : typeof (error as { message?: unknown })?.message === 'string'
-        ? (error as { message: string }).message
-        : undefined;
+  const message = getErrorMessage(error);
   if (!message) {
     return undefined;
   }
 
   const match = EQUIP_VALIDATION_ERROR_PATTERN.exec(message);
-  if (!match?.[1]) {
-    return undefined;
-  }
-
-  const code = match[1] as EquipValidationCode;
-  return EQUIP_VALIDATION_CODES.has(code) ? code : undefined;
+  const code = match?.[1] as EquipValidationCode | undefined;
+  return code && EQUIP_VALIDATION_CODES.has(code) ? code : undefined;
 }
 
-export function showEquipValidationToastIfPresent(
-  error: unknown,
-  t: (key: string, options?: Record<string, unknown>) => string,
-): boolean {
+/**
+ * Shows the "equip blocked" toast with the reason when the error is an equip validation error.
+ *
+ * @returns `true` when a toast was shown
+ */
+export function showEquipValidationToastIfPresent(error: unknown, t: Translate): boolean {
   const equipValidationCode = parseEquipValidationCode(error);
   if (!equipValidationCode) {
     return false;
   }
 
   toast.error(t(translations.inventoryBrowser.equipValidation.title), {
-    description: t(resolveEquipValidationReasonTranslationKey(equipValidationCode)),
+    description: t(EQUIP_VALIDATION_REASON_KEYS[equipValidationCode]),
   });
   return true;
 }
 
+/** Save file slot id of a paper doll slot; the hand slots depend on the shown weapon set. */
 export function resolveTargetEquippedSlotId(
   slotKey: PaperDollSlotKey,
   weaponSet: EquippedWeaponSet,
@@ -99,130 +83,34 @@ export function resolveTargetEquippedSlotId(
   return EQUIPPED_SLOT_IDS[slotKey];
 }
 
-function parseRawTypeName(rawItemJson: string): string {
+function parseRawItemCategories(rawItemJson: string): Set<string> | undefined {
   try {
-    const parsed = JSON.parse(rawItemJson) as {
-      type_name?: unknown;
-      name?: unknown;
-      type?: unknown;
-    };
-
-    if (typeof parsed.type_name === 'string' && parsed.type_name.trim().length > 0) {
-      return parsed.type_name.toLowerCase();
-    }
-
-    if (typeof parsed.name === 'string' && parsed.name.trim().length > 0) {
-      return parsed.name.toLowerCase();
-    }
-
-    if (typeof parsed.type === 'string' && parsed.type.trim().length > 0) {
-      return parsed.type.toLowerCase();
-    }
+    const parsed = JSON.parse(rawItemJson) as { categories?: unknown } | null;
+    return normalizeEquipCategories(parsed?.categories);
   } catch {
-    // Use fallback below.
+    return undefined;
   }
-
-  return '';
 }
 
-// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Equipment-slot inference intentionally combines code, raw tooltip name hints, and equipped-slot fallbacks.
+/**
+ * Paper doll slots the dragged item may be dropped on. Uses the same item type rules as the save
+ * file editor, applied to the categories d2s stored on the parsed item. Class and two-handed
+ * rules are still checked by the save file editor when the item is dropped.
+ *
+ * @param item - Dragged inventory item
+ * @returns Eligible slots; empty when the item cannot be equipped
+ */
 export function resolveEligibleEquipmentSlots(
-  item: ActiveInventoryDragItem,
+  item: Pick<ActiveInventoryDragItem, 'rawItemJson'>,
 ): Set<PaperDollSlotKey> {
+  const slotIds = resolveEligibleEquippedSlotIds(parseRawItemCategories(item.rawItemJson));
   const slots = new Set<PaperDollSlotKey>();
-  const sourceSlot = resolvePaperDollSlotKey(item.sourceEquippedSlotId);
-  const sourceCode = item.itemCode?.toLowerCase();
-  const typeText = parseRawTypeName(item.rawItemJson);
-  const hasKeyword = (keyword: string) => typeText.includes(keyword);
 
-  if (sourceCode === 'rin' || typeText === 'ring' || hasKeyword(' ring')) {
-    slots.add('leftRing');
-    slots.add('rightRing');
-  }
-
-  if (sourceCode === 'amu' || hasKeyword('amulet')) {
-    slots.add('amulet');
-  }
-
-  if (
-    hasKeyword('helm') ||
-    hasKeyword('coronet') ||
-    hasKeyword('circlet') ||
-    hasKeyword('tiara') ||
-    hasKeyword('diadem') ||
-    hasKeyword('mask') ||
-    hasKeyword('crown') ||
-    hasKeyword('pelt')
-  ) {
-    slots.add('head');
-  }
-
-  if (hasKeyword('glove') || hasKeyword('gauntlet') || hasKeyword('bracer') || hasKeyword('mitt')) {
-    slots.add('gloves');
-  }
-
-  if (hasKeyword('boot') || hasKeyword('greaves')) {
-    slots.add('boots');
-  }
-
-  if (hasKeyword('belt') || hasKeyword('sash') || hasKeyword('girdle') || hasKeyword('coil')) {
-    slots.add('belt');
-  }
-
-  if (hasKeyword('shield')) {
-    slots.add('leftHand');
-  }
-
-  const isLikelyWeapon =
-    hasKeyword('sword') ||
-    hasKeyword('axe') ||
-    hasKeyword('mace') ||
-    hasKeyword('staff') ||
-    hasKeyword('wand') ||
-    hasKeyword('spear') ||
-    hasKeyword('polearm') ||
-    hasKeyword('bow') ||
-    hasKeyword('crossbow') ||
-    hasKeyword('orb') ||
-    hasKeyword('javelin') ||
-    hasKeyword('dagger') ||
-    hasKeyword('flail') ||
-    hasKeyword('hammer') ||
-    hasKeyword('claw') ||
-    hasKeyword('knife');
-
-  if (isLikelyWeapon) {
-    slots.add('rightHand');
-    slots.add('leftHand');
-  }
-
-  const isLikelyArmor =
-    hasKeyword('armor') ||
-    hasKeyword('mail') ||
-    hasKeyword('plate') ||
-    hasKeyword('robe') ||
-    hasKeyword('skin') ||
-    hasKeyword('harness') ||
-    hasKeyword('cuirass') ||
-    hasKeyword('shell');
-  if (isLikelyArmor && !slots.has('head') && !slots.has('belt') && !slots.has('boots')) {
-    slots.add('armor');
-  }
-
-  if (sourceSlot) {
-    if (sourceSlot === 'leftRing' || sourceSlot === 'rightRing') {
-      slots.add('leftRing');
-      slots.add('rightRing');
-    } else if (sourceSlot === 'leftHand' || sourceSlot === 'rightHand') {
-      slots.add('leftHand');
-      slots.add('rightHand');
-    } else {
-      slots.add(sourceSlot);
+  for (const slotId of slotIds ?? []) {
+    const slotKey = resolvePaperDollSlotKey(slotId);
+    if (slotKey) {
+      slots.add(slotKey);
     }
-  }
-
-  if (slots.size === 0) {
-    return new Set(PAPER_DOLL_SLOT_ORDER);
   }
 
   return slots;
