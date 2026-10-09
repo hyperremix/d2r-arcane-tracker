@@ -1,0 +1,54 @@
+import type { ReactNode } from 'react';
+import { cn } from '@/lib/utils';
+
+/**
+ * Props for a single toggle button inside a segmented control.
+ */
+interface SegmentButtonProps {
+  pressed: boolean;
+  onClick: () => void;
+  children: ReactNode;
+  ariaLabel?: string;
+}
+
+/**
+ * A single button inside a segmented control. Uses aria-pressed to expose its state.
+ */
+export function SegmentButton({ pressed, onClick, children, ariaLabel }: SegmentButtonProps) {
+  return (
+    <button
+      type="button"
+      aria-pressed={pressed}
+      aria-label={ariaLabel}
+      onClick={onClick}
+      className={cn(
+        'inline-flex h-7 items-center justify-center gap-1.5 rounded-[5px] px-2.5 font-medium text-muted-foreground text-sm outline-none transition-colors',
+        'hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50',
+        '[&_svg]:size-4 [&_svg]:shrink-0',
+        pressed && 'bg-background text-foreground shadow-xs',
+      )}
+    >
+      {children}
+    </button>
+  );
+}
+
+/**
+ * Props for the SegmentedControl component.
+ */
+interface SegmentedControlProps {
+  legend: string;
+  children: ReactNode;
+}
+
+/**
+ * A group of mutually exclusive toggle buttons rendered as a labeled fieldset.
+ */
+export function SegmentedControl({ legend, children }: SegmentedControlProps) {
+  return (
+    <fieldset className="inline-flex items-center rounded-md border border-border bg-muted p-0.5">
+      <legend className="sr-only">{legend}</legend>
+      {children}
+    </fieldset>
+  );
+}
