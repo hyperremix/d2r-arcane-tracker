@@ -1,4 +1,4 @@
-#!/usr/bin/env npx tsx
+#!/usr/bin/env -S bunx tsx
 
 /**
  * inject-grail-item.ts
@@ -8,7 +8,7 @@
  * without needing to run the game.
  *
  * Usage:
- *   npx tsx scripts/inject-grail-item.ts [--item <itemId>] [--list] [--dry-run]
+ *   bunx tsx scripts/inject-grail-item.ts [--item <itemId>] [--list] [--dry-run]
  *
  * Options:
  *   --item <id>     Specific item ID to inject (from electron/items)
@@ -379,7 +379,7 @@ function listUnfoundItems(): void {
     }
   }
 
-  console.log('\n  Usage: npx tsx scripts/inject-grail-item.ts --item <itemId>\n');
+  console.log('\n  Usage: bunx tsx scripts/inject-grail-item.ts --item <itemId>\n');
 }
 
 /**
@@ -416,7 +416,7 @@ function parseArgs(): {
 🎮 D2R Grail Item Injection Script
 
 Usage:
-  npx tsx scripts/inject-grail-item.ts [options]
+  bunx tsx scripts/inject-grail-item.ts [options]
 
 Options:
   --item <id>     Inject a specific item by ID
@@ -428,13 +428,13 @@ Options:
 
 Examples:
   # List all unfound items
-  npx tsx scripts/inject-grail-item.ts --list
+  bunx tsx scripts/inject-grail-item.ts --list
 
   # Inject a random unfound item
-  npx tsx scripts/inject-grail-item.ts
+  bunx tsx scripts/inject-grail-item.ts
 
   # Inject a specific item
-  npx tsx scripts/inject-grail-item.ts --item goldwrap
+  bunx tsx scripts/inject-grail-item.ts --item goldwrap
 `);
       process.exit(0);
     }

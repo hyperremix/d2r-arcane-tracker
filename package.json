@@ -22,7 +22,7 @@
     "dev": "bun run rebuild && vite",
     "dev:debug": "bun run rebuild && node scripts/dev-with-debug.js",
     "preview": "electron-vite preview",
-    "build": "npm run typecheck && vite build && electron-builder --win",
+    "build": "bun run typecheck && vite build && electron-builder --win",
     "rebuild": "bun electron-rebuild -f -w better-sqlite3",
     "rebuild:test": "npm rebuild better-sqlite3",
     "typecheck": "concurrently \"tsc -p tsconfig.json --noEmit\" \"tsc -p tsconfig.node.json --noEmit\"",
