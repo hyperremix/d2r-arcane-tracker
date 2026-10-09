@@ -21,7 +21,8 @@ const userDataState = vi.hoisted(() => ({ userData: '' }));
 const importTimeDir = await vi.hoisted(async () => {
   const fs = await import('node:fs');
   const os = await import('node:os');
-  const dir = fs.mkdtempSync(`${os.tmpdir()}/grail-import-time-`);
+  const nodePath = await import('node:path');
+  const dir = fs.mkdtempSync(nodePath.join(os.tmpdir(), 'grail-import-time-'));
   userDataState.userData = dir;
   return dir;
 });
@@ -30,7 +31,11 @@ vi.mock('electron', () => ({ app: { getPath: () => userDataState.userData } }));
 
 afterAll(() => {
   // Only close the singleton if this file's import created it (it may be cached from another file).
-  if (importTimeDatabase.dbPath.startsWith(importTimeDir) && importTimeDatabase.rawDb.open) {
+  const importTimeDirPrefix = path.resolve(importTimeDir) + path.sep;
+  if (
+    path.resolve(importTimeDatabase.dbPath).startsWith(importTimeDirPrefix) &&
+    importTimeDatabase.rawDb.open
+  ) {
     importTimeDatabase.rawDb.close();
   }
   rmSync(importTimeDir, { recursive: true, force: true });
