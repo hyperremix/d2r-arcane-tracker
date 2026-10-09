@@ -18,6 +18,7 @@ import { initializeWidgetHandlers } from '../ipc-handlers/widgetHandlers';
 import { EventBus } from '../services/EventBus';
 import { createGameProcessGuard } from '../services/gameProcessGuard';
 import { GlobalHotkeyService } from '../services/globalHotkeys';
+import { GrailDetectionPipeline } from '../services/grailDetectionPipeline';
 import {
   GrailProgressService,
   loadGrailItemsIntoDetection,
@@ -163,6 +164,8 @@ async function startServices(paths: AppPaths, lifecycle: AppLifecycle): Promise<
   const saveFileMonitor = new SaveFileMonitor(eventBus, database, settings);
   lifecycle.onShutdown('save file monitor', () => saveFileMonitor.shutdown());
   saveFileMonitor.start();
+  // The effective save directory as the monitor applied it (see resolveEffectiveSaveDirectory)
+  const getSaveDirectory = () => saveFileMonitor.getSaveDirectory() ?? undefined;
 
   const itemDetection = new ItemDetectionService(eventBus);
 
@@ -182,8 +185,7 @@ async function startServices(paths: AppPaths, lifecycle: AppLifecycle): Promise<
     saveFileEditor,
     // Save files must not be edited while the game runs; uses the process monitor's state
     assertGameNotRunning: createGameProcessGuard({ processMonitor }),
-    getMonitoredSaveDirectory: () => saveFileMonitor.getSaveDirectory() ?? undefined,
-    getConfiguredSaveDirectory: () => settings.get('saveDir'),
+    getSaveDirectory,
     getInventorySnapshots: () => saveFileMonitor.getInventorySearchResult().snapshots,
   });
   const hotkeys = new GlobalHotkeyService({
@@ -219,11 +221,21 @@ async function startServices(paths: AppPaths, lifecycle: AppLifecycle): Promise<
     settings,
     eventBus,
     saveFileMonitor,
-    itemDetection,
-    grailProgress,
     broadcastToRenderers,
   });
   lifecycle.onShutdown('save file handlers', disposeSaveFileHandlers);
+  // Save file events -> item detection -> grail progress, plus the automatic monitoring start.
+  // Started after the save file handlers, so renderers get each save file event before its items
+  // are analyzed.
+  const detectionPipeline = new GrailDetectionPipeline({
+    eventBus,
+    settings,
+    saveFileMonitor,
+    itemDetection,
+    grailProgress,
+  });
+  lifecycle.onShutdown('grail detection pipeline', () => detectionPipeline.dispose());
+  detectionPipeline.start();
   lifecycle.onShutdown('vault handlers', initializeVaultHandlers(vault));
   lifecycle.onShutdown(
     'run tracker handlers',
@@ -249,7 +261,7 @@ async function startServices(paths: AppPaths, lifecycle: AppLifecycle): Promise<
   lifecycle.onShutdown('icon handlers', initializeIconHandlers({ iconService, settings }));
   lifecycle.onShutdown(
     'inventory window handlers',
-    initializeInventoryWindowHandlers(paths, () => saveFileMonitor.getSaveDirectory() ?? undefined),
+    initializeInventoryWindowHandlers(paths, getSaveDirectory),
   );
   lifecycle.onShutdown(
     'terror zone handlers',

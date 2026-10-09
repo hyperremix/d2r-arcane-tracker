@@ -90,6 +90,14 @@ vi.mock('../services/globalHotkeys', () => ({
     return { dispose: mocks.log('hotkeys.dispose') };
   }),
 }));
+vi.mock('../services/grailDetectionPipeline', () => ({
+  GrailDetectionPipeline: vi.fn(function GrailDetectionPipeline() {
+    return {
+      start: mocks.log('detectionPipeline.start'),
+      dispose: mocks.log('detectionPipeline.dispose'),
+    };
+  }),
+}));
 vi.mock('../services/iconService', () => ({ IconService: vi.fn() }));
 vi.mock('../services/itemDetection', () => ({
   ItemDetectionService: vi.fn(function ItemDetectionService() {
@@ -237,6 +245,20 @@ describe('When the app is bootstrapped', () => {
     );
   });
 
+  it('Then the grail detection pipeline is started once, and disposed before monitoring stops', async () => {
+    // Arrange
+    const runningApp = await startApp(env);
+
+    // Act
+    await runningApp.shutdown();
+
+    // Assert
+    const order = (call: string) => mocks.calls.indexOf(call);
+    expect(mocks.calls.filter((call) => call === 'detectionPipeline.start')).toHaveLength(1);
+    expect(order('detectionPipeline.start')).toBeLessThan(order('detectionPipeline.dispose'));
+    expect(order('detectionPipeline.dispose')).toBeLessThan(order('saveFileMonitor.shutdown'));
+  });
+
   describe('If the app shuts down', () => {
     it('Then hotkeys, run tracker and monitoring stop before the windows close and the database closes last', async () => {
       // Arrange
@@ -265,6 +287,7 @@ describe('When the app is bootstrapped', () => {
       const order = (call: string) => mocks.calls.indexOf(call);
       expect(order('globalHotkeyHandlers.dispose')).toBeGreaterThanOrEqual(0);
       expect(order('saveFileHandlers.dispose')).toBeLessThan(order('runTracker.shutdown'));
+      expect(order('detectionPipeline.dispose')).toBeLessThan(order('runTracker.shutdown'));
       expect(order('runTrackerHandlers.dispose')).toBeLessThan(order('runTracker.shutdown'));
     });
 

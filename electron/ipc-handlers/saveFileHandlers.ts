@@ -4,13 +4,11 @@ import type { GrailDatabase } from '../database/database';
 import type { BroadcastToRenderers } from '../ipc/broadcast';
 import { createIpcMainRegistry } from '../ipc/handle';
 import type { EventBus } from '../services/EventBus';
-import type { GrailProgressService } from '../services/grailProgressService';
-import type { ItemDetectionService } from '../services/itemDetection';
 import { inspectSaveDirectory } from '../services/saveDirectoryInspector';
 import type { D2SaveFile, SaveFileEvent, SaveFileMonitor } from '../services/saveFileMonitor';
+import { resolveEffectiveSaveDirectory } from '../services/saveFileMonitor/saveDirectorySettings';
 import type { SettingsService } from '../services/settingsService';
 import type { ItemDetectionEvent, SaveDirectoryInspection } from '../types/grail';
-import { GameMode } from '../types/grail';
 
 /** Dependencies of the save file IPC handlers. */
 export interface SaveFileHandlerDependencies {
@@ -18,22 +16,7 @@ export interface SaveFileHandlerDependencies {
   settings: SettingsService;
   eventBus: EventBus;
   saveFileMonitor: SaveFileMonitor;
-  itemDetection: ItemDetectionService;
-  grailProgress: GrailProgressService;
   broadcastToRenderers: BroadcastToRenderers;
-}
-
-/**
- * Checks whether the persisted game mode is Manual, where save file monitoring must stay off.
- * @returns True if the game mode is Manual; false otherwise or if settings cannot be read
- */
-function isManualGameMode({ settings }: SaveFileHandlerDependencies): boolean {
-  try {
-    return settings.get('gameMode') === GameMode.Manual;
-  } catch (error) {
-    console.warn('[isManualGameMode] Failed to read game mode from settings:', error);
-    return false;
-  }
 }
 
 /**
@@ -47,19 +30,18 @@ function normalizeDirectoryForComparison(directory: string): string {
 }
 
 /**
- * Gets the save directory whose data is currently stored in the database:
- * the configured `saveDir` setting, falling back to the platform default.
+ * Gets the save directory whose data is currently stored in the database: the effective save
+ * directory resolved from the stored setting (see `resolveEffectiveSaveDirectory`).
  * @returns The current effective save directory, or undefined if unknown
  */
 function getCurrentSaveDirectory({
   settings,
   saveFileMonitor,
 }: SaveFileHandlerDependencies): string | undefined {
-  const configured = settings.get('saveDir')?.trim();
-  if (configured) {
-    return configured;
-  }
-  return saveFileMonitor.getDefaultDirectory();
+  return resolveEffectiveSaveDirectory(
+    settings.get('saveDir'),
+    saveFileMonitor.getDefaultDirectory(),
+  );
 }
 
 /**
@@ -100,48 +82,22 @@ async function applySaveDirectoryChange(
 }
 
 /**
- * Initializes IPC handlers for save file monitoring and item detection.
- * Sets up event listeners for save file changes and item detection: parsed save files are
- * analyzed and recorded as grail progress, and events are forwarded to renderer processes.
- * Starts monitoring automatically (unless the game mode is Manual) and keeps it in sync with the
- * game mode.
+ * Initializes IPC handlers for save file monitoring and forwards save file, item detection and
+ * monitoring events to renderer processes. Detection and the automatic monitoring start live in
+ * the GrailDetectionPipeline service.
  * @param deps - The services the handlers use
- * @returns Function that removes the handlers and event listeners and cancels a pending
- *   automatic start
+ * @returns Function that removes the handlers and event listeners
  */
 export function initializeSaveFileHandlers(deps: SaveFileHandlerDependencies): () => void {
-  const {
-    eventBus,
-    saveFileMonitor,
-    itemDetection: itemDetectionService,
-    grailProgress,
-    broadcastToRenderers,
-    settings,
-  } = deps;
+  const { eventBus, saveFileMonitor, broadcastToRenderers } = deps;
   const { handle, dispose } = createIpcMainRegistry(ipcMain);
   const eventUnsubscribers: Array<() => void> = [dispose];
 
-  // Set up event forwarding to renderer process
-  const unsubscribeSaveFileEvent = eventBus.on('save-file-event', async (event: SaveFileEvent) => {
-    // Forward save file events to renderer processes
+  // Forward save file events to renderer processes
+  const unsubscribeSaveFileEvent = eventBus.on('save-file-event', (event: SaveFileEvent) => {
     // The parsed items stay in the main process; renderers only need the file header.
-    const { parsedItems, ...rendererEvent } = event;
+    const { parsedItems: _parsedItems, ...rendererEvent } = event;
     broadcastToRenderers('save-file-event', rendererEvent);
-
-    // Analyze save file for item changes if it's a modification
-    // Await to ensure sequential processing and prevent race conditions
-    const foundItems =
-      event.type === 'modified'
-        ? await itemDetectionService.analyzeSaveFile(
-            event.file,
-            parsedItems ?? [],
-            event.silent,
-            event.isInitialScan,
-          )
-        : [];
-
-    // Store the character and the progress of the found items in one transaction
-    grailProgress.recordSaveFile(event.file, foundItems);
   });
   eventUnsubscribers.push(unsubscribeSaveFileEvent);
 
@@ -179,44 +135,6 @@ export function initializeSaveFileHandlers(deps: SaveFileHandlerDependencies): (
     });
   });
   eventUnsubscribers.push(unsubscribeMonitoringError);
-
-  // Automatically start monitoring, unless Manual mode keeps it off
-  const monitoringStartTimeout = setTimeout(async () => {
-    try {
-      if (isManualGameMode(deps)) {
-        console.log(
-          '[initializeSaveFileHandlers] Manual mode active, not auto-starting monitoring',
-        );
-        return;
-      }
-      await saveFileMonitor.startMonitoring();
-    } catch (error) {
-      console.error('Failed to auto-start save file monitoring:', error);
-    }
-  }, 1000); // Short delay to ensure everything is initialized
-  eventUnsubscribers.push(() => clearTimeout(monitoringStartTimeout));
-
-  // Keep monitoring in sync with game mode changes from any renderer view (e.g. the setup wizard)
-  let manualModeActive = isManualGameMode(deps);
-  eventUnsubscribers.push(
-    settings.onUpdated(async (changes) => {
-      if (changes.gameMode === undefined) {
-        return;
-      }
-      const wasManual = manualModeActive;
-      manualModeActive = changes.gameMode === GameMode.Manual;
-      try {
-        if (manualModeActive) {
-          // Queued behind any start still in flight, so the watcher cannot come up in Manual mode
-          await saveFileMonitor.stopMonitoringIfActive();
-        } else if (wasManual && !manualModeActive) {
-          await saveFileMonitor.startMonitoring();
-        }
-      } catch (error) {
-        console.error('Failed to update save file monitoring for the game mode:', error);
-      }
-    }),
-  );
 
   /**
    * IPC handler for starting save file monitoring (e.g. when leaving Manual mode).

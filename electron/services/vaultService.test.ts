@@ -12,7 +12,7 @@ const mocks = {
     getVaultItemById: vi.fn(),
     searchVaultItems: vi.fn(),
   },
-  configuredSaveDirectory: vi.fn<() => string | undefined>(),
+  saveDirectory: vi.fn<() => string | undefined>(),
   assertGameNotRunning: vi.fn<() => Promise<void>>(),
   saveFileEditorMock: {
     addItemToSaveFile: vi.fn(),
@@ -25,7 +25,6 @@ const mocks = {
 
 /** The parts of the save file monitor the tests stub. */
 interface MonitorStub {
-  getSaveDirectory?: () => string | null;
   getInventorySearchResult?: () => { snapshots: unknown[] };
 }
 
@@ -44,8 +43,7 @@ function createService(getMonitor: () => MonitorStub | undefined = () => undefin
     database: mocks.grailDatabaseMock as unknown as VaultDatabase,
     saveFileEditor: mocks.saveFileEditorMock as unknown as VaultSaveFileEditor,
     assertGameNotRunning: mocks.assertGameNotRunning,
-    getMonitoredSaveDirectory: () => getMonitor()?.getSaveDirectory?.() ?? undefined,
-    getConfiguredSaveDirectory: () => mocks.configuredSaveDirectory(),
+    getSaveDirectory: () => mocks.saveDirectory(),
     getInventorySnapshots: () =>
       (getMonitor()?.getInventorySearchResult?.().snapshots ?? []) as ParsedInventorySnapshot[],
   });
@@ -91,7 +89,7 @@ describe('When the vault service handles a renderer request', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.assertGameNotRunning.mockResolvedValue(undefined);
-    mocks.configuredSaveDirectory.mockReturnValue('/tmp');
+    mocks.saveDirectory.mockReturnValue('/tmp');
     mocks.saveFileEditorMock.readSaveFileItem.mockResolvedValue({ type: 'uap', code: 'uap' });
     mocks.saveFileEditorMock.addItemToSaveFile.mockResolvedValue(undefined);
     mocks.saveFileEditorMock.removeItemFromSaveFile.mockResolvedValue(undefined);
@@ -1296,24 +1294,25 @@ describe('When the vault service handles a renderer request', () => {
       });
     });
 
-    describe('If the save file monitor reports a save directory', () => {
-      it('Then that directory is used instead of the stored setting', async () => {
+    describe('If the save directory changes', () => {
+      it('Then later requests are checked against the new directory', async () => {
         // Arrange
-        mocks.configuredSaveDirectory.mockReturnValue('/somewhere/else');
-        const service = createService(() => ({ getSaveDirectory: () => '/tmp' }));
+        const service = createService();
+        mocks.saveDirectory.mockReturnValue('/somewhere/else');
 
         // Act
-        await service.moveItem(makeMovePayload({}));
+        const promise = service.moveItem(makeMovePayload({}));
 
         // Assert
-        expect(mocks.saveFileEditorMock.moveItemBetweenSaveFiles).toHaveBeenCalled();
+        await expect(promise).rejects.toThrow('must be a save file inside');
+        expect(mocks.saveFileEditorMock.moveItemBetweenSaveFiles).not.toHaveBeenCalled();
       });
     });
 
-    describe('If no save directory is configured anywhere', () => {
+    describe('If the save directory is not known', () => {
       it('Then writes are refused', async () => {
         // Arrange
-        mocks.configuredSaveDirectory.mockReturnValue('');
+        mocks.saveDirectory.mockReturnValue('');
         const service = createService();
 
         // Act
