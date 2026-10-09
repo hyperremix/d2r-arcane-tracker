@@ -8,7 +8,7 @@ import { constants as constants99 } from '@dschu012/d2s/lib/data/versions/99_con
 import type { FSWatcher } from 'chokidar';
 import chokidar from 'chokidar';
 import { app } from 'electron';
-import type { GrailDatabase } from '../database/database';
+import type { GrailDatabase } from '../../database/database';
 import type {
   CharacterInventorySnapshot,
   D2SaveFile,
@@ -20,17 +20,17 @@ import type {
   StashTabKind,
   VaultLocationContext,
   VaultSourceFileType,
-} from '../types/grail';
-import { GameMode } from '../types/grail';
-import { isModernStashVersion } from '../utils/d2rFormat';
-import { isRune } from '../utils/objects';
-import { createServiceLogger } from '../utils/serviceLogger';
-import { createVaultPresenceKey } from '../utils/vaultPresence';
-import { ensureD2sConstants } from './d2s/constants';
-import type { EventBus } from './EventBus';
-import { normalizeItemsWithSocketedItems, resolveGrailLookupName } from './itemNormalizer';
-import { parseModernStash } from './modernStashParser';
-import { readD2iHeaderVersion, readD2iMetadata } from './stashFormat';
+} from '../../types/grail';
+import { GameMode } from '../../types/grail';
+import { isModernStashVersion } from '../../utils/d2rFormat';
+import { isRune } from '../../utils/objects';
+import { createServiceLogger } from '../../utils/serviceLogger';
+import { createVaultPresenceKey } from '../../utils/vaultPresence';
+import { ensureD2sConstants } from '../d2s/constants';
+import type { EventBus } from '../EventBus';
+import { normalizeItemsWithSocketedItems, resolveGrailLookupName } from '../itemNormalizer';
+import { parseModernStash } from '../modernStashParser';
+import { readD2iHeaderVersion, readD2iMetadata } from '../stashFormat';
 
 const log = createServiceLogger('SaveFileMonitor');
 /**

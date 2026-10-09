@@ -69,10 +69,10 @@ import * as d2stash from '@dschu012/d2s/lib/d2/stash';
 import chokidar from 'chokidar';
 import { app } from 'electron';
 import { D2SaveFileBuilder } from '@/fixtures';
-import { GameMode, type ParsedInventoryItem, type SaveFileEvent } from '../types/grail';
-import { EventBus } from './EventBus';
-import { createItemFingerprint, normalizeInventoryItem } from './itemNormalizer';
-import * as modernStashParser from './modernStashParser';
+import { GameMode, type ParsedInventoryItem, type SaveFileEvent } from '../../types/grail';
+import { EventBus } from '../EventBus';
+import { createItemFingerprint, normalizeInventoryItem } from '../itemNormalizer';
+import * as modernStashParser from '../modernStashParser';
 import { SaveFileMonitor } from './saveFileMonitor';
 
 const MODERN_STASH_FIXTURE_PATH = resolve(
