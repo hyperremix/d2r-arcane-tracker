@@ -14,7 +14,8 @@
       "!**/release",
       "!**/.tsbuildinfo",
       "!**/*.d.ts",
-      "!desecratedzones.json"
+      "!desecratedzones.json",
+      "!electron/database/migrations/meta"
     ]
   },
   "formatter": {

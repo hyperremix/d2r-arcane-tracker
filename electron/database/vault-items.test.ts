@@ -2,7 +2,7 @@ import Database from 'better-sqlite3';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createVaultPresenceKey } from '../utils/vaultPresence';
 import { createDrizzleDb } from './drizzle';
-import { createSchema } from './schema';
+import { initializeSchema } from './schema';
 import type { DatabaseContext } from './types';
 import {
   addVaultItem,
@@ -24,7 +24,7 @@ function createTestContext(): DatabaseContext {
     db,
     dbPath: ':memory:',
   };
-  createSchema(ctx);
+  initializeSchema(ctx);
   return ctx;
 }
 
@@ -1116,7 +1116,7 @@ describe('When vault item database operations are executed', () => {
       };
 
       // Act
-      createSchema(legacyCtx);
+      initializeSchema(legacyCtx);
       const columns = rawDb.prepare('PRAGMA table_info(vault_items)').all() as Array<{
         name: string;
       }>;
@@ -1145,8 +1145,8 @@ describe('When vault item database operations are executed', () => {
         grid_height: number | null;
       };
 
-      // Re-run createSchema to verify idempotent behavior.
-      createSchema(legacyCtx);
+      // Re-run schema initialization to verify idempotent behavior.
+      initializeSchema(legacyCtx);
       const secondPassIconName = rawDb
         .prepare(
           `

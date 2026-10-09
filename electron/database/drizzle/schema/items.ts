@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm';
-import { index, sqliteTable, text } from 'drizzle-orm/sqlite-core';
+import { check, index, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 import type {
   EtherealType,
   ItemCategory,
@@ -41,6 +41,8 @@ export const items = sqliteTable(
   (table) => [
     index('idx_items_category').on(table.category),
     index('idx_items_type').on(table.type),
+    check('items_type_check', sql`type IN ('unique', 'set', 'rune', 'runeword')`),
+    check('items_ethereal_type_check', sql`ethereal_type IN ('none', 'optional', 'only')`),
   ],
 );
 

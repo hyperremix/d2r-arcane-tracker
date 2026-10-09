@@ -24,6 +24,7 @@
     "preview": "electron-vite preview",
     "build": "bun run typecheck && vite build && electron-builder --win",
     "rebuild": "bun electron-rebuild -f -w better-sqlite3",
+    "db:generate": "drizzle-kit generate",
     "rebuild:test": "npm rebuild better-sqlite3",
     "typecheck": "concurrently \"tsc -p tsconfig.json --noEmit\" \"tsc -p tsconfig.node.json --noEmit\"",
     "typecheck:web": "tsc -p tsconfig.json --noEmit",

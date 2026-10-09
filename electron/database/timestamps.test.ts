@@ -2,12 +2,13 @@
 import type { Database as DatabaseType } from 'better-sqlite3';
 import { afterEach, beforeEach, describe, expect, it, type MockInstance, vi } from 'vitest';
 import { createInMemoryDatabase } from '../test/helpers/databaseHelpers';
+import { createLegacyDatabase } from '../test/helpers/legacyDatabase';
 import { upsertCharacter } from './characters';
 import { fromDbTimestamp } from './converters';
 import { createDrizzleDb } from './drizzle';
 import { addRunItem, getSessionItems } from './run-items';
 import { getRunsBySession, upsertRun } from './runs';
-import { createSchema, repairLiteralTimestamps } from './schema';
+import { initializeSchema } from './schema';
 import { getSessionById, upsertSession } from './sessions';
 import type { DatabaseContext } from './types';
 import { upsertVaultItemByFingerprint } from './vault-items';
@@ -17,7 +18,7 @@ const SQLITE_TIMESTAMP = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/;
 function createContext(): DatabaseContext {
   const rawDb = createInMemoryDatabase();
   const ctx: DatabaseContext = { rawDb, db: createDrizzleDb(rawDb), dbPath: ':memory:' };
-  createSchema(ctx);
+  initializeSchema(ctx);
   return ctx;
 }
 
@@ -143,19 +144,21 @@ describe('When legacy rows contain the literal text CURRENT_TIMESTAMP', () => {
 
   beforeEach(() => {
     logSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
-    ctx = createContext();
-    seedSessionRunAndItem(ctx);
-    ctx.rawDb.exec(`
-      DROP TRIGGER update_sessions_timestamp;
-      UPDATE sessions SET created_at = 'CURRENT_TIMESTAMP', updated_at = 'CURRENT_TIMESTAMP';
-      DROP TRIGGER update_runs_timestamp;
-      UPDATE runs SET created_at = 'CURRENT_TIMESTAMP', updated_at = '2024-06-01 08:00:00';
-      UPDATE run_items SET created_at = 'CURRENT_TIMESTAMP';
+    const rawDb = createInMemoryDatabase();
+    ctx = { rawDb, db: createDrizzleDb(rawDb), dbPath: ':memory:' };
+    // A database written by a version before migrations, whose drizzle inserts stored the text.
+    createLegacyDatabase(rawDb, 'pre-migrations');
+    rawDb.exec(`
+      INSERT INTO sessions (id, start_time, created_at, updated_at)
+        VALUES ('session-1', '2024-05-01T10:00:00.000Z', 'CURRENT_TIMESTAMP', 'CURRENT_TIMESTAMP');
+      INSERT INTO runs (id, session_id, run_number, start_time, created_at, updated_at)
+        VALUES ('run-1', 'session-1', 1, '2024-05-01T10:05:00.000Z', 'CURRENT_TIMESTAMP',
+          '2024-06-01 08:00:00');
+      INSERT INTO run_items (id, run_id, name, found_time, created_at)
+        VALUES ('run-item-1', 'run-1', 'Shako', '2024-05-01T10:06:00.000Z', 'CURRENT_TIMESTAMP');
       INSERT INTO vault_categories (id, name, created_at, updated_at)
         VALUES ('cat-1', 'Keepers', 'CURRENT_TIMESTAMP', '2024-07-01 09:30:00');
     `);
-    // Recreate the dropped triggers exactly as a real database has them.
-    createSchema(ctx);
   });
 
   afterEach(() => {
@@ -163,14 +166,11 @@ describe('When legacy rows contain the literal text CURRENT_TIMESTAMP', () => {
     logSpy.mockRestore();
   });
 
-  describe('If the startup repair has run on them', () => {
-    it('Then created_at uses the best known time, valid updated_at values are kept and a second run changes nothing', () => {
-      // Arrange
-      // (createSchema in beforeEach already ran the repair once)
-
+  describe('If the database is upgraded at startup', () => {
+    it('Then created_at uses the best known time, valid updated_at values are kept and a second start changes nothing', () => {
       // Act
-      // Run it again to prove idempotence
-      repairLiteralTimestamps(ctx);
+      initializeSchema(ctx);
+      initializeSchema(ctx);
 
       // Assert
       expect(getTimestamps(ctx.rawDb, 'sessions', 'session-1')).toMatchObject({
@@ -192,6 +192,7 @@ describe('When legacy rows contain the literal text CURRENT_TIMESTAMP', () => {
 
     it('Then the update-timestamp triggers still exist afterwards', () => {
       // Act
+      initializeSchema(ctx);
       ctx.rawDb.prepare("UPDATE runs SET duration = 1 WHERE id = 'run-1'").run();
 
       // Assert
@@ -204,6 +205,7 @@ describe('When legacy rows contain the literal text CURRENT_TIMESTAMP', () => {
 
     it('Then no literal CURRENT_TIMESTAMP values remain', () => {
       // Act
+      initializeSchema(ctx);
       const remaining = ctx.rawDb
         .prepare(
           `SELECT COUNT(*) AS count FROM (

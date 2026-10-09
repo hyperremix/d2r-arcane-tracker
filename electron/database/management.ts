@@ -16,8 +16,9 @@ export function close(ctx: DatabaseContext): void {
 
 /**
  * Deletes characters, grail progress and save file states in one transaction.
- * Run tracker history and vault items are kept; their character references are cleared first
- * because runs.character_id has no ON DELETE action and would otherwise make the delete fail.
+ * Run tracker history and vault items are kept; their character references are cleared first.
+ * Both foreign keys are ON DELETE SET NULL, but clearing them explicitly keeps the result
+ * independent of foreign key enforcement on the connection.
  * When `newSaveDir` is given, the `saveDir` setting is written in the same transaction, so a
  * failed setting write rolls the whole truncate back and the old folder and data are kept.
  * @param ctx - Database context

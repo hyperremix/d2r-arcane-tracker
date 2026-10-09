@@ -14,7 +14,7 @@ import type Database from 'better-sqlite3';
 import { afterEach, beforeEach, describe, expect, it, type MockInstance, vi } from 'vitest';
 import { BUSY_TIMEOUT_MS, openConnection, type RestoreTarget, restoreDatabase } from './connection';
 import { createDrizzleDb } from './drizzle';
-import { createSchema } from './schema';
+import { initializeSchema } from './schema';
 
 /**
  * Minimal stand-in for GrailDatabase: same connection and schema initialization,
@@ -29,7 +29,7 @@ class TestDatabase implements RestoreTarget {
 
   constructor(readonly dbPath: string) {
     this.rawDb = openConnection(dbPath);
-    createSchema({ rawDb: this.rawDb, db: createDrizzleDb(this.rawDb), dbPath });
+    initializeSchema({ rawDb: this.rawDb, db: createDrizzleDb(this.rawDb), dbPath });
   }
 
   closeConnection(): void {
@@ -45,7 +45,7 @@ class TestDatabase implements RestoreTarget {
         this.failedInitializations -= 1;
         throw new Error('schema initialization failed');
       }
-      createSchema({ rawDb, db: createDrizzleDb(rawDb), dbPath: this.dbPath });
+      initializeSchema({ rawDb, db: createDrizzleDb(rawDb), dbPath: this.dbPath });
     } catch (error) {
       rawDb.close();
       throw error;
