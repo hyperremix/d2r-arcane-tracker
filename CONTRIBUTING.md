@@ -4,7 +4,7 @@ Bug reports, feature ideas, docs fixes and pull requests are welcome. For larger
 
 ## Setup
 
-You need [Bun](https://bun.sh) 1.3.8 (pinned in `package.json`), Node.js 20 or later for the helper scripts, and Git. D2R is only needed to test game-related features. Auto mode and the installer are Windows-only. Everything else runs on macOS and Linux too.
+You need [Bun](https://bun.sh) 1.3.8 (pinned in `package.json`), Node.js 22.12 or later (required by Electron 44, Vite 8 and Vitest 5), and Git. D2R is only needed to test game-related features. Auto mode and the installer are Windows-only. Everything else runs on macOS and Linux too.
 
 ```bash
 git clone https://github.com/<you>/d2r-arcane-tracker.git
@@ -14,7 +14,7 @@ bun run rebuild   # compile native modules (better-sqlite3) for Electron
 bun run dev       # start Vite and Electron
 ```
 
-Run `bun run rebuild` again after upgrading Electron or if you see `NODE_MODULE_VERSION` errors. Those mean `better-sqlite3` was built for a different Node or Electron version.
+`better-sqlite3` ships Node-API prebuilds that load in both Node (tests) and Electron, so a rebuild is rarely needed. If you still see `NODE_MODULE_VERSION` errors after upgrading Electron, run `bun run rebuild` again.
 
 For attaching a debugger, see [docs/DEBUGGING.md](docs/DEBUGGING.md).
 
@@ -49,7 +49,7 @@ config/              shared build-tool config (d2s source aliases for Vite and V
 docs/                user guides, developer docs, GitHub Pages site
 ```
 
-Stack: Electron 30, React 18, TypeScript, Vite, Tailwind CSS v4, shadcn/ui (Base UI), Zustand, i18next, Biome and Vitest.
+Stack: Electron 44, React 18, TypeScript, Vite, Tailwind CSS v4, shadcn/ui (Base UI), Zustand, i18next, Biome and Vitest.
 
 ## Scripts
 

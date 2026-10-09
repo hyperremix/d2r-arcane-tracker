@@ -59,7 +59,9 @@ export default defineConfig({
           },
           plugins: [copyMigrations()],
           build: {
-            rollupOptions: {
+            // Vite 8 bundles with Rolldown; vite-plugin-electron 1.x only reads
+            // `rolldownOptions` here, so `rollupOptions` would silently drop the externals.
+            rolldownOptions: {
               external: ['better-sqlite3', 'koffi'],
             },
           },

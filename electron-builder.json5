@@ -8,6 +8,10 @@
     output: "release/${version}",
   },
   files: ["dist", "dist-electron"],
+  // Native deps ship Node-API prebuilds (better-sqlite3 >= 13, koffi) that load in any Electron
+  // version, so skip @electron/rebuild: it would otherwise invoke node-gyp, which needs a C++
+  // toolchain on the build machine and cannot cross-compile.
+  npmRebuild: false,
   publish: {
     provider: "github",
     owner: "hyperremix",
