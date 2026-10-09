@@ -985,6 +985,99 @@ describe('When SaveFileMonitor is used', () => {
         await expect(refresh).resolves.toBeUndefined();
       });
     });
+
+    describe('If a refresh is requested while the file watcher is closing during shutdown', () => {
+      it('Then the refresh still settles once the shutdown completes', async () => {
+        // Arrange
+        let finishClosing: () => void = () => undefined;
+        const closing = new Promise<void>((resolve) => {
+          finishClosing = resolve;
+        });
+        (monitor as any).fileWatcher = { close: vi.fn(() => closing) };
+        startWatching(monitor);
+        (monitor as any).readingFiles = true;
+        let refreshSettled = false;
+
+        // Act
+        const shutdown = monitor.shutdown();
+        const refresh = monitor.refreshSaveFiles().then(
+          () => {
+            refreshSettled = true;
+          },
+          () => {
+            refreshSettled = true;
+          },
+        );
+        finishClosing();
+        await shutdown;
+        await vi.advanceTimersByTimeAsync(1000);
+
+        // Assert
+        expect(refreshSettled).toBe(true);
+        await refresh;
+        expect((monitor as any).pendingForcedParse).toBeUndefined();
+      });
+    });
+
+    describe('If monitoring is stopped while a refresh is queued behind a running read', () => {
+      it('Then the refresh resolves on the next tick without parsing', async () => {
+        // Arrange
+        const parseAllSpy = vi.spyOn(monitor as any, 'parseAllSaveDirectories');
+        startWatching(monitor);
+        (monitor as any).readingFiles = true;
+        (monitor as any).tickReaderInterval = setInterval(() => {
+          void (monitor as any).tickReader();
+        }, 500);
+        let refreshed = false;
+        const refresh = monitor.refreshSaveFiles().then(() => {
+          refreshed = true;
+        });
+        await vi.advanceTimersByTimeAsync(0);
+        const refreshedWhileMonitoring = refreshed;
+
+        // Act
+        await monitor.stopMonitoring();
+        await vi.advanceTimersByTimeAsync(500);
+        await refresh;
+
+        // Assert
+        expect(refreshedWhileMonitoring).toBe(false);
+        expect(refreshed).toBe(true);
+        expect(parseAllSpy).not.toHaveBeenCalled();
+        expect((monitor as any).pendingForcedParse).toBeUndefined();
+      });
+    });
+
+    describe('If refreshes are requested concurrently behind a running read', () => {
+      it('Then they share one forced parse request and both settle after a single forced parse', async () => {
+        // Arrange
+        const forcedDuringParse: boolean[] = [];
+        vi.spyOn(monitor as any, 'parseAllSaveDirectories').mockImplementation(async () => {
+          forcedDuringParse.push((monitor as any).forceParseAll);
+          return true;
+        });
+        startWatching(monitor);
+        (monitor as any).readingFiles = true;
+        (monitor as any).tickReaderInterval = setInterval(() => {
+          void (monitor as any).tickReader();
+        }, 500);
+
+        // Act
+        const first = monitor.refreshSaveFiles();
+        const requestAfterFirst = (monitor as any).pendingForcedParse;
+        const second = monitor.refreshSaveFiles();
+        const requestAfterSecond = (monitor as any).pendingForcedParse;
+        (monitor as any).readingFiles = false;
+        await vi.advanceTimersByTimeAsync(500);
+        await Promise.all([first, second]);
+
+        // Assert
+        expect(requestAfterFirst).toBeDefined();
+        expect(requestAfterSecond).toBe(requestAfterFirst);
+        expect(forcedDuringParse).toEqual([true]);
+        expect((monitor as any).pendingForcedParse).toBeUndefined();
+      });
+    });
   });
 
   describe('When concurrent file parsing is used', () => {

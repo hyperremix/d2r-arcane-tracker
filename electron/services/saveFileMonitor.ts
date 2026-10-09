@@ -1777,6 +1777,9 @@ class SaveFileMonitor {
     }
     this.skipPendingForcedParse('monitor shut down');
     await this.stopMonitoring();
+    // A refresh requested while the file watcher was closing found the monitor still active and
+    // queued a request that no tick will pick up now that the interval is cleared.
+    this.skipPendingForcedParse('monitor shut down while the file watcher was closing');
     log.info('shutdown', 'Shutdown complete');
   }
 }
