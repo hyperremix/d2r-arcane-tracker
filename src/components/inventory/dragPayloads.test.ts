@@ -174,6 +174,17 @@ describe('When drag-state payloads from another window are parsed', () => {
     // Assert
     expect(parsed).toBeUndefined();
   });
+
+  it('If the source location context is not a known location, Then the inventory payload is rejected', () => {
+    // Arrange
+    const payload = { ...inventoryDragItem, active: true, sourceLocationContext: 'belt' };
+
+    // Act
+    const parsed = parseInventoryDragStatePayload(payload);
+
+    // Assert
+    expect(parsed).toBeUndefined();
+  });
 });
 
 describe('When the dragged item of a drop event is resolved', () => {

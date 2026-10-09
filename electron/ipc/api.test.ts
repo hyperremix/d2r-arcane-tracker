@@ -186,7 +186,7 @@ describe('When the renderer API is created from the bridge', () => {
       fingerprint: 'fp',
       sourceFilePath: '/saves/Sorc.d2s',
       sourceFileType: 'd2s' as const,
-      sourceLocationContext: 'inventory',
+      sourceLocationContext: 'inventory' as const,
       rawItemJson: '{}',
       gridWidth: 1,
       gridHeight: 1,

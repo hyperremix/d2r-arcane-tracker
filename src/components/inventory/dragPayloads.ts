@@ -1,9 +1,23 @@
 import type {
+  ActiveInventoryDragItem,
+  ActiveVaultDragItem,
+  InventoryDragStatePayload,
+  VaultDragStatePayload,
+} from 'electron/ipc/contract';
+import type {
   VaultItemUpsertInput,
   VaultLocationContext,
   VaultSourceFileType,
 } from 'electron/types/grail';
+import { isVaultLocationContext } from 'electron/utils/vaultState';
 import type { DragEvent } from 'react';
+
+export type {
+  ActiveInventoryDragItem,
+  ActiveVaultDragItem,
+  InventoryDragStatePayload,
+  VaultDragStatePayload,
+};
 
 export const INVENTORY_DRAG_MIME = 'application/x-d2r-arcane-tracker-inventory-item';
 export const VAULT_DRAG_MIME = 'application/x-d2r-arcane-tracker-vault-item';
@@ -155,32 +169,6 @@ export function parseVaultTextPayload(rawValue: string): VaultDragTextPayload | 
   }
 }
 
-export interface ActiveVaultDragItem {
-  id: string;
-  gridWidth: number;
-  gridHeight: number;
-}
-
-export interface ActiveInventoryDragItem {
-  fingerprint: string;
-  sourceFilePath: string;
-  sourceFileType: VaultSourceFileType;
-  sourceLocationContext: VaultLocationContext;
-  sourceStashTab?: number;
-  sourceGridX?: number;
-  sourceGridY?: number;
-  sourceEquippedSlotId?: number;
-  rawItemJson: string;
-  itemCode?: string;
-  gridWidth: number;
-  gridHeight: number;
-  stackPickup?: boolean;
-  stackPickupCount?: number;
-  stackPickupMaxCount?: number;
-  stackPickupItemName?: string;
-  stackPickupIconFileName?: string;
-}
-
 export function isSameInventoryMoveTarget(
   inventoryItem: ActiveInventoryDragItem,
   targetFilePath: string,
@@ -205,14 +193,6 @@ export function isSameInventoryMoveTarget(
 
   return isSameFile && isSameLocation && isSameStashTab && isSameGridPosition;
 }
-
-export type VaultDragStatePayload = ActiveVaultDragItem & {
-  active: boolean;
-};
-
-export type InventoryDragStatePayload = ActiveInventoryDragItem & {
-  active: boolean;
-};
 
 export function toActiveVaultDragItem(input: {
   id: string;
@@ -328,8 +308,7 @@ export function parseInventoryDragStatePayload(
     rawPayload.sourceFilePath.trim().length === 0 ||
     typeof rawPayload.sourceFileType !== 'string' ||
     rawPayload.sourceFileType.trim().length === 0 ||
-    typeof rawPayload.sourceLocationContext !== 'string' ||
-    rawPayload.sourceLocationContext.trim().length === 0 ||
+    !isVaultLocationContext(rawPayload.sourceLocationContext) ||
     typeof rawPayload.rawItemJson !== 'string' ||
     rawPayload.rawItemJson.trim().length === 0
   ) {
@@ -342,7 +321,7 @@ export function parseInventoryDragStatePayload(
       fingerprint: rawPayload.fingerprint.trim(),
       sourceFilePath: rawPayload.sourceFilePath.trim(),
       sourceFileType: rawPayload.sourceFileType as VaultSourceFileType,
-      sourceLocationContext: rawPayload.sourceLocationContext as VaultLocationContext,
+      sourceLocationContext: rawPayload.sourceLocationContext,
       sourceStashTab: Number.isInteger(rawPayload.sourceStashTab)
         ? rawPayload.sourceStashTab
         : undefined,

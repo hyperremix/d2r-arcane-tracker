@@ -1,4 +1,4 @@
-import type { VaultItem, VaultSourceFileType } from '../types/grail';
+import type { VaultItem, VaultLocationContext, VaultSourceFileType } from '../types/grail';
 
 /** Save file types the vault and inventory features understand. Shared by main and renderer. */
 export const VALID_SOURCE_FILE_TYPES: ReadonlySet<string> = new Set<VaultSourceFileType>([
@@ -7,6 +7,20 @@ export const VALID_SOURCE_FILE_TYPES: ReadonlySet<string> = new Set<VaultSourceF
   'd2x',
   'd2i',
 ]);
+
+const VALID_LOCATION_CONTEXTS: ReadonlySet<string> = new Set<VaultLocationContext>([
+  'equipped',
+  'inventory',
+  'stash',
+  'mercenary',
+  'corpse',
+  'unknown',
+]);
+
+/** Narrows an untrusted value to a {@link VaultLocationContext}. Shared by main and renderer. */
+export function isVaultLocationContext(value: unknown): value is VaultLocationContext {
+  return typeof value === 'string' && VALID_LOCATION_CONTEXTS.has(value);
+}
 
 /** Fingerprint prefix of the bookmark rows created from the Grail Tracker item details dialog. */
 export const GRAIL_BOOKMARK_FINGERPRINT_PREFIX = 'grail:';

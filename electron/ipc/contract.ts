@@ -76,21 +76,24 @@ export interface WidgetResult {
   error?: string;
 }
 
-/** Drag state of a vault item, relayed between the main window and snapshot windows. */
-export interface VaultDragStatePayload {
-  active: boolean;
+/** Vault item being dragged; the renderer's drag-and-drop state uses this shape too. */
+export interface ActiveVaultDragItem {
   id: string;
   gridWidth: number;
   gridHeight: number;
 }
 
-/** Drag state of an inventory item (or a stack pickup), relayed between windows. */
-export interface InventoryDragStatePayload {
+/** Drag state of a vault item, relayed between the main window and snapshot windows. */
+export interface VaultDragStatePayload extends ActiveVaultDragItem {
   active: boolean;
+}
+
+/** Inventory item (or stack pickup) being dragged; the renderer's drag state uses this shape too. */
+export interface ActiveInventoryDragItem {
   fingerprint: string;
   sourceFilePath: string;
   sourceFileType: VaultSourceFileType;
-  sourceLocationContext: string;
+  sourceLocationContext: VaultLocationContext;
   rawItemJson: string;
   itemCode?: string;
   sourceStashTab?: number;
@@ -104,6 +107,11 @@ export interface InventoryDragStatePayload {
   stackPickupMaxCount?: number;
   stackPickupItemName?: string;
   stackPickupIconFileName?: string;
+}
+
+/** Drag state of an inventory item (or a stack pickup), relayed between windows. */
+export interface InventoryDragStatePayload extends ActiveInventoryDragItem {
+  active: boolean;
 }
 
 /** Drag states that are active right now, used by windows that open mid-drag. */
