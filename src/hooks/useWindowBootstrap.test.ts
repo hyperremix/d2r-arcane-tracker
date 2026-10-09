@@ -1,58 +1,93 @@
-import { renderHook } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { initGrailData } from '@/stores/grailStore';
-import { useSettingsLanguage } from './useSettingsLanguage';
-import { useTheme } from './useTheme';
+import { act, renderHook, waitFor } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { THEME_PREFERENCE_STORAGE_KEY } from '@/lib/theme';
+import { useGrailStore } from '@/stores/grailStore';
+import { createMainEventsMock } from '@/test/mainEventsMock';
 import { useWindowBootstrap } from './useWindowBootstrap';
 
-vi.mock('@/stores/grailStore', () => ({ initGrailData: vi.fn() }));
-vi.mock('./useSettingsLanguage', () => ({ useSettingsLanguage: vi.fn() }));
-vi.mock('./useTheme', () => ({ useTheme: vi.fn() }));
-
+/**
+ * Uses the real store, theme and language hooks (no module mocks): test files share one module
+ * registry, so mocking this hook's dependencies would leak into the window roots' suites.
+ */
 describe('When useWindowBootstrap is used', () => {
-  const cleanupGrailData = vi.fn();
+  const originalElectronAPI = window.electronAPI;
+  const initialGrailState = useGrailStore.getInitialState();
+  const events = createMainEventsMock();
+  const grail = {
+    getSettings: vi.fn(),
+    getCharacters: vi.fn(),
+    getItems: vi.fn(),
+    getProgress: vi.fn(),
+  };
 
   beforeEach(() => {
-    vi.clearAllMocks();
-    vi.mocked(initGrailData).mockReturnValue(cleanupGrailData);
+    events.reset();
+    grail.getSettings.mockReset().mockResolvedValue({ lang: 'en', grailEthereal: false });
+    grail.getCharacters.mockReset().mockResolvedValue([]);
+    grail.getItems.mockReset().mockResolvedValue([]);
+    grail.getProgress.mockReset().mockResolvedValue([]);
+    useGrailStore.setState(initialGrailState, true);
+    document.documentElement.lang = '';
+    Object.defineProperty(window, 'electronAPI', {
+      value: { platform: 'darwin', grail, on: events.on },
+      configurable: true,
+      writable: true,
+    });
   });
 
-  it('If no options are given, Then the grail data is loaded without following settings broadcasts', () => {
+  afterEach(() => {
+    useGrailStore.setState(initialGrailState, true);
+    localStorage.removeItem(THEME_PREFERENCE_STORAGE_KEY);
+    Object.defineProperty(window, 'electronAPI', {
+      value: originalElectronAPI,
+      configurable: true,
+      writable: true,
+    });
+  });
+
+  it('If no options are given, Then the grail data and settings are loaded and the language is applied', async () => {
     // Arrange & Act
-    renderHook(() => useWindowBootstrap());
+    const { unmount } = renderHook(() => useWindowBootstrap());
 
     // Assert
-    expect(initGrailData).toHaveBeenCalledTimes(1);
-    expect(initGrailData).toHaveBeenCalledWith({ followSettingsUpdates: false });
+    await waitFor(() => expect(useGrailStore.getState().settingsHydrated).toBe(true));
+    await waitFor(() => expect(useGrailStore.getState().loading).toBe(false));
+    expect(grail.getItems).toHaveBeenCalledTimes(1);
+    expect(document.documentElement.lang).toBe('en');
+    expect(events.listenerCount('grail-progress-updated')).toBe(1);
+    expect(events.listenerCount('settings-updated')).toBe(0);
+    unmount();
   });
 
-  it('If settings updates are followed, Then the option is passed on to the grail data', () => {
-    // Arrange & Act
-    renderHook(() => useWindowBootstrap({ followSettingsUpdates: true }));
-
-    // Assert
-    expect(initGrailData).toHaveBeenCalledWith({ followSettingsUpdates: true });
-  });
-
-  it('Then the theme and language are applied', () => {
-    // Arrange & Act
-    renderHook(() => useWindowBootstrap());
-
-    // Assert
-    expect(useTheme).toHaveBeenCalled();
-    expect(useSettingsLanguage).toHaveBeenCalled();
-  });
-
-  it('If the window re-renders and then unmounts, Then the grail data is loaded once and cleaned up', () => {
+  it('If settings updates are followed, Then settings saved in another window are applied', async () => {
     // Arrange
-    const { rerender, unmount } = renderHook(() => useWindowBootstrap());
+    const { unmount } = renderHook(() => useWindowBootstrap({ followSettingsUpdates: true }));
+    await waitFor(() => expect(useGrailStore.getState().loading).toBe(false));
+
+    // Act
+    act(() => {
+      events.emit('settings-updated', { widgetOpacity: 0.5 });
+    });
+
+    // Assert
+    expect(useGrailStore.getState().settings.widgetOpacity).toBe(0.5);
+    unmount();
+  });
+
+  it('If the window re-renders and then unmounts, Then the data is loaded once and the subscriptions are removed', async () => {
+    // Arrange
+    const { rerender, unmount } = renderHook(() =>
+      useWindowBootstrap({ followSettingsUpdates: true }),
+    );
+    await waitFor(() => expect(useGrailStore.getState().loading).toBe(false));
 
     // Act
     rerender();
     unmount();
 
     // Assert
-    expect(initGrailData).toHaveBeenCalledTimes(1);
-    expect(cleanupGrailData).toHaveBeenCalledTimes(1);
+    expect(grail.getSettings).toHaveBeenCalledTimes(1);
+    expect(events.listenerCount('grail-progress-updated')).toBe(0);
+    expect(events.listenerCount('settings-updated')).toBe(0);
   });
 });

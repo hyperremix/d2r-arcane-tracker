@@ -2,6 +2,7 @@ import { act, render, waitFor } from '@testing-library/react';
 import type { GrailProgress, Item, Settings } from 'electron/types/grail';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { GrailProgressBuilder, HolyGrailItemBuilder } from '@/fixtures';
+import { THEME_PREFERENCE_STORAGE_KEY } from '@/lib/theme';
 import { useGrailStore } from '@/stores/grailStore';
 import { initRunTrackerSync } from '@/stores/runTrackerStore';
 import WidgetApp from '@/WidgetApp';
@@ -18,9 +19,6 @@ vi.mock('./Widget', () => ({
 }));
 
 const runTrackerSync = vi.hoisted(() => ({ stop: vi.fn() }));
-
-// The theme is applied by the real widget root, but is not under test here
-vi.mock('@/hooks/useTheme', () => ({ useTheme: vi.fn() }));
 
 vi.mock('@/stores/runTrackerStore', () => {
   const state = {
@@ -103,6 +101,8 @@ describe('WidgetContainer native window sizing', () => {
 
   afterEach(() => {
     useGrailStore.setState(initialGrailState, true);
+    // The widget root caches the loaded theme preference for the next startup
+    localStorage.removeItem(THEME_PREFERENCE_STORAGE_KEY);
     Object.defineProperty(window, 'electronAPI', {
       value: originalElectronAPI,
       configurable: true,

@@ -2,7 +2,8 @@ import { act, render } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { mockStoreState } from '@/test/storeMock';
 import App from './App';
-import { initGrailData, useGrailStore } from './stores/grailStore';
+import { useWindowBootstrap } from './hooks/useWindowBootstrap';
+import { useGrailStore } from './stores/grailStore';
 import { useWizardStore } from './stores/wizardStore';
 
 vi.mock('react-router', () => ({
@@ -24,12 +25,11 @@ vi.mock('@/components/ui/sonner', () => ({
 vi.mock('./hooks/useServiceErrorNotifications', () => ({
   useServiceErrorNotifications: vi.fn(),
 }));
-vi.mock('./hooks/useSettingsLanguage', () => ({ useSettingsLanguage: vi.fn() }));
-vi.mock('./hooks/useTheme', () => ({ useTheme: vi.fn() }));
 vi.mock('./hooks/useUpdateNotifications', () => ({ useUpdateNotifications: vi.fn() }));
+// Data loading, theme and language are covered by the useWindowBootstrap tests
+vi.mock('./hooks/useWindowBootstrap', () => ({ useWindowBootstrap: vi.fn() }));
 
 vi.mock('./stores/grailStore', () => ({
-  initGrailData: vi.fn(),
   useGrailStore: Object.assign(vi.fn(), { getState: vi.fn() }),
 }));
 
@@ -46,7 +46,6 @@ interface GrailStateOverrides {
 }
 
 describe('When App is rendered', () => {
-  const cleanupGrailData = vi.fn();
   const openWizard = vi.fn();
 
   const setGrailState = ({
@@ -63,7 +62,6 @@ describe('When App is rendered', () => {
     vi.useFakeTimers();
     vi.clearAllMocks();
     vi.spyOn(console, 'log').mockImplementation(() => undefined);
-    vi.mocked(initGrailData).mockReturnValue(cleanupGrailData);
     mockStoreState(vi.mocked(useWizardStore), { openWizard });
     setGrailState();
   });
@@ -73,34 +71,14 @@ describe('When App is rendered', () => {
     vi.restoreAllMocks();
   });
 
-  describe('If the window mounts and unmounts', () => {
-    it('Then the grail data is initialised once and cleaned up on unmount', () => {
+  describe('If the window mounts', () => {
+    it('Then it is bootstrapped without following settings broadcasts, since it saves the settings itself', () => {
       // Arrange & Act
-      const { unmount } = render(<App />);
-
-      // Assert - the main window saves settings itself, so it does not follow settings broadcasts
-      expect(initGrailData).toHaveBeenCalledTimes(1);
-      expect(initGrailData).toHaveBeenCalledWith({ followSettingsUpdates: false });
-      expect(cleanupGrailData).not.toHaveBeenCalled();
-
-      // Act
-      unmount();
+      render(<App />);
 
       // Assert
-      expect(cleanupGrailData).toHaveBeenCalledTimes(1);
-    });
-  });
-
-  describe('If the window re-renders', () => {
-    it('Then the grail data is not initialised again', () => {
-      // Arrange
-      const { rerender } = render(<App />);
-
-      // Act
-      rerender(<App />);
-
-      // Assert
-      expect(initGrailData).toHaveBeenCalledTimes(1);
+      expect(useWindowBootstrap).toHaveBeenCalled();
+      expect(useWindowBootstrap).toHaveBeenLastCalledWith();
     });
   });
 
