@@ -1,5 +1,6 @@
 import { materialDisplayNameByCode } from 'electron/items/materials';
 import { runeDisplayNameByCode, runeImageFilenameByCode } from 'electron/items/runes';
+import { parseRawItemJson } from 'electron/utils/rawItemJson';
 import { translations } from '@/i18n/translations';
 
 type TranslateFn = (key: string, options?: Record<string, unknown>) => string;
@@ -113,19 +114,6 @@ function toNonNegativeInteger(value: unknown): number | undefined {
   }
 
   return Math.max(0, Math.trunc(parsed));
-}
-
-function parseRawItem(rawItemJson: string): ParsedRawItem | undefined {
-  try {
-    const parsed = JSON.parse(rawItemJson);
-    if (parsed && typeof parsed === 'object') {
-      return parsed as ParsedRawItem;
-    }
-  } catch {
-    return undefined;
-  }
-
-  return undefined;
 }
 
 function getBaseDamage(raw: ParsedRawItem): ParsedBaseDamage | undefined {
@@ -411,7 +399,7 @@ function resolveNameAndBaseType(
 export function buildGameItemTooltipModel(
   args: BuildGameItemTooltipModelArgs,
 ): GameItemTooltipModel | null {
-  const raw = parseRawItem(args.rawItemJson);
+  const raw = parseRawItemJson<ParsedRawItem>(args.rawItemJson);
   if (!raw) {
     return null;
   }
