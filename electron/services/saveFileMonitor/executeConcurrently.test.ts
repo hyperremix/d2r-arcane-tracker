@@ -1,7 +1,15 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { executeConcurrently } from './executeConcurrently';
 
 describe('When concurrent file parsing is used', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it('Then should execute all tasks with concurrency limit', async () => {
     // Arrange
     let maxConcurrent = 0;
@@ -21,7 +29,10 @@ describe('When concurrent file parsing is used', () => {
     });
 
     // Act
-    const results = await executeConcurrently(tasks, limit);
+    const pending = executeConcurrently(tasks, limit);
+    // 10 tasks at 3 at a time take 4 rounds of 10 ms
+    await vi.advanceTimersByTimeAsync(40);
+    const results = await pending;
 
     // Assert
     expect(results).toHaveLength(taskCount);
@@ -47,7 +58,9 @@ describe('When concurrent file parsing is used', () => {
     ];
 
     // Act
-    const results = await executeConcurrently(tasks, 5);
+    const pending = executeConcurrently(tasks, 5);
+    await vi.advanceTimersByTimeAsync(50);
+    const results = await pending;
 
     // Assert - results should be in original order despite different completion times
     expect(results).toEqual(['first', 'second', 'third']);
@@ -98,7 +111,10 @@ describe('When concurrent file parsing is used', () => {
     });
 
     // Act
-    const results = await executeConcurrently(tasks, 1);
+    const pending = executeConcurrently(tasks, 1);
+    // 5 tasks one at a time take 5 rounds of 10 ms
+    await vi.advanceTimersByTimeAsync(50);
+    const results = await pending;
 
     // Assert - should execute sequentially (max 1 at a time)
     expect(maxConcurrent).toBe(1);
