@@ -14,19 +14,59 @@
  *   --item <id>     Specific item ID to inject (from electron/items)
  *   --list          List available unfound items and exit
  *   --dry-run       Parse the stash but don't write changes
- *   --save-dir      Custom save directory path
+ *   --save-dir      Custom save directory path (env: D2R_SAVE_DIR)
+ *   --db            Custom path to the app's grail.db (env: D2R_TRACKER_DB_PATH)
+ *
+ * Defaults:
+ *   Save directory: <home>/Saved Games/Diablo II Resurrected
+ *   Database: the development database path for the current OS (see CONTRIBUTING.md)
  */
 
 import { execSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import { createRequire } from 'node:module';
+import * as os from 'node:os';
 import * as path from 'node:path';
 import * as d2s from '@dschu012/d2s';
 import * as d2stash from '@dschu012/d2s/lib/d2/stash';
 
-// Default paths
-const DEFAULT_SAVE_DIR = '/Users/f00486/Saved Games/Diablo II Resurrected/mods/givemhell';
-const DB_PATH = '/Users/f00486/Library/Application Support/@hyperremix/d2r-arcane-tracker/grail.db';
+const APP_DATA_DIR_NAME = path.join('@hyperremix', 'd2r-arcane-tracker');
+
+/**
+ * Resolve the per-user application data directory Electron uses for `app.getPath('userData')`.
+ */
+function resolveAppDataRoot(): string {
+  const home = os.homedir();
+  switch (process.platform) {
+    case 'win32':
+      return process.env.APPDATA ?? path.join(home, 'AppData', 'Roaming');
+    case 'darwin':
+      return path.join(home, 'Library', 'Application Support');
+    default:
+      return process.env.XDG_CONFIG_HOME ?? path.join(home, '.config');
+  }
+}
+
+/**
+ * Default development database path, overridable via D2R_TRACKER_DB_PATH or --db.
+ */
+function resolveDefaultDbPath(): string {
+  return (
+    process.env.D2R_TRACKER_DB_PATH ??
+    path.join(resolveAppDataRoot(), APP_DATA_DIR_NAME, 'grail.db')
+  );
+}
+
+/**
+ * Default D2R save directory, overridable via D2R_SAVE_DIR or --save-dir.
+ */
+function resolveDefaultSaveDir(): string {
+  return (
+    process.env.D2R_SAVE_DIR ?? path.join(os.homedir(), 'Saved Games', 'Diablo II Resurrected')
+  );
+}
+
+let dbPath = resolveDefaultDbPath();
 
 // Use require for loading d2s constants
 const require = createRequire(import.meta.url);
@@ -60,7 +100,7 @@ interface GrailItem {
  */
 function runQuery(query: string): string {
   try {
-    const result = execSync(`sqlite3 -json "${DB_PATH}" "${query.replace(/"/g, '\\"')}"`, {
+    const result = execSync(`sqlite3 -json "${dbPath}" "${query.replace(/"/g, '\\"')}"`, {
       encoding: 'utf-8',
       maxBuffer: 10 * 1024 * 1024,
     });
@@ -345,11 +385,18 @@ function listUnfoundItems(): void {
 /**
  * Parse command line arguments
  */
-function parseArgs(): { itemId?: string; list: boolean; saveDir: string; dryRun: boolean } {
+function parseArgs(): {
+  itemId?: string;
+  list: boolean;
+  saveDir: string;
+  dbPath: string;
+  dryRun: boolean;
+} {
   const args = process.argv.slice(2);
   let itemId: string | undefined;
   let list = false;
-  let saveDir = DEFAULT_SAVE_DIR;
+  let saveDir = resolveDefaultSaveDir();
+  let db = resolveDefaultDbPath();
   let dryRun = false;
 
   for (let i = 0; i < args.length; i++) {
@@ -360,6 +407,8 @@ function parseArgs(): { itemId?: string; list: boolean; saveDir: string; dryRun:
       list = true;
     } else if (arg === '--save-dir') {
       saveDir = args[++i];
+    } else if (arg === '--db') {
+      db = args[++i];
     } else if (arg === '--dry-run') {
       dryRun = true;
     } else if (arg === '--help') {
@@ -373,7 +422,8 @@ Options:
   --item <id>     Inject a specific item by ID
   --list          List available unfound items
   --dry-run       Parse the stash but don't write changes
-  --save-dir      Custom save directory path
+  --save-dir      Custom save directory path (env: D2R_SAVE_DIR)
+  --db            Custom path to the app's grail.db (env: D2R_TRACKER_DB_PATH)
   --help          Show this help message
 
 Examples:
@@ -390,7 +440,7 @@ Examples:
     }
   }
 
-  return { itemId, list, saveDir, dryRun };
+  return { itemId, list, saveDir, dbPath: db, dryRun };
 }
 
 /**
@@ -447,12 +497,15 @@ async function main(): Promise<void> {
   // Initialize d2s constants
   initializeD2SConstants();
 
-  const { itemId, list, saveDir, dryRun } = parseArgs();
+  const args = parseArgs();
+  const { itemId, list, saveDir, dryRun } = args;
+  dbPath = args.dbPath;
 
   // Check if database exists
-  if (!fs.existsSync(DB_PATH)) {
-    console.error(`❌ Database not found at: ${DB_PATH}`);
-    console.error('   Make sure the D2R Arcane Tracker app has been run at least once.');
+  if (!fs.existsSync(dbPath)) {
+    console.error(`❌ Database not found at: ${dbPath}`);
+    console.error('   Make sure the D2R Arcane Tracker app has been run at least once,');
+    console.error('   or pass --db <path> / set D2R_TRACKER_DB_PATH.');
     process.exit(1);
   }
 
