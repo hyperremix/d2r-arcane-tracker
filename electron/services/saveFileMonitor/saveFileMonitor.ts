@@ -1,6 +1,6 @@
 import { existsSync, readdirSync } from 'node:fs';
 import { readFile, stat } from 'node:fs/promises';
-import { dirname, extname, join } from 'node:path';
+import { extname, join } from 'node:path';
 import type { FSWatcher } from 'chokidar';
 import { app } from 'electron';
 import type { GrailDatabase } from '../../database/database';
@@ -16,11 +16,13 @@ import { GameMode } from '../../types/grail';
 import { createServiceLogger } from '../../utils/serviceLogger';
 import { ensureD2sConstants } from '../d2s/constants';
 import type { EventBus } from '../EventBus';
+import type { SettingsService } from '../settingsService';
 import { executeConcurrently } from './executeConcurrently';
 import { countAvailableRunes, mergeInventorySnapshots } from './inventorySnapshots';
 import {
   readConfiguredSaveDirectory,
   resolveDebounceDelay,
+  resolveEffectiveSaveDirectory,
   resolveTickReaderInterval,
   resolveWatcherIntervals,
 } from './saveDirectorySettings';
@@ -43,9 +45,25 @@ import {
   createPresenceIdentityKey,
   markOrphanedVaultRowsMissing,
   reconcileVaultPresence,
+  type VaultPresenceDatabase,
 } from './vaultPresenceReconciler';
 
 const log = createServiceLogger('SaveFileMonitor');
+
+/** The database operations the save file monitor uses. */
+export type SaveFileMonitorDatabase = VaultPresenceDatabase &
+  Pick<
+    GrailDatabase,
+    | 'getSaveFileState'
+    | 'upsertSaveFileState'
+    | 'getAllSaveFileStates'
+    | 'deleteSaveFileState'
+    | 'getCharacterByName'
+  >;
+
+/** The settings access the save file monitor uses. */
+export type SaveFileMonitorSettings = Pick<SettingsService, 'get' | 'getAll'>;
+
 /** A pending request to re-parse every save file; settled once that parse ran or was skipped. */
 interface ForcedParseRequest {
   promise: Promise<void>;
@@ -77,7 +95,8 @@ class SaveFileMonitor {
   private readingFiles: boolean;
   private isMonitoring = false;
   private monitoringOperations: Promise<void> = Promise.resolve();
-  private grailDatabase: GrailDatabase | null = null;
+  private readonly grailDatabase: SaveFileMonitorDatabase;
+  private readonly settings: SaveFileMonitorSettings;
   private saveDirectory: string | null = null;
   /** True only while a forced parse runs: every file is parsed regardless of its modification time. */
   private forceParseAll: boolean = false;
@@ -93,12 +112,18 @@ class SaveFileMonitor {
   /**
    * Creates a new instance of the SaveFileMonitor.
    * @param {EventBus} eventBus - EventBus instance for emitting events
-   * @param {GrailDatabase} [grailDatabase] - Optional grail database instance for settings and data storage.
+   * @param {SaveFileMonitorDatabase} grailDatabase - Stores save file states and vault presence.
+   * @param {SaveFileMonitorSettings} settings - Reads the save directory, game mode and intervals.
    */
-  constructor(eventBus: EventBus, grailDatabase?: GrailDatabase) {
+  constructor(
+    eventBus: EventBus,
+    grailDatabase: SaveFileMonitorDatabase,
+    settings: SaveFileMonitorSettings,
+  ) {
     log.info('constructor', 'Constructor called');
     this.eventBus = eventBus;
-    this.grailDatabase = grailDatabase || null;
+    this.grailDatabase = grailDatabase;
+    this.settings = settings;
     this.fileWatcher = null;
     this.watchPath = null;
     this.fileChangeCounter = 0;
@@ -123,31 +148,25 @@ class SaveFileMonitor {
       return;
     }
 
-    const tickInterval = resolveTickReaderInterval(this.grailDatabase);
+    const tickInterval = resolveTickReaderInterval(this.settings);
     this.tickReaderInterval = setInterval(this.tickReader, tickInterval);
     log.info('start', `Tick reader started (interval: ${tickInterval}ms)`);
   }
 
   /**
-   * Initializes save directories by reading settings from the database or using platform defaults.
+   * Applies the effective save directory (see `resolveEffectiveSaveDirectory`): the configured
+   * `saveDir` setting, or the platform default. A setting that cannot be read counts as not
+   * configured.
    * @private
    */
   private initializeSaveDirectories(): void {
     log.info('initializeSaveDirectories', 'Starting initialization');
-    // First, try to get saveDir from Settings via grail database
-    const customSaveDir = readConfiguredSaveDirectory(this.grailDatabase);
-
-    // Use custom saveDir if available, otherwise fall back to platform default
-    if (customSaveDir) {
-      this.saveDirectory = customSaveDir;
-      log.info('initializeSaveDirectories', `Using custom directory: ${this.saveDirectory}`);
-    } else {
-      this.saveDirectory = this.getPlatformDefaultDirectory();
-      log.info(
-        'initializeSaveDirectories',
-        `Using platform default directory: ${this.saveDirectory}`,
-      );
-    }
+    this.saveDirectory =
+      resolveEffectiveSaveDirectory(
+        readConfiguredSaveDirectory(this.settings),
+        this.getPlatformDefaultDirectory(),
+      ) ?? null;
+    log.info('initializeSaveDirectories', `Using save directory: ${this.saveDirectory}`);
   }
 
   /**
@@ -243,9 +262,7 @@ class SaveFileMonitor {
     log.info('startMonitoring', `Using polling mode: ${SAVE_WATCHER_USES_POLLING}`);
 
     // Get configurable intervals from settings
-    const { pollingInterval, stabilityThreshold } = resolveWatcherIntervals(
-      this.grailDatabase?.getAllSettings(),
-    );
+    const { pollingInterval, stabilityThreshold } = resolveWatcherIntervals(this.settings.getAll());
 
     log.info(
       'startMonitoring',
@@ -377,7 +394,7 @@ class SaveFileMonitor {
     }
 
     // Parse all files and update current data
-    await this.parseFiles(allFiles, false);
+    await this.parseFiles(allFiles);
     log.info('parseAllSaveDirectories', 'Parsing complete');
     return true;
   }
@@ -411,7 +428,7 @@ class SaveFileMonitor {
 
       // Parse all files and update current data
       log.info('parseSaveDirectory', `Parsing ${allFiles.length} save files`);
-      await this.parseFiles(allFiles, false);
+      await this.parseFiles(allFiles);
       log.info('parseSaveDirectory', 'Parsing complete');
       return true;
     } catch (error) {
@@ -440,7 +457,7 @@ class SaveFileMonitor {
 
     try {
       const stats = await stat(filePath);
-      const fileState = this.grailDatabase?.getSaveFileState(filePath);
+      const fileState = this.grailDatabase.getSaveFileState(filePath);
 
       if (!fileState) {
         return true; // New file, should parse
@@ -482,13 +499,11 @@ class SaveFileMonitor {
   }
 
   /**
-   * Reads the configured game mode for the parser. Without a database there is none, and the
-   * parser skips every file.
+   * Reads the configured game mode for the parser.
    * @private
    */
-  private createGameModeReader(): GameModeReader | undefined {
-    const grailDatabase = this.grailDatabase;
-    return grailDatabase ? () => grailDatabase.getAllSettings().gameMode : undefined;
+  private createGameModeReader(): GameModeReader {
+    return () => this.settings.get('gameMode');
   }
 
   /**
@@ -521,7 +536,7 @@ class SaveFileMonitor {
         { saveName, filePath, content: buffer, extension },
         this.createGameModeReader(),
       );
-      const characterId = this.grailDatabase?.getCharacterByName(saveName)?.id;
+      const characterId = this.grailDatabase.getCharacterByName(saveName)?.id;
       const parsedItems = inventoryItems.map((inventoryItem) => ({
         ...inventoryItem,
         characterId,
@@ -584,7 +599,7 @@ class SaveFileMonitor {
   private async updateSaveFileState(filePath: string, lastModified: Date): Promise<void> {
     try {
       // Check if state already exists and reuse its ID
-      const existingState = this.grailDatabase?.getSaveFileState(filePath);
+      const existingState = this.grailDatabase.getSaveFileState(filePath);
       const id =
         existingState?.id || `save-file-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
@@ -597,7 +612,7 @@ class SaveFileMonitor {
         updated: new Date(),
       };
 
-      this.grailDatabase?.upsertSaveFileState(saveFileState);
+      this.grailDatabase.upsertSaveFileState(saveFileState);
     } catch (error) {
       log.error('updateSaveFileState', error, { filePath });
     }
@@ -647,18 +662,10 @@ class SaveFileMonitor {
    * Parses multiple save files and updates the current data.
    * @private
    * @param {string[]} filePaths - Array of file paths to parse.
-   * @param {boolean} userRequested - Whether the parsing was requested by the user.
    * @returns {Promise<void>} A promise that resolves when parsing is complete.
    */
-  private async parseFiles(filePaths: string[], userRequested: boolean): Promise<void> {
-    log.info(
-      'parseFiles',
-      `Starting to parse ${filePaths.length} files, userRequested: ${userRequested}`,
-    );
-    if (!this.grailDatabase) {
-      log.warn('parseFiles', 'No grail database available for parsing');
-      return;
-    }
+  private async parseFiles(filePaths: string[]): Promise<void> {
+    log.info('parseFiles', `Starting to parse ${filePaths.length} files`);
 
     await markOrphanedVaultRowsMissing(this.grailDatabase, filePaths);
 
@@ -711,13 +718,6 @@ class SaveFileMonitor {
       'parseFiles',
       `Concurrent parsing complete: ${filesToParse.length - failedFiles.length} succeeded, ${failedFiles.length} failed`,
     );
-
-    // Update save directory if user requested
-    if (userRequested && filePaths.length > 0) {
-      const firstDir = dirname(filePaths[0]);
-      log.info('parseFiles', `User requested parsing, updating saveDir to: ${firstDir}`);
-      this.grailDatabase.setSetting('saveDir', firstDir);
-    }
 
     this.inventorySnapshots = mergeInventorySnapshots(
       this.inventorySnapshots,
@@ -816,7 +816,7 @@ class SaveFileMonitor {
    */
   private isManualGameMode(): boolean {
     try {
-      return this.grailDatabase?.getAllSettings().gameMode === GameMode.Manual;
+      return this.settings.get('gameMode') === GameMode.Manual;
     } catch (error) {
       log.warn('isManualGameMode', `Failed to read game mode from settings: ${error}`);
       return false;
@@ -885,7 +885,7 @@ class SaveFileMonitor {
    * Triggers a manual refresh/rescan of all save files.
    * This forces a re-parse of all save files to get the latest item data.
    * Resolves once the forced parse finished, or once it was skipped (manual game mode, no save
-   * files, no database, monitoring stopped); rejects if the parse itself failed.
+   * files, monitoring stopped); rejects if the parse itself failed.
    * @returns {Promise<void>} A promise that resolves when the refresh is complete.
    */
   async refreshSaveFiles(): Promise<void> {
@@ -961,14 +961,6 @@ class SaveFileMonitor {
       );
     }
 
-    if (!this.grailDatabase) {
-      log.info('tickReader', 'Skipping: No grail database');
-      this.skipPendingForcedParse('no grail database');
-      return;
-    }
-
-    const settings = this.grailDatabase.getAllSettings();
-
     if (!this.watchPath) {
       log.info('tickReader', 'Skipping: No watch path');
       this.skipPendingForcedParse('not watching a save directory');
@@ -982,6 +974,9 @@ class SaveFileMonitor {
       // No new changes since last processing
       return;
     }
+
+    // Read only once there is something to process: most ticks see no changes
+    const settings = this.settings.getAll();
 
     // Check if enough time has passed since last file change (debouncing)
     // Skip debounce for initial parsing or force parse
@@ -1078,11 +1073,6 @@ class SaveFileMonitor {
    */
   private cleanupDeletedFileStates(existingFilePaths: string[]): void {
     log.info('cleanupDeletedFileStates', 'Checking for deleted files');
-    if (!this.grailDatabase) {
-      log.info('cleanupDeletedFileStates', 'No database available');
-      return;
-    }
-
     const existingPaths = new Set(existingFilePaths);
     const allStates = this.grailDatabase.getAllSaveFileStates();
     log.info(

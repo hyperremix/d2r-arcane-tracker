@@ -160,7 +160,7 @@ async function startServices(paths: AppPaths, lifecycle: AppLifecycle): Promise<
   lifecycle.onShutdown('process monitor', () => processMonitor?.shutdown());
   lifecycle.onShutdown('memory reader', () => memoryReader?.shutdown());
 
-  const saveFileMonitor = new SaveFileMonitor(eventBus, database);
+  const saveFileMonitor = new SaveFileMonitor(eventBus, database, settings);
   lifecycle.onShutdown('save file monitor', () => saveFileMonitor.shutdown());
   saveFileMonitor.start();
 

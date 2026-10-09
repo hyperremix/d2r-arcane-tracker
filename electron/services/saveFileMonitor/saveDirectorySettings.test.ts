@@ -4,6 +4,7 @@ import { GameMode } from '../../types/grail';
 import {
   readConfiguredSaveDirectory,
   resolveDebounceDelay,
+  resolveEffectiveSaveDirectory,
   resolveTickReaderInterval,
   resolveWatcherIntervals,
   validateInterval,
@@ -13,42 +14,31 @@ function createSettings(overrides: Partial<Settings> = {}): Settings {
   return { gameMode: GameMode.Softcore, ...overrides } as Settings;
 }
 
-function createDatabase(settings: Settings) {
-  return { getAllSettings: vi.fn(() => settings) };
+function createSettingsReader(settings: Settings) {
+  return { getAll: vi.fn(() => settings) };
 }
 
 describe('When configurable intervals are used', () => {
   describe('If the tick reader interval is not configured', () => {
     it('Then should use default intervals when settings not provided', () => {
       // Arrange
-      const database = createDatabase(createSettings());
+      const settingsReader = createSettingsReader(createSettings());
 
       // Act
-      const tickInterval = resolveTickReaderInterval(database);
+      const tickInterval = resolveTickReaderInterval(settingsReader);
 
       // Assert
       expect(tickInterval).toBe(500); // DEFAULT_TICK_INTERVAL
-    });
-
-    it('Then should use default when database not available', () => {
-      // Arrange
-      const database = null;
-
-      // Act
-      const tickInterval = resolveTickReaderInterval(database);
-
-      // Assert
-      expect(tickInterval).toBe(500);
     });
   });
 
   describe('If the tick reader interval is configured within its range', () => {
     it('Then should use custom tick reader interval from settings', () => {
       // Arrange
-      const database = createDatabase(createSettings({ tickReaderIntervalMs: 1000 }));
+      const settingsReader = createSettingsReader(createSettings({ tickReaderIntervalMs: 1000 }));
 
       // Act
-      const tickInterval = resolveTickReaderInterval(database);
+      const tickInterval = resolveTickReaderInterval(settingsReader);
 
       // Assert
       expect(tickInterval).toBe(1000);
@@ -56,10 +46,10 @@ describe('When configurable intervals are used', () => {
 
     it('Then should validate interval and allow valid custom value', () => {
       // Arrange
-      const database = createDatabase(createSettings({ tickReaderIntervalMs: 250 }));
+      const settingsReader = createSettingsReader(createSettings({ tickReaderIntervalMs: 250 }));
 
       // Act
-      const tickInterval = resolveTickReaderInterval(database);
+      const tickInterval = resolveTickReaderInterval(settingsReader);
 
       // Assert
       expect(tickInterval).toBe(250);
@@ -69,10 +59,10 @@ describe('When configurable intervals are used', () => {
   describe('If the tick reader interval is configured outside its range', () => {
     it('Then should validate and reject invalid tick reader interval', () => {
       // Arrange
-      const database = createDatabase(createSettings({ tickReaderIntervalMs: 50 })); // min is 100
+      const settingsReader = createSettingsReader(createSettings({ tickReaderIntervalMs: 50 })); // min is 100
 
       // Act
-      const tickInterval = resolveTickReaderInterval(database);
+      const tickInterval = resolveTickReaderInterval(settingsReader);
 
       // Assert - should fall back to default
       expect(tickInterval).toBe(500);
@@ -80,10 +70,10 @@ describe('When configurable intervals are used', () => {
 
     it('Then should validate interval with max constraint', () => {
       // Arrange
-      const database = createDatabase(createSettings({ tickReaderIntervalMs: 10000 })); // max is 5000
+      const settingsReader = createSettingsReader(createSettings({ tickReaderIntervalMs: 10000 })); // max is 5000
 
       // Act
-      const tickInterval = resolveTickReaderInterval(database);
+      const tickInterval = resolveTickReaderInterval(settingsReader);
 
       // Assert - should fall back to default
       expect(tickInterval).toBe(500);
@@ -135,7 +125,7 @@ describe('When configurable intervals are used', () => {
       // Act
       const configured = resolveWatcherIntervals(configuredSettings);
       const invalid = resolveWatcherIntervals(invalidSettings);
-      const withoutSettings = resolveWatcherIntervals(undefined);
+      const withoutSettings = resolveWatcherIntervals(createSettings());
 
       // Assert
       expect(configured).toEqual({ pollingInterval: 2000, stabilityThreshold: 1000 });
@@ -149,10 +139,10 @@ describe('When the configured save directory is read', () => {
   describe('If a save directory is configured', () => {
     it('Then it is returned without surrounding whitespace', () => {
       // Arrange
-      const database = createDatabase(createSettings({ saveDir: '  /saves/d2r  ' }));
+      const settingsReader = createSettingsReader(createSettings({ saveDir: '  /saves/d2r  ' }));
 
       // Act
-      const directory = readConfiguredSaveDirectory(database);
+      const directory = readConfiguredSaveDirectory(settingsReader);
 
       // Assert
       expect(directory).toBe('/saves/d2r');
@@ -162,32 +152,65 @@ describe('When the configured save directory is read', () => {
   describe('If the configured save directory is blank', () => {
     it('Then no directory is returned', () => {
       // Arrange
-      const database = createDatabase(createSettings({ saveDir: '   ' }));
+      const settingsReader = createSettingsReader(createSettings({ saveDir: '   ' }));
 
       // Act
-      const directory = readConfiguredSaveDirectory(database);
+      const directory = readConfiguredSaveDirectory(settingsReader);
 
       // Assert
       expect(directory).toBeUndefined();
     });
   });
 
-  describe('If the settings cannot be read or there is no database', () => {
+  describe('If the settings cannot be read', () => {
     it('Then no directory is returned', () => {
       // Arrange
-      const failingDatabase = {
-        getAllSettings: vi.fn(() => {
+      const failingSettings = {
+        getAll: vi.fn((): Settings => {
           throw new Error('database is locked');
         }),
       };
 
       // Act
-      const fromFailingDatabase = readConfiguredSaveDirectory(failingDatabase);
-      const withoutDatabase = readConfiguredSaveDirectory(null);
+      const directory = readConfiguredSaveDirectory(failingSettings);
 
       // Assert
-      expect(fromFailingDatabase).toBeUndefined();
-      expect(withoutDatabase).toBeUndefined();
+      expect(directory).toBeUndefined();
     });
+  });
+});
+
+describe('When the effective save directory is resolved', () => {
+  it('If a save directory is configured, Then it wins over the default without surrounding whitespace', () => {
+    // Arrange
+    const configured = '  /saves/custom  ';
+
+    // Act
+    const directory = resolveEffectiveSaveDirectory(configured, '/saves/default');
+
+    // Assert
+    expect(directory).toBe('/saves/custom');
+  });
+
+  it.each([
+    ['undefined', undefined],
+    ['blank', '   '],
+  ])('If the configured save directory is %s, Then the default is used', (_label, configured) => {
+    // Arrange
+    const defaultDirectory = '/saves/default';
+
+    // Act
+    const directory = resolveEffectiveSaveDirectory(configured, defaultDirectory);
+
+    // Assert
+    expect(directory).toBe(defaultDirectory);
+  });
+
+  it('If neither is known, Then no directory is returned', () => {
+    // Arrange & Act
+    const directory = resolveEffectiveSaveDirectory('', '');
+
+    // Assert
+    expect(directory).toBeUndefined();
   });
 });
