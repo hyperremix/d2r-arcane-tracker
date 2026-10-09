@@ -10,18 +10,7 @@ import type { CharacterClass } from '../types/grail';
  */
 
 /** Reasons the save file editor refuses an equip move, sent as `EQUIP_VALIDATION:<code>`. */
-export type EquipValidationCode =
-  | 'INVALID_SLOT'
-  | 'CLASS_RESTRICTED'
-  | 'OFFHAND_WEAPON_RESTRICTED'
-  | 'TWO_HANDED_REQUIRES_RIGHT_HAND'
-  | 'TWO_HANDED_OFFHAND_OCCUPIED'
-  | 'OFFHAND_BLOCKED_BY_TWO_HANDED'
-  | 'TARGET_SLOT_OCCUPIED';
-
-export const EQUIP_VALIDATION_PREFIX = 'EQUIP_VALIDATION';
-
-export const EQUIP_VALIDATION_CODES: ReadonlySet<EquipValidationCode> = new Set([
+const EQUIP_VALIDATION_CODE_LIST = [
   'INVALID_SLOT',
   'CLASS_RESTRICTED',
   'OFFHAND_WEAPON_RESTRICTED',
@@ -29,7 +18,15 @@ export const EQUIP_VALIDATION_CODES: ReadonlySet<EquipValidationCode> = new Set(
   'TWO_HANDED_OFFHAND_OCCUPIED',
   'OFFHAND_BLOCKED_BY_TWO_HANDED',
   'TARGET_SLOT_OCCUPIED',
-]);
+] as const;
+
+export type EquipValidationCode = (typeof EQUIP_VALIDATION_CODE_LIST)[number];
+
+export const EQUIP_VALIDATION_PREFIX = 'EQUIP_VALIDATION';
+
+export const EQUIP_VALIDATION_CODES: ReadonlySet<EquipValidationCode> = new Set(
+  EQUIP_VALIDATION_CODE_LIST,
+);
 
 const CLASS_SPECIFIC_CATEGORY_TO_CLASS: Record<string, Exclude<CharacterClass, 'shared_stash'>> = {
   'amazon item': 'amazon',
