@@ -1,8 +1,32 @@
-import { resolve } from 'node:path';
+import { existsSync } from 'node:fs';
+import { relative, resolve } from 'node:path';
+import { normalizePath, type Plugin } from 'vite';
 import { defineConfig } from 'vitest/config';
 import { getD2sSourceAliases } from './config/d2sAliases';
 
 const d2sSourceAliases = getD2sSourceAliases(__dirname);
+
+/**
+ * Serves root-relative imports of `public/` files (e.g. `import logoUrl from '/logo.png'`) as
+ * their public URL, as Vite does in the app build. Left to Vite, the module keeps the drive-less
+ * file path `/logo.png`, which Vitest rejects on Windows when it creates the module's `require`.
+ */
+function publicDirAssetUrls(): Plugin {
+  const publicDir = normalizePath(resolve(__dirname, 'public'));
+  return {
+    name: 'test:public-dir-asset-urls',
+    enforce: 'pre',
+    resolveId(source) {
+      if (!source.startsWith('/')) return undefined;
+      const file = normalizePath(resolve(publicDir, `.${source}`));
+      return existsSync(file) ? file : undefined;
+    },
+    load(id) {
+      if (!id.startsWith(`${publicDir}/`)) return undefined;
+      return `export default ${JSON.stringify(`/${normalizePath(relative(publicDir, id))}`)};`;
+    },
+  };
+}
 
 export default defineConfig({
   test: {
@@ -24,6 +48,7 @@ export default defineConfig({
       },
       {
         extends: true,
+        plugins: [publicDirAssetUrls()],
         test: {
           name: 'renderer',
           include: ['src/**/*.test.{ts,tsx}'],
