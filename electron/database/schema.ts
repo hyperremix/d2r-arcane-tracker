@@ -587,6 +587,8 @@ interface TimestampRepairTarget {
   readonly createdAtSources?: readonly string[];
 }
 
+// Legacy tables only (those that existed when the literal-timestamp bug shipped). Do not extend
+// this list for new tables; it is a stopgap that WP-Migrations replaces with a real migration.
 const timestampRepairTargets: readonly TimestampRepairTarget[] = [
   { table: 'items', hasCreatedAt: true, hasUpdatedAt: true },
   { table: 'characters', hasCreatedAt: true, hasUpdatedAt: true },

@@ -291,8 +291,8 @@ class GrailDatabase {
   close(): void {
     managementModule.close(this);
   }
-  truncateUserData(): void {
-    managementModule.truncateUserData(this);
+  truncateUserData(newSaveDir?: string): void {
+    managementModule.truncateUserData(this, newSaveDir);
     this.characterMapCache = null;
   }
   getDatabasePath(): string {
@@ -309,7 +309,8 @@ class GrailDatabase {
 
   /**
    * Validates the backup, swaps it in and reopens the connection with the standard pragmas.
-   * The previous database is restored if anything fails after the swap.
+   * The previous database is restored if anything fails after the swap; if that rollback
+   * fails too, `rawDb` stays closed until the app restarts (the old data is kept as `.pre-restore`).
    * @param source - The backup to restore
    */
   private restoreFrom(source: RestoreSource): void {

@@ -49,9 +49,11 @@ describe('When backing up the database', () => {
 describe('When user data is truncated', () => {
   let ctx: DatabaseContext;
   let logSpy: MockInstance<typeof console.log>;
+  let errorSpy: MockInstance<typeof console.error>;
 
   beforeEach(() => {
     logSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     const rawDb = createInMemoryDatabase();
     ctx = { rawDb, db: createDrizzleDb(rawDb), dbPath: ':memory:' };
     createSchema(ctx);
@@ -73,6 +75,7 @@ describe('When user data is truncated', () => {
   afterEach(() => {
     ctx.rawDb.close();
     logSpy.mockRestore();
+    errorSpy.mockRestore();
   });
 
   const count = (table: string): number =>
@@ -104,7 +107,6 @@ describe('When user data is truncated', () => {
         CREATE TRIGGER fail_progress_delete BEFORE DELETE ON grail_progress
         BEGIN SELECT RAISE(ABORT, 'progress delete failed'); END;
       `);
-      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
 
       // Act
       const act = () => truncateUserData(ctx);
@@ -116,7 +118,65 @@ describe('When user data is truncated', () => {
       expect(ctx.rawDb.prepare("SELECT character_id FROM runs WHERE id = 'run-1'").get()).toEqual({
         character_id: 'char-1',
       });
-      errorSpy.mockRestore();
+      expect(errorSpy).toHaveBeenCalled();
+    });
+  });
+
+  describe('If a new save directory is persisted together with the truncate', () => {
+    const savedDir = (): string | undefined =>
+      (
+        ctx.rawDb.prepare("SELECT value FROM settings WHERE key = 'saveDir'").get() as
+          | { value: string }
+          | undefined
+      )?.value;
+
+    it('Then the data is deleted and the new save directory is saved in the same transaction', () => {
+      // Act
+      truncateUserData(ctx, '/new/save/dir');
+
+      // Assert
+      expect(count('characters')).toBe(0);
+      expect(count('grail_progress')).toBe(0);
+      expect(savedDir()).toBe('/new/save/dir');
+    });
+
+    it('And writing the setting fails, Then the truncate is rolled back and the old setting is kept', () => {
+      // Arrange
+      ctx.rawDb.exec("INSERT OR REPLACE INTO settings (key, value) VALUES ('saveDir', '/old/dir')");
+      ctx.rawDb.exec(`
+        CREATE TRIGGER fail_save_dir_write BEFORE UPDATE ON settings
+        WHEN NEW.key = 'saveDir'
+        BEGIN SELECT RAISE(ABORT, 'disk full'); END;
+      `);
+
+      // Act
+      const act = () => truncateUserData(ctx, '/new/save/dir');
+
+      // Assert
+      expect(act).toThrow('disk full');
+      expect(count('characters')).toBe(1);
+      expect(count('grail_progress')).toBe(1);
+      expect(count('save_file_states')).toBe(1);
+      expect(ctx.rawDb.prepare("SELECT character_id FROM runs WHERE id = 'run-1'").get()).toEqual({
+        character_id: 'char-1',
+      });
+      expect(savedDir()).toBe('/old/dir');
+    });
+
+    it('And the truncate fails, Then the new save directory is not saved', () => {
+      // Arrange
+      ctx.rawDb.exec("INSERT OR REPLACE INTO settings (key, value) VALUES ('saveDir', '/old/dir')");
+      ctx.rawDb.exec(`
+        CREATE TRIGGER fail_progress_delete BEFORE DELETE ON grail_progress
+        BEGIN SELECT RAISE(ABORT, 'progress delete failed'); END;
+      `);
+
+      // Act
+      const act = () => truncateUserData(ctx, '/new/save/dir');
+
+      // Assert
+      expect(act).toThrow('progress delete failed');
+      expect(savedDir()).toBe('/old/dir');
     });
   });
 });

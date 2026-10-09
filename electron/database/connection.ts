@@ -4,6 +4,7 @@ import {
   existsSync,
   openSync,
   readSync,
+  renameSync,
   rmSync,
   writeFileSync,
 } from 'node:fs';
@@ -53,7 +54,7 @@ function hasSqliteHeader(filePath: string): boolean {
  * @param filePath - Path of the candidate database file
  * @throws {Error} If the file is not a valid app database
  */
-export function assertValidDatabaseFile(filePath: string): void {
+function assertValidDatabaseFile(filePath: string): void {
   if (!hasSqliteHeader(filePath)) {
     throw new Error('Invalid backup file: not a SQLite database');
   }
@@ -97,6 +98,18 @@ function copyDatabaseFiles(from: string, to: string): void {
     rmSync(`${to}-wal`, { force: true });
   }
   rmSync(`${to}-shm`, { force: true });
+}
+
+/**
+ * Moves a database file and its WAL sidecar aside. The shared-memory file is only a cache
+ * and is dropped.
+ */
+function moveDatabaseFiles(from: string, to: string): void {
+  renameSync(from, to);
+  if (existsSync(`${from}-wal`)) {
+    renameSync(`${from}-wal`, `${to}-wal`);
+  }
+  rmSync(`${from}-shm`, { force: true });
 }
 
 function removeDatabaseFilesQuietly(filePath: string): void {
@@ -151,7 +164,10 @@ function rollBackRestore(target: RestoreTarget, preRestorePath: string, cause: u
  * The backup is written to a temporary candidate file and validated before the live database
  * is touched. The live database is copied to `<dbPath>.pre-restore` and only deleted after the
  * restored database opened and its schema initialized; any failure after the swap restores
- * the previous database and reopens it.
+ * the previous database and reopens it. If that rollback itself fails, the connection stays
+ * closed until the app restarts and the `.pre-restore` copy is kept for manual recovery.
+ * A `.pre-restore` copy kept by an earlier failed rollback is never overwritten; it is renamed
+ * to `<dbPath>.pre-restore.<timestamp>` first.
  * @param target - The live database
  * @param source - The backup to restore
  * @throws {Error} If the backup is invalid or the restore failed (the previous data is kept)
@@ -170,13 +186,28 @@ export function restoreDatabase(target: RestoreTarget, source: RestoreSource): v
   }
 
   try {
+    if (existsSync(preRestorePath)) {
+      const keptPath = `${preRestorePath}.${Date.now()}`;
+      console.warn(`[Database] Keeping an earlier pre-restore copy at ${keptPath}`);
+      moveDatabaseFiles(preRestorePath, keptPath);
+    }
+
+    // If closing throws, the live database is untouched; the candidate is removed below.
     // Closing the last connection checkpoints the WAL, so the copy below is complete.
     target.closeConnection();
     try {
       copyDatabaseFiles(target.dbPath, preRestorePath);
     } catch (error) {
       removeDatabaseFilesQuietly(preRestorePath);
-      target.openConnectionAndInitialize();
+      try {
+        target.openConnectionAndInitialize();
+      } catch (reopenError) {
+        // Do not mask the original error with the reopen failure.
+        console.error(
+          '[Database] Reopening the database after a failed restore failed',
+          reopenError,
+        );
+      }
       throw error;
     }
 

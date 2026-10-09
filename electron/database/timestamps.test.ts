@@ -76,7 +76,7 @@ describe('When rows are inserted through drizzle', () => {
 
   describe('If created_at and updated_at are left to their defaults', () => {
     it('Then real timestamps are stored instead of the text CURRENT_TIMESTAMP', () => {
-      // Arrange & Act
+      // Act
       seedSessionRunAndItem(ctx);
       upsertCharacter(ctx, {
         id: 'char-1',
@@ -163,9 +163,13 @@ describe('When legacy rows contain the literal text CURRENT_TIMESTAMP', () => {
     logSpy.mockRestore();
   });
 
-  describe('If the startup repair runs', () => {
-    it('Then created_at uses the best known time and valid updated_at values are kept', () => {
-      // Act (createSchema already ran the repair once; run again to prove idempotence)
+  describe('If the startup repair has run on them', () => {
+    it('Then created_at uses the best known time, valid updated_at values are kept and a second run changes nothing', () => {
+      // Arrange
+      // (createSchema in beforeEach already ran the repair once)
+
+      // Act
+      // Run it again to prove idempotence
       repairLiteralTimestamps(ctx);
 
       // Assert
@@ -188,12 +192,12 @@ describe('When legacy rows contain the literal text CURRENT_TIMESTAMP', () => {
 
     it('Then the update-timestamp triggers still exist afterwards', () => {
       // Act
-      const triggers = ctx.rawDb
-        .prepare("SELECT name FROM sqlite_master WHERE type = 'trigger' AND tbl_name = 'runs'")
-        .all() as Array<{ name: string }>;
       ctx.rawDb.prepare("UPDATE runs SET duration = 1 WHERE id = 'run-1'").run();
 
       // Assert
+      const triggers = ctx.rawDb
+        .prepare("SELECT name FROM sqlite_master WHERE type = 'trigger' AND tbl_name = 'runs'")
+        .all() as Array<{ name: string }>;
       expect(triggers.map((trigger) => trigger.name)).toEqual(['update_runs_timestamp']);
       expect(getTimestamps(ctx.rawDb, 'runs', 'run-1').updated_at).not.toBe('2024-06-01 08:00:00');
     });

@@ -975,13 +975,13 @@ describe('When saveFileHandlers is used', () => {
       const result = await handler(null, newSaveDir);
 
       // Assert
-      expect(grailDatabase.setSetting).toHaveBeenCalledWith('saveDir', newSaveDir);
       expect(grailDatabase.truncateUserData).toHaveBeenCalledTimes(1);
+      expect(grailDatabase.truncateUserData).toHaveBeenCalledWith(newSaveDir);
       expect(mockSaveFileMonitor.updateSaveDirectory).toHaveBeenCalled();
       expect(result).toEqual({ success: true });
     });
 
-    it('Then saveFile:updateSaveDirectory should save the setting only after user data was truncated', async () => {
+    it('Then saveFile:updateSaveDirectory should persist the new directory in the truncate call instead of a separate write', async () => {
       // Arrange
       const handler = getHandler('saveFile:updateSaveDirectory');
 
@@ -989,15 +989,17 @@ describe('When saveFileHandlers is used', () => {
       await handler(null, '/new/save/dir');
 
       // Assert
-      const truncateOrder = vi.mocked(grailDatabase.truncateUserData).mock.invocationCallOrder[0];
-      const setSettingOrder = vi.mocked(grailDatabase.setSetting).mock.invocationCallOrder[0];
-      expect(truncateOrder).toBeLessThan(setSettingOrder);
+      expect(grailDatabase.truncateUserData).toHaveBeenCalledWith('/new/save/dir');
+      expect(grailDatabase.setSetting).not.toHaveBeenCalled();
     });
 
-    it('Then saveFile:updateSaveDirectory should keep the old setting and monitor if truncating fails', async () => {
+    it.each([
+      ['truncating', 'FOREIGN KEY constraint failed'],
+      ['writing the setting', 'database or disk is full'],
+    ])('Then saveFile:updateSaveDirectory should keep the old setting and monitor if %s fails', async (_label, message) => {
       // Arrange
       vi.mocked(grailDatabase.truncateUserData).mockImplementationOnce(() => {
-        throw new Error('FOREIGN KEY constraint failed');
+        throw new Error(message);
       });
       silenceConsole('error');
       const handler = getHandler('saveFile:updateSaveDirectory');
@@ -1006,7 +1008,7 @@ describe('When saveFileHandlers is used', () => {
       const act = handler(null, '/new/save/dir');
 
       // Assert
-      await expect(act).rejects.toThrow('FOREIGN KEY constraint failed');
+      await expect(act).rejects.toThrow(message);
       expect(grailDatabase.setSetting).not.toHaveBeenCalled();
       expect(mockSaveFileMonitor.updateSaveDirectory).not.toHaveBeenCalled();
     });
@@ -1119,8 +1121,8 @@ describe('When saveFileHandlers is used', () => {
       const result = await handler();
 
       // Assert
-      expect(grailDatabase.setSetting).toHaveBeenCalledWith('saveDir', defaultDir);
       expect(grailDatabase.truncateUserData).toHaveBeenCalledTimes(1);
+      expect(grailDatabase.truncateUserData).toHaveBeenCalledWith(defaultDir);
       expect(mockSaveFileMonitor.updateSaveDirectory).toHaveBeenCalled();
       expect(result).toEqual({ success: true, defaultDirectory: defaultDir });
     });

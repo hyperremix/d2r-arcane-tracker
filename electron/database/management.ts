@@ -1,6 +1,7 @@
 import { isNotNull } from 'drizzle-orm';
 import { schema } from './drizzle';
 import { clearAllSaveFileStates } from './save-file-states';
+import { setSetting } from './settings';
 import type { DatabaseContext } from './types';
 
 const { characters, grailProgress, runs, vaultItems } = schema;
@@ -17,9 +18,12 @@ export function close(ctx: DatabaseContext): void {
  * Deletes characters, grail progress and save file states in one transaction.
  * Run tracker history and vault items are kept; their character references are cleared first
  * because runs.character_id has no ON DELETE action and would otherwise make the delete fail.
+ * When `newSaveDir` is given, the `saveDir` setting is written in the same transaction, so a
+ * failed setting write rolls the whole truncate back and the old folder and data are kept.
  * @param ctx - Database context
+ * @param newSaveDir - Save directory to persist atomically with the truncate
  */
-export function truncateUserData(ctx: DatabaseContext): void {
+export function truncateUserData(ctx: DatabaseContext, newSaveDir?: string): void {
   try {
     const truncate = ctx.rawDb.transaction(() => {
       ctx.db.update(runs).set({ characterId: null }).where(isNotNull(runs.characterId)).run();
@@ -31,6 +35,9 @@ export function truncateUserData(ctx: DatabaseContext): void {
       ctx.db.delete(characters).run();
       ctx.db.delete(grailProgress).run();
       clearAllSaveFileStates(ctx);
+      if (newSaveDir !== undefined) {
+        setSetting(ctx, 'saveDir', newSaveDir);
+      }
     });
     truncate();
 
