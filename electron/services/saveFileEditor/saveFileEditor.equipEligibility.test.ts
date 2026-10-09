@@ -3,14 +3,14 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vites
 import { resolveEligibleEquipmentSlots } from '@/components/inventory/equipValidation';
 import { EQUIPPED_SLOT_IDS, type PaperDollSlotKey } from '@/components/inventory/spatialLayout';
 import { REPRESENTATIVE_ITEM_CODES } from '@/test/equipRepresentativeItems';
-import { normalizeWeaponSetSlotId } from '../utils/equipSlots';
+import { normalizeWeaponSetSlotId } from '../../utils/equipSlots';
 
 // These tests run the real save file editor equip validation against the real d2s v99/v96 item
 // tables (only file access and the d2s character read/write are mocked) and compare the slots it
 // accepts with the slots the inventory browser highlights. A rule change that makes the two
 // diverge, or that breaks the editor's own enforcement, fails here.
 
-type SaveFileEditorModule = typeof import('./saveFileEditor');
+type SaveFileEditorModule = typeof import('./index');
 type D2sItem = import('@dschu012/d2s').types.IItem;
 
 let mockReadFile: ReturnType<typeof vi.fn>;
@@ -34,10 +34,10 @@ beforeAll(async () => {
     readFile: mockReadFile,
     writeFile: mockWriteFile,
   }));
-  vi.doMock('./saveFileBackup', () => ({
+  vi.doMock('../saveFileBackup', () => ({
     backupSaveFile: vi.fn().mockResolvedValue(undefined),
   }));
-  vi.doMock('../utils/atomicWrite', () => ({
+  vi.doMock('../../utils/atomicWrite', () => ({
     writeFileAtomic: (filePath: string, data: Buffer) => mockWriteFile(filePath, data),
   }));
   vi.doMock('@dschu012/d2s', () => ({
@@ -48,7 +48,7 @@ beforeAll(async () => {
     setConstantData: vi.fn(),
   }));
 
-  const module = await import('./saveFileEditor');
+  const module = await import('./index');
   addItemToSaveFile = module.addItemToSaveFile;
 });
 
@@ -56,8 +56,8 @@ beforeAll(async () => {
 afterAll(() => {
   for (const modulePath of [
     'node:fs/promises',
-    './saveFileBackup',
-    '../utils/atomicWrite',
+    '../saveFileBackup',
+    '../../utils/atomicWrite',
     '@dschu012/d2s',
   ]) {
     vi.doUnmock(modulePath);
