@@ -52,7 +52,7 @@ In **Settings → Save File Monitoring**, **Change Directory** opens a folder pi
 | Both Softcore & Hardcore | Items from all characters count |
 | Softcore Only | Only softcore characters count |
 | Hardcore Only | Only hardcore characters count |
-| Manual Entry | Save files are not scanned and you mark items yourself |
+| Manual Entry | Save files are not rescanned and you mark items yourself |
 
 Switching modes changes which finds count toward progress. No data is deleted.
 

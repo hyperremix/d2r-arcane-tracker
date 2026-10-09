@@ -82,6 +82,8 @@ describe('When createServiceLogger is called', () => {
       const log = createServiceLogger('IconService');
 
       // Act
+      // No current emitter passes params; this exercises the generic forwarding of the one
+      // renderer-allowed param key (`fileName`) for any surfaced code.
       log.error(
         'convertAllSprites',
         new Error('Unexpected end of buffer'),

@@ -762,6 +762,13 @@ describe('When SaveFileMonitor is used', () => {
       (target as any).watchPath = '/test/saves';
     };
 
+    // Mirrors startMonitoring's tick reader; the monitor's shutdown() in afterEach clears it.
+    const startTickReader = (target: SaveFileMonitor) => {
+      (target as any).tickReaderInterval = setInterval(() => {
+        void (target as any).tickReader();
+      }, 500);
+    };
+
     beforeEach(() => {
       vi.useFakeTimers();
       eventBus = new EventBus();
@@ -1019,15 +1026,49 @@ describe('When SaveFileMonitor is used', () => {
       });
     });
 
+    describe('If the file watcher fails to close during shutdown while a refresh is queued', () => {
+      it('Then the refresh still settles and the shutdown rejects with the close error', async () => {
+        // Arrange
+        const closeError = new Error('watcher close failed');
+        (monitor as any).fileWatcher = {
+          close: vi.fn().mockRejectedValueOnce(closeError).mockResolvedValue(undefined),
+        };
+        startWatching(monitor);
+        (monitor as any).readingFiles = true;
+        let refreshSettled = false;
+
+        // Act
+        const shutdown = monitor.shutdown();
+        const shutdownOutcome = shutdown.then(
+          () => undefined,
+          (error: unknown) => error,
+        );
+        const refresh = monitor.refreshSaveFiles().then(
+          () => {
+            refreshSettled = true;
+          },
+          () => {
+            refreshSettled = true;
+          },
+        );
+        const error = await shutdownOutcome;
+        await vi.advanceTimersByTimeAsync(1000);
+
+        // Assert
+        expect(error).toBe(closeError);
+        expect(refreshSettled).toBe(true);
+        await refresh;
+        expect((monitor as any).pendingForcedParse).toBeUndefined();
+      });
+    });
+
     describe('If monitoring is stopped while a refresh is queued behind a running read', () => {
       it('Then the refresh resolves on the next tick without parsing', async () => {
         // Arrange
         const parseAllSpy = vi.spyOn(monitor as any, 'parseAllSaveDirectories');
         startWatching(monitor);
         (monitor as any).readingFiles = true;
-        (monitor as any).tickReaderInterval = setInterval(() => {
-          void (monitor as any).tickReader();
-        }, 500);
+        startTickReader(monitor);
         let refreshed = false;
         const refresh = monitor.refreshSaveFiles().then(() => {
           refreshed = true;
@@ -1058,9 +1099,7 @@ describe('When SaveFileMonitor is used', () => {
         });
         startWatching(monitor);
         (monitor as any).readingFiles = true;
-        (monitor as any).tickReaderInterval = setInterval(() => {
-          void (monitor as any).tickReader();
-        }, 500);
+        startTickReader(monitor);
 
         // Act
         const first = monitor.refreshSaveFiles();

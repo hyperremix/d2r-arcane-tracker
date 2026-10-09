@@ -12,7 +12,6 @@ const validPayload = {
   operation: 'convertAllSprites',
   severity: 'error',
   code: 'spriteConversionFailed',
-  params: { fileName: 'Sorceress.d2s' },
   detail: 'Unexpected end of buffer',
   timestamp: 1_700_000_000_000,
 };
@@ -147,7 +146,7 @@ describe('When building toast id and details', () => {
 
   it('If a payload has params and detail, Then the details include them', () => {
     // Arrange
-    const payload = parseServiceErrorPayload(validPayload);
+    const payload = parseServiceErrorPayload({ ...validPayload, params: { fileName: 'a.d2s' } });
 
     // Act
     const details = payload && formatServiceErrorDetails(payload);
@@ -157,7 +156,7 @@ describe('When building toast id and details', () => {
       [
         '[IconService.convertAllSprites] spriteConversionFailed (error)',
         'Time: 2023-11-14T22:13:20.000Z',
-        'Params: {"fileName":"Sorceress.d2s"}',
+        'Params: {"fileName":"a.d2s"}',
         'Detail: Unexpected end of buffer',
       ].join('\n'),
     );
