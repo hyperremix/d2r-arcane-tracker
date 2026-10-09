@@ -3,6 +3,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({
   handleMock: vi.fn(),
   onMock: vi.fn(),
+  removeHandlerMock: vi.fn(),
+  removeListenerMock: vi.fn(),
   openInventorySnapshotWindowMock: vi.fn(),
   getAllWindowsMock: vi.fn(),
   snapshotWindowSendMock: vi.fn(),
@@ -15,6 +17,8 @@ vi.mock('electron', () => ({
   ipcMain: {
     handle: mocks.handleMock,
     on: mocks.onMock,
+    removeHandler: mocks.removeHandlerMock,
+    removeListener: mocks.removeListenerMock,
   },
   BrowserWindow: {
     getAllWindows: mocks.getAllWindowsMock,
@@ -69,6 +73,51 @@ describe('When inventory window IPC handlers are initialized', () => {
       );
       expect(mocks.onMock).toHaveBeenCalledWith('inventory:vault-drag-state', expect.any(Function));
       expect(mocks.onMock).toHaveBeenCalledWith('inventory:item-drag-state', expect.any(Function));
+    });
+  });
+
+  describe('If the returned disposer is called', () => {
+    it('Then the handlers and the drag state listeners are removed', () => {
+      // Arrange
+      const dispose = initializeInventoryWindowHandlers(devPaths, () => '/tmp');
+      const listeners = mocks.onMock.mock.calls.map((call) => [call[0], call[1]]);
+
+      // Act
+      dispose();
+
+      // Assert
+      expect(mocks.removeHandlerMock).toHaveBeenCalledWith('inventory:openSnapshotWindow');
+      expect(mocks.removeHandlerMock).toHaveBeenCalledWith('inventory:getActiveDragState');
+      expect(listeners).toHaveLength(2);
+      for (const [channel, listener] of listeners) {
+        expect(mocks.removeListenerMock).toHaveBeenCalledWith(channel, listener);
+      }
+    });
+  });
+
+  describe('If the handlers are initialized again', () => {
+    it('Then the drag state of the previous registration is not reported', async () => {
+      // Arrange
+      mocks.getAllWindowsMock.mockReturnValue([]);
+      initializeInventoryWindowHandlers(devPaths, () => '/tmp');
+      const firstVaultDragListener = mocks.onMock.mock.calls.find(
+        (call) => call[0] === 'inventory:vault-drag-state',
+      )?.[1];
+      firstVaultDragListener?.(
+        { sender: { id: 101 } },
+        { active: true, id: 'vault-1', gridWidth: 1, gridHeight: 1 },
+      );
+      mocks.handleMock.mockClear();
+      initializeInventoryWindowHandlers(devPaths, () => '/tmp');
+      const getActiveDragStateHandler = mocks.handleMock.mock.calls.find(
+        (call) => call[0] === 'inventory:getActiveDragState',
+      )?.[1];
+
+      // Act
+      const result = await getActiveDragStateHandler?.();
+
+      // Assert
+      expect(result).toEqual({});
     });
   });
 

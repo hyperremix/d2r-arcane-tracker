@@ -15,6 +15,7 @@ import {
   normalizeWeaponSetSlotId,
   resolveEligibleEquippedSlotIds,
   resolveRequiredCharacterClass,
+  VALID_EQUIPPED_SLOT_IDS,
 } from '../../utils/equipSlots';
 import { normalizeItemId, resolveItemCode } from './itemFields';
 
@@ -22,8 +23,6 @@ import { normalizeItemId, resolveItemCode } from './itemFields';
  * Equip-slot rules for character saves: which slots an item fits, class restrictions, and
  * two-handed / off-hand constraints. Violations throw `EQUIP_VALIDATION:<code>` errors.
  */
-
-const VALID_EQUIPPED_SLOT_IDS = new Set([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
 
 const ITEM_EQUIP_METADATA_BY_CODE = buildItemEquipMetadataByCode([constants99, constants96]);
 

@@ -1,8 +1,8 @@
 import type { IpcMain, IpcMainEvent, IpcMainInvokeEvent } from 'electron';
 import { createServiceLogger } from '../utils/serviceLogger';
-import type { InvokeArgs, InvokeChannel, InvokeResult, SendChannel } from './contract';
-import type { ArgsValidator } from './validation';
-import { invokeArgValidators } from './validators';
+import type { InvokeArgs, InvokeChannel, InvokeResult, SendChannel, SendPayload } from './contract';
+import type { ArgsValidator, FieldValidator } from './validation';
+import { invokeArgValidators, sendPayloadValidators } from './validators';
 
 const log = createServiceLogger('IPC');
 
@@ -41,16 +41,23 @@ export interface IpcMainRegistry {
 
   /**
    * Listens for fire-and-forget messages a renderer sends on a channel from the contract.
-   * The payload is untrusted and must be validated by the listener.
+   * The payload is validated with the channel's validator first; invalid messages are logged and
+   * dropped (a send has no caller to reject).
    *
    * @param channel - Send channel from the contract
-   * @param listener - Called with the sender event and the raw payload
+   * @param listener - Called with the sender event and the validated payload
    * @returns Function that removes the listener
    */
-  onRendererMessage(
-    channel: SendChannel,
-    listener: (event: IpcMainEvent, payload: unknown) => void,
+  onRendererMessage<C extends SendChannel>(
+    channel: C,
+    listener: (event: IpcMainEvent, payload: SendPayload<C>) => void,
   ): () => void;
+
+  /**
+   * Removes every handler and listener registered through this registry. Handler modules return
+   * it (or call it from their own teardown) so the app lifecycle can unregister them on shutdown.
+   */
+  dispose(): void;
 }
 
 /**
@@ -64,10 +71,14 @@ export interface IpcMainRegistry {
  * @returns Registry used to register handlers and listeners
  */
 export function createIpcMainRegistry(ipcMain: IpcMainLike): IpcMainRegistry {
+  const handledChannels = new Set<InvokeChannel>();
+  const listenerRemovers = new Set<() => void>();
+
   return {
     handle(channel, handler) {
       const validate = invokeArgValidators[channel] as ArgsValidator<InvokeArgs<typeof channel>>;
 
+      handledChannels.add(channel);
       ipcMain.handle(channel, async (event, ...rawArgs: unknown[]) => {
         try {
           const args = validate(rawArgs);
@@ -80,14 +91,44 @@ export function createIpcMainRegistry(ipcMain: IpcMainLike): IpcMainRegistry {
     },
 
     removeHandler(channel) {
+      handledChannels.delete(channel);
       ipcMain.removeHandler(channel);
     },
 
     onRendererMessage(channel, listener) {
-      ipcMain.on(channel, listener);
-      return () => {
-        ipcMain.removeListener(channel, listener);
+      const validate = sendPayloadValidators[channel] as FieldValidator<
+        SendPayload<typeof channel>
+      >;
+      const validatingListener = (event: IpcMainEvent, rawPayload: unknown) => {
+        let payload: SendPayload<typeof channel>;
+        try {
+          payload = validate(rawPayload);
+        } catch (error) {
+          log.warn(channel, 'Dropped invalid renderer message', {
+            error: error instanceof Error ? error.message : String(error),
+          });
+          return;
+        }
+        listener(event, payload);
       };
+
+      ipcMain.on(channel, validatingListener);
+      const removeListener = () => {
+        listenerRemovers.delete(removeListener);
+        ipcMain.removeListener(channel, validatingListener);
+      };
+      listenerRemovers.add(removeListener);
+      return removeListener;
+    },
+
+    dispose() {
+      for (const channel of handledChannels) {
+        ipcMain.removeHandler(channel);
+      }
+      handledChannels.clear();
+      for (const removeListener of [...listenerRemovers]) {
+        removeListener();
+      }
     },
   };
 }

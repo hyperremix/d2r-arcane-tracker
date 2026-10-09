@@ -1,26 +1,24 @@
-import type {
-  GrailProgress,
-  InventoryItemMoveInput,
-  InventorySnapshotWindowTarget,
-  InventoryStackSplitInput,
-  Settings,
-  VaultItemFilter,
-  VaultItemUpsertInput,
-} from '../types/grail';
+import { isAbsolute } from 'node:path';
+import type { Difficulty, GrailProgress, Settings } from '../types/grail';
+import { RUN_TRACKER_SHORTCUT_ACTIONS } from '../utils/runTrackerShortcuts';
 import { MAX_SESSION_NOTES_LENGTH } from '../utils/sessionNotes';
 import type { WidgetDisplayMode } from '../utils/widgetDisplay';
 import {
   type AddRunItemInput,
   type FileDialogFilter,
+  INVENTORY_DRAG_STATE_CHANNEL,
   type InvokeArgs,
   type InvokeChannel,
   OPEN_DIALOG_PROPERTIES,
   type OpenFileDialogOptions,
   SAVE_DIALOG_PROPERTIES,
   type SaveFileDialogOptions,
+  type SendChannel,
+  type SendPayload,
   type TitleBarOverlayColors,
-  type UnvaultTargetOptions,
+  VAULT_DRAG_STATE_CHANNEL,
 } from './contract';
+import { inventoryDragStatePayload, vaultDragStatePayload } from './dragStateValidators';
 import {
   type ArgsValidator,
   args,
@@ -37,6 +35,16 @@ import {
   string,
   validatedByHandler,
 } from './validation';
+import {
+  inventoryItemMoveInput,
+  inventorySnapshotWindowTarget,
+  inventoryStackSplitInput,
+  unvaultTargetOptions,
+  vaultItemFilter,
+  vaultItemId,
+  vaultItemUpsertInput,
+  withdrawCount,
+} from './vaultValidators';
 
 const optionalString = (message: string) => optional(string(message));
 
@@ -128,6 +136,50 @@ const sessionNotes: FieldValidator<string> = (value) => {
   return notes;
 };
 
+const VALID_DIFFICULTIES: readonly Difficulty[] = ['normal', 'nightmare', 'hell'];
+
+function isNonEmptyString(value: unknown): value is string {
+  return typeof value === 'string' && value.trim().length > 0;
+}
+
+/**
+ * A grail progress record the renderer saves (manual finds). Only the record fields are kept.
+ */
+const grailProgress: FieldValidator<GrailProgress> = (value) => {
+  const message = 'Invalid grail progress payload';
+  ensure(isPlainObject(value), message);
+  const { id, characterId, itemId, foundDate, foundBy, manuallyAdded, difficulty, notes } = value;
+  const { isEthereal, fromInitialScan } = value;
+  ensure(
+    isNonEmptyString(id) && isNonEmptyString(characterId) && isNonEmptyString(itemId),
+    message,
+  );
+  ensure(typeof isEthereal === 'boolean' && typeof manuallyAdded === 'boolean', message);
+  ensure(fromInitialScan === undefined || typeof fromInitialScan === 'boolean', message);
+  ensure(foundBy === undefined || typeof foundBy === 'string', message);
+  ensure(notes === undefined || typeof notes === 'string', message);
+  ensure(
+    foundDate === undefined || (foundDate instanceof Date && !Number.isNaN(foundDate.getTime())),
+    message,
+  );
+  ensure(
+    difficulty === undefined || (VALID_DIFFICULTIES as readonly unknown[]).includes(difficulty),
+    message,
+  );
+  return {
+    id,
+    characterId,
+    itemId,
+    foundDate,
+    foundBy,
+    manuallyAdded,
+    difficulty: difficulty as Difficulty | undefined,
+    notes,
+    isEthereal,
+    fromInitialScan,
+  };
+};
+
 /**
  * Whether the renderer may write a setting through `grail:updateSettings`. The mapped type forces a
  * decision for every new setting. Settings with a dedicated flow (and its own validation) or that
@@ -201,6 +253,18 @@ export function isRendererWritableSetting(key: string): key is keyof Settings {
   return rendererWritableSettingKeys.has(key);
 }
 
+/**
+ * Checks that a renderer-provided shortcut mapping has a non-empty string for every action.
+ * @param value - The untrusted runTrackerShortcuts value
+ * @returns True if the value is a complete shortcut mapping
+ */
+function isValidRunTrackerShortcuts(value: unknown): boolean {
+  return (
+    isPlainObject(value) &&
+    RUN_TRACKER_SHORTCUT_ACTIONS.every((action) => isNonEmptyString(value[action]))
+  );
+}
+
 const settingsUpdate: FieldValidator<Partial<Settings>> = (value) => {
   ensure(isPlainObject(value), 'Invalid settings: expected an object');
   for (const key of Object.keys(value)) {
@@ -209,7 +273,38 @@ const settingsUpdate: FieldValidator<Partial<Settings>> = (value) => {
       `Setting cannot be changed through grail:updateSettings: ${key}`,
     );
   }
+  // Settings whose type affects main-process behavior (global hotkey registration)
+  ensure(
+    value.runTrackerGlobalHotkeys === undefined ||
+      typeof value.runTrackerGlobalHotkeys === 'boolean',
+    'Invalid runTrackerGlobalHotkeys setting: expected a boolean',
+  );
+  ensure(
+    value.runTrackerShortcuts === undefined ||
+      isValidRunTrackerShortcuts(value.runTrackerShortcuts),
+    'Invalid runTrackerShortcuts setting: expected an object with a non-empty string for each shortcut action',
+  );
   return value as Partial<Settings>;
+};
+
+/** A new save directory: a non-empty absolute path, returned trimmed. */
+const saveDirectory: FieldValidator<string> = (value) => {
+  ensure(typeof value === 'string', 'Invalid save directory: expected a string');
+  const trimmed = value.trim();
+  ensure(
+    trimmed !== '' && isAbsolute(trimmed),
+    'Invalid save directory: expected a non-empty absolute path',
+  );
+  return trimmed;
+};
+
+/** Target of `dialog:writeFile`: an absolute path (the user picked it in a save dialog). */
+const writableFilePath: FieldValidator<string> = (value) => {
+  ensure(
+    typeof value === 'string' && value.trim().length > 0 && isAbsolute(value),
+    'Invalid file path',
+  );
+  return value;
 };
 
 /** Largest database backup accepted from the renderer. */
@@ -268,8 +363,9 @@ const externalUrl: FieldValidator<string> = (value) => {
 /**
  * Argument validators for every invoke channel of the contract.
  *
- * The mapped type makes a missing or extra channel a compile error. Arguments marked
- * `validatedByHandler` are checked field by field (with precise error messages) by the handler.
+ * The mapped type makes a missing or extra channel a compile error. The few arguments marked
+ * `validatedByHandler` are checked by handlers that report invalid input as a failed result
+ * instead of rejecting.
  */
 export const invokeArgValidators: { [C in InvokeChannel]: ArgsValidator<InvokeArgs<C>> } = {
   // Grail
@@ -278,7 +374,7 @@ export const invokeArgValidators: { [C in InvokeChannel]: ArgsValidator<InvokeAr
   'grail:getAllRunewords': noArgs,
   'grail:getProgress': args(optionalString('Invalid character ID')),
   'grail:getProgressByItem': args(nonEmptyString('Invalid item ID')),
-  'grail:updateProgress': args(validatedByHandler<GrailProgress>()),
+  'grail:updateProgress': args(grailProgress),
   'grail:deleteProgress': args(nonEmptyString('Invalid progress ID')),
   'grail:getSettings': noArgs,
   'grail:updateSettings': args(settingsUpdate),
@@ -292,33 +388,29 @@ export const invokeArgValidators: { [C in InvokeChannel]: ArgsValidator<InvokeAr
   'saveFile:getSaveFiles': noArgs,
   'saveFile:getMonitoringStatus': noArgs,
   'saveFile:getDefaultDirectory': noArgs,
-  'saveFile:updateSaveDirectory': args(validatedByHandler<string>()),
+  'saveFile:updateSaveDirectory': args(saveDirectory),
   'saveFile:inspectDirectory': args(string('Invalid save directory: expected a string')),
   'saveFile:restoreDefaultDirectory': noArgs,
   'saveFile:getAvailableRunes': noArgs,
   'saveFile:refreshSaveFiles': noArgs,
 
   // Vault
-  'vault:addItem': args(validatedByHandler<VaultItemUpsertInput>()),
-  'vault:removeItem': args(validatedByHandler<string>()),
-  'vault:search': args(validatedByHandler<VaultItemFilter | undefined>()),
-  'vault:unvaultItem': args(
-    validatedByHandler<string>(),
-    validatedByHandler<UnvaultTargetOptions | undefined>(),
-    validatedByHandler<number | undefined>(),
-  ),
+  'vault:addItem': args(vaultItemUpsertInput),
+  'vault:removeItem': args(vaultItemId),
+  'vault:search': args(vaultItemFilter),
+  'vault:unvaultItem': args(vaultItemId, unvaultTargetOptions, withdrawCount),
 
   // Inventory
-  'inventory:searchAll': args(validatedByHandler<VaultItemFilter | undefined>()),
-  'inventory:openSnapshotWindow': args(validatedByHandler<InventorySnapshotWindowTarget>()),
-  'inventory:moveItem': args(validatedByHandler<InventoryItemMoveInput>()),
-  'inventory:splitStack': args(validatedByHandler<InventoryStackSplitInput>()),
+  'inventory:searchAll': args(vaultItemFilter),
+  'inventory:openSnapshotWindow': args(inventorySnapshotWindowTarget),
+  'inventory:moveItem': args(inventoryItemMoveInput),
+  'inventory:splitStack': args(inventoryStackSplitInput),
   'inventory:getActiveDragState': noArgs,
 
   // Native dialogs
   'dialog:showSaveDialog': args(fileDialogOptions<SaveFileDialogOptions>(SAVE_DIALOG_PROPERTIES)),
   'dialog:showOpenDialog': args(fileDialogOptions<OpenFileDialogOptions>(OPEN_DIALOG_PROPERTIES)),
-  'dialog:writeFile': args(validatedByHandler<string>(), validatedByHandler<string>()),
+  'dialog:writeFile': args(writableFilePath, string('Invalid file content')),
 
   // Icons
   'icon:setD2RPath': args(string('Invalid D2R installation path')),
@@ -387,3 +479,12 @@ export const invokeArgValidators: { [C in InvokeChannel]: ArgsValidator<InvokeAr
 
 /** All invoke channels of the contract. */
 export const IPC_INVOKE_CHANNELS = Object.keys(invokeArgValidators) as InvokeChannel[];
+
+/**
+ * Payload validators for every send channel (fire-and-forget renderer messages). The mapped type
+ * makes a missing or extra channel a compile error.
+ */
+export const sendPayloadValidators: { [C in SendChannel]: FieldValidator<SendPayload<C>> } = {
+  [VAULT_DRAG_STATE_CHANNEL]: vaultDragStatePayload,
+  [INVENTORY_DRAG_STATE_CHANNEL]: inventoryDragStatePayload,
+};

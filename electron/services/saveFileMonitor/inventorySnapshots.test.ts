@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import type { CharacterInventorySnapshot, ParsedInventoryItem } from '../../types/grail';
+import type { ParsedInventoryItemWithRaw, ParsedInventorySnapshot } from '../../types/grail';
 import { countAvailableRunes, mergeInventorySnapshots } from './inventorySnapshots';
 
 function createSnapshot(
   snapshotId: string,
   sourceFilePath: string,
-  items: Partial<ParsedInventoryItem>[] = [],
-): CharacterInventorySnapshot {
+  items: Partial<ParsedInventoryItemWithRaw>[] = [],
+): ParsedInventorySnapshot {
   return {
     snapshotId,
     characterName: snapshotId,
@@ -14,13 +14,13 @@ function createSnapshot(
     sourceFilePath,
     readOnly: false,
     capturedAt: new Date('2024-01-01T00:00:00.000Z'),
-    items: items as ParsedInventoryItem[],
+    items: items as ParsedInventoryItemWithRaw[],
   };
 }
 
-function rune(type: string, stackCount?: number): Partial<ParsedInventoryItem> {
+function rune(type: string, stackCount?: number): Partial<ParsedInventoryItemWithRaw> {
   return {
-    rawParsedItem: { type } as ParsedInventoryItem['rawParsedItem'],
+    rawParsedItem: { type } as ParsedInventoryItemWithRaw['rawParsedItem'],
     isSocketedItem: false,
     stackCount,
   };
@@ -84,7 +84,7 @@ describe('When available runes are counted', () => {
       runeInSocketedParent.rawParsedItem = {
         type: 'r03',
         socketed: 1,
-      } as ParsedInventoryItem['rawParsedItem'];
+      } as ParsedInventoryItemWithRaw['rawParsedItem'];
       const snapshots = [
         createSnapshot('a', '/saves/a.d2s', [rune('r01', 3), rune('r01', 2), socketedRune]),
         createSnapshot('b', '/saves/b.d2s', [rune('r01'), runeInSocketedParent]),

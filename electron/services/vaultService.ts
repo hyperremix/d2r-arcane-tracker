@@ -6,6 +6,9 @@ import type {
   InventoryItemMoveInput,
   InventorySearchResult,
   InventoryStackSplitInput,
+  ParsedInventoryItem,
+  ParsedInventoryItemWithRaw,
+  ParsedInventorySnapshot,
   VaultItem,
   VaultItemFilter,
   VaultItemSearchResult,
@@ -16,7 +19,7 @@ import type {
 import { assert } from '../utils/assert';
 import { assertSaveFilePathAllowed } from '../utils/saveFilePathGuard';
 import { isResourceStackFromRawJson, resolveStackCountFromRawJson } from '../utils/stackableItems';
-import { isCurrentlyVaulted, isGrailBookmark, VALID_SOURCE_FILE_TYPES } from '../utils/vaultState';
+import { isCurrentlyVaulted, isGrailBookmark } from '../utils/vaultState';
 import type {
   addItemToSaveFile,
   moveItemBetweenSaveFiles,
@@ -25,33 +28,6 @@ import type {
   SaveFileItemLocator,
   splitStackInSaveFile,
 } from './saveFileEditor';
-
-const MAX_SEARCH_TEXT_LENGTH = 120;
-const MAX_PAGE = 10000;
-const MAX_PAGE_SIZE = 200;
-const MIN_PAGE = 1;
-const MIN_PAGE_SIZE = 1;
-
-const VALID_PRESENT_STATES = new Set(['all', 'present', 'missing']);
-const VALID_VAULTED_STATES = new Set(['all', 'vaulted', 'unvaulted']);
-const VALID_SORT_BY = new Set(['itemName', 'lastSeenAt', 'createdAt', 'updatedAt', 'vaultedAt']);
-const VALID_SORT_ORDER = new Set(['asc', 'desc']);
-const VALID_LOCATION_CONTEXTS = new Set([
-  'equipped',
-  'inventory',
-  'stash',
-  'mercenary',
-  'corpse',
-  'unknown',
-]);
-const VALID_MOVE_TARGET_CONTEXTS = new Set([
-  'equipped',
-  'inventory',
-  'stash',
-  'mercenary',
-  'corpse',
-]);
-const VALID_EQUIPPED_SLOT_IDS = new Set([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
 
 interface NormalizedInventoryMoveInput {
   sourceFilePath: string;
@@ -68,151 +44,6 @@ interface NormalizedInventoryMoveInput {
   targetGridX?: number;
   targetGridY?: number;
   targetEquippedSlotId?: number;
-}
-
-interface NormalizedSplitStackTarget {
-  targetFilePath: string;
-  targetFileType: VaultSourceFileType;
-  targetLocationContext: VaultLocationContext;
-  targetStashTab?: number;
-  targetGridX: number;
-  targetGridY: number;
-}
-
-interface NormalizedSplitStackInput {
-  sourceFilePath: string;
-  sourceFileType: VaultSourceFileType;
-  sourceStashTab: number;
-  sourceItemCode: string;
-  sourceRawItemJson?: string;
-  splitCount: number;
-  targets: NormalizedSplitStackTarget[];
-}
-
-function sanitizeFilter(filter?: VaultItemFilter): VaultItemFilter {
-  const safeFilter = filter ?? {};
-
-  if (safeFilter.text !== undefined) {
-    assert(typeof safeFilter.text === 'string', 'Search text must be a string');
-    assert(
-      safeFilter.text.length <= MAX_SEARCH_TEXT_LENGTH,
-      `Search text must be <= ${MAX_SEARCH_TEXT_LENGTH} characters`,
-    );
-  }
-
-  if (safeFilter.page !== undefined) {
-    assert(Number.isInteger(safeFilter.page), 'Page must be an integer');
-    assert(safeFilter.page >= MIN_PAGE, `Page must be >= ${MIN_PAGE}`);
-    assert(safeFilter.page <= MAX_PAGE, `Page must be <= ${MAX_PAGE}`);
-  }
-
-  if (safeFilter.pageSize !== undefined) {
-    assert(Number.isInteger(safeFilter.pageSize), 'Page size must be an integer');
-    assert(
-      safeFilter.pageSize >= MIN_PAGE_SIZE && safeFilter.pageSize <= MAX_PAGE_SIZE,
-      `Page size must be between ${MIN_PAGE_SIZE} and ${MAX_PAGE_SIZE}`,
-    );
-  }
-
-  if (safeFilter.presentState !== undefined) {
-    assert(
-      VALID_PRESENT_STATES.has(safeFilter.presentState),
-      'presentState must be one of: all, present, missing',
-    );
-  }
-
-  if (safeFilter.vaultedState !== undefined) {
-    assert(
-      VALID_VAULTED_STATES.has(safeFilter.vaultedState),
-      'vaultedState must be one of: all, vaulted, unvaulted',
-    );
-  }
-
-  if (safeFilter.sortBy !== undefined) {
-    assert(
-      VALID_SORT_BY.has(safeFilter.sortBy),
-      'sortBy must be one of: itemName, lastSeenAt, createdAt, updatedAt, vaultedAt',
-    );
-  }
-
-  if (safeFilter.sortOrder !== undefined) {
-    assert(VALID_SORT_ORDER.has(safeFilter.sortOrder), 'sortOrder must be asc or desc');
-  }
-
-  if (safeFilter.sourceFileType !== undefined) {
-    assert(
-      VALID_SOURCE_FILE_TYPES.has(safeFilter.sourceFileType),
-      'sourceFileType must be one of: d2s, sss, d2x, d2i',
-    );
-  }
-
-  if (safeFilter.locationContext !== undefined) {
-    assert(
-      VALID_LOCATION_CONTEXTS.has(safeFilter.locationContext),
-      'locationContext must be one of: equipped, inventory, stash, mercenary, corpse, unknown',
-    );
-  }
-
-  if (safeFilter.includeSocketed !== undefined) {
-    assert(typeof safeFilter.includeSocketed === 'boolean', 'includeSocketed must be a boolean');
-  }
-
-  if (safeFilter.characterId !== undefined) {
-    assert(
-      typeof safeFilter.characterId === 'string' && safeFilter.characterId.length > 0,
-      'characterId must be a non-empty string',
-    );
-  }
-
-  return safeFilter;
-}
-
-function validateVaultItemInput(input: VaultItemUpsertInput): void {
-  assert(
-    typeof input.fingerprint === 'string' && input.fingerprint.length > 0,
-    'Missing fingerprint',
-  );
-  assert(typeof input.itemName === 'string' && input.itemName.length > 0, 'Missing itemName');
-  assert(
-    typeof input.rawItemJson === 'string' && input.rawItemJson.length > 0,
-    'Missing rawItemJson',
-  );
-  assert(VALID_SOURCE_FILE_TYPES.has(input.sourceFileType), 'Invalid sourceFileType');
-  assert(VALID_LOCATION_CONTEXTS.has(input.locationContext), 'Invalid locationContext');
-  assert(typeof input.quality === 'string' && input.quality.length > 0, 'Missing quality');
-}
-
-function normalizeOptionalDate(
-  value: Date | string | undefined,
-  fieldName: 'lastSeenAt' | 'vaultedAt' | 'unvaultedAt',
-): Date | undefined {
-  if (value === undefined) {
-    return undefined;
-  }
-
-  if (value instanceof Date) {
-    assert(!Number.isNaN(value.getTime()), `${fieldName} must be a valid date`);
-    return value;
-  }
-
-  const parsed = new Date(value);
-  assert(!Number.isNaN(parsed.getTime()), `${fieldName} must be a valid date`);
-  return parsed;
-}
-
-function normalizeVaultItemInput(input: VaultItemUpsertInput): VaultItemUpsertInput {
-  const unsafeInput = input as VaultItemUpsertInput & {
-    lastSeenAt?: Date | string;
-    vaultedAt?: Date | string;
-    unvaultedAt?: Date | string;
-  };
-
-  return {
-    ...input,
-    lastSeenAt: normalizeOptionalDate(unsafeInput.lastSeenAt, 'lastSeenAt'),
-    vaultedAt: normalizeOptionalDate(unsafeInput.vaultedAt, 'vaultedAt'),
-    unvaultedAt: normalizeOptionalDate(unsafeInput.unvaultedAt, 'unvaultedAt'),
-  };
 }
 
 function toItemId(value: unknown): number | undefined {
@@ -311,122 +142,11 @@ function normalizeCode(value: unknown): string | undefined {
   return typeof value === 'string' && value.trim() ? value.trim().toLowerCase() : undefined;
 }
 
-function normalizeSplitStackTarget(
-  target: InventoryStackSplitInput['targets'][number],
-): NormalizedSplitStackTarget {
-  const targetFilePath = (target.targetFilePath ?? '').trim();
-  const isStashTarget = target.targetLocationContext === 'stash';
-
-  assert(targetFilePath.length > 0, 'Each target must have a valid targetFilePath');
-  assert(
-    VALID_SOURCE_FILE_TYPES.has(target.targetFileType),
-    'Each target targetFileType must be one of: d2s, sss, d2x, d2i',
-  );
-  assert(
-    VALID_MOVE_TARGET_CONTEXTS.has(target.targetLocationContext) &&
-      target.targetLocationContext !== 'equipped',
-    'Each target targetLocationContext must be valid',
-  );
-  if (target.targetFileType !== 'd2s') {
-    assert(isStashTarget, 'Shared stash targets must use targetLocationContext=stash');
-  }
-
-  if (target.targetStashTab !== undefined) {
-    assert(
-      isStashTarget,
-      'Each target targetStashTab is only allowed when targetLocationContext=stash',
-    );
-    assert(
-      Number.isInteger(target.targetStashTab) && target.targetStashTab >= 0,
-      'Each target targetStashTab must be a non-negative integer',
-    );
-  }
-
-  assert(Number.isInteger(target.targetGridX), 'Each target must have integer targetGridX');
-  assert(Number.isInteger(target.targetGridY), 'Each target must have integer targetGridY');
-  assert(target.targetGridX >= 0, 'Each target targetGridX must be >= 0');
-  assert(target.targetGridY >= 0, 'Each target targetGridY must be >= 0');
-
-  return {
-    targetFilePath,
-    targetFileType: target.targetFileType,
-    targetLocationContext: target.targetLocationContext,
-    targetStashTab: target.targetStashTab,
-    targetGridX: target.targetGridX,
-    targetGridY: target.targetGridY,
-  };
-}
-
-function normalizeSplitStackInput(input: InventoryStackSplitInput): NormalizedSplitStackInput {
-  assert(input && typeof input === 'object', 'Split input is required');
-
-  const sourceFilePath = (input.sourceFilePath ?? '').trim();
-  const sourceItemCode = (input.sourceItemCode ?? '').trim();
-
-  assert(sourceFilePath.length > 0, 'sourceFilePath is required');
-  assert(
-    VALID_SOURCE_FILE_TYPES.has(input.sourceFileType),
-    'sourceFileType must be one of: d2s, sss, d2x, d2i',
-  );
-  assert(sourceItemCode.length > 0, 'sourceItemCode is required');
-  assert(
-    Number.isInteger(input.sourceStashTab) && input.sourceStashTab >= 0,
-    'sourceStashTab must be a non-negative integer',
-  );
-  assert(
-    Number.isInteger(input.splitCount) && input.splitCount > 0,
-    'splitCount must be a positive integer',
-  );
-  assert(Array.isArray(input.targets) && input.targets.length > 0, 'targets must be non-empty');
-
-  const sourceRawItemJson =
-    typeof input.sourceRawItemJson === 'string' && input.sourceRawItemJson.trim()
-      ? input.sourceRawItemJson.trim()
-      : undefined;
-
-  return {
-    sourceFilePath,
-    sourceFileType: input.sourceFileType,
-    sourceStashTab: input.sourceStashTab,
-    sourceItemCode,
-    sourceRawItemJson,
-    splitCount: input.splitCount,
-    targets: input.targets.map((target) => normalizeSplitStackTarget(target)),
-  };
-}
-
-// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Move-input validation enforces IPC safety for multiple target modes.
-function normalizeInventoryMoveInput(input: InventoryItemMoveInput): NormalizedInventoryMoveInput {
-  assert(input && typeof input === 'object', 'Move input is required');
-
-  const sourceFilePath = input.sourceFilePath?.trim();
-  const targetFilePath = input.targetFilePath?.trim();
-
-  assert(
-    typeof sourceFilePath === 'string' && sourceFilePath.length > 0,
-    'sourceFilePath is required',
-  );
-  assert(
-    typeof targetFilePath === 'string' && targetFilePath.length > 0,
-    'targetFilePath is required',
-  );
-  assert(
-    typeof input.rawItemJson === 'string' && input.rawItemJson.trim().length > 0,
-    'rawItemJson is required',
-  );
-  assert(
-    VALID_SOURCE_FILE_TYPES.has(input.sourceFileType),
-    'sourceFileType must be one of: d2s, sss, d2x, d2i',
-  );
-  assert(
-    VALID_SOURCE_FILE_TYPES.has(input.targetFileType),
-    'targetFileType must be one of: d2s, sss, d2x, d2i',
-  );
-  assert(
-    VALID_MOVE_TARGET_CONTEXTS.has(input.targetLocationContext),
-    'targetLocationContext must be one of: equipped, inventory, stash, mercenary, corpse',
-  );
-
+/**
+ * Locates the source item of a move by the id and position in its raw JSON.
+ * @param input - Validated move input
+ */
+function resolveMoveOptions(input: InventoryItemMoveInput): NormalizedInventoryMoveInput {
   const {
     itemId: sourceItemId,
     itemCode: sourceItemCode,
@@ -436,9 +156,10 @@ function normalizeInventoryMoveInput(input: InventoryItemMoveInput): NormalizedI
 
   // For non-d2i sources, a numeric item id is always required (non-simple items only).
   // For d2i sources, simple items (runes/gems) have no id — position is used instead.
-  if (input.sourceFileType !== 'd2i' && sourceItemId === undefined) {
-    throw new Error('rawItemJson must include a numeric item id');
-  }
+  assert(
+    input.sourceFileType === 'd2i' || sourceItemId !== undefined,
+    'rawItemJson must include a numeric item id',
+  );
   assert(
     input.sourceFileType !== 'd2i' ||
       sourceItemId !== undefined ||
@@ -446,79 +167,25 @@ function normalizeInventoryMoveInput(input: InventoryItemMoveInput): NormalizedI
     'rawItemJson must include a numeric item id or grid coordinates for d2i source items',
   );
 
-  const targetLocationContext = input.targetLocationContext as VaultLocationContext;
-  const isStashTarget = targetLocationContext === 'stash';
-  const isEquippedTarget = targetLocationContext === 'equipped';
-
-  if (input.targetFileType !== 'd2s') {
-    assert(
-      targetLocationContext === 'stash',
-      'Shared stash targets must use targetLocationContext=stash',
-    );
-  }
-
-  if (isEquippedTarget) {
-    assert(input.targetFileType === 'd2s', 'Equipped target requires targetFileType=d2s');
-    assert(
-      Number.isInteger(input.targetEquippedSlotId) &&
-        VALID_EQUIPPED_SLOT_IDS.has(input.targetEquippedSlotId as number),
-      'targetEquippedSlotId must be one of: 1-12',
-    );
-  } else {
-    assert(
-      input.targetEquippedSlotId === undefined,
-      'targetEquippedSlotId is only allowed when targetLocationContext=equipped',
-    );
-  }
-
-  if (isStashTarget) {
-    if (input.targetStashTab !== undefined) {
-      assert(
-        Number.isInteger(input.targetStashTab) && input.targetStashTab >= 0,
-        'targetStashTab must be a non-negative integer',
-      );
-    }
-  } else {
-    assert(
-      input.targetStashTab === undefined,
-      'targetStashTab is only allowed when targetLocationContext=stash',
-    );
-  }
-
-  if (targetLocationContext !== 'equipped') {
-    assert(Number.isInteger(input.targetGridX), 'targetGridX must be an integer');
-    assert(Number.isInteger(input.targetGridY), 'targetGridY must be an integer');
-    assert((input.targetGridX as number) >= 0, 'targetGridX must be >= 0');
-    assert((input.targetGridY as number) >= 0, 'targetGridY must be >= 0');
-  }
-
-  const sourceStashTab =
-    typeof input.sourceStashTab === 'number' && input.sourceStashTab >= 0
-      ? input.sourceStashTab
-      : undefined;
-
   return {
-    sourceFilePath,
+    sourceFilePath: input.sourceFilePath,
     sourceFileType: input.sourceFileType,
     sourceItemId,
-    sourceStashTab,
+    sourceStashTab: input.sourceStashTab,
     sourceGridXFromItem,
     sourceGridYFromItem,
     sourceItemCode,
-    targetFilePath,
+    targetFilePath: input.targetFilePath,
     targetFileType: input.targetFileType,
-    targetLocationContext,
-    targetStashTab: isStashTarget ? (input.targetStashTab ?? 0) : undefined,
-    targetGridX: targetLocationContext === 'equipped' ? undefined : input.targetGridX,
-    targetGridY: targetLocationContext === 'equipped' ? undefined : input.targetGridY,
-    targetEquippedSlotId: isEquippedTarget ? input.targetEquippedSlotId : undefined,
+    targetLocationContext: input.targetLocationContext,
+    targetStashTab: input.targetStashTab,
+    targetGridX: input.targetGridX,
+    targetGridY: input.targetGridY,
+    targetEquippedSlotId: input.targetEquippedSlotId,
   };
 }
 
-function itemMatchesFilter(
-  item: CharacterInventorySnapshot['items'][number],
-  filter: VaultItemFilter,
-): boolean {
+function itemMatchesFilter(item: ParsedInventoryItem, filter: VaultItemFilter): boolean {
   if (filter.includeSocketed !== true && item.isSocketedItem) {
     return false;
   }
@@ -555,15 +222,30 @@ function itemMatchesFilter(
   return true;
 }
 
+/**
+ * The renderer gets each item without the parsed d2s item: it already has the same data as
+ * `rawItemJson`, and sending both would roughly double the payload.
+ */
+function toRendererInventoryItem({
+  rawParsedItem: _rawParsedItem,
+  ...item
+}: ParsedInventoryItemWithRaw): ParsedInventoryItem {
+  return item;
+}
+
 function buildInventorySearchResult(
-  snapshots: CharacterInventorySnapshot[],
+  snapshots: ParsedInventorySnapshot[],
   filter: VaultItemFilter,
 ): InventorySearchResult {
   const filteredSnapshots = snapshots
-    .map((snapshot) => ({
-      ...snapshot,
-      items: snapshot.items.filter((item) => itemMatchesFilter(item, filter)),
-    }))
+    .map(
+      (snapshot): CharacterInventorySnapshot => ({
+        ...snapshot,
+        items: snapshot.items
+          .filter((item) => itemMatchesFilter(item, filter))
+          .map(toRendererInventoryItem),
+      }),
+    )
     .filter((snapshot) => snapshot.items.length > 0);
 
   return {
@@ -571,70 +253,6 @@ function buildInventorySearchResult(
     totalSnapshots: filteredSnapshots.length,
     totalItems: filteredSnapshots.reduce((sum, snapshot) => sum + snapshot.items.length, 0),
   };
-}
-
-function resolveWithdrawCount(withdrawCount: unknown): number | undefined {
-  if (withdrawCount === undefined) {
-    return undefined;
-  }
-  assert(
-    typeof withdrawCount === 'number' && Number.isInteger(withdrawCount) && withdrawCount > 0,
-    'withdrawCount must be a positive integer',
-  );
-  return withdrawCount as number;
-}
-
-function validateUnvaultTargetOptions(targetOptions: UnvaultTargetOptions): void {
-  assert(
-    targetOptions !== null && typeof targetOptions === 'object',
-    'targetOptions must be an object',
-  );
-  const targetFilePath = (targetOptions.targetFilePath ?? '').trim();
-  assert(targetFilePath.length > 0, 'targetOptions.targetFilePath must be a non-empty string');
-  assert(
-    VALID_SOURCE_FILE_TYPES.has(targetOptions.targetFileType),
-    'targetOptions.targetFileType must be one of: d2s, sss, d2x, d2i',
-  );
-  assert(
-    VALID_MOVE_TARGET_CONTEXTS.has(targetOptions.targetLocationContext),
-    'targetOptions.targetLocationContext must be one of: equipped, inventory, stash, mercenary, corpse',
-  );
-  if (targetOptions.targetFileType !== 'd2s') {
-    assert(
-      targetOptions.targetLocationContext === 'stash',
-      'Shared stash targets must use targetLocationContext=stash',
-    );
-  }
-  if (targetOptions.targetStashTab !== undefined) {
-    assert(
-      targetOptions.targetLocationContext === 'stash',
-      'targetOptions.targetStashTab is only allowed when targetLocationContext=stash',
-    );
-    assert(
-      Number.isInteger(targetOptions.targetStashTab) && targetOptions.targetStashTab >= 0,
-      'targetOptions.targetStashTab must be a non-negative integer',
-    );
-  }
-  if (targetOptions.targetLocationContext === 'equipped') {
-    assert(
-      Number.isInteger(targetOptions.targetEquippedSlotId) &&
-        VALID_EQUIPPED_SLOT_IDS.has(targetOptions.targetEquippedSlotId as number),
-      'targetOptions.targetEquippedSlotId must be one of: 1-12',
-    );
-  } else {
-    assert(
-      targetOptions.targetEquippedSlotId === undefined,
-      'targetOptions.targetEquippedSlotId is only allowed when targetLocationContext=equipped',
-    );
-  }
-  assert(
-    Number.isInteger(targetOptions.targetGridX) && targetOptions.targetGridX >= 0,
-    'targetOptions.targetGridX must be a non-negative integer',
-  );
-  assert(
-    Number.isInteger(targetOptions.targetGridY) && targetOptions.targetGridY >= 0,
-    'targetOptions.targetGridY must be a non-negative integer',
-  );
 }
 
 /** Database operations the vault service needs. */
@@ -667,13 +285,15 @@ export interface VaultServiceDependencies {
   /** The save directory configured in the settings, if any. */
   getConfiguredSaveDirectory: () => string | undefined;
   /** Inventory snapshots of the latest save file scan. */
-  getInventorySnapshots: () => CharacterInventorySnapshot[];
+  getInventorySnapshots: () => ParsedInventorySnapshot[];
 }
 
 /**
- * Vault and inventory operations requested by the renderer. Every input is untrusted: it is
- * normalized and validated here, renderer-supplied file paths must stay inside the save directory,
- * and save files are only written while the game is not running.
+ * Vault and inventory operations requested by the renderer. The IPC validators
+ * (`electron/ipc/vaultValidators.ts`) check and normalize the shape of every argument; this service
+ * enforces the rules that need app state: renderer-supplied file paths must stay inside the save
+ * directory, save files are only written while the game is not running, and the item a request
+ * refers to must still be in the save file.
  */
 export class VaultService {
   // Vault items that are being written to a save file right now. A second unvault of the same row
@@ -684,22 +304,18 @@ export class VaultService {
 
   /**
    * Adds an item to the vault. Items taken out of a save file are removed from it afterwards.
-   * @param item - Untrusted vault item input
+   * @param item - Validated vault item input
    * @returns The stored vault item
    */
   async addItem(item: VaultItemUpsertInput): Promise<VaultItem> {
-    const normalizedItem = normalizeVaultItemInput(item);
-    validateVaultItemInput(normalizedItem);
-    return this.addVaultItemWithSafeSourceRemoval(normalizedItem, this.resolveSaveDirectory());
+    return this.addVaultItemWithSafeSourceRemoval(item, this.resolveSaveDirectory());
   }
 
   /**
    * Removes a row from the vault, unless it is the only copy of an item taken out of a save file.
-   * @param itemId - Untrusted vault item ID
+   * @param itemId - Vault item ID
    */
   removeItem(itemId: string): void {
-    assert(typeof itemId === 'string' && itemId.length > 0, 'itemId is required');
-
     // A row that is still vaulted and was taken out of a save file is the only copy of that item.
     const vaultItem = this.deps.database.getVaultItemById(itemId);
     assert(
@@ -715,60 +331,55 @@ export class VaultService {
 
   /**
    * Takes an item (or part of a stack) out of the vault and writes it to a save file position.
-   * @param itemId - Untrusted vault item ID
-   * @param targetOptions - Untrusted target position; may only be omitted for rows that were not
+   * @param itemId - Vault item ID
+   * @param targetOptions - Validated target position; may only be omitted for rows that were not
    *   taken out of a save file
-   * @param withdrawCount - Untrusted number of stack units to withdraw (default: the whole stack)
+   * @param withdrawCount - Number of stack units to withdraw (default: the whole stack)
    */
   async unvaultItem(
     itemId: string,
     targetOptions?: UnvaultTargetOptions,
-    withdrawCount?: unknown,
+    withdrawCount?: number,
   ): Promise<void> {
-    assert(typeof itemId === 'string' && itemId.length > 0, 'itemId is required');
-
     if (targetOptions !== undefined) {
-      validateUnvaultTargetOptions(targetOptions);
       assertSaveFilePathAllowed(
-        targetOptions.targetFilePath.trim(),
+        targetOptions.targetFilePath,
         this.resolveSaveDirectory(),
         'targetOptions.targetFilePath',
       );
     }
 
-    await this.unvaultVaultItemSafely(itemId, targetOptions, resolveWithdrawCount(withdrawCount));
+    await this.unvaultVaultItemSafely(itemId, targetOptions, withdrawCount);
   }
 
   /**
    * Searches the vault.
-   * @param filter - Untrusted search filter
+   * @param filter - Validated search filter
    */
-  search(filter?: VaultItemFilter): VaultItemSearchResult {
-    return this.deps.database.searchVaultItems(sanitizeFilter(filter));
+  search(filter: VaultItemFilter = {}): VaultItemSearchResult {
+    return this.deps.database.searchVaultItems(filter);
   }
 
   /**
    * Searches the latest inventory scan and the vault with the same filter.
-   * @param filter - Untrusted search filter
+   * @param filter - Validated search filter
    */
-  searchAll(filter?: VaultItemFilter): {
+  searchAll(filter: VaultItemFilter = {}): {
     inventory: InventorySearchResult;
     vault: VaultItemSearchResult;
   } {
-    const safeFilter = sanitizeFilter(filter);
-
     return {
-      inventory: buildInventorySearchResult(this.deps.getInventorySnapshots(), safeFilter),
-      vault: this.deps.database.searchVaultItems(safeFilter),
+      inventory: buildInventorySearchResult(this.deps.getInventorySnapshots(), filter),
+      vault: this.deps.database.searchVaultItems(filter),
     };
   }
 
   /**
    * Moves an item within or between save files.
-   * @param input - Untrusted move input
+   * @param input - Validated move input
    */
   async moveItem(input: InventoryItemMoveInput): Promise<void> {
-    const normalizedInput = normalizeInventoryMoveInput(input);
+    const normalizedInput = resolveMoveOptions(input);
     const saveDirectory = this.resolveSaveDirectory();
     assertSaveFilePathAllowed(normalizedInput.sourceFilePath, saveDirectory, 'sourceFilePath');
     assertSaveFilePathAllowed(normalizedInput.targetFilePath, saveDirectory, 'targetFilePath');
@@ -778,17 +389,16 @@ export class VaultService {
 
   /**
    * Splits a stack into one or more target positions.
-   * @param input - Untrusted split input
+   * @param input - Validated split input
    */
   async splitStack(input: InventoryStackSplitInput): Promise<void> {
-    const normalizedInput = normalizeSplitStackInput(input);
     const saveDirectory = this.resolveSaveDirectory();
-    assertSaveFilePathAllowed(normalizedInput.sourceFilePath, saveDirectory, 'sourceFilePath');
-    for (const target of normalizedInput.targets) {
+    assertSaveFilePathAllowed(input.sourceFilePath, saveDirectory, 'sourceFilePath');
+    for (const target of input.targets) {
       assertSaveFilePathAllowed(target.targetFilePath, saveDirectory, 'targetFilePath');
     }
     await this.deps.assertGameNotRunning();
-    await this.deps.saveFileEditor.splitStackInSaveFile(normalizedInput);
+    await this.deps.saveFileEditor.splitStackInSaveFile(input);
   }
 
   /**
@@ -914,7 +524,7 @@ export class VaultService {
       throw new Error('Stored rawItemJson is not valid JSON');
     }
     await this.deps.saveFileEditor.addItemToSaveFile({
-      filePath: target.targetFilePath.trim(),
+      filePath: target.targetFilePath,
       fileType: target.targetFileType,
       item: parsedItem,
       locationContext: target.targetLocationContext,

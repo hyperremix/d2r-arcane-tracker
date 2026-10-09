@@ -31,11 +31,10 @@ export function initializeGlobalHotkeyHandlers({
   hotkeys,
   onSettingsUpdated,
 }: GlobalHotkeyHandlerDependencies): () => void {
-  const { handle, removeHandler } = createIpcMainRegistry(ipcMain);
-  const cleanups: Array<() => void> = [];
+  const { handle, dispose } = createIpcMainRegistry(ipcMain);
+  const cleanups: Array<() => void> = [dispose];
 
   handle('run-tracker:get-global-hotkey-status', () => hotkeys.getStatus());
-  cleanups.push(() => removeHandler('run-tracker:get-global-hotkey-status'));
 
   const handleFocusChange = () => hotkeys.handleFocusChange();
   app.on('browser-window-focus', handleFocusChange);

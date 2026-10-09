@@ -1,8 +1,8 @@
-import type { CharacterInventorySnapshot } from '../../types/grail';
+import type { ParsedInventorySnapshot } from '../../types/grail';
 import { isRune } from '../../utils/objects';
 import { resolveGrailLookupName } from '../itemNormalizer';
 
-function snapshotKey(snapshot: CharacterInventorySnapshot): string {
+function snapshotKey(snapshot: ParsedInventorySnapshot): string {
   return `${snapshot.sourceFileType}:${snapshot.sourceFilePath}`;
 }
 
@@ -16,15 +16,15 @@ function snapshotKey(snapshot: CharacterInventorySnapshot): string {
  * @param successfulSnapshots - The snapshots of the files that were parsed successfully.
  */
 export function mergeInventorySnapshots(
-  previousSnapshots: CharacterInventorySnapshot[],
+  previousSnapshots: ParsedInventorySnapshot[],
   allFilePaths: string[],
   parsedFilePaths: string[],
-  successfulSnapshots: CharacterInventorySnapshot[],
-): CharacterInventorySnapshot[] {
+  successfulSnapshots: ParsedInventorySnapshot[],
+): ParsedInventorySnapshot[] {
   const knownFilePathSet = new Set(allFilePaths);
   const parsedFilePathSet = new Set(parsedFilePaths);
   const successfulSnapshotKeySet = new Set(successfulSnapshots.map(snapshotKey));
-  const mergedByKey = new Map<string, CharacterInventorySnapshot>();
+  const mergedByKey = new Map<string, ParsedInventorySnapshot>();
 
   for (const snapshot of previousSnapshots) {
     if (!knownFilePathSet.has(snapshot.sourceFilePath)) {
@@ -52,9 +52,7 @@ export function mergeInventorySnapshots(
  * therefore not available for runewords.
  * @returns {Record<string, number>} A record mapping rune IDs to their counts.
  */
-export function countAvailableRunes(
-  snapshots: CharacterInventorySnapshot[],
-): Record<string, number> {
+export function countAvailableRunes(snapshots: ParsedInventorySnapshot[]): Record<string, number> {
   const runeCounts: Record<string, number> = {};
 
   for (const snapshot of snapshots) {

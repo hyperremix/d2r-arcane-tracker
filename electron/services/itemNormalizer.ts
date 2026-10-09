@@ -5,6 +5,7 @@ import type {
   D2SaveFile,
   D2SItem,
   ParsedInventoryItem,
+  ParsedInventoryItemWithRaw,
   StashTabKind,
   VaultLocationContext,
   VaultSourceFileType,
@@ -17,7 +18,7 @@ import { resolveSpatialLocation } from '../utils/spatialLocationResolver';
 /**
  * Single place that turns raw d2s items into the app's item shapes.
  *
- * Every save file item is normalized once into a `ParsedInventoryItem` (inventory snapshots, vault
+ * Every save file item is normalized once into a `ParsedInventoryItemWithRaw` (inventory snapshots, vault
  * reconciliation, rune counts) and the grail detection reads its `D2Item` view from that result
  * instead of converting the raw d2s item again.
  */
@@ -173,49 +174,58 @@ function resolveParsedItemType(
   return item.type ?? 'other';
 }
 
-function getFingerprintFieldValue<K extends keyof ParsedInventoryItem['fingerprintInputs']>(
-  item: ParsedInventoryItem,
-  key: K,
-): ParsedInventoryItem['fingerprintInputs'][K] {
-  const itemValue = item[key as keyof ParsedInventoryItem];
-  if (itemValue !== undefined) {
-    return itemValue as ParsedInventoryItem['fingerprintInputs'][K];
-  }
+/** Item fields the fingerprint is built from. */
+export type ItemFingerprintFields = Pick<
+  ParsedInventoryItem,
+  | 'sourceFileType'
+  | 'characterName'
+  | 'locationContext'
+  | 'itemCode'
+  | 'quality'
+  | 'ethereal'
+  | 'socketCount'
+  | 'stashTab'
+  | 'gridX'
+  | 'gridY'
+  | 'gridWidth'
+  | 'gridHeight'
+  | 'equippedSlotId'
+  | 'iconFileName'
+  | 'isSocketedItem'
+  | 'itemName'
+>;
 
-  return item.fingerprintInputs[key];
-}
-
-/** Builds the location-dependent fingerprint vault rows are keyed by. */
-export function createItemFingerprint(item: ParsedInventoryItem): string {
-  const stashTab = getFingerprintFieldValue(item, 'stashTab');
-  const gridX = getFingerprintFieldValue(item, 'gridX');
-  const gridY = getFingerprintFieldValue(item, 'gridY');
-  const gridWidth = getFingerprintFieldValue(item, 'gridWidth');
-  const gridHeight = getFingerprintFieldValue(item, 'gridHeight');
-  const equippedSlotId = getFingerprintFieldValue(item, 'equippedSlotId');
-  const iconFileName = item.fingerprintInputs.iconFileName ?? item.iconFileName ?? '';
-  const isSocketedItem = getFingerprintFieldValue(item, 'isSocketedItem') ?? false;
-  const itemCode = getFingerprintFieldValue(item, 'itemCode') ?? '';
-  const itemName = getFingerprintFieldValue(item, 'itemName');
-  const stash = stashTab !== undefined ? String(stashTab) : '';
+/**
+ * Builds the location-dependent fingerprint vault rows are keyed by.
+ * @param item - The normalized item
+ * @param fingerprintIconFileName - Icon name to use instead of `item.iconFileName`. Fingerprints
+ *   have always used the icon name the d2s parser reports, which can differ from the resolved
+ *   icon the UI shows; changing it would orphan existing vault rows.
+ */
+export function createItemFingerprint(
+  item: ItemFingerprintFields,
+  fingerprintIconFileName?: string,
+): string {
+  const iconFileName = fingerprintIconFileName ?? item.iconFileName ?? '';
+  const stash = item.stashTab !== undefined ? String(item.stashTab) : '';
 
   return [
-    getFingerprintFieldValue(item, 'sourceFileType'),
-    getFingerprintFieldValue(item, 'characterName'),
-    getFingerprintFieldValue(item, 'locationContext'),
-    itemCode,
-    getFingerprintFieldValue(item, 'quality'),
-    String(getFingerprintFieldValue(item, 'ethereal')),
-    String(getFingerprintFieldValue(item, 'socketCount')),
+    item.sourceFileType,
+    item.characterName,
+    item.locationContext,
+    item.itemCode ?? '',
+    item.quality,
+    String(item.ethereal),
+    String(item.socketCount),
     stash,
-    gridX ?? '',
-    gridY ?? '',
-    gridWidth ?? '',
-    gridHeight ?? '',
-    equippedSlotId ?? '',
+    item.gridX ?? '',
+    item.gridY ?? '',
+    item.gridWidth ?? '',
+    item.gridHeight ?? '',
+    item.equippedSlotId ?? '',
     iconFileName,
-    String(isSocketedItem),
-    itemName,
+    String(item.isSocketedItem ?? false),
+    item.itemName,
   ].join('|');
 }
 
@@ -232,7 +242,9 @@ export interface NormalizeInventoryItemParams {
 }
 
 /** Converts one raw d2s item of a save file into the app's inventory item. */
-export function normalizeInventoryItem(params: NormalizeInventoryItemParams): ParsedInventoryItem {
+export function normalizeInventoryItem(
+  params: NormalizeInventoryItemParams,
+): ParsedInventoryItemWithRaw {
   const resolvedSpatialLocation = resolveSpatialLocation({
     item: params.item,
     sourceFileType: params.sourceFileType,
@@ -270,26 +282,8 @@ export function normalizeInventoryItem(params: NormalizeInventoryItemParams): Pa
     isSocketedItem,
   };
 
-  const parsed: ParsedInventoryItem = {
+  const parsed: ParsedInventoryItemWithRaw = {
     fingerprint: '',
-    fingerprintInputs: {
-      sourceFileType: params.sourceFileType,
-      characterName: params.saveName,
-      locationContext,
-      itemCode,
-      quality,
-      ethereal: !!params.item.ethereal,
-      socketCount,
-      stashTab,
-      gridX: spatialMetadata.gridX,
-      gridY: spatialMetadata.gridY,
-      gridWidth: spatialMetadata.gridWidth,
-      gridHeight: spatialMetadata.gridHeight,
-      equippedSlotId: spatialMetadata.equippedSlotId,
-      iconFileName: legacyParserIconFileName,
-      isSocketedItem: spatialMetadata.isSocketedItem,
-      itemName,
-    },
     characterName: params.saveName,
     sourceFileType: params.sourceFileType,
     sourceFilePath: params.filePath,
@@ -310,7 +304,7 @@ export function normalizeInventoryItem(params: NormalizeInventoryItemParams): Pa
     seenAt: new Date(),
   };
 
-  parsed.fingerprint = createItemFingerprint(parsed);
+  parsed.fingerprint = createItemFingerprint(parsed, legacyParserIconFileName);
   return parsed;
 }
 
@@ -321,8 +315,8 @@ export function normalizeInventoryItem(params: NormalizeInventoryItemParams): Pa
 export function normalizeItemsWithSocketedItems(
   items: D2SItem[],
   params: Omit<NormalizeInventoryItemParams, 'item'>,
-): ParsedInventoryItem[] {
-  const normalized: ParsedInventoryItem[] = [];
+): ParsedInventoryItemWithRaw[] {
+  const normalized: ParsedInventoryItemWithRaw[] = [];
 
   for (const item of items) {
     normalized.push(normalizeInventoryItem({ ...params, item }));
@@ -361,11 +355,13 @@ function resolveDetectionType(item: D2SItem): string {
  * ones before ethereal ones, items sharing a lookup name together in file order. Each picked item
  * is followed by the items socketed into it.
  */
-export function selectDetectionCandidates(items: ParsedInventoryItem[]): ParsedInventoryItem[] {
+export function selectDetectionCandidates(
+  items: ParsedInventoryItemWithRaw[],
+): ParsedInventoryItemWithRaw[] {
   const itemsByRawItem = new Map(items.map((item) => [item.rawParsedItem, item]));
   const groupsByEthereal = [
-    new Map<string, ParsedInventoryItem[]>(),
-    new Map<string, ParsedInventoryItem[]>(),
+    new Map<string, ParsedInventoryItemWithRaw[]>(),
+    new Map<string, ParsedInventoryItemWithRaw[]>(),
   ];
 
   for (const item of items) {
@@ -383,8 +379,8 @@ export function selectDetectionCandidates(items: ParsedInventoryItem[]): ParsedI
     }
   }
 
-  const candidates: ParsedInventoryItem[] = [];
-  const addWithSocketedItems = (item: ParsedInventoryItem): void => {
+  const candidates: ParsedInventoryItemWithRaw[] = [];
+  const addWithSocketedItems = (item: ParsedInventoryItemWithRaw): void => {
     candidates.push(item);
     for (const socketedRawItem of item.rawParsedItem.socketed_items ?? []) {
       const socketedItem = itemsByRawItem.get(socketedRawItem);
@@ -404,7 +400,7 @@ export function selectDetectionCandidates(items: ParsedInventoryItem[]): ParsedI
 }
 
 /** Grail detection view of an already normalized inventory item. */
-export function toDetectedItem(item: ParsedInventoryItem, saveFile: D2SaveFile): D2Item {
+export function toDetectedItem(item: ParsedInventoryItemWithRaw, saveFile: D2SaveFile): D2Item {
   const rawItem: D2SItem = item.rawParsedItem;
 
   return {

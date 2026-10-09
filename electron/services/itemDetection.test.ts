@@ -2,13 +2,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { D2SaveFileBuilder, D2SItemBuilder, HolyGrailItemBuilder } from '@/fixtures';
 import { items as catalogItems } from '../items/index';
-import type { D2SItem, Item, ItemDetectionEvent, ParsedInventoryItem } from '../types/grail';
+import type { D2SItem, Item, ItemDetectionEvent, ParsedInventoryItemWithRaw } from '../types/grail';
 import { EventBus } from './EventBus';
 import { ItemDetectionService } from './itemDetection';
 import { normalizeItemsWithSocketedItems } from './itemNormalizer';
 
 /** Normalizes raw d2s items the way the save file monitor does before detection sees them. */
-const toParsedItems = (d2sItems: D2SItem[], saveName = 'TestChar'): ParsedInventoryItem[] =>
+const toParsedItems = (d2sItems: D2SItem[], saveName = 'TestChar'): ParsedInventoryItemWithRaw[] =>
   normalizeItemsWithSocketedItems(d2sItems, {
     filePath: `/test/${saveName}.d2s`,
     saveName,

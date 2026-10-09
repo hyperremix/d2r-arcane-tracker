@@ -1,4 +1,4 @@
-import { isAbsolute, resolve } from 'node:path';
+import { resolve } from 'node:path';
 import { ipcMain } from 'electron';
 import type { GrailDatabase } from '../database/database';
 import type { BroadcastToRenderers } from '../ipc/broadcast';
@@ -34,23 +34,6 @@ function isManualGameMode({ settings }: SaveFileHandlerDependencies): boolean {
     console.warn('[isManualGameMode] Failed to read game mode from settings:', error);
     return false;
   }
-}
-
-/**
- * Validates a renderer-provided save directory path.
- * @param saveDir - Value received over IPC
- * @returns The trimmed, validated directory path
- * @throws Error if the value is not a non-empty absolute path string
- */
-function validateSaveDirectoryInput(saveDir: unknown): string {
-  if (typeof saveDir !== 'string') {
-    throw new Error('Invalid save directory: expected a string');
-  }
-  const trimmed = saveDir.trim();
-  if (trimmed === '' || !isAbsolute(trimmed)) {
-    throw new Error('Invalid save directory: expected a non-empty absolute path');
-  }
-  return trimmed;
 }
 
 /**
@@ -123,7 +106,8 @@ async function applySaveDirectoryChange(
  * Starts monitoring automatically (unless the game mode is Manual) and keeps it in sync with the
  * game mode.
  * @param deps - The services the handlers use
- * @returns Function that removes the event listeners and cancels a pending automatic start
+ * @returns Function that removes the handlers and event listeners and cancels a pending
+ *   automatic start
  */
 export function initializeSaveFileHandlers(deps: SaveFileHandlerDependencies): () => void {
   const {
@@ -134,8 +118,8 @@ export function initializeSaveFileHandlers(deps: SaveFileHandlerDependencies): (
     broadcastToRenderers,
     settings,
   } = deps;
-  const { handle } = createIpcMainRegistry(ipcMain);
-  const eventUnsubscribers: Array<() => void> = [];
+  const { handle, dispose } = createIpcMainRegistry(ipcMain);
+  const eventUnsubscribers: Array<() => void> = [dispose];
 
   // Set up event forwarding to renderer process
   const unsubscribeSaveFileEvent = eventBus.on('save-file-event', async (event: SaveFileEvent) => {
@@ -285,10 +269,9 @@ export function initializeSaveFileHandlers(deps: SaveFileHandlerDependencies): (
    * @param _ - IPC event (unused)
    * @param saveDir - New save directory path
    */
-  handle('saveFile:updateSaveDirectory', async (_, saveDir: unknown) => {
-    const newDirectory = validateSaveDirectoryInput(saveDir);
-
-    await applySaveDirectoryChange(deps, newDirectory);
+  handle('saveFile:updateSaveDirectory', async (_, saveDir) => {
+    // The validator trimmed the path and checked that it is absolute
+    await applySaveDirectoryChange(deps, saveDir);
 
     return { success: true };
   });

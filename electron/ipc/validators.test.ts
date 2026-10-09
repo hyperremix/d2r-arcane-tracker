@@ -72,6 +72,22 @@ describe('When renderer arguments are validated against the IPC contract', () =>
     ],
     ['shell:openExternal', ['javascript:alert(1)'], 'Only http(s) URLs can be opened'],
     ['shell:openExternal', ['not a url'], 'Invalid URL'],
+    ['grail:updateProgress', [{ id: 'p-1' }], 'Invalid grail progress payload'],
+    [
+      'grail:updateSettings',
+      [{ runTrackerGlobalHotkeys: 'yes' }],
+      'Invalid runTrackerGlobalHotkeys setting',
+    ],
+    ['grail:updateSettings', [{ runTrackerShortcuts: {} }], 'Invalid runTrackerShortcuts setting'],
+    ['saveFile:updateSaveDirectory', ['saves'], 'expected a non-empty absolute path'],
+    ['dialog:writeFile', ['export.csv', 'data'], 'Invalid file path'],
+    ['dialog:writeFile', ['/tmp/export.csv', 42], 'Invalid file content'],
+    ['vault:removeItem', [''], 'itemId is required'],
+    ['vault:unvaultItem', ['row-1', undefined, 1.5], 'withdrawCount must be a positive integer'],
+    ['inventory:searchAll', [{ vaultedState: 'gone' }], 'vaultedState must be one of'],
+    ['inventory:moveItem', [null], 'Move input is required'],
+    ['inventory:splitStack', [{}], 'sourceFilePath is required'],
+    ['inventory:openSnapshotWindow', [{ sourceFilePath: ' ' }], 'sourceFilePath is required'],
   ])('If %s receives %j, Then it is rejected with "%s"', (channel, rawArgs, message) => {
     // Arrange
     const run = () => validate(channel, ...rawArgs);

@@ -1,7 +1,7 @@
 import { stat } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import type { GrailDatabase } from '../../database/database';
-import type { ParsedInventoryItem } from '../../types/grail';
+import type { ParsedInventoryItemWithRaw } from '../../types/grail';
 import { createServiceLogger } from '../../utils/serviceLogger';
 import { createVaultPresenceKey } from '../../utils/vaultPresence';
 import type { SingleFileParseResult } from './types';
@@ -20,7 +20,7 @@ export type VaultPresenceDatabase = Pick<
  * Describes an item without its position, location or character, so presence matching can still
  * recognise an item after it moved inside its save (which changes its fingerprint).
  */
-export function createPresenceIdentityKey(item: ParsedInventoryItem): string {
+export function createPresenceIdentityKey(item: ParsedInventoryItemWithRaw): string {
   return createVaultPresenceKey({
     sourceFileType: item.sourceFileType,
     itemCode: item.itemCode,

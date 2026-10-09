@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 vi.mock('electron', () => ({
   ipcMain: {
     handle: vi.fn(),
+    removeHandler: vi.fn(),
   },
 }));
 

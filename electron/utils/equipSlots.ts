@@ -28,6 +28,11 @@ export const EQUIP_VALIDATION_CODES: ReadonlySet<EquipValidationCode> = new Set(
   EQUIP_VALIDATION_CODE_LIST,
 );
 
+/** Every equipped slot id an item can occupy (1–12; the alternate ids 13/14 map onto 11/12). */
+export const VALID_EQUIPPED_SLOT_IDS: ReadonlySet<number> = new Set([
+  1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12,
+]);
+
 const CLASS_SPECIFIC_CATEGORY_TO_CLASS: Record<string, Exclude<CharacterClass, 'shared_stash'>> = {
   'amazon item': 'amazon',
   'assassin item': 'assassin',

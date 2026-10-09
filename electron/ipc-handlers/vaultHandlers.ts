@@ -3,12 +3,13 @@ import { createIpcMainRegistry } from '../ipc/handle';
 import type { VaultService } from '../services/vaultService';
 
 /**
- * Registers the vault and inventory IPC handlers. The vault service validates every
- * renderer-provided argument.
+ * Registers the vault and inventory IPC handlers. The channel validators check the shape of every
+ * renderer-provided argument; the vault service enforces the rules that need app state.
  * @param vault - The vault service
+ * @returns Function that removes the handlers
  */
-export function initializeVaultHandlers(vault: VaultService): void {
-  const { handle } = createIpcMainRegistry(ipcMain);
+export function initializeVaultHandlers(vault: VaultService): () => void {
+  const { handle, dispose } = createIpcMainRegistry(ipcMain);
 
   handle('vault:addItem', (_, item) => vault.addItem(item));
 
@@ -35,4 +36,6 @@ export function initializeVaultHandlers(vault: VaultService): void {
     await vault.splitStack(input);
     return { success: true };
   });
+
+  return dispose;
 }

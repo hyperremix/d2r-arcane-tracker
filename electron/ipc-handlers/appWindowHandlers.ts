@@ -14,12 +14,13 @@ export interface AppWindowHandlerDependencies {
 /**
  * Initializes IPC handlers for the app window chrome: title bar overlay colors and the app icon.
  * @param deps - The main window and the app locations
+ * @returns Function that removes the handlers
  */
 export function initializeAppWindowHandlers({
   getMainWindow,
   paths,
-}: AppWindowHandlerDependencies): void {
-  const { handle } = createIpcMainRegistry(ipcMain);
+}: AppWindowHandlerDependencies): () => void {
+  const { handle, dispose } = createIpcMainRegistry(ipcMain);
 
   // Handle titlebar overlay updates (Windows/Linux only)
   handle('update-titlebar-overlay', (_event, colors) => {
@@ -40,4 +41,6 @@ export function initializeAppWindowHandlers({
 
   // Handle app icon path requests for native notifications
   handle('app:getIconPath', () => getNotificationIconPath(paths));
+
+  return dispose;
 }

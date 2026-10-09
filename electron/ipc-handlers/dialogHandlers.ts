@@ -62,9 +62,10 @@ export function resetLastUsedDirectory(): void {
 /**
  * Initializes IPC handlers for native dialog operations.
  * Sets up handlers for save and open dialogs that can be called from the renderer process.
+ * @returns Function that removes the handlers
  */
-export function initializeDialogHandlers(): void {
-  const { handle } = createIpcMainRegistry(ipcMain);
+export function initializeDialogHandlers(): () => void {
+  const { handle, dispose } = createIpcMainRegistry(ipcMain);
   // Save dialog handler
   handle('dialog:showSaveDialog', async (_, options) => {
     const result = await dialog.showSaveDialog(applyLastUsedDirectory(options));
@@ -84,17 +85,13 @@ export function initializeDialogHandlers(): void {
   });
 
   // Write file handler
-  handle('dialog:writeFile', async (_, filePath: unknown, content: unknown) => {
-    if (typeof filePath !== 'string' || filePath.trim().length === 0 || !isAbsolute(filePath)) {
-      throw new Error('Invalid file path');
-    }
-    if (typeof content !== 'string') {
-      throw new Error('Invalid file content');
-    }
-
+  // The validator only accepts an absolute file path and string content
+  handle('dialog:writeFile', async (_, filePath, content) => {
     await writeFile(filePath, content, 'utf-8');
     return { success: true };
   });
 
   console.log('Dialog IPC handlers initialized');
+
+  return dispose;
 }

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AppPaths } from '../app/paths';
 import type { Settings } from '../types/grail';
 
@@ -62,6 +62,7 @@ vi.mock('electron', () => {
 
 import {
   closeWidgetWindow,
+  createDebouncedWidgetSizeSaver,
   createWidgetWindow,
   resetWidgetWindowSize,
   setWidgetWindowLocked,
@@ -429,5 +430,67 @@ describe('widgetWindow lock (click-through)', () => {
 
     // Assert
     expect(applied).toBe(false);
+  });
+});
+
+describe('When widget size changes are saved with the debounced saver', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('Then only the last size of a resize is saved once resizing stops', () => {
+    // Arrange
+    const persist = vi.fn();
+    const saver = createDebouncedWidgetSizeSaver(persist, 500);
+
+    // Act
+    saver.save('overall', { width: 260, height: 260 });
+    vi.advanceTimersByTime(300);
+    saver.save('overall', { width: 280, height: 270 });
+    vi.advanceTimersByTime(499);
+    const savedBeforeDelay = persist.mock.calls.length;
+    vi.advanceTimersByTime(1);
+
+    // Assert
+    expect(savedBeforeDelay).toBe(0);
+    expect(persist).toHaveBeenCalledTimes(1);
+    expect(persist).toHaveBeenCalledWith('overall', { width: 280, height: 270 });
+  });
+
+  it('If flush is called while a save is pending, Then it is saved right away and only once', () => {
+    // Arrange
+    const persist = vi.fn();
+    const saver = createDebouncedWidgetSizeSaver(persist, 500);
+    saver.save('split', { width: 350, height: 260 });
+
+    // Act
+    saver.flush();
+    vi.advanceTimersByTime(1000);
+    saver.flush();
+
+    // Assert
+    expect(persist).toHaveBeenCalledTimes(1);
+    expect(persist).toHaveBeenCalledWith('split', { width: 350, height: 260 });
+  });
+
+  it('If saving fails, Then the error is logged instead of thrown', () => {
+    // Arrange
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const saver = createDebouncedWidgetSizeSaver(() => {
+      throw new Error('database closed');
+    }, 500);
+    saver.save('overall', { width: 260, height: 260 });
+
+    // Act
+    const flush = () => saver.flush();
+
+    // Assert
+    expect(flush).not.toThrow();
+    expect(consoleError).toHaveBeenCalledWith('Failed to save widget size:', expect.any(Error));
+    consoleError.mockRestore();
   });
 });

@@ -15,12 +15,13 @@ export interface UpdateHandlerDependencies {
  * Initializes IPC handlers for application update functionality.
  * Sets up handlers for checking updates, downloading, and installing.
  * @param deps - The update service and the main window the status is sent to
+ * @returns Function that removes the handlers
  */
 export function initializeUpdateHandlers({
   updateService,
   getMainWindow,
-}: UpdateHandlerDependencies) {
-  const { handle } = createIpcMainRegistry(ipcMain);
+}: UpdateHandlerDependencies): () => void {
+  const { handle, dispose } = createIpcMainRegistry(ipcMain);
   // Only initialize update service in production
   if (!process.env.VITE_DEV_SERVER_URL) {
     updateService.initialize();
@@ -120,4 +121,6 @@ export function initializeUpdateHandlers({
       };
     }
   });
+
+  return dispose;
 }
