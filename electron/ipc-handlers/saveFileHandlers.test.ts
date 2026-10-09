@@ -170,6 +170,7 @@ vi.mock('../services/itemDetection', () => ({
 
 vi.mock('../services/saveFileMonitor', () => ({
   SaveFileMonitor: vi.fn().mockImplementation(() => ({
+    start: vi.fn(),
     startMonitoring: vi.fn(),
     stopMonitoring: vi.fn(),
     shutdown: vi.fn().mockResolvedValue(undefined),
@@ -229,6 +230,7 @@ interface MockDatabaseBatchWriter {
 }
 
 interface MockSaveFileMonitor {
+  start: ReturnType<typeof vi.fn>;
   startMonitoring: ReturnType<typeof vi.fn>;
   stopMonitoring: ReturnType<typeof vi.fn>;
   shutdown: ReturnType<typeof vi.fn>;
@@ -284,6 +286,7 @@ describe('When saveFileHandlers is used', () => {
 
     // Setup mock services
     mockSaveFileMonitor = {
+      start: vi.fn(),
       startMonitoring: vi.fn().mockResolvedValue(undefined),
       stopMonitoring: vi.fn(),
       shutdown: vi.fn().mockResolvedValue(undefined),
@@ -361,6 +364,7 @@ describe('When saveFileHandlers is used', () => {
         null, // memoryReader is null on non-Windows platforms (macOS test environment)
       );
       expect(SaveFileMonitor).toHaveBeenCalledWith(mockEventBus, grailDatabase);
+      expect(mockSaveFileMonitor.start).toHaveBeenCalledTimes(1);
       expect(ItemDetectionService).toHaveBeenCalledWith(mockEventBus);
       expect(mockEventBus.on).toHaveBeenCalledWith('save-file-event', expect.any(Function));
       expect(mockEventBus.on).toHaveBeenCalledWith('monitoring-started', expect.any(Function));

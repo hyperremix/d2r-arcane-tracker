@@ -706,17 +706,17 @@ async function writeVaultItemToSaveFile(
   } catch {
     throw new Error('Stored rawItemJson is not valid JSON');
   }
-  await addItemToSaveFile(
-    target.targetFilePath.trim(),
-    target.targetFileType,
-    parsedItem,
-    target.targetLocationContext,
+  await addItemToSaveFile({
+    filePath: target.targetFilePath.trim(),
+    fileType: target.targetFileType,
+    item: parsedItem,
+    locationContext: target.targetLocationContext,
     stashTab,
-    target.targetGridX,
-    target.targetGridY,
-    target.targetEquippedSlotId,
+    targetGridX: target.targetGridX,
+    targetGridY: target.targetGridY,
+    targetEquippedSlotId: target.targetEquippedSlotId,
     quantity,
-  );
+  });
 }
 
 function validateUnvaultTargetOptions(targetOptions: UnvaultTargetOptions): void {

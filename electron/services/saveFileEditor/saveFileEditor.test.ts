@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { D2I_SECTOR_HEADER_SIZE } from './stashFormat';
+import { D2I_SECTOR_HEADER_SIZE } from '../stashFormat';
 
-type SaveFileEditorModule = typeof import('./saveFileEditor');
+type SaveFileEditorModule = typeof import('./index');
 
 let mockReadFile: ReturnType<typeof vi.fn>;
 let mockWriteFile: ReturnType<typeof vi.fn>;
@@ -12,10 +12,12 @@ let mockD2stashWrite: ReturnType<typeof vi.fn>;
 let mockReadD2iMetadata: ReturnType<typeof vi.fn>;
 let mockReadItem: ReturnType<typeof vi.fn>;
 let mockWriteItem: ReturnType<typeof vi.fn>;
+let mockEnsureD2sConstants: ReturnType<typeof vi.fn>;
 let removeItemFromSaveFile: SaveFileEditorModule['removeItemFromSaveFile'];
 let addItemToSaveFile: SaveFileEditorModule['addItemToSaveFile'];
 let moveItemBetweenSaveFiles: SaveFileEditorModule['moveItemBetweenSaveFiles'];
 let splitStackInSaveFile: SaveFileEditorModule['splitStackInSaveFile'];
+let readSaveFileItem: SaveFileEditorModule['readSaveFileItem'];
 
 const equipValidationConstantData = {
   other_items: {
@@ -51,6 +53,7 @@ beforeAll(async () => {
   mockReadD2iMetadata = vi.fn();
   mockReadItem = vi.fn();
   mockWriteItem = vi.fn();
+  mockEnsureD2sConstants = vi.fn();
 
   vi.resetModules();
 
@@ -60,17 +63,23 @@ beforeAll(async () => {
     writeFile: mockWriteFile,
   }));
 
-  vi.doMock('./saveFileBackup', () => ({
+  vi.doMock('../d2s/constants', () => ({
+    ensureD2sConstants: mockEnsureD2sConstants,
+  }));
+
+  vi.doMock('../saveFileBackup', () => ({
     backupSaveFile: vi.fn().mockResolvedValue(undefined),
   }));
 
-  vi.doMock('../utils/atomicWrite', () => ({
+  vi.doMock('../../utils/atomicWrite', () => ({
     writeFileAtomic: (filePath: string, data: Buffer) => mockWriteFile(filePath, data),
   }));
 
   vi.doMock('@dschu012/d2s', () => ({
     read: mockD2sRead,
     write: mockD2sWrite,
+    getConstantData: vi.fn(),
+    setConstantData: vi.fn(),
   }));
 
   vi.doMock('@dschu012/d2s/lib/d2/stash', () => ({
@@ -86,7 +95,7 @@ beforeAll(async () => {
     constants: constants99,
   }));
 
-  vi.doMock('./stashFormat', () => ({
+  vi.doMock('../stashFormat', () => ({
     D2I_SECTOR_HEADER_SIZE,
     readD2iMetadata: mockReadD2iMetadata,
   }));
@@ -95,7 +104,7 @@ beforeAll(async () => {
   // With isolate:false, the stashFormat mock would otherwise contaminate tests
   // in other files (modernStashParser.test.ts, saveFileMonitor.test.ts) that
   // need the real readD2iMetadata implementation.
-  vi.doMock('./modernStashParser', () => ({
+  vi.doMock('../modernStashParser', () => ({
     constants105Extended: {},
   }));
 
@@ -106,25 +115,27 @@ beforeAll(async () => {
     writeItem: mockWriteItem,
   }));
 
-  const module = await import('./saveFileEditor');
+  const module = await import('./index');
   removeItemFromSaveFile = module.removeItemFromSaveFile;
   addItemToSaveFile = module.addItemToSaveFile;
   moveItemBetweenSaveFiles = module.moveItemBetweenSaveFiles;
   splitStackInSaveFile = module.splitStackInSaveFile;
+  readSaveFileItem = module.readSaveFileItem;
 });
 
 // With isolate:false, doMock registrations and the module cache are shared across test files.
 // Remove them so later files (e.g. saveFileEditor.integration.test.ts) load the real modules.
 const doMockedModules = [
   'node:fs/promises',
-  './saveFileBackup',
-  '../utils/atomicWrite',
+  '../d2s/constants',
+  '../saveFileBackup',
+  '../../utils/atomicWrite',
   '@dschu012/d2s',
   '@dschu012/d2s/lib/d2/stash',
   '@dschu012/d2s/lib/data/versions/96_constant_data',
   '@dschu012/d2s/lib/data/versions/99_constant_data',
-  './stashFormat',
-  './modernStashParser',
+  '../stashFormat',
+  '../modernStashParser',
   '@dschu012/d2s/lib/d2/items',
 ];
 
@@ -199,16 +210,13 @@ function addItemToEquippedSlot(params: {
     params.characterClass ?? 'sorceress',
   );
   mockD2sRead.mockResolvedValue(d2sData);
-  const addPromise = addItemToSaveFile(
-    '/path/to/char.d2s',
-    'd2s',
-    params.item,
-    'equipped',
-    undefined,
-    undefined,
-    undefined,
-    params.targetSlotId,
-  );
+  const addPromise = addItemToSaveFile({
+    filePath: '/path/to/char.d2s',
+    fileType: 'd2s',
+    item: params.item,
+    locationContext: 'equipped',
+    targetEquippedSlotId: params.targetSlotId,
+  });
 
   return {
     d2sData,
@@ -511,7 +519,12 @@ describe('When addItemToSaveFile is called', () => {
       mockD2sRead.mockResolvedValue(d2sData);
 
       // Act
-      await addItemToSaveFile('/path/to/char.d2s', 'd2s', testItem, 'inventory');
+      await addItemToSaveFile({
+        filePath: '/path/to/char.d2s',
+        fileType: 'd2s',
+        item: testItem,
+        locationContext: 'inventory',
+      });
 
       // Assert
       expect(d2sData.items).toHaveLength(1);
@@ -544,7 +557,12 @@ describe('When addItemToSaveFile is called', () => {
       } as unknown as import('@dschu012/d2s').types.IItem;
 
       // Act
-      await addItemToSaveFile('/path/to/char.d2s', 'd2s', modernResourceItem, 'inventory');
+      await addItemToSaveFile({
+        filePath: '/path/to/char.d2s',
+        fileType: 'd2s',
+        item: modernResourceItem,
+        locationContext: 'inventory',
+      });
 
       // Assert
       expect(d2sData.items).toHaveLength(1);
@@ -576,7 +594,12 @@ describe('When addItemToSaveFile is called', () => {
       } as unknown as import('@dschu012/d2s').types.IItem;
 
       // Act
-      await addItemToSaveFile('/path/to/char.d2s', 'd2s', modernResourceItem, 'inventory');
+      await addItemToSaveFile({
+        filePath: '/path/to/char.d2s',
+        fileType: 'd2s',
+        item: modernResourceItem,
+        locationContext: 'inventory',
+      });
 
       // Assert
       expect(d2sData.items).toHaveLength(1);
@@ -603,7 +626,12 @@ describe('When addItemToSaveFile is called', () => {
       mockD2sRead.mockResolvedValue(d2sData);
 
       // Act
-      await addItemToSaveFile('/path/to/char.d2s', 'd2s', testItem, 'mercenary');
+      await addItemToSaveFile({
+        filePath: '/path/to/char.d2s',
+        fileType: 'd2s',
+        item: testItem,
+        locationContext: 'mercenary',
+      });
 
       // Assert
       expect(d2sData.merc_items).toHaveLength(1);
@@ -633,7 +661,14 @@ describe('When addItemToSaveFile is called', () => {
       } as unknown as import('@dschu012/d2s').types.IItem;
 
       // Act
-      await addItemToSaveFile('/path/to/char.d2s', 'd2s', stashItem, 'inventory', undefined, 2, 1);
+      await addItemToSaveFile({
+        filePath: '/path/to/char.d2s',
+        fileType: 'd2s',
+        item: stashItem,
+        locationContext: 'inventory',
+        targetGridX: 2,
+        targetGridY: 1,
+      });
 
       // Assert
       expect(d2sData.items[0]).toEqual(
@@ -656,16 +691,15 @@ describe('When addItemToSaveFile is called', () => {
       const equippedHelm = makeD2sItem(700, 'hlm');
 
       // Act
-      await addItemToSaveFile(
-        '/path/to/char.d2s',
-        'd2s',
-        equippedHelm,
-        'equipped',
-        undefined,
-        5,
-        2,
-        1,
-      );
+      await addItemToSaveFile({
+        filePath: '/path/to/char.d2s',
+        fileType: 'd2s',
+        item: equippedHelm,
+        locationContext: 'equipped',
+        targetGridX: 5,
+        targetGridY: 2,
+        targetEquippedSlotId: 1,
+      });
 
       // Assert
       expect(d2sData.items[0]).toEqual(
@@ -966,16 +1000,13 @@ describe('When addItemToSaveFile is called', () => {
       const amazonOnlyHelm = makeD2sItem(701, 'ama');
 
       // Act
-      const addPromise = addItemToSaveFile(
-        '/path/to/char.d2s',
-        'd2s',
-        amazonOnlyHelm,
-        'equipped',
-        undefined,
-        undefined,
-        undefined,
-        1,
-      );
+      const addPromise = addItemToSaveFile({
+        filePath: '/path/to/char.d2s',
+        fileType: 'd2s',
+        item: amazonOnlyHelm,
+        locationContext: 'equipped',
+        targetEquippedSlotId: 1,
+      });
 
       // Assert
       await expect(addPromise).rejects.toThrow('EQUIP_VALIDATION:CLASS_RESTRICTED');
@@ -989,16 +1020,13 @@ describe('When addItemToSaveFile is called', () => {
       const amazonOnlyHelm = makeD2sItem(702, 'ama');
 
       // Act
-      await addItemToSaveFile(
-        '/path/to/char.d2s',
-        'd2s',
-        amazonOnlyHelm,
-        'equipped',
-        undefined,
-        undefined,
-        undefined,
-        1,
-      );
+      await addItemToSaveFile({
+        filePath: '/path/to/char.d2s',
+        fileType: 'd2s',
+        item: amazonOnlyHelm,
+        locationContext: 'equipped',
+        targetEquippedSlotId: 1,
+      });
 
       // Assert
       expect(d2sData.items[0]).toEqual(
@@ -1018,16 +1046,13 @@ describe('When addItemToSaveFile is called', () => {
       const twoHandedSword = makeD2sItem(704, 'two');
 
       // Act
-      const addPromise = addItemToSaveFile(
-        '/path/to/char.d2s',
-        'd2s',
-        twoHandedSword,
-        'equipped',
-        undefined,
-        undefined,
-        undefined,
-        4,
-      );
+      const addPromise = addItemToSaveFile({
+        filePath: '/path/to/char.d2s',
+        fileType: 'd2s',
+        item: twoHandedSword,
+        locationContext: 'equipped',
+        targetEquippedSlotId: 4,
+      });
 
       // Assert
       await expect(addPromise).rejects.toThrow('EQUIP_VALIDATION:TWO_HANDED_OFFHAND_OCCUPIED');
@@ -1041,16 +1066,13 @@ describe('When addItemToSaveFile is called', () => {
       const twoHandedSword = makeD2sItem(705, 'two');
 
       // Act
-      const addPromise = addItemToSaveFile(
-        '/path/to/char.d2s',
-        'd2s',
-        twoHandedSword,
-        'equipped',
-        undefined,
-        undefined,
-        undefined,
-        5,
-      );
+      const addPromise = addItemToSaveFile({
+        filePath: '/path/to/char.d2s',
+        fileType: 'd2s',
+        item: twoHandedSword,
+        locationContext: 'equipped',
+        targetEquippedSlotId: 5,
+      });
 
       // Assert
       await expect(addPromise).rejects.toThrow('EQUIP_VALIDATION:TWO_HANDED_REQUIRES_RIGHT_HAND');
@@ -1064,16 +1086,13 @@ describe('When addItemToSaveFile is called', () => {
       const twoHandedSword = makeD2sItem(706, 'two');
 
       // Act
-      await addItemToSaveFile(
-        '/path/to/char.d2s',
-        'd2s',
-        twoHandedSword,
-        'equipped',
-        undefined,
-        undefined,
-        undefined,
-        5,
-      );
+      await addItemToSaveFile({
+        filePath: '/path/to/char.d2s',
+        fileType: 'd2s',
+        item: twoHandedSword,
+        locationContext: 'equipped',
+        targetEquippedSlotId: 5,
+      });
 
       // Assert
       expect(d2sData.items[0]).toEqual(
@@ -1091,16 +1110,13 @@ describe('When addItemToSaveFile is called', () => {
       const claw = makeD2sItem(707, 'clw');
 
       // Act
-      await addItemToSaveFile(
-        '/path/to/char.d2s',
-        'd2s',
-        claw,
-        'equipped',
-        undefined,
-        undefined,
-        undefined,
-        5,
-      );
+      await addItemToSaveFile({
+        filePath: '/path/to/char.d2s',
+        fileType: 'd2s',
+        item: claw,
+        locationContext: 'equipped',
+        targetEquippedSlotId: 5,
+      });
 
       // Assert
       expect(d2sData.items[0]).toEqual(
@@ -1118,16 +1134,13 @@ describe('When addItemToSaveFile is called', () => {
       const oneHandSword = makeD2sItem(708, 'one');
 
       // Act
-      const addPromise = addItemToSaveFile(
-        '/path/to/char.d2s',
-        'd2s',
-        oneHandSword,
-        'equipped',
-        undefined,
-        undefined,
-        undefined,
-        5,
-      );
+      const addPromise = addItemToSaveFile({
+        filePath: '/path/to/char.d2s',
+        fileType: 'd2s',
+        item: oneHandSword,
+        locationContext: 'equipped',
+        targetEquippedSlotId: 5,
+      });
 
       // Assert
       await expect(addPromise).rejects.toThrow('EQUIP_VALIDATION:OFFHAND_WEAPON_RESTRICTED');
@@ -1142,16 +1155,13 @@ describe('When addItemToSaveFile is called', () => {
       const targetAmulet = makeD2sItem(710, 'amu');
 
       // Act
-      const addPromise = addItemToSaveFile(
-        '/path/to/char.d2s',
-        'd2s',
-        targetAmulet,
-        'equipped',
-        undefined,
-        undefined,
-        undefined,
-        2,
-      );
+      const addPromise = addItemToSaveFile({
+        filePath: '/path/to/char.d2s',
+        fileType: 'd2s',
+        item: targetAmulet,
+        locationContext: 'equipped',
+        targetEquippedSlotId: 2,
+      });
 
       // Assert
       await expect(addPromise).rejects.toThrow('EQUIP_VALIDATION:TARGET_SLOT_OCCUPIED');
@@ -1166,7 +1176,13 @@ describe('When addItemToSaveFile is called', () => {
       mockD2stashRead.mockResolvedValue(stashData);
 
       // Act
-      await addItemToSaveFile('/path/to/file.sss', 'sss', testItem, 'stash', 1);
+      await addItemToSaveFile({
+        filePath: '/path/to/file.sss',
+        fileType: 'sss',
+        item: testItem,
+        locationContext: 'stash',
+        stashTab: 1,
+      });
 
       // Assert
       expect(stashData.pages[1]?.items).toHaveLength(1);
@@ -1187,7 +1203,13 @@ describe('When addItemToSaveFile is called', () => {
 
       // Act
       const message = await rejectionMessage(
-        addItemToSaveFile('/path/to/file.d2i', 'd2i', testItem, 'stash', 5),
+        addItemToSaveFile({
+          filePath: '/path/to/file.d2i',
+          fileType: 'd2i',
+          item: testItem,
+          locationContext: 'stash',
+          stashTab: 5,
+        }),
       );
 
       // Assert
@@ -1214,18 +1236,18 @@ describe('When addItemToSaveFile is called', () => {
       mockWriteItem.mockResolvedValue(new Uint8Array([0xaa]));
 
       // Act
-      await addItemToSaveFile(
-        '/path/to/file.d2i',
-        'd2i',
-        {
+      await addItemToSaveFile({
+        filePath: '/path/to/file.d2i',
+        fileType: 'd2i',
+        item: {
           type: 'r01',
           code: 'r01',
         } as unknown as import('@dschu012/d2s').types.IItem,
-        'stash',
-        0,
-        4,
-        4,
-      );
+        locationContext: 'stash',
+        stashTab: 0,
+        targetGridX: 4,
+        targetGridY: 4,
+      });
 
       // Assert
       expect(mockWriteFile).toHaveBeenCalledTimes(1);
@@ -1249,20 +1271,20 @@ describe('When addItemToSaveFile is called', () => {
       mockWriteItem.mockResolvedValue(new Uint8Array([0xab]));
 
       // Act
-      await addItemToSaveFile(
-        '/path/to/file.d2i',
-        'd2i',
-        {
+      await addItemToSaveFile({
+        filePath: '/path/to/file.d2i',
+        fileType: 'd2i',
+        item: {
           id: 77,
           type: 'tbk',
           code: 'tbk',
           quantity: 12,
         } as unknown as import('@dschu012/d2s').types.IItem,
-        'stash',
-        0,
-        1,
-        1,
-      );
+        locationContext: 'stash',
+        stashTab: 0,
+        targetGridX: 1,
+        targetGridY: 1,
+      });
 
       // Assert
       const serialized = mockWriteItem.mock.calls[0]?.[0] as { quantity?: number } | undefined;
@@ -1281,20 +1303,20 @@ describe('When addItemToSaveFile is called', () => {
       mockWriteItem.mockResolvedValue(new Uint8Array([0xab]));
 
       // Act
-      await addItemToSaveFile(
-        '/path/to/file.d2i',
-        'd2i',
-        {
+      await addItemToSaveFile({
+        filePath: '/path/to/file.d2i',
+        fileType: 'd2i',
+        item: {
           id: 4242,
           type: 'amu',
           code: 'amu',
           simple_item: 0,
         } as unknown as import('@dschu012/d2s').types.IItem,
-        'stash',
-        0,
-        1,
-        1,
-      );
+        locationContext: 'stash',
+        stashTab: 0,
+        targetGridX: 1,
+        targetGridY: 1,
+      });
 
       // Assert
       const serialized = mockWriteItem.mock.calls[0]?.[0] as
@@ -1944,6 +1966,139 @@ describe('When items could be lost by a move or split', () => {
       // Assert
       expect(mockWriteFile).toHaveBeenCalledTimes(1);
       expect(stash.pages[0].items).toHaveLength(3);
+    });
+  });
+});
+
+describe('When a public editor operation starts', () => {
+  /**
+   * The d2s library reads its constants from a registry shared by the whole library, so
+   * `ensureD2sConstants` must have run before the first read or write of any save file.
+   */
+  function expectConstantsEnsuredBeforeFirstRead(): void {
+    expect(mockEnsureD2sConstants).toHaveBeenCalled();
+    const readOrders = [mockReadFile, mockD2sRead, mockD2stashRead].flatMap(
+      (read) => read.mock.invocationCallOrder,
+    );
+    expect(readOrders.length).toBeGreaterThan(0);
+    expect(mockEnsureD2sConstants.mock.invocationCallOrder[0]).toBeLessThan(
+      Math.min(...readOrders),
+    );
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockReadD2iMetadata.mockReturnValue({
+      version: 99,
+      hardcore: false,
+      sectors: [],
+    });
+    mockReadFile.mockResolvedValue(fakeBuffer);
+    mockWriteFile.mockResolvedValue(undefined);
+    mockD2sWrite.mockResolvedValue(fakeResultBuffer);
+    mockD2stashWrite.mockResolvedValue(fakeResultBuffer);
+  });
+
+  describe('If it is removeItemFromSaveFile', () => {
+    it('Then the d2s constants are ensured before the save file is read', async () => {
+      // Arrange
+      mockD2sRead.mockResolvedValue(makeD2sData([{ id: 42 }]));
+
+      // Act
+      await removeItemFromSaveFile('/path/to/char.d2s', 'd2s', 42);
+
+      // Assert
+      expectConstantsEnsuredBeforeFirstRead();
+    });
+  });
+
+  describe('If it is addItemToSaveFile', () => {
+    it('Then the d2s constants are ensured before the save file is read', async () => {
+      // Arrange
+      mockD2sRead.mockResolvedValue(makeD2sData([]));
+
+      // Act
+      await addItemToSaveFile({
+        filePath: '/path/to/char.d2s',
+        fileType: 'd2s',
+        item: makeD2sItem(123, 'uap'),
+        locationContext: 'inventory',
+      });
+
+      // Assert
+      expectConstantsEnsuredBeforeFirstRead();
+    });
+  });
+
+  describe('If it is moveItemBetweenSaveFiles', () => {
+    it('Then the d2s constants are ensured before the save file is read', async () => {
+      // Arrange
+      mockD2sRead.mockResolvedValue(
+        makeD2sData([makeD2sItem(77, 'uap', { location_id: 0, alt_position_id: 1 })]),
+      );
+
+      // Act
+      await moveItemBetweenSaveFiles({
+        sourceFilePath: '/path/to/char.d2s',
+        sourceFileType: 'd2s',
+        sourceItemId: 77,
+        targetFilePath: '/path/to/char.d2s',
+        targetFileType: 'd2s',
+        targetLocationContext: 'inventory',
+        targetGridX: 3,
+        targetGridY: 2,
+      });
+
+      // Assert
+      expectConstantsEnsuredBeforeFirstRead();
+    });
+  });
+
+  describe('If it is splitStackInSaveFile', () => {
+    it('Then the d2s constants are ensured before the save file is read', async () => {
+      // Arrange
+      const stash = makeStashData([[]]);
+      stash.pages[0].items.push(
+        makeD2sItem(1, 'key', { quantity: 4, position_x: 0, position_y: 0 }) as unknown as {
+          id: number;
+        },
+      );
+      mockD2stashRead.mockResolvedValue(stash);
+
+      // Act
+      await splitStackInSaveFile({
+        sourceFilePath: '/saves/stash.sss',
+        sourceFileType: 'sss',
+        sourceStashTab: 0,
+        sourceItemCode: 'key',
+        splitCount: 1,
+        targets: [
+          {
+            targetFilePath: '/saves/stash.sss',
+            targetFileType: 'sss',
+            targetLocationContext: 'stash',
+            targetStashTab: 0,
+            targetGridX: 3,
+            targetGridY: 3,
+          },
+        ],
+      });
+
+      // Assert
+      expectConstantsEnsuredBeforeFirstRead();
+    });
+  });
+
+  describe('If it is readSaveFileItem', () => {
+    it('Then the d2s constants are ensured before the save file is read', async () => {
+      // Arrange
+      mockD2sRead.mockResolvedValue(makeD2sData([{ id: 42 }]));
+
+      // Act
+      await readSaveFileItem('/path/to/char.d2s', 'd2s', 42);
+
+      // Assert
+      expectConstantsEnsuredBeforeFirstRead();
     });
   });
 });

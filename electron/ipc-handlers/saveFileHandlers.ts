@@ -480,6 +480,7 @@ export function initializeSaveFileHandlers(): void {
 
   // Initialize monitor and detection service with EventBus and grail database
   saveFileMonitor = new SaveFileMonitor(eventBus, grailDatabase);
+  saveFileMonitor.start();
   itemDetectionService = new ItemDetectionService(eventBus);
 
   // Set up event forwarding to renderer process

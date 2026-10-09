@@ -38,10 +38,12 @@ vi.mock('node:fs/promises', async (importOriginal) => {
 
 // Mock chokidar
 vi.mock('chokidar', () => ({
-  default: vi.fn(() => ({
-    on: vi.fn().mockReturnThis(),
-    close: vi.fn(),
-  })),
+  default: {
+    watch: vi.fn(() => ({
+      on: vi.fn().mockReturnThis(),
+      close: vi.fn(),
+    })),
+  },
 }));
 
 // Mock electron app
@@ -66,14 +68,19 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import * as d2s from '@dschu012/d2s';
 import * as d2stash from '@dschu012/d2s/lib/d2/stash';
+import type { FSWatcher } from 'chokidar';
 import chokidar from 'chokidar';
 import { app } from 'electron';
 import { D2SaveFileBuilder } from '@/fixtures';
-import { GameMode, type ParsedInventoryItem, type SaveFileEvent } from '../types/grail';
-import { EventBus } from './EventBus';
-import { createItemFingerprint, normalizeInventoryItem } from './itemNormalizer';
-import * as modernStashParser from './modernStashParser';
+import { GameMode, type ParsedInventoryItem, type SaveFileEvent } from '../../types/grail';
+import * as d2sConstants from '../d2s/constants';
+import { EventBus } from '../EventBus';
+import { createItemFingerprint, normalizeInventoryItem } from '../itemNormalizer';
+import * as modernStashParser from '../modernStashParser';
 import { SaveFileMonitor } from './saveFileMonitor';
+import * as saveFileParser from './saveFileParser';
+import { parseSaveContent } from './saveFileParser';
+import { createPresenceIdentityKey } from './vaultPresenceReconciler';
 
 const MODERN_STASH_FIXTURE_PATH = resolve(
   process.cwd(),
@@ -107,6 +114,31 @@ const createMockDatabase = (): MockGrailDatabase => ({
   markVaultItemsMissingForSourceFiles: vi.fn(),
 });
 
+/** Makes `processSingleFile` return the given results, one per parsed file in call order. */
+const mockParseResults = (target: SaveFileMonitor, results: unknown[]) => {
+  const spy = vi.spyOn(target as any, 'processSingleFile');
+  for (const result of results) {
+    spy.mockResolvedValueOnce(result);
+  }
+  return spy;
+};
+
+/** Fake chokidar watcher that records `on` handlers so tests can trigger events such as 'ready'. */
+const createFakeWatcher = (watched: Record<string, string[]>) => {
+  const handlers = new Map<string, () => void>();
+  const watcher = {
+    closed: false,
+    on: vi.fn(function (this: unknown, event: string, handler: () => void) {
+      handlers.set(event, handler);
+      return this;
+    }),
+    close: vi.fn(),
+    getWatched: vi.fn(() => watched),
+  };
+  vi.spyOn(chokidar, 'watch').mockImplementation(() => watcher as unknown as FSWatcher);
+  return { watcher, handlers };
+};
+
 describe('When SaveFileMonitor is used', () => {
   let monitor: SaveFileMonitor;
   let mockDatabase: MockGrailDatabase;
@@ -114,6 +146,7 @@ describe('When SaveFileMonitor is used', () => {
   const tempDirs: string[] = [];
 
   afterEach(async () => {
+    vi.restoreAllMocks();
     await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })));
   });
 
@@ -195,15 +228,42 @@ describe('When SaveFileMonitor is used', () => {
       expect(newMonitor.isCurrentlyMonitoring()).toBe(false);
     });
 
-    it('Then should initialize D2S constants', () => {
+    it('Then should ensure the D2S constants are registered', () => {
+      // Arrange
+      // Spies on the shared constants module instead of the mocked d2s registry: which registry
+      // the module is bound to depends on which test file loaded it first (isolate:false).
+      const ensureSpy = vi.spyOn(d2sConstants, 'ensureD2sConstants');
+
+      // Act
+      const newMonitor = new SaveFileMonitor(new EventBus(), mockDatabase as any);
+
       // Assert
-      expect(d2s.getConstantData).toHaveBeenCalledWith(96);
-      expect(d2s.getConstantData).toHaveBeenCalledWith(97);
-      expect(d2s.getConstantData).toHaveBeenCalledWith(98);
-      expect(d2s.getConstantData).toHaveBeenCalledWith(99);
-      expect(d2s.getConstantData).toHaveBeenCalledWith(0);
-      expect(d2s.getConstantData).toHaveBeenCalledWith(1);
-      expect(d2s.getConstantData).toHaveBeenCalledWith(2);
+      expect(newMonitor).toBeInstanceOf(SaveFileMonitor);
+      expect(ensureSpy).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('If the tick reader is started', () => {
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('Then construction starts no timer and start runs exactly one until shutdown', async () => {
+      // Arrange
+      vi.useFakeTimers();
+      const newMonitor = new SaveFileMonitor(new EventBus(), mockDatabase as any);
+      const timersAfterConstruction = vi.getTimerCount();
+
+      // Act
+      newMonitor.start();
+      newMonitor.start();
+      const timersAfterStart = vi.getTimerCount();
+      await newMonitor.shutdown();
+
+      // Assert
+      expect(timersAfterConstruction).toBe(0);
+      expect(timersAfterStart).toBe(1);
+      expect(vi.getTimerCount()).toBe(0);
     });
   });
 
@@ -250,8 +310,11 @@ describe('When SaveFileMonitor is used', () => {
         saveDir: emptyDir,
         gameMode: GameMode.Softcore,
       });
-      const watchSpy = vi.fn(() => ({ on: vi.fn().mockReturnThis(), close: vi.fn() }));
-      (chokidar as any).watch = watchSpy;
+      const watchSpy = vi
+        .spyOn(chokidar, 'watch')
+        .mockImplementation(
+          () => ({ on: vi.fn().mockReturnThis(), close: vi.fn() }) as unknown as FSWatcher,
+        );
       const startedSpy = vi.fn();
       eventBus.on('monitoring-started', startedSpy);
 
@@ -262,6 +325,45 @@ describe('When SaveFileMonitor is used', () => {
       expect(watchSpy).toHaveBeenCalledTimes(1);
       expect(monitor.isCurrentlyMonitoring()).toBe(true);
       expect(startedSpy).toHaveBeenCalledWith(expect.objectContaining({ saveFileCount: 0 }));
+    });
+
+    it('Then should report the watched paths once the watcher is ready', async () => {
+      // Arrange
+      const watchedDir = await mkdtemp(join(tmpdir(), 'arcane-ready-'));
+      tempDirs.push(watchedDir);
+      vi.mocked(mockDatabase.getAllSettings).mockReturnValue({
+        saveDir: watchedDir,
+        gameMode: GameMode.Softcore,
+      });
+      const { watcher: fakeWatcher, handlers } = createFakeWatcher({
+        [watchedDir]: ['a.d2s', 'b.d2s'],
+      });
+      await monitor.startMonitoring();
+
+      // Act
+      handlers.get('ready')?.();
+
+      // Assert
+      expect(fakeWatcher.getWatched).toHaveBeenCalledTimes(1);
+    });
+
+    it('Then should not query a watcher that was closed before it became ready', async () => {
+      // Arrange
+      const watchedDir = await mkdtemp(join(tmpdir(), 'arcane-ready-closed-'));
+      tempDirs.push(watchedDir);
+      vi.mocked(mockDatabase.getAllSettings).mockReturnValue({
+        saveDir: watchedDir,
+        gameMode: GameMode.Softcore,
+      });
+      const { watcher: fakeWatcher, handlers } = createFakeWatcher({});
+      await monitor.startMonitoring();
+      fakeWatcher.closed = true;
+
+      // Act
+      handlers.get('ready')?.();
+
+      // Assert
+      expect(fakeWatcher.getWatched).not.toHaveBeenCalled();
     });
 
     it('Then should not watch a directory that cannot be read', async () => {
@@ -275,8 +377,7 @@ describe('When SaveFileMonitor is used', () => {
         saveDir: notADirectory,
         gameMode: GameMode.Softcore,
       });
-      const watchSpy = vi.fn();
-      (chokidar as any).watch = watchSpy;
+      const watchSpy = vi.spyOn(chokidar, 'watch');
       const errorSpy = vi.fn();
       eventBus.on('monitoring-error', errorSpy);
 
@@ -301,8 +402,7 @@ describe('When SaveFileMonitor is used', () => {
         saveDir: missingDir,
         gameMode: GameMode.Softcore,
       });
-      const watchSpy = vi.fn();
-      (chokidar as any).watch = watchSpy;
+      const watchSpy = vi.spyOn(chokidar, 'watch');
 
       // Act
       await monitor.startMonitoring();
@@ -450,25 +550,6 @@ describe('When SaveFileMonitor is used', () => {
     });
   });
 
-  describe('If character class parsing is used', () => {
-    it('Then should return correct character class for valid ID', () => {
-      // Act & Assert
-      expect((monitor as any).getCharacterClass(0)).toBe('amazon');
-      expect((monitor as any).getCharacterClass(1)).toBe('sorceress');
-      expect((monitor as any).getCharacterClass(2)).toBe('necromancer');
-      expect((monitor as any).getCharacterClass(3)).toBe('paladin');
-      expect((monitor as any).getCharacterClass(4)).toBe('barbarian');
-      expect((monitor as any).getCharacterClass(5)).toBe('druid');
-      expect((monitor as any).getCharacterClass(6)).toBe('assassin');
-    });
-
-    it('Then should return unknown for invalid character class ID', () => {
-      // Act & Assert
-      expect((monitor as any).getCharacterClass(99)).toBe('unknown');
-      expect((monitor as any).getCharacterClass(-1)).toBe('unknown');
-    });
-  });
-
   describe('If parseSaveFile is called for legacy shared stash files', () => {
     let saveDir: string;
 
@@ -588,6 +669,7 @@ describe('When SaveFileMonitor is used', () => {
         saveFileDirectory: '/test/saves',
       });
       monitor = new SaveFileMonitor(eventBus, mockDatabase as any);
+      monitor.start();
     });
 
     afterEach(() => {
@@ -762,13 +844,6 @@ describe('When SaveFileMonitor is used', () => {
       (target as any).watchPath = '/test/saves';
     };
 
-    // Mirrors startMonitoring's tick reader; the monitor's shutdown() in afterEach clears it.
-    const startTickReader = (target: SaveFileMonitor) => {
-      (target as any).tickReaderInterval = setInterval(() => {
-        void (target as any).tickReader();
-      }, 500);
-    };
-
     beforeEach(() => {
       vi.useFakeTimers();
       eventBus = new EventBus();
@@ -779,6 +854,8 @@ describe('When SaveFileMonitor is used', () => {
       });
       mockDatabase.getAllSaveFileStates.mockReturnValue([]);
       monitor = new SaveFileMonitor(eventBus, mockDatabase as any);
+      // Runs the tick reader every 500 ms; the monitor's shutdown() in afterEach stops it.
+      monitor.start();
       vi.spyOn(monitor as any, 'findExistingSaveDirectories').mockResolvedValue(['/test/saves']);
     });
 
@@ -1068,7 +1145,6 @@ describe('When SaveFileMonitor is used', () => {
         const parseAllSpy = vi.spyOn(monitor as any, 'parseAllSaveDirectories');
         startWatching(monitor);
         (monitor as any).readingFiles = true;
-        startTickReader(monitor);
         let refreshed = false;
         const refresh = monitor.refreshSaveFiles().then(() => {
           refreshed = true;
@@ -1099,7 +1175,6 @@ describe('When SaveFileMonitor is used', () => {
         });
         startWatching(monitor);
         (monitor as any).readingFiles = true;
-        startTickReader(monitor);
 
         // Act
         const first = monitor.refreshSaveFiles();
@@ -1119,338 +1194,7 @@ describe('When SaveFileMonitor is used', () => {
     });
   });
 
-  describe('When concurrent file parsing is used', () => {
-    let monitor: SaveFileMonitor;
-    let eventBus: EventBus;
-
-    beforeEach(() => {
-      eventBus = new EventBus();
-      monitor = new SaveFileMonitor(eventBus);
-    });
-
-    it('Then should execute all tasks with concurrency limit', async () => {
-      // Arrange
-      let maxConcurrent = 0;
-      let currentConcurrent = 0;
-      const taskCount = 10;
-      const limit = 3;
-
-      const tasks = Array.from({ length: taskCount }, (_, i) => {
-        return async () => {
-          currentConcurrent++;
-          maxConcurrent = Math.max(maxConcurrent, currentConcurrent);
-          // Simulate async work
-          await new Promise((resolve) => setTimeout(resolve, 10));
-          currentConcurrent--;
-          return i;
-        };
-      });
-
-      // Act
-      const results = await (monitor as any).executeConcurrently(tasks, limit);
-
-      // Assert
-      expect(results).toHaveLength(taskCount);
-      expect(maxConcurrent).toBeLessThanOrEqual(limit);
-      expect(results).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
-    });
-
-    it('Then should preserve result order', async () => {
-      // Arrange
-      const tasks = [
-        async () => {
-          await new Promise((resolve) => setTimeout(resolve, 50));
-          return 'first';
-        },
-        async () => {
-          await new Promise((resolve) => setTimeout(resolve, 10));
-          return 'second';
-        },
-        async () => {
-          await new Promise((resolve) => setTimeout(resolve, 30));
-          return 'third';
-        },
-      ];
-
-      // Act
-      const results = await (monitor as any).executeConcurrently(tasks, 5);
-
-      // Assert - results should be in original order despite different completion times
-      expect(results).toEqual(['first', 'second', 'third']);
-    });
-
-    it('Then should handle errors in individual tasks gracefully', async () => {
-      // Arrange
-      const tasks = [
-        async () => 'success1',
-        async () => {
-          throw new Error('Task failed');
-        },
-        async () => 'success2',
-      ];
-
-      // Act
-      const results = await (monitor as any).executeConcurrently(tasks, 5);
-
-      // Assert - successful tasks should complete, failed task returns undefined
-      expect(results[0]).toBe('success1');
-      expect(results[1]).toBeUndefined();
-      expect(results[2]).toBe('success2');
-    });
-
-    it('Then should work with limit greater than task count', async () => {
-      // Arrange
-      const tasks = [async () => 1, async () => 2, async () => 3];
-
-      // Act
-      const results = await (monitor as any).executeConcurrently(tasks, 10);
-
-      // Assert
-      expect(results).toEqual([1, 2, 3]);
-    });
-
-    it('Then should work with limit of 1 (sequential execution)', async () => {
-      // Arrange
-      let maxConcurrent = 0;
-      let currentConcurrent = 0;
-      const tasks = Array.from({ length: 5 }, (_, i) => {
-        return async () => {
-          currentConcurrent++;
-          maxConcurrent = Math.max(maxConcurrent, currentConcurrent);
-          await new Promise((resolve) => setTimeout(resolve, 10));
-          currentConcurrent--;
-          return i;
-        };
-      });
-
-      // Act
-      const results = await (monitor as any).executeConcurrently(tasks, 1);
-
-      // Assert - should execute sequentially (max 1 at a time)
-      expect(maxConcurrent).toBe(1);
-      expect(results).toEqual([0, 1, 2, 3, 4]);
-    });
-
-    it('Then should work with empty task array', async () => {
-      // Arrange
-      const tasks: Array<() => Promise<number>> = [];
-
-      // Act
-      const results = await (monitor as any).executeConcurrently(tasks, 5);
-
-      // Assert
-      expect(results).toEqual([]);
-    });
-  });
-
-  describe('When configurable intervals are used', () => {
-    let monitor: SaveFileMonitor;
-    let mockDatabase: MockGrailDatabase;
-    let eventBus: EventBus;
-
-    beforeEach(() => {
-      eventBus = new EventBus();
-      mockDatabase = createMockDatabase();
-    });
-
-    it('Then should use default intervals when settings not provided', () => {
-      // Arrange
-      mockDatabase.getAllSettings.mockReturnValue({
-        gameMode: GameMode.Softcore,
-        saveFileDirectory: '/test/saves',
-      });
-
-      // Act
-      monitor = new SaveFileMonitor(eventBus, mockDatabase as any);
-
-      // Assert - verify defaults used (check via method calls)
-      const tickInterval = (monitor as any).getTickReaderInterval();
-      expect(tickInterval).toBe(500); // DEFAULT_TICK_INTERVAL
-    });
-
-    it('Then should use custom tick reader interval from settings', () => {
-      // Arrange
-      mockDatabase.getAllSettings.mockReturnValue({
-        gameMode: GameMode.Softcore,
-        saveFileDirectory: '/test/saves',
-        tickReaderIntervalMs: 1000, // Custom value
-      });
-
-      // Act
-      monitor = new SaveFileMonitor(eventBus, mockDatabase as any);
-
-      // Assert
-      const tickInterval = (monitor as any).getTickReaderInterval();
-      expect(tickInterval).toBe(1000);
-    });
-
-    it('Then should validate and reject invalid tick reader interval', () => {
-      // Arrange
-      mockDatabase.getAllSettings.mockReturnValue({
-        gameMode: GameMode.Softcore,
-        saveFileDirectory: '/test/saves',
-        tickReaderIntervalMs: 50, // Too low (min is 100)
-      });
-
-      // Act
-      monitor = new SaveFileMonitor(eventBus, mockDatabase as any);
-
-      // Assert - should fall back to default
-      const tickInterval = (monitor as any).getTickReaderInterval();
-      expect(tickInterval).toBe(500); // DEFAULT_TICK_INTERVAL
-    });
-
-    it('Then should validate interval with max constraint', () => {
-      // Arrange
-      mockDatabase.getAllSettings.mockReturnValue({
-        gameMode: GameMode.Softcore,
-        saveFileDirectory: '/test/saves',
-        tickReaderIntervalMs: 10000, // Too high (max is 5000)
-      });
-
-      // Act
-      monitor = new SaveFileMonitor(eventBus, mockDatabase as any);
-
-      // Assert - should fall back to default
-      const tickInterval = (monitor as any).getTickReaderInterval();
-      expect(tickInterval).toBe(500); // DEFAULT_TICK_INTERVAL
-    });
-
-    it('Then should validate interval and allow valid custom value', () => {
-      // Arrange
-      const validInterval = 250;
-      mockDatabase.getAllSettings.mockReturnValue({
-        gameMode: GameMode.Softcore,
-        saveFileDirectory: '/test/saves',
-        tickReaderIntervalMs: validInterval,
-      });
-
-      // Act
-      monitor = new SaveFileMonitor(eventBus, mockDatabase as any);
-
-      // Assert
-      const tickInterval = (monitor as any).getTickReaderInterval();
-      expect(tickInterval).toBe(validInterval);
-    });
-
-    it('Then should use default when database not available', () => {
-      // Arrange & Act
-      monitor = new SaveFileMonitor(eventBus); // No database
-
-      // Assert
-      const tickInterval = (monitor as any).getTickReaderInterval();
-      expect(tickInterval).toBe(500); // DEFAULT_TICK_INTERVAL
-    });
-
-    it('Then should validate debounce delay from settings', () => {
-      // Arrange
-      mockDatabase.getAllSettings.mockReturnValue({
-        gameMode: GameMode.Softcore,
-        saveFileDirectory: '/test/saves',
-        fileChangeDebounceMs: 3000, // Custom debounce
-      });
-      monitor = new SaveFileMonitor(eventBus, mockDatabase as any);
-
-      // Act
-      const validated = (monitor as any).validateInterval(3000, 500, 10000, 2000);
-
-      // Assert
-      expect(validated).toBe(3000);
-    });
-  });
-
   describe('When stash header parsing is used', () => {
-    describe('If getSaveNameFromPath is called with hardcore=true parameter', () => {
-      it('Then should return legacy Shared Stash Hardcore for legacy file versions', () => {
-        // Arrange
-        const filePath = '/test/SharedStashSoftcoreV2.d2i';
-
-        // Act
-        const result = (monitor as any).getSaveNameFromPath(filePath, true, 99);
-
-        // Assert
-        expect(result).toBe('Shared Stash Hardcore');
-      });
-    });
-
-    describe('If getSaveNameFromPath is called with hardcore=false parameter', () => {
-      it('Then should return modern Shared Stash Softcore for modern file versions', () => {
-        // Arrange
-        const filePath = '/test/SharedStashHardcoreV2.d2i';
-
-        // Act
-        const result = (monitor as any).getSaveNameFromPath(filePath, false, 105);
-
-        // Assert
-        expect(result).toBe('Modern Shared Stash Softcore');
-      });
-    });
-
-    describe('If getSaveNameFromPath is called with hardcore=true and modern version', () => {
-      it('Then should return modern Shared Stash Hardcore', () => {
-        // Arrange
-        const filePath = '/test/SharedStashSoftcoreV2.d2i';
-
-        // Act
-        const result = (monitor as any).getSaveNameFromPath(filePath, true, 105);
-
-        // Assert
-        expect(result).toBe('Modern Shared Stash Hardcore');
-      });
-    });
-
-    describe('If getSaveNameFromPath is called without hardcore parameter for hardcore stash', () => {
-      it('Then should fallback to filename detection', () => {
-        // Arrange
-        const filePath = '/test/SharedStashHardcoreV2.d2i';
-
-        // Act
-        const result = (monitor as any).getSaveNameFromPath(filePath);
-
-        // Assert
-        expect(result).toBe('Shared Stash Hardcore'); // Falls back to filename
-      });
-    });
-
-    describe('If getSaveNameFromPath is called without hardcore parameter for softcore stash', () => {
-      it('Then should fallback to filename detection', () => {
-        // Arrange
-        const filePath = '/test/SharedStashSoftcoreV2.d2i';
-
-        // Act
-        const result = (monitor as any).getSaveNameFromPath(filePath);
-
-        // Assert
-        expect(result).toBe('Shared Stash Softcore'); // Falls back to filename
-      });
-    });
-
-    describe('If getSaveNameFromPath is called with non-.d2i file', () => {
-      it('Then should return filename without extension', () => {
-        // Arrange
-        const filePath = '/test/MyCharacter.d2s';
-
-        // Act
-        const result = (monitor as any).getSaveNameFromPath(filePath);
-
-        // Assert
-        expect(result).toBe('MyCharacter');
-      });
-    });
-
-    describe('If getSaveNameFromPath is called with an uppercase extension', () => {
-      it('Then should strip the extension case-insensitively', () => {
-        // Arrange
-        const filePath = '/test/Hero.D2S';
-
-        // Act
-        const result = (monitor as any).getSaveNameFromPath(filePath);
-
-        // Assert
-        expect(result).toBe('Hero');
-      });
-    });
-
     describe('If parseSaveFile is called with an uppercase .D2S extension', () => {
       it('Then should use the filename without extension as the character name', async () => {
         // Arrange
@@ -1480,55 +1224,13 @@ describe('When SaveFileMonitor is used', () => {
         expect(result.name).toBe('Hero');
       });
     });
-
-    describe('If getSaveNameFromPath is called with hardcore parameter on non-.d2i file', () => {
-      it('Then should ignore hardcore parameter', () => {
-        // Arrange
-        const filePath = '/test/MyCharacter.d2s';
-
-        // Act
-        const result = (monitor as any).getSaveNameFromPath(filePath, true);
-
-        // Assert
-        expect(result).toBe('MyCharacter'); // Hardcore parameter only applies to .d2i files
-      });
-    });
-
-    describe('If backup-like stash filenames are evaluated', () => {
-      it('Then backup-like .d2i files should be excluded from parsing', () => {
-        // Arrange
-        const fileNames = [
-          'Barb.d2s',
-          'SharedStashSoftCoreV2.d2i',
-          'SharedStashSoftCoreV2_Backup.d2i',
-          'SharedStashSoftCoreV2.bak.d2i',
-          'notes.txt',
-        ];
-
-        // Act
-        const included = fileNames.map((name) => (monitor as any).shouldIncludeSaveFile(name));
-
-        // Assert
-        expect(included).toEqual([true, true, false, false, false]);
-      });
-    });
   });
 
   describe('When runeword parsing validates names', () => {
-    let monitor: SaveFileMonitor;
-    let mockDatabase: MockGrailDatabase;
-    let eventBus: EventBus;
+    const readSoftcoreGameMode = () => GameMode.Softcore;
 
     beforeEach(() => {
       vi.clearAllMocks();
-
-      eventBus = new EventBus();
-      mockDatabase = createMockDatabase();
-      mockDatabase.getAllSettings.mockReturnValue({
-        gameMode: GameMode.Softcore,
-        saveDir: '/test/saves',
-      });
-      monitor = new SaveFileMonitor(eventBus, mockDatabase as any);
     });
 
     it('Then should accept valid runeword names from known runewords', async () => {
@@ -1550,11 +1252,14 @@ describe('When SaveFileMonitor is used', () => {
       } as any);
 
       // Act
-      const { items } = await (monitor as any).parseSave(
-        'TestChar',
-        'TestChar.d2s',
-        Buffer.from('test'),
-        '.d2s',
+      const { items } = await parseSaveContent(
+        {
+          saveName: 'TestChar',
+          filePath: 'TestChar.d2s',
+          content: Buffer.from('test'),
+          extension: '.d2s',
+        },
+        readSoftcoreGameMode,
       );
 
       // Assert
@@ -1583,11 +1288,14 @@ describe('When SaveFileMonitor is used', () => {
       } as any);
 
       // Act
-      const { items } = await (monitor as any).parseSave(
-        'TestChar',
-        'TestChar.d2s',
-        Buffer.from('test'),
-        '.d2s',
+      const { items } = await parseSaveContent(
+        {
+          saveName: 'TestChar',
+          filePath: 'TestChar.d2s',
+          content: Buffer.from('test'),
+          extension: '.d2s',
+        },
+        readSoftcoreGameMode,
       );
 
       // Assert
@@ -1616,11 +1324,14 @@ describe('When SaveFileMonitor is used', () => {
       } as any);
 
       // Act
-      const { items } = await (monitor as any).parseSave(
-        'TestChar',
-        'TestChar.d2s',
-        Buffer.from('test'),
-        '.d2s',
+      const { items } = await parseSaveContent(
+        {
+          saveName: 'TestChar',
+          filePath: 'TestChar.d2s',
+          content: Buffer.from('test'),
+          extension: '.d2s',
+        },
+        readSoftcoreGameMode,
       );
 
       // Assert
@@ -1647,11 +1358,14 @@ describe('When SaveFileMonitor is used', () => {
       } as any);
 
       // Act
-      const { items } = await (monitor as any).parseSave(
-        'TestChar',
-        'TestChar.d2s',
-        Buffer.from('test'),
-        '.d2s',
+      const { items } = await parseSaveContent(
+        {
+          saveName: 'TestChar',
+          filePath: 'TestChar.d2s',
+          content: Buffer.from('test'),
+          extension: '.d2s',
+        },
+        readSoftcoreGameMode,
       );
 
       // Assert - should have no runeword items
@@ -1979,7 +1693,7 @@ describe('When SaveFileMonitor is used', () => {
       (monitor as any).inventorySnapshots = [oldSnapshotA, oldSnapshotB];
 
       vi.spyOn(monitor as any, 'filterFilesToParse').mockResolvedValue(['/test/save/dir/a.d2s']);
-      vi.spyOn(monitor as any, 'executeConcurrently').mockResolvedValue([
+      mockParseResults(monitor, [
         {
           saveName: 'A',
           success: true,
@@ -2052,7 +1766,7 @@ describe('When SaveFileMonitor is used', () => {
 
       (monitor as any).inventorySnapshots = [];
       vi.spyOn(monitor as any, 'filterFilesToParse').mockResolvedValue(['/test/save/dir/a.d2s']);
-      const executeSpy = vi.spyOn(monitor as any, 'executeConcurrently').mockResolvedValue([
+      const processSpy = mockParseResults(monitor, [
         {
           saveName: 'A',
           success: true,
@@ -2070,7 +1784,7 @@ describe('When SaveFileMonitor is used', () => {
       await (monitor as any).parseFiles(['/test/save/dir/a.d2s', '/test/save/dir/b.d2s'], false);
 
       // Assert
-      expect((executeSpy.mock.calls[0]?.[0] as unknown[]).length).toBe(2);
+      expect(processSpy).toHaveBeenCalledTimes(2);
       expect(emitSpy).toHaveBeenCalledWith([
         expect.objectContaining({ saveName: 'A' }),
         expect.objectContaining({ saveName: 'B' }),
@@ -2089,7 +1803,7 @@ describe('When SaveFileMonitor is used', () => {
         items: [{ fingerprint: 'fp-a-visible', isSocketedItem: false }],
       };
       vi.spyOn(monitor as any, 'filterFilesToParse').mockResolvedValue(['/test/save/dir/a.d2s']);
-      vi.spyOn(monitor as any, 'executeConcurrently').mockResolvedValue([
+      mockParseResults(monitor, [
         {
           saveName: 'A',
           success: true,
@@ -2118,9 +1832,7 @@ describe('When SaveFileMonitor is used', () => {
     it('Then a file that failed to parse never marks its vault rows as missing', async () => {
       // Arrange
       vi.spyOn(monitor as any, 'filterFilesToParse').mockResolvedValue(['/test/save/dir/a.d2s']);
-      vi.spyOn(monitor as any, 'executeConcurrently').mockResolvedValue([
-        { saveName: 'A', success: false, inventorySnapshot: undefined },
-      ]);
+      mockParseResults(monitor, [{ saveName: 'A', success: false, inventorySnapshot: undefined }]);
       vi.spyOn(monitor as any, 'emitSaveFileEvents').mockResolvedValue(undefined);
 
       // Act
@@ -2165,7 +1877,7 @@ describe('When SaveFileMonitor is used', () => {
         throw new Error('database is locked');
       });
       vi.spyOn(monitor as any, 'filterFilesToParse').mockResolvedValue(['/test/save/dir/a.d2s']);
-      vi.spyOn(monitor as any, 'executeConcurrently').mockResolvedValue([
+      mockParseResults(monitor, [
         { saveName: 'A', success: true, parseStatus: 'parsed', inventorySnapshot: snapshotA },
       ]);
       const emitSpy = vi.spyOn(monitor as any, 'emitSaveFileEvents').mockResolvedValue(undefined);
@@ -2183,7 +1895,7 @@ describe('When SaveFileMonitor is used', () => {
       const saveDir = mkdtempSync(join(tmpdir(), 'save-monitor-'));
       const savePath = join(saveDir, 'Hero.d2s');
       writeFileSync(savePath, Buffer.from('mock file content'));
-      vi.spyOn(monitor as any, 'parseSave').mockResolvedValue({
+      vi.spyOn(saveFileParser, 'parseSaveContent').mockResolvedValueOnce({
         status: 'parsed',
         items: [
           {
@@ -2201,7 +1913,7 @@ describe('When SaveFileMonitor is used', () => {
             rawParsedItem: { name: 'Ist Rune' },
           },
         ],
-      });
+      } as any);
       vi.spyOn(monitor as any, 'updateSaveFileState').mockResolvedValue(undefined);
 
       // Act
@@ -2211,75 +1923,6 @@ describe('When SaveFileMonitor is used', () => {
       // Assert
       expect(parseResult.presentFingerprints).toEqual(['fp-parent', 'fp-socketed']);
       expect(parseResult.inventorySnapshot?.items).toHaveLength(1);
-    });
-
-    it('Then a moved item keeps its presence identity while its fingerprint changes', () => {
-      // Arrange
-      const itemAt = (x: number, y: number) =>
-        ({
-          name: 'Ring of Fire',
-          type: 'ring',
-          code: 'rin',
-          quality: 4,
-          id: 987654,
-          location_id: 0,
-          alt_position_id: 5,
-          position_x: x,
-          position_y: y,
-          inv_width: 1,
-          inv_height: 1,
-        }) as any;
-      const parse = (item: any) =>
-        normalizeInventoryItem({
-          filePath: '/tmp/SharedStash.d2i',
-          saveName: 'Shared',
-          sourceFileType: 'd2i',
-          item,
-          fallbackLocation: 'stash',
-          stashTab: 0,
-        });
-
-      // Act
-      const before = parse(itemAt(1, 1));
-      const after = parse(itemAt(6, 4));
-
-      // Assert
-      expect(after.fingerprint).not.toBe(before.fingerprint);
-      expect((monitor as any).createPresenceIdentityKey(after)).toBe(
-        (monitor as any).createPresenceIdentityKey(before),
-      );
-    });
-
-    it('Then items that differ only by their game item id have different presence identities', () => {
-      // Arrange
-      const ring = (id: number) =>
-        ({
-          name: 'Ring of Fire',
-          type: 'ring',
-          code: 'rin',
-          quality: 4,
-          id,
-          position_x: 1,
-          position_y: 1,
-          inv_width: 1,
-          inv_height: 1,
-        }) as any;
-      const parse = (item: any) =>
-        normalizeInventoryItem({
-          filePath: '/tmp/SharedStash.d2i',
-          saveName: 'Shared',
-          sourceFileType: 'd2i',
-          item,
-          fallbackLocation: 'stash',
-          stashTab: 0,
-        });
-
-      // Act
-      const first = (monitor as any).createPresenceIdentityKey(parse(ring(1)));
-      const second = (monitor as any).createPresenceIdentityKey(parse(ring(2)));
-
-      // Assert
-      expect(first).not.toBe(second);
     });
 
     it('Then processSingleFile reports one identity key per fingerprint, in the same order', async () => {
@@ -2309,10 +1952,10 @@ describe('When SaveFileMonitor is used', () => {
           rawParsedItem: { name: 'Ist Rune' },
         },
       ];
-      vi.spyOn(monitor as any, 'parseSave').mockResolvedValue({
+      vi.spyOn(saveFileParser, 'parseSaveContent').mockResolvedValueOnce({
         status: 'parsed',
         items: parsedItems,
-      });
+      } as any);
       vi.spyOn(monitor as any, 'updateSaveFileState').mockResolvedValue(undefined);
 
       // Act
@@ -2321,7 +1964,7 @@ describe('When SaveFileMonitor is used', () => {
 
       // Assert
       expect(parseResult.presentIdentityKeys).toEqual(
-        parsedItems.map((item) => (monitor as any).createPresenceIdentityKey(item)),
+        parsedItems.map((item) => createPresenceIdentityKey(item as any)),
       );
       expect(parseResult.presentIdentityKeys).toHaveLength(parseResult.presentFingerprints.length);
     });
@@ -2358,11 +2001,14 @@ describe('When SaveFileMonitor is used', () => {
       const fixtureBuffer = readFileSync(MODERN_STASH_FIXTURE_PATH);
 
       // Act
-      const { items: parsedItems } = await (monitor as any).parseSave(
-        'Shared Stash Softcore',
-        MODERN_STASH_FIXTURE_PATH,
-        fixtureBuffer,
-        '.d2i',
+      const { items: parsedItems } = await parseSaveContent(
+        {
+          saveName: 'Shared Stash Softcore',
+          filePath: MODERN_STASH_FIXTURE_PATH,
+          content: fixtureBuffer,
+          extension: '.d2i',
+        },
+        () => GameMode.Softcore,
       );
 
       // Assert
@@ -2389,7 +2035,10 @@ describe('When SaveFileMonitor is used', () => {
     it('Then processSingleFile marks modern snapshots as writable and records source file version', async () => {
       // Arrange
       const fixtureBuffer = readFileSync(MODERN_STASH_FIXTURE_PATH);
-      vi.spyOn(monitor as any, 'parseSave').mockResolvedValue({ items: [], status: 'parsed' });
+      vi.spyOn(saveFileParser, 'parseSaveContent').mockResolvedValueOnce({
+        items: [],
+        status: 'parsed',
+      });
       vi.spyOn(monitor as any, 'updateSaveFileState').mockResolvedValue(undefined);
       vi.mocked(readFile).mockResolvedValue(fixtureBuffer);
 
@@ -2410,7 +2059,7 @@ describe('When SaveFileMonitor is used', () => {
       const savePath = join(saveDir, 'Hero.d2s');
       writeFileSync(savePath, Buffer.from('mock file content'));
       mockDatabase.getCharacterByName.mockReturnValue({ id: 'char-1', name: 'Hero' });
-      vi.spyOn(monitor as any, 'parseSave').mockResolvedValue({
+      vi.spyOn(saveFileParser, 'parseSaveContent').mockResolvedValueOnce({
         status: 'parsed',
         items: [
           {
@@ -2420,7 +2069,7 @@ describe('When SaveFileMonitor is used', () => {
             rawParsedItem: { name: 'Shako' },
           },
         ],
-      });
+      } as any);
       vi.spyOn(monitor as any, 'updateSaveFileState').mockResolvedValue(undefined);
 
       // Act
@@ -2449,90 +2098,6 @@ describe('When SaveFileMonitor is used', () => {
     afterEach(() => {
       chmodSync(saveDir, 0o700);
       rmSync(saveDir, { recursive: true, force: true });
-    });
-
-    it('Then rows of a file that is truly absent are marked missing', async () => {
-      // Arrange
-      const scannedFiles = [join(saveDir, 'Other.d2s')];
-
-      // Act
-      await (monitor as any).markOrphanedVaultRowsMissing(scannedFiles);
-
-      // Assert
-      expect(mockDatabase.markVaultItemsMissingForSourceFiles).toHaveBeenCalledWith([goneFile]);
-    });
-
-    it('Then a file that still exists is left alone', async () => {
-      // Arrange
-      writeFileSync(goneFile, 'save');
-
-      // Act
-      await (monitor as any).markOrphanedVaultRowsMissing([]);
-
-      // Assert
-      expect(mockDatabase.markVaultItemsMissingForSourceFiles).not.toHaveBeenCalled();
-    });
-
-    // chmod 000 only blocks stat() for unprivileged POSIX users: root ignores the mode and Windows
-    // has no POSIX permission bits, so the test would pass without checking anything there.
-    const canRestrictDirectoryAccess =
-      process.platform !== 'win32' && (process.getuid?.() ?? 0) !== 0;
-
-    it.skipIf(!canRestrictDirectoryAccess)(
-      'Then a file that cannot be inspected right now does not count as deleted',
-      async () => {
-        // Arrange
-        writeFileSync(goneFile, 'save');
-        chmodSync(saveDir, 0o000);
-
-        try {
-          // Act
-          await (monitor as any).markOrphanedVaultRowsMissing([]);
-
-          // Assert
-          expect(mockDatabase.markVaultItemsMissingForSourceFiles).not.toHaveBeenCalled();
-        } finally {
-          chmodSync(saveDir, 0o700);
-        }
-      },
-    );
-
-    it('Then an unavailable save directory does not count as deleted files', async () => {
-      // Arrange
-      const missingDirectoryFile = join(saveDir, 'unmounted', 'Gone.d2s');
-      mockDatabase.getVaultSourceFilePathsPresentInLatestScan.mockReturnValue([
-        missingDirectoryFile,
-      ]);
-
-      // Act
-      await (monitor as any).markOrphanedVaultRowsMissing([]);
-
-      // Assert
-      expect(mockDatabase.markVaultItemsMissingForSourceFiles).not.toHaveBeenCalled();
-    });
-
-    it('Then a file that was just scanned is never marked missing', async () => {
-      // Arrange
-      const scannedFiles = [goneFile];
-
-      // Act
-      await (monitor as any).markOrphanedVaultRowsMissing(scannedFiles);
-
-      // Assert
-      expect(mockDatabase.markVaultItemsMissingForSourceFiles).not.toHaveBeenCalled();
-    });
-
-    it('Then a database error does not break the scan', async () => {
-      // Arrange
-      mockDatabase.markVaultItemsMissingForSourceFiles.mockImplementation(() => {
-        throw new Error('database is locked');
-      });
-
-      // Act
-      const run = (monitor as any).markOrphanedVaultRowsMissing([]);
-
-      // Assert
-      await expect(run).resolves.toBeUndefined();
     });
 
     it('Then every scan checks for deleted files, even when no file needs reparsing', async () => {
@@ -2648,7 +2213,7 @@ describe('When SaveFileMonitor is used', () => {
         const modernParseSpy = vi
           .spyOn(modernStashParser, 'parseModernStash')
           .mockRejectedValueOnce(new Error('corrupt sector'));
-        const processSpy = vi.spyOn(monitor as any, 'parseSave');
+        const processSpy = vi.spyOn(saveFileParser, 'parseSaveContent');
 
         // Act
         await scanFile('ModernSharedStashSoftCoreV2.d2i', readFileSync(MODERN_STASH_FIXTURE_PATH));
@@ -2671,7 +2236,7 @@ describe('When SaveFileMonitor is used', () => {
         });
         const truncated = readFileSync(MODERN_STASH_FIXTURE_PATH).subarray(0, 3000);
         vi.mocked(d2stash.read).mockClear();
-        const parseSaveSpy = vi.spyOn(monitor as any, 'parseSave');
+        const parseSaveSpy = vi.spyOn(saveFileParser, 'parseSaveContent');
 
         // Act
         await scanFile('ModernSharedStashSoftCoreV2.d2i', truncated);
@@ -2699,7 +2264,7 @@ describe('When SaveFileMonitor is used', () => {
           ...complete,
           partial: true,
         });
-        const parseSaveSpy = vi.spyOn(monitor as any, 'parseSave');
+        const parseSaveSpy = vi.spyOn(saveFileParser, 'parseSaveContent');
 
         // Act
         await scanFile('ModernSharedStashSoftCoreV2.d2i', readFileSync(MODERN_STASH_FIXTURE_PATH));

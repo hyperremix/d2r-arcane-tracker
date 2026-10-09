@@ -1,95 +1,51 @@
 import { existsSync, readdirSync } from 'node:fs';
 import { readFile, stat } from 'node:fs/promises';
-import { basename, dirname, extname, join } from 'node:path';
-import * as d2s from '@dschu012/d2s';
-import * as d2stash from '@dschu012/d2s/lib/d2/stash';
-import { constants as constants96 } from '@dschu012/d2s/lib/data/versions/96_constant_data';
-import { constants as constants99 } from '@dschu012/d2s/lib/data/versions/99_constant_data';
+import { dirname, extname, join } from 'node:path';
 import type { FSWatcher } from 'chokidar';
-import chokidar from 'chokidar';
 import { app } from 'electron';
-import type { GrailDatabase } from '../database/database';
+import type { GrailDatabase } from '../../database/database';
 import type {
   CharacterInventorySnapshot,
   D2SaveFile,
-  D2SItem,
   InventorySearchResult,
-  ParsedInventoryItem,
   SaveFileEvent,
   SaveFileState,
-  StashTabKind,
-  VaultLocationContext,
   VaultSourceFileType,
-} from '../types/grail';
-import { GameMode } from '../types/grail';
-import { isModernStashVersion } from '../utils/d2rFormat';
-import { isRune } from '../utils/objects';
-import { createServiceLogger } from '../utils/serviceLogger';
-import { createVaultPresenceKey } from '../utils/vaultPresence';
-import type { EventBus } from './EventBus';
-import { normalizeItemsWithSocketedItems, resolveGrailLookupName } from './itemNormalizer';
-import { parseModernStash } from './modernStashParser';
-import { readD2iHeaderVersion, readD2iMetadata } from './stashFormat';
+} from '../../types/grail';
+import { GameMode } from '../../types/grail';
+import { createServiceLogger } from '../../utils/serviceLogger';
+import { ensureD2sConstants } from '../d2s/constants';
+import type { EventBus } from '../EventBus';
+import { executeConcurrently } from './executeConcurrently';
+import { countAvailableRunes, mergeInventorySnapshots } from './inventorySnapshots';
+import {
+  readConfiguredSaveDirectory,
+  resolveDebounceDelay,
+  resolveTickReaderInterval,
+  resolveWatcherIntervals,
+} from './saveDirectorySettings';
+import {
+  buildSaveFileHeader,
+  type D2iHeaderInfo,
+  getSaveNameFromPath,
+  readD2iHeaderInfo,
+  shouldIncludeSaveFile,
+} from './saveFileFormat';
+import { type GameModeReader, parseSaveContent, readLegacyStashHardcore } from './saveFileParser';
+import { SAVE_WATCHER_USES_POLLING, watchSaveDirectory } from './saveFileWatcher';
+import type {
+  CompleteFileParseResult,
+  FileParseSuccess,
+  IncompleteFileParseResult,
+  SingleFileParseResult,
+} from './types';
+import {
+  createPresenceIdentityKey,
+  markOrphanedVaultRowsMissing,
+  reconcileVaultPresence,
+} from './vaultPresenceReconciler';
 
 const log = createServiceLogger('SaveFileMonitor');
-/**
- * How much of a save file a parse really read.
- * - 'parsed': the whole file was read.
- * - 'partial': only some of the file could be read (a damaged .d2i sector); the items found so far are kept.
- * - 'skipped': filtered out by the configured game mode.
- * - 'errored': a parse error was swallowed.
- * Only 'parsed' proves which items are gone from a file; every other status yields no or only some items.
- */
-type SaveParseStatus = 'parsed' | 'partial' | 'skipped' | 'errored';
-
-interface FileParseSuccess {
-  saveName: string;
-  success: true;
-  inventorySnapshot: CharacterInventorySnapshot;
-  /** Header data of the file, read from the same buffer the items came from. */
-  saveFile: D2SaveFile;
-  /** Every item of the file, including socketed ones the snapshot omits. */
-  parsedItems: ParsedInventoryItem[];
-}
-
-/** A complete parse: the only result vault reconciliation may act on. */
-interface CompleteFileParseResult extends FileParseSuccess {
-  parseStatus: 'parsed';
-  /** Fingerprints of every item in the file, including socketed ones the snapshot omits. */
-  presentFingerprints: string[];
-  /** Location-independent identity of each item, parallel to `presentFingerprints`. */
-  presentIdentityKeys: string[];
-}
-
-/** A parse that read no items or only some of them; it must never mark vault rows as missing. */
-interface IncompleteFileParseResult extends FileParseSuccess {
-  parseStatus: Exclude<SaveParseStatus, 'parsed'>;
-}
-
-interface FailedFileParseResult {
-  saveName: string;
-  success: false;
-}
-
-type SingleFileParseResult =
-  | CompleteFileParseResult
-  | IncompleteFileParseResult
-  | FailedFileParseResult;
-
-/** Items of one save file plus what the parse learned about its header. */
-interface SaveParseResult {
-  items: ParsedInventoryItem[];
-  status: SaveParseStatus;
-  /** Hardcore flag read from a stash header (.sss/.d2x/.d2i), when the parser got that far. */
-  stashHardcore?: boolean;
-}
-
-/** Hardcore flag and version of a .d2i file, falling back to the file name when unreadable. */
-interface D2iHeaderInfo {
-  hardcore: boolean;
-  version?: number;
-}
-
 /** A pending request to re-parse every save file; settled once that parse ran or was skipped. */
 interface ForcedParseRequest {
   promise: Promise<void>;
@@ -106,12 +62,6 @@ function createForcedParseRequest(): ForcedParseRequest {
   });
   return { promise, resolve, reject };
 }
-
-const SUPPORTED_SAVE_EXTENSIONS = new Set(['.d2s', '.sss', '.d2x', '.d2i']);
-
-/** True when a save's softcore/hardcore status is excluded by the configured game mode. */
-const isGameModeMismatch = (gameMode: GameMode | undefined, isHardcore: boolean): boolean =>
-  (gameMode === GameMode.Softcore && isHardcore) || (gameMode === GameMode.Hardcore && !isHardcore);
 
 /**
  * Service for monitoring Diablo 2 save files and extracting item data.
@@ -137,11 +87,6 @@ class SaveFileMonitor {
   private tickReaderCount: number = 0;
   private eventBus: EventBus;
   private lastFileChangeTime: number = 0;
-  // Default values for configurable intervals
-  private readonly DEFAULT_TICK_INTERVAL = 500;
-  private readonly DEFAULT_POLLING_INTERVAL = 1000;
-  private readonly DEFAULT_STABILITY_THRESHOLD = 300;
-  private readonly DEFAULT_DEBOUNCE_DELAY = 500;
   private readonly MAX_CONCURRENT_PARSES = 5; // Limit concurrent file parsing
 
   /**
@@ -160,63 +105,36 @@ class SaveFileMonitor {
     this.readingFiles = false;
 
     // Initialize D2S constants
-    this.initializeD2SConstants();
+    ensureD2sConstants();
     log.info('constructor', 'D2S constants initialized');
 
     // Initialize save directories
     this.initializeSaveDirectories();
-
-    // Start the tick reader for automatic file change detection
-    const tickInterval = this.getTickReaderInterval();
-    this.tickReaderInterval = setInterval(this.tickReader, tickInterval);
-    log.info('constructor', `Tick reader started (interval: ${tickInterval}ms)`);
   }
 
   /**
-   * Initializes D2S library constants for different game versions.
-   * @private
+   * Starts the tick reader for automatic file change detection. The constructor starts no timers,
+   * so call this once right after construction. Calling it again while the tick reader runs does
+   * nothing. `shutdown` stops it.
    */
-  private initializeD2SConstants(): void {
-    const constantVersions = [96, 97, 98, 99, 0, 1, 2];
-
-    for (const version of constantVersions) {
-      try {
-        d2s.getConstantData(version);
-      } catch (_e) {
-        const constants = version === 99 ? constants99 : constants96;
-        d2s.setConstantData(version, constants);
-      }
+  start(): void {
+    if (this.tickReaderInterval) {
+      return;
     }
+
+    const tickInterval = resolveTickReaderInterval(this.grailDatabase);
+    this.tickReaderInterval = setInterval(this.tickReader, tickInterval);
+    log.info('start', `Tick reader started (interval: ${tickInterval}ms)`);
   }
 
   /**
    * Initializes save directories by reading settings from the database or using platform defaults.
    * @private
-   * @returns {Promise<void>} A promise that resolves when initialization is complete.
    */
-  private async initializeSaveDirectories(): Promise<void> {
+  private initializeSaveDirectories(): void {
     log.info('initializeSaveDirectories', 'Starting initialization');
     // First, try to get saveDir from Settings via grail database
-    let customSaveDir: string | null = null;
-    if (this.grailDatabase) {
-      try {
-        const settings = this.grailDatabase.getAllSettings();
-        log.info(
-          'initializeSaveDirectories',
-          `Settings retrieved: saveDir=${settings.saveDir}, gameMode=${settings.gameMode}`,
-        );
-        if (settings.saveDir && settings.saveDir.trim() !== '') {
-          customSaveDir = settings.saveDir.trim();
-          log.info('initializeSaveDirectories', `Custom save directory found: ${customSaveDir}`);
-        } else {
-          log.info('initializeSaveDirectories', 'No custom save directory in settings');
-        }
-      } catch (error) {
-        log.warn('initializeSaveDirectories', `Failed to read saveDir from settings: ${error}`);
-      }
-    } else {
-      log.info('initializeSaveDirectories', 'No grail database available');
-    }
+    const customSaveDir = readConfiguredSaveDirectory(this.grailDatabase);
 
     // Use custom saveDir if available, otherwise fall back to platform default
     if (customSaveDir) {
@@ -249,51 +167,6 @@ class SaveFileMonitor {
   }
 
   /**
-   * Validates an interval value to ensure it's within acceptable bounds.
-   * @private
-   * @param {number | undefined} value - The value to validate
-   * @param {number} min - Minimum acceptable value
-   * @param {number} max - Maximum acceptable value
-   * @param {number} defaultValue - Default value to use if validation fails
-   * @returns {number} The validated interval value
-   */
-  private validateInterval(
-    value: number | undefined,
-    min: number,
-    max: number,
-    defaultValue: number,
-  ): number {
-    if (value === undefined) return defaultValue;
-    if (value < min || value > max) {
-      log.warn(
-        'validateInterval',
-        `Invalid interval ${value} (valid range: ${min}-${max}ms), using default ${defaultValue}ms`,
-      );
-      return defaultValue;
-    }
-    return value;
-  }
-
-  /**
-   * Gets the tick reader interval from settings or returns default.
-   * @private
-   * @returns {number} The tick reader interval in milliseconds
-   */
-  private getTickReaderInterval(): number {
-    if (!this.grailDatabase) {
-      return this.DEFAULT_TICK_INTERVAL;
-    }
-
-    const settings = this.grailDatabase.getAllSettings();
-    return this.validateInterval(
-      settings.tickReaderIntervalMs,
-      100, // min 100ms
-      5000, // max 5 seconds
-      this.DEFAULT_TICK_INTERVAL,
-    );
-  }
-
-  /**
    * Starts monitoring the save file directory for changes.
    * Sets up file watching and parses existing save files.
    * @returns {Promise<void>} A promise that resolves when monitoring is started.
@@ -307,7 +180,7 @@ class SaveFileMonitor {
 
     // Refresh save directory from settings
     log.info('startMonitoring', 'Refreshing save directory from settings');
-    await this.initializeSaveDirectories();
+    this.initializeSaveDirectories();
 
     if (!this.saveDirectory) {
       log.warn('startMonitoring', 'No save directory configured');
@@ -349,24 +222,11 @@ class SaveFileMonitor {
     log.info('startMonitoring', 'Initial parsing successful');
     this.watchPath = this.saveDirectory;
 
-    // Use polling mode for better compatibility with D2R (which uses atomic file writes)
-    // Polling checks files periodically instead of relying on file system events
-    const usePolling = true;
-    log.info('startMonitoring', `Using polling mode: ${usePolling}`);
+    log.info('startMonitoring', `Using polling mode: ${SAVE_WATCHER_USES_POLLING}`);
 
     // Get configurable intervals from settings
-    const settings = this.grailDatabase?.getAllSettings();
-    const pollingInterval = this.validateInterval(
-      settings?.chokidarPollingIntervalMs,
-      500, // min 500ms
-      5000, // max 5 seconds
-      this.DEFAULT_POLLING_INTERVAL,
-    );
-    const stabilityThreshold = this.validateInterval(
-      settings?.fileStabilityThresholdMs,
-      100, // min 100ms
-      2000, // max 2 seconds
-      this.DEFAULT_STABILITY_THRESHOLD,
+    const { pollingInterval, stabilityThreshold } = resolveWatcherIntervals(
+      this.grailDatabase?.getAllSettings(),
     );
 
     log.info(
@@ -374,41 +234,15 @@ class SaveFileMonitor {
       `Using intervals: polling=${pollingInterval}ms, stability=${stabilityThreshold}ms`,
     );
 
-    this.fileWatcher = chokidar
-      .watch(this.saveDirectory, {
-        // Only watch files with save file extensions
-        ignored: (path, stats) => !!stats?.isFile() && !this.shouldIncludeSaveFile(basename(path)),
-        followSymlinks: false,
-        ignoreInitial: true,
-        depth: 0,
-        usePolling: usePolling, // Polling is more reliable for games like D2R that use atomic writes
-        interval: pollingInterval,
-        awaitWriteFinish: {
-          stabilityThreshold: stabilityThreshold,
-          pollInterval: 100,
-        },
-      })
-      .on('all', (event, path) => {
-        log.info('chokidar', `Event: ${event} on ${path}`);
+    this.fileWatcher = watchSaveDirectory(
+      this.saveDirectory,
+      { pollingInterval, stabilityThreshold },
+      () => {
         this.fileChangeCounter++;
         this.lastFileChangeTime = Date.now();
         log.info('chokidar', `fileChangeCounter incremented to ${this.fileChangeCounter}`);
-      })
-      .on('error', (error) => log.error('chokidar', error))
-      .on('ready', () => {
-        log.info('chokidar', 'File watcher ready');
-        const watched = this.fileWatcher?.getWatched();
-        if (watched) {
-          log.info('chokidar', `Watching paths: ${Object.keys(watched).join(', ')}`);
-          log.info(
-            'chokidar',
-            `Total files being watched: ${Object.values(watched).reduce((sum, files) => sum + files.length, 0)}`,
-          );
-        }
-      })
-      .on('add', (path) => log.info('chokidar', `File added: ${path}`))
-      .on('change', (path) => log.info('chokidar', `File changed: ${path}`))
-      .on('unlink', (path) => log.info('chokidar', `File removed: ${path}`));
+      },
+    );
 
     this.isMonitoring = true;
     log.info('startMonitoring', 'Monitoring flag set to true');
@@ -481,7 +315,7 @@ class SaveFileMonitor {
     for (const dir of directories) {
       try {
         const allFilesInDir = readdirSync(dir);
-        const files = allFilesInDir.filter((file) => this.shouldIncludeSaveFile(file));
+        const files = allFilesInDir.filter((file) => shouldIncludeSaveFile(file));
         allFiles.push(...files.map((file) => join(dir, file)));
       } catch (error) {
         log.error('parseAllSaveDirectories', error, { directory: dir });
@@ -523,7 +357,7 @@ class SaveFileMonitor {
     try {
       const allFilesInDir = readdirSync(directory);
 
-      const files = allFilesInDir.filter((file) => this.shouldIncludeSaveFile(file));
+      const files = allFilesInDir.filter((file) => shouldIncludeSaveFile(file));
 
       const allFiles = files.map((file) => join(directory, file));
 
@@ -555,51 +389,6 @@ class SaveFileMonitor {
       });
       return false;
     }
-  }
-
-  private shouldIncludeSaveFile(fileName: string): boolean {
-    const extension = extname(fileName).toLowerCase();
-    if (!SUPPORTED_SAVE_EXTENSIONS.has(extension)) {
-      return false;
-    }
-
-    if (extension !== '.d2i') {
-      return true;
-    }
-
-    return !this.isBackupLikeStashFile(fileName);
-  }
-
-  private isBackupLikeStashFile(fileName: string): boolean {
-    const lowerFileName = fileName.toLowerCase();
-    if (!lowerFileName.endsWith('.d2i')) {
-      return false;
-    }
-
-    const stem = lowerFileName.slice(0, -'.d2i'.length);
-    return (
-      stem.includes('_backup') ||
-      stem.endsWith('.bak') ||
-      stem.endsWith('_bak') ||
-      stem.endsWith('-bak')
-    );
-  }
-
-  private resolveSharedStashName(
-    isHardcore: boolean,
-    sourceFileVersion?: number,
-  ):
-    | 'Shared Stash Hardcore'
-    | 'Shared Stash Softcore'
-    | 'Modern Shared Stash Hardcore'
-    | 'Modern Shared Stash Softcore' {
-    const isModern = isModernStashVersion(sourceFileVersion);
-
-    if (isModern) {
-      return isHardcore ? 'Modern Shared Stash Hardcore' : 'Modern Shared Stash Softcore';
-    }
-
-    return isHardcore ? 'Shared Stash Hardcore' : 'Shared Stash Softcore';
   }
 
   /**
@@ -658,52 +447,13 @@ class SaveFileMonitor {
   }
 
   /**
-   * Extracts the character/save name from a file path.
-   * For .d2i files, returns friendly names like "Shared Stash Hardcore".
+   * Reads the configured game mode for the parser. Without a database there is none, and the
+   * parser skips every file.
    * @private
-   * @param {string} filePath - The file path to extract the name from.
-   * @param {boolean} [isHardcore] - Optional hardcore status (for shared stash files). If not provided, falls back to filename detection.
-   * @param {number} [sourceFileVersion] - Optional d2i source file version for modern stash naming.
-   * @returns {string} The character/save name.
    */
-  private getSaveNameFromPath(
-    filePath: string,
-    isHardcore?: boolean,
-    sourceFileVersion?: number,
-  ): string {
-    const extension = extname(filePath).toLowerCase();
-    let saveName = basename(filePath)
-      .replace(/\.d2s/i, '')
-      .replace(/\.sss/i, '')
-      .replace(/\.d2x/i, '')
-      .replace(/\.d2i/i, '');
-
-    // Use friendly names for shared stash files
-    if (extension === '.d2i') {
-      // Use provided hardcore status if available, otherwise fall back to filename
-      const hardcore =
-        isHardcore !== undefined ? isHardcore : saveName.toLowerCase().includes('hardcore');
-      saveName = this.resolveSharedStashName(hardcore, sourceFileVersion);
-    }
-
-    return saveName;
-  }
-
-  /**
-   * Describes an item without its position, location or character, so presence matching can still
-   * recognise an item after it moved inside its save (which changes its fingerprint).
-   */
-  private createPresenceIdentityKey(item: ParsedInventoryItem): string {
-    return createVaultPresenceKey({
-      sourceFileType: item.sourceFileType,
-      itemCode: item.itemCode,
-      quality: item.quality,
-      ethereal: item.ethereal,
-      socketCount: item.socketCount,
-      itemName: item.itemName,
-      isSocketedItem: item.isSocketedItem,
-      itemUid: item.rawParsedItem?.id,
-    });
+  private createGameModeReader(): GameModeReader | undefined {
+    const grailDatabase = this.grailDatabase;
+    return grailDatabase ? () => grailDatabase.getAllSettings().gameMode : undefined;
   }
 
   /**
@@ -713,7 +463,7 @@ class SaveFileMonitor {
    * @returns {Promise<SingleFileParseResult>} Parse result with save name, success status and snapshot data.
    */
   private async processSingleFile(filePath: string): Promise<SingleFileParseResult> {
-    let saveName = this.getSaveNameFromPath(filePath);
+    let saveName = getSaveNameFromPath(filePath);
 
     try {
       // Stat before reading: if the file changes while it is read, the stored time stays older than
@@ -724,15 +474,18 @@ class SaveFileMonitor {
       let d2iHeader: D2iHeaderInfo | undefined;
 
       if (extension === '.d2i') {
-        d2iHeader = this.readD2iHeaderInfo(filePath, buffer);
-        saveName = this.getSaveNameFromPath(filePath, d2iHeader.hardcore, d2iHeader.version);
+        d2iHeader = readD2iHeaderInfo(filePath, buffer);
+        saveName = getSaveNameFromPath(filePath, d2iHeader.hardcore, d2iHeader.version);
       }
 
       const {
         items: inventoryItems,
         status: parseStatus,
         stashHardcore,
-      } = await this.parseSave(saveName, filePath, buffer, extension);
+      } = await parseSaveContent(
+        { saveName, filePath, content: buffer, extension },
+        this.createGameModeReader(),
+      );
       const characterId = this.grailDatabase?.getCharacterByName(saveName)?.id;
       const parsedItems = inventoryItems.map((inventoryItem) => ({
         ...inventoryItem,
@@ -754,7 +507,7 @@ class SaveFileMonitor {
         capturedAt: new Date(),
         items: snapshotItems,
       };
-      const saveFile = this.buildSaveFileHeader(filePath, buffer, mtime, {
+      const saveFile = buildSaveFileHeader(filePath, buffer, mtime, {
         d2iHeader,
         stashHardcore,
       });
@@ -776,7 +529,7 @@ class SaveFileMonitor {
         parseStatus,
         // Includes socketed items, which the snapshot omits, so vault reconciliation sees every item.
         presentFingerprints: parsedItems.map((item) => item.fingerprint),
-        presentIdentityKeys: parsedItems.map((item) => this.createPresenceIdentityKey(item)),
+        presentIdentityKeys: parsedItems.map((item) => createPresenceIdentityKey(item)),
         inventorySnapshot,
         saveFile,
         parsedItems,
@@ -856,41 +609,6 @@ class SaveFileMonitor {
   }
 
   /**
-   * Executes an array of async tasks with a concurrency limit.
-   * This prevents resource exhaustion when many files need to be parsed.
-   * @private
-   * @template T - The return type of the tasks
-   * @param {Array<() => Promise<T>>} tasks - Array of async task functions
-   * @param {number} limit - Maximum number of concurrent tasks
-   * @returns {Promise<T[]>} Promise that resolves with all task results in order
-   */
-  private async executeConcurrently<T>(
-    tasks: Array<() => Promise<T>>,
-    limit: number,
-  ): Promise<T[]> {
-    const results: T[] = new Array(tasks.length);
-    const queue = tasks.map((task, index) => ({ task, index }));
-
-    const worker = async (): Promise<void> => {
-      let item = queue.shift();
-      while (item !== undefined) {
-        try {
-          results[item.index] = await item.task();
-        } catch (error) {
-          log.error('executeConcurrently', error, { taskIndex: item.index });
-          results[item.index] = undefined as T;
-        }
-        item = queue.shift();
-      }
-    };
-
-    const workers = Array.from({ length: Math.min(limit, tasks.length) }, () => worker());
-    await Promise.all(workers);
-
-    return results;
-  }
-
-  /**
    * Parses multiple save files and updates the current data.
    * @private
    * @param {string[]} filePaths - Array of file paths to parse.
@@ -907,7 +625,7 @@ class SaveFileMonitor {
       return;
     }
 
-    await this.markOrphanedVaultRowsMissing(filePaths);
+    await markOrphanedVaultRowsMissing(this.grailDatabase, filePaths);
 
     // Filter files that need parsing based on modification time
     let filesToParse = await this.filterFilesToParse(filePaths);
@@ -925,7 +643,7 @@ class SaveFileMonitor {
 
     if (filesToParse.length === 0) {
       log.info('parseFiles', 'No files to parse, exiting early');
-      this.inventorySnapshots = this.mergeInventorySnapshots(filePaths, [], []);
+      this.inventorySnapshots = mergeInventorySnapshots(this.inventorySnapshots, filePaths, [], []);
       return;
     }
 
@@ -939,7 +657,7 @@ class SaveFileMonitor {
       return () => this.processSingleFile(filePath);
     });
 
-    const parseResults = await this.executeConcurrently(tasks, this.MAX_CONCURRENT_PARSES);
+    const parseResults = await executeConcurrently(tasks, this.MAX_CONCURRENT_PARSES);
     const successfulParseResults = parseResults.filter(
       (result): result is CompleteFileParseResult | IncompleteFileParseResult =>
         Boolean(result?.success && result.saveName),
@@ -947,7 +665,7 @@ class SaveFileMonitor {
 
     const failedFiles = parseResults.filter((r) => r && !r.success);
     const successfulSnapshots = successfulParseResults.map((result) => result.inventorySnapshot);
-    this.reconcileVaultPresence(parseResults);
+    reconcileVaultPresence(this.grailDatabase, parseResults);
     if (failedFiles.length > 0) {
       log.warn(
         'parseFiles',
@@ -966,7 +684,8 @@ class SaveFileMonitor {
       this.grailDatabase.setSetting('saveDir', firstDir);
     }
 
-    this.inventorySnapshots = this.mergeInventorySnapshots(
+    this.inventorySnapshots = mergeInventorySnapshots(
+      this.inventorySnapshots,
       filePaths,
       filesToParse,
       successfulSnapshots,
@@ -975,248 +694,6 @@ class SaveFileMonitor {
     // Emit save file events for each file that was actually parsed
     await this.emitSaveFileEvents(successfulParseResults);
     log.info('parseFiles', `Complete - processed ${filesToParse.length} files`);
-  }
-
-  /**
-   * Clears the "present in latest scan" flag of vault rows whose source save file was deleted or
-   * renamed. Without this, such rows would stay present forever because only files that are still
-   * scanned get reconciled.
-   *
-   * Only presence flags change (see `markVaultItemsMissingForSourceFiles`). A file counts as gone
-   * only when it is not part of this scan and `stat` reports it missing (ENOENT/ENOTDIR) while its
-   * directory is still readable; any other error, or an unavailable directory (an unmounted drive,
-   * a moved save folder), is treated as unknown and leaves the rows alone. When no save file is
-   * found at all the scan aborts earlier and nothing is changed, because that is more likely a
-   * misconfigured directory than every file being deleted.
-   *
-   * Rows that were vaulted out of their file or that share a `#uuid` fingerprint with another row
-   * are not special-cased: they are handled like every other row of their file.
-   * @private
-   */
-  private async markOrphanedVaultRowsMissing(scannedFilePaths: string[]): Promise<void> {
-    if (!this.grailDatabase) {
-      return;
-    }
-
-    try {
-      const scanned = new Set(scannedFilePaths);
-      const candidates = this.grailDatabase
-        .getVaultSourceFilePathsPresentInLatestScan()
-        .filter((path) => !scanned.has(path));
-      const deletedFiles: string[] = [];
-
-      for (const path of candidates) {
-        if (await this.isSaveFileDeleted(path)) {
-          deletedFiles.push(path);
-        }
-      }
-
-      if (deletedFiles.length > 0) {
-        log.info('markOrphanedVaultRowsMissing', `Source files deleted: ${deletedFiles.length}`);
-        this.grailDatabase.markVaultItemsMissingForSourceFiles(deletedFiles);
-      }
-    } catch (error) {
-      log.error('markOrphanedVaultRowsMissing', error);
-    }
-  }
-
-  /** True only when the file is verifiably absent while its directory can still be read. */
-  private async isSaveFileDeleted(filePath: string): Promise<boolean> {
-    try {
-      await stat(filePath);
-      return false;
-    } catch (error) {
-      const code = (error as NodeJS.ErrnoException | undefined)?.code;
-      if (code !== 'ENOENT' && code !== 'ENOTDIR') {
-        return false;
-      }
-    }
-
-    try {
-      return (await stat(dirname(filePath))).isDirectory();
-    } catch {
-      return false;
-    }
-  }
-
-  /**
-   * Updates the "present in latest scan" flag of vault rows for every save file that was parsed
-   * successfully in this scan.
-   *
-   * Only parsed files are reconciled (a failed or skipped file keeps its previous flags), and each
-   * reconciliation is scoped to that one file, so it can never mark rows from other files as
-   * missing. It only touches presence flags: vaulted state and item data are never modified.
-   * Errors are logged and swallowed so a database problem cannot break save file scanning.
-   *
-   * Fingerprints include the character name and item position, so an item that moved inside its
-   * file gets a new fingerprint. The database therefore also matches rows by a location-independent
-   * identity key (`presentIdentityKeys`), and a moved item stays present. A renamed character is a
-   * different file and is not covered.
-   * @private
-   */
-  private reconcileVaultPresence(parseResults: Array<SingleFileParseResult | undefined>): void {
-    for (const result of parseResults) {
-      // Only a completed parse proves which items are gone. A skipped (game mode), errored or
-      // partial parse yields no or only some items, and must not mark vault rows of the file as missing.
-      if (result?.success !== true || result.parseStatus !== 'parsed') {
-        continue;
-      }
-
-      const snapshot = result.inventorySnapshot;
-      try {
-        this.grailDatabase?.reconcileVaultItemsForScan({
-          sourceFileType: snapshot.sourceFileType,
-          sourceFilePath: snapshot.sourceFilePath,
-          presentFingerprints: result.presentFingerprints,
-          presentIdentityKeys: result.presentIdentityKeys,
-          lastSeenAt: snapshot.capturedAt,
-        });
-      } catch (error) {
-        log.error('reconcileVaultPresence', error, { filePath: snapshot.sourceFilePath });
-      }
-    }
-  }
-
-  /**
-   * Parses a single save file and extracts items from it.
-   * @private
-   * @param {string} saveName - The name of the save file.
-   * @param {Buffer} content - The binary content of the save file.
-   * @param {string} extension - The file extension (.d2s, .sss, .d2x, .d2i).
-   * @returns A promise that resolves with the extracted items and whether the file was really parsed.
-   * A game-mode mismatch or a swallowed parse error yields no items without being a successful
-   * scan, so callers (vault reconciliation) must not read "no items" as "every item left the file".
-   */
-  private async parseSave(
-    saveName: string,
-    filePath: string,
-    content: Buffer,
-    extension: string,
-  ): Promise<SaveParseResult> {
-    const items: ParsedInventoryItem[] = [];
-    let stashHardcore: boolean | undefined;
-
-    const sourceFileType = extension.replace('.', '') as VaultSourceFileType;
-
-    const parseItems = (
-      itemList: D2SItem[],
-      fallbackLocation: VaultLocationContext,
-      stashTab?: number,
-      stashTabKind?: StashTabKind,
-      stackCount?: number,
-    ) => {
-      items.push(
-        ...normalizeItemsWithSocketedItems(itemList, {
-          filePath,
-          saveName,
-          sourceFileType,
-          fallbackLocation,
-          stashTab,
-          stashTabKind,
-          stackCount,
-        }),
-      );
-    };
-
-    // Each parser reports how much of the file it really read, so no shared mutable status is needed.
-    const parseD2S = (response: d2s.types.ID2S): SaveParseStatus => {
-      if (!this.grailDatabase) {
-        return 'skipped';
-      }
-
-      const settings = this.grailDatabase.getAllSettings();
-      const isHardcore = response.header.status.hardcore;
-
-      if (isGameModeMismatch(settings.gameMode, isHardcore)) {
-        return 'skipped';
-      }
-      const inventoryItems = (response.items || []) as D2SItem[];
-      const mercItems = (response.merc_items || []) as D2SItem[];
-      const corpseItems = (response.corpse_items || []) as D2SItem[];
-      parseItems(inventoryItems, 'inventory');
-      parseItems(mercItems, 'mercenary');
-      parseItems(corpseItems, 'corpse');
-      return 'parsed';
-    };
-
-    const parseStash = (response: d2s.types.IStash): SaveParseStatus => {
-      if (!this.grailDatabase) {
-        return 'skipped';
-      }
-
-      const settings = this.grailDatabase.getAllSettings();
-      // Use hardcore flag from parsed stash header instead of filename
-      const isHardcore = response.hardcore;
-      stashHardcore = isHardcore;
-
-      if (isGameModeMismatch(settings.gameMode, isHardcore)) {
-        return 'skipped';
-      }
-
-      response.pages.forEach((page, pageIndex) => {
-        parseItems(page.items as D2SItem[], 'stash', pageIndex);
-      });
-      return 'parsed';
-    };
-
-    const parseModernD2i = async (): Promise<SaveParseStatus> => {
-      if (!this.grailDatabase) {
-        return 'skipped';
-      }
-
-      const modern = await parseModernStash(content);
-      const settings = this.grailDatabase.getAllSettings();
-      const isHardcore = modern.hardcore;
-      stashHardcore = isHardcore;
-
-      if (isGameModeMismatch(settings.gameMode, isHardcore)) {
-        return 'skipped';
-      }
-
-      modern.items.forEach((entry) => {
-        parseItems([entry.item], 'stash', entry.stashTab, entry.stashTabKind, entry.stackCount);
-      });
-      // A damaged sector leaves its items out: keep what was read, but do not call it a full scan.
-      return modern.partial ? 'partial' : 'parsed';
-    };
-
-    const parseD2i = async (): Promise<SaveParseStatus> => {
-      let d2iVersion: number | undefined;
-      try {
-        const metadata = readD2iMetadata(content);
-        d2iVersion = metadata.version;
-        if (isModernStashVersion(metadata.version)) {
-          return await parseModernD2i();
-        }
-        return await d2stash.read(content, constants99).then(parseStash);
-      } catch {
-        // Only fall back to classic stash parsing for pre-105 format files.
-        // Calling d2stash.read on a v105+ .d2i file would fail or produce
-        // garbage because the formats are incompatible. A v105+ file cut off inside a
-        // sector throws before the metadata version is known, so read it from the header.
-        d2iVersion ??= readD2iHeaderVersion(content);
-        if (!isModernStashVersion(d2iVersion)) {
-          return await d2stash.read(content, constants99).then(parseStash);
-        }
-        // The swallowed error leaves the item list empty or partial: not a complete scan.
-        return 'errored';
-      }
-    };
-
-    const parseByExtension = (): Promise<SaveParseStatus> => {
-      switch (extension) {
-        case '.sss':
-        case '.d2x':
-          return d2stash.read(content, constants96).then(parseStash);
-        case '.d2i':
-          return parseD2i();
-        default:
-          return d2s.read(content).then(parseD2S);
-      }
-    };
-
-    const status = await parseByExtension();
-    return { items, status, stashHardcore };
   }
 
   /**
@@ -1233,146 +710,14 @@ class SaveFileMonitor {
 
       let stashHardcore: boolean | undefined;
       if (extension === '.sss' || extension === '.d2x') {
-        try {
-          stashHardcore = (await d2stash.read(buffer, constants96)).hardcore;
-        } catch (_parseError) {
-          log.warn(
-            'parseSaveFile',
-            'Failed to parse legacy stash header, falling back to filename',
-          );
-        }
+        stashHardcore = await readLegacyStashHardcore(buffer);
       }
 
-      return this.buildSaveFileHeader(filePath, buffer, stats.mtime, { stashHardcore });
+      return buildSaveFileHeader(filePath, buffer, stats.mtime, { stashHardcore });
     } catch (error) {
       log.error('parseSaveFile', error);
       return null;
     }
-  }
-
-  /**
-   * Reads the hardcore flag and version of a .d2i file, falling back to the file name.
-   * @private
-   */
-  private readD2iHeaderInfo(filePath: string, buffer: Buffer): D2iHeaderInfo {
-    try {
-      const metadata = readD2iMetadata(buffer);
-      log.info(
-        'readD2iHeaderInfo',
-        `Parsed .d2i metadata, hardcore: ${metadata.hardcore}, version: ${metadata.version}`,
-      );
-      return { hardcore: metadata.hardcore, version: metadata.version };
-    } catch (error) {
-      log.warn(
-        'readD2iHeaderInfo',
-        `Failed to read .d2i metadata, falling back to filename: ${error}`,
-      );
-      return { hardcore: basename(filePath).toLowerCase().includes('hardcore') };
-    }
-  }
-
-  /**
-   * Builds the character information of a save file from its already read content.
-   * @private
-   * @param {string} filePath - The path to the save file.
-   * @param {Buffer} buffer - The file content.
-   * @param {Date} lastModified - Modification time of the content.
-   * @param hints - Header data a parser already read: .d2i metadata, or the hardcore flag of a stash.
-   * @returns {D2SaveFile} The save file data.
-   */
-  private buildSaveFileHeader(
-    filePath: string,
-    buffer: Buffer,
-    lastModified: Date,
-    hints: { d2iHeader?: D2iHeaderInfo; stashHardcore?: boolean } = {},
-  ): D2SaveFile {
-    const extension = extname(filePath).toLowerCase();
-
-    // Handle shared stash files (.d2i)
-    if (extension === '.d2i') {
-      const { hardcore, version } = hints.d2iHeader ?? this.readD2iHeaderInfo(filePath, buffer);
-
-      return {
-        name: this.getSaveNameFromPath(filePath, hardcore, version),
-        path: filePath,
-        lastModified,
-        characterClass: 'shared_stash',
-        level: 1,
-        hardcore,
-        expansion: true,
-        sourceFileVersion: version,
-      };
-    }
-
-    // Legacy shared stash files (.sss/.d2x) have no character header: reading one as a .d2s would
-    // produce an invalid character class that the characters table rejects.
-    if (extension === '.sss' || extension === '.d2x') {
-      return {
-        name: this.getSaveNameFromPath(filePath),
-        path: filePath,
-        lastModified,
-        characterClass: 'shared_stash',
-        level: 1,
-        hardcore: hints.stashHardcore ?? basename(filePath).toLowerCase().includes('hardcore'),
-        expansion: true,
-      };
-    }
-
-    // Basic D2 save file parsing (simplified)
-    // Strip the extension case-insensitively (e.g. Hero.D2S), matching getSaveNameFromPath
-    const fileName =
-      extension === '.d2s' ? basename(filePath, extname(filePath)) : basename(filePath);
-
-    // Character name is typically the filename
-    const characterName = fileName;
-    let characterClass = 'unknown';
-    let level = 1;
-    let hardcore = false;
-    let expansion = true;
-
-    // Basic header parsing (D2 save files have a specific structure)
-    if (buffer.length >= 765) {
-      // Character class at offset 40
-      const classId = buffer.readUInt8(40);
-      characterClass = this.getCharacterClass(classId);
-
-      // Level at offset 43
-      level = buffer.readUInt8(43);
-
-      // Status flags at offset 36
-      const status = buffer.readUInt8(36);
-      hardcore = (status & 0x04) !== 0;
-      expansion = (status & 0x20) !== 0;
-    }
-
-    return {
-      name: characterName,
-      path: filePath,
-      lastModified,
-      characterClass,
-      level,
-      hardcore,
-      expansion,
-    };
-  }
-
-  /**
-   * Maps a character class ID to its name.
-   * @private
-   * @param {number} classId - The character class ID from the save file.
-   * @returns {string} The character class name.
-   */
-  private getCharacterClass(classId: number): string {
-    const classes = [
-      'amazon',
-      'sorceress',
-      'necromancer',
-      'paladin',
-      'barbarian',
-      'druid',
-      'assassin',
-    ];
-    return classes[classId] || 'unknown';
   }
 
   /**
@@ -1450,7 +795,7 @@ class SaveFileMonitor {
     try {
       // Re-initialize directories with the new setting
       log.info('updateSaveDirectory', 'Re-initializing save directories');
-      await this.initializeSaveDirectories();
+      this.initializeSaveDirectories();
 
       // Always start monitoring after directory change - user explicitly wants to use this directory
       log.info('updateSaveDirectory', 'Starting monitoring for new directory');
@@ -1470,43 +815,6 @@ class SaveFileMonitor {
     };
   }
 
-  private mergeInventorySnapshots(
-    allFilePaths: string[],
-    parsedFilePaths: string[],
-    successfulSnapshots: CharacterInventorySnapshot[],
-  ): CharacterInventorySnapshot[] {
-    const knownFilePathSet = new Set(allFilePaths);
-    const parsedFilePathSet = new Set(parsedFilePaths);
-    const successfulSnapshotKeySet = new Set(
-      successfulSnapshots.map(
-        (snapshot) => `${snapshot.sourceFileType}:${snapshot.sourceFilePath}`,
-      ),
-    );
-    const mergedByKey = new Map<string, CharacterInventorySnapshot>();
-
-    for (const snapshot of this.inventorySnapshots) {
-      if (!knownFilePathSet.has(snapshot.sourceFilePath)) {
-        continue;
-      }
-
-      const snapshotKey = `${snapshot.sourceFileType}:${snapshot.sourceFilePath}`;
-      if (
-        parsedFilePathSet.has(snapshot.sourceFilePath) &&
-        successfulSnapshotKeySet.has(snapshotKey)
-      ) {
-        continue;
-      }
-
-      mergedByKey.set(snapshotKey, snapshot);
-    }
-
-    for (const snapshot of successfulSnapshots) {
-      mergedByKey.set(`${snapshot.sourceFileType}:${snapshot.sourceFilePath}`, snapshot);
-    }
-
-    return [...mergedByKey.values()];
-  }
-
   /**
    * Gets the count of each available rune across the latest inventory snapshot of every save file.
    * Stacked runes count with their stack size. Runes socketed into another item are used up and
@@ -1514,25 +822,7 @@ class SaveFileMonitor {
    * @returns {Record<string, number>} A record mapping rune IDs to their counts.
    */
   getAvailableRunesCount(): Record<string, number> {
-    const runeCounts: Record<string, number> = {};
-
-    for (const snapshot of this.inventorySnapshots) {
-      for (const item of snapshot.items) {
-        const rawItem = item.rawParsedItem;
-        if (item.isSocketedItem || rawItem.socketed || !isRune(rawItem)) {
-          continue;
-        }
-
-        const runeId = resolveGrailLookupName(rawItem);
-        if (runeId === '') {
-          continue;
-        }
-
-        runeCounts[runeId] = (runeCounts[runeId] ?? 0) + (item.stackCount ?? 1);
-      }
-    }
-
-    return runeCounts;
+    return countAvailableRunes(this.inventorySnapshots);
   }
 
   /**
@@ -1641,12 +931,7 @@ class SaveFileMonitor {
     // Skip debounce for initial parsing or force parse
     const timeSinceLastChange = Date.now() - this.lastFileChangeTime;
     const shouldDebounce = !this.isInitialParsing && !hasForcedParseRequest;
-    const debounceDelay = this.validateInterval(
-      settings.fileChangeDebounceMs,
-      500, // min 500ms
-      10000, // max 10 seconds
-      this.DEFAULT_DEBOUNCE_DELAY,
-    );
+    const debounceDelay = resolveDebounceDelay(settings);
 
     if (shouldDebounce && timeSinceLastChange < debounceDelay) {
       // Still within debounce window - don't process yet
