@@ -17,25 +17,6 @@ vi.mock('@dschu012/d2s/lib/d2/stash', () => ({
   read: vi.fn(),
 }));
 
-// Mock fs modules
-vi.mock('node:fs', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('node:fs')>();
-  return {
-    ...actual,
-    existsSync: vi.fn(),
-    readdirSync: vi.fn(),
-  };
-});
-
-vi.mock('node:fs/promises', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('node:fs/promises')>();
-  return {
-    ...actual,
-    readFile: vi.fn(),
-    stat: vi.fn(),
-  };
-});
-
 // Mock chokidar
 vi.mock('chokidar', () => ({
   default: {
@@ -53,17 +34,8 @@ vi.mock('electron', () => ({
   },
 }));
 
-import {
-  chmodSync,
-  existsSync,
-  mkdtempSync,
-  readdirSync,
-  readFileSync,
-  rmSync,
-  utimesSync,
-  writeFileSync,
-} from 'node:fs';
-import { mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
+import { chmodSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import * as d2s from '@dschu012/d2s';
@@ -155,12 +127,6 @@ describe('When SaveFileMonitor is used', () => {
     vi.clearAllMocks();
 
     // Setup default mock implementations
-    vi.mocked(existsSync).mockReturnValue(true);
-    vi.mocked(readdirSync).mockReturnValue(['test.d2s', 'test2.d2s'] as any);
-    vi.mocked(readFile).mockResolvedValue(Buffer.from('mock file content'));
-    vi.mocked(stat).mockResolvedValue({
-      mtime: new Date('2024-01-01'),
-    } as any);
     vi.mocked(app.getPath).mockImplementation((path) => {
       if (path === 'documents') return '/Users/test/Documents';
       if (path === 'home') return '/Users/test';
@@ -285,8 +251,6 @@ describe('When SaveFileMonitor is used', () => {
   describe('If startMonitoring is called', () => {
     it('Then should emit error when directory does not exist', async () => {
       // Arrange
-      vi.mocked(existsSync).mockReturnValue(false);
-
       const eventSpy = vi.fn();
       eventBus.on('monitoring-error', eventSpy);
 
@@ -431,8 +395,6 @@ describe('When SaveFileMonitor is used', () => {
   describe('If stopMonitoring is called', () => {
     it('Then should stop monitoring and emit event', async () => {
       // Arrange
-      vi.mocked(existsSync).mockReturnValue(true);
-      vi.mocked(readdirSync).mockReturnValue(['test.d2s'] as any);
       await monitor.startMonitoring();
 
       const eventSpy = vi.fn();
@@ -607,7 +569,15 @@ describe('When SaveFileMonitor is used', () => {
 
     it('Then should handle parsing errors gracefully', async () => {
       // Arrange
-      vi.mocked(readFile).mockRejectedValue(new Error('Parse error'));
+      // A directory named like a save file is listed but cannot be read as a file.
+      const saveDir = await mkdtemp(join(tmpdir(), 'arcane-unparsable-'));
+      tempDirs.push(saveDir);
+      await mkdir(join(saveDir, 'Broken.d2s'));
+      vi.mocked(mockDatabase.getAllSettings).mockReturnValue({
+        saveDir,
+        gameMode: GameMode.Softcore,
+      });
+      await (monitor as any).initializeSaveDirectories();
 
       // Act
       const files = await monitor.getSaveFiles();
@@ -684,8 +654,6 @@ describe('When SaveFileMonitor is used', () => {
   describe('If shutdown is called', () => {
     it('Then should stop monitoring', async () => {
       // Arrange
-      vi.mocked(existsSync).mockReturnValue(true);
-      vi.mocked(readdirSync).mockReturnValue(['test.d2s'] as any);
       await monitor.startMonitoring();
 
       const stopSpy = vi.spyOn(monitor, 'stopMonitoring');
@@ -2182,13 +2150,11 @@ describe('When SaveFileMonitor is used', () => {
 
     it('Then processSingleFile marks modern snapshots as writable and records source file version', async () => {
       // Arrange
-      const fixtureBuffer = readFileSync(MODERN_STASH_FIXTURE_PATH);
       vi.spyOn(saveFileParser, 'parseSaveContent').mockResolvedValueOnce({
         items: [],
         status: 'parsed',
       });
       vi.spyOn(monitor as any, 'updateSaveFileState').mockResolvedValue(undefined);
-      vi.mocked(readFile).mockResolvedValue(fixtureBuffer);
 
       // Act
       const parseResult = await (monitor as any).processSingleFile(MODERN_STASH_FIXTURE_PATH);

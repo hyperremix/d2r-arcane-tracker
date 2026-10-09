@@ -1,4 +1,3 @@
-// @vitest-environment node
 import type { Database as DatabaseType } from 'better-sqlite3';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createDrizzleDb } from '../database/drizzle';

@@ -7,12 +7,36 @@ const d2sSourceAliases = getD2sSourceAliases(__dirname);
 export default defineConfig({
   test: {
     globals: true,
-    environment: 'jsdom',
-    setupFiles: ['./src/test/setup.ts'],
     pool: 'threads',
-    // Vitest 4+ replaced `poolOptions.threads.singleThread` with these top-level options
-    maxWorkers: 1,
-    isolate: false,
+    projects: [
+      {
+        // Electron main process and build config: plain Node, one module registry per file
+        extends: true,
+        test: {
+          name: 'main',
+          include: ['electron/**/*.test.ts', 'config/**/*.test.ts'],
+          environment: 'node',
+          setupFiles: ['./electron/test/setup.ts'],
+          isolate: true,
+          // Projects with different worker settings must run in separate groups
+          sequence: { groupOrder: 0 },
+        },
+      },
+      {
+        extends: true,
+        test: {
+          name: 'renderer',
+          include: ['src/**/*.test.{ts,tsx}'],
+          environment: 'jsdom',
+          setupFiles: ['./src/test/setup.ts'],
+          // Renderer suites share one jsdom and module registry: isolating each file (fresh jsdom
+          // and setup per file) measured about twice as slow, even with parallel workers
+          maxWorkers: 1,
+          isolate: false,
+          sequence: { groupOrder: 1 },
+        },
+      },
+    ],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'lcov', 'html'],

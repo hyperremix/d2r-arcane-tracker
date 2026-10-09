@@ -28,7 +28,8 @@ vi.mock('win32-api', () => ({
 }));
 
 // Mock child_process
-const mockExecAsync = vi.fn();
+// vi.mock factories are hoisted above this declaration, so the mock must be hoisted too
+const mockExecAsync = vi.hoisted(() => vi.fn());
 
 vi.mock('node:child_process', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:child_process')>();
