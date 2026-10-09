@@ -103,7 +103,7 @@ function TableRowSkeleton() {
  * and the ability to select a session to view its details.
  */
 export function SessionsList({ onSessionSelect }: SessionsListProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const showArchivedLabelId = useId();
   const { sessions, sessionsLoading, runs, loadSessionRuns, loadingSessions } = useRunTrackerStore(
     useShallow((state) => ({
@@ -287,6 +287,12 @@ export function SessionsList({ onSessionSelect }: SessionsListProps) {
     setCurrentPage(1);
   }, [showArchived]);
 
+  // Localized session day ("Today", "3 days ago", ...)
+  const formatSessionDay = useCallback(
+    (date: Date) => formatSessionDateRelative(date, t, i18n.language),
+    [t, i18n.language],
+  );
+
   // Handle session selection
   const handleSessionClick = useCallback(
     (sessionId: string) => {
@@ -403,7 +409,7 @@ export function SessionsList({ onSessionSelect }: SessionsListProps) {
                     onSessionClick={handleSessionClick}
                     getSessionStats={getSessionStats}
                     getSessionDuration={getSessionDuration}
-                    formatSessionDate={formatSessionDateRelative}
+                    formatSessionDate={formatSessionDay}
                   />
                 ))}
               </TableBody>

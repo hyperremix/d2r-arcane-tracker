@@ -18,7 +18,7 @@ import { useGrailStatistics, useGrailStore } from '@/stores/grailStore';
  * @returns {JSX.Element} A dashboard with multiple statistical views and progress indicators
  */
 export const StatsDashboard = memo(function StatsDashboard() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const stats = useGrailStatistics();
   const items = useGrailStore((state) => state.items);
   const progress = useGrailStore((state) => state.progress);
@@ -129,7 +129,7 @@ export const StatsDashboard = memo(function StatsDashboard() {
                 </span>
                 <span className="font-medium text-sm">
                   {stats.lastFind.foundDate
-                    ? formatTimeAgo(new Date(stats.lastFind.foundDate))
+                    ? formatTimeAgo(new Date(stats.lastFind.foundDate), t, i18n.language)
                     : t(translations.common.unknown)}
                 </span>
               </div>
