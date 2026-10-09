@@ -775,6 +775,68 @@ describe('When session statistics are read from the stores', () => {
     });
   });
 
+  describe('If an ethereal item is found in a run while ethereal tracking is off', () => {
+    it('Then useSessionStats does not count it as a new grail item', () => {
+      // Arrange
+      act(() => {
+        useGrailStore.setState({
+          settings: {
+            ...useGrailStore.getState().settings,
+            grailNormal: true,
+            grailEthereal: false,
+          },
+          progress: [
+            GrailProgressBuilder.new()
+              .withId('p-shako')
+              .withCharacterId('c1')
+              .withItemId('shako')
+              .withFoundDate(new Date(2024, 5, 15, 10, 2))
+              .withFromInitialScan(false)
+              .asEthereal()
+              .build(),
+          ],
+        });
+      });
+
+      // Act
+      const { result } = renderHook(() => useSessionStats(session));
+
+      // Assert
+      expect(result.current).toMatchObject({ newGrailItems: 0 });
+    });
+  });
+
+  describe('If a normal item is found in a run while only ethereal tracking is on', () => {
+    it('Then useSessionStats does not count it as a new grail item', () => {
+      // Arrange
+      act(() => {
+        useGrailStore.setState({
+          settings: {
+            ...useGrailStore.getState().settings,
+            grailNormal: false,
+            grailEthereal: true,
+          },
+          progress: [
+            GrailProgressBuilder.new()
+              .withId('p-shako')
+              .withCharacterId('c1')
+              .withItemId('shako')
+              .withFoundDate(new Date(2024, 5, 15, 10, 2))
+              .withFromInitialScan(false)
+              .asNormal()
+              .build(),
+          ],
+        });
+      });
+
+      // Act
+      const { result } = renderHook(() => useSessionStats(session));
+
+      // Assert
+      expect(result.current).toMatchObject({ newGrailItems: 0 });
+    });
+  });
+
   describe('If unrelated run tracker state changes', () => {
     it('Then useSessionStats reuses the previous statistics object', () => {
       // Arrange

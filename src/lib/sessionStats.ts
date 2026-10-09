@@ -6,29 +6,37 @@ import type {
   Session,
   SessionStats,
 } from 'electron/types/grail';
+import type { GrailStatisticsSettings } from '@/lib/grailStatistics';
 
 /**
  * Finds the progress records that added an item version to the grail: for every tracked item
- * (and, with ethereal tracking, every version of it) the earliest found record. A run item linked
- * to one of these records was a new grail item.
+ * (and, with both versions tracked, every version of it) the earliest found record. Records of
+ * versions that are not tracked are ignored. A run item linked to one of these records was a new
+ * grail item.
  * @param progress - All progress records
  * @param items - Tracked items; finds of other items are not grail items
- * @param trackEthereal - Whether normal and ethereal versions count as separate grail entries
+ * @param settings - Which versions are tracked; with both, normal and ethereal versions are
+ * separate grail entries
  * @returns The first-discovery records by progress ID
  */
 export function findFirstDiscoveries(
   progress: GrailProgress[],
   items: Item[],
-  trackEthereal: boolean,
+  settings: GrailStatisticsSettings,
 ): ReadonlyMap<string, GrailProgress> {
   const trackedItemIds = new Set(items.map((item) => item.id));
+  const trackBothVersions = settings.grailNormal && settings.grailEthereal;
   const earliestByEntry = new Map<string, GrailProgress>();
 
   for (const record of progress) {
     if (!record.foundDate || !trackedItemIds.has(record.itemId)) {
       continue;
     }
-    const entry = trackEthereal ? `${record.itemId}:${Boolean(record.isEthereal)}` : record.itemId;
+    const isEthereal = Boolean(record.isEthereal);
+    if (!(isEthereal ? settings.grailEthereal : settings.grailNormal)) {
+      continue;
+    }
+    const entry = trackBothVersions ? `${record.itemId}:${isEthereal}` : record.itemId;
     const earliest = earliestByEntry.get(entry);
     if (!earliest?.foundDate || record.foundDate.getTime() < earliest.foundDate.getTime()) {
       earliestByEntry.set(entry, record);

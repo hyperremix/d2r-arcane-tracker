@@ -43,6 +43,10 @@ const progressRecord = (id: string, itemId: string, foundDate: Date): GrailProgr
     .withFromInitialScan(false)
     .asNormal();
 
+const normalOnly = { grailNormal: true, grailEthereal: false };
+const etherealOnly = { grailNormal: false, grailEthereal: true };
+const normalAndEthereal = { grailNormal: true, grailEthereal: true };
+
 const items = [
   HolyGrailItemBuilder.new().withId('shako').withEtherealType('optional').build(),
   HolyGrailItemBuilder.new().withId('soj').build(),
@@ -109,7 +113,7 @@ describe('When computeSessionStats is called', () => {
         session,
         runs,
         runItems,
-        findFirstDiscoveries(progress, items, false),
+        findFirstDiscoveries(progress, items, normalOnly),
       );
 
       // Assert
@@ -131,7 +135,7 @@ describe('When computeSessionStats is called', () => {
         session,
         runs,
         runItems,
-        findFirstDiscoveries(progress, items, false),
+        findFirstDiscoveries(progress, items, normalOnly),
       );
 
       // Assert
@@ -150,7 +154,7 @@ describe('When findFirstDiscoveries is called', () => {
       ];
 
       // Act
-      const discoveries = findFirstDiscoveries(progress, items, false);
+      const discoveries = findFirstDiscoveries(progress, items, normalOnly);
 
       // Assert
       expect([...discoveries.keys()]).toEqual(['first']);
@@ -166,12 +170,60 @@ describe('When findFirstDiscoveries is called', () => {
       ];
 
       // Act
-      const separate = findFirstDiscoveries(progress, items, true);
-      const combined = findFirstDiscoveries(progress, items, false);
+      const separate = findFirstDiscoveries(progress, items, normalAndEthereal);
+      const combined = findFirstDiscoveries(progress, items, normalOnly);
 
       // Assert
       expect([...separate.keys()].sort()).toEqual(['ethereal', 'normal']);
       expect([...combined.keys()]).toEqual(['normal']);
+    });
+  });
+
+  describe('If only normal versions are tracked', () => {
+    it('Then ethereal finds are not grail discoveries', () => {
+      // Arrange
+      const progress: GrailProgress[] = [
+        progressRecord('ethereal', 'shako', at(9)).asEthereal().build(),
+        progressRecord('normal', 'shako', at(12)).build(),
+      ];
+
+      // Act
+      const discoveries = findFirstDiscoveries(progress, items, normalOnly);
+
+      // Assert
+      expect([...discoveries.keys()]).toEqual(['normal']);
+    });
+  });
+
+  describe('If only ethereal versions are tracked', () => {
+    it('Then normal finds are not grail discoveries', () => {
+      // Arrange
+      const progress: GrailProgress[] = [
+        progressRecord('normal', 'shako', at(9)).build(),
+        progressRecord('ethereal', 'shako', at(12)).asEthereal().build(),
+      ];
+
+      // Act
+      const discoveries = findFirstDiscoveries(progress, items, etherealOnly);
+
+      // Assert
+      expect([...discoveries.keys()]).toEqual(['ethereal']);
+    });
+  });
+
+  describe('If no version is tracked', () => {
+    it('Then nothing is a grail discovery', () => {
+      // Arrange
+      const progress = [progressRecord('normal', 'shako', at(9)).build()];
+
+      // Act
+      const discoveries = findFirstDiscoveries(progress, items, {
+        grailNormal: false,
+        grailEthereal: false,
+      });
+
+      // Assert
+      expect(discoveries.size).toBe(0);
     });
   });
 
@@ -181,7 +233,7 @@ describe('When findFirstDiscoveries is called', () => {
       const progress = [progressRecord('rune', 'ber-rune', at(9)).build()];
 
       // Act
-      const discoveries = findFirstDiscoveries(progress, items, false);
+      const discoveries = findFirstDiscoveries(progress, items, normalOnly);
 
       // Assert
       expect(discoveries.size).toBe(0);

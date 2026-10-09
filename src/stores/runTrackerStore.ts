@@ -822,10 +822,11 @@ async function runInitialLoad(isFirstLoad: boolean): Promise<void> {
 function useFirstDiscoveries(): ReadonlyMap<string, GrailProgress> {
   const progress = useGrailStore((state) => state.progress);
   const items = useGrailStore((state) => state.items);
+  const grailNormal = useGrailStore((state) => state.settings.grailNormal);
   const grailEthereal = useGrailStore((state) => state.settings.grailEthereal);
   return useMemo(
-    () => findFirstDiscoveries(progress, items, grailEthereal),
-    [progress, items, grailEthereal],
+    () => findFirstDiscoveries(progress, items, { grailNormal, grailEthereal }),
+    [progress, items, grailNormal, grailEthereal],
   );
 }
 
