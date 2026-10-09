@@ -203,7 +203,7 @@
       }
     },
     {
-      "includes": ["src/**/*.ts", "src/**/*.tsx", "!src/fixtures/**"],
+      "includes": ["src/**/*.ts", "src/**/*.tsx"],
       "linter": {
         "rules": {
           "style": {

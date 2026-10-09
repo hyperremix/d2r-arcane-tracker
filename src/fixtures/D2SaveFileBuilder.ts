@@ -1,4 +1,4 @@
-import type { D2SaveFile } from 'electron/services/saveFileMonitor';
+import type { D2SaveFile } from 'electron/types/grail';
 
 export class D2SaveFileBuilder {
   private saveFile: D2SaveFile = {
