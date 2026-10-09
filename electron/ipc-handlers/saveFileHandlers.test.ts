@@ -1,5 +1,5 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: This file is testing private methods */
-import type { MockInstance } from 'vitest';
+import type { Mock, MockInstance } from 'vitest';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('electron', () => ({
@@ -58,11 +58,11 @@ interface MockWebContents {
 }
 
 interface MockEventBus {
-  on: ReturnType<typeof vi.fn>;
-  emit: ReturnType<typeof vi.fn>;
-  off: ReturnType<typeof vi.fn>;
-  clear: ReturnType<typeof vi.fn>;
-  listenerCount: ReturnType<typeof vi.fn>;
+  on: Mock<(...args: any[]) => any>;
+  emit: Mock<(...args: any[]) => any>;
+  off: Mock<(...args: any[]) => any>;
+  clear: Mock<(...args: any[]) => any>;
+  listenerCount: Mock<(...args: any[]) => any>;
 }
 
 interface MockSaveFileMonitor {

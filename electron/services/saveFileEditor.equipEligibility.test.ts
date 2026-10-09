@@ -1,3 +1,4 @@
+import type { Mock } from 'vitest';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { resolveEligibleEquipmentSlots } from '@/components/inventory/equipValidation';
 import { EQUIPPED_SLOT_IDS, type PaperDollSlotKey } from '@/components/inventory/spatialLayout';
@@ -13,7 +14,7 @@ type SaveFileEditorModule = typeof import('./saveFileEditor');
 type D2sItem = import('@dschu012/d2s').types.IItem;
 
 let mockReadFile: ReturnType<typeof vi.fn>;
-let mockWriteFile: ReturnType<typeof vi.fn>;
+let mockWriteFile: Mock<(filePath: string, data: Buffer) => unknown>;
 let mockD2sRead: ReturnType<typeof vi.fn>;
 let mockD2sWrite: ReturnType<typeof vi.fn>;
 let addItemToSaveFile: SaveFileEditorModule['addItemToSaveFile'];

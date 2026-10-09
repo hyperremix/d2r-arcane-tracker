@@ -350,7 +350,7 @@ describe('When a native dialog IPC handler receives unusual input or fails', () 
     ['undefined', undefined],
     ['null', null],
     ['a string', 'not-options'],
-  ])('If the open dialog options are %s, Then they are passed to Electron unchanged', async (_label, options) => {
+  ])('If the open dialog options are %s, Then the IPC validator rejects them before Electron is called', async (_label, options) => {
     // Arrange
     vi.mocked(dialog.showOpenDialog).mockResolvedValue({
       canceled: false,
@@ -358,12 +358,14 @@ describe('When a native dialog IPC handler receives unusual input or fails', () 
     });
     const handler = getDialogHandler('dialog:showOpenDialog');
     await handler(null, { properties: ['openDirectory'] });
+    const callsBefore = vi.mocked(dialog.showOpenDialog).mock.calls.length;
 
     // Act
-    await handler(null, options);
+    const result = handler(null, options);
 
     // Assert
-    expect(dialog.showOpenDialog).toHaveBeenLastCalledWith(options);
+    await expect(result).rejects.toThrow('Invalid dialog options');
+    expect(vi.mocked(dialog.showOpenDialog).mock.calls.length).toBe(callsBefore);
   });
 
   it('If an open dialog is canceled, Then the remembered directory is not updated', async () => {
