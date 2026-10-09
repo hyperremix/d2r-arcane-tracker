@@ -1,8 +1,8 @@
-import { existsSync } from 'node:fs';
 import { relative, resolve } from 'node:path';
 import { normalizePath, type Plugin } from 'vite';
 import { defineConfig } from 'vitest/config';
 import { getD2sSourceAliases } from './config/d2sAliases';
+import { resolvePublicDirFile } from './config/publicDirAssets';
 
 const d2sSourceAliases = getD2sSourceAliases(__dirname);
 
@@ -17,9 +17,8 @@ function publicDirAssetUrls(): Plugin {
     name: 'test:public-dir-asset-urls',
     enforce: 'pre',
     resolveId(source) {
-      if (!source.startsWith('/')) return undefined;
-      const file = normalizePath(resolve(publicDir, `.${source}`));
-      return existsSync(file) ? file : undefined;
+      const file = resolvePublicDirFile(publicDir, source);
+      return file === undefined ? undefined : normalizePath(file);
     },
     load(id) {
       if (!id.startsWith(`${publicDir}/`)) return undefined;
@@ -75,6 +74,7 @@ export default defineConfig({
         'scripts/',
         '**/*.d.ts',
         '**/*.config.*',
+        'public/**',
         '**/test/**',
         '**/__tests__/**',
         '**/*.test.*',

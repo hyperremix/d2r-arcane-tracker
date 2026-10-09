@@ -251,6 +251,14 @@ describe('When SaveFileMonitor is used', () => {
   describe('If startMonitoring is called', () => {
     it('Then should emit error when directory does not exist', async () => {
       // Arrange
+      // A path under a fresh temp dir that is never created, so it cannot exist on any machine.
+      const parentDir = await mkdtemp(join(tmpdir(), 'arcane-missing-parent-'));
+      tempDirs.push(parentDir);
+      const missingDir = join(parentDir, 'does-not-exist');
+      vi.mocked(mockDatabase.getAllSettings).mockReturnValue({
+        saveDir: missingDir,
+        gameMode: GameMode.Softcore,
+      });
       const eventSpy = vi.fn();
       eventBus.on('monitoring-error', eventSpy);
 
@@ -261,8 +269,8 @@ describe('When SaveFileMonitor is used', () => {
       expect(monitor.isCurrentlyMonitoring()).toBe(false);
       expect(eventSpy).toHaveBeenCalledWith({
         type: 'directory-not-found',
-        message: 'Save directory does not exist: /test/save/dir',
-        directory: '/test/save/dir',
+        message: `Save directory does not exist: ${missingDir}`,
+        directory: missingDir,
       });
     });
 
@@ -578,11 +586,16 @@ describe('When SaveFileMonitor is used', () => {
         gameMode: GameMode.Softcore,
       });
       await (monitor as any).initializeSaveDirectories();
+      const brokenPath = join(saveDir, 'Broken.d2s');
+      const parseSpy = vi.spyOn(monitor as any, 'parseSaveFile');
 
       // Act
       const files = await monitor.getSaveFiles();
 
       // Assert
+      expect(parseSpy).toHaveBeenCalledTimes(1);
+      expect(parseSpy).toHaveBeenCalledWith(brokenPath);
+      await expect(parseSpy.mock.results[0]?.value).resolves.toBeNull();
       expect(files).toEqual([]);
     });
   });
