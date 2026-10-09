@@ -351,7 +351,7 @@ describe('When EventBus is instantiated', () => {
             hardcore: false,
             expansion: true,
           },
-          extractedItems: [],
+          parsedItems: [],
           silent: false,
         },
       };

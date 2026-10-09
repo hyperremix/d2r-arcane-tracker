@@ -1,9 +1,19 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: This file is testing private methods */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { D2SaveFileBuilder, D2SItemBuilder, HolyGrailItemBuilder } from '@/fixtures';
-import type { D2Item, D2SItem, Item } from '../types/grail';
+import type { D2Item, D2SItem, Item, ParsedInventoryItem } from '../types/grail';
 import { EventBus } from './EventBus';
 import { ItemDetectionService } from './itemDetection';
+import { normalizeItemsWithSocketedItems } from './itemNormalizer';
+
+/** Normalizes raw d2s items the way the save file monitor does before detection sees them. */
+const toParsedItems = (d2sItems: D2SItem[], saveName = 'TestChar'): ParsedInventoryItem[] =>
+  normalizeItemsWithSocketedItems(d2sItems, {
+    filePath: `/test/${saveName}.d2s`,
+    saveName,
+    sourceFileType: 'd2s',
+    fallbackLocation: 'inventory',
+  });
 
 describe('When ItemDetectionService is used', () => {
   let service: ItemDetectionService;
@@ -216,292 +226,6 @@ describe('When ItemDetectionService is used', () => {
     });
   });
 
-  describe('If getItemName is called', () => {
-    it('Then should return simplified unique item name', () => {
-      // Arrange
-      const uniqueItem: D2SItem = D2SItemBuilder.new().withUniqueName('Shako').build();
-
-      // Act
-      const result = (service as any).getItemName(uniqueItem);
-
-      // Assert
-      expect(result).toBe('shako');
-    });
-
-    it('Then should return simplified set item name', () => {
-      // Arrange
-      const setItem: D2SItem = D2SItemBuilder.new().withSetName('Angelic Raiment').build();
-
-      // Act
-      const result = (service as any).getItemName(setItem);
-
-      // Assert
-      expect(result).toBe('angelicraiment');
-    });
-
-    it('Then should NOT return rare item name (rare items excluded from grail)', () => {
-      // Arrange - rare items are intentionally excluded because their names
-      // can match real grail items (e.g., "Doom Collar" with rare_name "Doom")
-      const rareItem: D2SItem = D2SItemBuilder.new().withRareName('Rare Sword').build();
-
-      // Act
-      const result = (service as any).getItemName(rareItem);
-
-      // Assert - rare_name is ignored, falls through to item.name fallback
-      expect(result).toBe('Default Item');
-    });
-
-    it('Then should return rune name from mapping', () => {
-      // Arrange
-      const runeItem: D2SItem = D2SItemBuilder.new().asRune('r30').build(); // Ber rune
-
-      // Act
-      const result = (service as any).getItemName(runeItem);
-
-      // Assert
-      expect(result).toBe('ber');
-    });
-
-    it('Then should return runeword name with prefix', () => {
-      // Arrange
-      const runewordItem: D2SItem = D2SItemBuilder.new().withRunewordName('Enigma').build();
-
-      // Act
-      const result = (service as any).getItemName(runewordItem);
-
-      // Assert
-      expect(result).toBe('enigma');
-    });
-
-    it('Then should process rainbow facet correctly', () => {
-      // Arrange
-      const rainbowFacetItem: D2SItem = D2SItemBuilder.new().asRainbowFacet().build();
-
-      // Act
-      const result = (service as any).getItemName(rainbowFacetItem);
-
-      // Assert
-      expect(result).toBe('rainbowfacetcolddeath');
-    });
-
-    it('Then should return fallback name when no specific name found', () => {
-      // Arrange
-      const fallbackItem: D2SItem = D2SItemBuilder.new().withName('Generic Item').build();
-
-      // Act
-      const result = (service as any).getItemName(fallbackItem);
-
-      // Assert
-      expect(result).toBe('Generic Item');
-    });
-  });
-
-  describe('If getItemType is called', () => {
-    it('Then should return lowercase type', () => {
-      // Arrange
-      const item: D2SItem = D2SItemBuilder.new().withType('SHAKO').build();
-
-      // Act
-      const result = (service as any).getItemType(item);
-
-      // Assert
-      expect(result).toBe('shako');
-    });
-
-    it('Then should return type_name when type is not available', () => {
-      // Arrange
-      const item: D2SItem = D2SItemBuilder.new().withTypeName('Helm').withoutType().build();
-
-      // Act
-      const result = (service as any).getItemType(item);
-
-      // Assert
-      expect(result).toBe('helm');
-    });
-
-    it('Then should return code when type and type_name are not available', () => {
-      // Arrange
-      const item: D2SItem = D2SItemBuilder.new()
-        .withCode('SWOR')
-        .withoutType()
-        .withoutTypeName()
-        .build();
-
-      // Act
-      const result = (service as any).getItemType(item);
-
-      // Assert
-      expect(result).toBe('swor');
-    });
-
-    it('Then should return misc when no type information is available', () => {
-      // Arrange
-      const item: D2SItem = D2SItemBuilder.new()
-        .withoutType()
-        .withoutTypeName()
-        .withoutCode()
-        .build();
-
-      // Act
-      const result = (service as any).getItemType(item);
-
-      // Assert
-      expect(result).toBe('misc');
-    });
-  });
-
-  describe('If getItemQuality is called', () => {
-    it('Then should return normal for quality 1', () => {
-      // Arrange
-      const item: D2SItem = D2SItemBuilder.new().withQuality(1).build();
-
-      // Act
-      const result = (service as any).getItemQuality(item);
-
-      // Assert
-      expect(result).toBe('normal');
-    });
-
-    it('Then should return magic for quality 2', () => {
-      // Arrange
-      const item: D2SItem = D2SItemBuilder.new().withQuality(2).build();
-
-      // Act
-      const result = (service as any).getItemQuality(item);
-
-      // Assert
-      expect(result).toBe('magic');
-    });
-
-    it('Then should return rare for quality 3', () => {
-      // Arrange
-      const item: D2SItem = D2SItemBuilder.new().withQuality(3).build();
-
-      // Act
-      const result = (service as any).getItemQuality(item);
-
-      // Assert
-      expect(result).toBe('rare');
-    });
-
-    it('Then should return set for quality 4', () => {
-      // Arrange
-      const item: D2SItem = D2SItemBuilder.new().withQuality(4).build();
-
-      // Act
-      const result = (service as any).getItemQuality(item);
-
-      // Assert
-      expect(result).toBe('set');
-    });
-
-    it('Then should return unique for quality 5', () => {
-      // Arrange
-      const item: D2SItem = D2SItemBuilder.new().withQuality(5).build();
-
-      // Act
-      const result = (service as any).getItemQuality(item);
-
-      // Assert
-      expect(result).toBe('unique');
-    });
-
-    it('Then should return crafted for quality 6', () => {
-      // Arrange
-      const item: D2SItem = D2SItemBuilder.new().withQuality(6).build();
-
-      // Act
-      const result = (service as any).getItemQuality(item);
-
-      // Assert
-      expect(result).toBe('crafted');
-    });
-
-    it('Then should return normal for unknown quality', () => {
-      // Arrange
-      const item: D2SItem = D2SItemBuilder.new().withQuality(99).build();
-
-      // Act
-      const result = (service as any).getItemQuality(item);
-
-      // Assert
-      expect(result).toBe('normal');
-    });
-  });
-
-  describe('If getItemSockets is called', () => {
-    it('Then should return socket count from gems array', () => {
-      // Arrange
-      const item: D2SItem = D2SItemBuilder.new().withGems([1, 2, 3]).build();
-
-      // Act
-      const result = (service as any).getItemSockets(item);
-
-      // Assert
-      expect(result).toBe(3);
-    });
-
-    it('Then should return socket_count when available', () => {
-      // Arrange
-      const item: D2SItem = D2SItemBuilder.new()
-        .withSocketCount(2)
-        .withoutGems()
-        .withoutSocketed()
-        .build();
-
-      // Act
-      const result = (service as any).getItemSockets(item);
-
-      // Assert
-      expect(result).toBe(2);
-    });
-
-    it('Then should return socketed when available', () => {
-      // Arrange
-      const item: D2SItem = D2SItemBuilder.new()
-        .withSocketed(1)
-        .withoutGems()
-        .withoutSocketCount()
-        .build();
-
-      // Act
-      const result = (service as any).getItemSockets(item);
-
-      // Assert
-      expect(result).toBe(1);
-    });
-
-    it('Then should return 0 when no socket information is available', () => {
-      // Arrange
-      const item: D2SItem = D2SItemBuilder.new().build();
-
-      // Act
-      const result = (service as any).getItemSockets(item);
-
-      // Assert
-      expect(result).toBe(0);
-    });
-
-    it('Then should work with multiple items using buildMany', () => {
-      // Arrange
-      const multipleItems = D2SItemBuilder.new().asUniqueHelm().buildMany(3);
-
-      // Act & Assert
-      expect(multipleItems).toHaveLength(3);
-      expect(multipleItems[0].id).toBe('item-0');
-      expect(multipleItems[1].id).toBe('item-1');
-      expect(multipleItems[2].id).toBe('item-2');
-      // All should have the same properties except id
-      multipleItems.forEach((item) => {
-        expect(item.unique_name).toBe('Shako');
-        expect(item.type).toBe('ushk');
-        expect(item.level).toBe(62);
-        expect(item.quality).toBe(5);
-        expect(item.ethereal).toBe(0);
-      });
-    });
-  });
-
   describe('If findGrailMatch is called', () => {
     it('Then should return matching grail item', () => {
       // Arrange
@@ -569,7 +293,7 @@ describe('When ItemDetectionService is used', () => {
       service.setGrailItems(mockGrailItems);
 
       // Act - provide pre-extracted items to avoid parsing
-      await service.analyzeSaveFile(saveFile, [d2sItem as any]);
+      await service.analyzeSaveFile(saveFile, toParsedItems([d2sItem]));
 
       // Assert
       expect(eventSpy).toHaveBeenCalledTimes(1);
@@ -591,8 +315,8 @@ describe('When ItemDetectionService is used', () => {
       service.setGrailItems(mockGrailItems);
 
       // Act - provide pre-extracted items to avoid parsing
-      await service.analyzeSaveFile(saveFile, [d2sItem as any]); // First analysis
-      await service.analyzeSaveFile(saveFile, [d2sItem as any]); // Second analysis - should not emit
+      await service.analyzeSaveFile(saveFile, toParsedItems([d2sItem])); // First analysis
+      await service.analyzeSaveFile(saveFile, toParsedItems([d2sItem])); // Second analysis - should not emit
 
       // Assert
       expect(eventSpy).toHaveBeenCalledTimes(1); // Only called once
@@ -619,8 +343,8 @@ describe('When ItemDetectionService is used', () => {
       service.setGrailItems(mockGrailItems);
 
       // Act - provide pre-extracted items to avoid parsing
-      await service.analyzeSaveFile(saveFile, [d2sItem1 as any]); // First item
-      await service.analyzeSaveFile(saveFile, [d2sItem1 as any, d2sItem2 as any]); // Same item with different ID
+      await service.analyzeSaveFile(saveFile, toParsedItems([d2sItem1])); // First item
+      await service.analyzeSaveFile(saveFile, toParsedItems([d2sItem1, d2sItem2])); // Same item with different ID
 
       // Assert - should only emit once because it's the same item (stable key by name+ethereal)
       expect(eventSpy).toHaveBeenCalledTimes(1);
@@ -646,8 +370,8 @@ describe('When ItemDetectionService is used', () => {
       service.setGrailItems(mockGrailItems);
 
       // Act - provide pre-extracted items to avoid parsing
-      await service.analyzeSaveFile(saveFile1, [d2sItem as any]); // First save file
-      await service.analyzeSaveFile(saveFile2, [d2sItem as any]); // Same item in different save file
+      await service.analyzeSaveFile(saveFile1, toParsedItems([d2sItem])); // First save file
+      await service.analyzeSaveFile(saveFile2, toParsedItems([d2sItem])); // Same item in different save file
 
       // Assert - should only emit once (global tracking prevents duplicate notifications)
       expect(eventSpy).toHaveBeenCalledTimes(1);
@@ -671,9 +395,9 @@ describe('When ItemDetectionService is used', () => {
       service.setGrailItems(mockGrailItems);
 
       // Act - provide pre-extracted items to avoid parsing
-      await service.analyzeSaveFile(saveFile, [d2sItem as any]); // First detection
+      await service.analyzeSaveFile(saveFile, toParsedItems([d2sItem])); // First detection
       service.clearSeenItems(); // Clear tracking
-      await service.analyzeSaveFile(saveFile, [d2sItem as any]); // Should detect again
+      await service.analyzeSaveFile(saveFile, toParsedItems([d2sItem])); // Should detect again
 
       // Assert
       expect(eventSpy).toHaveBeenCalledTimes(2); // Emitted twice after clear
@@ -699,9 +423,9 @@ describe('When ItemDetectionService is used', () => {
       service.setGrailItems(mockGrailItems);
 
       // Act - provide pre-extracted items to avoid parsing
-      await service.analyzeSaveFile(saveFile1, [d2sItem as any]); // Detect in file 1
-      await service.analyzeSaveFile(saveFile2, [d2sItem as any]); // Same item in file 2 - should NOT detect again
-      await service.analyzeSaveFile(saveFile1, [d2sItem as any]); // Same item in file 1 again - should NOT detect again
+      await service.analyzeSaveFile(saveFile1, toParsedItems([d2sItem])); // Detect in file 1
+      await service.analyzeSaveFile(saveFile2, toParsedItems([d2sItem])); // Same item in file 2 - should NOT detect again
+      await service.analyzeSaveFile(saveFile1, toParsedItems([d2sItem])); // Same item in file 1 again - should NOT detect again
 
       // Assert - should only emit once (global tracking)
       expect(eventSpy).toHaveBeenCalledTimes(1);
@@ -747,7 +471,7 @@ describe('When ItemDetectionService is used', () => {
 
         // Act - initialize with existing progress, then try to detect same item
         service.initializeFromDatabase(existingProgress);
-        await service.analyzeSaveFile(saveFile, [d2sItem as any]);
+        await service.analyzeSaveFile(saveFile, toParsedItems([d2sItem]));
 
         // Assert - should NOT emit because item is already tracked from database
         expect(eventSpy).not.toHaveBeenCalled();
@@ -832,7 +556,7 @@ describe('When ItemDetectionService is used', () => {
 
         // Act
         service.initializeFromDatabase(existingProgress);
-        await service.analyzeSaveFile(saveFile, [d2sItem as any]);
+        await service.analyzeSaveFile(saveFile, toParsedItems([d2sItem]));
 
         // Assert - should not emit event for item that already exists in database
         expect(consoleSpy).toHaveBeenCalledWith(
@@ -876,7 +600,7 @@ describe('When ItemDetectionService is used', () => {
 
         // Act
         service.initializeFromDatabase(existingProgress);
-        await service.analyzeSaveFile(saveFile, [d2sItem as any]);
+        await service.analyzeSaveFile(saveFile, toParsedItems([d2sItem]));
 
         // Assert - should emit because ethereal version is different from normal
         expect(eventSpy).toHaveBeenCalledTimes(1);
@@ -913,8 +637,8 @@ describe('When ItemDetectionService is used', () => {
 
         // Act - initialize with empty database, then detect item twice
         service.initializeFromDatabase(existingProgress);
-        await service.analyzeSaveFile(saveFile, [d2sItem as any]); // First detection
-        await service.analyzeSaveFile(saveFile, [d2sItem as any]); // Second detection
+        await service.analyzeSaveFile(saveFile, toParsedItems([d2sItem])); // First detection
+        await service.analyzeSaveFile(saveFile, toParsedItems([d2sItem])); // Second detection
 
         // Assert - should emit only once, then skip duplicate
         expect(eventSpy).toHaveBeenCalledTimes(1);

@@ -469,6 +469,31 @@ describe('When saveFileHandlers is used', () => {
       expect(mockWebContents[1].send).toHaveBeenCalledWith('save-file-event', mockEvent);
     });
 
+    it('Then the parsed items stay in the main process and are not sent to renderers', () => {
+      // Arrange
+      const parsedItems = [{ fingerprint: 'fp-1' }] as unknown as SaveFileEvent['parsedItems'];
+      const file = D2SaveFileBuilder.new().withName('TestCharacter').build();
+      const mockEvent: SaveFileEvent = { type: 'modified', file, parsedItems, silent: false };
+
+      initializeSaveFileHandlers();
+
+      // Act
+      mockEventBus.emit('save-file-event', mockEvent);
+
+      // Assert
+      expect(mockWebContents[0].send).toHaveBeenCalledWith('save-file-event', {
+        type: 'modified',
+        file,
+        silent: false,
+      });
+      expect(mockItemDetectionService.analyzeSaveFile).toHaveBeenCalledWith(
+        file,
+        parsedItems,
+        false,
+        undefined,
+      );
+    });
+
     it('Then should skip destroyed web contents', () => {
       // Arrange
       mockWebContents[0].isDestroyed.mockReturnValue(true);

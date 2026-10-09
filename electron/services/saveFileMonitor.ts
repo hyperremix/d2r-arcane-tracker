@@ -9,14 +9,11 @@ import type { FSWatcher } from 'chokidar';
 import chokidar from 'chokidar';
 import { app } from 'electron';
 import type { GrailDatabase } from '../database/database';
-import { runewordsByNameSimple } from '../items/indexes';
 import type {
   CharacterInventorySnapshot,
   D2SaveFile,
   D2SItem,
-  FileReaderResponse,
   InventorySearchResult,
-  ItemDetails,
   ParsedInventoryItem,
   SaveFileEvent,
   SaveFileState,
@@ -26,13 +23,11 @@ import type {
 } from '../types/grail';
 import { GameMode } from '../types/grail';
 import { isModernStashVersion } from '../utils/d2rFormat';
-import { getGrailItemId } from '../utils/grailItemUtils';
-import { normalizeIconFilename, resolveCanonicalIconFilename } from '../utils/iconFilenameResolver';
 import { isRune } from '../utils/objects';
 import { createServiceLogger } from '../utils/serviceLogger';
-import { resolveSpatialLocation } from '../utils/spatialLocationResolver';
 import { createVaultPresenceKey } from '../utils/vaultPresence';
 import type { EventBus } from './EventBus';
+import { normalizeItemsWithSocketedItems, resolveGrailLookupName } from './itemNormalizer';
 import { parseModernStash } from './modernStashParser';
 import { readD2iHeaderVersion, readD2iMetadata } from './stashFormat';
 
@@ -51,6 +46,10 @@ interface FileParseSuccess {
   saveName: string;
   success: true;
   inventorySnapshot: CharacterInventorySnapshot;
+  /** Header data of the file, read from the same buffer the items came from. */
+  saveFile: D2SaveFile;
+  /** Every item of the file, including socketed ones the snapshot omits. */
+  parsedItems: ParsedInventoryItem[];
 }
 
 /** A complete parse: the only result vault reconciliation may act on. */
@@ -77,6 +76,20 @@ type SingleFileParseResult =
   | IncompleteFileParseResult
   | FailedFileParseResult;
 
+/** Items of one save file plus what the parse learned about its header. */
+interface SaveParseResult {
+  items: ParsedInventoryItem[];
+  status: SaveParseStatus;
+  /** Hardcore flag read from a stash header (.sss/.d2x/.d2i), when the parser got that far. */
+  stashHardcore?: boolean;
+}
+
+/** Hardcore flag and version of a .d2i file, falling back to the file name when unreadable. */
+interface D2iHeaderInfo {
+  hardcore: boolean;
+  version?: number;
+}
+
 /** A pending request to re-parse every save file; settled once that parse ran or was skipped. */
 interface ForcedParseRequest {
   promise: Promise<void>;
@@ -96,219 +109,9 @@ function createForcedParseRequest(): ForcedParseRequest {
 
 const SUPPORTED_SAVE_EXTENSIONS = new Set(['.d2s', '.sss', '.d2x', '.d2i']);
 
-const processItemName = (item: D2SItem): string => {
-  const itemId = getGrailItemId(item);
-  if (itemId) {
-    return itemId;
-  }
-
-  let name = item.unique_name || item.set_name || '';
-  name = name.toLowerCase().replace(/[^a-z0-9]/gi, '');
-
-  return name;
-};
-
-const shouldSkipItem = (name: string): boolean => name === '';
-
 /** True when a save's softcore/hardcore status is excluded by the configured game mode. */
 const isGameModeMismatch = (gameMode: GameMode | undefined, isHardcore: boolean): boolean =>
   (gameMode === GameMode.Softcore && isHardcore) || (gameMode === GameMode.Hardcore && !isHardcore);
-
-const createSavedItem = (item: D2SItem, quantity?: number): ItemDetails => ({
-  ethereal: !!item.ethereal,
-  ilevel: item.level ?? null,
-  socketed: !!item.socketed,
-  quantity,
-  d2sItem: item as d2s.types.IItem,
-});
-
-const addItemToResults = (
-  results: FileReaderResponse,
-  name: string,
-  savedItem: ItemDetails,
-  saveName: string,
-  item: D2SItem,
-  isEthereal: boolean,
-): void => {
-  const key: 'items' | 'ethItems' = isEthereal ? 'ethItems' : 'items';
-
-  if (results[key][name]) {
-    if (!results[key][name].inSaves[saveName]) {
-      results[key][name].inSaves[saveName] = [];
-    }
-    results[key][name].inSaves[saveName].push(savedItem);
-  } else {
-    results[key][name] = {
-      name,
-      inSaves: {},
-      type: item.type ?? 'unknown',
-    };
-    results[key][name].inSaves[saveName] = [savedItem];
-  }
-};
-
-const getValidatedRunewordName = (item: D2SItem): string | null => {
-  if (!item.runeword_name) {
-    return null;
-  }
-
-  const normalized = item.runeword_name === 'Love' ? 'Lore' : item.runeword_name;
-  const simplified = normalized.toLowerCase().replace(/[^a-z0-9]/gi, '');
-
-  if (!runewordsByNameSimple[simplified]) {
-    return null;
-  }
-
-  return normalized;
-};
-
-const mapQualityValue = (quality: number | undefined): string => {
-  switch (quality) {
-    case 1:
-      return 'normal';
-    case 2:
-      return 'magic';
-    case 3:
-      return 'rare';
-    case 4:
-      return 'set';
-    case 5:
-      return 'unique';
-    case 6:
-      return 'crafted';
-    default:
-      return 'normal';
-  }
-};
-
-function toDisplayString(value: unknown): string | undefined {
-  if (typeof value !== 'string') {
-    return undefined;
-  }
-
-  const normalized = value.replace(/\0/g, '').trim();
-  return normalized.length > 0 ? normalized : undefined;
-}
-
-function resolveFallbackItemName(item: D2SItem): string {
-  const candidates = [
-    item.name,
-    item.unique_name,
-    item.set_name,
-    item.type_name,
-    item.type,
-    item.code,
-    'unknown',
-  ];
-
-  for (const candidate of candidates) {
-    if (typeof candidate === 'string' && candidate.trim()) {
-      return candidate;
-    }
-  }
-
-  return 'unknown';
-}
-
-function resolveMagicOrRareDisplayName(item: D2SItem): string | undefined {
-  const rareParts = [toDisplayString(item.rare_name), toDisplayString(item.rare_name2)].filter(
-    (part): part is string => Boolean(part),
-  );
-  if (rareParts.length > 0) {
-    return rareParts.join(' ');
-  }
-
-  const prefix = toDisplayString(item.magic_prefix_name);
-  const suffix = toDisplayString(item.magic_suffix_name);
-  if (!prefix && !suffix) {
-    return undefined;
-  }
-
-  const baseName =
-    toDisplayString(item.type_name) ??
-    toDisplayString(item.name) ??
-    toDisplayString(item.type) ??
-    toDisplayString(item.code);
-
-  return [prefix, baseName, suffix].filter((part): part is string => Boolean(part)).join(' ');
-}
-
-function resolveParsedItemName(item: D2SItem, runewordName: string | null): string {
-  const candidates = [
-    toDisplayString(runewordName),
-    toDisplayString(item.unique_name),
-    toDisplayString(item.set_name),
-    resolveMagicOrRareDisplayName(item),
-    toDisplayString(resolveFallbackItemName(item)),
-  ];
-
-  for (const candidate of candidates) {
-    if (candidate) {
-      return candidate;
-    }
-  }
-
-  return 'unknown';
-}
-
-function resolveSocketCount(item: D2SItem): number {
-  if (Array.isArray(item.gems)) {
-    return item.gems.length;
-  }
-
-  if (typeof item.socket_count === 'number') {
-    return item.socket_count;
-  }
-
-  return typeof item.socketed === 'number' ? item.socketed : 0;
-}
-
-function resolveParsedItemType(
-  item: D2SItem,
-  quality: string,
-  runewordName: string | null,
-): string {
-  if (runewordName) {
-    return 'runeword';
-  }
-
-  if (isRune(item as d2s.types.IItem)) {
-    return 'rune';
-  }
-
-  if (quality === 'unique' || quality === 'set') {
-    return quality;
-  }
-
-  return item.type ?? 'other';
-}
-
-type ParsedItemSpatialMetadata = Pick<
-  ParsedInventoryItem,
-  | 'gridX'
-  | 'gridY'
-  | 'gridWidth'
-  | 'gridHeight'
-  | 'equippedSlotId'
-  | 'iconFileName'
-  | 'isSocketedItem'
->;
-
-function resolveParsedItemSpatialMetadata(
-  resolvedSpatial: ReturnType<typeof resolveSpatialLocation>,
-  isSocketedItem: boolean,
-  iconFileName: string | undefined,
-): ParsedItemSpatialMetadata {
-  return {
-    gridX: resolvedSpatial.gridX,
-    gridY: resolvedSpatial.gridY,
-    gridWidth: resolvedSpatial.gridWidth,
-    gridHeight: resolvedSpatial.gridHeight,
-    equippedSlotId: resolvedSpatial.equippedSlotId,
-    iconFileName,
-    isSocketedItem,
-  };
-}
 
 /**
  * Service for monitoring Diablo 2 save files and extracting item data.
@@ -887,79 +690,6 @@ class SaveFileMonitor {
   }
 
   /**
-   * Collects extracted items for a specific save file from the results.
-   * @private
-   * @param {FileReaderResponse} results - The parsing results containing all items.
-   * @param {string} saveName - The save name to collect items for.
-   * @returns {d2s.types.IItem[]} Array of extracted items for this save.
-   */
-  private collectExtractedItems(results: FileReaderResponse, saveName: string): d2s.types.IItem[] {
-    const extractedItems: d2s.types.IItem[] = [];
-
-    // Collect items from both regular and ethereal item collections
-    const itemCollections = [results.items, results.ethItems];
-
-    for (const collection of itemCollections) {
-      Object.values(collection).forEach((itemData) => {
-        if (itemData.inSaves[saveName]) {
-          itemData.inSaves[saveName].forEach((itemDetails) => {
-            if (itemDetails.d2sItem) {
-              extractedItems.push(itemDetails.d2sItem);
-            }
-          });
-        }
-      });
-    }
-
-    return extractedItems;
-  }
-
-  private getFingerprintFieldValue<K extends keyof ParsedInventoryItem['fingerprintInputs']>(
-    item: ParsedInventoryItem,
-    key: K,
-  ): ParsedInventoryItem['fingerprintInputs'][K] {
-    const itemValue = item[key as keyof ParsedInventoryItem];
-    if (itemValue !== undefined) {
-      return itemValue as ParsedInventoryItem['fingerprintInputs'][K];
-    }
-
-    return item.fingerprintInputs[key];
-  }
-
-  private createFingerprint(item: ParsedInventoryItem): string {
-    const stashTab = this.getFingerprintFieldValue(item, 'stashTab');
-    const gridX = this.getFingerprintFieldValue(item, 'gridX');
-    const gridY = this.getFingerprintFieldValue(item, 'gridY');
-    const gridWidth = this.getFingerprintFieldValue(item, 'gridWidth');
-    const gridHeight = this.getFingerprintFieldValue(item, 'gridHeight');
-    const equippedSlotId = this.getFingerprintFieldValue(item, 'equippedSlotId');
-    const iconFileName = item.fingerprintInputs.iconFileName ?? item.iconFileName ?? '';
-    const isSocketedItem = this.getFingerprintFieldValue(item, 'isSocketedItem') ?? false;
-    const itemCode = this.getFingerprintFieldValue(item, 'itemCode') ?? '';
-    const itemName = this.getFingerprintFieldValue(item, 'itemName');
-    const stash = stashTab !== undefined ? String(stashTab) : '';
-
-    return [
-      this.getFingerprintFieldValue(item, 'sourceFileType'),
-      this.getFingerprintFieldValue(item, 'characterName'),
-      this.getFingerprintFieldValue(item, 'locationContext'),
-      itemCode,
-      this.getFingerprintFieldValue(item, 'quality'),
-      String(this.getFingerprintFieldValue(item, 'ethereal')),
-      String(this.getFingerprintFieldValue(item, 'socketCount')),
-      stash,
-      gridX ?? '',
-      gridY ?? '',
-      gridWidth ?? '',
-      gridHeight ?? '',
-      equippedSlotId ?? '',
-      iconFileName,
-      String(isSocketedItem),
-      itemName,
-    ].join('|');
-  }
-
-  /**
    * Describes an item without its position, location or character, so presence matching can still
    * recognise an item after it moved inside its save (which changes its fingerprint).
    */
@@ -976,153 +706,42 @@ class SaveFileMonitor {
     });
   }
 
-  private createParsedInventoryItem(params: {
-    filePath: string;
-    saveName: string;
-    sourceFileType: VaultSourceFileType;
-    item: D2SItem;
-    fallbackLocation: VaultLocationContext;
-    stashTab?: number;
-    stashTabKind?: StashTabKind;
-    stackCount?: number;
-    isSocketedItem?: boolean;
-  }): ParsedInventoryItem {
-    const resolvedSpatialLocation = resolveSpatialLocation({
-      item: params.item,
-      sourceFileType: params.sourceFileType,
-      fallbackLocation: params.fallbackLocation,
-      fallbackStashTab: params.stashTab,
-    });
-    const locationContext = resolvedSpatialLocation.locationContext;
-    const stashTab = resolvedSpatialLocation.stashTab;
-    const quality = mapQualityValue(params.item.quality);
-    const runewordName = getValidatedRunewordName(params.item);
-    const isSocketedItem = params.isSocketedItem ?? false;
-    const itemName = resolveParsedItemName(params.item, runewordName);
-    const socketCount = resolveSocketCount(params.item);
-    const parsedType = resolveParsedItemType(params.item, quality, runewordName);
-    const grailItemId = getGrailItemId(params.item as d2s.types.IItem) ?? undefined;
-    const legacyParserIconFileName = normalizeIconFilename(params.item.inv_file);
-    const resolvedIconFileName = resolveCanonicalIconFilename({
-      grailItemId,
-      itemCode: params.item.code ?? params.item.type,
-      itemName,
-      uniqueName: params.item.unique_name,
-      setName: params.item.set_name,
-      parsedName: params.item.name,
-      typeName: params.item.type_name,
-      rawIconFileName: params.item.inv_file,
-    });
-    const spatialMetadata = resolveParsedItemSpatialMetadata(
-      resolvedSpatialLocation,
-      isSocketedItem,
-      resolvedIconFileName ?? legacyParserIconFileName,
-    );
-
-    const parsed: ParsedInventoryItem = {
-      fingerprint: '',
-      fingerprintInputs: {
-        sourceFileType: params.sourceFileType,
-        characterName: params.saveName,
-        locationContext,
-        itemCode: params.item.code ?? params.item.type ?? undefined,
-        quality,
-        ethereal: !!params.item.ethereal,
-        socketCount,
-        stashTab,
-        gridX: spatialMetadata.gridX,
-        gridY: spatialMetadata.gridY,
-        gridWidth: spatialMetadata.gridWidth,
-        gridHeight: spatialMetadata.gridHeight,
-        equippedSlotId: spatialMetadata.equippedSlotId,
-        iconFileName: legacyParserIconFileName,
-        isSocketedItem: spatialMetadata.isSocketedItem,
-        itemName,
-      },
-      characterName: params.saveName,
-      sourceFileType: params.sourceFileType,
-      sourceFilePath: params.filePath,
-      locationContext,
-      stashTab,
-      stashTabKind: params.stashTabKind,
-      ...spatialMetadata,
-      itemName,
-      itemCode: params.item.code ?? params.item.type ?? undefined,
-      quality,
-      type: parsedType,
-      ethereal: !!params.item.ethereal,
-      socketCount,
-      stackCount: params.stackCount,
-      grailItemId,
-      rawItemJson: JSON.stringify(params.item),
-      rawParsedItem: params.item as d2s.types.IItem,
-      seenAt: new Date(),
-    };
-
-    parsed.fingerprint = this.createFingerprint(parsed);
-    return parsed;
-  }
-
   /**
-   * Processes a single save file and updates results.
+   * Reads and parses a single save file once: its items, inventory snapshot and header.
    * @private
    * @param {string} filePath - Path to the save file.
-   * @param {FileReaderResponse} results - Results object to update.
    * @returns {Promise<SingleFileParseResult>} Parse result with save name, success status and snapshot data.
    */
-  private async processSingleFile(
-    filePath: string,
-    results: FileReaderResponse,
-  ): Promise<SingleFileParseResult> {
+  private async processSingleFile(filePath: string): Promise<SingleFileParseResult> {
     let saveName = this.getSaveNameFromPath(filePath);
 
     try {
+      // Stat before reading: if the file changes while it is read, the stored time stays older than
+      // the new content, so the next scan parses the file again.
+      const { mtime } = await stat(filePath);
       const buffer = await readFile(filePath);
       const extension = extname(filePath).toLowerCase();
-      let sourceFileVersion: number | undefined;
+      let d2iHeader: D2iHeaderInfo | undefined;
 
       if (extension === '.d2i') {
-        try {
-          const metadata = readD2iMetadata(buffer);
-          sourceFileVersion = metadata.version;
-          saveName = this.getSaveNameFromPath(filePath, metadata.hardcore, metadata.version);
-        } catch (error) {
-          log.warn('processSingleFile', `Failed to read .d2i metadata: ${error}`);
-        }
+        d2iHeader = this.readD2iHeaderInfo(filePath, buffer);
+        saveName = this.getSaveNameFromPath(filePath, d2iHeader.hardcore, d2iHeader.version);
       }
 
-      const { items: inventoryItems, status: parseStatus } = await this.parseSave(
-        saveName,
-        filePath,
-        buffer,
-        extension,
-      );
+      const {
+        items: inventoryItems,
+        status: parseStatus,
+        stashHardcore,
+      } = await this.parseSave(saveName, filePath, buffer, extension);
       const characterId = this.grailDatabase?.getCharacterByName(saveName)?.id;
-      const inventoryItemsWithCharacter = inventoryItems.map((inventoryItem) => ({
+      const parsedItems = inventoryItems.map((inventoryItem) => ({
         ...inventoryItem,
         characterId,
       }));
-      const snapshotItems = inventoryItemsWithCharacter.filter((item) => !item.isSocketedItem);
-
-      results.stats[saveName] = 0;
-
-      for (const inventoryItem of inventoryItemsWithCharacter) {
-        const item = inventoryItem.rawParsedItem;
-        const name = processItemName(item);
-
-        if (shouldSkipItem(name)) {
-          continue;
-        }
-
-        const savedItem = createSavedItem(item, inventoryItem.stackCount);
-        const isEthereal = !!item.ethereal;
-        addItemToResults(results, name, savedItem, saveName, item, isEthereal);
-
-        results.stats[saveName] = (results.stats[saveName] || 0) + 1;
-      }
+      const snapshotItems = parsedItems.filter((item) => !item.isSocketedItem);
 
       // Update save file state after successful parsing
-      await this.updateSaveFileState(filePath);
+      await this.updateSaveFileState(filePath, mtime);
 
       const inventorySnapshot: CharacterInventorySnapshot = {
         snapshotId: `${saveName}-${Date.now()}`,
@@ -1130,14 +749,25 @@ class SaveFileMonitor {
         characterId,
         sourceFileType: extension.replace('.', '') as VaultSourceFileType,
         sourceFilePath: filePath,
-        sourceFileVersion,
+        sourceFileVersion: d2iHeader?.version,
         readOnly: false,
         capturedAt: new Date(),
         items: snapshotItems,
       };
+      const saveFile = this.buildSaveFileHeader(filePath, buffer, mtime, {
+        d2iHeader,
+        stashHardcore,
+      });
 
       if (parseStatus !== 'parsed') {
-        return { saveName, success: true, parseStatus, inventorySnapshot };
+        return {
+          saveName,
+          success: true,
+          parseStatus,
+          inventorySnapshot,
+          saveFile,
+          parsedItems,
+        };
       }
 
       return {
@@ -1145,15 +775,14 @@ class SaveFileMonitor {
         success: true,
         parseStatus,
         // Includes socketed items, which the snapshot omits, so vault reconciliation sees every item.
-        presentFingerprints: inventoryItemsWithCharacter.map((item) => item.fingerprint),
-        presentIdentityKeys: inventoryItemsWithCharacter.map((item) =>
-          this.createPresenceIdentityKey(item),
-        ),
+        presentFingerprints: parsedItems.map((item) => item.fingerprint),
+        presentIdentityKeys: parsedItems.map((item) => this.createPresenceIdentityKey(item)),
         inventorySnapshot,
+        saveFile,
+        parsedItems,
       };
     } catch (error) {
       log.error('processSingleFile', error, { filePath });
-      results.stats[saveName] = null;
       return { saveName, success: false };
     }
   }
@@ -1162,11 +791,10 @@ class SaveFileMonitor {
    * Updates the database state for a parsed save file.
    * @private
    * @param {string} filePath - Path to the save file.
+   * @param {Date} lastModified - Modification time of the file content that was parsed.
    */
-  private async updateSaveFileState(filePath: string): Promise<void> {
+  private async updateSaveFileState(filePath: string, lastModified: Date): Promise<void> {
     try {
-      const stats = await stat(filePath);
-
       // Check if state already exists and reuse its ID
       const existingState = this.grailDatabase?.getSaveFileState(filePath);
       const id =
@@ -1175,7 +803,7 @@ class SaveFileMonitor {
       const saveFileState: SaveFileState = {
         id,
         filePath,
-        lastModified: stats.mtime,
+        lastModified,
         lastParsed: new Date(),
         created: existingState?.created || new Date(),
         updated: new Date(),
@@ -1188,25 +816,15 @@ class SaveFileMonitor {
   }
 
   /**
-   * Emits save file events for all successfully parsed files.
+   * Emits a save file event for every successfully parsed file, carrying the items and header that
+   * were already parsed so listeners never read the file again.
    * @private
-   * @param {string[]} filePaths - Array of file paths that were parsed.
-   * @param {FileReaderResponse} results - The parsing results.
+   * @param {FileParseSuccess[]} parsedFiles - Successful parse results, in file order.
    */
-  private async emitSaveFileEvents(
-    parsedFiles: Array<{ filePath: string; saveName: string }>,
-    results: FileReaderResponse,
-  ): Promise<void> {
+  private async emitSaveFileEvents(parsedFiles: FileParseSuccess[]): Promise<void> {
     log.info('emitSaveFileEvents', `Emitting events for ${parsedFiles.length} files`);
-    for (const { filePath, saveName } of parsedFiles) {
+    for (const { saveFile, parsedItems } of parsedFiles) {
       try {
-        const saveFile = await this.parseSaveFile(filePath);
-        if (!saveFile) {
-          continue;
-        }
-
-        const extractedItems = this.collectExtractedItems(results, saveName);
-
         // Suppress notifications during initial parsing so items that already exist on app startup
         // do not spam the user. A manual re-scan is not silent: the detection service already
         // ignores items it has seen, so only genuinely new items notify.
@@ -1222,15 +840,16 @@ class SaveFileMonitor {
 
         // Emit event and wait for all handlers to complete processing
         // This prevents race conditions in item detection by ensuring sequential processing
-        await this.eventBus.emitAsync('save-file-event', {
+        const event: SaveFileEvent = {
           type: 'modified',
           file: saveFile,
-          extractedItems,
+          parsedItems,
           silent,
           isInitialScan,
-        } as SaveFileEvent);
+        };
+        await this.eventBus.emitAsync('save-file-event', event);
       } catch (error) {
-        log.error('emitSaveFileEvents', error, { filePath });
+        log.error('emitSaveFileEvents', error, { filePath: saveFile.path });
       }
     }
     log.info('emitSaveFileEvents', 'All events emitted');
@@ -1283,13 +902,6 @@ class SaveFileMonitor {
       'parseFiles',
       `Starting to parse ${filePaths.length} files, userRequested: ${userRequested}`,
     );
-    const results: FileReaderResponse = {
-      items: {},
-      ethItems: {},
-      stats: {},
-      availableRunes: {},
-    };
-
     if (!this.grailDatabase) {
       log.warn('parseFiles', 'No grail database available for parsing');
       return;
@@ -1324,23 +936,17 @@ class SaveFileMonitor {
     );
 
     const tasks = filesToParse.map((filePath) => {
-      return () => this.processSingleFile(filePath, results);
+      return () => this.processSingleFile(filePath);
     });
 
     const parseResults = await this.executeConcurrently(tasks, this.MAX_CONCURRENT_PARSES);
-    const successfulParseResults = parseResults
-      .map((result, index) => ({ result, filePath: filesToParse[index] }))
-      .filter(
-        (
-          entry,
-        ): entry is { result: NonNullable<(typeof parseResults)[number]>; filePath: string } =>
-          Boolean(entry.result?.success && entry.result.saveName),
-      );
+    const successfulParseResults = parseResults.filter(
+      (result): result is CompleteFileParseResult | IncompleteFileParseResult =>
+        Boolean(result?.success && result.saveName),
+    );
 
     const failedFiles = parseResults.filter((r) => r && !r.success);
-    const successfulSnapshots = parseResults.flatMap((r) =>
-      r?.success ? [r.inventorySnapshot] : [],
-    );
+    const successfulSnapshots = successfulParseResults.map((result) => result.inventorySnapshot);
     this.reconcileVaultPresence(parseResults);
     if (failedFiles.length > 0) {
       log.warn(
@@ -1367,13 +973,7 @@ class SaveFileMonitor {
     );
 
     // Emit save file events for each file that was actually parsed
-    await this.emitSaveFileEvents(
-      successfulParseResults.map((entry) => ({
-        filePath: entry.filePath,
-        saveName: entry.result.saveName,
-      })),
-      results,
-    );
+    await this.emitSaveFileEvents(successfulParseResults);
     log.info('parseFiles', `Complete - processed ${filesToParse.length} files`);
   }
 
@@ -1492,8 +1092,9 @@ class SaveFileMonitor {
     filePath: string,
     content: Buffer,
     extension: string,
-  ): Promise<{ items: ParsedInventoryItem[]; status: SaveParseStatus }> {
+  ): Promise<SaveParseResult> {
     const items: ParsedInventoryItem[] = [];
+    let stashHardcore: boolean | undefined;
 
     const sourceFileType = extension.replace('.', '') as VaultSourceFileType;
 
@@ -1503,34 +1104,18 @@ class SaveFileMonitor {
       stashTab?: number,
       stashTabKind?: StashTabKind,
       stackCount?: number,
-      isSocketedItem: boolean = false,
     ) => {
-      itemList.forEach((item) => {
-        items.push(
-          this.createParsedInventoryItem({
-            filePath,
-            saveName,
-            sourceFileType,
-            item,
-            fallbackLocation,
-            stashTab,
-            stashTabKind,
-            stackCount,
-            isSocketedItem,
-          }),
-        );
-
-        if (item.socketed_items?.length) {
-          parseItems(
-            item.socketed_items,
-            fallbackLocation,
-            stashTab,
-            stashTabKind,
-            undefined,
-            true,
-          );
-        }
-      });
+      items.push(
+        ...normalizeItemsWithSocketedItems(itemList, {
+          filePath,
+          saveName,
+          sourceFileType,
+          fallbackLocation,
+          stashTab,
+          stashTabKind,
+          stackCount,
+        }),
+      );
     };
 
     // Each parser reports how much of the file it really read, so no shared mutable status is needed.
@@ -1562,6 +1147,7 @@ class SaveFileMonitor {
       const settings = this.grailDatabase.getAllSettings();
       // Use hardcore flag from parsed stash header instead of filename
       const isHardcore = response.hardcore;
+      stashHardcore = isHardcore;
 
       if (isGameModeMismatch(settings.gameMode, isHardcore)) {
         return 'skipped';
@@ -1581,6 +1167,7 @@ class SaveFileMonitor {
       const modern = await parseModernStash(content);
       const settings = this.grailDatabase.getAllSettings();
       const isHardcore = modern.hardcore;
+      stashHardcore = isHardcore;
 
       if (isGameModeMismatch(settings.gameMode, isHardcore)) {
         return 'skipped';
@@ -1629,11 +1216,11 @@ class SaveFileMonitor {
     };
 
     const status = await parseByExtension();
-    return { items, status };
+    return { items, status, stashHardcore };
   }
 
   /**
-   * Parses a save file to extract basic character information.
+   * Reads a save file to extract basic character information.
    * @private
    * @param {string} filePath - The path to the save file.
    * @returns {Promise<D2SaveFile | null>} A promise that resolves with the parsed save file data or null if parsing fails.
@@ -1644,102 +1231,129 @@ class SaveFileMonitor {
       const buffer = await readFile(filePath);
       const extension = extname(filePath).toLowerCase();
 
-      // Handle shared stash files (.d2i)
-      if (extension === '.d2i') {
-        let isHardcore = false;
-        let sourceFileVersion: number | undefined;
-        try {
-          const metadata = readD2iMetadata(buffer);
-          isHardcore = metadata.hardcore;
-          sourceFileVersion = metadata.version;
-          log.info(
-            'parseSaveFile',
-            `Parsed .d2i metadata, hardcore: ${isHardcore}, version: ${sourceFileVersion}`,
-          );
-        } catch (_parseError) {
-          log.warn('parseSaveFile', 'Failed to parse .d2i metadata, falling back to filename');
-          // Fallback to filename if parsing fails
-          isHardcore = basename(filePath).toLowerCase().includes('hardcore');
-        }
-
-        const characterName = this.getSaveNameFromPath(filePath, isHardcore, sourceFileVersion);
-
-        return {
-          name: characterName,
-          path: filePath,
-          lastModified: stats.mtime,
-          characterClass: 'shared_stash',
-          level: 1,
-          hardcore: isHardcore,
-          expansion: true,
-          sourceFileVersion,
-        };
-      }
-
-      // Legacy shared stash files (.sss/.d2x) have no character header: reading one as a .d2s would
-      // produce an invalid character class that the characters table rejects.
+      let stashHardcore: boolean | undefined;
       if (extension === '.sss' || extension === '.d2x') {
-        let isHardcore = basename(filePath).toLowerCase().includes('hardcore');
         try {
-          isHardcore = (await d2stash.read(buffer, constants96)).hardcore;
+          stashHardcore = (await d2stash.read(buffer, constants96)).hardcore;
         } catch (_parseError) {
           log.warn(
             'parseSaveFile',
             'Failed to parse legacy stash header, falling back to filename',
           );
         }
-
-        return {
-          name: this.getSaveNameFromPath(filePath),
-          path: filePath,
-          lastModified: stats.mtime,
-          characterClass: 'shared_stash',
-          level: 1,
-          hardcore: isHardcore,
-          expansion: true,
-        };
       }
 
-      // Basic D2 save file parsing (simplified)
-      // Strip the extension case-insensitively (e.g. Hero.D2S), matching getSaveNameFromPath
-      const fileName =
-        extension === '.d2s' ? basename(filePath, extname(filePath)) : basename(filePath);
-
-      // Character name is typically the filename
-      const characterName = fileName;
-      let characterClass = 'unknown';
-      let level = 1;
-      let hardcore = false;
-      let expansion = true;
-
-      // Basic header parsing (D2 save files have a specific structure)
-      if (buffer.length >= 765) {
-        // Character class at offset 40
-        const classId = buffer.readUInt8(40);
-        characterClass = this.getCharacterClass(classId);
-
-        // Level at offset 43
-        level = buffer.readUInt8(43);
-
-        // Status flags at offset 36
-        const status = buffer.readUInt8(36);
-        hardcore = (status & 0x04) !== 0;
-        expansion = (status & 0x20) !== 0;
-      }
-
-      return {
-        name: characterName,
-        path: filePath,
-        lastModified: stats.mtime,
-        characterClass,
-        level,
-        hardcore,
-        expansion,
-      };
+      return this.buildSaveFileHeader(filePath, buffer, stats.mtime, { stashHardcore });
     } catch (error) {
       log.error('parseSaveFile', error);
       return null;
     }
+  }
+
+  /**
+   * Reads the hardcore flag and version of a .d2i file, falling back to the file name.
+   * @private
+   */
+  private readD2iHeaderInfo(filePath: string, buffer: Buffer): D2iHeaderInfo {
+    try {
+      const metadata = readD2iMetadata(buffer);
+      log.info(
+        'readD2iHeaderInfo',
+        `Parsed .d2i metadata, hardcore: ${metadata.hardcore}, version: ${metadata.version}`,
+      );
+      return { hardcore: metadata.hardcore, version: metadata.version };
+    } catch (error) {
+      log.warn(
+        'readD2iHeaderInfo',
+        `Failed to read .d2i metadata, falling back to filename: ${error}`,
+      );
+      return { hardcore: basename(filePath).toLowerCase().includes('hardcore') };
+    }
+  }
+
+  /**
+   * Builds the character information of a save file from its already read content.
+   * @private
+   * @param {string} filePath - The path to the save file.
+   * @param {Buffer} buffer - The file content.
+   * @param {Date} lastModified - Modification time of the content.
+   * @param hints - Header data a parser already read: .d2i metadata, or the hardcore flag of a stash.
+   * @returns {D2SaveFile} The save file data.
+   */
+  private buildSaveFileHeader(
+    filePath: string,
+    buffer: Buffer,
+    lastModified: Date,
+    hints: { d2iHeader?: D2iHeaderInfo; stashHardcore?: boolean } = {},
+  ): D2SaveFile {
+    const extension = extname(filePath).toLowerCase();
+
+    // Handle shared stash files (.d2i)
+    if (extension === '.d2i') {
+      const { hardcore, version } = hints.d2iHeader ?? this.readD2iHeaderInfo(filePath, buffer);
+
+      return {
+        name: this.getSaveNameFromPath(filePath, hardcore, version),
+        path: filePath,
+        lastModified,
+        characterClass: 'shared_stash',
+        level: 1,
+        hardcore,
+        expansion: true,
+        sourceFileVersion: version,
+      };
+    }
+
+    // Legacy shared stash files (.sss/.d2x) have no character header: reading one as a .d2s would
+    // produce an invalid character class that the characters table rejects.
+    if (extension === '.sss' || extension === '.d2x') {
+      return {
+        name: this.getSaveNameFromPath(filePath),
+        path: filePath,
+        lastModified,
+        characterClass: 'shared_stash',
+        level: 1,
+        hardcore: hints.stashHardcore ?? basename(filePath).toLowerCase().includes('hardcore'),
+        expansion: true,
+      };
+    }
+
+    // Basic D2 save file parsing (simplified)
+    // Strip the extension case-insensitively (e.g. Hero.D2S), matching getSaveNameFromPath
+    const fileName =
+      extension === '.d2s' ? basename(filePath, extname(filePath)) : basename(filePath);
+
+    // Character name is typically the filename
+    const characterName = fileName;
+    let characterClass = 'unknown';
+    let level = 1;
+    let hardcore = false;
+    let expansion = true;
+
+    // Basic header parsing (D2 save files have a specific structure)
+    if (buffer.length >= 765) {
+      // Character class at offset 40
+      const classId = buffer.readUInt8(40);
+      characterClass = this.getCharacterClass(classId);
+
+      // Level at offset 43
+      level = buffer.readUInt8(43);
+
+      // Status flags at offset 36
+      const status = buffer.readUInt8(36);
+      hardcore = (status & 0x04) !== 0;
+      expansion = (status & 0x20) !== 0;
+    }
+
+    return {
+      name: characterName,
+      path: filePath,
+      lastModified,
+      characterClass,
+      level,
+      hardcore,
+      expansion,
+    };
   }
 
   /**
@@ -1909,8 +1523,8 @@ class SaveFileMonitor {
           continue;
         }
 
-        const runeId = processItemName(rawItem);
-        if (shouldSkipItem(runeId)) {
+        const runeId = resolveGrailLookupName(rawItem);
+        if (runeId === '') {
           continue;
         }
 

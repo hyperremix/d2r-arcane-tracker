@@ -51,26 +51,6 @@ vi.mock('electron', () => ({
   },
 }));
 
-// Mock items indexes
-vi.mock('../items/indexes', () => ({
-  runewordsByNameSimple: {
-    lore: { id: 'lore', name: 'Lore' },
-    enigma: { id: 'enigma', name: 'Enigma' },
-    beast: { id: 'beast', name: 'Beast' },
-    infinity: { id: 'infinity', name: 'Infinity' },
-  },
-}));
-
-// Mock utils
-vi.mock('../utils/objects', () => ({
-  isRune: vi.fn(),
-  simplifyItemName: vi.fn(),
-}));
-
-vi.mock('../utils/grailItemUtils', () => ({
-  getGrailItemId: vi.fn(),
-}));
-
 import {
   chmodSync,
   existsSync,
@@ -78,6 +58,7 @@ import {
   readdirSync,
   readFileSync,
   rmSync,
+  utimesSync,
   writeFileSync,
 } from 'node:fs';
 import { mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
@@ -88,10 +69,9 @@ import * as d2stash from '@dschu012/d2s/lib/d2/stash';
 import chokidar from 'chokidar';
 import { app } from 'electron';
 import { D2SaveFileBuilder } from '@/fixtures';
-import { GameMode } from '../types/grail';
-import { getGrailItemId } from '../utils/grailItemUtils';
-import { isRune, simplifyItemName } from '../utils/objects';
+import { GameMode, type ParsedInventoryItem, type SaveFileEvent } from '../types/grail';
 import { EventBus } from './EventBus';
+import { createItemFingerprint, normalizeInventoryItem } from './itemNormalizer';
 import * as modernStashParser from './modernStashParser';
 import { SaveFileMonitor } from './saveFileMonitor';
 
@@ -173,9 +153,6 @@ describe('When SaveFileMonitor is used', () => {
       hardcore: false,
       pages: [{ items: [] }],
     } as any);
-    vi.mocked(getGrailItemId).mockReturnValue('test-item-id');
-    vi.mocked(isRune).mockReturnValue(false);
-    vi.mocked(simplifyItemName).mockReturnValue('test-item');
 
     // Create mock database
     mockDatabase = createMockDatabase();
@@ -1396,11 +1373,6 @@ describe('When SaveFileMonitor is used', () => {
     beforeEach(() => {
       vi.clearAllMocks();
 
-      // Setup simplifyItemName to return lowercase with no spaces
-      vi.mocked(simplifyItemName).mockImplementation((name: string) =>
-        name.toLowerCase().replace(/[^a-z0-9]/gi, ''),
-      );
-
       eventBus = new EventBus();
       mockDatabase = createMockDatabase();
       mockDatabase.getAllSettings.mockReturnValue({
@@ -1542,9 +1514,9 @@ describe('When SaveFileMonitor is used', () => {
   describe('If spatial inventory parsing is executed', () => {
     it('Then createParsedInventoryItem maps spatial metadata and prefers canonical grail filename over parser inv_file', () => {
       // Arrange
-      vi.mocked(getGrailItemId).mockReturnValue('harlequincrest');
       const item = {
         name: 'Battle Hammer',
+        unique_name: 'Harlequin Crest',
         type: 'mace',
         code: 'uap',
         quality: 5,
@@ -1560,7 +1532,7 @@ describe('When SaveFileMonitor is used', () => {
       } as any;
 
       // Act
-      const parsed = (monitor as any).createParsedInventoryItem({
+      const parsed = normalizeInventoryItem({
         filePath: '/tmp/TestChar.d2s',
         saveName: 'TestChar',
         sourceFileType: 'd2s',
@@ -1583,7 +1555,6 @@ describe('When SaveFileMonitor is used', () => {
 
     it('Then canonical code-based icon is preferred over parser inv_file when both exist', () => {
       // Arrange
-      vi.mocked(getGrailItemId).mockReturnValue(null);
       const item = {
         name: 'Shako',
         type: 'helm',
@@ -1593,7 +1564,7 @@ describe('When SaveFileMonitor is used', () => {
       } as any;
 
       // Act
-      const parsed = (monitor as any).createParsedInventoryItem({
+      const parsed = normalizeInventoryItem({
         filePath: '/tmp/TestChar.d2s',
         saveName: 'TestChar',
         sourceFileType: 'd2s',
@@ -1608,7 +1579,6 @@ describe('When SaveFileMonitor is used', () => {
 
     it('Then magic items keep their generated prefix/suffix display name', () => {
       // Arrange
-      vi.mocked(getGrailItemId).mockReturnValue(null);
       const item = {
         name: 'Ring',
         type_name: 'Ring',
@@ -1620,7 +1590,7 @@ describe('When SaveFileMonitor is used', () => {
       } as any;
 
       // Act
-      const parsed = (monitor as any).createParsedInventoryItem({
+      const parsed = normalizeInventoryItem({
         filePath: '/tmp/TestChar.d2s',
         saveName: 'TestChar',
         sourceFileType: 'd2s',
@@ -1634,7 +1604,6 @@ describe('When SaveFileMonitor is used', () => {
 
     it('Then rare items keep their generated rare name parts', () => {
       // Arrange
-      vi.mocked(getGrailItemId).mockReturnValue(null);
       const item = {
         name: 'Ring',
         type_name: 'Ring',
@@ -1646,7 +1615,7 @@ describe('When SaveFileMonitor is used', () => {
       } as any;
 
       // Act
-      const parsed = (monitor as any).createParsedInventoryItem({
+      const parsed = normalizeInventoryItem({
         filePath: '/tmp/TestChar.d2s',
         saveName: 'TestChar',
         sourceFileType: 'd2s',
@@ -1660,7 +1629,6 @@ describe('When SaveFileMonitor is used', () => {
 
     it('Then location_id 2 maps to unknown belt coordinates in a 4x4 belt board space', () => {
       // Arrange
-      vi.mocked(getGrailItemId).mockReturnValue(null);
       const item = {
         name: 'Super Healing Potion',
         type: 'potion',
@@ -1674,7 +1642,7 @@ describe('When SaveFileMonitor is used', () => {
       } as any;
 
       // Act
-      const parsed = (monitor as any).createParsedInventoryItem({
+      const parsed = normalizeInventoryItem({
         filePath: '/tmp/TestChar.d2s',
         saveName: 'TestChar',
         sourceFileType: 'd2s',
@@ -1692,7 +1660,6 @@ describe('When SaveFileMonitor is used', () => {
 
     it('Then d2s location_id 0 alt_position_id 5 maps to personal stash tab 0', () => {
       // Arrange
-      vi.mocked(getGrailItemId).mockReturnValue(null);
       const item = {
         name: 'Grand Charm',
         type: 'charm',
@@ -1707,7 +1674,7 @@ describe('When SaveFileMonitor is used', () => {
       } as any;
 
       // Act
-      const parsed = (monitor as any).createParsedInventoryItem({
+      const parsed = normalizeInventoryItem({
         filePath: '/tmp/TestChar.d2s',
         saveName: 'TestChar',
         sourceFileType: 'd2s',
@@ -1722,7 +1689,6 @@ describe('When SaveFileMonitor is used', () => {
 
     it('Then d2s alt_position_id 1 remains inventory even when outside canonical bounds', () => {
       // Arrange
-      vi.mocked(getGrailItemId).mockReturnValue(null);
       const inBoundsItem = {
         name: 'Tome of Town Portal',
         type: 'book',
@@ -1749,14 +1715,14 @@ describe('When SaveFileMonitor is used', () => {
       } as any;
 
       // Act
-      const inBoundsParsed = (monitor as any).createParsedInventoryItem({
+      const inBoundsParsed = normalizeInventoryItem({
         filePath: '/tmp/TestChar.d2s',
         saveName: 'TestChar',
         sourceFileType: 'd2s',
         item: inBoundsItem,
         fallbackLocation: 'inventory',
       });
-      const outOfBoundsParsed = (monitor as any).createParsedInventoryItem({
+      const outOfBoundsParsed = normalizeInventoryItem({
         filePath: '/tmp/TestChar.d2s',
         saveName: 'TestChar',
         sourceFileType: 'd2s',
@@ -1773,7 +1739,6 @@ describe('When SaveFileMonitor is used', () => {
 
     it('Then unknown items derive a snake_case filename fallback from type_name when parser icon is absent', () => {
       // Arrange
-      vi.mocked(getGrailItemId).mockReturnValue(null);
       const item = {
         type: 'misc',
         quality: 1,
@@ -1781,7 +1746,7 @@ describe('When SaveFileMonitor is used', () => {
       } as any;
 
       // Act
-      const parsed = (monitor as any).createParsedInventoryItem({
+      const parsed = normalizeInventoryItem({
         filePath: '/tmp/TestChar.d2s',
         saveName: 'TestChar',
         sourceFileType: 'd2s',
@@ -1795,7 +1760,7 @@ describe('When SaveFileMonitor is used', () => {
 
     it('Then socketed child items can be excluded from UI snapshot arrays', () => {
       // Arrange
-      const createParsedInventoryItem = (monitor as any).createParsedInventoryItem.bind(monitor);
+      const createParsedInventoryItem = normalizeInventoryItem;
       const parent = createParsedInventoryItem({
         filePath: '/tmp/TestChar.d2s',
         saveName: 'TestChar',
@@ -1957,13 +1922,10 @@ describe('When SaveFileMonitor is used', () => {
 
       // Assert
       expect((executeSpy.mock.calls[0]?.[0] as unknown[]).length).toBe(2);
-      expect(emitSpy).toHaveBeenCalledWith(
-        [
-          { filePath: '/test/save/dir/a.d2s', saveName: 'A' },
-          { filePath: '/test/save/dir/b.d2s', saveName: 'B' },
-        ],
-        expect.any(Object),
-      );
+      expect(emitSpy).toHaveBeenCalledWith([
+        expect.objectContaining({ saveName: 'A' }),
+        expect.objectContaining({ saveName: 'B' }),
+      ]);
       expect((monitor as any).inventorySnapshots).toHaveLength(2);
     });
 
@@ -2094,12 +2056,7 @@ describe('When SaveFileMonitor is used', () => {
       vi.spyOn(monitor as any, 'updateSaveFileState').mockResolvedValue(undefined);
 
       // Act
-      const parseResult = await (monitor as any).processSingleFile(savePath, {
-        items: {},
-        ethItems: {},
-        stats: {},
-        availableRunes: {},
-      });
+      const parseResult = await (monitor as any).processSingleFile(savePath);
       rmSync(saveDir, { recursive: true, force: true });
 
       // Assert
@@ -2109,7 +2066,6 @@ describe('When SaveFileMonitor is used', () => {
 
     it('Then a moved item keeps its presence identity while its fingerprint changes', () => {
       // Arrange
-      vi.mocked(getGrailItemId).mockReturnValue(null);
       const itemAt = (x: number, y: number) =>
         ({
           name: 'Ring of Fire',
@@ -2125,7 +2081,7 @@ describe('When SaveFileMonitor is used', () => {
           inv_height: 1,
         }) as any;
       const parse = (item: any) =>
-        (monitor as any).createParsedInventoryItem({
+        normalizeInventoryItem({
           filePath: '/tmp/SharedStash.d2i',
           saveName: 'Shared',
           sourceFileType: 'd2i',
@@ -2147,7 +2103,6 @@ describe('When SaveFileMonitor is used', () => {
 
     it('Then items that differ only by their game item id have different presence identities', () => {
       // Arrange
-      vi.mocked(getGrailItemId).mockReturnValue(null);
       const ring = (id: number) =>
         ({
           name: 'Ring of Fire',
@@ -2161,7 +2116,7 @@ describe('When SaveFileMonitor is used', () => {
           inv_height: 1,
         }) as any;
       const parse = (item: any) =>
-        (monitor as any).createParsedInventoryItem({
+        normalizeInventoryItem({
           filePath: '/tmp/SharedStash.d2i',
           saveName: 'Shared',
           sourceFileType: 'd2i',
@@ -2212,12 +2167,7 @@ describe('When SaveFileMonitor is used', () => {
       vi.spyOn(monitor as any, 'updateSaveFileState').mockResolvedValue(undefined);
 
       // Act
-      const parseResult = await (monitor as any).processSingleFile(savePath, {
-        items: {},
-        ethItems: {},
-        stats: {},
-        availableRunes: {},
-      });
+      const parseResult = await (monitor as any).processSingleFile(savePath);
       rmSync(saveDir, { recursive: true, force: true });
 
       // Assert
@@ -2227,7 +2177,7 @@ describe('When SaveFileMonitor is used', () => {
       expect(parseResult.presentIdentityKeys).toHaveLength(parseResult.presentFingerprints.length);
     });
 
-    it('Then createFingerprint returns deterministic output for the same inputs', () => {
+    it('Then createItemFingerprint returns deterministic output for the same inputs', () => {
       // Arrange
       const item = {
         fingerprintInputs: {
@@ -2241,11 +2191,11 @@ describe('When SaveFileMonitor is used', () => {
           stashTab: 1,
           itemName: 'Shako',
         },
-      };
+      } as unknown as ParsedInventoryItem;
 
       // Act
-      const first = (monitor as any).createFingerprint(item);
-      const second = (monitor as any).createFingerprint(item);
+      const first = createItemFingerprint(item);
+      const second = createItemFingerprint(item);
 
       // Assert
       expect(first).toBe(second);
@@ -2295,12 +2245,7 @@ describe('When SaveFileMonitor is used', () => {
       vi.mocked(readFile).mockResolvedValue(fixtureBuffer);
 
       // Act
-      const parseResult = await (monitor as any).processSingleFile(MODERN_STASH_FIXTURE_PATH, {
-        items: {},
-        ethItems: {},
-        stats: {},
-        availableRunes: {},
-      });
+      const parseResult = await (monitor as any).processSingleFile(MODERN_STASH_FIXTURE_PATH);
 
       // Assert
       expect(parseResult.success).toBe(true);
@@ -2330,12 +2275,7 @@ describe('When SaveFileMonitor is used', () => {
       vi.spyOn(monitor as any, 'updateSaveFileState').mockResolvedValue(undefined);
 
       // Act
-      const parseResult = await (monitor as any).processSingleFile(savePath, {
-        items: {},
-        ethItems: {},
-        stats: {},
-        availableRunes: {},
-      });
+      const parseResult = await (monitor as any).processSingleFile(savePath);
       rmSync(saveDir, { recursive: true, force: true });
 
       // Assert
@@ -2667,8 +2607,6 @@ describe('When SaveFileMonitor is used', () => {
   describe('When item counts are read from parsed saves', () => {
     it('Then getAvailableRunesCount sums rune quantities instead of entry counts', () => {
       // Arrange
-      vi.mocked(isRune).mockReturnValue(true);
-      vi.mocked(getGrailItemId).mockReturnValue('el');
       const runeEntry = (stackCount?: number) => ({
         rawParsedItem: { type: 'r01' },
         isSocketedItem: false,
@@ -2684,6 +2622,123 @@ describe('When SaveFileMonitor is used', () => {
 
       // Assert
       expect(counts).toEqual({ el: 6 });
+    });
+  });
+
+  describe('When parsed save files are announced', () => {
+    let saveDir: string;
+    let events: SaveFileEvent[];
+
+    beforeEach(() => {
+      saveDir = mkdtempSync(join(tmpdir(), 'save-monitor-events-'));
+      events = [];
+      eventBus.on('save-file-event', (event) => {
+        events.push(event);
+      });
+      mockDatabase.getAllSettings.mockReturnValue({
+        saveDir,
+        gameMode: GameMode.Both,
+      });
+    });
+
+    afterEach(() => {
+      rmSync(saveDir, { recursive: true, force: true });
+    });
+
+    describe('If a character save is parsed', () => {
+      it('Then the event carries the parsed items and the header read from the same content', async () => {
+        // Arrange
+        const header = Buffer.alloc(800);
+        header.writeUInt8(0x24, 36); // hardcore + expansion
+        header.writeUInt8(1, 40); // sorceress
+        header.writeUInt8(85, 43);
+        const filePath = join(saveDir, 'Hero.d2s');
+        writeFileSync(filePath, header);
+        vi.mocked(d2s.read).mockResolvedValue({
+          header: { status: { hardcore: true } },
+          items: [{ type: 'uap', unique_name: 'Shako' }],
+          merc_items: [],
+          corpse_items: [],
+        } as any);
+        const parseSaveFileSpy = vi.spyOn(monitor as any, 'parseSaveFile');
+
+        // Act
+        await (monitor as any).parseFiles([filePath], false);
+
+        // Assert
+        expect(parseSaveFileSpy).not.toHaveBeenCalled();
+        expect(events).toHaveLength(1);
+        expect(events[0].file).toEqual(
+          expect.objectContaining({
+            name: 'Hero',
+            path: filePath,
+            characterClass: 'sorceress',
+            level: 85,
+            hardcore: true,
+            expansion: true,
+          }),
+        );
+        expect(events[0].parsedItems?.map((item) => item.rawParsedItem.unique_name)).toEqual([
+          'Shako',
+        ]);
+      });
+
+      it('Then the stored modification time is the one of the content that was parsed', async () => {
+        // Arrange
+        const filePath = join(saveDir, 'Hero.d2s');
+        writeFileSync(filePath, Buffer.alloc(800));
+        const contentTime = new Date('2024-05-01T10:00:00.000Z');
+        utimesSync(filePath, contentTime, contentTime);
+
+        // Act
+        await (monitor as any).parseFiles([filePath], false);
+
+        // Assert
+        expect(mockDatabase.upsertSaveFileState).toHaveBeenCalledWith(
+          expect.objectContaining({ filePath, lastModified: contentTime }),
+        );
+        expect(events[0].file.lastModified).toEqual(contentTime);
+      });
+    });
+
+    describe('If a legacy shared stash is parsed', () => {
+      it('Then the hardcore flag of the event comes from the parsed stash header', async () => {
+        // Arrange
+        const filePath = join(saveDir, 'SharedStash.sss');
+        writeFileSync(filePath, Buffer.alloc(1024));
+        vi.mocked(d2stash.read).mockResolvedValue({ hardcore: true, pages: [] } as any);
+
+        // Act
+        await (monitor as any).parseFiles([filePath], false);
+
+        // Assert
+        expect(vi.mocked(d2stash.read)).toHaveBeenCalledTimes(1);
+        expect(events[0].file).toEqual(
+          expect.objectContaining({ characterClass: 'shared_stash', hardcore: true }),
+        );
+      });
+    });
+
+    describe('If a modern shared stash is parsed', () => {
+      it('Then the event describes the stash with its version and carries its items', async () => {
+        // Arrange
+        const filePath = join(saveDir, 'ModernSharedStashSoftCoreV2.d2i');
+        writeFileSync(filePath, readFileSync(MODERN_STASH_FIXTURE_PATH));
+
+        // Act
+        await (monitor as any).parseFiles([filePath], false);
+
+        // Assert
+        expect(events[0].file).toEqual(
+          expect.objectContaining({
+            name: 'Modern Shared Stash Softcore',
+            characterClass: 'shared_stash',
+            hardcore: false,
+            sourceFileVersion: 105,
+          }),
+        );
+        expect(events[0].parsedItems?.length).toBeGreaterThan(0);
+      });
     });
   });
 
@@ -2705,14 +2760,6 @@ describe('When SaveFileMonitor is used', () => {
           saveDir: '/test/save/dir',
           gameMode: GameMode.Both,
         });
-        vi.mocked(isRune).mockImplementation((item) => /^r\d\d$/.test(item.type ?? ''));
-        vi.mocked(getGrailItemId).mockImplementation((item) =>
-          (item as { type?: string }).type === 'r01'
-            ? 'el'
-            : (item as { type?: string }).type === 'r02'
-              ? 'eld'
-              : null,
-        );
         vi.mocked(d2s.read).mockResolvedValue({
           header: { status: { hardcore: false } },
           items: [
@@ -2731,13 +2778,18 @@ describe('When SaveFileMonitor is used', () => {
         writeFileSync(filePath, Buffer.from('mock'));
         vi.spyOn(monitor as any, 'filterFilesToParse').mockResolvedValue([filePath]);
         vi.spyOn(monitor as any, 'updateSaveFileState').mockResolvedValue(undefined);
-        vi.spyOn(monitor as any, 'emitSaveFileEvents').mockResolvedValue(undefined);
+        const events: SaveFileEvent[] = [];
+        eventBus.on('save-file-event', (event) => {
+          events.push(event);
+        });
 
         // Act
         await (monitor as any).parseFiles([filePath], false);
 
         // Assert
         expect(monitor.getAvailableRunesCount()).toEqual({ el: 1 });
+        const eventItemCodes = events[0]?.parsedItems?.map((item) => item.rawParsedItem.type);
+        expect(eventItemCodes).toEqual(['r01', 'armor', 'r02']);
       });
     });
   });

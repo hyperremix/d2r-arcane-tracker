@@ -486,10 +486,12 @@ export function initializeSaveFileHandlers(): void {
   const unsubscribeSaveFileEvent = eventBus.on('save-file-event', async (event: SaveFileEvent) => {
     // Forward save file events to renderer processes
     // Filter to only 'window' type to exclude DevTools, background pages, etc.
+    // The parsed items stay in the main process; renderers only need the file header.
+    const { parsedItems, ...rendererEvent } = event;
     const allWebContents = webContents.getAllWebContents();
     for (const wc of allWebContents) {
       if (!wc.isDestroyed() && wc.getType() === 'window') {
-        wc.send('save-file-event', event);
+        wc.send('save-file-event', rendererEvent);
       }
     }
 
@@ -501,7 +503,7 @@ export function initializeSaveFileHandlers(): void {
     if (event.type === 'modified') {
       await itemDetectionService.analyzeSaveFile(
         event.file,
-        event.extractedItems ?? [],
+        parsedItems ?? [],
         event.silent,
         event.isInitialScan,
       );

@@ -6,7 +6,7 @@ import { simplifyItemName } from './objects';
 /**
  * Resolves the specific Rainbow Facet name based on magic attributes.
  */
-function resolveRainbowFacetName(item: D2SItem, simpleName: string): string {
+export function resolveRainbowFacetName(item: D2SItem, simpleName: string): string {
   let type = '';
   let skill = '';
 

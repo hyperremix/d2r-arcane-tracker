@@ -1030,7 +1030,12 @@ export type D2SaveFile = {
 export type SaveFileEvent = {
   type: 'created' | 'modified' | 'deleted';
   file: D2SaveFile;
-  extractedItems?: d2s.types.IItem[];
+  /**
+   * Every item the monitor parsed from the file (socketed items included), so listeners never
+   * read the file again. Only present in the main process: it is stripped before the event is
+   * forwarded to renderer windows.
+   */
+  parsedItems?: ParsedInventoryItem[];
   /**
    * When true, suppresses all user-facing notifications for this event.
    * Used during initial startup parsing to prevent notification spam for
