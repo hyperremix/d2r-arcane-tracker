@@ -1,7 +1,6 @@
 {
   "app": {
-    "title": "D2R Arcane Tracker",
-    "description": "Automatic tracker for everything D2R related"
+    "title": "D2R Arcane Tracker"
   },
   "common": {
     "found": "Found",
@@ -11,7 +10,6 @@
     "allFiles": "All Files",
     "error": "Error",
     "retry": "Retry",
-    "reset": "Reset",
     "search": "Search",
     "loading": "Loading...",
     "note": "Note:",
