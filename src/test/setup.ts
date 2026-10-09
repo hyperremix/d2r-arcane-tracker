@@ -3,6 +3,7 @@ import { cleanup } from '@testing-library/react';
 import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';
 import { afterEach, expect } from 'vitest';
+import { clearIconCache } from '../hooks/useIconsByFilename';
 import en from '../i18n/locales/en/common.json';
 
 // Extend Vitest's expect with jest-dom matchers
@@ -21,4 +22,6 @@ i18n.use(initReactI18next).init({
 // Cleanup after each test case
 afterEach(() => {
   cleanup();
+  // The icon cache is module state shared by all test files (isolate: false)
+  clearIconCache();
 });
