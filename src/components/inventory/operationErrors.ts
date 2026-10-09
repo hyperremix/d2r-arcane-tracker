@@ -1,6 +1,8 @@
 import { toast } from 'sonner';
 import { translations } from '@/i18n/translations';
 
+const MODERN_STASH_READ_ONLY_ERROR = 'MODERN_STASH_READ_ONLY';
+
 type Translate = (key: string, options?: Record<string, unknown>) => string;
 
 function getMessage(error: unknown): string | undefined {
@@ -52,4 +54,12 @@ export function showInventoryOperationErrorToast(error: unknown, t: Translate): 
   } else {
     toast.error(t(messages.failed));
   }
+}
+
+export function isModernStashReadOnlyError(error: unknown): boolean {
+  return includesAny(getMessage(error), [MODERN_STASH_READ_ONLY_ERROR]);
+}
+
+export function showModernStashReadOnlyToast(t: Translate): void {
+  toast.error(t(translations.inventoryBrowser.modernStashReadOnlyError));
 }

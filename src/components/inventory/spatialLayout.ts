@@ -487,3 +487,172 @@ export function getSortedStashTabs<T extends SpatialItemLike>(
     .sort(([left], [right]) => left - right)
     .map(([stashTab, items]) => ({ stashTab, items: sortByGridPosition(items) }));
 }
+
+function createOccupiedCellSet(
+  startX: number,
+  startY: number,
+  width: number,
+  height: number,
+): Set<string> {
+  const occupiedCells = new Set<string>();
+
+  for (let x = startX; x < startX + width; x += 1) {
+    for (let y = startY; y < startY + height; y += 1) {
+      occupiedCells.add(`${x},${y}`);
+    }
+  }
+
+  return occupiedCells;
+}
+
+export function hasBoardOverlap<T extends SpatialItemLike & { fingerprint: string }>(
+  items: T[],
+  startX: number,
+  startY: number,
+  width: number,
+  height: number,
+  ignoredFingerprint?: string,
+): boolean {
+  const droppingCells = createOccupiedCellSet(startX, startY, width, height);
+
+  return items.some((item) => {
+    if (ignoredFingerprint && item.fingerprint === ignoredFingerprint) {
+      return false;
+    }
+
+    if (!hasGridPosition(item) || !hasGridDimensions(item)) {
+      return false;
+    }
+
+    const itemGridX = item.gridX as number;
+    const itemGridY = item.gridY as number;
+
+    for (let x = itemGridX; x < itemGridX + getGridWidth(item); x += 1) {
+      for (let y = itemGridY; y < itemGridY + getGridHeight(item); y += 1) {
+        if (droppingCells.has(`${x},${y}`)) {
+          return true;
+        }
+      }
+    }
+
+    return false;
+  });
+}
+
+function collectOccupiedCells(existingItems: SpatialItemLike[]): Set<string> {
+  const occupiedCells = new Set<string>();
+  for (const item of existingItems) {
+    if (item.gridX === undefined || item.gridY === undefined) {
+      continue;
+    }
+
+    const x0 = item.gridX;
+    const y0 = item.gridY;
+    const width = getGridWidth(item);
+    const height = getGridHeight(item);
+    for (let x = x0; x < x0 + width; x += 1) {
+      for (let y = y0; y < y0 + height; y += 1) {
+        occupiedCells.add(`${x},${y}`);
+      }
+    }
+  }
+
+  return occupiedCells;
+}
+
+function buildWrappedScanCandidates(
+  maxX: number,
+  maxY: number,
+  startX: number,
+  startY: number,
+): Array<{ x: number; y: number }> {
+  const candidates: Array<{ x: number; y: number }> = [];
+
+  for (let y = startY; y <= maxY; y += 1) {
+    const rowStartX = y === startY ? startX : 0;
+    for (let x = rowStartX; x <= maxX; x += 1) {
+      candidates.push({ x, y });
+    }
+  }
+
+  for (let y = 0; y <= startY; y += 1) {
+    const rowEndX = y === startY ? startX - 1 : maxX;
+    for (let x = 0; x <= rowEndX; x += 1) {
+      candidates.push({ x, y });
+    }
+  }
+
+  return candidates;
+}
+
+function canPlaceAt(
+  occupiedCells: Set<string>,
+  itemWidth: number,
+  itemHeight: number,
+  x: number,
+  y: number,
+): boolean {
+  for (let dy = 0; dy < itemHeight; dy += 1) {
+    for (let dx = 0; dx < itemWidth; dx += 1) {
+      if (occupiedCells.has(`${x + dx},${y + dy}`)) {
+        return false;
+      }
+    }
+  }
+  return true;
+}
+
+function occupyCells(
+  occupiedCells: Set<string>,
+  itemWidth: number,
+  itemHeight: number,
+  x: number,
+  y: number,
+): void {
+  for (let dy = 0; dy < itemHeight; dy += 1) {
+    for (let dx = 0; dx < itemWidth; dx += 1) {
+      occupiedCells.add(`${x + dx},${y + dy}`);
+    }
+  }
+}
+
+export function findStackPickupSlots(
+  gridSize: GridSize,
+  existingItems: SpatialItemLike[],
+  itemWidth: number,
+  itemHeight: number,
+  count: number,
+  preferredGridX?: number,
+  preferredGridY?: number,
+): Array<{ x: number; y: number }> {
+  if (count <= 0 || itemWidth <= 0 || itemHeight <= 0) {
+    return [];
+  }
+
+  const maxX = gridSize.columns - itemWidth;
+  const maxY = gridSize.rows - itemHeight;
+  if (maxX < 0 || maxY < 0) {
+    return [];
+  }
+
+  const startX = Math.min(maxX, Math.max(0, preferredGridX ?? 0));
+  const startY = Math.min(maxY, Math.max(0, preferredGridY ?? 0));
+  const occupiedCells = collectOccupiedCells(existingItems);
+  const candidates = buildWrappedScanCandidates(maxX, maxY, startX, startY);
+
+  const selected: Array<{ x: number; y: number }> = [];
+  for (const candidate of candidates) {
+    if (!canPlaceAt(occupiedCells, itemWidth, itemHeight, candidate.x, candidate.y)) {
+      continue;
+    }
+
+    selected.push(candidate);
+    occupyCells(occupiedCells, itemWidth, itemHeight, candidate.x, candidate.y);
+
+    if (selected.length >= count) {
+      break;
+    }
+  }
+
+  return selected;
+}
