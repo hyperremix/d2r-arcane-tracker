@@ -5,7 +5,6 @@ import type { WidgetDisplayMode, WidgetSize } from '../utils/widgetDisplay';
 import { isWidgetDisplayMode } from '../utils/widgetDisplay';
 import {
   closeWidgetWindow,
-  getWidgetWindowPosition,
   resetWidgetWindowSize,
   setWidgetWindowLocked,
   showWidgetWindow,
@@ -88,34 +87,6 @@ export function initializeWidgetHandlers(
   });
 
   /**
-   * Get current widget position.
-   */
-  ipcMain.handle('widget:get-position', async () => {
-    try {
-      const position = getWidgetWindowPosition();
-      return { success: true, position };
-    } catch (error) {
-      console.error('Failed to get widget position:', error);
-      return { success: false, error: String(error), position: null };
-    }
-  });
-
-  /**
-   * Update widget position (called during drag).
-   */
-  ipcMain.handle('widget:update-position', async (_event, position: { x: number; y: number }) => {
-    try {
-      if (onPositionChange) {
-        onPositionChange(position);
-      }
-      return { success: true };
-    } catch (error) {
-      console.error('Failed to update widget position:', error);
-      return { success: false, error: String(error) };
-    }
-  });
-
-  /**
    * Update widget display mode.
    */
   ipcMain.handle(
@@ -168,43 +139,6 @@ export function initializeWidgetHandlers(
         return { success: true };
       } catch (error) {
         console.error('Failed to update widget lock state:', error);
-        return { success: false, error: String(error) };
-      }
-    },
-  );
-
-  /**
-   * Check if widget is currently open.
-   */
-  ipcMain.handle('widget:is-open', async () => {
-    try {
-      return { success: true, isOpen: widgetWindow !== null && !widgetWindow.isDestroyed() };
-    } catch (error) {
-      console.error('Failed to check widget status:', error);
-      return { success: false, isOpen: false };
-    }
-  });
-
-  /**
-   * Update widget size (called manually from settings or after resize).
-   */
-  ipcMain.handle(
-    'widget:update-size',
-    async (
-      _event,
-      display: unknown, // Renderer-provided: validated below
-      size: WidgetSize,
-    ) => {
-      try {
-        if (!isWidgetDisplayMode(display)) {
-          return { success: false, error: 'Invalid widget display mode' };
-        }
-        if (onSizeChange) {
-          onSizeChange(display, size);
-        }
-        return { success: true };
-      } catch (error) {
-        console.error('Failed to update widget size:', error);
         return { success: false, error: String(error) };
       }
     },

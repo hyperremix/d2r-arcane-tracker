@@ -139,32 +139,6 @@ export function initializeRunTrackerHandlers(
     }
   });
 
-  ipcMain.handle('run-tracker:get-active-session', async (_event) => {
-    try {
-      if (!runTracker) {
-        console.warn('[runTrackerHandlers] Run tracker not initialized, returning null');
-        return null;
-      }
-      return runTracker.getActiveSession();
-    } catch (error) {
-      console.error('[runTrackerHandlers] Error getting active session:', error);
-      return null;
-    }
-  });
-
-  ipcMain.handle('run-tracker:get-active-run', async (_event) => {
-    try {
-      if (!runTracker) {
-        console.warn('[runTrackerHandlers] Run tracker not initialized, returning null');
-        return null;
-      }
-      return runTracker.getActiveRun();
-    } catch (error) {
-      console.error('[runTrackerHandlers] Error getting active run:', error);
-      return null;
-    }
-  });
-
   // Statistics and data query handlers
   ipcMain.handle(
     'run-tracker:get-all-sessions',

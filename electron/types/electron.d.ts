@@ -2,7 +2,6 @@ import type {
   Character,
   D2Item,
   D2SaveFile,
-  FileReaderResponse,
   GlobalHotkeyStatus,
   GrailProgress,
   InventoryItemMoveInput,
@@ -93,30 +92,6 @@ export interface ElectronAPI {
     updateSettings(settings: Partial<Settings>): Promise<{ success: boolean }>
 
     /**
-     * Retrieves Holy Grail statistics for a specific character or overall progress.
-     * @param {string} [characterId] - Optional character ID to get statistics for.
-     * @returns {Promise<Object>} A promise that resolves with statistics object containing:
-     * @returns {number} returns.totalItems - Total number of items in the Holy Grail.
-     * @returns {number} returns.foundItems - Number of items found.
-     * @returns {number} returns.uniqueItems - Total number of unique items.
-     * @returns {number} returns.setItems - Total number of set items.
-     * @returns {number} returns.runes - Total number of runes.
-     * @returns {number} returns.foundUnique - Number of unique items found.
-     * @returns {number} returns.foundSet - Number of set items found.
-     * @returns {number} returns.foundRunes - Number of runes found.
-     */
-    getStatistics(characterId?: string): Promise<{
-      totalItems: number
-      foundItems: number
-      uniqueItems: number
-      setItems: number
-      runes: number
-      foundUnique: number
-      foundSet: number
-      foundRunes: number
-    }>
-
-    /**
      * Creates a backup of the database to the specified path.
      * @param {string} backupPath - The file path where the backup should be saved.
      * @returns {Promise<{ success: boolean }>} A promise that resolves with a success indicator.
@@ -134,11 +109,6 @@ export interface ElectronAPI {
      * @returns {Promise<{ success: boolean }>} A promise that resolves with a success indicator.
      */
     restoreFromBuffer(backupBuffer: Uint8Array): Promise<{ success: boolean }>
-    /**
-     * Truncates all user data from the database (keeps only seed data).
-     * @returns {Promise<{ success: boolean }>} A promise that resolves with a success indicator.
-     */
-    truncateUserData(): Promise<{ success: boolean }>
   }
 
   /**
@@ -254,38 +224,11 @@ export interface ElectronAPI {
     }>
 
     /**
-     * Gets an item icon by item name.
-     * @param {string} itemName - The display name of the item.
-     * @returns {Promise<string | null>} Base64 data URL of the icon or null if not found.
-     */
-    getByName(itemName: string): Promise<string | null>
-
-    /**
      * Gets an item icon by filename.
      * @param {string} filename - The icon filename (e.g., "item.png").
      * @returns {Promise<string | null>} Base64 data URL of the icon or null if not found.
      */
     getByFilename(filename: string): Promise<string | null>
-
-    /**
-     * Clears the icon cache.
-     * @returns {Promise<{ success: boolean }>} Success indicator.
-     */
-    clearCache(): Promise<{ success: boolean }>
-
-    /**
-     * Gets cache statistics.
-     * @returns {Promise<{ size: number; iconDirectory: string; cacheFile: string; conversionStatus: any }>} Cache stats.
-     */
-    getCacheStats(): Promise<{
-      size: number
-      iconDirectory: string
-      cacheFile: string
-      conversionStatus: {
-        status: 'not_started' | 'in_progress' | 'completed' | 'failed'
-        progress?: { current: number; total: number }
-      }
-    }>
 
     /**
      * Validates the D2R installation path for icon extraction.
@@ -386,19 +329,6 @@ export interface ElectronAPI {
     toggle(enabled: boolean, settings: Partial<Settings>): Promise<{ success: boolean; error?: string }>
 
     /**
-     * Gets the current widget window position.
-     * @returns {Promise<{ success: boolean; position: { x: number; y: number } | null; error?: string }>} A promise that resolves with the widget position.
-     */
-    getPosition(): Promise<{ success: boolean; position: { x: number; y: number } | null; error?: string }>
-
-    /**
-     * Updates the widget window position.
-     * @param {{ x: number; y: number }} position - The new position for the widget.
-     * @returns {Promise<{ success: boolean; error?: string }>} A promise that resolves with a success indicator.
-     */
-    updatePosition(position: { x: number; y: number }): Promise<{ success: boolean; error?: string }>
-
-    /**
      * Updates the widget display mode.
      * @param {'overall' | 'split' | 'all' | 'run-only'} display - The new display mode for the widget.
      * @param {Partial<Settings>} settings - Application settings containing custom sizes.
@@ -422,25 +352,11 @@ export interface ElectronAPI {
     setLocked(locked: boolean): Promise<{ success: boolean; error?: string }>
 
     /**
-     * Updates the widget window size.
-     * @param {'overall' | 'split' | 'all' | 'run-only'} display - The display mode for the size.
-     * @param {{ width: number; height: number }} size - The new size for the widget.
-     * @returns {Promise<{ success: boolean; error?: string }>} A promise that resolves with a success indicator.
-     */
-    updateSize(display: 'overall' | 'split' | 'all' | 'run-only', size: { width: number; height: number }): Promise<{ success: boolean; error?: string }>
-
-    /**
      * Resets the widget size to default for the current display mode.
      * @param {'overall' | 'split' | 'all' | 'run-only'} display - The display mode to reset size for.
      * @returns {Promise<{ success: boolean; size: { width: number; height: number } | null; error?: string }>} A promise that resolves with the default size.
      */
     resetSize(display: 'overall' | 'split' | 'all' | 'run-only'): Promise<{ success: boolean; size: { width: number; height: number } | null; error?: string }>
-
-    /**
-     * Checks if the widget window is currently open.
-     * @returns {Promise<{ success: boolean; isOpen: boolean }>} A promise that resolves with the widget status.
-     */
-    isOpen(): Promise<{ success: boolean; isOpen: boolean }>
 
     /**
      * Resets the widget position to the center of the screen.
@@ -483,13 +399,6 @@ export interface ElectronAPI {
    * Data update API methods for receiving data updates from the main process.
    */
   data: {
-    /**
-     * Registers a callback for data update events from the main process.
-     * @param {(data: FileReaderResponse) => void} callback - Function to call when data updates are received.
-     * @returns {Electron.IpcRenderer} The IpcRenderer instance for chaining.
-     */
-    onUpdate(callback: (data: FileReaderResponse) => void): Electron.IpcRenderer
-
     /**
      * Registers a callback for service error events from the main process.
      * The payload is untrusted IPC data and must be validated by the caller.
@@ -568,18 +477,6 @@ export interface ElectronAPI {
     }>
 
     /**
-     * Gets the currently active session.
-     * @returns {Promise<Session | null>} A promise that resolves with the active session or null.
-     */
-    getActiveSession(): Promise<Session | null>
-
-    /**
-     * Gets the currently active run.
-     * @returns {Promise<Run | null>} A promise that resolves with the active run or null.
-     */
-    getActiveRun(): Promise<Run | null>
-
-    /**
      * Statistics Queries
      */
     /**
@@ -641,18 +538,6 @@ export interface ElectronAPI {
       grailProgressId?: string
       foundTime?: Date
     }): Promise<{ success: boolean; runItem: RunItem }>
-
-    /**
-     * Gets the currently active session.
-     * @returns {Promise<Session | null>} A promise that resolves with the active session or null.
-     */
-    getActiveSession(): Promise<Session | null>
-
-    /**
-     * Gets the currently active run.
-     * @returns {Promise<Run | null>} A promise that resolves with the active run or null.
-     */
-    getActiveRun(): Promise<Run | null>
 
     /**
      * Gets the memory reading status (whether offsets are valid).

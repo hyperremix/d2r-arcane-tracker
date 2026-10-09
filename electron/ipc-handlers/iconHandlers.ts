@@ -167,19 +167,6 @@ export function initializeIconHandlers(): void {
   });
 
   /**
-   * Gets an item icon by item name.
-   * @returns Base64 data URL or null if not found
-   */
-  ipcMain.handle('icon:getByName', async (): Promise<string | null> => {
-    try {
-      return await iconService.getIconByName();
-    } catch (error) {
-      console.error('Failed to get icon:', error);
-      return null;
-    }
-  });
-
-  /**
    * Gets an item icon by filename.
    * @param _ - IPC event (unused)
    * @param filename - The icon filename (e.g., "item.png")
@@ -191,31 +178,6 @@ export function initializeIconHandlers(): void {
     } catch (error) {
       console.error(`Failed to get icon for filename ${filename}:`, error);
       return null;
-    }
-  });
-
-  /**
-   * Clears the icon cache.
-   */
-  ipcMain.handle('icon:clearCache', async (): Promise<{ success: boolean }> => {
-    try {
-      iconService.clearCache();
-      return { success: true };
-    } catch (error) {
-      console.error('Failed to clear cache:', error);
-      return { success: false };
-    }
-  });
-
-  /**
-   * Gets cache statistics for debugging.
-   */
-  ipcMain.handle('icon:getCacheStats', async () => {
-    try {
-      return iconService.getCacheStats();
-    } catch (error) {
-      console.error('Failed to get cache stats:', error);
-      throw error;
     }
   });
 

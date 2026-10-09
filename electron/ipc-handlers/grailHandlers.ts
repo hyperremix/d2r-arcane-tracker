@@ -1,6 +1,6 @@
 import { ipcMain, webContents } from 'electron';
 import { type GrailDatabase, grailDatabase } from '../database/database';
-import type { Difficulty, GrailProgress, Item, Settings } from '../types/grail';
+import type { Difficulty, GrailProgress, Settings } from '../types/grail';
 import { RUN_TRACKER_SHORTCUT_ACTIONS } from '../utils/runTrackerShortcuts';
 
 /**
@@ -251,21 +251,6 @@ export function initializeGrailHandlers(): void {
     }
   });
 
-  /**
-   * IPC handler for seeding items into the database.
-   * @param _ - IPC event (unused)
-   * @param items - Array of Holy Grail items to seed
-   */
-  ipcMain.handle('grail:seedItems', async (_, items: Item[]) => {
-    try {
-      grailDB.insertItems(items);
-      return { success: true };
-    } catch (error) {
-      console.error('Failed to seed items:', error);
-      throw error;
-    }
-  });
-
   // Progress handlers
   /**
    * IPC handler for retrieving grail progress.
@@ -410,23 +395,6 @@ export function initializeGrailHandlers(): void {
     }
   });
 
-  // Statistics handlers
-  /**
-   * IPC handler for retrieving grail statistics.
-   * @param _ - IPC event (unused)
-   * @param characterId - Optional character ID to get statistics for specific character
-   */
-  ipcMain.handle('grail:getStatistics', async (_, characterId?: string) => {
-    try {
-      const settings = grailDB.getAllSettings();
-      const stats = grailDB.getFilteredGrailStatistics(settings, characterId);
-      return stats;
-    } catch (error) {
-      console.error('Failed to get statistics:', error);
-      throw error;
-    }
-  });
-
   // Backup handlers
   /**
    * IPC handler for creating a database backup.
@@ -469,20 +437,6 @@ export function initializeGrailHandlers(): void {
       return { success: true };
     } catch (error) {
       console.error('Failed to restore database from buffer:', error);
-      throw error;
-    }
-  });
-
-  /**
-   * IPC handler for truncating all user data (characters and progress).
-   * This removes all characters and their associated progress while keeping items and settings.
-   */
-  ipcMain.handle('grail:truncateUserData', async () => {
-    try {
-      grailDB.truncateUserData();
-      return { success: true };
-    } catch (error) {
-      console.error('Failed to truncate user data:', error);
       throw error;
     }
   });

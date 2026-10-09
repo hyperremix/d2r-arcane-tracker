@@ -2,7 +2,6 @@ import { contextBridge, ipcRenderer } from 'electron';
 import type {
   Character,
   D2SaveFile,
-  FileReaderResponse,
   GlobalHotkeyStatus,
   GrailProgress,
   InventoryItemMoveInput,
@@ -99,25 +98,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
      * @returns {Promise<Item[]>} A promise that resolves with an array of runeword items.
      */
     getAllRunewords: (): Promise<Item[]> => ipcRenderer.invoke('grail:getAllRunewords'),
-    /**
-     * Seeds the database with Holy Grail items.
-     * @param {Item[]} items - The items to seed the database with.
-     * @returns {Promise<{ success: boolean }>} A promise that resolves with a success indicator.
-     */
-    seedItems: (items: Item[]): Promise<{ success: boolean }> =>
-      ipcRenderer.invoke('grail:seedItems', items),
-    /**
-     * Automatically seeds the database with default Holy Grail data if needed.
-     * @returns {Promise<{ success: boolean; seeded: boolean }>} A promise that resolves with success and seeded status.
-     */
-    autoSeed: (): Promise<{ success: boolean; seeded: boolean }> =>
-      ipcRenderer.invoke('grail:autoSeed'),
-    /**
-     * Checks if the database needs seeding.
-     * @returns {Promise<{ needsSeeding: boolean }>} A promise that resolves with seeding requirement status.
-     */
-    needsSeeding: (): Promise<{ needsSeeding: boolean }> =>
-      ipcRenderer.invoke('grail:needsSeeding'),
 
     /**
      * Retrieves grail progress for a specific character or all characters.
@@ -155,24 +135,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.invoke('grail:updateSettings', settings),
 
     /**
-     * Retrieves Holy Grail statistics for a specific character or overall progress.
-     * @param {string} [characterId] - Optional character ID to get statistics for.
-     * @returns {Promise<Object>} A promise that resolves with statistics object.
-     */
-    getStatistics: (
-      characterId?: string,
-    ): Promise<{
-      totalItems: number;
-      foundItems: number;
-      uniqueItems: number;
-      setItems: number;
-      runes: number;
-      foundUnique: number;
-      foundSet: number;
-      foundRunes: number;
-    }> => ipcRenderer.invoke('grail:getStatistics', characterId),
-
-    /**
      * Creates a backup of the database to the specified path.
      * @param {string} backupPath - The file path where the backup should be saved.
      * @returns {Promise<{ success: boolean }>} A promise that resolves with a success indicator.
@@ -193,12 +155,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
      */
     restoreFromBuffer: (backupBuffer: Uint8Array): Promise<{ success: boolean }> =>
       ipcRenderer.invoke('grail:restoreFromBuffer', backupBuffer),
-    /**
-     * Truncates all user data from the database (keeps only seed data).
-     * @returns {Promise<{ success: boolean }>} A promise that resolves with a success indicator.
-     */
-    truncateUserData: (): Promise<{ success: boolean }> =>
-      ipcRenderer.invoke('grail:truncateUserData'),
   },
 
   /**
@@ -357,14 +313,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
    */
   data: {
     /**
-     * Registers a callback for data update events from the main process.
-     * @param {(data: FileReaderResponse) => void} callback - Function to call when data updates are received.
-     * @returns {Electron.IpcRenderer} The IpcRenderer instance for chaining.
-     */
-    onUpdate: (callback: (data: FileReaderResponse) => void) =>
-      ipcRenderer.on('data:onUpdate', (_event, value) => callback(value)),
-
-    /**
      * Registers a callback for service error events from the main process.
      * @param callback - Function to call when service errors are received.
      * @returns Cleanup function to remove the listener.
@@ -429,40 +377,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
     }> => ipcRenderer.invoke('icon:getConversionStatus'),
 
     /**
-     * Gets an item icon by item name.
-     * @param {string} itemName - The display name of the item.
-     * @returns {Promise<string | null>} Base64 data URL of the icon or null if not found.
-     */
-    getByName: (itemName: string): Promise<string | null> =>
-      ipcRenderer.invoke('icon:getByName', itemName),
-
-    /**
      * Gets an item icon by filename.
      * @param {string} filename - The icon filename (e.g., "item.png").
      * @returns {Promise<string | null>} Base64 data URL of the icon or null if not found.
      */
     getByFilename: (filename: string): Promise<string | null> =>
       ipcRenderer.invoke('icon:getByFilename', filename),
-
-    /**
-     * Clears the icon cache.
-     * @returns {Promise<{ success: boolean }>} Success indicator.
-     */
-    clearCache: (): Promise<{ success: boolean }> => ipcRenderer.invoke('icon:clearCache'),
-
-    /**
-     * Gets cache statistics.
-     * @returns {Promise<CacheStats>} Cache stats.
-     */
-    getCacheStats: (): Promise<{
-      size: number;
-      iconDirectory: string;
-      cacheFile: string;
-      conversionStatus: {
-        status: 'not_started' | 'in_progress' | 'completed' | 'failed';
-        progress?: { current: number; total: number };
-      };
-    }> => ipcRenderer.invoke('icon:getCacheStats'),
 
     /**
      * Validates the D2R installation path for icon extraction.
@@ -487,27 +407,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
       settings: Partial<Settings>,
     ): Promise<{ success: boolean; error?: string }> =>
       ipcRenderer.invoke('widget:toggle', enabled, settings),
-
-    /**
-     * Gets the current widget window position.
-     * @returns {Promise<{ success: boolean; position: { x: number; y: number } | null; error?: string }>} Widget position.
-     */
-    getPosition: (): Promise<{
-      success: boolean;
-      position: { x: number; y: number } | null;
-      error?: string;
-    }> => ipcRenderer.invoke('widget:get-position'),
-
-    /**
-     * Updates the widget window position.
-     * @param {{ x: number; y: number }} position - The new position for the widget.
-     * @returns {Promise<{ success: boolean; error?: string }>} Success indicator.
-     */
-    updatePosition: (position: {
-      x: number;
-      y: number;
-    }): Promise<{ success: boolean; error?: string }> =>
-      ipcRenderer.invoke('widget:update-position', position),
 
     /**
      * Updates the widget display mode.
@@ -539,18 +438,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.invoke('widget:set-locked', locked),
 
     /**
-     * Updates the widget window size.
-     * @param {'overall' | 'split' | 'all' | 'run-only'} display - The display mode for the size.
-     * @param {{ width: number; height: number }} size - The new size for the widget.
-     * @returns {Promise<{ success: boolean; error?: string }>} Success indicator.
-     */
-    updateSize: (
-      display: 'overall' | 'split' | 'all' | 'run-only',
-      size: { width: number; height: number },
-    ): Promise<{ success: boolean; error?: string }> =>
-      ipcRenderer.invoke('widget:update-size', display, size),
-
-    /**
      * Resets the widget size to default for the current display mode.
      * @param {'overall' | 'split' | 'all' | 'run-only'} display - The display mode to reset size for.
      * @returns {Promise<{ success: boolean; size: { width: number; height: number } | null; error?: string }>} Default size.
@@ -562,13 +449,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
       size: { width: number; height: number } | null;
       error?: string;
     }> => ipcRenderer.invoke('widget:reset-size', display),
-
-    /**
-     * Checks if the widget window is currently open.
-     * @returns {Promise<{ success: boolean; isOpen: boolean }>} Widget status.
-     */
-    isOpen: (): Promise<{ success: boolean; isOpen: boolean }> =>
-      ipcRenderer.invoke('widget:is-open'),
 
     /**
      * Resets the widget position to the center of the screen.
@@ -723,19 +603,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
       activeSession: Session | null;
       activeRun: Run | null;
     }> => ipcRenderer.invoke('run-tracker:get-state'),
-
-    /**
-     * Gets the currently active session.
-     * @returns {Promise<Session | null>} A promise that resolves with the active session or null.
-     */
-    getActiveSession: (): Promise<Session | null> =>
-      ipcRenderer.invoke('run-tracker:get-active-session'),
-
-    /**
-     * Gets the currently active run.
-     * @returns {Promise<Run | null>} A promise that resolves with the active run or null.
-     */
-    getActiveRun: (): Promise<Run | null> => ipcRenderer.invoke('run-tracker:get-active-run'),
 
     /**
      * Statistics Queries
