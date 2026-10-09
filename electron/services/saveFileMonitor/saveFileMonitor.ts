@@ -31,6 +31,13 @@ import type { EventBus } from '../EventBus';
 import { normalizeItemsWithSocketedItems, resolveGrailLookupName } from '../itemNormalizer';
 import { parseModernStash } from '../modernStashParser';
 import { readD2iHeaderVersion, readD2iMetadata } from '../stashFormat';
+import {
+  buildSaveFileHeader,
+  type D2iHeaderInfo,
+  getSaveNameFromPath,
+  readD2iHeaderInfo,
+  shouldIncludeSaveFile,
+} from './saveFileFormat';
 
 const log = createServiceLogger('SaveFileMonitor');
 /**
@@ -85,12 +92,6 @@ interface SaveParseResult {
   stashHardcore?: boolean;
 }
 
-/** Hardcore flag and version of a .d2i file, falling back to the file name when unreadable. */
-interface D2iHeaderInfo {
-  hardcore: boolean;
-  version?: number;
-}
-
 /** A pending request to re-parse every save file; settled once that parse ran or was skipped. */
 interface ForcedParseRequest {
   promise: Promise<void>;
@@ -107,8 +108,6 @@ function createForcedParseRequest(): ForcedParseRequest {
   });
   return { promise, resolve, reject };
 }
-
-const SUPPORTED_SAVE_EXTENSIONS = new Set(['.d2s', '.sss', '.d2x', '.d2i']);
 
 /** True when a save's softcore/hardcore status is excluded by the configured game mode. */
 const isGameModeMismatch = (gameMode: GameMode | undefined, isHardcore: boolean): boolean =>
@@ -361,7 +360,7 @@ class SaveFileMonitor {
     this.fileWatcher = chokidar
       .watch(this.saveDirectory, {
         // Only watch files with save file extensions
-        ignored: (path, stats) => !!stats?.isFile() && !this.shouldIncludeSaveFile(basename(path)),
+        ignored: (path, stats) => !!stats?.isFile() && !shouldIncludeSaveFile(basename(path)),
         followSymlinks: false,
         ignoreInitial: true,
         depth: 0,
@@ -465,7 +464,7 @@ class SaveFileMonitor {
     for (const dir of directories) {
       try {
         const allFilesInDir = readdirSync(dir);
-        const files = allFilesInDir.filter((file) => this.shouldIncludeSaveFile(file));
+        const files = allFilesInDir.filter((file) => shouldIncludeSaveFile(file));
         allFiles.push(...files.map((file) => join(dir, file)));
       } catch (error) {
         log.error('parseAllSaveDirectories', error, { directory: dir });
@@ -507,7 +506,7 @@ class SaveFileMonitor {
     try {
       const allFilesInDir = readdirSync(directory);
 
-      const files = allFilesInDir.filter((file) => this.shouldIncludeSaveFile(file));
+      const files = allFilesInDir.filter((file) => shouldIncludeSaveFile(file));
 
       const allFiles = files.map((file) => join(directory, file));
 
@@ -539,51 +538,6 @@ class SaveFileMonitor {
       });
       return false;
     }
-  }
-
-  private shouldIncludeSaveFile(fileName: string): boolean {
-    const extension = extname(fileName).toLowerCase();
-    if (!SUPPORTED_SAVE_EXTENSIONS.has(extension)) {
-      return false;
-    }
-
-    if (extension !== '.d2i') {
-      return true;
-    }
-
-    return !this.isBackupLikeStashFile(fileName);
-  }
-
-  private isBackupLikeStashFile(fileName: string): boolean {
-    const lowerFileName = fileName.toLowerCase();
-    if (!lowerFileName.endsWith('.d2i')) {
-      return false;
-    }
-
-    const stem = lowerFileName.slice(0, -'.d2i'.length);
-    return (
-      stem.includes('_backup') ||
-      stem.endsWith('.bak') ||
-      stem.endsWith('_bak') ||
-      stem.endsWith('-bak')
-    );
-  }
-
-  private resolveSharedStashName(
-    isHardcore: boolean,
-    sourceFileVersion?: number,
-  ):
-    | 'Shared Stash Hardcore'
-    | 'Shared Stash Softcore'
-    | 'Modern Shared Stash Hardcore'
-    | 'Modern Shared Stash Softcore' {
-    const isModern = isModernStashVersion(sourceFileVersion);
-
-    if (isModern) {
-      return isHardcore ? 'Modern Shared Stash Hardcore' : 'Modern Shared Stash Softcore';
-    }
-
-    return isHardcore ? 'Shared Stash Hardcore' : 'Shared Stash Softcore';
   }
 
   /**
@@ -642,38 +596,6 @@ class SaveFileMonitor {
   }
 
   /**
-   * Extracts the character/save name from a file path.
-   * For .d2i files, returns friendly names like "Shared Stash Hardcore".
-   * @private
-   * @param {string} filePath - The file path to extract the name from.
-   * @param {boolean} [isHardcore] - Optional hardcore status (for shared stash files). If not provided, falls back to filename detection.
-   * @param {number} [sourceFileVersion] - Optional d2i source file version for modern stash naming.
-   * @returns {string} The character/save name.
-   */
-  private getSaveNameFromPath(
-    filePath: string,
-    isHardcore?: boolean,
-    sourceFileVersion?: number,
-  ): string {
-    const extension = extname(filePath).toLowerCase();
-    let saveName = basename(filePath)
-      .replace(/\.d2s/i, '')
-      .replace(/\.sss/i, '')
-      .replace(/\.d2x/i, '')
-      .replace(/\.d2i/i, '');
-
-    // Use friendly names for shared stash files
-    if (extension === '.d2i') {
-      // Use provided hardcore status if available, otherwise fall back to filename
-      const hardcore =
-        isHardcore !== undefined ? isHardcore : saveName.toLowerCase().includes('hardcore');
-      saveName = this.resolveSharedStashName(hardcore, sourceFileVersion);
-    }
-
-    return saveName;
-  }
-
-  /**
    * Describes an item without its position, location or character, so presence matching can still
    * recognise an item after it moved inside its save (which changes its fingerprint).
    */
@@ -697,7 +619,7 @@ class SaveFileMonitor {
    * @returns {Promise<SingleFileParseResult>} Parse result with save name, success status and snapshot data.
    */
   private async processSingleFile(filePath: string): Promise<SingleFileParseResult> {
-    let saveName = this.getSaveNameFromPath(filePath);
+    let saveName = getSaveNameFromPath(filePath);
 
     try {
       // Stat before reading: if the file changes while it is read, the stored time stays older than
@@ -708,8 +630,8 @@ class SaveFileMonitor {
       let d2iHeader: D2iHeaderInfo | undefined;
 
       if (extension === '.d2i') {
-        d2iHeader = this.readD2iHeaderInfo(filePath, buffer);
-        saveName = this.getSaveNameFromPath(filePath, d2iHeader.hardcore, d2iHeader.version);
+        d2iHeader = readD2iHeaderInfo(filePath, buffer);
+        saveName = getSaveNameFromPath(filePath, d2iHeader.hardcore, d2iHeader.version);
       }
 
       const {
@@ -738,7 +660,7 @@ class SaveFileMonitor {
         capturedAt: new Date(),
         items: snapshotItems,
       };
-      const saveFile = this.buildSaveFileHeader(filePath, buffer, mtime, {
+      const saveFile = buildSaveFileHeader(filePath, buffer, mtime, {
         d2iHeader,
         stashHardcore,
       });
@@ -1227,136 +1149,11 @@ class SaveFileMonitor {
         }
       }
 
-      return this.buildSaveFileHeader(filePath, buffer, stats.mtime, { stashHardcore });
+      return buildSaveFileHeader(filePath, buffer, stats.mtime, { stashHardcore });
     } catch (error) {
       log.error('parseSaveFile', error);
       return null;
     }
-  }
-
-  /**
-   * Reads the hardcore flag and version of a .d2i file, falling back to the file name.
-   * @private
-   */
-  private readD2iHeaderInfo(filePath: string, buffer: Buffer): D2iHeaderInfo {
-    try {
-      const metadata = readD2iMetadata(buffer);
-      log.info(
-        'readD2iHeaderInfo',
-        `Parsed .d2i metadata, hardcore: ${metadata.hardcore}, version: ${metadata.version}`,
-      );
-      return { hardcore: metadata.hardcore, version: metadata.version };
-    } catch (error) {
-      log.warn(
-        'readD2iHeaderInfo',
-        `Failed to read .d2i metadata, falling back to filename: ${error}`,
-      );
-      return { hardcore: basename(filePath).toLowerCase().includes('hardcore') };
-    }
-  }
-
-  /**
-   * Builds the character information of a save file from its already read content.
-   * @private
-   * @param {string} filePath - The path to the save file.
-   * @param {Buffer} buffer - The file content.
-   * @param {Date} lastModified - Modification time of the content.
-   * @param hints - Header data a parser already read: .d2i metadata, or the hardcore flag of a stash.
-   * @returns {D2SaveFile} The save file data.
-   */
-  private buildSaveFileHeader(
-    filePath: string,
-    buffer: Buffer,
-    lastModified: Date,
-    hints: { d2iHeader?: D2iHeaderInfo; stashHardcore?: boolean } = {},
-  ): D2SaveFile {
-    const extension = extname(filePath).toLowerCase();
-
-    // Handle shared stash files (.d2i)
-    if (extension === '.d2i') {
-      const { hardcore, version } = hints.d2iHeader ?? this.readD2iHeaderInfo(filePath, buffer);
-
-      return {
-        name: this.getSaveNameFromPath(filePath, hardcore, version),
-        path: filePath,
-        lastModified,
-        characterClass: 'shared_stash',
-        level: 1,
-        hardcore,
-        expansion: true,
-        sourceFileVersion: version,
-      };
-    }
-
-    // Legacy shared stash files (.sss/.d2x) have no character header: reading one as a .d2s would
-    // produce an invalid character class that the characters table rejects.
-    if (extension === '.sss' || extension === '.d2x') {
-      return {
-        name: this.getSaveNameFromPath(filePath),
-        path: filePath,
-        lastModified,
-        characterClass: 'shared_stash',
-        level: 1,
-        hardcore: hints.stashHardcore ?? basename(filePath).toLowerCase().includes('hardcore'),
-        expansion: true,
-      };
-    }
-
-    // Basic D2 save file parsing (simplified)
-    // Strip the extension case-insensitively (e.g. Hero.D2S), matching getSaveNameFromPath
-    const fileName =
-      extension === '.d2s' ? basename(filePath, extname(filePath)) : basename(filePath);
-
-    // Character name is typically the filename
-    const characterName = fileName;
-    let characterClass = 'unknown';
-    let level = 1;
-    let hardcore = false;
-    let expansion = true;
-
-    // Basic header parsing (D2 save files have a specific structure)
-    if (buffer.length >= 765) {
-      // Character class at offset 40
-      const classId = buffer.readUInt8(40);
-      characterClass = this.getCharacterClass(classId);
-
-      // Level at offset 43
-      level = buffer.readUInt8(43);
-
-      // Status flags at offset 36
-      const status = buffer.readUInt8(36);
-      hardcore = (status & 0x04) !== 0;
-      expansion = (status & 0x20) !== 0;
-    }
-
-    return {
-      name: characterName,
-      path: filePath,
-      lastModified,
-      characterClass,
-      level,
-      hardcore,
-      expansion,
-    };
-  }
-
-  /**
-   * Maps a character class ID to its name.
-   * @private
-   * @param {number} classId - The character class ID from the save file.
-   * @returns {string} The character class name.
-   */
-  private getCharacterClass(classId: number): string {
-    const classes = [
-      'amazon',
-      'sorceress',
-      'necromancer',
-      'paladin',
-      'barbarian',
-      'druid',
-      'assassin',
-    ];
-    return classes[classId] || 'unknown';
   }
 
   /**

@@ -439,25 +439,6 @@ describe('When SaveFileMonitor is used', () => {
     });
   });
 
-  describe('If character class parsing is used', () => {
-    it('Then should return correct character class for valid ID', () => {
-      // Act & Assert
-      expect((monitor as any).getCharacterClass(0)).toBe('amazon');
-      expect((monitor as any).getCharacterClass(1)).toBe('sorceress');
-      expect((monitor as any).getCharacterClass(2)).toBe('necromancer');
-      expect((monitor as any).getCharacterClass(3)).toBe('paladin');
-      expect((monitor as any).getCharacterClass(4)).toBe('barbarian');
-      expect((monitor as any).getCharacterClass(5)).toBe('druid');
-      expect((monitor as any).getCharacterClass(6)).toBe('assassin');
-    });
-
-    it('Then should return unknown for invalid character class ID', () => {
-      // Act & Assert
-      expect((monitor as any).getCharacterClass(99)).toBe('unknown');
-      expect((monitor as any).getCharacterClass(-1)).toBe('unknown');
-    });
-  });
-
   describe('If parseSaveFile is called for legacy shared stash files', () => {
     let saveDir: string;
 
@@ -1349,97 +1330,6 @@ describe('When SaveFileMonitor is used', () => {
   });
 
   describe('When stash header parsing is used', () => {
-    describe('If getSaveNameFromPath is called with hardcore=true parameter', () => {
-      it('Then should return legacy Shared Stash Hardcore for legacy file versions', () => {
-        // Arrange
-        const filePath = '/test/SharedStashSoftcoreV2.d2i';
-
-        // Act
-        const result = (monitor as any).getSaveNameFromPath(filePath, true, 99);
-
-        // Assert
-        expect(result).toBe('Shared Stash Hardcore');
-      });
-    });
-
-    describe('If getSaveNameFromPath is called with hardcore=false parameter', () => {
-      it('Then should return modern Shared Stash Softcore for modern file versions', () => {
-        // Arrange
-        const filePath = '/test/SharedStashHardcoreV2.d2i';
-
-        // Act
-        const result = (monitor as any).getSaveNameFromPath(filePath, false, 105);
-
-        // Assert
-        expect(result).toBe('Modern Shared Stash Softcore');
-      });
-    });
-
-    describe('If getSaveNameFromPath is called with hardcore=true and modern version', () => {
-      it('Then should return modern Shared Stash Hardcore', () => {
-        // Arrange
-        const filePath = '/test/SharedStashSoftcoreV2.d2i';
-
-        // Act
-        const result = (monitor as any).getSaveNameFromPath(filePath, true, 105);
-
-        // Assert
-        expect(result).toBe('Modern Shared Stash Hardcore');
-      });
-    });
-
-    describe('If getSaveNameFromPath is called without hardcore parameter for hardcore stash', () => {
-      it('Then should fallback to filename detection', () => {
-        // Arrange
-        const filePath = '/test/SharedStashHardcoreV2.d2i';
-
-        // Act
-        const result = (monitor as any).getSaveNameFromPath(filePath);
-
-        // Assert
-        expect(result).toBe('Shared Stash Hardcore'); // Falls back to filename
-      });
-    });
-
-    describe('If getSaveNameFromPath is called without hardcore parameter for softcore stash', () => {
-      it('Then should fallback to filename detection', () => {
-        // Arrange
-        const filePath = '/test/SharedStashSoftcoreV2.d2i';
-
-        // Act
-        const result = (monitor as any).getSaveNameFromPath(filePath);
-
-        // Assert
-        expect(result).toBe('Shared Stash Softcore'); // Falls back to filename
-      });
-    });
-
-    describe('If getSaveNameFromPath is called with non-.d2i file', () => {
-      it('Then should return filename without extension', () => {
-        // Arrange
-        const filePath = '/test/MyCharacter.d2s';
-
-        // Act
-        const result = (monitor as any).getSaveNameFromPath(filePath);
-
-        // Assert
-        expect(result).toBe('MyCharacter');
-      });
-    });
-
-    describe('If getSaveNameFromPath is called with an uppercase extension', () => {
-      it('Then should strip the extension case-insensitively', () => {
-        // Arrange
-        const filePath = '/test/Hero.D2S';
-
-        // Act
-        const result = (monitor as any).getSaveNameFromPath(filePath);
-
-        // Assert
-        expect(result).toBe('Hero');
-      });
-    });
-
     describe('If parseSaveFile is called with an uppercase .D2S extension', () => {
       it('Then should use the filename without extension as the character name', async () => {
         // Arrange
@@ -1467,38 +1357,6 @@ describe('When SaveFileMonitor is used', () => {
 
         // Assert
         expect(result.name).toBe('Hero');
-      });
-    });
-
-    describe('If getSaveNameFromPath is called with hardcore parameter on non-.d2i file', () => {
-      it('Then should ignore hardcore parameter', () => {
-        // Arrange
-        const filePath = '/test/MyCharacter.d2s';
-
-        // Act
-        const result = (monitor as any).getSaveNameFromPath(filePath, true);
-
-        // Assert
-        expect(result).toBe('MyCharacter'); // Hardcore parameter only applies to .d2i files
-      });
-    });
-
-    describe('If backup-like stash filenames are evaluated', () => {
-      it('Then backup-like .d2i files should be excluded from parsing', () => {
-        // Arrange
-        const fileNames = [
-          'Barb.d2s',
-          'SharedStashSoftCoreV2.d2i',
-          'SharedStashSoftCoreV2_Backup.d2i',
-          'SharedStashSoftCoreV2.bak.d2i',
-          'notes.txt',
-        ];
-
-        // Act
-        const included = fileNames.map((name) => (monitor as any).shouldIncludeSaveFile(name));
-
-        // Assert
-        expect(included).toEqual([true, true, false, false, false]);
       });
     });
   });
