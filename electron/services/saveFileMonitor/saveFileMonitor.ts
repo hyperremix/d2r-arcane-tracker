@@ -1,8 +1,7 @@
 import { existsSync, readdirSync } from 'node:fs';
 import { readFile, stat } from 'node:fs/promises';
-import { basename, dirname, extname, join } from 'node:path';
+import { dirname, extname, join } from 'node:path';
 import type { FSWatcher } from 'chokidar';
-import chokidar from 'chokidar';
 import { app } from 'electron';
 import type { GrailDatabase } from '../../database/database';
 import type {
@@ -14,11 +13,11 @@ import type {
   VaultSourceFileType,
 } from '../../types/grail';
 import { GameMode } from '../../types/grail';
-import { isRune } from '../../utils/objects';
 import { createServiceLogger } from '../../utils/serviceLogger';
 import { ensureD2sConstants } from '../d2s/constants';
 import type { EventBus } from '../EventBus';
-import { resolveGrailLookupName } from '../itemNormalizer';
+import { executeConcurrently } from './executeConcurrently';
+import { countAvailableRunes, mergeInventorySnapshots } from './inventorySnapshots';
 import {
   readConfiguredSaveDirectory,
   resolveDebounceDelay,
@@ -33,6 +32,7 @@ import {
   shouldIncludeSaveFile,
 } from './saveFileFormat';
 import { type GameModeReader, parseSaveContent, readLegacyStashHardcore } from './saveFileParser';
+import { SAVE_WATCHER_USES_POLLING, watchSaveDirectory } from './saveFileWatcher';
 import type {
   CompleteFileParseResult,
   FileParseSuccess,
@@ -212,10 +212,7 @@ class SaveFileMonitor {
     log.info('startMonitoring', 'Initial parsing successful');
     this.watchPath = this.saveDirectory;
 
-    // Use polling mode for better compatibility with D2R (which uses atomic file writes)
-    // Polling checks files periodically instead of relying on file system events
-    const usePolling = true;
-    log.info('startMonitoring', `Using polling mode: ${usePolling}`);
+    log.info('startMonitoring', `Using polling mode: ${SAVE_WATCHER_USES_POLLING}`);
 
     // Get configurable intervals from settings
     const { pollingInterval, stabilityThreshold } = resolveWatcherIntervals(
@@ -227,41 +224,15 @@ class SaveFileMonitor {
       `Using intervals: polling=${pollingInterval}ms, stability=${stabilityThreshold}ms`,
     );
 
-    this.fileWatcher = chokidar
-      .watch(this.saveDirectory, {
-        // Only watch files with save file extensions
-        ignored: (path, stats) => !!stats?.isFile() && !shouldIncludeSaveFile(basename(path)),
-        followSymlinks: false,
-        ignoreInitial: true,
-        depth: 0,
-        usePolling: usePolling, // Polling is more reliable for games like D2R that use atomic writes
-        interval: pollingInterval,
-        awaitWriteFinish: {
-          stabilityThreshold: stabilityThreshold,
-          pollInterval: 100,
-        },
-      })
-      .on('all', (event, path) => {
-        log.info('chokidar', `Event: ${event} on ${path}`);
+    this.fileWatcher = watchSaveDirectory(
+      this.saveDirectory,
+      { pollingInterval, stabilityThreshold },
+      () => {
         this.fileChangeCounter++;
         this.lastFileChangeTime = Date.now();
         log.info('chokidar', `fileChangeCounter incremented to ${this.fileChangeCounter}`);
-      })
-      .on('error', (error) => log.error('chokidar', error))
-      .on('ready', () => {
-        log.info('chokidar', 'File watcher ready');
-        const watched = this.fileWatcher?.getWatched();
-        if (watched) {
-          log.info('chokidar', `Watching paths: ${Object.keys(watched).join(', ')}`);
-          log.info(
-            'chokidar',
-            `Total files being watched: ${Object.values(watched).reduce((sum, files) => sum + files.length, 0)}`,
-          );
-        }
-      })
-      .on('add', (path) => log.info('chokidar', `File added: ${path}`))
-      .on('change', (path) => log.info('chokidar', `File changed: ${path}`))
-      .on('unlink', (path) => log.info('chokidar', `File removed: ${path}`));
+      },
+    );
 
     this.isMonitoring = true;
     log.info('startMonitoring', 'Monitoring flag set to true');
@@ -628,41 +599,6 @@ class SaveFileMonitor {
   }
 
   /**
-   * Executes an array of async tasks with a concurrency limit.
-   * This prevents resource exhaustion when many files need to be parsed.
-   * @private
-   * @template T - The return type of the tasks
-   * @param {Array<() => Promise<T>>} tasks - Array of async task functions
-   * @param {number} limit - Maximum number of concurrent tasks
-   * @returns {Promise<T[]>} Promise that resolves with all task results in order
-   */
-  private async executeConcurrently<T>(
-    tasks: Array<() => Promise<T>>,
-    limit: number,
-  ): Promise<T[]> {
-    const results: T[] = new Array(tasks.length);
-    const queue = tasks.map((task, index) => ({ task, index }));
-
-    const worker = async (): Promise<void> => {
-      let item = queue.shift();
-      while (item !== undefined) {
-        try {
-          results[item.index] = await item.task();
-        } catch (error) {
-          log.error('executeConcurrently', error, { taskIndex: item.index });
-          results[item.index] = undefined as T;
-        }
-        item = queue.shift();
-      }
-    };
-
-    const workers = Array.from({ length: Math.min(limit, tasks.length) }, () => worker());
-    await Promise.all(workers);
-
-    return results;
-  }
-
-  /**
    * Parses multiple save files and updates the current data.
    * @private
    * @param {string[]} filePaths - Array of file paths to parse.
@@ -697,7 +633,7 @@ class SaveFileMonitor {
 
     if (filesToParse.length === 0) {
       log.info('parseFiles', 'No files to parse, exiting early');
-      this.inventorySnapshots = this.mergeInventorySnapshots(filePaths, [], []);
+      this.inventorySnapshots = mergeInventorySnapshots(this.inventorySnapshots, filePaths, [], []);
       return;
     }
 
@@ -711,7 +647,7 @@ class SaveFileMonitor {
       return () => this.processSingleFile(filePath);
     });
 
-    const parseResults = await this.executeConcurrently(tasks, this.MAX_CONCURRENT_PARSES);
+    const parseResults = await executeConcurrently(tasks, this.MAX_CONCURRENT_PARSES);
     const successfulParseResults = parseResults.filter(
       (result): result is CompleteFileParseResult | IncompleteFileParseResult =>
         Boolean(result?.success && result.saveName),
@@ -738,7 +674,8 @@ class SaveFileMonitor {
       this.grailDatabase.setSetting('saveDir', firstDir);
     }
 
-    this.inventorySnapshots = this.mergeInventorySnapshots(
+    this.inventorySnapshots = mergeInventorySnapshots(
+      this.inventorySnapshots,
       filePaths,
       filesToParse,
       successfulSnapshots,
@@ -868,43 +805,6 @@ class SaveFileMonitor {
     };
   }
 
-  private mergeInventorySnapshots(
-    allFilePaths: string[],
-    parsedFilePaths: string[],
-    successfulSnapshots: CharacterInventorySnapshot[],
-  ): CharacterInventorySnapshot[] {
-    const knownFilePathSet = new Set(allFilePaths);
-    const parsedFilePathSet = new Set(parsedFilePaths);
-    const successfulSnapshotKeySet = new Set(
-      successfulSnapshots.map(
-        (snapshot) => `${snapshot.sourceFileType}:${snapshot.sourceFilePath}`,
-      ),
-    );
-    const mergedByKey = new Map<string, CharacterInventorySnapshot>();
-
-    for (const snapshot of this.inventorySnapshots) {
-      if (!knownFilePathSet.has(snapshot.sourceFilePath)) {
-        continue;
-      }
-
-      const snapshotKey = `${snapshot.sourceFileType}:${snapshot.sourceFilePath}`;
-      if (
-        parsedFilePathSet.has(snapshot.sourceFilePath) &&
-        successfulSnapshotKeySet.has(snapshotKey)
-      ) {
-        continue;
-      }
-
-      mergedByKey.set(snapshotKey, snapshot);
-    }
-
-    for (const snapshot of successfulSnapshots) {
-      mergedByKey.set(`${snapshot.sourceFileType}:${snapshot.sourceFilePath}`, snapshot);
-    }
-
-    return [...mergedByKey.values()];
-  }
-
   /**
    * Gets the count of each available rune across the latest inventory snapshot of every save file.
    * Stacked runes count with their stack size. Runes socketed into another item are used up and
@@ -912,25 +812,7 @@ class SaveFileMonitor {
    * @returns {Record<string, number>} A record mapping rune IDs to their counts.
    */
   getAvailableRunesCount(): Record<string, number> {
-    const runeCounts: Record<string, number> = {};
-
-    for (const snapshot of this.inventorySnapshots) {
-      for (const item of snapshot.items) {
-        const rawItem = item.rawParsedItem;
-        if (item.isSocketedItem || rawItem.socketed || !isRune(rawItem)) {
-          continue;
-        }
-
-        const runeId = resolveGrailLookupName(rawItem);
-        if (runeId === '') {
-          continue;
-        }
-
-        runeCounts[runeId] = (runeCounts[runeId] ?? 0) + (item.stackCount ?? 1);
-      }
-    }
-
-    return runeCounts;
+    return countAvailableRunes(this.inventorySnapshots);
   }
 
   /**
