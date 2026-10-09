@@ -870,12 +870,12 @@ describe('When session statistics are read from the stores', () => {
   });
 
   describe('If a session is not loaded', () => {
-    it('Then useSessionStatsLookup returns null for it', () => {
+    it('Then useSessionStatsLookup returns undefined for it', () => {
       // Arrange & Act
       const { result } = renderHook(() => useSessionStatsLookup());
 
       // Assert
-      expect(result.current('unknown-session')).toBeNull();
+      expect(result.current('unknown-session')).toBeUndefined();
     });
   });
 });

@@ -129,7 +129,7 @@ Conversion only reads game files and is safe to run again. The PNGs are stored i
 
 ### Statistics
 
-The **Statistics** page shows overall and per-category progress, recent finds, find streaks, a comparison between characters, and run analytics from the [Run Tracker](RUN_TRACKER.md). Recent finds are the finds of the last 7 days, and a find streak counts consecutive calendar days with at least one find. Items found by the first scan of your save files count as found, but not as recent finds or towards streaks. The selected tab (**Grail Statistics** or **Run Statistics**) is kept in the page address, so going back to the page with the browser's back button restores it.
+The **Statistics** page shows overall and per-category progress, recent finds, find streaks, a comparison between characters, and run analytics from the [Run Tracker](RUN_TRACKER.md). Recent finds are the finds of the last 7 days, and a find streak counts consecutive calendar days with at least one find. Items found by the first scan of your save files count as found, but not as recent finds or towards streaks. Recent finds count every find made while the tracker was running, whether or not that version of the item is tracked. They are refreshed when the date changes, so a window left open overnight stays current. The selected tab (**Grail Statistics** or **Run Statistics**) is kept in the page address, so going back to the page with the browser's back button restores it.
 
 ### Inventory Browser
 
@@ -170,7 +170,7 @@ If a background task fails, for example a save file can't be read or a database 
 - **All**: all three gauges. Requires ethereal tracking.
 - **Run Only**: the current run counter, and optionally a list of items found in this run. Turning the item list on or off switches the widget to the matching default height.
 
-The progress gauges show the same numbers as the progress summary on the Holy Grail page.
+The progress gauges show the same numbers as the progress summary on the Holy Grail page. Only the versions you track count towards the totals: with **Include Ethereal Items** off there is no ethereal total, and with **Include Normal Items** off there is no normal total. The normal and ethereal split in the progress summary is only shown while both versions are tracked.
 
 The widget remembers its size separately for each display mode. **Reset Size** restores the default for the current mode.
 

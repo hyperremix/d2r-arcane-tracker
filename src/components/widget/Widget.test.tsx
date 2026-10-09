@@ -95,7 +95,7 @@ vi.mock('@/stores/runTrackerStore', () => {
     // Selector-aware like the real store hook
     useRunTrackerStore: (selector?: (state: ReturnType<typeof getState>) => unknown) =>
       selector ? selector(getState()) : getState(),
-    useSessionStats: () => null,
+    useSessionStats: () => undefined,
   };
 });
 

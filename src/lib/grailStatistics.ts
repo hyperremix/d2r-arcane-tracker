@@ -6,9 +6,8 @@ import type {
   ItemCategory,
   Settings,
 } from 'electron/types/grail';
+import { DAY_MS } from '@/lib/date';
 import { canItemBeEthereal, canItemBeNormal } from '@/lib/ethereal';
-
-const DAY_MS = 24 * 60 * 60 * 1000;
 
 /** Number of days a find counts as recent. */
 export const RECENT_FIND_DAYS = 7;

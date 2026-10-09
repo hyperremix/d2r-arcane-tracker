@@ -63,7 +63,7 @@ Turn on **Global hotkeys** in **Settings → Run Tracker Settings** to use the s
 
 ## Run items
 
-Grail items detected while a run is active are added to that run automatically. Because D2R only saves when you leave a game, they appear once you exit. **New Grail Items** (on the active session card and in a session's details) counts the items found in the session's runs that weren't in your grail before. Repeat finds and items added manually by name don't count. Use **Add Item Manually** in the live session card for anything the app didn't detect.
+Grail items detected while a run is active are added to that run automatically. Because D2R only saves when you leave a game, they appear once you exit. **New Grail Items** (on the active session card and in a session's details) counts the items found in the session's runs that weren't in your grail before. Repeat finds and items added manually by name don't count, and neither do versions you don't track (for example an ethereal find while ethereal tracking is off). When both normal and ethereal items are tracked, the two versions of an item are separate entries, so finding the ethereal version of an item you already have as normal counts as new. Use **Add Item Manually** in the live session card for anything the app didn't detect.
 
 ## Exporting
 

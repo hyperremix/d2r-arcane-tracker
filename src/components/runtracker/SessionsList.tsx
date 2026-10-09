@@ -31,7 +31,7 @@ const ITEMS_PER_PAGE = 10;
 interface SessionTableRowProps {
   session: Session;
   onSessionClick: (sessionId: string) => void;
-  getSessionStats: (sessionId: string) => { itemsFound: number } | null;
+  getSessionStats: (sessionId: string) => { itemsFound: number } | undefined;
   getSessionDuration: (session: Session) => number;
   formatSessionDate: (date: Date) => string;
 }

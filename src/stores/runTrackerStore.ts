@@ -849,9 +849,9 @@ function findSession(
  * Returns the statistics of a session, computed from its loaded runs and run items and the grail
  * progress. Recalculated only when that data changes.
  * @param session - The session, or null/undefined if there is none
- * @returns The session statistics, or null without a session
+ * @returns The session statistics, or undefined without a session
  */
-export function useSessionStats(session: Session | null | undefined): SessionStats | null {
+export function useSessionStats(session: Session | null | undefined): SessionStats | undefined {
   const sessionRuns = useRunTrackerStore((state) =>
     session ? state.runs.get(session.id) : undefined,
   );
@@ -860,7 +860,9 @@ export function useSessionStats(session: Session | null | undefined): SessionSta
 
   return useMemo(
     () =>
-      session ? computeSessionStats(session, sessionRuns ?? [], runItems, firstDiscoveries) : null,
+      session
+        ? computeSessionStats(session, sessionRuns ?? [], runItems, firstDiscoveries)
+        : undefined,
     [session, sessionRuns, runItems, firstDiscoveries],
   );
 }
@@ -869,9 +871,9 @@ export function useSessionStats(session: Session | null | undefined): SessionSta
  * Returns a function that looks up the statistics of any loaded session, for lists that need
  * the statistics of many sessions. Each session's statistics are computed at most once until the
  * run tracker or grail data changes.
- * @returns Function returning the statistics of a session, or null if it is not loaded
+ * @returns Function returning the statistics of a session, or undefined if it is not loaded
  */
-export function useSessionStatsLookup(): (sessionId: string) => SessionStats | null {
+export function useSessionStatsLookup(): (sessionId: string) => SessionStats | undefined {
   const sessions = useRunTrackerStore((state) => state.sessions);
   const activeSession = useRunTrackerStore((state) => state.activeSession);
   const runs = useRunTrackerStore((state) => state.runs);
@@ -881,20 +883,20 @@ export function useSessionStatsLookup(): (sessionId: string) => SessionStats | n
   // A fresh cache per data snapshot; it is local to this hook and never written to the store
   // biome-ignore lint/correctness/useExhaustiveDependencies: the cache must be dropped whenever the data it was computed from changes
   const cache = useMemo(
-    () => new Map<string, SessionStats | null>(),
+    () => new Map<string, SessionStats | undefined>(),
     [sessions, activeSession, runs, runItems, firstDiscoveries],
   );
 
   return useCallback(
     (sessionId: string) => {
-      const cached = cache.get(sessionId);
-      if (cached !== undefined) {
-        return cached;
+      // A session that is not loaded is cached as undefined, so check presence rather than value
+      if (cache.has(sessionId)) {
+        return cache.get(sessionId);
       }
       const session = findSession(sessionId, sessions, activeSession);
       const stats = session
         ? computeSessionStats(session, runs.get(sessionId) ?? [], runItems, firstDiscoveries)
-        : null;
+        : undefined;
       cache.set(sessionId, stats);
       return stats;
     },

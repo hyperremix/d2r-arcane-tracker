@@ -29,7 +29,7 @@ function setupRunTrackerStore(sessions: Session[]) {
     loadSessionRuns: vi.fn().mockResolvedValue(undefined),
     loadingSessions: new Set<string>(),
   };
-  vi.mocked(useSessionStatsLookup).mockReturnValue(() => null);
+  vi.mocked(useSessionStatsLookup).mockReturnValue(() => undefined);
   vi.mocked(useRunTrackerStore).mockImplementation((selector?: unknown) => {
     if (typeof selector === 'function') {
       return (selector as (s: typeof storeState) => unknown)(storeState);

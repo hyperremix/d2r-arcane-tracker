@@ -12,6 +12,7 @@ import i18n from 'i18next';
 import { useMemo } from 'react';
 import { toast } from 'sonner';
 import { create } from 'zustand';
+import { useCurrentDay } from '@/hooks/useCurrentDay';
 import { translations } from '@/i18n/translations';
 import { filterItemsByTrackedVersions } from '@/lib/ethereal';
 import { computeGrailStatistics, type GrailStatisticsSummary } from '@/lib/grailStatistics';
@@ -1064,7 +1065,7 @@ export const useItemResultCount = (): ItemResultCount => {
 /**
  * Custom hook that returns the Holy Grail statistics (overall progress, recent finds, streaks and
  * the category and character breakdowns). The result is memoized and only recalculated when the
- * items, progress, characters or tracked versions change.
+ * items, progress, characters or tracked versions change, or the day rolls over.
  * @returns {GrailStatisticsSummary} The statistics
  */
 export const useGrailStatistics = (): GrailStatisticsSummary => {
@@ -1075,6 +1076,11 @@ export const useGrailStatistics = (): GrailStatisticsSummary => {
   const grailNormal = useGrailStore((state) => state.settings.grailNormal);
   const grailEthereal = useGrailStore((state) => state.settings.grailEthereal);
 
+  // Recent finds and streaks depend on the current date, so recalculate when the day rolls over
+  // even if the data did not change (e.g. a widget left open overnight)
+  const currentDay = useCurrentDay();
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: currentDay only triggers a recalculation with a fresh current time
   return useMemo(
     () =>
       computeGrailStatistics({
@@ -1083,6 +1089,6 @@ export const useGrailStatistics = (): GrailStatisticsSummary => {
         characters,
         settings: { grailNormal, grailEthereal },
       }),
-    [items, progress, characters, grailNormal, grailEthereal],
+    [items, progress, characters, grailNormal, grailEthereal, currentDay],
   );
 };

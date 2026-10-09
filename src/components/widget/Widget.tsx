@@ -48,7 +48,7 @@ const NO_DRAG_STYLE: WidgetRootStyle = { WebkitAppRegion: 'no-drag' };
 interface RunOnlyDisplayProps {
   activeSession: Session | null;
   runDuration: number;
-  sessionStats: SessionStats | null;
+  sessionStats: SessionStats | undefined;
   runItemsByRun: RunItemsByRun[];
   showItemList: boolean;
   onAddManualItem?: (name: string) => Promise<void>;
@@ -402,7 +402,7 @@ export function Widget({ statistics, settings, onDragStart, onDragEnd }: WidgetP
 
   // Session statistics for run-only mode
   const activeSessionStats = useSessionStats(activeSession);
-  const sessionStats = displayMode === 'run-only' ? activeSessionStats : null;
+  const sessionStats = displayMode === 'run-only' ? activeSessionStats : undefined;
 
   // Build per-run item list for run-only mode
   const runItemsByRun = useMemo(() => {

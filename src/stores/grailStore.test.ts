@@ -1947,6 +1947,42 @@ describe('When useGrailStatistics is used', () => {
     });
   });
 
+  describe('If a find ages out of the recent window after midnight without any data change', () => {
+    it('Then the recent finds are recalculated', () => {
+      // Arrange
+      vi.useFakeTimers();
+      try {
+        vi.setSystemTime(new Date(2024, 5, 15, 23, 59, 0));
+        act(() => {
+          useGrailStore
+            .getState()
+            .setItems([HolyGrailItemBuilder.new().withId('a').withType('unique').build()]);
+          useGrailStore.getState().setProgress([
+            GrailProgressBuilder.new()
+              .withId('p')
+              .withCharacterId('c')
+              .withItemId('a')
+              .withFoundDate(new Date(2024, 5, 8, 23, 59, 30))
+              .withFromInitialScan(false)
+              .build(),
+          ]);
+        });
+        const { result } = renderHook(() => useGrailStatistics());
+        expect(result.current.recentFinds).toBe(1);
+
+        // Act
+        act(() => {
+          vi.advanceTimersByTime(61_000);
+        });
+
+        // Assert
+        expect(result.current.recentFinds).toBe(0);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+  });
+
   describe('If the progress changes', () => {
     it('Then the statistics are recalculated', () => {
       // Arrange

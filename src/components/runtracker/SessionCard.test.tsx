@@ -49,7 +49,7 @@ const createStoreState = (overrides: Record<string, unknown> = {}) =>
 describe('SessionCard', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(useSessionStats).mockReturnValue(null);
+    vi.mocked(useSessionStats).mockReturnValue(undefined);
     mockStoreState(mockUseRunTrackerStore, createStoreState());
     mockStoreState(mockUseGrailStore, {
       items: [],
