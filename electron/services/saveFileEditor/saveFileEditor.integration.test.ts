@@ -2,14 +2,14 @@ import { copyFileSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { parseModernStash } from './modernStashParser';
+import { parseModernStash } from '../modernStashParser';
 import {
   addItemToSaveFile,
   moveItemBetweenSaveFiles,
   readSaveFileItem,
   removeItemFromSaveFile,
   splitStackInSaveFile,
-} from './saveFileEditor';
+} from './index';
 
 // These tests run the real d2s library against a real v105 shared stash fixture: the point is that
 // no operation may ever change the number of items (or runes) in the stash unexpectedly.

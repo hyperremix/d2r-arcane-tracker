@@ -6,8 +6,8 @@ import { readItem, writeItem } from '@dschu012/d2s/lib/d2/items';
 import * as d2stash from '@dschu012/d2s/lib/d2/stash';
 import { constants as constants96 } from '@dschu012/d2s/lib/data/versions/96_constant_data';
 import { constants as constants99 } from '@dschu012/d2s/lib/data/versions/99_constant_data';
-import type { CharacterClass, VaultLocationContext, VaultSourceFileType } from '../types/grail';
-import { writeFileAtomic } from '../utils/atomicWrite';
+import type { CharacterClass, VaultLocationContext, VaultSourceFileType } from '../../types/grail';
+import { writeFileAtomic } from '../../utils/atomicWrite';
 import {
   isModernStashVersion,
   isResourceCodeOfKind,
@@ -18,12 +18,12 @@ import {
   resolveResourceStashTabKind,
   resolveStackCount,
   SHARED_TAB_COUNT,
-} from '../utils/d2rFormat';
-import { createBoundedBitReader } from './boundedBitReader';
-import { ensureD2sConstants } from './d2s/constants';
-import { constants105Extended } from './modernStashParser';
-import { backupSaveFile } from './saveFileBackup';
-import { D2I_SECTOR_HEADER_SIZE, readD2iMetadata } from './stashFormat';
+} from '../../utils/d2rFormat';
+import { createBoundedBitReader } from '../boundedBitReader';
+import { ensureD2sConstants } from '../d2s/constants';
+import { constants105Extended } from '../modernStashParser';
+import { backupSaveFile } from '../saveFileBackup';
+import { D2I_SECTOR_HEADER_SIZE, readD2iMetadata } from '../stashFormat';
 
 interface StashConstants {
   constants: d2sTypes.IConstantData;

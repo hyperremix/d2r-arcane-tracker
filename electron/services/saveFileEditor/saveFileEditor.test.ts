@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { D2I_SECTOR_HEADER_SIZE } from './stashFormat';
+import { D2I_SECTOR_HEADER_SIZE } from '../stashFormat';
 
-type SaveFileEditorModule = typeof import('./saveFileEditor');
+type SaveFileEditorModule = typeof import('./index');
 
 let mockReadFile: ReturnType<typeof vi.fn>;
 let mockWriteFile: ReturnType<typeof vi.fn>;
@@ -60,11 +60,11 @@ beforeAll(async () => {
     writeFile: mockWriteFile,
   }));
 
-  vi.doMock('./saveFileBackup', () => ({
+  vi.doMock('../saveFileBackup', () => ({
     backupSaveFile: vi.fn().mockResolvedValue(undefined),
   }));
 
-  vi.doMock('../utils/atomicWrite', () => ({
+  vi.doMock('../../utils/atomicWrite', () => ({
     writeFileAtomic: (filePath: string, data: Buffer) => mockWriteFile(filePath, data),
   }));
 
@@ -88,7 +88,7 @@ beforeAll(async () => {
     constants: constants99,
   }));
 
-  vi.doMock('./stashFormat', () => ({
+  vi.doMock('../stashFormat', () => ({
     D2I_SECTOR_HEADER_SIZE,
     readD2iMetadata: mockReadD2iMetadata,
   }));
@@ -97,7 +97,7 @@ beforeAll(async () => {
   // With isolate:false, the stashFormat mock would otherwise contaminate tests
   // in other files (modernStashParser.test.ts, saveFileMonitor.test.ts) that
   // need the real readD2iMetadata implementation.
-  vi.doMock('./modernStashParser', () => ({
+  vi.doMock('../modernStashParser', () => ({
     constants105Extended: {},
   }));
 
@@ -108,7 +108,7 @@ beforeAll(async () => {
     writeItem: mockWriteItem,
   }));
 
-  const module = await import('./saveFileEditor');
+  const module = await import('./index');
   removeItemFromSaveFile = module.removeItemFromSaveFile;
   addItemToSaveFile = module.addItemToSaveFile;
   moveItemBetweenSaveFiles = module.moveItemBetweenSaveFiles;
@@ -119,14 +119,14 @@ beforeAll(async () => {
 // Remove them so later files (e.g. saveFileEditor.integration.test.ts) load the real modules.
 const doMockedModules = [
   'node:fs/promises',
-  './saveFileBackup',
-  '../utils/atomicWrite',
+  '../saveFileBackup',
+  '../../utils/atomicWrite',
   '@dschu012/d2s',
   '@dschu012/d2s/lib/d2/stash',
   '@dschu012/d2s/lib/data/versions/96_constant_data',
   '@dschu012/d2s/lib/data/versions/99_constant_data',
-  './stashFormat',
-  './modernStashParser',
+  '../stashFormat',
+  '../modernStashParser',
   '@dschu012/d2s/lib/d2/items',
 ];
 
