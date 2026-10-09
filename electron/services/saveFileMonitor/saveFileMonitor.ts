@@ -9,7 +9,6 @@ import type {
   CharacterInventorySnapshot,
   D2SaveFile,
   InventorySearchResult,
-  ParsedInventoryItem,
   SaveFileEvent,
   SaveFileState,
   VaultSourceFileType,
@@ -17,7 +16,6 @@ import type {
 import { GameMode } from '../../types/grail';
 import { isRune } from '../../utils/objects';
 import { createServiceLogger } from '../../utils/serviceLogger';
-import { createVaultPresenceKey } from '../../utils/vaultPresence';
 import { ensureD2sConstants } from '../d2s/constants';
 import type { EventBus } from '../EventBus';
 import { resolveGrailLookupName } from '../itemNormalizer';
@@ -28,48 +26,20 @@ import {
   readD2iHeaderInfo,
   shouldIncludeSaveFile,
 } from './saveFileFormat';
+import { type GameModeReader, parseSaveContent, readLegacyStashHardcore } from './saveFileParser';
+import type {
+  CompleteFileParseResult,
+  FileParseSuccess,
+  IncompleteFileParseResult,
+  SingleFileParseResult,
+} from './types';
 import {
-  type GameModeReader,
-  parseSaveContent,
-  readLegacyStashHardcore,
-  type SaveParseStatus,
-} from './saveFileParser';
+  createPresenceIdentityKey,
+  markOrphanedVaultRowsMissing,
+  reconcileVaultPresence,
+} from './vaultPresenceReconciler';
 
 const log = createServiceLogger('SaveFileMonitor');
-interface FileParseSuccess {
-  saveName: string;
-  success: true;
-  inventorySnapshot: CharacterInventorySnapshot;
-  /** Header data of the file, read from the same buffer the items came from. */
-  saveFile: D2SaveFile;
-  /** Every item of the file, including socketed ones the snapshot omits. */
-  parsedItems: ParsedInventoryItem[];
-}
-
-/** A complete parse: the only result vault reconciliation may act on. */
-interface CompleteFileParseResult extends FileParseSuccess {
-  parseStatus: 'parsed';
-  /** Fingerprints of every item in the file, including socketed ones the snapshot omits. */
-  presentFingerprints: string[];
-  /** Location-independent identity of each item, parallel to `presentFingerprints`. */
-  presentIdentityKeys: string[];
-}
-
-/** A parse that read no items or only some of them; it must never mark vault rows as missing. */
-interface IncompleteFileParseResult extends FileParseSuccess {
-  parseStatus: Exclude<SaveParseStatus, 'parsed'>;
-}
-
-interface FailedFileParseResult {
-  saveName: string;
-  success: false;
-}
-
-type SingleFileParseResult =
-  | CompleteFileParseResult
-  | IncompleteFileParseResult
-  | FailedFileParseResult;
-
 /** A pending request to re-parse every save file; settled once that parse ran or was skipped. */
 interface ForcedParseRequest {
   promise: Promise<void>;
@@ -570,23 +540,6 @@ class SaveFileMonitor {
   }
 
   /**
-   * Describes an item without its position, location or character, so presence matching can still
-   * recognise an item after it moved inside its save (which changes its fingerprint).
-   */
-  private createPresenceIdentityKey(item: ParsedInventoryItem): string {
-    return createVaultPresenceKey({
-      sourceFileType: item.sourceFileType,
-      itemCode: item.itemCode,
-      quality: item.quality,
-      ethereal: item.ethereal,
-      socketCount: item.socketCount,
-      itemName: item.itemName,
-      isSocketedItem: item.isSocketedItem,
-      itemUid: item.rawParsedItem?.id,
-    });
-  }
-
-  /**
    * Reads the configured game mode for the parser. Without a database there is none, and the
    * parser skips every file.
    * @private
@@ -669,7 +622,7 @@ class SaveFileMonitor {
         parseStatus,
         // Includes socketed items, which the snapshot omits, so vault reconciliation sees every item.
         presentFingerprints: parsedItems.map((item) => item.fingerprint),
-        presentIdentityKeys: parsedItems.map((item) => this.createPresenceIdentityKey(item)),
+        presentIdentityKeys: parsedItems.map((item) => createPresenceIdentityKey(item)),
         inventorySnapshot,
         saveFile,
         parsedItems,
@@ -800,7 +753,7 @@ class SaveFileMonitor {
       return;
     }
 
-    await this.markOrphanedVaultRowsMissing(filePaths);
+    await markOrphanedVaultRowsMissing(this.grailDatabase, filePaths);
 
     // Filter files that need parsing based on modification time
     let filesToParse = await this.filterFilesToParse(filePaths);
@@ -840,7 +793,7 @@ class SaveFileMonitor {
 
     const failedFiles = parseResults.filter((r) => r && !r.success);
     const successfulSnapshots = successfulParseResults.map((result) => result.inventorySnapshot);
-    this.reconcileVaultPresence(parseResults);
+    reconcileVaultPresence(this.grailDatabase, parseResults);
     if (failedFiles.length > 0) {
       log.warn(
         'parseFiles',
@@ -868,106 +821,6 @@ class SaveFileMonitor {
     // Emit save file events for each file that was actually parsed
     await this.emitSaveFileEvents(successfulParseResults);
     log.info('parseFiles', `Complete - processed ${filesToParse.length} files`);
-  }
-
-  /**
-   * Clears the "present in latest scan" flag of vault rows whose source save file was deleted or
-   * renamed. Without this, such rows would stay present forever because only files that are still
-   * scanned get reconciled.
-   *
-   * Only presence flags change (see `markVaultItemsMissingForSourceFiles`). A file counts as gone
-   * only when it is not part of this scan and `stat` reports it missing (ENOENT/ENOTDIR) while its
-   * directory is still readable; any other error, or an unavailable directory (an unmounted drive,
-   * a moved save folder), is treated as unknown and leaves the rows alone. When no save file is
-   * found at all the scan aborts earlier and nothing is changed, because that is more likely a
-   * misconfigured directory than every file being deleted.
-   *
-   * Rows that were vaulted out of their file or that share a `#uuid` fingerprint with another row
-   * are not special-cased: they are handled like every other row of their file.
-   * @private
-   */
-  private async markOrphanedVaultRowsMissing(scannedFilePaths: string[]): Promise<void> {
-    if (!this.grailDatabase) {
-      return;
-    }
-
-    try {
-      const scanned = new Set(scannedFilePaths);
-      const candidates = this.grailDatabase
-        .getVaultSourceFilePathsPresentInLatestScan()
-        .filter((path) => !scanned.has(path));
-      const deletedFiles: string[] = [];
-
-      for (const path of candidates) {
-        if (await this.isSaveFileDeleted(path)) {
-          deletedFiles.push(path);
-        }
-      }
-
-      if (deletedFiles.length > 0) {
-        log.info('markOrphanedVaultRowsMissing', `Source files deleted: ${deletedFiles.length}`);
-        this.grailDatabase.markVaultItemsMissingForSourceFiles(deletedFiles);
-      }
-    } catch (error) {
-      log.error('markOrphanedVaultRowsMissing', error);
-    }
-  }
-
-  /** True only when the file is verifiably absent while its directory can still be read. */
-  private async isSaveFileDeleted(filePath: string): Promise<boolean> {
-    try {
-      await stat(filePath);
-      return false;
-    } catch (error) {
-      const code = (error as NodeJS.ErrnoException | undefined)?.code;
-      if (code !== 'ENOENT' && code !== 'ENOTDIR') {
-        return false;
-      }
-    }
-
-    try {
-      return (await stat(dirname(filePath))).isDirectory();
-    } catch {
-      return false;
-    }
-  }
-
-  /**
-   * Updates the "present in latest scan" flag of vault rows for every save file that was parsed
-   * successfully in this scan.
-   *
-   * Only parsed files are reconciled (a failed or skipped file keeps its previous flags), and each
-   * reconciliation is scoped to that one file, so it can never mark rows from other files as
-   * missing. It only touches presence flags: vaulted state and item data are never modified.
-   * Errors are logged and swallowed so a database problem cannot break save file scanning.
-   *
-   * Fingerprints include the character name and item position, so an item that moved inside its
-   * file gets a new fingerprint. The database therefore also matches rows by a location-independent
-   * identity key (`presentIdentityKeys`), and a moved item stays present. A renamed character is a
-   * different file and is not covered.
-   * @private
-   */
-  private reconcileVaultPresence(parseResults: Array<SingleFileParseResult | undefined>): void {
-    for (const result of parseResults) {
-      // Only a completed parse proves which items are gone. A skipped (game mode), errored or
-      // partial parse yields no or only some items, and must not mark vault rows of the file as missing.
-      if (result?.success !== true || result.parseStatus !== 'parsed') {
-        continue;
-      }
-
-      const snapshot = result.inventorySnapshot;
-      try {
-        this.grailDatabase?.reconcileVaultItemsForScan({
-          sourceFileType: snapshot.sourceFileType,
-          sourceFilePath: snapshot.sourceFilePath,
-          presentFingerprints: result.presentFingerprints,
-          presentIdentityKeys: result.presentIdentityKeys,
-          lastSeenAt: snapshot.capturedAt,
-        });
-      } catch (error) {
-        log.error('reconcileVaultPresence', error, { filePath: snapshot.sourceFilePath });
-      }
-    }
   }
 
   /**

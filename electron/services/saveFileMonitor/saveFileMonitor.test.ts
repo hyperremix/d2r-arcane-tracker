@@ -76,6 +76,7 @@ import * as modernStashParser from '../modernStashParser';
 import { SaveFileMonitor } from './saveFileMonitor';
 import * as saveFileParser from './saveFileParser';
 import { parseSaveContent } from './saveFileParser';
+import { createPresenceIdentityKey } from './vaultPresenceReconciler';
 
 const MODERN_STASH_FIXTURE_PATH = resolve(
   process.cwd(),
@@ -2065,75 +2066,6 @@ describe('When SaveFileMonitor is used', () => {
       expect(parseResult.inventorySnapshot?.items).toHaveLength(1);
     });
 
-    it('Then a moved item keeps its presence identity while its fingerprint changes', () => {
-      // Arrange
-      const itemAt = (x: number, y: number) =>
-        ({
-          name: 'Ring of Fire',
-          type: 'ring',
-          code: 'rin',
-          quality: 4,
-          id: 987654,
-          location_id: 0,
-          alt_position_id: 5,
-          position_x: x,
-          position_y: y,
-          inv_width: 1,
-          inv_height: 1,
-        }) as any;
-      const parse = (item: any) =>
-        normalizeInventoryItem({
-          filePath: '/tmp/SharedStash.d2i',
-          saveName: 'Shared',
-          sourceFileType: 'd2i',
-          item,
-          fallbackLocation: 'stash',
-          stashTab: 0,
-        });
-
-      // Act
-      const before = parse(itemAt(1, 1));
-      const after = parse(itemAt(6, 4));
-
-      // Assert
-      expect(after.fingerprint).not.toBe(before.fingerprint);
-      expect((monitor as any).createPresenceIdentityKey(after)).toBe(
-        (monitor as any).createPresenceIdentityKey(before),
-      );
-    });
-
-    it('Then items that differ only by their game item id have different presence identities', () => {
-      // Arrange
-      const ring = (id: number) =>
-        ({
-          name: 'Ring of Fire',
-          type: 'ring',
-          code: 'rin',
-          quality: 4,
-          id,
-          position_x: 1,
-          position_y: 1,
-          inv_width: 1,
-          inv_height: 1,
-        }) as any;
-      const parse = (item: any) =>
-        normalizeInventoryItem({
-          filePath: '/tmp/SharedStash.d2i',
-          saveName: 'Shared',
-          sourceFileType: 'd2i',
-          item,
-          fallbackLocation: 'stash',
-          stashTab: 0,
-        });
-
-      // Act
-      const first = (monitor as any).createPresenceIdentityKey(parse(ring(1)));
-      const second = (monitor as any).createPresenceIdentityKey(parse(ring(2)));
-
-      // Assert
-      expect(first).not.toBe(second);
-    });
-
     it('Then processSingleFile reports one identity key per fingerprint, in the same order', async () => {
       // Arrange
       const saveDir = mkdtempSync(join(tmpdir(), 'save-monitor-'));
@@ -2173,7 +2105,7 @@ describe('When SaveFileMonitor is used', () => {
 
       // Assert
       expect(parseResult.presentIdentityKeys).toEqual(
-        parsedItems.map((item) => (monitor as any).createPresenceIdentityKey(item)),
+        parsedItems.map((item) => createPresenceIdentityKey(item as any)),
       );
       expect(parseResult.presentIdentityKeys).toHaveLength(parseResult.presentFingerprints.length);
     });
@@ -2307,90 +2239,6 @@ describe('When SaveFileMonitor is used', () => {
     afterEach(() => {
       chmodSync(saveDir, 0o700);
       rmSync(saveDir, { recursive: true, force: true });
-    });
-
-    it('Then rows of a file that is truly absent are marked missing', async () => {
-      // Arrange
-      const scannedFiles = [join(saveDir, 'Other.d2s')];
-
-      // Act
-      await (monitor as any).markOrphanedVaultRowsMissing(scannedFiles);
-
-      // Assert
-      expect(mockDatabase.markVaultItemsMissingForSourceFiles).toHaveBeenCalledWith([goneFile]);
-    });
-
-    it('Then a file that still exists is left alone', async () => {
-      // Arrange
-      writeFileSync(goneFile, 'save');
-
-      // Act
-      await (monitor as any).markOrphanedVaultRowsMissing([]);
-
-      // Assert
-      expect(mockDatabase.markVaultItemsMissingForSourceFiles).not.toHaveBeenCalled();
-    });
-
-    // chmod 000 only blocks stat() for unprivileged POSIX users: root ignores the mode and Windows
-    // has no POSIX permission bits, so the test would pass without checking anything there.
-    const canRestrictDirectoryAccess =
-      process.platform !== 'win32' && (process.getuid?.() ?? 0) !== 0;
-
-    it.skipIf(!canRestrictDirectoryAccess)(
-      'Then a file that cannot be inspected right now does not count as deleted',
-      async () => {
-        // Arrange
-        writeFileSync(goneFile, 'save');
-        chmodSync(saveDir, 0o000);
-
-        try {
-          // Act
-          await (monitor as any).markOrphanedVaultRowsMissing([]);
-
-          // Assert
-          expect(mockDatabase.markVaultItemsMissingForSourceFiles).not.toHaveBeenCalled();
-        } finally {
-          chmodSync(saveDir, 0o700);
-        }
-      },
-    );
-
-    it('Then an unavailable save directory does not count as deleted files', async () => {
-      // Arrange
-      const missingDirectoryFile = join(saveDir, 'unmounted', 'Gone.d2s');
-      mockDatabase.getVaultSourceFilePathsPresentInLatestScan.mockReturnValue([
-        missingDirectoryFile,
-      ]);
-
-      // Act
-      await (monitor as any).markOrphanedVaultRowsMissing([]);
-
-      // Assert
-      expect(mockDatabase.markVaultItemsMissingForSourceFiles).not.toHaveBeenCalled();
-    });
-
-    it('Then a file that was just scanned is never marked missing', async () => {
-      // Arrange
-      const scannedFiles = [goneFile];
-
-      // Act
-      await (monitor as any).markOrphanedVaultRowsMissing(scannedFiles);
-
-      // Assert
-      expect(mockDatabase.markVaultItemsMissingForSourceFiles).not.toHaveBeenCalled();
-    });
-
-    it('Then a database error does not break the scan', async () => {
-      // Arrange
-      mockDatabase.markVaultItemsMissingForSourceFiles.mockImplementation(() => {
-        throw new Error('database is locked');
-      });
-
-      // Act
-      const run = (monitor as any).markOrphanedVaultRowsMissing([]);
-
-      // Assert
-      await expect(run).resolves.toBeUndefined();
     });
 
     it('Then every scan checks for deleted files, even when no file needs reparsing', async () => {
