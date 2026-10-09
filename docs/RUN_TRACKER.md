@@ -30,6 +30,8 @@ Auto mode reads D2R's memory to tell whether you're in a game. It starts a run w
 2. Turn on **Auto Mode** in the live session card.
 3. Optional: change the polling interval in **Settings → Run Tracker Settings** (100–5000 ms, default 500). Lower values react faster and use more CPU.
 
+The app remembers whether auto mode is on or off between launches, so turning it off stays off after you restart.
+
 While auto mode is on, the run buttons are replaced by a *Runs are tracked automatically* notice and the Start Run, Pause/Resume and End Run shortcuts are disabled. **End Session** and its shortcut stay available, so you can still stop a tracked session. If auto mode is on but memory reading isn't available for your D2R version, a warning appears in the live session area, the notice is hidden and the run buttons and shortcuts come back so you can track runs manually.
 
 Auto mode only reads memory and never writes to the game process. Each D2R patch needs a verified memory offset. After a patch that isn't supported yet, auto mode does nothing until an app update adds it. See [Troubleshooting](#troubleshooting).

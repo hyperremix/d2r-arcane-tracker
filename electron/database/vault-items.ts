@@ -73,13 +73,20 @@ function buildVaultItemValues(input: VaultItemUpsertInput) {
   };
 }
 
-/** Rows that are currently vaulted (vaulted and not unvaulted since). */
+/**
+ * Rows that are currently vaulted (vaulted and not unvaulted since). SQL counterpart of
+ * `isCurrentlyVaulted` in electron/utils/vaultState.ts; keep the two in sync.
+ */
 const isVaultedCondition = and(
   isNotNull(vaultItems.vaultedAt),
   or(isNull(vaultItems.unvaultedAt), lt(vaultItems.unvaultedAt, vaultItems.vaultedAt)),
 );
 
-/** Rows that were vaulted and have been unvaulted since. */
+/**
+ * Rows that were vaulted and have been unvaulted since: the negation of `isVaultedCondition` among
+ * rows that have a vaulted timestamp. Counterpart of `isCurrentlyVaulted` in
+ * electron/utils/vaultState.ts.
+ */
 const isUnvaultedCondition = and(
   isNotNull(vaultItems.vaultedAt),
   isNotNull(vaultItems.unvaultedAt),
@@ -582,6 +589,8 @@ function textCondition(text: string | undefined): SQL | undefined {
     return undefined;
   }
 
+  // The text is deliberately not escaped: `%` and `_` in a search act as LIKE wildcards, as they
+  // did before the move to drizzle (pinned in vault-items.test.ts).
   const textQuery = `%${normalized}%`;
   return or(
     like(sql`lower(${vaultItems.itemName})`, textQuery),

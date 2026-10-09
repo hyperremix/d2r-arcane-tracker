@@ -75,6 +75,12 @@ export function getFilteredItems(ctx: DatabaseContext, userSettings: Settings): 
 
 type ItemDbValues = ReturnType<typeof itemToDbValues>;
 
+/**
+ * The columns written by the item upsert. This repeats the keys of `itemToDbValues` (converters.ts)
+ * on purpose: the converter's return type cannot be enumerated at runtime, and `satisfies` makes
+ * the compiler reject any key that `itemToDbValues` does not return. A column added to the
+ * converter must be added here too, or the upsert will not write it.
+ */
 const itemValueKeys = [
   'id',
   'name',
@@ -94,7 +100,11 @@ const itemValueKeys = [
 type UpdatableItemKey = Exclude<(typeof itemValueKeys)[number], 'id'>;
 const updatableItemKeys = itemValueKeys.filter((key): key is UpdatableItemKey => key !== 'id');
 
-/** Named placeholders for every item column, so one prepared statement serves all items. */
+/**
+ * Named placeholders for every item column, so one prepared statement serves all items. The cast
+ * is needed because drizzle's `.values()` expects column values while placeholders are SQL
+ * fragments; the real values are bound by name when the statement runs.
+ */
 const itemValuePlaceholders = Object.fromEntries(
   itemValueKeys.map((key) => [key, sql.placeholder(key)]),
 ) as unknown as ItemDbValues;
@@ -126,6 +136,7 @@ export function insertItems(ctx: DatabaseContext, itemsToInsert: readonly Item[]
   const insertMany = ctx.rawDb.transaction(() => {
     for (const item of itemsToInsert) {
       const values = itemToDbValues(item);
+      // better-sqlite3 rejects `undefined` for a named parameter, and `link` is optional on Item.
       upsert.run({ ...values, link: values.link ?? null });
     }
   });

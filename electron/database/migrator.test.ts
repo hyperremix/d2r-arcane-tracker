@@ -31,19 +31,66 @@ function normalizeDefault(value: string | null): string | null {
 }
 
 /**
+ * Extracts the normalized CHECK expressions of a table definition, so that quoting and whitespace
+ * differences between the legacy script and the generated migrations do not matter.
+ */
+function extractChecks(createSql: string): string[] {
+  const checks: string[] = [];
+  const pattern = /\bCHECK\s*\(/gi;
+  let match = pattern.exec(createSql);
+  while (match !== null) {
+    let depth = 1;
+    let end = match.index + match[0].length;
+    while (end < createSql.length && depth > 0) {
+      if (createSql[end] === '(') depth += 1;
+      if (createSql[end] === ')') depth -= 1;
+      end += 1;
+    }
+    checks.push(
+      createSql
+        .slice(match.index + match[0].length, end - 1)
+        .replace(/[\s`"]/g, '')
+        .toLowerCase(),
+    );
+    match = pattern.exec(createSql);
+  }
+  return checks.sort();
+}
+
+/**
+ * Lists the unique indexes of a table, including the implicit ones SQLite creates for inline
+ * UNIQUE and PRIMARY KEY constraints, as one "unique (columns)" entry per index. Duplicates are
+ * kept so that redundant indexes show up.
+ */
+function listUniqueIndexes(rawDb: DatabaseType, table: string): string[] {
+  return (rawDb.pragma(`index_list(${table})`) as Array<{ name: string; unique: number }>)
+    .filter((index) => index.unique === 1)
+    .map(
+      (index) =>
+        `(${(rawDb.pragma(`index_info(${index.name})`) as Array<{ name: string }>)
+          .map((column) => column.name)
+          .join(',')})`,
+    )
+    .sort();
+}
+
+/**
  * Describes everything about a schema that affects behavior: tables, columns (nullability and
- * defaults), primary keys, foreign keys with their actions, named indexes and triggers. Declared
- * column types (legacy DATETIME/BOOLEAN vs. drizzle text/integer) and column order are ignored.
+ * defaults), primary keys, foreign keys with their actions, CHECK constraints, named indexes, the
+ * distinct column sets that are enforced unique (also when enforced by an inline UNIQUE
+ * constraint) and triggers. Declared column types (legacy DATETIME/BOOLEAN vs. drizzle
+ * text/integer), column order and how many indexes enforce the same uniqueness are ignored; see
+ * `listUniqueIndexes` for the latter.
  */
 function describeSchema(rawDb: DatabaseType): Record<string, unknown> {
   const tables = rawDb
     .prepare(
-      `SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite\\_%' ESCAPE '\\'
+      `SELECT name, sql FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite\\_%' ESCAPE '\\'
          AND name <> ? ORDER BY name`,
     )
-    .all(MIGRATIONS_TABLE) as Array<{ name: string }>;
+    .all(MIGRATIONS_TABLE) as Array<{ name: string; sql: string }>;
   const description: Record<string, unknown> = {};
-  for (const { name } of tables) {
+  for (const { name, sql } of tables) {
     const columns = (rawDb.pragma(`table_info(${name})`) as ColumnInfo[])
       .map(
         (column) =>
@@ -69,7 +116,14 @@ function describeSchema(rawDb: DatabaseType): Record<string, unknown> {
         return `${index.name} unique=${index.unique} (${indexColumns})`;
       })
       .sort();
-    description[name] = { columns, foreignKeys, indexes };
+    const uniqueColumnSets = [...new Set(listUniqueIndexes(rawDb, name))];
+    description[name] = {
+      columns,
+      foreignKeys,
+      checks: extractChecks(sql),
+      indexes,
+      uniqueColumnSets,
+    };
   }
   description.triggers = (
     rawDb
@@ -188,7 +242,68 @@ describe('When the schema is initialized', () => {
 
       // Assert
       expect(describeSchema(legacy.rawDb)).toEqual(describeSchema(fresh.rawDb));
+      const characterChecks = (describeSchema(fresh.rawDb).characters as { checks: string[] })
+        .checks;
+      expect(characterChecks.length).toBeGreaterThan(0);
       expect(countRows(legacy.rawDb, MIGRATIONS_TABLE)).toBe(journalEntryCount);
+    });
+
+    it('Then the only unique index it has more than a new database is the documented redundant one', () => {
+      // Arrange
+      const fresh = track(createContext());
+      const legacy = track(createContext());
+      createLegacyDatabase(legacy.rawDb, version);
+      const tableNames = (ctx: DatabaseContext) =>
+        (
+          ctx.rawDb
+            .prepare(
+              "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite\\_%' ESCAPE '\\' ORDER BY name",
+            )
+            .all() as Array<{ name: string }>
+        ).map((table) => table.name);
+
+      // Act
+      initializeSchema(fresh);
+      initializeSchema(legacy);
+      const extraUniqueIndexes = tableNames(fresh).flatMap((table) => {
+        const remaining = listUniqueIndexes(fresh.rawDb, table);
+        const extras: string[] = [];
+        for (const entry of listUniqueIndexes(legacy.rawDb, table)) {
+          const position = remaining.indexOf(entry);
+          if (position === -1) {
+            extras.push(`${table}${entry}`);
+          } else {
+            remaining.splice(position, 1);
+          }
+        }
+        return extras;
+      });
+
+      // Assert
+      // A legacy table declared `file_path TEXT NOT NULL UNIQUE`, which SQLite backs with an
+      // implicit index. The baseline also names the unique index (so that later migrations can
+      // drop or change it), and SQLite cannot drop an inline UNIQUE without rebuilding the table.
+      // Both enforce the same rule, so the upgraded database carries the constraint twice.
+      expect(extraUniqueIndexes).toEqual(['save_file_states(file_path)']);
+    });
+
+    it('Then a duplicate save file path is still rejected', () => {
+      // Arrange
+      const ctx = track(createContext());
+      createLegacyDatabase(ctx.rawDb, version);
+      initializeSchema(ctx);
+      ctx.rawDb.exec(
+        "INSERT INTO save_file_states (id, file_path, last_modified, last_parsed) VALUES ('s0', '/saves/a.d2s', 1, 1)",
+      );
+
+      // Act
+      const insertDuplicate = () =>
+        ctx.rawDb.exec(
+          "INSERT INTO save_file_states (id, file_path, last_modified, last_parsed) VALUES ('s1', '/saves/a.d2s', 2, 2)",
+        );
+
+      // Assert
+      expect(insertDuplicate).toThrow('UNIQUE constraint failed: save_file_states.file_path');
     });
 
     it('Then all user data is kept, including run items of the rebuilt runs table', () => {

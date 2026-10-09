@@ -897,6 +897,52 @@ describe('When vault item database operations are executed', () => {
     });
   });
 
+  describe('If searchVaultItems is given search text containing LIKE wildcards', () => {
+    const names = ['Harlequin Crest', 'Hat', 'Hoat', 'Shako'];
+
+    beforeEach(() => {
+      for (const name of names) {
+        upsertVaultItemByFingerprint(ctx, {
+          fingerprint: `fp-${name}`,
+          itemName: name,
+          itemCode: 'xyz',
+          quality: 'unique',
+          ethereal: false,
+          rawItemJson: '{}',
+          sourceFileType: 'd2s',
+          locationContext: 'stash',
+        });
+      }
+    });
+
+    const searchNames = (text: string) =>
+      searchVaultItems(ctx, { text, page: 1, pageSize: 20 })
+        .items.map((item) => item.itemName)
+        .sort();
+
+    it('Then % matches any run of characters', () => {
+      // Arrange
+      const text = 'h%t';
+
+      // Act
+      const result = searchNames(text);
+
+      // Assert
+      expect(result).toEqual(['Harlequin Crest', 'Hat', 'Hoat']);
+    });
+
+    it('Then _ matches exactly one character', () => {
+      // Arrange
+      const text = 'h_t';
+
+      // Act
+      const result = searchNames(text);
+
+      // Assert
+      expect(result).toEqual(['Hat']);
+    });
+  });
+
   describe('If addVaultItem is called twice for the same stackable rune item code', () => {
     it('Then the second vault merges count instead of creating a duplicate', () => {
       // Arrange

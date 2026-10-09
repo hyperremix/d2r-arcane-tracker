@@ -519,6 +519,13 @@ function backfillVaultItemSpatialFields(ctx: DatabaseContext): void {
 /**
  * Indexes the migration baseline has but databases created by the legacy schema script lack.
  * Later migrations may refer to them by name.
+ *
+ * `save_file_states_file_path_unique` is the one known redundancy: the legacy table declared
+ * `file_path TEXT NOT NULL UNIQUE`, so SQLite already enforces uniqueness through an implicit
+ * `sqlite_autoindex_*` index, which cannot be dropped without rebuilding the table. Creating the
+ * named index anyway keeps it available to later migrations (for example `DROP INDEX`) on upgraded
+ * databases, at the cost of one extra index on a tiny table. migrator.test.ts pins this as the
+ * only unique index an upgraded database has beyond a new database's.
  */
 const BASELINE_ALIGNMENT_SQL = `
   CREATE INDEX IF NOT EXISTS idx_vault_items_socketed ON vault_items(is_socketed_item);
