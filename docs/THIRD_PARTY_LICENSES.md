@@ -27,7 +27,7 @@ Each dependency keeps its own license. For the full list and versions, see [`pac
 | [React](https://github.com/facebook/react), [react-router](https://github.com/remix-run/react-router), [Zustand](https://github.com/pmndrs/zustand) | MIT |
 | [Base UI](https://github.com/mui/base-ui), [shadcn/ui](https://github.com/shadcn-ui/ui), [lucide-react](https://github.com/lucide-icons/lucide) | MIT / ISC (lucide) |
 | [i18next](https://github.com/i18next/i18next), [react-i18next](https://github.com/i18next/react-i18next) | MIT |
-| [chokidar](https://github.com/paulmillr/chokidar), [win32-api](https://github.com/waitingsong/node-win32-api), [recharts](https://github.com/recharts/recharts) | MIT |
+| [chokidar](https://github.com/paulmillr/chokidar) and [win32-api](https://github.com/waitingsong/node-win32-api) | MIT |
 | [Inter](https://github.com/rsms/inter) and [Cinzel](https://github.com/NDISCOVER/Cinzel) fonts, bundled via [Fontsource](https://github.com/fontsource/fontsource) | OFL-1.1 |
 
 Memory-reading research builds on [d2go](https://github.com/hectorgimenez/d2go) (see [MEMORY_READING.md](MEMORY_READING.md)).

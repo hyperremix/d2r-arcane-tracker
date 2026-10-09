@@ -1,4 +1,4 @@
-#!/usr/bin/env npx tsx
+#!/usr/bin/env -S bunx tsx
 
 /**
  * inject-grail-item.ts
@@ -8,25 +8,68 @@
  * without needing to run the game.
  *
  * Usage:
- *   npx tsx scripts/inject-grail-item.ts [--item <itemId>] [--list] [--dry-run]
+ *   bunx tsx scripts/inject-grail-item.ts [--item <itemId>] [--list] [--dry-run]
  *
  * Options:
  *   --item <id>     Specific item ID to inject (from electron/items)
  *   --list          List available unfound items and exit
  *   --dry-run       Parse the stash but don't write changes
- *   --save-dir      Custom save directory path
+ *   --save-dir      Custom save directory path (env: D2R_SAVE_DIR)
+ *   --db            Custom path to the app's grail.db (env: D2R_TRACKER_DB_PATH)
+ *
+ * Defaults:
+ *   Save directory: <home>/Saved Games/Diablo II Resurrected
+ *   Database: the development database path for the current OS (see CONTRIBUTING.md)
  */
 
-import { execSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import { createRequire } from 'node:module';
+import * as os from 'node:os';
 import * as path from 'node:path';
 import * as d2s from '@dschu012/d2s';
 import * as d2stash from '@dschu012/d2s/lib/d2/stash';
 
-// Default paths
-const DEFAULT_SAVE_DIR = '/Users/f00486/Saved Games/Diablo II Resurrected/mods/givemhell';
-const DB_PATH = '/Users/f00486/Library/Application Support/@hyperremix/d2r-arcane-tracker/grail.db';
+const APP_DATA_DIR_NAME = path.join('@hyperremix', 'd2r-arcane-tracker');
+
+/**
+ * Read an environment variable, treating an empty string the same as unset.
+ */
+function readEnv(name: string): string | undefined {
+  const value = process.env[name];
+  return value ? value : undefined;
+}
+
+/**
+ * Resolve the per-user application data directory Electron uses for `app.getPath('userData')`.
+ */
+function resolveAppDataRoot(): string {
+  const home = os.homedir();
+  switch (process.platform) {
+    case 'win32':
+      return readEnv('APPDATA') ?? path.join(home, 'AppData', 'Roaming');
+    case 'darwin':
+      return path.join(home, 'Library', 'Application Support');
+    default:
+      return readEnv('XDG_CONFIG_HOME') ?? path.join(home, '.config');
+  }
+}
+
+/**
+ * Default development database path, overridable via D2R_TRACKER_DB_PATH or --db.
+ */
+function resolveDefaultDbPath(): string {
+  return (
+    readEnv('D2R_TRACKER_DB_PATH') ?? path.join(resolveAppDataRoot(), APP_DATA_DIR_NAME, 'grail.db')
+  );
+}
+
+/**
+ * Default D2R save directory, overridable via D2R_SAVE_DIR or --save-dir.
+ */
+function resolveDefaultSaveDir(): string {
+  return readEnv('D2R_SAVE_DIR') ?? path.join(os.homedir(), 'Saved Games', 'Diablo II Resurrected');
+}
 
 // Use require for loading d2s constants
 const require = createRequire(import.meta.url);
@@ -55,12 +98,28 @@ interface GrailItem {
   subCategory: string;
 }
 
+interface ParsedArgs {
+  itemId?: string;
+  list: boolean;
+  saveDir: string;
+  dbPath: string;
+  dryRun: boolean;
+}
+
 /**
- * Run a sqlite3 query and return results as JSON
+ * Escape a value for use inside a single-quoted SQL string literal.
  */
-function runQuery(query: string): string {
+function escapeSqlString(value: string): string {
+  return value.replace(/'/g, "''");
+}
+
+/**
+ * Run a sqlite3 query against the given database and return results as JSON.
+ * Arguments are passed as an array (no shell), so paths are never shell-interpreted.
+ */
+function runQuery(dbPath: string, query: string): string {
   try {
-    const result = execSync(`sqlite3 -json "${DB_PATH}" "${query.replace(/"/g, '\\"')}"`, {
+    const result = execFileSync('sqlite3', ['-json', dbPath, query], {
       encoding: 'utf-8',
       maxBuffer: 10 * 1024 * 1024,
     });
@@ -73,7 +132,7 @@ function runQuery(query: string): string {
 /**
  * Get unfound unique/set items from the database
  */
-function getUnfoundItems(): GrailItem[] {
+function getUnfoundItems(dbPath: string): GrailItem[] {
   const query = `
     SELECT id, name, code, type, category, sub_category as subCategory
     FROM items
@@ -82,19 +141,19 @@ function getUnfoundItems(): GrailItem[] {
       AND id NOT IN (SELECT item_id FROM grail_progress)
     ORDER BY category, sub_category, name
   `;
-  const result = runQuery(query);
+  const result = runQuery(dbPath, query);
   return result ? JSON.parse(result) : [];
 }
 
 /**
  * Get a specific item by ID
  */
-function getItemById(itemId: string): GrailItem | null {
+function getItemById(dbPath: string, itemId: string): GrailItem | null {
   const query = `
     SELECT id, name, code, type, category, sub_category as subCategory
-    FROM items WHERE id = '${itemId}'
+    FROM items WHERE id = '${escapeSqlString(itemId)}'
   `;
-  const result = runQuery(query);
+  const result = runQuery(dbPath, query);
   const items = result ? JSON.parse(result) : [];
   return items[0] || null;
 }
@@ -102,9 +161,9 @@ function getItemById(itemId: string): GrailItem | null {
 /**
  * Check if item is already found
  */
-function isItemFound(itemId: string): boolean {
-  const query = `SELECT COUNT(*) as count FROM grail_progress WHERE item_id = '${itemId}'`;
-  const result = runQuery(query);
+function isItemFound(dbPath: string, itemId: string): boolean {
+  const query = `SELECT COUNT(*) as count FROM grail_progress WHERE item_id = '${escapeSqlString(itemId)}'`;
+  const result = runQuery(dbPath, query);
   const rows = result ? JSON.parse(result) : [];
   return rows[0]?.count > 0;
 }
@@ -310,8 +369,8 @@ function createD2SItem(grailItem: GrailItem, x: number, y: number): d2s.types.II
 /**
  * List unfound items grouped by category
  */
-function listUnfoundItems(): void {
-  const unfoundItems = getUnfoundItems();
+function listUnfoundItems(dbPath: string): void {
+  const unfoundItems = getUnfoundItems(dbPath);
 
   if (unfoundItems.length === 0) {
     console.log('🎉 Congratulations! All unique and set items have been found!');
@@ -339,17 +398,18 @@ function listUnfoundItems(): void {
     }
   }
 
-  console.log('\n  Usage: npx tsx scripts/inject-grail-item.ts --item <itemId>\n');
+  console.log('\n  Usage: bunx tsx scripts/inject-grail-item.ts --item <itemId>\n');
 }
 
 /**
  * Parse command line arguments
  */
-function parseArgs(): { itemId?: string; list: boolean; saveDir: string; dryRun: boolean } {
+function parseArgs(): ParsedArgs {
   const args = process.argv.slice(2);
   let itemId: string | undefined;
   let list = false;
-  let saveDir = DEFAULT_SAVE_DIR;
+  let saveDir = resolveDefaultSaveDir();
+  let dbPath = resolveDefaultDbPath();
   let dryRun = false;
 
   for (let i = 0; i < args.length; i++) {
@@ -360,6 +420,8 @@ function parseArgs(): { itemId?: string; list: boolean; saveDir: string; dryRun:
       list = true;
     } else if (arg === '--save-dir') {
       saveDir = args[++i];
+    } else if (arg === '--db') {
+      dbPath = args[++i];
     } else if (arg === '--dry-run') {
       dryRun = true;
     } else if (arg === '--help') {
@@ -367,30 +429,31 @@ function parseArgs(): { itemId?: string; list: boolean; saveDir: string; dryRun:
 🎮 D2R Grail Item Injection Script
 
 Usage:
-  npx tsx scripts/inject-grail-item.ts [options]
+  bunx tsx scripts/inject-grail-item.ts [options]
 
 Options:
   --item <id>     Inject a specific item by ID
   --list          List available unfound items
   --dry-run       Parse the stash but don't write changes
-  --save-dir      Custom save directory path
+  --save-dir      Custom save directory path (env: D2R_SAVE_DIR)
+  --db            Custom path to the app's grail.db (env: D2R_TRACKER_DB_PATH)
   --help          Show this help message
 
 Examples:
   # List all unfound items
-  npx tsx scripts/inject-grail-item.ts --list
+  bunx tsx scripts/inject-grail-item.ts --list
 
   # Inject a random unfound item
-  npx tsx scripts/inject-grail-item.ts
+  bunx tsx scripts/inject-grail-item.ts
 
   # Inject a specific item
-  npx tsx scripts/inject-grail-item.ts --item goldwrap
+  bunx tsx scripts/inject-grail-item.ts --item goldwrap
 `);
       process.exit(0);
     }
   }
 
-  return { itemId, list, saveDir, dryRun };
+  return { itemId, list, saveDir, dbPath, dryRun };
 }
 
 /**
@@ -447,18 +510,19 @@ async function main(): Promise<void> {
   // Initialize d2s constants
   initializeD2SConstants();
 
-  const { itemId, list, saveDir, dryRun } = parseArgs();
+  const { itemId, list, saveDir, dbPath, dryRun } = parseArgs();
 
   // Check if database exists
-  if (!fs.existsSync(DB_PATH)) {
-    console.error(`❌ Database not found at: ${DB_PATH}`);
-    console.error('   Make sure the D2R Arcane Tracker app has been run at least once.');
+  if (!fs.existsSync(dbPath)) {
+    console.error(`❌ Database not found at: ${dbPath}`);
+    console.error('   Make sure the D2R Arcane Tracker app has been run at least once,');
+    console.error('   or pass --db <path> / set D2R_TRACKER_DB_PATH.');
     process.exit(1);
   }
 
   // List mode
   if (list) {
-    listUnfoundItems();
+    listUnfoundItems(dbPath);
     return;
   }
 
@@ -466,19 +530,19 @@ async function main(): Promise<void> {
   let item: GrailItem | null;
 
   if (itemId) {
-    item = getItemById(itemId);
+    item = getItemById(dbPath, itemId);
     if (!item) {
       console.error(`❌ Item not found: ${itemId}`);
       console.error('   Use --list to see available items.');
       process.exit(1);
     }
-    if (isItemFound(itemId)) {
+    if (isItemFound(dbPath, itemId)) {
       console.warn(`⚠️  Warning: ${item.name} is already found in grail progress.`);
       console.warn('   The app may not show a notification for this item.');
     }
   } else {
     // Get a random unfound item
-    const unfoundItems = getUnfoundItems();
+    const unfoundItems = getUnfoundItems(dbPath);
     if (unfoundItems.length === 0) {
       console.log('🎉 All unique and set items have been found!');
       return;
