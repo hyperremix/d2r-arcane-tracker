@@ -29,7 +29,11 @@ describe('When the run tracker IPC handlers are initialized', () => {
   let eventBus: EventBus;
   let broadcastToRenderers: ReturnType<typeof vi.fn>;
   let database: { [K in keyof RunTrackerDatabase]: ReturnType<typeof vi.fn> };
-  let runTracker: { startSession: ReturnType<typeof vi.fn>; endRun: ReturnType<typeof vi.fn> };
+  let runTracker: {
+    startSession: ReturnType<typeof vi.fn>;
+    endRun: ReturnType<typeof vi.fn>;
+    updateSessionNotes: ReturnType<typeof vi.fn>;
+  };
   let dispose: () => void;
 
   beforeEach(() => {
@@ -45,7 +49,11 @@ describe('When the run tracker IPC handlers are initialized', () => {
       getSessionById: vi.fn(),
       getSessionItems: vi.fn(() => []),
     };
-    runTracker = { startSession: vi.fn(() => ({ id: 'session-1' })), endRun: vi.fn() };
+    runTracker = {
+      startSession: vi.fn(() => ({ id: 'session-1' })),
+      endRun: vi.fn(),
+      updateSessionNotes: vi.fn((id: string, notes: string) => ({ id, notes })),
+    };
     dispose = initializeRunTrackerHandlers({
       runTracker: runTracker as unknown as RunTrackerService,
       database: database as unknown as RunTrackerDatabase,
@@ -74,6 +82,26 @@ describe('When the run tracker IPC handlers are initialized', () => {
       expect(session).toEqual({ id: 'session-1' });
       expect(runTracker.endRun).toHaveBeenCalledWith(true);
       expect(endResult).toEqual({ success: true });
+    });
+  });
+
+  describe('When session notes are saved', () => {
+    it('Then they are delegated to the run tracker and the updated session is returned', async () => {
+      // Act
+      const session = await invoke('run-tracker:update-session-notes', 'session-1', 'Cows');
+
+      // Assert
+      expect(runTracker.updateSessionNotes).toHaveBeenCalledWith('session-1', 'Cows');
+      expect(session).toEqual({ id: 'session-1', notes: 'Cows' });
+    });
+
+    it('If the notes are not a string, Then the call is rejected before reaching the run tracker', async () => {
+      // Act
+      const result = invoke('run-tracker:update-session-notes', 'session-1', { notes: 'Cows' });
+
+      // Assert
+      await expect(result).rejects.toThrow('Invalid session notes');
+      expect(runTracker.updateSessionNotes).not.toHaveBeenCalled();
     });
   });
 

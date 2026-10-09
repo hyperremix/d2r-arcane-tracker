@@ -129,14 +129,11 @@ export function SessionDetailView({ sessionId, onBack }: SessionDetailViewProps)
     if (!session || notes === (session.notes || '')) return;
 
     setIsSavingNotes(true);
-    try {
-      await updateSessionNotes(session.id, notes);
-    } catch (error) {
-      console.error('Error updating session notes:', error);
-      // Revert notes on error
+    const saved = await updateSessionNotes(session.id, notes);
+    setIsSavingNotes(false);
+    // The store reports the failure inline (with a retry); show the saved notes again
+    if (!saved) {
       setNotes(session.notes || '');
-    } finally {
-      setIsSavingNotes(false);
     }
   }, [session, notes, updateSessionNotes]);
 

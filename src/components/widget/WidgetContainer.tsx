@@ -1,7 +1,7 @@
 import type { Settings } from 'electron/types/grail';
 import { useEffect, useRef } from 'react';
 import { useShallow } from 'zustand/react/shallow';
-import { combineUnsubscribers, onMainEvent } from '@/lib/ipcEvents';
+import { onMainEvent } from '@/lib/ipcEvents';
 import type { WidgetDisplayMode } from '@/lib/widget';
 import { resolveWidgetDisplayMode } from '@/lib/widget';
 import {
@@ -10,7 +10,7 @@ import {
   useGrailStatistics,
   useGrailStore,
 } from '@/stores/grailStore';
-import { useRunTrackerStore } from '@/stores/runTrackerStore';
+import { initRunTrackerSync, useRunTrackerStore } from '@/stores/runTrackerStore';
 import { Widget } from './Widget';
 
 const NO_SETTINGS: Partial<Settings> = {};
@@ -29,26 +29,11 @@ export function WidgetContainer() {
   const settings = settingsLoaded ? storedSettings : NO_SETTINGS;
   const statistics = settingsLoaded ? grailStatistics : null;
 
-  // Get run tracker store actions to handle IPC events
-  const {
-    handleSessionStarted: storeHandleSessionStarted,
-    handleSessionEnded: storeHandleSessionEnded,
-    handleRunStarted: storeHandleRunStarted,
-    handleRunEnded: storeHandleRunEnded,
-    refreshActiveRun,
-    loadSessionRuns,
-    activeSession,
-    loadRunItems,
-  } = useRunTrackerStore(
+  const { refreshActiveRun, loadSessionRuns, activeSession } = useRunTrackerStore(
     useShallow((state) => ({
-      handleSessionStarted: state.handleSessionStarted,
-      handleSessionEnded: state.handleSessionEnded,
-      handleRunStarted: state.handleRunStarted,
-      handleRunEnded: state.handleRunEnded,
       refreshActiveRun: state.refreshActiveRun,
       loadSessionRuns: state.loadSessionRuns,
       activeSession: state.activeSession,
-      loadRunItems: state.loadRunItems,
     })),
   );
 
@@ -113,55 +98,9 @@ export function WidgetContainer() {
     });
   }, []);
 
-  // Listen for run tracker events for real-time updates
-  useEffect(() => {
-    // Listen for run tracker events (note: events are prefixed with 'run-tracker:')
-    return combineUnsubscribers([
-      onMainEvent('run-tracker:run-started', (payload) => {
-        console.log('[WidgetContainer] Run started:', payload.run.id);
-        storeHandleRunStarted(payload.run, payload.session);
-      }),
-      onMainEvent('run-tracker:run-ended', (payload) => {
-        console.log('[WidgetContainer] Run ended');
-        storeHandleRunEnded(payload.run, payload.session);
-      }),
-      onMainEvent('run-tracker:session-started', (payload) => {
-        console.log('[WidgetContainer] Session started:', payload.session.id);
-        storeHandleSessionStarted(payload.session);
-      }),
-      onMainEvent('run-tracker:session-ended', () => {
-        console.log('[WidgetContainer] Session ended');
-        storeHandleSessionEnded();
-      }),
-      onMainEvent('run-tracker:run-item-added', (payload) => {
-        console.log('[WidgetContainer] Run item added for run:', payload.runId);
-        loadRunItems(payload.runId).catch((error) => {
-          console.error('[WidgetContainer] Error loading run items for run from event:', error);
-        });
-      }),
-    ]);
-  }, [
-    storeHandleRunStarted,
-    storeHandleRunEnded,
-    storeHandleSessionStarted,
-    storeHandleSessionEnded,
-    loadRunItems,
-  ]);
+  // Keep the run tracker store in sync with the run tracker events of the main process
+  useEffect(() => initRunTrackerSync(), []);
 
-  const handleDragStart = () => {
-    // Empty function - drag is handled by Electron
-  };
-
-  const handleDragEnd = () => {
-    // Empty function - drag is handled by Electron
-  };
-
-  return (
-    <Widget
-      statistics={statistics}
-      settings={settings}
-      onDragStart={handleDragStart}
-      onDragEnd={handleDragEnd}
-    />
-  );
+  // The window is dragged by its WebkitAppRegion drag region, so no drag handlers are needed
+  return <Widget statistics={statistics} settings={settings} />;
 }

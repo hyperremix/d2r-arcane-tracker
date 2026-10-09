@@ -1238,8 +1238,22 @@
       "noItemsFound": "No items found in this run."
     },
     "errorDisplay": {
-      "attempt": "(Attempt {{current}}/{{max}})",
       "dismiss": "Dismiss error"
+    },
+    "errors": {
+      "sessionStartUnavailable": "Unable to start session. Please ensure a character is selected.",
+      "startSessionFailed": "Failed to start session",
+      "endSessionFailed": "Failed to end session. Your progress has been saved.",
+      "archiveSessionFailed": "Failed to archive session",
+      "updateSessionNotesFailed": "Failed to save session notes",
+      "startRunFailed": "Failed to start run",
+      "endRunFailed": "Failed to end run",
+      "pauseRunFailed": "Failed to pause run",
+      "resumeRunFailed": "Failed to resume run",
+      "loadFailed": "Failed to load run tracker data",
+      "itemNameEmpty": "Item name cannot be empty",
+      "noRunForManualItem": "No active run or finished run found. Please start a run first.",
+      "addManualRunItemFailed": "Failed to add manual run item"
     }
   },
   "widget": {

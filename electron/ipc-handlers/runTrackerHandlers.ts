@@ -52,6 +52,10 @@ export function initializeRunTrackerHandlers({
     return { success: true };
   });
 
+  handle('run-tracker:update-session-notes', (_event, sessionId, notes) =>
+    runTracker.updateSessionNotes(sessionId, notes),
+  );
+
   // Run management handlers
   handle('run-tracker:start-run', (_event, characterId) => runTracker.startRun(characterId, true));
 

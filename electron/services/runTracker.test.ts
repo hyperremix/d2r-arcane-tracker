@@ -386,6 +386,40 @@ describe('When RunTrackerService is instantiated', () => {
     });
   });
 
+  describe('When the notes of the active session are updated', () => {
+    it('Then the notes are saved and kept when the session is saved again', () => {
+      // Arrange
+      const session = service.startSession();
+      mockDatabase.updateSessionNotes = vi.fn().mockReturnValue(true);
+      mockDatabase.getSessionById = vi.fn().mockReturnValue({ ...session, notes: 'Cows' });
+      vi.mocked(mockDatabase.upsertSession as GrailDatabase['upsertSession']).mockClear();
+
+      // Act
+      const updated = service.updateSessionNotes(session.id, 'Cows');
+      service.endSession();
+
+      // Assert
+      expect(mockDatabase.updateSessionNotes).toHaveBeenCalledWith(session.id, 'Cows');
+      expect(updated.notes).toBe('Cows');
+      expect(mockDatabase.upsertSession).toHaveBeenCalledWith(
+        expect.objectContaining({ id: session.id, notes: 'Cows' }),
+      );
+    });
+  });
+
+  describe('If the notes of an unknown session are updated', () => {
+    it('Then an error is thrown', () => {
+      // Arrange
+      mockDatabase.updateSessionNotes = vi.fn().mockReturnValue(false);
+
+      // Act
+      const update = () => service.updateSessionNotes('missing', 'Cows');
+
+      // Assert
+      expect(update).toThrow('Session not found: missing');
+    });
+  });
+
   describe('If getState is called', () => {
     it('Then should return current run tracker state', () => {
       // Arrange

@@ -42,7 +42,7 @@ const createStoreState = (overrides: Record<string, unknown> = {}) =>
     archiveSession: mockArchiveSession,
     endSession: mockEndSession,
     startSession: mockStartSession,
-    updateSessionNotes: vi.fn().mockResolvedValue(undefined),
+    updateSessionNotes: vi.fn().mockResolvedValue(true),
     ...overrides,
   }) as unknown as ReturnType<typeof useRunTrackerStore>;
 

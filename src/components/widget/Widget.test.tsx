@@ -190,12 +190,7 @@ describe('Widget run-only item list', () => {
 
   it('shows run item list text when enabled', () => {
     const { getByText, getAllByText } = render(
-      <Widget
-        statistics={null}
-        settings={baseSettings}
-        onDragStart={() => ({})}
-        onDragEnd={() => ({})}
-      />,
+      <Widget statistics={null} settings={baseSettings} />,
     );
 
     // The structure changed - run numbers are now in format "#1 -" or "#2 -"
@@ -210,14 +205,7 @@ describe('Widget run-only item list', () => {
     const settings: Partial<Settings> = { ...baseSettings, widgetLocked: true };
 
     // Act
-    const { getByText, queryByRole } = render(
-      <Widget
-        statistics={null}
-        settings={settings}
-        onDragStart={() => ({})}
-        onDragEnd={() => ({})}
-      />,
-    );
+    const { getByText, queryByRole } = render(<Widget statistics={null} settings={settings} />);
 
     // Assert
     expect(queryByRole('textbox')).toBeNull();
@@ -230,14 +218,7 @@ describe('Widget run-only item list', () => {
       widgetRunOnlyShowItems: false,
     };
 
-    const { queryByText } = render(
-      <Widget
-        statistics={null}
-        settings={settings}
-        onDragStart={() => ({})}
-        onDragEnd={() => ({})}
-      />,
-    );
+    const { queryByText } = render(<Widget statistics={null} settings={settings} />);
 
     expect(queryByText(/#1/)).toBeNull();
     expect(queryByText('Harlequin Crest')).toBeNull();
@@ -251,14 +232,7 @@ describe('Widget run-only item list', () => {
     };
     store.runItems.clear();
 
-    const { queryByText } = render(
-      <Widget
-        statistics={null}
-        settings={baseSettings}
-        onDragStart={() => ({})}
-        onDragEnd={() => ({})}
-      />,
-    );
+    const { queryByText } = render(<Widget statistics={null} settings={baseSettings} />);
 
     expect(queryByText(/#1/)).toBeNull();
     expect(queryByText('Harlequin Crest')).toBeNull();
@@ -279,14 +253,7 @@ describe('Widget run-only item list', () => {
     store.loadRunItems.mockClear();
 
     // Act
-    render(
-      <Widget
-        statistics={null}
-        settings={baseSettings}
-        onDragStart={() => ({})}
-        onDragEnd={() => ({})}
-      />,
-    );
+    render(<Widget statistics={null} settings={baseSettings} />);
 
     // Assert
     expect(store.loadSessionRuns).toHaveBeenCalledTimes(1);
@@ -309,14 +276,7 @@ describe('Widget run-only item list', () => {
     store.loadRunItems.mockClear();
 
     // Act - the initial render triggers the data loading effect
-    render(
-      <Widget
-        statistics={null}
-        settings={baseSettings}
-        onDragStart={() => ({})}
-        onDragEnd={() => ({})}
-      />,
-    );
+    render(<Widget statistics={null} settings={baseSettings} />);
 
     // Assert - loadRunItems is called once for each run that is missing its items
     expect(sessionRuns.length).toBeGreaterThan(0);
@@ -362,14 +322,7 @@ describe('Widget run-only item list', () => {
     store.runItems.set(run1.id, [manualItem]);
 
     // Act - render the widget
-    const { getAllByText } = render(
-      <Widget
-        statistics={null}
-        settings={baseSettings}
-        onDragStart={() => ({})}
-        onDragEnd={() => ({})}
-      />,
-    );
+    const { getAllByText } = render(<Widget statistics={null} settings={baseSettings} />);
 
     // Assert - should only see one instance of the run number, not duplicates
     // The run number should appear in the format "#1 - Test Item"
@@ -402,12 +355,7 @@ describe('Widget display and legibility', () => {
 
     // Act
     const { getAllByText, queryAllByText } = render(
-      <Widget
-        statistics={statistics}
-        settings={settings}
-        onDragStart={() => ({})}
-        onDragEnd={() => ({})}
-      />,
+      <Widget statistics={statistics} settings={settings} />,
     );
 
     // Assert
@@ -422,12 +370,7 @@ describe('Widget display and legibility', () => {
 
     // Act
     const { getAllByText, queryAllByText } = render(
-      <Widget
-        statistics={statistics}
-        settings={settings}
-        onDragStart={() => ({})}
-        onDragEnd={() => ({})}
-      />,
+      <Widget statistics={statistics} settings={settings} />,
     );
 
     // Assert
@@ -441,14 +384,7 @@ describe('Widget display and legibility', () => {
     const settings: Partial<Settings> = { widgetDisplay: 'overall', widgetOpacity: 0 };
 
     // Act
-    const { container } = render(
-      <Widget
-        statistics={statistics}
-        settings={settings}
-        onDragStart={() => ({})}
-        onDragEnd={() => ({})}
-      />,
-    );
+    const { container } = render(<Widget statistics={statistics} settings={settings} />);
 
     // Assert
     const root = container.firstElementChild as HTMLElement;
@@ -460,14 +396,7 @@ describe('Widget display and legibility', () => {
     const settings: Partial<Settings> = { widgetDisplay: 'overall' };
 
     // Act
-    const { getByText } = render(
-      <Widget
-        statistics={statistics}
-        settings={settings}
-        onDragStart={() => ({})}
-        onDragEnd={() => ({})}
-      />,
-    );
+    const { getByText } = render(<Widget statistics={statistics} settings={settings} />);
 
     // Assert
     const ratio = getByText('40/100');
@@ -482,12 +411,7 @@ describe('Widget display and legibility', () => {
 
     // Act
     const { getByTestId, container } = render(
-      <Widget
-        statistics={statistics}
-        settings={settings}
-        onDragStart={() => ({})}
-        onDragEnd={() => ({})}
-      />,
+      <Widget statistics={statistics} settings={settings} />,
     );
 
     // Assert
@@ -504,12 +428,7 @@ describe('Widget display and legibility', () => {
 
     // Act
     const { getByTestId, container } = render(
-      <Widget
-        statistics={statistics}
-        settings={settings}
-        onDragStart={() => ({})}
-        onDragEnd={() => ({})}
-      />,
+      <Widget statistics={statistics} settings={settings} />,
     );
 
     // Assert
@@ -527,12 +446,7 @@ describe('Widget display and legibility', () => {
 
     // Act
     const { queryByTestId, container } = render(
-      <Widget
-        statistics={statistics}
-        settings={settings}
-        onDragStart={() => ({})}
-        onDragEnd={() => ({})}
-      />,
+      <Widget statistics={statistics} settings={settings} />,
     );
 
     // Assert
@@ -547,12 +461,7 @@ describe('Widget display and legibility', () => {
 
     // Act
     const { container, getByLabelText } = render(
-      <Widget
-        statistics={statistics}
-        settings={settings}
-        onDragStart={() => ({})}
-        onDragEnd={() => ({})}
-      />,
+      <Widget statistics={statistics} settings={settings} />,
     );
 
     // Assert
@@ -602,14 +511,7 @@ describe('Widget localization', () => {
   }
 
   const renderWidget = (settings: Partial<Settings>, statistics: GrailStatistics | null) =>
-    render(
-      <Widget
-        statistics={statistics}
-        settings={settings}
-        onDragStart={() => ({})}
-        onDragEnd={() => ({})}
-      />,
-    );
+    render(<Widget statistics={statistics} settings={settings} />);
 
   it('If there is no active session in run-only mode, Then the status copy is translated', () => {
     // Arrange
@@ -724,8 +626,6 @@ describe('When the Widget is rendered', () => {
         <Widget
           statistics={null}
           settings={{ widgetDisplay: 'run-only', widgetRunOnlyShowItems: true }}
-          onDragStart={() => ({})}
-          onDragEnd={() => ({})}
         />,
       );
 
@@ -739,14 +639,7 @@ describe('When the Widget is rendered', () => {
   describe('If statistics are still loading', () => {
     it('Then a translated loading message is shown inside the region', () => {
       // Arrange & Act
-      render(
-        <Widget
-          statistics={null}
-          settings={{ widgetDisplay: 'overall' }}
-          onDragStart={() => ({})}
-          onDragEnd={() => ({})}
-        />,
-      );
+      render(<Widget statistics={null} settings={{ widgetDisplay: 'overall' }} />);
 
       // Assert
       const region = screen.getByRole('region', { name: 'Grail progress widget' });

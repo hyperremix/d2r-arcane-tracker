@@ -206,6 +206,9 @@ class GrailDatabase {
   archiveSession(sessionId: string): void {
     sessionsModule.archiveSession(this, sessionId);
   }
+  updateSessionNotes(sessionId: string, notes: string): boolean {
+    return sessionsModule.updateSessionNotes(this, sessionId, notes);
+  }
   deleteSession(sessionId: string): void {
     sessionsModule.deleteSession(this, sessionId);
   }

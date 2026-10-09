@@ -118,6 +118,18 @@ const addRunItemInput: FieldValidator<AddRunItemInput> = (value) => {
 
 const sessionId = nonEmptyString('Invalid session ID');
 
+/** Longest session notes the renderer may save. */
+export const MAX_SESSION_NOTES_LENGTH = 10_000;
+
+const sessionNotes: FieldValidator<string> = (value) => {
+  const notes = string('Invalid session notes')(value);
+  ensure(
+    notes.length <= MAX_SESSION_NOTES_LENGTH,
+    `Invalid session notes: longer than ${MAX_SESSION_NOTES_LENGTH} characters`,
+  );
+  return notes;
+};
+
 /**
  * Whether the renderer may write a setting through `grail:updateSettings`. The mapped type forces a
  * decision for every new setting. Settings with a dedicated flow (and its own validation) or that
@@ -351,6 +363,7 @@ export const invokeArgValidators: { [C in InvokeChannel]: ArgsValidator<InvokeAr
   'run-tracker:start-session': noArgs,
   'run-tracker:end-session': noArgs,
   'run-tracker:archive-session': args(sessionId),
+  'run-tracker:update-session-notes': args(sessionId, sessionNotes),
   'run-tracker:start-run': args(optional(nonEmptyString('Invalid character ID'))),
   'run-tracker:end-run': noArgs,
   'run-tracker:pause': noArgs,

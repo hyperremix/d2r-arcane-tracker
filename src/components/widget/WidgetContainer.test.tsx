@@ -3,7 +3,7 @@ import type { GrailProgress, Item, Settings } from 'electron/types/grail';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { GrailProgressBuilder, HolyGrailItemBuilder } from '@/fixtures';
 import { useGrailStore } from '@/stores/grailStore';
-import { useRunTrackerStore } from '@/stores/runTrackerStore';
+import { initRunTrackerSync } from '@/stores/runTrackerStore';
 import { WidgetContainer } from './WidgetContainer';
 
 const widgetProps = vi.hoisted(() => ({
@@ -17,19 +17,17 @@ vi.mock('./Widget', () => ({
   },
 }));
 
+const runTrackerSync = vi.hoisted(() => ({ stop: vi.fn() }));
+
 vi.mock('@/stores/runTrackerStore', () => {
   const state = {
-    handleSessionStarted: vi.fn(),
-    handleSessionEnded: vi.fn(),
-    handleRunStarted: vi.fn(),
-    handleRunEnded: vi.fn(),
     refreshActiveRun: vi.fn().mockResolvedValue(undefined),
     loadSessionRuns: vi.fn().mockResolvedValue(undefined),
-    loadRunItems: vi.fn().mockResolvedValue(undefined),
     activeSession: undefined,
   };
   const useRunTrackerStore = Object.assign(() => state, { getState: () => state });
-  return { useRunTrackerStore };
+  const initRunTrackerSync = vi.fn(() => runTrackerSync.stop);
+  return { useRunTrackerStore, initRunTrackerSync };
 });
 
 type IpcHandler = (payload: unknown) => Promise<void> | void;
@@ -105,30 +103,28 @@ describe('WidgetContainer native window sizing', () => {
     });
   });
 
-  it('When the main process reports a started session, Then the session from the payload is stored', async () => {
+  it('When the widget mounts, Then the run tracker sync is started', async () => {
     // Arrange
-    await renderWithSettings({ widgetDisplay: 'overall' });
-    const session = { id: 'session-1' };
-    const { handleSessionStarted } = useRunTrackerStore.getState();
+    vi.mocked(initRunTrackerSync).mockClear();
 
     // Act
-    await act(async () => {
-      await handlers.get('run-tracker:session-started')?.({ session });
-    });
+    await renderWithSettings({ widgetDisplay: 'overall' });
 
     // Assert
-    expect(handleSessionStarted).toHaveBeenCalledWith(session);
+    expect(initRunTrackerSync).toHaveBeenCalledTimes(1);
   });
 
   it('When the widget unmounts, Then its main-process event listeners are removed', async () => {
     // Arrange
     const { unmount } = await renderWithSettings({ widgetDisplay: 'overall' });
+    runTrackerSync.stop.mockClear();
 
     // Act
     unmount();
 
     // Assert
     expect(handlers.size).toBe(0);
+    expect(runTrackerSync.stop).toHaveBeenCalledTimes(1);
   });
 
   it('When the widget loads its stored settings, Then the window is not resized again', async () => {

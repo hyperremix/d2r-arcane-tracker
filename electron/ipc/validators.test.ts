@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import type { InvokeChannel } from './contract';
 import { IpcValidationError } from './validation';
-import { invokeArgValidators, isRendererWritableSetting } from './validators';
+import {
+  invokeArgValidators,
+  isRendererWritableSetting,
+  MAX_SESSION_NOTES_LENGTH,
+} from './validators';
 
 function validate(channel: InvokeChannel, ...rawArgs: unknown[]): unknown[] {
   return invokeArgValidators[channel](rawArgs);
@@ -27,6 +31,13 @@ describe('When renderer arguments are validated against the IPC contract', () =>
     ['grail:backup', [''], 'Invalid backup path'],
     ['saveFile:inspectDirectory', [undefined], 'Invalid save directory: expected a string'],
     ['run-tracker:archive-session', [''], 'Invalid session ID'],
+    ['run-tracker:update-session-notes', ['', 'Cows'], 'Invalid session ID'],
+    ['run-tracker:update-session-notes', ['session-1', 42], 'Invalid session notes'],
+    [
+      'run-tracker:update-session-notes',
+      ['session-1', 'x'.repeat(MAX_SESSION_NOTES_LENGTH + 1)],
+      'Invalid session notes: longer than',
+    ],
     ['run-tracker:get-session-by-id', [{ id: 'x' }], 'Invalid session ID'],
     ['run-tracker:get-runs-by-session', [undefined], 'Invalid session ID'],
     ['run-tracker:get-session-items', [7], 'Invalid session ID'],

@@ -6,8 +6,7 @@ import { PageShell } from '@/components/layout/PageShell';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { translations } from '@/i18n/translations';
-import { combineUnsubscribers, onMainEvent } from '@/lib/ipcEvents';
-import { useRunTrackerStore } from '@/stores/runTrackerStore';
+import { initRunTrackerSync, useRunTrackerStore } from '@/stores/runTrackerStore';
 import { ErrorDisplay } from './ErrorDisplay';
 import { SessionCard } from './SessionCard';
 import { SessionControls } from './SessionControls';
@@ -28,17 +27,10 @@ export function RunTracker() {
     pendingActions,
     error,
     errorType,
-    retryCount,
+    canRetry,
     loadInitialData,
-    handleSessionStarted,
-    handleSessionEnded,
-    handleRunStarted,
-    handleRunEnded,
-    handleRunPaused,
-    handleRunResumed,
     clearError,
     retryLastAction,
-    loadRunItems,
   } = useRunTrackerStore(
     useShallow((state) => ({
       activeSession: state.activeSession,
@@ -47,17 +39,10 @@ export function RunTracker() {
       pendingActions: state.pendingActions,
       error: state.error,
       errorType: state.errorType,
-      retryCount: state.retryCount,
+      canRetry: state.lastFailedAction !== undefined,
       loadInitialData: state.loadInitialData,
-      handleSessionStarted: state.handleSessionStarted,
-      handleSessionEnded: state.handleSessionEnded,
-      handleRunStarted: state.handleRunStarted,
-      handleRunEnded: state.handleRunEnded,
-      handleRunPaused: state.handleRunPaused,
-      handleRunResumed: state.handleRunResumed,
       clearError: state.clearError,
       retryLastAction: state.retryLastAction,
-      loadRunItems: state.loadRunItems,
     })),
   );
 
@@ -80,43 +65,8 @@ export function RunTracker() {
     });
   }, [activeSession?.id]); // Only re-run when active session changes
 
-  // Set up IPC event listeners for real-time updates
-  // biome-ignore lint/correctness/useExhaustiveDependencies: Event listeners should only be set up once
-  useEffect(() => {
-    const unsubscribe = combineUnsubscribers([
-      onMainEvent('run-tracker:session-started', (payload) => {
-        handleSessionStarted(payload.session);
-      }),
-      onMainEvent('run-tracker:session-ended', () => {
-        handleSessionEnded();
-      }),
-      onMainEvent('run-tracker:run-started', (payload) => {
-        handleRunStarted(payload.run, payload.session);
-      }),
-      onMainEvent('run-tracker:run-ended', (payload) => {
-        handleRunEnded(payload.run, payload.session);
-      }),
-      onMainEvent('run-tracker:run-paused', (payload) => {
-        handleRunPaused(payload.session);
-      }),
-      onMainEvent('run-tracker:run-resumed', (payload) => {
-        handleRunResumed(payload.session);
-      }),
-      onMainEvent('run-tracker:run-item-added', (payload) => {
-        // Refresh items for the affected run so UI reflects newly found items
-        loadRunItems(payload.runId).catch((error) => {
-          console.error('[RunTracker] Error loading items for run from event:', error);
-        });
-      }),
-    ]);
-
-    console.log('[RunTracker] IPC event listeners registered');
-
-    return () => {
-      unsubscribe();
-      console.log('[RunTracker] IPC event listeners cleaned up');
-    };
-  }, []); // Only set up once on mount
+  // Keep the store in sync with the run tracker events of the main process
+  useEffect(() => initRunTrackerSync(), []);
 
   // Full-page spinner only until the first data load has completed
   if (initialLoadStatus === 'idle' || initialLoadStatus === 'loading') {
@@ -184,7 +134,7 @@ export function RunTracker() {
       <ErrorDisplay
         error={error}
         errorType={errorType}
-        retryCount={retryCount}
+        canRetry={canRetry}
         loading={isAnyActionPending}
         onRetry={retryLastAction}
         onDismiss={clearError}

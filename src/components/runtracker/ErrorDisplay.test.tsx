@@ -2,15 +2,15 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { ErrorDisplay } from './ErrorDisplay';
 
-describe('When ErrorDisplay is rendered with a network error', () => {
+describe('When ErrorDisplay is rendered with a retryable error', () => {
   it('Then the dismiss button has an accessible name and dismisses the error', () => {
     // Arrange
     const onDismiss = vi.fn();
     render(
       <ErrorDisplay
-        error="Connection lost"
-        errorType="network"
-        retryCount={0}
+        error={{ code: 'endSessionFailed', detail: 'Connection lost' }}
+        errorType="unknown"
+        canRetry
         loading={false}
         onRetry={vi.fn()}
         onDismiss={onDismiss}
@@ -24,13 +24,13 @@ describe('When ErrorDisplay is rendered with a network error', () => {
     expect(onDismiss).toHaveBeenCalledTimes(1);
   });
 
-  it('Then the retry button and attempt counter are translated', () => {
+  it('Then the error code is translated and the technical detail is shown', () => {
     // Arrange & Act
     render(
       <ErrorDisplay
-        error="Connection lost"
-        errorType="network"
-        retryCount={2}
+        error={{ code: 'endSessionFailed', detail: 'Connection lost' }}
+        errorType="unknown"
+        canRetry
         loading={false}
         onRetry={vi.fn()}
         onDismiss={vi.fn()}
@@ -38,7 +38,50 @@ describe('When ErrorDisplay is rendered with a network error', () => {
     );
 
     // Assert
-    expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
-    expect(screen.getByText('(Attempt 2/3)')).toBeInTheDocument();
+    expect(
+      screen.getByText('Failed to end session. Your progress has been saved.', { exact: false }),
+    ).toBeInTheDocument();
+    expect(screen.getByText('Connection lost')).toBeInTheDocument();
+  });
+
+  it('Then clicking the translated retry button retries the action', () => {
+    // Arrange
+    const onRetry = vi.fn();
+    render(
+      <ErrorDisplay
+        error={{ code: 'startRunFailed' }}
+        errorType="unknown"
+        canRetry
+        loading={false}
+        onRetry={onRetry}
+        onDismiss={vi.fn()}
+      />,
+    );
+
+    // Act
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+
+    // Assert
+    expect(onRetry).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('If ErrorDisplay is rendered with an error that cannot be retried', () => {
+  it('Then no retry button is shown', () => {
+    // Arrange & Act
+    render(
+      <ErrorDisplay
+        error={{ code: 'itemNameEmpty' }}
+        errorType="validation"
+        canRetry={false}
+        loading={false}
+        onRetry={vi.fn()}
+        onDismiss={vi.fn()}
+      />,
+    );
+
+    // Assert
+    expect(screen.getByText('Item name cannot be empty')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Retry' })).toBeNull();
   });
 });

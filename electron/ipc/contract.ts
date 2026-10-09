@@ -338,6 +338,7 @@ export interface IpcInvokeContract {
   'run-tracker:start-session': Invoke<[], Session>;
   'run-tracker:end-session': Invoke<[], SuccessResult>;
   'run-tracker:archive-session': Invoke<[sessionId: string], SuccessResult>;
+  'run-tracker:update-session-notes': Invoke<[sessionId: string, notes: string], Session>;
   'run-tracker:start-run': Invoke<[characterId?: string], Run>;
   'run-tracker:end-run': Invoke<[], SuccessResult>;
   'run-tracker:pause': Invoke<[], SuccessResult>;

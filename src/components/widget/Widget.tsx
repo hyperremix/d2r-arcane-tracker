@@ -27,8 +27,6 @@ import { useRunTrackerStore, useSessionStats } from '@/stores/runTrackerStore';
 interface WidgetProps {
   statistics: GrailStatistics | null;
   settings: Partial<Settings>;
-  onDragStart: () => void;
-  onDragEnd: () => void;
 }
 
 /**
@@ -306,7 +304,7 @@ function RunOnlyDisplay({
  * Widget component that displays grail progress statistics in a compact overlay format.
  * Supports multiple size configurations and dynamic opacity.
  */
-export function Widget({ statistics, settings, onDragStart, onDragEnd }: WidgetProps) {
+export function Widget({ statistics, settings }: WidgetProps) {
   const { t } = useTranslation();
   const widgetLabel = t(translations.widget.ariaLabel);
   // Split/all modes need ethereal tracking; fall back to overall here so the widget never renders empty
@@ -444,13 +442,7 @@ export function Widget({ statistics, settings, onDragStart, onDragEnd }: WidgetP
   // Handle run-only mode separately (doesn't need statistics)
   if (displayMode === 'run-only') {
     return (
-      <section
-        aria-label={widgetLabel}
-        className={containerClasses}
-        style={rootStyle}
-        onMouseDown={onDragStart}
-        onMouseUp={onDragEnd}
-      >
+      <section aria-label={widgetLabel} className={containerClasses} style={rootStyle}>
         {!locked && <WidgetDragGrip />}
         <RunOnlyDisplay
           activeSession={activeSession}
@@ -468,13 +460,7 @@ export function Widget({ statistics, settings, onDragStart, onDragEnd }: WidgetP
 
   if (!statistics) {
     return (
-      <section
-        aria-label={widgetLabel}
-        className={containerClasses}
-        style={rootStyle}
-        onMouseDown={onDragStart}
-        onMouseUp={onDragEnd}
-      >
+      <section aria-label={widgetLabel} className={containerClasses} style={rootStyle}>
         {!locked && <WidgetDragGrip />}
         <p className="text-sm text-white">{t(translations.common.loading)}</p>
       </section>
@@ -482,13 +468,7 @@ export function Widget({ statistics, settings, onDragStart, onDragEnd }: WidgetP
   }
 
   return (
-    <section
-      aria-label={widgetLabel}
-      className={containerClasses}
-      style={rootStyle}
-      onMouseDown={onDragStart}
-      onMouseUp={onDragEnd}
-    >
+    <section aria-label={widgetLabel} className={containerClasses} style={rootStyle}>
       {!locked && <WidgetDragGrip />}
       {/* Display mode: overall - Just overall progress */}
       {displayMode === 'overall' && (

@@ -154,14 +154,11 @@ export function SessionCard({ session, onViewAllRuns }: SessionCardProps) {
     if (!currentSession || notes === (currentSession.notes || '')) return;
 
     setIsSavingNotes(true);
-    try {
-      await updateSessionNotes(currentSession.id, notes);
-    } catch (error) {
-      console.error('Error updating session notes:', error);
-      // Revert notes on error
+    const saved = await updateSessionNotes(currentSession.id, notes);
+    setIsSavingNotes(false);
+    // The store reports the failure inline (with a retry); show the saved notes again
+    if (!saved) {
       setNotes(currentSession.notes || '');
-    } finally {
-      setIsSavingNotes(false);
     }
   }, [currentSession, notes, updateSessionNotes]);
 

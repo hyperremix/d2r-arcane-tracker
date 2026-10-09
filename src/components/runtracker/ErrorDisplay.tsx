@@ -3,13 +3,13 @@ import { useTranslation } from 'react-i18next';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { translations } from '@/i18n/translations';
-
-const MAX_RETRY_ATTEMPTS = 3;
+import type { RunTrackerError, RunTrackerErrorType } from '@/stores/runTrackerStore';
 
 interface ErrorDisplayProps {
-  error: string | null;
-  errorType: 'network' | 'validation' | 'permission' | 'unknown' | null;
-  retryCount: number;
+  error: RunTrackerError | null;
+  errorType: RunTrackerErrorType | null;
+  /** Whether the failed action can be run again. */
+  canRetry: boolean;
   loading: boolean;
   onRetry: () => void;
   onDismiss: () => void;
@@ -18,7 +18,7 @@ interface ErrorDisplayProps {
 export function ErrorDisplay({
   error,
   errorType,
-  retryCount,
+  canRetry,
   loading,
   onRetry,
   onDismiss,
@@ -27,49 +27,14 @@ export function ErrorDisplay({
 
   if (!error) return null;
 
-  const getErrorIcon = () => {
-    switch (errorType) {
-      case 'network':
-        return <RefreshCw className="h-4 w-4" />;
-      case 'validation':
-        return <AlertCircle className="h-4 w-4" />;
-      case 'permission':
-        return <AlertCircle className="h-4 w-4" />;
-      default:
-        return <AlertCircle className="h-4 w-4" />;
-    }
-  };
-
-  const getErrorVariant = () => {
-    switch (errorType) {
-      case 'network':
-        return 'default';
-      case 'validation':
-        return 'destructive';
-      case 'permission':
-        return 'destructive';
-      default:
-        return 'default';
-    }
-  };
-
-  const canRetry = errorType === 'network' && retryCount < MAX_RETRY_ATTEMPTS;
-
   return (
-    <Alert variant={getErrorVariant()}>
+    <Alert variant={errorType === 'validation' ? 'destructive' : 'default'}>
       <div className="flex items-start gap-2">
-        {getErrorIcon()}
+        <AlertCircle className="h-4 w-4" />
         <div className="flex-1">
           <AlertDescription className="text-sm">
-            {error}
-            {retryCount > 0 && (
-              <span className="ml-2 text-muted-foreground">
-                {t(translations.runTracker.errorDisplay.attempt, {
-                  current: retryCount,
-                  max: MAX_RETRY_ATTEMPTS,
-                })}
-              </span>
-            )}
+            {t(translations.runTracker.errors[error.code])}
+            {error.detail && <span className="ml-2 text-muted-foreground">{error.detail}</span>}
           </AlertDescription>
         </div>
         <div className="flex items-center gap-2">

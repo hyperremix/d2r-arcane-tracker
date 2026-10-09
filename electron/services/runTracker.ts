@@ -278,6 +278,27 @@ export class RunTrackerService {
   }
 
   /**
+   * Replaces the notes of a session. The in-memory active session is updated as well, so its
+   * periodic saves do not overwrite the new notes.
+   * @returns The updated session
+   * @throws If no session with the ID exists
+   */
+  updateSessionNotes(sessionId: string, notes: string): Session {
+    if (!this.database.updateSessionNotes(sessionId, notes)) {
+      throw new Error(`Session not found: ${sessionId}`);
+    }
+    const session = this.database.getSessionById(sessionId);
+    if (!session) {
+      throw new Error(`Session not found: ${sessionId}`);
+    }
+    if (this.currentSession?.id === sessionId) {
+      this.currentSession = { ...this.currentSession, notes: session.notes };
+    }
+    log.info('updateSessionNotes', `Session notes updated: ${sessionId}`);
+    return session;
+  }
+
+  /**
    * Starts a new run.
    * Requires an active session - will throw error if no session exists.
    */
