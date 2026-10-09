@@ -147,28 +147,6 @@ export interface Item {
 }
 
 /**
- * Type representing an item as stored in the database.
- * SQLite-compatible types: booleans as 0/1, undefined as null
- */
-export type DatabaseItem = {
-  id: string;
-  name: string;
-  link: string;
-  code: string | null;
-  item_base: string | null;
-  image_filename: string | null;
-  ethereal_type: EtherealType;
-  type: ItemType;
-  category: ItemCategory;
-  sub_category: ItemSubCategory;
-  treasure_class: ItemTreasureClass;
-  set_name: ItemSet | null;
-  runes: string | null;
-  created_at: string;
-  updated_at: string;
-};
-
-/**
  * Interface representing a Diablo 2 character with all its properties.
  */
 export interface Character {
@@ -183,23 +161,6 @@ export interface Character {
   created: Date;
   deleted?: Date;
 }
-
-/**
- * Type representing a character as stored in the database.
- * SQLite-compatible types: booleans as 0/1, undefined as null
- */
-export type DatabaseCharacter = {
-  id: string;
-  name: string;
-  character_class: CharacterClass;
-  level: number;
-  hardcore: 0 | 1;
-  expansion: 0 | 1;
-  save_file_path: string | null;
-  deleted_at: string | null;
-  created_at: string;
-  updated_at: string;
-};
 
 // ============================================================================
 // Run Tracking Types
@@ -349,38 +310,6 @@ export interface VaultItemSearchResult {
   pageSize: number;
 }
 
-export interface DatabaseVaultItem {
-  id: string;
-  fingerprint: string;
-  item_name: string;
-  item_code: string | null;
-  quality: string;
-  ethereal: 0 | 1;
-  socket_count: number | null;
-  stack_count: number;
-  raw_item_json: string;
-  source_character_id: string | null;
-  source_character_name: string | null;
-  source_file_type: VaultSourceFileType;
-  source_file_path: string | null;
-  location_context: VaultLocationContext;
-  stash_tab: number | null;
-  grid_x: number | null;
-  grid_y: number | null;
-  grid_width: number | null;
-  grid_height: number | null;
-  equipped_slot_id: number | null;
-  icon_file_name: string | null;
-  is_socketed_item: 0 | 1;
-  grail_item_id: string | null;
-  is_present_in_latest_scan: 0 | 1;
-  last_seen_at: string | null;
-  vaulted_at: string | null;
-  unvaulted_at: string | null;
-  created_at: string;
-  updated_at: string;
-}
-
 export interface GrailProgress {
   id: string;
   characterId: string;
@@ -393,71 +322,6 @@ export interface GrailProgress {
   isEthereal: boolean;
   fromInitialScan?: boolean; // true if found during initial application startup scan
 }
-
-/**
- * Type representing grail progress as stored in the database.
- * SQLite-compatible types: booleans as 0/1, undefined as null
- */
-export type DatabaseGrailProgress = {
-  id: string;
-  character_id: string;
-  item_id: string;
-  found_date: string | null;
-  manually_added: 0 | 1;
-  auto_detected: 0 | 1;
-  difficulty: 'normal' | 'nightmare' | 'hell' | null;
-  notes: string | null;
-  is_ethereal: 0 | 1;
-  from_initial_scan: 0 | 1;
-  created_at: string;
-  updated_at: string;
-};
-
-/**
- * Type representing a session as stored in the database.
- * SQLite-compatible types: booleans as 0/1, undefined as null
- */
-export type DatabaseSession = {
-  id: string;
-  start_time: string; // ISO datetime string
-  end_time: string | null;
-  total_run_time: number;
-  total_session_time: number;
-  run_count: number;
-  archived: 0 | 1; // SQLite boolean
-  notes: string | null;
-  created_at: string;
-  updated_at: string;
-};
-
-/**
- * Type representing a run as stored in the database.
- * SQLite-compatible types: booleans as 0/1, undefined as null
- */
-export type DatabaseRun = {
-  id: string;
-  session_id: string;
-  character_id: string | null;
-  run_number: number;
-  start_time: string;
-  end_time: string | null;
-  duration: number | null;
-  created_at: string;
-  updated_at: string;
-};
-
-/**
- * Type representing a run item as stored in the database.
- * SQLite-compatible types: booleans as 0/1, undefined as null
- */
-export type DatabaseRunItem = {
-  id: string;
-  run_id: string;
-  grail_progress_id: string | null;
-  name: string | null;
-  found_time: string;
-  created_at: string;
-};
 
 /**
  * Interface representing Holy Grail completion statistics.
@@ -516,19 +380,6 @@ export interface RunStatistics {
   /** Longest completed run, or `undefined` if no run has been completed yet. */
   slowestRun?: RunHighlight;
   itemsPerRun: number;
-}
-
-/**
- * Interface representing character run summary statistics.
- */
-export interface CharacterRunSummary {
-  characterId: string;
-  totalSessions: number;
-  totalRuns: number;
-  totalTimePlayed: number;
-  averageSessionDuration: number;
-  averageRunsPerSession: number;
-  totalItemsFound: number;
 }
 
 /**
@@ -595,55 +446,6 @@ export interface SaveDirectoryInspection {
  * Type representing the state of the run tracker.
  */
 export type RunTrackerState = 'idle' | 'running' | 'paused';
-
-/**
- * Type representing statistics for save files, mapping filenames to item counts.
- */
-export type SaveFileStats = {
-  [filename: string]: number | null;
-};
-
-/**
- * Type representing an item found in save files with its locations.
- */
-export type SaveFileItem = {
-  name: string;
-  type: string;
-  inSaves: { [saveName: string]: ItemDetails[] };
-};
-
-/**
- * Type representing detailed properties of an item found in a save file.
- */
-export type ItemDetails = {
-  ethereal: boolean;
-  ilevel: number | null;
-  socketed: boolean;
-  quantity?: number;
-  d2sItem?: d2s.types.IItem;
-};
-
-/**
- * Type representing a mapping of item names to their Item objects.
- */
-export type ItemsInSaves = {
-  [itemName: string]: SaveFileItem;
-};
-
-/**
- * Type representing the response from parsing save files, containing all found items and statistics.
- */
-export type FileReaderResponse = {
-  items: ItemsInSaves;
-  ethItems: ItemsInSaves;
-  stats: SaveFileStats;
-  availableRunes: AvailableRunes;
-};
-
-/**
- * Type representing available runes mapped by their rune ID.
- */
-export type AvailableRunes = { [runeId: string]: SaveFileItem };
 
 /**
  * Enum representing the different game modes for Holy Grail tracking.
@@ -765,15 +567,6 @@ export interface GlobalHotkeyStatus {
   /** Result of the most recent registration attempt per action (empty when disabled). */
   registrations: GlobalHotkeyRegistration[];
 }
-
-/**
- * Type representing a setting as stored in the database.
- */
-export type DatabaseSetting = {
-  key: string;
-  value: string | null;
-  updated_at: string;
-};
 
 /**
  * Interface representing a terror zone configuration.
@@ -1078,19 +871,6 @@ export interface SaveFileState {
   created: Date;
   updated: Date;
 }
-
-/**
- * Type representing a save file state as stored in the database.
- * SQLite-compatible types: dates as strings
- */
-export type DatabaseSaveFileState = {
-  id: string;
-  file_path: string;
-  last_modified: string;
-  last_parsed: string;
-  created_at: string;
-  updated_at: string;
-};
 
 /**
  * Information about an available update.
