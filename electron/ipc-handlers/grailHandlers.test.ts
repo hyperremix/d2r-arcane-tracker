@@ -6,54 +6,59 @@ vi.mock('electron', () => ({
   ipcMain: {
     handle: vi.fn(),
   },
-  webContents: {
-    getAllWebContents: vi.fn(() => []),
-  },
 }));
-
-// Mock database
-vi.mock('../database/database', () => {
-  // Create mock database instance inside the factory
-  const mockDB = {
-    getAllCharacters: vi.fn(),
-    getCharacterById: vi.fn(),
-    getCharacterMap: vi.fn(() => new Map()),
-    insertCharacter: vi.fn(),
-    updateCharacter: vi.fn(),
-    deleteCharacter: vi.fn(),
-    getAllSettings: vi.fn(),
-    getFilteredItems: vi.fn(),
-    getAllRunewords: vi.fn(),
-    getProgressByCharacter: vi.fn(),
-    getProgressById: vi.fn(),
-    getAllProgress: vi.fn(),
-    getFilteredProgress: vi.fn(),
-    upsertProgress: vi.fn(),
-    deleteManualProgress: vi.fn(),
-    setSetting: vi.fn(),
-    backup: vi.fn(),
-    restore: vi.fn(),
-    restoreFromBuffer: vi.fn(),
-    close: vi.fn(),
-  };
-
-  return {
-    GrailDatabase: vi.fn().mockImplementation(() => mockDB),
-    grailDatabase: mockDB,
-  };
-});
 
 import { ipcMain } from 'electron';
 import { GrailProgressBuilder } from '@/fixtures';
-import { GrailDatabase, grailDatabase } from '../database/database';
+import type { GrailDatabase } from '../database/database';
+import type { BroadcastToRenderers } from '../ipc/broadcast';
 import { MAX_RESTORE_BACKUP_BYTES } from '../ipc/validators';
+import { EventBus } from '../services/EventBus';
+import { SettingsService } from '../services/settingsService';
 import type { Character, Settings } from '../types/grail';
 import { GameMode } from '../types/grail';
-import {
-  addSettingsUpdatedListener,
-  closeGrailDatabase,
-  initializeGrailHandlers,
-} from './grailHandlers';
+import { initializeGrailHandlers as initialize } from './grailHandlers';
+
+const grailDatabase = {
+  getAllCharacters: vi.fn(),
+  getCharacterById: vi.fn(),
+  getCharacterMap: vi.fn(() => new Map()),
+  insertCharacter: vi.fn(),
+  updateCharacter: vi.fn(),
+  deleteCharacter: vi.fn(),
+  getAllSettings: vi.fn(),
+  getFilteredItems: vi.fn(),
+  getAllRunewords: vi.fn(),
+  getProgressByCharacter: vi.fn(),
+  getProgressById: vi.fn(),
+  getAllProgress: vi.fn(),
+  getFilteredProgress: vi.fn(),
+  upsertProgress: vi.fn(),
+  deleteManualProgress: vi.fn(),
+  setSetting: vi.fn(),
+  backup: vi.fn(),
+  restore: vi.fn(),
+  restoreFromBuffer: vi.fn(),
+  close: vi.fn(),
+  transaction: vi.fn((fn: () => unknown) => fn()),
+};
+
+const broadcastToRenderers = vi.fn() as BroadcastToRenderers;
+const eventBus = new EventBus();
+const settingsService = new SettingsService(grailDatabase as unknown as GrailDatabase, eventBus);
+
+/** Subscribes to stored setting changes, like the run tracker and the global hotkeys do. */
+function addSettingsUpdatedListener(listener: (settings: Partial<Settings>) => void) {
+  return settingsService.onUpdated(listener);
+}
+
+function initializeGrailHandlers() {
+  initialize({
+    database: grailDatabase as unknown as GrailDatabase,
+    settings: settingsService,
+    broadcastToRenderers,
+  });
+}
 
 function getUpdateProgressHandler() {
   return vi
@@ -75,7 +80,6 @@ describe('When grailHandlers is used', () => {
       initializeGrailHandlers();
 
       // Assert
-      // Note: GrailDatabase constructor is not called because grailHandlers uses the singleton instance
       expect(ipcMain.handle).toHaveBeenCalledWith('grail:getCharacters', expect.any(Function));
       expect(ipcMain.handle).toHaveBeenCalledWith('grail:getItems', expect.any(Function));
       expect(ipcMain.handle).toHaveBeenCalledWith('grail:getProgress', expect.any(Function));
@@ -86,16 +90,6 @@ describe('When grailHandlers is used', () => {
       expect(ipcMain.handle).toHaveBeenCalledWith('grail:backup', expect.any(Function));
       expect(ipcMain.handle).toHaveBeenCalledWith('grail:restore', expect.any(Function));
       expect(ipcMain.handle).toHaveBeenCalledWith('grail:restoreFromBuffer', expect.any(Function));
-    });
-
-    it('Then should handle database initialization errors gracefully', () => {
-      // Arrange
-      vi.mocked(GrailDatabase).mockImplementation(() => {
-        throw new Error('Database initialization failed');
-      });
-
-      // Act & Assert
-      expect(() => initializeGrailHandlers()).not.toThrow();
     });
   });
 
@@ -1014,24 +1008,6 @@ describe('When grailHandlers is used', () => {
 
       // Act & Assert
       await expect(handler(null, '/path/to/backup.db')).rejects.toThrow('Backup failed');
-    });
-  });
-
-  describe('If closeGrailDatabase is called', () => {
-    it('Then should close database when database is initialized', () => {
-      // Arrange
-      initializeGrailHandlers();
-
-      // Act
-      closeGrailDatabase();
-
-      // Assert
-      expect(vi.mocked(grailDatabase.close)).toHaveBeenCalled();
-    });
-
-    it('Then should handle case when database is not initialized', () => {
-      // Act & Assert
-      expect(() => closeGrailDatabase()).not.toThrow();
     });
   });
 

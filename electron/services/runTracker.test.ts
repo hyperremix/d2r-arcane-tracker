@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { GrailDatabase } from '../database/database';
 import type { Run } from '../types/grail';
-import type { EventBus } from './EventBus';
+import { EventBus } from './EventBus';
+import type { MemoryReader } from './memoryReader';
 import { RunTrackerService } from './runTracker';
 
 // Mock database
@@ -418,5 +419,71 @@ describe('When RunTrackerService is instantiated', () => {
       expect(mockDatabase.upsertRun).toHaveBeenCalled();
       expect(mockDatabase.upsertSession).toHaveBeenCalled();
     });
+  });
+});
+
+describe('When the auto mode setting changes while the app runs', () => {
+  const originalPlatform = process.platform;
+  let settings: { runTrackerMemoryReading: boolean; runTrackerMemoryPollingInterval: number };
+  let eventBus: EventBus;
+  let memoryReader: {
+    startPolling: ReturnType<typeof vi.fn>;
+    stopPolling: ReturnType<typeof vi.fn>;
+    updatePollingInterval: ReturnType<typeof vi.fn>;
+  };
+  let service: RunTrackerService;
+
+  beforeEach(() => {
+    // Auto mode is only available on Windows
+    Object.defineProperty(process, 'platform', { value: 'win32' });
+    settings = { runTrackerMemoryReading: false, runTrackerMemoryPollingInterval: 500 };
+    eventBus = new EventBus();
+    memoryReader = { startPolling: vi.fn(), stopPolling: vi.fn(), updatePollingInterval: vi.fn() };
+    const database = {
+      getAllSettings: vi.fn(() => settings),
+      getActiveSession: vi.fn(() => null),
+    } as unknown as GrailDatabase;
+    service = new RunTrackerService(eventBus, database, memoryReader as unknown as MemoryReader);
+  });
+
+  afterEach(() => {
+    service.shutdown();
+    Object.defineProperty(process, 'platform', { value: originalPlatform });
+  });
+
+  it('If auto mode is turned on, Then memory reading starts without a restart', () => {
+    // Arrange
+    settings = { runTrackerMemoryReading: true, runTrackerMemoryPollingInterval: 250 };
+
+    // Act
+    eventBus.emit('settings-updated', { runTrackerMemoryReading: true });
+
+    // Assert
+    expect(memoryReader.updatePollingInterval).toHaveBeenCalledWith(250);
+    expect(memoryReader.startPolling).toHaveBeenCalledTimes(1);
+  });
+
+  it('If auto mode is turned off again, Then memory reading stops', () => {
+    // Arrange
+    settings = { ...settings, runTrackerMemoryReading: true };
+    eventBus.emit('settings-updated', { runTrackerMemoryReading: true });
+
+    // Act
+    settings = { ...settings, runTrackerMemoryReading: false };
+    eventBus.emit('settings-updated', { runTrackerMemoryReading: false });
+
+    // Assert
+    expect(memoryReader.stopPolling).toHaveBeenCalledTimes(1);
+  });
+
+  it('If an unrelated setting changes, Then memory reading is left alone', () => {
+    // Arrange
+    settings = { ...settings, runTrackerMemoryReading: true };
+
+    // Act
+    eventBus.emit('settings-updated', { theme: 'dark' });
+
+    // Assert
+    expect(memoryReader.startPolling).not.toHaveBeenCalled();
   });
 });

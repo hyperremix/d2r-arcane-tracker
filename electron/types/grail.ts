@@ -764,8 +764,6 @@ export interface GlobalHotkeyStatus {
   enabled: boolean;
   /** Result of the most recent registration attempt per action (empty when disabled). */
   registrations: GlobalHotkeyRegistration[];
-  /** True when the run tracker service is unavailable, so no global hotkeys can be registered. */
-  unavailable?: boolean;
 }
 
 /**

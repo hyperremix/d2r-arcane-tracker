@@ -1,5 +1,5 @@
-import path from 'node:path';
 import { BrowserWindow, screen } from 'electron';
+import type { AppPaths } from '../app/paths';
 import type { Settings } from '../types/grail';
 import type { WidgetDisplayMode, WidgetSize } from '../utils/widgetDisplay';
 import {
@@ -13,6 +13,7 @@ import {
   getDefaultPosition,
   isPositionOnScreen,
 } from '../utils/windowSnapping';
+import { createAppWindow } from './appWindow';
 
 /**
  * The widget window instance.
@@ -70,17 +71,14 @@ function applyWidgetLock(window: BrowserWindow, locked: boolean): void {
  * Creates the widget window with the specified settings.
  *
  * @param settings - Application settings containing widget configuration
- * @param __dirname - Directory name for resolving preload script path
- * @param viteDevServerUrl - Vite dev server URL (only in development)
- * @param rendererDist - Path to renderer distribution folder (production)
+ * @param paths - Locations of the preload script and the renderer
  * @param onPositionChange - Callback when widget position changes (for saving to settings)
+ * @param onSizeChange - Callback when widget size changes (for saving to settings)
  * @returns The created BrowserWindow instance
  */
 export function createWidgetWindow(
   settings: Partial<Settings>,
-  __dirname: string,
-  viteDevServerUrl?: string,
-  rendererDist?: string,
+  paths: AppPaths,
   onPositionChange?: (position: { x: number; y: number }) => void,
   onSizeChange?: (display: WidgetDisplayMode, size: WidgetSize) => void,
 ): BrowserWindow {
@@ -103,7 +101,9 @@ export function createWidgetWindow(
     }
   }
 
-  widgetWindow = new BrowserWindow({
+  widgetWindow = createAppWindow(BrowserWindow, {
+    paths,
+    route: '/widget',
     width: size.width,
     height: size.height,
     minWidth: 150,
@@ -122,27 +122,11 @@ export function createWidgetWindow(
     // A locked widget must never take focus from the game, so it is shown inactive below
     focusable: !widgetLocked,
     show: !widgetLocked,
-    webPreferences: {
-      preload: path.join(__dirname, 'preload.mjs'),
-      contextIsolation: true,
-      nodeIntegration: false,
-      sandbox: true,
-      webSecurity: true,
-    },
   });
   widgetWindow.setAlwaysOnTop(true, 'screen-saver');
   if (widgetLocked) {
     applyWidgetLock(widgetWindow, true);
     widgetWindow.showInactive();
-  }
-
-  // Load the widget page
-  if (viteDevServerUrl) {
-    widgetWindow.loadURL(`${viteDevServerUrl}#/widget`);
-  } else {
-    widgetWindow.loadFile(path.join(rendererDist || '', 'index.html'), {
-      hash: '/widget',
-    });
   }
 
   // Handle window move with snapping
@@ -227,17 +211,13 @@ export function createWidgetWindow(
  * Shows the widget window if it exists, or creates it if it doesn't.
  *
  * @param settings - Application settings containing widget configuration
- * @param __dirname - Directory name for resolving preload script path
- * @param viteDevServerUrl - Vite dev server URL (only in development)
- * @param rendererDist - Path to renderer distribution folder (production)
+ * @param paths - Locations of the preload script and the renderer
  * @param onPositionChange - Callback when widget position changes (for saving to settings)
  * @param onSizeChange - Callback when widget size changes (for saving to settings)
  */
 export function showWidgetWindow(
   settings: Partial<Settings>,
-  __dirname: string,
-  viteDevServerUrl?: string,
-  rendererDist?: string,
+  paths: AppPaths,
   onPositionChange?: (position: { x: number; y: number }) => void,
   onSizeChange?: (display: WidgetDisplayMode, size: WidgetSize) => void,
 ): void {
@@ -248,14 +228,7 @@ export function showWidgetWindow(
       widgetWindow.show();
     }
   } else {
-    createWidgetWindow(
-      settings,
-      __dirname,
-      viteDevServerUrl,
-      rendererDist,
-      onPositionChange,
-      onSizeChange,
-    );
+    createWidgetWindow(settings, paths, onPositionChange, onSizeChange);
   }
 }
 

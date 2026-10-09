@@ -1,1482 +1,166 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { VaultItemSearchResult } from '../types/grail';
 
 const mocks = vi.hoisted(() => ({
-  handleMock: vi.fn(),
-  grailDatabaseMock: {
-    addVaultItemWithUndo: vi.fn(),
-    unvaultVaultItem: vi.fn(),
-    removeVaultItem: vi.fn(),
-    getVaultItemById: vi.fn(),
-    searchVaultItems: vi.fn(),
-    getAllSettings: vi.fn(),
-  },
-  assertGameNotRunning: vi.fn(),
-  saveFileEditorMock: {
-    addItemToSaveFile: vi.fn(),
-    readSaveFileItem: vi.fn(),
-    removeItemFromSaveFile: vi.fn(),
-    moveItemBetweenSaveFiles: vi.fn(),
-    splitStackInSaveFile: vi.fn(),
-  },
+  handlers: new Map<string, (...args: unknown[]) => unknown>(),
 }));
 
 vi.mock('electron', () => ({
   ipcMain: {
-    handle: mocks.handleMock,
+    handle: vi.fn((channel: string, handler: (...args: unknown[]) => unknown) => {
+      mocks.handlers.set(channel, handler);
+    }),
   },
 }));
 
-vi.mock('../database/database', () => ({
-  grailDatabase: mocks.grailDatabaseMock,
-}));
-
-vi.mock('../services/gameProcessGuard', () => ({
-  assertGameNotRunning: mocks.assertGameNotRunning,
-}));
-
-vi.mock('../services/saveFileEditor', () => ({
-  addItemToSaveFile: mocks.saveFileEditorMock.addItemToSaveFile,
-  readSaveFileItem: mocks.saveFileEditorMock.readSaveFileItem,
-  removeItemFromSaveFile: mocks.saveFileEditorMock.removeItemFromSaveFile,
-  moveItemBetweenSaveFiles: mocks.saveFileEditorMock.moveItemBetweenSaveFiles,
-  splitStackInSaveFile: mocks.saveFileEditorMock.splitStackInSaveFile,
-}));
-
-import type { SaveFileMonitor } from '../services/saveFileMonitor';
+import type { VaultService } from '../services/vaultService';
 import { initializeVaultHandlers } from './vaultHandlers';
 
-function makeVaultItem(overrides: Record<string, unknown>) {
+function createVaultServiceStub() {
   return {
-    id: 'row',
-    fingerprint: 'fp',
-    itemName: 'Item',
-    quality: 'unique',
-    ethereal: false,
-    stackCount: 1,
-    rawItemJson: '{"id":1}',
-    sourceFileType: 'd2s',
-    locationContext: 'inventory',
-    isSocketedItem: false,
-    isPresentInLatestScan: true,
-    vaultedAt: new Date('2024-01-01T00:00:00.000Z'),
-    created: new Date('2024-01-01T00:00:00.000Z'),
-    lastUpdated: new Date('2024-01-01T00:00:00.000Z'),
-    ...overrides,
+    addItem: vi.fn().mockResolvedValue({ id: 'vault-1' }),
+    removeItem: vi.fn(),
+    unvaultItem: vi.fn().mockResolvedValue(undefined),
+    search: vi.fn().mockReturnValue({ items: [], total: 0 }),
+    searchAll: vi.fn().mockReturnValue({ inventory: {}, vault: {} }),
+    moveItem: vi.fn().mockResolvedValue(undefined),
+    splitStack: vi.fn().mockResolvedValue(undefined),
   };
 }
 
-describe('When vault IPC handlers are initialized', () => {
+function invoke(channel: string, ...args: unknown[]) {
+  const handler = mocks.handlers.get(channel);
+  if (!handler) {
+    throw new Error(`No handler registered for ${channel}`);
+  }
+  return handler({}, ...args);
+}
+
+describe('When the vault IPC handlers are initialized', () => {
+  let vault: ReturnType<typeof createVaultServiceStub>;
+
   beforeEach(() => {
-    vi.clearAllMocks();
-    mocks.assertGameNotRunning.mockResolvedValue(undefined);
-    mocks.grailDatabaseMock.getAllSettings.mockReturnValue({ saveDir: '/tmp' });
-    mocks.saveFileEditorMock.readSaveFileItem.mockResolvedValue({ type: 'uap', code: 'uap' });
-    mocks.saveFileEditorMock.addItemToSaveFile.mockResolvedValue(undefined);
-    mocks.saveFileEditorMock.removeItemFromSaveFile.mockResolvedValue(undefined);
+    mocks.handlers.clear();
+    vault = createVaultServiceStub();
+    initializeVaultHandlers(vault as unknown as VaultService);
   });
 
-  describe('If initializeVaultHandlers is called', () => {
-    it('Then all required vault and inventory channels are registered', () => {
-      // Arrange
-      const getSaveFileMonitor = vi.fn(() => undefined);
+  it('Then every vault and inventory channel is registered', () => {
+    // Arrange
+    const expectedChannels = [
+      'vault:addItem',
+      'vault:removeItem',
+      'vault:unvaultItem',
+      'vault:search',
+      'inventory:searchAll',
+      'inventory:moveItem',
+      'inventory:splitStack',
+    ];
 
-      // Act
-      initializeVaultHandlers(
-        getSaveFileMonitor as unknown as Parameters<typeof initializeVaultHandlers>[0],
-      );
+    // Act
+    const registeredChannels = [...mocks.handlers.keys()];
 
-      // Assert
-      expect(mocks.handleMock).toHaveBeenCalledWith('vault:addItem', expect.any(Function));
-      expect(mocks.handleMock).toHaveBeenCalledWith('vault:removeItem', expect.any(Function));
-      expect(mocks.handleMock).toHaveBeenCalledWith('vault:search', expect.any(Function));
-      expect(mocks.handleMock).toHaveBeenCalledWith('inventory:searchAll', expect.any(Function));
-      expect(mocks.handleMock).toHaveBeenCalledWith('inventory:moveItem', expect.any(Function));
-    });
-
-    it('Then channels without a renderer caller are not registered', () => {
-      // Arrange
-      const removedChannels = [
-        'vault:listItems',
-        'vault:listCategories',
-        'vault:updateItemTags',
-        'vault:createCategory',
-        'vault:updateCategory',
-        'vault:deleteCategory',
-        'inventory:listSnapshots',
-      ];
-
-      // Act
-      initializeVaultHandlers(() => undefined);
-
-      // Assert
-      const registeredChannels = mocks.handleMock.mock.calls.map((call) => call[0]);
-      for (const channel of removedChannels) {
-        expect(registeredChannels).not.toContain(channel);
-      }
-    });
+    // Assert
+    expect(registeredChannels).toEqual(expect.arrayContaining(expectedChannels));
   });
 
-  describe('If vault:addItem receives date fields as ISO strings', () => {
-    it('Then the handler normalizes them to Date instances before database writes', async () => {
+  it('Then channels without a renderer caller are not registered', () => {
+    // Arrange
+    const removedChannels = [
+      'vault:listItems',
+      'vault:listCategories',
+      'vault:updateItemTags',
+      'vault:createCategory',
+      'vault:updateCategory',
+      'vault:deleteCategory',
+      'inventory:listSnapshots',
+    ];
+
+    // Act
+    const registeredChannels = [...mocks.handlers.keys()];
+
+    // Assert
+    for (const channel of removedChannels) {
+      expect(registeredChannels).not.toContain(channel);
+    }
+  });
+
+  describe('If vault:addItem is invoked', () => {
+    it('Then the item is passed to the vault service and the stored item returned', async () => {
       // Arrange
-      initializeVaultHandlers(() => undefined);
-      mocks.grailDatabaseMock.addVaultItemWithUndo.mockReturnValue({
-        item: { id: 'fp-1' },
-        undo: vi.fn(),
-      });
-      const handler = mocks.handleMock.mock.calls.find((call) => call[0] === 'vault:addItem')?.[1];
+      const item = { fingerprint: 'fp-1' };
 
       // Act
-      await handler?.(null, {
-        fingerprint: 'fp-1',
-        itemName: 'Shako',
-        quality: 'unique',
-        ethereal: false,
-        rawItemJson: '{}',
-        sourceFileType: 'd2s',
-        locationContext: 'inventory',
-        lastSeenAt: '2024-01-01T10:00:00.000Z',
-        vaultedAt: '2024-01-01T10:01:00.000Z',
-      });
+      const result = await invoke('vault:addItem', item);
 
       // Assert
-      expect(mocks.grailDatabaseMock.addVaultItemWithUndo).toHaveBeenCalledWith(
-        expect.objectContaining({
-          lastSeenAt: expect.any(Date),
-          vaultedAt: expect.any(Date),
-        }),
-      );
+      expect(vault.addItem).toHaveBeenCalledWith(item);
+      expect(result).toEqual({ id: 'vault-1' });
     });
   });
 
-  describe('If vault:addItem receives an invalid date string', () => {
-    it('Then the handler rejects the request with a validation error', async () => {
+  describe('If vault:unvaultItem is invoked', () => {
+    it('Then the item, target and withdraw count are passed on and success is reported', async () => {
       // Arrange
-      initializeVaultHandlers(() => undefined);
-      const handler = mocks.handleMock.mock.calls.find((call) => call[0] === 'vault:addItem')?.[1];
+      const target = { targetFilePath: '/tmp/sorc.d2s' };
 
       // Act
-      const promise = handler?.(null, {
-        fingerprint: 'fp-1',
-        itemName: 'Shako',
-        quality: 'unique',
-        ethereal: false,
-        rawItemJson: '{}',
-        sourceFileType: 'd2s',
-        locationContext: 'inventory',
-        lastSeenAt: 'invalid-date-value',
-      });
+      const result = await invoke('vault:unvaultItem', 'row-1', target, 3);
 
       // Assert
-      await expect(promise).rejects.toThrow('lastSeenAt must be a valid date');
-    });
-  });
-
-  describe('If vault:addItem receives a modern d2i source with coordinate locator', () => {
-    it('Then it writes to vault first and removes from source by coordinates', async () => {
-      // Arrange
-      initializeVaultHandlers(() => undefined);
-      mocks.saveFileEditorMock.readSaveFileItem.mockResolvedValue({
-        type: 'r19',
-        code: 'r19',
-        position_x: 2,
-        position_y: 1,
-      });
-      mocks.grailDatabaseMock.addVaultItemWithUndo.mockReturnValue({
-        item: { id: 'vault-item-1' },
-        undo: vi.fn(),
-      });
-      const handler = mocks.handleMock.mock.calls.find((call) => call[0] === 'vault:addItem')?.[1];
-
-      // Act
-      await handler?.(null, {
-        fingerprint: 'fp-rune',
-        itemName: 'Fal Rune',
-        quality: 'normal',
-        ethereal: false,
-        rawItemJson: '{"type":"r19","position_x":2,"position_y":1}',
-        sourceFileType: 'd2i',
-        sourceFilePath: '/tmp/shared-stash.d2i',
-        locationContext: 'stash',
-        stashTab: 7,
-        gridX: 2,
-        gridY: 1,
-      });
-
-      // Assert
-      expect(mocks.saveFileEditorMock.removeItemFromSaveFile).toHaveBeenCalledWith(
-        '/tmp/shared-stash.d2i',
-        'd2i',
-        expect.objectContaining({
-          itemId: undefined,
-          stashTab: 7,
-          gridX: 2,
-          gridY: 1,
-        }),
-      );
-      const addOrder = mocks.grailDatabaseMock.addVaultItemWithUndo.mock.invocationCallOrder[0];
-      const removeOrder =
-        mocks.saveFileEditorMock.removeItemFromSaveFile.mock.invocationCallOrder[0];
-      expect(addOrder).toBeLessThan(removeOrder);
-    });
-  });
-
-  describe('If vault:addItem receives a stackable d2i item without id or position in its raw JSON', () => {
-    it('Then the source item is located by the input stash tab, coordinates and code', async () => {
-      // Arrange
-      initializeVaultHandlers(() => undefined);
-      mocks.saveFileEditorMock.readSaveFileItem.mockResolvedValue({ type: 'r19', code: 'r19' });
-      mocks.grailDatabaseMock.addVaultItemWithUndo.mockReturnValue({
-        item: { id: 'vault-item-3' },
-        undo: vi.fn(),
-      });
-      const handler = mocks.handleMock.mock.calls.find((call) => call[0] === 'vault:addItem')?.[1];
-
-      // Act
-      await handler?.(null, {
-        fingerprint: 'fp-rune-no-position',
-        itemName: 'Fal Rune',
-        itemCode: 'r19',
-        quality: 'normal',
-        ethereal: false,
-        rawItemJson: '{"type":"r19","code":"r19"}',
-        sourceFileType: 'd2i',
-        sourceFilePath: '/tmp/shared-stash.d2i',
-        locationContext: 'stash',
-        stashTab: 7,
-        gridX: 3,
-        gridY: 2,
-      });
-
-      // Assert
-      expect(mocks.saveFileEditorMock.removeItemFromSaveFile).toHaveBeenCalledWith(
-        '/tmp/shared-stash.d2i',
-        'd2i',
-        expect.objectContaining({
-          itemId: undefined,
-          itemCode: 'r19',
-          stashTab: 7,
-          gridX: 3,
-          gridY: 2,
-        }),
-      );
-    });
-  });
-
-  describe('If vault:addItem source removal fails after vault row is written', () => {
-    it('Then it reverts vaulted state and returns a clear error', async () => {
-      // Arrange
-      initializeVaultHandlers(() => undefined);
-      const undo = vi.fn();
-      mocks.grailDatabaseMock.addVaultItemWithUndo.mockReturnValue({
-        item: { id: 'vault-item-2' },
-        undo,
-      });
-      mocks.saveFileEditorMock.removeItemFromSaveFile.mockRejectedValue(
-        new Error('disk write failed'),
-      );
-      const handler = mocks.handleMock.mock.calls.find((call) => call[0] === 'vault:addItem')?.[1];
-
-      // Act
-      const promise = handler?.(null, {
-        fingerprint: 'fp-shako',
-        itemName: 'Shako',
-        quality: 'unique',
-        ethereal: false,
-        rawItemJson: '{"id":42}',
-        sourceFileType: 'd2s',
-        sourceFilePath: '/tmp/sorc.d2s',
-        locationContext: 'inventory',
-      });
-
-      // Assert
-      await expect(promise).rejects.toThrow('Vault add persisted but source item removal failed');
-      expect(undo).toHaveBeenCalledTimes(1);
-    });
-  });
-
-  describe('If vault:addItem fails to write the vault row', () => {
-    it('Then the item is never removed from the save file', async () => {
-      // Arrange
-      initializeVaultHandlers(() => undefined);
-      mocks.grailDatabaseMock.addVaultItemWithUndo.mockImplementation(() => {
-        throw new Error('database is locked');
-      });
-      const handler = mocks.handleMock.mock.calls.find((call) => call[0] === 'vault:addItem')?.[1];
-
-      // Act
-      const promise = handler?.(null, {
-        fingerprint: 'fp-shako-db-failure',
-        itemName: 'Shako',
-        quality: 'unique',
-        ethereal: false,
-        rawItemJson: '{"id":42}',
-        sourceFileType: 'd2s',
-        sourceFilePath: '/tmp/sorc.d2s',
-        locationContext: 'inventory',
-      });
-
-      // Assert
-      await expect(promise).rejects.toThrow('database is locked');
-      expect(mocks.saveFileEditorMock.removeItemFromSaveFile).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('If vault:addItem receives invalid raw item JSON for a source-backed item', () => {
-    it('Then it rejects before writing to the vault database', async () => {
-      // Arrange
-      initializeVaultHandlers(() => undefined);
-      const handler = mocks.handleMock.mock.calls.find((call) => call[0] === 'vault:addItem')?.[1];
-
-      // Act
-      const promise = handler?.(null, {
-        fingerprint: 'fp-invalid-json',
-        itemName: 'Malformed Item',
-        quality: 'normal',
-        ethereal: false,
-        rawItemJson: '{"id": 42',
-        sourceFileType: 'd2s',
-        sourceFilePath: '/tmp/sorc.d2s',
-        locationContext: 'inventory',
-      });
-
-      // Assert
-      await expect(promise).rejects.toThrow('rawItemJson must be valid JSON');
-      expect(mocks.grailDatabaseMock.addVaultItemWithUndo).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('If inventory:searchAll is invoked', () => {
-    it('Then it returns combined inventory and vault search results', async () => {
-      // Arrange
-      const snapshots = [
-        {
-          snapshotId: 's1',
-          characterName: 'Sorc',
-          sourceFileType: 'd2s',
-          sourceFilePath: '/tmp/sorc.d2s',
-          capturedAt: new Date('2024-01-01T00:00:00.000Z'),
-          items: [
-            {
-              fingerprint: 'fp-1',
-              fingerprintInputs: {
-                sourceFileType: 'd2s',
-                characterName: 'Sorc',
-                locationContext: 'inventory',
-                quality: 'unique',
-                ethereal: false,
-                socketCount: 0,
-                itemName: 'Shako',
-              },
-              characterName: 'Sorc',
-              sourceFileType: 'd2s',
-              sourceFilePath: '/tmp/sorc.d2s',
-              locationContext: 'inventory',
-              itemName: 'Shako',
-              quality: 'unique',
-              ethereal: false,
-              socketCount: 0,
-              rawItemJson: '{}',
-              rawParsedItem: {} as never,
-              seenAt: new Date('2024-01-01T00:00:00.000Z'),
-            },
-          ],
-        },
-      ];
-
-      const getSaveFileMonitor = vi.fn(() => ({
-        getInventorySearchResult: vi.fn(() => ({
-          snapshots,
-          totalSnapshots: 1,
-          totalItems: 1,
-        })),
-      }));
-
-      const vaultResult: VaultItemSearchResult = {
-        items: [],
-        page: 1,
-        pageSize: 20,
-        total: 0,
-      };
-      mocks.grailDatabaseMock.searchVaultItems.mockReturnValue(vaultResult);
-
-      initializeVaultHandlers(
-        getSaveFileMonitor as unknown as Parameters<typeof initializeVaultHandlers>[0],
-      );
-      const handler = mocks.handleMock.mock.calls.find(
-        (call) => call[0] === 'inventory:searchAll',
-      )?.[1];
-
-      // Act
-      const result = await handler?.(null, { text: 'shako', page: 1, pageSize: 20 });
-
-      // Assert
-      expect(mocks.grailDatabaseMock.searchVaultItems).toHaveBeenCalledWith({
-        text: 'shako',
-        page: 1,
-        pageSize: 20,
-      });
-      expect(result).toEqual({
-        inventory: {
-          snapshots,
-          totalSnapshots: 1,
-          totalItems: 1,
-        },
-        vault: vaultResult,
-      });
-    });
-  });
-
-  describe('If inventory:searchAll receives a characterId filter', () => {
-    it('Then it filters inventory items by characterId', async () => {
-      // Arrange
-      const snapshots = [
-        {
-          snapshotId: 's1',
-          characterName: 'Sorc',
-          characterId: 'char-1',
-          sourceFileType: 'd2s',
-          sourceFilePath: '/tmp/sorc.d2s',
-          capturedAt: new Date('2024-01-01T00:00:00.000Z'),
-          items: [
-            {
-              fingerprint: 'fp-1',
-              fingerprintInputs: {
-                sourceFileType: 'd2s',
-                characterName: 'Sorc',
-                locationContext: 'inventory',
-                quality: 'unique',
-                ethereal: false,
-                socketCount: 0,
-                itemName: 'Shako',
-              },
-              characterName: 'Sorc',
-              characterId: 'char-1',
-              sourceFileType: 'd2s',
-              sourceFilePath: '/tmp/sorc.d2s',
-              locationContext: 'inventory',
-              itemName: 'Shako',
-              quality: 'unique',
-              ethereal: false,
-              socketCount: 0,
-              rawItemJson: '{}',
-              rawParsedItem: {} as never,
-              seenAt: new Date('2024-01-01T00:00:00.000Z'),
-            },
-            {
-              fingerprint: 'fp-2',
-              fingerprintInputs: {
-                sourceFileType: 'd2s',
-                characterName: 'Barb',
-                locationContext: 'inventory',
-                quality: 'unique',
-                ethereal: false,
-                socketCount: 0,
-                itemName: 'Arreat',
-              },
-              characterName: 'Barb',
-              characterId: 'char-2',
-              sourceFileType: 'd2s',
-              sourceFilePath: '/tmp/barb.d2s',
-              locationContext: 'inventory',
-              itemName: 'Arreat',
-              quality: 'unique',
-              ethereal: false,
-              socketCount: 0,
-              rawItemJson: '{}',
-              rawParsedItem: {} as never,
-              seenAt: new Date('2024-01-01T00:00:00.000Z'),
-            },
-          ],
-        },
-      ];
-
-      const getSaveFileMonitor = vi.fn(() => ({
-        getInventorySearchResult: vi.fn(() => ({
-          snapshots,
-          totalSnapshots: 1,
-          totalItems: 2,
-        })),
-      }));
-
-      mocks.grailDatabaseMock.searchVaultItems.mockReturnValue({
-        items: [],
-        page: 1,
-        pageSize: 20,
-        total: 0,
-      });
-
-      initializeVaultHandlers(
-        getSaveFileMonitor as unknown as Parameters<typeof initializeVaultHandlers>[0],
-      );
-      const handler = mocks.handleMock.mock.calls.find(
-        (call) => call[0] === 'inventory:searchAll',
-      )?.[1];
-
-      // Act
-      const result = await handler?.(null, { characterId: 'char-1', page: 1, pageSize: 20 });
-
-      // Assert
-      expect(result.inventory.totalItems).toBe(1);
-    });
-  });
-
-  describe('If invalid search text is provided', () => {
-    it('Then the handler rejects the request via defensive validation', async () => {
-      // Arrange
-      initializeVaultHandlers(() => undefined);
-      const handler = mocks.handleMock.mock.calls.find((call) => call[0] === 'vault:search')?.[1];
-
-      // Act
-      const promise = handler?.(null, { text: 'x'.repeat(121) });
-
-      // Assert
-      await expect(promise).rejects.toThrow('Search text must be <= 120 characters');
-    });
-  });
-
-  describe('If inventory:moveItem receives a valid move payload', () => {
-    it('Then it delegates to save-file move logic and returns success', async () => {
-      // Arrange
-      initializeVaultHandlers(() => undefined);
-      const handler = mocks.handleMock.mock.calls.find(
-        (call) => call[0] === 'inventory:moveItem',
-      )?.[1];
-      const movePayload = {
-        sourceFilePath: '/tmp/sorc.d2s',
-        sourceFileType: 'd2s',
-        rawItemJson: JSON.stringify({ id: 42, code: 'uap' }),
-        targetFilePath: '/tmp/barb.d2s',
-        targetFileType: 'd2s',
-        targetLocationContext: 'inventory',
-        targetGridX: 3,
-        targetGridY: 1,
-      };
-
-      // Act
-      const result = await handler?.(null, movePayload);
-
-      // Assert
-      expect(mocks.saveFileEditorMock.moveItemBetweenSaveFiles).toHaveBeenCalledWith(
-        expect.objectContaining({
-          sourceFilePath: '/tmp/sorc.d2s',
-          sourceFileType: 'd2s',
-          sourceItemId: 42,
-          targetFilePath: '/tmp/barb.d2s',
-          targetFileType: 'd2s',
-          targetLocationContext: 'inventory',
-          targetGridX: 3,
-          targetGridY: 1,
-        }),
-      );
+      expect(vault.unvaultItem).toHaveBeenCalledWith('row-1', target, 3);
       expect(result).toEqual({ success: true });
     });
   });
 
-  describe('If inventory:moveItem receives an invalid equipped target', () => {
-    it('Then it rejects the request', async () => {
+  describe('If vault:removeItem is refused by the vault service', () => {
+    it('Then the invoke rejects with the service error', async () => {
       // Arrange
-      initializeVaultHandlers(() => undefined);
-      const handler = mocks.handleMock.mock.calls.find(
-        (call) => call[0] === 'inventory:moveItem',
-      )?.[1];
-      const movePayload = {
-        sourceFilePath: '/tmp/sorc.d2s',
-        sourceFileType: 'd2s',
-        rawItemJson: JSON.stringify({ id: 42, code: 'uap' }),
-        targetFilePath: '/tmp/barb.d2s',
-        targetFileType: 'd2s',
-        targetLocationContext: 'equipped',
-        targetGridX: 0,
-        targetGridY: 0,
-      };
+      vault.removeItem.mockImplementation(() => {
+        throw new Error('Unvault this item before removing it from the vault');
+      });
+      const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
 
       // Act
-      const promise = handler?.(null, movePayload);
+      const result = invoke('vault:removeItem', 'row-1');
 
       // Assert
-      await expect(promise).rejects.toThrow('targetEquippedSlotId must be one of: 1-12');
+      await expect(result).rejects.toThrow('Unvault this item before removing it from the vault');
+      consoleError.mockRestore();
     });
   });
 
-  describe('If inventory:splitStack receives a valid payload', () => {
-    it('Then it delegates to splitStackInSaveFile and returns success', async () => {
+  describe('If inventory:moveItem and inventory:splitStack are invoked', () => {
+    it('Then the inputs are passed to the vault service and success is reported', async () => {
       // Arrange
-      initializeVaultHandlers(() => undefined);
-      const handler = mocks.handleMock.mock.calls.find(
-        (call) => call[0] === 'inventory:splitStack',
-      )?.[1];
+      const moveInput = { sourceFilePath: '/tmp/a.d2s' };
+      const splitInput = { sourceFilePath: '/tmp/b.d2i' };
 
       // Act
-      const result = await handler?.(null, {
-        sourceFilePath: '/tmp/shared.d2i',
-        sourceFileType: 'd2i',
-        sourceStashTab: 7,
-        sourceItemCode: 'r19',
-        splitCount: 1,
-        targets: [
-          {
-            targetFilePath: '/tmp/sorc.d2s',
-            targetFileType: 'd2s',
-            targetLocationContext: 'inventory',
-            targetGridX: 3,
-            targetGridY: 2,
-          },
-        ],
-      });
+      const moveResult = await invoke('inventory:moveItem', moveInput);
+      const splitResult = await invoke('inventory:splitStack', splitInput);
 
       // Assert
-      expect(mocks.saveFileEditorMock.splitStackInSaveFile).toHaveBeenCalledWith(
-        expect.objectContaining({
-          sourceFilePath: '/tmp/shared.d2i',
-          sourceFileType: 'd2i',
-          sourceStashTab: 7,
-          sourceItemCode: 'r19',
-          splitCount: 1,
-        }),
-      );
-      expect(result).toEqual({ success: true });
+      expect(vault.moveItem).toHaveBeenCalledWith(moveInput);
+      expect(vault.splitStack).toHaveBeenCalledWith(splitInput);
+      expect(moveResult).toEqual({ success: true });
+      expect(splitResult).toEqual({ success: true });
     });
   });
 
-  describe('If inventory:splitStack has a negative target grid coordinate', () => {
-    it('Then it rejects the request at IPC validation', async () => {
+  describe('If vault:search and inventory:searchAll are invoked', () => {
+    it('Then the search results of the vault service are returned', async () => {
       // Arrange
-      initializeVaultHandlers(() => undefined);
-      const handler = mocks.handleMock.mock.calls.find(
-        (call) => call[0] === 'inventory:splitStack',
-      )?.[1];
+      const filter = { text: 'shako' };
 
       // Act
-      const promise = handler?.(null, {
-        sourceFilePath: '/tmp/shared.d2i',
-        sourceFileType: 'd2i',
-        sourceStashTab: 7,
-        sourceItemCode: 'r19',
-        splitCount: 1,
-        targets: [
-          {
-            targetFilePath: '/tmp/sorc.d2s',
-            targetFileType: 'd2s',
-            targetLocationContext: 'inventory',
-            targetGridX: -1,
-            targetGridY: 2,
-          },
-        ],
-      });
+      const vaultResult = await invoke('vault:search', filter);
+      const allResult = await invoke('inventory:searchAll', filter);
 
       // Assert
-      await expect(promise).rejects.toThrow('Each target targetGridX must be >= 0');
-    });
-  });
-
-  describe('If inventory:splitStack targets a non-d2s file with non-stash context', () => {
-    it('Then it rejects the request due to unsafe target context pairing', async () => {
-      // Arrange
-      initializeVaultHandlers(() => undefined);
-      const handler = mocks.handleMock.mock.calls.find(
-        (call) => call[0] === 'inventory:splitStack',
-      )?.[1];
-
-      // Act
-      const promise = handler?.(null, {
-        sourceFilePath: '/tmp/shared.d2i',
-        sourceFileType: 'd2i',
-        sourceStashTab: 7,
-        sourceItemCode: 'r19',
-        splitCount: 1,
-        targets: [
-          {
-            targetFilePath: '/tmp/shared-target.d2i',
-            targetFileType: 'd2i',
-            targetLocationContext: 'inventory',
-            targetGridX: 1,
-            targetGridY: 2,
-          },
-        ],
-      });
-
-      // Assert
-      await expect(promise).rejects.toThrow(
-        'Shared stash targets must use targetLocationContext=stash',
-      );
-    });
-  });
-
-  describe('If vault:addItem is called for an item that is no longer in the save file', () => {
-    it('Then nothing is vaulted and nothing is removed', async () => {
-      // Arrange
-      initializeVaultHandlers(() => undefined);
-      mocks.saveFileEditorMock.readSaveFileItem.mockResolvedValue(undefined);
-      const handler = mocks.handleMock.mock.calls.find((call) => call[0] === 'vault:addItem')?.[1];
-
-      // Act
-      const promise = handler?.(null, {
-        fingerprint: 'fp-stale',
-        itemName: 'Shako',
-        itemCode: 'uap',
-        quality: 'unique',
-        ethereal: false,
-        rawItemJson: '{"id":42,"code":"uap"}',
-        sourceFileType: 'd2s',
-        sourceFilePath: '/tmp/sorc.d2s',
-        locationContext: 'inventory',
-      });
-
-      // Assert
-      await expect(promise).rejects.toThrow('no longer in the save file');
-      expect(mocks.grailDatabaseMock.addVaultItemWithUndo).not.toHaveBeenCalled();
-      expect(mocks.saveFileEditorMock.removeItemFromSaveFile).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('If vault:addItem is called for a stack whose size changed since the scan', () => {
-    it('Then it refuses so the larger real stack is not deleted with a smaller vault copy', async () => {
-      // Arrange
-      initializeVaultHandlers(() => undefined);
-      mocks.saveFileEditorMock.readSaveFileItem.mockResolvedValue({
-        type: 'r19',
-        code: 'r19',
-        quantity: 60,
-      });
-      const handler = mocks.handleMock.mock.calls.find((call) => call[0] === 'vault:addItem')?.[1];
-
-      // Act
-      const promise = handler?.(null, {
-        fingerprint: 'fp-stack',
-        itemName: 'Fal Rune',
-        itemCode: 'r19',
-        quality: 'normal',
-        ethereal: false,
-        rawItemJson: '{"code":"r19","quantity":50,"position_x":1,"position_y":1}',
-        sourceFileType: 'd2i',
-        sourceFilePath: '/tmp/shared-stash.d2i',
-        locationContext: 'stash',
-        stashTab: 7,
-      });
-
-      // Assert
-      await expect(promise).rejects.toThrow('stack size in the save file changed');
-      expect(mocks.grailDatabaseMock.addVaultItemWithUndo).not.toHaveBeenCalled();
-      expect(mocks.saveFileEditorMock.removeItemFromSaveFile).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('If vault:addItem finds a different item than the one in the request', () => {
-    it('Then it refuses to remove the item from the save file', async () => {
-      // Arrange
-      initializeVaultHandlers(() => undefined);
-      mocks.saveFileEditorMock.readSaveFileItem.mockResolvedValue({ type: 'xea', code: 'xea' });
-      const handler = mocks.handleMock.mock.calls.find((call) => call[0] === 'vault:addItem')?.[1];
-
-      // Act
-      const promise = handler?.(null, {
-        fingerprint: 'fp-changed',
-        itemName: 'Shako',
-        itemCode: 'uap',
-        quality: 'unique',
-        ethereal: false,
-        rawItemJson: '{"id":42,"code":"uap"}',
-        sourceFileType: 'd2s',
-        sourceFilePath: '/tmp/sorc.d2s',
-        locationContext: 'inventory',
-      });
-
-      // Assert
-      await expect(promise).rejects.toThrow('item in the save file changed');
-      expect(mocks.saveFileEditorMock.removeItemFromSaveFile).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('When vault:removeItem is invoked', () => {
-    describe('If it targets a vaulted item that was taken out of a save file', () => {
-      it('Then it refuses, because that row is the only copy of the item', async () => {
-        // Arrange
-        initializeVaultHandlers(() => undefined);
-        mocks.grailDatabaseMock.getVaultItemById.mockReturnValue(
-          makeVaultItem({ id: 'row-1', fingerprint: 'fp-real', sourceFilePath: '/tmp/sorc.d2s' }),
-        );
-        const handler = mocks.handleMock.mock.calls.find(
-          (call) => call[0] === 'vault:removeItem',
-        )?.[1];
-
-        // Act
-        const promise = handler?.(null, 'row-1');
-
-        // Assert
-        await expect(promise).rejects.toThrow('Unvault this item before removing');
-        expect(mocks.grailDatabaseMock.removeVaultItem).not.toHaveBeenCalled();
-      });
-    });
-
-    describe('If it targets a grail bookmark that holds no item', () => {
-      it('Then it still deletes the bookmark', async () => {
-        // Arrange
-        initializeVaultHandlers(() => undefined);
-        mocks.grailDatabaseMock.getVaultItemById.mockReturnValue(
-          makeVaultItem({ id: 'grail:shako', fingerprint: 'grail:shako' }),
-        );
-        const handler = mocks.handleMock.mock.calls.find(
-          (call) => call[0] === 'vault:removeItem',
-        )?.[1];
-
-        // Act
-        await handler?.(null, 'grail:shako');
-
-        // Assert
-        expect(mocks.grailDatabaseMock.removeVaultItem).toHaveBeenCalledWith('grail:shako');
-      });
-    });
-
-    describe('If it targets a row that is no longer vaulted', () => {
-      it('Then it deletes the row', async () => {
-        // Arrange
-        initializeVaultHandlers(() => undefined);
-        mocks.grailDatabaseMock.getVaultItemById.mockReturnValue(
-          makeVaultItem({
-            id: 'row-2',
-            fingerprint: 'fp-old',
-            sourceFilePath: '/tmp/sorc.d2s',
-            unvaultedAt: new Date('2024-03-01T00:00:00.000Z'),
-          }),
-        );
-        const handler = mocks.handleMock.mock.calls.find(
-          (call) => call[0] === 'vault:removeItem',
-        )?.[1];
-
-        // Act
-        await handler?.(null, 'row-2');
-
-        // Assert
-        expect(mocks.grailDatabaseMock.removeVaultItem).toHaveBeenCalledWith('row-2');
-      });
-    });
-  });
-
-  describe('When vault:unvaultItem is invoked', () => {
-    const inventoryTarget = {
-      targetFilePath: '/tmp/sorc.d2s',
-      targetFileType: 'd2s',
-      targetLocationContext: 'inventory',
-      targetGridX: 4,
-      targetGridY: 2,
-    };
-
-    function getUnvaultHandler() {
-      initializeVaultHandlers(() => undefined);
-      return mocks.handleMock.mock.calls.find((call) => call[0] === 'vault:unvaultItem')?.[1];
-    }
-
-    describe('If the row came from a save file and no target is given', () => {
-      it('Then it refuses instead of marking it unvaulted without writing it', async () => {
-        // Arrange
-        mocks.grailDatabaseMock.getVaultItemById.mockReturnValue(
-          makeVaultItem({ id: 'row-1', fingerprint: 'fp-real', sourceFilePath: '/tmp/sorc.d2s' }),
-        );
-        const handler = getUnvaultHandler();
-
-        // Act
-        const promise = handler?.(null, 'row-1');
-
-        // Assert
-        await expect(promise).rejects.toThrow('target position is required');
-        expect(mocks.grailDatabaseMock.unvaultVaultItem).not.toHaveBeenCalled();
-      });
-    });
-
-    describe('If the row does not exist', () => {
-      it('Then it refuses with "Vault item not found" and writes nothing', async () => {
-        // Arrange
-        mocks.grailDatabaseMock.getVaultItemById.mockReturnValue(undefined);
-        const handler = getUnvaultHandler();
-
-        // Act
-        const promise = handler?.(null, 'missing-row', inventoryTarget);
-
-        // Assert
-        await expect(promise).rejects.toThrow('Vault item not found');
-        expect(mocks.saveFileEditorMock.addItemToSaveFile).not.toHaveBeenCalled();
-        expect(mocks.grailDatabaseMock.unvaultVaultItem).not.toHaveBeenCalled();
-      });
-    });
-
-    describe('If the row is not vaulted anymore', () => {
-      it('Then it does not write the item a second time', async () => {
-        // Arrange
-        mocks.grailDatabaseMock.getVaultItemById.mockReturnValue(
-          makeVaultItem({
-            id: 'row-1',
-            fingerprint: 'fp-real',
-            sourceFilePath: '/tmp/sorc.d2s',
-            unvaultedAt: new Date('2024-03-01T00:00:00.000Z'),
-          }),
-        );
-        const handler = getUnvaultHandler();
-
-        // Act
-        const promise = handler?.(null, 'row-1', inventoryTarget);
-
-        // Assert
-        await expect(promise).rejects.toThrow('not currently vaulted');
-        expect(mocks.saveFileEditorMock.addItemToSaveFile).not.toHaveBeenCalled();
-      });
-    });
-
-    describe('If the row is a grail bookmark', () => {
-      it('Then it never writes catalog data into a save file', async () => {
-        // Arrange
-        mocks.grailDatabaseMock.getVaultItemById.mockReturnValue(
-          makeVaultItem({ id: 'grail:shako', fingerprint: 'grail:shako' }),
-        );
-        const handler = getUnvaultHandler();
-
-        // Act
-        const promise = handler?.(null, 'grail:shako', inventoryTarget);
-
-        // Assert
-        await expect(promise).rejects.toThrow('grail bookmark');
-        expect(mocks.saveFileEditorMock.addItemToSaveFile).not.toHaveBeenCalled();
-      });
-    });
-
-    describe('If a rune stack is unvaulted completely', () => {
-      it('Then the whole stack count is written before the vault row is cleared', async () => {
-        // Arrange
-        mocks.grailDatabaseMock.getVaultItemById.mockReturnValue(
-          makeVaultItem({
-            id: 'row-runes',
-            fingerprint: 'fp-runes',
-            itemCode: 'r19',
-            stackCount: 12,
-            rawItemJson: JSON.stringify({ code: 'r19', quantity: 3 }),
-            sourceFilePath: '/tmp/shared.d2i',
-          }),
-        );
-        const handler = getUnvaultHandler();
-
-        // Act
-        await handler?.(null, 'row-runes', {
-          targetFilePath: '/tmp/shared.d2i',
-          targetFileType: 'd2i',
-          targetLocationContext: 'stash',
-          targetStashTab: 7,
-          targetGridX: 0,
-          targetGridY: 0,
-        });
-
-        // Assert
-        expect(mocks.saveFileEditorMock.addItemToSaveFile).toHaveBeenCalledWith({
-          filePath: '/tmp/shared.d2i',
-          fileType: 'd2i',
-          item: expect.objectContaining({ code: 'r19' }),
-          locationContext: 'stash',
-          stashTab: 7,
-          targetGridX: 0,
-          targetGridY: 0,
-          quantity: 12,
-        });
-        expect(mocks.grailDatabaseMock.unvaultVaultItem).toHaveBeenCalledWith('row-runes', 12);
-        expect(mocks.saveFileEditorMock.addItemToSaveFile.mock.invocationCallOrder[0]).toBeLessThan(
-          mocks.grailDatabaseMock.unvaultVaultItem.mock.invocationCallOrder[0],
-        );
-      });
-    });
-
-    describe('If part of a rune stack is withdrawn', () => {
-      it('Then exactly that many units are written and deducted', async () => {
-        // Arrange
-        mocks.grailDatabaseMock.getVaultItemById.mockReturnValue(
-          makeVaultItem({
-            id: 'row-runes',
-            fingerprint: 'fp-runes',
-            itemCode: 'r19',
-            stackCount: 12,
-            rawItemJson: JSON.stringify({ code: 'r19', quantity: 3 }),
-            sourceFilePath: '/tmp/shared.d2i',
-          }),
-        );
-        const handler = getUnvaultHandler();
-
-        // Act
-        await handler?.(
-          null,
-          'row-runes',
-          {
-            targetFilePath: '/tmp/shared.d2i',
-            targetFileType: 'd2i',
-            targetLocationContext: 'stash',
-            targetStashTab: 7,
-            targetGridX: 0,
-            targetGridY: 0,
-          },
-          5,
-        );
-
-        // Assert
-        expect(mocks.saveFileEditorMock.addItemToSaveFile.mock.calls[0]?.[0]?.quantity).toBe(5);
-        expect(mocks.grailDatabaseMock.unvaultVaultItem).toHaveBeenCalledWith('row-runes', 5);
-      });
-    });
-
-    describe('If more units are withdrawn than the stack holds', () => {
-      it('Then it refuses before touching any file', async () => {
-        // Arrange
-        mocks.grailDatabaseMock.getVaultItemById.mockReturnValue(
-          makeVaultItem({
-            id: 'row-runes',
-            fingerprint: 'fp-runes',
-            itemCode: 'r19',
-            stackCount: 2,
-            rawItemJson: JSON.stringify({ code: 'r19' }),
-            sourceFilePath: '/tmp/shared.d2i',
-          }),
-        );
-        const handler = getUnvaultHandler();
-
-        // Act
-        const promise = handler?.(null, 'row-runes', inventoryTarget, 3);
-
-        // Assert
-        await expect(promise).rejects.toThrow('exceeds the number of items');
-        expect(mocks.saveFileEditorMock.addItemToSaveFile).not.toHaveBeenCalled();
-      });
-    });
-
-    describe('If a non-stack item is withdrawn partially', () => {
-      it('Then it refuses', async () => {
-        // Arrange
-        mocks.grailDatabaseMock.getVaultItemById.mockReturnValue(
-          makeVaultItem({
-            id: 'row-arrows',
-            fingerprint: 'fp-arrows',
-            itemCode: 'aqv',
-            stackCount: 80,
-            rawItemJson: JSON.stringify({ code: 'aqv', quantity: 80 }),
-            sourceFilePath: '/tmp/sorc.d2s',
-          }),
-        );
-        const handler = getUnvaultHandler();
-
-        // Act
-        const promise = handler?.(null, 'row-arrows', inventoryTarget, 10);
-
-        // Assert
-        await expect(promise).rejects.toThrow('partially');
-        expect(mocks.saveFileEditorMock.addItemToSaveFile).not.toHaveBeenCalled();
-      });
-    });
-
-    describe('If writing the item to the save file fails', () => {
-      it('Then the vault row stays vaulted', async () => {
-        // Arrange
-        mocks.grailDatabaseMock.getVaultItemById.mockReturnValue(
-          makeVaultItem({
-            id: 'row-1',
-            fingerprint: 'fp-real',
-            rawItemJson: '{"id":42,"code":"uap"}',
-            sourceFilePath: '/tmp/sorc.d2s',
-          }),
-        );
-        mocks.saveFileEditorMock.addItemToSaveFile.mockRejectedValue(
-          new Error('TARGET_CELL_OCCUPIED'),
-        );
-        const handler = getUnvaultHandler();
-
-        // Act
-        const promise = handler?.(null, 'row-1', inventoryTarget);
-
-        // Assert
-        await expect(promise).rejects.toThrow('TARGET_CELL_OCCUPIED');
-        expect(mocks.grailDatabaseMock.unvaultVaultItem).not.toHaveBeenCalled();
-      });
-    });
-
-    describe('If the same row is unvaulted twice at once', () => {
-      it('Then the item is written only once', async () => {
-        // Arrange
-        mocks.grailDatabaseMock.getVaultItemById.mockReturnValue(
-          makeVaultItem({
-            id: 'row-1',
-            fingerprint: 'fp-real',
-            rawItemJson: '{"id":42,"code":"uap"}',
-            sourceFilePath: '/tmp/sorc.d2s',
-          }),
-        );
-        let finishWrite: () => void = () => undefined;
-        mocks.saveFileEditorMock.addItemToSaveFile.mockImplementation(
-          () =>
-            new Promise<void>((resolve) => {
-              finishWrite = resolve;
-            }),
-        );
-        const handler = getUnvaultHandler();
-
-        // Act
-        const first = handler?.(null, 'row-1', inventoryTarget);
-        const second = handler?.(null, 'row-1', inventoryTarget);
-        await expect(second).rejects.toThrow('already being unvaulted');
-        finishWrite();
-        await first;
-
-        // Assert
-        expect(mocks.saveFileEditorMock.addItemToSaveFile).toHaveBeenCalledTimes(1);
-        expect(mocks.grailDatabaseMock.unvaultVaultItem).toHaveBeenCalledTimes(1);
-      });
-    });
-
-    describe('If an equipped target has no slot', () => {
-      it('Then it is rejected at IPC validation', async () => {
-        // Arrange
-        const handler = getUnvaultHandler();
-
-        // Act
-        const promise = handler?.(null, 'row-1', {
-          ...inventoryTarget,
-          targetLocationContext: 'equipped',
-        });
-
-        // Assert
-        await expect(promise).rejects.toThrow('targetEquippedSlotId must be one of: 1-12');
-      });
-    });
-
-    describe('If a tag-only row without a source file is unvaulted', () => {
-      it('Then only the vault state changes', async () => {
-        // Arrange
-        mocks.grailDatabaseMock.getVaultItemById.mockReturnValue(
-          makeVaultItem({ id: 'row-tag', fingerprint: 'fp-tag' }),
-        );
-        const handler = getUnvaultHandler();
-
-        // Act
-        await handler?.(null, 'row-tag');
-
-        // Assert
-        expect(mocks.grailDatabaseMock.unvaultVaultItem).toHaveBeenCalledWith('row-tag', undefined);
-        expect(mocks.saveFileEditorMock.addItemToSaveFile).not.toHaveBeenCalled();
-      });
-    });
-  });
-
-  describe('If inventory:moveItem receives a d2i source without item id and coordinates', () => {
-    it('Then it rejects the request instead of searching for nothing after the add', async () => {
-      // Arrange
-      initializeVaultHandlers(() => undefined);
-      const handler = mocks.handleMock.mock.calls.find(
-        (call) => call[0] === 'inventory:moveItem',
-      )?.[1];
-
-      // Act
-      const promise = handler?.(null, {
-        sourceFilePath: '/tmp/shared.d2i',
-        sourceFileType: 'd2i',
-        rawItemJson: JSON.stringify({ code: 'r19' }),
-        targetFilePath: '/tmp/shared.d2i',
-        targetFileType: 'd2i',
-        targetLocationContext: 'stash',
-        targetStashTab: 0,
-        targetGridX: 1,
-        targetGridY: 1,
-      });
-
-      // Assert
-      await expect(promise).rejects.toThrow('numeric item id or grid coordinates');
-      expect(mocks.saveFileEditorMock.moveItemBetweenSaveFiles).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('If the game is running', () => {
-    beforeEach(() => {
-      mocks.assertGameNotRunning.mockRejectedValue(new Error('GAME_RUNNING'));
-    });
-
-    it('Then inventory:moveItem is refused before any file is touched', async () => {
-      // Arrange
-      initializeVaultHandlers(() => undefined);
-      const handler = mocks.handleMock.mock.calls.find(
-        (call) => call[0] === 'inventory:moveItem',
-      )?.[1];
-
-      // Act
-      const promise = handler?.(null, {
-        sourceFilePath: '/tmp/sorc.d2s',
-        sourceFileType: 'd2s',
-        rawItemJson: JSON.stringify({ id: 42, code: 'uap' }),
-        targetFilePath: '/tmp/barb.d2s',
-        targetFileType: 'd2s',
-        targetLocationContext: 'inventory',
-        targetGridX: 3,
-        targetGridY: 1,
-      });
-
-      // Assert
-      await expect(promise).rejects.toThrow('GAME_RUNNING');
-      expect(mocks.saveFileEditorMock.moveItemBetweenSaveFiles).not.toHaveBeenCalled();
-    });
-
-    it('Then vault:addItem does not vault or remove a source-backed item', async () => {
-      // Arrange
-      initializeVaultHandlers(() => undefined);
-      const handler = mocks.handleMock.mock.calls.find((call) => call[0] === 'vault:addItem')?.[1];
-
-      // Act
-      const promise = handler?.(null, {
-        fingerprint: 'fp-shako',
-        itemName: 'Shako',
-        quality: 'unique',
-        ethereal: false,
-        rawItemJson: '{"id":42}',
-        sourceFileType: 'd2s',
-        sourceFilePath: '/tmp/sorc.d2s',
-        locationContext: 'inventory',
-      });
-
-      // Assert
-      await expect(promise).rejects.toThrow('GAME_RUNNING');
-      expect(mocks.grailDatabaseMock.addVaultItemWithUndo).not.toHaveBeenCalled();
-      expect(mocks.saveFileEditorMock.removeItemFromSaveFile).not.toHaveBeenCalled();
-    });
-
-    it('Then vault:unvaultItem keeps the item in the vault', async () => {
-      // Arrange
-      mocks.grailDatabaseMock.getVaultItemById.mockReturnValue(
-        makeVaultItem({
-          id: 'row-1',
-          fingerprint: 'fp-real',
-          rawItemJson: '{"id":42,"code":"uap"}',
-          sourceFilePath: '/tmp/sorc.d2s',
-        }),
-      );
-      initializeVaultHandlers(() => undefined);
-      const handler = mocks.handleMock.mock.calls.find(
-        (call) => call[0] === 'vault:unvaultItem',
-      )?.[1];
-
-      // Act
-      const promise = handler?.(null, 'row-1', {
-        targetFilePath: '/tmp/sorc.d2s',
-        targetFileType: 'd2s',
-        targetLocationContext: 'inventory',
-        targetGridX: 0,
-        targetGridY: 0,
-      });
-
-      // Assert
-      await expect(promise).rejects.toThrow('GAME_RUNNING');
-      expect(mocks.saveFileEditorMock.addItemToSaveFile).not.toHaveBeenCalled();
-      expect(mocks.grailDatabaseMock.unvaultVaultItem).not.toHaveBeenCalled();
-    });
-  });
-  describe('When renderer-supplied file paths reach the IPC boundary', () => {
-    const outsidePath = '/etc/evil.d2s';
-    const traversalPath = '/tmp/../etc/evil.d2s';
-
-    function getHandler(channel: string) {
-      initializeVaultHandlers(() => undefined);
-      return mocks.handleMock.mock.calls.find((call) => call[0] === channel)?.[1];
-    }
-
-    function makeMovePayload(overrides: Record<string, unknown>) {
-      return {
-        sourceFilePath: '/tmp/sorc.d2s',
-        sourceFileType: 'd2s',
-        rawItemJson: JSON.stringify({ id: 42, code: 'uap' }),
-        targetFilePath: '/tmp/barb.d2s',
-        targetFileType: 'd2s',
-        targetLocationContext: 'inventory',
-        targetGridX: 3,
-        targetGridY: 1,
-        ...overrides,
-      };
-    }
-
-    describe.each([
-      ['a path outside the save directory', outsidePath],
-      ['a ".." traversal path', traversalPath],
-      ['a non-save extension', '/tmp/notes.txt'],
-    ])('If inventory:moveItem receives %s as source', (_label, badPath) => {
-      it('Then it rejects before any write', async () => {
-        // Arrange
-        const handler = getHandler('inventory:moveItem');
-
-        // Act
-        const promise = handler?.(null, makeMovePayload({ sourceFilePath: badPath }));
-
-        // Assert
-        await expect(promise).rejects.toThrow('sourceFilePath');
-        expect(mocks.saveFileEditorMock.moveItemBetweenSaveFiles).not.toHaveBeenCalled();
-      });
-    });
-
-    describe('If inventory:moveItem receives a target outside the save directory', () => {
-      it('Then it rejects before any write', async () => {
-        // Arrange
-        const handler = getHandler('inventory:moveItem');
-
-        // Act
-        const promise = handler?.(null, makeMovePayload({ targetFilePath: traversalPath }));
-
-        // Assert
-        await expect(promise).rejects.toThrow('targetFilePath must be a save file inside');
-        expect(mocks.saveFileEditorMock.moveItemBetweenSaveFiles).not.toHaveBeenCalled();
-      });
-    });
-
-    describe('If inventory:splitStack receives a source or target outside the save directory', () => {
-      it('Then it rejects before any write', async () => {
-        // Arrange
-        const handler = getHandler('inventory:splitStack');
-        const basePayload = {
-          sourceFilePath: '/tmp/shared.d2i',
-          sourceFileType: 'd2i',
-          sourceStashTab: 7,
-          sourceItemCode: 'r19',
-          splitCount: 1,
-          targets: [
-            {
-              targetFilePath: '/tmp/sorc.d2s',
-              targetFileType: 'd2s',
-              targetLocationContext: 'inventory',
-              targetGridX: 3,
-              targetGridY: 2,
-            },
-          ],
-        };
-
-        // Act
-        const badSource = handler?.(null, { ...basePayload, sourceFilePath: outsidePath });
-        const badTarget = handler?.(null, {
-          ...basePayload,
-          targets: [{ ...basePayload.targets[0], targetFilePath: traversalPath }],
-        });
-
-        // Assert
-        await expect(badSource).rejects.toThrow('sourceFilePath must be a save file inside');
-        await expect(badTarget).rejects.toThrow('targetFilePath must be a save file inside');
-        expect(mocks.saveFileEditorMock.splitStackInSaveFile).not.toHaveBeenCalled();
-      });
-    });
-
-    describe('If vault:addItem receives a source file outside the save directory', () => {
-      it('Then it rejects before reading or writing anything', async () => {
-        // Arrange
-        const handler = getHandler('vault:addItem');
-
-        // Act
-        const promise = handler?.(null, {
-          fingerprint: 'fp-evil',
-          itemName: 'Shako',
-          quality: 'unique',
-          ethereal: false,
-          rawItemJson: '{"id":42}',
-          sourceFileType: 'd2s',
-          sourceFilePath: traversalPath,
-          locationContext: 'inventory',
-        });
-
-        // Assert
-        await expect(promise).rejects.toThrow('sourceFilePath must be a save file inside');
-        expect(mocks.saveFileEditorMock.readSaveFileItem).not.toHaveBeenCalled();
-        expect(mocks.grailDatabaseMock.addVaultItemWithUndo).not.toHaveBeenCalled();
-        expect(mocks.saveFileEditorMock.removeItemFromSaveFile).not.toHaveBeenCalled();
-      });
-    });
-
-    describe('If vault:unvaultItem receives a target outside the save directory', () => {
-      it('Then it rejects before writing the item', async () => {
-        // Arrange
-        mocks.grailDatabaseMock.getVaultItemById.mockReturnValue(
-          makeVaultItem({ id: 'row-1', rawItemJson: '{"id":42,"code":"uap"}' }),
-        );
-        const handler = getHandler('vault:unvaultItem');
-
-        // Act
-        const promise = handler?.(null, 'row-1', {
-          targetFilePath: outsidePath,
-          targetFileType: 'd2s',
-          targetLocationContext: 'inventory',
-          targetGridX: 0,
-          targetGridY: 0,
-        });
-
-        // Assert
-        await expect(promise).rejects.toThrow(
-          'targetOptions.targetFilePath must be a save file inside',
-        );
-        expect(mocks.saveFileEditorMock.addItemToSaveFile).not.toHaveBeenCalled();
-        expect(mocks.grailDatabaseMock.unvaultVaultItem).not.toHaveBeenCalled();
-      });
-    });
-
-    describe('If the save file monitor reports a save directory', () => {
-      it('Then that directory is used instead of the stored setting', async () => {
-        // Arrange
-        mocks.grailDatabaseMock.getAllSettings.mockReturnValue({ saveDir: '/somewhere/else' });
-        initializeVaultHandlers(
-          () => ({ getSaveDirectory: () => '/tmp' }) as unknown as SaveFileMonitor,
-        );
-        const handler = mocks.handleMock.mock.calls.find(
-          (call) => call[0] === 'inventory:moveItem',
-        )?.[1];
-
-        // Act
-        const result = await handler?.(null, makeMovePayload({}));
-
-        // Assert
-        expect(result).toEqual({ success: true });
-        expect(mocks.saveFileEditorMock.moveItemBetweenSaveFiles).toHaveBeenCalled();
-      });
-    });
-
-    describe('If no save directory is configured anywhere', () => {
-      it('Then writes are refused', async () => {
-        // Arrange
-        mocks.grailDatabaseMock.getAllSettings.mockReturnValue({ saveDir: '' });
-        const handler = getHandler('inventory:moveItem');
-
-        // Act
-        const promise = handler?.(null, makeMovePayload({}));
-
-        // Assert
-        await expect(promise).rejects.toThrow('The save directory is not configured');
-        expect(mocks.saveFileEditorMock.moveItemBetweenSaveFiles).not.toHaveBeenCalled();
-      });
-    });
-  });
-
-  describe('When vault:search is invoked', () => {
-    describe('If a valid filter is supplied', () => {
-      it('Then it returns the database search result', async () => {
-        // Arrange
-        const result = { items: [], total: 0, page: 1, pageSize: 50 };
-        mocks.grailDatabaseMock.searchVaultItems.mockReturnValue(result);
-        initializeVaultHandlers(() => undefined);
-        const handler = mocks.handleMock.mock.calls.find((call) => call[0] === 'vault:search')?.[1];
-
-        // Act
-        const searched = await handler?.(null, { text: 'shako' });
-
-        // Assert
-        expect(searched).toBe(result);
-        expect(mocks.grailDatabaseMock.searchVaultItems).toHaveBeenCalledTimes(1);
-      });
-    });
-
-    describe('If an invalid sortBy is supplied', () => {
-      it('Then the error lists every valid sort key including vaultedAt', async () => {
-        // Arrange
-        initializeVaultHandlers(() => undefined);
-        const handler = mocks.handleMock.mock.calls.find((call) => call[0] === 'vault:search')?.[1];
-
-        // Act
-        const promise = handler?.(null, { sortBy: 'bogus' });
-
-        // Assert
-        await expect(promise).rejects.toThrow(
-          'sortBy must be one of: itemName, lastSeenAt, createdAt, updatedAt, vaultedAt',
-        );
-      });
+      expect(vault.search).toHaveBeenCalledWith(filter);
+      expect(vault.searchAll).toHaveBeenCalledWith(filter);
+      expect(vaultResult).toEqual({ items: [], total: 0 });
+      expect(allResult).toEqual({ inventory: {}, vault: {} });
     });
   });
 });

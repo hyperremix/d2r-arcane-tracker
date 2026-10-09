@@ -74,6 +74,16 @@ class GrailDatabase {
     }
   }
 
+  /**
+   * Runs `fn` in a database transaction: all its writes are committed together, or none if it
+   * throws. Nested calls become savepoints.
+   * @param fn - Synchronous function doing the reads and writes
+   * @returns The result of `fn`
+   */
+  transaction<T>(fn: () => T): T {
+    return this.rawDb.transaction(fn)();
+  }
+
   // Items
   getAllItems(): Item[] {
     return itemsModule.getAllItems(this);
@@ -315,6 +325,4 @@ class GrailDatabase {
   }
 }
 
-const grailDatabase = new GrailDatabase();
-
-export { GrailDatabase, grailDatabase };
+export { GrailDatabase };

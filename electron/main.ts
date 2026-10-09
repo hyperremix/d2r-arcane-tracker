@@ -1,40 +1,9 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { app, BrowserWindow, ipcMain, nativeTheme, screen, session } from 'electron';
-import { grailDatabase } from './database/database';
-import { createIpcMainRegistry } from './ipc/handle';
-import { initializeDialogHandlers } from './ipc-handlers/dialogHandlers';
-import {
-  closeGlobalHotkeys,
-  initializeGlobalHotkeyHandlers,
-} from './ipc-handlers/globalHotkeyHandlers';
-import { closeGrailDatabase, initializeGrailHandlers } from './ipc-handlers/grailHandlers';
-import { initializeIconHandlers } from './ipc-handlers/iconHandlers';
-import { initializeInventoryWindowHandlers } from './ipc-handlers/inventoryWindowHandlers';
-import { closeRunTracker, initializeRunTrackerHandlers } from './ipc-handlers/runTrackerHandlers';
-import {
-  closeSaveFileMonitor,
-  eventBus,
-  getRunTracker,
-  getSaveFileMonitor,
-  initializeSaveFileHandlers,
-} from './ipc-handlers/saveFileHandlers';
-import { initializeShellHandlers } from './ipc-handlers/shellHandlers';
-import { initializeTerrorZoneHandlers } from './ipc-handlers/terrorZoneHandlers';
-import { initializeUpdateHandlers } from './ipc-handlers/updateHandlers';
-import { initializeVaultHandlers } from './ipc-handlers/vaultHandlers';
-import { initializeWidgetHandlers } from './ipc-handlers/widgetHandlers';
-import { configureSaveFileBackups } from './services/saveFileBackup';
-import type { Settings } from './types/grail';
-import type { WidgetDisplayMode, WidgetSize } from './utils/widgetDisplay';
-import { getWidgetSizeSettingKey } from './utils/widgetDisplay';
-import { isPositionOnScreen } from './utils/windowSnapping';
-import {
-  closeInventorySnapshotWindows,
-  setInventorySnapshotWindowsTitleBarOverlay,
-} from './window/inventorySnapshotWindow';
-import { getMainWindowThemeColors } from './window/mainWindowTheme';
-import { closeWidgetWindow, showWidgetWindow } from './window/widgetWindow';
+import { app, BrowserWindow, session } from 'electron';
+import { type RunningApp, startApp } from './app/bootstrap';
+import { deferQuitUntilShutdown } from './app/lifecycle';
+import { resolveAppPaths } from './app/paths';
 
 /**
  * The directory name of the current module.
@@ -42,31 +11,13 @@ import { closeWidgetWindow, showWidgetWindow } from './window/widgetWindow';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 /**
- * The built directory structure:
- *
- * ```
- * ├─┬─┬ dist
- * │ │ └── index.html
- * │ │
- * │ ├─┬ dist-electron
- * │ │ ├── main.js
- * │ │ └── preload.mjs
- * ```
+ * Locations of the bundled app; the main process bundle lives in `dist-electron`.
  */
-process.env.APP_ROOT = path.join(__dirname, '..');
+const paths = resolveAppPaths(__dirname, process.env.VITE_DEV_SERVER_URL);
+const VITE_DEV_SERVER_URL = paths.viteDevServerUrl;
 
-/**
- * Vite development server URL (only available in development mode).
- */
-export const VITE_DEV_SERVER_URL = process.env.VITE_DEV_SERVER_URL;
-/**
- * Path to the renderer process distribution folder.
- */
-export const RENDERER_DIST = path.join(process.env.APP_ROOT, 'dist');
-
-process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL
-  ? path.join(process.env.APP_ROOT, 'public')
-  : RENDERER_DIST;
+process.env.APP_ROOT = paths.appRoot;
+process.env.VITE_PUBLIC = paths.publicDir;
 
 // Enable Chrome DevTools Protocol (CDP) remote debugging in development only
 if (VITE_DEV_SERVER_URL) {
@@ -75,150 +26,9 @@ if (VITE_DEV_SERVER_URL) {
 }
 
 /**
- * The main application window instance.
+ * The running application, once the app is ready.
  */
-export let mainWindow: BrowserWindow | null;
-
-/**
- * Saves the current main window bounds (position and size) to the database.
- */
-function saveMainWindowBounds() {
-  if (!mainWindow) {
-    return;
-  }
-
-  try {
-    const bounds = mainWindow.getBounds();
-    grailDatabase.setSetting('mainWindowBounds', JSON.stringify(bounds));
-  } catch (error) {
-    console.error('Failed to save main window bounds:', error);
-  }
-}
-
-/**
- * Creates the main application window with appropriate icon and web preferences.
- * Loads the application from the Vite dev server in development or from built files in production.
- */
-function createWindow() {
-  // Set icon path - use ICO on Windows for better compatibility
-  // In production, the ICO file is unpacked from ASAR for Windows to read
-  const iconPath =
-    process.platform === 'win32' && !VITE_DEV_SERVER_URL
-      ? path.join(process.resourcesPath, 'app.asar.unpacked', 'dist', 'logo.ico')
-      : path.join(process.env.VITE_PUBLIC, 'logo.png');
-
-  // Load saved window bounds from settings
-  let windowBounds = {
-    width: 1200,
-    height: 856,
-    x: undefined as number | undefined,
-    y: undefined as number | undefined,
-  };
-  let storedTheme: Settings['theme'] | undefined;
-  try {
-    const settings = grailDatabase.getAllSettings();
-    storedTheme = settings.theme;
-
-    if (settings.mainWindowBounds) {
-      const { x, y, width, height } = settings.mainWindowBounds;
-
-      // Validate that saved position is still on screen
-      const displays = screen.getAllDisplays();
-      if (isPositionOnScreen(x, y, displays)) {
-        windowBounds = { x, y, width, height };
-      } else {
-        // Position is off-screen, use saved size but let OS choose position
-        windowBounds = { width, height, x: undefined, y: undefined };
-      }
-    }
-  } catch (error) {
-    console.error('Failed to load main window bounds from settings:', error);
-  }
-
-  // Match the renderer's theme so the window doesn't flash the wrong color before it paints
-  const themeColors = getMainWindowThemeColors(storedTheme, nativeTheme.shouldUseDarkColors);
-
-  mainWindow = new BrowserWindow({
-    width: windowBounds.width,
-    height: windowBounds.height,
-    // Keep the custom title bar (navigation, notifications, platform controls) from overflowing
-    minWidth: 800,
-    ...(windowBounds.x !== undefined && windowBounds.y !== undefined
-      ? { x: windowBounds.x, y: windowBounds.y }
-      : {}),
-    icon: iconPath,
-    backgroundColor: themeColors.backgroundColor,
-    // Custom title bar configuration
-    titleBarStyle: 'hidden',
-    // Position macOS traffic lights to be vertically centered in 48px title bar
-    ...(process.platform === 'darwin'
-      ? { trafficLightPosition: { x: 10, y: 14 } }
-      : {
-          // Expose window controls on Windows/Linux with custom styling
-          titleBarOverlay: {
-            color: themeColors.backgroundColor, // Background matching the title bar
-            symbolColor: themeColors.symbolColor,
-            height: 47, // Match title bar height (h-12 = 48px)
-          },
-        }),
-    webPreferences: {
-      preload: path.join(__dirname, 'preload.mjs'),
-      contextIsolation: true,
-      nodeIntegration: false,
-      sandbox: true,
-      webSecurity: true,
-    },
-  });
-
-  if (VITE_DEV_SERVER_URL) {
-    mainWindow.loadURL(VITE_DEV_SERVER_URL);
-  } else {
-    // win.loadFile('dist/index.html')
-    mainWindow.loadFile(path.join(RENDERER_DIST, 'index.html'));
-  }
-
-  // Enable dev tools keyboard shortcut in production
-  // Cmd+Option+I (macOS) or Ctrl+Shift+I (Windows/Linux)
-  mainWindow.webContents.on('before-input-event', (event, input) => {
-    const isMac = process.platform === 'darwin';
-    const isDevToolsShortcut = isMac
-      ? input.meta && input.alt && input.key.toLowerCase() === 'i'
-      : input.control && input.shift && input.key.toLowerCase() === 'i';
-
-    if (isDevToolsShortcut) {
-      mainWindow?.webContents.toggleDevTools();
-      event.preventDefault();
-    }
-  });
-
-  // Save window bounds when moved
-  mainWindow.on('moved', () => {
-    saveMainWindowBounds();
-  });
-
-  // Debounce timer for window resize
-  let resizeTimeout: NodeJS.Timeout | null = null;
-
-  // Save window bounds when resized (debounced)
-  mainWindow.on('resize', () => {
-    if (resizeTimeout) {
-      clearTimeout(resizeTimeout);
-    }
-
-    resizeTimeout = setTimeout(() => {
-      saveMainWindowBounds();
-    }, 500); // Wait 500ms after resize stops before saving
-  });
-
-  // Ensure bounds are saved before window closes
-  mainWindow.on('close', () => {
-    // Clear any pending resize timeout
-    if (resizeTimeout) {
-      clearTimeout(resizeTimeout);
-    }
-    saveMainWindowBounds();
-  });
-}
+let runningApp: RunningApp | undefined;
 
 // Quit when all windows are closed, except on macOS. There, it's common
 // for applications and their menu bar to stay active until the user quits
@@ -226,7 +36,6 @@ function createWindow() {
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit();
-    mainWindow = null;
   }
 });
 
@@ -234,7 +43,7 @@ app.on('activate', () => {
   // On OS X it's common to re-create a window in the app when the
   // dock icon is clicked and there are no other windows open.
   if (BrowserWindow.getAllWindows().length === 0) {
-    createWindow();
+    runningApp?.createMainWindow();
   }
 });
 
@@ -256,142 +65,18 @@ app.whenReady().then(() => {
     callback({ responseHeaders: headers });
   });
 
-  // Keep a copy of every save file before the vault/inventory editor modifies it
-  configureSaveFileBackups(path.join(app.getPath('userData'), 'save-file-backups'));
-
-  // Initialize grail database and IPC handlers
-  initializeGrailHandlers();
-  initializeSaveFileHandlers();
-  initializeVaultHandlers(getSaveFileMonitor);
-
-  // Initialize run tracker handlers after save file handlers
-  const runTracker = getRunTracker();
-  if (runTracker) {
-    console.log('[main] Run tracker instance found, initializing handlers');
-    initializeRunTrackerHandlers(runTracker, eventBus);
-  } else {
-    console.error(
-      '[main] Failed to get run tracker instance - this may indicate an initialization error',
-    );
-    console.error('[main] Check the logs above for any RunTrackerService creation errors');
-  }
-
-  // Opt-in global hotkeys for the run tracker (work while D2R is focused)
-  initializeGlobalHotkeyHandlers(runTracker, () => mainWindow);
-
-  initializeDialogHandlers();
-  initializeShellHandlers();
-  initializeIconHandlers();
-  initializeInventoryWindowHandlers(
-    __dirname,
-    VITE_DEV_SERVER_URL,
-    RENDERER_DIST,
-    () => getSaveFileMonitor()?.getSaveDirectory() ?? undefined,
+  startApp(paths).then(
+    (startedApp) => {
+      runningApp = startedApp;
+    },
+    (error: unknown) => {
+      // startApp has already stopped what it started; without a window the app has nothing to show
+      console.error('[main] Failed to start the app:', error);
+      app.quit();
+    },
   );
-  initializeTerrorZoneHandlers();
-  initializeUpdateHandlers();
-
-  // Initialize widget handlers with callbacks for position and size updates
-  const onWidgetPositionChange = (position: { x: number; y: number }) => {
-    // Save widget position to database using singleton
-    try {
-      grailDatabase.setSetting('widgetPosition', JSON.stringify(position));
-    } catch (error) {
-      console.error('Failed to save widget position:', error);
-    }
-  };
-
-  // Debounce timer for widget size changes
-  let widgetSizeChangeTimeout: NodeJS.Timeout | null = null;
-
-  const onWidgetSizeChange = (display: WidgetDisplayMode, size: WidgetSize) => {
-    // Debounce widget size changes to avoid excessive database writes during resize
-    if (widgetSizeChangeTimeout) {
-      clearTimeout(widgetSizeChangeTimeout);
-    }
-
-    widgetSizeChangeTimeout = setTimeout(() => {
-      try {
-        grailDatabase.setSetting(getWidgetSizeSettingKey(display), JSON.stringify(size));
-      } catch (error) {
-        console.error('Failed to save widget size:', error);
-      }
-    }, 500); // Wait 500ms after resize stops before saving
-  };
-
-  initializeWidgetHandlers(
-    __dirname,
-    VITE_DEV_SERVER_URL,
-    RENDERER_DIST,
-    onWidgetPositionChange,
-    onWidgetSizeChange,
-  );
-
-  const { handle } = createIpcMainRegistry(ipcMain);
-
-  // Handle titlebar overlay updates (Windows/Linux only)
-  handle('update-titlebar-overlay', (_event, colors) => {
-    if (process.platform !== 'darwin') {
-      mainWindow?.setTitleBarOverlay({
-        color: colors.backgroundColor,
-        symbolColor: colors.symbolColor,
-        height: 47,
-      });
-
-      setInventorySnapshotWindowsTitleBarOverlay({
-        color: colors.backgroundColor,
-        symbolColor: colors.symbolColor,
-      });
-    }
-    return { success: true };
-  });
-
-  // Handle app icon path requests for native notifications
-  handle('app:getIconPath', () => {
-    // In development mode, return relative URL for Vite dev server
-    if (VITE_DEV_SERVER_URL) {
-      return '/logo.png';
-    }
-
-    // In production, return absolute file path for native notifications
-    const iconPath =
-      process.platform === 'win32'
-        ? path.join(process.resourcesPath, 'app.asar.unpacked', 'dist', 'logo.ico')
-        : path.join(process.env.VITE_PUBLIC, 'logo.png');
-    return iconPath;
-  });
-
-  // Create main window
-  createWindow();
-
-  // Initialize widget window if enabled in settings
-  try {
-    const settings = grailDatabase.getAllSettings();
-    if (settings.widgetEnabled) {
-      showWidgetWindow(
-        settings,
-        __dirname,
-        VITE_DEV_SERVER_URL,
-        RENDERER_DIST,
-        onWidgetPositionChange,
-        onWidgetSizeChange,
-      );
-    }
-  } catch (error) {
-    console.error('Failed to initialize widget window:', error);
-  }
 });
 
-// Clean up database connection when app is about to quit
-app.on('before-quit', () => {
-  closeGrailDatabase();
-  closeSaveFileMonitor();
-  closeRunTracker();
-  closeWidgetWindow();
-  closeInventorySnapshotWindows();
-});
-
-// Release OS-wide hotkeys so other applications can use the key combinations again
-app.on('will-quit', () => {
-  closeGlobalHotkeys();
-});
+// Stop the services, close the windows and the database before the app quits. Quitting waits for
+// the asynchronous shutdown, so open runs are ended and pending writes are flushed.
+deferQuitUntilShutdown(app, () => runningApp?.shutdown() ?? Promise.resolve());

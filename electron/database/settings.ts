@@ -1,98 +1,16 @@
 import { eq } from 'drizzle-orm';
-import { NUMERIC_TO_STRING_ZONE_ID } from '../data/terrorZoneNames';
 import type { Settings } from '../types/grail';
-import { GameMode, GameVersion } from '../types/grail';
-import type { WidgetSize } from '../utils/widgetDisplay';
+import { getSeededSettings, parseSettings } from '../utils/settingsCodec';
 import { schema } from './drizzle';
 import type { DatabaseContext } from './types';
 
 const { settings } = schema;
 
-// Track which setting keys have been warned about to avoid log spam
-const warnedKeys = new Set<string>();
-
-function parseJSON(jsonString: string, settingKey?: string): unknown {
-  if (!jsonString || jsonString === 'undefined' || jsonString === 'null') {
-    return undefined;
-  }
-  if (jsonString === '[object Object]') {
-    // Only warn once per setting key to avoid log spam
-    if (settingKey && !warnedKeys.has(settingKey)) {
-      console.warn(
-        `[parseJSON] Setting "${settingKey}" has corrupted value "[object Object]". This will be ignored.`,
-      );
-      warnedKeys.add(settingKey);
-    }
-    return undefined;
-  }
-  try {
-    return JSON.parse(jsonString);
-  } catch {
-    if (settingKey && !warnedKeys.has(settingKey)) {
-      console.warn(
-        `[parseJSON] Failed to parse setting "${settingKey}" value: "${jsonString}". Using undefined.`,
-      );
-      warnedKeys.add(settingKey);
-    }
-    return undefined;
-  }
-}
-
-function parseJSONSetting<T>(value: string | undefined, settingKey?: string): T | undefined {
-  if (!value || value === '') {
-    return undefined;
-  }
-  return parseJSON(value, settingKey) as T | undefined;
-}
-
-function parseIntSetting(value: string | undefined): number | undefined {
-  return value ? Number.parseInt(value, 10) : undefined;
-}
-
-function parseFloatSetting(value: string | undefined, defaultValue?: number): number | undefined {
-  if (!value) {
-    return defaultValue;
-  }
-  const parsed = Number.parseFloat(value);
-  return Number.isNaN(parsed) ? defaultValue : parsed;
-}
-
-function parseBooleanSetting(value: string | undefined): boolean {
-  return value === 'true';
-}
-
-function parseEnumSetting<T>(value: string | undefined, defaultValue: T): T {
-  return (value as T) || defaultValue;
-}
-
 /**
- * Migrates terror zone configuration from old numeric IDs to new string IDs.
- * @param config - The config object that may contain numeric or string keys
- * @returns Migrated config with only string keys
+ * Reads all settings, parsed to their types; settings that are not stored get their default.
+ * @param ctx - Database context
+ * @returns The typed settings
  */
-function migrateTerrorZoneConfig(
-  config: Record<string | number, boolean> | undefined,
-): Record<string, boolean> | undefined {
-  if (!config || Object.keys(config).length === 0) {
-    return undefined;
-  }
-
-  const migrated: Record<string, boolean> = {};
-  for (const [key, value] of Object.entries(config)) {
-    const numericKey = Number(key);
-    // Check if the key is a numeric string and can be converted to a number
-    if (!Number.isNaN(numericKey) && NUMERIC_TO_STRING_ZONE_ID[numericKey]) {
-      // Migrate from numeric to string ID
-      migrated[NUMERIC_TO_STRING_ZONE_ID[numericKey]] = value;
-    } else {
-      // Already a string ID, keep as is
-      migrated[key] = value;
-    }
-  }
-
-  return migrated;
-}
-
 export function getAllSettings(ctx: DatabaseContext): Settings {
   const dbSettings = ctx.db.select().from(settings).all();
   const settingsMap: Record<string, string> = {};
@@ -100,92 +18,7 @@ export function getAllSettings(ctx: DatabaseContext): Settings {
     settingsMap[setting.key] = setting.value ?? '';
   }
 
-  // Convert string values back to their proper types
-  const typedSettings: Settings = {
-    saveDir: settingsMap.saveDir || '',
-    lang: settingsMap.lang || 'en',
-    gameMode: parseEnumSetting(settingsMap.gameMode, GameMode.Both),
-    grailNormal: parseBooleanSetting(settingsMap.grailNormal),
-    grailEthereal: parseBooleanSetting(settingsMap.grailEthereal),
-    grailRunes: parseBooleanSetting(settingsMap.grailRunes),
-    grailRunewords: parseBooleanSetting(settingsMap.grailRunewords),
-    gameVersion: parseEnumSetting(settingsMap.gameVersion, GameVersion.Resurrected),
-    enableSounds: parseBooleanSetting(settingsMap.enableSounds),
-    notificationVolume: parseFloatSetting(settingsMap.notificationVolume, 0.5) || 0.5,
-    inAppNotifications: parseBooleanSetting(settingsMap.inAppNotifications),
-    nativeNotifications: parseBooleanSetting(settingsMap.nativeNotifications),
-    needsSeeding: parseBooleanSetting(settingsMap.needsSeeding),
-    theme: parseEnumSetting(settingsMap.theme, 'system' as const),
-    showItemIcons: settingsMap.showItemIcons !== 'false', // Default to true
-    // D2R installation settings
-    d2rInstallPath: settingsMap.d2rInstallPath || undefined,
-    iconConversionStatus: settingsMap.iconConversionStatus as
-      | 'not_started'
-      | 'in_progress'
-      | 'completed'
-      | 'failed'
-      | undefined,
-    iconConversionProgress: parseJSONSetting<{ current: number; total: number }>(
-      settingsMap.iconConversionProgress,
-      'iconConversionProgress',
-    ),
-    // Advanced monitoring settings
-    tickReaderIntervalMs: parseIntSetting(settingsMap.tickReaderIntervalMs),
-    chokidarPollingIntervalMs: parseIntSetting(settingsMap.chokidarPollingIntervalMs),
-    fileStabilityThresholdMs: parseIntSetting(settingsMap.fileStabilityThresholdMs),
-    fileChangeDebounceMs: parseIntSetting(settingsMap.fileChangeDebounceMs),
-    // Widget settings
-    widgetEnabled: parseBooleanSetting(settingsMap.widgetEnabled),
-    widgetDisplay: parseEnumSetting(settingsMap.widgetDisplay, 'overall' as const),
-    widgetPosition: parseJSONSetting<{ x: number; y: number }>(
-      settingsMap.widgetPosition,
-      'widgetPosition',
-    ),
-    widgetOpacity: parseFloatSetting(settingsMap.widgetOpacity, 0.9) ?? 0.9,
-    widgetSizeOverall: parseJSONSetting<WidgetSize>(
-      settingsMap.widgetSizeOverall,
-      'widgetSizeOverall',
-    ),
-    widgetSizeSplit: parseJSONSetting<WidgetSize>(settingsMap.widgetSizeSplit, 'widgetSizeSplit'),
-    widgetSizeAll: parseJSONSetting<WidgetSize>(settingsMap.widgetSizeAll, 'widgetSizeAll'),
-    widgetSizeRunOnly: parseJSONSetting<WidgetSize>(
-      settingsMap.widgetSizeRunOnly,
-      'widgetSizeRunOnly',
-    ),
-    widgetRunOnlyShowItems: settingsMap.widgetRunOnlyShowItems !== 'false', // Default to true
-    widgetLocked: parseBooleanSetting(settingsMap.widgetLocked),
-    // Main window settings
-    mainWindowBounds: parseJSONSetting<{
-      x: number;
-      y: number;
-      width: number;
-      height: number;
-    }>(settingsMap.mainWindowBounds, 'mainWindowBounds'),
-    // Wizard settings
-    wizardCompleted: parseBooleanSetting(settingsMap.wizardCompleted),
-    wizardSkipped: parseBooleanSetting(settingsMap.wizardSkipped),
-    // Terror zone configuration (with migration from numeric to string IDs)
-    terrorZoneConfig: migrateTerrorZoneConfig(
-      parseJSONSetting<Record<string | number, boolean>>(
-        settingsMap.terrorZoneConfig,
-        'terrorZoneConfig',
-      ),
-    ),
-    terrorZoneBackupCreated: parseBooleanSetting(settingsMap.terrorZoneBackupCreated),
-    // Run tracker settings
-    runTrackerAutoStart: parseBooleanSetting(settingsMap.runTrackerAutoStart),
-    runTrackerEndThreshold: parseIntSetting(settingsMap.runTrackerEndThreshold) ?? 10,
-    runTrackerMemoryReading: parseBooleanSetting(settingsMap.runTrackerMemoryReading),
-    runTrackerMemoryPollingInterval:
-      parseIntSetting(settingsMap.runTrackerMemoryPollingInterval) ?? 500,
-    runTrackerShortcuts: parseJSONSetting<Settings['runTrackerShortcuts']>(
-      settingsMap.runTrackerShortcuts,
-      'runTrackerShortcuts',
-    ),
-    runTrackerGlobalHotkeys: parseBooleanSetting(settingsMap.runTrackerGlobalHotkeys),
-  };
-
-  return typedSettings;
+  return parseSettings(settingsMap);
 }
 
 export function setSetting(ctx: DatabaseContext, key: keyof Settings, value: string): void {
@@ -199,40 +32,13 @@ export function setSetting(ctx: DatabaseContext, key: keyof Settings, value: str
     .run();
 }
 
-/** Settings rows every database has. Missing rows are added at startup; existing values are kept. */
-const DEFAULT_SETTINGS: ReadonlyArray<{ key: keyof Settings; value: string }> = [
-  { key: 'saveDir', value: '' },
-  { key: 'lang', value: 'en' },
-  { key: 'gameMode', value: 'both' },
-  { key: 'grailNormal', value: 'true' },
-  { key: 'grailEthereal', value: 'false' },
-  { key: 'grailRunes', value: 'false' },
-  { key: 'grailRunewords', value: 'false' },
-  { key: 'enableSounds', value: 'true' },
-  { key: 'notificationVolume', value: '0.5' },
-  { key: 'inAppNotifications', value: 'true' },
-  { key: 'nativeNotifications', value: 'true' },
-  { key: 'needsSeeding', value: 'true' },
-  { key: 'theme', value: 'system' },
-  { key: 'showItemIcons', value: 'false' },
-  { key: 'wizardCompleted', value: 'false' },
-  { key: 'wizardSkipped', value: 'false' },
-  { key: 'runTrackerAutoStart', value: 'true' },
-  { key: 'runTrackerEndThreshold', value: '10' },
-  { key: 'runTrackerMemoryReading', value: 'false' },
-  { key: 'runTrackerMemoryPollingInterval', value: '500' },
-];
-
 /**
- * Inserts the default value of every setting that has no row yet. Existing values are kept.
+ * Inserts the seeded default value of every setting that has no row yet. Existing values are kept.
+ * The seeded settings and their stored text come from the settings codec.
  * @param ctx - Database context
  */
 export function ensureDefaultSettings(ctx: DatabaseContext): void {
-  ctx.db
-    .insert(settings)
-    .values(DEFAULT_SETTINGS.map((setting) => ({ key: setting.key, value: setting.value })))
-    .onConflictDoNothing()
-    .run();
+  ctx.db.insert(settings).values(getSeededSettings()).onConflictDoNothing().run();
 }
 
 /**

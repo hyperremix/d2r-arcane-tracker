@@ -633,6 +633,3 @@ export class IconService {
     }
   }
 }
-
-// Singleton instance
-export const iconService = new IconService();

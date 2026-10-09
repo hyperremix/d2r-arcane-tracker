@@ -1,27 +1,21 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: handlers are retrieved from mocked ipcMain.handle calls */
 import { ipcMain } from 'electron';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { grailDatabase } from '../database/database';
+import type { GrailDatabase } from '../database/database';
+import { EventBus } from '../services/EventBus';
+import { SettingsService } from '../services/settingsService';
+import type { TerrorZoneService } from '../services/terrorZoneService';
 import { initializeTerrorZoneHandlers } from './terrorZoneHandlers';
-
-const { validateGameFile } = vi.hoisted(() => ({ validateGameFile: vi.fn() }));
 
 vi.mock('electron', () => ({
   ipcMain: { handle: vi.fn() },
 }));
 
-vi.mock('../database/database', () => ({
-  grailDatabase: {
-    getAllSettings: vi.fn(),
-    setSetting: vi.fn(),
-  },
-}));
-
-vi.mock('../services/terrorZoneService', () => ({
-  TerrorZoneService: class {
-    validateGameFile = validateGameFile;
-  },
-}));
+const validateGameFile = vi.fn();
+const grailDatabase = {
+  getAllSettings: vi.fn(),
+  setSetting: vi.fn(),
+};
 
 function getHandler(channel: string) {
   return vi.mocked(ipcMain.handle).mock.calls.find((call) => call[0] === channel)?.[1] as any;
@@ -32,7 +26,10 @@ describe('When the terrorZone:validatePath handler is invoked', () => {
     vi.clearAllMocks();
     vi.spyOn(console, 'log').mockImplementation(() => undefined);
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
-    initializeTerrorZoneHandlers();
+    initializeTerrorZoneHandlers({
+      terrorZoneService: { validateGameFile } as unknown as TerrorZoneService,
+      settings: new SettingsService(grailDatabase as unknown as GrailDatabase, new EventBus()),
+    });
   });
 
   it('If no D2R install path is configured, Then it returns the pathNotConfigured error code', async () => {

@@ -1,6 +1,7 @@
-import path from 'node:path';
 import { BrowserWindow } from 'electron';
+import type { AppPaths } from '../app/paths';
 import type { InventorySnapshotWindowTarget } from '../types/grail';
+import { createAppWindow } from './appWindow';
 
 const inventorySnapshotWindows = new Map<string, BrowserWindow>();
 
@@ -53,11 +54,15 @@ function getSnapshotTitleBarOptions():
   };
 }
 
+/**
+ * Opens the inventory snapshot window of a save file, or focuses it if it is already open.
+ * @param target - The save file to show
+ * @param paths - Locations of the preload script and the renderer
+ * @returns The snapshot window
+ */
 export function openInventorySnapshotWindow(
   target: InventorySnapshotWindowTarget,
-  __dirname: string,
-  viteDevServerUrl?: string,
-  rendererDist?: string,
+  paths: AppPaths,
 ): BrowserWindow {
   const windowKey = getSnapshotWindowKey(target);
   const existingWindow = inventorySnapshotWindows.get(windowKey);
@@ -67,31 +72,16 @@ export function openInventorySnapshotWindow(
     return existingWindow;
   }
 
-  const snapshotWindow = new BrowserWindow({
+  const snapshotWindow = createAppWindow(BrowserWindow, {
+    paths,
+    route: getSnapshotHash(target),
     width: 1200,
     height: 900,
     minWidth: 900,
     minHeight: 700,
     title: target.characterName,
     ...getSnapshotTitleBarOptions(),
-    webPreferences: {
-      preload: path.join(__dirname, 'preload.mjs'),
-      contextIsolation: true,
-      nodeIntegration: false,
-      sandbox: true,
-      webSecurity: true,
-    },
   });
-
-  const hash = getSnapshotHash(target);
-
-  if (viteDevServerUrl) {
-    snapshotWindow.loadURL(`${viteDevServerUrl}#${hash}`);
-  } else {
-    snapshotWindow.loadFile(path.join(rendererDist || '', 'index.html'), {
-      hash,
-    });
-  }
 
   snapshotWindow.on('closed', () => {
     inventorySnapshotWindows.delete(windowKey);

@@ -1,361 +1,38 @@
 import { isAbsolute, resolve } from 'node:path';
-import { ipcMain, webContents } from 'electron';
+import { ipcMain } from 'electron';
 import type { GrailDatabase } from '../database/database';
-import { grailDatabase } from '../database/database';
-import { createRendererBroadcaster } from '../ipc/broadcast';
+import type { BroadcastToRenderers } from '../ipc/broadcast';
 import { createIpcMainRegistry } from '../ipc/handle';
-import { DatabaseBatchWriter } from '../services/DatabaseBatchWriter';
-import { EventBus } from '../services/EventBus';
-import { ItemDetectionService } from '../services/itemDetection';
-import { MemoryReader } from '../services/memoryReader';
-import { ProcessMonitor } from '../services/processMonitor';
-import { RunTrackerService } from '../services/runTracker';
+import type { EventBus } from '../services/EventBus';
+import type { GrailProgressService } from '../services/grailProgressService';
+import type { ItemDetectionService } from '../services/itemDetection';
 import { inspectSaveDirectory } from '../services/saveDirectoryInspector';
-import type { D2SaveFile, SaveFileEvent } from '../services/saveFileMonitor';
-import { SaveFileMonitor } from '../services/saveFileMonitor';
-import type {
-  Character,
-  CharacterClass,
-  GrailProgress,
-  Item,
-  ItemDetectionEvent,
-  RunItem,
-  SaveDirectoryInspection,
-} from '../types/grail';
+import type { D2SaveFile, SaveFileEvent, SaveFileMonitor } from '../services/saveFileMonitor';
+import type { SettingsService } from '../services/settingsService';
+import type { ItemDetectionEvent, SaveDirectoryInspection } from '../types/grail';
 import { GameMode } from '../types/grail';
-import { setErrorForwarder } from '../utils/serviceLogger';
-import { addSettingsUpdatedListener } from './grailHandlers';
 
-/** Sends an event from the IPC contract to every renderer window. */
-const broadcastToRenderers = createRendererBroadcaster(() => webContents.getAllWebContents());
-
-/**
- * Global service instances for save file monitoring and item detection.
- */
-export const eventBus = new EventBus();
-const batchWriter = new DatabaseBatchWriter(grailDatabase, () => {
-  // Emit grail-progress-updated event to all renderer windows after batch flush
-  broadcastToRenderers('grail-progress-updated');
-});
-let saveFileMonitor: SaveFileMonitor;
-let itemDetectionService: ItemDetectionService;
-let runTracker: RunTrackerService | undefined;
-let processMonitor: ProcessMonitor | undefined;
-let memoryReader: MemoryReader | undefined;
-const eventUnsubscribers: Array<() => void> = [];
+/** Dependencies of the save file IPC handlers. */
+export interface SaveFileHandlerDependencies {
+  database: GrailDatabase;
+  settings: SettingsService;
+  eventBus: EventBus;
+  saveFileMonitor: SaveFileMonitor;
+  itemDetection: ItemDetectionService;
+  grailProgress: GrailProgressService;
+  broadcastToRenderers: BroadcastToRenderers;
+}
 
 /**
  * Checks whether the persisted game mode is Manual, where save file monitoring must stay off.
  * @returns True if the game mode is Manual; false otherwise or if settings cannot be read
  */
-function isManualGameMode(): boolean {
+function isManualGameMode({ settings }: SaveFileHandlerDependencies): boolean {
   try {
-    return grailDatabase.getAllSettings().gameMode === GameMode.Manual;
+    return settings.get('gameMode') === GameMode.Manual;
   } catch (error) {
     console.warn('[isManualGameMode] Failed to read game mode from settings:', error);
     return false;
-  }
-}
-
-function isSharedStashCharacterName(characterName: string): boolean {
-  return characterName.toLowerCase().includes('shared stash');
-}
-
-function isSharedStashHardcore(characterName: string): boolean {
-  return /hardcore/i.test(characterName);
-}
-
-/**
- * Finds or creates a character by name.
- * @param characterName - Name of the character to find or create
- * @param level - Level of the character (used when creating new character)
- * @param characterClass - Optional character class to use when creating new character
- * @returns Character object or null if creation fails
- */
-function findOrCreateCharacter(
-  characterName: string,
-  level: number,
-  database: GrailDatabase,
-  writer: DatabaseBatchWriter,
-  characterClass?: CharacterClass,
-) {
-  let character = database.getCharacterByName(characterName);
-
-  if (!character) {
-    const characterId = `char_${characterName}_${Date.now()}`;
-    // Determine if this is a shared stash based on the character name
-    const isSharedStash = isSharedStashCharacterName(characterName);
-    const defaultCharacterClass = isSharedStash ? 'shared_stash' : characterClass || 'barbarian';
-
-    character = {
-      id: characterId,
-      name: characterName,
-      characterClass: defaultCharacterClass, // Use shared_stash for shared stash files, will be updated from save file data for regular characters
-      level: level || 1,
-      hardcore: isSharedStash ? isSharedStashHardcore(characterName) : false,
-      expansion: true,
-      saveFilePath: undefined,
-      lastUpdated: new Date(),
-      created: new Date(),
-    };
-
-    // Queue character creation for batch write
-    writer.queueCharacter(character);
-    console.log(`Queued new character for batch write: ${characterName}`);
-  }
-
-  return character;
-}
-
-/**
- * Creates a grail progress entry for a character and item.
- * @param character - Character who found the item
- * @param event - Item detection event
- * @returns Grail progress object
- */
-function createGrailProgress(character: Character, event: ItemDetectionEvent): GrailProgress {
-  // Use d2s item ID if available, otherwise fall back to timestamp for backward compatibility
-  const itemIdentifier = event.d2sItemId ? String(event.d2sItemId) : `timestamp_${Date.now()}`;
-  const progressId = `${character.id}_${event.grailItem.id}_${itemIdentifier}`;
-  return {
-    id: progressId,
-    characterId: character.id,
-    itemId: event.grailItem.id,
-    isEthereal: Boolean(event.item.ethereal),
-    foundDate: new Date(),
-    manuallyAdded: false,
-    notes: `Auto-detected from ${event.item.location}`,
-    fromInitialScan: event.isInitialScan ?? false,
-  };
-}
-
-// Manual rows are excluded: run_items.grail_progress_id cascades on delete, so
-// attaching a run item to a manual row would lose it when the row is removed.
-function findMatchingProgressForCharacter(
-  existingProgress: GrailProgress[] | undefined,
-  targetProgress: GrailProgress,
-): GrailProgress | undefined {
-  if (!existingProgress?.length) {
-    return undefined;
-  }
-
-  return existingProgress.find(
-    (progress) =>
-      !progress.manuallyAdded &&
-      progress.characterId === targetProgress.characterId &&
-      Boolean(progress.isEthereal) === Boolean(targetProgress.isEthereal),
-  );
-}
-
-/**
- * Emits grail progress update event to all renderer processes.
- * @param character - Character who found the item
- * @param event - Item detection event
- * @param grailProgress - Grail progress object
- */
-function emitGrailProgressUpdate(
-  character: Character,
-  event: ItemDetectionEvent,
-  grailProgress: GrailProgress,
-): void {
-  broadcastToRenderers('grail-progress-updated', {
-    character: character,
-    item: event.item,
-    progress: grailProgress,
-    autoDetected: true,
-    firstTimeDiscovery: true,
-  });
-}
-
-export type HandleAutomaticGrailProgressDependencies = {
-  database?: GrailDatabase;
-  batchWriter?: DatabaseBatchWriter;
-  eventBus?: EventBus;
-  runTracker?: RunTrackerService;
-};
-
-/**
- * Handles automatic grail progress updates when items are detected.
- * Creates or updates character information and grail progress entries.
- * Emits events to renderer processes for first-time global discoveries.
- * @param event - Item detection event containing the found item
- * @param dependencies - Optional dependency overrides (for testing)
- */
-export function handleAutomaticGrailProgress(
-  event: ItemDetectionEvent,
-  dependencies: HandleAutomaticGrailProgressDependencies = {},
-): void {
-  const currentDatabase = dependencies.database ?? grailDatabase;
-  const currentBatchWriter = dependencies.batchWriter ?? batchWriter;
-  const currentEventBus = dependencies.eventBus ?? eventBus;
-  const currentRunTracker = dependencies.runTracker ?? runTracker;
-
-  // Store run item payload for emission after flush to avoid race condition
-  // where UI queries database before data is persisted
-  let runItemPayload: {
-    runId: string;
-    grailProgress: GrailProgress;
-    item: ItemDetectionEvent['item'];
-  } | null = null;
-
-  try {
-    if (!event.item) return;
-
-    const characterName = event.item.characterName;
-    const character = findOrCreateCharacter(
-      characterName,
-      event.item.level,
-      currentDatabase,
-      currentBatchWriter,
-      event.item.characterClass,
-    );
-
-    if (!character) {
-      console.error('Failed to create or find character:', characterName);
-      return;
-    }
-
-    // Check if this is a first-time global discovery
-    const existingGlobalProgress = currentDatabase.getProgressByItem(event.grailItem.id);
-    const isFirstTimeDiscovery = !existingGlobalProgress;
-
-    // Create grail progress entry and queue for batch write
-    const grailProgress = createGrailProgress(character, event);
-    currentBatchWriter.queueProgress(grailProgress);
-    const matchingPersistedProgress = findMatchingProgressForCharacter(
-      existingGlobalProgress,
-      grailProgress,
-    );
-
-    // Check for active run and associate item if found
-    try {
-      const activeRun = currentRunTracker?.getActiveRun();
-      if (activeRun && !event.silent) {
-        const runItem: RunItem = {
-          id: `run_item_${activeRun.id}_${grailProgress.id}`,
-          runId: activeRun.id,
-          grailProgressId: matchingPersistedProgress?.id ?? grailProgress.id,
-          foundTime: new Date(),
-          created: new Date(),
-        };
-
-        // Queue run item for batch write (will be flushed with progress)
-        // This ensures correct order: Progress -> RunItem
-        currentBatchWriter.queueRunItem(runItem);
-
-        // Store payload for emission after flush - this fixes the race condition
-        // where UI queries database before data is persisted
-        runItemPayload = {
-          runId: activeRun.id,
-          grailProgress,
-          item: event.item,
-        };
-      }
-    } catch (runAssociationError) {
-      console.error('Error associating item with run:', runAssociationError);
-      // Don't throw - grail progress is already saved, run association is secondary
-    }
-
-    // Flush the batch writer to ensure items are persisted before UI updates
-    // This is critical because the UI will query the database immediately
-    currentBatchWriter.flush();
-
-    // NOW emit the run-item-added event - data is guaranteed to be in database
-    if (runItemPayload) {
-      currentEventBus.emit('run-item-added', runItemPayload);
-    }
-
-    // Log and notify about the discovery (synchronous - don't delay user feedback)
-    if (isFirstTimeDiscovery) {
-      console.log(`🎉 NEW GRAIL ITEM: ${event.item.name} found by ${characterName}`);
-      // Only emit grail update notifications for non-silent events
-      // Silent events still save to database but don't trigger user notifications
-      // This prevents notification spam during initial parsing and force re-scans
-      if (!event.silent) {
-        emitGrailProgressUpdate(character, event, grailProgress);
-      }
-    }
-  } catch (error) {
-    console.error('Error handling automatic grail progress:', error);
-  }
-}
-
-/**
- * Updates character information from save file data.
- * Creates new character if not found, or updates existing character with latest save file data.
- * @param saveFile - Save file data containing character information
- */
-function updateCharacterFromSaveFile(saveFile: D2SaveFile): void {
-  try {
-    const character =
-      grailDatabase.getCharacterBySaveFilePath(saveFile.path) ||
-      grailDatabase.getCharacterByName(saveFile.name);
-
-    if (character) {
-      // Update existing character - queue for batch write
-      const updatedCharacter: Character = {
-        ...character,
-        characterClass: saveFile.characterClass as CharacterClass,
-        level: saveFile.level,
-        hardcore: saveFile.hardcore,
-        expansion: saveFile.expansion,
-        saveFilePath: saveFile.path,
-        lastUpdated: new Date(),
-      };
-      batchWriter.queueCharacter(updatedCharacter);
-    } else {
-      // Create new character - queue for batch write
-      const characterId = `char_${saveFile.name}_${Date.now()}`;
-
-      const newCharacter: Character = {
-        id: characterId,
-        name: saveFile.name,
-        characterClass: saveFile.characterClass as CharacterClass,
-        level: saveFile.level,
-        hardcore: saveFile.hardcore,
-        expansion: saveFile.expansion,
-        saveFilePath: saveFile.path,
-        lastUpdated: new Date(),
-        created: new Date(),
-      };
-
-      batchWriter.queueCharacter(newCharacter);
-      console.log(
-        `Queued character for batch write: ${saveFile.name} (${saveFile.characterClass})`,
-      );
-    }
-  } catch (error) {
-    console.error('Error updating character from save file:', error);
-  }
-}
-
-/**
- * Initializes Windows-specific services (process monitor and memory reader).
- * @private
- */
-function initializeWindowsServices(): void {
-  if (process.platform !== 'win32') {
-    return;
-  }
-
-  // Initialize process monitor
-  try {
-    processMonitor = new ProcessMonitor(eventBus);
-    processMonitor.startMonitoring();
-  } catch (error) {
-    console.error('[initializeSaveFileHandlers] Failed to initialize process monitor:', error);
-    processMonitor = undefined;
-    return;
-  }
-
-  // Initialize memory reader (optional, depends on process monitor)
-  if (processMonitor) {
-    try {
-      memoryReader = new MemoryReader(eventBus);
-    } catch (error) {
-      console.error('[initializeSaveFileHandlers] Failed to initialize memory reader:', error);
-      memoryReader = undefined;
-    }
   }
 }
 
@@ -391,12 +68,15 @@ function normalizeDirectoryForComparison(directory: string): string {
  * the configured `saveDir` setting, falling back to the platform default.
  * @returns The current effective save directory, or undefined if unknown
  */
-function getCurrentSaveDirectory(): string | undefined {
-  const configured = grailDatabase.getAllSettings().saveDir?.trim();
+function getCurrentSaveDirectory({
+  settings,
+  saveFileMonitor,
+}: SaveFileHandlerDependencies): string | undefined {
+  const configured = settings.get('saveDir')?.trim();
   if (configured) {
     return configured;
   }
-  return saveFileMonitor?.getDefaultDirectory();
+  return saveFileMonitor.getDefaultDirectory();
 }
 
 /**
@@ -407,8 +87,12 @@ function getCurrentSaveDirectory(): string | undefined {
  * Fails safe: if the current directory cannot be determined, user data is kept.
  * @param newDirectory - The validated new save directory
  */
-async function applySaveDirectoryChange(newDirectory: string): Promise<void> {
-  const currentDirectory = getCurrentSaveDirectory();
+async function applySaveDirectoryChange(
+  deps: SaveFileHandlerDependencies,
+  newDirectory: string,
+): Promise<void> {
+  const { database, settings, saveFileMonitor } = deps;
+  const currentDirectory = getCurrentSaveDirectory(deps);
   let directoryChanged = false;
   if (currentDirectory) {
     directoryChanged =
@@ -423,9 +107,9 @@ async function applySaveDirectoryChange(newDirectory: string): Promise<void> {
   // Only truncate user data when switching away from a known, different directory;
   // the new directory is saved in the same transaction as the truncate
   if (directoryChanged) {
-    grailDatabase.truncateUserData(newDirectory);
+    database.truncateUserData(newDirectory);
   } else {
-    grailDatabase.setSetting('saveDir', newDirectory);
+    settings.set('saveDir', newDirectory);
   }
 
   // Update the monitor's directories and restart if needed
@@ -434,58 +118,24 @@ async function applySaveDirectoryChange(newDirectory: string): Promise<void> {
 
 /**
  * Initializes IPC handlers for save file monitoring and item detection.
- * Sets up event listeners for save file changes and item detection.
- * Configures automatic grail progress updates and forwards events to renderer processes.
- * Loads grail items into the detection service and starts monitoring automatically.
+ * Sets up event listeners for save file changes and item detection: parsed save files are
+ * analyzed and recorded as grail progress, and events are forwarded to renderer processes.
+ * Starts monitoring automatically (unless the game mode is Manual) and keeps it in sync with the
+ * game mode.
+ * @param deps - The services the handlers use
+ * @returns Function that removes the event listeners and cancels a pending automatic start
  */
-export function initializeSaveFileHandlers(): void {
+export function initializeSaveFileHandlers(deps: SaveFileHandlerDependencies): () => void {
+  const {
+    eventBus,
+    saveFileMonitor,
+    itemDetection: itemDetectionService,
+    grailProgress,
+    broadcastToRenderers,
+    settings,
+  } = deps;
   const { handle } = createIpcMainRegistry(ipcMain);
-  console.log('[initializeSaveFileHandlers] Starting initialization');
-  console.log('[initializeSaveFileHandlers] Current EventBus listener counts:', {
-    'save-file-event': eventBus.listenerCount('save-file-event'),
-    'item-detection': eventBus.listenerCount('item-detection'),
-  });
-
-  // Wire up service error forwarding to renderer processes
-  setErrorForwarder((payload) => {
-    try {
-      broadcastToRenderers('service-error', payload);
-    } catch {
-      // Forwarding must never break logging (e.g. webContents is unavailable in tests)
-    }
-  });
-
-  // Clean up any existing handlers before re-initialization (important for hot-reload scenarios)
-  if (eventUnsubscribers.length > 0) {
-    console.log(
-      `[initializeSaveFileHandlers] Cleaning up ${eventUnsubscribers.length} existing event handlers`,
-    );
-    for (const unsubscribe of eventUnsubscribers) {
-      unsubscribe();
-    }
-    eventUnsubscribers.length = 0;
-  }
-
-  // Initialize Windows-specific services
-  initializeWindowsServices();
-
-  // Initialize run tracker service with optional memory reader
-  try {
-    runTracker = new RunTrackerService(eventBus, grailDatabase, memoryReader || null);
-
-    // If memory reader was created after run tracker, set it now
-    if (memoryReader && runTracker) {
-      runTracker.setMemoryReader(memoryReader);
-    }
-  } catch (error) {
-    console.error('[initializeSaveFileHandlers] Failed to initialize run tracker:', error);
-    runTracker = undefined;
-  }
-
-  // Initialize monitor and detection service with EventBus and grail database
-  saveFileMonitor = new SaveFileMonitor(eventBus, grailDatabase);
-  saveFileMonitor.start();
-  itemDetectionService = new ItemDetectionService(eventBus);
+  const eventUnsubscribers: Array<() => void> = [];
 
   // Set up event forwarding to renderer process
   const unsubscribeSaveFileEvent = eventBus.on('save-file-event', async (event: SaveFileEvent) => {
@@ -494,31 +144,26 @@ export function initializeSaveFileHandlers(): void {
     const { parsedItems, ...rendererEvent } = event;
     broadcastToRenderers('save-file-event', rendererEvent);
 
-    // Update character information from save file
-    updateCharacterFromSaveFile(event.file);
-
     // Analyze save file for item changes if it's a modification
     // Await to ensure sequential processing and prevent race conditions
-    if (event.type === 'modified') {
-      await itemDetectionService.analyzeSaveFile(
-        event.file,
-        parsedItems ?? [],
-        event.silent,
-        event.isInitialScan,
-      );
-    }
+    const foundItems =
+      event.type === 'modified'
+        ? await itemDetectionService.analyzeSaveFile(
+            event.file,
+            parsedItems ?? [],
+            event.silent,
+            event.isInitialScan,
+          )
+        : [];
+
+    // Store the character and the progress of the found items in one transaction
+    grailProgress.recordSaveFile(event.file, foundItems);
   });
   eventUnsubscribers.push(unsubscribeSaveFileEvent);
 
-  // Set up item detection event forwarding and automatic grail progress updates
+  // Forward item detection events to renderer processes
   const unsubscribeItemDetection = eventBus.on('item-detection', (event: ItemDetectionEvent) => {
-    // Forward event to renderer processes
     broadcastToRenderers('item-detection-event', event);
-
-    // Handle automatic grail progress updates for found items
-    if (event.type === 'item-found' && event.item) {
-      handleAutomaticGrailProgress(event);
-    }
   });
   eventUnsubscribers.push(unsubscribeItemDetection);
 
@@ -551,23 +196,10 @@ export function initializeSaveFileHandlers(): void {
   });
   eventUnsubscribers.push(unsubscribeMonitoringError);
 
-  // Load grail items into item detection service
-  try {
-    const grailItems: Item[] = grailDatabase.getAllItems();
-    itemDetectionService.setGrailItems(grailItems);
-    console.log(`Loaded ${grailItems.length} grail items into detection service`);
-
-    // Initialize with existing progress to prevent re-notification
-    const grailProgress = grailDatabase.getAllProgress();
-    itemDetectionService.initializeFromDatabase(grailProgress);
-  } catch (error) {
-    console.error('Failed to load grail items into detection service:', error);
-  }
-
   // Automatically start monitoring, unless Manual mode keeps it off
-  setTimeout(async () => {
+  const monitoringStartTimeout = setTimeout(async () => {
     try {
-      if (isManualGameMode()) {
+      if (isManualGameMode(deps)) {
         console.log(
           '[initializeSaveFileHandlers] Manual mode active, not auto-starting monitoring',
         );
@@ -578,16 +210,17 @@ export function initializeSaveFileHandlers(): void {
       console.error('Failed to auto-start save file monitoring:', error);
     }
   }, 1000); // Short delay to ensure everything is initialized
+  eventUnsubscribers.push(() => clearTimeout(monitoringStartTimeout));
 
   // Keep monitoring in sync with game mode changes from any renderer view (e.g. the setup wizard)
-  let manualModeActive = isManualGameMode();
+  let manualModeActive = isManualGameMode(deps);
   eventUnsubscribers.push(
-    addSettingsUpdatedListener(async (settings) => {
-      if (settings.gameMode === undefined) {
+    settings.onUpdated(async (changes) => {
+      if (changes.gameMode === undefined) {
         return;
       }
       const wasManual = manualModeActive;
-      manualModeActive = settings.gameMode === GameMode.Manual;
+      manualModeActive = changes.gameMode === GameMode.Manual;
       try {
         if (manualModeActive) {
           // Queued behind any start still in flight, so the watcher cannot come up in Manual mode
@@ -655,7 +288,7 @@ export function initializeSaveFileHandlers(): void {
   handle('saveFile:updateSaveDirectory', async (_, saveDir: unknown) => {
     const newDirectory = validateSaveDirectoryInput(saveDir);
 
-    await applySaveDirectoryChange(newDirectory);
+    await applySaveDirectoryChange(deps, newDirectory);
 
     return { success: true };
   });
@@ -682,7 +315,7 @@ export function initializeSaveFileHandlers(): void {
     // Get the platform default directory
     const defaultDirectory = saveFileMonitor.getDefaultDirectory();
 
-    await applySaveDirectoryChange(defaultDirectory);
+    await applySaveDirectoryChange(deps, defaultDirectory);
 
     return { success: true, defaultDirectory };
   });
@@ -707,39 +340,10 @@ export function initializeSaveFileHandlers(): void {
   });
 
   console.log('Save file IPC handlers initialized');
-}
 
-/**
- * Closes the save file monitor and stops monitoring.
- * Should be called when the application is shutting down to properly clean up resources.
- */
-/**
- * Gets the run tracker instance.
- */
-export function getRunTracker(): RunTrackerService | undefined {
-  return runTracker;
-}
-
-export function getSaveFileMonitor(): SaveFileMonitor | undefined {
-  return saveFileMonitor;
-}
-
-export function closeSaveFileMonitor(): void {
-  // Flush any pending database writes before shutdown
-  console.log('[closeSaveFileMonitor] Flushing pending database writes');
-  batchWriter.flush();
-
-  // Unsubscribe IPC handler event listeners
-  for (const unsubscribe of eventUnsubscribers) {
-    unsubscribe();
-  }
-  eventUnsubscribers.length = 0;
-
-  // Shut down services (each cleans up its own EventBus listeners)
-  processMonitor?.shutdown();
-  memoryReader?.shutdown();
-  saveFileMonitor?.shutdown();
-
-  // Final safety net: clear any remaining EventBus listeners
-  eventBus.clear();
+  return () => {
+    for (const unsubscribe of eventUnsubscribers) {
+      unsubscribe();
+    }
+  };
 }

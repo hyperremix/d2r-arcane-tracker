@@ -11,7 +11,7 @@ const log = createServiceLogger('UpdateService');
  * Service for managing application updates using electron-updater.
  * Handles checking for updates, downloading, and installing new versions.
  */
-class UpdateService {
+export class UpdateService {
   private updateStatus: UpdateStatus = {
     checking: false,
     available: false,
@@ -242,5 +242,3 @@ class UpdateService {
     return app.getVersion();
   }
 }
-
-export const updateService = new UpdateService();
