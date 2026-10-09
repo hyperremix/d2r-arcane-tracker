@@ -1,7 +1,8 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: This file is testing private methods */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { D2SaveFileBuilder, D2SItemBuilder, HolyGrailItemBuilder } from '@/fixtures';
-import type { D2Item, D2SItem, Item, ParsedInventoryItem } from '../types/grail';
+import { items as catalogItems } from '../items/index';
+import type { D2SItem, Item, ItemDetectionEvent, ParsedInventoryItem } from '../types/grail';
 import { EventBus } from './EventBus';
 import { ItemDetectionService } from './itemDetection';
 import { normalizeItemsWithSocketedItems } from './itemNormalizer';
@@ -229,18 +230,7 @@ describe('When ItemDetectionService is used', () => {
   describe('If findGrailMatch is called', () => {
     it('Then should return matching grail item', () => {
       // Arrange
-      const item: D2Item = {
-        id: 'test',
-        name: 'shako',
-        type: 'helms',
-        quality: 'unique',
-        level: 62,
-        ethereal: false,
-        sockets: 0,
-        timestamp: new Date(),
-        characterName: 'Test',
-        location: 'inventory',
-      };
+      const item = D2SItemBuilder.new().asUniqueHelm().withUniqueName('shako').build();
 
       service.setGrailItems(mockGrailItems);
 
@@ -253,18 +243,7 @@ describe('When ItemDetectionService is used', () => {
 
     it('Then should return null when no match is found', () => {
       // Arrange
-      const item: D2Item = {
-        id: 'test',
-        name: 'nonexistent',
-        type: 'misc',
-        quality: 'normal',
-        level: 1,
-        ethereal: false,
-        sockets: 0,
-        timestamp: new Date(),
-        characterName: 'Test',
-        location: 'inventory',
-      };
+      const item = D2SItemBuilder.new().withUniqueName('nonexistent').build();
 
       service.setGrailItems(mockGrailItems);
 
@@ -679,6 +658,79 @@ describe('When ItemDetectionService is used', () => {
           }),
         );
       });
+    });
+  });
+
+  describe('When items are matched against the real grail catalog', () => {
+    const detectGrailIds = async (d2sItems: D2SItem[]): Promise<string[]> => {
+      const saveFile = D2SaveFileBuilder.new()
+        .withPath('/test/char.d2s')
+        .withName('TestChar')
+        .build();
+      service.setGrailItems(catalogItems);
+      const found = await service.analyzeSaveFile(saveFile, toParsedItems(d2sItems));
+      return found.map((event: ItemDetectionEvent) => event.grailItem.id);
+    };
+
+    it('If a runeword carries the d2s "Love" name, Then it is detected as the Lore runeword', async () => {
+      // Arrange
+      const loreItem = D2SItemBuilder.new().asRuneword().withRunewordName('Love').build();
+
+      // Act
+      const grailIds = await detectGrailIds([loreItem]);
+
+      // Assert
+      expect(grailIds).toEqual(['lore']);
+    });
+
+    it('If uniques, sets, runes, runewords and rainbow facets are found, Then each is detected as its grail item', async () => {
+      // Arrange
+      const items = [
+        D2SItemBuilder.new().withId(1).asUniqueHelm().withUniqueName('Harlequin Crest').build(),
+        D2SItemBuilder.new().withId(2).asSetArmor().withSetName("Tal Rasha's Guardianship").build(),
+        D2SItemBuilder.new().withId(3).asRune('r30').build(),
+        D2SItemBuilder.new().withId(4).asRuneword().build(),
+        D2SItemBuilder.new().withId(5).asRainbowFacet().build(),
+      ];
+
+      // Act
+      const grailIds = await detectGrailIds(items);
+
+      // Assert
+      expect(grailIds).toEqual([
+        'harlequincrest',
+        'talrashasguardianship',
+        'ber',
+        'enigma',
+        'rainbowfacetcolddeath',
+      ]);
+    });
+
+    it('If a unique and a runeword share the name Crescent Moon, Then each is detected as its own grail item', async () => {
+      // Arrange
+      const amulet = D2SItemBuilder.new().withId(1).withUniqueName('Crescent Moon').build();
+      const runeword = D2SItemBuilder.new()
+        .withId(2)
+        .asRuneword()
+        .withRunewordName('Crescent Moon')
+        .build();
+
+      // Act
+      const grailIds = await detectGrailIds([amulet, runeword]);
+
+      // Assert
+      expect(grailIds.sort()).toEqual(['crescentmoon-amulet', 'crescentmoon-runeword']);
+    });
+
+    it('If a unique is not a grail item, Then nothing is detected', async () => {
+      // Arrange
+      const item = D2SItemBuilder.new().withUniqueName('Not A Real Unique').build();
+
+      // Act
+      const grailIds = await detectGrailIds([item]);
+
+      // Assert
+      expect(grailIds).toEqual([]);
     });
   });
 });

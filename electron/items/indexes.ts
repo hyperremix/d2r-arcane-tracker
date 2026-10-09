@@ -3,7 +3,8 @@ import { simplifyItemName } from '../utils/objects';
 import { items } from './index';
 
 /**
- * Read-only indexes for efficient item lookups
+ * Read-only indexes for efficient item lookups.
+ * `itemsByNameSimple` holds every non-runeword item (uniques, sets and runes) by simplified name.
  */
 export const itemsByNameSimple: Record<string, Item> = {};
 export const runesByCode: Record<string, Item> = {};
@@ -11,17 +12,18 @@ export const runewordsByNameSimple: Record<string, Item> = {};
 
 // Build indexes at module load time
 for (const item of items) {
-  // Index by simplified name
   const simpleName = simplifyItemName(item.name);
-  itemsByNameSimple[simpleName] = item;
 
   // Index runes by code
   if (item.type === 'rune' && item.code) {
     runesByCode[item.code] = item;
   }
 
-  // Index runewords by simplified name
+  // Runewords get their own index so a runeword never shadows a unique of the same name
+  // (e.g. the Crescent Moon runeword and the Crescent Moon unique amulet)
   if (item.type === 'runeword') {
     runewordsByNameSimple[simpleName] = item;
+  } else {
+    itemsByNameSimple[simpleName] = item;
   }
 }

@@ -11,7 +11,6 @@ import {
   mapItemQuality,
   normalizeInventoryItem,
   normalizeItemsWithSocketedItems,
-  resolveDetectionName,
   resolveGrailLookupName,
   resolveParsedItemName,
   resolveSocketCount,
@@ -41,18 +40,21 @@ const toParsedItems = (d2sItems: D2SItem[]): ParsedInventoryItem[] =>
 const resolveDetectedType = (item: D2SItem): string =>
   toDetectedItem(toParsedItems([item])[0], saveFile).type;
 
+const resolveDetectedName = (item: D2SItem): string =>
+  toDetectedItem(toParsedItems([item])[0], saveFile).name;
+
 const detectionKeys = (items: ParsedInventoryItem[]) =>
   selectDetectionCandidates(items).map(
-    (item) => `${resolveDetectionName(item.rawParsedItem)}${item.ethereal ? '+eth' : ''}`,
+    (item) => `${resolveGrailLookupName(item.rawParsedItem)}${item.ethereal ? '+eth' : ''}`,
   );
 
-describe('When resolveDetectionName is called', () => {
+describe('When the detected item name is resolved', () => {
   it('Then should return simplified unique item name', () => {
     // Arrange
     const uniqueItem: D2SItem = D2SItemBuilder.new().withUniqueName('Shako').build();
 
     // Act
-    const result = resolveDetectionName(uniqueItem);
+    const result = resolveDetectedName(uniqueItem);
 
     // Assert
     expect(result).toBe('shako');
@@ -63,7 +65,7 @@ describe('When resolveDetectionName is called', () => {
     const setItem: D2SItem = D2SItemBuilder.new().withSetName('Angelic Raiment').build();
 
     // Act
-    const result = resolveDetectionName(setItem);
+    const result = resolveDetectedName(setItem);
 
     // Assert
     expect(result).toBe('angelicraiment');
@@ -75,7 +77,7 @@ describe('When resolveDetectionName is called', () => {
     const rareItem: D2SItem = D2SItemBuilder.new().withRareName('Rare Sword').build();
 
     // Act
-    const result = resolveDetectionName(rareItem);
+    const result = resolveDetectedName(rareItem);
 
     // Assert - rare_name is ignored, falls through to item.name fallback
     expect(result).toBe('Default Item');
@@ -86,7 +88,7 @@ describe('When resolveDetectionName is called', () => {
     const runeItem: D2SItem = D2SItemBuilder.new().asRune('r30').build(); // Ber rune
 
     // Act
-    const result = resolveDetectionName(runeItem);
+    const result = resolveDetectedName(runeItem);
 
     // Assert
     expect(result).toBe('ber');
@@ -101,7 +103,7 @@ describe('When resolveDetectionName is called', () => {
     const runeItem: D2SItem = { ...D2SItemBuilder.new().asRune('r30').build(), type };
 
     // Act
-    const result = resolveDetectionName(runeItem);
+    const result = resolveDetectedName(runeItem);
 
     // Assert
     expect(result).toBe('ber');
@@ -113,10 +115,21 @@ describe('When resolveDetectionName is called', () => {
     const runewordItem: D2SItem = D2SItemBuilder.new().withRunewordName('Enigma').build();
 
     // Act
-    const result = resolveDetectionName(runewordItem);
+    const result = resolveDetectedName(runewordItem);
 
     // Assert
     expect(result).toBe('enigma');
+  });
+
+  it('If the runeword name is the d2s "Love" bug, Then the name is the Lore grail id', () => {
+    // Arrange
+    const runewordItem: D2SItem = D2SItemBuilder.new().withRunewordName('Love').build();
+
+    // Act
+    const result = resolveDetectedName(runewordItem);
+
+    // Assert
+    expect(result).toBe('lore');
   });
 
   it('Then should process rainbow facet correctly', () => {
@@ -124,7 +137,7 @@ describe('When resolveDetectionName is called', () => {
     const rainbowFacetItem: D2SItem = D2SItemBuilder.new().asRainbowFacet().build();
 
     // Act
-    const result = resolveDetectionName(rainbowFacetItem);
+    const result = resolveDetectedName(rainbowFacetItem);
 
     // Assert
     expect(result).toBe('rainbowfacetcolddeath');
@@ -135,7 +148,7 @@ describe('When resolveDetectionName is called', () => {
     const fallbackItem: D2SItem = D2SItemBuilder.new().withName('Generic Item').build();
 
     // Act
-    const result = resolveDetectionName(fallbackItem);
+    const result = resolveDetectedName(fallbackItem);
 
     // Assert
     expect(result).toBe('Generic Item');
