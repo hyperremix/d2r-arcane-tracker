@@ -6,9 +6,12 @@
 
 const KNOWN_IMAGE_EXTENSION_PATTERN = /\.(png|sprite|dc6|dds|jpg|jpeg|webp)$/i;
 
-/** Last segment of a path, splitting on both POSIX (`/`) and Windows (`\`) separators. */
+/**
+ * Last segment of a path, splitting on both POSIX (`/`) and Windows (`\`) separators. Trailing
+ * separators are ignored (`a/` gives `a`), matching `node:path` `basename`.
+ */
 export function getPathBasename(input: string): string {
-  const segments = input.split(/[\\/]/);
+  const segments = input.replace(/[\\/]+$/, '').split(/[\\/]/);
   return segments[segments.length - 1] ?? input;
 }
 

@@ -11,6 +11,12 @@ describe('When getPathBasename is called', () => {
     ['a POSIX path', 'items/armor/invhlm.png', 'invhlm.png'],
     ['a Windows path', 'C:\\items\\invhlm.dc6', 'invhlm.dc6'],
     ['a bare filename', 'invhlm', 'invhlm'],
+    ['a path with a trailing POSIX separator', 'dir/file.png/', 'file.png'],
+    ['a path with a trailing Windows separator', 'items\\armor\\', 'armor'],
+    ['a name with several trailing separators', 'a//', 'a'],
+    ['a single trailing separator', 'a/', 'a'],
+    ['only a separator', '/', ''],
+    ['an empty string', '', ''],
   ])('If the input is %s', (_label, input, expected) => {
     it('Then the last path segment is returned', () => {
       // Arrange / Act
