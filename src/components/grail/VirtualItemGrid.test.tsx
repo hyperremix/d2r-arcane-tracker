@@ -1,4 +1,4 @@
-import { act, render, renderHook, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import type { Character, GrailProgress, Item } from 'electron/types/grail';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
@@ -6,7 +6,6 @@ import {
   createGridRows,
   getColumnCount,
   MIN_COLUMN_WIDTH,
-  useElementColumnCount,
   VirtualItemGrid,
 } from './VirtualItemGrid';
 
@@ -737,21 +736,6 @@ describe('When VirtualItemGrid renders a group with far more items than fit into
       } else {
         expect(screen.queryByText('Unique Armor')).not.toBeInTheDocument();
       }
-    });
-  });
-});
-
-describe('When useElementColumnCount is used', () => {
-  describe('If the ref is not attached to an element', () => {
-    it('Then keeps the single-column fallback', () => {
-      // Arrange
-      const detachedRef = { current: null };
-
-      // Act
-      const { result } = renderHook(() => useElementColumnCount(detachedRef));
-
-      // Assert
-      expect(result.current).toBe(1);
     });
   });
 });

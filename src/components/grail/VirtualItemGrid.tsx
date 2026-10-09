@@ -152,14 +152,16 @@ export function createGridRows(
 }
 
 /**
- * Tracks how many grid columns fit into the element's width, updating on resize.
+ * Tracks how many grid columns fit into an element's width, updating on resize.
+ * Returns a callback ref to attach to the measured element and the current column count.
+ * The element is kept in state, so measuring starts once it is attached (still before the first paint).
  * Only the column count is stored, so resizes that keep the same count do not re-render.
  */
-export function useElementColumnCount(elementRef: React.RefObject<HTMLDivElement | null>): number {
+function useElementColumnCount(): [(element: HTMLDivElement | null) => void, number] {
+  const [element, setElement] = useState<HTMLDivElement | null>(null);
   const [columnCount, setColumnCount] = useState(1);
 
   useLayoutEffect(() => {
-    const element = elementRef.current;
     if (!element) return;
 
     const update = () => setColumnCount(getColumnCount(element.clientWidth));
@@ -169,9 +171,9 @@ export function useElementColumnCount(elementRef: React.RefObject<HTMLDivElement
     const observer = new ResizeObserver(update);
     observer.observe(element);
     return () => observer.disconnect();
-  }, [elementRef]);
+  }, [element]);
 
-  return columnCount;
+  return [setElement, columnCount];
 }
 
 interface VirtualItemGridProps {
@@ -198,8 +200,7 @@ export const VirtualItemGrid = memo(function VirtualItemGrid({
   onItemClick,
 }: VirtualItemGridProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
-  const contentRef = useRef<HTMLDivElement>(null);
-  const columnCount = useElementColumnCount(contentRef);
+  const [contentRef, columnCount] = useElementColumnCount();
 
   const rows = useMemo(
     () => createGridRows(groupedItems, columnCount, showGroupHeaders),
