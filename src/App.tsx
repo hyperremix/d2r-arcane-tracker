@@ -8,7 +8,6 @@ import { Toaster } from '@/components/ui/sonner';
 import { SetupWizard } from '@/components/wizard/SetupWizard';
 import { translations } from '@/i18n/translations';
 
-import { useIconPreloader } from './hooks/useItemIcon';
 import { useServiceErrorNotifications } from './hooks/useServiceErrorNotifications';
 import { useSettingsLanguage } from './hooks/useSettingsLanguage';
 import { useTheme } from './hooks/useTheme';
@@ -38,9 +37,6 @@ function App(): JSX.Element {
   // Apply theme and language based on user settings
   useTheme();
   useSettingsLanguage();
-
-  // Preload popular item icons
-  useIconPreloader();
 
   // Listen for automatic update notifications
   useUpdateNotifications();

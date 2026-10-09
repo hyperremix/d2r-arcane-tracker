@@ -1,6 +1,7 @@
 import { renderHook, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { clearIconCache, useIconsByFilename } from './useIconsByFilename';
+import { clearIconCache, forgetMissingIcons } from '@/lib/iconLoader';
+import { useIconsByFilename } from './useIconsByFilename';
 
 const windowGlobals = window as unknown as { electronAPI: unknown };
 const originalElectronAPI = windowGlobals.electronAPI;
@@ -83,14 +84,30 @@ describe('When icons are loaded by filename', () => {
   });
 
   describe('If an icon does not exist yet', () => {
-    it('Then it is requested again by a later component, since sprites may have been converted since', async () => {
+    it('Then a later component does not request it again', async () => {
       // Arrange
-      getByFilename.mockResolvedValueOnce(null).mockResolvedValueOnce('data:ber');
+      getByFilename.mockResolvedValue(null);
       const first = renderHook(() => useIconsByFilename(['ber.png']));
       await waitFor(() => expect(first.result.current.isLoading).toBe(false));
       expect(first.result.current.icons.size).toBe(0);
 
       // Act
+      const { result } = renderHook(() => useIconsByFilename(['ber.png']));
+
+      // Assert
+      expect(result.current.isLoading).toBe(false);
+      expect(result.current.icons.size).toBe(0);
+      expect(getByFilename).toHaveBeenCalledTimes(1);
+    });
+
+    it('Then it is requested again once the sprites have been converted', async () => {
+      // Arrange
+      getByFilename.mockResolvedValueOnce(null).mockResolvedValueOnce('data:ber');
+      const first = renderHook(() => useIconsByFilename(['ber.png']));
+      await waitFor(() => expect(first.result.current.isLoading).toBe(false));
+
+      // Act
+      forgetMissingIcons();
       const { result } = renderHook(() => useIconsByFilename(['ber.png']));
 
       // Assert

@@ -2,7 +2,7 @@ import '@testing-library/jest-dom/vitest';
 import { cleanup } from '@testing-library/react';
 import Database from 'better-sqlite3';
 import { afterEach } from 'vitest';
-import { clearIconCache } from '../hooks/useIconsByFilename';
+import { clearIconCache } from '../lib/iconLoader';
 // The production i18n setup, so t() returns real English strings
 import '../i18n';
 

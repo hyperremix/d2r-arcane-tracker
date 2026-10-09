@@ -21,7 +21,6 @@ vi.mock('@/components/ui/sonner', () => ({
   Toaster: () => <div data-testid="toaster" />,
 }));
 
-vi.mock('./hooks/useItemIcon', () => ({ useIconPreloader: vi.fn() }));
 vi.mock('./hooks/useServiceErrorNotifications', () => ({
   useServiceErrorNotifications: vi.fn(),
 }));

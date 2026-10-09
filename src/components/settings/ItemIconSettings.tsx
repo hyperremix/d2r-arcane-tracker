@@ -19,6 +19,7 @@ import { Label } from '@/components/ui/label';
 import { Progress } from '@/components/ui/progress';
 import { Switch } from '@/components/ui/switch';
 import { translations } from '@/i18n/translations';
+import { forgetMissingIcons } from '@/lib/iconLoader';
 import { onMainEvent } from '@/lib/ipcEvents';
 import { useGrailStore } from '@/stores/grailStore';
 
@@ -79,6 +80,8 @@ export function ItemIconSettings() {
 
     try {
       const result = await window.electronAPI?.icon.convertSprites();
+      // Icons that were missing before may exist now
+      forgetMissingIcons();
       setConversionResult(result || null);
     } catch (error) {
       console.error('Sprite conversion failed:', error);
