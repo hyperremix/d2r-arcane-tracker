@@ -30,7 +30,7 @@ describe('When buildGameItemTooltipModel is called', () => {
       // Act
       const result = buildGameItemTooltipModel({
         rawItemJson,
-        fallbackName: 'fallback-name',
+        itemName: 'Bonesnap',
         quality: 'unique',
         type: 'unique',
         t,
@@ -55,37 +55,45 @@ describe('When buildGameItemTooltipModel is called', () => {
     });
   });
 
-  describe('If runeword and unique names both exist', () => {
-    it('Then runeword_name is prioritized as the header', () => {
+  describe('If the raw runeword name is the d2s "Love" bug', () => {
+    it('Then the item name resolved by the main process (Lore) is the title', () => {
       // Arrange
       const rawItemJson = JSON.stringify({
-        runeword_name: 'Enigma',
-        unique_name: 'Shako',
-        displayed_combined_magic_attributes: [{ description: '+2 To All Skills', visible: true }],
+        runeword_name: 'Love',
+        type_name: 'Cap',
+        displayed_combined_magic_attributes: [{ description: '+1 To All Skills', visible: true }],
       });
 
       // Act
       const result = buildGameItemTooltipModel({
         rawItemJson,
-        fallbackName: 'fallback-name',
-        quality: 'crafted',
+        itemName: 'Lore',
+        quality: 'normal',
         type: 'runeword',
         t,
       });
 
       // Assert
-      expect(result?.name).toBe('Enigma');
+      expect(result?.name).toBe('Lore');
+      expect(result?.baseTypeLine).toBe('Cap');
+      expect(result?.isRuneword).toBe(true);
     });
   });
 
-  describe('If raw magic item fields include prefix and suffix names', () => {
-    it('Then the generated magic display name is used instead of raw base name', () => {
+  describe('If the item is magic or rare', () => {
+    it.each([
+      [
+        'magic',
+        { magic_prefix_name: 'Viper', magic_suffix_name: 'of the Fox' },
+        'Viper Ring of the Fox',
+      ],
+      ['rare', { rare_name: 'Stone', rare_name2: 'Master' }, 'Stone Master'],
+    ])('Then the %s item name is the title and the base type is its own line', (quality, nameFields, itemName) => {
       // Arrange
       const rawItemJson = JSON.stringify({
         name: 'Ring',
         type_name: 'Ring',
-        magic_prefix_name: 'Viper',
-        magic_suffix_name: 'of the Fox',
+        ...nameFields,
         displayed_combined_magic_attributes: [
           { description: '+80 to Attack Rating', visible: true },
         ],
@@ -94,42 +102,14 @@ describe('When buildGameItemTooltipModel is called', () => {
       // Act
       const result = buildGameItemTooltipModel({
         rawItemJson,
-        fallbackName: 'Ring',
-        quality: 'magic',
-        type: 'magic',
+        itemName,
+        quality,
+        type: quality,
         t,
       });
 
       // Assert
-      expect(result?.name).toBe('Viper Ring of the Fox');
-      expect(result?.baseTypeLine).toBe('Ring');
-    });
-  });
-
-  describe('If raw rare item fields include rare name parts', () => {
-    it('Then the generated rare display name is used instead of raw base name', () => {
-      // Arrange
-      const rawItemJson = JSON.stringify({
-        name: 'Ring',
-        type_name: 'Ring',
-        rare_name: 'Stone',
-        rare_name2: 'Master',
-        displayed_combined_magic_attributes: [
-          { description: '+24% Better Chance of Magic Items', visible: true },
-        ],
-      });
-
-      // Act
-      const result = buildGameItemTooltipModel({
-        rawItemJson,
-        fallbackName: 'Ring',
-        quality: 'rare',
-        type: 'rare',
-        t,
-      });
-
-      // Assert
-      expect(result?.name).toBe('Stone Master');
+      expect(result?.name).toBe(itemName);
       expect(result?.baseTypeLine).toBe('Ring');
     });
   });
@@ -148,7 +128,7 @@ describe('When buildGameItemTooltipModel is called', () => {
       // Act
       const result = buildGameItemTooltipModel({
         rawItemJson,
-        fallbackName: 'fallback-name',
+        itemName: 'fallback-name',
         quality: 'magic',
         type: 'magic',
         t,
@@ -167,7 +147,7 @@ describe('When buildGameItemTooltipModel is called', () => {
       // Act
       const result = buildGameItemTooltipModel({
         rawItemJson,
-        fallbackName: 'fallback-name',
+        itemName: 'fallback-name',
         quality: 'unique',
         type: 'unique',
         t,
@@ -186,7 +166,7 @@ describe('When buildGameItemTooltipModel is called', () => {
       // Act
       const result = buildGameItemTooltipModel({
         rawItemJson,
-        fallbackName: 'fallback-name',
+        itemName: 'fallback-name',
         quality: 'unique',
         type: 'unique',
         t,
@@ -220,7 +200,7 @@ describe('When buildGameItemTooltipModel is called', () => {
       // Act
       const result = buildGameItemTooltipModel({
         rawItemJson,
-        fallbackName: 'fallback-name',
+        itemName: 'fallback-name',
         quality: 'magic',
         type: 'magic',
         t,
@@ -251,7 +231,7 @@ describe('When buildGameItemTooltipModel is called', () => {
       // Act
       const result = buildGameItemTooltipModel({
         rawItemJson,
-        fallbackName: 'fallback-name',
+        itemName: 'fallback-name',
         quality: 'normal',
         type: 'normal',
         t,
@@ -274,7 +254,7 @@ describe('When buildGameItemTooltipModel is called', () => {
       // Act
       const result = buildGameItemTooltipModel({
         rawItemJson,
-        fallbackName: 'flaweddiamond',
+        itemName: 'flaweddiamond',
         quality: 'normal',
         type: 'normal',
         t,
@@ -301,7 +281,7 @@ describe('When buildGameItemTooltipModel is called', () => {
       // Act
       const result = buildGameItemTooltipModel({
         rawItemJson,
-        fallbackName: 'fallback-name',
+        itemName: 'fallback-name',
         quality: 'normal',
         type: 'normal',
         t,
@@ -336,7 +316,7 @@ describe('When buildGameItemTooltipModel is called', () => {
       // Act
       const result = buildGameItemTooltipModel({
         rawItemJson,
-        fallbackName: 'fallback-name',
+        itemName: 'fallback-name',
         quality: 'runeword',
         type: 'runeword',
         t,
