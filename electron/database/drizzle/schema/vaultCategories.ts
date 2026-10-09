@@ -1,3 +1,4 @@
+import { sql } from 'drizzle-orm';
 import { sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
 
 export const vaultCategories = sqliteTable(
@@ -7,8 +8,8 @@ export const vaultCategories = sqliteTable(
     name: text('name').notNull(),
     color: text('color'),
     metadata: text('metadata'),
-    createdAt: text('created_at').default('CURRENT_TIMESTAMP'),
-    updatedAt: text('updated_at').default('CURRENT_TIMESTAMP'),
+    createdAt: text('created_at').default(sql`CURRENT_TIMESTAMP`),
+    updatedAt: text('updated_at').default(sql`CURRENT_TIMESTAMP`),
   },
   (table) => [uniqueIndex('idx_vault_categories_name').on(table.name)],
 );

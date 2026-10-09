@@ -1,3 +1,4 @@
+import { sql } from 'drizzle-orm';
 import { index, integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 import type { CharacterClass } from '../../../types/grail';
 
@@ -25,8 +26,8 @@ export const characters = sqliteTable(
     expansion: integer('expansion', { mode: 'boolean' }).notNull().default(true),
     saveFilePath: text('save_file_path'),
     deletedAt: text('deleted_at'),
-    createdAt: text('created_at').default('CURRENT_TIMESTAMP'),
-    updatedAt: text('updated_at').default('CURRENT_TIMESTAMP'),
+    createdAt: text('created_at').default(sql`CURRENT_TIMESTAMP`),
+    updatedAt: text('updated_at').default(sql`CURRENT_TIMESTAMP`),
   },
   (table) => [
     index('idx_characters_class').on(table.characterClass),

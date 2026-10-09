@@ -1,3 +1,4 @@
+import { sql } from 'drizzle-orm';
 import { index, integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 import type { Difficulty } from '../../../types/grail';
 import { items } from './items';
@@ -17,8 +18,8 @@ export const grailProgress = sqliteTable(
     notes: text('notes'),
     isEthereal: integer('is_ethereal', { mode: 'boolean' }).notNull().default(false),
     fromInitialScan: integer('from_initial_scan', { mode: 'boolean' }).notNull().default(false),
-    createdAt: text('created_at').default('CURRENT_TIMESTAMP'),
-    updatedAt: text('updated_at').default('CURRENT_TIMESTAMP'),
+    createdAt: text('created_at').default(sql`CURRENT_TIMESTAMP`),
+    updatedAt: text('updated_at').default(sql`CURRENT_TIMESTAMP`),
   },
   (table) => [
     index('idx_grail_progress_character').on(table.characterId),

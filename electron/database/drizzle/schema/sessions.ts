@@ -1,3 +1,4 @@
+import { sql } from 'drizzle-orm';
 import { index, integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 
 export const sessions = sqliteTable(
@@ -11,8 +12,8 @@ export const sessions = sqliteTable(
     runCount: integer('run_count').default(0),
     archived: integer('archived', { mode: 'boolean' }).default(false),
     notes: text('notes'),
-    createdAt: text('created_at').default('CURRENT_TIMESTAMP'),
-    updatedAt: text('updated_at').default('CURRENT_TIMESTAMP'),
+    createdAt: text('created_at').default(sql`CURRENT_TIMESTAMP`),
+    updatedAt: text('updated_at').default(sql`CURRENT_TIMESTAMP`),
   },
   (table) => [
     index('idx_sessions_start_time').on(table.startTime),

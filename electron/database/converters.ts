@@ -29,6 +29,28 @@ export function fromISOString(dateStr: string | null | undefined): Date | undefi
   return new Date(dateStr);
 }
 
+// SQLite's CURRENT_TIMESTAMP format: UTC without a timezone designator.
+const SQLITE_DATETIME_PATTERN = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}(\.\d+)?$/;
+
+/**
+ * Parses a created_at/updated_at column value.
+ * SQLite `CURRENT_TIMESTAMP` values are UTC, so they are parsed as UTC instead of local time.
+ * Missing or unparseable values (such as the literal text 'CURRENT_TIMESTAMP' written by
+ * older versions) fall back to the current time, so callers never receive an Invalid Date.
+ * @param value - The stored timestamp text
+ * @returns A valid Date
+ */
+export function fromDbTimestamp(value: string | null | undefined): Date {
+  if (value) {
+    const normalized = SQLITE_DATETIME_PATTERN.test(value) ? `${value.replace(' ', 'T')}Z` : value;
+    const parsed = new Date(normalized);
+    if (!Number.isNaN(parsed.getTime())) {
+      return parsed;
+    }
+  }
+  return new Date();
+}
+
 // App to Database type mappers
 export function itemToDbValues(item: Item) {
   return {
@@ -85,8 +107,8 @@ export function dbCharacterToCharacter(dbChar: DbCharacter): Character {
     hardcore: dbChar.hardcore,
     expansion: dbChar.expansion,
     saveFilePath: dbChar.saveFilePath ?? undefined,
-    lastUpdated: new Date(dbChar.updatedAt ?? new Date().toISOString()),
-    created: new Date(dbChar.createdAt ?? new Date().toISOString()),
+    lastUpdated: fromDbTimestamp(dbChar.updatedAt),
+    created: fromDbTimestamp(dbChar.createdAt),
     deleted: dbChar.deletedAt ? new Date(dbChar.deletedAt) : undefined,
   };
 }
@@ -112,8 +134,8 @@ export function dbSaveFileStateToSaveFileState(dbState: DbSaveFileState): SaveFi
     filePath: dbState.filePath,
     lastModified: new Date(dbState.lastModified),
     lastParsed: new Date(dbState.lastParsed),
-    created: new Date(dbState.createdAt ?? new Date().toISOString()),
-    updated: new Date(dbState.updatedAt ?? new Date().toISOString()),
+    created: fromDbTimestamp(dbState.createdAt),
+    updated: fromDbTimestamp(dbState.updatedAt),
   };
 }
 
@@ -127,8 +149,8 @@ export function dbSessionToSession(dbSession: DbSession): Session {
     runCount: dbSession.runCount ?? 0,
     archived: dbSession.archived ?? false,
     notes: dbSession.notes ?? undefined,
-    created: new Date(dbSession.createdAt ?? new Date().toISOString()),
-    lastUpdated: new Date(dbSession.updatedAt ?? new Date().toISOString()),
+    created: fromDbTimestamp(dbSession.createdAt),
+    lastUpdated: fromDbTimestamp(dbSession.updatedAt),
   };
 }
 
@@ -141,8 +163,8 @@ export function dbRunToRun(dbRun: DbRun): Run {
     startTime: new Date(dbRun.startTime),
     endTime: fromISOString(dbRun.endTime),
     duration: dbRun.duration ?? undefined,
-    created: new Date(dbRun.createdAt ?? new Date().toISOString()),
-    lastUpdated: new Date(dbRun.updatedAt ?? new Date().toISOString()),
+    created: fromDbTimestamp(dbRun.createdAt),
+    lastUpdated: fromDbTimestamp(dbRun.updatedAt),
   };
 }
 
@@ -153,7 +175,7 @@ export function dbRunItemToRunItem(dbRunItem: DbRunItem): RunItem {
     grailProgressId: dbRunItem.grailProgressId ?? undefined,
     name: dbRunItem.name ?? undefined,
     foundTime: new Date(dbRunItem.foundTime),
-    created: new Date(dbRunItem.createdAt ?? new Date().toISOString()),
+    created: fromDbTimestamp(dbRunItem.createdAt),
   };
 }
 
@@ -192,7 +214,7 @@ export function dbVaultItemToVaultItem(dbItem: DbVaultItem): VaultItem {
     lastSeenAt: fromISOString(dbItem.lastSeenAt),
     vaultedAt: fromISOString(dbItem.vaultedAt),
     unvaultedAt: fromISOString(dbItem.unvaultedAt),
-    created: new Date(dbItem.createdAt ?? new Date().toISOString()),
-    lastUpdated: new Date(dbItem.updatedAt ?? new Date().toISOString()),
+    created: fromDbTimestamp(dbItem.createdAt),
+    lastUpdated: fromDbTimestamp(dbItem.updatedAt),
   };
 }

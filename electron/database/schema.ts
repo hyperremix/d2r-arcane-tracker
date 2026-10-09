@@ -319,6 +319,9 @@ export function createSchema(ctx: DatabaseContext): void {
   ensureVaultItemSpatialColumns(ctx);
   ensureVaultItemStackCountColumn(ctx);
 
+  // Data repair for rows written while drizzle stored the literal text 'CURRENT_TIMESTAMP'
+  repairLiteralTimestamps(ctx);
+
   // Ensure wizard settings exist for existing databases
   ensureWizardSettings(ctx);
 
@@ -566,6 +569,109 @@ function ensureVaultItemStackCountColumn(ctx: DatabaseContext): void {
   if (!columnNames.has('stack_count')) {
     ctx.rawDb.exec('ALTER TABLE vault_items ADD COLUMN stack_count INTEGER NOT NULL DEFAULT 1');
   }
+}
+
+// ---------------------------------------------------------------------------
+// Literal 'CURRENT_TIMESTAMP' repair (idempotent data repair, runs on every startup).
+// The drizzle schema used `.default('CURRENT_TIMESTAMP')`, which drizzle binds as a string
+// parameter, so rows inserted through drizzle stored that text instead of a timestamp.
+// ---------------------------------------------------------------------------
+
+const LITERAL_TIMESTAMP = 'CURRENT_TIMESTAMP';
+
+interface TimestampRepairTarget {
+  readonly table: string;
+  readonly hasCreatedAt: boolean;
+  readonly hasUpdatedAt: boolean;
+  /** Columns tried, in order, before updated_at when repairing created_at. */
+  readonly createdAtSources?: readonly string[];
+}
+
+const timestampRepairTargets: readonly TimestampRepairTarget[] = [
+  { table: 'items', hasCreatedAt: true, hasUpdatedAt: true },
+  { table: 'characters', hasCreatedAt: true, hasUpdatedAt: true },
+  { table: 'grail_progress', hasCreatedAt: true, hasUpdatedAt: true },
+  { table: 'settings', hasCreatedAt: false, hasUpdatedAt: true },
+  { table: 'save_file_states', hasCreatedAt: true, hasUpdatedAt: true },
+  { table: 'sessions', hasCreatedAt: true, hasUpdatedAt: true, createdAtSources: ['start_time'] },
+  { table: 'runs', hasCreatedAt: true, hasUpdatedAt: true, createdAtSources: ['start_time'] },
+  { table: 'run_items', hasCreatedAt: true, hasUpdatedAt: false, createdAtSources: ['found_time'] },
+  { table: 'vault_categories', hasCreatedAt: true, hasUpdatedAt: true },
+  { table: 'vault_items', hasCreatedAt: true, hasUpdatedAt: true },
+  { table: 'vault_item_categories', hasCreatedAt: true, hasUpdatedAt: false },
+];
+
+function getTimestampColumns(target: TimestampRepairTarget): string[] {
+  const columns: string[] = [];
+  if (target.hasCreatedAt) columns.push('created_at');
+  if (target.hasUpdatedAt) columns.push('updated_at');
+  return columns;
+}
+
+function needsTimestampRepair(ctx: DatabaseContext, target: TimestampRepairTarget): boolean {
+  const columns = getTimestampColumns(target);
+  const condition = columns.map((column) => `${column} = ?`).join(' OR ');
+  const row = ctx.rawDb
+    .prepare(`SELECT 1 FROM ${target.table} WHERE ${condition} LIMIT 1`)
+    .get(...columns.map(() => LITERAL_TIMESTAMP));
+  return row !== undefined;
+}
+
+function repairTableTimestamps(ctx: DatabaseContext, target: TimestampRepairTarget): void {
+  // created_at is repaired first so updated_at can fall back to it. datetime() normalizes ISO
+  // values to SQLite's CURRENT_TIMESTAMP format and returns NULL for unparseable text.
+  if (target.hasCreatedAt) {
+    const sources = [
+      ...(target.createdAtSources ?? []),
+      ...(target.hasUpdatedAt ? ['updated_at'] : []),
+    ].map((column) => `datetime(${column})`);
+    const value = `COALESCE(${[...sources, 'CURRENT_TIMESTAMP'].join(', ')})`;
+    ctx.rawDb
+      .prepare(`UPDATE ${target.table} SET created_at = ${value} WHERE created_at = ?`)
+      .run(LITERAL_TIMESTAMP);
+  }
+  if (target.hasUpdatedAt) {
+    const sources = [...(target.hasCreatedAt ? ['datetime(created_at)'] : []), 'CURRENT_TIMESTAMP'];
+    ctx.rawDb
+      .prepare(
+        `UPDATE ${target.table} SET updated_at = COALESCE(${sources.join(', ')}) WHERE updated_at = ?`,
+      )
+      .run(LITERAL_TIMESTAMP);
+  }
+}
+
+/**
+ * Replaces the literal text 'CURRENT_TIMESTAMP' in created_at/updated_at columns with real
+ * timestamps. The table's triggers are dropped while repairing (and recreated from their stored
+ * definitions in the same transaction) so the update-timestamp triggers don't reset every valid
+ * updated_at to "now". Idempotent: does nothing once no literal values remain.
+ * @param ctx - Database context
+ */
+export function repairLiteralTimestamps(ctx: DatabaseContext): void {
+  const targets = timestampRepairTargets.filter((target) => needsTimestampRepair(ctx, target));
+  if (targets.length === 0) {
+    return;
+  }
+
+  const repair = ctx.rawDb.transaction(() => {
+    for (const target of targets) {
+      const triggers = ctx.rawDb
+        .prepare("SELECT name, sql FROM sqlite_master WHERE type = 'trigger' AND tbl_name = ?")
+        .all(target.table) as Array<{ name: string; sql: string }>;
+      for (const trigger of triggers) {
+        ctx.rawDb.exec(`DROP TRIGGER "${trigger.name}"`);
+      }
+      repairTableTimestamps(ctx, target);
+      for (const trigger of triggers) {
+        ctx.rawDb.exec(trigger.sql);
+      }
+    }
+  });
+  repair();
+
+  console.log(
+    `[Database] Repaired literal CURRENT_TIMESTAMP values in: ${targets.map((target) => target.table).join(', ')}`,
+  );
 }
 
 function migrateRunTrackerAutoStart(ctx: DatabaseContext): void {
