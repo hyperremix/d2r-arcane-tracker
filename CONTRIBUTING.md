@@ -10,11 +10,10 @@ You need [Bun](https://bun.sh) 1.3.8 (pinned in `package.json`), Node.js 22.12 o
 git clone https://github.com/<you>/d2r-arcane-tracker.git
 cd d2r-arcane-tracker
 bun install
-bun run rebuild   # compile native modules (better-sqlite3) for Electron
 bun run dev       # start Vite and Electron
 ```
 
-`better-sqlite3` ships Node-API prebuilds that load in both Node (tests) and Electron, so a rebuild is rarely needed. If you still see `NODE_MODULE_VERSION` errors after upgrading Electron, run `bun run rebuild` again.
+The native modules (`better-sqlite3` and `koffi`) ship Node-API prebuilds that load in both Node (tests) and any Electron version, so no manual native rebuild or C++ toolchain is needed and `NODE_MODULE_VERSION` mismatches do not occur. The `rebuild` scripts that `bun run dev` and the test scripts still call are kept for now. For how the native modules are packaged, see [docs/RELEASE.md](docs/RELEASE.md).
 
 For attaching a debugger, see [docs/DEBUGGING.md](docs/DEBUGGING.md).
 
