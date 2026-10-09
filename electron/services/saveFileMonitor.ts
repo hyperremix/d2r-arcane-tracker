@@ -1581,10 +1581,27 @@ class SaveFileMonitor {
 
   /**
    * Periodic tick reader that checks for file changes and re-parses if needed.
+   * Never rejects: an unexpected error fails a pending forced parse instead of leaving
+   * `refreshSaveFiles` waiting.
    * @private
    * @returns {Promise<void>} A promise that resolves when the tick is complete.
    */
   private tickReader = async (): Promise<void> => {
+    try {
+      await this.checkForFileChanges();
+    } catch (error) {
+      log.error('tickReader', error);
+      const request = this.pendingForcedParse;
+      this.pendingForcedParse = undefined;
+      request?.reject(error);
+    }
+  };
+
+  /**
+   * Decides whether the save directories must be parsed on this tick and parses them if so.
+   * @private
+   */
+  private async checkForFileChanges(): Promise<void> {
     // Log periodic heartbeat every 20 ticks (10 seconds)
     if (!this.tickReaderCount) {
       this.tickReaderCount = 0;
@@ -1660,7 +1677,7 @@ class SaveFileMonitor {
       `Debounce period elapsed (${timeSinceLastChange}ms), processing file changes...`,
     );
     await this.processFileChanges();
-  };
+  }
 
   /**
    * Parses the save directories for the tick reader, taking a pending forced parse request along.

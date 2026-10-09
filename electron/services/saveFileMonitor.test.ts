@@ -919,6 +919,23 @@ describe('When SaveFileMonitor is used', () => {
       });
     });
 
+    describe('If reading the settings fails before the parse starts', () => {
+      it('Then the refresh rejects instead of waiting forever', async () => {
+        // Arrange
+        startWatching(monitor);
+        mockDatabase.getAllSettings.mockImplementation(() => {
+          throw new Error('database is locked');
+        });
+
+        // Act
+        const refresh = monitor.refreshSaveFiles();
+
+        // Assert
+        await expect(refresh).rejects.toThrow('database is locked');
+        expect((monitor as any).pendingForcedParse).toBeUndefined();
+      });
+    });
+
     describe('If a refresh is requested while files are already being read', () => {
       it('Then the refresh waits for its own forced parse after the running one', async () => {
         // Arrange
