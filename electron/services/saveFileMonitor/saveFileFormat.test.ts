@@ -17,20 +17,33 @@ const LAST_MODIFIED = new Date('2024-05-01T10:00:00.000Z');
 
 describe('When a character class id is mapped', () => {
   it('Then should return correct character class for valid ID', () => {
-    // Act & Assert
-    expect(getCharacterClass(0)).toBe('amazon');
-    expect(getCharacterClass(1)).toBe('sorceress');
-    expect(getCharacterClass(2)).toBe('necromancer');
-    expect(getCharacterClass(3)).toBe('paladin');
-    expect(getCharacterClass(4)).toBe('barbarian');
-    expect(getCharacterClass(5)).toBe('druid');
-    expect(getCharacterClass(6)).toBe('assassin');
+    // Arrange
+    const classIds = [0, 1, 2, 3, 4, 5, 6];
+
+    // Act
+    const classes = classIds.map((id) => getCharacterClass(id));
+
+    // Assert
+    expect(classes).toEqual([
+      'amazon',
+      'sorceress',
+      'necromancer',
+      'paladin',
+      'barbarian',
+      'druid',
+      'assassin',
+    ]);
   });
 
   it('Then should return unknown for invalid character class ID', () => {
-    // Act & Assert
-    expect(getCharacterClass(99)).toBe('unknown');
-    expect(getCharacterClass(-1)).toBe('unknown');
+    // Arrange
+    const invalidIds = [99, -1];
+
+    // Act
+    const classes = invalidIds.map((id) => getCharacterClass(id));
+
+    // Assert
+    expect(classes).toEqual(['unknown', 'unknown']);
   });
 });
 

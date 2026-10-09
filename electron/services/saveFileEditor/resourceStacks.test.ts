@@ -30,10 +30,14 @@ function runeStack(count: number): d2sTypes.IItem {
 describe('When a resource stack leaves its resource tab', () => {
   describe('If the stack holds more than one unit', () => {
     it('Then only a target that keeps stack counts accepts the whole stack', () => {
+      // Arrange
+      const stack = runeStack(50);
+      const singleRuneStack = runeStack(1);
+
       // Act
-      const toSharedTab = () => assertStackMoveIsLossless(runeStack(50), false);
-      const toResourceTab = () => assertStackMoveIsLossless(runeStack(50), true);
-      const singleRune = () => assertStackMoveIsLossless(runeStack(1), false);
+      const toSharedTab = () => assertStackMoveIsLossless(stack, false);
+      const toResourceTab = () => assertStackMoveIsLossless(stack, true);
+      const singleRune = () => assertStackMoveIsLossless(singleRuneStack, false);
 
       // Assert
       expect(toSharedTab).toThrow('STACK_MOVE_REQUIRES_SPLIT');
@@ -46,11 +50,12 @@ describe('When a resource stack leaves its resource tab', () => {
     it('Then resource items get that stack count and other items stay unchanged', () => {
       // Arrange
       const tome = item({ code: 'tbk', quantity: 12 });
+      const stack = runeStack(10);
 
       // Act
-      const runes = applyWriteQuantity(runeStack(10), 3, true);
+      const runes = applyWriteQuantity(stack, 3, true);
       const unchangedTome = applyWriteQuantity(tome, 3, false);
-      const tooManyForSharedTab = () => applyWriteQuantity(runeStack(10), 3, false);
+      const tooManyForSharedTab = () => applyWriteQuantity(stack, 3, false);
 
       // Assert
       expect((runes as unknown as { quantity: number }).quantity).toBe(3);
@@ -62,8 +67,11 @@ describe('When a resource stack leaves its resource tab', () => {
 
 describe('When the stack metadata of a resource item is changed', () => {
   it('Then stripping it keeps one unit without the stack attribute and id', () => {
+    // Arrange
+    const stack = runeStack(5);
+
     // Act
-    const stripped = stripResourceStashStackMetadata(runeStack(5)) as unknown as {
+    const stripped = stripResourceStashStackMetadata(stack) as unknown as {
       id?: number;
       quantity: number;
       magic_attributes: Array<{ id: number }>;
@@ -76,8 +84,11 @@ describe('When the stack metadata of a resource item is changed', () => {
   });
 
   it('Then updating the count changes both the stack attribute and the quantity', () => {
+    // Arrange
+    const stack = runeStack(5);
+
     // Act
-    const updated = withUpdatedResourceStackCount(runeStack(5), 2) as unknown as {
+    const updated = withUpdatedResourceStackCount(stack, 2) as unknown as {
       quantity: number;
       magic_attributes: Array<{ id: number; values: number[] }>;
     };
@@ -91,15 +102,28 @@ describe('When the stack metadata of a resource item is changed', () => {
 
 describe('When quantities of stackable items are computed', () => {
   it('Then shared tabs keep native stacks but only one unit of a resource stack', () => {
-    // Act & Assert
-    expect(shouldKeepQuantity(item({ code: 'tbk', quantity: 12 }))).toBe(12);
-    expect(shouldKeepQuantity(runeStack(12))).toBe(1);
-    expect(shouldKeepQuantity(item({ code: 'tbk' }))).toBe(1);
+    // Arrange
+    const tomeStack = item({ code: 'tbk', quantity: 12 });
+    const runes = runeStack(12);
+    const tomeWithoutQuantity = item({ code: 'tbk' });
+
+    // Act
+    const tomeQuantity = shouldKeepQuantity(tomeStack);
+    const runeQuantity = shouldKeepQuantity(runes);
+    const defaultQuantity = shouldKeepQuantity(tomeWithoutQuantity);
+
+    // Assert
+    expect(tomeQuantity).toBe(12);
+    expect(runeQuantity).toBe(1);
+    expect(defaultQuantity).toBe(1);
   });
 
   it('Then a reduced quantity never drops below zero', () => {
+    // Arrange
+    const stack = item({ quantity: 2 });
+
     // Act
-    const reduced = withReducedQuantity(item({ quantity: 2 }), 5) as unknown as {
+    const reduced = withReducedQuantity(stack, 5) as unknown as {
       quantity: number;
     };
 
@@ -110,9 +134,17 @@ describe('When quantities of stackable items are computed', () => {
 
 describe('When an item code is checked against a resource tab', () => {
   it('Then gems, materials and runes only fit their own tab', () => {
-    // Act & Assert
-    expect(isResourceCodeAllowedForTab('r01', 7)).toBe(true);
-    expect(isResourceCodeAllowedForTab('r01', 5)).toBe(false);
-    expect(isResourceCodeAllowedForTab('r01', 0)).toBe(false);
+    // Arrange
+    const runeCode = 'r01';
+
+    // Act
+    const inRuneTab = isResourceCodeAllowedForTab(runeCode, 7);
+    const inGemTab = isResourceCodeAllowedForTab(runeCode, 5);
+    const inSharedTab = isResourceCodeAllowedForTab(runeCode, 0);
+
+    // Assert
+    expect(inRuneTab).toBe(true);
+    expect(inGemTab).toBe(false);
+    expect(inSharedTab).toBe(false);
   });
 });

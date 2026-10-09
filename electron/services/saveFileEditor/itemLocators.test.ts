@@ -15,9 +15,13 @@ function item(fields: Record<string, unknown>): d2sTypes.IItem {
 describe('When an item locator from the renderer is normalized', () => {
   describe('If the locator is a number', () => {
     it('Then integers become an id locator and other numbers are rejected', () => {
+      // Arrange
+      const integerLocator = 42;
+      const fractionalLocator = 4.2;
+
       // Act
-      const locator = normalizeSaveFileItemLocator(42);
-      const act = () => normalizeSaveFileItemLocator(4.2);
+      const locator = normalizeSaveFileItemLocator(integerLocator);
+      const act = () => normalizeSaveFileItemLocator(fractionalLocator);
 
       // Assert
       expect(locator).toEqual({ itemId: 42 });
@@ -46,10 +50,15 @@ describe('When an item locator from the renderer is normalized', () => {
 
   describe('If the locator is invalid', () => {
     it('Then it is rejected with a message naming the problem', () => {
+      // Arrange
+      const missingLocator = undefined as never;
+      const negativeTabLocator = { itemId: 1, stashTab: -1 };
+      const noPositionLocator = { gridX: 1 };
+
       // Act
-      const notAnObject = () => normalizeSaveFileItemLocator(undefined as never);
-      const negativeTab = () => normalizeSaveFileItemLocator({ itemId: 1, stashTab: -1 });
-      const noPosition = () => normalizeSaveFileItemLocator({ gridX: 1 });
+      const notAnObject = () => normalizeSaveFileItemLocator(missingLocator);
+      const negativeTab = () => normalizeSaveFileItemLocator(negativeTabLocator);
+      const noPosition = () => normalizeSaveFileItemLocator(noPositionLocator);
 
       // Assert
       expect(notAnObject).toThrow('itemLocator must be a number or an object');
@@ -97,10 +106,15 @@ describe('When an item is matched against a locator', () => {
       // Arrange
       const stored = item({ id: '12' });
 
-      // Act & Assert
-      expect(itemMatchesLocator(stored, 12)).toBe(true);
-      expect(itemMatchesLocator(stored, 13)).toBe(false);
-      expect(itemMatchesLocator(stored, undefined)).toBe(false);
+      // Act
+      const sameId = itemMatchesLocator(stored, 12);
+      const otherId = itemMatchesLocator(stored, 13);
+      const noId = itemMatchesLocator(stored, undefined);
+
+      // Assert
+      expect(sameId).toBe(true);
+      expect(otherId).toBe(false);
+      expect(noId).toBe(false);
     });
   });
 });
@@ -122,9 +136,14 @@ describe('When items are looked up in a list', () => {
     // Arrange
     const items = [item({ type: 'r01' }), item({ code: 'GEM' })];
 
-    // Act & Assert
-    expect(findItemByCode(items, 'r01')).toBe(items[0]);
-    expect(findItemByCode(items, 'gem')).toBe(items[1]);
-    expect(findItemByCode(items, 'r02')).toBeUndefined();
+    // Act
+    const byType = findItemByCode(items, 'r01');
+    const byCode = findItemByCode(items, 'gem');
+    const missing = findItemByCode(items, 'r02');
+
+    // Assert
+    expect(byType).toBe(items[0]);
+    expect(byCode).toBe(items[1]);
+    expect(missing).toBeUndefined();
   });
 });

@@ -49,10 +49,15 @@ describe('When an item is validated for an equipped slot', () => {
 
   describe('If an item goes to a slot it does not fit', () => {
     it('Then it is rejected as an invalid slot', () => {
+      // Arrange
+      const ring = item('rin');
+      const helm = item('cap');
+      const unknown = item('zzz');
+
       // Act
-      const ringOnHead = validationError(item('rin'), 1);
-      const helmOnNeck = validationError(item('cap'), 2);
-      const unknownItem = validationError(item('zzz'), 4);
+      const ringOnHead = validationError(ring, 1);
+      const helmOnNeck = validationError(helm, 2);
+      const unknownItem = validationError(unknown, 4);
 
       // Assert
       expect(ringOnHead).toBe('EQUIP_VALIDATION:INVALID_SLOT');
@@ -63,9 +68,15 @@ describe('When an item is validated for an equipped slot', () => {
 
   describe('If the target slot is already occupied', () => {
     it('Then it is rejected, also for the second weapon set', () => {
+      // Arrange
+      const helm = item('cap');
+      const equippedHelm = item('cap', 1);
+      const sword = item('ssd');
+      const equippedSwapSword = item('lsd', 11);
+
       // Act
-      const occupiedHead = validationError(item('cap'), 1, 'sorceress', [item('cap', 1)]);
-      const occupiedSwapHand = validationError(item('ssd'), 11, 'sorceress', [item('lsd', 11)]);
+      const occupiedHead = validationError(helm, 1, 'sorceress', [equippedHelm]);
+      const occupiedSwapHand = validationError(sword, 11, 'sorceress', [equippedSwapSword]);
 
       // Assert
       expect(occupiedHead).toBe('EQUIP_VALIDATION:TARGET_SLOT_OCCUPIED');
@@ -75,9 +86,12 @@ describe('When an item is validated for an equipped slot', () => {
 
   describe('If a class-specific item is equipped', () => {
     it('Then only the matching class may wear it', () => {
+      // Arrange
+      const amazonBow = item('am1');
+
       // Act
-      const amazonBowOnSorceress = validationError(item('am1'), 4, 'sorceress');
-      const amazonBowOnAmazon = validationError(item('am1'), 4, 'amazon');
+      const amazonBowOnSorceress = validationError(amazonBow, 4, 'sorceress');
+      const amazonBowOnAmazon = validationError(amazonBow, 4, 'amazon');
 
       // Assert
       expect(amazonBowOnSorceress).toBe('EQUIP_VALIDATION:CLASS_RESTRICTED');
@@ -87,11 +101,15 @@ describe('When an item is validated for an equipped slot', () => {
 
   describe('If a two-handed weapon is equipped', () => {
     it('Then it needs the right hand and a free left hand', () => {
+      // Arrange
+      const twoHander = item('gix');
+      const equippedShield = item('buc', 5);
+
       // Act
-      const inLeftHand = validationError(item('gix'), 5);
-      const inSwapLeftHand = validationError(item('gix'), 12);
-      const besideShield = validationError(item('gix'), 4, 'sorceress', [item('buc', 5)]);
-      const inFreeRightHand = validationError(item('gix'), 4);
+      const inLeftHand = validationError(twoHander, 5);
+      const inSwapLeftHand = validationError(twoHander, 12);
+      const besideShield = validationError(twoHander, 4, 'sorceress', [equippedShield]);
+      const inFreeRightHand = validationError(twoHander, 4);
 
       // Assert
       expect(inLeftHand).toBe('EQUIP_VALIDATION:TWO_HANDED_REQUIRES_RIGHT_HAND');
@@ -101,9 +119,13 @@ describe('When an item is validated for an equipped slot', () => {
     });
 
     it('Then nothing can go to the left hand of the same weapon set', () => {
+      // Arrange
+      const shield = item('buc');
+      const equippedTwoHander = item('gix', 4);
+
       // Act
-      const shieldBesideTwoHander = validationError(item('buc'), 5, 'sorceress', [item('gix', 4)]);
-      const shieldInOtherSet = validationError(item('buc'), 12, 'sorceress', [item('gix', 4)]);
+      const shieldBesideTwoHander = validationError(shield, 5, 'sorceress', [equippedTwoHander]);
+      const shieldInOtherSet = validationError(shield, 12, 'sorceress', [equippedTwoHander]);
 
       // Assert
       expect(shieldBesideTwoHander).toBe('EQUIP_VALIDATION:OFFHAND_BLOCKED_BY_TWO_HANDED');
@@ -113,11 +135,16 @@ describe('When an item is validated for an equipped slot', () => {
 
   describe('If a weapon goes to the left hand', () => {
     it('Then only barbarians (one-handed and two-handed swords) and assassins (claws) may do it', () => {
+      // Arrange
+      const sword = item('ssd');
+      const twoHandedSword = item('clm');
+      const claw = item('ktr');
+
       // Act
-      const sorceressSword = validationError(item('ssd'), 5, 'sorceress');
-      const barbarianSword = validationError(item('ssd'), 5, 'barbarian');
-      const barbarianTwoHandedSword = validationError(item('clm'), 5, 'barbarian');
-      const assassinClaw = validationError(item('ktr'), 5, 'assassin');
+      const sorceressSword = validationError(sword, 5, 'sorceress');
+      const barbarianSword = validationError(sword, 5, 'barbarian');
+      const barbarianTwoHandedSword = validationError(twoHandedSword, 5, 'barbarian');
+      const assassinClaw = validationError(claw, 5, 'assassin');
 
       // Assert
       expect(sorceressSword).toBe('EQUIP_VALIDATION:OFFHAND_WEAPON_RESTRICTED');
