@@ -20,6 +20,12 @@ import { ensureD2sConstants } from '../d2s/constants';
 import type { EventBus } from '../EventBus';
 import { resolveGrailLookupName } from '../itemNormalizer';
 import {
+  readConfiguredSaveDirectory,
+  resolveDebounceDelay,
+  resolveTickReaderInterval,
+  resolveWatcherIntervals,
+} from './saveDirectorySettings';
+import {
   buildSaveFileHeader,
   type D2iHeaderInfo,
   getSaveNameFromPath,
@@ -81,11 +87,6 @@ class SaveFileMonitor {
   private tickReaderCount: number = 0;
   private eventBus: EventBus;
   private lastFileChangeTime: number = 0;
-  // Default values for configurable intervals
-  private readonly DEFAULT_TICK_INTERVAL = 500;
-  private readonly DEFAULT_POLLING_INTERVAL = 1000;
-  private readonly DEFAULT_STABILITY_THRESHOLD = 300;
-  private readonly DEFAULT_DEBOUNCE_DELAY = 500;
   private readonly MAX_CONCURRENT_PARSES = 5; // Limit concurrent file parsing
 
   /**
@@ -111,7 +112,7 @@ class SaveFileMonitor {
     this.initializeSaveDirectories();
 
     // Start the tick reader for automatic file change detection
-    const tickInterval = this.getTickReaderInterval();
+    const tickInterval = resolveTickReaderInterval(this.grailDatabase);
     this.tickReaderInterval = setInterval(this.tickReader, tickInterval);
     log.info('constructor', `Tick reader started (interval: ${tickInterval}ms)`);
   }
@@ -119,31 +120,11 @@ class SaveFileMonitor {
   /**
    * Initializes save directories by reading settings from the database or using platform defaults.
    * @private
-   * @returns {Promise<void>} A promise that resolves when initialization is complete.
    */
-  private async initializeSaveDirectories(): Promise<void> {
+  private initializeSaveDirectories(): void {
     log.info('initializeSaveDirectories', 'Starting initialization');
     // First, try to get saveDir from Settings via grail database
-    let customSaveDir: string | null = null;
-    if (this.grailDatabase) {
-      try {
-        const settings = this.grailDatabase.getAllSettings();
-        log.info(
-          'initializeSaveDirectories',
-          `Settings retrieved: saveDir=${settings.saveDir}, gameMode=${settings.gameMode}`,
-        );
-        if (settings.saveDir && settings.saveDir.trim() !== '') {
-          customSaveDir = settings.saveDir.trim();
-          log.info('initializeSaveDirectories', `Custom save directory found: ${customSaveDir}`);
-        } else {
-          log.info('initializeSaveDirectories', 'No custom save directory in settings');
-        }
-      } catch (error) {
-        log.warn('initializeSaveDirectories', `Failed to read saveDir from settings: ${error}`);
-      }
-    } else {
-      log.info('initializeSaveDirectories', 'No grail database available');
-    }
+    const customSaveDir = readConfiguredSaveDirectory(this.grailDatabase);
 
     // Use custom saveDir if available, otherwise fall back to platform default
     if (customSaveDir) {
@@ -176,51 +157,6 @@ class SaveFileMonitor {
   }
 
   /**
-   * Validates an interval value to ensure it's within acceptable bounds.
-   * @private
-   * @param {number | undefined} value - The value to validate
-   * @param {number} min - Minimum acceptable value
-   * @param {number} max - Maximum acceptable value
-   * @param {number} defaultValue - Default value to use if validation fails
-   * @returns {number} The validated interval value
-   */
-  private validateInterval(
-    value: number | undefined,
-    min: number,
-    max: number,
-    defaultValue: number,
-  ): number {
-    if (value === undefined) return defaultValue;
-    if (value < min || value > max) {
-      log.warn(
-        'validateInterval',
-        `Invalid interval ${value} (valid range: ${min}-${max}ms), using default ${defaultValue}ms`,
-      );
-      return defaultValue;
-    }
-    return value;
-  }
-
-  /**
-   * Gets the tick reader interval from settings or returns default.
-   * @private
-   * @returns {number} The tick reader interval in milliseconds
-   */
-  private getTickReaderInterval(): number {
-    if (!this.grailDatabase) {
-      return this.DEFAULT_TICK_INTERVAL;
-    }
-
-    const settings = this.grailDatabase.getAllSettings();
-    return this.validateInterval(
-      settings.tickReaderIntervalMs,
-      100, // min 100ms
-      5000, // max 5 seconds
-      this.DEFAULT_TICK_INTERVAL,
-    );
-  }
-
-  /**
    * Starts monitoring the save file directory for changes.
    * Sets up file watching and parses existing save files.
    * @returns {Promise<void>} A promise that resolves when monitoring is started.
@@ -234,7 +170,7 @@ class SaveFileMonitor {
 
     // Refresh save directory from settings
     log.info('startMonitoring', 'Refreshing save directory from settings');
-    await this.initializeSaveDirectories();
+    this.initializeSaveDirectories();
 
     if (!this.saveDirectory) {
       log.warn('startMonitoring', 'No save directory configured');
@@ -282,18 +218,8 @@ class SaveFileMonitor {
     log.info('startMonitoring', `Using polling mode: ${usePolling}`);
 
     // Get configurable intervals from settings
-    const settings = this.grailDatabase?.getAllSettings();
-    const pollingInterval = this.validateInterval(
-      settings?.chokidarPollingIntervalMs,
-      500, // min 500ms
-      5000, // max 5 seconds
-      this.DEFAULT_POLLING_INTERVAL,
-    );
-    const stabilityThreshold = this.validateInterval(
-      settings?.fileStabilityThresholdMs,
-      100, // min 100ms
-      2000, // max 2 seconds
-      this.DEFAULT_STABILITY_THRESHOLD,
+    const { pollingInterval, stabilityThreshold } = resolveWatcherIntervals(
+      this.grailDatabase?.getAllSettings(),
     );
 
     log.info(
@@ -922,7 +848,7 @@ class SaveFileMonitor {
     try {
       // Re-initialize directories with the new setting
       log.info('updateSaveDirectory', 'Re-initializing save directories');
-      await this.initializeSaveDirectories();
+      this.initializeSaveDirectories();
 
       // Always start monitoring after directory change - user explicitly wants to use this directory
       log.info('updateSaveDirectory', 'Starting monitoring for new directory');
@@ -1113,12 +1039,7 @@ class SaveFileMonitor {
     // Skip debounce for initial parsing or force parse
     const timeSinceLastChange = Date.now() - this.lastFileChangeTime;
     const shouldDebounce = !this.isInitialParsing && !hasForcedParseRequest;
-    const debounceDelay = this.validateInterval(
-      settings.fileChangeDebounceMs,
-      500, // min 500ms
-      10000, // max 10 seconds
-      this.DEFAULT_DEBOUNCE_DELAY,
-    );
+    const debounceDelay = resolveDebounceDelay(settings);
 
     if (shouldDebounce && timeSinceLastChange < debounceDelay) {
       // Still within debounce window - don't process yet
