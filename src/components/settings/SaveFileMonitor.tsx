@@ -9,7 +9,7 @@ import {
   RotateCcw,
   XCircle,
 } from 'lucide-react';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -27,6 +27,25 @@ import { saveFileEventTypeLabelKeys } from '@/lib/labelKeys';
 import { formatShortDate } from '@/lib/utils';
 import { useGrailStore } from '@/stores/grailStore';
 import { SaveDirectoryChangeDialog } from './SaveDirectoryChangeDialog';
+
+/**
+ * Decides whether save file monitoring must be stopped (Manual mode) or resumed (after leaving
+ * Manual mode) for a game mode change.
+ * @param previousGameMode - Game mode seen on the previous check
+ * @param gameMode - Current game mode
+ * @param isMonitoring - Whether the main process is currently monitoring
+ * @returns The monitoring action to apply, or undefined if nothing must change
+ */
+function getMonitoringActionForGameMode(
+  previousGameMode: GameMode | undefined,
+  gameMode: GameMode | undefined,
+  isMonitoring: boolean,
+): 'start' | 'stop' | undefined {
+  if (gameMode === GameMode.Manual) {
+    return isMonitoring ? 'stop' : undefined;
+  }
+  return previousGameMode === GameMode.Manual && !isMonitoring ? 'start' : undefined;
+}
 
 /**
  * SaveFileMonitor component that displays and manages save file monitoring status.
@@ -276,20 +295,33 @@ export function SaveFileMonitor() {
     t,
   ]);
 
-  // Automatically stop monitoring when gameMode is Manual
+  // Stop monitoring in Manual mode and resume it when switching back to an automatic mode
+  const previousGameModeRef = useRef(settings.gameMode);
   useEffect(() => {
-    const handleManualMode = async () => {
-      if (settings.gameMode === GameMode.Manual && monitoringStatus.isMonitoring) {
-        try {
+    const action = getMonitoringActionForGameMode(
+      previousGameModeRef.current,
+      settings.gameMode,
+      monitoringStatus.isMonitoring,
+    );
+    previousGameModeRef.current = settings.gameMode;
+    if (!action) {
+      return;
+    }
+
+    const applyMonitoringAction = async () => {
+      try {
+        if (action === 'stop') {
           await window.electronAPI?.saveFile.stopMonitoring();
-          await loadMonitoringStatus();
-        } catch (error) {
-          console.error('Failed to stop monitoring for Manual mode:', error);
+        } else {
+          await window.electronAPI?.saveFile.startMonitoring();
         }
+        await loadMonitoringStatus();
+      } catch (error) {
+        console.error(`Failed to ${action} save file monitoring for the game mode:`, error);
       }
     };
 
-    handleManualMode();
+    void applyMonitoringAction();
   }, [settings.gameMode, monitoringStatus.isMonitoring, loadMonitoringStatus]);
 
   return (

@@ -38,6 +38,7 @@ interface MockElectronAPI {
   saveFile: {
     getMonitoringStatus: ReturnType<typeof vi.fn>;
     getSaveFiles: ReturnType<typeof vi.fn>;
+    startMonitoring: ReturnType<typeof vi.fn>;
     stopMonitoring: ReturnType<typeof vi.fn>;
     getDefaultDirectory: ReturnType<typeof vi.fn>;
     updateSaveDirectory: ReturnType<typeof vi.fn>;
@@ -102,7 +103,8 @@ describe('SaveFileMonitor', () => {
       saveFile: {
         getMonitoringStatus: vi.fn().mockResolvedValue({ isMonitoring: false, directory: null }),
         getSaveFiles: vi.fn().mockResolvedValue([]),
-        stopMonitoring: vi.fn().mockResolvedValue(undefined),
+        startMonitoring: vi.fn().mockResolvedValue({ success: true }),
+        stopMonitoring: vi.fn().mockResolvedValue({ success: true }),
         getDefaultDirectory: vi.fn().mockResolvedValue(DEFAULT_DIRECTORY),
         updateSaveDirectory: vi.fn().mockResolvedValue({ success: true }),
         restoreDefaultDirectory: vi
@@ -149,6 +151,55 @@ describe('SaveFileMonitor', () => {
       // Assert
       await waitFor(() => expect(window.electronAPI?.saveFile.getSaveFiles).toHaveBeenCalled());
       expect(screen.queryByText(/Manual Mode Active:/)).not.toBeInTheDocument();
+    });
+  });
+
+  describe('manual mode monitoring', () => {
+    it('When game mode is manual while monitoring, Then monitoring is stopped', async () => {
+      // Arrange
+      mockGameMode(GameMode.Manual);
+      getElectronAPI().saveFile.getMonitoringStatus.mockResolvedValue({
+        isMonitoring: true,
+        directory: CURRENT_DIRECTORY,
+      });
+
+      // Act
+      render(<SaveFileMonitor />);
+
+      // Assert
+      await waitFor(() =>
+        expect(getElectronAPI().saveFile.stopMonitoring).toHaveBeenCalledTimes(1),
+      );
+      expect(getElectronAPI().saveFile.startMonitoring).not.toHaveBeenCalled();
+    });
+
+    it('When switching from manual to an automatic mode, Then monitoring is resumed', async () => {
+      // Arrange
+      mockGameMode(GameMode.Manual);
+      const { rerender } = render(<SaveFileMonitor />);
+      await waitFor(() => expect(getElectronAPI().saveFile.getMonitoringStatus).toHaveBeenCalled());
+
+      // Act
+      mockGameMode(GameMode.Both);
+      rerender(<SaveFileMonitor />);
+
+      // Assert
+      await waitFor(() =>
+        expect(getElectronAPI().saveFile.startMonitoring).toHaveBeenCalledTimes(1),
+      );
+    });
+
+    it('If game mode stays automatic, Then monitoring is neither stopped nor started', async () => {
+      // Arrange
+      mockGameMode(GameMode.Both);
+
+      // Act
+      render(<SaveFileMonitor />);
+
+      // Assert
+      await waitFor(() => expect(getElectronAPI().saveFile.getSaveFiles).toHaveBeenCalled());
+      expect(getElectronAPI().saveFile.startMonitoring).not.toHaveBeenCalled();
+      expect(getElectronAPI().saveFile.stopMonitoring).not.toHaveBeenCalled();
     });
   });
 

@@ -968,6 +968,41 @@ describe('When saveFileHandlers is used', () => {
       expect(grailDatabase.truncateUserData).not.toHaveBeenCalled();
     });
 
+    it('When saveFile:stopMonitoring is invoked, Then the monitor stops and success is reported', async () => {
+      // Arrange
+      const handler = getHandler('saveFile:stopMonitoring');
+
+      // Act
+      const result = await handler(null);
+
+      // Assert
+      expect(mockSaveFileMonitor.stopMonitoring).toHaveBeenCalledTimes(1);
+      expect(result).toEqual({ success: true });
+    });
+
+    it('When saveFile:startMonitoring is invoked, Then the monitor starts and success is reported', async () => {
+      // Arrange
+      const handler = getHandler('saveFile:startMonitoring');
+      mockSaveFileMonitor.startMonitoring.mockClear();
+
+      // Act
+      const result = await handler(null);
+
+      // Assert
+      expect(mockSaveFileMonitor.startMonitoring).toHaveBeenCalledTimes(1);
+      expect(result).toEqual({ success: true });
+    });
+
+    it('If stopping the monitor fails, Then saveFile:stopMonitoring rejects', async () => {
+      // Arrange
+      silenceConsole('error');
+      mockSaveFileMonitor.stopMonitoring.mockRejectedValue(new Error('watcher close failed'));
+      const handler = getHandler('saveFile:stopMonitoring');
+
+      // Act & Assert
+      await expect(handler(null)).rejects.toThrow('watcher close failed');
+    });
+
     it('Then saveFile:inspectDirectory should reject non-string input without touching settings', async () => {
       // Arrange
       const handler = getHandler('saveFile:inspectDirectory');

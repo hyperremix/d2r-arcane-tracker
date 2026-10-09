@@ -599,7 +599,32 @@ export function initializeSaveFileHandlers(): void {
     }
   }, 1000); // Short delay to ensure everything is initialized
 
-  // IPC handlers for status and file retrieval only
+  /**
+   * IPC handler for starting save file monitoring (e.g. when leaving Manual mode).
+   * Starting while already monitoring is a no-op in the monitor service.
+   */
+  ipcMain.handle('saveFile:startMonitoring', async (): Promise<{ success: boolean }> => {
+    try {
+      await saveFileMonitor.startMonitoring();
+      return { success: true };
+    } catch (error) {
+      console.error('Failed to start save file monitoring:', error);
+      throw error;
+    }
+  });
+
+  /**
+   * IPC handler for stopping save file monitoring (e.g. when switching to Manual mode).
+   */
+  ipcMain.handle('saveFile:stopMonitoring', async (): Promise<{ success: boolean }> => {
+    try {
+      await saveFileMonitor.stopMonitoring();
+      return { success: true };
+    } catch (error) {
+      console.error('Failed to stop save file monitoring:', error);
+      throw error;
+    }
+  });
 
   /**
    * IPC handler for retrieving all save files.
