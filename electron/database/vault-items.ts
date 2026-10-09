@@ -1,5 +1,21 @@
 import { randomUUID } from 'node:crypto';
-import { and, eq, inArray } from 'drizzle-orm';
+import {
+  and,
+  asc,
+  count,
+  desc,
+  eq,
+  gte,
+  inArray,
+  isNotNull,
+  isNull,
+  like,
+  lt,
+  notLike,
+  or,
+  type SQL,
+  sql,
+} from 'drizzle-orm';
 import type {
   VaultItem,
   VaultItemFilter,
@@ -13,96 +29,11 @@ import {
   isCurrentlyVaulted,
   isGrailBookmark,
 } from '../utils/vaultState';
-import { dbVaultItemToVaultItem, fromDbTimestamp, fromISOString, toISOString } from './converters';
+import { dbVaultItemToVaultItem, toISOString } from './converters';
 import { type DbVaultItem, schema } from './drizzle';
 import type { DatabaseContext } from './types';
 
 const { vaultItems } = schema;
-
-interface SearchClauses {
-  clauses: string[];
-  params: Array<string | number>;
-}
-
-interface RawVaultSearchRow {
-  id: string;
-  fingerprint: string;
-  item_name: string;
-  item_code: string | null;
-  quality: string;
-  ethereal: number | boolean;
-  socket_count: number | null;
-  stack_count: number;
-  raw_item_json: string;
-  source_character_id: string | null;
-  source_character_name: string | null;
-  source_file_type: VaultItem['sourceFileType'];
-  source_file_path: string | null;
-  location_context: VaultItem['locationContext'];
-  stash_tab: number | null;
-  grid_x: number | null;
-  grid_y: number | null;
-  grid_width: number | null;
-  grid_height: number | null;
-  equipped_slot_id: number | null;
-  icon_file_name: string | null;
-  is_socketed_item: number | boolean | null;
-  grail_item_id: string | null;
-  is_present_in_latest_scan: number | boolean;
-  last_seen_at: string | null;
-  vaulted_at: string | null;
-  unvaulted_at: string | null;
-  created_at: string | null;
-  updated_at: string | null;
-}
-
-function toBoolean(value: number | boolean | null | undefined): boolean {
-  if (typeof value === 'boolean') {
-    return value;
-  }
-
-  return value === 1;
-}
-
-function extractRawRowSpatialFields(row: RawVaultSearchRow) {
-  return {
-    stashTab: row.stash_tab ?? undefined,
-    gridX: row.grid_x ?? undefined,
-    gridY: row.grid_y ?? undefined,
-    gridWidth: row.grid_width ?? undefined,
-    gridHeight: row.grid_height ?? undefined,
-    equippedSlotId: row.equipped_slot_id ?? undefined,
-  };
-}
-
-function mapRawVaultSearchRowToVaultItem(row: RawVaultSearchRow): VaultItem {
-  return {
-    id: row.id,
-    fingerprint: row.fingerprint,
-    itemName: row.item_name,
-    itemCode: row.item_code ?? undefined,
-    quality: row.quality,
-    ethereal: toBoolean(row.ethereal),
-    socketCount: row.socket_count ?? undefined,
-    stackCount: row.stack_count ?? 1,
-    rawItemJson: row.raw_item_json,
-    sourceCharacterId: row.source_character_id ?? undefined,
-    sourceCharacterName: row.source_character_name ?? undefined,
-    sourceFileType: row.source_file_type,
-    sourceFilePath: row.source_file_path ?? undefined,
-    locationContext: row.location_context,
-    ...extractRawRowSpatialFields(row),
-    iconFileName: row.icon_file_name ?? undefined,
-    isSocketedItem: toBoolean(row.is_socketed_item),
-    grailItemId: row.grail_item_id ?? undefined,
-    isPresentInLatestScan: toBoolean(row.is_present_in_latest_scan),
-    lastSeenAt: fromISOString(row.last_seen_at),
-    vaultedAt: fromISOString(row.vaulted_at),
-    unvaultedAt: fromISOString(row.unvaulted_at),
-    created: fromDbTimestamp(row.created_at),
-    lastUpdated: fromDbTimestamp(row.updated_at),
-  };
-}
 
 function toNullable<T>(value: T | undefined): T | null {
   return value ?? null;
@@ -142,29 +73,37 @@ function buildVaultItemValues(input: VaultItemUpsertInput) {
   };
 }
 
+/** Rows that are currently vaulted (vaulted and not unvaulted since). */
+const isVaultedCondition = and(
+  isNotNull(vaultItems.vaultedAt),
+  or(isNull(vaultItems.unvaultedAt), lt(vaultItems.unvaultedAt, vaultItems.vaultedAt)),
+);
+
+/** Rows that were vaulted and have been unvaulted since. */
+const isUnvaultedCondition = and(
+  isNotNull(vaultItems.vaultedAt),
+  isNotNull(vaultItems.unvaultedAt),
+  gte(vaultItems.unvaultedAt, vaultItems.vaultedAt),
+);
+
 function findExistingStackableVaultItem(
   ctx: DatabaseContext,
   itemCode: string,
 ): VaultItem | undefined {
-  const row = ctx.rawDb
-    .prepare(
-      `
-        SELECT vi.*
-        FROM vault_items vi
-        WHERE vi.item_code = ?
-          AND vi.fingerprint NOT LIKE ?
-          AND vi.vaulted_at IS NOT NULL
-          AND (vi.unvaulted_at IS NULL OR vi.unvaulted_at < vi.vaulted_at)
-        LIMIT 1
-      `,
+  const row = ctx.db
+    .select()
+    .from(vaultItems)
+    .where(
+      and(
+        eq(vaultItems.itemCode, itemCode),
+        notLike(vaultItems.fingerprint, `${GRAIL_BOOKMARK_FINGERPRINT_PREFIX}%`),
+        isVaultedCondition,
+      ),
     )
-    .get(itemCode, `${GRAIL_BOOKMARK_FINGERPRINT_PREFIX}%`) as RawVaultSearchRow | undefined;
+    .limit(1)
+    .get();
 
-  if (!row) {
-    return undefined;
-  }
-
-  return mapRawVaultSearchRowToVaultItem(row);
+  return row ? dbVaultItemToVaultItem(row) : undefined;
 }
 
 export interface VaultAddResult {
@@ -637,143 +576,99 @@ export function getVaultItemById(ctx: DatabaseContext, itemId: string): VaultIte
   return dbVaultItemToVaultItem(row);
 }
 
-function appendTextClause(query: SearchClauses, text: string | undefined): void {
+function textCondition(text: string | undefined): SQL | undefined {
   const normalized = text?.trim().toLowerCase();
   if (!normalized) {
-    return;
+    return undefined;
   }
 
   const textQuery = `%${normalized}%`;
-  query.clauses.push(
-    "(lower(vi.item_name) LIKE ? OR lower(COALESCE(vi.item_code, '')) LIKE ? OR lower(vi.quality) LIKE ?)",
+  return or(
+    like(sql`lower(${vaultItems.itemName})`, textQuery),
+    like(sql`lower(COALESCE(${vaultItems.itemCode}, ''))`, textQuery),
+    like(sql`lower(${vaultItems.quality})`, textQuery),
   );
-  query.params.push(textQuery, textQuery, textQuery);
 }
 
-function appendCharacterClause(query: SearchClauses, characterId: string | undefined): void {
+function characterCondition(characterId: string | undefined): SQL | undefined {
   if (!characterId) {
-    return;
+    return undefined;
   }
 
-  query.clauses.push('(vi.source_character_id = ? OR vi.source_character_name = ?)');
-  query.params.push(characterId, characterId);
+  return or(
+    eq(vaultItems.sourceCharacterId, characterId),
+    eq(vaultItems.sourceCharacterName, characterId),
+  );
 }
 
-function appendLocationClause(
-  query: SearchClauses,
-  locationContext: VaultItemFilter['locationContext'],
-): void {
-  if (!locationContext) {
-    return;
-  }
-
-  query.clauses.push('vi.location_context = ?');
-  query.params.push(locationContext);
-}
-
-function appendSourceFileTypeClause(
-  query: SearchClauses,
-  sourceFileType: VaultItemFilter['sourceFileType'],
-): void {
-  if (!sourceFileType) {
-    return;
-  }
-
-  query.clauses.push('vi.source_file_type = ?');
-  query.params.push(sourceFileType);
-}
-
-function appendPresentStateClause(
-  query: SearchClauses,
-  presentState: VaultItemFilter['presentState'],
-): void {
+function presentStateCondition(presentState: VaultItemFilter['presentState']): SQL | undefined {
   if (!presentState || presentState === 'all') {
-    return;
+    return undefined;
   }
 
-  query.clauses.push('vi.is_present_in_latest_scan = ?');
-  query.params.push(presentState === 'present' ? 1 : 0);
+  return eq(vaultItems.isPresentInLatestScan, presentState === 'present');
 }
 
-function appendVaultedStateClause(
-  query: SearchClauses,
-  vaultedState: VaultItemFilter['vaultedState'],
-): void {
+function vaultedStateCondition(vaultedState: VaultItemFilter['vaultedState']): SQL | undefined {
   if (!vaultedState || vaultedState === 'all') {
-    return;
+    return undefined;
   }
 
-  if (vaultedState === 'vaulted') {
-    query.clauses.push(
-      '(vi.vaulted_at IS NOT NULL AND (vi.unvaulted_at IS NULL OR vi.unvaulted_at < vi.vaulted_at))',
-    );
-  } else {
-    query.clauses.push(
-      '(vi.vaulted_at IS NOT NULL AND vi.unvaulted_at IS NOT NULL AND vi.unvaulted_at >= vi.vaulted_at)',
-    );
-  }
+  return vaultedState === 'vaulted' ? isVaultedCondition : isUnvaultedCondition;
 }
 
-function appendSocketedClause(
-  query: SearchClauses,
-  includeSocketed: VaultItemFilter['includeSocketed'],
-): void {
+function socketedCondition(includeSocketed: VaultItemFilter['includeSocketed']): SQL | undefined {
   if (includeSocketed === true) {
-    return;
+    return undefined;
   }
 
-  query.clauses.push('COALESCE(vi.is_socketed_item, 0) = 0');
+  return sql`COALESCE(${vaultItems.isSocketedItem}, 0) = 0`;
 }
 
-function buildSearchQuery(filter: VaultItemFilter): SearchClauses {
-  const query: SearchClauses = { clauses: [], params: [] };
-  appendTextClause(query, filter.text);
-  appendCharacterClause(query, filter.characterId);
-  appendLocationClause(query, filter.locationContext);
-  appendSourceFileTypeClause(query, filter.sourceFileType);
-  appendPresentStateClause(query, filter.presentState);
-  appendVaultedStateClause(query, filter.vaultedState);
-  appendSocketedClause(query, filter.includeSocketed);
-  return query;
+function buildSearchCondition(filter: VaultItemFilter): SQL | undefined {
+  return and(
+    textCondition(filter.text),
+    characterCondition(filter.characterId),
+    filter.locationContext ? eq(vaultItems.locationContext, filter.locationContext) : undefined,
+    filter.sourceFileType ? eq(vaultItems.sourceFileType, filter.sourceFileType) : undefined,
+    presentStateCondition(filter.presentState),
+    vaultedStateCondition(filter.vaultedState),
+    socketedCondition(filter.includeSocketed),
+  );
 }
 
-function getSortByColumn(sortBy: VaultItemFilter['sortBy']): string {
-  const sortByMap: Record<NonNullable<VaultItemFilter['sortBy']>, string> = {
-    itemName: 'vi.item_name',
-    lastSeenAt: 'vi.last_seen_at',
-    createdAt: 'vi.created_at',
-    updatedAt: 'vi.updated_at',
-    vaultedAt: 'vi.vaulted_at',
-  };
-
-  return sortByMap[sortBy ?? 'updatedAt'];
-}
+const sortColumns = {
+  itemName: vaultItems.itemName,
+  lastSeenAt: vaultItems.lastSeenAt,
+  createdAt: vaultItems.createdAt,
+  updatedAt: vaultItems.updatedAt,
+  vaultedAt: vaultItems.vaultedAt,
+} satisfies Record<NonNullable<VaultItemFilter['sortBy']>, unknown>;
 
 export function searchVaultItems(
   ctx: DatabaseContext,
   filter: VaultItemFilter,
 ): VaultItemSearchResult {
-  const query = buildSearchQuery(filter);
-  const whereClause = query.clauses.length > 0 ? `WHERE ${query.clauses.join(' AND ')}` : '';
+  const where = buildSearchCondition(filter);
   const page = filter.page ?? 1;
   const pageSize = filter.pageSize ?? 50;
   const offset = (page - 1) * pageSize;
-  const sortBy = getSortByColumn(filter.sortBy);
-  const sortOrder = filter.sortOrder === 'asc' ? 'ASC' : 'DESC';
+  const sortColumn = sortColumns[filter.sortBy ?? 'updatedAt'] ?? sortColumns.updatedAt;
+  const orderBy = filter.sortOrder === 'asc' ? asc(sortColumn) : desc(sortColumn);
 
-  const countRow = ctx.rawDb
-    .prepare(`SELECT COUNT(*) as total FROM vault_items vi ${whereClause}`)
-    .get(...query.params) as { total: number };
-
-  const rows = ctx.rawDb
-    .prepare(
-      `SELECT vi.* FROM vault_items vi ${whereClause} ORDER BY ${sortBy} ${sortOrder} LIMIT ? OFFSET ?`,
-    )
-    .all(...query.params, pageSize, offset) as RawVaultSearchRow[];
+  const total = ctx.db.select({ total: count() }).from(vaultItems).where(where).get()?.total ?? 0;
+  const rows = ctx.db
+    .select()
+    .from(vaultItems)
+    .where(where)
+    .orderBy(orderBy)
+    .limit(pageSize)
+    .offset(offset)
+    .all();
 
   return {
-    items: rows.map(mapRawVaultSearchRowToVaultItem),
-    total: countRow.total,
+    items: rows.map(dbVaultItemToVaultItem),
+    total,
     page,
     pageSize,
   };

@@ -1,5 +1,6 @@
 import Database from 'better-sqlite3';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { VaultItemUpsertInput } from '../types/grail';
 import { createVaultPresenceKey } from '../utils/vaultPresence';
 import { createDrizzleDb } from './drizzle';
 import { initializeSchema } from './schema';
@@ -688,7 +689,7 @@ describe('When vault item database operations are executed', () => {
     });
   });
 
-  describe('If search returns rows loaded from raw SQL', () => {
+  describe('If search results are mapped from database rows', () => {
     it('Then mapped vault items keep icon and raw metadata fields', () => {
       // Arrange
       upsertVaultItemByFingerprint(ctx, {
@@ -1488,5 +1489,152 @@ describe('When a stack merge is undone after another merge landed in the same ro
 
     // Assert
     expect(getVaultItemById(ctx, row.id)?.stackCount).toBe(13);
+  });
+});
+
+describe('When vault items are searched with filters, sorting and paging', () => {
+  let ctx: DatabaseContext;
+
+  const seed = (fingerprint: string, overrides: Partial<VaultItemUpsertInput> = {}) =>
+    upsertVaultItemByFingerprint(ctx, {
+      fingerprint,
+      itemName: fingerprint,
+      quality: 'unique',
+      ethereal: false,
+      rawItemJson: '{}',
+      sourceFileType: 'd2s',
+      locationContext: 'inventory',
+      ...overrides,
+    });
+
+  beforeEach(() => {
+    ctx = createTestContext();
+    seed('fp-shako', {
+      itemName: 'Harlequin Crest',
+      itemCode: 'uap',
+      sourceCharacterName: 'Sorc',
+      lastSeenAt: new Date('2024-01-03T00:00:00.000Z'),
+    });
+    seed('fp-ber', {
+      itemName: 'Ber Rune',
+      itemCode: 'r30',
+      quality: 'rune',
+      sourceFileType: 'd2i',
+      locationContext: 'stash',
+      lastSeenAt: new Date('2024-01-01T00:00:00.000Z'),
+    });
+    seed('fp-socketed-jewel', {
+      itemName: 'Rainbow Facet',
+      itemCode: 'jew',
+      isSocketedItem: true,
+      lastSeenAt: new Date('2024-01-02T00:00:00.000Z'),
+    });
+    seed('fp-missing', {
+      itemName: 'Arachnid Mesh',
+      itemCode: 'ulc',
+      isPresentInLatestScan: false,
+      lastSeenAt: new Date('2024-01-04T00:00:00.000Z'),
+    });
+  });
+
+  afterEach(() => {
+    ctx.rawDb.close();
+  });
+
+  describe('If no filter is given', () => {
+    it('Then socketed items are excluded and the rest are returned on the first page', () => {
+      // Act
+      const result = searchVaultItems(ctx, {});
+
+      // Assert
+      expect(result.total).toBe(3);
+      expect(result.items.map((item) => item.fingerprint).sort()).toEqual([
+        'fp-ber',
+        'fp-missing',
+        'fp-shako',
+      ]);
+      expect(result.page).toBe(1);
+      expect(result.pageSize).toBe(50);
+    });
+  });
+
+  describe('If includeSocketed is true', () => {
+    it('Then socketed items are returned as well', () => {
+      // Act
+      const result = searchVaultItems(ctx, { includeSocketed: true });
+
+      // Assert
+      expect(result.total).toBe(4);
+    });
+  });
+
+  describe('If the text matches an item code or a quality in another case', () => {
+    it('Then the matching items are returned', () => {
+      // Act
+      const byCode = searchVaultItems(ctx, { text: '  UAP ' });
+      const byQuality = searchVaultItems(ctx, { text: 'RUNE' });
+
+      // Assert
+      expect(byCode.items.map((item) => item.fingerprint)).toEqual(['fp-shako']);
+      expect(byQuality.items.map((item) => item.fingerprint)).toEqual(['fp-ber']);
+    });
+  });
+
+  describe('If location, source file type and presence filters are used', () => {
+    it('Then only items matching all given filters are returned', () => {
+      // Act
+      const stashD2i = searchVaultItems(ctx, { locationContext: 'stash', sourceFileType: 'd2i' });
+      const inventoryD2i = searchVaultItems(ctx, {
+        locationContext: 'inventory',
+        sourceFileType: 'd2i',
+      });
+      const missing = searchVaultItems(ctx, { presentState: 'missing' });
+      const present = searchVaultItems(ctx, { presentState: 'present' });
+
+      // Assert
+      expect(stashD2i.items.map((item) => item.fingerprint)).toEqual(['fp-ber']);
+      expect(inventoryD2i.total).toBe(0);
+      expect(missing.items.map((item) => item.fingerprint)).toEqual(['fp-missing']);
+      expect(present.total).toBe(2);
+    });
+  });
+
+  describe('If results are sorted by item name ascending and paged', () => {
+    it('Then each page holds the next items in order and total counts all matches', () => {
+      // Act
+      const firstPage = searchVaultItems(ctx, {
+        sortBy: 'itemName',
+        sortOrder: 'asc',
+        page: 1,
+        pageSize: 2,
+      });
+      const secondPage = searchVaultItems(ctx, {
+        sortBy: 'itemName',
+        sortOrder: 'asc',
+        page: 2,
+        pageSize: 2,
+      });
+
+      // Assert
+      expect(firstPage.items.map((item) => item.itemName)).toEqual(['Arachnid Mesh', 'Ber Rune']);
+      expect(secondPage.items.map((item) => item.itemName)).toEqual(['Harlequin Crest']);
+      expect(firstPage.total).toBe(3);
+      expect(secondPage.total).toBe(3);
+    });
+  });
+
+  describe('If results are sorted by last seen time without a sort order', () => {
+    it('Then the most recently seen item comes first', () => {
+      // Act
+      const result = searchVaultItems(ctx, { sortBy: 'lastSeenAt', includeSocketed: true });
+
+      // Assert
+      expect(result.items.map((item) => item.fingerprint)).toEqual([
+        'fp-missing',
+        'fp-shako',
+        'fp-socketed-jewel',
+        'fp-ber',
+      ]);
+    });
   });
 });
