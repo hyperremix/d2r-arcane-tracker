@@ -1,15 +1,8 @@
-import { existsSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { resolve } from 'node:path';
 import { defineConfig } from 'vitest/config';
+import { getD2sSourceAliases } from './config/d2sAliases';
 
-const d2sRoot = resolve(__dirname, './node_modules/@dschu012/d2s');
-const hasD2sLibBuild = existsSync(join(d2sRoot, 'lib/index.js'));
-const d2sSourceAliases = hasD2sLibBuild
-  ? []
-  : [
-      { find: /^@dschu012\/d2s\/lib\//, replacement: `${join(d2sRoot, 'src')}/` },
-      { find: '@dschu012/d2s', replacement: join(d2sRoot, 'src/index.ts') },
-    ];
+const d2sSourceAliases = getD2sSourceAliases(__dirname);
 
 export default defineConfig({
   test: {
