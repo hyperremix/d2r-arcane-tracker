@@ -263,10 +263,6 @@ export function addVaultItemWithUndo(
   return { item: refreshed, undo: createUndo(ctx, saved.id, previous) };
 }
 
-export function addVaultItem(ctx: DatabaseContext, input: VaultItemUpsertInput): VaultItem {
-  return addVaultItemWithUndo(ctx, input).item;
-}
-
 export function unvaultVaultItem(
   ctx: DatabaseContext,
   itemId: string,

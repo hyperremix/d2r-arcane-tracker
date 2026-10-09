@@ -1,4 +1,3 @@
-import { runes } from 'electron/items/runes';
 import type { Item } from 'electron/types/grail';
 
 /**
@@ -196,12 +195,4 @@ export function getRunewordCompletionStatus(
     availableCount,
     totalCount,
   };
-}
-
-/**
- * Gets the name of a rune by its ID
- */
-export function getRuneName(runeId: string): string {
-  const rune = runes.find((r) => r.id === runeId);
-  return rune?.name || runeId;
 }
