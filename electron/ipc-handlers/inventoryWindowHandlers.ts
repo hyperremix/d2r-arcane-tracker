@@ -81,7 +81,11 @@ function normalizeInventoryDragStatePayload(
     return undefined;
   }
 
-  if (!isVaultLocationContext(rawPayload.sourceLocationContext)) {
+  const sourceLocationContext =
+    typeof rawPayload.sourceLocationContext === 'string'
+      ? rawPayload.sourceLocationContext.trim()
+      : undefined;
+  if (!isVaultLocationContext(sourceLocationContext)) {
     return undefined;
   }
 
@@ -109,7 +113,7 @@ function normalizeInventoryDragStatePayload(
     fingerprint: rawPayload.fingerprint.trim(),
     sourceFilePath: rawPayload.sourceFilePath.trim(),
     sourceFileType: rawPayload.sourceFileType as VaultSourceFileType,
-    sourceLocationContext: rawPayload.sourceLocationContext,
+    sourceLocationContext,
     rawItemJson: rawPayload.rawItemJson,
     itemCode:
       typeof rawPayload.itemCode === 'string' && rawPayload.itemCode.trim().length > 0

@@ -471,6 +471,52 @@ describe('When inventory window IPC handlers are initialized', () => {
     });
   });
 
+  describe('If inventory:item-drag-state is emitted with a padded source location context', () => {
+    it('Then the trimmed context is relayed to renderer windows', () => {
+      // Arrange
+      const receiverSend = vi.fn();
+      mocks.getAllWindowsMock.mockReturnValue([
+        {
+          webContents: {
+            id: 202,
+            isDestroyed: () => false,
+            send: receiverSend,
+          },
+        },
+      ]);
+
+      initializeInventoryWindowHandlers(devPaths, () => '/tmp');
+      const listener = mocks.onMock.mock.calls.find(
+        (call) => call[0] === 'inventory:item-drag-state',
+      )?.[1];
+
+      // Act
+      listener?.(
+        {
+          sender: {
+            id: 101,
+          },
+        },
+        {
+          active: true,
+          fingerprint: 'fp-1',
+          sourceFilePath: '/tmp/sorc.d2s',
+          sourceFileType: 'd2s',
+          sourceLocationContext: ' stash ',
+          rawItemJson: '{"id":42}',
+          gridWidth: 1,
+          gridHeight: 1,
+        },
+      );
+
+      // Assert
+      expect(receiverSend).toHaveBeenCalledWith(
+        'inventory:item-drag-state',
+        expect.objectContaining({ sourceLocationContext: 'stash' }),
+      );
+    });
+  });
+
   describe('If inventory:item-drag-state is emitted with an unknown source location context', () => {
     it('Then no payload is relayed to renderer windows', () => {
       // Arrange
