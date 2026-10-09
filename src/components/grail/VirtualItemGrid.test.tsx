@@ -96,90 +96,88 @@ function createMockProgressLookup(
   return map;
 }
 
-describe('VirtualItemGrid Column Count Calculation', () => {
-  describe('When getColumnCount is called', () => {
-    describe('If the container is narrower than two minimum-width columns', () => {
-      it('Then should return 1 column', () => {
-        // Arrange
-        const twoColumnThreshold = 2 * MIN_COLUMN_WIDTH + COLUMN_GUTTER;
+describe('When getColumnCount is called', () => {
+  describe('If the container is narrower than two minimum-width columns', () => {
+    it('Then should return 1 column', () => {
+      // Arrange
+      const twoColumnThreshold = 2 * MIN_COLUMN_WIDTH + COLUMN_GUTTER;
 
-        // Act
-        const narrowColumnCount = getColumnCount(320);
-        const justBelowThresholdColumnCount = getColumnCount(twoColumnThreshold - 1);
+      // Act
+      const narrowColumnCount = getColumnCount(320);
+      const justBelowThresholdColumnCount = getColumnCount(twoColumnThreshold - 1);
 
-        // Assert
-        expect(narrowColumnCount).toBe(1);
-        expect(justBelowThresholdColumnCount).toBe(1);
-      });
+      // Assert
+      expect(narrowColumnCount).toBe(1);
+      expect(justBelowThresholdColumnCount).toBe(1);
     });
+  });
 
-    describe('If the container width is zero, negative or not a number', () => {
-      it('Then should fall back to 1 column', () => {
-        // Arrange
-        const invalidWidths = [0, -100, Number.NaN];
+  describe('If the container width is zero, negative or not a number', () => {
+    it('Then should fall back to 1 column', () => {
+      // Arrange
+      const invalidWidths = [0, -100, Number.NaN];
 
-        // Act
-        const columnCounts = invalidWidths.map((width) => getColumnCount(width));
+      // Act
+      const columnCounts = invalidWidths.map((width) => getColumnCount(width));
 
-        // Assert
-        expect(columnCounts).toEqual([1, 1, 1]);
-      });
+      // Assert
+      expect(columnCounts).toEqual([1, 1, 1]);
     });
+  });
 
-    describe('If the container fits exactly N minimum-width columns', () => {
-      it('Then should return N columns', () => {
-        // Arrange
-        const widthFor = (columns: number) =>
-          columns * MIN_COLUMN_WIDTH + (columns - 1) * COLUMN_GUTTER;
+  describe('If the container fits exactly N minimum-width columns', () => {
+    it('Then should return N columns', () => {
+      // Arrange
+      const widthFor = (columns: number) =>
+        columns * MIN_COLUMN_WIDTH + (columns - 1) * COLUMN_GUTTER;
 
-        // Act
-        const columnCounts = [
-          getColumnCount(widthFor(2)),
-          getColumnCount(widthFor(3)),
-          getColumnCount(widthFor(6)),
-          getColumnCount(widthFor(6) - 1),
-        ];
+      // Act
+      const columnCounts = [
+        getColumnCount(widthFor(2)),
+        getColumnCount(widthFor(3)),
+        getColumnCount(widthFor(6)),
+        getColumnCount(widthFor(6) - 1),
+      ];
 
-        // Assert
-        expect(columnCounts).toEqual([2, 3, 6, 5]);
-      });
+      // Assert
+      expect(columnCounts).toEqual([2, 3, 6, 5]);
     });
+  });
 
-    describe('If the grid spans the full content width of typical windows', () => {
-      it('Then should keep card widths between the minimum and roughly 230px', () => {
-        // Arrange
-        const containerWidths = [];
-        for (let width = 768; width <= 2560; width += 16) {
-          containerWidths.push(width);
-        }
+  describe('If the grid spans the full content width of typical windows', () => {
+    it('Then should keep card widths between the minimum and roughly 230px', () => {
+      // Arrange
+      const containerWidths = [];
+      for (let width = 768; width <= 2560; width += 16) {
+        containerWidths.push(width);
+      }
 
-        // Act
-        const columnWidths = containerWidths.map((width) => {
-          const columns = getColumnCount(width);
-          return (width - (columns - 1) * COLUMN_GUTTER) / columns;
-        });
-
-        // Assert
-        expect(Math.min(...columnWidths)).toBeGreaterThanOrEqual(MIN_COLUMN_WIDTH);
-        expect(Math.max(...columnWidths)).toBeLessThanOrEqual(230);
+      // Act
+      const columnWidths = containerWidths.map((width) => {
+        const columns = getColumnCount(width);
+        return (width - (columns - 1) * COLUMN_GUTTER) / columns;
       });
+
+      // Assert
+      expect(Math.min(...columnWidths)).toBeGreaterThanOrEqual(MIN_COLUMN_WIDTH);
+      expect(Math.max(...columnWidths)).toBeLessThanOrEqual(230);
     });
+  });
 
-    describe('If the container grows', () => {
-      it('Then should never decrease the column count', () => {
-        // Arrange
-        const widths: number[] = [];
-        for (let width = 300; width <= 2560; width += 10) {
-          widths.push(width);
-        }
+  describe('If the container grows', () => {
+    it('Then should never decrease the column count', () => {
+      // Arrange
+      const widths: number[] = [];
+      for (let width = 300; width <= 2560; width += 10) {
+        widths.push(width);
+      }
 
-        // Act
-        const columnCounts = widths.map((width) => getColumnCount(width));
+      // Act
+      const columnCounts = widths.map((width) => getColumnCount(width));
 
-        // Assert
-        const decreases = columnCounts.filter((count, index) => count < columnCounts[index - 1]);
-        expect(decreases).toEqual([]);
-      });
+      // Assert
+      const decreases = columnCounts.filter((count, index) => count < columnCounts[index - 1]);
+      expect(decreases).toEqual([]);
     });
   });
 });
@@ -255,6 +253,19 @@ describe('When createGridRows is called', () => {
     });
   });
 
+  describe('If a group has no found count', () => {
+    it('Then the header shows zero found items', () => {
+      // Arrange
+      const items = [1, 2].map((n) => createMockItem({ id: `item-${n}` }));
+
+      // Act
+      const rows = createGridRows([{ title: 'Helms', items }], 2);
+
+      // Assert
+      expect(rows[0]).toMatchObject({ type: 'header', itemCount: 2, foundCount: 0 });
+    });
+  });
+
   describe('If group headers are hidden', () => {
     it('Then emits only item rows in item order', () => {
       // Arrange
@@ -272,7 +283,7 @@ describe('When createGridRows is called', () => {
   });
 });
 
-describe('VirtualItemGrid Component', () => {
+describe('When VirtualItemGrid is rendered', () => {
   beforeEach(() => {
     stubLayout();
   });
@@ -281,299 +292,297 @@ describe('VirtualItemGrid Component', () => {
     vi.restoreAllMocks();
   });
 
-  describe('When VirtualItemGrid is rendered', () => {
-    describe('If groupedItems is empty', () => {
-      it('Then should render an empty scroll container without rows', () => {
-        // Arrange
-        const progressLookup = createMockProgressLookup();
-        const characters: Character[] = [];
-        const onItemClick = vi.fn();
+  describe('If groupedItems is empty', () => {
+    it('Then should render an empty scroll container without rows', () => {
+      // Arrange
+      const progressLookup = createMockProgressLookup();
+      const characters: Character[] = [];
+      const onItemClick = vi.fn();
 
-        // Act
-        const { container } = render(
-          <VirtualItemGrid
-            groupedItems={[]}
-            showGroupHeaders
-            progressLookup={progressLookup}
-            characters={characters}
-            onItemClick={onItemClick}
-          />,
-        );
+      // Act
+      const { container } = render(
+        <VirtualItemGrid
+          groupedItems={[]}
+          showGroupHeaders
+          progressLookup={progressLookup}
+          characters={characters}
+          onItemClick={onItemClick}
+        />,
+      );
 
-        // Assert
-        expect(container.firstElementChild).toHaveClass('min-h-0', 'flex-1', 'overflow-auto');
-        expect(screen.queryAllByTestId('item-grid-row')).toHaveLength(0);
-      });
+      // Assert
+      expect(container.firstElementChild).toHaveClass('min-h-0', 'flex-1', 'overflow-auto');
+      expect(screen.queryAllByTestId('item-grid-row')).toHaveLength(0);
+    });
+  });
+
+  describe('If groupedItems has one group', () => {
+    it('Then should render group header with title', () => {
+      // Arrange
+      const groupedItems = [
+        {
+          title: 'Unique Armor',
+          items: [createMockItem({ id: 'item-1', name: 'Harlequin Crest' })],
+          foundCount: 1,
+        },
+      ];
+      const progressLookup = createMockProgressLookup();
+      const characters: Character[] = [];
+      const onItemClick = vi.fn();
+
+      // Act
+      render(
+        <VirtualItemGrid
+          groupedItems={groupedItems}
+          showGroupHeaders
+          progressLookup={progressLookup}
+          characters={characters}
+          onItemClick={onItemClick}
+        />,
+      );
+
+      // Assert
+      expect(screen.getByText('Unique Armor')).toBeDefined();
     });
 
-    describe('If groupedItems has one group', () => {
-      it('Then should render group header with title', () => {
-        // Arrange
-        const groupedItems = [
-          {
-            title: 'Unique Armor',
-            items: [createMockItem({ id: 'item-1', name: 'Harlequin Crest' })],
-            foundCount: 1,
-          },
-        ];
-        const progressLookup = createMockProgressLookup();
-        const characters: Character[] = [];
-        const onItemClick = vi.fn();
+    it('Then should render badge with found count', () => {
+      // Arrange
+      const groupedItems = [
+        {
+          title: 'Unique Armor',
+          items: [
+            createMockItem({ id: 'item-1', name: 'Harlequin Crest' }),
+            createMockItem({ id: 'item-2', name: "Tyrael's Might" }),
+          ],
+          foundCount: 1,
+        },
+      ];
+      const progressLookup = createMockProgressLookup();
+      const characters: Character[] = [];
+      const onItemClick = vi.fn();
 
-        // Act
-        render(
-          <VirtualItemGrid
-            groupedItems={groupedItems}
-            showGroupHeaders
-            progressLookup={progressLookup}
-            characters={characters}
-            onItemClick={onItemClick}
-          />,
-        );
+      // Act
+      render(
+        <VirtualItemGrid
+          groupedItems={groupedItems}
+          showGroupHeaders
+          progressLookup={progressLookup}
+          characters={characters}
+          onItemClick={onItemClick}
+        />,
+      );
 
-        // Assert
-        expect(screen.getByText('Unique Armor')).toBeDefined();
-      });
-
-      it('Then should render badge with found count', () => {
-        // Arrange
-        const groupedItems = [
-          {
-            title: 'Unique Armor',
-            items: [
-              createMockItem({ id: 'item-1', name: 'Harlequin Crest' }),
-              createMockItem({ id: 'item-2', name: "Tyrael's Might" }),
-            ],
-            foundCount: 1,
-          },
-        ];
-        const progressLookup = createMockProgressLookup();
-        const characters: Character[] = [];
-        const onItemClick = vi.fn();
-
-        // Act
-        render(
-          <VirtualItemGrid
-            groupedItems={groupedItems}
-            showGroupHeaders
-            progressLookup={progressLookup}
-            characters={characters}
-            onItemClick={onItemClick}
-          />,
-        );
-
-        // Assert
-        expect(screen.getByText('1/2')).toBeDefined();
-      });
-
-      it('Then should render all items in the group', () => {
-        // Arrange
-        const groupedItems = [
-          {
-            title: 'Unique Armor',
-            items: [
-              createMockItem({ id: 'item-1', name: 'Harlequin Crest' }),
-              createMockItem({ id: 'item-2', name: "Tyrael's Might" }),
-            ],
-            foundCount: 1,
-          },
-        ];
-        const progressLookup = createMockProgressLookup();
-        const characters: Character[] = [];
-        const onItemClick = vi.fn();
-
-        // Act
-        render(
-          <VirtualItemGrid
-            groupedItems={groupedItems}
-            showGroupHeaders
-            progressLookup={progressLookup}
-            characters={characters}
-            onItemClick={onItemClick}
-          />,
-        );
-
-        // Assert
-        expect(screen.getByText('Harlequin Crest')).toBeDefined();
-        expect(screen.getByText("Tyrael's Might")).toBeDefined();
-      });
+      // Assert
+      expect(screen.getByText('1/2')).toBeDefined();
     });
 
-    describe('If groupedItems has multiple groups', () => {
-      it('Then should render all group headers', () => {
-        // Arrange
-        const groupedItems = [
-          {
-            title: 'Unique Armor',
-            items: [createMockItem({ id: 'item-1', name: 'Harlequin Crest' })],
-            foundCount: 1,
-          },
-          {
-            title: 'Unique Weapons',
-            items: [createMockItem({ id: 'item-2', name: 'Windforce' })],
-            foundCount: 0,
-          },
-        ];
-        const progressLookup = createMockProgressLookup();
-        const characters: Character[] = [];
-        const onItemClick = vi.fn();
+    it('Then should render all items in the group', () => {
+      // Arrange
+      const groupedItems = [
+        {
+          title: 'Unique Armor',
+          items: [
+            createMockItem({ id: 'item-1', name: 'Harlequin Crest' }),
+            createMockItem({ id: 'item-2', name: "Tyrael's Might" }),
+          ],
+          foundCount: 1,
+        },
+      ];
+      const progressLookup = createMockProgressLookup();
+      const characters: Character[] = [];
+      const onItemClick = vi.fn();
 
-        // Act
-        render(
-          <VirtualItemGrid
-            groupedItems={groupedItems}
-            showGroupHeaders
-            progressLookup={progressLookup}
-            characters={characters}
-            onItemClick={onItemClick}
-          />,
-        );
+      // Act
+      render(
+        <VirtualItemGrid
+          groupedItems={groupedItems}
+          showGroupHeaders
+          progressLookup={progressLookup}
+          characters={characters}
+          onItemClick={onItemClick}
+        />,
+      );
 
-        // Assert
-        expect(screen.getByText('Unique Armor')).toBeDefined();
-        expect(screen.getByText('Unique Weapons')).toBeDefined();
-      });
+      // Assert
+      expect(screen.getByText('Harlequin Crest')).toBeDefined();
+      expect(screen.getByText("Tyrael's Might")).toBeDefined();
+    });
+  });
 
-      it('Then should render items from all groups', () => {
-        // Arrange
-        const groupedItems = [
-          {
-            title: 'Unique Armor',
-            items: [createMockItem({ id: 'item-1', name: 'Harlequin Crest' })],
-            foundCount: 1,
-          },
-          {
-            title: 'Unique Weapons',
-            items: [createMockItem({ id: 'item-2', name: 'Windforce' })],
-            foundCount: 0,
-          },
-        ];
-        const progressLookup = createMockProgressLookup();
-        const characters: Character[] = [];
-        const onItemClick = vi.fn();
+  describe('If groupedItems has multiple groups', () => {
+    it('Then should render all group headers', () => {
+      // Arrange
+      const groupedItems = [
+        {
+          title: 'Unique Armor',
+          items: [createMockItem({ id: 'item-1', name: 'Harlequin Crest' })],
+          foundCount: 1,
+        },
+        {
+          title: 'Unique Weapons',
+          items: [createMockItem({ id: 'item-2', name: 'Windforce' })],
+          foundCount: 0,
+        },
+      ];
+      const progressLookup = createMockProgressLookup();
+      const characters: Character[] = [];
+      const onItemClick = vi.fn();
 
-        // Act
-        render(
-          <VirtualItemGrid
-            groupedItems={groupedItems}
-            showGroupHeaders
-            progressLookup={progressLookup}
-            characters={characters}
-            onItemClick={onItemClick}
-          />,
-        );
+      // Act
+      render(
+        <VirtualItemGrid
+          groupedItems={groupedItems}
+          showGroupHeaders
+          progressLookup={progressLookup}
+          characters={characters}
+          onItemClick={onItemClick}
+        />,
+      );
 
-        // Assert
-        expect(screen.getByText('Harlequin Crest')).toBeDefined();
-        expect(screen.getByText('Windforce')).toBeDefined();
-      });
+      // Assert
+      expect(screen.getByText('Unique Armor')).toBeDefined();
+      expect(screen.getByText('Unique Weapons')).toBeDefined();
     });
 
-    describe('If item click handler is provided', () => {
-      it('Then should call onItemClick when item is clicked', () => {
-        // Arrange
-        const groupedItems = [
-          {
-            title: 'Unique Armor',
-            items: [createMockItem({ id: 'item-1', name: 'Harlequin Crest' })],
-            foundCount: 1,
-          },
-        ];
-        const progressLookup = createMockProgressLookup();
-        const characters: Character[] = [];
-        const onItemClick = vi.fn();
+    it('Then should render items from all groups', () => {
+      // Arrange
+      const groupedItems = [
+        {
+          title: 'Unique Armor',
+          items: [createMockItem({ id: 'item-1', name: 'Harlequin Crest' })],
+          foundCount: 1,
+        },
+        {
+          title: 'Unique Weapons',
+          items: [createMockItem({ id: 'item-2', name: 'Windforce' })],
+          foundCount: 0,
+        },
+      ];
+      const progressLookup = createMockProgressLookup();
+      const characters: Character[] = [];
+      const onItemClick = vi.fn();
 
-        // Act
-        render(
-          <VirtualItemGrid
-            groupedItems={groupedItems}
-            showGroupHeaders
-            progressLookup={progressLookup}
-            characters={characters}
-            onItemClick={onItemClick}
-          />,
-        );
+      // Act
+      render(
+        <VirtualItemGrid
+          groupedItems={groupedItems}
+          showGroupHeaders
+          progressLookup={progressLookup}
+          characters={characters}
+          onItemClick={onItemClick}
+        />,
+      );
 
-        const itemCard = screen.getByTestId('item-card-item-1');
-        itemCard.click();
-
-        // Assert
-        expect(onItemClick).toHaveBeenCalledWith('item-1');
-      });
+      // Assert
+      expect(screen.getByText('Harlequin Crest')).toBeDefined();
+      expect(screen.getByText('Windforce')).toBeDefined();
     });
+  });
 
-    describe('If item has progress data', () => {
-      it('Then should pass progress data to ItemCard', () => {
-        // Arrange
-        const item = createMockItem({ id: 'item-1', name: 'Harlequin Crest' });
-        const groupedItems = [
-          {
-            title: 'Unique Armor',
-            items: [item],
-            foundCount: 1,
-          },
-        ];
-        const normalProgress: GrailProgress[] = [
-          {
-            id: 'progress-1',
-            characterId: 'char-1',
-            itemId: 'item-1',
-            manuallyAdded: false,
-            isEthereal: false,
-          },
-        ];
-        const progressLookup = createMockProgressLookup([
-          { itemId: 'item-1', normalProgress, etherealProgress: [] },
-        ]);
-        const characters: Character[] = [];
-        const onItemClick = vi.fn();
+  describe('If item click handler is provided', () => {
+    it('Then should call onItemClick when item is clicked', () => {
+      // Arrange
+      const groupedItems = [
+        {
+          title: 'Unique Armor',
+          items: [createMockItem({ id: 'item-1', name: 'Harlequin Crest' })],
+          foundCount: 1,
+        },
+      ];
+      const progressLookup = createMockProgressLookup();
+      const characters: Character[] = [];
+      const onItemClick = vi.fn();
 
-        // Act
-        render(
-          <VirtualItemGrid
-            groupedItems={groupedItems}
-            showGroupHeaders
-            progressLookup={progressLookup}
-            characters={characters}
-            onItemClick={onItemClick}
-          />,
-        );
+      // Act
+      render(
+        <VirtualItemGrid
+          groupedItems={groupedItems}
+          showGroupHeaders
+          progressLookup={progressLookup}
+          characters={characters}
+          onItemClick={onItemClick}
+        />,
+      );
 
-        // Assert - ItemCard is rendered (progress is passed internally)
-        expect(screen.getByTestId('item-card-item-1')).toBeDefined();
-      });
+      const itemCard = screen.getByTestId('item-card-item-1');
+      itemCard.click();
+
+      // Assert
+      expect(onItemClick).toHaveBeenCalledWith('item-1');
     });
+  });
 
-    describe('If item has no progress data in lookup', () => {
-      it('Then should use empty progress arrays', () => {
-        // Arrange
-        const item = createMockItem({ id: 'item-1', name: 'Harlequin Crest' });
-        const groupedItems = [
-          {
-            title: 'Unique Armor',
-            items: [item],
-            foundCount: 0,
-          },
-        ];
-        // Empty progress lookup - item-1 is not in the map
-        const progressLookup = createMockProgressLookup();
-        const characters: Character[] = [];
-        const onItemClick = vi.fn();
+  describe('If item has progress data', () => {
+    it('Then should pass progress data to ItemCard', () => {
+      // Arrange
+      const item = createMockItem({ id: 'item-1', name: 'Harlequin Crest' });
+      const groupedItems = [
+        {
+          title: 'Unique Armor',
+          items: [item],
+          foundCount: 1,
+        },
+      ];
+      const normalProgress: GrailProgress[] = [
+        {
+          id: 'progress-1',
+          characterId: 'char-1',
+          itemId: 'item-1',
+          manuallyAdded: false,
+          isEthereal: false,
+        },
+      ];
+      const progressLookup = createMockProgressLookup([
+        { itemId: 'item-1', normalProgress, etherealProgress: [] },
+      ]);
+      const characters: Character[] = [];
+      const onItemClick = vi.fn();
 
-        // Act
-        render(
-          <VirtualItemGrid
-            groupedItems={groupedItems}
-            showGroupHeaders
-            progressLookup={progressLookup}
-            characters={characters}
-            onItemClick={onItemClick}
-          />,
-        );
+      // Act
+      render(
+        <VirtualItemGrid
+          groupedItems={groupedItems}
+          showGroupHeaders
+          progressLookup={progressLookup}
+          characters={characters}
+          onItemClick={onItemClick}
+        />,
+      );
 
-        // Assert - ItemCard is still rendered with empty progress
-        expect(screen.getByTestId('item-card-item-1')).toBeDefined();
-      });
+      // Assert - ItemCard is rendered (progress is passed internally)
+      expect(screen.getByTestId('item-card-item-1')).toBeDefined();
+    });
+  });
+
+  describe('If item has no progress data in lookup', () => {
+    it('Then should use empty progress arrays', () => {
+      // Arrange
+      const item = createMockItem({ id: 'item-1', name: 'Harlequin Crest' });
+      const groupedItems = [
+        {
+          title: 'Unique Armor',
+          items: [item],
+          foundCount: 0,
+        },
+      ];
+      // Empty progress lookup - item-1 is not in the map
+      const progressLookup = createMockProgressLookup();
+      const characters: Character[] = [];
+      const onItemClick = vi.fn();
+
+      // Act
+      render(
+        <VirtualItemGrid
+          groupedItems={groupedItems}
+          showGroupHeaders
+          progressLookup={progressLookup}
+          characters={characters}
+          onItemClick={onItemClick}
+        />,
+      );
+
+      // Assert - ItemCard is still rendered with empty progress
+      expect(screen.getByTestId('item-card-item-1')).toBeDefined();
     });
   });
 });
@@ -723,7 +732,11 @@ describe('When VirtualItemGrid renders a group with far more items than fit into
       expect(renderedCards.length).toBeLessThan(items.length);
       expect(screen.getByTestId('item-card-item-0')).toBeInTheDocument();
       expect(screen.queryByTestId('item-card-item-49')).not.toBeInTheDocument();
-      expect(screen.queryByText('Unique Armor') !== null).toBe(showGroupHeaders);
+      if (showGroupHeaders) {
+        expect(screen.getByText('Unique Armor')).toBeInTheDocument();
+      } else {
+        expect(screen.queryByText('Unique Armor')).not.toBeInTheDocument();
+      }
     });
   });
 });

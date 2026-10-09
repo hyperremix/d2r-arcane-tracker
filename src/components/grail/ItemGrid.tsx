@@ -429,7 +429,9 @@ function GridContainer({
       groupedItems.map((group) => ({
         ...group,
         // The found count is only shown in group headers, so skip counting when they are hidden
-        foundCount: showGroupHeaders ? calculateGroupFoundCount(group.items, progressLookup) : 0,
+        foundCount: showGroupHeaders
+          ? calculateGroupFoundCount(group.items, progressLookup)
+          : undefined,
       })),
     [groupedItems, progressLookup, showGroupHeaders],
   );

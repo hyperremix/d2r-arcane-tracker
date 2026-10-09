@@ -87,12 +87,13 @@ const HEADER_ROW_HEIGHT_ESTIMATE = 60;
 const ITEM_ROW_HEIGHT_ESTIMATE = 180;
 
 /**
- * A group of items shown in the grid, with the number of items of the group that have been found.
+ * A group of items shown in the grid. `foundCount` is the number of items of the group that have
+ * been found; it is only shown in the group header, so it may be omitted when headers are hidden.
  */
 export interface ItemGridGroup {
   title: string;
   items: Item[];
-  foundCount: number;
+  foundCount?: number;
 }
 
 /**
@@ -132,7 +133,7 @@ export function createGridRows(
         key: `header-${groupIndex}-${group.title}`,
         title: group.title,
         itemCount: group.items.length,
-        foundCount: group.foundCount,
+        foundCount: group.foundCount ?? 0,
         isFirstGroup: groupIndex === 0,
       });
     }

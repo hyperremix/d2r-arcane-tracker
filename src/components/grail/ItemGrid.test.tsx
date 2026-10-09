@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { HolyGrailItemBuilder } from '@/fixtures';
 import type { ProgressLookupData } from '@/hooks/useProgressLookup';
 import { ItemGrid } from './ItemGrid';
+import type { ItemGridGroup } from './VirtualItemGrid';
 
 // ============================================================================
 // Helper functions copied from ItemGrid for testing
@@ -495,7 +496,29 @@ describe('When createListRows is called', () => {
 // ============================================================================
 
 // Records the groupedItems prop of every VirtualItemGrid render and how often it is mounted
-const groupedGridRenders = vi.hoisted(() => ({ groupedItems: [] as unknown[], mounts: 0 }));
+const groupedGridRenders = vi.hoisted(() => ({
+  groupedItems: [] as ItemGridGroup[][],
+  mounts: 0,
+}));
+
+function lastRenderedGroups(): ItemGridGroup[] {
+  return groupedGridRenders.groupedItems[groupedGridRenders.groupedItems.length - 1];
+}
+
+function createFoundProgressLookup(itemId: string) {
+  return new Map<string, ProgressLookupData>([
+    [
+      itemId,
+      {
+        normalFound: true,
+        etherealFound: false,
+        normalProgress: [],
+        etherealProgress: [],
+        overallFound: true,
+      },
+    ],
+  ]);
+}
 
 // Mock dependencies for component tests
 vi.mock('@/stores/grailStore', async (importOriginal) => ({
@@ -530,7 +553,7 @@ vi.mock('./VirtualItemGrid', () => ({
     showGroupHeaders,
     onItemClick,
   }: {
-    groupedItems: Array<{ title: string; items: Item[] }>;
+    groupedItems: ItemGridGroup[];
     showGroupHeaders: boolean;
     onItemClick: (itemId: string) => void;
   }) => {
@@ -710,41 +733,39 @@ describe('When ItemGrid component is rendered', () => {
     });
   });
 
-  describe('If viewMode "grid" and an item is found', () => {
-    it('Then only counts found items per group while group headers are shown', () => {
+  describe('If viewMode "grid", groupMode "category" and an item is found', () => {
+    it('Then passes the found count of each group to VirtualItemGrid', () => {
       // Arrange
       const items = [HolyGrailItemBuilder.new().withId('found').build()];
-      const progressLookup = new Map<string, ProgressLookupData>([
-        [
-          'found',
-          {
-            normalFound: true,
-            etherealFound: false,
-            normalProgress: [],
-            etherealProgress: [],
-            overallFound: true,
-          },
-        ],
-      ]);
-      const lastFoundCount = () =>
-        (
-          groupedGridRenders.groupedItems[groupedGridRenders.groupedItems.length - 1] as Array<{
-            foundCount: number;
-          }>
-        )[0].foundCount;
+      setupComponentMocks({
+        filteredItems: items,
+        groupMode: 'category',
+        progressLookup: createFoundProgressLookup('found'),
+      });
 
       // Act
-      setupComponentMocks({ filteredItems: items, groupMode: 'category', progressLookup });
-      const { unmount } = render(<ItemGrid />);
-      const groupedFoundCount = lastFoundCount();
-      unmount();
-      setupComponentMocks({ filteredItems: items, groupMode: 'none', progressLookup });
       render(<ItemGrid />);
-      const ungroupedFoundCount = lastFoundCount();
 
       // Assert
-      expect(groupedFoundCount).toBe(1);
-      expect(ungroupedFoundCount).toBe(0);
+      expect(lastRenderedGroups()[0].foundCount).toBe(1);
+    });
+  });
+
+  describe('If viewMode "grid", groupMode "none" and an item is found', () => {
+    it('Then skips counting found items because no group headers are shown', () => {
+      // Arrange
+      const items = [HolyGrailItemBuilder.new().withId('found').build()];
+      setupComponentMocks({
+        filteredItems: items,
+        groupMode: 'none',
+        progressLookup: createFoundProgressLookup('found'),
+      });
+
+      // Act
+      render(<ItemGrid />);
+
+      // Assert
+      expect(lastRenderedGroups()[0].foundCount).toBeUndefined();
     });
   });
 
