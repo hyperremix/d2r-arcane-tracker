@@ -10,7 +10,7 @@ import { getSubCategoryFilterLabel } from './subCategories';
 /**
  * Describes a removable chip representing an active filter.
  */
-export interface ActiveFilterChip {
+interface ActiveFilterChip {
   key: string;
   label: string;
   onRemove: () => void;

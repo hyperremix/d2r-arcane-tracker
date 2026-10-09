@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef } from 'react';
  * A debounced function: calling it (re)starts the delay, and only the last call's arguments are
  * passed to the callback once the delay elapses.
  */
-export interface DebouncedCallback<Args extends unknown[]> {
+interface DebouncedCallback<Args extends unknown[]> {
   (...args: Args): void;
   /** Drops the pending call, if any. */
   cancel: () => void;

@@ -7,7 +7,7 @@ import { translations } from '@/i18n/translations';
 
 type GrailTrackingKey = 'grailNormal' | 'grailEthereal' | 'grailRunes' | 'grailRunewords';
 
-export type GrailTrackingValues = Pick<Settings, GrailTrackingKey>;
+type GrailTrackingValues = Pick<Settings, GrailTrackingKey>;
 
 interface GrailTrackingSwitchProps {
   label: string;

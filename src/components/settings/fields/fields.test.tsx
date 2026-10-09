@@ -9,26 +9,42 @@ import { ThemeSelect } from './ThemeSelect';
 
 describe('When a shared settings select is rendered', () => {
   describe('If a value is selected', () => {
-    it('Then the trigger shows the translated label instead of the raw value', () => {
+    it('Then the game mode trigger shows the translated label instead of the raw value', () => {
+      // Arrange
+      const onValueChange = vi.fn();
+
+      // Act
+      render(<GameModeSelect id="mode" value={GameMode.Hardcore} onValueChange={onValueChange} />);
+
+      // Assert
+      expect(document.getElementById('mode')).toHaveTextContent('Hardcore Only');
+    });
+
+    it('Then the game version trigger shows the translated label instead of the raw value', () => {
       // Arrange
       const onValueChange = vi.fn();
 
       // Act
       render(
-        <>
-          <GameModeSelect id="mode" value={GameMode.Hardcore} onValueChange={onValueChange} />
-          <GameVersionSelect
-            id="version"
-            value={GameVersion.Classic}
-            onValueChange={onValueChange}
-          />
-          <ThemeSelect id="theme" value="system" onValueChange={onValueChange} />
-        </>,
+        <GameVersionSelect
+          id="version"
+          value={GameVersion.Classic}
+          onValueChange={onValueChange}
+        />,
       );
 
       // Assert
-      expect(document.getElementById('mode')).toHaveTextContent('Hardcore Only');
       expect(document.getElementById('version')).toHaveTextContent('Diablo II: Classic');
+    });
+
+    it('Then the theme trigger shows the translated label instead of the raw value', () => {
+      // Arrange
+      const onValueChange = vi.fn();
+
+      // Act
+      render(<ThemeSelect id="theme" value="system" onValueChange={onValueChange} />);
+
+      // Assert
       expect(document.getElementById('theme')).toHaveTextContent('System');
     });
   });

@@ -4,6 +4,11 @@ const foundIcons = new Map<string, string>();
 const missingIcons = new Set<string>();
 /** Requests that are still running, so concurrent callers share one IPC call per filename. */
 const pendingRequests = new Map<string, Promise<string | undefined>>();
+/**
+ * Incremented whenever the missing icons are forgotten. A request that started in an older
+ * generation must not mark its filename as missing, since its answer may predate the conversion.
+ */
+let generation = 0;
 
 /**
  * Returns the icon for a filename if it was loaded before.
@@ -31,6 +36,26 @@ export function isIconSettled(filename: string): boolean {
 }
 
 /**
+ * Asks the main process for an icon and remembers whether it was found. Never rejects.
+ * @param filename - Filename of the converted icon
+ */
+async function requestIcon(filename: string): Promise<string | undefined> {
+  const startedInGeneration = generation;
+  try {
+    const iconUrl = (await window.electronAPI?.icon.getByFilename(filename)) ?? undefined;
+    if (iconUrl) {
+      foundIcons.set(filename, iconUrl);
+    } else if (startedInGeneration === generation) {
+      missingIcons.add(filename);
+    }
+    return iconUrl;
+  } catch (error) {
+    console.error(`Failed to load icon ${filename}:`, error);
+    return undefined;
+  }
+}
+
+/**
  * Loads an icon by its filename, reusing a cached result or a request that is already running.
  * Failed requests are not cached, so they are retried by the next caller.
  * @param filename - Filename of the converted icon
@@ -49,22 +74,12 @@ export function loadIconByFilename(filename: string): Promise<string | undefined
     return pending;
   }
 
-  const request = (async () => {
-    try {
-      const iconUrl = (await window.electronAPI?.icon.getByFilename(filename)) ?? undefined;
-      if (iconUrl) {
-        foundIcons.set(filename, iconUrl);
-      } else {
-        missingIcons.add(filename);
-      }
-      return iconUrl;
-    } catch (error) {
-      console.error(`Failed to load icon ${filename}:`, error);
-      return undefined;
-    } finally {
+  const request = requestIcon(filename).finally(() => {
+    // After forgetMissingIcons() a newer request may own the entry
+    if (pendingRequests.get(filename) === request) {
       pendingRequests.delete(filename);
     }
-  })();
+  });
   pendingRequests.set(filename, request);
   return request;
 }
@@ -89,13 +104,18 @@ export async function loadFirstIcon(filenames: readonly string[]): Promise<strin
  * sprites, since icons that did not exist before may exist now.
  */
 export function forgetMissingIcons(): void {
+  generation += 1;
   missingIcons.clear();
+  // Requests that are still running may have started before the conversion finished, so new
+  // callers must not share them
+  pendingRequests.clear();
 }
 
 /**
  * Clears the shared icon cache. Only intended for tests, which share this module state.
  */
 export function clearIconCache(): void {
+  generation += 1;
   foundIcons.clear();
   missingIcons.clear();
   pendingRequests.clear();

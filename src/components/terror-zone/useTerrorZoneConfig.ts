@@ -9,7 +9,7 @@ import { translations } from '@/i18n/translations';
  */
 const SAVE_TOAST_ID = 'terror-zone-config-saved';
 
-export type BulkAction = 'enableAll' | 'disableAll';
+type BulkAction = 'enableAll' | 'disableAll';
 
 /**
  * A write that has been queued but has not started yet. Changes made while it waits share it.

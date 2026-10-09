@@ -80,8 +80,6 @@ export function ItemIconSettings() {
 
     try {
       const result = await window.electronAPI?.icon.convertSprites();
-      // Icons that were missing before may exist now
-      forgetMissingIcons();
       setConversionResult(result || null);
     } catch (error) {
       console.error('Sprite conversion failed:', error);
@@ -93,6 +91,8 @@ export function ItemIconSettings() {
         errors: [{ file: 'N/A', error: String(error) }],
       });
     } finally {
+      // Icons that were missing before may exist now, even if the conversion stopped part-way
+      forgetMissingIcons();
       setIsConverting(false);
     }
   }, []);
