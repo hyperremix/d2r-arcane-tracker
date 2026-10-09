@@ -110,11 +110,21 @@ class SaveFileMonitor {
 
     // Initialize save directories
     this.initializeSaveDirectories();
+  }
 
-    // Start the tick reader for automatic file change detection
+  /**
+   * Starts the tick reader for automatic file change detection. The constructor starts no timers,
+   * so call this once right after construction. Calling it again while the tick reader runs does
+   * nothing. `shutdown` stops it.
+   */
+  start(): void {
+    if (this.tickReaderInterval) {
+      return;
+    }
+
     const tickInterval = resolveTickReaderInterval(this.grailDatabase);
     this.tickReaderInterval = setInterval(this.tickReader, tickInterval);
-    log.info('constructor', `Tick reader started (interval: ${tickInterval}ms)`);
+    log.info('start', `Tick reader started (interval: ${tickInterval}ms)`);
   }
 
   /**

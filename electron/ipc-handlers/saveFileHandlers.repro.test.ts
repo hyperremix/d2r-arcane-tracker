@@ -45,6 +45,7 @@ vi.mock('../services/itemDetection', () => ({
 }));
 vi.mock('../services/saveFileMonitor', () => ({
   SaveFileMonitor: vi.fn().mockImplementation(() => ({
+    start: vi.fn(),
     startMonitoring: vi.fn(),
     stopMonitoring: vi.fn(),
   })),

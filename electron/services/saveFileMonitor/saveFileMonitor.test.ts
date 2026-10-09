@@ -209,6 +209,30 @@ describe('When SaveFileMonitor is used', () => {
     });
   });
 
+  describe('If the tick reader is started', () => {
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('Then construction starts no timer and start runs exactly one until shutdown', async () => {
+      // Arrange
+      vi.useFakeTimers();
+      const newMonitor = new SaveFileMonitor(new EventBus(), mockDatabase as any);
+      const timersAfterConstruction = vi.getTimerCount();
+
+      // Act
+      newMonitor.start();
+      newMonitor.start();
+      const timersAfterStart = vi.getTimerCount();
+      await newMonitor.shutdown();
+
+      // Assert
+      expect(timersAfterConstruction).toBe(0);
+      expect(timersAfterStart).toBe(1);
+      expect(vi.getTimerCount()).toBe(0);
+    });
+  });
+
   describe('If getDefaultDirectory is called', () => {
     it('Then should return', () => {
       // Arrange
@@ -571,6 +595,7 @@ describe('When SaveFileMonitor is used', () => {
         saveFileDirectory: '/test/saves',
       });
       monitor = new SaveFileMonitor(eventBus, mockDatabase as any);
+      monitor.start();
     });
 
     afterEach(() => {
@@ -762,6 +787,7 @@ describe('When SaveFileMonitor is used', () => {
       });
       mockDatabase.getAllSaveFileStates.mockReturnValue([]);
       monitor = new SaveFileMonitor(eventBus, mockDatabase as any);
+      monitor.start();
       vi.spyOn(monitor as any, 'findExistingSaveDirectories').mockResolvedValue(['/test/saves']);
     });
 
