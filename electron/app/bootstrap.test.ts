@@ -96,8 +96,21 @@ vi.mock('../services/itemDetection', () => ({
     return { setGrailItems: vi.fn(), initializeFromDatabase: vi.fn() };
   }),
 }));
-vi.mock('../services/memoryReader', () => ({ MemoryReader: vi.fn() }));
-vi.mock('../services/processMonitor', () => ({ ProcessMonitor: vi.fn() }));
+vi.mock('../services/memoryReader', () => ({
+  MemoryReader: vi.fn(function MemoryReader() {
+    return { shutdown: vi.fn() };
+  }),
+}));
+vi.mock('../services/processMonitor', () => ({
+  ProcessMonitor: vi.fn(function ProcessMonitor() {
+    return { startMonitoring: vi.fn(), shutdown: vi.fn() };
+  }),
+}));
+vi.mock('../services/win32/processMemory', () => ({
+  WindowsMemoryReaderImpl: vi.fn(function WindowsMemoryReaderImpl() {
+    return { kind: 'win32-process-memory' };
+  }),
+}));
 vi.mock('../services/runTracker', () => ({
   RunTrackerService: vi.fn(function RunTrackerService() {
     return { shutdown: mocks.log('runTracker.shutdown') };
@@ -141,7 +154,10 @@ vi.mock('../window/widgetWindow', () => ({
 }));
 
 import { initializeUpdateHandlers } from '../ipc-handlers/updateHandlers';
+import { EventBus } from '../services/EventBus';
+import { MemoryReader } from '../services/memoryReader';
 import { RunTrackerService } from '../services/runTracker';
+import { WindowsMemoryReaderImpl } from '../services/win32/processMemory';
 import { type RunningApp, startApp as start } from './bootstrap';
 import type { AppPaths } from './paths';
 
@@ -309,6 +325,48 @@ describe('When the app is bootstrapped', () => {
       // Assert
       expect(mocks.calls.filter((call) => call === 'database.close')).toHaveLength(1);
     });
+  });
+});
+
+describe('When the app starts', () => {
+  const originalPlatform = process.platform;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.calls.length = 0;
+    mocks.windows = [createWindow()];
+  });
+
+  afterEach(async () => {
+    await Promise.all(runningApps.splice(0).map((runningApp) => runningApp.shutdown()));
+    Object.defineProperty(process, 'platform', { value: originalPlatform, configurable: true });
+  });
+
+  it('If it runs on Windows, Then the memory reader gets the Win32 process memory bindings', async () => {
+    // Arrange
+    Object.defineProperty(process, 'platform', { value: 'win32', configurable: true });
+
+    // Act
+    await startApp(env);
+
+    // Assert
+    expect(WindowsMemoryReaderImpl).toHaveBeenCalledTimes(1);
+    expect(MemoryReader).toHaveBeenCalledWith(
+      expect.any(EventBus),
+      vi.mocked(WindowsMemoryReaderImpl).mock.results[0].value,
+    );
+  });
+
+  it('If it runs on another platform, Then the Win32 bindings are not used', async () => {
+    // Arrange
+    Object.defineProperty(process, 'platform', { value: 'darwin', configurable: true });
+
+    // Act
+    await startApp(env);
+
+    // Assert
+    expect(WindowsMemoryReaderImpl).not.toHaveBeenCalled();
+    expect(MemoryReader).not.toHaveBeenCalled();
   });
 });
 

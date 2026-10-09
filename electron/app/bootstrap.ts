@@ -54,16 +54,26 @@ export interface RunningApp {
 }
 
 /**
- * Starts the process monitor and the memory reader, which only work on Windows.
+ * Starts the process monitor and the memory reader, which only work on Windows. The Win32 memory
+ * bindings are imported here, so other platforms never load them.
  * @param eventBus - Event bus the services publish on
  * @returns The started services; undefined when unsupported or when they failed to start
  */
-function startWindowsServices(eventBus: EventBus): {
+async function startWindowsServices(eventBus: EventBus): Promise<{
   processMonitor?: ProcessMonitor;
   memoryReader?: MemoryReader;
-} {
+}> {
   if (process.platform !== 'win32') {
     return {};
+  }
+
+  // Loaded before the process monitor starts, so the memory reader subscribes before the first
+  // d2r-started event
+  let processMemory: typeof import('../services/win32/processMemory') | undefined;
+  try {
+    processMemory = await import('../services/win32/processMemory');
+  } catch (error) {
+    console.error('[bootstrap] Failed to load the Win32 memory bindings:', error);
   }
 
   let processMonitor: ProcessMonitor;
@@ -75,8 +85,15 @@ function startWindowsServices(eventBus: EventBus): {
     return {};
   }
 
+  if (!processMemory) {
+    return { processMonitor };
+  }
+
   try {
-    return { processMonitor, memoryReader: new MemoryReader(eventBus) };
+    return {
+      processMonitor,
+      memoryReader: new MemoryReader(eventBus, new processMemory.WindowsMemoryReaderImpl()),
+    };
   } catch (error) {
     console.error('[bootstrap] Failed to initialize memory reader:', error);
     return { processMonitor };
@@ -95,14 +112,14 @@ export async function startApp(paths: AppPaths): Promise<RunningApp> {
   // Every started part registers its teardown; shutdown runs them in reverse order
   const lifecycle = new AppLifecycle();
   try {
-    return startServices(paths, lifecycle);
+    return await startServices(paths, lifecycle);
   } catch (error) {
     await lifecycle.shutdown();
     throw error;
   }
 }
 
-function startServices(paths: AppPaths, lifecycle: AppLifecycle): RunningApp {
+async function startServices(paths: AppPaths, lifecycle: AppLifecycle): Promise<RunningApp> {
   const broadcastToRenderers = createRendererBroadcaster(() => webContents.getAllWebContents());
 
   // Forward service errors to the renderers
@@ -139,7 +156,7 @@ function startServices(paths: AppPaths, lifecycle: AppLifecycle): RunningApp {
   // Every settings write goes through the settings service, which announces it on the event bus
   const settings = new SettingsService(database, eventBus);
 
-  const { processMonitor, memoryReader } = startWindowsServices(eventBus);
+  const { processMonitor, memoryReader } = await startWindowsServices(eventBus);
   lifecycle.onShutdown('process monitor', () => processMonitor?.shutdown());
   lifecycle.onShutdown('memory reader', () => memoryReader?.shutdown());
 

@@ -3,49 +3,20 @@ import { KNOWN_D2R_BUILDS, PE_HEADER_READ_SIZE } from '../config/d2rBuilds';
 import { D2RGameState } from '../config/d2rPatterns';
 import { EventBus } from './EventBus';
 import { MemoryReader } from './memoryReader';
+import type { WindowsMemoryReader } from './win32/processMemory';
 
-// Mock win32-api
-vi.mock('win32-api', () => ({
-  Kernel32: {
-    load: vi.fn().mockReturnValue({
-      OpenProcess: vi.fn().mockReturnValue(1234),
-      GetLastError: vi.fn().mockReturnValue(0),
-    }),
-  },
-  ffi: {
-    load: vi.fn().mockReturnValue({
-      func: vi.fn((name: string) => {
-        if (name === 'CloseHandle') {
-          return vi.fn().mockReturnValue(true);
-        }
-        if (name === 'ReadProcessMemory') {
-          return vi.fn().mockReturnValue(true);
-        }
-        return vi.fn();
-      }),
-    }),
-  },
-}));
-
-// Mock child_process
-// vi.mock factories are hoisted above this declaration, so the mock must be hoisted too
-const mockExecAsync = vi.hoisted(() => vi.fn());
-
-vi.mock('node:child_process', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('node:child_process')>();
+/** Win32 memory access that finds no process; the tests that need memory replace it. */
+function createUnavailableProcessMemory(): WindowsMemoryReader {
   return {
-    ...actual,
-    exec: vi.fn(),
+    openProcess: vi.fn().mockResolvedValue(null),
+    closeHandle: vi.fn().mockResolvedValue(undefined),
+    getModuleInfo: vi.fn().mockResolvedValue(null),
+    readMemory: vi.fn().mockResolvedValue(null),
+    readInt32: vi.fn().mockResolvedValue(null),
+    readInt64: vi.fn().mockResolvedValue(null),
+    readModuleImage: vi.fn().mockResolvedValue(null),
   };
-});
-
-vi.mock('node:util', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('node:util')>();
-  return {
-    ...actual,
-    promisify: () => mockExecAsync,
-  };
-});
+}
 
 describe('When MemoryReader is instantiated', () => {
   let eventBus: EventBus;
@@ -53,10 +24,9 @@ describe('When MemoryReader is instantiated', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    mockExecAsync.mockReset();
 
     eventBus = new EventBus();
-    memoryReader = new MemoryReader(eventBus);
+    memoryReader = new MemoryReader(eventBus, createUnavailableProcessMemory());
   });
 
   afterEach(() => {
@@ -93,7 +63,7 @@ describe('When MemoryReader is instantiated', () => {
         configurable: true,
       });
 
-      const testMemoryReader = new MemoryReader(eventBus);
+      const testMemoryReader = new MemoryReader(eventBus, createUnavailableProcessMemory());
 
       // Act
       testMemoryReader.startPolling();
@@ -145,7 +115,7 @@ describe('When MemoryReader is instantiated', () => {
       const initialListenerCount = eventBus.listenerCount('d2r-started');
 
       // Act
-      const newMemoryReader = new MemoryReader(eventBus);
+      const newMemoryReader = new MemoryReader(eventBus, createUnavailableProcessMemory());
 
       // Assert
       expect(eventBus.listenerCount('d2r-started')).toBeGreaterThan(initialListenerCount);
@@ -159,7 +129,7 @@ describe('When MemoryReader is instantiated', () => {
       const initialListenerCount = eventBus.listenerCount('d2r-stopped');
 
       // Act
-      const newMemoryReader = new MemoryReader(eventBus);
+      const newMemoryReader = new MemoryReader(eventBus, createUnavailableProcessMemory());
 
       // Assert
       expect(eventBus.listenerCount('d2r-stopped')).toBeGreaterThan(initialListenerCount);
@@ -251,8 +221,7 @@ describe('When D2R starts and the memory offsets are resolved', () => {
     };
 
     eventBus = new EventBus();
-    memoryReader = new MemoryReader(eventBus);
-    Reflect.set(memoryReader, 'memoryReader', fakeReader);
+    memoryReader = new MemoryReader(eventBus, fakeReader as unknown as WindowsMemoryReader);
   });
 
   afterEach(async () => {
