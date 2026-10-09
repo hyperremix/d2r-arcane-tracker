@@ -43,7 +43,10 @@ export interface SplitStackOptions {
   sourceFileType: VaultSourceFileType;
   sourceStashTab: number;
   sourceItemCode: string;
-  /** Raw JSON of the source IItem. Required when sourceFileType is 'd2i' (modern stash). */
+  /**
+   * Raw JSON of the source IItem. Required for a modern (v105+) stash source. A pre-105 .d2i
+   * source with raw JSON is accepted and split as a classic stash.
+   */
   sourceRawItemJson?: string;
   splitCount: number;
   targets: SplitStackTarget[];
