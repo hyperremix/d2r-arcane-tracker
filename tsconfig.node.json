@@ -11,5 +11,5 @@
       "@/*": ["./src/*"]
     }
   },
-  "include": ["vite.config.ts", "vitest.config.ts", "config"]
+  "include": ["vite.config.ts", "vitest.config.ts", "drizzle.config.ts", "config"]
 }

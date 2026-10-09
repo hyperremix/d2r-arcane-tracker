@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm';
-import { index, integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
+import { check, index, integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 import type { Difficulty } from '../../../types/grail';
 import { items } from './items';
 
@@ -26,6 +26,8 @@ export const grailProgress = sqliteTable(
     index('idx_grail_progress_item').on(table.itemId),
     index('idx_grail_progress_found_date').on(table.foundDate),
     index('idx_grail_progress_character_item').on(table.characterId, table.itemId),
+    index('idx_grail_progress_updated_at').on(table.updatedAt),
+    check('grail_progress_difficulty_check', sql`difficulty IN ('normal', 'nightmare', 'hell')`),
   ],
 );
 

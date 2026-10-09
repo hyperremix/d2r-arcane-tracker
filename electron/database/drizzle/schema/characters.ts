@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm';
-import { index, integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
+import { check, index, integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 import type { CharacterClass } from '../../../types/grail';
 
 export const characters = sqliteTable(
@@ -32,6 +32,11 @@ export const characters = sqliteTable(
   (table) => [
     index('idx_characters_class').on(table.characterClass),
     index('idx_characters_deleted_at').on(table.deletedAt),
+    index('idx_characters_updated_at').on(table.updatedAt),
+    check(
+      'characters_character_class_check',
+      sql`character_class IN ('amazon', 'assassin', 'barbarian', 'druid', 'necromancer', 'paladin', 'sorceress', 'shared_stash')`,
+    ),
   ],
 );
 

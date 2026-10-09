@@ -10,7 +10,7 @@ export const runs = sqliteTable(
     sessionId: text('session_id')
       .notNull()
       .references(() => sessions.id, { onDelete: 'cascade' }),
-    characterId: text('character_id').references(() => characters.id),
+    characterId: text('character_id').references(() => characters.id, { onDelete: 'set null' }),
     runNumber: integer('run_number').notNull(),
     startTime: text('start_time').notNull(),
     endTime: text('end_time'),

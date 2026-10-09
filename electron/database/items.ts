@@ -1,10 +1,12 @@
-import { asc, eq } from 'drizzle-orm';
+import { createHash } from 'node:crypto';
+import { asc, count, eq, or, type Placeholder, sql } from 'drizzle-orm';
+import { items as grailItems } from '../items';
 import type { Item, Settings } from '../types/grail';
 import { dbItemToItem, itemToDbValues } from './converters';
 import { type DbItem, schema } from './drizzle';
 import type { DatabaseContext } from './types';
 
-const { items } = schema;
+const { items, settings } = schema;
 
 export function getAllItems(ctx: DatabaseContext): Item[] {
   const dbItems = ctx.db
@@ -71,19 +73,133 @@ export function getFilteredItems(ctx: DatabaseContext, userSettings: Settings): 
   });
 }
 
-export function insertItems(ctx: DatabaseContext, itemsToInsert: Item[]): void {
+type ItemDbValues = ReturnType<typeof itemToDbValues>;
+
+/**
+ * The columns written by the item upsert. This repeats the keys of `itemToDbValues` (converters.ts)
+ * on purpose: the converter's return type cannot be enumerated at runtime, and `satisfies` makes
+ * the compiler reject any key that `itemToDbValues` does not return. A column added to the
+ * converter must be added here too, or the upsert will not write it.
+ */
+const itemValueKeys = [
+  'id',
+  'name',
+  'link',
+  'code',
+  'itemBase',
+  'imageFilename',
+  'type',
+  'category',
+  'subCategory',
+  'treasureClass',
+  'setName',
+  'runes',
+  'etherealType',
+] as const satisfies ReadonlyArray<keyof ItemDbValues>;
+
+type UpdatableItemKey = Exclude<(typeof itemValueKeys)[number], 'id'>;
+const updatableItemKeys = itemValueKeys.filter((key): key is UpdatableItemKey => key !== 'id');
+
+/**
+ * Named placeholders for every item column, so one prepared statement serves all items; the real
+ * values are bound by name when the statement runs. The cast is needed because
+ * `Object.fromEntries` returns `{ [k: string]: Placeholder }`, which lacks the required column keys.
+ */
+const itemValuePlaceholders = Object.fromEntries(
+  itemValueKeys.map((key) => [key, sql.placeholder(key)]),
+) as Record<(typeof itemValueKeys)[number], Placeholder>;
+
+/** On conflict, take every item column from the proposed row (`excluded`). */
+const excludedItemValues = Object.fromEntries(
+  updatableItemKeys.map((key) => [key, sql`excluded.${sql.identifier(items[key].name)}`]),
+);
+
+/** True when the proposed row differs from the stored row in any item column. */
+const itemRowChanged = or(
+  ...updatableItemKeys.map(
+    (key) => sql`${items[key]} IS NOT excluded.${sql.identifier(items[key].name)}`,
+  ),
+);
+
+/**
+ * Inserts new items and updates existing ones, in one transaction. Rows whose values did not
+ * change are not written, so their updated_at trigger does not fire.
+ * @param ctx - Database context
+ * @param itemsToInsert - Items to insert or update
+ */
+export function insertItems(ctx: DatabaseContext, itemsToInsert: readonly Item[]): void {
+  const upsert = ctx.db
+    .insert(items)
+    .values(itemValuePlaceholders)
+    .onConflictDoUpdate({ target: items.id, set: excludedItemValues, setWhere: itemRowChanged })
+    .prepare();
   const insertMany = ctx.rawDb.transaction(() => {
     for (const item of itemsToInsert) {
       const values = itemToDbValues(item);
-      ctx.db
-        .insert(items)
-        .values(values)
-        .onConflictDoUpdate({
-          target: items.id,
-          set: values,
-        })
-        .run();
+      // better-sqlite3 rejects `undefined` for a named parameter, and `link` is optional on Item.
+      upsert.run({ ...values, link: values.link ?? null });
     }
   });
   insertMany();
+}
+
+/** Settings key that stores the hash of the item catalog the items table was last synced with. */
+export const ITEM_CATALOG_HASH_SETTING = 'grailItemCatalogHash';
+
+/**
+ * Hash of the static Holy Grail item catalog, as stored in the items table.
+ * @param catalog - The item catalog
+ */
+export function computeItemCatalogHash(catalog: readonly Item[]): string {
+  const hash = createHash('sha256');
+  for (const item of catalog) {
+    hash.update(JSON.stringify(itemToDbValues(item)));
+    hash.update('\n');
+  }
+  return hash.digest('hex');
+}
+
+let cachedCatalogHash: { catalog: readonly Item[]; hash: string } | undefined;
+
+function getItemCatalogHash(catalog: readonly Item[]): string {
+  if (cachedCatalogHash?.catalog !== catalog) {
+    cachedCatalogHash = { catalog, hash: computeItemCatalogHash(catalog) };
+  }
+  return cachedCatalogHash.hash;
+}
+
+/**
+ * Brings the items table in line with the static item catalog when the catalog changed since the
+ * last sync (detected by a hash stored in settings). Otherwise does nothing, so a normal start
+ * does not touch the items table.
+ * @param ctx - Database context
+ * @param catalog - The item catalog (defaults to the bundled Holy Grail data)
+ * @returns Whether the items table was synced
+ */
+export function syncItemCatalog(
+  ctx: DatabaseContext,
+  catalog: readonly Item[] = grailItems,
+): boolean {
+  const catalogHash = getItemCatalogHash(catalog);
+  const stored = ctx.db
+    .select({ value: settings.value })
+    .from(settings)
+    .where(eq(settings.key, ITEM_CATALOG_HASH_SETTING))
+    .get();
+  const itemCount = ctx.db.select({ total: count() }).from(items).get()?.total ?? 0;
+  if (stored?.value === catalogHash && itemCount >= catalog.length) {
+    return false;
+  }
+
+  const sync = ctx.rawDb.transaction(() => {
+    insertItems(ctx, catalog);
+    ctx.db
+      .insert(settings)
+      .values({ key: ITEM_CATALOG_HASH_SETTING, value: catalogHash })
+      .onConflictDoUpdate({ target: settings.key, set: { value: catalogHash } })
+      .run();
+  });
+  sync();
+  console.log(`[Database] Synced ${catalog.length} Holy Grail items with the item catalog`);
+  return true;
 }

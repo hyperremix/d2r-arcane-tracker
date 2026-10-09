@@ -62,16 +62,13 @@ class GrailDatabase {
   }
 
   /**
-   * Initializes the database schema by creating tables and indexes.
-   * This method is called during database construction and handles schema creation errors.
-   * Also runs cleanup operations to fix corrupted settings.
+   * Applies pending migrations and prepares settings and item data (see `initializeSchema`).
+   * Called when the database is opened.
    * @throws {Error} If schema initialization fails
    */
   private initializeSchema(): void {
     try {
-      schemaModule.createSchema(this);
-      // Clean up any corrupted settings from previous versions
-      settingsModule.cleanupCorruptedSettings(this);
+      schemaModule.initializeSchema(this);
     } catch (error) {
       console.error('Failed to initialize database schema:', error);
       throw error;
@@ -183,11 +180,6 @@ class GrailDatabase {
   }
   getOverallRunStatistics(): RunStatistics {
     return statisticsModule.getOverallRunStatistics(this);
-  }
-
-  // Schema/Seeding
-  upsertItemsFromGrailData(): void {
-    schemaModule.upsertItemsFromGrailData(this);
   }
 
   // Save file states

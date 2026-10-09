@@ -199,6 +199,42 @@ export function setSetting(ctx: DatabaseContext, key: keyof Settings, value: str
     .run();
 }
 
+/** Settings rows every database has. Missing rows are added at startup; existing values are kept. */
+const DEFAULT_SETTINGS: ReadonlyArray<{ key: keyof Settings; value: string }> = [
+  { key: 'saveDir', value: '' },
+  { key: 'lang', value: 'en' },
+  { key: 'gameMode', value: 'both' },
+  { key: 'grailNormal', value: 'true' },
+  { key: 'grailEthereal', value: 'false' },
+  { key: 'grailRunes', value: 'false' },
+  { key: 'grailRunewords', value: 'false' },
+  { key: 'enableSounds', value: 'true' },
+  { key: 'notificationVolume', value: '0.5' },
+  { key: 'inAppNotifications', value: 'true' },
+  { key: 'nativeNotifications', value: 'true' },
+  { key: 'needsSeeding', value: 'true' },
+  { key: 'theme', value: 'system' },
+  { key: 'showItemIcons', value: 'false' },
+  { key: 'wizardCompleted', value: 'false' },
+  { key: 'wizardSkipped', value: 'false' },
+  { key: 'runTrackerAutoStart', value: 'true' },
+  { key: 'runTrackerEndThreshold', value: '10' },
+  { key: 'runTrackerMemoryReading', value: 'false' },
+  { key: 'runTrackerMemoryPollingInterval', value: '500' },
+];
+
+/**
+ * Inserts the default value of every setting that has no row yet. Existing values are kept.
+ * @param ctx - Database context
+ */
+export function ensureDefaultSettings(ctx: DatabaseContext): void {
+  ctx.db
+    .insert(settings)
+    .values(DEFAULT_SETTINGS.map((setting) => ({ key: setting.key, value: setting.value })))
+    .onConflictDoNothing()
+    .run();
+}
+
 /**
  * Cleans up corrupted settings that have the value "[object Object]".
  * This can happen when an object is coerced to a string instead of being JSON.stringify'd.

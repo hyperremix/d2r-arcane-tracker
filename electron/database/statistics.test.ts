@@ -33,10 +33,10 @@ function insertCharacter(rawDb: DatabaseType): void {
 function insertSession(rawDb: DatabaseType, session: SessionRow): void {
   rawDb
     .prepare(
-      `INSERT INTO sessions (id, character_id, start_time, total_session_time, archived)
-       VALUES (?, ?, '2024-01-01T10:00:00.000Z', ?, ?)`,
+      `INSERT INTO sessions (id, start_time, total_session_time, archived)
+       VALUES (?, '2024-01-01T10:00:00.000Z', ?, ?)`,
     )
-    .run(session.id, CHARACTER_ID, session.totalSessionTime, session.archived ? 1 : 0);
+    .run(session.id, session.totalSessionTime, session.archived ? 1 : 0);
 }
 
 function insertRun(rawDb: DatabaseType, run: RunRow): void {

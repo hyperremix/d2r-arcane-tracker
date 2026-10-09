@@ -63,8 +63,26 @@ Stack: Electron 30, React 18, TypeScript, Vite, Tailwind CSS v4, shadcn/ui (Base
 | `bun run test` / `test:run` | Vitest in watch mode, or a single run |
 | `bun run test:coverage` | Tests with coverage (what CI runs) |
 | `bun run build` | Typecheck and build the Windows installer ([RELEASE.md](docs/RELEASE.md)) |
+| `bun run db:generate` | Generate a database migration from the drizzle schema ([Changing the database schema](#changing-the-database-schema)) |
 
 A pre-commit hook runs `typecheck` and Biome on staged files.
+
+## Changing the database schema
+
+The drizzle schema in `electron/database/drizzle/schema/` is the single source of truth. The app applies pending migrations from `electron/database/migrations/` at startup (`initializeSchema` in `electron/database/schema.ts`).
+
+1. Edit the drizzle schema.
+2. Run `bun run db:generate -- --name <short_description>`. drizzle-kit writes `NNNN_<short_description>.sql` and updates `migrations/meta/`.
+3. Review the SQL and commit it together with the `meta/` changes. Never edit a migration that is already on `main`; add a new one.
+
+Some things drizzle-kit doesn't generate, so add them to the migration by hand:
+
+- **Triggers.** Every table with `updated_at` has an `update_<table>_timestamp` trigger (see `0000_baseline.sql`). Changes that rebuild a table (`__new_<table>`, for example a changed foreign key) drop its trigger, so recreate it at the end.
+- **Data changes and one-time repairs.** Use `bun run db:generate -- --custom --name <short_description>` for an empty migration.
+
+The migration runner turns foreign keys off while migrating, so table rebuilds don't cascade-delete child rows. Add a test in `electron/database/migrator.test.ts` for migrations that move data. Default settings live in `DEFAULT_SETTINGS` in `electron/database/settings.ts`, not in migrations.
+
+Databases created before migrations existed have no recorded migrations. On their first start, `electron/database/legacyUpgrade.ts` brings them to the baseline and marks the baseline as applied. Leave that module alone for new schema changes.
 
 ## Making changes
 

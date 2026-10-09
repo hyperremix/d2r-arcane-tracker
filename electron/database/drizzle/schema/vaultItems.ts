@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm';
-import { index, integer, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
+import { check, index, integer, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core';
 import { characters } from './characters';
 import { items } from './items';
 
@@ -56,6 +56,14 @@ export const vaultItems = sqliteTable(
     index('idx_vault_items_grail_item_id').on(table.grailItemId),
     index('idx_vault_items_present_scan').on(table.isPresentInLatestScan),
     index('idx_vault_items_last_seen_at').on(table.lastSeenAt),
+    check(
+      'vault_items_source_file_type_check',
+      sql`source_file_type IN ('d2s', 'sss', 'd2x', 'd2i')`,
+    ),
+    check(
+      'vault_items_location_context_check',
+      sql`location_context IN ('equipped', 'inventory', 'stash', 'mercenary', 'corpse', 'unknown')`,
+    ),
   ],
 );
 

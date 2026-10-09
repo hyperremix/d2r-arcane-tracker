@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, type MockInstance, vi } fr
 import { createInMemoryDatabase } from '../test/helpers/databaseHelpers';
 import { createDrizzleDb } from './drizzle';
 import { backup, truncateUserData } from './management';
-import { createSchema } from './schema';
+import { initializeSchema } from './schema';
 import type { DatabaseContext } from './types';
 
 function createContext(backupImpl: (path: string) => Promise<unknown>): DatabaseContext {
@@ -56,7 +56,7 @@ describe('When user data is truncated', () => {
     errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     const rawDb = createInMemoryDatabase();
     ctx = { rawDb, db: createDrizzleDb(rawDb), dbPath: ':memory:' };
-    createSchema(ctx);
+    initializeSchema(ctx);
     rawDb.exec(`
       INSERT INTO characters (id, name, character_class) VALUES ('char-1', 'Hammerdin', 'paladin');
       INSERT INTO grail_progress (id, character_id, item_id)

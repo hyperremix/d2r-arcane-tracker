@@ -1,11 +1,38 @@
+import { cpSync, rmSync } from 'node:fs';
 import path from 'node:path';
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
-import { defineConfig } from 'vite';
+import { defineConfig, type Plugin } from 'vite';
 import electron from 'vite-plugin-electron/simple';
 import { getD2sSourceAliases } from './config/d2sAliases';
 
 const d2sSourceAliases = getD2sSourceAliases(__dirname);
+
+/**
+ * Copies the SQL migrations next to the bundled main process (`dist-electron/migrations`), where
+ * `resolveMigrationsFolder` in electron/database/migrator.ts looks for them at runtime.
+ * electron-builder packs `dist-electron` into the app archive.
+ */
+function copyMigrations(): Plugin {
+  const source = path.resolve(__dirname, 'electron/database/migrations');
+  return {
+    name: 'copy-database-migrations',
+    buildStart() {
+      // Rebuild in watch mode (bun run dev) when a migration is generated.
+      this.addWatchFile(path.join(source, 'meta', '_journal.json'));
+    },
+    writeBundle(options) {
+      const outDir = options.dir ?? path.dirname(options.file ?? '');
+      const target = path.join(outDir, 'migrations');
+      rmSync(target, { recursive: true, force: true });
+      // drizzle-kit snapshots are only needed to generate migrations, not to apply them.
+      cpSync(source, target, {
+        recursive: true,
+        filter: (file) => !file.endsWith('_snapshot.json'),
+      });
+    },
+  };
+}
 
 // https://vitejs.dev/config/
 export default defineConfig({
@@ -30,6 +57,7 @@ export default defineConfig({
           resolve: {
             alias: d2sSourceAliases,
           },
+          plugins: [copyMigrations()],
           build: {
             rollupOptions: {
               external: ['better-sqlite3', 'koffi'],
