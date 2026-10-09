@@ -37,8 +37,8 @@ function normalizeOptionalDate(value: Date | string | undefined): Date | undefin
   return Number.isNaN(parsed.getTime()) ? undefined : parsed;
 }
 
-function normalizeVaultGridDimension(value: unknown): number {
-  return Number.isInteger(value) && value && (value as number) > 0 ? (value as number) : 1;
+function normalizePositiveGridDimension(value: unknown): number {
+  return typeof value === 'number' && Number.isInteger(value) && value > 0 ? value : 1;
 }
 
 function toVaultDragTextPayload(
@@ -50,8 +50,8 @@ function toVaultDragTextPayload(
 
   return {
     id: parsed.id.trim(),
-    gridWidth: normalizeVaultGridDimension(parsed.gridWidth),
-    gridHeight: normalizeVaultGridDimension(parsed.gridHeight),
+    gridWidth: normalizePositiveGridDimension(parsed.gridWidth),
+    gridHeight: normalizePositiveGridDimension(parsed.gridHeight),
   };
 }
 
@@ -221,19 +221,9 @@ export function toActiveVaultDragItem(input: {
 }): ActiveVaultDragItem {
   return {
     id: input.id,
-    gridWidth:
-      Number.isInteger(input.gridWidth) && input.gridWidth && input.gridWidth > 0
-        ? input.gridWidth
-        : 1,
-    gridHeight:
-      Number.isInteger(input.gridHeight) && input.gridHeight && input.gridHeight > 0
-        ? input.gridHeight
-        : 1,
+    gridWidth: normalizePositiveGridDimension(input.gridWidth),
+    gridHeight: normalizePositiveGridDimension(input.gridHeight),
   };
-}
-
-export function normalizePositiveGridDimension(value: unknown): number {
-  return typeof value === 'number' && Number.isInteger(value) && value > 0 ? value : 1;
 }
 
 export function toActiveInventoryDragItem(input: {
@@ -337,6 +327,7 @@ export function parseInventoryDragStatePayload(
     typeof rawPayload.sourceFilePath !== 'string' ||
     rawPayload.sourceFilePath.trim().length === 0 ||
     typeof rawPayload.sourceFileType !== 'string' ||
+    rawPayload.sourceFileType.trim().length === 0 ||
     typeof rawPayload.sourceLocationContext !== 'string' ||
     rawPayload.sourceLocationContext.trim().length === 0 ||
     typeof rawPayload.rawItemJson !== 'string' ||
@@ -434,18 +425,8 @@ export function resolveActiveVaultDragItem(
   event: DragEvent<HTMLElement>,
   draggingVaultItem?: ActiveVaultDragItem | null,
 ): ActiveVaultDragItem | undefined {
-  const getDragData = (format: string): string => {
-    try {
-      return event.dataTransfer.getData(format) ?? '';
-    } catch {
-      return '';
-    }
-  };
-
-  const mimeItemId = getDragData(VAULT_DRAG_MIME).trim();
-  const textPayload = parseVaultTextPayload(
-    getDragData('text/plain') || getDragData('text') || getDragData('Text'),
-  );
+  const mimeItemId = readDragData(event, VAULT_DRAG_MIME).trim();
+  const textPayload = parseVaultTextPayload(readDragText(event));
 
   if (textPayload) {
     return {
@@ -472,17 +453,7 @@ export function resolveActiveInventoryDragItem(
   event: DragEvent<HTMLElement>,
   draggingInventoryItem?: ActiveInventoryDragItem | null,
 ): ActiveInventoryDragItem | undefined {
-  const getDragData = (format: string): string => {
-    try {
-      return event.dataTransfer.getData(format) ?? '';
-    } catch {
-      return '';
-    }
-  };
-
-  const parsedPayload = parseInventoryTextPayload(
-    getDragData('text/plain') || getDragData('text') || getDragData('Text'),
-  );
+  const parsedPayload = parseInventoryTextPayload(readDragText(event));
   if (parsedPayload) {
     const normalizedPayload = toInventoryDragStatePayload(parsedPayload);
     if (normalizedPayload) {
@@ -490,7 +461,7 @@ export function resolveActiveInventoryDragItem(
     }
   }
 
-  const mimeFingerprint = getDragData(INVENTORY_DRAG_MIME).trim();
+  const mimeFingerprint = readDragData(event, INVENTORY_DRAG_MIME).trim();
   const fallbackItem = draggingInventoryItem ?? undefined;
   if (!mimeFingerprint && !fallbackItem) {
     return undefined;
@@ -505,4 +476,31 @@ export function resolveActiveInventoryDragItem(
   }
 
   return fallbackItem;
+}
+
+/**
+ * Checks whether a drag carries an inventory item or a vault item of this app, either from this
+ * window (custom MIME types) or from another window (prefixed text payload).
+ */
+export function hasInventoryOrVaultDragData(event: DragEvent<HTMLElement>): boolean {
+  const dataTransferTypes = Array.from(event.dataTransfer?.types ?? []);
+  if (
+    dataTransferTypes.includes(INVENTORY_DRAG_MIME) ||
+    dataTransferTypes.includes(VAULT_DRAG_MIME)
+  ) {
+    return true;
+  }
+
+  const textPayload = readDragText(event);
+  if (!textPayload) {
+    return false;
+  }
+
+  if (parseInventoryTextPayload(textPayload) !== undefined) {
+    return true;
+  }
+
+  return (
+    textPayload.startsWith(VAULT_TEXT_PREFIX) && parseVaultTextPayload(textPayload) !== undefined
+  );
 }
