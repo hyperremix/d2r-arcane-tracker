@@ -38,10 +38,12 @@ vi.mock('node:fs/promises', async (importOriginal) => {
 
 // Mock chokidar
 vi.mock('chokidar', () => ({
-  default: vi.fn(() => ({
-    on: vi.fn().mockReturnThis(),
-    close: vi.fn(),
-  })),
+  default: {
+    watch: vi.fn(() => ({
+      on: vi.fn().mockReturnThis(),
+      close: vi.fn(),
+    })),
+  },
 }));
 
 // Mock electron app
@@ -66,6 +68,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import * as d2s from '@dschu012/d2s';
 import * as d2stash from '@dschu012/d2s/lib/d2/stash';
+import type { FSWatcher } from 'chokidar';
 import chokidar from 'chokidar';
 import { app } from 'electron';
 import { D2SaveFileBuilder } from '@/fixtures';
@@ -118,6 +121,22 @@ const mockParseResults = (target: SaveFileMonitor, results: unknown[]) => {
     spy.mockResolvedValueOnce(result);
   }
   return spy;
+};
+
+/** Fake chokidar watcher that records `on` handlers so tests can trigger events such as 'ready'. */
+const createFakeWatcher = (watched: Record<string, string[]>) => {
+  const handlers = new Map<string, () => void>();
+  const watcher = {
+    closed: false,
+    on: vi.fn(function (this: unknown, event: string, handler: () => void) {
+      handlers.set(event, handler);
+      return this;
+    }),
+    close: vi.fn(),
+    getWatched: vi.fn(() => watched),
+  };
+  vi.spyOn(chokidar, 'watch').mockImplementation(() => watcher as unknown as FSWatcher);
+  return { watcher, handlers };
 };
 
 describe('When SaveFileMonitor is used', () => {
@@ -291,8 +310,11 @@ describe('When SaveFileMonitor is used', () => {
         saveDir: emptyDir,
         gameMode: GameMode.Softcore,
       });
-      const watchSpy = vi.fn(() => ({ on: vi.fn().mockReturnThis(), close: vi.fn() }));
-      (chokidar as any).watch = watchSpy;
+      const watchSpy = vi
+        .spyOn(chokidar, 'watch')
+        .mockImplementation(
+          () => ({ on: vi.fn().mockReturnThis(), close: vi.fn() }) as unknown as FSWatcher,
+        );
       const startedSpy = vi.fn();
       eventBus.on('monitoring-started', startedSpy);
 
@@ -313,17 +335,9 @@ describe('When SaveFileMonitor is used', () => {
         saveDir: watchedDir,
         gameMode: GameMode.Softcore,
       });
-      const handlers = new Map<string, () => void>();
-      const fakeWatcher = {
-        closed: false,
-        on: vi.fn(function (this: unknown, event: string, handler: () => void) {
-          handlers.set(event, handler);
-          return this;
-        }),
-        close: vi.fn(),
-        getWatched: vi.fn(() => ({ [watchedDir]: ['a.d2s', 'b.d2s'] })),
-      };
-      (chokidar as any).watch = vi.fn(() => fakeWatcher);
+      const { watcher: fakeWatcher, handlers } = createFakeWatcher({
+        [watchedDir]: ['a.d2s', 'b.d2s'],
+      });
       await monitor.startMonitoring();
 
       // Act
@@ -341,17 +355,7 @@ describe('When SaveFileMonitor is used', () => {
         saveDir: watchedDir,
         gameMode: GameMode.Softcore,
       });
-      const handlers = new Map<string, () => void>();
-      const fakeWatcher = {
-        closed: false,
-        on: vi.fn(function (this: unknown, event: string, handler: () => void) {
-          handlers.set(event, handler);
-          return this;
-        }),
-        close: vi.fn(),
-        getWatched: vi.fn(() => ({})),
-      };
-      (chokidar as any).watch = vi.fn(() => fakeWatcher);
+      const { watcher: fakeWatcher, handlers } = createFakeWatcher({});
       await monitor.startMonitoring();
       fakeWatcher.closed = true;
 
@@ -373,8 +377,7 @@ describe('When SaveFileMonitor is used', () => {
         saveDir: notADirectory,
         gameMode: GameMode.Softcore,
       });
-      const watchSpy = vi.fn();
-      (chokidar as any).watch = watchSpy;
+      const watchSpy = vi.spyOn(chokidar, 'watch');
       const errorSpy = vi.fn();
       eventBus.on('monitoring-error', errorSpy);
 
@@ -399,8 +402,7 @@ describe('When SaveFileMonitor is used', () => {
         saveDir: missingDir,
         gameMode: GameMode.Softcore,
       });
-      const watchSpy = vi.fn();
-      (chokidar as any).watch = watchSpy;
+      const watchSpy = vi.spyOn(chokidar, 'watch');
 
       // Act
       await monitor.startMonitoring();
