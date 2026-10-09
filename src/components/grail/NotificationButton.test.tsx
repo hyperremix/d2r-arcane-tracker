@@ -1,6 +1,8 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { ItemDetectionEvent } from 'electron/types/grail';
-import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { createMainEventsMock } from '@/test/mainEventsMock';
+import { NotificationButton } from './NotificationButton';
 
 vi.mock('@/stores/grailStore', () => ({
   useGrailStore: () => ({
@@ -17,19 +19,9 @@ vi.mock('@/components/grail/ItemCard', () => ({
   ItemCard: ({ item }: { item: { name: string } }) => <div>{item.name}</div>,
 }));
 
-type DetectionHandler = (event: unknown, itemEvent: ItemDetectionEvent) => void;
-
-let detectionHandler: DetectionHandler | undefined;
-
-const mockIpcRenderer = {
-  invoke: vi.fn(async () => []),
-  on: vi.fn((channel: string, handler: DetectionHandler) => {
-    if (channel === 'item-detection-event') {
-      detectionHandler = handler;
-    }
-  }),
-  off: vi.fn(),
-};
+const mainEvents = createMainEventsMock();
+const windowGlobals = window as unknown as { electronAPI: unknown };
+const originalElectronAPI = windowGlobals.electronAPI;
 
 function createDetectionEvent(id: string, name: string): ItemDetectionEvent {
   return {
@@ -39,45 +31,62 @@ function createDetectionEvent(id: string, name: string): ItemDetectionEvent {
   } as unknown as ItemDetectionEvent;
 }
 
-let NotificationButton: typeof import('./NotificationButton').NotificationButton;
-
-/**
- * Imports a fresh copy of the component so its module-level IPC registration guard is reset.
- */
-async function loadFreshNotificationButton() {
-  vi.resetModules();
-  ({ NotificationButton } = await import('./NotificationButton'));
-}
-
 async function renderNotificationButton() {
   // Flush the mount-time IPC requests (characters, icon path) inside act
-  await act(async () => {
-    render(<NotificationButton />);
-  });
+  return await act(async () => render(<NotificationButton />));
 }
 
 async function emitDetections(events: ItemDetectionEvent[]) {
   await act(async () => {
     for (const event of events) {
-      detectionHandler?.({}, event);
+      mainEvents.emit('item-detection-event', event);
     }
   });
 }
 
 describe('When NotificationButton is rendered', () => {
-  beforeAll(async () => {
-    // Warm the transform cache once so per-test fresh imports stay fast
-    await import('./NotificationButton');
-  }, 120000);
-
-  beforeEach(async () => {
-    detectionHandler = undefined;
+  beforeEach(() => {
     vi.clearAllMocks();
+    mainEvents.reset();
     // Assign rather than redefine: other suites may already have defined a writable,
-    // non-configurable `window.ipcRenderer` in the shared test environment.
-    Object.assign(window, { ipcRenderer: mockIpcRenderer });
-    await loadFreshNotificationButton();
-  }, 60000);
+    // non-configurable `window.electronAPI` in the shared test environment.
+    windowGlobals.electronAPI = {
+      on: mainEvents.on,
+      getIconPath: vi.fn(async () => undefined),
+      grail: {
+        getCharacters: vi.fn(async () => []),
+        getProgressByItem: vi.fn(async () => []),
+      },
+    };
+  });
+
+  afterAll(() => {
+    windowGlobals.electronAPI = originalElectronAPI;
+  });
+
+  it('When it unmounts, Then the item detection listener is removed', async () => {
+    // Arrange
+    const { unmount } = await renderNotificationButton();
+    expect(mainEvents.listenerCount('item-detection-event')).toBe(1);
+
+    // Act
+    unmount();
+
+    // Assert
+    expect(mainEvents.listenerCount('item-detection-event')).toBe(0);
+  });
+
+  it('When it is mounted again, Then exactly one item detection listener is active', async () => {
+    // Arrange
+    const { unmount } = await renderNotificationButton();
+    unmount();
+
+    // Act
+    await renderNotificationButton();
+
+    // Assert
+    expect(mainEvents.listenerCount('item-detection-event')).toBe(1);
+  });
 
   it('Then the bell button has an accessible name', async () => {
     // Arrange & Act

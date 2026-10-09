@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { translations } from '@/i18n/translations';
+import { onMainEvent } from '@/lib/ipcEvents';
 import { startLoad, useGrailStatistics, useGrailStore } from '@/stores/grailStore';
 import { AdvancedSearch } from './AdvancedSearch';
 import { ItemGrid } from './ItemGrid';
@@ -94,11 +95,7 @@ export function GrailTracker() {
       }
     };
 
-    window.ipcRenderer?.on('grail-progress-updated', handleGrailProgressUpdate);
-
-    return () => {
-      window.ipcRenderer?.off('grail-progress-updated', handleGrailProgressUpdate);
-    };
+    return onMainEvent('grail-progress-updated', handleGrailProgressUpdate);
   }, [setProgress, setCharacters]);
 
   return (

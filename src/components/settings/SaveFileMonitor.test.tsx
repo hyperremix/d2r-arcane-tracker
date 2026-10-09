@@ -4,6 +4,7 @@ import { GameMode } from 'electron/types/grail';
 import { toast } from 'sonner';
 import { afterEach, beforeEach, describe, expect, it, type MockInstance, vi } from 'vitest';
 import { useGrailStore } from '@/stores/grailStore';
+import { createMainEventsMock } from '@/test/mainEventsMock';
 import { SaveFileMonitor } from './SaveFileMonitor';
 
 vi.mock('sonner', () => import('@/test/sonnerMock'));
@@ -49,8 +50,9 @@ interface MockElectronAPI {
 // Other suites define a non-configurable `window.electronAPI` (vitest runs with isolate: false),
 // so it is replaced by assignment rather than vi.stubGlobal, and restored after each test.
 const windowGlobals = window as unknown as Record<string, unknown>;
-const stubbedKeys = ['electronAPI', 'ipcRenderer'] as const;
+const stubbedKeys = ['electronAPI'] as const;
 const originalDescriptors = new Map<string, PropertyDescriptor | undefined>();
+const mainEvents = createMainEventsMock();
 
 function getElectronAPI(): MockElectronAPI {
   return windowGlobals.electronAPI as MockElectronAPI;
@@ -85,6 +87,7 @@ function pickFolder(directory: string) {
 describe('SaveFileMonitor', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mainEvents.reset();
     for (const key of stubbedKeys) {
       originalDescriptors.set(key, Object.getOwnPropertyDescriptor(window, key));
     }
@@ -111,8 +114,8 @@ describe('SaveFileMonitor', () => {
           .fn()
           .mockResolvedValue({ success: true, defaultDirectory: DEFAULT_DIRECTORY }),
       },
+      on: mainEvents.on,
     };
-    windowGlobals.ipcRenderer = { on: vi.fn(), off: vi.fn() };
   });
 
   afterEach(() => {
@@ -205,19 +208,11 @@ describe('SaveFileMonitor', () => {
 
   describe('latest activity', () => {
     function emitSaveFileEvent(type: string) {
-      const onMock = vi.mocked(
-        (windowGlobals.ipcRenderer as { on: (channel: string, listener: unknown) => void }).on,
-      );
-      const call = onMock.mock.calls.find(([channel]) => channel === 'save-file-event');
-      const listener = call?.[1] as (event: unknown, payload: unknown) => void;
       act(() => {
-        listener(
-          {},
-          {
-            type,
-            file: { name: 'Sorc', level: 90, characterClass: 'sorceress', hardcore: false },
-          },
-        );
+        mainEvents.emit('save-file-event', {
+          type,
+          file: { name: 'Sorc', level: 90, characterClass: 'sorceress', hardcore: false },
+        });
       });
     }
 

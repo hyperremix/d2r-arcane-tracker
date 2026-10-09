@@ -1,3 +1,4 @@
+import type { MonitoringStatusChangedPayload } from 'electron/ipc/contract';
 import type { D2SaveFile, MonitoringStatus, SaveFileEvent } from 'electron/types/grail';
 import { GameMode } from 'electron/types/grail';
 import {
@@ -23,6 +24,7 @@ import type {
 } from '@/hooks/useSaveDirectoryChange';
 import { useSaveDirectoryChange } from '@/hooks/useSaveDirectoryChange';
 import { translations } from '@/i18n/translations';
+import { combineUnsubscribers, onMainEvent } from '@/lib/ipcEvents';
 import { saveFileEventTypeLabelKeys } from '@/lib/labelKeys';
 import { formatShortDate } from '@/lib/utils';
 import { useGrailStore } from '@/stores/grailStore';
@@ -246,28 +248,16 @@ export function SaveFileMonitor() {
     loadSaveFiles();
 
     // Listen for save file events
-    const handleSaveFileEvent = (
-      _event: Electron.IpcRendererEvent,
-      saveFileEvent: SaveFileEvent,
-    ) => {
+    const handleSaveFileEvent = (saveFileEvent: SaveFileEvent) => {
       setLastEvent(saveFileEvent);
       // Reload save files when events occur
       loadSaveFiles();
     };
 
-    const handleMonitoringStatusChange = (
-      _event: Electron.IpcRendererEvent,
-      status: {
-        status: string;
-        directory?: string | null;
-        saveFileCount?: number;
-        error?: string;
-        errorType?: string;
-      },
-    ) => {
+    const handleMonitoringStatusChange = (status: MonitoringStatusChangedPayload) => {
       setMonitoringStatus((prev) => ({
         isMonitoring: status.status === 'started',
-        directory: status.directory !== undefined ? status.directory : prev.directory,
+        directory: 'directory' in status ? status.directory : prev.directory,
       }));
 
       if (status.status === 'error') {
@@ -282,13 +272,10 @@ export function SaveFileMonitor() {
       }
     };
 
-    window.ipcRenderer?.on('save-file-event', handleSaveFileEvent);
-    window.ipcRenderer?.on('monitoring-status-changed', handleMonitoringStatusChange);
-
-    return () => {
-      window.ipcRenderer?.off('save-file-event', handleSaveFileEvent);
-      window.ipcRenderer?.off('monitoring-status-changed', handleMonitoringStatusChange);
-    };
+    return combineUnsubscribers([
+      onMainEvent('save-file-event', handleSaveFileEvent),
+      onMainEvent('monitoring-status-changed', handleMonitoringStatusChange),
+    ]);
   }, [
     loadMonitoringStatus, // Reload save files when events occur
     loadSaveFiles,

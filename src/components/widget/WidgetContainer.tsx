@@ -1,13 +1,7 @@
-import type {
-  GrailProgress,
-  GrailStatistics,
-  Item,
-  Run,
-  Session,
-  Settings,
-} from 'electron/types/grail';
+import type { GrailProgress, GrailStatistics, Item, Settings } from 'electron/types/grail';
 import { useEffect, useRef, useState } from 'react';
 import { canItemBeEthereal, canItemBeNormal } from '@/lib/ethereal';
+import { combineUnsubscribers, onMainEvent } from '@/lib/ipcEvents';
 import type { WidgetDisplayMode } from '@/lib/widget';
 import { resolveWidgetDisplayMode } from '@/lib/widget';
 import { useGrailStore } from '@/stores/grailStore';
@@ -118,11 +112,7 @@ export function WidgetContainer() {
     };
 
     // Listen for progress updates from the main process
-    window.ipcRenderer?.on('grail-progress-updated', handleProgressUpdate);
-
-    return () => {
-      window.ipcRenderer?.off('grail-progress-updated', handleProgressUpdate);
-    };
+    return onMainEvent('grail-progress-updated', handleProgressUpdate);
   }, [setItems, setProgress]);
 
   // Resize the native window whenever the mode the widget actually renders changes. That covers
@@ -147,7 +137,7 @@ export function WidgetContainer() {
 
   // Listen for settings updates
   useEffect(() => {
-    const handleSettingsUpdate = async (_event: unknown, updatedSettings: Partial<Settings>) => {
+    const handleSettingsUpdate = async (updatedSettings: Partial<Settings>) => {
       // Opacity is applied by the widget's CSS from these settings; the settings UI already notifies
       // the main process, so no IPC is sent from here
       setSettings((prev) => ({ ...prev, ...updatedSettings }));
@@ -171,62 +161,36 @@ export function WidgetContainer() {
       }
     };
 
-    window.ipcRenderer?.on('settings-updated', handleSettingsUpdate);
-
-    return () => {
-      window.ipcRenderer?.off('settings-updated', handleSettingsUpdate);
-    };
+    return onMainEvent('settings-updated', handleSettingsUpdate);
   }, [settings]);
 
   // Listen for run tracker events for real-time updates
   useEffect(() => {
-    const handleRunStarted = (
-      _event: Electron.IpcRendererEvent,
-      payload: { run: Run; session: Session; manual: boolean },
-    ) => {
-      console.log('[WidgetContainer] Run started:', payload.run.id);
-      storeHandleRunStarted(payload.run, payload.session);
-    };
-
-    const handleRunEnded = (
-      _event: Electron.IpcRendererEvent,
-      payload: { run: Run; session: Session; manual: boolean },
-    ) => {
-      console.log('[WidgetContainer] Run ended');
-      storeHandleRunEnded(payload.run, payload.session);
-    };
-
-    const handleSessionStarted = (_event: Electron.IpcRendererEvent, session: Session) => {
-      console.log('[WidgetContainer] Session started:', session.id);
-      storeHandleSessionStarted(session);
-    };
-
-    const handleSessionEnded = () => {
-      console.log('[WidgetContainer] Session ended');
-      storeHandleSessionEnded();
-    };
-
-    const handleRunItemAdded = (_event: Electron.IpcRendererEvent, payload: { runId: string }) => {
-      console.log('[WidgetContainer] Run item added for run:', payload.runId);
-      loadRunItems(payload.runId).catch((error) => {
-        console.error('[WidgetContainer] Error loading run items for run from event:', error);
-      });
-    };
-
     // Listen for run tracker events (note: events are prefixed with 'run-tracker:')
-    window.ipcRenderer?.on('run-tracker:run-started', handleRunStarted);
-    window.ipcRenderer?.on('run-tracker:run-ended', handleRunEnded);
-    window.ipcRenderer?.on('run-tracker:session-started', handleSessionStarted);
-    window.ipcRenderer?.on('run-tracker:session-ended', handleSessionEnded);
-    window.ipcRenderer?.on('run-tracker:run-item-added', handleRunItemAdded);
-
-    return () => {
-      window.ipcRenderer?.off('run-tracker:run-started', handleRunStarted);
-      window.ipcRenderer?.off('run-tracker:run-ended', handleRunEnded);
-      window.ipcRenderer?.off('run-tracker:session-started', handleSessionStarted);
-      window.ipcRenderer?.off('run-tracker:session-ended', handleSessionEnded);
-      window.ipcRenderer?.off('run-tracker:run-item-added', handleRunItemAdded);
-    };
+    return combineUnsubscribers([
+      onMainEvent('run-tracker:run-started', (payload) => {
+        console.log('[WidgetContainer] Run started:', payload.run.id);
+        storeHandleRunStarted(payload.run, payload.session);
+      }),
+      onMainEvent('run-tracker:run-ended', (payload) => {
+        console.log('[WidgetContainer] Run ended');
+        storeHandleRunEnded(payload.run, payload.session);
+      }),
+      onMainEvent('run-tracker:session-started', (payload) => {
+        console.log('[WidgetContainer] Session started:', payload.session.id);
+        storeHandleSessionStarted(payload.session);
+      }),
+      onMainEvent('run-tracker:session-ended', () => {
+        console.log('[WidgetContainer] Session ended');
+        storeHandleSessionEnded();
+      }),
+      onMainEvent('run-tracker:run-item-added', (payload) => {
+        console.log('[WidgetContainer] Run item added for run:', payload.runId);
+        loadRunItems(payload.runId).catch((error) => {
+          console.error('[WidgetContainer] Error loading run items for run from event:', error);
+        });
+      }),
+    ]);
   }, [
     storeHandleRunStarted,
     storeHandleRunEnded,

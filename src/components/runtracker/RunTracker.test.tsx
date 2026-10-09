@@ -2,32 +2,22 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import type { Run, Session } from 'electron/types/grail';
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useRunTrackerStore } from '@/stores/runTrackerStore';
+import { createMainEventsMock } from '@/test/mainEventsMock';
 import { RunTracker } from './RunTracker';
 
 // Mock the store
 vi.mock('@/stores/runTrackerStore');
 const mockUseRunTrackerStore = vi.mocked(useRunTrackerStore);
 
-// Mock IPC renderer
-const mockIpcRenderer = {
-  on: vi.fn(),
-  off: vi.fn(),
-};
-
-// Mock window.ipcRenderer (restored afterwards because test files share one window)
-const originalIpcRenderer = window.ipcRenderer;
-Object.defineProperty(window, 'ipcRenderer', {
-  value: mockIpcRenderer,
-  configurable: true,
-  writable: true,
-});
+// Mock main-process events. Assigned rather than redefined (other suites define a
+// non-configurable `window.electronAPI`) and restored afterwards because test files share one window
+const mainEvents = createMainEventsMock();
+const windowGlobals = window as unknown as { electronAPI: unknown };
+const originalElectronAPI = windowGlobals.electronAPI;
+windowGlobals.electronAPI = { on: mainEvents.on };
 
 afterAll(() => {
-  Object.defineProperty(window, 'ipcRenderer', {
-    value: originalIpcRenderer,
-    configurable: true,
-    writable: true,
-  });
+  windowGlobals.electronAPI = originalElectronAPI;
 });
 
 // Mock child components
@@ -129,12 +119,13 @@ describe('RunTracker', () => {
   };
 
   const getIpcHandler = (channel: string) => {
-    const call = mockIpcRenderer.on.mock.calls.find(([registered]) => registered === channel);
-    return call?.[1] as ((event: unknown, payload: unknown) => void) | undefined;
+    const call = mainEvents.on.mock.calls.find(([registered]) => registered === channel);
+    return call?.[1];
   };
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mainEvents.reset();
     mockUseRunTrackerStore.mockReturnValue(defaultStoreState);
   });
 
@@ -296,7 +287,7 @@ describe('RunTracker', () => {
 
       // Act
       act(() => {
-        handler?.({}, { runId: 'run-1' });
+        handler?.({ runId: 'run-1' });
       });
       mockUseRunTrackerStore.mockReturnValue({
         ...defaultStoreState,
@@ -363,51 +354,36 @@ describe('RunTracker', () => {
   it('sets up IPC event listeners on mount', () => {
     render(<RunTracker />);
 
-    expect(mockIpcRenderer.on).toHaveBeenCalledWith(
-      'run-tracker:session-started',
-      expect.any(Function),
-    );
-    expect(mockIpcRenderer.on).toHaveBeenCalledWith(
-      'run-tracker:session-ended',
-      expect.any(Function),
-    );
-    expect(mockIpcRenderer.on).toHaveBeenCalledWith(
-      'run-tracker:run-started',
-      expect.any(Function),
-    );
-    expect(mockIpcRenderer.on).toHaveBeenCalledWith('run-tracker:run-ended', expect.any(Function));
-    expect(mockIpcRenderer.on).toHaveBeenCalledWith('run-tracker:run-paused', expect.any(Function));
-    expect(mockIpcRenderer.on).toHaveBeenCalledWith(
-      'run-tracker:run-resumed',
-      expect.any(Function),
-    );
+    expect(mainEvents.on).toHaveBeenCalledWith('run-tracker:session-started', expect.any(Function));
+    expect(mainEvents.on).toHaveBeenCalledWith('run-tracker:session-ended', expect.any(Function));
+    expect(mainEvents.on).toHaveBeenCalledWith('run-tracker:run-started', expect.any(Function));
+    expect(mainEvents.on).toHaveBeenCalledWith('run-tracker:run-ended', expect.any(Function));
+    expect(mainEvents.on).toHaveBeenCalledWith('run-tracker:run-paused', expect.any(Function));
+    expect(mainEvents.on).toHaveBeenCalledWith('run-tracker:run-resumed', expect.any(Function));
   });
 
-  it('cleans up IPC event listeners on unmount', () => {
+  it('When the component unmounts, Then every IPC event listener is removed', () => {
+    // Arrange
     const { unmount } = render(<RunTracker />);
+    const channels = [
+      'run-tracker:session-started',
+      'run-tracker:session-ended',
+      'run-tracker:run-started',
+      'run-tracker:run-ended',
+      'run-tracker:run-paused',
+      'run-tracker:run-resumed',
+      'run-tracker:run-item-added',
+    ];
+    expect(channels.map((channel) => mainEvents.listenerCount(channel))).toEqual(
+      channels.map(() => 1),
+    );
 
+    // Act
     unmount();
 
-    expect(mockIpcRenderer.off).toHaveBeenCalledWith(
-      'run-tracker:session-started',
-      expect.any(Function),
-    );
-    expect(mockIpcRenderer.off).toHaveBeenCalledWith(
-      'run-tracker:session-ended',
-      expect.any(Function),
-    );
-    expect(mockIpcRenderer.off).toHaveBeenCalledWith(
-      'run-tracker:run-started',
-      expect.any(Function),
-    );
-    expect(mockIpcRenderer.off).toHaveBeenCalledWith('run-tracker:run-ended', expect.any(Function));
-    expect(mockIpcRenderer.off).toHaveBeenCalledWith(
-      'run-tracker:run-paused',
-      expect.any(Function),
-    );
-    expect(mockIpcRenderer.off).toHaveBeenCalledWith(
-      'run-tracker:run-resumed',
-      expect.any(Function),
+    // Assert
+    expect(channels.map((channel) => mainEvents.listenerCount(channel))).toEqual(
+      channels.map(() => 0),
     );
   });
 

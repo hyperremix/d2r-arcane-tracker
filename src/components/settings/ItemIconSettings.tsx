@@ -18,6 +18,7 @@ import { Label } from '@/components/ui/label';
 import { Progress } from '@/components/ui/progress';
 import { Switch } from '@/components/ui/switch';
 import { translations } from '@/i18n/translations';
+import { onMainEvent } from '@/lib/ipcEvents';
 import { useGrailStore } from '@/stores/grailStore';
 
 /**
@@ -62,15 +63,9 @@ export function ItemIconSettings() {
 
   // Listen for conversion progress updates
   useEffect(() => {
-    const handleProgress = (_event: unknown, progress: { current: number; total: number }) => {
+    return onMainEvent('icon:conversionProgress', (progress) => {
       setConversionProgress(progress);
-    };
-
-    window.ipcRenderer?.on('icon:conversionProgress', handleProgress);
-
-    return () => {
-      window.ipcRenderer?.off('icon:conversionProgress', handleProgress);
-    };
+    });
   }, []);
 
   const handleConvertSprites = useCallback(async () => {
