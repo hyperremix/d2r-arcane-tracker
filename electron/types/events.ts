@@ -6,7 +6,6 @@ import type {
   SaveFileEvent,
   Session,
 } from './grail';
-import type { ServiceErrorPayload } from './serviceError';
 
 /**
  * Payload for monitoring-started event
@@ -134,8 +133,7 @@ export type AppEvent =
   | { type: 'd2r-started'; payload: D2RStartedPayload }
   | { type: 'd2r-stopped'; payload: D2RStoppedPayload }
   | { type: 'game-entered'; payload: GameEnteredPayload }
-  | { type: 'game-exited'; payload: GameExitedPayload }
-  | { type: 'service-error'; payload: ServiceErrorPayload };
+  | { type: 'game-exited'; payload: GameExitedPayload };
 
 /**
  * Extract event type names

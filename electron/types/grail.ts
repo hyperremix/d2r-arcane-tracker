@@ -592,17 +592,6 @@ export interface SaveDirectoryInspection {
 }
 
 /**
- * Interface representing the current state of run tracking.
- */
-export interface RunState {
-  isRunning: boolean;
-  isPaused: boolean;
-  activeSession?: Session;
-  activeRun?: Run;
-  lastRunEndTime?: Date;
-}
-
-/**
  * Type representing the state of the run tracker.
  */
 export type RunTrackerState = 'idle' | 'running' | 'paused';
@@ -815,37 +804,6 @@ export type TerrorZoneValidationErrorCode =
 export type TerrorZoneValidationResult =
   | { valid: true; path?: string; error?: undefined; errorCode?: undefined }
   | { valid: false; path?: string; error?: string; errorCode: TerrorZoneValidationErrorCode };
-
-/**
- * Type representing comprehensive Holy Grail statistics.
- */
-export type HolyGrailStats = {
-  normal: SubStats;
-  ethereal: SubStats;
-  runes: Stats;
-  runewords: Stats;
-};
-
-/**
- * Type representing basic statistics for a category of items.
- */
-export type Stats = {
-  exists: number;
-  owned: number;
-  remaining: number;
-  percent: number;
-};
-
-/**
- * Type representing sub-statistics broken down by item categories.
- */
-export type SubStats = {
-  armor: Stats;
-  weapon: Stats;
-  other: Stats;
-  sets: Stats;
-  total: Stats;
-};
 
 /**
  * Type representing a raw item from a D2 save file as parsed by the d2s library.
@@ -1128,44 +1086,6 @@ export type DatabaseSaveFileState = {
   created_at: string;
   updated_at: string;
 };
-
-/**
- * Type representing magic attributes on items.
- */
-export type MagicAttribute = {
-  name: string;
-  [key: string]: unknown;
-};
-
-/**
- * Type representing an item that includes magic attributes.
- */
-export type ItemWithMagicAttributes = {
-  magic_attributes: MagicAttribute[];
-  [key: string]: unknown;
-};
-
-/**
- * Type representing a flat mapping of items for efficient lookup.
- */
-export type FlatItemsMap = {
-  [key: string]: unknown;
-};
-
-/**
- * Type representing Holy Grail items in a nested structure.
- */
-export type GrailItems = Record<string, Record<string, unknown>>;
-
-/**
- * Type representing Holy Grail tiers containing items.
- */
-export type GrailTiers = Record<string, GrailItems>;
-
-/**
- * Type representing a Holy Grail category.
- */
-export type GrailCategory = Record<string, unknown>;
 
 /**
  * Information about an available update.

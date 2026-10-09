@@ -3,14 +3,6 @@ import type { D2SItem } from '../types/grail';
 import { simplifyItemName } from './objects';
 
 /**
- * Checks if a D2S item is grail-trackable (unique, set, rune, or runeword).
- * Single source of truth.
- */
-export function isGrailTrackable(item: D2SItem): boolean {
-  return getGrailItemId(item) !== null;
-}
-
-/**
  * Resolves the specific Rainbow Facet name based on magic attributes.
  */
 function resolveRainbowFacetName(item: D2SItem, simpleName: string): string {
@@ -82,8 +74,3 @@ export function getGrailItemId(d2sItem: unknown): string | null {
 
   return null;
 }
-
-/**
- * Legacy alias for backward compatibility during refactor
- */
-export const getItemIdForD2SItem = getGrailItemId;

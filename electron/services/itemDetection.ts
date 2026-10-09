@@ -1,6 +1,4 @@
-import fs from 'node:fs/promises';
 import type * as d2s from '@dschu012/d2s';
-import { read } from '@dschu012/d2s';
 import { runesByCode } from '../items/indexes';
 import type { D2SaveFile } from '../services/saveFileMonitor';
 import type {
@@ -11,8 +9,6 @@ import type {
   ItemDetectionEvent,
   VaultLocationContext,
 } from '../types/grail';
-import { isGrailTrackable } from '../utils/grailItemUtils';
-import { DEFAULT_RETRY_OPTIONS, retryWithBackoff } from '../utils/retry';
 import { createServiceLogger } from '../utils/serviceLogger';
 import type { EventBus } from './EventBus';
 
@@ -64,31 +60,23 @@ class ItemDetectionService {
   /**
    * Analyzes a Diablo 2 save file to detect and match items against the Holy Grail database.
    * @param {D2SaveFile} saveFile - The save file to analyze.
-   * @param {d2s.types.IItem[]} [preExtractedItems] - Optional pre-extracted items to avoid re-parsing.
+   * @param {d2s.types.IItem[]} extractedItems - Items the save file monitor already parsed from the file.
    * @param {boolean} [silent=false] - If true, suppress notifications for detected items.
    * @param {boolean} [isInitialScan=false] - If true, marks items as being from initial scan for statistics exclusion.
    * @returns {Promise<void>} A promise that resolves when analysis is complete.
    */
   async analyzeSaveFile(
     saveFile: D2SaveFile,
-    preExtractedItems?: d2s.types.IItem[],
+    extractedItems: d2s.types.IItem[],
     silent: boolean = false,
     isInitialScan: boolean = false,
   ): Promise<void> {
     try {
-      let items: D2Item[];
-
-      if (preExtractedItems !== undefined) {
-        // Use pre-extracted items to avoid duplicate parsing (even if empty)
-        items = this.convertD2SItemsToD2Items(
-          preExtractedItems,
-          saveFile.name,
-          saveFile.characterClass,
-        );
-      } else {
-        // Fallback to parsing the save file again (only if pre-extracted items not provided)
-        items = await this.extractItemsFromSaveFile(saveFile, saveFile.characterClass);
-      }
+      const items = this.convertD2SItemsToD2Items(
+        extractedItems,
+        saveFile.name,
+        saveFile.characterClass,
+      );
 
       // Track items to prevent duplicate notifications globally
       for (const item of items) {
@@ -166,152 +154,6 @@ class ItemDetectionService {
 
     processItems(d2sItems);
     return items;
-  }
-
-  /**
-   * Extracts items from a D2 save file using the d2s library.
-   * @private
-   * @param {D2SaveFile} saveFile - The save file to extract items from.
-   * @param {string} [characterClass] - The character class for the items.
-   * @returns {Promise<D2Item[]>} A promise that resolves with an array of extracted items.
-   */
-  private async extractItemsFromSaveFile(
-    saveFile: D2SaveFile,
-    characterClass?: string,
-  ): Promise<D2Item[]> {
-    const items: D2Item[] = [];
-
-    try {
-      // Wrap file reading and parsing in retry logic to handle transient errors
-      // (file locks, temporary I/O issues, race conditions with game writing files)
-      const saveData = await retryWithBackoff(
-        async () => {
-          const buffer = await fs.readFile(saveFile.path);
-
-          // Parse the D2 save file using the d2s library
-          const data = await read(buffer);
-
-          if (!data) {
-            throw new Error(`Failed to parse save file: ${saveFile.path}`);
-          }
-
-          return data;
-        },
-        DEFAULT_RETRY_OPTIONS,
-        `Parse ${saveFile.name}`,
-      );
-
-      // Extract items from all possible locations
-      const allItemLists = [
-        {
-          items: saveData.items || [],
-          location: 'inventory',
-          context: 'inventory' as VaultLocationContext,
-        },
-        {
-          items: saveData.merc_items || [],
-          location: 'equipment',
-          context: 'mercenary' as VaultLocationContext,
-        },
-        {
-          items: saveData.corpse_items || [],
-          location: 'inventory',
-          context: 'corpse' as VaultLocationContext,
-        },
-      ];
-
-      for (const { items: itemList, location, context } of allItemLists) {
-        this.extractItemsFromList(
-          itemList as D2SItem[],
-          items,
-          saveFile.name,
-          location as D2Item['location'],
-          false,
-          characterClass,
-          context,
-        );
-      }
-
-      log.info('extractItemsFromSaveFile', `Extracted ${items.length} items from ${saveFile.name}`);
-    } catch (error) {
-      log.error(
-        'extractItemsFromSaveFile',
-        error,
-        { saveFile: saveFile.name },
-        {
-          surfaceToUI: true,
-          code: 'saveFileParseFailed',
-          params: { fileName: saveFile.name },
-        },
-      );
-      return []; // Return empty array after exhausting retries
-    }
-
-    return items;
-  }
-
-  /**
-   * Extracts items from a list of D2S items and adds them to the results array.
-   * @private
-   * @param {D2SItem[]} itemList - The list of D2S items to process.
-   * @param {D2Item[]} items - The array to add extracted items to.
-   * @param {string} characterName - The name of the character owning these items.
-   * @param {D2Item['location']} defaultLocation - The default location for items.
-   * @param {boolean} [_isEmbed=false] - Whether these items are embedded in other items.
-   * @param {string} [characterClass] - The character class for the items.
-   */
-  private extractItemsFromList(
-    itemList: D2SItem[],
-    items: D2Item[],
-    characterName: string,
-    defaultLocation: D2Item['location'],
-    _isEmbed: boolean = false,
-    characterClass?: string,
-    fallbackLocationContext: VaultLocationContext = 'unknown',
-  ): void {
-    for (const item of itemList) {
-      try {
-        // Only extract items that are unique, set, runes, or runewords
-        // Note: rare items (rare_name/rare_name2) are excluded because they have
-        // randomly generated names that can match real grail items (e.g., "Doom Collar")
-        if (isGrailTrackable(item)) {
-          const d2Item: D2Item = {
-            id: `${item.id}`,
-            name: this.getItemName(item),
-            type: this.getItemType(item),
-            quality: this.getItemQuality(item),
-            level: item.level || 1,
-            ethereal: Boolean(item.ethereal),
-            sockets: this.getItemSockets(item),
-            timestamp: new Date(),
-            characterName,
-            characterClass: characterClass as D2Item['characterClass'],
-            location: this.getItemLocation(item) || defaultLocation,
-            locationContext: this.getItemLocationContext(item, fallbackLocationContext),
-          };
-
-          items.push(d2Item);
-        }
-
-        // Recursively process socketed items
-        if (item.socketed_items?.length) {
-          this.extractItemsFromList(
-            item.socketed_items,
-            items,
-            characterName,
-            defaultLocation,
-            true,
-            characterClass,
-            fallbackLocationContext,
-          );
-        }
-      } catch (itemError) {
-        log.warn(
-          'extractItemsFromList',
-          `Error parsing individual item: ${(itemError as Error).message || itemError}`,
-        );
-      }
-    }
   }
 
   /**
@@ -430,31 +272,6 @@ class ItemDetectionService {
       default:
         return 'normal';
     }
-  }
-
-  /**
-   * Determines the location of a D2S item.
-   * @private
-   * @param {D2SItem} d2Item - The D2S item to get the location from.
-   * @returns {'inventory' | 'stash' | 'equipment'} The item location.
-   */
-  private getItemLocation(d2Item: D2SItem): 'inventory' | 'stash' | 'equipment' {
-    // Determine item location based on d2s data
-    if (d2Item.location === 'equipped' || d2Item.equipped) return 'equipment';
-    if (d2Item.location === 'stash') return 'stash';
-    return 'inventory';
-  }
-
-  private getItemLocationContext(
-    d2Item: D2SItem,
-    fallbackLocationContext: VaultLocationContext = 'unknown',
-  ): VaultLocationContext {
-    if (d2Item.location === 'equipped' || d2Item.equipped) return 'equipped';
-    if (d2Item.location === 'stash') return 'stash';
-    if (d2Item.location === 'inventory') return 'inventory';
-    if (d2Item.location === 'mercenary') return 'mercenary';
-    if (d2Item.location === 'corpse') return 'corpse';
-    return fallbackLocationContext;
   }
 
   /**

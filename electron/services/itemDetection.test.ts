@@ -1,37 +1,9 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: This file is testing private methods */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-
-// Mock the d2s library
-vi.mock('@dschu012/d2s', () => ({
-  read: vi.fn(),
-}));
-
-// Mock fs/promises — source uses `import fs from 'node:fs/promises'` (default import),
-// so the mock must provide a `default` export alongside the named export.
-vi.mock('node:fs/promises', () => {
-  const readFile = vi.fn();
-  return {
-    default: { readFile },
-    readFile,
-  };
-});
-
-import { readFile } from 'node:fs/promises';
-// Import mocked modules
-import { read } from '@dschu012/d2s';
 import { D2SaveFileBuilder, D2SItemBuilder, HolyGrailItemBuilder } from '@/fixtures';
 import type { D2Item, D2SItem, Item } from '../types/grail';
-import { isGrailTrackable } from '../utils/grailItemUtils';
-import { setErrorForwarder } from '../utils/serviceLogger';
 import { EventBus } from './EventBus';
 import { ItemDetectionService } from './itemDetection';
-
-// Mock utils
-vi.mock('../utils/grailItemUtils', () => ({
-  isGrailTrackable: vi.fn(),
-}));
-
-// Mock data types
 
 describe('When ItemDetectionService is used', () => {
   let service: ItemDetectionService;
@@ -41,16 +13,6 @@ describe('When ItemDetectionService is used', () => {
   beforeEach(() => {
     // Create EventBus instance
     eventBus = new EventBus();
-
-    // Mock isGrailTrackable to mimic legacy logic for tests
-    vi.mocked(isGrailTrackable).mockImplementation((item: any) => {
-      return !!(
-        item.unique_name ||
-        item.set_name ||
-        item.type?.match(/^r[0-3][0-9]$/) ||
-        item.runeword_name
-      );
-    });
 
     // Create service with EventBus
     service = new ItemDetectionService(eventBus);
@@ -80,10 +42,6 @@ describe('When ItemDetectionService is used', () => {
 
     // Clear all mocks
     vi.clearAllMocks();
-
-    // Reset mocks to default behavior
-    vi.mocked(readFile).mockClear();
-    vi.mocked(read).mockClear();
   });
 
   describe('If setGrailItems is called', () => {
@@ -210,8 +168,8 @@ describe('When ItemDetectionService is used', () => {
       service.setGrailItems(mockGrailItems);
 
       // Act & Assert
-      await service.analyzeSaveFile(amazonSaveFile);
-      await service.analyzeSaveFile(barbarianSaveFile);
+      await service.analyzeSaveFile(amazonSaveFile, []);
+      await service.analyzeSaveFile(barbarianSaveFile, []);
       expect(amazonSaveFile.characterClass).toBe('Amazon');
       expect(amazonSaveFile.level).toBe(85);
       expect(amazonSaveFile.hardcore).toBe(true);
@@ -237,7 +195,7 @@ describe('When ItemDetectionService is used', () => {
 
       // Act
       for (const saveFile of saveFiles) {
-        await service.analyzeSaveFile(saveFile);
+        await service.analyzeSaveFile(saveFile, []);
       }
 
       // Assert
@@ -255,153 +213,6 @@ describe('When ItemDetectionService is used', () => {
         expect(saveFile.hardcore).toBe(true);
         expect(saveFile.expansion).toBe(true);
       });
-    });
-  });
-
-  describe('If extractItemsFromSaveFile is called', () => {
-    it('Then should handle parsing errors', async () => {
-      // Arrange
-      const mockSaveFile = D2SaveFileBuilder.new()
-        .withName('TestCharacter')
-        .withPath('/path/to/save.d2s')
-        .withLastModified(new Date())
-        .build();
-
-      vi.mocked(readFile).mockRejectedValue(new Error('Parse error'));
-
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {
-        // Mock implementation
-      });
-
-      // Act
-      const result = await (service as any).extractItemsFromSaveFile(mockSaveFile);
-
-      // Assert
-      expect(result).toEqual([]);
-      expect(consoleSpy).toHaveBeenCalledWith(
-        '[ItemDetection.extractItemsFromSaveFile]',
-        expect.any(Error),
-        { saveFile: mockSaveFile.name },
-      );
-      consoleSpy.mockRestore();
-    });
-
-    it('Then should surface a saveFileParseFailed error with the file name to the UI', async () => {
-      // Arrange
-      const mockSaveFile = D2SaveFileBuilder.new()
-        .withName('TestCharacter')
-        .withPath('/path/to/save.d2s')
-        .withLastModified(new Date())
-        .build();
-      vi.mocked(readFile).mockRejectedValue(new Error('Parse error'));
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {
-        // Mock implementation
-      });
-      const forwarder = vi.fn();
-      setErrorForwarder(forwarder);
-
-      // Act
-      await (service as any).extractItemsFromSaveFile(mockSaveFile);
-
-      // Assert
-      expect(forwarder).toHaveBeenCalledWith({
-        service: 'ItemDetection',
-        operation: 'extractItemsFromSaveFile',
-        severity: 'error',
-        code: 'saveFileParseFailed',
-        params: { fileName: 'TestCharacter' },
-        detail: 'Parse error',
-        timestamp: expect.any(Number),
-      });
-      setErrorForwarder(() => {
-        // Reset forwarder
-      });
-      consoleSpy.mockRestore();
-    });
-  });
-
-  describe('If extractItemsFromList is called', () => {
-    it('Then should extract items with proper names and types', () => {
-      // Arrange - rare items are intentionally excluded from Holy Grail tracking
-      // because they have randomly generated names that can match real grail items
-      const mockItemList: D2SItem[] = [
-        D2SItemBuilder.new().withId(1).asUniqueHelm().build(),
-        D2SItemBuilder.new().withId(2).asSetArmor().withLevel(30).asEquipped().build(),
-        D2SItemBuilder.new().withId(3).asRareItem().withLevel(25).build(), // Should be skipped
-        D2SItemBuilder.new()
-          .withId(4)
-          .asRune('r30') // Ber rune
-          .withQuality(1)
-          .build(),
-        D2SItemBuilder.new().withId(5).asRuneword().withQuality(1).build(),
-      ];
-
-      const items: D2Item[] = [];
-
-      // Act
-      (service as any).extractItemsFromList(mockItemList, items, 'TestCharacter', 'inventory');
-
-      // Assert - rare item is excluded, only 4 items extracted
-      expect(items).toHaveLength(4);
-      expect(items[0].name).toBe('shako');
-      expect(items[0].quality).toBe('unique');
-      expect(items[1].name).toBe('angelicraiment');
-      expect(items[1].quality).toBe('set');
-      expect(items[2].name).toBe('ber');
-      expect(items[2].quality).toBe('normal');
-      expect(items[3].name).toBe('enigma');
-      expect(items[3].quality).toBe('normal');
-    });
-
-    it('Then should handle socketed items recursively', () => {
-      // Arrange
-      const mockItemList: D2SItem[] = [
-        D2SItemBuilder.new()
-          .withId(1)
-          .asUniqueHelm()
-          .asSocketed(1)
-          .withSocketedItems([
-            D2SItemBuilder.new()
-              .withId(2)
-              .asRune('r30') // Ber rune
-              .withQuality(1)
-              .build(),
-          ])
-          .build(),
-      ];
-
-      const items: D2Item[] = [];
-
-      // Act
-      (service as any).extractItemsFromList(mockItemList, items, 'TestCharacter', 'inventory');
-
-      // Assert
-      expect(items).toHaveLength(2); // Shako + socketed Ber rune
-      expect(items[0].name).toBe('shako');
-      expect(items[1].name).toBe('ber');
-    });
-
-    it('Then should skip items without grail-relevant names', () => {
-      // Arrange
-      const mockItemList: D2SItem[] = [
-        D2SItemBuilder.new()
-          .withId(1)
-          .withName('Regular Sword')
-          .withType('swor')
-          .withLevel(10)
-          .withQuality(1)
-          .build(),
-        D2SItemBuilder.new().withId(2).asUniqueHelm().build(),
-      ];
-
-      const items: D2Item[] = [];
-
-      // Act
-      (service as any).extractItemsFromList(mockItemList, items, 'TestCharacter', 'inventory');
-
-      // Assert
-      expect(items).toHaveLength(1);
-      expect(items[0].name).toBe('shako');
     });
   });
 
@@ -618,41 +429,6 @@ describe('When ItemDetectionService is used', () => {
     });
   });
 
-  describe('If getItemLocation is called', () => {
-    it('Then should return equipment for equipped items', () => {
-      // Arrange
-      const equippedItem: D2SItem = D2SItemBuilder.new().asEquipped().build();
-
-      // Act
-      const result = (service as any).getItemLocation(equippedItem);
-
-      // Assert
-      expect(result).toBe('equipment');
-    });
-
-    it('Then should return stash for stash items', () => {
-      // Arrange
-      const stashItem: D2SItem = D2SItemBuilder.new().withLocation('stash').build();
-
-      // Act
-      const result = (service as any).getItemLocation(stashItem);
-
-      // Assert
-      expect(result).toBe('stash');
-    });
-
-    it('Then should return inventory for other items', () => {
-      // Arrange
-      const inventoryItem: D2SItem = D2SItemBuilder.new().withLocation('inventory').build();
-
-      // Act
-      const result = (service as any).getItemLocation(inventoryItem);
-
-      // Assert
-      expect(result).toBe('inventory');
-    });
-  });
-
   describe('If getItemSockets is called', () => {
     it('Then should return socket count from gems array', () => {
       // Arrange
@@ -723,26 +499,6 @@ describe('When ItemDetectionService is used', () => {
         expect(item.quality).toBe(5);
         expect(item.ethereal).toBe(0);
       });
-    });
-
-    it('Then should work with real D2SItem interface using D2SItemBuilder', () => {
-      // Arrange
-      const d2sItems = D2SItemBuilder.new()
-        .withId('test-item-1')
-        .asUniqueHelm()
-        .withSocketedItems([D2SItemBuilder.new().withId('socketed-rune').asRune('r30').build()])
-        .build();
-
-      // Act
-      const items: D2Item[] = [];
-      (service as any).extractItemsFromList([d2sItems], items, 'TestCharacter', 'inventory');
-
-      // Assert
-      expect(items).toHaveLength(2); // Shako + socketed rune
-      expect(items[0].name).toBe('shako');
-      expect(items[0].quality).toBe('unique');
-      expect(items[1].name).toBe('ber');
-      expect(items[1].quality).toBe('crafted');
     });
   });
 
@@ -949,46 +705,6 @@ describe('When ItemDetectionService is used', () => {
 
       // Assert - should only emit once (global tracking)
       expect(eventSpy).toHaveBeenCalledTimes(1);
-    });
-  });
-
-  describe('When analyzeSaveFile is called with pre-extracted items', () => {
-    it('Then should use pre-extracted items even if empty array', async () => {
-      // Arrange
-      const saveFile = D2SaveFileBuilder.new()
-        .withPath('/test/char.d2s')
-        .withName('TestChar')
-        .build();
-      service.setGrailItems(mockGrailItems);
-
-      // Act - pass empty array (no grail items in save file)
-      await service.analyzeSaveFile(saveFile, []); // Empty array, not undefined
-
-      // Assert - should NOT call read (no re-parsing)
-      // This verifies the fix: empty arrays are accepted to avoid redundant parsing
-      expect(read).not.toHaveBeenCalled();
-      expect(readFile).not.toHaveBeenCalled();
-    });
-
-    it('Then should use pre-extracted items with grail items', async () => {
-      // Arrange
-      const saveFile = D2SaveFileBuilder.new()
-        .withPath('/test/char.d2s')
-        .withName('TestChar')
-        .build();
-      const d2sItem = D2SItemBuilder.new()
-        .withId('1234')
-        .asUniqueHelm()
-        .withUniqueName('shako')
-        .build();
-      service.setGrailItems(mockGrailItems);
-
-      // Act - pass pre-extracted items array
-      await service.analyzeSaveFile(saveFile, [d2sItem as any]);
-
-      // Assert - should NOT call read or readFile (no re-parsing)
-      expect(read).not.toHaveBeenCalled();
-      expect(readFile).not.toHaveBeenCalled();
     });
   });
 

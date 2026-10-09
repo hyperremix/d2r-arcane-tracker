@@ -53,7 +53,6 @@ vi.mock('electron', () => ({
 
 // Mock items indexes
 vi.mock('../items/indexes', () => ({
-  isRuneId: vi.fn(),
   runewordsByNameSimple: {
     lore: { id: 'lore', name: 'Lore' },
     enigma: { id: 'enigma', name: 'Enigma' },
@@ -89,7 +88,6 @@ import * as d2stash from '@dschu012/d2s/lib/d2/stash';
 import chokidar from 'chokidar';
 import { app } from 'electron';
 import { D2SaveFileBuilder } from '@/fixtures';
-import { isRuneId } from '../items/indexes';
 import { GameMode } from '../types/grail';
 import { getGrailItemId } from '../utils/grailItemUtils';
 import { isRune, simplifyItemName } from '../utils/objects';
@@ -176,7 +174,6 @@ describe('When SaveFileMonitor is used', () => {
       pages: [{ items: [] }],
     } as any);
     vi.mocked(getGrailItemId).mockReturnValue('test-item-id');
-    vi.mocked(isRuneId).mockReturnValue(false);
     vi.mocked(isRune).mockReturnValue(false);
     vi.mocked(simplifyItemName).mockReturnValue('test-item');
 
@@ -456,44 +453,6 @@ describe('When SaveFileMonitor is used', () => {
       // Assert - both stop and start called when monitoring was active
       expect(stopSpy).toHaveBeenCalledOnce();
       expect(startSpy).toHaveBeenCalledOnce();
-    });
-  });
-
-  describe('If getItems is called', () => {
-    it('Then should return current data', () => {
-      // Act
-      const items = monitor.getItems();
-
-      // Assert
-      expect(items).toEqual({
-        items: {},
-        ethItems: {},
-        stats: {},
-        availableRunes: {},
-      });
-    });
-  });
-
-  describe('If fillInAvailableRunes is called', () => {
-    it('Then should call the method without errors', () => {
-      // Act & Assert
-      expect(() => monitor.fillInAvailableRunes()).not.toThrow();
-    });
-  });
-
-  describe('If createManualItem is called', () => {
-    it('Then should create manual item with specified count', () => {
-      // Act
-      const item = monitor.createManualItem(3);
-
-      // Assert
-      expect(item).toEqual({
-        inSaves: {
-          'Manual entry': [{}, {}, {}],
-        },
-        name: '',
-        type: '',
-      });
     });
   });
 
@@ -1252,7 +1211,12 @@ describe('When SaveFileMonitor is used', () => {
       } as any);
 
       // Act
-      const { items } = await (monitor as any).parseSave('TestChar', Buffer.from('test'), '.d2s');
+      const { items } = await (monitor as any).parseSave(
+        'TestChar',
+        'TestChar.d2s',
+        Buffer.from('test'),
+        '.d2s',
+      );
 
       // Assert
       const runewordItems = items.filter((item: any) => item.type === 'runeword');
@@ -1280,7 +1244,12 @@ describe('When SaveFileMonitor is used', () => {
       } as any);
 
       // Act
-      const { items } = await (monitor as any).parseSave('TestChar', Buffer.from('test'), '.d2s');
+      const { items } = await (monitor as any).parseSave(
+        'TestChar',
+        'TestChar.d2s',
+        Buffer.from('test'),
+        '.d2s',
+      );
 
       // Assert
       const runewordItems = items.filter((item: any) => item.type === 'runeword');
@@ -1308,7 +1277,12 @@ describe('When SaveFileMonitor is used', () => {
       } as any);
 
       // Act
-      const { items } = await (monitor as any).parseSave('TestChar', Buffer.from('test'), '.d2s');
+      const { items } = await (monitor as any).parseSave(
+        'TestChar',
+        'TestChar.d2s',
+        Buffer.from('test'),
+        '.d2s',
+      );
 
       // Assert
       const runewordItems = items.filter((item: any) => item.type === 'runeword');
@@ -1334,7 +1308,12 @@ describe('When SaveFileMonitor is used', () => {
       } as any);
 
       // Act
-      const { items } = await (monitor as any).parseSave('TestChar', Buffer.from('test'), '.d2s');
+      const { items } = await (monitor as any).parseSave(
+        'TestChar',
+        'TestChar.d2s',
+        Buffer.from('test'),
+        '.d2s',
+      );
 
       // Assert - should have no runeword items
       const runewordItems = items.filter((item: any) => item.type === 'runeword');
@@ -2470,21 +2449,23 @@ describe('When SaveFileMonitor is used', () => {
   describe('When item counts are read from parsed saves', () => {
     it('Then getAvailableRunesCount sums rune quantities instead of entry counts', () => {
       // Arrange
-      (monitor as any).currentData.availableRunes = {
-        elrune: {
-          name: 'elrune',
-          type: 'rune',
-          inSaves: {
-            'Shared Stash Softcore': [{ quantity: 3 }, { quantity: 2 }, {}],
-          },
-        },
-      };
+      vi.mocked(isRune).mockReturnValue(true);
+      vi.mocked(getGrailItemId).mockReturnValue('el');
+      const runeEntry = (stackCount?: number) => ({
+        rawParsedItem: { type: 'r01' },
+        isSocketedItem: false,
+        stackCount,
+      });
+      (monitor as any).inventorySnapshots = [
+        { items: [runeEntry(3), runeEntry(2)] },
+        { items: [runeEntry()] },
+      ];
 
       // Act
       const counts = monitor.getAvailableRunesCount();
 
       // Assert
-      expect(counts.elrune).toBe(6);
+      expect(counts).toEqual({ el: 6 });
     });
   });
 
@@ -2539,7 +2520,6 @@ describe('When SaveFileMonitor is used', () => {
 
         // Assert
         expect(monitor.getAvailableRunesCount()).toEqual({ el: 1 });
-        expect(Object.keys((monitor as any).currentData.items)).toContain('eld');
       });
     });
   });

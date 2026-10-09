@@ -3,7 +3,6 @@ import { KNOWN_D2R_BUILDS, PE_HEADER_READ_SIZE } from '../config/d2rBuilds';
 import { D2RGameState } from '../config/d2rPatterns';
 import { EventBus } from './EventBus';
 import { MemoryReader } from './memoryReader';
-import { ProcessMonitor } from './processMonitor';
 
 // Mock win32-api
 vi.mock('win32-api', () => ({
@@ -49,7 +48,6 @@ vi.mock('node:util', async (importOriginal) => {
 
 describe('When MemoryReader is instantiated', () => {
   let eventBus: EventBus;
-  let processMonitor: ProcessMonitor;
   let memoryReader: MemoryReader;
 
   beforeEach(() => {
@@ -57,8 +55,7 @@ describe('When MemoryReader is instantiated', () => {
     mockExecAsync.mockReset();
 
     eventBus = new EventBus();
-    processMonitor = new ProcessMonitor(eventBus);
-    memoryReader = new MemoryReader(eventBus, processMonitor);
+    memoryReader = new MemoryReader(eventBus);
   });
 
   afterEach(() => {
@@ -95,7 +92,7 @@ describe('When MemoryReader is instantiated', () => {
         configurable: true,
       });
 
-      const testMemoryReader = new MemoryReader(eventBus, processMonitor);
+      const testMemoryReader = new MemoryReader(eventBus);
 
       // Act
       testMemoryReader.startPolling();
@@ -141,23 +138,13 @@ describe('When MemoryReader is instantiated', () => {
     });
   });
 
-  describe('If isInGame is called', () => {
-    it('Then should return null when no process handle', async () => {
-      // Act
-      const result = await memoryReader.isInGame();
-
-      // Assert
-      expect(result).toBeNull();
-    });
-  });
-
   describe('If event bus integration works', () => {
     it('Then should listen to d2r-started events', () => {
       // Arrange
       const initialListenerCount = eventBus.listenerCount('d2r-started');
 
       // Act
-      const newMemoryReader = new MemoryReader(eventBus, processMonitor);
+      const newMemoryReader = new MemoryReader(eventBus);
 
       // Assert
       expect(eventBus.listenerCount('d2r-started')).toBeGreaterThan(initialListenerCount);
@@ -171,7 +158,7 @@ describe('When MemoryReader is instantiated', () => {
       const initialListenerCount = eventBus.listenerCount('d2r-stopped');
 
       // Act
-      const newMemoryReader = new MemoryReader(eventBus, processMonitor);
+      const newMemoryReader = new MemoryReader(eventBus);
 
       // Assert
       expect(eventBus.listenerCount('d2r-stopped')).toBeGreaterThan(initialListenerCount);
@@ -263,7 +250,7 @@ describe('When D2R starts and the memory offsets are resolved', () => {
     };
 
     eventBus = new EventBus();
-    memoryReader = new MemoryReader(eventBus, new ProcessMonitor(eventBus));
+    memoryReader = new MemoryReader(eventBus);
     Reflect.set(memoryReader, 'memoryReader', fakeReader);
   });
 

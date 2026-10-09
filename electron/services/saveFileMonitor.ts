@@ -9,9 +9,8 @@ import type { FSWatcher } from 'chokidar';
 import chokidar from 'chokidar';
 import { app } from 'electron';
 import type { GrailDatabase } from '../database/database';
-import { isRuneId, runewordsByNameSimple } from '../items/indexes';
+import { runewordsByNameSimple } from '../items/indexes';
 import type {
-  AvailableRunes,
   CharacterInventorySnapshot,
   D2SaveFile,
   D2SItem,
@@ -20,7 +19,6 @@ import type {
   ItemDetails,
   ParsedInventoryItem,
   SaveFileEvent,
-  SaveFileItem,
   SaveFileState,
   StashTabKind,
   VaultLocationContext,
@@ -129,28 +127,6 @@ const addItemToResults = (
       type: item.type ?? 'unknown',
     };
     results[key][name].inSaves[saveName] = [savedItem];
-  }
-};
-
-const addRuneToAvailableRunes = (
-  results: FileReaderResponse,
-  name: string,
-  savedItem: ItemDetails,
-  saveName: string,
-  item: D2SItem,
-): void => {
-  if (results.availableRunes[name]) {
-    if (!results.availableRunes[name].inSaves[saveName]) {
-      results.availableRunes[name].inSaves[saveName] = [];
-    }
-    results.availableRunes[name].inSaves[saveName].push(savedItem);
-  } else {
-    results.availableRunes[name] = {
-      name,
-      inSaves: {},
-      type: item.type ?? 'unknown',
-    };
-    results.availableRunes[name].inSaves[saveName] = [savedItem];
   }
 };
 
@@ -323,7 +299,6 @@ function resolveParsedItemSpatialMetadata(
  * a database of found items for Holy Grail tracking.
  */
 class SaveFileMonitor {
-  private currentData: FileReaderResponse;
   private inventorySnapshots: CharacterInventorySnapshot[] = [];
   private fileWatcher: FSWatcher | null;
   private watchPath: string | null;
@@ -355,12 +330,6 @@ class SaveFileMonitor {
     log.info('constructor', 'Constructor called');
     this.eventBus = eventBus;
     this.grailDatabase = grailDatabase || null;
-    this.currentData = {
-      items: {},
-      ethItems: {},
-      stats: {},
-      availableRunes: {},
-    };
     this.fileWatcher = null;
     this.watchPath = null;
     this.fileChangeCounter = 0;
@@ -1126,11 +1095,6 @@ class SaveFileMonitor {
         const isEthereal = !!item.ethereal;
         addItemToResults(results, name, savedItem, saveName, item, isEthereal);
 
-        // Runes sitting in another item's sockets are used up and not available for runewords.
-        if (isRune(item) && !item.socketed && !inventoryItem.isSocketedItem) {
-          addRuneToAvailableRunes(results, name, savedItem, saveName, item);
-        }
-
         results.stats[saveName] = (results.stats[saveName] || 0) + 1;
       }
 
@@ -1379,8 +1343,6 @@ class SaveFileMonitor {
       this.grailDatabase.setSetting('saveDir', firstDir);
     }
 
-    // Update current data
-    this.currentData = results;
     this.inventorySnapshots = this.mergeInventorySnapshots(
       filePaths,
       filesToParse,
@@ -1510,16 +1472,11 @@ class SaveFileMonitor {
    */
   private async parseSave(
     saveName: string,
-    filePathOrContent: string | Buffer,
-    contentOrExtension: Buffer | string,
-    extensionArg?: string,
+    filePath: string,
+    content: Buffer,
+    extension: string,
   ): Promise<{ items: ParsedInventoryItem[]; status: SaveParseStatus }> {
     const items: ParsedInventoryItem[] = [];
-
-    const legacyCall = Buffer.isBuffer(filePathOrContent);
-    const filePath = legacyCall ? `${saveName}.d2s` : filePathOrContent;
-    const content = (legacyCall ? filePathOrContent : contentOrExtension) as Buffer;
-    const extension = (legacyCall ? contentOrExtension : extensionArg) as string;
 
     const sourceFileType = extension.replace('.', '') as VaultSourceFileType;
 
@@ -1870,14 +1827,6 @@ class SaveFileMonitor {
     log.info('updateSaveDirectory', 'Complete');
   }
 
-  /**
-   * Gets the current parsed item data.
-   * @returns {FileReaderResponse} The current item data from all parsed save files.
-   */
-  getItems(): FileReaderResponse {
-    return this.currentData;
-  }
-
   getInventorySearchResult(): InventorySearchResult {
     return {
       snapshots: this.inventorySnapshots,
@@ -1924,53 +1873,28 @@ class SaveFileMonitor {
   }
 
   /**
-   * Fills in available runes from the current item data.
-   * This method populates the availableRunes section of the current data.
-   */
-  fillInAvailableRunes(): void {
-    // filling in all the runes into the "available runes"
-    this.currentData.availableRunes = Object.keys(this.currentData.items).reduce(
-      (acc: AvailableRunes, itemKey: string) => {
-        const item = this.currentData.items[itemKey];
-        if (isRuneId(itemKey)) {
-          acc[itemKey] = item;
-        }
-        return acc;
-      },
-      {} as AvailableRunes,
-    );
-  }
-
-  /**
-   * Creates a manual item entry for tracking purposes.
-   * @param {number} count - The number of items to create.
-   * @returns {SaveFileItem} A manual item object.
-   */
-  createManualItem(count: number): SaveFileItem {
-    return {
-      inSaves: {
-        'Manual entry': new Array(count).fill({} as ItemDetails),
-      },
-      name: '',
-      type: '',
-    };
-  }
-
-  /**
-   * Gets the count of each available rune from the most recent save file scan.
-   * Returns a map of rune IDs to their total counts across all save files.
+   * Gets the count of each available rune across the latest inventory snapshot of every save file.
+   * Stacked runes count with their stack size. Runes socketed into another item are used up and
+   * therefore not available for runewords.
    * @returns {Record<string, number>} A record mapping rune IDs to their counts.
    */
   getAvailableRunesCount(): Record<string, number> {
     const runeCounts: Record<string, number> = {};
 
-    for (const [runeId, saveFileItem] of Object.entries(this.currentData.availableRunes)) {
-      let totalCount = 0;
-      // Sum up rune counts across all save files
-      for (const itemsArray of Object.values(saveFileItem.inSaves)) {
-        totalCount += itemsArray.reduce((sum, item) => sum + (item.quantity ?? 1), 0);
+    for (const snapshot of this.inventorySnapshots) {
+      for (const item of snapshot.items) {
+        const rawItem = item.rawParsedItem;
+        if (item.isSocketedItem || rawItem.socketed || !isRune(rawItem)) {
+          continue;
+        }
+
+        const runeId = processItemName(rawItem);
+        if (shouldSkipItem(runeId)) {
+          continue;
+        }
+
+        runeCounts[runeId] = (runeCounts[runeId] ?? 0) + (item.stackCount ?? 1);
       }
-      runeCounts[runeId] = totalCount;
     }
 
     return runeCounts;

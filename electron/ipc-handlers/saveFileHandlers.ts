@@ -341,7 +341,7 @@ function initializeWindowsServices(): void {
   // Initialize memory reader (optional, depends on process monitor)
   if (processMonitor) {
     try {
-      memoryReader = new MemoryReader(eventBus, processMonitor);
+      memoryReader = new MemoryReader(eventBus);
     } catch (error) {
       console.error('[initializeSaveFileHandlers] Failed to initialize memory reader:', error);
       memoryReader = undefined;
@@ -501,7 +501,7 @@ export function initializeSaveFileHandlers(): void {
     if (event.type === 'modified') {
       await itemDetectionService.analyzeSaveFile(
         event.file,
-        event.extractedItems,
+        event.extractedItems ?? [],
         event.silent,
         event.isInitialScan,
       );

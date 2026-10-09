@@ -41,7 +41,6 @@ vi.mock('../services/memoryReader', () => ({
     stopPolling: vi.fn(),
     shutdown: vi.fn().mockResolvedValue(undefined),
     updatePollingInterval: vi.fn(),
-    isInGame: vi.fn().mockResolvedValue(false),
     readGameState: vi.fn().mockResolvedValue(null),
     getGameId: vi.fn().mockResolvedValue(null),
     getCharacterName: vi.fn().mockResolvedValue(null),
@@ -506,7 +505,7 @@ describe('When saveFileHandlers is used', () => {
       // Assert
       expect(mockItemDetectionService.analyzeSaveFile).toHaveBeenCalledWith(
         mockEvent.file,
-        mockEvent.extractedItems,
+        [],
         mockEvent.silent,
         mockEvent.isInitialScan,
       );

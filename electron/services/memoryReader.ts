@@ -1,12 +1,10 @@
 import { exec } from 'node:child_process';
-import { writeFile } from 'node:fs/promises';
 import { promisify } from 'node:util';
 import { ffi, Kernel32 } from 'win32-api';
 import { findKnownBuild, PE_HEADER_READ_SIZE, parsePeIdentity } from '../config/d2rBuilds';
 import { D2RGameState, OFFSET_ADJUSTMENTS } from '../config/d2rPatterns';
 import { createServiceLogger } from '../utils/serviceLogger';
 import type { EventBus } from './EventBus';
-import type { ProcessMonitor } from './processMonitor';
 import { resolveUiOffset } from './uiOffsetResolver';
 
 const log = createServiceLogger('MemoryReader');
@@ -238,15 +236,6 @@ interface WindowsMemoryReader {
    * @returns Number value or null on failure
    */
   readInt32(handle: number, address: number): Promise<number | null>;
-
-  /**
-   * Reads a string from memory.
-   * @param handle - Process handle
-   * @param address - Memory address to read
-   * @param maxLength - Maximum length of string to read
-   * @returns String value or null on failure
-   */
-  readString(handle: number, address: number, maxLength?: number): Promise<string | null>;
 
   /**
    * Reads a 64-bit integer (QWORD) from memory.
@@ -544,26 +533,6 @@ class WindowsMemoryReaderImpl implements WindowsMemoryReader {
   }
 
   /**
-   * Reads a string from memory.
-   * @param handle - Process handle
-   * @param address - Memory address to read
-   * @param maxLength - Maximum length of string to read
-   * @returns String value or null on failure
-   */
-  async readString(handle: number, address: number, maxLength = 256): Promise<string | null> {
-    const buffer = await this.readMemory(handle, address, maxLength);
-    if (!buffer) {
-      return null;
-    }
-    // Find null terminator
-    const nullIndex = buffer.indexOf(0);
-    if (nullIndex === -1) {
-      return buffer.toString('utf8');
-    }
-    return buffer.subarray(0, nullIndex).toString('utf8');
-  }
-
-  /**
    * Reads the module image for pattern scanning.
    * Uses VirtualQueryEx to find readable regions and copies them to their RVA in the result, so
    * unreadable regions leave zero-filled gaps instead of shifting everything after them.
@@ -711,10 +680,7 @@ export class MemoryReader {
   private eventUnsubscribers: Array<() => void> = [];
   private offsetRetryTimeout: NodeJS.Timeout | null = null;
 
-  constructor(
-    private eventBus: EventBus,
-    _processMonitor: ProcessMonitor, // Reserved for future use
-  ) {
+  constructor(private eventBus: EventBus) {
     this.memoryReader = new WindowsMemoryReaderImpl();
     // Initialize with placeholder - resolved once D2R is running
     this.addresses = {
@@ -1138,56 +1104,6 @@ export class MemoryReader {
     } catch (error) {
       log.error('readGameState', error);
       return null;
-    }
-  }
-
-  /**
-   * Reads the in-game state from memory.
-   * Wrapper around readGameState() for backward compatibility.
-   * @returns True if in game (1), false if in lobby (0), null on error
-   */
-  async isInGame(): Promise<boolean | null> {
-    const state = await this.readGameState();
-    if (state === null) {
-      return null;
-    }
-    return state === D2RGameState.InGame;
-  }
-
-  /**
-   * Dumps process memory to a file for manual pattern analysis.
-   * This is useful when the current pattern is not found and you need to
-   * manually search for alternative patterns in the D2R.exe binary.
-   * @param filePath - Path to save the memory dump
-   * @returns True if dump was successful, false otherwise
-   */
-  async dumpMemoryForAnalysis(filePath: string): Promise<boolean> {
-    if (!this.processHandle || !this.addresses.baseAddress) {
-      log.error('dumpMemoryForAnalysis', 'Cannot dump memory: no process handle or base address');
-      return false;
-    }
-
-    try {
-      const memory = await this.memoryReader.readModuleImage(
-        this.processHandle,
-        this.addresses.baseAddress,
-        this.addresses.moduleSize,
-      );
-
-      if (!memory) {
-        log.error('dumpMemoryForAnalysis', 'Failed to read process memory for dump');
-        return false;
-      }
-
-      await writeFile(filePath, memory);
-      log.info(
-        'dumpMemoryForAnalysis',
-        `Dumped ${memory.length} bytes (${(memory.length / 1024 / 1024).toFixed(1)}MB) to ${filePath}`,
-      );
-      return true;
-    } catch (error) {
-      log.error('dumpMemoryForAnalysis', error);
-      return false;
     }
   }
 
