@@ -1,13 +1,16 @@
-import React, { Suspense } from 'react';
+import React, { lazy, Suspense } from 'react';
 import ReactDOM from 'react-dom/client';
-import App from './App';
 import { ErrorBoundary } from './components/ErrorBoundary';
-import InventorySnapshotWindowApp from './InventorySnapshotWindowApp';
-import WidgetApp from './WidgetApp';
 import './i18n';
 import './index.css';
 import logoUrl from '/logo.png';
 import { applyInitialTheme } from './lib/theme';
+
+// Each window only loads the code of its own entry: the overlay widget must not pull in the
+// router, every page and the inventory browser
+const App = lazy(() => import('./App'));
+const WidgetApp = lazy(() => import('./WidgetApp'));
+const InventorySnapshotWindowApp = lazy(() => import('./InventorySnapshotWindowApp'));
 
 // Apply the last-used theme before React mounts so dark-theme users don't see a light flash
 // while settings load from the main process
@@ -30,7 +33,9 @@ const AppComponent = isWidget
 ReactDOM.createRoot(rootElement).render(
   <React.StrictMode>
     <ErrorBoundary>
-      <Suspense fallback={isWidget ? null : <img src={logoUrl} alt="logo" />}>
+      {/* The transparent widget shows nothing while its chunk loads; the other windows show the
+          logo as a decorative splash */}
+      <Suspense fallback={isWidget ? null : <img src={logoUrl} alt="" />}>
         <AppComponent />
       </Suspense>
     </ErrorBoundary>
