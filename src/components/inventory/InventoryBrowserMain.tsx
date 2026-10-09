@@ -3,122 +3,42 @@ import type {
   CharacterInventorySnapshot,
   VaultItem,
   VaultItemUpsertInput,
-  VaultLocationContext,
 } from 'electron/types/grail';
 import { isGrailBookmark } from 'electron/utils/vaultState';
 import { type DragEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-  INVENTORY_DRAG_MIME,
+  hasInventoryOrVaultDragData,
+  parseInventoryDragStatePayload,
   parseInventoryTextPayload,
-  parseVaultTextPayload,
+  parseVaultDragStatePayload,
   serializeVaultTextPayload,
+  toActiveVaultDragItem,
   VAULT_DRAG_MIME,
 } from '@/components/inventory/dragPayloads';
-import {
-  buildInventorySearchFilter,
-  type InventorySearchAllResponse,
-  loadInventorySearchResponse,
-} from '@/components/inventory/inventorySearch';
+import { InventoryFilterBar, type LocationFilter } from '@/components/inventory/InventoryFilterBar';
+import { getTypeValue, type TypeFilter } from '@/components/inventory/inventoryItems';
+import { useInventoryIconLookup } from '@/components/inventory/useInventoryIconLookup';
+import { useInventorySearch } from '@/components/inventory/useInventorySearch';
+import { VaultDropzone } from '@/components/inventory/VaultDropzone';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { useSpriteIcon } from '@/hooks/useSpriteIcon';
 import { translations } from '@/i18n/translations';
 import { combineUnsubscribers, onMainEvent } from '@/lib/ipcEvents';
 import {
   createSpatialIconCandidates,
-  createSpriteIconLookupIndex,
   type SpriteIconLookupIndex,
 } from '@/lib/spriteIconCandidates';
 import { cn } from '@/lib/utils';
-import { useGrailStore } from '@/stores/grailStore';
 import { showInventoryOperationErrorToast } from './operationErrors';
 
-const VAULT_TEXT_PAYLOAD_PREFIX = 'd2r-arcane-tracker:vault-item:';
 const SNAPSHOT_HOVER_OPEN_DELAY_MS = 650;
 const SNAPSHOT_DRAG_SESSION_IDLE_RESET_MS = 900;
 
-type TypeFilter = 'all' | 'unique' | 'set' | 'runeword' | 'rune' | 'other';
-
-function toVaultDragStatePayload(item: VaultItem): {
-  id: string;
-  gridWidth: number;
-  gridHeight: number;
-} {
-  return {
-    id: item.id,
-    gridWidth:
-      Number.isInteger(item.gridWidth) && item.gridWidth && item.gridWidth > 0 ? item.gridWidth : 1,
-    gridHeight:
-      Number.isInteger(item.gridHeight) && item.gridHeight && item.gridHeight > 0
-        ? item.gridHeight
-        : 1,
-  };
-}
-
 function getSnapshotWindowTargetKey(snapshot: CharacterInventorySnapshot): string {
   return `${snapshot.sourceFileType}:${snapshot.sourceFilePath}`;
-}
-
-function parseVaultDragStatePayload(payload: unknown): { active: boolean } | undefined {
-  if (!payload || typeof payload !== 'object') {
-    return undefined;
-  }
-
-  const rawPayload = payload as Partial<{
-    active: boolean;
-    id: string;
-  }>;
-  if (
-    typeof rawPayload.active !== 'boolean' ||
-    typeof rawPayload.id !== 'string' ||
-    rawPayload.id.trim().length === 0
-  ) {
-    return undefined;
-  }
-
-  return { active: rawPayload.active };
-}
-
-function parseInventoryDragStatePayload(payload: unknown): { active: boolean } | undefined {
-  if (!payload || typeof payload !== 'object') {
-    return undefined;
-  }
-
-  const rawPayload = payload as Partial<{
-    active: boolean;
-    fingerprint: string;
-    sourceFilePath: string;
-    sourceFileType: string;
-    sourceLocationContext: string;
-    rawItemJson: string;
-  }>;
-  if (
-    typeof rawPayload.active !== 'boolean' ||
-    typeof rawPayload.fingerprint !== 'string' ||
-    rawPayload.fingerprint.trim().length === 0 ||
-    typeof rawPayload.sourceFilePath !== 'string' ||
-    rawPayload.sourceFilePath.trim().length === 0 ||
-    typeof rawPayload.sourceFileType !== 'string' ||
-    rawPayload.sourceFileType.trim().length === 0 ||
-    typeof rawPayload.sourceLocationContext !== 'string' ||
-    rawPayload.sourceLocationContext.trim().length === 0 ||
-    typeof rawPayload.rawItemJson !== 'string' ||
-    rawPayload.rawItemJson.trim().length === 0
-  ) {
-    return undefined;
-  }
-
-  return { active: rawPayload.active };
 }
 
 interface MainVaultTileProps {
@@ -151,7 +71,7 @@ function MainVaultTile({ item, iconLookup, selected, onSelect }: MainVaultTilePr
       onDragStart={(event) => {
         event.dataTransfer.effectAllowed = 'move';
         event.dataTransfer.setData(VAULT_DRAG_MIME, item.id);
-        const dragStatePayload = toVaultDragStatePayload(item);
+        const dragStatePayload = toActiveVaultDragItem(item);
         const textPayload = serializeVaultTextPayload(dragStatePayload);
         event.dataTransfer.setData('text/plain', textPayload);
         event.dataTransfer.setData('text', textPayload);
@@ -163,7 +83,7 @@ function MainVaultTile({ item, iconLookup, selected, onSelect }: MainVaultTilePr
       onDragEnd={() => {
         window.electronAPI?.inventory.sendVaultDragState({
           active: false,
-          ...toVaultDragStatePayload(item),
+          ...toActiveVaultDragItem(item),
         });
       }}
     >
@@ -178,124 +98,24 @@ function MainVaultTile({ item, iconLookup, selected, onSelect }: MainVaultTilePr
   );
 }
 
-function getTypeValue(type?: string): TypeFilter {
-  if (!type) {
-    return 'other';
-  }
-
-  const normalizedType = type.toLowerCase();
-
-  if (normalizedType === 'unique' || normalizedType === 'set' || normalizedType === 'runeword') {
-    return normalizedType;
-  }
-
-  if (normalizedType === 'rune') {
-    return 'rune';
-  }
-
-  return 'other';
-}
-
 export function InventoryBrowserMain() {
   const { t } = useTranslation();
-  const grailItems = useGrailStore((state) => state.items);
-  const setGrailItems = useGrailStore((state) => state.setItems);
-  const [isLoading, setIsLoading] = useState(true);
   const [isVaulting, setIsVaulting] = useState(false);
   const [isUnvaulting, setIsUnvaulting] = useState(false);
   const [selectedVaultItemId, setSelectedVaultItemId] = useState<string | undefined>(undefined);
   const [searchText, setSearchText] = useState('');
   const [characterId, setCharacterId] = useState('all');
-  const [locationContext, setLocationContext] = useState<'all' | VaultLocationContext>('all');
+  const [locationContext, setLocationContext] = useState<LocationFilter>('all');
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('all');
-  const [dragOverVaultDropzone, setDragOverVaultDropzone] = useState(false);
-  const [inventoryResponse, setInventoryResponse] = useState<InventorySearchAllResponse | null>(
-    null,
-  );
-  const latestSearchRequestRef = useRef(0);
   const hasCrossWindowVaultDragRef = useRef(false);
   const hasCrossWindowInventoryDragRef = useRef(false);
   const snapshotHoverTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const snapshotHoverKeyRef = useRef<string | undefined>(undefined);
   const lastSnapshotDragSeenAtRef = useRef(0);
   const autoOpenedSnapshotKeysRef = useRef<Set<string>>(new Set());
-  const spriteIconLookup = useMemo(() => createSpriteIconLookupIndex(grailItems), [grailItems]);
-
-  useEffect(() => {
-    if (grailItems.length > 0 || !window.electronAPI?.grail?.getItems) {
-      return;
-    }
-
-    let cancelled = false;
-
-    void window.electronAPI.grail
-      .getItems()
-      .then((items) => {
-        if (cancelled || !items) {
-          return;
-        }
-
-        setGrailItems(items);
-      })
-      .catch((error) => {
-        if (!cancelled) {
-          console.error('Failed to load grail items for inventory icon lookup', error);
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [grailItems.length, setGrailItems]);
-
-  const loadInventorySearch = useCallback(async (): Promise<void> => {
-    const requestId = latestSearchRequestRef.current + 1;
-    latestSearchRequestRef.current = requestId;
-    const filter = buildInventorySearchFilter(searchText, characterId, locationContext);
-
-    setIsLoading(true);
-    try {
-      const response = await loadInventorySearchResponse(filter);
-      if (requestId === latestSearchRequestRef.current) {
-        setInventoryResponse(response);
-      }
-    } catch (error) {
-      if (requestId === latestSearchRequestRef.current) {
-        console.error('Failed to load inventory search results', error);
-      }
-    } finally {
-      if (requestId === latestSearchRequestRef.current) {
-        setIsLoading(false);
-      }
-    }
-  }, [characterId, locationContext, searchText]);
-
-  useEffect(() => {
-    void loadInventorySearch();
-  }, [loadInventorySearch]);
-
-  useEffect(() => {
-    let reloadTimeout: ReturnType<typeof setTimeout> | undefined;
-
-    const handleSaveFileEvent = () => {
-      if (reloadTimeout) {
-        clearTimeout(reloadTimeout);
-      }
-
-      reloadTimeout = setTimeout(() => {
-        void loadInventorySearch();
-      }, 250);
-    };
-
-    const unsubscribe = onMainEvent('save-file-event', handleSaveFileEvent);
-
-    return () => {
-      if (reloadTimeout) {
-        clearTimeout(reloadTimeout);
-      }
-      unsubscribe();
-    };
-  }, [loadInventorySearch]);
+  const spriteIconLookup = useInventoryIconLookup();
+  const { isLoading, inventoryResponse, loadInventorySearch, reloadInventoryAfterSaveWrite } =
+    useInventorySearch({ searchText, characterId, locationContext });
 
   const clearSnapshotHoverTimer = useCallback((): void => {
     if (snapshotHoverTimerRef.current) {
@@ -416,16 +236,6 @@ export function InventoryBrowserMain() {
     [selectedVaultItemId, vaultItems],
   );
 
-  const reloadInventoryAfterSaveWrite = useCallback(async (): Promise<void> => {
-    try {
-      await window.electronAPI.saveFile.refreshSaveFiles();
-    } catch (error) {
-      console.warn('Failed to refresh save files after write', error);
-    }
-
-    await loadInventorySearch();
-  }, [loadInventorySearch]);
-
   const handleUnvault = useCallback(async (): Promise<void> => {
     if (!selectedVaultItemId || isUnvaulting) {
       return;
@@ -469,9 +279,6 @@ export function InventoryBrowserMain() {
 
   const handleVaultDrop = useCallback(
     async (event: DragEvent<HTMLButtonElement>) => {
-      event.preventDefault();
-      setDragOverVaultDropzone(false);
-
       const textPayload = event.dataTransfer.getData('text/plain');
       const payloadItemInput = parseInventoryTextPayload(textPayload);
       if (!payloadItemInput) {
@@ -503,35 +310,7 @@ export function InventoryBrowserMain() {
       return true;
     }
 
-    const dataTransferTypes = Array.from(event.dataTransfer?.types ?? []);
-    if (
-      dataTransferTypes.includes(INVENTORY_DRAG_MIME) ||
-      dataTransferTypes.includes(VAULT_DRAG_MIME)
-    ) {
-      return true;
-    }
-
-    const readDragData = (format: string): string => {
-      try {
-        return event.dataTransfer.getData(format) ?? '';
-      } catch {
-        return '';
-      }
-    };
-
-    const textPayload = readDragData('text/plain') || readDragData('text') || readDragData('Text');
-    if (!textPayload) {
-      return false;
-    }
-
-    if (parseInventoryTextPayload(textPayload) !== undefined) {
-      return true;
-    }
-
-    return (
-      textPayload.startsWith(VAULT_TEXT_PAYLOAD_PREFIX) &&
-      parseVaultTextPayload(textPayload) !== undefined
-    );
+    return hasInventoryOrVaultDragData(event);
   }, []);
 
   const trackSnapshotDragSession = useCallback((): void => {
@@ -595,89 +374,17 @@ export function InventoryBrowserMain() {
   return (
     <div className="flex-1 overflow-auto p-4">
       <div className="flex w-full flex-col gap-4">
-        <Card>
-          <CardHeader>
-            <CardTitle>{t(translations.inventoryBrowser.title)}</CardTitle>
-          </CardHeader>
-          <CardContent className="grid grid-cols-1 gap-3 md:grid-cols-5">
-            <Input
-              value={searchText}
-              onChange={(event) => setSearchText(event.target.value)}
-              placeholder={t(translations.inventoryBrowser.searchPlaceholder)}
-              aria-label={t(translations.common.search)}
-              className="md:col-span-2"
-            />
-            <Select value={characterId} onValueChange={(value) => setCharacterId(value ?? 'all')}>
-              <SelectTrigger>
-                <SelectValue placeholder={t(translations.inventoryBrowser.character)} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">
-                  {t(translations.inventoryBrowser.allCharacters)}
-                </SelectItem>
-                {characterOptions.map(([id, name]) => (
-                  <SelectItem key={id} value={id}>
-                    {name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select
-              value={locationContext}
-              onValueChange={(value) =>
-                setLocationContext((value as 'all' | VaultLocationContext | null) ?? 'all')
-              }
-            >
-              <SelectTrigger>
-                <SelectValue placeholder={t(translations.inventoryBrowser.locationFilter)} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">{t(translations.inventoryBrowser.allLocations)}</SelectItem>
-                <SelectItem value="equipped">
-                  {t(translations.inventoryBrowser.location.equipped)}
-                </SelectItem>
-                <SelectItem value="inventory">
-                  {t(translations.inventoryBrowser.location.inventory)}
-                </SelectItem>
-                <SelectItem value="stash">
-                  {t(translations.inventoryBrowser.location.stash)}
-                </SelectItem>
-                <SelectItem value="mercenary">
-                  {t(translations.inventoryBrowser.location.mercenary)}
-                </SelectItem>
-                <SelectItem value="corpse">
-                  {t(translations.inventoryBrowser.location.corpse)}
-                </SelectItem>
-              </SelectContent>
-            </Select>
-            <Select
-              value={typeFilter}
-              onValueChange={(value) => setTypeFilter((value as TypeFilter | null) ?? 'all')}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder={t(translations.inventoryBrowser.type)} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">{t(translations.inventoryBrowser.allTypes)}</SelectItem>
-                <SelectItem value="unique">
-                  {t(translations.inventoryBrowser.typeOptions.unique)}
-                </SelectItem>
-                <SelectItem value="set">
-                  {t(translations.inventoryBrowser.typeOptions.set)}
-                </SelectItem>
-                <SelectItem value="runeword">
-                  {t(translations.inventoryBrowser.typeOptions.runeword)}
-                </SelectItem>
-                <SelectItem value="rune">
-                  {t(translations.inventoryBrowser.typeOptions.rune)}
-                </SelectItem>
-                <SelectItem value="other">
-                  {t(translations.inventoryBrowser.typeOptions.other)}
-                </SelectItem>
-              </SelectContent>
-            </Select>
-          </CardContent>
-        </Card>
+        <InventoryFilterBar
+          searchText={searchText}
+          onSearchTextChange={setSearchText}
+          characterId={characterId}
+          onCharacterIdChange={setCharacterId}
+          characterOptions={characterOptions}
+          locationContext={locationContext}
+          onLocationContextChange={setLocationContext}
+          typeFilter={typeFilter}
+          onTypeFilterChange={setTypeFilter}
+        />
 
         {vaultItems.length > 0 && (
           <Card>
@@ -718,25 +425,7 @@ export function InventoryBrowserMain() {
           </Card>
         )}
 
-        <button
-          type="button"
-          className={[
-            'rounded-lg border border-dashed p-3 text-center text-sm transition-colors',
-            dragOverVaultDropzone
-              ? 'border-primary bg-primary/10'
-              : 'border-border text-muted-foreground',
-          ].join(' ')}
-          onDragOver={(event) => {
-            event.preventDefault();
-            setDragOverVaultDropzone(true);
-          }}
-          onDragLeave={() => setDragOverVaultDropzone(false)}
-          onDrop={(event) => {
-            void handleVaultDrop(event);
-          }}
-        >
-          {t(translations.inventoryBrowser.dropToVault)}
-        </button>
+        <VaultDropzone onDropItem={handleVaultDrop} />
 
         <Card>
           <CardHeader>

@@ -11,7 +11,7 @@ The **Inventory Browser** (title bar → **Inventory Browser**, route `/inventor
 
 ## Changing your items
 
-- **Move**: drag an item to a free spot in the same file or another file. Occupied spots, invalid equipment slots and class restrictions are refused with a message, and nothing is changed.
+- **Move**: drag an item to a free spot in the same file or another file. Occupied spots, invalid equipment slots and class restrictions are refused with a message, and nothing is changed. While you drag over the equipment, a slot turns green when the item type fits it (for example a helm, circlet or pelt on the head) and the slot is free, and red otherwise. Class restrictions and two-handed weapon rules are checked when you drop.
 - **Split a stack**: pick up part of a stack and place the pieces one by one. The Runes, Gems and Materials tabs themselves are not draggable.
 - **Vault**: drop an item on the vault area (or use **Vault**) to take it out of the save file and keep it in the app's database. Drag a vaulted item onto a free spot to **Unvault** it back into a character or stash.
 

@@ -234,12 +234,12 @@ export function classifyBoardItems<T extends SpatialItemLike>(
       continue;
     }
 
-    if (hasOccupiedCellOverlap(item, occupiedCells)) {
+    if (isRectOccupied(getItemRect(item), occupiedCells)) {
       unplaced.push({ item, reason: 'overlap' });
       continue;
     }
 
-    occupyItemCells(item, occupiedCells);
+    occupyRect(getItemRect(item), occupiedCells);
     placed.push(item);
   }
 
@@ -304,18 +304,34 @@ export function buildOverflowBoardLayout<T extends SpatialItemLike, TKey extends
   };
 }
 
+/** Cell coordinates of a grid cell. */
+export interface GridCell {
+  x: number;
+  y: number;
+}
+
+interface GridRect extends GridCell {
+  width: number;
+  height: number;
+}
+
 function createCellKey(x: number, y: number): string {
   return `${x},${y}`;
 }
 
-function hasOccupiedCellOverlap(item: SpatialItemLike, occupiedCells: Set<string>): boolean {
-  const gridX = item.gridX as number;
-  const gridY = item.gridY as number;
-  const width = getGridWidth(item);
-  const height = getGridHeight(item);
+/** Rectangle covered by a positioned item; missing dimensions count as one cell. */
+function getItemRect(item: SpatialItemLike): GridRect {
+  return {
+    x: item.gridX as number,
+    y: item.gridY as number,
+    width: getGridWidth(item),
+    height: getGridHeight(item),
+  };
+}
 
-  for (let x = gridX; x < gridX + width; x += 1) {
-    for (let y = gridY; y < gridY + height; y += 1) {
+function isRectOccupied(rect: GridRect, occupiedCells: Set<string>): boolean {
+  for (let x = rect.x; x < rect.x + rect.width; x += 1) {
+    for (let y = rect.y; y < rect.y + rect.height; y += 1) {
       if (occupiedCells.has(createCellKey(x, y))) {
         return true;
       }
@@ -325,14 +341,9 @@ function hasOccupiedCellOverlap(item: SpatialItemLike, occupiedCells: Set<string
   return false;
 }
 
-function occupyItemCells(item: SpatialItemLike, occupiedCells: Set<string>): void {
-  const gridX = item.gridX as number;
-  const gridY = item.gridY as number;
-  const width = getGridWidth(item);
-  const height = getGridHeight(item);
-
-  for (let x = gridX; x < gridX + width; x += 1) {
-    for (let y = gridY; y < gridY + height; y += 1) {
+function occupyRect(rect: GridRect, occupiedCells: Set<string>): void {
+  for (let x = rect.x; x < rect.x + rect.width; x += 1) {
+    for (let y = rect.y; y < rect.y + rect.height; y += 1) {
       occupiedCells.add(createCellKey(x, y));
     }
   }
@@ -486,4 +497,123 @@ export function getSortedStashTabs<T extends SpatialItemLike>(
   return [...stashByTab.entries()]
     .sort(([left], [right]) => left - right)
     .map(([stashTab, items]) => ({ stashTab, items: sortByGridPosition(items) }));
+}
+
+/**
+ * Checks whether a `width` x `height` drop at (`startX`, `startY`) would cover a cell of a
+ * positioned item.
+ *
+ * @param items - Items on the board
+ * @param ignoredFingerprint - Item that is being moved and does not block its own drop
+ * @returns `true` when the drop overlaps another item
+ */
+export function hasBoardOverlap<T extends SpatialItemLike & { fingerprint: string }>(
+  items: T[],
+  startX: number,
+  startY: number,
+  width: number,
+  height: number,
+  ignoredFingerprint?: string,
+): boolean {
+  const droppingCells = new Set<string>();
+  occupyRect({ x: startX, y: startY, width, height }, droppingCells);
+
+  return items.some((item) => {
+    if (ignoredFingerprint && item.fingerprint === ignoredFingerprint) {
+      return false;
+    }
+
+    if (!hasGridPosition(item) || !hasGridDimensions(item)) {
+      return false;
+    }
+
+    return isRectOccupied(getItemRect(item), droppingCells);
+  });
+}
+
+function collectOccupiedCells(existingItems: SpatialItemLike[]): Set<string> {
+  const occupiedCells = new Set<string>();
+  for (const item of existingItems) {
+    if (item.gridX === undefined || item.gridY === undefined) {
+      continue;
+    }
+
+    occupyRect(getItemRect(item), occupiedCells);
+  }
+
+  return occupiedCells;
+}
+
+/** Cells from (`startX`, `startY`) to the end of the board, then from the top back to the start. */
+function buildWrappedScanCandidates(
+  maxX: number,
+  maxY: number,
+  startX: number,
+  startY: number,
+): GridCell[] {
+  const candidates: GridCell[] = [];
+
+  for (let y = startY; y <= maxY; y += 1) {
+    const rowStartX = y === startY ? startX : 0;
+    for (let x = rowStartX; x <= maxX; x += 1) {
+      candidates.push({ x, y });
+    }
+  }
+
+  for (let y = 0; y <= startY; y += 1) {
+    const rowEndX = y === startY ? startX - 1 : maxX;
+    for (let x = 0; x <= rowEndX; x += 1) {
+      candidates.push({ x, y });
+    }
+  }
+
+  return candidates;
+}
+
+/**
+ * Finds free positions for up to `count` single units of a picked-up stack, scanning row by row
+ * from the preferred cell and wrapping around to the top of the board.
+ *
+ * @returns Top-left cells of the placements; fewer than `count` when the board is full
+ */
+export function findStackPickupSlots(
+  gridSize: GridSize,
+  existingItems: SpatialItemLike[],
+  itemWidth: number,
+  itemHeight: number,
+  count: number,
+  preferredGridX?: number,
+  preferredGridY?: number,
+): GridCell[] {
+  if (count <= 0 || itemWidth <= 0 || itemHeight <= 0) {
+    return [];
+  }
+
+  const maxX = gridSize.columns - itemWidth;
+  const maxY = gridSize.rows - itemHeight;
+  if (maxX < 0 || maxY < 0) {
+    return [];
+  }
+
+  const startX = Math.min(maxX, Math.max(0, preferredGridX ?? 0));
+  const startY = Math.min(maxY, Math.max(0, preferredGridY ?? 0));
+  const occupiedCells = collectOccupiedCells(existingItems);
+  const candidates = buildWrappedScanCandidates(maxX, maxY, startX, startY);
+
+  const selected: GridCell[] = [];
+  for (const candidate of candidates) {
+    const rect = { ...candidate, width: itemWidth, height: itemHeight };
+    if (isRectOccupied(rect, occupiedCells)) {
+      continue;
+    }
+
+    selected.push(candidate);
+    occupyRect(rect, occupiedCells);
+
+    if (selected.length >= count) {
+      break;
+    }
+  }
+
+  return selected;
 }

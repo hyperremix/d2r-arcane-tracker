@@ -7,8 +7,104 @@ import {
   DEFAULT_STASH_GRID_SIZE,
   EQUIPPED_BOARD_SIZE,
   EQUIPPED_SLOT_LAYOUT,
+  findStackPickupSlots,
+  hasBoardOverlap,
   type SpatialItemLike,
 } from './spatialLayout';
+
+type BoardTestItem = SpatialItemLike & { fingerprint: string };
+
+function boardItem(
+  fingerprint: string,
+  gridX: number,
+  gridY: number,
+  gridWidth = 1,
+  gridHeight = 1,
+): BoardTestItem {
+  return { fingerprint, locationContext: 'inventory', gridX, gridY, gridWidth, gridHeight };
+}
+
+describe('When a drop is checked against items on the board', () => {
+  const items = [boardItem('armor', 2, 0, 2, 3)];
+
+  it('Then a drop covering a cell of another item overlaps', () => {
+    // Arrange / Act
+    const overlaps = hasBoardOverlap(items, 3, 2, 1, 1);
+
+    // Assert
+    expect(overlaps).toBe(true);
+  });
+
+  it('Then a drop next to the item does not overlap', () => {
+    // Arrange / Act
+    const overlaps = hasBoardOverlap(items, 4, 0, 2, 2);
+
+    // Assert
+    expect(overlaps).toBe(false);
+  });
+
+  it('If the overlapping item is the one being moved, Then it does not block the drop', () => {
+    // Arrange / Act
+    const overlaps = hasBoardOverlap(items, 2, 1, 2, 3, 'armor');
+
+    // Assert
+    expect(overlaps).toBe(false);
+  });
+
+  it('If an item has no position, Then it does not block the drop', () => {
+    // Arrange
+    const unplaced: BoardTestItem = { fingerprint: 'loose', locationContext: 'inventory' };
+
+    // Act
+    const overlaps = hasBoardOverlap([unplaced], 0, 0, 1, 1);
+
+    // Assert
+    expect(overlaps).toBe(false);
+  });
+});
+
+describe('When free cells for a stack pickup are searched', () => {
+  const gridSize = { columns: 3, rows: 2 };
+
+  it('Then cells are taken row by row from the preferred cell and wrap to the top', () => {
+    // Arrange
+    const items = [boardItem('blocker', 2, 1)];
+
+    // Act
+    const slots = findStackPickupSlots(gridSize, items, 1, 1, 4, 1, 1);
+
+    // Assert
+    expect(slots).toEqual([
+      { x: 1, y: 1 },
+      { x: 0, y: 0 },
+      { x: 1, y: 0 },
+      { x: 2, y: 0 },
+    ]);
+  });
+
+  it('If the board has fewer free cells than units, Then only the free cells are returned', () => {
+    // Arrange
+    const items = [boardItem('wide', 0, 0, 3, 1)];
+
+    // Act
+    const slots = findStackPickupSlots(gridSize, items, 1, 1, 5);
+
+    // Assert
+    expect(slots).toEqual([
+      { x: 0, y: 1 },
+      { x: 1, y: 1 },
+      { x: 2, y: 1 },
+    ]);
+  });
+
+  it('If the item is larger than the board, Then no cell is returned', () => {
+    // Arrange / Act
+    const slots = findStackPickupSlots(gridSize, [], 1, 3, 1);
+
+    // Assert
+    expect(slots).toEqual([]);
+  });
+});
 
 type TestItem = SpatialItemLike & {
   id: string;

@@ -1,9 +1,11 @@
 import { toast } from 'sonner';
 import { translations } from '@/i18n/translations';
 
+const MODERN_STASH_READ_ONLY_ERROR = 'MODERN_STASH_READ_ONLY';
+
 type Translate = (key: string, options?: Record<string, unknown>) => string;
 
-function getMessage(error: unknown): string | undefined {
+export function getErrorMessage(error: unknown): string | undefined {
   if (typeof error === 'string') {
     return error;
   }
@@ -36,7 +38,7 @@ function includesAny(message: string | undefined, fragments: string[]): boolean 
  * the save files untouched, so the message says so and the caller reloads the (possibly stale) view.
  */
 export function showInventoryOperationErrorToast(error: unknown, t: Translate): void {
-  const message = getMessage(error);
+  const message = getErrorMessage(error);
   const messages = translations.inventoryBrowser.operationErrors;
 
   if (includesAny(message, ['GAME_RUNNING'])) {
@@ -52,4 +54,12 @@ export function showInventoryOperationErrorToast(error: unknown, t: Translate): 
   } else {
     toast.error(t(messages.failed));
   }
+}
+
+export function isModernStashReadOnlyError(error: unknown): boolean {
+  return includesAny(getErrorMessage(error), [MODERN_STASH_READ_ONLY_ERROR]);
+}
+
+export function showModernStashReadOnlyToast(t: Translate): void {
+  toast.error(t(translations.inventoryBrowser.modernStashReadOnlyError));
 }
