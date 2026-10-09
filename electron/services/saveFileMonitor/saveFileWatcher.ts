@@ -45,7 +45,8 @@ export function watchSaveDirectory(
     .on('error', (error) => log.error('chokidar', error))
     .on('ready', () => {
       log.info('chokidar', 'File watcher ready');
-      const watched = watcher.getWatched();
+      // A watcher that was closed before it became ready has nothing left to report.
+      const watched = watcher.closed ? undefined : watcher.getWatched();
       if (watched) {
         log.info('chokidar', `Watching paths: ${Object.keys(watched).join(', ')}`);
         log.info(

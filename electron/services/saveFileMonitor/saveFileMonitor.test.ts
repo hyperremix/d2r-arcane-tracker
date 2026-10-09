@@ -305,6 +305,63 @@ describe('When SaveFileMonitor is used', () => {
       expect(startedSpy).toHaveBeenCalledWith(expect.objectContaining({ saveFileCount: 0 }));
     });
 
+    it('Then should report the watched paths once the watcher is ready', async () => {
+      // Arrange
+      const watchedDir = await mkdtemp(join(tmpdir(), 'arcane-ready-'));
+      tempDirs.push(watchedDir);
+      vi.mocked(mockDatabase.getAllSettings).mockReturnValue({
+        saveDir: watchedDir,
+        gameMode: GameMode.Softcore,
+      });
+      const handlers = new Map<string, () => void>();
+      const fakeWatcher = {
+        closed: false,
+        on: vi.fn(function (this: unknown, event: string, handler: () => void) {
+          handlers.set(event, handler);
+          return this;
+        }),
+        close: vi.fn(),
+        getWatched: vi.fn(() => ({ [watchedDir]: ['a.d2s', 'b.d2s'] })),
+      };
+      (chokidar as any).watch = vi.fn(() => fakeWatcher);
+      await monitor.startMonitoring();
+
+      // Act
+      handlers.get('ready')?.();
+
+      // Assert
+      expect(fakeWatcher.getWatched).toHaveBeenCalledTimes(1);
+    });
+
+    it('Then should not query a watcher that was closed before it became ready', async () => {
+      // Arrange
+      const watchedDir = await mkdtemp(join(tmpdir(), 'arcane-ready-closed-'));
+      tempDirs.push(watchedDir);
+      vi.mocked(mockDatabase.getAllSettings).mockReturnValue({
+        saveDir: watchedDir,
+        gameMode: GameMode.Softcore,
+      });
+      const handlers = new Map<string, () => void>();
+      const fakeWatcher = {
+        closed: false,
+        on: vi.fn(function (this: unknown, event: string, handler: () => void) {
+          handlers.set(event, handler);
+          return this;
+        }),
+        close: vi.fn(),
+        getWatched: vi.fn(() => ({})),
+      };
+      (chokidar as any).watch = vi.fn(() => fakeWatcher);
+      await monitor.startMonitoring();
+      fakeWatcher.closed = true;
+
+      // Act
+      handlers.get('ready')?.();
+
+      // Assert
+      expect(fakeWatcher.getWatched).not.toHaveBeenCalled();
+    });
+
     it('Then should not watch a directory that cannot be read', async () => {
       // Arrange
       // A regular file used as the save directory exists but cannot be listed (readdir throws).
