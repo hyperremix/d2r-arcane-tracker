@@ -1,8 +1,7 @@
 import { Trophy } from 'lucide-react';
 import { useId } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
+import { GrailTrackingFields } from '@/components/settings/fields/GrailTrackingFields';
 import { useWizardSettingsSave, WizardSaveError } from '@/components/wizard/wizardSettingsSave';
 import { translations } from '@/i18n/translations';
 import { useGrailStore } from '@/stores/grailStore';
@@ -14,18 +13,9 @@ import { useGrailStore } from '@/stores/grailStore';
  */
 export function GrailSettingsStep() {
   const { t } = useTranslation();
-  const grailNormalId = useId();
-  const grailEtherealId = useId();
-  const grailRunesId = useId();
-  const grailRunewordsId = useId();
   const headingId = useId();
   const settings = useGrailStore((state) => state.settings);
   const { saveSettings, saveFailed } = useWizardSettingsSave();
-
-  const grailNormal = settings.grailNormal ?? true;
-  const grailEthereal = settings.grailEthereal ?? false;
-  const grailRunes = settings.grailRunes ?? false;
-  const grailRunewords = settings.grailRunewords ?? false;
 
   return (
     <section aria-labelledby={headingId} className="space-y-4">
@@ -40,75 +30,15 @@ export function GrailSettingsStep() {
       </div>
 
       <div className="space-y-6">
-        {/* Item Type Toggles */}
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="space-y-0.5">
-              <Label htmlFor={grailNormalId} className="text-base">
-                {t(translations.settings.grail.includeNormal)}
-              </Label>
-              <p className="text-muted-foreground text-sm">
-                {t(translations.settings.grail.includeNormalDescription)}
-              </p>
-            </div>
-            <Switch
-              id={grailNormalId}
-              checked={grailNormal}
-              onCheckedChange={(checked) => saveSettings({ grailNormal: checked })}
-            />
-          </div>
-
-          <div className="flex items-center justify-between">
-            <div className="space-y-0.5">
-              <Label htmlFor={grailEtherealId} className="text-base">
-                {t(translations.settings.grail.includeEthereal)}
-              </Label>
-              <p className="text-muted-foreground text-sm">
-                {t(translations.settings.grail.includeEtherealDescription)}
-              </p>
-            </div>
-            <Switch
-              id={grailEtherealId}
-              checked={grailEthereal}
-              onCheckedChange={(checked) => saveSettings({ grailEthereal: checked })}
-            />
-          </div>
-        </div>
-
-        {/* Runes and Runewords Toggles */}
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="space-y-0.5">
-              <Label htmlFor={grailRunesId} className="text-base">
-                {t(translations.settings.grail.includeRunes)}
-              </Label>
-              <p className="text-muted-foreground text-sm">
-                {t(translations.settings.grail.includeRunesDescription)}
-              </p>
-            </div>
-            <Switch
-              id={grailRunesId}
-              checked={grailRunes}
-              onCheckedChange={(checked) => saveSettings({ grailRunes: checked })}
-            />
-          </div>
-
-          <div className="flex items-center justify-between">
-            <div className="space-y-0.5">
-              <Label htmlFor={grailRunewordsId} className="text-base">
-                {t(translations.settings.grail.includeRunewords)}
-              </Label>
-              <p className="text-muted-foreground text-sm">
-                {t(translations.settings.grail.includeRunewordsDescription)}
-              </p>
-            </div>
-            <Switch
-              id={grailRunewordsId}
-              checked={grailRunewords}
-              onCheckedChange={(checked) => saveSettings({ grailRunewords: checked })}
-            />
-          </div>
-        </div>
+        <GrailTrackingFields
+          values={{
+            grailNormal: settings.grailNormal ?? true,
+            grailEthereal: settings.grailEthereal ?? false,
+            grailRunes: settings.grailRunes ?? false,
+            grailRunewords: settings.grailRunewords ?? false,
+          }}
+          onChange={saveSettings}
+        />
 
         <WizardSaveError visible={saveFailed} />
 

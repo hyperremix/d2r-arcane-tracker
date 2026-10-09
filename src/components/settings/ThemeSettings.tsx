@@ -2,15 +2,9 @@ import { Monitor, Moon, Sun } from 'lucide-react';
 import { useId } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useShallow } from 'zustand/react/shallow';
+import { ThemeSelect } from '@/components/settings/fields/ThemeSelect';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { translations } from '@/i18n/translations';
 import { useGrailStore } from '@/stores/grailStore';
 
@@ -60,34 +54,12 @@ export function ThemeSettings() {
                 {t(translations.settings.theme.selectTheme)}
               </p>
             </div>
-            <Select
+            <ThemeSelect
+              id={themeSelectId}
               value={settings.theme}
-              onValueChange={(value) => value && updateTheme(value as 'light' | 'dark' | 'system')}
-            >
-              <SelectTrigger id={themeSelectId} className="w-[180px]">
-                <SelectValue placeholder={t(translations.settings.theme.selectThemePlaceholder)} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="light">
-                  <div className="flex items-center gap-2">
-                    <Sun className="h-4 w-4" />
-                    {t(translations.settings.theme.light)}
-                  </div>
-                </SelectItem>
-                <SelectItem value="dark">
-                  <div className="flex items-center gap-2">
-                    <Moon className="h-4 w-4" />
-                    {t(translations.settings.theme.dark)}
-                  </div>
-                </SelectItem>
-                <SelectItem value="system">
-                  <div className="flex items-center gap-2">
-                    <Monitor className="h-4 w-4" />
-                    {t(translations.settings.theme.system)}
-                  </div>
-                </SelectItem>
-              </SelectContent>
-            </Select>
+              onValueChange={updateTheme}
+              triggerClassName="w-[180px]"
+            />
           </div>
         </div>
 

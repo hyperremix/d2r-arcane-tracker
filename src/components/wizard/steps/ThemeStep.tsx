@@ -1,33 +1,12 @@
-import type { LucideIcon } from 'lucide-react';
 import { Monitor, Moon, Sun } from 'lucide-react';
 import { useId } from 'react';
 import { useTranslation } from 'react-i18next';
+import { ThemeSelect } from '@/components/settings/fields/ThemeSelect';
 import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { useWizardSettingsSave, WizardSaveError } from '@/components/wizard/wizardSettingsSave';
 import { translations } from '@/i18n/translations';
 import { themeLabelKeys } from '@/lib/labelKeys';
 import { useGrailStore } from '@/stores/grailStore';
-
-/**
- * A selectable theme with its icon; labels come from the shared theme label keys.
- */
-interface ThemeOption {
-  value: 'light' | 'dark' | 'system';
-  Icon: LucideIcon;
-}
-
-const themeOptions: ThemeOption[] = [
-  { value: 'light', Icon: Sun },
-  { value: 'dark', Icon: Moon },
-  { value: 'system', Icon: Monitor },
-];
 
 /**
  * ThemeStep component - Theme section of the wizard Preferences step.
@@ -72,28 +51,7 @@ export function ThemeStep() {
       <div className="space-y-4">
         <div className="space-y-2">
           <Label htmlFor={themeId}>{t(translations.settings.theme.selectTheme)}</Label>
-          <Select
-            value={theme}
-            onValueChange={(value) =>
-              value && handleThemeChange(value as 'light' | 'dark' | 'system')
-            }
-          >
-            <SelectTrigger id={themeId}>
-              <SelectValue placeholder={t(translations.settings.theme.selectThemePlaceholder)}>
-                {t(themeLabelKeys[theme])}
-              </SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              {themeOptions.map(({ value, Icon }) => (
-                <SelectItem key={value} value={value}>
-                  <div className="flex items-center gap-2">
-                    <Icon className="h-4 w-4" />
-                    {t(themeLabelKeys[value])}
-                  </div>
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <ThemeSelect id={themeId} value={theme} onValueChange={handleThemeChange} />
         </div>
 
         {/* Theme Preview */}

@@ -1,30 +1,13 @@
-import { GameMode } from 'electron/types/grail';
-import { Shield, Sword, Users, Wrench } from 'lucide-react';
-import { useCallback, useId, useMemo } from 'react';
+import type { GameMode } from 'electron/types/grail';
+import { Users } from 'lucide-react';
+import { useCallback, useId } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useShallow } from 'zustand/react/shallow';
+import { GameModeSelect } from '@/components/settings/fields/GameModeSelect';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { translations } from '@/i18n/translations';
-import { gameModeDescriptionKeys, gameModeLabelKeys } from '@/lib/labelKeys';
 import { useGrailStore } from '@/stores/grailStore';
-
-/**
- * Available game modes with their icons.
- */
-const gameModeValues: { value: GameMode; icon: React.ReactNode }[] = [
-  { value: GameMode.Both, icon: <Users className="h-4 w-4" /> },
-  { value: GameMode.Softcore, icon: <Shield className="h-4 w-4" /> },
-  { value: GameMode.Hardcore, icon: <Sword className="h-4 w-4" /> },
-  { value: GameMode.Manual, icon: <Wrench className="h-4 w-4" /> },
-];
 
 /**
  * GameModeSettings component that allows users to select the game mode for Holy Grail tracking.
@@ -36,17 +19,6 @@ export function GameModeSettings() {
   const gameModeSelectId = useId();
   const { settings, setSettings } = useGrailStore(
     useShallow((state) => ({ settings: state.settings, setSettings: state.setSettings })),
-  );
-
-  const gameModes = useMemo(
-    () =>
-      gameModeValues.map(({ value, icon }) => ({
-        value,
-        icon,
-        label: t(gameModeLabelKeys[value]),
-        description: t(gameModeDescriptionKeys[value]),
-      })),
-    [t],
   );
 
   const updateGameMode = useCallback(
@@ -69,27 +41,11 @@ export function GameModeSettings() {
           <Label htmlFor={gameModeSelectId}>
             {t(translations.settings.gameMode.selectGameMode)}
           </Label>
-          <Select
+          <GameModeSelect
+            id={gameModeSelectId}
             value={settings.gameMode}
-            onValueChange={(value) => value && updateGameMode(value as GameMode)}
-          >
-            <SelectTrigger id={gameModeSelectId}>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {gameModes.map((mode) => (
-                <SelectItem key={mode.value} value={mode.value}>
-                  <div className="flex items-center gap-2">
-                    {mode.icon}
-                    <div className="flex flex-col">
-                      <span className="font-medium">{mode.label}</span>
-                      <span className="text-muted-foreground text-xs">{mode.description}</span>
-                    </div>
-                  </div>
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            onValueChange={updateGameMode}
+          />
         </div>
 
         <div className="rounded bg-info/10 p-3">
