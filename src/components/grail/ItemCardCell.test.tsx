@@ -14,8 +14,8 @@ interface RenderedItemCardProps {
 const itemCardRenders = { props: [] as RenderedItemCardProps[] };
 
 // Loaded per test: the suite shares one module cache across files (isolate: false), so a cached
-// MasonryItemGrid from another file would keep that file's ItemCard mock instead of this one
-let ItemCardCell: typeof import('./MasonryItemGrid').ItemCardCell;
+// VirtualItemGrid from another file would keep that file's ItemCard mock instead of this one
+let ItemCardCell: typeof import('./VirtualItemGrid').ItemCardCell;
 
 function createProgress(itemId: string): GrailProgress {
   return {
@@ -54,11 +54,11 @@ beforeEach(async () => {
       return <div data-testid="item-card" />;
     },
   }));
-  ({ ItemCardCell } = await import('./MasonryItemGrid'));
+  ({ ItemCardCell } = await import('./VirtualItemGrid'));
 });
 
 afterEach(() => {
-  // Do not leak this file's ItemCard mock or MasonryItemGrid instance into other test files
+  // Do not leak this file's ItemCard mock or VirtualItemGrid instance into other test files
   vi.doUnmock('./ItemCard');
   vi.resetModules();
 });

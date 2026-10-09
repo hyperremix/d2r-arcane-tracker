@@ -1,10 +1,12 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import type { GrailFilter, Item, Settings } from 'electron/types/grail';
 import { GameMode, GameVersion } from 'electron/types/grail';
+import { useEffect } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { HolyGrailItemBuilder } from '@/fixtures';
 import type { ProgressLookupData } from '@/hooks/useProgressLookup';
 import { ItemGrid } from './ItemGrid';
+import type { ItemGridGroup } from './VirtualItemGrid';
 
 // ============================================================================
 // Helper functions copied from ItemGrid for testing
@@ -493,8 +495,30 @@ describe('When createListRows is called', () => {
 // Component tests
 // ============================================================================
 
-// Records the groupedItems prop of every GroupedMasonryGrid render
-const groupedGridRenders = vi.hoisted(() => ({ groupedItems: [] as unknown[] }));
+// Records the groupedItems prop of every VirtualItemGrid render and how often it is mounted
+const groupedGridRenders = vi.hoisted(() => ({
+  groupedItems: [] as ItemGridGroup[][],
+  mounts: 0,
+}));
+
+function lastRenderedGroups(): ItemGridGroup[] {
+  return groupedGridRenders.groupedItems[groupedGridRenders.groupedItems.length - 1];
+}
+
+function createFoundProgressLookup(itemId: string) {
+  return new Map<string, ProgressLookupData>([
+    [
+      itemId,
+      {
+        normalFound: true,
+        etherealFound: false,
+        normalProgress: [],
+        etherealProgress: [],
+        overallFound: true,
+      },
+    ],
+  ]);
+}
 
 // Mock dependencies for component tests
 vi.mock('@/stores/grailStore', async (importOriginal) => ({
@@ -522,22 +546,25 @@ vi.mock('./ItemDetailsDialog', () => ({
   ItemDetailsDialog: ({ itemId, open }: { itemId: string | null; open: boolean }) =>
     open ? <div data-testid="item-details-dialog">{itemId}</div> : null,
 }));
-vi.mock('./MasonryItemGrid', () => ({
+vi.mock('./VirtualItemGrid', () => ({
   ItemCardCell: ({ item }: { item: Item }) => <div data-testid="item-card">{item.name}</div>,
-  MasonryItemGrid: ({ items }: { items: Item[] }) => (
-    <div data-testid="masonry-item-grid">{items.length} items</div>
-  ),
-  GroupedMasonryGrid: ({
+  VirtualItemGrid: ({
     groupedItems,
+    showGroupHeaders,
     onItemClick,
   }: {
-    groupedItems: Array<{ title: string; items: Item[] }>;
+    groupedItems: ItemGridGroup[];
+    showGroupHeaders: boolean;
     onItemClick: (itemId: string) => void;
   }) => {
     groupedGridRenders.groupedItems.push(groupedItems);
+    useEffect(() => {
+      groupedGridRenders.mounts += 1;
+    }, []);
+    const itemCount = groupedItems.reduce((count, group) => count + group.items.length, 0);
     return (
-      <div data-testid="grouped-masonry-grid">
-        {groupedItems.length} groups
+      <div data-testid="virtual-item-grid" data-show-group-headers={String(showGroupHeaders)}>
+        <span data-testid="grid-item-count">{itemCount} items</span>
         <ul>
           {groupedItems.map((group) => (
             <li key={group.title} data-testid="group">
@@ -608,11 +635,12 @@ describe('When ItemGrid component is rendered', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     groupedGridRenders.groupedItems.length = 0;
+    groupedGridRenders.mounts = 0;
     setupComponentMocks();
   });
 
   describe('If viewMode "grid" and groupMode "none"', () => {
-    it('Then renders MasonryItemGrid', () => {
+    it('Then renders all items in the virtualized grid without group headers', () => {
       // Arrange
       const items = HolyGrailItemBuilder.new().buildMany(3);
       setupComponentMocks({ filteredItems: items, viewMode: 'grid', groupMode: 'none' });
@@ -621,12 +649,15 @@ describe('When ItemGrid component is rendered', () => {
       render(<ItemGrid />);
 
       // Assert
-      expect(screen.getByTestId('masonry-item-grid')).toBeInTheDocument();
+      const grid = screen.getByTestId('virtual-item-grid');
+      expect(grid).toHaveAttribute('data-show-group-headers', 'false');
+      expect(screen.getAllByTestId('group')).toHaveLength(1);
+      expect(screen.getByTestId('grid-item-count')).toHaveTextContent('3 items');
     });
   });
 
   describe('If viewMode "grid" and groupMode "category"', () => {
-    it('Then renders GroupedMasonryGrid', () => {
+    it('Then renders the virtualized grid with group headers', () => {
       // Arrange
       const items = HolyGrailItemBuilder.new().buildMany(3);
       setupComponentMocks({ filteredItems: items, viewMode: 'grid', groupMode: 'category' });
@@ -635,7 +666,10 @@ describe('When ItemGrid component is rendered', () => {
       render(<ItemGrid />);
 
       // Assert
-      expect(screen.getByTestId('grouped-masonry-grid')).toBeInTheDocument();
+      expect(screen.getByTestId('virtual-item-grid')).toHaveAttribute(
+        'data-show-group-headers',
+        'true',
+      );
     });
 
     it('Then group titles are translated category labels', () => {
@@ -673,8 +707,70 @@ describe('When ItemGrid component is rendered', () => {
     });
   });
 
+  describe('If viewMode "grid" and the groupMode switches between "none" and a grouping', () => {
+    it('Then the grid is remounted, but not when switching between two groupings', () => {
+      // Arrange
+      const items = HolyGrailItemBuilder.new().buildMany(3);
+      setupComponentMocks({ filteredItems: items, viewMode: 'grid', groupMode: 'none' });
+      render(<ItemGrid />);
+      const mountsAfterUngroupedRender = groupedGridRenders.mounts;
+      // ItemGrid is memoized and reads the mocked store, so a state change (selecting an item)
+      // is what makes it render again with the updated group mode
+      const renderWithGroupMode = (groupMode: string) => {
+        setupComponentMocks({ filteredItems: items, viewMode: 'grid', groupMode });
+        fireEvent.click(screen.getByRole('button', { name: 'select item' }));
+      };
+
+      // Act
+      renderWithGroupMode('category');
+      const mountsAfterGroupedRender = groupedGridRenders.mounts;
+      renderWithGroupMode('type');
+
+      // Assert
+      expect(mountsAfterUngroupedRender).toBe(1);
+      expect(mountsAfterGroupedRender).toBe(2);
+      expect(groupedGridRenders.mounts).toBe(2);
+    });
+  });
+
+  describe('If viewMode "grid", groupMode "category" and an item is found', () => {
+    it('Then passes the found count of each group to VirtualItemGrid', () => {
+      // Arrange
+      const items = [HolyGrailItemBuilder.new().withId('found').build()];
+      setupComponentMocks({
+        filteredItems: items,
+        groupMode: 'category',
+        progressLookup: createFoundProgressLookup('found'),
+      });
+
+      // Act
+      render(<ItemGrid />);
+
+      // Assert
+      expect(lastRenderedGroups()[0].foundCount).toBe(1);
+    });
+  });
+
+  describe('If viewMode "grid", groupMode "none" and an item is found', () => {
+    it('Then skips counting found items because no group headers are shown', () => {
+      // Arrange
+      const items = [HolyGrailItemBuilder.new().withId('found').build()];
+      setupComponentMocks({
+        filteredItems: items,
+        groupMode: 'none',
+        progressLookup: createFoundProgressLookup('found'),
+      });
+
+      // Act
+      render(<ItemGrid />);
+
+      // Assert
+      expect(lastRenderedGroups()[0].foundCount).toBeUndefined();
+    });
+  });
+
   describe('If viewMode "grid" and groupMode "category" and an unrelated ItemGrid state changes', () => {
-    it('Then passes the same grouped items to GroupedMasonryGrid', () => {
+    it('Then passes the same grouped items to VirtualItemGrid', () => {
       // Arrange
       const items = HolyGrailItemBuilder.new().buildMany(3);
       setupComponentMocks({ filteredItems: items, viewMode: 'grid', groupMode: 'category' });
@@ -700,20 +796,17 @@ describe('When ItemGrid component is rendered', () => {
       // Act
       render(<ItemGrid />);
 
-      // Assert — list view uses a div-based virtualized container (no masonry)
-      expect(screen.queryByTestId('masonry-item-grid')).not.toBeInTheDocument();
-      expect(screen.queryByTestId('grouped-masonry-grid')).not.toBeInTheDocument();
+      // Assert — list view uses its own div-based virtualized container (not the card grid)
+      expect(screen.queryByTestId('virtual-item-grid')).not.toBeInTheDocument();
     });
   });
 
-  describe.each([
-    ['grid', 'none'],
-    ['list', 'none'],
-  ])('If viewMode "%s", groupMode "%s" and there are items to show', (viewMode, groupMode) => {
+  // The grid view's scroll container lives inside VirtualItemGrid and is covered by its own tests
+  describe('If viewMode "list", groupMode "none" and there are items to show', () => {
     it('Then the items container is the single scroll container inside a bounded root', () => {
       // Arrange
       const items = HolyGrailItemBuilder.new().buildMany(3);
-      setupComponentMocks({ filteredItems: items, viewMode, groupMode });
+      setupComponentMocks({ filteredItems: items, viewMode: 'list', groupMode: 'none' });
 
       // Act
       const { container } = render(<ItemGrid />);
@@ -766,8 +859,7 @@ describe('When ItemGrid component is rendered', () => {
         'noMatches',
       );
       expect(screen.getByText('No items match your filters')).toBeInTheDocument();
-      expect(screen.queryByTestId('masonry-item-grid')).not.toBeInTheDocument();
-      expect(screen.queryByTestId('grouped-masonry-grid')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('virtual-item-grid')).not.toBeInTheDocument();
     });
   });
 
@@ -808,7 +900,7 @@ describe('When ItemGrid component is rendered', () => {
       );
       expect(screen.getByText('Grail tracking is turned off')).toBeInTheDocument();
       expect(mockNavigate).toHaveBeenCalledWith('/settings');
-      expect(screen.queryByTestId('masonry-item-grid')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('virtual-item-grid')).not.toBeInTheDocument();
     });
   });
 
@@ -897,8 +989,8 @@ describe('When ItemGrid component is rendered', () => {
       render(<ItemGrid />);
 
       // Assert — the component filters to only normal items via filterItemsByTrackedVersions
-      // MasonryItemGrid receives only the filtered items
-      expect(screen.getByTestId('masonry-item-grid')).toHaveTextContent('1 items');
+      // VirtualItemGrid receives only the filtered items
+      expect(screen.getByTestId('grid-item-count')).toHaveTextContent('1 items');
     });
   });
 
@@ -924,7 +1016,7 @@ describe('When ItemGrid component is rendered', () => {
       render(<ItemGrid />);
 
       // Assert
-      expect(screen.getByTestId('masonry-item-grid')).toHaveTextContent('1 items');
+      expect(screen.getByTestId('grid-item-count')).toHaveTextContent('1 items');
     });
   });
 

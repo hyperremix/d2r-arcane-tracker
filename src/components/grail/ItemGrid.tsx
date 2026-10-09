@@ -14,7 +14,8 @@ import { itemCategoryLabelKeys, itemTypeLabelKeys } from '@/lib/labelKeys';
 import { countActiveFilters, useFilteredItems, useGrailStore } from '@/stores/grailStore';
 import { ItemDetailsDialog } from './ItemDetailsDialog';
 import { getItemGridEmptyStateVariant, ItemGridEmptyState } from './ItemGridEmptyState';
-import { GroupedMasonryGrid, ItemCardCell, MasonryItemGrid } from './MasonryItemGrid';
+import type { ItemGridGroup } from './VirtualItemGrid';
+import { ItemCardCell, VirtualItemGrid } from './VirtualItemGrid';
 
 /**
  * Determines the ethereal grouping key for an item based on its ethereal status and progress.
@@ -66,6 +67,11 @@ type ViewMode = 'grid' | 'list';
  * Type representing the available grouping modes for organizing items.
  */
 type GroupMode = 'none' | 'category' | 'type' | 'ethereal';
+
+/**
+ * A group of items before its found count is known (the count is added for the grid).
+ */
+type ItemGroup = Omit<ItemGridGroup, 'foundCount'>;
 
 /**
  * ItemGrid component that displays Holy Grail items in a filterable, sortable, and groupable grid or list view.
@@ -203,7 +209,7 @@ type VirtualRowType =
  * Props interface for VirtualizedItemsContainer component.
  */
 interface VirtualizedItemsContainerProps {
-  groupedItems: Array<{ title: string; items: Item[] }>;
+  groupedItems: ItemGroup[];
   viewMode: ViewMode;
   groupMode: GroupMode;
   progressLookup: ReturnType<typeof useProgressLookup>;
@@ -316,45 +322,10 @@ function renderVirtualRow({
 }
 
 /**
- * Props for the MasonryGridContainer component.
- */
-interface MasonryGridContainerProps {
-  items: Item[];
-  progressLookup: ReturnType<typeof useProgressLookup>;
-  characters: Character[];
-  handleItemClick: (itemId: string) => void;
-}
-
-/**
- * MasonryGridContainer component that renders items in a masonry layout.
- * Used for ungrouped grid view only.
- */
-function MasonryGridContainer({
-  items,
-  progressLookup,
-  characters,
-  handleItemClick,
-}: MasonryGridContainerProps) {
-  const listRef = useRef<HTMLDivElement>(null);
-
-  return (
-    <div ref={listRef} className="min-h-0 w-full flex-1 overflow-auto p-4">
-      <MasonryItemGrid
-        items={items}
-        progressLookup={progressLookup}
-        characters={characters}
-        onItemClick={handleItemClick}
-        containerRef={listRef}
-      />
-    </div>
-  );
-}
-
-/**
  * Props for the ListVirtualizedContainer component.
  */
 interface ListVirtualizedContainerProps {
-  groupedItems: Array<{ title: string; items: Item[] }>;
+  groupedItems: ItemGroup[];
   groupMode: GroupMode;
   progressLookup: ReturnType<typeof useProgressLookup>;
   characters: Character[];
@@ -431,38 +402,44 @@ function ListVirtualizedContainer({
 }
 
 /**
- * Props for the GroupedGridContainer component.
+ * Props for the GridContainer component.
  */
-interface GroupedGridContainerProps {
-  groupedItems: Array<{ title: string; items: Item[] }>;
+interface GridContainerProps {
+  groupedItems: ItemGroup[];
+  showGroupHeaders: boolean;
   progressLookup: ReturnType<typeof useProgressLookup>;
   characters: Character[];
   handleItemClick: (itemId: string) => void;
 }
 
 /**
- * GroupedGridContainer component that renders grouped items in the virtualized grouped grid.
+ * GridContainer component that renders the (optionally grouped) items in the virtualized grid.
  * The groups with their found counts are memoized so the memoized grid (and its row model) is
  * only recomputed when the groups or the progress change, not on unrelated ItemGrid renders.
  */
-function GroupedGridContainer({
+function GridContainer({
   groupedItems,
+  showGroupHeaders,
   progressLookup,
   characters,
   handleItemClick,
-}: GroupedGridContainerProps) {
+}: GridContainerProps) {
   const groupsWithFoundCount = useMemo(
     () =>
       groupedItems.map((group) => ({
         ...group,
-        foundCount: calculateGroupFoundCount(group.items, progressLookup),
+        // The found count is only shown in group headers, so skip counting when they are hidden
+        foundCount: showGroupHeaders
+          ? calculateGroupFoundCount(group.items, progressLookup)
+          : undefined,
       })),
-    [groupedItems, progressLookup],
+    [groupedItems, progressLookup, showGroupHeaders],
   );
 
   return (
-    <GroupedMasonryGrid
+    <VirtualItemGrid
       groupedItems={groupsWithFoundCount}
+      showGroupHeaders={showGroupHeaders}
       progressLookup={progressLookup}
       characters={characters}
       onItemClick={handleItemClick}
@@ -472,7 +449,7 @@ function GroupedGridContainer({
 
 /**
  * VirtualizedItemsContainer component that renders all items with virtual scrolling.
- * For grid views, uses masonry layout. For list view, uses row-based virtualization.
+ * Both the grid and the list view use row-based virtualization.
  * @param {VirtualizedItemsContainerProps} props - Component props
  * @returns {JSX.Element} A virtualized container of all items
  */
@@ -484,24 +461,16 @@ function VirtualizedItemsContainer({
   characters,
   handleItemClick,
 }: VirtualizedItemsContainerProps) {
-  // For ungrouped grid view, use virtualized masonry layout
-  if (viewMode === 'grid' && groupMode === 'none') {
-    const allItems = groupedItems.flatMap((g) => g.items);
-    return (
-      <MasonryGridContainer
-        items={allItems}
-        progressLookup={progressLookup}
-        characters={characters}
-        handleItemClick={handleItemClick}
-      />
-    );
-  }
-
-  // For grouped grid view, use row-based virtualization with group headers
+  // For grid view, use row-based virtualization with a header above each group (when grouped).
+  // The key remounts the grid (resetting its scroll position) when switching between the
+  // ungrouped and the grouped layout.
   if (viewMode === 'grid') {
+    const showGroupHeaders = groupMode !== 'none';
     return (
-      <GroupedGridContainer
+      <GridContainer
+        key={showGroupHeaders ? 'grouped' : 'ungrouped'}
         groupedItems={groupedItems}
+        showGroupHeaders={showGroupHeaders}
         progressLookup={progressLookup}
         characters={characters}
         handleItemClick={handleItemClick}
