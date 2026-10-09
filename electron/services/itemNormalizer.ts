@@ -9,6 +9,7 @@ import type {
   VaultLocationContext,
   VaultSourceFileType,
 } from '../types/grail';
+import { normalizeItemCodeKey } from '../utils/d2rFormat';
 import { getGrailItemId, resolveRainbowFacetName } from '../utils/grailItemUtils';
 import { normalizeIconFilename, resolveCanonicalIconFilename } from '../utils/iconFilenameResolver';
 import { isRune, simplifyItemName } from '../utils/objects';
@@ -351,8 +352,8 @@ export function resolveDetectionName(item: D2SItem): string {
 
   if (name.includes('rainbowfacet')) {
     name = resolveRainbowFacetName(item, name);
-  } else if (item.type && runesByCode[item.type]) {
-    name = runesByCode[item.type].name.toLowerCase();
+  } else if (runesByCode[normalizeItemCodeKey(item.type) ?? '']) {
+    name = runesByCode[normalizeItemCodeKey(item.type) ?? ''].name.toLowerCase();
   } else if (item.runeword_name) {
     name = simplifyItemName(item.runeword_name);
   }

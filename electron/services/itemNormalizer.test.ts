@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { D2SaveFileBuilder, D2SItemBuilder } from '@/fixtures';
 import { items as catalogItems } from '../items/index';
 import type { D2SItem, ItemDetectionEvent, ParsedInventoryItem } from '../types/grail';
+import { getGrailItemId } from '../utils/grailItemUtils';
 import { EventBus } from './EventBus';
 import { ItemDetectionService } from './itemDetection';
 import {
@@ -89,6 +90,22 @@ describe('When resolveDetectionName is called', () => {
 
     // Assert
     expect(result).toBe('ber');
+  });
+
+  it.each([
+    ['lower-case', 'r30'],
+    ['upper-case', 'R30'],
+    ['padded', ' r30\0\0'],
+  ])('If a rune has a %s type code, Then it returns the rune name like the grail id lookup', (_label, type) => {
+    // Arrange
+    const runeItem: D2SItem = { ...D2SItemBuilder.new().asRune('r30').build(), type };
+
+    // Act
+    const result = resolveDetectionName(runeItem);
+
+    // Assert
+    expect(result).toBe('ber');
+    expect(getGrailItemId(runeItem)).toBe('ber');
   });
 
   it('Then should return runeword name with prefix', () => {
@@ -595,6 +612,20 @@ describe('When selectDetectionCandidates is called', () => {
 });
 
 describe('When toDetectedItem is called', () => {
+  it('If a rune has an upper-case or padded type code, Then the detection view is named after the rune', () => {
+    // Arrange
+    const items = ['R30', ' r30\0'].map((type) => ({
+      ...D2SItemBuilder.new().asRune('r30').build(),
+      type,
+    }));
+
+    // Act
+    const names = toParsedItems(items).map((parsed) => toDetectedItem(parsed, saveFile).name);
+
+    // Assert
+    expect(names).toEqual(['ber', 'ber']);
+  });
+
   it('Then the detection view reuses the normalized item and reports the save file character', () => {
     // Arrange
     const [parsed] = toParsedItems([
