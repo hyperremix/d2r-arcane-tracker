@@ -4,6 +4,7 @@ import {
   forgetMissingIcons,
   isIconMissing,
   isIconSettled,
+  loadFirstIcon,
   loadIconByFilename,
 } from './iconLoader';
 
@@ -123,6 +124,77 @@ describe('When icons are loaded by filename', () => {
       expect(retried).toBe('data:ber');
       expect(isIconMissing('ber.png')).toBe(false);
       expect(getByFilename).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe('If the Electron API is not available', () => {
+    it('Then the filename is remembered as missing without a request', async () => {
+      // Arrange
+      windowGlobals.electronAPI = undefined;
+
+      // Act
+      const iconUrl = await loadIconByFilename('ber.png');
+
+      // Assert
+      expect(iconUrl).toBeUndefined();
+      expect(isIconMissing('ber.png')).toBe(true);
+      expect(getByFilename).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('If the Electron API has no icon API', () => {
+    it('Then the failure is logged and not remembered', async () => {
+      // Arrange
+      const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+      windowGlobals.electronAPI = {};
+
+      // Act
+      const iconUrl = await loadIconByFilename('ber.png');
+
+      // Assert
+      expect(iconUrl).toBeUndefined();
+      expect(consoleError).toHaveBeenCalledTimes(1);
+      expect(isIconMissing('ber.png')).toBe(false);
+      expect(isIconSettled('ber.png')).toBe(false);
+    });
+
+    it('Then the next caller asks again once the icon API exists', async () => {
+      // Arrange
+      vi.spyOn(console, 'error').mockImplementation(() => undefined);
+      windowGlobals.electronAPI = {};
+      await loadIconByFilename('ber.png');
+      windowGlobals.electronAPI = { icon: { getByFilename } };
+      getByFilename.mockResolvedValueOnce('data:ber');
+
+      // Act
+      const iconUrl = await loadIconByFilename('ber.png');
+
+      // Assert
+      expect(iconUrl).toBe('data:ber');
+    });
+  });
+
+  describe('If the first of several candidates fails to load', () => {
+    it('Then the next candidates are still tried and the first found icon is returned', async () => {
+      // Arrange
+      vi.spyOn(console, 'error').mockImplementation(() => undefined);
+      getByFilename
+        .mockRejectedValueOnce(new Error('IPC failed'))
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce('data:third');
+
+      // Act
+      const iconUrl = await loadFirstIcon(['first.png', 'second.png', 'third.png']);
+
+      // Assert
+      expect(iconUrl).toBe('data:third');
+      expect(getByFilename.mock.calls.map(([filename]) => filename)).toEqual([
+        'first.png',
+        'second.png',
+        'third.png',
+      ]);
+      expect(isIconMissing('first.png')).toBe(false);
+      expect(isIconMissing('second.png')).toBe(true);
     });
   });
 });
