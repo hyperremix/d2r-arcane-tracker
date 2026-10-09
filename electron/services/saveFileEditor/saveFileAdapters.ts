@@ -218,7 +218,7 @@ export async function decodeSaveFile(
   }
 }
 
-/** The "not found" wording each decoded file kind has always used ("save file" / "stash file"). */
+/** Noun in the "not found" error: "save file" for characters, "stash file" for classic stashes. */
 export function describeDecodedSaveFile(file: DecodedSaveFile): string {
   return file.kind === 'character' ? 'save file' : 'stash file';
 }

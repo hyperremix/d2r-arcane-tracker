@@ -66,7 +66,7 @@ function detectD2iFormat(buffer: Buffer): SaveFormat {
   try {
     d2iVersion = readD2iMetadata(buffer).version;
   } catch (error) {
-    // A file cut off inside a sector fails the metadata read; its header still tells a damaged
+    // A file cut off inside a sector fails the metadata read; its header tells a damaged
     // v105+ file from a pre-105 one.
     d2iReadError = error;
     d2iVersion = readD2iHeaderVersion(buffer);

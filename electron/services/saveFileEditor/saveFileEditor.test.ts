@@ -1225,8 +1225,8 @@ describe('When addItemToSaveFile is called', () => {
   });
 
   describe('If sourceFileType is d2i and format is pre-105', () => {
-    it('Then an add to a shared tab (0-4) still uses the modern sector-splicing writer', async () => {
-      // Arrange — deferred follow-up: pre-105 .d2i adds keep the sector writer, as on main
+    it('Then an add to a shared tab (0-4) uses the modern sector-splicing writer', async () => {
+      // Arrange — pre-105 .d2i adds to shared tabs use the sector writer, not the classic codec
       const { buffer, sectors } = createModernD2iTestBuffer([createModernSectorPayload(0)]);
       mockReadD2iMetadata.mockReturnValue({ version: 99, hardcore: false, sectors });
       mockReadFile.mockResolvedValue(buffer);
@@ -1521,7 +1521,7 @@ describe('When moveItemBetweenSaveFiles is called', () => {
       );
     });
 
-    it('Then a pre-105 .d2i target shared tab is still written by the modern sector writer', async () => {
+    it('Then a pre-105 .d2i target shared tab is written by the modern sector writer', async () => {
       // Arrange
       const sourceItem = {
         id: 88,

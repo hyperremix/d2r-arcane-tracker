@@ -70,7 +70,7 @@ describe('When detectSaveFormat is called', () => {
   });
 
   describe('If a v105+ .d2i stash is cut off inside a sector', () => {
-    it('Then the header version still makes it a modern stash and the read error is kept', () => {
+    it('Then the header version makes it a modern stash and the read error is kept', () => {
       // Arrange
       const buffer = readFileSync(MODERN_FIXTURE_PATH);
       const truncated = buffer.subarray(0, buffer.length - 10);

@@ -139,9 +139,9 @@ export async function addItemToSaveFileUnlocked({
   }
 
   // Shared stash pages (tabs 0–4) of a .d2i are written via sector patching. This includes
-  // pre-105 .d2i files, which every other operation edits as classic stashes: they keep the modern
-  // sector-splicing writer, kept from before the refactor. The extension is matched
-  // case-insensitively, so a .D2I file takes the same path.
+  // pre-105 .d2i files, which every other operation edits as classic stashes: they are added to with
+  // the modern sector-splicing writer. The extension is matched case-insensitively, so a .D2I file
+  // takes the same path.
   if (
     file.format.fileType === 'd2i' &&
     locationContext === 'stash' &&
