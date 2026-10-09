@@ -13,6 +13,7 @@ import {
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
+import { useShallow } from 'zustand/react/shallow';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -69,7 +70,9 @@ export function SaveFileMonitor() {
   const [saveFileCount, setSaveFileCount] = useState<number>(0);
   const [isSelectingDirectory, setIsSelectingDirectory] = useState(false);
   const [hasBackedUp, setHasBackedUp] = useState(false);
-  const { reloadData, settings } = useGrailStore();
+  const { reloadData, settings } = useGrailStore(
+    useShallow((state) => ({ reloadData: state.reloadData, settings: state.settings })),
+  );
   const { backup, isBackingUp } = useDatabaseBackup();
 
   const loadMonitoringStatus = useCallback(async () => {

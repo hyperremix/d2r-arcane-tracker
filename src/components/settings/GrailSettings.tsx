@@ -1,6 +1,7 @@
 import { Trophy } from 'lucide-react';
 import { useCallback, useId } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useShallow } from 'zustand/react/shallow';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
@@ -18,7 +19,9 @@ export function GrailSettings() {
   const grailEtherealId = useId();
   const grailRunesId = useId();
   const grailRunewordsId = useId();
-  const { settings, setSettings } = useGrailStore();
+  const { settings, setSettings } = useGrailStore(
+    useShallow((state) => ({ settings: state.settings, setSettings: state.setSettings })),
+  );
 
   const toggleGrailNormal = useCallback(
     (checked: boolean) => {

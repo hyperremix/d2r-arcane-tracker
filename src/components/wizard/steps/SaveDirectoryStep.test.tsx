@@ -3,6 +3,7 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useGrailStore } from '@/stores/grailStore';
 import { useWizardStore } from '@/stores/wizardStore';
+import { mockStoreState } from '@/test/storeMock';
 import { SAVE_DIRECTORY_INSPECTION_DEBOUNCE_MS, SaveDirectoryStep } from './SaveDirectoryStep';
 
 vi.mock('@/stores/grailStore');
@@ -82,7 +83,7 @@ describe('When SaveDirectoryStep is rendered', () => {
     vi.clearAllMocks();
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
     reloadData = vi.fn().mockResolvedValue(undefined);
-    mockUseGrailStore.mockReturnValue({
+    mockStoreState(mockUseGrailStore, {
       settings: { saveDir: CURRENT_DIR },
       reloadData,
     } as unknown as ReturnType<typeof useGrailStore>);
@@ -295,7 +296,7 @@ describe('When SaveDirectoryStep is rendered', () => {
   describe('If the current directory is decided', () => {
     it('Then the monitoring status directory is used rather than the stored setting', async () => {
       // Arrange: the stored setting is stale, the monitor is actually using CURRENT_DIR
-      mockUseGrailStore.mockReturnValue({
+      mockStoreState(mockUseGrailStore, {
         settings: { saveDir: NEW_DIR },
         reloadData,
       } as unknown as ReturnType<typeof useGrailStore>);
@@ -311,7 +312,7 @@ describe('When SaveDirectoryStep is rendered', () => {
 
     it('Then confirmation is requested when neither the monitoring status nor the setting identify it', async () => {
       // Arrange
-      mockUseGrailStore.mockReturnValue({
+      mockStoreState(mockUseGrailStore, {
         settings: { saveDir: '' },
         reloadData,
       } as unknown as ReturnType<typeof useGrailStore>);
@@ -360,7 +361,7 @@ describe('When SaveDirectoryStep is rendered without a detected directory', () =
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
     useWizardStore.setState({ stepValidity: {} });
     reloadData = vi.fn().mockResolvedValue(undefined);
-    mockUseGrailStore.mockReturnValue({
+    mockStoreState(mockUseGrailStore, {
       settings: { saveDir: '' },
       reloadData,
     } as unknown as ReturnType<typeof useGrailStore>);
@@ -464,7 +465,7 @@ describe('When SaveDirectoryStep is rendered with a detected directory', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     useWizardStore.setState({ stepValidity: {} });
-    mockUseGrailStore.mockReturnValue({
+    mockStoreState(mockUseGrailStore, {
       settings: { saveDir: '' },
       reloadData: vi.fn().mockResolvedValue(undefined),
     } as unknown as ReturnType<typeof useGrailStore>);
@@ -511,7 +512,7 @@ describe('When SaveDirectoryStep validates the selected folder', () => {
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
     useWizardStore.setState({ stepValidity: {} });
     reloadData = vi.fn().mockResolvedValue(undefined);
-    mockUseGrailStore.mockReturnValue({
+    mockStoreState(mockUseGrailStore, {
       settings: { saveDir: CURRENT_DIR },
       reloadData,
     } as unknown as ReturnType<typeof useGrailStore>);

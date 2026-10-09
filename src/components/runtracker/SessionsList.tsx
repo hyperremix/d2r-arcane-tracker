@@ -2,6 +2,7 @@ import type { Session } from 'electron/types/grail';
 import { Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useShallow } from 'zustand/react/shallow';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -104,8 +105,15 @@ function TableRowSkeleton() {
 export function SessionsList({ onSessionSelect }: SessionsListProps) {
   const { t } = useTranslation();
   const showArchivedLabelId = useId();
-  const { sessions, sessionsLoading, runs, loadSessionRuns, loadingSessions } =
-    useRunTrackerStore();
+  const { sessions, sessionsLoading, runs, loadSessionRuns, loadingSessions } = useRunTrackerStore(
+    useShallow((state) => ({
+      sessions: state.sessions,
+      sessionsLoading: state.sessionsLoading,
+      runs: state.runs,
+      loadSessionRuns: state.loadSessionRuns,
+      loadingSessions: state.loadingSessions,
+    })),
+  );
   const getSessionStats = useSessionStatsLookup();
   // Only show the skeleton when there is nothing to display yet; background refreshes keep the list visible
   const showSkeleton = sessionsLoading && sessions.length === 0;

@@ -2,6 +2,7 @@ import { GameVersion } from 'electron/types/grail';
 import { Gamepad2 } from 'lucide-react';
 import { useCallback, useId, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useShallow } from 'zustand/react/shallow';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import {
@@ -28,7 +29,9 @@ const gameVersionValues: GameVersion[] = [GameVersion.Resurrected, GameVersion.C
 export function GameVersionSettings() {
   const { t } = useTranslation();
   const gameVersionSelectId = useId();
-  const { settings, setSettings } = useGrailStore();
+  const { settings, setSettings } = useGrailStore(
+    useShallow((state) => ({ settings: state.settings, setSettings: state.setSettings })),
+  );
 
   const gameVersions = useMemo(
     () =>

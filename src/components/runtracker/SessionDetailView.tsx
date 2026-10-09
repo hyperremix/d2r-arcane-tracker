@@ -2,6 +2,7 @@ import type { Session } from 'electron/types/grail';
 import { Archive, ArrowLeft, FileDown, Loader2 } from 'lucide-react';
 import { useCallback, useEffect, useId, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useShallow } from 'zustand/react/shallow';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -41,7 +42,18 @@ export function SessionDetailView({ sessionId, onBack }: SessionDetailViewProps)
     archiveSession,
     updateSessionNotes,
     loadSessionRuns,
-  } = useRunTrackerStore();
+  } = useRunTrackerStore(
+    useShallow((state) => ({
+      sessions: state.sessions,
+      activeSession: state.activeSession,
+      runs: state.runs,
+      sessionsLoading: state.sessionsLoading,
+      pendingActions: state.pendingActions,
+      archiveSession: state.archiveSession,
+      updateSessionNotes: state.updateSessionNotes,
+      loadSessionRuns: state.loadSessionRuns,
+    })),
+  );
 
   const [notes, setNotes] = useState<string>('');
   const [isSavingNotes, setIsSavingNotes] = useState<boolean>(false);

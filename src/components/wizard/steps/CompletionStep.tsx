@@ -72,7 +72,7 @@ function useSaveDirectorySummary(storedSaveDir: string | undefined): SaveDirecto
  */
 export function CompletionStep() {
   const { t } = useTranslation();
-  const { settings } = useGrailStore();
+  const settings = useGrailStore((state) => state.settings);
   const saveDirectorySummary = useSaveDirectorySummary(settings.saveDir || undefined);
 
   const enabledLabel = (enabled: boolean) =>

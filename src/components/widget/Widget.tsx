@@ -12,6 +12,7 @@ import { GripHorizontal } from 'lucide-react';
 import type { ComponentProps, CSSProperties } from 'react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useShallow } from 'zustand/react/shallow';
 import { ProgressGauge } from '@/components/grail/ProgressGauge';
 import { Input } from '@/components/ui/input';
 import { translations } from '@/i18n/translations';
@@ -335,11 +336,23 @@ export function Widget({ statistics, settings, onDragStart, onDragEnd }: WidgetP
     loadSessionRuns,
     loadRunItems,
     addManualRunItem,
-  } = useRunTrackerStore();
+  } = useRunTrackerStore(
+    useShallow((state) => ({
+      activeRun: state.activeRun,
+      activeSession: state.activeSession,
+      runs: state.runs,
+      runItems: state.runItems,
+      loadSessionRuns: state.loadSessionRuns,
+      loadRunItems: state.loadRunItems,
+      addManualRunItem: state.addManualRunItem,
+    })),
+  );
   const [runDuration, setRunDuration] = useState<number>(0);
 
   // Grail data for resolving item names in run-only mode
-  const { items, progress } = useGrailStore();
+  const { items, progress } = useGrailStore(
+    useShallow((state) => ({ items: state.items, progress: state.progress })),
+  );
 
   // Real-time timer for run duration updates
   useEffect(() => {

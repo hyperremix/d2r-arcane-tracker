@@ -2,6 +2,7 @@ import type { Run, Session } from 'electron/types/grail';
 import { ChevronDown, FileDownIcon, Loader2 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useShallow } from 'zustand/react/shallow';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
@@ -102,7 +103,16 @@ function SessionStatsRow({ session, activeRun }: SessionStatsRowProps) {
 export function SessionCard({ session, onViewAllRuns }: SessionCardProps) {
   const { t } = useTranslation();
   const { activeSession, activeRun, pendingActions, archiveSession, updateSessionNotes, runs } =
-    useRunTrackerStore();
+    useRunTrackerStore(
+      useShallow((state) => ({
+        activeSession: state.activeSession,
+        activeRun: state.activeRun,
+        pendingActions: state.pendingActions,
+        archiveSession: state.archiveSession,
+        updateSessionNotes: state.updateSessionNotes,
+        runs: state.runs,
+      })),
+    );
 
   const [notes, setNotes] = useState<string>(session?.notes || '');
   const [isSavingNotes, setIsSavingNotes] = useState<boolean>(false);

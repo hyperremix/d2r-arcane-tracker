@@ -14,6 +14,7 @@ import {
 import type { KeyboardEvent } from 'react';
 import { useCallback, useEffect, useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useShallow } from 'zustand/react/shallow';
 import { SaveDirectoryChangeDialog } from '@/components/settings/SaveDirectoryChangeDialog';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -484,7 +485,9 @@ export function SaveDirectoryStep() {
   const pathHintId = useId();
   const statusId = useId();
   const notDetectedId = useId();
-  const { settings, reloadData } = useGrailStore();
+  const { settings, reloadData } = useGrailStore(
+    useShallow((state) => ({ settings: state.settings, reloadData: state.reloadData })),
+  );
   const setStepValidity = useWizardStore((state) => state.setStepValidity);
   // Directory the monitor is actually using
   const [saveDir, setSaveDir] = useState<string>(settings.saveDir || '');

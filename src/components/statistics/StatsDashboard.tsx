@@ -20,13 +20,18 @@ import { useGrailStatistics, useGrailStore } from '@/stores/grailStore';
 export const StatsDashboard = memo(function StatsDashboard() {
   const { t } = useTranslation();
   const stats = useGrailStatistics();
-  const { items, progress, characters, settings } = useGrailStore();
-  const progressLookup = useProgressLookup(items, progress, settings);
+  const items = useGrailStore((state) => state.items);
+  const progress = useGrailStore((state) => state.progress);
+  const characters = useGrailStore((state) => state.characters);
+  const settings = useGrailStore((state) => state.settings);
 
   const lastFindItem = useMemo(
     () => items.find((i) => i.id === stats.lastFind?.itemId),
     [items, stats.lastFind?.itemId],
   );
+  // Only the last found item is shown with its progress
+  const lastFindItems = useMemo(() => (lastFindItem ? [lastFindItem] : []), [lastFindItem]);
+  const progressLookup = useProgressLookup(lastFindItems, progress, settings);
 
   return (
     <div className="space-y-6">

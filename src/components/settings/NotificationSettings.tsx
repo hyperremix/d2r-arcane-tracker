@@ -1,6 +1,7 @@
 import { Bell, Monitor, Smartphone } from 'lucide-react';
 import { useCallback, useId } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useShallow } from 'zustand/react/shallow';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
@@ -15,7 +16,9 @@ import { useGrailStore } from '@/stores/grailStore';
  */
 export function NotificationSettings() {
   const { t } = useTranslation();
-  const { settings, setSettings } = useGrailStore();
+  const { settings, setSettings } = useGrailStore(
+    useShallow((state) => ({ settings: state.settings, setSettings: state.setSettings })),
+  );
   const volumeLabelId = useId();
   const soundLabelId = useId();
   const soundDescriptionId = useId();

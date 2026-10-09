@@ -3,6 +3,7 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useGrailStore } from '@/stores/grailStore';
 import { useRunTrackerStore } from '@/stores/runTrackerStore';
+import { mockStoreState } from '@/test/storeMock';
 import { SessionControls } from './SessionControls';
 
 // Mock the stores
@@ -98,13 +99,13 @@ describe('SessionControls', () => {
     mockRemoveEventListener.mockClear();
 
     // Set up default mocks
-    mockUseRunTrackerStore.mockReturnValue(defaultStoreState);
-    mockUseGrailStore.mockReturnValue(defaultGrailStoreState);
+    mockStoreState(mockUseRunTrackerStore, defaultStoreState);
+    mockStoreState(mockUseGrailStore, defaultGrailStoreState);
   });
 
   describe('Rendering', () => {
     it('renders the live session card', () => {
-      mockUseRunTrackerStore.mockReturnValue(defaultStoreState);
+      mockStoreState(mockUseRunTrackerStore, defaultStoreState);
 
       render(<SessionControls />);
 
@@ -113,7 +114,7 @@ describe('SessionControls', () => {
 
     it('When a run is active, Then End Run is the primary action next to Pause and End Session', () => {
       // Arrange
-      mockUseRunTrackerStore.mockReturnValue({
+      mockStoreState(mockUseRunTrackerStore, {
         ...defaultStoreState,
         activeSession: mockSession,
         activeRun: mockRun,
@@ -131,7 +132,7 @@ describe('SessionControls', () => {
 
     it('When a session has no active run, Then Start Run is the primary action and Pause is hidden', () => {
       // Arrange
-      mockUseRunTrackerStore.mockReturnValue({
+      mockStoreState(mockUseRunTrackerStore, {
         ...defaultStoreState,
         activeSession: mockSession,
       });
@@ -147,7 +148,7 @@ describe('SessionControls', () => {
 
     it('When a run is active, Then the state badge politely reports Running', () => {
       // Arrange
-      mockUseRunTrackerStore.mockReturnValue({
+      mockStoreState(mockUseRunTrackerStore, {
         ...defaultStoreState,
         activeSession: mockSession,
         activeRun: mockRun,
@@ -165,7 +166,7 @@ describe('SessionControls', () => {
 
     it('When the run is paused, Then the state badge reports Paused', () => {
       // Arrange
-      mockUseRunTrackerStore.mockReturnValue({
+      mockStoreState(mockUseRunTrackerStore, {
         ...defaultStoreState,
         activeSession: mockSession,
         activeRun: mockRun,
@@ -181,7 +182,7 @@ describe('SessionControls', () => {
 
     it('When a session has no active run, Then the state badge reports Idle and no run is in progress', () => {
       // Arrange
-      mockUseRunTrackerStore.mockReturnValue({
+      mockStoreState(mockUseRunTrackerStore, {
         ...defaultStoreState,
         activeSession: mockSession,
       });
@@ -199,7 +200,7 @@ describe('SessionControls', () => {
       // Arrange
       vi.useFakeTimers({ toFake: ['Date'] });
       vi.setSystemTime(new Date('2024-01-01T00:12:34Z'));
-      mockUseRunTrackerStore.mockReturnValue({
+      mockStoreState(mockUseRunTrackerStore, {
         ...defaultStoreState,
         activeSession: mockSession,
         activeRun: { ...mockRun, runNumber: 7 },
@@ -227,7 +228,7 @@ describe('SessionControls', () => {
       label,
     }) => {
       // Arrange
-      mockUseRunTrackerStore.mockReturnValue({
+      mockStoreState(mockUseRunTrackerStore, {
         ...defaultStoreState,
         activeSession: mockSession,
         activeRun: mockRun,
@@ -245,7 +246,7 @@ describe('SessionControls', () => {
     });
 
     it('shows resume button when run is paused', () => {
-      mockUseRunTrackerStore.mockReturnValue({
+      mockStoreState(mockUseRunTrackerStore, {
         ...defaultStoreState,
         activeSession: mockSession,
         activeRun: mockRun,
@@ -261,7 +262,7 @@ describe('SessionControls', () => {
   describe('Button States', () => {
     it('If no session is active, Then only Start New Session is offered and the badge reports No Session', () => {
       // Arrange
-      mockUseRunTrackerStore.mockReturnValue(defaultStoreState);
+      mockStoreState(mockUseRunTrackerStore, defaultStoreState);
 
       // Act
       render(<SessionControls />);
@@ -275,7 +276,7 @@ describe('SessionControls', () => {
 
     it('If no session is active, When Start New Session is clicked, Then a session is started', () => {
       // Arrange
-      mockUseRunTrackerStore.mockReturnValue(defaultStoreState);
+      mockStoreState(mockUseRunTrackerStore, defaultStoreState);
       render(<SessionControls />);
 
       // Act
@@ -287,7 +288,7 @@ describe('SessionControls', () => {
 
     it('If starting a session is in flight, Then the Start New Session button is disabled', () => {
       // Arrange
-      mockUseRunTrackerStore.mockReturnValue({
+      mockStoreState(mockUseRunTrackerStore, {
         ...defaultStoreState,
         pendingActions: { startSession: true },
       });
@@ -300,7 +301,7 @@ describe('SessionControls', () => {
     });
 
     it('enables start run button when session exists but no active run', () => {
-      mockUseRunTrackerStore.mockReturnValue({
+      mockStoreState(mockUseRunTrackerStore, {
         ...defaultStoreState,
         activeSession: mockSession,
         activeRun: null,
@@ -313,7 +314,7 @@ describe('SessionControls', () => {
     });
 
     it('enables pause/resume button when active run exists', () => {
-      mockUseRunTrackerStore.mockReturnValue({
+      mockStoreState(mockUseRunTrackerStore, {
         ...defaultStoreState,
         activeSession: mockSession,
         activeRun: mockRun,
@@ -326,7 +327,7 @@ describe('SessionControls', () => {
     });
 
     it('enables end run button when active run exists', () => {
-      mockUseRunTrackerStore.mockReturnValue({
+      mockStoreState(mockUseRunTrackerStore, {
         ...defaultStoreState,
         activeSession: mockSession,
         activeRun: mockRun,
@@ -339,7 +340,7 @@ describe('SessionControls', () => {
     });
 
     it('enables end session button when session exists', () => {
-      mockUseRunTrackerStore.mockReturnValue({
+      mockStoreState(mockUseRunTrackerStore, {
         ...defaultStoreState,
         activeSession: mockSession,
       });
@@ -352,7 +353,7 @@ describe('SessionControls', () => {
 
     it('When a run action is in flight, Then all run control buttons are disabled', () => {
       // Arrange
-      mockUseRunTrackerStore.mockReturnValue({
+      mockStoreState(mockUseRunTrackerStore, {
         ...defaultStoreState,
         activeSession: mockSession,
         activeRun: mockRun,
@@ -373,7 +374,7 @@ describe('SessionControls', () => {
 
   describe('Button Click Handlers', () => {
     it('calls startRun when start run button is clicked', () => {
-      mockUseRunTrackerStore.mockReturnValue({
+      mockStoreState(mockUseRunTrackerStore, {
         ...defaultStoreState,
         activeSession: mockSession,
         activeRun: null,
@@ -388,7 +389,7 @@ describe('SessionControls', () => {
     });
 
     it('calls pauseRun when pause button is clicked', () => {
-      mockUseRunTrackerStore.mockReturnValue({
+      mockStoreState(mockUseRunTrackerStore, {
         ...defaultStoreState,
         activeSession: mockSession,
         activeRun: mockRun,
@@ -404,7 +405,7 @@ describe('SessionControls', () => {
     });
 
     it('calls resumeRun when resume button is clicked', () => {
-      mockUseRunTrackerStore.mockReturnValue({
+      mockStoreState(mockUseRunTrackerStore, {
         ...defaultStoreState,
         activeSession: mockSession,
         activeRun: mockRun,
@@ -420,7 +421,7 @@ describe('SessionControls', () => {
     });
 
     it('opens end run dialog when end run button is clicked', () => {
-      mockUseRunTrackerStore.mockReturnValue({
+      mockStoreState(mockUseRunTrackerStore, {
         ...defaultStoreState,
         activeSession: mockSession,
         activeRun: mockRun,
@@ -436,7 +437,7 @@ describe('SessionControls', () => {
     });
 
     it('opens end session dialog when end session button is clicked', () => {
-      mockUseRunTrackerStore.mockReturnValue({
+      mockStoreState(mockUseRunTrackerStore, {
         ...defaultStoreState,
         activeSession: mockSession,
       });
@@ -454,7 +455,7 @@ describe('SessionControls', () => {
   describe('Confirmation Dialogs', () => {
     it('When End Session is clicked, Then the session only ends after confirming', async () => {
       // Arrange
-      mockUseRunTrackerStore.mockReturnValue({
+      mockStoreState(mockUseRunTrackerStore, {
         ...defaultStoreState,
         activeSession: mockSession,
       });
@@ -479,7 +480,7 @@ describe('SessionControls', () => {
 
     it('If the end session confirmation is cancelled, Then the session is not ended', async () => {
       // Arrange
-      mockUseRunTrackerStore.mockReturnValue({
+      mockStoreState(mockUseRunTrackerStore, {
         ...defaultStoreState,
         activeSession: mockSession,
       });
@@ -499,7 +500,7 @@ describe('SessionControls', () => {
 
     it('When ending the session is in flight, Then the dialog buttons are disabled', async () => {
       // Arrange
-      mockUseRunTrackerStore.mockReturnValue({
+      mockStoreState(mockUseRunTrackerStore, {
         ...defaultStoreState,
         activeSession: mockSession,
       });
@@ -508,7 +509,7 @@ describe('SessionControls', () => {
       const dialog = await screen.findByRole('alertdialog');
 
       // Act
-      mockUseRunTrackerStore.mockReturnValue({
+      mockStoreState(mockUseRunTrackerStore, {
         ...defaultStoreState,
         activeSession: mockSession,
         pendingActions: { endSession: true },
@@ -535,11 +536,11 @@ describe('SessionControls', () => {
         writable: true,
         configurable: true,
       });
-      mockUseGrailStore.mockReturnValue({
+      mockStoreState(mockUseGrailStore, {
         ...defaultGrailStoreState,
         settings: { ...defaultGrailStoreState.settings, runTrackerMemoryReading: true },
       });
-      mockUseRunTrackerStore.mockReturnValue({
+      mockStoreState(mockUseRunTrackerStore, {
         ...defaultStoreState,
         activeSession: mockSession,
       });
@@ -565,7 +566,7 @@ describe('SessionControls', () => {
 
   describe('Keyboard Shortcuts', () => {
     it('sets up keyboard event listeners on mount', () => {
-      mockUseRunTrackerStore.mockReturnValue(defaultStoreState);
+      mockStoreState(mockUseRunTrackerStore, defaultStoreState);
 
       render(<SessionControls />);
 
@@ -573,7 +574,7 @@ describe('SessionControls', () => {
     });
 
     it('removes keyboard event listeners on unmount', () => {
-      mockUseRunTrackerStore.mockReturnValue(defaultStoreState);
+      mockStoreState(mockUseRunTrackerStore, defaultStoreState);
 
       const { unmount } = render(<SessionControls />);
       unmount();
@@ -582,7 +583,7 @@ describe('SessionControls', () => {
     });
 
     it('triggers start run on Ctrl+R', () => {
-      mockUseRunTrackerStore.mockReturnValue({
+      mockStoreState(mockUseRunTrackerStore, {
         ...defaultStoreState,
         activeSession: mockSession,
         activeRun: null,
@@ -608,13 +609,13 @@ describe('SessionControls', () => {
     });
 
     it('triggers pause on Ctrl+Space when not paused', () => {
-      mockUseRunTrackerStore.mockReturnValue({
+      mockStoreState(mockUseRunTrackerStore, {
         ...defaultStoreState,
         activeSession: mockSession,
         activeRun: mockRun,
         isPaused: false,
       });
-      mockUseGrailStore.mockReturnValue(defaultGrailStoreState);
+      mockStoreState(mockUseGrailStore, defaultGrailStoreState);
 
       render(<SessionControls />);
 
@@ -634,13 +635,13 @@ describe('SessionControls', () => {
     });
 
     it('triggers resume on Ctrl+Space when paused', () => {
-      mockUseRunTrackerStore.mockReturnValue({
+      mockStoreState(mockUseRunTrackerStore, {
         ...defaultStoreState,
         activeSession: mockSession,
         activeRun: mockRun,
         isPaused: true,
       });
-      mockUseGrailStore.mockReturnValue(defaultGrailStoreState);
+      mockStoreState(mockUseGrailStore, defaultGrailStoreState);
 
       render(<SessionControls />);
 
@@ -660,7 +661,7 @@ describe('SessionControls', () => {
     });
 
     it('triggers end run dialog on Ctrl+E', () => {
-      mockUseRunTrackerStore.mockReturnValue({
+      mockStoreState(mockUseRunTrackerStore, {
         ...defaultStoreState,
         activeSession: mockSession,
         activeRun: mockRun,
@@ -686,7 +687,7 @@ describe('SessionControls', () => {
     });
 
     it('triggers end session dialog on Ctrl+Shift+E', () => {
-      mockUseRunTrackerStore.mockReturnValue({
+      mockStoreState(mockUseRunTrackerStore, {
         ...defaultStoreState,
         activeSession: mockSession,
       });
@@ -711,7 +712,7 @@ describe('SessionControls', () => {
     });
 
     it('ignores shortcuts when typing in input fields', () => {
-      mockUseRunTrackerStore.mockReturnValue({
+      mockStoreState(mockUseRunTrackerStore, {
         ...defaultStoreState,
         activeSession: mockSession,
         activeRun: null,
@@ -747,7 +748,7 @@ describe('SessionControls', () => {
         writable: true,
       });
 
-      mockUseRunTrackerStore.mockReturnValue({
+      mockStoreState(mockUseRunTrackerStore, {
         ...defaultStoreState,
         activeSession: mockSession,
         activeRun: null,
@@ -777,12 +778,12 @@ describe('SessionControls', () => {
     });
 
     it('respects customized shortcuts with additional modifiers', () => {
-      mockUseRunTrackerStore.mockReturnValue({
+      mockStoreState(mockUseRunTrackerStore, {
         ...defaultStoreState,
         activeSession: mockSession,
         activeRun: null,
       });
-      mockUseGrailStore.mockReturnValue({
+      mockStoreState(mockUseGrailStore, {
         settings: {
           runTrackerShortcuts: {
             ...defaultGrailStoreState.settings.runTrackerShortcuts,
@@ -826,7 +827,7 @@ describe('SessionControls', () => {
         writable: true,
         configurable: true,
       });
-      mockUseGrailStore.mockReturnValue({
+      mockStoreState(mockUseGrailStore, {
         ...defaultGrailStoreState,
         settings: { ...defaultGrailStoreState.settings, runTrackerMemoryReading: true },
       });
@@ -853,7 +854,7 @@ describe('SessionControls', () => {
 
     it('If auto mode is enabled, Then the start run shortcut is ignored', () => {
       // Arrange
-      mockUseRunTrackerStore.mockReturnValue({
+      mockStoreState(mockUseRunTrackerStore, {
         ...defaultStoreState,
         activeSession: mockSession,
         activeRun: null,
@@ -869,7 +870,7 @@ describe('SessionControls', () => {
 
     it('If auto mode is enabled, Then the pause and end run shortcuts are ignored', () => {
       // Arrange
-      mockUseRunTrackerStore.mockReturnValue({
+      mockStoreState(mockUseRunTrackerStore, {
         ...defaultStoreState,
         activeSession: mockSession,
         activeRun: mockRun,
@@ -887,7 +888,7 @@ describe('SessionControls', () => {
 
     it('If auto mode is enabled, Then the end session shortcut still opens the confirmation', async () => {
       // Arrange
-      mockUseRunTrackerStore.mockReturnValue({
+      mockStoreState(mockUseRunTrackerStore, {
         ...defaultStoreState,
         activeSession: mockSession,
       });
@@ -910,7 +911,7 @@ describe('SessionControls', () => {
         ...window.electronAPI,
         runTracker: { ...window.electronAPI?.runTracker, getMemoryStatus },
       } as typeof window.electronAPI;
-      mockUseRunTrackerStore.mockReturnValue({
+      mockStoreState(mockUseRunTrackerStore, {
         ...defaultStoreState,
         activeSession: mockSession,
         activeRun: null,
@@ -1005,7 +1006,7 @@ describe('SessionControls', () => {
         throw new Error('Test error');
       });
 
-      mockUseRunTrackerStore.mockReturnValue({
+      mockStoreState(mockUseRunTrackerStore, {
         ...defaultStoreState,
         activeSession: mockSession,
         activeRun: null,
@@ -1053,7 +1054,7 @@ describe('SessionControls', () => {
     it('If auto mode is off, Then the unavailable warning is not shown', async () => {
       // Arrange
       setUnavailableMemoryReading();
-      mockUseRunTrackerStore.mockReturnValue({ ...defaultStoreState, activeSession: mockSession });
+      mockStoreState(mockUseRunTrackerStore, { ...defaultStoreState, activeSession: mockSession });
 
       // Act
       render(<SessionControls />);
@@ -1068,11 +1069,11 @@ describe('SessionControls', () => {
     it('If auto mode is on and memory reading is unavailable, Then a polite warning is shown', async () => {
       // Arrange
       setUnavailableMemoryReading();
-      mockUseGrailStore.mockReturnValue({
+      mockStoreState(mockUseGrailStore, {
         ...defaultGrailStoreState,
         settings: { ...defaultGrailStoreState.settings, runTrackerMemoryReading: true },
       });
-      mockUseRunTrackerStore.mockReturnValue({ ...defaultStoreState, activeSession: mockSession });
+      mockStoreState(mockUseRunTrackerStore, { ...defaultStoreState, activeSession: mockSession });
 
       // Act
       render(<SessionControls />);
@@ -1088,11 +1089,11 @@ describe('SessionControls', () => {
     it('If auto mode is on and memory reading is unavailable, Then the automatic tracking notice is hidden and manual run controls and the switch stay usable', async () => {
       // Arrange
       setUnavailableMemoryReading();
-      mockUseGrailStore.mockReturnValue({
+      mockStoreState(mockUseGrailStore, {
         ...defaultGrailStoreState,
         settings: { ...defaultGrailStoreState.settings, runTrackerMemoryReading: true },
       });
-      mockUseRunTrackerStore.mockReturnValue({ ...defaultStoreState, activeSession: mockSession });
+      mockStoreState(mockUseRunTrackerStore, { ...defaultStoreState, activeSession: mockSession });
 
       // Act
       render(<SessionControls />);
@@ -1107,7 +1108,7 @@ describe('SessionControls', () => {
 
   describe('Tooltips', () => {
     it('renders tooltip triggers for all buttons', () => {
-      mockUseRunTrackerStore.mockReturnValue({
+      mockStoreState(mockUseRunTrackerStore, {
         ...defaultStoreState,
         activeSession: mockSession,
         activeRun: mockRun,

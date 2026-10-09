@@ -3,6 +3,7 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useGrailStore } from '@/stores/grailStore';
 import { useWizardStore } from '@/stores/wizardStore';
+import { mockStoreState } from '@/test/storeMock';
 import { SetupWizard, wizardSteps } from './SetupWizard';
 
 vi.mock('@/stores/grailStore');
@@ -36,7 +37,7 @@ function openWizardAt(step: number, stepValidity: Record<string, boolean> = {}) 
 describe('SetupWizard', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockUseGrailStore.mockReturnValue({
+    mockStoreState(mockUseGrailStore, {
       setSettings: vi.fn().mockResolvedValue({ success: true }),
     } as unknown as ReturnType<typeof useGrailStore>);
     useWizardStore.setState({ isOpen: false, currentStep: 0, stepValidity: {} });
@@ -196,7 +197,7 @@ describe('When SetupWizard is open', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     setSettings = vi.fn().mockResolvedValue({ success: true });
-    mockUseGrailStore.mockReturnValue({ setSettings } as unknown as ReturnType<
+    mockStoreState(mockUseGrailStore, { setSettings } as unknown as ReturnType<
       typeof useGrailStore
     >);
     openWizardAt(0);

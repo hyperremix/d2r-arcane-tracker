@@ -83,8 +83,9 @@ async function resolveIconFromCandidates(candidates: string[]): Promise<string> 
 }
 
 export function useSpriteIcon(iconFileName?: IconFilenameInput, options?: UseSpriteIconOptions) {
-  const { settings } = useGrailStore();
-  const iconsEnabled = options?.forceEnabled ?? settings.showItemIcons;
+  // Rendered by every item tile, so only subscribe to the one setting that matters here
+  const showItemIcons = useGrailStore((state) => state.settings.showItemIcons);
+  const iconsEnabled = options?.forceEnabled ?? showItemIcons;
 
   const filenameCandidates = useMemo(() => normalizeCandidates(iconFileName), [iconFileName]);
   const cacheKey = filenameCandidates[0] ?? '';

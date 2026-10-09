@@ -4,16 +4,22 @@ import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createMainEventsMock } from '@/test/mainEventsMock';
 import { NotificationButton } from './NotificationButton';
 
-vi.mock('@/stores/grailStore', () => ({
-  useGrailStore: () => ({
+vi.mock('@/stores/grailStore', () => {
+  const state = {
+    characters: [],
     settings: {
       enableSounds: false,
       notificationVolume: 0,
       inAppNotifications: true,
       nativeNotifications: false,
     },
-  }),
-}));
+  };
+  return {
+    // Selector-aware like the real store hook
+    useGrailStore: (selector?: (current: typeof state) => unknown) =>
+      selector ? selector(state) : state,
+  };
+});
 
 vi.mock('@/components/grail/ItemCard', () => ({
   ItemCard: ({ item }: { item: { name: string } }) => <div>{item.name}</div>,
@@ -32,7 +38,7 @@ function createDetectionEvent(id: string, name: string): ItemDetectionEvent {
 }
 
 async function renderNotificationButton() {
-  // Flush the mount-time IPC requests (characters, icon path) inside act
+  // Flush the mount-time IPC request (icon path) inside act
   return await act(async () => render(<NotificationButton />));
 }
 
@@ -54,7 +60,6 @@ describe('When NotificationButton is rendered', () => {
       on: mainEvents.on,
       getIconPath: vi.fn(async () => undefined),
       grail: {
-        getCharacters: vi.fn(async () => []),
         getProgressByItem: vi.fn(async () => []),
       },
     };

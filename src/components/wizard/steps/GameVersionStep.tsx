@@ -49,7 +49,7 @@ export function GameVersionStep() {
   const { t } = useTranslation();
   const gameVersionId = useId();
   const headingId = useId();
-  const { settings } = useGrailStore();
+  const settings = useGrailStore((state) => state.settings);
   const { saveSettings, saveFailed } = useWizardSettingsSave();
   const gameVersion = settings.gameVersion || GameVersion.Resurrected;
   const selectedVersion = gameVersions.find((version) => version.value === gameVersion);

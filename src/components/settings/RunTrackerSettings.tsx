@@ -2,6 +2,7 @@ import type { GlobalHotkeyRegistration, RunTrackerShortcutAction } from 'electro
 import { AlertCircle, Globe, Keyboard, Timer } from 'lucide-react';
 import { useCallback, useEffect, useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useShallow } from 'zustand/react/shallow';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
@@ -42,7 +43,9 @@ const isFailedRegistration = (
  */
 export function RunTrackerSettings() {
   const { t } = useTranslation();
-  const { settings, setSettings } = useGrailStore();
+  const { settings, setSettings } = useGrailStore(
+    useShallow((state) => ({ settings: state.settings, setSettings: state.setSettings })),
+  );
   const startRunShortcutId = useId();
   const pauseRunShortcutId = useId();
   const endRunShortcutId = useId();

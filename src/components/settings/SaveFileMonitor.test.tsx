@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { afterEach, beforeEach, describe, expect, it, type MockInstance, vi } from 'vitest';
 import { useGrailStore } from '@/stores/grailStore';
 import { createMainEventsMock } from '@/test/mainEventsMock';
+import { mockStoreState } from '@/test/storeMock';
 import { SaveFileMonitor } from './SaveFileMonitor';
 
 vi.mock('sonner', () => import('@/test/sonnerMock'));
@@ -15,7 +16,7 @@ const mockUseGrailStore = vi.mocked(useGrailStore);
 const mockReloadData = vi.fn();
 
 function mockGameMode(gameMode: GameMode) {
-  mockUseGrailStore.mockReturnValue({
+  mockStoreState(mockUseGrailStore, {
     reloadData: mockReloadData,
     settings: { gameMode },
   } as unknown as ReturnType<typeof useGrailStore>);
