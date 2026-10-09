@@ -48,6 +48,7 @@ import { GrailProgressBuilder } from '@/fixtures';
 import { GrailDatabase, grailDatabase } from '../database/database';
 import { MAX_RESTORE_BACKUP_BYTES } from '../ipc/validators';
 import type { Character, Settings } from '../types/grail';
+import { GameMode } from '../types/grail';
 import {
   addSettingsUpdatedListener,
   closeGrailDatabase,
@@ -910,6 +911,52 @@ describe('When grailHandlers is used', () => {
       // Assert
       expect(grailDatabase.restoreFromBuffer).toHaveBeenCalledWith(Buffer.from(backupBuffer));
       expect(result).toEqual({ success: true });
+    });
+
+    it.each([
+      ['grail:restore', '/path/to/backup.db'],
+      [
+        'grail:restoreFromBuffer',
+        new Uint8Array([...new TextEncoder().encode('SQLite format 3\0'), 1, 2, 3, 4]),
+      ],
+    ])('When %s succeeds, Then settings listeners are notified with the restored settings', async (channel, payload) => {
+      // Arrange
+      const restoredSettings = { gameMode: GameMode.Manual };
+      vi.mocked(grailDatabase.getAllSettings).mockReturnValue(restoredSettings as any);
+      const listener = vi.fn();
+      const removeListener = addSettingsUpdatedListener(listener);
+      const handler = vi
+        .mocked(ipcMain.handle)
+        .mock.calls.find((call) => call[0] === channel)?.[1] as any;
+
+      // Act
+      const result = await handler(null, payload);
+      removeListener();
+
+      // Assert
+      expect(listener).toHaveBeenCalledTimes(1);
+      expect(listener).toHaveBeenCalledWith(restoredSettings);
+      expect(result).toEqual({ success: true });
+    });
+
+    it('If the restore fails, Then settings listeners are not notified', async () => {
+      // Arrange
+      vi.mocked(grailDatabase.restore).mockImplementationOnce(() => {
+        throw new Error('restore failed');
+      });
+      const listener = vi.fn();
+      const removeListener = addSettingsUpdatedListener(listener);
+      const handler = vi
+        .mocked(ipcMain.handle)
+        .mock.calls.find((call) => call[0] === 'grail:restore')?.[1] as any;
+
+      // Act
+      const result = handler(null, '/path/to/backup.db');
+      await expect(result).rejects.toThrow('restore failed');
+      removeListener();
+
+      // Assert
+      expect(listener).not.toHaveBeenCalled();
     });
 
     it('If the restore buffer is not a SQLite database, Then the database is not replaced', async () => {

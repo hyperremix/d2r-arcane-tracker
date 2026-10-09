@@ -43,7 +43,6 @@ let runTracker: RunTrackerService | undefined;
 let processMonitor: ProcessMonitor | undefined;
 let memoryReader: MemoryReader | undefined;
 const eventUnsubscribers: Array<() => void> = [];
-let pendingMonitoringStart: Promise<void> | undefined;
 
 /**
  * Checks whether the persisted game mode is Manual, where save file monitoring must stay off.
@@ -56,21 +55,6 @@ function isManualGameMode(): boolean {
     console.warn('[isManualGameMode] Failed to read game mode from settings:', error);
     return false;
   }
-}
-
-/**
- * Starts save file monitoring, sharing one in-flight start between concurrent callers
- * (startup, explicit IPC start, and game mode changes) so only one file watcher is created.
- */
-function startMonitoringOnce(): Promise<void> {
-  pendingMonitoringStart ??= (async () => {
-    try {
-      await saveFileMonitor.startMonitoring();
-    } finally {
-      pendingMonitoringStart = undefined;
-    }
-  })();
-  return pendingMonitoringStart;
 }
 
 function isSharedStashCharacterName(characterName: string): boolean {
@@ -589,7 +573,7 @@ export function initializeSaveFileHandlers(): void {
         );
         return;
       }
-      await startMonitoringOnce();
+      await saveFileMonitor.startMonitoring();
     } catch (error) {
       console.error('Failed to auto-start save file monitoring:', error);
     }
@@ -605,10 +589,11 @@ export function initializeSaveFileHandlers(): void {
       const wasManual = manualModeActive;
       manualModeActive = settings.gameMode === GameMode.Manual;
       try {
-        if (manualModeActive && saveFileMonitor.isCurrentlyMonitoring()) {
-          await saveFileMonitor.stopMonitoring();
+        if (manualModeActive) {
+          // Queued behind any start still in flight, so the watcher cannot come up in Manual mode
+          await saveFileMonitor.stopMonitoringIfActive();
         } else if (wasManual && !manualModeActive) {
-          await startMonitoringOnce();
+          await saveFileMonitor.startMonitoring();
         }
       } catch (error) {
         console.error('Failed to update save file monitoring for the game mode:', error);
@@ -621,7 +606,7 @@ export function initializeSaveFileHandlers(): void {
    * Starting while already monitoring is a no-op in the monitor service.
    */
   handle('saveFile:startMonitoring', async (): Promise<{ success: boolean }> => {
-    await startMonitoringOnce();
+    await saveFileMonitor.startMonitoring();
     return { success: true };
   });
 

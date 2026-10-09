@@ -124,9 +124,10 @@ vi.mock('../services/runTracker', () => {
 });
 
 // Capture settings-updated listeners registered by the handlers (keeps the real grailHandlers out)
-const settingsUpdatedListeners: Array<(settings: Record<string, unknown>) => void> = [];
+type SettingsUpdatedListener = (settings: Record<string, unknown>) => void | Promise<void>;
+const settingsUpdatedListeners: SettingsUpdatedListener[] = [];
 vi.mock('./grailHandlers', () => ({
-  addSettingsUpdatedListener: vi.fn((listener: (settings: Record<string, unknown>) => void) => {
+  addSettingsUpdatedListener: vi.fn((listener: SettingsUpdatedListener) => {
     settingsUpdatedListeners.push(listener);
     return vi.fn();
   }),
@@ -182,6 +183,7 @@ vi.mock('../services/saveFileMonitor', () => ({
     start: vi.fn(),
     startMonitoring: vi.fn(),
     stopMonitoring: vi.fn(),
+    stopMonitoringIfActive: vi.fn(),
     shutdown: vi.fn().mockResolvedValue(undefined),
     getSaveFiles: vi.fn(),
     isCurrentlyMonitoring: vi.fn(),
@@ -242,6 +244,7 @@ interface MockSaveFileMonitor {
   start: ReturnType<typeof vi.fn>;
   startMonitoring: ReturnType<typeof vi.fn>;
   stopMonitoring: ReturnType<typeof vi.fn>;
+  stopMonitoringIfActive: ReturnType<typeof vi.fn>;
   shutdown: ReturnType<typeof vi.fn>;
   getSaveFiles: ReturnType<typeof vi.fn>;
   isCurrentlyMonitoring: ReturnType<typeof vi.fn>;
@@ -299,6 +302,7 @@ describe('When saveFileHandlers is used', () => {
       start: vi.fn(),
       startMonitoring: vi.fn().mockResolvedValue(undefined),
       stopMonitoring: vi.fn(),
+      stopMonitoringIfActive: vi.fn().mockResolvedValue(undefined),
       shutdown: vi.fn().mockResolvedValue(undefined),
       getSaveFiles: vi.fn().mockResolvedValue([]),
       isCurrentlyMonitoring: vi.fn().mockReturnValue(false),
@@ -1235,11 +1239,15 @@ describe('When saveFileHandlers is used', () => {
   });
 
   describe('If save file monitoring is auto-started', () => {
+    let warnSpy: MockInstance | undefined;
+
     beforeEach(() => {
       vi.useFakeTimers();
     });
 
     afterEach(() => {
+      warnSpy?.mockRestore();
+      warnSpy = undefined;
       vi.useRealTimers();
     });
 
@@ -1275,7 +1283,7 @@ describe('When saveFileHandlers is used', () => {
 
     it('If the settings cannot be read, Then monitoring still starts', async () => {
       // Arrange
-      vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+      warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
       vi.mocked(grailDatabase.getAllSettings).mockImplementation(() => {
         throw new Error('database unavailable');
       });
@@ -1290,26 +1298,52 @@ describe('When saveFileHandlers is used', () => {
   });
 
   describe('If the game mode is changed while the app is running', () => {
-    const emitSettingsUpdated = (settings: Record<string, unknown>) => {
-      for (const listener of settingsUpdatedListeners) {
-        listener(settings);
-      }
+    interface Deferred {
+      promise: Promise<void>;
+      resolve: () => void;
+    }
+    const createDeferred = (): Deferred => {
+      let resolve!: () => void;
+      const promise = new Promise<void>((res) => {
+        resolve = res;
+      });
+      return { promise, resolve };
     };
 
-    it('When switching to Manual while monitoring, Then monitoring stops', async () => {
+    const getRegisteredHandler = (channel: string) =>
+      vi.mocked(ipcMain.handle).mock.calls.find((call) => call[0] === channel)?.[1] as any;
+
+    // Returns a promise that settles once every listener has finished processing the update
+    const emitSettingsUpdated = (settings: Record<string, unknown>): Promise<unknown> =>
+      Promise.all(settingsUpdatedListeners.map((listener) => listener(settings)));
+
+    it('When switching to Manual, Then monitoring is stopped if active', async () => {
       // Arrange
       vi.mocked(grailDatabase.getAllSettings).mockReturnValue({
         gameMode: GameMode.Both,
       } as any);
-      mockSaveFileMonitor.isCurrentlyMonitoring.mockReturnValue(true);
       initializeSaveFileHandlers();
 
       // Act
-      emitSettingsUpdated({ gameMode: GameMode.Manual });
-      await vi.waitFor(() => expect(mockSaveFileMonitor.stopMonitoring).toHaveBeenCalledTimes(1));
+      await emitSettingsUpdated({ gameMode: GameMode.Manual });
 
       // Assert
-      expect(mockSaveFileMonitor.stopMonitoring).toHaveBeenCalledTimes(1);
+      expect(mockSaveFileMonitor.stopMonitoringIfActive).toHaveBeenCalledTimes(1);
+    });
+
+    it('When switching to Manual while the monitor is still starting, Then the stop is still requested', async () => {
+      // Arrange
+      vi.mocked(grailDatabase.getAllSettings).mockReturnValue({
+        gameMode: GameMode.Both,
+      } as any);
+      mockSaveFileMonitor.isCurrentlyMonitoring.mockReturnValue(false);
+      initializeSaveFileHandlers();
+
+      // Act
+      await emitSettingsUpdated({ gameMode: GameMode.Manual });
+
+      // Assert
+      expect(mockSaveFileMonitor.stopMonitoringIfActive).toHaveBeenCalledTimes(1);
     });
 
     it('When switching from Manual to an automatic mode, Then monitoring resumes once', async () => {
@@ -1317,17 +1351,39 @@ describe('When saveFileHandlers is used', () => {
       vi.mocked(grailDatabase.getAllSettings).mockReturnValue({
         gameMode: GameMode.Manual,
       } as any);
-      mockSaveFileMonitor.isCurrentlyMonitoring.mockReturnValue(false);
       initializeSaveFileHandlers();
       mockSaveFileMonitor.startMonitoring.mockClear();
 
       // Act
-      emitSettingsUpdated({ gameMode: GameMode.Softcore });
-      emitSettingsUpdated({ gameMode: GameMode.Softcore });
-      await vi.waitFor(() => expect(mockSaveFileMonitor.startMonitoring).toHaveBeenCalled());
+      await Promise.all([
+        emitSettingsUpdated({ gameMode: GameMode.Softcore }),
+        emitSettingsUpdated({ gameMode: GameMode.Softcore }),
+      ]);
 
       // Assert
       expect(mockSaveFileMonitor.startMonitoring).toHaveBeenCalledTimes(1);
+    });
+
+    it('When the mode flips auto -> Manual -> auto during an in-flight start, Then the resume start is still requested', async () => {
+      // Arrange
+      vi.mocked(grailDatabase.getAllSettings).mockReturnValue({
+        gameMode: GameMode.Both,
+      } as any);
+      initializeSaveFileHandlers();
+      mockSaveFileMonitor.startMonitoring.mockClear();
+      const inFlightStart = createDeferred();
+      mockSaveFileMonitor.startMonitoring.mockReturnValueOnce(inFlightStart.promise);
+      const startRequest = getRegisteredHandler('saveFile:startMonitoring')(null);
+
+      // Act
+      await emitSettingsUpdated({ gameMode: GameMode.Manual });
+      const resume = emitSettingsUpdated({ gameMode: GameMode.Softcore });
+      inFlightStart.resolve();
+      await Promise.all([startRequest, resume]);
+
+      // Assert
+      expect(mockSaveFileMonitor.startMonitoring).toHaveBeenCalledTimes(2);
+      expect(mockSaveFileMonitor.stopMonitoringIfActive).toHaveBeenCalledTimes(1);
     });
 
     it('When switching between automatic modes, Then monitoring is left untouched', async () => {
@@ -1335,17 +1391,16 @@ describe('When saveFileHandlers is used', () => {
       vi.mocked(grailDatabase.getAllSettings).mockReturnValue({
         gameMode: GameMode.Both,
       } as any);
-      mockSaveFileMonitor.isCurrentlyMonitoring.mockReturnValue(false);
       initializeSaveFileHandlers();
       mockSaveFileMonitor.startMonitoring.mockClear();
 
       // Act
-      emitSettingsUpdated({ gameMode: GameMode.Hardcore });
-      await Promise.resolve();
+      await emitSettingsUpdated({ gameMode: GameMode.Hardcore });
 
       // Assert
       expect(mockSaveFileMonitor.startMonitoring).not.toHaveBeenCalled();
       expect(mockSaveFileMonitor.stopMonitoring).not.toHaveBeenCalled();
+      expect(mockSaveFileMonitor.stopMonitoringIfActive).not.toHaveBeenCalled();
     });
 
     it('When unrelated settings change, Then monitoring is left untouched', async () => {
@@ -1357,12 +1412,12 @@ describe('When saveFileHandlers is used', () => {
       mockSaveFileMonitor.startMonitoring.mockClear();
 
       // Act
-      emitSettingsUpdated({ theme: 'dark' });
-      await Promise.resolve();
+      await emitSettingsUpdated({ theme: 'dark' });
 
       // Assert
       expect(mockSaveFileMonitor.startMonitoring).not.toHaveBeenCalled();
       expect(mockSaveFileMonitor.stopMonitoring).not.toHaveBeenCalled();
+      expect(mockSaveFileMonitor.stopMonitoringIfActive).not.toHaveBeenCalled();
     });
 
     it('When monitoring is started explicitly after leaving Manual mode, Then the monitor starts', async () => {

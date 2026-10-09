@@ -47,6 +47,18 @@ function notifySettingsUpdatedListeners(settings: Partial<Settings>): void {
 }
 
 /**
+ * Notifies main-process listeners with the settings of a freshly restored database, because a
+ * restore can change settings (e.g. the game mode) without going through grail:updateSettings.
+ */
+function notifyRestoredSettings(): void {
+  try {
+    notifySettingsUpdatedListeners(grailDB.getAllSettings());
+  } catch (error) {
+    console.error('Failed to notify listeners about restored settings:', error);
+  }
+}
+
+/**
  * Validates renderer-provided settings whose type affects main-process behavior.
  * @param settings - The partial settings received over IPC
  * @throws Error if a validated setting has an invalid type
@@ -360,6 +372,7 @@ export function initializeGrailHandlers(): void {
    */
   handle('grail:restore', async (_, backupPath) => {
     grailDB.restore(backupPath);
+    notifyRestoredSettings();
     return { success: true };
   });
 
@@ -370,6 +383,7 @@ export function initializeGrailHandlers(): void {
    */
   handle('grail:restoreFromBuffer', async (_, backupBuffer) => {
     grailDB.restoreFromBuffer(Buffer.from(backupBuffer));
+    notifyRestoredSettings();
     return { success: true };
   });
 
