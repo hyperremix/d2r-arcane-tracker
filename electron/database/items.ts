@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { asc, count, eq, or, sql } from 'drizzle-orm';
+import { asc, count, eq, or, type Placeholder, sql } from 'drizzle-orm';
 import { items as grailItems } from '../items';
 import type { Item, Settings } from '../types/grail';
 import { dbItemToItem, itemToDbValues } from './converters';
@@ -101,13 +101,13 @@ type UpdatableItemKey = Exclude<(typeof itemValueKeys)[number], 'id'>;
 const updatableItemKeys = itemValueKeys.filter((key): key is UpdatableItemKey => key !== 'id');
 
 /**
- * Named placeholders for every item column, so one prepared statement serves all items. The cast
- * is needed because drizzle's `.values()` expects column values while placeholders are SQL
- * fragments; the real values are bound by name when the statement runs.
+ * Named placeholders for every item column, so one prepared statement serves all items; the real
+ * values are bound by name when the statement runs. The cast is needed because
+ * `Object.fromEntries` returns `{ [k: string]: Placeholder }`, which lacks the required column keys.
  */
 const itemValuePlaceholders = Object.fromEntries(
   itemValueKeys.map((key) => [key, sql.placeholder(key)]),
-) as unknown as ItemDbValues;
+) as Record<(typeof itemValueKeys)[number], Placeholder>;
 
 /** On conflict, take every item column from the proposed row (`excluded`). */
 const excludedItemValues = Object.fromEntries(
