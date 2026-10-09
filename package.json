@@ -24,7 +24,6 @@
   "scripts": {
     "dev": "vite",
     "dev:debug": "node scripts/dev-with-debug.js",
-    "preview": "electron-vite preview",
     "build": "bun run typecheck && vite build && electron-builder --win",
     "db:generate": "drizzle-kit generate",
     "typecheck": "concurrently \"tsc -p tsconfig.json --noEmit\" \"tsc -p tsconfig.node.json --noEmit\"",
