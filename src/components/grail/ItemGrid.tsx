@@ -10,8 +10,9 @@ import {
   shouldShowEtherealStatus,
   shouldShowNormalStatus,
 } from '@/lib/ethereal';
+import { countActiveFilters } from '@/lib/grailFilters';
 import { itemCategoryLabelKeys, itemTypeLabelKeys } from '@/lib/labelKeys';
-import { countActiveFilters, useFilteredItems, useGrailStore } from '@/stores/grailStore';
+import { useFilteredItems, useGrailStore } from '@/stores/grailStore';
 import { ItemDetailsDialog } from './ItemDetailsDialog';
 import { getItemGridEmptyStateVariant, ItemGridEmptyState } from './ItemGridEmptyState';
 import type { ItemGridGroup } from './VirtualItemGrid';

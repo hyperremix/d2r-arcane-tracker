@@ -2,7 +2,8 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import { toast } from 'sonner';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Toaster } from '@/components/ui/sonner';
-import { resetSettingsWriteTracking, useGrailStore } from './grailStore';
+import { useGrailStore } from './grailStore';
+import { resetSettingsWriteTracking } from './settingsStore';
 
 const TOAST_TITLE = "Couldn't save your settings";
 

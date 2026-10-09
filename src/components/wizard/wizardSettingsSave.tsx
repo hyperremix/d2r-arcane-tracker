@@ -2,7 +2,8 @@ import type { Settings } from 'electron/types/grail';
 import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { translations } from '@/i18n/translations';
-import { type SettingsSaveResult, useGrailStore } from '@/stores/grailStore';
+import { useGrailStore } from '@/stores/grailStore';
+import type { SettingsSaveResult } from '@/stores/settingsStore';
 
 /**
  * Saves wizard settings and tracks whether the latest save failed. The error toast is

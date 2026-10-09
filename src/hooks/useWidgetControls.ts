@@ -2,7 +2,8 @@ import type { Settings } from 'electron/types/grail';
 import { useCallback, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { clampWidgetOpacity, getDefaultWidgetSize, resolveWidgetDisplayMode } from '@/lib/widget';
-import { type SettingsSaveResult, useGrailStore } from '@/stores/grailStore';
+import { useGrailStore } from '@/stores/grailStore';
+import type { SettingsSaveResult } from '@/stores/settingsStore';
 
 /**
  * Persists a settings update and reports whether it was saved.

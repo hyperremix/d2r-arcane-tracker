@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { GrailProgressBuilder, HolyGrailItemBuilder } from '@/fixtures';
 import { useGrailStore } from '@/stores/grailStore';
 import { initRunTrackerSync } from '@/stores/runTrackerStore';
-import { WidgetContainer } from './WidgetContainer';
+import WidgetApp from '@/WidgetApp';
 
 const widgetProps = vi.hoisted(() => ({
   last: undefined as { statistics: { foundItems: number; totalItems: number } | null } | undefined,
@@ -19,6 +19,9 @@ vi.mock('./Widget', () => ({
 
 const runTrackerSync = vi.hoisted(() => ({ stop: vi.fn() }));
 
+// The theme is applied by the real widget root, but is not under test here
+vi.mock('@/hooks/useTheme', () => ({ useTheme: vi.fn() }));
+
 vi.mock('@/stores/runTrackerStore', () => {
   const state = {
     refreshActiveRun: vi.fn().mockResolvedValue(undefined),
@@ -32,6 +35,10 @@ vi.mock('@/stores/runTrackerStore', () => {
 
 type IpcHandler = (payload: unknown) => Promise<void> | void;
 
+/**
+ * Renders the container through the widget window root, which loads the grail data and follows
+ * the settings saved in the main window.
+ */
 describe('WidgetContainer native window sizing', () => {
   const originalElectronAPI = window.electronAPI;
   const initialGrailState = useGrailStore.getInitialState();
@@ -67,7 +74,7 @@ describe('WidgetContainer native window sizing', () => {
       configurable: true,
       writable: true,
     });
-    const result = render(<WidgetContainer />);
+    const result = render(<WidgetApp />);
     await waitFor(() => {
       expect(handlers.has('settings-updated')).toBe(true);
       expect(useGrailStore.getState().settingsHydrated).toBe(true);

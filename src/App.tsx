@@ -1,6 +1,6 @@
 import type { JSX } from 'react';
 
-import { useEffect, useLayoutEffect, useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { RouterProvider } from 'react-router';
 
@@ -9,11 +9,10 @@ import { SetupWizard } from '@/components/wizard/SetupWizard';
 import { translations } from '@/i18n/translations';
 
 import { useServiceErrorNotifications } from './hooks/useServiceErrorNotifications';
-import { useSettingsLanguage } from './hooks/useSettingsLanguage';
-import { useTheme } from './hooks/useTheme';
 import { useUpdateNotifications } from './hooks/useUpdateNotifications';
+import { useWindowBootstrap } from './hooks/useWindowBootstrap';
 import { router } from './router';
-import { initGrailData, useGrailStore } from './stores/grailStore';
+import { useGrailStore } from './stores/grailStore';
 import { useWizardStore } from './stores/wizardStore';
 
 /**
@@ -30,13 +29,9 @@ function App(): JSX.Element {
   const hasCheckedWizard = useRef(false);
 
   // Load the grail data once for the whole window and keep it in sync with the main process, so
-  // every page sees current data. A layout effect sets the loading flag before the first paint;
-  // otherwise the empty store would briefly render the "no items" state before the spinner.
-  useLayoutEffect(() => initGrailData(), []);
-
-  // Apply theme and language based on user settings
-  useTheme();
-  useSettingsLanguage();
+  // every page sees current data, and apply theme and language based on user settings. This
+  // window saves the settings itself, so it does not follow settings broadcasts.
+  useWindowBootstrap();
 
   // Listen for automatic update notifications
   useUpdateNotifications();

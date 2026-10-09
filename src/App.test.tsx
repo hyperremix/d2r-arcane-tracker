@@ -78,8 +78,9 @@ describe('When App is rendered', () => {
       // Arrange & Act
       const { unmount } = render(<App />);
 
-      // Assert
+      // Assert - the main window saves settings itself, so it does not follow settings broadcasts
       expect(initGrailData).toHaveBeenCalledTimes(1);
+      expect(initGrailData).toHaveBeenCalledWith({ followSettingsUpdates: false });
       expect(cleanupGrailData).not.toHaveBeenCalled();
 
       // Act
