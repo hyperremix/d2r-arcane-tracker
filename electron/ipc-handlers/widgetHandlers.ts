@@ -1,5 +1,6 @@
 import { ipcMain } from 'electron';
 import { grailDatabase } from '../database/database';
+import { createIpcMainRegistry } from '../ipc/handle';
 import type { Settings } from '../types/grail';
 import type { WidgetDisplayMode, WidgetSize } from '../utils/widgetDisplay';
 import { isWidgetDisplayMode } from '../utils/widgetDisplay';
@@ -62,10 +63,11 @@ export function initializeWidgetHandlers(
   onPositionChange?: (position: { x: number; y: number }) => void,
   onSizeChange?: (display: WidgetDisplayMode, size: WidgetSize) => void,
 ): void {
+  const { handle } = createIpcMainRegistry(ipcMain);
   /**
    * Toggle widget visibility based on settings.
    */
-  ipcMain.handle('widget:toggle', async (_event, enabled: boolean, settings: Partial<Settings>) => {
+  handle('widget:toggle', async (_event, enabled, settings) => {
     try {
       if (enabled) {
         showWidgetWindow(
@@ -89,7 +91,7 @@ export function initializeWidgetHandlers(
   /**
    * Update widget display mode.
    */
-  ipcMain.handle(
+  handle(
     'widget:update-display',
     async (
       _event,
@@ -112,7 +114,7 @@ export function initializeWidgetHandlers(
   /**
    * Update widget opacity.
    */
-  ipcMain.handle('widget:update-opacity', async (_event, opacity: number) => {
+  handle('widget:update-opacity', async (_event, opacity) => {
     try {
       updateWidgetWindowOpacity(opacity);
       return { success: true };
@@ -125,7 +127,7 @@ export function initializeWidgetHandlers(
   /**
    * Lock or unlock the widget (click-through mode).
    */
-  ipcMain.handle(
+  handle(
     'widget:set-locked',
     async (
       _event,
@@ -147,7 +149,7 @@ export function initializeWidgetHandlers(
   /**
    * Reset widget size to default for current display mode.
    */
-  ipcMain.handle('widget:reset-size', async (_event, display: unknown) => {
+  handle('widget:reset-size', async (_event, display: unknown) => {
     try {
       if (!isWidgetDisplayMode(display)) {
         return { success: false, error: 'Invalid widget display mode', size: null };
@@ -169,7 +171,7 @@ export function initializeWidgetHandlers(
   /**
    * Reset widget position to center of screen.
    */
-  ipcMain.handle('widget:reset-position', async () => {
+  handle('widget:reset-position', async () => {
     try {
       if (widgetWindow) {
         widgetWindow.center();

@@ -1,6 +1,8 @@
 import type { types as d2sTypes } from '@dschu012/d2s';
 import { ipcMain } from 'electron';
 import { grailDatabase } from '../database/database';
+import type { UnvaultTargetOptions } from '../ipc/contract';
+import { createIpcMainRegistry } from '../ipc/handle';
 import { assertGameNotRunning } from '../services/gameProcessGuard';
 import {
   addItemToSaveFile,
@@ -673,16 +675,6 @@ function buildInventorySearchResult(
   };
 }
 
-interface UnvaultTargetOptions {
-  targetFilePath: string;
-  targetFileType: VaultSourceFileType;
-  targetLocationContext: VaultLocationContext;
-  targetStashTab?: number;
-  targetGridX: number;
-  targetGridY: number;
-  targetEquippedSlotId?: number;
-}
-
 function resolveWithdrawCount(withdrawCount: unknown): number | undefined {
   if (withdrawCount === undefined) {
     return undefined;
@@ -834,7 +826,8 @@ async function unvaultVaultItemSafely(
 export function initializeVaultHandlers(
   getSaveFileMonitor: () => SaveFileMonitor | undefined,
 ): void {
-  ipcMain.handle('vault:addItem', async (_, item: VaultItemUpsertInput): Promise<VaultItem> => {
+  const { handle } = createIpcMainRegistry(ipcMain);
+  handle('vault:addItem', async (_, item: VaultItemUpsertInput): Promise<VaultItem> => {
     const normalizedItem = normalizeVaultItemInput(item);
     validateVaultItemInput(normalizedItem);
     return addVaultItemWithSafeSourceRemoval(
@@ -843,7 +836,7 @@ export function initializeVaultHandlers(
     );
   });
 
-  ipcMain.handle('vault:removeItem', async (_, itemId: string): Promise<{ success: boolean }> => {
+  handle('vault:removeItem', async (_, itemId: string): Promise<{ success: boolean }> => {
     assert(typeof itemId === 'string' && itemId.length > 0, 'itemId is required');
 
     // A row that is still vaulted and was taken out of a save file is the only copy of that item.
@@ -860,7 +853,7 @@ export function initializeVaultHandlers(
     return { success: true };
   });
 
-  ipcMain.handle(
+  handle(
     'vault:unvaultItem',
     async (
       _,
@@ -884,13 +877,13 @@ export function initializeVaultHandlers(
     },
   );
 
-  ipcMain.handle(
+  handle(
     'vault:search',
     async (_, filter?: VaultItemFilter): Promise<VaultItemSearchResult> =>
       grailDatabase.searchVaultItems(sanitizeFilter(filter)),
   );
 
-  ipcMain.handle(
+  handle(
     'inventory:searchAll',
     async (
       _,
@@ -910,7 +903,7 @@ export function initializeVaultHandlers(
     },
   );
 
-  ipcMain.handle(
+  handle(
     'inventory:moveItem',
     async (_, input: InventoryItemMoveInput): Promise<{ success: boolean }> => {
       const normalizedInput = normalizeInventoryMoveInput(input);
@@ -923,7 +916,7 @@ export function initializeVaultHandlers(
     },
   );
 
-  ipcMain.handle(
+  handle(
     'inventory:splitStack',
     async (_, input: InventoryStackSplitInput): Promise<{ success: boolean }> => {
       const normalizedInput = normalizeSplitStackInput(input);

@@ -1,5 +1,6 @@
 import { BrowserWindow, ipcMain } from 'electron';
 import { grailDatabase } from '../database/database';
+import { createIpcMainRegistry } from '../ipc/handle';
 import type { ConversionResult, ConversionStatus } from '../services/iconService';
 import { iconService } from '../services/iconService';
 import type { Settings } from '../types/grail';
@@ -45,24 +46,20 @@ function updateSettings(settings: Partial<Settings>): void {
  * Initializes IPC handlers for icon-related operations.
  */
 export function initializeIconHandlers(): void {
+  const { handle } = createIpcMainRegistry(ipcMain);
   /**
    * Sets the D2R installation path
    */
-  ipcMain.handle('icon:setD2RPath', async (_, d2rPath: string): Promise<void> => {
-    try {
-      iconService.setD2RPath(d2rPath);
-      // Save to settings
-      updateSettings({ d2rInstallPath: d2rPath });
-    } catch (error) {
-      console.error('Failed to set D2R path:', error);
-      throw error;
-    }
+  handle('icon:setD2RPath', async (_, d2rPath): Promise<void> => {
+    iconService.setD2RPath(d2rPath);
+    // Save to settings
+    updateSettings({ d2rInstallPath: d2rPath });
   });
 
   /**
    * Gets the current D2R installation path
    */
-  ipcMain.handle('icon:getD2RPath', async (): Promise<string | null> => {
+  handle('icon:getD2RPath', async (): Promise<string | null> => {
     try {
       // Try to get from service first
       let d2rPath = iconService.getD2RPath();
@@ -95,7 +92,7 @@ export function initializeIconHandlers(): void {
    * Gets the platform's default D2R installation path if it exists on disk.
    * Used by the setup wizard so it only suggests a path that is actually there.
    */
-  ipcMain.handle('icon:getSuggestedD2RPath', async (): Promise<string | undefined> => {
+  handle('icon:getSuggestedD2RPath', async (): Promise<string | undefined> => {
     try {
       return iconService.getSuggestedD2RPath();
     } catch (error) {
@@ -107,7 +104,7 @@ export function initializeIconHandlers(): void {
   /**
    * Converts all sprite files from D2R installation to PNGs
    */
-  ipcMain.handle('icon:convertSprites', async (): Promise<ConversionResult> => {
+  handle('icon:convertSprites', async (): Promise<ConversionResult> => {
     try {
       // Get D2R path
       const d2rPath = iconService.getD2RPath();
@@ -157,13 +154,8 @@ export function initializeIconHandlers(): void {
   /**
    * Gets the current conversion status
    */
-  ipcMain.handle('icon:getConversionStatus', async (): Promise<ConversionStatus> => {
-    try {
-      return iconService.getConversionStatus();
-    } catch (error) {
-      console.error('Failed to get conversion status:', error);
-      throw error;
-    }
+  handle('icon:getConversionStatus', async (): Promise<ConversionStatus> => {
+    return iconService.getConversionStatus();
   });
 
   /**
@@ -172,7 +164,7 @@ export function initializeIconHandlers(): void {
    * @param filename - The icon filename (e.g., "item.png")
    * @returns Base64 data URL or null if not found
    */
-  ipcMain.handle('icon:getByFilename', async (_, filename: string): Promise<string | null> => {
+  handle('icon:getByFilename', async (_, filename): Promise<string | null> => {
     try {
       return await iconService.getIconByFilename(filename);
     } catch (error) {
@@ -185,7 +177,7 @@ export function initializeIconHandlers(): void {
    * IPC handler for validating the D2R installation path for icon extraction.
    * @returns Promise resolving to validation result
    */
-  ipcMain.handle(
+  handle(
     'icon:validatePath',
     async (): Promise<{ valid: boolean; path?: string; error?: string }> => {
       try {

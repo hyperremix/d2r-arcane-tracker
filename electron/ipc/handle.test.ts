@@ -1,21 +1,23 @@
-import { ipcMain } from 'electron';
 import { afterEach, beforeEach, describe, expect, it, type MockInstance, vi } from 'vitest';
-import { handle, onRendererMessage, removeHandler } from './handle';
+import { createIpcMainRegistry, type IpcMainLike } from './handle';
 import { IpcValidationError } from './validation';
 
-vi.mock('electron', () => ({
-  ipcMain: {
+type RegisteredHandler = (event: unknown, ...args: unknown[]) => Promise<unknown>;
+
+function createFakeIpcMain() {
+  return {
     handle: vi.fn(),
     removeHandler: vi.fn(),
     on: vi.fn(),
     removeListener: vi.fn(),
-  },
-}));
+  };
+}
 
-type RegisteredHandler = (event: unknown, ...args: unknown[]) => Promise<unknown>;
-
-function getRegisteredHandler(channel: string): RegisteredHandler {
-  const call = vi.mocked(ipcMain.handle).mock.calls.find(([registered]) => registered === channel);
+function getRegisteredHandler(
+  ipcMain: ReturnType<typeof createFakeIpcMain>,
+  channel: string,
+): RegisteredHandler {
+  const call = ipcMain.handle.mock.calls.find(([registered]) => registered === channel);
   if (!call) {
     throw new Error(`No handler registered for ${channel}`);
   }
@@ -24,9 +26,10 @@ function getRegisteredHandler(channel: string): RegisteredHandler {
 
 describe('When an invoke handler is registered with handle()', () => {
   let consoleError: MockInstance;
+  let ipcMain: ReturnType<typeof createFakeIpcMain>;
 
   beforeEach(() => {
-    vi.mocked(ipcMain.handle).mockClear();
+    ipcMain = createFakeIpcMain();
     consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
   });
 
@@ -36,28 +39,33 @@ describe('When an invoke handler is registered with handle()', () => {
 
   it('Then the handler receives the event and the validated arguments', async () => {
     // Arrange
-    const handler = vi.fn(() => [{ id: 'run-1' }]);
-    handle('run-tracker:get-runs-by-session', handler as never);
+    const { handle } = createIpcMainRegistry(ipcMain as unknown as IpcMainLike);
+    const handler = vi.fn(() => []);
+    handle('run-tracker:get-runs-by-session', handler);
     const event = { sender: { id: 1 } };
 
     // Act
-    const result = await getRegisteredHandler('run-tracker:get-runs-by-session')(
+    const result = await getRegisteredHandler(ipcMain, 'run-tracker:get-runs-by-session')(
       event,
       'session-1',
     );
 
     // Assert
     expect(handler).toHaveBeenCalledWith(event, 'session-1');
-    expect(result).toEqual([{ id: 'run-1' }]);
+    expect(result).toEqual([]);
   });
 
   it('If the arguments violate the contract, Then the call rejects and the handler does not run', async () => {
     // Arrange
-    const handler = vi.fn();
+    const { handle } = createIpcMainRegistry(ipcMain as unknown as IpcMainLike);
+    const handler = vi.fn(() => []);
     handle('run-tracker:get-runs-by-session', handler);
 
     // Act
-    const result = getRegisteredHandler('run-tracker:get-runs-by-session')({}, { id: 'x' });
+    const result = getRegisteredHandler(ipcMain, 'run-tracker:get-runs-by-session')(
+      {},
+      { id: 'x' },
+    );
 
     // Assert
     await expect(result).rejects.toBeInstanceOf(IpcValidationError);
@@ -71,13 +79,14 @@ describe('When an invoke handler is registered with handle()', () => {
 
   it('If the handler throws, Then the error is logged with the channel and rethrown', async () => {
     // Arrange
+    const { handle } = createIpcMainRegistry(ipcMain as unknown as IpcMainLike);
     const failure = new Error('database locked');
     handle('grail:getCharacters', () => {
       throw failure;
     });
 
     // Act
-    const result = getRegisteredHandler('grail:getCharacters')({});
+    const result = getRegisteredHandler(ipcMain, 'grail:getCharacters')({});
 
     // Assert
     await expect(result).rejects.toBe(failure);
@@ -86,11 +95,12 @@ describe('When an invoke handler is registered with handle()', () => {
 
   it('Then extra arguments beyond the contract are not passed to the handler', async () => {
     // Arrange
+    const { handle } = createIpcMainRegistry(ipcMain as unknown as IpcMainLike);
     const handler = vi.fn(() => []);
     handle('grail:getItems', handler);
 
     // Act
-    await getRegisteredHandler('grail:getItems')({}, 'unexpected', 42);
+    await getRegisteredHandler(ipcMain, 'grail:getItems')({}, 'unexpected', 42);
 
     // Assert
     expect(handler).toHaveBeenCalledWith({});
@@ -100,7 +110,8 @@ describe('When an invoke handler is registered with handle()', () => {
 describe('When handlers and renderer message listeners are removed', () => {
   it('Then removeHandler removes the channel handler', () => {
     // Arrange
-    vi.mocked(ipcMain.removeHandler).mockClear();
+    const ipcMain = createFakeIpcMain();
+    const { removeHandler } = createIpcMainRegistry(ipcMain as unknown as IpcMainLike);
 
     // Act
     removeHandler('run-tracker:get-global-hotkey-status');
@@ -111,6 +122,8 @@ describe('When handlers and renderer message listeners are removed', () => {
 
   it('Then the function returned by onRendererMessage removes the same listener', () => {
     // Arrange
+    const ipcMain = createFakeIpcMain();
+    const { onRendererMessage } = createIpcMainRegistry(ipcMain as unknown as IpcMainLike);
     const listener = vi.fn();
     const unsubscribe = onRendererMessage('inventory:vault-drag-state', listener);
 

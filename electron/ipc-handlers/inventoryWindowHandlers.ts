@@ -1,45 +1,17 @@
 import { BrowserWindow, ipcMain } from 'electron';
+import {
+  type ActiveDragStateSnapshot,
+  INVENTORY_DRAG_STATE_CHANNEL,
+  type InventoryDragStatePayload,
+  VAULT_DRAG_STATE_CHANNEL,
+  type VaultDragStatePayload,
+} from '../ipc/contract';
+import { createIpcMainRegistry } from '../ipc/handle';
 import type { InventorySnapshotWindowTarget, VaultSourceFileType } from '../types/grail';
 import { assert } from '../utils/assert';
 import { assertSaveFilePathAllowed } from '../utils/saveFilePathGuard';
 import { VALID_SOURCE_FILE_TYPES } from '../utils/vaultState';
 import { openInventorySnapshotWindow } from '../window/inventorySnapshotWindow';
-
-const VAULT_DRAG_STATE_CHANNEL = 'inventory:vault-drag-state';
-const INVENTORY_DRAG_STATE_CHANNEL = 'inventory:item-drag-state';
-
-interface VaultDragStatePayload {
-  active: boolean;
-  id: string;
-  gridWidth: number;
-  gridHeight: number;
-}
-
-interface InventoryDragStatePayload {
-  active: boolean;
-  fingerprint: string;
-  sourceFilePath: string;
-  sourceFileType: VaultSourceFileType;
-  sourceLocationContext: string;
-  rawItemJson: string;
-  itemCode?: string;
-  sourceStashTab?: number;
-  sourceGridX?: number;
-  sourceGridY?: number;
-  sourceEquippedSlotId?: number;
-  gridWidth: number;
-  gridHeight: number;
-  stackPickup?: boolean;
-  stackPickupCount?: number;
-  stackPickupMaxCount?: number;
-  stackPickupItemName?: string;
-  stackPickupIconFileName?: string;
-}
-
-interface ActiveDragStateSnapshot {
-  vault?: VaultDragStatePayload;
-  inventory?: InventoryDragStatePayload;
-}
 
 let activeVaultDragState: VaultDragStatePayload | undefined;
 let activeInventoryDragState: InventoryDragStatePayload | undefined;
@@ -261,10 +233,11 @@ export function initializeInventoryWindowHandlers(
   rendererDist?: string,
   getSaveDirectory?: () => string | undefined,
 ): void {
+  const { handle, onRendererMessage } = createIpcMainRegistry(ipcMain);
   activeVaultDragState = undefined;
   activeInventoryDragState = undefined;
 
-  ipcMain.on(VAULT_DRAG_STATE_CHANNEL, (event, payload: unknown) => {
+  onRendererMessage(VAULT_DRAG_STATE_CHANNEL, (event, payload) => {
     const normalizedPayload = normalizeVaultDragStatePayload(payload);
     if (!normalizedPayload) {
       return;
@@ -274,7 +247,7 @@ export function initializeInventoryWindowHandlers(
     relayDragState(event, VAULT_DRAG_STATE_CHANNEL, normalizedPayload);
   });
 
-  ipcMain.on(INVENTORY_DRAG_STATE_CHANNEL, (event, payload: unknown) => {
+  onRendererMessage(INVENTORY_DRAG_STATE_CHANNEL, (event, payload) => {
     const normalizedPayload = normalizeInventoryDragStatePayload(payload);
     if (!normalizedPayload) {
       return;
@@ -284,31 +257,28 @@ export function initializeInventoryWindowHandlers(
     relayDragState(event, INVENTORY_DRAG_STATE_CHANNEL, normalizedPayload);
   });
 
-  ipcMain.handle(
+  handle(
     'inventory:getActiveDragState',
     async (): Promise<ActiveDragStateSnapshot> => getActiveDragStateSnapshot(),
   );
 
-  ipcMain.handle(
-    'inventory:openSnapshotWindow',
-    async (_, target: InventorySnapshotWindowTarget): Promise<{ success: boolean }> => {
-      const validatedTarget = validateSnapshotTarget(target, getSaveDirectory?.());
-      const snapshotWindow = openInventorySnapshotWindow(
-        validatedTarget,
-        __dirname,
-        viteDevServerUrl,
-        rendererDist,
-      );
+  handle('inventory:openSnapshotWindow', async (_, target): Promise<{ success: boolean }> => {
+    const validatedTarget = validateSnapshotTarget(target, getSaveDirectory?.());
+    const snapshotWindow = openInventorySnapshotWindow(
+      validatedTarget,
+      __dirname,
+      viteDevServerUrl,
+      rendererDist,
+    );
 
-      if (snapshotWindow.webContents.isLoadingMainFrame()) {
-        snapshotWindow.webContents.once('did-finish-load', () => {
-          sendActiveDragStateSnapshot(snapshotWindow);
-        });
-      } else {
+    if (snapshotWindow.webContents.isLoadingMainFrame()) {
+      snapshotWindow.webContents.once('did-finish-load', () => {
         sendActiveDragStateSnapshot(snapshotWindow);
-      }
+      });
+    } else {
+      sendActiveDragStateSnapshot(snapshotWindow);
+    }
 
-      return { success: true };
-    },
-  );
+    return { success: true };
+  });
 }

@@ -1,36 +1,26 @@
 import { writeFile } from 'node:fs/promises';
 import { isAbsolute } from 'node:path';
 import { dialog, ipcMain } from 'electron';
+import { createIpcMainRegistry } from '../ipc/handle';
 
 /**
  * Initializes IPC handlers for native dialog operations.
  * Sets up handlers for save and open dialogs that can be called from the renderer process.
  */
 export function initializeDialogHandlers(): void {
+  const { handle } = createIpcMainRegistry(ipcMain);
   // Save dialog handler
-  ipcMain.handle('dialog:showSaveDialog', async (_, options) => {
-    try {
-      const result = await dialog.showSaveDialog(options);
-      return result;
-    } catch (error) {
-      console.error('Failed to show save dialog:', error);
-      throw error;
-    }
+  handle('dialog:showSaveDialog', async (_, options) => {
+    return await dialog.showSaveDialog(options);
   });
 
   // Open dialog handler
-  ipcMain.handle('dialog:showOpenDialog', async (_, options) => {
-    try {
-      const result = await dialog.showOpenDialog(options);
-      return result;
-    } catch (error) {
-      console.error('Failed to show open dialog:', error);
-      throw error;
-    }
+  handle('dialog:showOpenDialog', async (_, options) => {
+    return await dialog.showOpenDialog(options);
   });
 
   // Write file handler
-  ipcMain.handle('dialog:writeFile', async (_, filePath: unknown, content: unknown) => {
+  handle('dialog:writeFile', async (_, filePath: unknown, content: unknown) => {
     if (typeof filePath !== 'string' || filePath.trim().length === 0 || !isAbsolute(filePath)) {
       throw new Error('Invalid file path');
     }
@@ -38,13 +28,8 @@ export function initializeDialogHandlers(): void {
       throw new Error('Invalid file content');
     }
 
-    try {
-      await writeFile(filePath, content, 'utf-8');
-      return { success: true };
-    } catch (error) {
-      console.error('Failed to write file:', error);
-      throw error;
-    }
+    await writeFile(filePath, content, 'utf-8');
+    return { success: true };
   });
 
   console.log('Dialog IPC handlers initialized');

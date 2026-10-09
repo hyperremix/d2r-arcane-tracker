@@ -2,6 +2,7 @@ import { isAbsolute, resolve } from 'node:path';
 import { ipcMain, webContents } from 'electron';
 import type { GrailDatabase } from '../database/database';
 import { grailDatabase } from '../database/database';
+import { createIpcMainRegistry } from '../ipc/handle';
 import { DatabaseBatchWriter } from '../services/DatabaseBatchWriter';
 import { EventBus } from '../services/EventBus';
 import { ItemDetectionService } from '../services/itemDetection';
@@ -429,6 +430,7 @@ async function applySaveDirectoryChange(newDirectory: string): Promise<void> {
  * Loads grail items into the detection service and starts monitoring automatically.
  */
 export function initializeSaveFileHandlers(): void {
+  const { handle } = createIpcMainRegistry(ipcMain);
   console.log('[initializeSaveFileHandlers] Starting initialization');
   console.log('[initializeSaveFileHandlers] Current EventBus listener counts:', {
     'save-file-event': eventBus.listenerCount('save-file-event'),
@@ -603,69 +605,44 @@ export function initializeSaveFileHandlers(): void {
    * IPC handler for starting save file monitoring (e.g. when leaving Manual mode).
    * Starting while already monitoring is a no-op in the monitor service.
    */
-  ipcMain.handle('saveFile:startMonitoring', async (): Promise<{ success: boolean }> => {
-    try {
-      await saveFileMonitor.startMonitoring();
-      return { success: true };
-    } catch (error) {
-      console.error('Failed to start save file monitoring:', error);
-      throw error;
-    }
+  handle('saveFile:startMonitoring', async (): Promise<{ success: boolean }> => {
+    await saveFileMonitor.startMonitoring();
+    return { success: true };
   });
 
   /**
    * IPC handler for stopping save file monitoring (e.g. when switching to Manual mode).
    */
-  ipcMain.handle('saveFile:stopMonitoring', async (): Promise<{ success: boolean }> => {
-    try {
-      await saveFileMonitor.stopMonitoring();
-      return { success: true };
-    } catch (error) {
-      console.error('Failed to stop save file monitoring:', error);
-      throw error;
-    }
+  handle('saveFile:stopMonitoring', async (): Promise<{ success: boolean }> => {
+    await saveFileMonitor.stopMonitoring();
+    return { success: true };
   });
 
   /**
    * IPC handler for retrieving all save files.
    * @returns Promise resolving to array of save file data
    */
-  ipcMain.handle('saveFile:getSaveFiles', async (): Promise<D2SaveFile[]> => {
-    try {
-      return await saveFileMonitor.getSaveFiles();
-    } catch (error) {
-      console.error('Failed to get save files:', error);
-      throw error;
-    }
+  handle('saveFile:getSaveFiles', async (): Promise<D2SaveFile[]> => {
+    return await saveFileMonitor.getSaveFiles();
   });
 
   /**
    * IPC handler for getting the current monitoring status.
    * @returns Object containing monitoring status and directory information
    */
-  ipcMain.handle('saveFile:getMonitoringStatus', async () => {
-    try {
-      return {
-        isMonitoring: saveFileMonitor.isCurrentlyMonitoring(),
-        directory: saveFileMonitor.getSaveDirectory(),
-      };
-    } catch (error) {
-      console.error('Failed to get monitoring status:', error);
-      throw error;
-    }
+  handle('saveFile:getMonitoringStatus', async () => {
+    return {
+      isMonitoring: saveFileMonitor.isCurrentlyMonitoring(),
+      directory: saveFileMonitor.getSaveDirectory(),
+    };
   });
 
   /**
    * IPC handler for getting the platform default save directory.
    * @returns The platform-specific default save directory path
    */
-  ipcMain.handle('saveFile:getDefaultDirectory', async (): Promise<string> => {
-    try {
-      return saveFileMonitor.getDefaultDirectory();
-    } catch (error) {
-      console.error('Failed to get default directory:', error);
-      throw error;
-    }
+  handle('saveFile:getDefaultDirectory', async (): Promise<string> => {
+    return saveFileMonitor.getDefaultDirectory();
   });
 
   /**
@@ -675,17 +652,12 @@ export function initializeSaveFileHandlers(): void {
    * @param _ - IPC event (unused)
    * @param saveDir - New save directory path
    */
-  ipcMain.handle('saveFile:updateSaveDirectory', async (_, saveDir: unknown) => {
-    try {
-      const newDirectory = validateSaveDirectoryInput(saveDir);
+  handle('saveFile:updateSaveDirectory', async (_, saveDir: unknown) => {
+    const newDirectory = validateSaveDirectoryInput(saveDir);
 
-      await applySaveDirectoryChange(newDirectory);
+    await applySaveDirectoryChange(newDirectory);
 
-      return { success: true };
-    } catch (error) {
-      console.error('Failed to update save directory:', error);
-      throw error;
-    }
+    return { success: true };
   });
 
   /**
@@ -696,19 +668,9 @@ export function initializeSaveFileHandlers(): void {
    * @param directory - Candidate directory path
    * @returns The inspection result
    */
-  ipcMain.handle(
+  handle(
     'saveFile:inspectDirectory',
-    async (_, directory: unknown): Promise<SaveDirectoryInspection> => {
-      if (typeof directory !== 'string') {
-        throw new Error('Invalid save directory: expected a string');
-      }
-      try {
-        return await inspectSaveDirectory(directory);
-      } catch (error) {
-        console.error('Failed to inspect save directory:', error);
-        throw error;
-      }
-    },
+    async (_, directory): Promise<SaveDirectoryInspection> => inspectSaveDirectory(directory),
   );
 
   /**
@@ -716,18 +678,13 @@ export function initializeSaveFileHandlers(): void {
    * Gets platform-specific default directory and updates settings accordingly.
    * User data is only truncated if the default differs from the current directory.
    */
-  ipcMain.handle('saveFile:restoreDefaultDirectory', async () => {
-    try {
-      // Get the platform default directory
-      const defaultDirectory = saveFileMonitor.getDefaultDirectory();
+  handle('saveFile:restoreDefaultDirectory', async () => {
+    // Get the platform default directory
+    const defaultDirectory = saveFileMonitor.getDefaultDirectory();
 
-      await applySaveDirectoryChange(defaultDirectory);
+    await applySaveDirectoryChange(defaultDirectory);
 
-      return { success: true, defaultDirectory };
-    } catch (error) {
-      console.error('Failed to restore default directory:', error);
-      throw error;
-    }
+    return { success: true, defaultDirectory };
   });
 
   /**
@@ -735,13 +692,8 @@ export function initializeSaveFileHandlers(): void {
    * Returns a map of rune IDs to their counts from current inventory/stash.
    * @returns Promise resolving to record of rune IDs mapped to their counts
    */
-  ipcMain.handle('saveFile:getAvailableRunes', async (): Promise<Record<string, number>> => {
-    try {
-      return saveFileMonitor.getAvailableRunesCount();
-    } catch (error) {
-      console.error('Failed to get available runes:', error);
-      throw error;
-    }
+  handle('saveFile:getAvailableRunes', async (): Promise<Record<string, number>> => {
+    return saveFileMonitor.getAvailableRunesCount();
   });
 
   /**
@@ -749,14 +701,9 @@ export function initializeSaveFileHandlers(): void {
    * Forces a re-parse of all save files to get the latest item data.
    * @returns Promise resolving when the refresh is complete
    */
-  ipcMain.handle('saveFile:refreshSaveFiles', async (): Promise<{ success: boolean }> => {
-    try {
-      await saveFileMonitor.refreshSaveFiles();
-      return { success: true };
-    } catch (error) {
-      console.error('Failed to refresh save files:', error);
-      throw error;
-    }
+  handle('saveFile:refreshSaveFiles', async (): Promise<{ success: boolean }> => {
+    await saveFileMonitor.refreshSaveFiles();
+    return { success: true };
   });
 
   console.log('Save file IPC handlers initialized');
