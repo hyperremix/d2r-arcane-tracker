@@ -63,6 +63,30 @@ describe('When the item catalog is synced at startup', () => {
     });
   });
 
+  describe('If catalog item rows are missing while the stored hash matches', () => {
+    it('Then the missing rows are restored and a second sync writes nothing', () => {
+      // Arrange
+      const missingCount = 5;
+      ctx.rawDb
+        .prepare('DELETE FROM items WHERE id IN (SELECT id FROM items ORDER BY id LIMIT ?)')
+        .run(missingCount);
+      const countItems = () =>
+        (ctx.rawDb.prepare('SELECT COUNT(*) AS total FROM items').get() as { total: number }).total;
+      expect(countItems()).toBe(grailItems.length - missingCount);
+
+      // Act
+      const synced = syncItemCatalog(ctx);
+      const changesAfterSync = totalChanges(ctx);
+      const syncedAgain = syncItemCatalog(ctx);
+
+      // Assert
+      expect(synced).toBe(true);
+      expect(countItems()).toBe(grailItems.length);
+      expect(syncedAgain).toBe(false);
+      expect(totalChanges(ctx)).toBe(changesAfterSync);
+    });
+  });
+
   describe('If the stored catalog hash is missing', () => {
     it('Then the catalog is synced again and the hash is stored', () => {
       // Arrange
