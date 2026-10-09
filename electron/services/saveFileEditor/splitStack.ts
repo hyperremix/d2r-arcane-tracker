@@ -202,15 +202,15 @@ export async function splitStackInSaveFileUnlocked(options: SplitStackOptions): 
         withTargetCoordinates(sourceItem, target.targetGridX, target.targetGridY),
       );
       (copy as { id?: unknown }).id = undefined;
-      await addItemToSaveFileUnlocked(
-        target.targetFilePath,
-        target.targetFileType,
-        copy,
-        target.targetLocationContext,
-        target.targetStashTab,
-        target.targetGridX,
-        target.targetGridY,
-      );
+      await addItemToSaveFileUnlocked({
+        filePath: target.targetFilePath,
+        fileType: target.targetFileType,
+        item: copy,
+        locationContext: target.targetLocationContext,
+        stashTab: target.targetStashTab,
+        targetGridX: target.targetGridX,
+        targetGridY: target.targetGridY,
+      });
     }
 
     // Reduce the source resource-stack quantity after placements in multi-file flows.
@@ -289,15 +289,15 @@ export async function splitStackInSaveFileUnlocked(options: SplitStackOptions): 
     // Place copies in other files first: if anything fails from here on the source stack is still
     // intact, so the worst outcome is an extra copy instead of a missing one.
     for (const { target, copy } of copiesForOtherFiles) {
-      await addItemToSaveFileUnlocked(
-        target.targetFilePath,
-        target.targetFileType,
-        copy,
-        target.targetLocationContext,
-        target.targetStashTab,
-        target.targetGridX,
-        target.targetGridY,
-      );
+      await addItemToSaveFileUnlocked({
+        filePath: target.targetFilePath,
+        fileType: target.targetFileType,
+        item: copy,
+        locationContext: target.targetLocationContext,
+        stashTab: target.targetStashTab,
+        targetGridX: target.targetGridX,
+        targetGridY: target.targetGridY,
+      });
     }
 
     // Reduce or remove source item.
@@ -362,15 +362,15 @@ export async function splitStackInSaveFileUnlocked(options: SplitStackOptions): 
   }
 
   for (const { target, copy } of copiesForOtherFiles) {
-    await addItemToSaveFileUnlocked(
-      target.targetFilePath,
-      target.targetFileType,
-      copy,
-      target.targetLocationContext,
-      target.targetStashTab,
-      target.targetGridX,
-      target.targetGridY,
-    );
+    await addItemToSaveFileUnlocked({
+      filePath: target.targetFilePath,
+      fileType: target.targetFileType,
+      item: copy,
+      locationContext: target.targetLocationContext,
+      stashTab: target.targetStashTab,
+      targetGridX: target.targetGridX,
+      targetGridY: target.targetGridY,
+    });
   }
 
   // Reduce or remove source item and write source file.

@@ -966,17 +966,16 @@ describe('When vault IPC handlers are initialized', () => {
         });
 
         // Assert
-        expect(mocks.saveFileEditorMock.addItemToSaveFile).toHaveBeenCalledWith(
-          '/tmp/shared.d2i',
-          'd2i',
-          expect.objectContaining({ code: 'r19' }),
-          'stash',
-          7,
-          0,
-          0,
-          undefined,
-          12,
-        );
+        expect(mocks.saveFileEditorMock.addItemToSaveFile).toHaveBeenCalledWith({
+          filePath: '/tmp/shared.d2i',
+          fileType: 'd2i',
+          item: expect.objectContaining({ code: 'r19' }),
+          locationContext: 'stash',
+          stashTab: 7,
+          targetGridX: 0,
+          targetGridY: 0,
+          quantity: 12,
+        });
         expect(mocks.grailDatabaseMock.unvaultVaultItem).toHaveBeenCalledWith('row-runes', 12);
         expect(mocks.saveFileEditorMock.addItemToSaveFile.mock.invocationCallOrder[0]).toBeLessThan(
           mocks.grailDatabaseMock.unvaultVaultItem.mock.invocationCallOrder[0],
@@ -1015,7 +1014,7 @@ describe('When vault IPC handlers are initialized', () => {
         );
 
         // Assert
-        expect(mocks.saveFileEditorMock.addItemToSaveFile.mock.calls[0]?.[8]).toBe(5);
+        expect(mocks.saveFileEditorMock.addItemToSaveFile.mock.calls[0]?.[0]?.quantity).toBe(5);
         expect(mocks.grailDatabaseMock.unvaultVaultItem).toHaveBeenCalledWith('row-runes', 5);
       });
     });

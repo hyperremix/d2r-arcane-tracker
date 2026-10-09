@@ -296,16 +296,16 @@ export async function moveItemBetweenSaveFilesUnlocked(
       options.targetGridY ?? 0,
     );
   } else {
-    await addItemToSaveFileUnlocked(
-      options.targetFilePath,
-      options.targetFileType,
-      sourceItem,
-      options.targetLocationContext,
-      options.targetStashTab,
-      options.targetGridX,
-      options.targetGridY,
-      options.targetEquippedSlotId,
-    );
+    await addItemToSaveFileUnlocked({
+      filePath: options.targetFilePath,
+      fileType: options.targetFileType,
+      item: sourceItem,
+      locationContext: options.targetLocationContext,
+      stashTab: options.targetStashTab,
+      targetGridX: options.targetGridX,
+      targetGridY: options.targetGridY,
+      targetEquippedSlotId: options.targetEquippedSlotId,
+    });
   }
 
   if (sourceIsModernD2i) {

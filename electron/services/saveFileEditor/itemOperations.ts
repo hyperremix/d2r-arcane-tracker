@@ -182,17 +182,35 @@ function isModernResourceTabTarget(
   );
 }
 
-export async function addItemToSaveFileUnlocked(
-  filePath: string,
-  fileType: VaultSourceFileType,
-  item: d2sTypes.IItem,
-  locationContext: VaultLocationContext,
-  stashTab?: number,
-  targetGridX?: number,
-  targetGridY?: number,
-  targetEquippedSlotId?: number,
-  quantity?: number,
-): Promise<void> {
+/** What `addItemToSaveFile` writes and where. */
+export interface AddItemToSaveFileOptions {
+  filePath: string;
+  fileType: VaultSourceFileType;
+  item: d2sTypes.IItem;
+  locationContext: VaultLocationContext;
+  stashTab?: number;
+  targetGridX?: number;
+  targetGridY?: number;
+  /** Equipped slot for `locationContext: 'equipped'`; checked against the equip-slot rules. */
+  targetEquippedSlotId?: number;
+  /**
+   * Units of a resource stack (runes/gems/materials) to write. Only the resource tabs of a modern
+   * stash keep more than one unit per item; anywhere else more than one unit is refused.
+   */
+  quantity?: number;
+}
+
+export async function addItemToSaveFileUnlocked({
+  filePath,
+  fileType,
+  item,
+  locationContext,
+  stashTab,
+  targetGridX,
+  targetGridY,
+  targetEquippedSlotId,
+  quantity,
+}: AddItemToSaveFileOptions): Promise<void> {
   const buffer = await readFile(filePath);
   const ext = extname(filePath);
   const targetIsModernResourceTab = isModernResourceTabTarget(

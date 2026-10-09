@@ -1,12 +1,16 @@
-import type { types as d2sTypes } from '@dschu012/d2s';
-import type { VaultLocationContext, VaultSourceFileType } from '../../types/grail';
+import type { VaultSourceFileType } from '../../types/grail';
 import type { SaveFileItemLocator } from './itemLocators';
-import { addItemToSaveFileUnlocked, removeItemFromSaveFileUnlocked } from './itemOperations';
+import {
+  type AddItemToSaveFileOptions,
+  addItemToSaveFileUnlocked,
+  removeItemFromSaveFileUnlocked,
+} from './itemOperations';
 import { type MoveSaveFileItemOptions, moveItemBetweenSaveFilesUnlocked } from './moveItem';
 import { runExclusively } from './mutationQueue';
 import { type SplitStackOptions, splitStackInSaveFileUnlocked } from './splitStack';
 
 export type { SaveFileItemLocator } from './itemLocators';
+export type { AddItemToSaveFileOptions } from './itemOperations';
 export { readSaveFileItem } from './itemOperations';
 export type { MoveSaveFileItemOptions } from './moveItem';
 export type { SplitStackOptions, SplitStackTarget } from './splitStack';
@@ -24,30 +28,8 @@ export function removeItemFromSaveFile(
   return runExclusively(() => removeItemFromSaveFileUnlocked(filePath, fileType, itemLocator));
 }
 
-export function addItemToSaveFile(
-  filePath: string,
-  fileType: VaultSourceFileType,
-  item: d2sTypes.IItem,
-  locationContext: VaultLocationContext,
-  stashTab?: number,
-  targetGridX?: number,
-  targetGridY?: number,
-  targetEquippedSlotId?: number,
-  quantity?: number,
-): Promise<void> {
-  return runExclusively(() =>
-    addItemToSaveFileUnlocked(
-      filePath,
-      fileType,
-      item,
-      locationContext,
-      stashTab,
-      targetGridX,
-      targetGridY,
-      targetEquippedSlotId,
-      quantity,
-    ),
-  );
+export function addItemToSaveFile(options: AddItemToSaveFileOptions): Promise<void> {
+  return runExclusively(() => addItemToSaveFileUnlocked(options));
 }
 
 export function splitStackInSaveFile(options: SplitStackOptions): Promise<void> {

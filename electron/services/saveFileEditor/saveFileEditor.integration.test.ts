@@ -353,15 +353,15 @@ describe('When the real saveFileEditor modifies a v105 shared stash', () => {
       const vaulted = await readSaveFileItem(stashA, 'd2i', locator);
       await removeItemFromSaveFile(stashA, 'd2i', locator);
       const whileVaulted = await parseFile(stashA);
-      await addItemToSaveFile(
-        stashA,
-        'd2i',
-        vaulted as NonNullable<typeof vaulted>,
-        'stash',
-        0,
-        locator.gridX,
-        locator.gridY,
-      );
+      await addItemToSaveFile({
+        filePath: stashA,
+        fileType: 'd2i',
+        item: vaulted as NonNullable<typeof vaulted>,
+        locationContext: 'stash',
+        stashTab: 0,
+        targetGridX: locator.gridX,
+        targetGridY: locator.gridY,
+      });
       const afterWriteBack = await parseFile(stashA);
 
       // Assert
@@ -389,17 +389,16 @@ describe('When the real saveFileEditor modifies a v105 shared stash', () => {
       const vaulted = await readSaveFileItem(stashA, 'd2i', locator);
       await removeItemFromSaveFile(stashA, 'd2i', locator);
       const whileVaulted = await parseFile(stashA);
-      await addItemToSaveFile(
-        stashA,
-        'd2i',
-        vaulted as NonNullable<typeof vaulted>,
-        'stash',
-        stack.stashTab,
-        0,
-        0,
-        undefined,
-        stack.stackCount,
-      );
+      await addItemToSaveFile({
+        filePath: stashA,
+        fileType: 'd2i',
+        item: vaulted as NonNullable<typeof vaulted>,
+        locationContext: 'stash',
+        stashTab: stack.stashTab,
+        targetGridX: 0,
+        targetGridY: 0,
+        quantity: stack.stackCount,
+      });
       const afterWriteBack = await parseFile(stashA);
 
       // Assert
@@ -425,17 +424,16 @@ describe('When the real saveFileEditor modifies a v105 shared stash', () => {
       const originalBytes = readFileSync(stashA);
 
       // Act
-      const act = addItemToSaveFile(
-        stashA,
-        'd2i',
-        raw,
-        'stash',
-        0,
-        cell.x,
-        cell.y,
-        undefined,
-        stack.stackCount,
-      );
+      const act = addItemToSaveFile({
+        filePath: stashA,
+        fileType: 'd2i',
+        item: raw,
+        locationContext: 'stash',
+        stashTab: 0,
+        targetGridX: cell.x,
+        targetGridY: cell.y,
+        quantity: stack.stackCount,
+      });
 
       // Assert
       await expect(act).rejects.toThrow('STACK_MOVE_REQUIRES_SPLIT');
