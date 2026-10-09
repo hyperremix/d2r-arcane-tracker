@@ -385,32 +385,6 @@ describe('Widget run-only item list', () => {
 });
 
 describe('Widget display and legibility', () => {
-  beforeAll(() => {
-    // ProgressGauge animations rely on IntersectionObserver, which jsdom does not provide
-    vi.stubGlobal(
-      'IntersectionObserver',
-      class {
-        observe = vi.fn();
-        unobserve = vi.fn();
-        disconnect = vi.fn();
-        takeRecords = vi.fn(() => []);
-      },
-    );
-    // framer-motion reads matchMedia for reduced-motion, which jsdom does not provide
-    vi.stubGlobal(
-      'matchMedia',
-      vi.fn().mockReturnValue({
-        matches: false,
-        addEventListener: vi.fn(),
-        removeEventListener: vi.fn(),
-      }),
-    );
-  });
-
-  afterAll(() => {
-    vi.unstubAllGlobals();
-  });
-
   const statistics: GrailStatistics = {
     totalItems: 100,
     foundItems: 40,

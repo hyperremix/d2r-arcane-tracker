@@ -1,4 +1,3 @@
-import { motion } from 'motion/react';
 import { useMemo } from 'react';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
@@ -90,6 +89,12 @@ const colorConfig = {
 };
 
 /**
+ * Fill animation for the progress stroke, applied only when the user allows motion.
+ */
+const fillAnimationClasses =
+  'motion-safe:transition-[stroke-dasharray] motion-safe:duration-1500 motion-safe:ease-in-out motion-safe:starting:[stroke-dasharray:0_100]';
+
+/**
  * ProgressGauge component that displays a circular progress indicator with centered statistics.
  * Inspired by the skill-gauge component pattern with animated SVG circle.
  * @param {ProgressGaugeProps} props - Component props
@@ -150,18 +155,19 @@ export function ProgressGauge({
             strokeDasharray="75 100"
             strokeLinecap="round"
           />
-          {/* Animated progress circle */}
-          <motion.circle
-            initial={{ strokeDasharray: '0 100' }}
-            whileInView={{ strokeDasharray: `${degree} 100` }}
-            transition={{ duration: 1.5, ease: 'easeInOut' }}
-            viewport={{ once: true }}
+          {/*
+            Animated progress circle. The stroke grows from empty on first render (@starting-style)
+            and eases between values; both are skipped when the user prefers reduced motion. The
+            dasharray stays a presentation attribute so the starting style can override it.
+          */}
+          <circle
             cx="18"
             cy="18"
             r="16"
             fill="none"
-            className={cn('stroke-current', colors.stroke)}
+            className={cn('stroke-current', colors.stroke, fillAnimationClasses)}
             strokeWidth="2"
+            strokeDasharray={`${degree} 100`}
             strokeLinecap="round"
           />
         </svg>
