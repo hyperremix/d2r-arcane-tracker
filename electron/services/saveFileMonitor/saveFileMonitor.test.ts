@@ -770,13 +770,6 @@ describe('When SaveFileMonitor is used', () => {
       (target as any).watchPath = '/test/saves';
     };
 
-    // Mirrors startMonitoring's tick reader; the monitor's shutdown() in afterEach clears it.
-    const startTickReader = (target: SaveFileMonitor) => {
-      (target as any).tickReaderInterval = setInterval(() => {
-        void (target as any).tickReader();
-      }, 500);
-    };
-
     beforeEach(() => {
       vi.useFakeTimers();
       eventBus = new EventBus();
@@ -787,6 +780,7 @@ describe('When SaveFileMonitor is used', () => {
       });
       mockDatabase.getAllSaveFileStates.mockReturnValue([]);
       monitor = new SaveFileMonitor(eventBus, mockDatabase as any);
+      // Runs the tick reader every 500 ms; the monitor's shutdown() in afterEach stops it.
       monitor.start();
       vi.spyOn(monitor as any, 'findExistingSaveDirectories').mockResolvedValue(['/test/saves']);
     });
@@ -1077,7 +1071,6 @@ describe('When SaveFileMonitor is used', () => {
         const parseAllSpy = vi.spyOn(monitor as any, 'parseAllSaveDirectories');
         startWatching(monitor);
         (monitor as any).readingFiles = true;
-        startTickReader(monitor);
         let refreshed = false;
         const refresh = monitor.refreshSaveFiles().then(() => {
           refreshed = true;
@@ -1108,7 +1101,6 @@ describe('When SaveFileMonitor is used', () => {
         });
         startWatching(monitor);
         (monitor as any).readingFiles = true;
-        startTickReader(monitor);
 
         // Act
         const first = monitor.refreshSaveFiles();
