@@ -33,7 +33,7 @@ const DATE_INPUT_FORMAT = 'YYYY-MM-DD';
  * Returns the item versions a user can record as found, based on the item and grail settings.
  * Falls back to the item's intrinsic version if no version is tracked by the current settings.
  */
-export function getRecordableVersions(item: Item, settings: Settings): ItemVersion[] {
+function getRecordableVersions(item: Item, settings: Settings): ItemVersion[] {
   const versions: ItemVersion[] = [];
   if (shouldShowNormalStatus(item, settings)) versions.push('normal');
   if (shouldShowEtherealStatus(item, settings)) versions.push('ethereal');

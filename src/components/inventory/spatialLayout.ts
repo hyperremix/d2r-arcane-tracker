@@ -175,7 +175,7 @@ export function getGridHeight(item: SpatialItemLike): number {
   return Math.max(1, item.gridHeight ?? 1);
 }
 
-export function hasGridDimensions(item: SpatialItemLike): boolean {
+function hasGridDimensions(item: SpatialItemLike): boolean {
   return (
     typeof item.gridWidth === 'number' &&
     typeof item.gridHeight === 'number' &&
@@ -184,7 +184,7 @@ export function hasGridDimensions(item: SpatialItemLike): boolean {
   );
 }
 
-export function hasGridPosition(item: SpatialItemLike): boolean {
+function hasGridPosition(item: SpatialItemLike): boolean {
   return typeof item.gridX === 'number' && typeof item.gridY === 'number';
 }
 
@@ -192,7 +192,7 @@ export function createBoardCellIndexes(gridSize: GridSize): number[] {
   return Array.from({ length: gridSize.columns * gridSize.rows }, (_, index) => index);
 }
 
-export function isWithinBounds(item: SpatialItemLike, gridSize: GridSize): boolean {
+function isWithinBounds(item: SpatialItemLike, gridSize: GridSize): boolean {
   if (!hasGridPosition(item) || !hasGridDimensions(item)) {
     return false;
   }

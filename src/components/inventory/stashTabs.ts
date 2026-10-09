@@ -48,7 +48,7 @@ export function canDropItemCodeInModernResourceTab(itemCode: string, stashTab: n
   return false;
 }
 
-export function isResourceStackItemCode(itemCode: unknown): boolean {
+function isResourceStackItemCode(itemCode: unknown): boolean {
   const normalizedCode = normalizeResourceItemCode(itemCode);
   return (
     normalizedCode !== undefined &&

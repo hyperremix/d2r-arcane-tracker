@@ -62,7 +62,7 @@ export function DiscoveryInfo({ allProgress, characters }: DiscoveryInfoProps) {
 /**
  * Determines if an item is fully complete based on grail settings and found versions.
  */
-export function determineCompletionStatus(
+function determineCompletionStatus(
   item: Item,
   normalProgress: GrailProgress[],
   etherealProgress: GrailProgress[],
@@ -85,11 +85,7 @@ export function determineCompletionStatus(
 /**
  * Gets tooltip text based on completion status and ethereal settings.
  */
-export function getTooltipText(
-  allVersionsFound: boolean,
-  settings: Settings,
-  t: (key: string) => string,
-) {
+function getTooltipText(allVersionsFound: boolean, settings: Settings, t: (key: string) => string) {
   if (allVersionsFound) {
     return settings.grailEthereal
       ? t(translations.grail.itemCard.allVersionsFound)
