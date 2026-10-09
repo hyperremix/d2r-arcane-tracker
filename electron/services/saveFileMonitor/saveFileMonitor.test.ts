@@ -74,6 +74,8 @@ import { EventBus } from '../EventBus';
 import { createItemFingerprint, normalizeInventoryItem } from '../itemNormalizer';
 import * as modernStashParser from '../modernStashParser';
 import { SaveFileMonitor } from './saveFileMonitor';
+import * as saveFileParser from './saveFileParser';
+import { parseSaveContent } from './saveFileParser';
 
 const MODERN_STASH_FIXTURE_PATH = resolve(
   process.cwd(),
@@ -114,6 +116,7 @@ describe('When SaveFileMonitor is used', () => {
   const tempDirs: string[] = [];
 
   afterEach(async () => {
+    vi.restoreAllMocks();
     await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })));
   });
 
@@ -1362,20 +1365,10 @@ describe('When SaveFileMonitor is used', () => {
   });
 
   describe('When runeword parsing validates names', () => {
-    let monitor: SaveFileMonitor;
-    let mockDatabase: MockGrailDatabase;
-    let eventBus: EventBus;
+    const readSoftcoreGameMode = () => GameMode.Softcore;
 
     beforeEach(() => {
       vi.clearAllMocks();
-
-      eventBus = new EventBus();
-      mockDatabase = createMockDatabase();
-      mockDatabase.getAllSettings.mockReturnValue({
-        gameMode: GameMode.Softcore,
-        saveDir: '/test/saves',
-      });
-      monitor = new SaveFileMonitor(eventBus, mockDatabase as any);
     });
 
     it('Then should accept valid runeword names from known runewords', async () => {
@@ -1397,11 +1390,14 @@ describe('When SaveFileMonitor is used', () => {
       } as any);
 
       // Act
-      const { items } = await (monitor as any).parseSave(
-        'TestChar',
-        'TestChar.d2s',
-        Buffer.from('test'),
-        '.d2s',
+      const { items } = await parseSaveContent(
+        {
+          saveName: 'TestChar',
+          filePath: 'TestChar.d2s',
+          content: Buffer.from('test'),
+          extension: '.d2s',
+        },
+        readSoftcoreGameMode,
       );
 
       // Assert
@@ -1430,11 +1426,14 @@ describe('When SaveFileMonitor is used', () => {
       } as any);
 
       // Act
-      const { items } = await (monitor as any).parseSave(
-        'TestChar',
-        'TestChar.d2s',
-        Buffer.from('test'),
-        '.d2s',
+      const { items } = await parseSaveContent(
+        {
+          saveName: 'TestChar',
+          filePath: 'TestChar.d2s',
+          content: Buffer.from('test'),
+          extension: '.d2s',
+        },
+        readSoftcoreGameMode,
       );
 
       // Assert
@@ -1463,11 +1462,14 @@ describe('When SaveFileMonitor is used', () => {
       } as any);
 
       // Act
-      const { items } = await (monitor as any).parseSave(
-        'TestChar',
-        'TestChar.d2s',
-        Buffer.from('test'),
-        '.d2s',
+      const { items } = await parseSaveContent(
+        {
+          saveName: 'TestChar',
+          filePath: 'TestChar.d2s',
+          content: Buffer.from('test'),
+          extension: '.d2s',
+        },
+        readSoftcoreGameMode,
       );
 
       // Assert
@@ -1494,11 +1496,14 @@ describe('When SaveFileMonitor is used', () => {
       } as any);
 
       // Act
-      const { items } = await (monitor as any).parseSave(
-        'TestChar',
-        'TestChar.d2s',
-        Buffer.from('test'),
-        '.d2s',
+      const { items } = await parseSaveContent(
+        {
+          saveName: 'TestChar',
+          filePath: 'TestChar.d2s',
+          content: Buffer.from('test'),
+          extension: '.d2s',
+        },
+        readSoftcoreGameMode,
       );
 
       // Assert - should have no runeword items
@@ -2030,7 +2035,7 @@ describe('When SaveFileMonitor is used', () => {
       const saveDir = mkdtempSync(join(tmpdir(), 'save-monitor-'));
       const savePath = join(saveDir, 'Hero.d2s');
       writeFileSync(savePath, Buffer.from('mock file content'));
-      vi.spyOn(monitor as any, 'parseSave').mockResolvedValue({
+      vi.spyOn(saveFileParser, 'parseSaveContent').mockResolvedValueOnce({
         status: 'parsed',
         items: [
           {
@@ -2048,7 +2053,7 @@ describe('When SaveFileMonitor is used', () => {
             rawParsedItem: { name: 'Ist Rune' },
           },
         ],
-      });
+      } as any);
       vi.spyOn(monitor as any, 'updateSaveFileState').mockResolvedValue(undefined);
 
       // Act
@@ -2156,10 +2161,10 @@ describe('When SaveFileMonitor is used', () => {
           rawParsedItem: { name: 'Ist Rune' },
         },
       ];
-      vi.spyOn(monitor as any, 'parseSave').mockResolvedValue({
+      vi.spyOn(saveFileParser, 'parseSaveContent').mockResolvedValueOnce({
         status: 'parsed',
         items: parsedItems,
-      });
+      } as any);
       vi.spyOn(monitor as any, 'updateSaveFileState').mockResolvedValue(undefined);
 
       // Act
@@ -2205,11 +2210,14 @@ describe('When SaveFileMonitor is used', () => {
       const fixtureBuffer = readFileSync(MODERN_STASH_FIXTURE_PATH);
 
       // Act
-      const { items: parsedItems } = await (monitor as any).parseSave(
-        'Shared Stash Softcore',
-        MODERN_STASH_FIXTURE_PATH,
-        fixtureBuffer,
-        '.d2i',
+      const { items: parsedItems } = await parseSaveContent(
+        {
+          saveName: 'Shared Stash Softcore',
+          filePath: MODERN_STASH_FIXTURE_PATH,
+          content: fixtureBuffer,
+          extension: '.d2i',
+        },
+        () => GameMode.Softcore,
       );
 
       // Assert
@@ -2236,7 +2244,10 @@ describe('When SaveFileMonitor is used', () => {
     it('Then processSingleFile marks modern snapshots as writable and records source file version', async () => {
       // Arrange
       const fixtureBuffer = readFileSync(MODERN_STASH_FIXTURE_PATH);
-      vi.spyOn(monitor as any, 'parseSave').mockResolvedValue({ items: [], status: 'parsed' });
+      vi.spyOn(saveFileParser, 'parseSaveContent').mockResolvedValueOnce({
+        items: [],
+        status: 'parsed',
+      });
       vi.spyOn(monitor as any, 'updateSaveFileState').mockResolvedValue(undefined);
       vi.mocked(readFile).mockResolvedValue(fixtureBuffer);
 
@@ -2257,7 +2268,7 @@ describe('When SaveFileMonitor is used', () => {
       const savePath = join(saveDir, 'Hero.d2s');
       writeFileSync(savePath, Buffer.from('mock file content'));
       mockDatabase.getCharacterByName.mockReturnValue({ id: 'char-1', name: 'Hero' });
-      vi.spyOn(monitor as any, 'parseSave').mockResolvedValue({
+      vi.spyOn(saveFileParser, 'parseSaveContent').mockResolvedValueOnce({
         status: 'parsed',
         items: [
           {
@@ -2267,7 +2278,7 @@ describe('When SaveFileMonitor is used', () => {
             rawParsedItem: { name: 'Shako' },
           },
         ],
-      });
+      } as any);
       vi.spyOn(monitor as any, 'updateSaveFileState').mockResolvedValue(undefined);
 
       // Act
@@ -2495,7 +2506,7 @@ describe('When SaveFileMonitor is used', () => {
         const modernParseSpy = vi
           .spyOn(modernStashParser, 'parseModernStash')
           .mockRejectedValueOnce(new Error('corrupt sector'));
-        const processSpy = vi.spyOn(monitor as any, 'parseSave');
+        const processSpy = vi.spyOn(saveFileParser, 'parseSaveContent');
 
         // Act
         await scanFile('ModernSharedStashSoftCoreV2.d2i', readFileSync(MODERN_STASH_FIXTURE_PATH));
@@ -2518,7 +2529,7 @@ describe('When SaveFileMonitor is used', () => {
         });
         const truncated = readFileSync(MODERN_STASH_FIXTURE_PATH).subarray(0, 3000);
         vi.mocked(d2stash.read).mockClear();
-        const parseSaveSpy = vi.spyOn(monitor as any, 'parseSave');
+        const parseSaveSpy = vi.spyOn(saveFileParser, 'parseSaveContent');
 
         // Act
         await scanFile('ModernSharedStashSoftCoreV2.d2i', truncated);
@@ -2546,7 +2557,7 @@ describe('When SaveFileMonitor is used', () => {
           ...complete,
           partial: true,
         });
-        const parseSaveSpy = vi.spyOn(monitor as any, 'parseSave');
+        const parseSaveSpy = vi.spyOn(saveFileParser, 'parseSaveContent');
 
         // Act
         await scanFile('ModernSharedStashSoftCoreV2.d2i', readFileSync(MODERN_STASH_FIXTURE_PATH));

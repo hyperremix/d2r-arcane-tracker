@@ -1,10 +1,6 @@
 import { existsSync, readdirSync } from 'node:fs';
 import { readFile, stat } from 'node:fs/promises';
 import { basename, dirname, extname, join } from 'node:path';
-import * as d2s from '@dschu012/d2s';
-import * as d2stash from '@dschu012/d2s/lib/d2/stash';
-import { constants as constants96 } from '@dschu012/d2s/lib/data/versions/96_constant_data';
-import { constants as constants99 } from '@dschu012/d2s/lib/data/versions/99_constant_data';
 import type { FSWatcher } from 'chokidar';
 import chokidar from 'chokidar';
 import { app } from 'electron';
@@ -12,25 +8,19 @@ import type { GrailDatabase } from '../../database/database';
 import type {
   CharacterInventorySnapshot,
   D2SaveFile,
-  D2SItem,
   InventorySearchResult,
   ParsedInventoryItem,
   SaveFileEvent,
   SaveFileState,
-  StashTabKind,
-  VaultLocationContext,
   VaultSourceFileType,
 } from '../../types/grail';
 import { GameMode } from '../../types/grail';
-import { isModernStashVersion } from '../../utils/d2rFormat';
 import { isRune } from '../../utils/objects';
 import { createServiceLogger } from '../../utils/serviceLogger';
 import { createVaultPresenceKey } from '../../utils/vaultPresence';
 import { ensureD2sConstants } from '../d2s/constants';
 import type { EventBus } from '../EventBus';
-import { normalizeItemsWithSocketedItems, resolveGrailLookupName } from '../itemNormalizer';
-import { parseModernStash } from '../modernStashParser';
-import { readD2iHeaderVersion, readD2iMetadata } from '../stashFormat';
+import { resolveGrailLookupName } from '../itemNormalizer';
 import {
   buildSaveFileHeader,
   type D2iHeaderInfo,
@@ -38,18 +28,14 @@ import {
   readD2iHeaderInfo,
   shouldIncludeSaveFile,
 } from './saveFileFormat';
+import {
+  type GameModeReader,
+  parseSaveContent,
+  readLegacyStashHardcore,
+  type SaveParseStatus,
+} from './saveFileParser';
 
 const log = createServiceLogger('SaveFileMonitor');
-/**
- * How much of a save file a parse really read.
- * - 'parsed': the whole file was read.
- * - 'partial': only some of the file could be read (a damaged .d2i sector); the items found so far are kept.
- * - 'skipped': filtered out by the configured game mode.
- * - 'errored': a parse error was swallowed.
- * Only 'parsed' proves which items are gone from a file; every other status yields no or only some items.
- */
-type SaveParseStatus = 'parsed' | 'partial' | 'skipped' | 'errored';
-
 interface FileParseSuccess {
   saveName: string;
   success: true;
@@ -84,14 +70,6 @@ type SingleFileParseResult =
   | IncompleteFileParseResult
   | FailedFileParseResult;
 
-/** Items of one save file plus what the parse learned about its header. */
-interface SaveParseResult {
-  items: ParsedInventoryItem[];
-  status: SaveParseStatus;
-  /** Hardcore flag read from a stash header (.sss/.d2x/.d2i), when the parser got that far. */
-  stashHardcore?: boolean;
-}
-
 /** A pending request to re-parse every save file; settled once that parse ran or was skipped. */
 interface ForcedParseRequest {
   promise: Promise<void>;
@@ -108,10 +86,6 @@ function createForcedParseRequest(): ForcedParseRequest {
   });
   return { promise, resolve, reject };
 }
-
-/** True when a save's softcore/hardcore status is excluded by the configured game mode. */
-const isGameModeMismatch = (gameMode: GameMode | undefined, isHardcore: boolean): boolean =>
-  (gameMode === GameMode.Softcore && isHardcore) || (gameMode === GameMode.Hardcore && !isHardcore);
 
 /**
  * Service for monitoring Diablo 2 save files and extracting item data.
@@ -613,6 +587,16 @@ class SaveFileMonitor {
   }
 
   /**
+   * Reads the configured game mode for the parser. Without a database there is none, and the
+   * parser skips every file.
+   * @private
+   */
+  private createGameModeReader(): GameModeReader | undefined {
+    const grailDatabase = this.grailDatabase;
+    return grailDatabase ? () => grailDatabase.getAllSettings().gameMode : undefined;
+  }
+
+  /**
    * Reads and parses a single save file once: its items, inventory snapshot and header.
    * @private
    * @param {string} filePath - Path to the save file.
@@ -638,7 +622,10 @@ class SaveFileMonitor {
         items: inventoryItems,
         status: parseStatus,
         stashHardcore,
-      } = await this.parseSave(saveName, filePath, buffer, extension);
+      } = await parseSaveContent(
+        { saveName, filePath, content: buffer, extension },
+        this.createGameModeReader(),
+      );
       const characterId = this.grailDatabase?.getCharacterByName(saveName)?.id;
       const parsedItems = inventoryItems.map((inventoryItem) => ({
         ...inventoryItem,
@@ -984,148 +971,6 @@ class SaveFileMonitor {
   }
 
   /**
-   * Parses a single save file and extracts items from it.
-   * @private
-   * @param {string} saveName - The name of the save file.
-   * @param {Buffer} content - The binary content of the save file.
-   * @param {string} extension - The file extension (.d2s, .sss, .d2x, .d2i).
-   * @returns A promise that resolves with the extracted items and whether the file was really parsed.
-   * A game-mode mismatch or a swallowed parse error yields no items without being a successful
-   * scan, so callers (vault reconciliation) must not read "no items" as "every item left the file".
-   */
-  private async parseSave(
-    saveName: string,
-    filePath: string,
-    content: Buffer,
-    extension: string,
-  ): Promise<SaveParseResult> {
-    const items: ParsedInventoryItem[] = [];
-    let stashHardcore: boolean | undefined;
-
-    const sourceFileType = extension.replace('.', '') as VaultSourceFileType;
-
-    const parseItems = (
-      itemList: D2SItem[],
-      fallbackLocation: VaultLocationContext,
-      stashTab?: number,
-      stashTabKind?: StashTabKind,
-      stackCount?: number,
-    ) => {
-      items.push(
-        ...normalizeItemsWithSocketedItems(itemList, {
-          filePath,
-          saveName,
-          sourceFileType,
-          fallbackLocation,
-          stashTab,
-          stashTabKind,
-          stackCount,
-        }),
-      );
-    };
-
-    // Each parser reports how much of the file it really read, so no shared mutable status is needed.
-    const parseD2S = (response: d2s.types.ID2S): SaveParseStatus => {
-      if (!this.grailDatabase) {
-        return 'skipped';
-      }
-
-      const settings = this.grailDatabase.getAllSettings();
-      const isHardcore = response.header.status.hardcore;
-
-      if (isGameModeMismatch(settings.gameMode, isHardcore)) {
-        return 'skipped';
-      }
-      const inventoryItems = (response.items || []) as D2SItem[];
-      const mercItems = (response.merc_items || []) as D2SItem[];
-      const corpseItems = (response.corpse_items || []) as D2SItem[];
-      parseItems(inventoryItems, 'inventory');
-      parseItems(mercItems, 'mercenary');
-      parseItems(corpseItems, 'corpse');
-      return 'parsed';
-    };
-
-    const parseStash = (response: d2s.types.IStash): SaveParseStatus => {
-      if (!this.grailDatabase) {
-        return 'skipped';
-      }
-
-      const settings = this.grailDatabase.getAllSettings();
-      // Use hardcore flag from parsed stash header instead of filename
-      const isHardcore = response.hardcore;
-      stashHardcore = isHardcore;
-
-      if (isGameModeMismatch(settings.gameMode, isHardcore)) {
-        return 'skipped';
-      }
-
-      response.pages.forEach((page, pageIndex) => {
-        parseItems(page.items as D2SItem[], 'stash', pageIndex);
-      });
-      return 'parsed';
-    };
-
-    const parseModernD2i = async (): Promise<SaveParseStatus> => {
-      if (!this.grailDatabase) {
-        return 'skipped';
-      }
-
-      const modern = await parseModernStash(content);
-      const settings = this.grailDatabase.getAllSettings();
-      const isHardcore = modern.hardcore;
-      stashHardcore = isHardcore;
-
-      if (isGameModeMismatch(settings.gameMode, isHardcore)) {
-        return 'skipped';
-      }
-
-      modern.items.forEach((entry) => {
-        parseItems([entry.item], 'stash', entry.stashTab, entry.stashTabKind, entry.stackCount);
-      });
-      // A damaged sector leaves its items out: keep what was read, but do not call it a full scan.
-      return modern.partial ? 'partial' : 'parsed';
-    };
-
-    const parseD2i = async (): Promise<SaveParseStatus> => {
-      let d2iVersion: number | undefined;
-      try {
-        const metadata = readD2iMetadata(content);
-        d2iVersion = metadata.version;
-        if (isModernStashVersion(metadata.version)) {
-          return await parseModernD2i();
-        }
-        return await d2stash.read(content, constants99).then(parseStash);
-      } catch {
-        // Only fall back to classic stash parsing for pre-105 format files.
-        // Calling d2stash.read on a v105+ .d2i file would fail or produce
-        // garbage because the formats are incompatible. A v105+ file cut off inside a
-        // sector throws before the metadata version is known, so read it from the header.
-        d2iVersion ??= readD2iHeaderVersion(content);
-        if (!isModernStashVersion(d2iVersion)) {
-          return await d2stash.read(content, constants99).then(parseStash);
-        }
-        // The swallowed error leaves the item list empty or partial: not a complete scan.
-        return 'errored';
-      }
-    };
-
-    const parseByExtension = (): Promise<SaveParseStatus> => {
-      switch (extension) {
-        case '.sss':
-        case '.d2x':
-          return d2stash.read(content, constants96).then(parseStash);
-        case '.d2i':
-          return parseD2i();
-        default:
-          return d2s.read(content).then(parseD2S);
-      }
-    };
-
-    const status = await parseByExtension();
-    return { items, status, stashHardcore };
-  }
-
-  /**
    * Reads a save file to extract basic character information.
    * @private
    * @param {string} filePath - The path to the save file.
@@ -1139,14 +984,7 @@ class SaveFileMonitor {
 
       let stashHardcore: boolean | undefined;
       if (extension === '.sss' || extension === '.d2x') {
-        try {
-          stashHardcore = (await d2stash.read(buffer, constants96)).hardcore;
-        } catch (_parseError) {
-          log.warn(
-            'parseSaveFile',
-            'Failed to parse legacy stash header, falling back to filename',
-          );
-        }
+        stashHardcore = await readLegacyStashHardcore(buffer);
       }
 
       return buildSaveFileHeader(filePath, buffer, stats.mtime, { stashHardcore });
