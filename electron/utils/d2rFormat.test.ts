@@ -56,6 +56,43 @@ describe('When item codes are normalized', () => {
   });
 });
 
+describe('When rune item codes are matched', () => {
+  it.each([
+    ['the first rune slot', 'r00'],
+    ['the El rune', 'r01'],
+    ['the last base game rune', 'r33'],
+    ['the first code above the base game runes', 'r34'],
+    ['the last code of the accepted range', 'r39'],
+    ['an upper-case code', 'R01'],
+    ['a code padded with whitespace', '  r33 '],
+    ['a code padded with NUL bytes', 'r39\0'],
+  ])('If the code is %s, Then it is a rune code', (_label, code) => {
+    // Arrange / Act
+    const result = isRuneCode(code);
+
+    // Assert
+    expect(result).toBe(true);
+  });
+
+  it.each([
+    ['the first code past the accepted range', 'r40'],
+    ['a code with a single digit', 'r4'],
+    ['a code with a doubled prefix', 'rr1'],
+    ['a bare prefix', 'r'],
+    ['a code with a third digit', 'r001'],
+    ['an empty string', ''],
+    ['a number', 1],
+    ['null', null],
+    ['an object', {}],
+  ])('If the code is %s, Then it is not a rune code', (_label, code) => {
+    // Arrange / Act
+    const result = isRuneCode(code);
+
+    // Assert
+    expect(result).toBe(false);
+  });
+});
+
 describe('When resource item codes are classified', () => {
   it('Then rune codes match case-insensitively and other codes do not', () => {
     // Arrange

@@ -32,6 +32,9 @@ describe('When items are dropped on modern resource tabs', () => {
     ['a rune on the gems tab', 'r01', 5, false],
     ['a helm on the materials tab', 'uap', 6, false],
     ['a rune on a shared tab', 'r01', 0, false],
+    ['the last base game rune on the runes tab', 'r33', 7, true],
+    ['a rune code above the base game runes on the runes tab', 'r39', 7, true],
+    ['a code past the rune range on the runes tab', 'r40', 7, false],
   ])('Then %s is allowed: %s', (_label, code, stashTab, expected) => {
     // Arrange / Act
     const allowed = canDropItemCodeInModernResourceTab(code, stashTab);
@@ -74,6 +77,31 @@ describe('When a vaulted item is withdrawn onto a grid', () => {
 
     // Assert
     expect(count).toBe(1);
+  });
+
+  it.each([
+    ['a rune code at the top of the accepted range', 'r39'],
+    ['an upper-case padded rune code', ' R34 '],
+  ])('If the vaulted stack holds %s, Then it gives up exactly one unit', (_label, itemCode) => {
+    // Arrange
+    const vaultItem = { itemCode, stackCount: 5 } as VaultItem;
+
+    // Act
+    const count = resolveWithdrawCountForGridDrop(vaultItem);
+
+    // Assert
+    expect(count).toBe(1);
+  });
+
+  it('If the vaulted stack has a code past the rune range, Then the whole item is withdrawn', () => {
+    // Arrange
+    const vaultItem = { itemCode: 'r40', stackCount: 5 } as VaultItem;
+
+    // Act
+    const count = resolveWithdrawCountForGridDrop(vaultItem);
+
+    // Assert
+    expect(count).toBeUndefined();
   });
 
   it.each([
