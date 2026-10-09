@@ -2,6 +2,8 @@ import { isAbsolute, resolve } from 'node:path';
 import { ipcMain, webContents } from 'electron';
 import type { GrailDatabase } from '../database/database';
 import { grailDatabase } from '../database/database';
+import { createRendererBroadcaster } from '../ipc/broadcast';
+import { createIpcMainRegistry } from '../ipc/handle';
 import { DatabaseBatchWriter } from '../services/DatabaseBatchWriter';
 import { EventBus } from '../services/EventBus';
 import { ItemDetectionService } from '../services/itemDetection';
@@ -20,7 +22,12 @@ import type {
   RunItem,
   SaveDirectoryInspection,
 } from '../types/grail';
+import { GameMode } from '../types/grail';
 import { setErrorForwarder } from '../utils/serviceLogger';
+import { addSettingsUpdatedListener } from './grailHandlers';
+
+/** Sends an event from the IPC contract to every renderer window. */
+const broadcastToRenderers = createRendererBroadcaster(() => webContents.getAllWebContents());
 
 /**
  * Global service instances for save file monitoring and item detection.
@@ -28,12 +35,7 @@ import { setErrorForwarder } from '../utils/serviceLogger';
 export const eventBus = new EventBus();
 const batchWriter = new DatabaseBatchWriter(grailDatabase, () => {
   // Emit grail-progress-updated event to all renderer windows after batch flush
-  const allWebContents = webContents.getAllWebContents();
-  for (const wc of allWebContents) {
-    if (!wc.isDestroyed() && wc.getType() === 'window') {
-      wc.send('grail-progress-updated');
-    }
-  }
+  broadcastToRenderers('grail-progress-updated');
 });
 let saveFileMonitor: SaveFileMonitor;
 let itemDetectionService: ItemDetectionService;
@@ -41,6 +43,19 @@ let runTracker: RunTrackerService | undefined;
 let processMonitor: ProcessMonitor | undefined;
 let memoryReader: MemoryReader | undefined;
 const eventUnsubscribers: Array<() => void> = [];
+
+/**
+ * Checks whether the persisted game mode is Manual, where save file monitoring must stay off.
+ * @returns True if the game mode is Manual; false otherwise or if settings cannot be read
+ */
+function isManualGameMode(): boolean {
+  try {
+    return grailDatabase.getAllSettings().gameMode === GameMode.Manual;
+  } catch (error) {
+    console.warn('[isManualGameMode] Failed to read game mode from settings:', error);
+    return false;
+  }
+}
 
 function isSharedStashCharacterName(characterName: string): boolean {
   return characterName.toLowerCase().includes('shared stash');
@@ -143,18 +158,13 @@ function emitGrailProgressUpdate(
   event: ItemDetectionEvent,
   grailProgress: GrailProgress,
 ): void {
-  const allWebContents = webContents.getAllWebContents();
-  for (const wc of allWebContents) {
-    if (!wc.isDestroyed()) {
-      wc.send('grail-progress-updated', {
-        character: character,
-        item: event.item,
-        progress: grailProgress,
-        autoDetected: true,
-        firstTimeDiscovery: true,
-      });
-    }
-  }
+  broadcastToRenderers('grail-progress-updated', {
+    character: character,
+    item: event.item,
+    progress: grailProgress,
+    autoDetected: true,
+    firstTimeDiscovery: true,
+  });
 }
 
 export type HandleAutomaticGrailProgressDependencies = {
@@ -429,6 +439,7 @@ async function applySaveDirectoryChange(newDirectory: string): Promise<void> {
  * Loads grail items into the detection service and starts monitoring automatically.
  */
 export function initializeSaveFileHandlers(): void {
+  const { handle } = createIpcMainRegistry(ipcMain);
   console.log('[initializeSaveFileHandlers] Starting initialization');
   console.log('[initializeSaveFileHandlers] Current EventBus listener counts:', {
     'save-file-event': eventBus.listenerCount('save-file-event'),
@@ -438,16 +449,9 @@ export function initializeSaveFileHandlers(): void {
   // Wire up service error forwarding to renderer processes
   setErrorForwarder((payload) => {
     try {
-      const allWebContents = webContents.getAllWebContents();
-      if (Array.isArray(allWebContents)) {
-        for (const wc of allWebContents) {
-          if (!wc.isDestroyed() && wc.getType() === 'window') {
-            wc.send('service-error', payload);
-          }
-        }
-      }
+      broadcastToRenderers('service-error', payload);
     } catch {
-      // Silently fail if webContents is not available (e.g., in test environment)
+      // Forwarding must never break logging (e.g. webContents is unavailable in tests)
     }
   });
 
@@ -486,15 +490,9 @@ export function initializeSaveFileHandlers(): void {
   // Set up event forwarding to renderer process
   const unsubscribeSaveFileEvent = eventBus.on('save-file-event', async (event: SaveFileEvent) => {
     // Forward save file events to renderer processes
-    // Filter to only 'window' type to exclude DevTools, background pages, etc.
     // The parsed items stay in the main process; renderers only need the file header.
     const { parsedItems, ...rendererEvent } = event;
-    const allWebContents = webContents.getAllWebContents();
-    for (const wc of allWebContents) {
-      if (!wc.isDestroyed() && wc.getType() === 'window') {
-        wc.send('save-file-event', rendererEvent);
-      }
-    }
+    broadcastToRenderers('save-file-event', rendererEvent);
 
     // Update character information from save file
     updateCharacterFromSaveFile(event.file);
@@ -515,13 +513,7 @@ export function initializeSaveFileHandlers(): void {
   // Set up item detection event forwarding and automatic grail progress updates
   const unsubscribeItemDetection = eventBus.on('item-detection', (event: ItemDetectionEvent) => {
     // Forward event to renderer processes
-    // Filter to only 'window' type to exclude DevTools, background pages, etc.
-    const allWebContents = webContents.getAllWebContents();
-    for (const wc of allWebContents) {
-      if (!wc.isDestroyed() && wc.getType() === 'window') {
-        wc.send('item-detection-event', event);
-      }
-    }
+    broadcastToRenderers('item-detection-event', event);
 
     // Handle automatic grail progress updates for found items
     if (event.type === 'item-found' && event.item) {
@@ -534,46 +526,28 @@ export function initializeSaveFileHandlers(): void {
     console.log(
       `Save file monitoring started for directory: ${data.directory} - Found ${data.saveFileCount} save files`,
     );
-    // Filter to only 'window' type to exclude DevTools, background pages, etc.
-    const allWebContents = webContents.getAllWebContents();
-    for (const wc of allWebContents) {
-      if (!wc.isDestroyed() && wc.getType() === 'window') {
-        wc.send('monitoring-status-changed', {
-          status: 'started',
-          directory: data.directory,
-          saveFileCount: data.saveFileCount,
-        });
-      }
-    }
+    broadcastToRenderers('monitoring-status-changed', {
+      status: 'started',
+      directory: data.directory,
+      saveFileCount: data.saveFileCount,
+    });
   });
   eventUnsubscribers.push(unsubscribeMonitoringStarted);
 
   const unsubscribeMonitoringStopped = eventBus.on('monitoring-stopped', () => {
     console.log('Save file monitoring stopped');
-    // Filter to only 'window' type to exclude DevTools, background pages, etc.
-    const allWebContents = webContents.getAllWebContents();
-    for (const wc of allWebContents) {
-      if (!wc.isDestroyed() && wc.getType() === 'window') {
-        wc.send('monitoring-status-changed', { status: 'stopped' });
-      }
-    }
+    broadcastToRenderers('monitoring-status-changed', { status: 'stopped' });
   });
   eventUnsubscribers.push(unsubscribeMonitoringStopped);
 
   const unsubscribeMonitoringError = eventBus.on('monitoring-error', (error) => {
-    // Filter to only 'window' type to exclude DevTools, background pages, etc.
-    const allWebContents = webContents.getAllWebContents();
-    for (const wc of allWebContents) {
-      if (!wc.isDestroyed() && wc.getType() === 'window') {
-        wc.send('monitoring-status-changed', {
-          status: 'error',
-          error: error.message,
-          errorType: error.type,
-          directory: error.directory,
-          saveFileCount: error.saveFileCount || 0,
-        });
-      }
-    }
+    broadcastToRenderers('monitoring-status-changed', {
+      status: 'error',
+      error: error.message,
+      errorType: error.type,
+      directory: error.directory,
+      saveFileCount: error.saveFileCount || 0,
+    });
   });
   eventUnsubscribers.push(unsubscribeMonitoringError);
 
@@ -590,57 +564,85 @@ export function initializeSaveFileHandlers(): void {
     console.error('Failed to load grail items into detection service:', error);
   }
 
-  // Automatically start monitoring
+  // Automatically start monitoring, unless Manual mode keeps it off
   setTimeout(async () => {
     try {
+      if (isManualGameMode()) {
+        console.log(
+          '[initializeSaveFileHandlers] Manual mode active, not auto-starting monitoring',
+        );
+        return;
+      }
       await saveFileMonitor.startMonitoring();
     } catch (error) {
       console.error('Failed to auto-start save file monitoring:', error);
     }
   }, 1000); // Short delay to ensure everything is initialized
 
-  // IPC handlers for status and file retrieval only
+  // Keep monitoring in sync with game mode changes from any renderer view (e.g. the setup wizard)
+  let manualModeActive = isManualGameMode();
+  eventUnsubscribers.push(
+    addSettingsUpdatedListener(async (settings) => {
+      if (settings.gameMode === undefined) {
+        return;
+      }
+      const wasManual = manualModeActive;
+      manualModeActive = settings.gameMode === GameMode.Manual;
+      try {
+        if (manualModeActive) {
+          // Queued behind any start still in flight, so the watcher cannot come up in Manual mode
+          await saveFileMonitor.stopMonitoringIfActive();
+        } else if (wasManual && !manualModeActive) {
+          await saveFileMonitor.startMonitoring();
+        }
+      } catch (error) {
+        console.error('Failed to update save file monitoring for the game mode:', error);
+      }
+    }),
+  );
+
+  /**
+   * IPC handler for starting save file monitoring (e.g. when leaving Manual mode).
+   * Starting while already monitoring is a no-op in the monitor service.
+   */
+  handle('saveFile:startMonitoring', async (): Promise<{ success: boolean }> => {
+    await saveFileMonitor.startMonitoring();
+    return { success: true };
+  });
+
+  /**
+   * IPC handler for stopping save file monitoring (e.g. when switching to Manual mode).
+   */
+  handle('saveFile:stopMonitoring', async (): Promise<{ success: boolean }> => {
+    await saveFileMonitor.stopMonitoring();
+    return { success: true };
+  });
 
   /**
    * IPC handler for retrieving all save files.
    * @returns Promise resolving to array of save file data
    */
-  ipcMain.handle('saveFile:getSaveFiles', async (): Promise<D2SaveFile[]> => {
-    try {
-      return await saveFileMonitor.getSaveFiles();
-    } catch (error) {
-      console.error('Failed to get save files:', error);
-      throw error;
-    }
+  handle('saveFile:getSaveFiles', async (): Promise<D2SaveFile[]> => {
+    return await saveFileMonitor.getSaveFiles();
   });
 
   /**
    * IPC handler for getting the current monitoring status.
    * @returns Object containing monitoring status and directory information
    */
-  ipcMain.handle('saveFile:getMonitoringStatus', async () => {
-    try {
-      return {
-        isMonitoring: saveFileMonitor.isCurrentlyMonitoring(),
-        directory: saveFileMonitor.getSaveDirectory(),
-      };
-    } catch (error) {
-      console.error('Failed to get monitoring status:', error);
-      throw error;
-    }
+  handle('saveFile:getMonitoringStatus', async () => {
+    return {
+      isMonitoring: saveFileMonitor.isCurrentlyMonitoring(),
+      directory: saveFileMonitor.getSaveDirectory(),
+    };
   });
 
   /**
    * IPC handler for getting the platform default save directory.
    * @returns The platform-specific default save directory path
    */
-  ipcMain.handle('saveFile:getDefaultDirectory', async (): Promise<string> => {
-    try {
-      return saveFileMonitor.getDefaultDirectory();
-    } catch (error) {
-      console.error('Failed to get default directory:', error);
-      throw error;
-    }
+  handle('saveFile:getDefaultDirectory', async (): Promise<string> => {
+    return saveFileMonitor.getDefaultDirectory();
   });
 
   /**
@@ -650,17 +652,12 @@ export function initializeSaveFileHandlers(): void {
    * @param _ - IPC event (unused)
    * @param saveDir - New save directory path
    */
-  ipcMain.handle('saveFile:updateSaveDirectory', async (_, saveDir: unknown) => {
-    try {
-      const newDirectory = validateSaveDirectoryInput(saveDir);
+  handle('saveFile:updateSaveDirectory', async (_, saveDir: unknown) => {
+    const newDirectory = validateSaveDirectoryInput(saveDir);
 
-      await applySaveDirectoryChange(newDirectory);
+    await applySaveDirectoryChange(newDirectory);
 
-      return { success: true };
-    } catch (error) {
-      console.error('Failed to update save directory:', error);
-      throw error;
-    }
+    return { success: true };
   });
 
   /**
@@ -671,19 +668,9 @@ export function initializeSaveFileHandlers(): void {
    * @param directory - Candidate directory path
    * @returns The inspection result
    */
-  ipcMain.handle(
+  handle(
     'saveFile:inspectDirectory',
-    async (_, directory: unknown): Promise<SaveDirectoryInspection> => {
-      if (typeof directory !== 'string') {
-        throw new Error('Invalid save directory: expected a string');
-      }
-      try {
-        return await inspectSaveDirectory(directory);
-      } catch (error) {
-        console.error('Failed to inspect save directory:', error);
-        throw error;
-      }
-    },
+    async (_, directory): Promise<SaveDirectoryInspection> => inspectSaveDirectory(directory),
   );
 
   /**
@@ -691,18 +678,13 @@ export function initializeSaveFileHandlers(): void {
    * Gets platform-specific default directory and updates settings accordingly.
    * User data is only truncated if the default differs from the current directory.
    */
-  ipcMain.handle('saveFile:restoreDefaultDirectory', async () => {
-    try {
-      // Get the platform default directory
-      const defaultDirectory = saveFileMonitor.getDefaultDirectory();
+  handle('saveFile:restoreDefaultDirectory', async () => {
+    // Get the platform default directory
+    const defaultDirectory = saveFileMonitor.getDefaultDirectory();
 
-      await applySaveDirectoryChange(defaultDirectory);
+    await applySaveDirectoryChange(defaultDirectory);
 
-      return { success: true, defaultDirectory };
-    } catch (error) {
-      console.error('Failed to restore default directory:', error);
-      throw error;
-    }
+    return { success: true, defaultDirectory };
   });
 
   /**
@@ -710,13 +692,8 @@ export function initializeSaveFileHandlers(): void {
    * Returns a map of rune IDs to their counts from current inventory/stash.
    * @returns Promise resolving to record of rune IDs mapped to their counts
    */
-  ipcMain.handle('saveFile:getAvailableRunes', async (): Promise<Record<string, number>> => {
-    try {
-      return saveFileMonitor.getAvailableRunesCount();
-    } catch (error) {
-      console.error('Failed to get available runes:', error);
-      throw error;
-    }
+  handle('saveFile:getAvailableRunes', async (): Promise<Record<string, number>> => {
+    return saveFileMonitor.getAvailableRunesCount();
   });
 
   /**
@@ -724,14 +701,9 @@ export function initializeSaveFileHandlers(): void {
    * Forces a re-parse of all save files to get the latest item data.
    * @returns Promise resolving when the refresh is complete
    */
-  ipcMain.handle('saveFile:refreshSaveFiles', async (): Promise<{ success: boolean }> => {
-    try {
-      await saveFileMonitor.refreshSaveFiles();
-      return { success: true };
-    } catch (error) {
-      console.error('Failed to refresh save files:', error);
-      throw error;
-    }
+  handle('saveFile:refreshSaveFiles', async (): Promise<{ success: boolean }> => {
+    await saveFileMonitor.refreshSaveFiles();
+    return { success: true };
   });
 
   console.log('Save file IPC handlers initialized');

@@ -1,9 +1,14 @@
 import { app, type BrowserWindow, ipcMain, webContents } from 'electron';
 import { grailDatabase } from '../database/database';
+import { createRendererBroadcaster } from '../ipc/broadcast';
+import { createIpcMainRegistry } from '../ipc/handle';
 import { GlobalHotkeyService } from '../services/globalHotkeys';
 import type { RunTrackerService } from '../services/runTracker';
 import type { GlobalHotkeyStatus, Settings } from '../types/grail';
 import { addSettingsUpdatedListener } from './grailHandlers';
+
+/** Sends an event from the IPC contract to every renderer window. */
+const broadcastToRenderers = createRendererBroadcaster(() => webContents.getAllWebContents());
 
 /**
  * Settings that require the global hotkeys to be re-registered when they change.
@@ -17,11 +22,7 @@ let service: GlobalHotkeyService | undefined;
 const cleanups: Array<() => void> = [];
 
 function broadcastStatus(status: GlobalHotkeyStatus): void {
-  for (const wc of webContents.getAllWebContents()) {
-    if (!wc.isDestroyed() && wc.getType() === 'window') {
-      wc.send('run-tracker:global-hotkey-status', status);
-    }
-  }
+  broadcastToRenderers('run-tracker:global-hotkey-status', status);
 }
 
 /**
@@ -35,15 +36,16 @@ export function initializeGlobalHotkeyHandlers(
   runTracker: RunTrackerService | undefined,
   getMainWindow: () => BrowserWindow | null,
 ): void {
+  const { handle, removeHandler } = createIpcMainRegistry(ipcMain);
   closeGlobalHotkeys();
 
   if (!runTracker) {
     console.error('[globalHotkeys] Run tracker unavailable, global hotkeys are not registered');
-    ipcMain.handle(
+    handle(
       'run-tracker:get-global-hotkey-status',
       (): GlobalHotkeyStatus => ({ enabled: false, registrations: [], unavailable: true }),
     );
-    cleanups.push(() => ipcMain.removeHandler('run-tracker:get-global-hotkey-status'));
+    cleanups.push(() => removeHandler('run-tracker:get-global-hotkey-status'));
     return;
   }
 
@@ -58,8 +60,8 @@ export function initializeGlobalHotkeyHandlers(
   });
   service = hotkeys;
 
-  ipcMain.handle('run-tracker:get-global-hotkey-status', () => hotkeys.getStatus());
-  cleanups.push(() => ipcMain.removeHandler('run-tracker:get-global-hotkey-status'));
+  handle('run-tracker:get-global-hotkey-status', () => hotkeys.getStatus());
+  cleanups.push(() => removeHandler('run-tracker:get-global-hotkey-status'));
 
   const handleFocusChange = () => hotkeys.handleFocusChange();
   app.on('browser-window-focus', handleFocusChange);

@@ -24,19 +24,16 @@ vi.mock('../database/database', () => {
     getAllSettings: vi.fn(),
     getFilteredItems: vi.fn(),
     getAllRunewords: vi.fn(),
-    insertItems: vi.fn(),
     getProgressByCharacter: vi.fn(),
     getProgressById: vi.fn(),
     getAllProgress: vi.fn(),
     getFilteredProgress: vi.fn(),
     upsertProgress: vi.fn(),
     deleteManualProgress: vi.fn(),
-    getFilteredGrailStatistics: vi.fn(),
     setSetting: vi.fn(),
     backup: vi.fn(),
     restore: vi.fn(),
     restoreFromBuffer: vi.fn(),
-    truncateUserData: vi.fn(),
     close: vi.fn(),
   };
 
@@ -47,9 +44,11 @@ vi.mock('../database/database', () => {
 });
 
 import { ipcMain } from 'electron';
-import { GrailProgressBuilder, HolyGrailItemBuilder } from '@/fixtures';
+import { GrailProgressBuilder } from '@/fixtures';
 import { GrailDatabase, grailDatabase } from '../database/database';
+import { MAX_RESTORE_BACKUP_BYTES } from '../ipc/validators';
 import type { Character, Settings } from '../types/grail';
+import { GameMode } from '../types/grail';
 import {
   addSettingsUpdatedListener,
   closeGrailDatabase,
@@ -79,17 +78,14 @@ describe('When grailHandlers is used', () => {
       // Note: GrailDatabase constructor is not called because grailHandlers uses the singleton instance
       expect(ipcMain.handle).toHaveBeenCalledWith('grail:getCharacters', expect.any(Function));
       expect(ipcMain.handle).toHaveBeenCalledWith('grail:getItems', expect.any(Function));
-      expect(ipcMain.handle).toHaveBeenCalledWith('grail:seedItems', expect.any(Function));
       expect(ipcMain.handle).toHaveBeenCalledWith('grail:getProgress', expect.any(Function));
       expect(ipcMain.handle).toHaveBeenCalledWith('grail:updateProgress', expect.any(Function));
       expect(ipcMain.handle).toHaveBeenCalledWith('grail:deleteProgress', expect.any(Function));
       expect(ipcMain.handle).toHaveBeenCalledWith('grail:getSettings', expect.any(Function));
       expect(ipcMain.handle).toHaveBeenCalledWith('grail:updateSettings', expect.any(Function));
-      expect(ipcMain.handle).toHaveBeenCalledWith('grail:getStatistics', expect.any(Function));
       expect(ipcMain.handle).toHaveBeenCalledWith('grail:backup', expect.any(Function));
       expect(ipcMain.handle).toHaveBeenCalledWith('grail:restore', expect.any(Function));
       expect(ipcMain.handle).toHaveBeenCalledWith('grail:restoreFromBuffer', expect.any(Function));
-      expect(ipcMain.handle).toHaveBeenCalledWith('grail:truncateUserData', expect.any(Function));
     });
 
     it('Then should handle database initialization errors gracefully', () => {
@@ -210,43 +206,6 @@ describe('When grailHandlers is used', () => {
           etherealType: 'none',
         },
       ]);
-    });
-
-    it('Then grail:seedItems should insert items', async () => {
-      // Arrange
-      const mockItems = [
-        HolyGrailItemBuilder.new()
-          .withId('shako')
-          .withName('shako')
-          .withType('unique')
-          .withArmorSubCategory('helms')
-          .withEtherealType('none')
-          .build(),
-      ];
-
-      const handler = vi
-        .mocked(ipcMain.handle)
-        .mock.calls.find((call) => call[0] === 'grail:seedItems')?.[1] as any;
-
-      // Act
-      const result = await handler(null, mockItems);
-
-      // Assert
-      expect(grailDatabase.insertItems).toHaveBeenCalledWith([
-        {
-          id: 'shako',
-          name: 'shako',
-          link: 'https://example.com/default-item',
-          code: undefined,
-          type: 'unique',
-          category: 'armor',
-          subCategory: 'helms',
-          setName: undefined,
-          etherealType: 'none',
-          treasureClass: 'normal',
-        },
-      ]);
-      expect(result).toEqual({ success: true });
     });
 
     it('Then item handlers should handle errors properly', async () => {
@@ -708,7 +667,7 @@ describe('When grailHandlers is used', () => {
       // Arrange
       const settingsUpdates = {
         grailEthereal: true,
-        saveDir: '/new/path/to/saves',
+        widgetPosition: { x: 10, y: 20 },
       };
 
       const handler = vi
@@ -720,8 +679,46 @@ describe('When grailHandlers is used', () => {
 
       // Assert
       expect(grailDatabase.setSetting).toHaveBeenCalledWith('grailEthereal', 'true');
-      expect(grailDatabase.setSetting).toHaveBeenCalledWith('saveDir', '/new/path/to/saves');
+      expect(grailDatabase.setSetting).toHaveBeenCalledWith(
+        'widgetPosition',
+        JSON.stringify({ x: 10, y: 20 }),
+      );
       expect(result).toEqual({ success: true });
+    });
+
+    it.each([
+      ['saveDir', '/other/saves'],
+      ['d2rInstallPath', '/games/d2r'],
+      ['terrorZoneConfig', { 'zone-1': true }],
+      ['mainWindowBounds', { x: 0, y: 0, width: 1, height: 1 }],
+    ])('If the update contains %s, which has a dedicated flow, Then nothing is written', async (key, value) => {
+      // Arrange
+      const handler = vi
+        .mocked(ipcMain.handle)
+        .mock.calls.find((call) => call[0] === 'grail:updateSettings')?.[1] as any;
+
+      // Act
+      const result = handler(null, { grailEthereal: true, [key]: value });
+
+      // Assert
+      await expect(result).rejects.toThrow(
+        `Setting cannot be changed through grail:updateSettings: ${key}`,
+      );
+      expect(grailDatabase.setSetting).not.toHaveBeenCalled();
+    });
+
+    it('If the update contains an unknown key, Then nothing is written', async () => {
+      // Arrange
+      const handler = vi
+        .mocked(ipcMain.handle)
+        .mock.calls.find((call) => call[0] === 'grail:updateSettings')?.[1] as any;
+
+      // Act
+      const result = handler(null, { theme: 'dark', __proto__polluted: true });
+
+      // Assert
+      await expect(result).rejects.toThrow('__proto__polluted');
+      expect(grailDatabase.setSetting).not.toHaveBeenCalled();
     });
 
     it('When settings are updated, Then registered main-process listeners are notified', async () => {
@@ -828,86 +825,6 @@ describe('When grailHandlers is used', () => {
     });
   });
 
-  describe('If statistics handlers are called', () => {
-    beforeEach(() => {
-      initializeGrailHandlers();
-    });
-
-    it('Then grail:getStatistics should return statistics for all characters', async () => {
-      // Arrange
-      const mockSettings = { grailEthereal: false } as Settings;
-      const mockStatistics = {
-        totalItems: 100,
-        foundItems: 25,
-        uniqueItems: 80,
-        setItems: 20,
-        runes: 0,
-        foundUnique: 20,
-        foundSet: 5,
-        foundRunes: 0,
-      };
-      vi.mocked(grailDatabase.getAllSettings).mockReturnValue(mockSettings);
-      vi.mocked(grailDatabase.getFilteredGrailStatistics).mockReturnValue(mockStatistics);
-
-      const handler = vi
-        .mocked(ipcMain.handle)
-        .mock.calls.find((call) => call[0] === 'grail:getStatistics')?.[1] as any;
-
-      // Act
-      const result = await handler();
-
-      // Assert
-      expect(grailDatabase.getFilteredGrailStatistics).toHaveBeenCalledWith(
-        mockSettings,
-        undefined,
-      );
-      expect(result).toEqual(mockStatistics);
-    });
-
-    it('Then grail:getStatistics should return statistics for specific character', async () => {
-      // Arrange
-      const characterId = 'char-1';
-      const mockSettings = { grailEthereal: false } as Settings;
-      const mockStatistics = {
-        totalItems: 100,
-        foundItems: 10,
-        uniqueItems: 80,
-        setItems: 20,
-        runes: 0,
-        foundUnique: 8,
-        foundSet: 2,
-        foundRunes: 0,
-      };
-      vi.mocked(grailDatabase.getAllSettings).mockReturnValue(mockSettings);
-      vi.mocked(grailDatabase.getFilteredGrailStatistics).mockReturnValue(mockStatistics);
-
-      const handler = vi
-        .mocked(ipcMain.handle)
-        .mock.calls.find((call) => call[0] === 'grail:getStatistics')?.[1] as any;
-
-      // Act
-      const result = await handler(null, characterId);
-
-      // Assert
-      expect(grailDatabase.getFilteredGrailStatistics).toHaveBeenCalledWith(mockSettings, 'char-1');
-      expect(result).toEqual(mockStatistics);
-    });
-
-    it('Then statistics handlers should handle errors properly', async () => {
-      // Arrange
-      vi.mocked(grailDatabase.getAllSettings).mockImplementation(() => {
-        throw new Error('Database error');
-      });
-
-      const handler = vi
-        .mocked(ipcMain.handle)
-        .mock.calls.find((call) => call[0] === 'grail:getStatistics')?.[1] as any;
-
-      // Act & Assert
-      await expect(handler()).rejects.toThrow('Database error');
-    });
-  });
-
   describe('If backup handlers are called', () => {
     beforeEach(() => {
       initializeGrailHandlers();
@@ -976,7 +893,13 @@ describe('When grailHandlers is used', () => {
 
     it('Then grail:restoreFromBuffer should restore from buffer', async () => {
       // Arrange
-      const backupBuffer = new Uint8Array([1, 2, 3, 4]);
+      const backupBuffer = new Uint8Array([
+        ...new TextEncoder().encode('SQLite format 3\0'),
+        1,
+        2,
+        3,
+        4,
+      ]);
 
       const handler = vi
         .mocked(ipcMain.handle)
@@ -990,18 +913,95 @@ describe('When grailHandlers is used', () => {
       expect(result).toEqual({ success: true });
     });
 
-    it('Then grail:truncateUserData should truncate user data', async () => {
+    it.each([
+      ['grail:restore', '/path/to/backup.db'],
+      [
+        'grail:restoreFromBuffer',
+        new Uint8Array([...new TextEncoder().encode('SQLite format 3\0'), 1, 2, 3, 4]),
+      ],
+    ])('When %s succeeds, Then settings listeners are notified with the restored settings', async (channel, payload) => {
+      // Arrange
+      const restoredSettings = { gameMode: GameMode.Manual };
+      vi.mocked(grailDatabase.getAllSettings).mockReturnValue(restoredSettings as any);
+      const listener = vi.fn();
+      const removeListener = addSettingsUpdatedListener(listener);
+      const handler = vi
+        .mocked(ipcMain.handle)
+        .mock.calls.find((call) => call[0] === channel)?.[1] as any;
+
+      // Act
+      const result = await handler(null, payload);
+      removeListener();
+
+      // Assert
+      expect(listener).toHaveBeenCalledTimes(1);
+      expect(listener).toHaveBeenCalledWith(restoredSettings);
+      expect(result).toEqual({ success: true });
+    });
+
+    it('If the restore fails, Then settings listeners are not notified', async () => {
+      // Arrange
+      vi.mocked(grailDatabase.restore).mockImplementationOnce(() => {
+        throw new Error('restore failed');
+      });
+      const listener = vi.fn();
+      const removeListener = addSettingsUpdatedListener(listener);
+      const handler = vi
+        .mocked(ipcMain.handle)
+        .mock.calls.find((call) => call[0] === 'grail:restore')?.[1] as any;
+
+      // Act
+      const result = handler(null, '/path/to/backup.db');
+      await expect(result).rejects.toThrow('restore failed');
+      removeListener();
+
+      // Assert
+      expect(listener).not.toHaveBeenCalled();
+    });
+
+    it('If the restore buffer is not a SQLite database, Then the database is not replaced', async () => {
       // Arrange
       const handler = vi
         .mocked(ipcMain.handle)
-        .mock.calls.find((call) => call[0] === 'grail:truncateUserData')?.[1] as any;
+        .mock.calls.find((call) => call[0] === 'grail:restoreFromBuffer')?.[1] as any;
+      const notADatabase = new TextEncoder().encode('{"characters":[],"progress":[]}');
 
       // Act
-      const result = await handler();
+      const result = handler(null, notADatabase);
 
       // Assert
-      expect(grailDatabase.truncateUserData).toHaveBeenCalled();
-      expect(result).toEqual({ success: true });
+      await expect(result).rejects.toThrow('Invalid backup data: not a SQLite database');
+      expect(grailDatabase.restoreFromBuffer).not.toHaveBeenCalled();
+    });
+
+    it('If the restore buffer exceeds the size cap, Then the database is not replaced', async () => {
+      // Arrange
+      const handler = vi
+        .mocked(ipcMain.handle)
+        .mock.calls.find((call) => call[0] === 'grail:restoreFromBuffer')?.[1] as any;
+      const oversized = new TextEncoder().encode('SQLite format 3\0');
+      Object.defineProperty(oversized, 'byteLength', { value: MAX_RESTORE_BACKUP_BYTES + 1 });
+
+      // Act
+      const result = handler(null, oversized);
+
+      // Assert
+      await expect(result).rejects.toThrow('Invalid backup data: larger than 256 MB');
+      expect(grailDatabase.restoreFromBuffer).not.toHaveBeenCalled();
+    });
+
+    it('If the restore payload is not a byte array, Then the database is not replaced', async () => {
+      // Arrange
+      const handler = vi
+        .mocked(ipcMain.handle)
+        .mock.calls.find((call) => call[0] === 'grail:restoreFromBuffer')?.[1] as any;
+
+      // Act
+      const result = handler(null, 'SQLite format 3');
+
+      // Assert
+      await expect(result).rejects.toThrow('Invalid backup data: expected a byte array');
+      expect(grailDatabase.restoreFromBuffer).not.toHaveBeenCalled();
     });
 
     it('Then backup handlers should handle errors properly', async () => {

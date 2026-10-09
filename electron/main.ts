@@ -2,6 +2,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { app, BrowserWindow, ipcMain, nativeTheme, screen, session } from 'electron';
 import { grailDatabase } from './database/database';
+import { createIpcMainRegistry } from './ipc/handle';
 import { initializeDialogHandlers } from './ipc-handlers/dialogHandlers';
 import {
   closeGlobalHotkeys,
@@ -169,11 +170,6 @@ function createWindow() {
     },
   });
 
-  // Test active push message to Renderer-process.
-  mainWindow.webContents.on('did-finish-load', () => {
-    mainWindow?.webContents.send('main-process-message', new Date().toLocaleString());
-  });
-
   if (VITE_DEV_SERVER_URL) {
     mainWindow.loadURL(VITE_DEV_SERVER_URL);
   } else {
@@ -331,28 +327,27 @@ app.whenReady().then(() => {
     onWidgetSizeChange,
   );
 
-  // Handle titlebar overlay updates (Windows/Linux only)
-  ipcMain.handle(
-    'update-titlebar-overlay',
-    (_event, colors: { backgroundColor: string; symbolColor: string }) => {
-      if (process.platform !== 'darwin') {
-        mainWindow?.setTitleBarOverlay({
-          color: colors.backgroundColor,
-          symbolColor: colors.symbolColor,
-          height: 47,
-        });
+  const { handle } = createIpcMainRegistry(ipcMain);
 
-        setInventorySnapshotWindowsTitleBarOverlay({
-          color: colors.backgroundColor,
-          symbolColor: colors.symbolColor,
-        });
-      }
-      return { success: true };
-    },
-  );
+  // Handle titlebar overlay updates (Windows/Linux only)
+  handle('update-titlebar-overlay', (_event, colors) => {
+    if (process.platform !== 'darwin') {
+      mainWindow?.setTitleBarOverlay({
+        color: colors.backgroundColor,
+        symbolColor: colors.symbolColor,
+        height: 47,
+      });
+
+      setInventorySnapshotWindowsTitleBarOverlay({
+        color: colors.backgroundColor,
+        symbolColor: colors.symbolColor,
+      });
+    }
+    return { success: true };
+  });
 
   // Handle app icon path requests for native notifications
-  ipcMain.handle('app:getIconPath', () => {
+  handle('app:getIconPath', () => {
     // In development mode, return relative URL for Vite dev server
     if (VITE_DEV_SERVER_URL) {
       return '/logo.png';

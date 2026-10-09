@@ -1,12 +1,14 @@
 import { ipcMain, shell } from 'electron';
+import { createIpcMainRegistry } from '../ipc/handle';
 
 /**
  * Initializes IPC handlers for shell operations.
  * Sets up handlers for opening external URLs and other shell-related functionality.
  */
 export function initializeShellHandlers(): void {
+  const { handle } = createIpcMainRegistry(ipcMain);
   // Open external URL handler
-  ipcMain.handle('shell:openExternal', async (_, url: string) => {
+  handle('shell:openExternal', async (_, url) => {
     try {
       await shell.openExternal(url);
       return { success: true };

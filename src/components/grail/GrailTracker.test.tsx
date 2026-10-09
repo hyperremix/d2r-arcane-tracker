@@ -92,12 +92,10 @@ function createDeferred<T>(): Deferred<T> {
 
 interface WindowWithApis {
   electronAPI?: unknown;
-  ipcRenderer?: unknown;
 }
 
 const testWindow = window as unknown as WindowWithApis;
 const originalElectronAPI = testWindow.electronAPI;
-const originalIpcRenderer = testWindow.ipcRenderer;
 const getSettings = vi.fn();
 const getCharacters = vi.fn();
 const getItems = vi.fn();
@@ -110,8 +108,10 @@ beforeEach(() => {
   getCharacters.mockReset().mockResolvedValue([]);
   getItems.mockReset().mockResolvedValue([]);
   getProgress.mockReset().mockResolvedValue([]);
-  testWindow.electronAPI = { grail: { getSettings, getCharacters, getItems, getProgress } };
-  testWindow.ipcRenderer = { on: vi.fn(), off: vi.fn() };
+  testWindow.electronAPI = {
+    grail: { getSettings, getCharacters, getItems, getProgress },
+    on: vi.fn(() => () => undefined),
+  };
   vi.mocked(useGrailStatistics).mockReset();
   useGrailStore.setState(initialStoreState, true);
   itemGridObservations.loadingAtFirstEffect.length = 0;
@@ -119,7 +119,6 @@ beforeEach(() => {
 
 afterEach(() => {
   testWindow.electronAPI = originalElectronAPI;
-  testWindow.ipcRenderer = originalIpcRenderer;
   useGrailStore.setState(initialStoreState, true);
   vi.restoreAllMocks();
 });

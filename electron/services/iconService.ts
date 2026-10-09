@@ -538,26 +538,6 @@ export class IconService {
   }
 
   /**
-   * Gets an icon by item name (legacy support)
-   * @returns Base64 data URL or null if not found
-   */
-  async getIconByName(): Promise<string | null> {
-    // For now, this is a placeholder that returns null
-    // The actual item name to filename mapping would need to be implemented
-    // based on your item database
-    return null;
-  }
-
-  /**
-   * Clears the in-memory icon cache.
-   */
-  clearCache(): void {
-    this.iconCache.clear();
-    this.iconDirectoryIndex = null;
-    log.info('clearCache', 'Icon cache cleared');
-  }
-
-  /**
    * Gets the current cache size.
    * @returns Number of cached icons
    */
@@ -611,24 +591,6 @@ export class IconService {
     } catch (error) {
       log.error('saveCacheToDisk', error);
     }
-  }
-
-  /**
-   * Gets cache statistics for debugging.
-   * @returns Object with cache information
-   */
-  getCacheStats(): {
-    size: number;
-    iconDirectory: string;
-    cacheFile: string;
-    conversionStatus: ConversionStatus;
-  } {
-    return {
-      size: this.iconCache.size,
-      iconDirectory: this.iconDirectory,
-      cacheFile: this.cacheFile,
-      conversionStatus: this.conversionStatus,
-    };
   }
 
   /**

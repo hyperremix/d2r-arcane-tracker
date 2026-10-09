@@ -7,17 +7,11 @@ import { Badge } from '@/components/ui/badge';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTitle, PopoverTrigger } from '@/components/ui/popover';
 import { translations } from '@/i18n/translations';
+import { onMainEvent } from '@/lib/ipcEvents';
 import { cn } from '@/lib/utils';
 import { useGrailStore } from '@/stores/grailStore';
 import dingSound from '/ding.mp3';
 import logoUrl from '/logo.png';
-
-/**
- * Module-level flag to prevent duplicate IPC handler registration.
- * This is necessary because React Strict Mode in development will mount components twice,
- * and without this guard, multiple handlers would accumulate.
- */
-let globalIpcHandlerRegistered = false;
 
 /**
  * Interface extending ItemDetectionEvent with additional notification metadata.
@@ -55,7 +49,7 @@ export function NotificationButton() {
   useEffect(() => {
     const fetchCharacters = async () => {
       try {
-        const chars = await window.ipcRenderer?.invoke('grail:getCharacters');
+        const chars = await window.electronAPI?.grail.getCharacters();
         if (chars) {
           setCharacters(chars);
         }
@@ -173,10 +167,8 @@ export function NotificationButton() {
         notificationQueue.map(async (itemEvent) => {
           let allProgress: GrailProgress[] = [];
           try {
-            allProgress = await window.ipcRenderer?.invoke(
-              'grail:getProgressByItem',
-              itemEvent.grailItem.id,
-            );
+            allProgress =
+              (await window.electronAPI?.grail.getProgressByItem(itemEvent.grailItem.id)) ?? [];
           } catch (error) {
             console.error('Failed to fetch progress for item:', error);
           }
@@ -238,23 +230,9 @@ export function NotificationButton() {
   }, [processBatch]);
 
   useEffect(() => {
-    // Singleton pattern: Prevent duplicate IPC handler registration
-    // This is critical because React Strict Mode (development) will mount components twice
-    if (globalIpcHandlerRegistered) {
-      console.log(
-        '[NotificationButton] IPC handler already registered globally, skipping duplicate registration',
-      );
-      return;
-    }
-
-    // Mark as registered before setting up handler
-    globalIpcHandlerRegistered = true;
-
-    // Listen for item detection events
-    const handleItemDetection = (
-      _event: Electron.IpcRendererEvent,
-      itemEvent: ItemDetectionEvent,
-    ) => {
+    // Listen for item detection events. The cleanup removes exactly this listener, so React Strict
+    // Mode's mount/unmount/mount in development does not leave a duplicate behind.
+    const handleItemDetection = (itemEvent: ItemDetectionEvent) => {
       // Skip all notifications if silent flag is set
       // Silent flag is true during:
       // - Initial startup parsing: prevents spam for existing items
@@ -282,17 +260,14 @@ export function NotificationButton() {
       }, BATCH_DELAY);
     };
 
-    console.log('[NotificationButton] ✅ Registering IPC handler for item-detection-event');
-    window.ipcRenderer?.on('item-detection-event', handleItemDetection);
+    const unsubscribe = onMainEvent('item-detection-event', handleItemDetection);
 
     return () => {
-      console.log('[NotificationButton] 🧹 Cleanup called - Unregistering IPC handler');
-      window.ipcRenderer?.off('item-detection-event', handleItemDetection);
-      // DO NOT reset globalIpcHandlerRegistered to false here!
-      // React Strict Mode in development will mount/unmount/mount components,
-      // and resetting the flag would allow duplicate handler registration.
-      // The flag should only be reset when the component is truly being destroyed,
-      // not during Strict Mode's intentional double-mounting behavior.
+      unsubscribe();
+      if (batchTimerRef.current) {
+        clearTimeout(batchTimerRef.current);
+        batchTimerRef.current = null;
+      }
     };
   }, []); // Empty dependency array - only run once on mount (notificationQueue accessed via closure)
 

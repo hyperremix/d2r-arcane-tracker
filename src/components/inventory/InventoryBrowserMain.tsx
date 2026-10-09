@@ -1,3 +1,4 @@
+import { INVENTORY_DRAG_STATE_CHANNEL, VAULT_DRAG_STATE_CHANNEL } from 'electron/ipc/contract';
 import type {
   CharacterInventorySnapshot,
   VaultItem,
@@ -32,6 +33,7 @@ import {
 } from '@/components/ui/select';
 import { useSpriteIcon } from '@/hooks/useSpriteIcon';
 import { translations } from '@/i18n/translations';
+import { combineUnsubscribers, onMainEvent } from '@/lib/ipcEvents';
 import {
   createSpatialIconCandidates,
   createSpriteIconLookupIndex,
@@ -41,8 +43,6 @@ import { cn } from '@/lib/utils';
 import { useGrailStore } from '@/stores/grailStore';
 import { showInventoryOperationErrorToast } from './operationErrors';
 
-const VAULT_DRAG_STATE_CHANNEL = 'inventory:vault-drag-state';
-const INVENTORY_DRAG_STATE_CHANNEL = 'inventory:item-drag-state';
 const VAULT_TEXT_PAYLOAD_PREFIX = 'd2r-arcane-tracker:vault-item:';
 const SNAPSHOT_HOVER_OPEN_DELAY_MS = 650;
 const SNAPSHOT_DRAG_SESSION_IDLE_RESET_MS = 900;
@@ -155,13 +155,13 @@ function MainVaultTile({ item, iconLookup, selected, onSelect }: MainVaultTilePr
         const textPayload = serializeVaultTextPayload(dragStatePayload);
         event.dataTransfer.setData('text/plain', textPayload);
         event.dataTransfer.setData('text', textPayload);
-        window.ipcRenderer?.send(VAULT_DRAG_STATE_CHANNEL, {
+        window.electronAPI?.inventory.sendVaultDragState({
           active: true,
           ...dragStatePayload,
         });
       }}
       onDragEnd={() => {
-        window.ipcRenderer?.send(VAULT_DRAG_STATE_CHANNEL, {
+        window.electronAPI?.inventory.sendVaultDragState({
           active: false,
           ...toVaultDragStatePayload(item),
         });
@@ -287,13 +287,13 @@ export function InventoryBrowserMain() {
       }, 250);
     };
 
-    window.ipcRenderer?.on('save-file-event', handleSaveFileEvent);
+    const unsubscribe = onMainEvent('save-file-event', handleSaveFileEvent);
 
     return () => {
       if (reloadTimeout) {
         clearTimeout(reloadTimeout);
       }
-      window.ipcRenderer?.off('save-file-event', handleSaveFileEvent);
+      unsubscribe();
     };
   }, [loadInventorySearch]);
 
@@ -319,7 +319,7 @@ export function InventoryBrowserMain() {
       }
     };
 
-    const handleVaultDragState = (_event: unknown, payload: unknown) => {
+    const handleVaultDragState = (payload: unknown) => {
       const parsedPayload = parseVaultDragStatePayload(payload);
       if (!parsedPayload) {
         return;
@@ -331,7 +331,7 @@ export function InventoryBrowserMain() {
       }
     };
 
-    const handleInventoryDragState = (_event: unknown, payload: unknown) => {
+    const handleInventoryDragState = (payload: unknown) => {
       const parsedPayload = parseInventoryDragStatePayload(payload);
       if (!parsedPayload) {
         return;
@@ -343,13 +343,10 @@ export function InventoryBrowserMain() {
       }
     };
 
-    window.ipcRenderer?.on(VAULT_DRAG_STATE_CHANNEL, handleVaultDragState);
-    window.ipcRenderer?.on(INVENTORY_DRAG_STATE_CHANNEL, handleInventoryDragState);
-
-    return () => {
-      window.ipcRenderer?.off(VAULT_DRAG_STATE_CHANNEL, handleVaultDragState);
-      window.ipcRenderer?.off(INVENTORY_DRAG_STATE_CHANNEL, handleInventoryDragState);
-    };
+    return combineUnsubscribers([
+      onMainEvent(VAULT_DRAG_STATE_CHANNEL, handleVaultDragState),
+      onMainEvent(INVENTORY_DRAG_STATE_CHANNEL, handleInventoryDragState),
+    ]);
   }, [resetSnapshotHoverSession]);
 
   useEffect(() => {

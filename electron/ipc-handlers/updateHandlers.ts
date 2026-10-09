@@ -1,4 +1,6 @@
 import { ipcMain } from 'electron';
+import { sendToRenderer } from '../ipc/broadcast';
+import { createIpcMainRegistry } from '../ipc/handle';
 import { mainWindow } from '../main';
 import { updateService } from '../services/updateService';
 import type { UpdateStatus } from '../types/grail';
@@ -8,13 +10,16 @@ import type { UpdateStatus } from '../types/grail';
  * Sets up handlers for checking updates, downloading, and installing.
  */
 export function initializeUpdateHandlers() {
+  const { handle } = createIpcMainRegistry(ipcMain);
   // Only initialize update service in production
   if (!process.env.VITE_DEV_SERVER_URL) {
     updateService.initialize();
 
     // Register status change callback to send updates to renderer
     updateService.setStatusCallback((status: UpdateStatus) => {
-      mainWindow?.webContents.send('update:status', status);
+      if (mainWindow) {
+        sendToRenderer(mainWindow.webContents, 'update:status', status);
+      }
     });
   }
 
@@ -22,7 +27,7 @@ export function initializeUpdateHandlers() {
    * Handles checking for available updates.
    * Returns the current update status.
    */
-  ipcMain.handle('update:checkForUpdates', async () => {
+  handle('update:checkForUpdates', async () => {
     try {
       // In development, return a mock status
       if (process.env.VITE_DEV_SERVER_URL) {
@@ -53,7 +58,7 @@ export function initializeUpdateHandlers() {
    * Handles downloading the available update.
    * Returns success indicator.
    */
-  ipcMain.handle('update:downloadUpdate', async () => {
+  handle('update:downloadUpdate', async () => {
     try {
       if (process.env.VITE_DEV_SERVER_URL) {
         return { success: false };
@@ -69,24 +74,19 @@ export function initializeUpdateHandlers() {
   /**
    * Handles quitting the application and installing the update.
    */
-  ipcMain.handle('update:quitAndInstall', async () => {
-    try {
-      if (process.env.VITE_DEV_SERVER_URL) {
-        return;
-      }
-
-      await updateService.quitAndInstall();
-    } catch (error) {
-      console.error('[Update Handlers] Error installing update:', error);
-      throw error;
+  handle('update:quitAndInstall', async () => {
+    if (process.env.VITE_DEV_SERVER_URL) {
+      return;
     }
+
+    await updateService.quitAndInstall();
   });
 
   /**
    * Handles getting current update information.
    * Returns the current version and update status.
    */
-  ipcMain.handle('update:getUpdateInfo', async () => {
+  handle('update:getUpdateInfo', async () => {
     try {
       const currentVersion = updateService.getCurrentVersion();
       const status = updateService.getStatus();

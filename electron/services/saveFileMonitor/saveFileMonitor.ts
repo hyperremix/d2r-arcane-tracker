@@ -76,6 +76,7 @@ class SaveFileMonitor {
   private lastProcessedChangeCounter: number = 0;
   private readingFiles: boolean;
   private isMonitoring = false;
+  private monitoringOperations: Promise<void> = Promise.resolve();
   private grailDatabase: GrailDatabase | null = null;
   private saveDirectory: string | null = null;
   /** True only while a forced parse runs: every file is parsed regardless of its modification time. */
@@ -172,6 +173,23 @@ class SaveFileMonitor {
    * @returns {Promise<void>} A promise that resolves when monitoring is started.
    */
   async startMonitoring(): Promise<void> {
+    return this.runMonitoringOperation(() => this.performStartMonitoring());
+  }
+
+  /**
+   * Runs a start/stop operation after all previously requested ones have settled, so a stop can
+   * never overtake a start still parsing (and vice versa) and leave monitoring in the wrong state.
+   * @private
+   * @param {() => Promise<void>} operation - The operation to run.
+   * @returns {Promise<void>} A promise that settles with the operation's outcome.
+   */
+  private runMonitoringOperation(operation: () => Promise<void>): Promise<void> {
+    const result = this.monitoringOperations.then(operation);
+    this.monitoringOperations = result.catch(() => undefined);
+    return result;
+  }
+
+  private async performStartMonitoring(): Promise<void> {
     log.info('startMonitoring', 'Called');
     if (this.isMonitoring) {
       log.info('startMonitoring', 'Already monitoring, exiting');
@@ -267,6 +285,23 @@ class SaveFileMonitor {
    * @returns {Promise<void>} A promise that resolves when monitoring is stopped.
    */
   async stopMonitoring(): Promise<void> {
+    return this.runMonitoringOperation(() => this.performStopMonitoring());
+  }
+
+  /**
+   * Stops monitoring only if it is active once all previously requested start/stop operations
+   * have settled. Unlike stopMonitoring, it emits nothing when there is nothing to stop.
+   * @returns {Promise<void>} A promise that resolves when the monitor is stopped.
+   */
+  async stopMonitoringIfActive(): Promise<void> {
+    return this.runMonitoringOperation(async () => {
+      if (this.isMonitoring || this.fileWatcher) {
+        await this.performStopMonitoring();
+      }
+    });
+  }
+
+  private async performStopMonitoring(): Promise<void> {
     log.info('stopMonitoring', 'Called');
     if (this.fileWatcher) {
       log.info('stopMonitoring', 'Closing file watcher');
@@ -775,6 +810,20 @@ class SaveFileMonitor {
   }
 
   /**
+   * Checks whether the persisted game mode is Manual (no save file monitoring).
+   * @private
+   * @returns {boolean} True if the game mode is Manual, false otherwise or if settings are unavailable.
+   */
+  private isManualGameMode(): boolean {
+    try {
+      return this.grailDatabase?.getAllSettings().gameMode === GameMode.Manual;
+    } catch (error) {
+      log.warn('isManualGameMode', `Failed to read game mode from settings: ${error}`);
+      return false;
+    }
+  }
+
+  /**
    * Updates the save directory and restarts monitoring if it was active.
    * @returns {Promise<void>} A promise that resolves when the update is complete.
    */
@@ -797,7 +846,14 @@ class SaveFileMonitor {
       log.info('updateSaveDirectory', 'Re-initializing save directories');
       this.initializeSaveDirectories();
 
-      // Always start monitoring after directory change - user explicitly wants to use this directory
+      // Manual mode never monitors save files; the new directory is used when leaving Manual mode
+      if (this.isManualGameMode()) {
+        log.info('updateSaveDirectory', 'Manual mode active, not starting monitoring');
+        log.info('updateSaveDirectory', 'Complete');
+        return;
+      }
+
+      // Start monitoring after directory change - user explicitly wants to use this directory
       log.info('updateSaveDirectory', 'Starting monitoring for new directory');
       await this.startMonitoring();
     } finally {

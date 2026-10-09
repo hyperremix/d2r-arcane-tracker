@@ -19,7 +19,6 @@ vi.mock('../database/database', () => ({
 
 vi.mock('../window/widgetWindow', () => ({
   closeWidgetWindow: vi.fn(),
-  getWidgetWindowPosition: vi.fn(),
   resetWidgetWindowSize: vi.fn(() => ({ width: 250, height: 250 })),
   setWidgetWindowLocked: vi.fn(() => true),
   showWidgetWindow: vi.fn(),
@@ -99,18 +98,6 @@ describe('widget IPC handlers display mode validation', () => {
     // Assert
     expect(result).toMatchObject({ success: false });
     expect(updateWidgetWindowSize).not.toHaveBeenCalled();
-  });
-
-  it('If widget:update-size receives an invalid display mode, Then it is rejected', async () => {
-    // Arrange
-    const invalid = 'huge';
-
-    // Act
-    const result = await invoke('widget:update-size', invalid, { width: 1, height: 1 });
-
-    // Assert
-    expect(result).toMatchObject({ success: false });
-    expect(onSizeChange).not.toHaveBeenCalled();
   });
 
   it('If the renderer sends stale custom sizes, Then the persisted sizes from the database are used', async () => {

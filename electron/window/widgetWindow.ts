@@ -279,19 +279,6 @@ export function closeWidgetWindow(): void {
 }
 
 /**
- * Gets the current position of the widget window.
- *
- * @returns The current position { x, y } or null if window doesn't exist
- */
-export function getWidgetWindowPosition(): { x: number; y: number } | null {
-  if (widgetWindow) {
-    const bounds = widgetWindow.getBounds();
-    return { x: bounds.x, y: bounds.y };
-  }
-  return null;
-}
-
-/**
  * Updates the widget window size based on new display mode.
  * Uses saved size for the mode if available, otherwise uses default SIZE_MAP.
  *

@@ -87,10 +87,13 @@ describe('When CharacterInventoryBrowser is rendered', () => {
       configurable: true,
       writable: true,
       value: {
+        on: vi.fn(() => () => undefined),
         inventory: {
           searchAll: searchAllMock,
           moveItem: moveInventoryItemMock,
           splitStack: splitStackMock,
+          sendItemDragState: vi.fn(),
+          sendVaultDragState: vi.fn(),
         },
         vault: {
           addItem: addItemMock,
@@ -1453,116 +1456,96 @@ describe('When CharacterInventoryBrowser is rendered', () => {
           stackPickupIconFileName: 'r19.png',
         },
       });
-      const onMock = vi.fn();
-      const offMock = vi.fn();
-      const sendMock = vi.fn();
-      const originalIpcRenderer = window.ipcRenderer;
-      Object.defineProperty(window, 'ipcRenderer', {
-        configurable: true,
-        writable: true,
-        value: {
-          on: onMock,
-          off: offMock,
-          invoke: invokeMock,
-          send: sendMock,
-        },
-      });
-      try {
-        searchAllMock.mockResolvedValueOnce({
-          inventory: {
-            snapshots: [
-              {
-                snapshotId: 'target-char-snap',
-                characterName: 'Target Sorc',
-                characterId: 'target-char',
-                sourceFileType: 'd2s',
-                sourceFilePath: '/tmp/target-char.d2s',
-                capturedAt: new Date('2024-01-01T00:00:00.000Z'),
-                items: [
-                  {
-                    fingerprint: 'fp-target-existing',
-                    fingerprintInputs: {
-                      sourceFileType: 'd2s',
-                      characterName: 'Target Sorc',
-                      locationContext: 'inventory',
-                      quality: 'normal',
-                      ethereal: false,
-                      socketCount: 0,
-                      gridX: 7,
-                      gridY: 0,
-                      gridWidth: 1,
-                      gridHeight: 1,
-                      isSocketedItem: false,
-                      itemName: 'Town Portal Scroll',
-                    },
-                    characterName: 'Target Sorc',
-                    characterId: 'target-char',
+      // The electronAPI mock is recreated for every test, so no restore is needed
+      Object.assign(window.electronAPI.inventory, { getActiveDragState: invokeMock });
+      searchAllMock.mockResolvedValueOnce({
+        inventory: {
+          snapshots: [
+            {
+              snapshotId: 'target-char-snap',
+              characterName: 'Target Sorc',
+              characterId: 'target-char',
+              sourceFileType: 'd2s',
+              sourceFilePath: '/tmp/target-char.d2s',
+              capturedAt: new Date('2024-01-01T00:00:00.000Z'),
+              items: [
+                {
+                  fingerprint: 'fp-target-existing',
+                  fingerprintInputs: {
                     sourceFileType: 'd2s',
-                    sourceFilePath: '/tmp/target-char.d2s',
+                    characterName: 'Target Sorc',
                     locationContext: 'inventory',
-                    type: 'other',
-                    itemCode: 'tsc',
+                    quality: 'normal',
+                    ethereal: false,
+                    socketCount: 0,
                     gridX: 7,
                     gridY: 0,
                     gridWidth: 1,
                     gridHeight: 1,
                     isSocketedItem: false,
                     itemName: 'Town Portal Scroll',
-                    quality: 'normal',
-                    ethereal: false,
-                    socketCount: 0,
-                    iconFileName: 'tsc.png',
-                    rawItemJson: '{}',
-                    rawParsedItem: {},
-                    seenAt: new Date('2024-01-01T00:00:00.000Z'),
                   },
-                ],
-              },
-            ],
-            totalSnapshots: 1,
-            totalItems: 1,
-          },
-          vault: {
-            items: [],
-            total: 0,
-            page: 1,
-            pageSize: 20,
-          },
-        });
+                  characterName: 'Target Sorc',
+                  characterId: 'target-char',
+                  sourceFileType: 'd2s',
+                  sourceFilePath: '/tmp/target-char.d2s',
+                  locationContext: 'inventory',
+                  type: 'other',
+                  itemCode: 'tsc',
+                  gridX: 7,
+                  gridY: 0,
+                  gridWidth: 1,
+                  gridHeight: 1,
+                  isSocketedItem: false,
+                  itemName: 'Town Portal Scroll',
+                  quality: 'normal',
+                  ethereal: false,
+                  socketCount: 0,
+                  iconFileName: 'tsc.png',
+                  rawItemJson: '{}',
+                  rawParsedItem: {},
+                  seenAt: new Date('2024-01-01T00:00:00.000Z'),
+                },
+              ],
+            },
+          ],
+          totalSnapshots: 1,
+          totalItems: 1,
+        },
+        vault: {
+          items: [],
+          total: 0,
+          page: 1,
+          pageSize: 20,
+        },
+      });
 
-        render(<CharacterInventoryBrowser />);
-        const inventoryBoard = await screen.findByTestId('inventory-board-target-char-snap');
-        await waitFor(() => {
-          expect(invokeMock).toHaveBeenCalledWith('inventory:getActiveDragState');
-        });
+      render(<CharacterInventoryBrowser />);
+      const inventoryBoard = await screen.findByTestId('inventory-board-target-char-snap');
+      await waitFor(() => {
+        expect(invokeMock).toHaveBeenCalled();
+      });
 
-        // Act
-        fireEvent.click(inventoryBoard, { clientX: 12, clientY: 12 });
+      // Act
+      fireEvent.click(inventoryBoard, { clientX: 12, clientY: 12 });
 
-        // Assert
-        await waitFor(() => {
-          expect(splitStackMock).toHaveBeenCalledTimes(1);
-        });
-        const payload = splitStackMock.mock.calls[0]?.[0];
-        expect(payload?.sourceFilePath).toBe('/tmp/shared-stash.d2i');
-        expect(payload?.sourceFileType).toBe('d2i');
-        expect(payload?.sourceStashTab).toBe(7);
-        expect(payload?.sourceItemCode).toBe('r19');
-        expect(payload?.splitCount).toBe(2);
-        expect(payload?.targets?.[0]).toEqual(
-          expect.objectContaining({
-            targetFilePath: '/tmp/target-char.d2s',
-            targetFileType: 'd2s',
-            targetLocationContext: 'inventory',
-          }),
-        );
-      } finally {
-        Object.defineProperty(window, 'ipcRenderer', {
-          configurable: true,
-          writable: true,
-          value: originalIpcRenderer,
-        });
-      }
+      // Assert
+      await waitFor(() => {
+        expect(splitStackMock).toHaveBeenCalledTimes(1);
+      });
+      const payload = splitStackMock.mock.calls[0]?.[0];
+      expect(payload?.sourceFilePath).toBe('/tmp/shared-stash.d2i');
+      expect(payload?.sourceFileType).toBe('d2i');
+      expect(payload?.sourceStashTab).toBe(7);
+      expect(payload?.sourceItemCode).toBe('r19');
+      expect(payload?.splitCount).toBe(2);
+      expect(payload?.targets?.[0]).toEqual(
+        expect.objectContaining({
+          targetFilePath: '/tmp/target-char.d2s',
+          targetFileType: 'd2s',
+          targetLocationContext: 'inventory',
+        }),
+      );
     });
 
     it('Then a stack pickup that started in another window renders the pickup cursor in this window', async () => {
@@ -1588,102 +1571,82 @@ describe('When CharacterInventoryBrowser is rendered', () => {
           stackPickupIconFileName: 'r19.png',
         },
       });
-      const onMock = vi.fn();
-      const offMock = vi.fn();
-      const sendMock = vi.fn();
-      const originalIpcRenderer = window.ipcRenderer;
-      Object.defineProperty(window, 'ipcRenderer', {
-        configurable: true,
-        writable: true,
-        value: {
-          on: onMock,
-          off: offMock,
-          invoke: invokeMock,
-          send: sendMock,
-        },
-      });
+      // The electronAPI mock is recreated for every test, so no restore is needed
+      Object.assign(window.electronAPI.inventory, { getActiveDragState: invokeMock });
 
-      try {
-        searchAllMock.mockResolvedValueOnce({
-          inventory: {
-            snapshots: [
-              {
-                snapshotId: 'target-char-cursor-snap',
-                characterName: 'Target Sorc',
-                characterId: 'target-char',
-                sourceFileType: 'd2s',
-                sourceFilePath: '/tmp/target-char.d2s',
-                capturedAt: new Date('2024-01-01T00:00:00.000Z'),
-                items: [
-                  {
-                    fingerprint: 'fp-target-existing-cursor',
-                    fingerprintInputs: {
-                      sourceFileType: 'd2s',
-                      characterName: 'Target Sorc',
-                      locationContext: 'inventory',
-                      quality: 'normal',
-                      ethereal: false,
-                      socketCount: 0,
-                      gridX: 7,
-                      gridY: 0,
-                      gridWidth: 1,
-                      gridHeight: 1,
-                      isSocketedItem: false,
-                      itemName: 'Town Portal Scroll',
-                    },
-                    characterName: 'Target Sorc',
-                    characterId: 'target-char',
+      searchAllMock.mockResolvedValueOnce({
+        inventory: {
+          snapshots: [
+            {
+              snapshotId: 'target-char-cursor-snap',
+              characterName: 'Target Sorc',
+              characterId: 'target-char',
+              sourceFileType: 'd2s',
+              sourceFilePath: '/tmp/target-char.d2s',
+              capturedAt: new Date('2024-01-01T00:00:00.000Z'),
+              items: [
+                {
+                  fingerprint: 'fp-target-existing-cursor',
+                  fingerprintInputs: {
                     sourceFileType: 'd2s',
-                    sourceFilePath: '/tmp/target-char.d2s',
+                    characterName: 'Target Sorc',
                     locationContext: 'inventory',
-                    type: 'other',
-                    itemCode: 'tsc',
+                    quality: 'normal',
+                    ethereal: false,
+                    socketCount: 0,
                     gridX: 7,
                     gridY: 0,
                     gridWidth: 1,
                     gridHeight: 1,
                     isSocketedItem: false,
                     itemName: 'Town Portal Scroll',
-                    quality: 'normal',
-                    ethereal: false,
-                    socketCount: 0,
-                    iconFileName: 'tsc.png',
-                    rawItemJson: '{}',
-                    rawParsedItem: {},
-                    seenAt: new Date('2024-01-01T00:00:00.000Z'),
                   },
-                ],
-              },
-            ],
-            totalSnapshots: 1,
-            totalItems: 1,
-          },
-          vault: {
-            items: [],
-            total: 0,
-            page: 1,
-            pageSize: 20,
-          },
-        });
+                  characterName: 'Target Sorc',
+                  characterId: 'target-char',
+                  sourceFileType: 'd2s',
+                  sourceFilePath: '/tmp/target-char.d2s',
+                  locationContext: 'inventory',
+                  type: 'other',
+                  itemCode: 'tsc',
+                  gridX: 7,
+                  gridY: 0,
+                  gridWidth: 1,
+                  gridHeight: 1,
+                  isSocketedItem: false,
+                  itemName: 'Town Portal Scroll',
+                  quality: 'normal',
+                  ethereal: false,
+                  socketCount: 0,
+                  iconFileName: 'tsc.png',
+                  rawItemJson: '{}',
+                  rawParsedItem: {},
+                  seenAt: new Date('2024-01-01T00:00:00.000Z'),
+                },
+              ],
+            },
+          ],
+          totalSnapshots: 1,
+          totalItems: 1,
+        },
+        vault: {
+          items: [],
+          total: 0,
+          page: 1,
+          pageSize: 20,
+        },
+      });
 
-        // Act
-        render(<CharacterInventoryBrowser />);
-        await waitFor(() => {
-          expect(invokeMock).toHaveBeenCalledWith('inventory:getActiveDragState');
-        });
-        expect(screen.queryByLabelText('Inventory item Fal Rune')).not.toBeInTheDocument();
+      // Act
+      render(<CharacterInventoryBrowser />);
+      await waitFor(() => {
+        expect(invokeMock).toHaveBeenCalled();
+      });
+      expect(screen.queryByLabelText('Inventory item Fal Rune')).not.toBeInTheDocument();
 
-        // Assert
-        await waitFor(() => {
-          expect(screen.getByAltText('Fal Rune')).toBeInTheDocument();
-        });
-      } finally {
-        Object.defineProperty(window, 'ipcRenderer', {
-          configurable: true,
-          writable: true,
-          value: originalIpcRenderer,
-        });
-      }
+      // Assert
+      await waitFor(() => {
+        expect(screen.getByAltText('Fal Rune')).toBeInTheDocument();
+      });
     });
 
     it('Then first-click placement still works when stack pickup state is fetched after mount', async () => {
@@ -1712,107 +1675,87 @@ describe('When CharacterInventoryBrowser is rendered', () => {
             stackPickupIconFileName: 'r19.png',
           },
         });
-      const onMock = vi.fn();
-      const offMock = vi.fn();
-      const sendMock = vi.fn();
-      const originalIpcRenderer = window.ipcRenderer;
-      Object.defineProperty(window, 'ipcRenderer', {
-        configurable: true,
-        writable: true,
-        value: {
-          on: onMock,
-          off: offMock,
-          invoke: invokeMock,
-          send: sendMock,
-        },
-      });
+      // The electronAPI mock is recreated for every test, so no restore is needed
+      Object.assign(window.electronAPI.inventory, { getActiveDragState: invokeMock });
 
-      try {
-        searchAllMock.mockResolvedValueOnce({
-          inventory: {
-            snapshots: [
-              {
-                snapshotId: 'target-char-late-sync-snap',
-                characterName: 'Target Sorc',
-                characterId: 'target-char',
-                sourceFileType: 'd2s',
-                sourceFilePath: '/tmp/target-char.d2s',
-                capturedAt: new Date('2024-01-01T00:00:00.000Z'),
-                items: [
-                  {
-                    fingerprint: 'fp-target-existing-late-sync',
-                    fingerprintInputs: {
-                      sourceFileType: 'd2s',
-                      characterName: 'Target Sorc',
-                      locationContext: 'inventory',
-                      quality: 'normal',
-                      ethereal: false,
-                      socketCount: 0,
-                      gridX: 7,
-                      gridY: 0,
-                      gridWidth: 1,
-                      gridHeight: 1,
-                      isSocketedItem: false,
-                      itemName: 'Town Portal Scroll',
-                    },
-                    characterName: 'Target Sorc',
-                    characterId: 'target-char',
+      searchAllMock.mockResolvedValueOnce({
+        inventory: {
+          snapshots: [
+            {
+              snapshotId: 'target-char-late-sync-snap',
+              characterName: 'Target Sorc',
+              characterId: 'target-char',
+              sourceFileType: 'd2s',
+              sourceFilePath: '/tmp/target-char.d2s',
+              capturedAt: new Date('2024-01-01T00:00:00.000Z'),
+              items: [
+                {
+                  fingerprint: 'fp-target-existing-late-sync',
+                  fingerprintInputs: {
                     sourceFileType: 'd2s',
-                    sourceFilePath: '/tmp/target-char.d2s',
+                    characterName: 'Target Sorc',
                     locationContext: 'inventory',
-                    type: 'other',
-                    itemCode: 'tsc',
+                    quality: 'normal',
+                    ethereal: false,
+                    socketCount: 0,
                     gridX: 7,
                     gridY: 0,
                     gridWidth: 1,
                     gridHeight: 1,
                     isSocketedItem: false,
                     itemName: 'Town Portal Scroll',
-                    quality: 'normal',
-                    ethereal: false,
-                    socketCount: 0,
-                    iconFileName: 'tsc.png',
-                    rawItemJson: '{}',
-                    rawParsedItem: {},
-                    seenAt: new Date('2024-01-01T00:00:00.000Z'),
                   },
-                ],
-              },
-            ],
-            totalSnapshots: 1,
-            totalItems: 0,
-          },
-          vault: {
-            items: [],
-            total: 0,
-            page: 1,
-            pageSize: 20,
-          },
-        });
+                  characterName: 'Target Sorc',
+                  characterId: 'target-char',
+                  sourceFileType: 'd2s',
+                  sourceFilePath: '/tmp/target-char.d2s',
+                  locationContext: 'inventory',
+                  type: 'other',
+                  itemCode: 'tsc',
+                  gridX: 7,
+                  gridY: 0,
+                  gridWidth: 1,
+                  gridHeight: 1,
+                  isSocketedItem: false,
+                  itemName: 'Town Portal Scroll',
+                  quality: 'normal',
+                  ethereal: false,
+                  socketCount: 0,
+                  iconFileName: 'tsc.png',
+                  rawItemJson: '{}',
+                  rawParsedItem: {},
+                  seenAt: new Date('2024-01-01T00:00:00.000Z'),
+                },
+              ],
+            },
+          ],
+          totalSnapshots: 1,
+          totalItems: 0,
+        },
+        vault: {
+          items: [],
+          total: 0,
+          page: 1,
+          pageSize: 20,
+        },
+      });
 
-        render(<CharacterInventoryBrowser />);
-        const inventoryBoard = await screen.findByTestId(
-          'inventory-board-target-char-late-sync-snap',
-        );
-        await waitFor(() => {
-          expect(invokeMock).toHaveBeenCalledWith('inventory:getActiveDragState');
-        });
+      render(<CharacterInventoryBrowser />);
+      const inventoryBoard = await screen.findByTestId(
+        'inventory-board-target-char-late-sync-snap',
+      );
+      await waitFor(() => {
+        expect(invokeMock).toHaveBeenCalled();
+      });
 
-        // Act
-        fireEvent.click(inventoryBoard, { clientX: 12, clientY: 12 });
+      // Act
+      fireEvent.click(inventoryBoard, { clientX: 12, clientY: 12 });
 
-        // Assert
-        await waitFor(() => {
-          expect(splitStackMock).toHaveBeenCalledTimes(1);
-        });
-        expect(invokeMock).toHaveBeenCalledTimes(2);
-      } finally {
-        Object.defineProperty(window, 'ipcRenderer', {
-          configurable: true,
-          writable: true,
-          value: originalIpcRenderer,
-        });
-      }
+      // Assert
+      await waitFor(() => {
+        expect(splitStackMock).toHaveBeenCalledTimes(1);
+      });
+      expect(invokeMock).toHaveBeenCalledTimes(2);
     });
 
     it('Then picking up the full stack hides the owned rune tile until placement', async () => {
@@ -3270,19 +3213,8 @@ describe('When CharacterInventoryBrowser is rendered', () => {
           gridHeight: 1,
         },
       });
-      const onMock = vi.fn();
-      const offMock = vi.fn();
-      const originalIpcRenderer = window.ipcRenderer;
-      Object.defineProperty(window, 'ipcRenderer', {
-        configurable: true,
-        writable: true,
-        value: {
-          on: onMock,
-          off: offMock,
-          invoke: invokeMock,
-          send: vi.fn(),
-        },
-      });
+      // The electronAPI mock is recreated for every test, so no restore is needed
+      Object.assign(window.electronAPI.inventory, { getActiveDragState: invokeMock });
 
       searchAllMock.mockResolvedValue({
         inventory: {
@@ -3348,7 +3280,7 @@ describe('When CharacterInventoryBrowser is rendered', () => {
       render(<CharacterInventoryBrowser />);
       const inventoryBoard = await screen.findByTestId('inventory-board-drag-open-snap-1');
       await waitFor(() => {
-        expect(invokeMock).toHaveBeenCalledWith('inventory:getActiveDragState');
+        expect(invokeMock).toHaveBeenCalled();
       });
 
       const dataTransfer = createBlockedDragDataTransfer();
@@ -3365,11 +3297,6 @@ describe('When CharacterInventoryBrowser is rendered', () => {
         expect(inventoryBoard.querySelector('.border-success')).not.toBeNull();
       });
       getComputedStyleSpy.mockRestore();
-      Object.defineProperty(window, 'ipcRenderer', {
-        configurable: true,
-        writable: true,
-        value: originalIpcRenderer,
-      });
     });
   });
 

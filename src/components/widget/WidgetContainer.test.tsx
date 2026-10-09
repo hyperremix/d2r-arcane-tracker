@@ -2,6 +2,7 @@ import { act, render, waitFor } from '@testing-library/react';
 import type { Settings } from 'electron/types/grail';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useGrailStore } from '@/stores/grailStore';
+import { useRunTrackerStore } from '@/stores/runTrackerStore';
 import { WidgetContainer } from './WidgetContainer';
 
 vi.mock('./Widget', () => ({ Widget: () => <div>WidgetStub</div> }));
@@ -21,11 +22,10 @@ vi.mock('@/stores/runTrackerStore', () => {
   return { useRunTrackerStore };
 });
 
-type IpcHandler = (event: unknown, payload: Partial<Settings>) => Promise<void>;
+type IpcHandler = (payload: unknown) => Promise<void> | void;
 
 describe('WidgetContainer native window sizing', () => {
   const originalElectronAPI = window.electronAPI;
-  const originalIpcRenderer = window.ipcRenderer;
   const originalSettings = useGrailStore.getState().settings;
   const handlers = new Map<string, IpcHandler>();
   const updateDisplay = vi.fn().mockResolvedValue({ success: true });
@@ -43,17 +43,24 @@ describe('WidgetContainer native window sizing', () => {
           getProgress: vi.fn().mockResolvedValue([]),
         },
         widget: { updateDisplay, updateOpacity },
+        on: vi.fn((channel: string, handler: IpcHandler) => {
+          handlers.set(channel, handler);
+          return () => {
+            handlers.delete(channel);
+          };
+        }),
       },
       configurable: true,
       writable: true,
     });
-    render(<WidgetContainer />);
+    const result = render(<WidgetContainer />);
     await waitFor(() => {
       expect(handlers.has('settings-updated')).toBe(true);
     });
     await act(async () => {
       await Promise.resolve();
     });
+    return result;
   }
 
   /**
@@ -61,7 +68,7 @@ describe('WidgetContainer native window sizing', () => {
    */
   async function emitSettings(update: Partial<Settings>) {
     await act(async () => {
-      await handlers.get('settings-updated')?.({}, update);
+      await handlers.get('settings-updated')?.(update);
     });
   }
 
@@ -69,16 +76,6 @@ describe('WidgetContainer native window sizing', () => {
     handlers.clear();
     updateDisplay.mockClear();
     updateOpacity.mockClear();
-    Object.defineProperty(window, 'ipcRenderer', {
-      value: {
-        on: vi.fn((channel: string, handler: IpcHandler) => {
-          handlers.set(channel, handler);
-        }),
-        off: vi.fn(),
-      },
-      configurable: true,
-      writable: true,
-    });
   });
 
   afterEach(() => {
@@ -88,11 +85,32 @@ describe('WidgetContainer native window sizing', () => {
       configurable: true,
       writable: true,
     });
-    Object.defineProperty(window, 'ipcRenderer', {
-      value: originalIpcRenderer,
-      configurable: true,
-      writable: true,
+  });
+
+  it('When the main process reports a started session, Then the session from the payload is stored', async () => {
+    // Arrange
+    await renderWithSettings({ widgetDisplay: 'overall' });
+    const session = { id: 'session-1' };
+    const { handleSessionStarted } = useRunTrackerStore.getState();
+
+    // Act
+    await act(async () => {
+      await handlers.get('run-tracker:session-started')?.({ session });
     });
+
+    // Assert
+    expect(handleSessionStarted).toHaveBeenCalledWith(session);
+  });
+
+  it('When the widget unmounts, Then its main-process event listeners are removed', async () => {
+    // Arrange
+    const { unmount } = await renderWithSettings({ widgetDisplay: 'overall' });
+
+    // Act
+    unmount();
+
+    // Assert
+    expect(handlers.size).toBe(0);
   });
 
   it('When the widget loads its stored settings, Then the window is not resized again', async () => {

@@ -28,14 +28,3 @@ declare namespace NodeJS {
     VITE_PUBLIC: string
   }
 }
-
-/**
- * Interface extending the Window object to include IpcRenderer for renderer process communication.
- * This is exposed in the preload script for secure IPC communication.
- */
-interface Window {
-  /**
-   * Electron IpcRenderer for sending messages to the main process.
-   */
-  ipcRenderer: import('electron').IpcRenderer
-}

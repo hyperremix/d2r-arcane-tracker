@@ -453,6 +453,119 @@ describe('When SaveFileMonitor is used', () => {
     });
   });
 
+  describe('If start and stop are requested while another is in flight', () => {
+    interface Deferred<T> {
+      promise: Promise<T>;
+      resolve: (value: T) => void;
+    }
+    const createDeferred = <T>(): Deferred<T> => {
+      let resolve!: (value: T) => void;
+      const promise = new Promise<T>((res) => {
+        resolve = res;
+      });
+      return { promise, resolve };
+    };
+
+    let originalWatch: unknown;
+    let closeSpy: ReturnType<typeof vi.fn>;
+
+    beforeEach(async () => {
+      const saveDir = await mkdtemp(join(tmpdir(), 'arcane-serial-'));
+      tempDirs.push(saveDir);
+      vi.mocked(mockDatabase.getAllSettings).mockReturnValue({
+        saveDir,
+        gameMode: GameMode.Softcore,
+      });
+      originalWatch = (chokidar as any).watch;
+      closeSpy = vi.fn().mockResolvedValue(undefined);
+      (chokidar as any).watch = vi.fn(() => ({ on: vi.fn().mockReturnThis(), close: closeSpy }));
+    });
+
+    afterEach(() => {
+      (chokidar as any).watch = originalWatch;
+    });
+
+    it('When a stop is requested during the initial parse, Then monitoring ends up stopped', async () => {
+      // Arrange
+      const parse = createDeferred<boolean>();
+      const parseSpy = vi.fn(() => parse.promise);
+      (monitor as any).parseSaveDirectory = parseSpy;
+      const start = monitor.startMonitoring();
+      await vi.waitFor(() => expect(parseSpy).toHaveBeenCalledTimes(1));
+
+      // Act
+      const stop = monitor.stopMonitoring();
+      parse.resolve(true);
+      await Promise.all([start, stop]);
+
+      // Assert
+      expect(monitor.isCurrentlyMonitoring()).toBe(false);
+      expect(closeSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it('When a start is requested while a stop is closing the watcher, Then monitoring ends up started', async () => {
+      // Arrange
+      (monitor as any).parseSaveDirectory = vi.fn().mockResolvedValue(true);
+      await monitor.startMonitoring();
+      const close = createDeferred<undefined>();
+      closeSpy.mockReturnValueOnce(close.promise);
+      const stop = monitor.stopMonitoring();
+      await vi.waitFor(() => expect(closeSpy).toHaveBeenCalledTimes(1));
+
+      // Act
+      const resume = monitor.startMonitoring();
+      close.resolve(undefined);
+      await Promise.all([stop, resume]);
+
+      // Assert
+      expect(monitor.isCurrentlyMonitoring()).toBe(true);
+    });
+
+    it('When stopMonitoringIfActive is called during the initial parse, Then monitoring ends up stopped', async () => {
+      // Arrange
+      const parse = createDeferred<boolean>();
+      const parseSpy = vi.fn(() => parse.promise);
+      (monitor as any).parseSaveDirectory = parseSpy;
+      const start = monitor.startMonitoring();
+      await vi.waitFor(() => expect(parseSpy).toHaveBeenCalledTimes(1));
+
+      // Act
+      const stop = monitor.stopMonitoringIfActive();
+      parse.resolve(true);
+      await Promise.all([start, stop]);
+
+      // Assert
+      expect(monitor.isCurrentlyMonitoring()).toBe(false);
+    });
+
+    it('When stopMonitoringIfActive is called while not monitoring, Then no stopped event is emitted', async () => {
+      // Arrange
+      const stoppedSpy = vi.fn();
+      eventBus.on('monitoring-stopped', stoppedSpy);
+
+      // Act
+      await monitor.stopMonitoringIfActive();
+
+      // Assert
+      expect(stoppedSpy).not.toHaveBeenCalled();
+    });
+
+    it('When an operation fails, Then later operations still run', async () => {
+      // Arrange
+      (monitor as any).parseSaveDirectory = vi
+        .fn()
+        .mockRejectedValueOnce(new Error('parse crashed'))
+        .mockResolvedValue(true);
+      await expect(monitor.startMonitoring()).rejects.toThrow('parse crashed');
+
+      // Act
+      await monitor.startMonitoring();
+
+      // Assert
+      expect(monitor.isCurrentlyMonitoring()).toBe(true);
+    });
+  });
+
   describe('If getSaveFiles is called', () => {
     it('Then should return empty array when no save directory', async () => {
       // Arrange
@@ -530,6 +643,41 @@ describe('When SaveFileMonitor is used', () => {
       // Assert - both stop and start called when monitoring was active
       expect(stopSpy).toHaveBeenCalledOnce();
       expect(startSpy).toHaveBeenCalledOnce();
+    });
+
+    it('When the game mode is Manual, Then should not start monitoring', async () => {
+      // Arrange
+      mockDatabase.getAllSettings.mockReturnValue({
+        saveDir: '/test/save/dir',
+        gameMode: GameMode.Manual,
+      });
+      const startSpy = vi.spyOn(monitor, 'startMonitoring');
+
+      // Act
+      await monitor.updateSaveDirectory();
+
+      // Assert
+      expect(startSpy).not.toHaveBeenCalled();
+      expect(monitor.isCurrentlyMonitoring()).toBe(false);
+      expect(monitor.getSaveDirectory()).toBe('/test/save/dir');
+    });
+
+    it('When the game mode is Manual and monitoring is active, Then should stop it without restarting', async () => {
+      // Arrange
+      mockDatabase.getAllSettings.mockReturnValue({
+        saveDir: '/test/save/dir',
+        gameMode: GameMode.Manual,
+      });
+      const stopSpy = vi.spyOn(monitor, 'stopMonitoring');
+      const startSpy = vi.spyOn(monitor, 'startMonitoring');
+      (monitor as any).isMonitoring = true;
+
+      // Act
+      await monitor.updateSaveDirectory();
+
+      // Assert
+      expect(stopSpy).toHaveBeenCalledOnce();
+      expect(startSpy).not.toHaveBeenCalled();
     });
   });
 

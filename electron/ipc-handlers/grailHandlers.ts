@@ -1,7 +1,12 @@
 import { ipcMain, webContents } from 'electron';
 import { type GrailDatabase, grailDatabase } from '../database/database';
-import type { Difficulty, GrailProgress, Item, Settings } from '../types/grail';
+import { createRendererBroadcaster } from '../ipc/broadcast';
+import { createIpcMainRegistry } from '../ipc/handle';
+import type { Difficulty, GrailProgress, Settings } from '../types/grail';
 import { RUN_TRACKER_SHORTCUT_ACTIONS } from '../utils/runTrackerShortcuts';
+
+/** Sends an event from the IPC contract to every renderer window. */
+const broadcastToRenderers = createRendererBroadcaster(() => webContents.getAllWebContents());
 
 /**
  * Global database instance for grail operations.
@@ -38,6 +43,18 @@ function notifySettingsUpdatedListeners(settings: Partial<Settings>): void {
     } catch (error) {
       console.error('Settings updated listener failed:', error);
     }
+  }
+}
+
+/**
+ * Notifies main-process listeners with the settings of a freshly restored database, because a
+ * restore can change settings (e.g. the game mode) without going through grail:updateSettings.
+ */
+function notifyRestoredSettings(): void {
+  try {
+    notifySettingsUpdatedListeners(grailDB.getAllSettings());
+  } catch (error) {
+    console.error('Failed to notify listeners about restored settings:', error);
   }
 }
 
@@ -185,12 +202,7 @@ function assertManualProgressAllowed(progress: GrailProgress): void {
  * Notifies all renderer windows that grail progress changed so they can reload it.
  */
 function notifyProgressUpdated(): void {
-  const allWebContents = webContents.getAllWebContents();
-  for (const wc of allWebContents) {
-    if (!wc.isDestroyed() && wc.getType() === 'window') {
-      wc.send('grail-progress-updated');
-    }
-  }
+  broadcastToRenderers('grail-progress-updated');
 }
 
 /**
@@ -199,6 +211,7 @@ function notifyProgressUpdated(): void {
  * Initializes the database connection and registers all IPC event handlers.
  */
 export function initializeGrailHandlers(): void {
+  const { handle } = createIpcMainRegistry(ipcMain);
   // Initialize database using singleton
   try {
     // Import the singleton database instance
@@ -213,13 +226,8 @@ export function initializeGrailHandlers(): void {
    * IPC handler for retrieving all characters.
    * Maps database character format to renderer format with proper date conversion.
    */
-  ipcMain.handle('grail:getCharacters', async () => {
-    try {
-      return grailDB.getAllCharacters();
-    } catch (error) {
-      console.error('Failed to get characters:', error);
-      throw error;
-    }
+  handle('grail:getCharacters', async () => {
+    return grailDB.getAllCharacters();
   });
 
   // Items handlers
@@ -227,14 +235,9 @@ export function initializeGrailHandlers(): void {
    * IPC handler for retrieving all grail items.
    * Returns items filtered by current settings and maps database format to renderer format.
    */
-  ipcMain.handle('grail:getItems', async () => {
-    try {
-      const settings = grailDB.getAllSettings();
-      return grailDB.getFilteredItems(settings);
-    } catch (error) {
-      console.error('Failed to get items:', error);
-      throw error;
-    }
+  handle('grail:getItems', async () => {
+    const settings = grailDB.getAllSettings();
+    return grailDB.getFilteredItems(settings);
   });
 
   /**
@@ -242,28 +245,8 @@ export function initializeGrailHandlers(): void {
    * Returns all runewords regardless of grailRunewords setting.
    * Used by the runeword calculator to work independently of tracking settings.
    */
-  ipcMain.handle('grail:getAllRunewords', async () => {
-    try {
-      return grailDB.getAllRunewords();
-    } catch (error) {
-      console.error('Failed to get all runewords:', error);
-      throw error;
-    }
-  });
-
-  /**
-   * IPC handler for seeding items into the database.
-   * @param _ - IPC event (unused)
-   * @param items - Array of Holy Grail items to seed
-   */
-  ipcMain.handle('grail:seedItems', async (_, items: Item[]) => {
-    try {
-      grailDB.insertItems(items);
-      return { success: true };
-    } catch (error) {
-      console.error('Failed to seed items:', error);
-      throw error;
-    }
+  handle('grail:getAllRunewords', async () => {
+    return grailDB.getAllRunewords();
   });
 
   // Progress handlers
@@ -275,23 +258,18 @@ export function initializeGrailHandlers(): void {
    * @param _ - IPC event (unused)
    * @param characterId - Optional character ID to filter progress for specific character
    */
-  ipcMain.handle('grail:getProgress', async (_, characterId?: string) => {
-    try {
-      const dbProgress = characterId
-        ? grailDB.getProgressByCharacter(characterId)
-        : grailDB.getAllProgress();
+  handle('grail:getProgress', async (_, characterId) => {
+    const dbProgress = characterId
+      ? grailDB.getProgressByCharacter(characterId)
+      : grailDB.getAllProgress();
 
-      // Use cached character map (invalidated by GrailDatabase on character mutations)
-      const characterMap = grailDB.getCharacterMap();
+    // Use cached character map (invalidated by GrailDatabase on character mutations)
+    const characterMap = grailDB.getCharacterMap();
 
-      return dbProgress.map((prog) => ({
-        ...prog,
-        foundBy: characterMap.get(prog.characterId),
-      }));
-    } catch (error) {
-      console.error('Failed to get progress:', error);
-      throw error;
-    }
+    return dbProgress.map((prog) => ({
+      ...prog,
+      foundBy: characterMap.get(prog.characterId),
+    }));
   });
 
   /**
@@ -300,24 +278,19 @@ export function initializeGrailHandlers(): void {
    * @param _ - IPC event (unused)
    * @param progress - Grail progress data to update
    */
-  ipcMain.handle('grail:updateProgress', async (_, progress: unknown) => {
-    try {
-      if (!isValidGrailProgress(progress)) {
-        throw new Error('Invalid grail progress payload');
-      }
-
-      assertManualProgressAllowed(progress);
-
-      grailDB.upsertProgress(progress);
-
-      // Emit event to all renderer windows to refresh their progress data
-      notifyProgressUpdated();
-
-      return { success: true };
-    } catch (error) {
-      console.error('Failed to update progress:', error);
-      throw error;
+  handle('grail:updateProgress', async (_, progress: unknown) => {
+    if (!isValidGrailProgress(progress)) {
+      throw new Error('Invalid grail progress payload');
     }
+
+    assertManualProgressAllowed(progress);
+
+    grailDB.upsertProgress(progress);
+
+    // Emit event to all renderer windows to refresh their progress data
+    notifyProgressUpdated();
+
+    return { success: true };
   });
 
   /**
@@ -327,22 +300,13 @@ export function initializeGrailHandlers(): void {
    * @param _ - IPC event (unused)
    * @param progressId - ID of the progress record to delete
    */
-  ipcMain.handle('grail:deleteProgress', async (_, progressId: unknown) => {
-    try {
-      if (!isNonEmptyString(progressId)) {
-        throw new Error('Invalid progress ID');
-      }
-
-      const deleted = grailDB.deleteManualProgress(progressId);
-      if (deleted) {
-        notifyProgressUpdated();
-      }
-
-      return { success: deleted };
-    } catch (error) {
-      console.error('Failed to delete progress:', error);
-      throw error;
+  handle('grail:deleteProgress', async (_, progressId) => {
+    const deleted = grailDB.deleteManualProgress(progressId);
+    if (deleted) {
+      notifyProgressUpdated();
     }
+
+    return { success: deleted };
   });
 
   /**
@@ -350,26 +314,16 @@ export function initializeGrailHandlers(): void {
    * @param _ - IPC event (unused)
    * @param itemId - The item ID to get progress for
    */
-  ipcMain.handle('grail:getProgressByItem', async (_, itemId: string) => {
-    try {
-      return grailDB.getProgressByItem(itemId);
-    } catch (error) {
-      console.error('Failed to get progress by item:', error);
-      throw error;
-    }
+  handle('grail:getProgressByItem', async (_, itemId) => {
+    return grailDB.getProgressByItem(itemId);
   });
 
   // Settings handlers
   /**
    * IPC handler for retrieving all user settings.
    */
-  ipcMain.handle('grail:getSettings', async () => {
-    try {
-      return grailDB.getAllSettings();
-    } catch (error) {
-      console.error('Failed to get settings:', error);
-      throw error;
-    }
+  handle('grail:getSettings', async () => {
+    return grailDB.getAllSettings();
   });
 
   /**
@@ -378,53 +332,26 @@ export function initializeGrailHandlers(): void {
    * @param _ - IPC event (unused)
    * @param settings - Partial settings object to update
    */
-  ipcMain.handle('grail:updateSettings', async (_, settings: Partial<Settings>) => {
-    try {
-      validateSettingsUpdate(settings);
+  handle('grail:updateSettings', async (_, settings) => {
+    validateSettingsUpdate(settings);
 
-      for (const key in settings) {
-        const settingsKey = key as keyof Settings;
-        const value = settings[settingsKey];
-        const stringValue = convertSettingValueToString(value);
+    for (const key in settings) {
+      const settingsKey = key as keyof Settings;
+      const value = settings[settingsKey];
+      const stringValue = convertSettingValueToString(value);
 
-        // Skip if value should not be saved (undefined)
-        if (stringValue !== null) {
-          grailDB.setSetting(settingsKey, stringValue);
-        }
+      // Skip if value should not be saved (undefined)
+      if (stringValue !== null) {
+        grailDB.setSetting(settingsKey, stringValue);
       }
-
-      // Emit event to all renderer windows to notify them of settings changes
-      const allWebContents = webContents.getAllWebContents();
-      for (const wc of allWebContents) {
-        if (!wc.isDestroyed() && wc.getType() === 'window') {
-          wc.send('settings-updated', settings);
-        }
-      }
-
-      notifySettingsUpdatedListeners(settings);
-
-      return { success: true };
-    } catch (error) {
-      console.error('Failed to update settings:', error);
-      throw error;
     }
-  });
 
-  // Statistics handlers
-  /**
-   * IPC handler for retrieving grail statistics.
-   * @param _ - IPC event (unused)
-   * @param characterId - Optional character ID to get statistics for specific character
-   */
-  ipcMain.handle('grail:getStatistics', async (_, characterId?: string) => {
-    try {
-      const settings = grailDB.getAllSettings();
-      const stats = grailDB.getFilteredGrailStatistics(settings, characterId);
-      return stats;
-    } catch (error) {
-      console.error('Failed to get statistics:', error);
-      throw error;
-    }
+    // Emit event to all renderer windows to notify them of settings changes
+    broadcastToRenderers('settings-updated', settings);
+
+    notifySettingsUpdatedListeners(settings);
+
+    return { success: true };
   });
 
   // Backup handlers
@@ -433,14 +360,9 @@ export function initializeGrailHandlers(): void {
    * @param _ - IPC event (unused)
    * @param backupPath - File path where the backup should be saved
    */
-  ipcMain.handle('grail:backup', async (_, backupPath: string) => {
-    try {
-      await grailDB.backup(backupPath);
-      return { success: true };
-    } catch (error) {
-      console.error('Failed to backup database:', error);
-      throw error;
-    }
+  handle('grail:backup', async (_, backupPath) => {
+    await grailDB.backup(backupPath);
+    return { success: true };
   });
 
   /**
@@ -448,14 +370,10 @@ export function initializeGrailHandlers(): void {
    * @param _ - IPC event (unused)
    * @param backupPath - File path of the backup to restore from
    */
-  ipcMain.handle('grail:restore', async (_, backupPath: string) => {
-    try {
-      grailDB.restore(backupPath);
-      return { success: true };
-    } catch (error) {
-      console.error('Failed to restore database:', error);
-      throw error;
-    }
+  handle('grail:restore', async (_, backupPath) => {
+    grailDB.restore(backupPath);
+    notifyRestoredSettings();
+    return { success: true };
   });
 
   /**
@@ -463,28 +381,10 @@ export function initializeGrailHandlers(): void {
    * @param _ - IPC event (unused)
    * @param backupBuffer - Buffer containing the backup data
    */
-  ipcMain.handle('grail:restoreFromBuffer', async (_, backupBuffer: Uint8Array) => {
-    try {
-      grailDB.restoreFromBuffer(Buffer.from(backupBuffer));
-      return { success: true };
-    } catch (error) {
-      console.error('Failed to restore database from buffer:', error);
-      throw error;
-    }
-  });
-
-  /**
-   * IPC handler for truncating all user data (characters and progress).
-   * This removes all characters and their associated progress while keeping items and settings.
-   */
-  ipcMain.handle('grail:truncateUserData', async () => {
-    try {
-      grailDB.truncateUserData();
-      return { success: true };
-    } catch (error) {
-      console.error('Failed to truncate user data:', error);
-      throw error;
-    }
+  handle('grail:restoreFromBuffer', async (_, backupBuffer) => {
+    grailDB.restoreFromBuffer(Buffer.from(backupBuffer));
+    notifyRestoredSettings();
+    return { success: true };
   });
 
   console.log('Grail IPC handlers initialized');

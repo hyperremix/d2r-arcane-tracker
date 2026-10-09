@@ -1,4 +1,3 @@
-import type { Run, Session } from 'electron/types/grail';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PageHeader } from '@/components/layout/PageHeader';
@@ -6,6 +5,7 @@ import { PageShell } from '@/components/layout/PageShell';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { translations } from '@/i18n/translations';
+import { combineUnsubscribers, onMainEvent } from '@/lib/ipcEvents';
 import { useRunTrackerStore } from '@/stores/runTrackerStore';
 import { ErrorDisplay } from './ErrorDisplay';
 import { SessionCard } from './SessionCard';
@@ -62,78 +62,37 @@ export function RunTracker() {
   // Set up IPC event listeners for real-time updates
   // biome-ignore lint/correctness/useExhaustiveDependencies: Event listeners should only be set up once
   useEffect(() => {
-    const handleSessionStartedEvent = (
-      _event: Electron.IpcRendererEvent,
-      payload: { session: Session },
-    ) => {
-      handleSessionStarted(payload.session);
-    };
-
-    const handleSessionEndedEvent = (
-      _event: Electron.IpcRendererEvent,
-      _payload: { session: Session },
-    ) => {
-      handleSessionEnded();
-    };
-
-    const handleRunStartedEvent = (
-      _event: Electron.IpcRendererEvent,
-      payload: { run: Run; session: Session; manual: boolean },
-    ) => {
-      handleRunStarted(payload.run, payload.session);
-    };
-
-    const handleRunEndedEvent = (
-      _event: Electron.IpcRendererEvent,
-      payload: { run: Run; session: Session; manual: boolean },
-    ) => {
-      handleRunEnded(payload.run, payload.session);
-    };
-
-    const handleRunPausedEvent = (
-      _event: Electron.IpcRendererEvent,
-      payload: { run: Run; session: Session },
-    ) => {
-      handleRunPaused(payload.session);
-    };
-
-    const handleRunResumedEvent = (
-      _event: Electron.IpcRendererEvent,
-      payload: { run: Run; session: Session },
-    ) => {
-      handleRunResumed(payload.session);
-    };
-
-    const handleRunItemAddedEvent = (
-      _event: Electron.IpcRendererEvent,
-      payload: { runId: string; name?: string },
-    ) => {
-      // Refresh items for the affected run so UI reflects newly found items
-      loadRunItems(payload.runId).catch((error) => {
-        console.error('[RunTracker] Error loading items for run from event:', error);
-      });
-    };
-
-    // Register IPC event listeners
-    window.ipcRenderer?.on('run-tracker:session-started', handleSessionStartedEvent);
-    window.ipcRenderer?.on('run-tracker:session-ended', handleSessionEndedEvent);
-    window.ipcRenderer?.on('run-tracker:run-started', handleRunStartedEvent);
-    window.ipcRenderer?.on('run-tracker:run-ended', handleRunEndedEvent);
-    window.ipcRenderer?.on('run-tracker:run-paused', handleRunPausedEvent);
-    window.ipcRenderer?.on('run-tracker:run-resumed', handleRunResumedEvent);
-    window.ipcRenderer?.on('run-tracker:run-item-added', handleRunItemAddedEvent);
+    const unsubscribe = combineUnsubscribers([
+      onMainEvent('run-tracker:session-started', (payload) => {
+        handleSessionStarted(payload.session);
+      }),
+      onMainEvent('run-tracker:session-ended', () => {
+        handleSessionEnded();
+      }),
+      onMainEvent('run-tracker:run-started', (payload) => {
+        handleRunStarted(payload.run, payload.session);
+      }),
+      onMainEvent('run-tracker:run-ended', (payload) => {
+        handleRunEnded(payload.run, payload.session);
+      }),
+      onMainEvent('run-tracker:run-paused', (payload) => {
+        handleRunPaused(payload.session);
+      }),
+      onMainEvent('run-tracker:run-resumed', (payload) => {
+        handleRunResumed(payload.session);
+      }),
+      onMainEvent('run-tracker:run-item-added', (payload) => {
+        // Refresh items for the affected run so UI reflects newly found items
+        loadRunItems(payload.runId).catch((error) => {
+          console.error('[RunTracker] Error loading items for run from event:', error);
+        });
+      }),
+    ]);
 
     console.log('[RunTracker] IPC event listeners registered');
 
-    // Cleanup function to remove listeners
     return () => {
-      window.ipcRenderer?.off('run-tracker:session-started', handleSessionStartedEvent);
-      window.ipcRenderer?.off('run-tracker:session-ended', handleSessionEndedEvent);
-      window.ipcRenderer?.off('run-tracker:run-started', handleRunStartedEvent);
-      window.ipcRenderer?.off('run-tracker:run-ended', handleRunEndedEvent);
-      window.ipcRenderer?.off('run-tracker:run-paused', handleRunPausedEvent);
-      window.ipcRenderer?.off('run-tracker:run-resumed', handleRunResumedEvent);
-      window.ipcRenderer?.off('run-tracker:run-item-added', handleRunItemAddedEvent);
+      unsubscribe();
       console.log('[RunTracker] IPC event listeners cleaned up');
     };
   }, []); // Only set up once on mount

@@ -1,3 +1,4 @@
+import { INVENTORY_DRAG_STATE_CHANNEL, VAULT_DRAG_STATE_CHANNEL } from 'electron/ipc/contract';
 import { gems } from 'electron/items/gems';
 import { materials } from 'electron/items/materials';
 import { runes } from 'electron/items/runes';
@@ -80,6 +81,7 @@ import { useSpriteIcon } from '@/hooks/useSpriteIcon';
 import { translations } from '@/i18n/translations';
 import type { GameItemTooltipSocketEntry } from '@/lib/gameItemTooltip';
 import { buildGameItemTooltipModel } from '@/lib/gameItemTooltip';
+import { combineUnsubscribers, onMainEvent } from '@/lib/ipcEvents';
 import { getRawItemLocation, isRawBeltItem } from '@/lib/rawItemLocation';
 import {
   createSpatialIconCandidates,
@@ -100,8 +102,6 @@ type EquipValidationCode =
   | 'TWO_HANDED_OFFHAND_OCCUPIED'
   | 'OFFHAND_BLOCKED_BY_TWO_HANDED'
   | 'TARGET_SLOT_OCCUPIED';
-const VAULT_DRAG_STATE_CHANNEL = 'inventory:vault-drag-state';
-const INVENTORY_DRAG_STATE_CHANNEL = 'inventory:item-drag-state';
 const DEFAULT_MERCENARY_SLOT_ORDER: PaperDollSlotKey[] = ['head', 'leftHand', 'armor', 'rightHand'];
 const DEFAULT_MERCENARY_SLOT_SET = new Set(DEFAULT_MERCENARY_SLOT_ORDER);
 const STASH_SOURCE_FILE_TYPES = new Set<VaultSourceFileType>(['sss', 'd2x', 'd2i']);
@@ -2588,7 +2588,7 @@ export function CharacterInventoryBrowser({
   useEffect(() => {
     let isDisposed = false;
 
-    const handleVaultDragState = (_event: unknown, payload: unknown) => {
+    const handleVaultDragState = (payload: unknown) => {
       const parsedPayload = parseVaultDragStatePayload(payload);
       if (!parsedPayload) {
         return;
@@ -2603,7 +2603,7 @@ export function CharacterInventoryBrowser({
     };
 
     // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: inventory drag-state synchronization intentionally handles local/remote pickup reconciliation and cancellation in one guarded callback.
-    const handleInventoryDragState = (_event: unknown, payload: unknown) => {
+    const handleInventoryDragState = (payload: unknown) => {
       const parsedPayload = parseInventoryDragStatePayload(payload);
       if (!parsedPayload) {
         return;
@@ -2639,21 +2639,20 @@ export function CharacterInventoryBrowser({
       );
     };
 
-    window.ipcRenderer?.on(VAULT_DRAG_STATE_CHANNEL, handleVaultDragState);
-    window.ipcRenderer?.on(INVENTORY_DRAG_STATE_CHANNEL, handleInventoryDragState);
+    const unsubscribe = combineUnsubscribers([
+      onMainEvent(VAULT_DRAG_STATE_CHANNEL, handleVaultDragState),
+      onMainEvent(INVENTORY_DRAG_STATE_CHANNEL, handleInventoryDragState),
+    ]);
 
-    if (typeof window.ipcRenderer?.invoke === 'function') {
-      void window.ipcRenderer
-        .invoke('inventory:getActiveDragState')
+    const getActiveDragState = window.electronAPI?.inventory?.getActiveDragState;
+    if (typeof getActiveDragState === 'function') {
+      void getActiveDragState()
         .then((payload) => {
           if (isDisposed || !payload || typeof payload !== 'object') {
             return;
           }
 
-          const rawPayload = payload as {
-            vault?: unknown;
-            inventory?: unknown;
-          };
+          const rawPayload: { vault?: unknown; inventory?: unknown } = payload;
           const parsedVaultPayload = parseVaultDragStatePayload(rawPayload.vault);
           if (parsedVaultPayload?.active) {
             setCrossWindowVaultDragItem(parsedVaultPayload);
@@ -2673,8 +2672,7 @@ export function CharacterInventoryBrowser({
 
     return () => {
       isDisposed = true;
-      window.ipcRenderer?.off(VAULT_DRAG_STATE_CHANNEL, handleVaultDragState);
-      window.ipcRenderer?.off(INVENTORY_DRAG_STATE_CHANNEL, handleInventoryDragState);
+      unsubscribe();
     };
   }, [cancelPickup, consumePickup]);
 
@@ -2691,13 +2689,13 @@ export function CharacterInventoryBrowser({
       }, 250);
     };
 
-    window.ipcRenderer?.on('save-file-event', handleSaveFileEvent);
+    const unsubscribe = onMainEvent('save-file-event', handleSaveFileEvent);
 
     return () => {
       if (reloadTimeout) {
         clearTimeout(reloadTimeout);
       }
-      window.ipcRenderer?.off('save-file-event', handleSaveFileEvent);
+      unsubscribe();
     };
   }, [loadInventorySearch]);
 
@@ -2706,7 +2704,7 @@ export function CharacterInventoryBrowser({
     if (payload) {
       lastSyncedStackPickupPayloadRef.current = payload;
       setCrossWindowInventoryDragItem(payload);
-      window.ipcRenderer?.send(INVENTORY_DRAG_STATE_CHANNEL, payload);
+      window.electronAPI?.inventory.sendItemDragState(payload);
       return;
     }
 
@@ -2721,7 +2719,7 @@ export function CharacterInventoryBrowser({
         ? null
         : current,
     );
-    window.ipcRenderer?.send(INVENTORY_DRAG_STATE_CHANNEL, {
+    window.electronAPI?.inventory.sendItemDragState({
       ...lastPayload,
       active: false,
     });
@@ -2901,7 +2899,7 @@ export function CharacterInventoryBrowser({
     const dragStatePayload = toInventoryDragStatePayload(itemInput);
     if (dragStatePayload) {
       setDraggingInventoryItem(dragStatePayload);
-      window.ipcRenderer?.send(INVENTORY_DRAG_STATE_CHANNEL, dragStatePayload);
+      window.electronAPI?.inventory.sendItemDragState(dragStatePayload);
     }
 
     event.dataTransfer.effectAllowed = 'move';
@@ -2915,7 +2913,7 @@ export function CharacterInventoryBrowser({
     draggingVaultInputRef.current = undefined;
     setDraggingInventoryItem((current) => {
       if (current) {
-        window.ipcRenderer?.send(INVENTORY_DRAG_STATE_CHANNEL, {
+        window.electronAPI?.inventory.sendItemDragState({
           ...current,
           active: false,
         });
@@ -2928,7 +2926,7 @@ export function CharacterInventoryBrowser({
   const handleVaultItemDragStart = useCallback((item: VaultItem) => {
     const dragItem = toActiveVaultDragItem(item);
     setDraggingVaultItem(dragItem);
-    window.ipcRenderer?.send(VAULT_DRAG_STATE_CHANNEL, {
+    window.electronAPI?.inventory.sendVaultDragState({
       active: true,
       ...dragItem,
     });
@@ -2937,7 +2935,7 @@ export function CharacterInventoryBrowser({
   const handleVaultItemDragEnd = useCallback(() => {
     setDraggingVaultItem((current) => {
       if (current) {
-        window.ipcRenderer?.send(VAULT_DRAG_STATE_CHANNEL, {
+        window.electronAPI?.inventory.sendVaultDragState({
           active: false,
           ...current,
         });
@@ -2960,19 +2958,18 @@ export function CharacterInventoryBrowser({
   const getActiveSynchronizedStackPickupDragItem = useCallback(async (): Promise<
     ActiveInventoryDragItem | undefined
   > => {
-    if (!window.ipcRenderer?.invoke) {
+    const getActiveDragState = window.electronAPI?.inventory?.getActiveDragState;
+    if (typeof getActiveDragState !== 'function') {
       return undefined;
     }
 
     try {
-      const payload = await window.ipcRenderer.invoke('inventory:getActiveDragState');
+      const payload = await getActiveDragState();
       if (!payload || typeof payload !== 'object') {
         return undefined;
       }
 
-      const rawPayload = payload as {
-        inventory?: unknown;
-      };
+      const rawPayload: { inventory?: unknown } = payload;
       const parsedInventoryPayload = parseInventoryDragStatePayload(rawPayload.inventory);
       if (!parsedInventoryPayload?.active || !isStackPickupDragState(parsedInventoryPayload)) {
         return undefined;
@@ -3035,7 +3032,7 @@ export function CharacterInventoryBrowser({
           targetGridY,
           targetEquippedSlotId,
         });
-        window.ipcRenderer?.send(INVENTORY_DRAG_STATE_CHANNEL, {
+        window.electronAPI?.inventory.sendItemDragState({
           ...inventoryItem,
           active: false,
         });
@@ -3157,7 +3154,7 @@ export function CharacterInventoryBrowser({
         ? null
         : current,
     );
-    window.ipcRenderer?.send(INVENTORY_DRAG_STATE_CHANNEL, inactivePayload);
+    window.electronAPI?.inventory.sendItemDragState(inactivePayload);
   }, []);
 
   const consumeSynchronizedStackPickup = useCallback(
@@ -3171,7 +3168,7 @@ export function CharacterInventoryBrowser({
         };
         lastSyncedStackPickupPayloadRef.current = nextPayload;
         setCrossWindowInventoryDragItem(nextPayload);
-        window.ipcRenderer?.send(INVENTORY_DRAG_STATE_CHANNEL, nextPayload);
+        window.electronAPI?.inventory.sendItemDragState(nextPayload);
         return;
       }
 

@@ -39,7 +39,8 @@ src/                 React renderer
   i18n/              translations.ts (keys) and locales/
 electron/            Main process
   services/          save file monitor, run tracker, memory reader, terror zones, updates
-  ipc-handlers/      IPC endpoints exposed via preload.ts
+  ipc/               IPC contract (channels, payloads, validators), handler registry, preload API
+  ipc-handlers/      main-process IPC handlers
   database/          SQLite (better-sqlite3 + drizzle-orm)
   items/             Holy Grail item data
   config/            D2R build and memory pattern tables
@@ -87,6 +88,8 @@ Databases created before migrations existed have no recorded migrations. On thei
 ## Making changes
 
 Coding, i18n, testing and Electron safety conventions are in [AGENTS.md](AGENTS.md). They apply to human contributors too. In short: TypeScript with named exports, every UI string goes through `t(...)`, tests use Vitest and describe their scenarios, and inputs are validated at IPC boundaries.
+
+To add an IPC channel, declare it in `electron/ipc/contract.ts` first. The type checker then requires its argument validator in `electron/ipc/validators.ts` and checks the `handle()` registration and the `window.electronAPI` method in `electron/ipc/api.ts` against it; the tests in `electron/ipc/` fail while the handler or the API method is missing. Renderer code subscribes to main-process events with `onMainEvent()` from `src/lib/ipcEvents.ts` and returns the unsubscribe function from the effect cleanup.
 
 Before opening a PR, run the same checks as CI:
 
