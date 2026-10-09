@@ -411,6 +411,25 @@ export function parseVaultDragStatePayload(payload: unknown): VaultDragStatePayl
   };
 }
 
+/**
+ * Reads drag data of one format. Some platforms throw while the data is protected (during
+ * dragover), which is treated as no data.
+ */
+export function readDragData(event: DragEvent<HTMLElement>, format: string): string {
+  try {
+    return event.dataTransfer.getData(format) ?? '';
+  } catch {
+    return '';
+  }
+}
+
+/** Reads the plain-text drag data, trying each name platforms use for that format. */
+export function readDragText(event: DragEvent<HTMLElement>): string {
+  return (
+    readDragData(event, 'text/plain') || readDragData(event, 'text') || readDragData(event, 'Text')
+  );
+}
+
 export function resolveActiveVaultDragItem(
   event: DragEvent<HTMLElement>,
   draggingVaultItem?: ActiveVaultDragItem | null,
