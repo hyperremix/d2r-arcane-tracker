@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, type MockInstance, vi } from 'vitest';
 import { items as grailItems } from '../items';
 import { createInMemoryDatabase } from '../test/helpers/databaseHelpers';
-import type { Item } from '../types/grail';
+import type { Item, Settings } from '../types/grail';
 import { createDrizzleDb } from './drizzle';
-import { ITEM_CATALOG_HASH_SETTING, syncItemCatalog } from './items';
+import { getAllItems, getFilteredItems, ITEM_CATALOG_HASH_SETTING, syncItemCatalog } from './items';
 import { initializeSchema } from './schema';
 import type { DatabaseContext } from './types';
 
@@ -101,6 +101,67 @@ describe('When the item catalog is synced at startup', () => {
           .prepare('SELECT value FROM settings WHERE key = ?')
           .get(ITEM_CATALOG_HASH_SETTING),
       ).toEqual({ value: expect.stringMatching(/^[0-9a-f]{64}$/) });
+    });
+  });
+});
+
+describe('When the items are filtered by the grail settings', () => {
+  let ctx: DatabaseContext;
+  let logSpy: MockInstance<typeof console.log>;
+
+  beforeEach(() => {
+    logSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    const rawDb = createInMemoryDatabase();
+    ctx = { rawDb, db: createDrizzleDb(rawDb), dbPath: ':memory:' };
+    initializeSchema(ctx);
+  });
+
+  afterEach(() => {
+    ctx.rawDb.close();
+    logSpy.mockRestore();
+  });
+
+  describe('If runes and runewords are both excluded', () => {
+    it('Then every other item is returned in catalog order', () => {
+      // Arrange
+      const settings = { grailRunes: false, grailRunewords: false } as Settings;
+      const expected = getAllItems(ctx).filter(
+        (item) => item.type !== 'rune' && item.type !== 'runeword',
+      );
+
+      // Act
+      const filtered = getFilteredItems(ctx, settings);
+
+      // Assert
+      expect(expected.length).toBeGreaterThan(0);
+      expect(filtered).toEqual(expected);
+    });
+  });
+
+  describe('If only runes are excluded', () => {
+    it('Then runewords are still returned', () => {
+      // Arrange
+      const settings = { grailRunes: false, grailRunewords: true } as Settings;
+
+      // Act
+      const filtered = getFilteredItems(ctx, settings);
+
+      // Assert
+      expect(filtered.some((item) => item.type === 'rune')).toBe(false);
+      expect(filtered.some((item) => item.type === 'runeword')).toBe(true);
+    });
+  });
+
+  describe('If nothing is excluded', () => {
+    it('Then all items are returned', () => {
+      // Arrange
+      const settings = { grailRunes: true, grailRunewords: true } as Settings;
+
+      // Act
+      const filtered = getFilteredItems(ctx, settings);
+
+      // Assert
+      expect(filtered).toEqual(getAllItems(ctx));
     });
   });
 });

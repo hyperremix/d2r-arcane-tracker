@@ -17,7 +17,8 @@ RunTracker       starts/ends runs in the active session
 | File | Role |
 | --- | --- |
 | `electron/services/processMonitor.ts` | Detects D2R.exe |
-| `electron/services/memoryReader.ts` | Windows API calls through `win32-api`, offset resolution, polling |
+| `electron/services/memoryReader.ts` | Offset resolution, polling |
+| `electron/services/win32/processMemory.ts` | Windows API calls through `win32-api`, loaded on Windows only |
 | `electron/config/d2rBuilds.ts` | `KNOWN_D2R_BUILDS`: verified offsets per build |
 | `electron/config/d2rPatterns.ts` | d2go UI signature for the fallback scan |
 | `electron/services/uiOffsetResolver.ts` | Validates signature matches |

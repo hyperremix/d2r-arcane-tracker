@@ -280,10 +280,11 @@ export interface VaultServiceDependencies {
   saveFileEditor: VaultSaveFileEditor;
   /** Rejects while the game is running, because it would overwrite edited save files. */
   assertGameNotRunning: () => Promise<void>;
-  /** The directory the save file monitor watches, if it watches one. */
-  getMonitoredSaveDirectory: () => string | undefined;
-  /** The save directory configured in the settings, if any. */
-  getConfiguredSaveDirectory: () => string | undefined;
+  /**
+   * The effective save directory the save file monitor works with (see
+   * `resolveEffectiveSaveDirectory`), if known.
+   */
+  getSaveDirectory: () => string | undefined;
   /** Inventory snapshots of the latest save file scan. */
   getInventorySnapshots: () => ParsedInventorySnapshot[];
 }
@@ -402,22 +403,11 @@ export class VaultService {
   }
 
   /**
-   * The directory the save file monitor watches, falling back to the configured one.
-   * Renderer-supplied file paths must resolve to a save file inside it before they can be read or
-   * written.
+   * The save directory the save file monitor works with. Renderer-supplied file paths must resolve
+   * to a save file inside it before they can be read or written.
    */
   private resolveSaveDirectory(): string | undefined {
-    const monitorDirectory = this.deps.getMonitoredSaveDirectory();
-    if (monitorDirectory) {
-      return monitorDirectory;
-    }
-
-    try {
-      return this.deps.getConfiguredSaveDirectory() || undefined;
-    } catch (error) {
-      console.error('Failed to read the configured save directory', error);
-      return undefined;
-    }
+    return this.deps.getSaveDirectory() || undefined;
   }
 
   /**

@@ -2,7 +2,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { app, BrowserWindow, session } from 'electron';
 import { type RunningApp, startApp } from './app/bootstrap';
-import { deferQuitUntilShutdown } from './app/lifecycle';
+import { deferQuitUntilShutdown, shutdownWhenStarted } from './app/lifecycle';
 import { resolveAppPaths } from './app/paths';
 
 /**
@@ -29,6 +29,12 @@ if (VITE_DEV_SERVER_URL) {
  * The running application, once the app is ready.
  */
 let runningApp: RunningApp | undefined;
+
+/**
+ * The startup of the app: resolves to the running app, or to undefined when the start failed.
+ * Startup is asynchronous, so a quit during it must wait for it instead of finding no running app.
+ */
+let startup: Promise<RunningApp | undefined> | undefined;
 
 // Quit when all windows are closed, except on macOS. There, it's common
 // for applications and their menu bar to stay active until the user quits
@@ -65,18 +71,21 @@ app.whenReady().then(() => {
     callback({ responseHeaders: headers });
   });
 
-  startApp(paths).then(
+  startup = startApp(paths).then(
     (startedApp) => {
       runningApp = startedApp;
+      return startedApp;
     },
     (error: unknown) => {
       // startApp has already stopped what it started; without a window the app has nothing to show
       console.error('[main] Failed to start the app:', error);
       app.quit();
+      return undefined;
     },
   );
 });
 
 // Stop the services, close the windows and the database before the app quits. Quitting waits for
-// the asynchronous shutdown, so open runs are ended and pending writes are flushed.
-deferQuitUntilShutdown(app, () => runningApp?.shutdown() ?? Promise.resolve());
+// the asynchronous shutdown, so open runs are ended and pending writes are flushed. A quit while the
+// app is still starting waits for the startup to finish and then shuts the started app down.
+deferQuitUntilShutdown(app, () => shutdownWhenStarted(startup));

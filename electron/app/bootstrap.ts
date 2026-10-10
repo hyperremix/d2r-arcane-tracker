@@ -18,6 +18,7 @@ import { initializeWidgetHandlers } from '../ipc-handlers/widgetHandlers';
 import { EventBus } from '../services/EventBus';
 import { createGameProcessGuard } from '../services/gameProcessGuard';
 import { GlobalHotkeyService } from '../services/globalHotkeys';
+import { GrailDetectionPipeline } from '../services/grailDetectionPipeline';
 import {
   GrailProgressService,
   loadGrailItemsIntoDetection,
@@ -34,6 +35,7 @@ import { SettingsService } from '../services/settingsService';
 import { TerrorZoneService } from '../services/terrorZoneService';
 import { UpdateService } from '../services/updateService';
 import { VaultService } from '../services/vaultService';
+import type { WindowsMemoryReaderImpl } from '../services/win32/processMemory';
 import { setErrorForwarder } from '../utils/serviceLogger';
 import { getWidgetSizeSettingKey } from '../utils/widgetDisplay';
 import { createMainWindow, getMainWindow } from '../window/mainWindow';
@@ -54,16 +56,26 @@ export interface RunningApp {
 }
 
 /**
- * Starts the process monitor and the memory reader, which only work on Windows.
+ * Starts the process monitor and the memory reader, which only work on Windows. The Win32 memory
+ * bindings are imported here, so other platforms never load them.
  * @param eventBus - Event bus the services publish on
  * @returns The started services; undefined when unsupported or when they failed to start
  */
-function startWindowsServices(eventBus: EventBus): {
+async function startWindowsServices(eventBus: EventBus): Promise<{
   processMonitor?: ProcessMonitor;
   memoryReader?: MemoryReader;
-} {
+}> {
   if (process.platform !== 'win32') {
     return {};
+  }
+
+  // Loaded before the process monitor starts, so the memory reader subscribes before the first
+  // d2r-started event
+  let processMemory: { WindowsMemoryReaderImpl: typeof WindowsMemoryReaderImpl } | undefined;
+  try {
+    processMemory = await import('../services/win32/processMemory');
+  } catch (error) {
+    console.error('[bootstrap] Failed to load the Win32 memory bindings:', error);
   }
 
   let processMonitor: ProcessMonitor;
@@ -75,8 +87,15 @@ function startWindowsServices(eventBus: EventBus): {
     return {};
   }
 
+  if (!processMemory) {
+    return { processMonitor };
+  }
+
   try {
-    return { processMonitor, memoryReader: new MemoryReader(eventBus) };
+    return {
+      processMonitor,
+      memoryReader: new MemoryReader(eventBus, new processMemory.WindowsMemoryReaderImpl()),
+    };
   } catch (error) {
     console.error('[bootstrap] Failed to initialize memory reader:', error);
     return { processMonitor };
@@ -95,14 +114,14 @@ export async function startApp(paths: AppPaths): Promise<RunningApp> {
   // Every started part registers its teardown; shutdown runs them in reverse order
   const lifecycle = new AppLifecycle();
   try {
-    return startServices(paths, lifecycle);
+    return await startServices(paths, lifecycle);
   } catch (error) {
     await lifecycle.shutdown();
     throw error;
   }
 }
 
-function startServices(paths: AppPaths, lifecycle: AppLifecycle): RunningApp {
+async function startServices(paths: AppPaths, lifecycle: AppLifecycle): Promise<RunningApp> {
   const broadcastToRenderers = createRendererBroadcaster(() => webContents.getAllWebContents());
 
   // Forward service errors to the renderers
@@ -139,13 +158,15 @@ function startServices(paths: AppPaths, lifecycle: AppLifecycle): RunningApp {
   // Every settings write goes through the settings service, which announces it on the event bus
   const settings = new SettingsService(database, eventBus);
 
-  const { processMonitor, memoryReader } = startWindowsServices(eventBus);
+  const { processMonitor, memoryReader } = await startWindowsServices(eventBus);
   lifecycle.onShutdown('process monitor', () => processMonitor?.shutdown());
   lifecycle.onShutdown('memory reader', () => memoryReader?.shutdown());
 
-  const saveFileMonitor = new SaveFileMonitor(eventBus, database);
+  const saveFileMonitor = new SaveFileMonitor(eventBus, database, settings);
   lifecycle.onShutdown('save file monitor', () => saveFileMonitor.shutdown());
   saveFileMonitor.start();
+  // The effective save directory as the monitor applied it (see resolveEffectiveSaveDirectory)
+  const getSaveDirectory = () => saveFileMonitor.getSaveDirectory() ?? undefined;
 
   const itemDetection = new ItemDetectionService(eventBus);
 
@@ -165,8 +186,7 @@ function startServices(paths: AppPaths, lifecycle: AppLifecycle): RunningApp {
     saveFileEditor,
     // Save files must not be edited while the game runs; uses the process monitor's state
     assertGameNotRunning: createGameProcessGuard({ processMonitor }),
-    getMonitoredSaveDirectory: () => saveFileMonitor.getSaveDirectory() ?? undefined,
-    getConfiguredSaveDirectory: () => settings.get('saveDir'),
+    getSaveDirectory,
     getInventorySnapshots: () => saveFileMonitor.getInventorySearchResult().snapshots,
   });
   const hotkeys = new GlobalHotkeyService({
@@ -202,11 +222,21 @@ function startServices(paths: AppPaths, lifecycle: AppLifecycle): RunningApp {
     settings,
     eventBus,
     saveFileMonitor,
-    itemDetection,
-    grailProgress,
     broadcastToRenderers,
   });
   lifecycle.onShutdown('save file handlers', disposeSaveFileHandlers);
+  // Save file events -> item detection -> grail progress, plus the automatic monitoring start.
+  // Started after the save file handlers, so renderers get each save file event before its items
+  // are analyzed.
+  const detectionPipeline = new GrailDetectionPipeline({
+    eventBus,
+    settings,
+    saveFileMonitor,
+    itemDetection,
+    grailProgress,
+  });
+  lifecycle.onShutdown('grail detection pipeline', () => detectionPipeline.dispose());
+  detectionPipeline.start();
   lifecycle.onShutdown('vault handlers', initializeVaultHandlers(vault));
   lifecycle.onShutdown(
     'run tracker handlers',
@@ -232,7 +262,7 @@ function startServices(paths: AppPaths, lifecycle: AppLifecycle): RunningApp {
   lifecycle.onShutdown('icon handlers', initializeIconHandlers({ iconService, settings }));
   lifecycle.onShutdown(
     'inventory window handlers',
-    initializeInventoryWindowHandlers(paths, () => saveFileMonitor.getSaveDirectory() ?? undefined),
+    initializeInventoryWindowHandlers(paths, getSaveDirectory),
   );
   lifecycle.onShutdown(
     'terror zone handlers',

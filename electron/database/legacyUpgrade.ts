@@ -8,9 +8,9 @@
 // Do not update the legacy script below for new schema changes. New schema changes are
 // migrations; this module only reproduces what the legacy script created.
 
+import { basename } from 'node:path';
+import { items as grailItemCatalog } from '../items';
 import type { D2SItem, VaultLocationContext, VaultSourceFileType } from '../types/grail';
-import { resolveCanonicalIconFilename } from '../utils/iconFilenameResolver';
-import { resolveSpatialLocation } from '../utils/spatialLocationResolver';
 import type { DatabaseContext } from './types';
 
 /** The schema script of the last version before migrations, without its default settings. */
@@ -366,6 +366,357 @@ function getOptionalStringValue(
   return undefined;
 }
 
+// Frozen rewrites of the location and icon resolvers the legacy backfill needs.
+//
+// They reproduce `resolveSpatialLocation` (utils/spatialLocationResolver.ts) and
+// `resolveCanonicalIconFilename` (utils/iconFilenameResolver.ts) as they were when migrations
+// replaced the legacy script. This upgrade step must produce the same result whenever it runs,
+// so it must not change when the live resolvers do. Do not update or reuse this code. The
+// icon lookup still reads the bundled item catalog, which is data rather than resolver logic.
+
+interface LegacySpatialLocation {
+  locationContext: VaultLocationContext;
+  stashTab?: number;
+  gridX?: number;
+  gridY?: number;
+  gridWidth?: number;
+  gridHeight?: number;
+  equippedSlotId?: number;
+}
+
+type LegacySpatialFields = Omit<LegacySpatialLocation, 'locationContext'>;
+
+const LEGACY_INVENTORY_COLUMNS = 10;
+const LEGACY_INVENTORY_ROWS = 4;
+const LEGACY_BELT_COLUMNS = 4;
+
+function legacyToFiniteNumber(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+}
+
+function legacyFitsInventoryBounds(spatial: LegacySpatialFields): boolean {
+  const { gridX, gridY, gridWidth, gridHeight } = spatial;
+  if (
+    typeof gridX !== 'number' ||
+    gridX < 0 ||
+    typeof gridY !== 'number' ||
+    gridY < 0 ||
+    typeof gridWidth !== 'number' ||
+    gridWidth <= 0 ||
+    typeof gridHeight !== 'number' ||
+    gridHeight <= 0
+  ) {
+    return false;
+  }
+
+  return (
+    gridX + gridWidth <= LEGACY_INVENTORY_COLUMNS && gridY + gridHeight <= LEGACY_INVENTORY_ROWS
+  );
+}
+
+/** Moves an inventory item outside the 10x4 grid by one cell up and/or left if it then fits. */
+function legacyNormalizeInventorySpatial(
+  locationContext: VaultLocationContext,
+  spatial: LegacySpatialFields,
+): LegacySpatialFields {
+  if (locationContext !== 'inventory') {
+    return spatial;
+  }
+
+  const { gridX, gridY, gridWidth, gridHeight } = spatial;
+  if (
+    typeof gridX !== 'number' ||
+    typeof gridY !== 'number' ||
+    typeof gridWidth !== 'number' ||
+    typeof gridHeight !== 'number' ||
+    legacyFitsInventoryBounds(spatial)
+  ) {
+    return spatial;
+  }
+
+  const candidateOffsets = [
+    { xOffset: 0, yOffset: -1 },
+    { xOffset: -1, yOffset: 0 },
+    { xOffset: -1, yOffset: -1 },
+  ];
+  for (const { xOffset, yOffset } of candidateOffsets) {
+    const moved = { ...spatial, gridX: gridX + xOffset, gridY: gridY + yOffset };
+    if (legacyFitsInventoryBounds(moved)) {
+      return moved;
+    }
+  }
+
+  return spatial;
+}
+
+function legacyBuildLocation(
+  locationContext: VaultLocationContext,
+  spatial: LegacySpatialFields,
+): LegacySpatialLocation {
+  const normalized = legacyNormalizeInventorySpatial(locationContext, spatial);
+  return {
+    locationContext,
+    stashTab: normalized.stashTab,
+    gridX: normalized.gridX,
+    gridY: normalized.gridY,
+    gridWidth: normalized.gridWidth,
+    gridHeight: normalized.gridHeight,
+    equippedSlotId: normalized.equippedSlotId,
+  };
+}
+
+function legacyInferLocationContext(
+  item: D2SItem,
+  fallbackLocation: VaultLocationContext,
+): VaultLocationContext {
+  if (item.location === 'equipped' || item.equipped) return 'equipped';
+  if (item.location === 'stash') return 'stash';
+  if (item.location === 'inventory') return 'inventory';
+  if (item.location === 'mercenary') return 'mercenary';
+  if (item.location === 'corpse') return 'corpse';
+  return fallbackLocation;
+}
+
+/** Belt items: the x position is the slot index of a 4-column belt. */
+function legacyResolveBeltLocation(
+  positionX: number | undefined,
+  equippedSlotId: number | undefined,
+): LegacySpatialLocation {
+  const hasSlot = typeof positionX === 'number' && positionX >= 0;
+  return legacyBuildLocation('unknown', {
+    gridX: hasSlot ? positionX % LEGACY_BELT_COLUMNS : undefined,
+    gridY: hasSlot ? Math.floor(positionX / LEGACY_BELT_COLUMNS) : undefined,
+    gridWidth: 1,
+    gridHeight: 1,
+    equippedSlotId,
+  });
+}
+
+/** Stored items: the alternate position tells the stash (5) from the inventory (1, `.d2s` only). */
+function legacyResolveStoredLocation(
+  altPositionId: number | undefined,
+  sourceFileType: VaultSourceFileType,
+  fallbackStashTab: number | undefined,
+  spatial: LegacySpatialFields,
+): LegacySpatialLocation | undefined {
+  if (altPositionId === 5) {
+    return legacyBuildLocation('stash', {
+      stashTab: sourceFileType === 'd2s' ? 0 : fallbackStashTab,
+      ...spatial,
+    });
+  }
+  if (altPositionId === 1 && sourceFileType === 'd2s') {
+    return legacyBuildLocation('inventory', spatial);
+  }
+  return undefined;
+}
+
+function legacyResolveSpatialLocation(params: {
+  item: D2SItem;
+  sourceFileType: VaultSourceFileType;
+  fallbackLocation: VaultLocationContext;
+  fallbackStashTab?: number;
+}): LegacySpatialLocation {
+  const { item, sourceFileType, fallbackLocation, fallbackStashTab } = params;
+  const locationId = legacyToFiniteNumber(item.location_id);
+  const altPositionId = legacyToFiniteNumber(item.alt_position_id);
+  const positionX = legacyToFiniteNumber(item.position_x);
+  const spatial: LegacySpatialFields = {
+    gridX: positionX,
+    gridY: legacyToFiniteNumber(item.position_y),
+    gridWidth: legacyToFiniteNumber(item.inv_width),
+    gridHeight: legacyToFiniteNumber(item.inv_height),
+    equippedSlotId: legacyToFiniteNumber(item.equipped_id),
+  };
+
+  // Equipped (or worn by the mercenary / on the corpse)
+  if (locationId === 1) {
+    const context: VaultLocationContext =
+      fallbackLocation === 'mercenary' || fallbackLocation === 'corpse'
+        ? fallbackLocation
+        : 'equipped';
+    return legacyBuildLocation(context, spatial);
+  }
+
+  if (locationId === 2) {
+    return legacyResolveBeltLocation(positionX, spatial.equippedSlotId);
+  }
+
+  const storedLocation =
+    locationId === 0
+      ? legacyResolveStoredLocation(altPositionId, sourceFileType, fallbackStashTab, spatial)
+      : undefined;
+  if (storedLocation) {
+    return storedLocation;
+  }
+
+  const inferredLocation = legacyInferLocationContext(item, fallbackLocation);
+  return legacyBuildLocation(inferredLocation, {
+    stashTab: inferredLocation === 'stash' ? fallbackStashTab : undefined,
+    ...spatial,
+  });
+}
+
+function legacyNormalizeLookupKey(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '');
+}
+
+function legacyNormalizeIconFilename(value: unknown): string | undefined {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return `${value}.png`;
+  }
+  if (typeof value !== 'string') {
+    return undefined;
+  }
+
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return undefined;
+  }
+
+  const withoutExtension = basename(trimmed)
+    .replace(/\.(png|sprite|dc6|dds|jpg|jpeg|webp)$/i, '')
+    .trim()
+    .toLowerCase();
+  return withoutExtension ? `${withoutExtension}.png` : undefined;
+}
+
+function legacyToSnakeCaseIconFilename(value: unknown): string | undefined {
+  if (typeof value !== 'string') {
+    return undefined;
+  }
+
+  const slug = value
+    .trim()
+    .toLowerCase()
+    .replace(/['`]/g, '')
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+  return slug ? `${slug}.png` : undefined;
+}
+
+interface LegacyIconIndex {
+  byGrailItemId: Map<string, string>;
+  byItemCode: Map<string, string>;
+  byNameKey: Map<string, string>;
+}
+
+let legacyIconIndex: LegacyIconIndex | undefined;
+
+/** Built on first use, so the index only exists when a legacy database is upgraded. */
+function getLegacyIconIndex(): LegacyIconIndex {
+  if (legacyIconIndex) {
+    return legacyIconIndex;
+  }
+
+  const index: LegacyIconIndex = {
+    byGrailItemId: new Map(),
+    byItemCode: new Map(),
+    byNameKey: new Map(),
+  };
+  for (const item of grailItemCatalog) {
+    const iconFilename = legacyNormalizeIconFilename(item.imageFilename);
+    if (!iconFilename) {
+      continue;
+    }
+
+    index.byGrailItemId.set(item.id, iconFilename);
+    // The first catalog item wins a code or name that several items share
+    setIfAbsent(index.byItemCode, item.code?.trim().toLowerCase(), iconFilename);
+    for (const nameCandidate of [item.name, item.id]) {
+      const lookupKey = nameCandidate ? legacyNormalizeLookupKey(nameCandidate) : undefined;
+      setIfAbsent(index.byNameKey, lookupKey, iconFilename);
+    }
+  }
+
+  legacyIconIndex = index;
+  return index;
+}
+
+function setIfAbsent(map: Map<string, string>, key: string | undefined, value: string): void {
+  if (key && !map.has(key)) {
+    map.set(key, value);
+  }
+}
+
+function legacyResolveIconByName(
+  index: LegacyIconIndex,
+  candidates: Array<string | undefined>,
+): string | undefined {
+  for (const candidate of candidates) {
+    const lookupKey = candidate ? legacyNormalizeLookupKey(candidate) : undefined;
+    const iconFilename = lookupKey ? index.byNameKey.get(lookupKey) : undefined;
+    if (iconFilename) {
+      return iconFilename;
+    }
+  }
+  return undefined;
+}
+
+function legacyResolveIconBySlug(sources: Array<string | undefined>): string | undefined {
+  for (const source of sources) {
+    const slugCandidate = legacyToSnakeCaseIconFilename(source);
+    if (slugCandidate) {
+      return slugCandidate;
+    }
+  }
+  return undefined;
+}
+
+/** Charm codes many items share: only used for the icon when another signal names the item. */
+const LEGACY_AMBIGUOUS_CHARM_CODES = new Set(['cm1', 'cm2']);
+
+function legacyResolveIconFilename(input: {
+  grailItemId: string | null;
+  itemCode: string | null;
+  itemName: string;
+  uniqueName?: string;
+  setName?: string;
+  parsedName?: string;
+  typeName?: string;
+  rawIconFileName: unknown;
+  fallbackIconFileName: string | null;
+}): string | undefined {
+  const index = getLegacyIconIndex();
+
+  const grailItemId = input.grailItemId?.trim();
+  if (grailItemId) {
+    const grailIcon = index.byGrailItemId.get(grailItemId);
+    if (grailIcon) {
+      return grailIcon;
+    }
+  }
+
+  const nameIcon = legacyResolveIconByName(index, [
+    input.itemName,
+    input.uniqueName,
+    input.setName,
+    input.parsedName,
+  ]);
+
+  const codeKey = input.itemCode?.trim().toLowerCase();
+  const skipCode =
+    !codeKey || (LEGACY_AMBIGUOUS_CHARM_CODES.has(codeKey) && !grailItemId && !nameIcon);
+  const codeIcon = skipCode ? undefined : index.byItemCode.get(codeKey);
+
+  return (
+    codeIcon ??
+    nameIcon ??
+    legacyResolveIconBySlug([
+      input.typeName,
+      input.parsedName,
+      input.itemName,
+      input.uniqueName,
+      input.setName,
+    ]) ??
+    legacyNormalizeIconFilename(input.rawIconFileName) ??
+    legacyNormalizeIconFilename(input.fallbackIconFileName)
+  );
+}
+
 function getVaultItemSpatialBackfillRows(ctx: DatabaseContext): VaultItemSpatialBackfillRow[] {
   return ctx.rawDb
     .prepare(
@@ -418,7 +769,7 @@ function buildVaultItemSpatialBackfillValues(
 ): VaultItemSpatialBackfillValues {
   const parsedItem = parsed as D2SItem | undefined;
   const resolvedSpatial = parsedItem
-    ? resolveSpatialLocation({
+    ? legacyResolveSpatialLocation({
         item: parsedItem,
         sourceFileType: row.source_file_type,
         fallbackLocation: row.location_context,
@@ -426,7 +777,7 @@ function buildVaultItemSpatialBackfillValues(
       })
     : undefined;
   const iconFileName =
-    resolveCanonicalIconFilename({
+    legacyResolveIconFilename({
       grailItemId: row.grail_item_id,
       itemCode: row.item_code,
       itemName: row.item_name,

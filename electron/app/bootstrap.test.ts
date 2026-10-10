@@ -19,7 +19,21 @@ const mocks = vi.hoisted(() => {
       };
     }),
     windows: [] as Array<{ isDestroyed: () => boolean; close: () => void; destroy: () => void }>,
-    initializeSaveFileHandlers: disposer('saveFileHandlers'),
+    WindowsMemoryReaderImpl: vi.fn(function WindowsMemoryReaderImpl() {
+      return { kind: 'win32-process-memory' };
+    }),
+    // Subscribes like the real save file handlers, which forward every event to the renderers
+    initializeSaveFileHandlers: vi.fn(
+      (deps: { eventBus: import('../services/EventBus').EventBus }) => {
+        const unsubscribe = deps.eventBus.on('save-file-event', () => {
+          calls.push('saveFileHandlers.forwardToRenderers');
+        });
+        return () => {
+          unsubscribe();
+          calls.push('saveFileHandlers.dispose');
+        };
+      },
+    ),
     initializeRunTrackerHandlers: disposer('runTrackerHandlers'),
     initializeGlobalHotkeyHandlers: disposer('globalHotkeyHandlers'),
     initializeAppWindowHandlers: disposer('appWindowHandlers'),
@@ -90,14 +104,57 @@ vi.mock('../services/globalHotkeys', () => ({
     return { dispose: mocks.log('hotkeys.dispose') };
   }),
 }));
+vi.mock('../services/grailDetectionPipeline', () => ({
+  GrailDetectionPipeline: vi.fn(function GrailDetectionPipeline(deps: {
+    eventBus: import('../services/EventBus').EventBus;
+  }) {
+    let unsubscribe: (() => void) | undefined;
+    return {
+      // Subscribes like the real pipeline, which analyzes the items of every save file event
+      start: () => {
+        mocks.calls.push('detectionPipeline.start');
+        unsubscribe = deps.eventBus.on('save-file-event', () => {
+          mocks.calls.push('detectionPipeline.analyzeItems');
+        });
+      },
+      dispose: () => {
+        unsubscribe?.();
+        mocks.calls.push('detectionPipeline.dispose');
+      },
+    };
+  }),
+}));
 vi.mock('../services/iconService', () => ({ IconService: vi.fn() }));
 vi.mock('../services/itemDetection', () => ({
   ItemDetectionService: vi.fn(function ItemDetectionService() {
     return { setGrailItems: vi.fn(), initializeFromDatabase: vi.fn() };
   }),
 }));
-vi.mock('../services/memoryReader', () => ({ MemoryReader: vi.fn() }));
-vi.mock('../services/processMonitor', () => ({ ProcessMonitor: vi.fn() }));
+vi.mock('../services/memoryReader', () => ({
+  MemoryReader: vi.fn(function MemoryReader(eventBus: import('../services/EventBus').EventBus) {
+    // Subscribes like the real memory reader, which reacts to the game process starting
+    mocks.calls.push('memoryReader.subscribe');
+    eventBus.on('d2r-started', mocks.log('memoryReader.receivedD2rStarted'));
+    return { shutdown: vi.fn() };
+  }),
+}));
+vi.mock('../services/processMonitor', () => ({
+  ProcessMonitor: vi.fn(function ProcessMonitor(eventBus: import('../services/EventBus').EventBus) {
+    return {
+      // Like the real monitor, the first d2r-started follows the start asynchronously
+      startMonitoring: vi.fn(() => {
+        mocks.calls.push('processMonitor.start');
+        queueMicrotask(() => {
+          eventBus.emit('d2r-started', { processId: 4242, processName: 'D2R.exe' });
+        });
+      }),
+      shutdown: vi.fn(),
+    };
+  }),
+}));
+vi.mock('../services/win32/processMemory', () => ({
+  WindowsMemoryReaderImpl: mocks.WindowsMemoryReaderImpl,
+}));
 vi.mock('../services/runTracker', () => ({
   RunTrackerService: vi.fn(function RunTrackerService() {
     return { shutdown: mocks.log('runTracker.shutdown') };
@@ -141,7 +198,12 @@ vi.mock('../window/widgetWindow', () => ({
 }));
 
 import { initializeUpdateHandlers } from '../ipc-handlers/updateHandlers';
+import { EventBus } from '../services/EventBus';
+import { createGameProcessGuard } from '../services/gameProcessGuard';
+import { MemoryReader } from '../services/memoryReader';
+import { ProcessMonitor } from '../services/processMonitor';
 import { RunTrackerService } from '../services/runTracker';
+import type { SaveFileEvent } from '../types/grail';
 import { type RunningApp, startApp as start } from './bootstrap';
 import type { AppPaths } from './paths';
 
@@ -221,6 +283,39 @@ describe('When the app is bootstrapped', () => {
     );
   });
 
+  it('Then the grail detection pipeline is started once, and disposed before monitoring stops', async () => {
+    // Arrange
+    const runningApp = await startApp(env);
+
+    // Act
+    await runningApp.shutdown();
+
+    // Assert
+    const order = (call: string) => mocks.calls.indexOf(call);
+    expect(mocks.calls.filter((call) => call === 'detectionPipeline.start')).toHaveLength(1);
+    expect(order('detectionPipeline.start')).toBeLessThan(order('detectionPipeline.dispose'));
+    expect(order('detectionPipeline.dispose')).toBeLessThan(order('saveFileMonitor.shutdown'));
+  });
+
+  it('If a save file event is emitted, Then renderers receive it before the pipeline analyzes its items', async () => {
+    // Arrange
+    await startApp(env);
+    const { eventBus } = mocks.initializeSaveFileHandlers.mock.calls[0][0];
+    mocks.calls.length = 0;
+
+    // Act
+    await eventBus.emitAsync('save-file-event', {
+      type: 'modified',
+      file: { name: 'Hero' },
+    } as unknown as SaveFileEvent);
+
+    // Assert
+    expect(mocks.calls).toEqual([
+      'saveFileHandlers.forwardToRenderers',
+      'detectionPipeline.analyzeItems',
+    ]);
+  });
+
   describe('If the app shuts down', () => {
     it('Then hotkeys, run tracker and monitoring stop before the windows close and the database closes last', async () => {
       // Arrange
@@ -249,6 +344,7 @@ describe('When the app is bootstrapped', () => {
       const order = (call: string) => mocks.calls.indexOf(call);
       expect(order('globalHotkeyHandlers.dispose')).toBeGreaterThanOrEqual(0);
       expect(order('saveFileHandlers.dispose')).toBeLessThan(order('runTracker.shutdown'));
+      expect(order('detectionPipeline.dispose')).toBeLessThan(order('runTracker.shutdown'));
       expect(order('runTrackerHandlers.dispose')).toBeLessThan(order('runTracker.shutdown'));
     });
 
@@ -308,6 +404,164 @@ describe('When the app is bootstrapped', () => {
 
       // Assert
       expect(mocks.calls.filter((call) => call === 'database.close')).toHaveLength(1);
+    });
+  });
+});
+
+describe('When the app starts', () => {
+  const originalPlatform = process.platform;
+  const processMemoryModule = '../services/win32/processMemory';
+
+  // Registers the Win32 bindings module; the factory runs only when the module is imported
+  function mockProcessMemory(factory: () => Record<string, unknown>): void {
+    vi.doMock(processMemoryModule, factory);
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.calls.length = 0;
+    mocks.windows = [createWindow()];
+  });
+
+  afterEach(async () => {
+    await Promise.all(runningApps.splice(0).map((runningApp) => runningApp.shutdown()));
+    Object.defineProperty(process, 'platform', { value: originalPlatform, configurable: true });
+    mockProcessMemory(() => ({ WindowsMemoryReaderImpl: mocks.WindowsMemoryReaderImpl }));
+  });
+
+  it('If it runs on Windows, Then the memory reader gets the Win32 process memory bindings', async () => {
+    // Arrange
+    Object.defineProperty(process, 'platform', { value: 'win32', configurable: true });
+
+    // Act
+    await startApp(env);
+
+    // Assert
+    expect(mocks.WindowsMemoryReaderImpl).toHaveBeenCalledTimes(1);
+    expect(MemoryReader).toHaveBeenCalledWith(
+      expect.any(EventBus),
+      vi.mocked(mocks.WindowsMemoryReaderImpl).mock.results[0].value,
+    );
+  });
+
+  it('If it runs on Windows, Then the memory reader subscribes before the first d2r-started event', async () => {
+    // Arrange
+    Object.defineProperty(process, 'platform', { value: 'win32', configurable: true });
+
+    // Act
+    await startApp(env);
+
+    // Assert
+    await vi.waitFor(() => expect(mocks.calls).toContain('memoryReader.receivedD2rStarted'));
+    expect(mocks.calls.indexOf('memoryReader.subscribe')).toBeLessThan(
+      mocks.calls.indexOf('memoryReader.receivedD2rStarted'),
+    );
+  });
+
+  it('If it runs on another platform, Then the Win32 bindings module is never imported', async () => {
+    // Arrange
+    Object.defineProperty(process, 'platform', { value: 'darwin', configurable: true });
+    const evaluated = vi.fn();
+    mockProcessMemory(() => {
+      evaluated();
+      return { WindowsMemoryReaderImpl: mocks.WindowsMemoryReaderImpl };
+    });
+
+    // Act
+    await startApp(env);
+
+    // Assert
+    expect(evaluated).not.toHaveBeenCalled();
+    expect(mocks.WindowsMemoryReaderImpl).not.toHaveBeenCalled();
+    expect(MemoryReader).not.toHaveBeenCalled();
+  });
+
+  it('If it runs on Windows, Then the Win32 bindings module is imported (control for the test above)', async () => {
+    // Arrange
+    Object.defineProperty(process, 'platform', { value: 'win32', configurable: true });
+    const evaluated = vi.fn();
+    mockProcessMemory(() => {
+      evaluated();
+      return { WindowsMemoryReaderImpl: mocks.WindowsMemoryReaderImpl };
+    });
+
+    // Act
+    await startApp(env);
+
+    // Assert
+    expect(evaluated).toHaveBeenCalledTimes(1);
+  });
+
+  describe('If the Win32 bindings fail to load on Windows', () => {
+    let consoleError: ReturnType<typeof vi.spyOn>;
+    const loadFailure = new Error('koffi failed to load');
+
+    beforeEach(() => {
+      consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+      Object.defineProperty(process, 'platform', { value: 'win32', configurable: true });
+      mockProcessMemory(() => {
+        throw loadFailure;
+      });
+    });
+
+    afterEach(() => {
+      consoleError.mockRestore();
+    });
+
+    it('Then the startup does not throw and the error is logged', async () => {
+      // Arrange
+      const startup = startApp(env);
+
+      // Act
+      const runningApp = await startup;
+
+      // Assert
+      expect(runningApp).toBeDefined();
+      expect(consoleError).toHaveBeenCalledWith(
+        '[bootstrap] Failed to load the Win32 memory bindings:',
+        // Vitest wraps an error thrown by a module factory and keeps the original as its cause
+        expect.objectContaining({ cause: loadFailure }),
+      );
+    });
+
+    it('Then the memory reader is disabled', async () => {
+      // Arrange
+      const startup = startApp(env);
+
+      // Act
+      await startup;
+
+      // Assert
+      expect(mocks.WindowsMemoryReaderImpl).not.toHaveBeenCalled();
+      expect(MemoryReader).not.toHaveBeenCalled();
+      expect(vi.mocked(RunTrackerService).mock.calls[0][2]).toBeUndefined();
+    });
+
+    it('Then the process monitor still starts and the rest of the app comes up', async () => {
+      // Arrange
+      const startup = startApp(env);
+
+      // Act
+      await startup;
+
+      // Assert
+      expect(ProcessMonitor).toHaveBeenCalledTimes(1);
+      expect(mocks.calls).toContain('processMonitor.start');
+      expect(mocks.calls).toContain('saveFileMonitor.start');
+      expect(mocks.calls).toContain('detectionPipeline.start');
+    });
+
+    it('Then the started process monitor is handed to the game process guard and stopped on shutdown', async () => {
+      // Arrange
+      const runningApp = await startApp(env);
+      const processMonitor = vi.mocked(ProcessMonitor).mock.results[0].value;
+
+      // Act
+      await runningApp.shutdown();
+
+      // Assert
+      expect(createGameProcessGuard).toHaveBeenCalledWith({ processMonitor });
+      expect(processMonitor.shutdown).toHaveBeenCalledTimes(1);
     });
   });
 });

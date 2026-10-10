@@ -99,6 +99,25 @@ export function deferQuitUntilShutdown(app: QuittableApp, shutdown: () => Promis
   });
 }
 
+/**
+ * Stops the app that is still starting up: waits for the startup to finish, then shuts the started
+ * app down. A quit during an asynchronous startup would otherwise find no running app to stop,
+ * while the startup went on to open windows and services.
+ * @param startup - The pending (or finished) startup; resolves to the started app, or to
+ *   undefined when the startup failed (it has stopped what it started). Undefined if never begun.
+ * @returns Promise that resolves when the app has stopped; it never rejects
+ */
+export async function shutdownWhenStarted(
+  startup: Promise<{ shutdown: () => Promise<void> } | undefined> | undefined,
+): Promise<void> {
+  try {
+    const startedApp = await startup;
+    await startedApp?.shutdown();
+  } catch (error) {
+    console.error('[shutdown] Stopping the started app failed:', error);
+  }
+}
+
 /** The parts of a `BrowserWindow` needed to close it. */
 export interface ClosableWindow {
   isDestroyed(): boolean;

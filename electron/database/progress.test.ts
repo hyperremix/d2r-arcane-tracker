@@ -2,17 +2,24 @@ import type { Database as DatabaseType } from 'better-sqlite3';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { GrailProgressBuilder } from '@/fixtures';
 import { createInMemoryDatabase, initializeDatabaseSchema } from '../test/helpers/databaseHelpers';
+import type { Settings } from '../types/grail';
 import { createDrizzleDb } from './drizzle';
-import { deleteManualProgress, getAllProgress, getProgressById, upsertProgress } from './progress';
+import {
+  deleteManualProgress,
+  getAllProgress,
+  getFilteredProgress,
+  getProgressById,
+  upsertProgress,
+} from './progress';
 import type { DatabaseContext } from './types';
 
-function insertItem(rawDb: DatabaseType, id: string): void {
+function insertItem(rawDb: DatabaseType, id: string, type = 'unique'): void {
   rawDb
     .prepare(
       `INSERT INTO items (id, name, type, category, sub_category, treasure_class, ethereal_type)
-       VALUES (?, ?, 'unique', 'armor', 'helms', 'elite', 'optional')`,
+       VALUES (?, ?, ?, 'armor', 'helms', 'elite', 'optional')`,
     )
-    .run(id, id);
+    .run(id, id, type);
 }
 
 describe('When grail progress is persisted to the database', () => {
@@ -135,6 +142,50 @@ describe('When grail progress is persisted to the database', () => {
 
       // Assert
       expect(found).toBeNull();
+    });
+  });
+
+  describe('If progress is filtered by the grail settings', () => {
+    beforeEach(() => {
+      insertItem(rawDb, 'jah', 'rune');
+      insertItem(rawDb, 'enigma', 'runeword');
+      const records = [
+        { id: 'p-shako', itemId: 'shako', updated: '2024-01-01T00:00:00.000Z' },
+        { id: 'p-jah', itemId: 'jah', updated: '2024-01-03T00:00:00.000Z' },
+        { id: 'p-enigma', itemId: 'enigma', updated: '2024-01-02T00:00:00.000Z' },
+      ];
+      for (const record of records) {
+        upsertProgress(
+          ctx,
+          GrailProgressBuilder.new().withId(record.id).withItemId(record.itemId).build(),
+        );
+        rawDb
+          .prepare('UPDATE grail_progress SET updated_at = ? WHERE id = ?')
+          .run(record.updated, record.id);
+      }
+    });
+
+    it('When runes are excluded, Then rune progress is left out and the newest record comes first', () => {
+      // Arrange
+      const settings = { grailRunes: false, grailRunewords: true } as Settings;
+
+      // Act
+      const filtered = getFilteredProgress(ctx, settings);
+
+      // Assert
+      expect(filtered.map((progress) => progress.id)).toEqual(['p-enigma', 'p-shako']);
+    });
+
+    it('When runes and runewords are excluded, Then only the other progress is returned', () => {
+      // Arrange
+      const settings = { grailRunes: false, grailRunewords: false } as Settings;
+
+      // Act
+      const filtered = getFilteredProgress(ctx, settings);
+
+      // Assert
+      expect(filtered).toHaveLength(1);
+      expect(filtered[0]).toMatchObject({ id: 'p-shako', itemId: 'shako' });
     });
   });
 });
