@@ -1,4 +1,5 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
+import { runes } from 'electron/items/runes';
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { RuneFilters } from './RuneFilters';
 
@@ -50,5 +51,37 @@ describe('When RuneFilters shows the selection summary', () => {
 
     // Assert
     expect(await screen.findByText('3 runes selected')).toBeInTheDocument();
+  });
+});
+
+describe('When RuneFilters is placed in a height-bounded sidebar', () => {
+  beforeEach(() => {
+    setElectronAPI({ icon: { getByFilename: vi.fn().mockResolvedValue(undefined) } });
+  });
+
+  afterAll(() => {
+    setElectronAPI(originalElectronAPI);
+  });
+
+  it('Then the root is a shrinkable flex column and the rune list is the scroll container', () => {
+    // Arrange & Act
+    const { container } = renderRuneFilters([]);
+
+    // Assert
+    // The root must shrink to the space left in the sidebar so the list below gets a bounded height
+    expect(container.firstElementChild).toHaveClass('flex', 'min-h-0', 'flex-1', 'flex-col');
+    const runeList = screen.getByRole('group', { name: 'Filter by Runes' });
+    expect(runeList).toHaveClass('min-h-0', 'flex-1', 'overflow-y-auto');
+  });
+
+  it('Then every rune, including the highest runes, is inside the scrollable list', () => {
+    // Arrange & Act
+    renderRuneFilters([]);
+
+    // Assert
+    const runeList = screen.getByRole('group', { name: 'Filter by Runes' });
+    expect(within(runeList).getAllByRole('checkbox')).toHaveLength(runes.length);
+    expect(within(runeList).getByLabelText(/^Zod/)).toBeInTheDocument();
+    expect(within(runeList).getByLabelText(/^Cham/)).toBeInTheDocument();
   });
 });

@@ -1,12 +1,13 @@
 import type { Item } from 'electron/types/grail';
 import { RefreshCw } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useId, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { translations } from '@/i18n/translations';
 import {
   filterRunewordsByName,
@@ -121,6 +122,7 @@ function AvailabilityFilter({ value, onChange }: AvailabilityFilterProps) {
  */
 export function RunewordCalculator() {
   const { t } = useTranslation();
+  const searchInputId = useId();
   const [allRunewords, setAllRunewords] = useState<Item[]>([]);
   const [availableRunes, setAvailableRunes] = useState<Record<string, number>>({});
   const [searchTerm, setSearchTerm] = useState('');
@@ -203,9 +205,21 @@ export function RunewordCalculator() {
 
       {/* Left Sidebar - Filters */}
       <div className="flex min-h-0 flex-col gap-6">
-        {/* Search Bar */}
         <Card className="flex flex-1 flex-col overflow-hidden">
-          <CardContent className="flex flex-1 flex-col gap-4 overflow-hidden">
+          <CardContent className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden">
+            {/* Search Bar */}
+            <div className="flex flex-col gap-2">
+              <Label htmlFor={searchInputId}>
+                {t(translations.runeword.calculator.searchLabel)}
+              </Label>
+              <Input
+                id={searchInputId}
+                type="text"
+                placeholder={t(translations.runeword.calculator.searchPlaceholder)}
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
             <AvailabilityFilter value={availability} onChange={setAvailability} />
             {/* Results Count and Refresh */}
             <div className="flex items-center justify-between gap-2">
@@ -230,17 +244,10 @@ export function RunewordCalculator() {
                 {t(translations.runeword.calculator.refreshRunes)}
               </Button>
             </div>
-            <Input
-              type="text"
-              placeholder={t(translations.runeword.calculator.searchPlaceholder)}
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
             <RuneFilters
               selectedRunes={selectedRunes}
               onRuneSelectionChange={setSelectedRunes}
               availableRunes={availableRunes}
-              className="flex-1 overflow-y-auto"
             />
           </CardContent>
         </Card>
@@ -267,9 +274,12 @@ export function RunewordCalculator() {
           </div>
         )}
 
-        {/* Runeword Grid */}
+        {/* Runeword Grid: columns follow the available width, not the viewport */}
         {!isLoading && filteredRunewords.length > 0 && (
-          <div className="grid grid-cols-2 gap-4 pb-7 md:grid-cols-3 lg:grid-cols-4">
+          <div
+            data-testid="runeword-grid"
+            className="grid grid-cols-[repeat(auto-fill,minmax(14rem,1fr))] gap-4 pb-7"
+          >
             {filteredRunewords.map((runeword) => (
               <RunewordCard key={runeword.id} runeword={runeword} availableRunes={availableRunes} />
             ))}

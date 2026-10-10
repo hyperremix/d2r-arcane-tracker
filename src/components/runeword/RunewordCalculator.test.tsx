@@ -380,6 +380,52 @@ describe('RunewordCalculator', () => {
     });
   });
 
+  describe('sidebar layout', () => {
+    it('When the page loads, then the search field has an accessible label and comes before the other filters', async () => {
+      // Arrange
+      stubElectronApi();
+
+      // Act
+      await renderCalculator();
+
+      // Assert
+      const search = screen.getByRole('textbox', { name: 'Search runewords' });
+      const availability = screen.getByRole('group', { name: 'Show runewords' });
+      const refresh = screen.getByRole('button', { name: 'Refresh runes' });
+      expect(search.compareDocumentPosition(availability)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+      expect(search.compareDocumentPosition(refresh)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    });
+
+    it('When the labelled search field is used, then runewords are filtered by name', async () => {
+      // Arrange
+      stubElectronApi();
+      await renderCalculator();
+
+      // Act
+      fireEvent.change(screen.getByRole('textbox', { name: 'Search runewords' }), {
+        target: { value: 'Ste' },
+      });
+
+      // Assert
+      expect(getCardTitles()).toEqual(['Filter by Runes', 'Stealth', 'Steel']);
+    });
+  });
+
+  describe('runeword grid', () => {
+    it('When runewords are shown, then the grid sizes its columns from the available width instead of viewport breakpoints', async () => {
+      // Arrange
+      stubElectronApi();
+
+      // Act
+      await renderCalculator();
+
+      // Assert
+      const grid = screen.getByTestId('runeword-grid');
+      expect(grid).toHaveClass('grid-cols-[repeat(auto-fill,minmax(14rem,1fr))]');
+      expect(grid.className).not.toMatch(/\b(md|lg):grid-cols-/);
+    });
+  });
+
   describe('page heading', () => {
     it('If the data is still loading, Then exactly one level-1 heading is present', () => {
       // Arrange

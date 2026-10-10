@@ -1,7 +1,9 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import type { TerrorZoneValidationResult } from 'electron/types/grail';
+import { MemoryRouter, Route, Routes } from 'react-router';
 import { toast } from 'sonner';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { useTerrorZoneSessionStore } from '@/stores/terrorZoneSessionStore';
 import { TerrorZoneConfiguration } from './TerrorZoneConfiguration';
 
 vi.mock('sonner', () => ({
@@ -12,6 +14,25 @@ vi.mock('sonner', () => ({
 }));
 
 const originalElectronAPI = window.electronAPI;
+
+// The restart reminder lasts for the app session, so every test starts without saved changes
+beforeEach(() => {
+  useTerrorZoneSessionStore.getState().reset();
+});
+
+/**
+ * Renders the page inside a router, with a stand-in Settings page to observe navigation.
+ */
+function renderTerrorZoneConfiguration() {
+  return render(
+    <MemoryRouter initialEntries={['/terror-zones']}>
+      <Routes>
+        <Route path="/terror-zones" element={<TerrorZoneConfiguration />} />
+        <Route path="/settings" element={<div>Settings page</div>} />
+      </Routes>
+    </MemoryRouter>,
+  );
+}
 
 function setupTerrorZoneApi(validation: TerrorZoneValidationResult) {
   window.electronAPI = {
@@ -77,7 +98,7 @@ describe('When TerrorZoneConfiguration validates the game installation', () => {
       });
 
       // Act
-      render(<TerrorZoneConfiguration />);
+      renderTerrorZoneConfiguration();
 
       // Assert
       expect(
@@ -87,6 +108,9 @@ describe('When TerrorZoneConfiguration validates the game installation', () => {
       expect(screen.getByText("Ladik's CASC Viewer")).toBeInTheDocument();
       expect(screen.getByText('Always launch D2R using this shortcut')).toBeInTheDocument();
       expect(screen.queryByText('Spieldatei fehlt')).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole('button', { name: 'Open D2R Installation settings' }),
+      ).not.toBeInTheDocument();
     });
   });
 
@@ -100,13 +124,16 @@ describe('When TerrorZoneConfiguration validates the game installation', () => {
       });
 
       // Act
-      render(<TerrorZoneConfiguration />);
+      renderTerrorZoneConfiguration();
 
       // Assert
       expect(
         await screen.findByText('D2R installation directory does not exist'),
       ).toBeInTheDocument();
       expect(screen.queryByText('Game Files Must Be Extracted')).not.toBeInTheDocument();
+      expect(
+        screen.getByRole('button', { name: 'Open D2R Installation settings' }),
+      ).toBeInTheDocument();
     });
   });
 
@@ -116,7 +143,7 @@ describe('When TerrorZoneConfiguration validates the game installation', () => {
       setupTerrorZoneApi({ valid: false, errorCode: 'directoryNotFound' });
 
       // Act
-      render(<TerrorZoneConfiguration />);
+      renderTerrorZoneConfiguration();
 
       // Assert
       await screen.findByText('D2R installation directory does not exist');
@@ -126,12 +153,27 @@ describe('When TerrorZoneConfiguration validates the game installation', () => {
   });
 
   describe('If the path is not configured', () => {
+    it('Then a button opens the D2R Installation settings', async () => {
+      // Arrange
+      setupTerrorZoneApi({ valid: false, errorCode: 'pathNotConfigured' });
+      renderTerrorZoneConfiguration();
+      const openSettings = await screen.findByRole('button', {
+        name: 'Open D2R Installation settings',
+      });
+
+      // Act
+      fireEvent.click(openSettings);
+
+      // Assert
+      expect(await screen.findByText('Settings page')).toBeInTheDocument();
+    });
+
     it('Then the translated path message is shown', async () => {
       // Arrange
       setupTerrorZoneApi({ valid: false, errorCode: 'pathNotConfigured' });
 
       // Act
-      render(<TerrorZoneConfiguration />);
+      renderTerrorZoneConfiguration();
 
       // Assert
       expect(
@@ -157,7 +199,7 @@ describe('When TerrorZoneConfiguration lists zones', () => {
     setupValidTerrorZoneApi();
 
     // Act
-    render(<TerrorZoneConfiguration />);
+    renderTerrorZoneConfiguration();
 
     // Assert
     const bloodMoor = await screen.findByRole('switch', { name: 'Blood Moor' });
@@ -170,7 +212,7 @@ describe('When TerrorZoneConfiguration lists zones', () => {
     it('Then the zone switch is toggled', async () => {
       // Arrange
       const terrorZone = setupValidTerrorZoneApi();
-      render(<TerrorZoneConfiguration />);
+      renderTerrorZoneConfiguration();
       const coldPlains = await screen.findByRole('switch', { name: 'Cold Plains' });
       expect(coldPlains).not.toBeChecked();
 
@@ -190,7 +232,7 @@ describe('When TerrorZoneConfiguration lists zones', () => {
       setupValidTerrorZoneApi({
         updateConfig: vi.fn().mockRejectedValue(new Error('EACCES: raw failure')),
       });
-      render(<TerrorZoneConfiguration />);
+      renderTerrorZoneConfiguration();
       const coldPlains = await screen.findByRole('switch', { name: 'Cold Plains' });
 
       // Act
@@ -208,7 +250,7 @@ describe('When TerrorZoneConfiguration lists zones', () => {
       setupValidTerrorZoneApi({
         updateConfig: vi.fn().mockRejectedValue(new Error('EACCES: raw failure')),
       });
-      render(<TerrorZoneConfiguration />);
+      renderTerrorZoneConfiguration();
       const coldPlains = await screen.findByRole('switch', { name: 'Cold Plains' });
 
       // Act
@@ -226,7 +268,7 @@ describe('When TerrorZoneConfiguration lists zones', () => {
     it('Then the translated enable-all failure is shown', async () => {
       // Arrange
       setupValidTerrorZoneApi({ updateConfig: vi.fn().mockResolvedValue({ success: false }) });
-      render(<TerrorZoneConfiguration />);
+      renderTerrorZoneConfiguration();
       await screen.findByRole('switch', { name: 'Blood Moor' });
 
       // Act
@@ -241,7 +283,7 @@ describe('When TerrorZoneConfiguration lists zones', () => {
     it('Then the translated disable-all failure is shown and the zones are rolled back', async () => {
       // Arrange
       setupValidTerrorZoneApi({ updateConfig: vi.fn().mockRejectedValue(new Error('boom')) });
-      render(<TerrorZoneConfiguration />);
+      renderTerrorZoneConfiguration();
       const bloodMoor = await screen.findByRole('switch', { name: 'Blood Moor' });
       fireEvent.click(screen.getByRole('button', { name: 'Disable All' }));
       const dialog = await screen.findByRole('alertdialog');
@@ -259,7 +301,7 @@ describe('When TerrorZoneConfiguration lists zones', () => {
     it('Then the translated restore failure is shown', async () => {
       // Arrange
       setupValidTerrorZoneApi({ restoreOriginal: vi.fn().mockResolvedValue({ success: false }) });
-      render(<TerrorZoneConfiguration />);
+      renderTerrorZoneConfiguration();
       await screen.findByRole('switch', { name: 'Blood Moor' });
       fireEvent.click(screen.getByRole('button', { name: 'Restore Original' }));
       const dialog = await screen.findByRole('alertdialog');
@@ -283,7 +325,7 @@ describe('When TerrorZoneConfiguration lists zones', () => {
         .mockResolvedValueOnce(zones)
         .mockRejectedValueOnce(new Error('EIO: raw failure'));
       const terrorZone = setupValidTerrorZoneApi({ getZones });
-      render(<TerrorZoneConfiguration />);
+      renderTerrorZoneConfiguration();
       await screen.findByRole('switch', { name: 'Blood Moor' });
       fireEvent.click(screen.getByRole('button', { name: 'Restore Original' }));
       const dialog = await screen.findByRole('alertdialog');
@@ -305,7 +347,7 @@ describe('When TerrorZoneConfiguration lists zones', () => {
       setupValidTerrorZoneApi({
         updateConfig: vi.fn().mockRejectedValueOnce(new Error('EBUSY')),
       });
-      render(<TerrorZoneConfiguration />);
+      renderTerrorZoneConfiguration();
       fireEvent.click(await screen.findByRole('switch', { name: 'Cold Plains' }));
       await screen.findByText('Failed to update terror zone configuration');
       fireEvent.click(screen.getByRole('button', { name: 'Restore Original' }));
@@ -342,7 +384,7 @@ describe('When TerrorZoneConfiguration saves changes', () => {
     it('Then one deduplicated success toast with the restart hint is shown', async () => {
       // Arrange
       setupValidTerrorZoneApi();
-      render(<TerrorZoneConfiguration />);
+      renderTerrorZoneConfiguration();
       const coldPlains = await screen.findByRole('switch', { name: 'Cold Plains' });
       const bloodMoor = screen.getByRole('switch', { name: 'Blood Moor' });
 
@@ -373,7 +415,7 @@ describe('When TerrorZoneConfiguration saves changes', () => {
         .mockRejectedValueOnce(new Error('EBUSY'))
         .mockResolvedValue(saveSuccess);
       setupValidTerrorZoneApi({ updateConfig });
-      render(<TerrorZoneConfiguration />);
+      renderTerrorZoneConfiguration();
       const coldPlains = await screen.findByRole('switch', { name: 'Cold Plains' });
       fireEvent.click(coldPlains);
       await screen.findByText('Failed to update terror zone configuration');
@@ -396,7 +438,7 @@ describe('When TerrorZoneConfiguration saves changes', () => {
     it('Then toggling one zone saves an explicit state for every zone', async () => {
       // Arrange
       const terrorZone = setupValidTerrorZoneApi({ getConfig: vi.fn().mockResolvedValue({}) });
-      render(<TerrorZoneConfiguration />);
+      renderTerrorZoneConfiguration();
       const bloodMoor = await screen.findByRole('switch', { name: 'Blood Moor' });
 
       // Act
@@ -414,7 +456,7 @@ describe('When TerrorZoneConfiguration saves changes', () => {
       // Arrange
       const write = createDeferred<typeof saveSuccess>();
       setupValidTerrorZoneApi({ updateConfig: vi.fn().mockReturnValue(write.promise) });
-      render(<TerrorZoneConfiguration />);
+      renderTerrorZoneConfiguration();
       const coldPlains = await screen.findByRole('switch', { name: 'Cold Plains' });
       const bloodMoor = screen.getByRole('switch', { name: 'Blood Moor' });
 
@@ -441,7 +483,7 @@ describe('When TerrorZoneConfiguration saves changes', () => {
         .mockReturnValueOnce(firstWrite.promise)
         .mockResolvedValue(saveSuccess);
       setupValidTerrorZoneApi({ updateConfig });
-      render(<TerrorZoneConfiguration />);
+      renderTerrorZoneConfiguration();
       const coldPlains = await screen.findByRole('switch', { name: 'Cold Plains' });
       const bloodMoor = screen.getByRole('switch', { name: 'Blood Moor' });
       fireEvent.click(coldPlains);
@@ -472,7 +514,7 @@ describe('When TerrorZoneConfiguration saves changes', () => {
         getConfig: vi.fn().mockResolvedValue({ '1': true, '2': true, '3': true }),
         updateConfig,
       });
-      render(<TerrorZoneConfiguration />);
+      renderTerrorZoneConfiguration();
       const bloodMoor = await screen.findByRole('switch', { name: 'Blood Moor' });
       const coldPlains = screen.getByRole('switch', { name: 'Cold Plains' });
       const rogueEncampment = screen.getByRole('switch', { name: 'Rogue Encampment' });
@@ -503,7 +545,7 @@ describe('When TerrorZoneConfiguration saves changes', () => {
         getConfig: vi.fn().mockResolvedValue({ '1': true, '2': true, '3': true }),
         updateConfig,
       });
-      render(<TerrorZoneConfiguration />);
+      renderTerrorZoneConfiguration();
       const bloodMoor = await screen.findByRole('switch', { name: 'Blood Moor' });
       const coldPlains = screen.getByRole('switch', { name: 'Cold Plains' });
       const rogueEncampment = screen.getByRole('switch', { name: 'Rogue Encampment' });
@@ -527,7 +569,7 @@ describe('When TerrorZoneConfiguration saves changes', () => {
       // Arrange
       const write = createDeferred<typeof saveSuccess>();
       setupValidTerrorZoneApi({ updateConfig: vi.fn().mockReturnValue(write.promise) });
-      render(<TerrorZoneConfiguration />);
+      renderTerrorZoneConfiguration();
       const coldPlains = await screen.findByRole('switch', { name: 'Cold Plains' });
       const enableAll = screen.getByRole('button', { name: 'Enable All' });
       const disableAll = screen.getByRole('button', { name: 'Disable All' });
@@ -552,7 +594,7 @@ describe('When TerrorZoneConfiguration saves changes', () => {
       // Arrange
       const write = createDeferred<typeof saveSuccess>();
       setupValidTerrorZoneApi({ updateConfig: vi.fn().mockReturnValue(write.promise) });
-      render(<TerrorZoneConfiguration />);
+      renderTerrorZoneConfiguration();
       const bloodMoor = await screen.findByRole('switch', { name: 'Blood Moor' });
       const enableAll = screen.getByRole('button', { name: 'Enable All' });
       const disableAll = screen.getByRole('button', { name: 'Disable All' });
@@ -586,7 +628,7 @@ describe('When TerrorZoneConfiguration saves changes', () => {
         getConfig: vi.fn().mockResolvedValue({ '1': true, '2': true, '3': true }),
         updateConfig,
       });
-      render(<TerrorZoneConfiguration />);
+      renderTerrorZoneConfiguration();
       const bloodMoor = await screen.findByRole('switch', { name: 'Blood Moor' });
       const coldPlains = screen.getByRole('switch', { name: 'Cold Plains' });
       const rogueEncampment = screen.getByRole('switch', { name: 'Rogue Encampment' });
@@ -616,7 +658,7 @@ describe('When TerrorZoneConfiguration saves changes', () => {
         getConfig: vi.fn().mockResolvedValue({ '1': true, '2': true, '3': true }),
         updateConfig,
       });
-      render(<TerrorZoneConfiguration />);
+      renderTerrorZoneConfiguration();
       const bloodMoor = await screen.findByRole('switch', { name: 'Blood Moor' });
       const coldPlains = screen.getByRole('switch', { name: 'Cold Plains' });
       const rogueEncampment = screen.getByRole('switch', { name: 'Rogue Encampment' });
@@ -656,7 +698,7 @@ describe('When TerrorZoneConfiguration disables all zones', () => {
     it('Then a confirmation dialog is shown and nothing is written yet', async () => {
       // Arrange
       const terrorZone = setupValidTerrorZoneApi();
-      render(<TerrorZoneConfiguration />);
+      renderTerrorZoneConfiguration();
       await screen.findByRole('switch', { name: 'Blood Moor' });
 
       // Act
@@ -673,7 +715,7 @@ describe('When TerrorZoneConfiguration disables all zones', () => {
     it('Then the zones are left unchanged', async () => {
       // Arrange
       const terrorZone = setupValidTerrorZoneApi();
-      render(<TerrorZoneConfiguration />);
+      renderTerrorZoneConfiguration();
       const bloodMoor = await screen.findByRole('switch', { name: 'Blood Moor' });
       fireEvent.click(screen.getByRole('button', { name: 'Disable All' }));
       const dialog = await screen.findByRole('alertdialog');
@@ -692,7 +734,7 @@ describe('When TerrorZoneConfiguration disables all zones', () => {
     it('Then every zone is disabled and saved', async () => {
       // Arrange
       const terrorZone = setupValidTerrorZoneApi();
-      render(<TerrorZoneConfiguration />);
+      renderTerrorZoneConfiguration();
       const bloodMoor = await screen.findByRole('switch', { name: 'Blood Moor' });
       fireEvent.click(screen.getByRole('button', { name: 'Disable All' }));
       const dialog = await screen.findByRole('alertdialog');
@@ -720,7 +762,7 @@ describe('When TerrorZoneConfiguration filters zones by search', () => {
     it('Then only that zone is listed', async () => {
       // Arrange
       setupValidTerrorZoneApi();
-      render(<TerrorZoneConfiguration />);
+      renderTerrorZoneConfiguration();
       await screen.findByRole('switch', { name: 'Blood Moor' });
 
       // Act
@@ -732,11 +774,26 @@ describe('When TerrorZoneConfiguration filters zones by search', () => {
     });
   });
 
+  describe('If the search field is looked up by its label', () => {
+    it('Then it has an accessible name', async () => {
+      // Arrange
+      setupValidTerrorZoneApi();
+
+      // Act
+      renderTerrorZoneConfiguration();
+
+      // Assert
+      expect(
+        await screen.findByRole('textbox', { name: 'Search terror zones' }),
+      ).toBeInTheDocument();
+    });
+  });
+
   describe('If the search matches no zone', () => {
     it('Then the empty search message is shown', async () => {
       // Arrange
       setupValidTerrorZoneApi();
-      render(<TerrorZoneConfiguration />);
+      renderTerrorZoneConfiguration();
       await screen.findByRole('switch', { name: 'Blood Moor' });
 
       // Act
@@ -759,7 +816,7 @@ describe('When TerrorZoneConfiguration is configured', () => {
     setupValidTerrorZoneApi();
 
     // Act
-    render(<TerrorZoneConfiguration />);
+    renderTerrorZoneConfiguration();
 
     // Assert
     expect(await screen.findByText('Before your changes show up in game')).toBeInTheDocument();
@@ -769,11 +826,43 @@ describe('When TerrorZoneConfiguration is configured', () => {
     ).toBeInTheDocument();
   });
 
+  it('Then the warning and the launch requirements share one warning callout that mentions the restart once', async () => {
+    // Arrange
+    setupValidTerrorZoneApi();
+
+    // Act
+    renderTerrorZoneConfiguration();
+
+    // Assert
+    const requirementsTitle = await screen.findByText('Before your changes show up in game');
+    const callout = requirementsTitle.closest('[data-slot="alert"]');
+    expect(callout).not.toBeNull();
+    expect(callout).toHaveClass('text-warning');
+    expect(
+      within(callout as HTMLElement).getByText(/modifies game files in your D2R installation/),
+    ).toBeInTheDocument();
+    expect(screen.getAllByText(/restart/i)).toHaveLength(1);
+  });
+
+  it('Then the merged warning callout is a polite live region rather than an assertive alert', async () => {
+    // Arrange
+    setupValidTerrorZoneApi();
+
+    // Act
+    renderTerrorZoneConfiguration();
+
+    // Assert
+    const requirementsTitle = await screen.findByText('Before your changes show up in game');
+    const callout = requirementsTitle.closest('[data-slot="alert"]');
+    expect(callout).toHaveAttribute('role', 'status');
+    expect(callout).not.toHaveAttribute('role', 'alert');
+  });
+
   describe('If the guide link is clicked', () => {
     it('Then the guide is opened in the system browser', async () => {
       // Arrange
       const { shell } = setupValidTerrorZoneApi();
-      render(<TerrorZoneConfiguration />);
+      renderTerrorZoneConfiguration();
       const guideLink = await screen.findByRole('link', { name: 'Read the terror zone guide' });
 
       // Act
@@ -797,7 +886,7 @@ describe('When TerrorZoneConfiguration is rendered as a page', () => {
     setupValidTerrorZoneApi();
 
     // Act
-    render(<TerrorZoneConfiguration />);
+    renderTerrorZoneConfiguration();
     await screen.findByRole('switch', { name: 'Blood Moor' });
 
     // Assert
@@ -811,9 +900,180 @@ describe('When TerrorZoneConfiguration is rendered as a page', () => {
     });
 
     // Act
-    render(<TerrorZoneConfiguration />);
+    renderTerrorZoneConfiguration();
 
     // Assert
     expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
+  });
+});
+
+describe('When TerrorZoneConfiguration groups zones by act', () => {
+  const zonesFromSeveralActs = [
+    { id: 'Act2-Sewers', name: 'Lut Gholein Sewers', levels: [] },
+    { id: 'Act1-BloodMoor', name: 'Blood Moor', levels: [] },
+    { id: 'Custom-Zone', name: 'Custom Zone', levels: [] },
+    { id: 'Act1-ColdPlains', name: 'Cold Plains', levels: [] },
+    { id: 'Act4_OuterSteppes', name: 'Outer Steppes', levels: [] },
+  ];
+
+  afterEach(() => {
+    window.electronAPI = originalElectronAPI;
+    vi.restoreAllMocks();
+  });
+
+  it('Then each act is a labelled section in act order, followed by zones without an act', async () => {
+    // Arrange
+    setupValidTerrorZoneApi({
+      getZones: vi.fn().mockResolvedValue(zonesFromSeveralActs),
+      getConfig: vi.fn().mockResolvedValue({}),
+    });
+
+    // Act
+    renderTerrorZoneConfiguration();
+    await screen.findByRole('switch', { name: 'Blood Moor' });
+
+    // Assert
+    const headings = screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent);
+    expect(headings).toEqual(['Act 1', 'Act 2', 'Act 4', 'Other zones']);
+    const actOne = screen.getByRole('region', { name: 'Act 1' });
+    expect(within(actOne).getAllByRole('switch')).toHaveLength(2);
+    expect(within(actOne).getByRole('switch', { name: 'Blood Moor' })).toBeInTheDocument();
+    expect(within(actOne).getByRole('switch', { name: 'Cold Plains' })).toBeInTheDocument();
+    expect(
+      within(screen.getByRole('region', { name: 'Other zones' })).getByRole('switch', {
+        name: 'Custom Zone',
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it('If a search leaves an act without matches, Then that act is not shown', async () => {
+    // Arrange
+    setupValidTerrorZoneApi({
+      getZones: vi.fn().mockResolvedValue(zonesFromSeveralActs),
+      getConfig: vi.fn().mockResolvedValue({}),
+    });
+    renderTerrorZoneConfiguration();
+    await screen.findByRole('switch', { name: 'Blood Moor' });
+
+    // Act
+    fireEvent.change(screen.getByRole('textbox', { name: 'Search terror zones' }), {
+      target: { value: 'sewers' },
+    });
+
+    // Assert
+    const headings = screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent);
+    expect(headings).toEqual(['Act 2']);
+  });
+
+  it('If no zone id names an act, Then the zones are listed without act headings', async () => {
+    // Arrange
+    setupValidTerrorZoneApi();
+
+    // Act
+    renderTerrorZoneConfiguration();
+    await screen.findByRole('switch', { name: 'Blood Moor' });
+
+    // Assert
+    expect(screen.queryAllByRole('heading', { level: 2 })).toHaveLength(0);
+  });
+});
+
+describe('When TerrorZoneConfiguration shows the restart reminder', () => {
+  const restartReminder = 'Restart D2R to apply your changes';
+
+  beforeEach(() => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+  });
+
+  afterEach(() => {
+    window.electronAPI = originalElectronAPI;
+    vi.restoreAllMocks();
+  });
+
+  it('If nothing was saved in this session, Then no reminder is shown', async () => {
+    // Arrange
+    setupValidTerrorZoneApi();
+
+    // Act
+    renderTerrorZoneConfiguration();
+    await screen.findByRole('switch', { name: 'Blood Moor' });
+
+    // Assert
+    expect(screen.queryByText(restartReminder)).not.toBeInTheDocument();
+  });
+
+  it('If a zone change is saved, Then the reminder is shown next to the counts', async () => {
+    // Arrange
+    setupValidTerrorZoneApi();
+    renderTerrorZoneConfiguration();
+    const coldPlains = await screen.findByRole('switch', { name: 'Cold Plains' });
+
+    // Act
+    fireEvent.click(coldPlains);
+
+    // Assert
+    expect(await screen.findByText(restartReminder)).toBeInTheDocument();
+    // The reminder sits in a live region next to the counts, not in the warning callout
+    const reminderRegion = screen.getByText(restartReminder).closest('output');
+    expect(reminderRegion).toHaveAttribute('aria-live', 'polite');
+    expect(reminderRegion?.closest('[data-slot="alert"]')).toBeNull();
+  });
+
+  it('If saving a zone change fails, Then no reminder is shown', async () => {
+    // Arrange
+    setupValidTerrorZoneApi({ updateConfig: vi.fn().mockResolvedValue({ success: false }) });
+    renderTerrorZoneConfiguration();
+    const coldPlains = await screen.findByRole('switch', { name: 'Cold Plains' });
+
+    // Act
+    fireEvent.click(coldPlains);
+
+    // Assert
+    await screen.findByText('Failed to update terror zone configuration');
+    expect(screen.queryByText(restartReminder)).not.toBeInTheDocument();
+  });
+
+  it('If Enable All is saved, Then the reminder is shown', async () => {
+    // Arrange
+    setupValidTerrorZoneApi();
+    renderTerrorZoneConfiguration();
+    await screen.findByRole('switch', { name: 'Blood Moor' });
+
+    // Act
+    fireEvent.click(screen.getByRole('button', { name: 'Enable All' }));
+
+    // Assert
+    expect(await screen.findByText(restartReminder)).toBeInTheDocument();
+  });
+
+  it('If the original file is restored, Then the reminder is shown', async () => {
+    // Arrange
+    setupValidTerrorZoneApi();
+    renderTerrorZoneConfiguration();
+    await screen.findByRole('switch', { name: 'Blood Moor' });
+    fireEvent.click(screen.getByRole('button', { name: 'Restore Original' }));
+    const dialog = await screen.findByRole('alertdialog');
+
+    // Act
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Restore Original' }));
+
+    // Assert
+    expect(await screen.findByText(restartReminder)).toBeInTheDocument();
+  });
+
+  it('If the page is left and opened again in the same session, Then the reminder is still shown', async () => {
+    // Arrange
+    setupValidTerrorZoneApi();
+    const firstVisit = renderTerrorZoneConfiguration();
+    fireEvent.click(await screen.findByRole('switch', { name: 'Cold Plains' }));
+    await screen.findByText(restartReminder);
+    firstVisit.unmount();
+
+    // Act
+    renderTerrorZoneConfiguration();
+    await screen.findByRole('switch', { name: 'Blood Moor' });
+
+    // Assert
+    expect(screen.getByText(restartReminder)).toBeInTheDocument();
   });
 });

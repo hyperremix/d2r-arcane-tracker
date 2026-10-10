@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { translations } from '@/i18n/translations';
+import { useTerrorZoneSessionStore } from '@/stores/terrorZoneSessionStore';
 
 /**
  * Sonner toast id shared by all successful writes so repeated saves update one toast.
@@ -32,7 +33,8 @@ function buildConfig(
 /**
  * Loads the terror zones and their configuration, and writes changes to the game file.
  * Changes are shown optimistically; writes run one after another and roll back the zones they
- * covered if they fail. Successful writes show a toast, failures set `error`.
+ * covered if they fail. Successful writes show a toast and are remembered for the app session
+ * (`hasChangesToApply`), failures set `error`.
  */
 export function useTerrorZoneConfig() {
   const { t } = useTranslation();
@@ -47,6 +49,8 @@ export function useTerrorZoneConfig() {
     errorCode: 'pathNotConfigured',
   });
   const [error, setError] = useState<string | undefined>(undefined);
+  const hasChangesToApply = useTerrorZoneSessionStore((state) => state.hasChangesToApply);
+  const markChangesToApply = useTerrorZoneSessionStore((state) => state.markChangesToApply);
 
   // The configuration the user wants (shown optimistically) and the last one written successfully.
   const desiredConfigRef = useRef<Record<string, boolean>>({});
@@ -132,6 +136,7 @@ export function useTerrorZoneConfig() {
             throw new Error('Failed to update terror zone configuration');
           }
           persistedConfigRef.current = snapshot;
+          markChangesToApply();
         } catch (err) {
           console.error('Failed to update terror zone configuration:', err);
           const rolledBack = { ...desiredConfigRef.current };
@@ -146,7 +151,7 @@ export function useTerrorZoneConfig() {
       writeQueueRef.current = promise.catch(() => undefined);
       return promise;
     },
-    [applyConfig],
+    [applyConfig, markChangesToApply],
   );
 
   const handleSaveSuccess = useCallback(
@@ -220,6 +225,7 @@ export function useTerrorZoneConfig() {
       if (!result.success) {
         throw new Error('Failed to restore original file');
       }
+      markChangesToApply();
 
       // Reload data after restore; a failed reload keeps its own load error instead of a success
       const reloaded = await loadData();
@@ -234,7 +240,7 @@ export function useTerrorZoneConfig() {
     } finally {
       setIsRestoring(false);
     }
-  }, [handleSaveSuccess, loadData, t]);
+  }, [handleSaveSuccess, loadData, markChangesToApply, t]);
 
   return {
     zones,
@@ -245,6 +251,7 @@ export function useTerrorZoneConfig() {
     isRestoring,
     validationStatus,
     error,
+    hasChangesToApply,
     toggleZone,
     runBulkUpdate,
     restoreOriginal,
