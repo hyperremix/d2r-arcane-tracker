@@ -1,6 +1,8 @@
+import type { VaultItem, VaultItemUpsertInput } from 'electron/types/grail';
 import { describe, expect, it } from 'vitest';
 import {
   isVaultedFromSaveFile,
+  isVaultRowCreatedByAdd,
   resolveVaultRestoreTarget,
   type VaultItemOrigin,
 } from './vaultRestore';
@@ -66,12 +68,86 @@ describe('When the restore target of a vault row is resolved', () => {
       'a stash file without a stash location',
       { ...INVENTORY_ORIGIN, sourceFileType: 'd2i' as const },
     ],
+    [
+      'a shared stash row without a stash tab',
+      {
+        ...INVENTORY_ORIGIN,
+        sourceFileType: 'sss' as const,
+        locationContext: 'stash' as const,
+        stashTab: undefined,
+      },
+    ],
+    [
+      'a shared stash row with an invalid stash tab',
+      {
+        ...INVENTORY_ORIGIN,
+        sourceFileType: 'd2i' as const,
+        locationContext: 'stash' as const,
+        stashTab: -1,
+      },
+    ],
+    [
+      'a stack count that differs from the stack it was taken from (merged stack)',
+      { ...INVENTORY_ORIGIN, stackCount: 5, rawItemJson: '{"code":"r01","quantity":2}' },
+    ],
   ])('If the origin has %s, Then there is no restore target', (_case, origin) => {
     // Arrange / Act
     const target = resolveVaultRestoreTarget(origin);
 
     // Assert
     expect(target).toBeUndefined();
+  });
+});
+
+describe('When the restore target of a stack row is resolved', () => {
+  it('If the stack count matches the stack that was taken out, Then the target is its origin', () => {
+    // Arrange
+    const origin = {
+      ...INVENTORY_ORIGIN,
+      stackCount: 2,
+      rawItemJson: '{"code":"r01","quantity":2}',
+    };
+
+    // Act
+    const target = resolveVaultRestoreTarget(origin);
+
+    // Assert
+    expect(target).toMatchObject({ targetGridX: 2, targetGridY: 3 });
+  });
+});
+
+describe('When it is checked whether a vault row was created by an add', () => {
+  const INPUT = {
+    ...INVENTORY_ORIGIN,
+    fingerprint: 'fp',
+    stackCount: 2,
+  } as VaultItemUpsertInput;
+
+  it('If the row has the stack count and origin of the input, Then it was created by the add', () => {
+    // Arrange
+    const row = { ...INPUT, id: 'v1' } as VaultItem;
+
+    // Act
+    const result = isVaultRowCreatedByAdd(INPUT, row);
+
+    // Assert
+    expect(result).toBe(true);
+  });
+
+  it.each([
+    ['a larger stack count (merged stack)', { stackCount: 5 }],
+    ['another grid cell', { gridX: 9 }],
+    ['another stash tab', { stashTab: 3 }],
+    ['another source file', { sourceFilePath: '/saves/Other.d2s' }],
+  ])('If the row has %s, Then it is an existing row', (_case, difference) => {
+    // Arrange
+    const row = { ...INPUT, id: 'v1', ...difference } as VaultItem;
+
+    // Act
+    const result = isVaultRowCreatedByAdd(INPUT, row);
+
+    // Assert
+    expect(result).toBe(false);
   });
 });
 

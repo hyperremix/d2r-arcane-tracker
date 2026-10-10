@@ -9,6 +9,7 @@ import {
 } from '@/components/inventory/operationErrors';
 import {
   isVaultedFromSaveFile,
+  isVaultRowCreatedByAdd,
   resolveVaultRestoreTarget,
 } from '@/components/inventory/vaultRestore';
 import { translations } from '@/i18n/translations';
@@ -25,7 +26,8 @@ export interface VaultActions {
   pendingVaultFingerprints: Set<string>;
   /**
    * Vaults an item. When it was taken out of a save file, a success toast says so and offers to
-   * undo the change while the original position is known.
+   * undo the change while the original position is known. A stack that was merged into an existing
+   * vault row has no undo: that row also holds other units and the first stack's origin.
    */
   vaultItem: (itemInput: VaultItemUpsertInput) => Promise<void>;
   /**
@@ -57,6 +59,7 @@ export function useVaultActions({
   const unvaultItem = useCallback(
     async (vaultItem: VaultItem, onUnvaulted: () => void): Promise<void> => {
       if (isUnvaultInFlightRef.current) {
+        toast.info(t(translations.inventoryBrowser.vaultFeedback.unvaultBusy));
         return;
       }
 
@@ -105,9 +108,14 @@ export function useVaultActions({
   }, [unvaultItem]);
 
   const showVaultedFromSaveFileToast = useCallback(
-    (itemName: string, savedItem: VaultItem | undefined): void => {
-      const message = t(translations.inventoryBrowser.vaultFeedback.vaulted, { itemName });
-      const canUndo = savedItem !== undefined && resolveVaultRestoreTarget(savedItem) !== undefined;
+    (itemInput: VaultItemUpsertInput, savedItem: VaultItem | undefined): void => {
+      const message = t(translations.inventoryBrowser.vaultFeedback.vaulted, {
+        itemName: itemInput.itemName,
+      });
+      const canUndo =
+        savedItem !== undefined &&
+        isVaultRowCreatedByAdd(itemInput, savedItem) &&
+        resolveVaultRestoreTarget(savedItem) !== undefined;
 
       if (!canUndo) {
         toast.success(message);
@@ -142,7 +150,7 @@ export function useVaultActions({
       try {
         const savedItem = await window.electronAPI.vault.addItem(itemInput);
         if (isVaultedFromSaveFile(itemInput)) {
-          showVaultedFromSaveFileToast(itemInput.itemName, savedItem ?? undefined);
+          showVaultedFromSaveFileToast(itemInput, savedItem);
         }
         await loadInventorySearch();
       } catch (error) {

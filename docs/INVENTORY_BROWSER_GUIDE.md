@@ -14,15 +14,14 @@ The **Inventory Browser** (title bar → **Inventory Browser**, route `/inventor
 
 - **Move**: drag an item to a free spot in the same file or another file. Occupied spots, invalid equipment slots and class restrictions are refused with a message, and nothing is changed. While you drag over the equipment, a slot turns green when the item type fits it (for example a helm, circlet or pelt on the head) and the slot is free, and red otherwise. Class restrictions and two-handed weapon rules are checked when you drop.
 - **Split a stack**: pick up part of a stack and place the pieces one by one. The Runes, Gems and Materials tabs themselves are not draggable.
-- **Vault**: drop an item on the vault area (or select it in a character window and use **Vault**) to remove it from the save file and keep it in the app's database. A message confirms the move; for items that came from an inventory or stash spot it has an **Undo** button that puts the item back there.
-- **Unvault**: drag a vaulted item onto a free spot in a character or stash window to put it back into that save file. If you select a vaulted item that came from an inventory or stash spot, **Put back where it was** returns it to that spot (refused with a message if the spot is taken now). Other items (for example from an equipment slot, the belt or the mercenary) can only be dragged back.
+- **Vault**: drop an item on the vault area (or select it in a character window and use **Vault**) to remove it from the save file and keep it in the app's database. A message confirms the move; for items that came from an inventory or stash spot it has an **Undo** button that puts the item back there (refused with a message if the spot is taken now). Runes, gems and materials that merge into a stack already in the vault have no **Undo**.
+- **Unvault**: drag a vaulted item onto a free spot in a character or stash window to put it back into that save file. If you select a vaulted item that came from an inventory or stash spot, **Put back where it was** returns it to that spot (refused with a message if the spot is taken now). Other items (for example from an equipment slot, the belt, the mercenary, or a merged stack) can only be dragged back. Vault entries that never came from a save file have a plain **Unvault** button.
 
 Vaulting and unvaulting are the only ways the app keeps an item outside a save file. The **Bookmark** action in the grail item dialog is different: see [Bookmarks](HOLY_GRAIL_GUIDE.md#bookmarks).
 
 ## Safety
 
-- Moving, vaulting and unvaulting edit your save files directly. Close **Diablo II: Resurrected** before you change items here.
 - Before every write, the app copies the save file to `save-file-backups` in its data folder and keeps the 20 newest copies per file. If the backup fails, the file is not modified.
-- On Windows, writes are refused while **Diablo II: Resurrected** is running, because the game would overwrite the change. Close the game first. Other platforms can't check this, so close the game yourself before editing.
+- Moving, vaulting and unvaulting edit your save files directly. Close **Diablo II: Resurrected** before you change items here. On Windows, writes are refused while the game is running, because it would overwrite the change. Other platforms can't check this, so close the game yourself before editing.
 - The app only edits files inside your configured save folder, and refuses a change if the file changed since the last scan (refresh and try again).
 - Bookmarks never appear here and can't be unvaulted, since they hold no item.

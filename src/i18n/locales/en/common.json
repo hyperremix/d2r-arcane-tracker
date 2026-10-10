@@ -966,6 +966,7 @@
       "vaulted": "{{itemName}} was removed from its save file and is now in the vault.",
       "undo": "Undo",
       "restored": "{{itemName}} is back in its original spot.",
+      "unvaultBusy": "Another unvault is still running. Try again in a moment.",
       "restoreAction": "Put back where it was",
       "restoreHint": "This puts the item back into its original spot. To place it somewhere else, open a character or stash and drag the item onto a free spot.",
       "dragHint": "To take this item out of the vault, open a character or stash and drag the item onto a free spot."

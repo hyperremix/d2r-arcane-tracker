@@ -197,6 +197,41 @@ describe('When an item is vaulted out of a save file', () => {
     await waitFor(() => expect(reloadInventoryAfterSaveWrite).toHaveBeenCalledTimes(1));
   });
 
+  it('If the item was merged into an existing vaulted stack, Then the success toast has no undo', async () => {
+    // Arrange
+    const stackInput = { ...SAVE_FILE_INPUT, stackCount: 2 } as VaultItemUpsertInput;
+    addItem.mockResolvedValue({ ...SAVE_FILE_VAULT_ITEM, stackCount: 5 });
+    const { result } = renderVaultActions();
+
+    // Act
+    await act(async () => {
+      await result.current.vaultItem(stackInput);
+    });
+
+    // Assert
+    expect(toast.success).toHaveBeenCalledWith(
+      i18n.t(translations.inventoryBrowser.vaultFeedback.vaulted, { itemName: 'Shako' }),
+    );
+    expect(getSuccessToastOptions()).toBeUndefined();
+  });
+
+  it('If a stack became its own vault row, Then the success toast still offers an undo', async () => {
+    // Arrange
+    const stackInput = { ...SAVE_FILE_INPUT, stackCount: 2 } as VaultItemUpsertInput;
+    addItem.mockResolvedValue({ ...SAVE_FILE_VAULT_ITEM, stackCount: 2 });
+    const { result } = renderVaultActions();
+
+    // Act
+    await act(async () => {
+      await result.current.vaultItem(stackInput);
+    });
+
+    // Assert
+    expect(getSuccessToastOptions()?.action?.label).toBe(
+      i18n.t(translations.inventoryBrowser.vaultFeedback.undo),
+    );
+  });
+
   it('If the origin cannot be restored, Then the success toast has no undo', async () => {
     // Arrange
     addItem.mockResolvedValue({
@@ -277,6 +312,9 @@ describe('When a vault item is unvaulted', () => {
 
     // Assert
     expect(unvaultItem).toHaveBeenCalledTimes(1);
+    expect(toast.info).toHaveBeenCalledWith(
+      i18n.t(translations.inventoryBrowser.vaultFeedback.unvaultBusy),
+    );
   });
 
   it('If the stash is read-only, Then it shows the read-only toast and does not run onUnvaulted', async () => {
