@@ -406,7 +406,7 @@ export function parseVaultDragStatePayload(payload: unknown): VaultDragStatePayl
  * Reads drag data of one format. Some platforms throw while the data is protected (during
  * dragover), which is treated as no data.
  */
-export function readDragData(event: DragEvent<HTMLElement>, format: string): string {
+function readDragData(event: DragEvent<HTMLElement>, format: string): string {
   try {
     return event.dataTransfer.getData(format) ?? '';
   } catch {

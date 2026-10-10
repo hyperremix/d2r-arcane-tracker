@@ -26,7 +26,7 @@ function toOptionalNumber(value: unknown): number | undefined {
   return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
 }
 
-export function parseRawItemLocation(rawItemJson: string): RawItemLocation | undefined {
+function parseRawItemLocation(rawItemJson: string): RawItemLocation | undefined {
   try {
     const parsed = JSON.parse(rawItemJson) as ParsedRawItem;
     if (!parsed || typeof parsed !== 'object') {

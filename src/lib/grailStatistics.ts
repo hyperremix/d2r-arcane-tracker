@@ -10,7 +10,7 @@ import { DAY_MS } from '@/lib/date';
 import { canItemBeEthereal, canItemBeNormal } from '@/lib/ethereal';
 
 /** Number of days a find counts as recent. */
-export const RECENT_FIND_DAYS = 7;
+const RECENT_FIND_DAYS = 7;
 
 /** Grail settings that decide which item versions are tracked. */
 export type GrailStatisticsSettings = Pick<Settings, 'grailNormal' | 'grailEthereal'>;

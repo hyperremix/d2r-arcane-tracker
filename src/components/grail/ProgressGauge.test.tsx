@@ -1,32 +1,8 @@
 import { render, screen } from '@testing-library/react';
-import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { ProgressGauge } from './ProgressGauge';
 
 describe('ProgressGauge', () => {
-  beforeAll(() => {
-    vi.stubGlobal(
-      'IntersectionObserver',
-      class {
-        observe = vi.fn();
-        unobserve = vi.fn();
-        disconnect = vi.fn();
-        takeRecords = vi.fn(() => []);
-      },
-    );
-    vi.stubGlobal(
-      'matchMedia',
-      vi.fn().mockReturnValue({
-        matches: false,
-        addEventListener: vi.fn(),
-        removeEventListener: vi.fn(),
-      }),
-    );
-  });
-
-  afterAll(() => {
-    vi.unstubAllGlobals();
-  });
-
   it('When rendered with the default tone, Then the ratio and label use theme muted text', () => {
     // Arrange
     const props = { label: 'Overall', current: 4, total: 10, showLabel: true };
@@ -53,5 +29,38 @@ describe('ProgressGauge', () => {
     expect(screen.getByText('4/10').className).not.toContain('text-muted-foreground');
     expect(screen.getByText('Overall', { selector: 'div' }).className).toContain('text-white/85');
     expect(screen.getByText('40.0%').className).toContain('text-white');
+  });
+
+  it('When rendered, Then the progress stroke dasharray reflects the value', () => {
+    // Arrange
+    const props = { label: 'Overall', current: 4, total: 10 };
+
+    // Act
+    const { container } = render(<ProgressGauge {...props} />);
+    const fill = container.querySelector('circle.text-ethereal');
+
+    // Assert
+    expect(fill?.getAttribute('stroke-dasharray')).toBe('30 100');
+  });
+
+  it('If rendered, Then the transition and starting-style classes are gated by motion-safe', () => {
+    // Arrange
+    const props = { label: 'Overall', current: 4, total: 10 };
+
+    // Act
+    const { container } = render(<ProgressGauge {...props} />);
+    const fill = container.querySelector('circle.text-ethereal');
+    const animationClasses = fill
+      ?.getAttribute('class')
+      ?.split(' ')
+      .filter((cls) => /transition|duration|ease|starting/.test(cls));
+
+    // Assert
+    expect(animationClasses).toEqual([
+      'motion-safe:transition-[stroke-dasharray]',
+      'motion-safe:duration-1500',
+      'motion-safe:ease-in-out',
+      'motion-safe:starting:[stroke-dasharray:0_100]',
+    ]);
   });
 });

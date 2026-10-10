@@ -9,7 +9,7 @@ import type {
   Settings,
 } from 'electron/types/grail';
 import i18n from 'i18next';
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useRunTrackerStore } from '@/stores/runTrackerStore';
 import { Widget } from './Widget';
 
@@ -385,32 +385,6 @@ describe('Widget run-only item list', () => {
 });
 
 describe('Widget display and legibility', () => {
-  beforeAll(() => {
-    // ProgressGauge animations rely on IntersectionObserver, which jsdom does not provide
-    vi.stubGlobal(
-      'IntersectionObserver',
-      class {
-        observe = vi.fn();
-        unobserve = vi.fn();
-        disconnect = vi.fn();
-        takeRecords = vi.fn(() => []);
-      },
-    );
-    // framer-motion reads matchMedia for reduced-motion, which jsdom does not provide
-    vi.stubGlobal(
-      'matchMedia',
-      vi.fn().mockReturnValue({
-        matches: false,
-        addEventListener: vi.fn(),
-        removeEventListener: vi.fn(),
-      }),
-    );
-  });
-
-  afterAll(() => {
-    vi.unstubAllGlobals();
-  });
-
   const statistics: GrailStatistics = {
     totalItems: 100,
     foundItems: 40,
@@ -591,33 +565,9 @@ describe('Widget display and legibility', () => {
 describe('Widget localization', () => {
   const originalBundle = structuredClone(i18n.getResourceBundle('en', 'common'));
 
-  beforeAll(() => {
-    vi.stubGlobal(
-      'IntersectionObserver',
-      class {
-        observe = vi.fn();
-        unobserve = vi.fn();
-        disconnect = vi.fn();
-        takeRecords = vi.fn(() => []);
-      },
-    );
-    vi.stubGlobal(
-      'matchMedia',
-      vi.fn().mockReturnValue({
-        matches: false,
-        addEventListener: vi.fn(),
-        removeEventListener: vi.fn(),
-      }),
-    );
-  });
-
   afterEach(() => {
     widgetTestState.hideSession = false;
     i18n.addResourceBundle('en', 'common', originalBundle, true, true);
-  });
-
-  afterAll(() => {
-    vi.unstubAllGlobals();
   });
 
   /**

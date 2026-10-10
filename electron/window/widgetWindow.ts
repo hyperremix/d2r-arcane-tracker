@@ -233,15 +233,6 @@ export function showWidgetWindow(
 }
 
 /**
- * Hides the widget window without destroying it.
- */
-export function hideWidgetWindow(): void {
-  if (widgetWindow) {
-    widgetWindow.hide();
-  }
-}
-
-/**
  * Closes and destroys the widget window.
  */
 export function closeWidgetWindow(): void {

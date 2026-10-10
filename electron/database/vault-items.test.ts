@@ -6,7 +6,6 @@ import { createDrizzleDb } from './drizzle';
 import { initializeSchema } from './schema';
 import type { DatabaseContext } from './types';
 import {
-  addVaultItem,
   addVaultItemWithUndo,
   getVaultItemById,
   getVaultSourceFilePathsPresentInLatestScan,
@@ -75,7 +74,7 @@ describe('When vault item database operations are executed', () => {
       const fingerprint = 'fp-manual-repeat';
 
       // Act
-      const first = addVaultItem(ctx, {
+      const first = addVaultItemWithUndo(ctx, {
         fingerprint,
         itemName: 'War Traveler',
         quality: 'unique',
@@ -83,8 +82,8 @@ describe('When vault item database operations are executed', () => {
         rawItemJson: '{"roll":1}',
         sourceFileType: 'd2s',
         locationContext: 'stash',
-      });
-      const second = addVaultItem(ctx, {
+      }).item;
+      const second = addVaultItemWithUndo(ctx, {
         fingerprint,
         itemName: 'War Traveler (Updated)',
         quality: 'unique',
@@ -92,7 +91,7 @@ describe('When vault item database operations are executed', () => {
         rawItemJson: '{"roll":2}',
         sourceFileType: 'd2s',
         locationContext: 'stash',
-      });
+      }).item;
 
       // Assert
       expect(second.id).toBe(first.id);
@@ -351,7 +350,7 @@ describe('When vault item database operations are executed', () => {
 
     it('Then a vaulted row is never matched by content, because its item left the file', () => {
       // Arrange
-      const vaulted = addVaultItem(ctx, {
+      const vaulted = addVaultItemWithUndo(ctx, {
         fingerprint: 'fp-vaulted-el',
         itemName: 'El Rune',
         itemCode: 'r01',
@@ -361,7 +360,7 @@ describe('When vault item database operations are executed', () => {
         sourceFileType: 'd2i',
         sourceFilePath: FILE,
         locationContext: 'stash',
-      });
+      }).item;
 
       // Act: another, identical El Rune remains in the file
       reconcileVaultItemsForScan(ctx, {
@@ -449,12 +448,12 @@ describe('When vault item database operations are executed', () => {
     it('Then only the presence flag of rows from those files is cleared', () => {
       // Arrange
       const lastSeenAt = new Date('2024-01-01T00:00:00.000Z');
-      const orphan = addVaultItem(ctx, {
+      const orphan = addVaultItemWithUndo(ctx, {
         ...baseRow,
         fingerprint: 'fp-orphan-vaulted',
         sourceFilePath: '/saves/Deleted.d2s',
         lastSeenAt,
-      });
+      }).item;
       const plain = upsertVaultItemByFingerprint(ctx, {
         ...baseRow,
         fingerprint: 'fp-orphan-plain',
@@ -604,7 +603,7 @@ describe('When vault item database operations are executed', () => {
   describe('If reconciliation runs against a vaulted item', () => {
     it('Then only the presence flag changes and vault state and item data are preserved', () => {
       // Arrange
-      const vaulted = addVaultItem(ctx, {
+      const vaulted = addVaultItemWithUndo(ctx, {
         fingerprint: 'fp-vaulted',
         itemName: 'Harlequin Crest',
         quality: 'unique',
@@ -614,7 +613,7 @@ describe('When vault item database operations are executed', () => {
         sourceFileType: 'd2s',
         sourceFilePath: '/saves/SorcOne.d2s',
         locationContext: 'inventory',
-      });
+      }).item;
 
       // Act
       reconcileVaultItemsForScan(ctx, {
@@ -725,13 +724,13 @@ describe('When vault item database operations are executed', () => {
     });
   });
 
-  describe('If addVaultItem is called without providing vaultedAt', () => {
+  describe('If addVaultItemWithUndo is called without providing vaultedAt', () => {
     it('Then vaultedAt is automatically stamped on the persisted record', () => {
       // Arrange
       const before = new Date();
 
       // Act
-      const item = addVaultItem(ctx, {
+      const item = addVaultItemWithUndo(ctx, {
         fingerprint: 'fp-vault-stamp',
         itemName: "Mara's Kaleidoscope",
         quality: 'unique',
@@ -739,7 +738,7 @@ describe('When vault item database operations are executed', () => {
         rawItemJson: '{}',
         sourceFileType: 'd2s',
         locationContext: 'inventory',
-      });
+      }).item;
 
       // Assert
       expect(item.vaultedAt).toBeTruthy();
@@ -747,11 +746,11 @@ describe('When vault item database operations are executed', () => {
     });
   });
 
-  describe('If addVaultItem is called for a previously unvaulted item', () => {
+  describe('If addVaultItemWithUndo is called for a previously unvaulted item', () => {
     it('Then unvaultedAt is cleared to mark the item as currently vaulted', () => {
       // Arrange
       const fingerprint = 'fp-re-vault';
-      const first = addVaultItem(ctx, {
+      const first = addVaultItemWithUndo(ctx, {
         fingerprint,
         itemName: "Tal Rasha's Wrappings",
         quality: 'set',
@@ -759,13 +758,13 @@ describe('When vault item database operations are executed', () => {
         rawItemJson: '{}',
         sourceFileType: 'd2s',
         locationContext: 'stash',
-      });
+      }).item;
       unvaultVaultItem(ctx, first.id);
       const afterUnvault = getVaultItemById(ctx, first.id);
       expect(afterUnvault?.unvaultedAt).toBeTruthy();
 
       // Act
-      const revaulted = addVaultItem(ctx, {
+      const revaulted = addVaultItemWithUndo(ctx, {
         fingerprint,
         itemName: "Tal Rasha's Wrappings",
         quality: 'set',
@@ -773,21 +772,21 @@ describe('When vault item database operations are executed', () => {
         rawItemJson: '{}',
         sourceFileType: 'd2s',
         locationContext: 'stash',
-      });
+      }).item;
 
       // Assert
       expect(revaulted.unvaultedAt).toBeUndefined();
     });
   });
 
-  describe('If addVaultItem is called with a sourceFilePath', () => {
+  describe('If addVaultItemWithUndo is called with a sourceFilePath', () => {
     it('Then sourceFilePath is stored and returned in the result', () => {
       // Arrange
       const fingerprint = 'fp-source-file-path';
       const sourceFilePath = '/saves/Sorc.d2s';
 
       // Act
-      const item = addVaultItem(ctx, {
+      const item = addVaultItemWithUndo(ctx, {
         fingerprint,
         itemName: 'Shako',
         quality: 'unique',
@@ -796,7 +795,7 @@ describe('When vault item database operations are executed', () => {
         sourceFileType: 'd2s',
         sourceFilePath,
         locationContext: 'inventory',
-      });
+      }).item;
 
       // Assert
       expect(item.sourceFilePath).toBe(sourceFilePath);
@@ -806,7 +805,7 @@ describe('When vault item database operations are executed', () => {
   describe('If unvaultVaultItem is called for a vaulted item', () => {
     it('Then unvaultedAt is set to a recent timestamp', () => {
       // Arrange
-      const item = addVaultItem(ctx, {
+      const item = addVaultItemWithUndo(ctx, {
         fingerprint: 'fp-unvault',
         itemName: 'Windforce',
         quality: 'unique',
@@ -814,7 +813,7 @@ describe('When vault item database operations are executed', () => {
         rawItemJson: '{}',
         sourceFileType: 'd2s',
         locationContext: 'inventory',
-      });
+      }).item;
       const before = new Date();
 
       // Act
@@ -834,7 +833,7 @@ describe('When vault item database operations are executed', () => {
       const laterUnvaulted = new Date('2024-01-01T09:00:00.000Z').toISOString(); // before vaultedAt
 
       // Item that IS currently vaulted (vaultedAt set, no unvaultedAt)
-      const vaulted = addVaultItem(ctx, {
+      const vaulted = addVaultItemWithUndo(ctx, {
         fingerprint: 'fp-currently-vaulted',
         itemName: 'Vaulted Shako',
         quality: 'unique',
@@ -843,10 +842,10 @@ describe('When vault item database operations are executed', () => {
         sourceFileType: 'd2s',
         locationContext: 'stash',
         vaultedAt: new Date(vaultedAt),
-      });
+      }).item;
 
       // Item with unvaultedAt < vaultedAt — still considered vaulted
-      const revaultedAfterUnvault = addVaultItem(ctx, {
+      const revaultedAfterUnvault = addVaultItemWithUndo(ctx, {
         fingerprint: 'fp-revaulted',
         itemName: 'Re-Vaulted Belt',
         quality: 'unique',
@@ -856,11 +855,11 @@ describe('When vault item database operations are executed', () => {
         locationContext: 'stash',
         vaultedAt: new Date(vaultedAt),
         unvaultedAt: new Date(laterUnvaulted),
-      });
+      }).item;
       expect(revaultedAfterUnvault.id).toBeTruthy();
 
       // Item with unvaultedAt >= vaultedAt — NOT currently vaulted
-      const unvaultedItem = addVaultItem(ctx, {
+      const unvaultedItem = addVaultItemWithUndo(ctx, {
         fingerprint: 'fp-unvaulted-search',
         itemName: 'Unvaulted Ring',
         quality: 'unique',
@@ -868,7 +867,7 @@ describe('When vault item database operations are executed', () => {
         rawItemJson: '{}',
         sourceFileType: 'd2s',
         locationContext: 'stash',
-      });
+      }).item;
       unvaultVaultItem(ctx, unvaultedItem.id);
 
       // Item with no vaultedAt — NOT currently vaulted
@@ -943,7 +942,7 @@ describe('When vault item database operations are executed', () => {
     });
   });
 
-  describe('If addVaultItem is called twice for the same stackable rune item code', () => {
+  describe('If addVaultItemWithUndo is called twice for the same stackable rune item code', () => {
     it('Then the second vault merges count instead of creating a duplicate', () => {
       // Arrange
       const runeJson = JSON.stringify({
@@ -952,7 +951,7 @@ describe('When vault item database operations are executed', () => {
       });
 
       // Act
-      const first = addVaultItem(ctx, {
+      const first = addVaultItemWithUndo(ctx, {
         fingerprint: 'fp-rune-first',
         itemName: 'Vex Rune',
         itemCode: 'r07',
@@ -961,9 +960,9 @@ describe('When vault item database operations are executed', () => {
         rawItemJson: runeJson,
         sourceFileType: 'd2i',
         locationContext: 'stash',
-      });
+      }).item;
 
-      const second = addVaultItem(ctx, {
+      const second = addVaultItemWithUndo(ctx, {
         fingerprint: 'fp-rune-second',
         itemName: 'Vex Rune',
         itemCode: 'r07',
@@ -975,7 +974,7 @@ describe('When vault item database operations are executed', () => {
         }),
         sourceFileType: 'd2i',
         locationContext: 'stash',
-      });
+      }).item;
 
       // Assert — should be merged into first entry
       expect(second.id).toBe(first.id);
@@ -990,7 +989,7 @@ describe('When vault item database operations are executed', () => {
         code: 'r07',
         magic_attributes: [{ id: 381, values: [5] }],
       });
-      const item = addVaultItem(ctx, {
+      const item = addVaultItemWithUndo(ctx, {
         fingerprint: 'fp-rune-partial',
         itemName: 'Vex Rune',
         itemCode: 'r07',
@@ -999,7 +998,7 @@ describe('When vault item database operations are executed', () => {
         rawItemJson: runeJson,
         sourceFileType: 'd2i',
         locationContext: 'stash',
-      });
+      }).item;
 
       // Act
       unvaultVaultItem(ctx, item.id, 2);
@@ -1018,7 +1017,7 @@ describe('When vault item database operations are executed', () => {
         code: 'r07',
         magic_attributes: [{ id: 381, values: [3] }],
       });
-      const item = addVaultItem(ctx, {
+      const item = addVaultItemWithUndo(ctx, {
         fingerprint: 'fp-rune-full-unvault',
         itemName: 'Vex Rune',
         itemCode: 'r07',
@@ -1027,7 +1026,7 @@ describe('When vault item database operations are executed', () => {
         rawItemJson: runeJson,
         sourceFileType: 'd2i',
         locationContext: 'stash',
-      });
+      }).item;
 
       // Act
       unvaultVaultItem(ctx, item.id, 3);
@@ -1042,7 +1041,7 @@ describe('When vault item database operations are executed', () => {
     it('Then only previously-vaulted-then-unvaulted items are returned', () => {
       // Arrange
       // Item that IS currently vaulted — should NOT appear
-      addVaultItem(ctx, {
+      addVaultItemWithUndo(ctx, {
         fingerprint: 'fp-still-vaulted',
         itemName: 'Still Vaulted Item',
         quality: 'unique',
@@ -1053,7 +1052,7 @@ describe('When vault item database operations are executed', () => {
       });
 
       // Item that was vaulted then unvaulted — SHOULD appear
-      const toUnvault = addVaultItem(ctx, {
+      const toUnvault = addVaultItemWithUndo(ctx, {
         fingerprint: 'fp-was-vaulted',
         itemName: 'Was Vaulted Item',
         quality: 'unique',
@@ -1061,7 +1060,7 @@ describe('When vault item database operations are executed', () => {
         rawItemJson: '{}',
         sourceFileType: 'd2s',
         locationContext: 'stash',
-      });
+      }).item;
       unvaultVaultItem(ctx, toUnvault.id);
 
       // Act
@@ -1286,18 +1285,18 @@ describe('When vault adds could overwrite or lose already vaulted items', () => 
   describe('If a different item with the same fingerprint is vaulted while the first is still vaulted', () => {
     it('Then both items are kept in separate rows', () => {
       // Arrange
-      const first = addVaultItem(ctx, {
+      const first = addVaultItemWithUndo(ctx, {
         ...baseInput,
         fingerprint: 'fp-shared',
         rawItemJson: '{"id":1,"roll":"first"}',
-      });
+      }).item;
 
       // Act
-      const second = addVaultItem(ctx, {
+      const second = addVaultItemWithUndo(ctx, {
         ...baseInput,
         fingerprint: 'fp-shared',
         rawItemJson: '{"id":2,"roll":"second"}',
-      });
+      }).item;
 
       // Assert
       expect(second.id).not.toBe(first.id);
@@ -1310,13 +1309,13 @@ describe('When vault adds could overwrite or lose already vaulted items', () => 
   describe('If a stack merge is undone after the source removal failed', () => {
     it('Then the previously vaulted stack keeps its count and stays vaulted', () => {
       // Arrange
-      const existing = addVaultItem(ctx, {
+      const existing = addVaultItemWithUndo(ctx, {
         ...baseInput,
         fingerprint: 'fp-runes-1',
         itemName: 'Fal Rune',
         itemCode: 'r19',
         rawItemJson: JSON.stringify({ code: 'r19', magic_attributes: [{ id: 381, values: [10] }] }),
-      });
+      }).item;
       const result = addVaultItemWithUndo(ctx, {
         ...baseInput,
         fingerprint: 'fp-runes-2',
@@ -1340,11 +1339,11 @@ describe('When vault adds could overwrite or lose already vaulted items', () => 
   describe('If an add that replaced a previously unvaulted row is undone', () => {
     it('Then the old row data is restored', () => {
       // Arrange
-      const first = addVaultItem(ctx, {
+      const first = addVaultItemWithUndo(ctx, {
         ...baseInput,
         fingerprint: 'fp-reused',
         rawItemJson: '{"id":1,"roll":"old"}',
-      });
+      }).item;
       unvaultVaultItem(ctx, first.id);
       const result = addVaultItemWithUndo(ctx, {
         ...baseInput,
@@ -1393,8 +1392,8 @@ describe('When vault adds could overwrite or lose already vaulted items', () => 
       });
 
       // Act
-      const first = addVaultItem(ctx, keys('fp-key-1'));
-      const second = addVaultItem(ctx, keys('fp-key-2'));
+      const first = addVaultItemWithUndo(ctx, keys('fp-key-1')).item;
+      const second = addVaultItemWithUndo(ctx, keys('fp-key-2')).item;
 
       // Assert
       expect(second.id).not.toBe(first.id);
@@ -1406,7 +1405,7 @@ describe('When vault adds could overwrite or lose already vaulted items', () => 
   describe('If a rune is vaulted while a grail bookmark exists for the same code', () => {
     it('Then the rune is not merged into the bookmark', () => {
       // Arrange
-      const bookmark = addVaultItem(ctx, {
+      const bookmark = addVaultItemWithUndo(ctx, {
         fingerprint: 'grail:fal',
         itemName: 'Fal Rune',
         itemCode: 'r19',
@@ -1415,16 +1414,16 @@ describe('When vault adds could overwrite or lose already vaulted items', () => 
         rawItemJson: '{"id":"fal"}',
         sourceFileType: 'd2s',
         locationContext: 'unknown',
-      });
+      }).item;
 
       // Act
-      const rune = addVaultItem(ctx, {
+      const rune = addVaultItemWithUndo(ctx, {
         ...baseInput,
         fingerprint: 'fp-fal',
         itemName: 'Fal Rune',
         itemCode: 'r19',
         rawItemJson: JSON.stringify({ code: 'r19' }),
-      });
+      }).item;
 
       // Assert
       expect(rune.id).not.toBe(bookmark.id);
@@ -1435,13 +1434,13 @@ describe('When vault adds could overwrite or lose already vaulted items', () => 
   describe('If a grail bookmark is added while a real rune stack of the same code is vaulted', () => {
     it('Then the real stack keeps its count and a separate bookmark row is returned', () => {
       // Arrange
-      const realStack = addVaultItem(ctx, {
+      const realStack = addVaultItemWithUndo(ctx, {
         ...baseInput,
         fingerprint: 'd2i|stash|r01',
         itemName: 'El Rune',
         itemCode: 'r01',
         rawItemJson: JSON.stringify({ code: 'r01', quantity: 3 }),
-      });
+      }).item;
       const bookmarkInput = {
         fingerprint: 'grail:el',
         itemName: 'El Rune',
@@ -1456,8 +1455,8 @@ describe('When vault adds could overwrite or lose already vaulted items', () => 
       };
 
       // Act
-      const bookmark = addVaultItem(ctx, bookmarkInput);
-      const bookmarkAgain = addVaultItem(ctx, bookmarkInput);
+      const bookmark = addVaultItemWithUndo(ctx, bookmarkInput).item;
+      const bookmarkAgain = addVaultItemWithUndo(ctx, bookmarkInput).item;
 
       // Assert
       expect(bookmark.id).not.toBe(realStack.id);
@@ -1480,8 +1479,8 @@ describe('When vault adds could overwrite or lose already vaulted items', () => 
       });
 
       // Act
-      const first = addVaultItem(ctx, gem('fp-skz-1', 6));
-      const second = addVaultItem(ctx, gem('fp-skz-2', 1));
+      const first = addVaultItemWithUndo(ctx, gem('fp-skz-1', 6)).item;
+      const second = addVaultItemWithUndo(ctx, gem('fp-skz-2', 1)).item;
 
       // Assert
       expect(second.id).toBe(first.id);
@@ -1492,12 +1491,12 @@ describe('When vault adds could overwrite or lose already vaulted items', () => 
   describe('If unvaultVaultItem receives an invalid withdraw count', () => {
     it('Then it throws instead of growing or ignoring the stack', () => {
       // Arrange
-      const saved = addVaultItem(ctx, {
+      const saved = addVaultItemWithUndo(ctx, {
         ...baseInput,
         fingerprint: 'fp-rune-withdraw',
         itemCode: 'r07',
         rawItemJson: JSON.stringify({ code: 'r07', magic_attributes: [{ id: 381, values: [5] }] }),
-      });
+      }).item;
 
       // Act
       const withdrawNegative = () => unvaultVaultItem(ctx, saved.id, -2);
@@ -1526,7 +1525,11 @@ describe('When a stack merge is undone after another merge landed in the same ro
     };
     const rune = (count: number) =>
       JSON.stringify({ code: 'r19', magic_attributes: [{ id: 381, values: [count] }] });
-    const row = addVaultItem(ctx, { ...base, fingerprint: 'fp-a', rawItemJson: rune(10) });
+    const row = addVaultItemWithUndo(ctx, {
+      ...base,
+      fingerprint: 'fp-a',
+      rawItemJson: rune(10),
+    }).item;
     const first = addVaultItemWithUndo(ctx, { ...base, fingerprint: 'fp-b', rawItemJson: rune(4) });
     addVaultItemWithUndo(ctx, { ...base, fingerprint: 'fp-c', rawItemJson: rune(3) });
 
