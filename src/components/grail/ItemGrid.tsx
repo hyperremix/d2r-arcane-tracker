@@ -2,72 +2,51 @@ import { useVirtualizer } from '@tanstack/react-virtual';
 import type { Character, Item, Settings } from 'electron/types/grail';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Badge } from '@/components/ui/badge';
+import type { GroupMode, ViewMode } from '@/components/grail/search/options';
 import { useProgressLookup } from '@/hooks/useProgressLookup';
 import { translations } from '@/i18n/translations';
-import {
-  filterItemsByTrackedVersions,
-  shouldShowEtherealStatus,
-  shouldShowNormalStatus,
-} from '@/lib/ethereal';
-import { countActiveFilters } from '@/lib/grailFilters';
+import { filterItemsByTrackedVersions } from '@/lib/ethereal';
+import { getEtherealGroupKey, getEtherealGroupRank } from '@/lib/etherealGroups';
+import { countActiveFilters, getItemCategoryRank, getItemTypeRank } from '@/lib/grailFilters';
 import { itemCategoryLabelKeys, itemTypeLabelKeys } from '@/lib/labelKeys';
 import { useFilteredItems, useGrailStore } from '@/stores/grailStore';
 import { ItemDetailsDialog } from './ItemDetailsDialog';
 import { getItemGridEmptyStateVariant, ItemGridEmptyState } from './ItemGridEmptyState';
 import type { ItemGridGroup } from './VirtualItemGrid';
-import { ItemCardCell, VirtualItemGrid } from './VirtualItemGrid';
+import { GroupHeader, ItemCardCell, VirtualItemGrid } from './VirtualItemGrid';
 
 /**
- * Determines the ethereal grouping key for an item based on its ethereal status and progress.
- * @param {Item} itemData - The Holy Grail item data
- * @param {{ normalFound: boolean; etherealFound: boolean } | undefined} itemProgress - The progress data for the item
- * @returns {string} A string key representing the item's ethereal status group
+ * The group an item belongs to: the translation key of the group title and the group's position.
  */
-function getEtherealGroupKey(
-  itemData: Item,
-  itemProgress: { normalFound: boolean; etherealFound: boolean } | undefined,
-  settings: Settings,
-  t: (key: string) => string,
-) {
-  const hasEthereal = itemProgress?.etherealFound;
-  const hasNormal = itemProgress?.normalFound;
-  const canBeEthereal = shouldShowEtherealStatus(itemData, settings);
-  const canBeNormal = shouldShowNormalStatus(itemData, settings);
-
-  if (!canBeEthereal && !canBeNormal) {
-    return t(translations.grail.itemGrid.notApplicable);
-  }
-  if (!canBeEthereal) {
-    return hasNormal
-      ? t(translations.grail.itemGrid.normalFound)
-      : t(translations.grail.itemGrid.normalNotFound);
-  }
-  if (!canBeNormal) {
-    return hasEthereal
-      ? t(translations.grail.itemGrid.etherealFound)
-      : t(translations.grail.itemGrid.etherealNotFound);
-  }
-  if (hasEthereal && hasNormal) {
-    return t(translations.grail.itemGrid.bothFound);
-  }
-  if (hasEthereal) {
-    return t(translations.grail.itemGrid.etherealOnly);
-  }
-  if (hasNormal) {
-    return t(translations.grail.itemGrid.normalOnly);
-  }
-  return t(translations.grail.itemGrid.neitherFound);
+interface ItemGroupPlacement {
+  titleKey: string;
+  rank: number;
 }
 
 /**
- * Type representing the available view modes for displaying items.
+ * Determines the group of an item for a grouping mode. Groups are ranked in a defined order
+ * (categories in display order, types in quality order) rather than by their first item.
  */
-type ViewMode = 'grid' | 'list';
-/**
- * Type representing the available grouping modes for organizing items.
- */
-type GroupMode = 'none' | 'category' | 'type' | 'ethereal';
+function getItemGroupPlacement(
+  itemData: Item,
+  groupMode: Exclude<GroupMode, 'none'>,
+  progressLookup: ReturnType<typeof useProgressLookup>,
+  settings: Settings,
+): ItemGroupPlacement {
+  switch (groupMode) {
+    case 'category':
+      return {
+        titleKey: itemCategoryLabelKeys[itemData.category],
+        rank: getItemCategoryRank(itemData.category),
+      };
+    case 'type':
+      return { titleKey: itemTypeLabelKeys[itemData.type], rank: getItemTypeRank(itemData.type) };
+    case 'ethereal': {
+      const titleKey = getEtherealGroupKey(itemData, progressLookup.get(itemData.id), settings);
+      return { titleKey, rank: getEtherealGroupRank(titleKey) };
+    }
+  }
+}
 
 /**
  * A group of items before its found count is known (the count is added for the grid).
@@ -121,38 +100,26 @@ export const ItemGrid = memo(function ItemGrid() {
       return [{ title: t(translations.common.allItems), items: displayItems }];
     }
 
-    const groups = new Map<string, typeof displayItems>();
-
-    displayItems.forEach((itemData) => {
-      let groupKey = '';
-
-      switch (groupMode) {
-        case 'category':
-          groupKey = t(itemCategoryLabelKeys[itemData.category]);
-          break;
-        case 'type':
-          groupKey = t(itemTypeLabelKeys[itemData.type]);
-          break;
-        case 'ethereal': {
-          // For consolidated view, group by whether either version is found
-          const itemProgress = progressLookup.get(itemData.id);
-          groupKey = getEtherealGroupKey(itemData, itemProgress, settings, t);
-          break;
-        }
-        default:
-          groupKey = t(translations.common.allItems);
-      }
-
-      if (!groups.has(groupKey)) {
-        groups.set(groupKey, []);
-      }
-      const group = groups.get(groupKey);
+    // Items keep their sort order within a group; the groups themselves follow a defined order
+    const groups = new Map<string, { rank: number; items: Item[] }>();
+    for (const itemData of displayItems) {
+      const { titleKey, rank } = getItemGroupPlacement(
+        itemData,
+        groupMode,
+        progressLookup,
+        settings,
+      );
+      const group = groups.get(titleKey);
       if (group) {
-        group.push(itemData);
+        group.items.push(itemData);
+      } else {
+        groups.set(titleKey, { rank, items: [itemData] });
       }
-    });
+    }
 
-    return Array.from(groups.entries()).map(([title, items]) => ({ title, items }));
+    return Array.from(groups.entries())
+      .sort(([, a], [, b]) => a.rank - b.rank)
+      .map(([titleKey, { items }]) => ({ title: t(titleKey), items }));
   }, [displayItems, groupMode, progressLookup, settings, t]);
 
   const handleItemClick = useCallback((itemId: string) => {
@@ -285,12 +252,12 @@ function renderVirtualRow({
           transform: `translateY(${virtualRow.start}px)`,
         }}
       >
-        <div className="flex items-center gap-2 py-4">
-          <h3 className="font-semibold text-lg">{row.groupTitle}</h3>
-          <Badge variant="outline">
-            {row.foundCount}/{row.itemCount}
-          </Badge>
-        </div>
+        <GroupHeader
+          title={row.groupTitle}
+          foundCount={row.foundCount}
+          itemCount={row.itemCount}
+          className="py-4"
+        />
       </div>
     );
   }

@@ -1,5 +1,5 @@
 import type { ItemCategory, ItemType } from 'electron/types/grail';
-import { LayoutGrid, List, RotateCcw } from 'lucide-react';
+import { RotateCcw } from 'lucide-react';
 import { useId, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
@@ -7,7 +7,6 @@ import { translations } from '@/i18n/translations';
 import { useGrailStore } from '@/stores/grailStore';
 import { ActiveFilterChips, buildActiveFilterChips } from './search/ActiveFilterChips';
 import { FiltersPopover } from './search/FiltersPopover';
-import { GroupBySelect } from './search/GroupBySelect';
 import {
   DEFAULT_SORT_BY,
   DEFAULT_SORT_ORDER,
@@ -19,17 +18,17 @@ import {
 import { ResultCount } from './search/ResultCount';
 import { SearchField } from './search/SearchField';
 import { SegmentButton, SegmentedControl } from './search/SegmentedControl';
-import { SortControls } from './search/SortControls';
 import { getSubCategoryGroups } from './search/subCategories';
 import { TypeToggleChips } from './search/TypeToggleChips';
 import { useFocusSearchShortcut } from './search/useFocusSearchShortcut';
 import { useSearchInput } from './search/useSearchInput';
+import { ViewOptionsPopover } from './search/ViewOptionsPopover';
 
 /**
  * AdvancedSearch renders the Holy Grail toolbar shown above the item grid.
- * It provides search (with optional fuzzy matching and a `/` / Ctrl+F shortcut), a found-status
- * segmented control, item type toggle chips, a filters popover for categories and sub-categories,
- * sorting, grouping, view mode controls and a live result count.
+ * It provides search (with a `/` / Ctrl+F shortcut), a found-status segmented control, item type
+ * toggle chips, a filters popover (fuzzy search, categories and sub-categories), a view popover
+ * (grid/list, sorting and grouping) and a live result count.
  * The grail store is the single source of truth for all filter values.
  * @returns {JSX.Element} The grail toolbar with active filter chips
  */
@@ -98,22 +97,23 @@ export function AdvancedSearch() {
     resetStoreFilters();
   };
 
+  const setFuzzySearch = (value: boolean) => setAdvancedFilter({ fuzzySearch: value });
+
   const activeChips = buildActiveFilterChips({
     searchTerm,
-    foundStatus,
+    fuzzySearch,
     categories: selectedCategories,
     subCategories: selectedSubCategories,
-    types: selectedTypes,
     t,
     onClearSearch: clearSearch,
-    onClearStatus: () => setFilter({ foundStatus: 'all' }),
+    onDisableFuzzySearch: () => setFuzzySearch(false),
     onToggleCategory: toggleCategory,
     onToggleSubCategory: toggleSubCategory,
-    onToggleType: toggleType,
   });
 
   const isSortCustomized = sortBy !== DEFAULT_SORT_BY || sortOrder !== DEFAULT_SORT_ORDER;
-  const hasActiveState = activeChips.length > 0 || fuzzySearch || isSortCustomized;
+  const hasActiveState =
+    activeChips.length > 0 || foundStatus !== 'all' || selectedTypes.length > 0 || isSortCustomized;
 
   return (
     <section
@@ -126,8 +126,6 @@ export function AdvancedSearch() {
           value={searchInput}
           onChange={changeSearchInput}
           onClear={clearSearch}
-          fuzzySearch={fuzzySearch}
-          onToggleFuzzySearch={() => setAdvancedFilter({ fuzzySearch: !fuzzySearch })}
         />
 
         {/* Found status */}
@@ -150,60 +148,41 @@ export function AdvancedSearch() {
           onToggleType={toggleType}
         />
 
-        {/* Category / sub-category filters */}
+        {/* Fuzzy search, category and sub-category filters */}
         <FiltersPopover
           selectedCategories={selectedCategories}
           selectedSubCategories={selectedSubCategories}
           subCategoryGroups={subCategoryGroups}
           onToggleCategory={toggleCategory}
           onToggleSubCategory={toggleSubCategory}
+          fuzzySearch={fuzzySearch}
+          onFuzzySearchChange={setFuzzySearch}
         />
 
-        <SortControls
+        {/* Grid/list, sorting and grouping */}
+        <ViewOptionsPopover
+          viewMode={viewMode}
           sortBy={sortBy}
           sortOrder={sortOrder}
-          onSortByChange={(value) => setAdvancedFilter({ sortBy: value })}
-          onToggleSortOrder={() =>
-            setAdvancedFilter({ sortOrder: sortOrder === 'asc' ? 'desc' : 'asc' })
-          }
-        />
-
-        <GroupBySelect
           groupMode={groupMode}
           showEthereal={Boolean(settings.grailEthereal)}
+          onViewModeChange={setViewMode}
+          onSortByChange={(value) => setAdvancedFilter({ sortBy: value })}
+          onSortOrderChange={(value) => setAdvancedFilter({ sortOrder: value })}
           onGroupModeChange={setGroupMode}
         />
+      </div>
 
-        {/* View mode */}
-        <SegmentedControl legend={t(translations.grail.advancedSearch.viewMode)}>
-          <SegmentButton
-            pressed={viewMode === 'grid'}
-            onClick={() => setViewMode('grid')}
-            ariaLabel={t(translations.grail.advancedSearch.grid)}
-          >
-            <LayoutGrid aria-hidden="true" />
-          </SegmentButton>
-          <SegmentButton
-            pressed={viewMode === 'list'}
-            onClick={() => setViewMode('list')}
-            ariaLabel={t(translations.grail.advancedSearch.list)}
-          >
-            <List aria-hidden="true" />
-          </SegmentButton>
-        </SegmentedControl>
-
+      {/* Active filter chips, reset and result count */}
+      <div className="flex flex-wrap items-center gap-2">
+        {activeChips.length > 0 && <ActiveFilterChips chips={activeChips} />}
         {/* Reset everything back to defaults */}
         {hasActiveState && (
-          <Button variant="ghost" size="sm" className="h-9" onClick={resetAll}>
+          <Button variant="ghost" size="sm" className="h-7" onClick={resetAll}>
             <RotateCcw aria-hidden="true" />
             {t(translations.grail.advancedSearch.clearAll)}
           </Button>
         )}
-      </div>
-
-      {/* Active filter chips and result count */}
-      <div className="flex flex-wrap items-center gap-2">
-        {activeChips.length > 0 && <ActiveFilterChips chips={activeChips} />}
         <ResultCount className="ml-auto" />
       </div>
     </section>

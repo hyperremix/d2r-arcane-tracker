@@ -5,6 +5,12 @@ import { useEffect } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { HolyGrailItemBuilder } from '@/fixtures';
 import type { ProgressLookupData } from '@/hooks/useProgressLookup';
+import { translations } from '@/i18n/translations';
+import {
+  etherealGroupKeyOrder,
+  getEtherealGroupKey,
+  getEtherealGroupRank,
+} from '@/lib/etherealGroups';
 import { ItemGrid } from './ItemGrid';
 import type { ItemGridGroup } from './VirtualItemGrid';
 
@@ -56,44 +62,6 @@ function deduplicateItems(items: Item[]) {
   }
 
   return canonicalItems;
-}
-
-// getEtherealGroupKey function copied from ItemGrid for testing
-// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Test helper copied from source
-function getEtherealGroupKey(
-  itemData: Item,
-  itemProgress: { normalFound: boolean; etherealFound: boolean } | undefined,
-  settings: Settings,
-) {
-  const hasEthereal = itemProgress?.etherealFound;
-  const hasNormal = itemProgress?.normalFound;
-  // Use inline checks instead of importing (tests shouldn't depend on module internals)
-  const canBeEthereal =
-    settings.grailEthereal &&
-    (itemData.etherealType === 'optional' || itemData.etherealType === 'only');
-  const canBeNormal =
-    settings.grailNormal &&
-    (itemData.etherealType === 'none' || itemData.etherealType === 'optional');
-
-  if (!canBeEthereal && !canBeNormal) {
-    return 'Not Applicable';
-  }
-  if (!canBeEthereal) {
-    return hasNormal ? 'Normal Found' : 'Normal Not Found';
-  }
-  if (!canBeNormal) {
-    return hasEthereal ? 'Ethereal Found' : 'Ethereal Not Found';
-  }
-  if (hasEthereal && hasNormal) {
-    return 'Both Found';
-  }
-  if (hasEthereal) {
-    return 'Ethereal Only';
-  }
-  if (hasNormal) {
-    return 'Normal Only';
-  }
-  return 'Neither Found';
 }
 
 // calculateGroupFoundCount function copied from ItemGrid for testing
@@ -252,7 +220,7 @@ describe('ItemGrid Deduplication Logic', () => {
 
 describe('When getEtherealGroupKey is called', () => {
   describe('If neither normal nor ethereal can apply', () => {
-    it('Then returns "Not Applicable"', () => {
+    it('Then returns the notApplicable group key', () => {
       // Arrange
       const item = HolyGrailItemBuilder.new().withEtherealType('none').build();
       const settings = { ...defaultSettings, grailNormal: false, grailEthereal: true };
@@ -261,12 +229,12 @@ describe('When getEtherealGroupKey is called', () => {
       const result = getEtherealGroupKey(item, undefined, settings);
 
       // Assert
-      expect(result).toBe('Not Applicable');
+      expect(result).toBe(translations.grail.itemGrid.notApplicable);
     });
   });
 
   describe('If only normal can apply and normal is found', () => {
-    it('Then returns "Normal Found"', () => {
+    it('Then returns the normalFound group key', () => {
       // Arrange
       const item = HolyGrailItemBuilder.new().withEtherealType('none').build();
       const settings = { ...defaultSettings, grailNormal: true, grailEthereal: false };
@@ -279,12 +247,12 @@ describe('When getEtherealGroupKey is called', () => {
       );
 
       // Assert
-      expect(result).toBe('Normal Found');
+      expect(result).toBe(translations.grail.itemGrid.normalFound);
     });
   });
 
   describe('If only normal can apply and normal is not found', () => {
-    it('Then returns "Normal Not Found"', () => {
+    it('Then returns the normalNotFound group key', () => {
       // Arrange
       const item = HolyGrailItemBuilder.new().withEtherealType('none').build();
       const settings = { ...defaultSettings, grailNormal: true, grailEthereal: false };
@@ -297,12 +265,12 @@ describe('When getEtherealGroupKey is called', () => {
       );
 
       // Assert
-      expect(result).toBe('Normal Not Found');
+      expect(result).toBe(translations.grail.itemGrid.normalNotFound);
     });
   });
 
   describe('If only ethereal can apply and ethereal is found', () => {
-    it('Then returns "Ethereal Found"', () => {
+    it('Then returns the etherealFound group key', () => {
       // Arrange
       const item = HolyGrailItemBuilder.new().withEtherealType('only').build();
       const settings = { ...defaultSettings, grailNormal: false, grailEthereal: true };
@@ -315,12 +283,12 @@ describe('When getEtherealGroupKey is called', () => {
       );
 
       // Assert
-      expect(result).toBe('Ethereal Found');
+      expect(result).toBe(translations.grail.itemGrid.etherealFound);
     });
   });
 
   describe('If only ethereal can apply and ethereal is not found', () => {
-    it('Then returns "Ethereal Not Found"', () => {
+    it('Then returns the etherealNotFound group key', () => {
       // Arrange
       const item = HolyGrailItemBuilder.new().withEtherealType('only').build();
       const settings = { ...defaultSettings, grailNormal: false, grailEthereal: true };
@@ -333,12 +301,12 @@ describe('When getEtherealGroupKey is called', () => {
       );
 
       // Assert
-      expect(result).toBe('Ethereal Not Found');
+      expect(result).toBe(translations.grail.itemGrid.etherealNotFound);
     });
   });
 
   describe('If both can apply and both found', () => {
-    it('Then returns "Both Found"', () => {
+    it('Then returns the bothFound group key', () => {
       // Arrange
       const item = HolyGrailItemBuilder.new().withEtherealType('optional').build();
 
@@ -350,12 +318,12 @@ describe('When getEtherealGroupKey is called', () => {
       );
 
       // Assert
-      expect(result).toBe('Both Found');
+      expect(result).toBe(translations.grail.itemGrid.bothFound);
     });
   });
 
   describe('If both can apply and only ethereal found', () => {
-    it('Then returns "Ethereal Only"', () => {
+    it('Then returns the etherealOnly group key', () => {
       // Arrange
       const item = HolyGrailItemBuilder.new().withEtherealType('optional').build();
 
@@ -367,12 +335,12 @@ describe('When getEtherealGroupKey is called', () => {
       );
 
       // Assert
-      expect(result).toBe('Ethereal Only');
+      expect(result).toBe(translations.grail.itemGrid.etherealOnly);
     });
   });
 
   describe('If both can apply and only normal found', () => {
-    it('Then returns "Normal Only"', () => {
+    it('Then returns the normalOnly group key', () => {
       // Arrange
       const item = HolyGrailItemBuilder.new().withEtherealType('optional').build();
 
@@ -384,12 +352,12 @@ describe('When getEtherealGroupKey is called', () => {
       );
 
       // Assert
-      expect(result).toBe('Normal Only');
+      expect(result).toBe(translations.grail.itemGrid.normalOnly);
     });
   });
 
   describe('If both can apply and neither found', () => {
-    it('Then returns "Neither Found"', () => {
+    it('Then returns the neitherFound group key', () => {
       // Arrange
       const item = HolyGrailItemBuilder.new().withEtherealType('optional').build();
 
@@ -401,7 +369,35 @@ describe('When getEtherealGroupKey is called', () => {
       );
 
       // Assert
-      expect(result).toBe('Neither Found');
+      expect(result).toBe(translations.grail.itemGrid.neitherFound);
+    });
+  });
+});
+
+describe('When getEtherealGroupRank is called', () => {
+  describe('If the key is one of the ethereal group keys', () => {
+    it('Then ranks the keys in the defined group order', () => {
+      // Arrange
+      const keys = [...etherealGroupKeyOrder].reverse();
+
+      // Act
+      const ranks = keys.map(getEtherealGroupRank);
+
+      // Assert
+      expect(ranks).toEqual([8, 7, 6, 5, 4, 3, 2, 1, 0]);
+    });
+  });
+
+  describe('If the key is unknown', () => {
+    it('Then ranks it after every known group', () => {
+      // Arrange
+      const unknownKey = 'grail.itemGrid.unknown';
+
+      // Act
+      const rank = getEtherealGroupRank(unknownKey);
+
+      // Assert
+      expect(rank).toBe(etherealGroupKeyOrder.length);
     });
   });
 });
@@ -547,6 +543,7 @@ vi.mock('./ItemDetailsDialog', () => ({
     open ? <div data-testid="item-details-dialog">{itemId}</div> : null,
 }));
 vi.mock('./VirtualItemGrid', () => ({
+  GroupHeader: ({ title }: { title: string }) => <h3>{title}</h3>,
   ItemCardCell: ({ item }: { item: Item }) => <div data-testid="item-card">{item.name}</div>,
   VirtualItemGrid: ({
     groupedItems,
@@ -704,6 +701,70 @@ describe('When ItemGrid component is rendered', () => {
       // Assert
       const titles = screen.getAllByTestId('group-title').map((el) => el.textContent);
       expect(titles).toEqual(['Unique', 'Runeword']);
+    });
+
+    it('Then the groups follow the quality order regardless of the item order', () => {
+      // Arrange: a descending type sort delivers the items already in reverse type order
+      const items = [
+        HolyGrailItemBuilder.new().withId('a').withType('runeword').build(),
+        HolyGrailItemBuilder.new().withId('b').withType('rune').build(),
+        HolyGrailItemBuilder.new().withId('c').withType('set').build(),
+        HolyGrailItemBuilder.new().withId('d').withType('unique').build(),
+      ];
+      setupComponentMocks({ filteredItems: items, viewMode: 'grid', groupMode: 'type' });
+
+      // Act
+      render(<ItemGrid />);
+
+      // Assert
+      const titles = screen.getAllByTestId('group-title').map((el) => el.textContent);
+      expect(titles).toEqual(['Unique', 'Set', 'Rune', 'Runeword']);
+    });
+  });
+
+  describe('If viewMode "grid", groupMode "category" and items arrive in any order', () => {
+    it('Then the groups follow the defined category order', () => {
+      // Arrange
+      const items = [
+        HolyGrailItemBuilder.new().withId('a').withCategory('runewords').build(),
+        HolyGrailItemBuilder.new().withId('b').withCategory('charms').build(),
+        HolyGrailItemBuilder.new().withId('c').withCategory('armor').build(),
+        HolyGrailItemBuilder.new().withId('d').withCategory('weapons').build(),
+        HolyGrailItemBuilder.new().withId('e').withCategory('runes').build(),
+        HolyGrailItemBuilder.new().withId('f').withCategory('jewelry').build(),
+      ];
+      setupComponentMocks({ filteredItems: items, viewMode: 'grid', groupMode: 'category' });
+
+      // Act
+      render(<ItemGrid />);
+
+      // Assert
+      const titles = screen.getAllByTestId('group-title').map((el) => el.textContent);
+      expect(titles).toEqual(['Weapons', 'Armor', 'Jewelry', 'Charms', 'Runes', 'Runewords']);
+    });
+  });
+
+  describe('If viewMode "grid", groupMode "type" and the items are sorted descending by type', () => {
+    it('Then the groups keep the fixed type order', () => {
+      // Arrange: a descending type sort delivers the items already in reverse type order
+      const items = [
+        HolyGrailItemBuilder.new().withId('a').withType('runeword').build(),
+        HolyGrailItemBuilder.new().withId('b').withType('rune').build(),
+        HolyGrailItemBuilder.new().withId('c').withType('set').build(),
+        HolyGrailItemBuilder.new().withId('d').withType('unique').build(),
+      ];
+      setupComponentMocks({
+        filteredItems: items,
+        viewMode: 'grid',
+        groupMode: 'type',
+      });
+
+      // Act
+      render(<ItemGrid />);
+
+      // Assert
+      const titles = screen.getAllByTestId('group-title').map((el) => el.textContent);
+      expect(titles).toEqual(['Unique', 'Set', 'Rune', 'Runeword']);
     });
   });
 
@@ -1021,7 +1082,7 @@ describe('When ItemGrid component is rendered', () => {
   });
 
   describe('If ethereal tracking is enabled and group mode is ethereal', () => {
-    it('Then keeps the ethereal group mode and groups items by translated ethereal status', () => {
+    it('Then keeps the ethereal group mode and groups items by translated ethereal status in a fixed order', () => {
       // Arrange
       const bothFoundItem = HolyGrailItemBuilder.new()
         .withId('both-found')
@@ -1062,7 +1123,8 @@ describe('When ItemGrid component is rendered', () => {
         ],
       ]);
       setupComponentMocks({
-        filteredItems: [bothFoundItem, neitherFoundItem, normalOnlyTypeItem, etherealOnlyTypeItem],
+        // Reverse of the group order, so the groups cannot simply follow the item order
+        filteredItems: [etherealOnlyTypeItem, normalOnlyTypeItem, neitherFoundItem, bothFoundItem],
         settings: { grailNormal: true, grailEthereal: true },
         viewMode: 'grid',
         groupMode: 'ethereal',
@@ -1075,10 +1137,10 @@ describe('When ItemGrid component is rendered', () => {
       // Assert
       expect(mockSetGroupMode).not.toHaveBeenCalled();
       expect(screen.getAllByTestId('group').map((group) => group.textContent)).toEqual([
-        'Both Found: 1',
-        'Neither Found: 1',
-        'Normal Found: 1',
-        'Ethereal Not Found: 1',
+        'Both versions found: 1',
+        'Missing both versions: 1',
+        'No ethereal version: found: 1',
+        'Ethereal version missing: 1',
       ]);
     });
   });

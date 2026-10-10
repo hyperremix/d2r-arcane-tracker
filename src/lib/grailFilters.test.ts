@@ -68,8 +68,67 @@ describe('When filterAndSortItems is called', () => {
       });
 
       // Assert
-      expect(ascending.map((item) => item.id)).toEqual(['a', 'z', 'b', 'm']);
-      expect(descending.map((item) => item.id)).toEqual(['b', 'm', 'a', 'z']);
+      expect(ascending.map((item) => item.id)).toEqual(['b', 'm', 'a', 'z']);
+      expect(descending.map((item) => item.id)).toEqual(['a', 'z', 'b', 'm']);
+    });
+  });
+
+  describe('If sorting by type', () => {
+    it('Then types follow the quality order (unique, set, rune, runeword) instead of the alphabet', () => {
+      // Arrange
+      const items = [
+        HolyGrailItemBuilder.new().withId('runeword').withType('runeword').build(),
+        HolyGrailItemBuilder.new().withId('set').withType('set').build(),
+        HolyGrailItemBuilder.new().withId('rune').withType('rune').build(),
+        HolyGrailItemBuilder.new().withId('unique').withType('unique').build(),
+      ];
+
+      // Act
+      const ascending = filterAndSortItems(items, [], noFilter, {
+        ...defaultSort,
+        sortBy: 'type',
+        sortOrder: 'asc',
+      });
+      const descending = filterAndSortItems(items, [], noFilter, {
+        ...defaultSort,
+        sortBy: 'type',
+        sortOrder: 'desc',
+      });
+
+      // Assert
+      expect(ascending.map((item) => item.id)).toEqual(['unique', 'set', 'rune', 'runeword']);
+      expect(descending.map((item) => item.id)).toEqual(['runeword', 'rune', 'set', 'unique']);
+    });
+  });
+
+  describe('If sorting by category', () => {
+    it('Then categories follow the display order instead of the alphabet', () => {
+      // Arrange
+      const items = [
+        HolyGrailItemBuilder.new().withId('runewords').withCategory('runewords').build(),
+        HolyGrailItemBuilder.new().withId('armor').withCategory('armor').build(),
+        HolyGrailItemBuilder.new().withId('charms').withCategory('charms').build(),
+        HolyGrailItemBuilder.new().withId('runes').withCategory('runes').build(),
+        HolyGrailItemBuilder.new().withId('weapons').withCategory('weapons').build(),
+        HolyGrailItemBuilder.new().withId('jewelry').withCategory('jewelry').build(),
+      ];
+
+      // Act
+      const result = filterAndSortItems(items, [], noFilter, {
+        ...defaultSort,
+        sortBy: 'category',
+        sortOrder: 'asc',
+      });
+
+      // Assert
+      expect(result.map((item) => item.id)).toEqual([
+        'weapons',
+        'armor',
+        'jewelry',
+        'charms',
+        'runes',
+        'runewords',
+      ]);
     });
   });
 

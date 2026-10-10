@@ -5,6 +5,7 @@ export type FoundStatus = 'all' | 'found' | 'missing';
 export type SortBy = AdvancedGrailFilter['sortBy'];
 export type SortOrder = AdvancedGrailFilter['sortOrder'];
 export type GroupMode = 'none' | 'category' | 'type' | 'ethereal';
+export type ViewMode = 'grid' | 'list';
 
 /**
  * Default sort configuration, matching the grail store defaults.
@@ -44,6 +45,21 @@ export const sortLabelKeys: Record<SortBy, string> = {
   category: translations.grail.advancedSearch.sortCategory,
   type: translations.grail.advancedSearch.sortType,
   found_date: translations.grail.advancedSearch.sortFoundDate,
+};
+
+/**
+ * Available grouping modes, in the order they are offered.
+ */
+export const groupModeValues: GroupMode[] = ['none', 'category', 'type', 'ethereal'];
+
+/**
+ * Translation keys for the grouping modes.
+ */
+export const groupModeLabelKeys: Record<GroupMode, string> = {
+  none: translations.grail.advancedSearch.noGrouping,
+  category: translations.grail.advancedSearch.byCategory,
+  type: translations.grail.advancedSearch.byType,
+  ethereal: translations.grail.advancedSearch.byEthereal,
 };
 
 /**

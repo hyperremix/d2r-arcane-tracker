@@ -1,10 +1,9 @@
-import type { ItemCategory, ItemType } from 'electron/types/grail';
+import type { ItemCategory } from 'electron/types/grail';
 import type { TFunction } from 'i18next';
 import { X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { translations } from '@/i18n/translations';
-import { itemCategoryLabelKeys, itemTypeLabelKeys } from '@/lib/labelKeys';
-import type { FoundStatus } from './options';
+import { itemCategoryLabelKeys } from '@/lib/labelKeys';
 import { getSubCategoryFilterLabel } from './subCategories';
 
 /**
@@ -21,33 +20,31 @@ interface ActiveFilterChip {
  */
 interface ActiveFilterChipsInput {
   searchTerm: string;
-  foundStatus: FoundStatus;
+  fuzzySearch: boolean;
   categories: ItemCategory[];
   subCategories: string[];
-  types: ItemType[];
   t: TFunction;
   onClearSearch: () => void;
-  onClearStatus: () => void;
+  onDisableFuzzySearch: () => void;
   onToggleCategory: (category: ItemCategory) => void;
   onToggleSubCategory: (subCategory: string) => void;
-  onToggleType: (type: ItemType) => void;
 }
 
 /**
- * Builds the removable chips for all currently active filters.
+ * Builds the removable chips for the search text and the options set in the filters popover
+ * (fuzzy search, categories and sub-categories). The found status and item types are not
+ * repeated as chips since their toolbar controls already show them.
  */
 export function buildActiveFilterChips({
   searchTerm,
-  foundStatus,
+  fuzzySearch,
   categories,
   subCategories,
-  types,
   t,
   onClearSearch,
-  onClearStatus,
+  onDisableFuzzySearch,
   onToggleCategory,
   onToggleSubCategory,
-  onToggleType,
 }: ActiveFilterChipsInput): ActiveFilterChip[] {
   const chips: ActiveFilterChip[] = [];
 
@@ -59,15 +56,11 @@ export function buildActiveFilterChips({
     });
   }
 
-  if (foundStatus !== 'all') {
+  if (fuzzySearch) {
     chips.push({
-      key: 'status',
-      label: t(
-        foundStatus === 'found'
-          ? translations.grail.advancedSearch.foundOnly
-          : translations.grail.advancedSearch.missingOnly,
-      ),
-      onRemove: onClearStatus,
+      key: 'fuzzySearch',
+      label: t(translations.grail.advancedSearch.fuzzySearch),
+      onRemove: onDisableFuzzySearch,
     });
   }
 
@@ -84,14 +77,6 @@ export function buildActiveFilterChips({
       key: `subCategory-${subCategory}`,
       label: getSubCategoryFilterLabel(subCategory, t),
       onRemove: () => onToggleSubCategory(subCategory),
-    });
-  }
-
-  for (const type of types) {
-    chips.push({
-      key: `type-${type}`,
-      label: t(itemTypeLabelKeys[type]),
-      onRemove: () => onToggleType(type),
     });
   }
 

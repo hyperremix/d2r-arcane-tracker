@@ -1,8 +1,11 @@
 import { useVirtualizer } from '@tanstack/react-virtual';
 import type { Character, GrailProgress, Item } from 'electron/types/grail';
 import { memo, useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
 import type { useProgressLookup } from '@/hooks/useProgressLookup';
+import { translations } from '@/i18n/translations';
 import { cn } from '@/lib/utils';
 import { ItemCard } from './ItemCard';
 
@@ -49,6 +52,46 @@ export const ItemCardCell = memo(function ItemCardCell({
     />
   );
 });
+
+/**
+ * Props for the GroupHeader component.
+ */
+interface GroupHeaderProps {
+  title: string;
+  foundCount: number;
+  itemCount: number;
+  className?: string;
+}
+
+/**
+ * Header shown above a group of items in the grid and list views: the group title, its
+ * found/total count and a small progress bar of the found share.
+ */
+export function GroupHeader({ title, foundCount, itemCount, className }: GroupHeaderProps) {
+  const { t } = useTranslation();
+  const percentage = itemCount > 0 ? (foundCount / itemCount) * 100 : 0;
+
+  return (
+    <div className={cn('flex items-center gap-3', className)}>
+      <h3 className="font-semibold text-lg">{title}</h3>
+      <Badge variant="outline" className="tabular-nums">
+        {foundCount}/{itemCount}
+      </Badge>
+      <Progress
+        value={percentage}
+        aria-label={t(translations.grail.itemGrid.groupProgress, { group: title })}
+        getAriaValueText={() =>
+          t(translations.grail.progressBar.progress, {
+            current: foundCount,
+            total: itemCount,
+            percentage: percentage.toFixed(1),
+          })
+        }
+        className="w-24"
+      />
+    </div>
+  );
+}
 
 /**
  * Gap between grid columns (and, via the row padding, between grid rows) in pixels.
@@ -252,18 +295,16 @@ export const VirtualItemGrid = memo(function VirtualItemGrid({
               }}
             >
               {row.type === 'header' ? (
-                <div
+                <GroupHeader
+                  title={row.title}
+                  foundCount={row.foundCount}
+                  itemCount={row.itemCount}
                   className={cn(
-                    'flex items-center gap-2 pb-4',
+                    'pb-4',
                     // Extra space above every group but the first separates it from the previous one
                     row.isFirstGroup ? 'pt-4' : 'pt-10',
                   )}
-                >
-                  <h3 className="font-semibold text-lg">{row.title}</h3>
-                  <Badge variant="outline">
-                    {row.foundCount}/{row.itemCount}
-                  </Badge>
-                </div>
+                />
               ) : (
                 <div
                   data-testid="item-grid-row"
