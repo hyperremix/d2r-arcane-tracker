@@ -6,16 +6,16 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { useItemIcon } from '@/hooks/useItemIcon';
 import { translations } from '@/i18n/translations';
 import { cn } from '@/lib/utils';
-import { useGrailStore } from '@/stores/grailStore';
 import placeholderUrl from '/images/placeholder-item.svg';
 import { RuneImages } from '../RuneImages';
-import { ItemTypeIcon } from '../StatusIcons';
+import { RecentDiscoveryIndicator } from '../StatusIcons';
 import { getTooltipTriggerRender } from '../tooltipTriggerRender';
+import { getItemSubtitle, type VersionStatus } from './cardState';
 import { ItemCategoryLabel } from './ItemCategoryLabel';
-import { DiscoveryAttribution, DiscoveryInfo, StatusIndicators, VersionCounts } from './indicators';
+import { DiscoveryAttribution, DiscoveryInfo, VersionPills } from './indicators';
 import {
   getCardStateClasses,
-  getItemQualityTextClass,
+  getItemNameClasses,
   interactiveCardStyles,
   missingArtworkStyles,
 } from './styles';
@@ -29,19 +29,21 @@ export type InteractiveCardProps = Pick<
 >;
 
 /**
- * Props interface for the GridView component.
+ * Props shared by the grid and list renderings of an item card.
  */
-export interface GridViewProps {
+export interface ItemCardViewProps {
   item: Item;
+  isFound: boolean;
   allProgress: GrailProgress[];
   characters: Character[];
   discoveringCharacters: Character[];
-  normalProgress: GrailProgress[];
-  etherealProgress: GrailProgress[];
-  mostRecentDiscovery: GrailProgress | undefined;
+  /** Found state per tracked version; empty when only the normal version is tracked */
+  versionStatuses: VersionStatus[];
+  /** Date of a recent find, shown as a "New" badge; undefined hides the badge */
+  recentFindDate: Date | undefined;
+  showItemIcons: boolean;
   className: string | undefined;
   interactiveProps?: InteractiveCardProps;
-  withoutStatusIndicators?: boolean;
 }
 
 /**
@@ -95,32 +97,31 @@ function GridArtwork({ item, isFound, showItemIcons, focusableTriggers }: GridAr
 }
 
 /**
- * GridView component that renders an item in grid view mode.
+ * GridView component that renders an item as a tile of the grail "collection wall": found items
+ * light up in their quality color, missing items stay dim and neutral.
  * When interactive props are provided the card is a focusable button-like element
  * that can be activated with Enter or Space.
  */
 export function GridView({
   item,
+  isFound,
   allProgress,
   characters,
   discoveringCharacters,
-  normalProgress,
-  etherealProgress,
-  mostRecentDiscovery,
+  versionStatuses,
+  recentFindDate,
+  showItemIcons,
   className,
   interactiveProps,
-  withoutStatusIndicators = false,
-}: GridViewProps) {
+}: ItemCardViewProps) {
   const { t } = useTranslation();
-  // Only subscribe to settings so unrelated store updates (filters, progress of other items, ...)
-  // don't re-render every card
-  const settings = useGrailStore((state) => state.settings);
-  const isFound = allProgress.length > 0;
   // Tooltip triggers are only taken out of the tab order when the card itself is the focusable button.
-  // Trade-off: on clickable cards the tooltip content (name, status, character, recent find) is
+  // Trade-off: on clickable cards the tooltip content (category, characters, find dates) is
   // mouse-only by design: nested focusable elements are invalid inside a button, and keyboard and
   // screen reader users reach the same details through the item details dialog the card opens.
+  // The found state, the per-version state and the recent find are part of the card's label.
   const focusableTriggers = !interactiveProps;
+  const subtitle = getItemSubtitle(item);
 
   return (
     <div
@@ -134,44 +135,39 @@ export function GridView({
       <Card
         data-found={isFound}
         className={cn(
-          'relative rounded-lg border-2',
+          'relative gap-0 rounded-lg border py-0',
           getCardStateClasses(item.type, isFound, !!interactiveProps),
         )}
       >
-        {/* Status indicators overlay */}
-        {!withoutStatusIndicators && (
-          <StatusIndicators
-            mostRecentDiscovery={mostRecentDiscovery}
-            item={item}
-            normalProgress={normalProgress}
-            etherealProgress={etherealProgress}
-            settings={settings}
-            focusableTriggers={focusableTriggers}
-          />
+        {recentFindDate && (
+          <div className="absolute top-2 right-2 z-10">
+            <RecentDiscoveryIndicator
+              foundDate={recentFindDate}
+              focusableTriggers={focusableTriggers}
+            />
+          </div>
         )}
 
-        <CardContent className="p-3">
-          {/* Item Type Badge */}
-          <ItemTypeIcon type={item.type} className="absolute top-2 left-2" />
-
+        <CardContent className="flex flex-col items-center gap-0.5 p-3 text-center">
           {/* Item Icon or Rune Images */}
           <GridArtwork
             item={item}
             isFound={isFound}
-            showItemIcons={settings.showItemIcons}
+            showItemIcons={showItemIcons}
             focusableTriggers={focusableTriggers}
           />
 
-          {/* Item Name (quality colored, never dimmed regardless of found state) */}
+          {/* Item Name: lit in its quality color when found, muted while missing */}
           <Tooltip>
             <TooltipTrigger
               render={getTooltipTriggerRender(focusableTriggers)}
-              className="block w-full text-center"
+              // Keeps the name clear of the "New" badge in the top-right corner
+              className={cn('block w-full text-center', recentFindDate && 'px-9')}
             >
               <h3
                 className={cn(
-                  'truncate font-semibold text-sm leading-tight',
-                  getItemQualityTextClass(item.type),
+                  'line-clamp-2 break-words text-sm leading-tight',
+                  getItemNameClasses(item.type, isFound),
                 )}
               >
                 {item.name}
@@ -194,12 +190,18 @@ export function GridView({
             </TooltipContent>
           </Tooltip>
 
+          {/* Base item */}
+          {subtitle && <p className="w-full truncate text-muted-foreground text-xs">{subtitle}</p>}
+
           {/* Set specific info */}
           {item.setName && (
-            <p className="truncate text-center font-medium text-item-set text-xs">
+            <p className="w-full truncate text-muted-foreground text-xs">
               {t(translations.grail.itemCard.setName, { name: item.setName })}
             </p>
           )}
+
+          {/* Found state per tracked version */}
+          <VersionPills item={item} versionStatuses={versionStatuses} className="pt-2" />
 
           {/* Discovery attribution */}
           {allProgress.length > 0 && (
@@ -207,16 +209,9 @@ export function GridView({
               discoveringCharacters={discoveringCharacters}
               item={item}
               focusableTriggers={focusableTriggers}
+              className="pt-2"
             />
           )}
-
-          {/* Version counts */}
-          <VersionCounts
-            item={item}
-            normalProgress={normalProgress}
-            etherealProgress={etherealProgress}
-            settings={settings}
-          />
         </CardContent>
       </Card>
     </div>

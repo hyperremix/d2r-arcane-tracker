@@ -3,7 +3,6 @@ import {
   BowArrow,
   Circle,
   Crown,
-  Flame,
   HandFist,
   Package,
   PawPrint,
@@ -107,12 +106,14 @@ interface RecentDiscoveryProps {
 }
 
 /**
- * RecentDiscoveryIndicator component that displays a flame icon for recently found items.
+ * RecentDiscoveryIndicator component that displays a small "New" badge for recently found items.
+ * The badge uses the neutral foreground color, never an item-quality color, so it cannot be
+ * confused with an item's quality; its meaning is carried by its text.
  * @param {RecentDiscoveryProps} props - Component props
  * @param {Date} props.foundDate - The date when the item was found
  * @param {string} [props.className] - Optional additional CSS classes
  * @param {boolean} [props.focusableTriggers] - Whether the tooltip trigger is a focusable button
- * @returns {JSX.Element | null} A flame icon if the find is recent, null otherwise
+ * @returns {JSX.Element | null} A "New" badge if the find is recent, null otherwise
  */
 export function RecentDiscoveryIndicator({
   foundDate,
@@ -125,9 +126,14 @@ export function RecentDiscoveryIndicator({
   return (
     <Tooltip>
       <TooltipTrigger render={getTooltipTriggerRender(focusableTriggers)} className="inline-flex">
-        <Flame
-          className={cn('h-6 w-6 rounded-full bg-background pb-0.5 text-item-rune', className)}
-        />
+        <span
+          className={cn(
+            'rounded-sm bg-foreground px-1.5 font-semibold text-[0.625rem] text-background uppercase leading-4 tracking-wider',
+            className,
+          )}
+        >
+          {t(translations.runTracker.runDetails.new)}
+        </span>
       </TooltipTrigger>
       <TooltipContent>
         <p>{t(translations.grail.statusIcons.recentlyFound)}</p>

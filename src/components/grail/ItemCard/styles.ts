@@ -21,50 +21,40 @@ export function getItemQualityTextClass(itemType: ItemType): string {
 }
 
 /**
- * Frame classes per item type:
- * - found: solid quality border plus a faint inner quality line, like a D2 item frame.
- * - missing: softened quality border (combined with a dashed style below).
- * - hover: a quality-tinted ring and shadow glow; neither affects layout, so cards never
- *   overlap their grid gutters.
- * Item type is conveyed by the frame, the type icon and the name color; the card background
- * stays neutral so that text keeps full contrast.
+ * Returns the name classes of a grail card. The grail is a collection wall: a found item's name
+ * lights up in its quality color, a missing item's name stays in the muted neutral text color.
+ * Found names are also heavier, so the two states differ without relying on hue alone.
  */
-const typeFrameStyles: Record<ItemType, { found: string; missing: string; hover: string }> = {
-  unique: {
-    found: 'border-item-unique inset-ring-1 inset-ring-item-unique/25',
-    missing: 'border-item-unique/60',
-    hover: 'hover:ring-2 hover:ring-item-unique/40',
-  },
-  set: {
-    found: 'border-item-set inset-ring-1 inset-ring-item-set/25',
-    missing: 'border-item-set/60',
-    hover: 'hover:ring-2 hover:ring-item-set/40',
-  },
-  rune: {
-    found: 'border-item-rune inset-ring-1 inset-ring-item-rune/25',
-    missing: 'border-item-rune/60',
-    hover: 'hover:ring-2 hover:ring-item-rune/40',
-  },
-  runeword: {
-    found: 'border-item-runeword inset-ring-1 inset-ring-item-runeword/25',
-    missing: 'border-item-runeword/60',
-    hover: 'hover:ring-2 hover:ring-item-runeword/40',
-  },
+export function getItemNameClasses(itemType: ItemType, isFound: boolean): string {
+  return isFound
+    ? `font-semibold ${getItemQualityTextClass(itemType)}`
+    : 'font-medium text-muted-foreground';
+}
+
+/**
+ * Quality accents of a found ("lit") card: a quality-colored hairline border, which turns solid
+ * on hover for clickable cards. Missing cards use the neutral border instead.
+ */
+const foundFrameStyles: Record<ItemType, { border: string; hover: string }> = {
+  unique: { border: 'border-item-unique/60', hover: 'hover:border-item-unique' },
+  set: { border: 'border-item-set/60', hover: 'hover:border-item-set' },
+  rune: { border: 'border-item-rune/60', hover: 'hover:border-item-rune' },
+  runeword: { border: 'border-item-runeword/60', hover: 'hover:border-item-runeword' },
 };
 
 /**
  * Card surface styles depending on whether the item has been found.
- * - Found: neutral card surface with a solid type frame and a subtle elevation.
- * - Missing: muted neutral surface with a dashed, softened type border.
- * Opacity is never applied to the whole card so the item name keeps full text contrast.
+ * - Found: card surface with a quality-colored hairline border and a subtle elevation.
+ * - Missing: muted neutral surface with a neutral hairline border, so the card recedes.
+ * Opacity is never applied to the whole card so text keeps full contrast.
  */
 const foundStateStyles = {
-  found: 'border-solid bg-card shadow-sm',
-  missing: 'border-dashed bg-muted/40 shadow-none dark:bg-muted/20',
+  found: 'bg-card shadow-sm',
+  missing: 'border-border bg-muted/40 shadow-none dark:bg-muted/20',
 } as const;
 
 /**
- * Transition for the hover glow. Only paint properties are animated, and only when the user
+ * Transition for the hover state. Only paint properties are animated, and only when the user
  * has not asked for reduced motion.
  */
 const cardTransitionStyles =
@@ -80,16 +70,18 @@ export function getCardStateClasses(
   isFound: boolean,
   isInteractive = false,
 ): string {
-  const state = isFound ? 'found' : 'missing';
-  const frame = typeFrameStyles[itemType];
-  const frameClasses = frame ? frame[state] : 'border-border';
-  const classes = [frameClasses, foundStateStyles[state]];
+  const frame = foundFrameStyles[itemType];
+  const classes: string[] = [];
+  if (isFound) {
+    classes.push(frame ? frame.border : 'border-border', foundStateStyles.found);
+  } else {
+    classes.push(foundStateStyles.missing);
+  }
   if (isInteractive) {
-    if (frame) {
-      classes.push(frame.hover);
-    }
     if (isFound) {
-      classes.push('hover:shadow-md');
+      classes.push(frame ? frame.hover : 'hover:border-foreground/30', 'hover:shadow-md');
+    } else {
+      classes.push('hover:border-muted-foreground/50');
     }
     classes.push(cardTransitionStyles);
   }
@@ -97,9 +89,30 @@ export function getCardStateClasses(
 }
 
 /**
+ * Pill classes for a version (normal / ethereal) that has been found: lit in the item's quality
+ * color with a solid border. The quality text colors keep AA contrast on the faint tint.
+ */
+const foundVersionPillClasses: Record<ItemType, string> = {
+  unique: 'border-item-unique/50 bg-item-unique/10 text-item-unique',
+  set: 'border-item-set/50 bg-item-set/10 text-item-set',
+  rune: 'border-item-rune/50 bg-item-rune/10 text-item-rune',
+  runeword: 'border-item-runeword/50 bg-item-runeword/10 text-item-runeword',
+};
+
+/**
+ * Returns the classes of a version pill: solid and quality-colored when the version is found,
+ * dashed, neutral and transparent when it is still missing. The border style is the non-color
+ * cue that tells the two states apart.
+ */
+export function getVersionPillClasses(itemType: ItemType, isFound: boolean): string {
+  if (!isFound) return 'border-dashed border-muted-foreground/50 text-muted-foreground';
+  return `border-solid ${foundVersionPillClasses[itemType] ?? 'border-border text-foreground'}`;
+}
+
+/**
  * Styles applied to the item artwork (icon or rune images) of missing items.
  */
-export const missingArtworkStyles = 'opacity-50 grayscale';
+export const missingArtworkStyles = 'opacity-40 grayscale';
 
 /**
  * Focus and interaction styles shared by the clickable grid and list cards.

@@ -1,13 +1,15 @@
-import type { Character, GrailProgress, Item, Settings } from 'electron/types/grail';
-import { Check, CheckCheck } from 'lucide-react';
+import type { Character, GrailProgress, Item } from 'electron/types/grail';
+import { Check, Circle } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { translations } from '@/i18n/translations';
-import { formatShortDate, isRecentFind } from '@/lib/date';
-import { isEtherealOnly, shouldShowEtherealStatus, shouldShowNormalStatus } from '@/lib/ethereal';
+import { formatShortDate } from '@/lib/date';
+import { isEtherealOnly } from '@/lib/ethereal';
 import { cn } from '@/lib/utils';
-import { CharacterIcon, RecentDiscoveryIndicator } from '../StatusIcons';
+import { CharacterIcon } from '../StatusIcons';
 import { getTooltipTriggerRender } from '../tooltipTriggerRender';
+import { getVersionLabel, getVersionStatusLabel, type VersionStatus } from './cardState';
+import { getVersionPillClasses } from './styles';
 
 /**
  * Props interface for the DiscoveryInfo component.
@@ -61,135 +63,28 @@ export function DiscoveryInfo({ allProgress, characters }: DiscoveryInfoProps) {
 }
 
 /**
- * Determines if an item is fully complete based on grail settings and found versions.
- */
-function determineCompletionStatus(
-  item: Item,
-  normalProgress: GrailProgress[],
-  etherealProgress: GrailProgress[],
-  settings: Settings,
-) {
-  const normalFound = normalProgress.length > 0;
-  const etherealFound = etherealProgress.length > 0;
-  const canBeNormal = shouldShowNormalStatus(item, settings);
-  const canBeEthereal = shouldShowEtherealStatus(item, settings);
-
-  if (!settings.grailEthereal) {
-    // If ethereal tracking is disabled, only normal version matters
-    return canBeNormal ? normalFound : true;
-  }
-
-  // If ethereal tracking is enabled, both versions matter
-  return (canBeNormal ? normalFound : true) && (canBeEthereal ? etherealFound : true);
-}
-
-/**
- * Gets tooltip text based on completion status and ethereal settings.
- */
-function getTooltipText(allVersionsFound: boolean, settings: Settings, t: (key: string) => string) {
-  if (allVersionsFound) {
-    return settings.grailEthereal
-      ? t(translations.grail.itemCard.allVersionsFound)
-      : t(translations.grail.itemCard.itemFound);
-  }
-  return settings.grailEthereal
-    ? t(translations.grail.itemCard.someVersionsMissing)
-    : t(translations.grail.itemCard.itemNotFound);
-}
-
-/**
- * Props interface for the StatusIndicators component.
- */
-export interface StatusIndicatorsProps {
-  mostRecentDiscovery: GrailProgress | undefined;
-  item: Item;
-  normalProgress: GrailProgress[];
-  etherealProgress: GrailProgress[];
-  settings: Settings;
-  focusableTriggers?: boolean;
-}
-
-/**
- * StatusIndicators component that renders status overlay icons for an item.
- */
-export function StatusIndicators({
-  mostRecentDiscovery,
-  item,
-  normalProgress,
-  etherealProgress,
-  settings,
-  focusableTriggers = true,
-}: StatusIndicatorsProps) {
-  const { t } = useTranslation();
-  if (
-    mostRecentDiscovery?.foundDate &&
-    !mostRecentDiscovery.fromInitialScan &&
-    isRecentFind(mostRecentDiscovery.foundDate)
-  ) {
-    return (
-      <div className="absolute -top-3 -right-3 z-40">
-        <RecentDiscoveryIndicator
-          foundDate={mostRecentDiscovery.foundDate}
-          focusableTriggers={focusableTriggers}
-        />
-      </div>
-    );
-  }
-
-  const normalFound = normalProgress.length > 0;
-  const etherealFound = etherealProgress.length > 0;
-  const hasAnyVersion = normalFound || etherealFound;
-
-  if (!hasAnyVersion) {
-    return null; // No status indicator for items with no discoveries
-  }
-
-  const allVersionsFound = determineCompletionStatus(
-    item,
-    normalProgress,
-    etherealProgress,
-    settings,
-  );
-
-  return (
-    <div className="absolute -top-3 -right-3 z-40">
-      <Tooltip>
-        {/* Rendered as a span inside an interactive card so it adds no nested tab stop */}
-        <TooltipTrigger render={getTooltipTriggerRender(focusableTriggers)} className="inline-flex">
-          {allVersionsFound ? (
-            <CheckCheck className="h-5 w-5 rounded-full bg-background text-found" />
-          ) : (
-            <Check className="h-5 w-5 rounded-full bg-background text-warning" />
-          )}
-        </TooltipTrigger>
-        <TooltipContent>
-          <p className="text-xs">{getTooltipText(allVersionsFound, settings, t)}</p>
-        </TooltipContent>
-      </Tooltip>
-    </div>
-  );
-}
-
-/**
  * Props interface for the DiscoveryAttribution component.
  */
 export interface DiscoveryAttributionProps {
   discoveringCharacters: Character[];
   item: Item;
   focusableTriggers?: boolean;
+  className?: string;
 }
 
 /**
- * DiscoveryAttribution component that displays character icons showing who found the item.
+ * DiscoveryAttribution component that displays small, muted character icons showing who found
+ * the item.
  */
 export function DiscoveryAttribution({
   discoveringCharacters,
   item,
   focusableTriggers = true,
+  className,
 }: DiscoveryAttributionProps) {
   const { t } = useTranslation();
   return (
-    <div className="flex items-center justify-center gap-1 pt-3">
+    <div className={cn('flex items-center justify-center gap-1', className)}>
       <span className="text-muted-foreground text-xs">
         {t(translations.grail.itemCard.foundBy)}
       </span>
@@ -203,7 +98,7 @@ export function DiscoveryAttribution({
               >
                 <CharacterIcon
                   characterClass={character.characterClass}
-                  className="text-muted-foreground"
+                  className="size-3.5 text-muted-foreground"
                 />
               </TooltipTrigger>
               <TooltipContent>
@@ -223,44 +118,53 @@ export function DiscoveryAttribution({
 }
 
 /**
- * Props interface for the VersionCounts component.
+ * Props interface for the VersionPills component.
  */
-export interface VersionCountsProps {
+export interface VersionPillsProps {
   item: Item;
-  normalProgress: GrailProgress[];
-  etherealProgress: GrailProgress[];
-  settings: Settings;
+  versionStatuses: VersionStatus[];
+  className?: string;
 }
 
 /**
- * VersionCounts component that displays badges showing count of normal and ethereal versions found.
+ * VersionPills component that shows one pill per tracked version (Normal / Ethereal): solid, with
+ * a check mark and lit in the item's quality color when found; dashed, with an empty circle and
+ * muted while still missing. Each pill also carries its status as screen reader text, so the state
+ * never depends on color or shape alone.
  */
-export function VersionCounts({
-  item,
-  normalProgress,
-  etherealProgress,
-  settings,
-}: VersionCountsProps) {
+export function VersionPills({ item, versionStatuses, className }: VersionPillsProps) {
   const { t } = useTranslation();
-  const normalCount = normalProgress.length;
-  const etherealCount = etherealProgress.length;
-
-  if (normalCount === 0 && etherealCount === 0) return null;
+  if (versionStatuses.length === 0) return null;
 
   return (
-    <div className="flex items-center justify-center gap-2 pt-2">
-      {shouldShowNormalStatus(item, settings) && normalCount > 0 && (
-        <span className="rounded bg-found/15 px-2 py-1 font-medium text-found text-xs">
-          {t(translations.grail.itemCard.normalCount, { count: normalCount })}
-        </span>
-      )}
-      {shouldShowEtherealStatus(item, settings) && etherealCount > 0 && (
-        <span className="rounded bg-ethereal/15 px-2 py-1 font-medium text-ethereal text-xs">
-          {isEtherealOnly(item)
+    <ul className={cn('flex flex-wrap items-center justify-center gap-1.5', className)}>
+      {versionStatuses.map((status) => {
+        const pillLabel =
+          status.version === 'ethereal' && isEtherealOnly(item)
             ? t(translations.grail.itemCard.etherealOnly)
-            : t(translations.grail.itemCard.etherealCount, { count: etherealCount })}
-        </span>
-      )}
-    </div>
+            : getVersionLabel(status.version, t);
+        return (
+          <li
+            key={status.version}
+            data-version={status.version}
+            data-found={status.isFound}
+            className={cn(
+              'inline-flex items-center rounded-full border px-2 py-0.5 font-medium text-xs leading-4',
+              getVersionPillClasses(item.type, status.isFound),
+            )}
+          >
+            <span aria-hidden="true" className="inline-flex items-center gap-1">
+              {status.isFound ? (
+                <Check className="size-3" strokeWidth={3} />
+              ) : (
+                <Circle className="size-2.5" />
+              )}
+              {pillLabel}
+            </span>
+            <span className="sr-only">{getVersionStatusLabel(status, t)}</span>
+          </li>
+        );
+      })}
+    </ul>
   );
 }
