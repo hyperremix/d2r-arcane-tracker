@@ -552,10 +552,14 @@ describe('When SaveFileMonitor is used', () => {
   describe('If getSaveFiles is called', () => {
     it('Then should return empty array when the save directory cannot be read', async () => {
       // Arrange
-      const newMonitor = createMonitor(new EventBus(), mockDatabase);
-      vi.mocked(readdirSync).mockImplementation(() => {
-        throw new Error('ENOENT: no such file or directory');
+      const parentDir = await mkdtemp(join(tmpdir(), 'arcane-unreadable-'));
+      tempDirs.push(parentDir);
+      vi.mocked(mockDatabase.getAllSettings).mockReturnValue({
+        saveDir: join(parentDir, 'does-not-exist'),
+        gameMode: GameMode.Softcore,
       });
+      const newMonitor = createMonitor(new EventBus(), mockDatabase);
+      await (newMonitor as any).initializeSaveDirectories();
 
       // Act
       const files = await newMonitor.getSaveFiles();

@@ -12,7 +12,7 @@ import { D2ItemBuilder, D2SaveFileBuilder, HolyGrailItemBuilder } from '@/fixtur
 import {
   GameMode,
   type ItemDetectionEvent,
-  type ParsedInventoryItem,
+  type ParsedInventoryItemWithRaw,
   type SaveFileEvent,
   type Settings,
 } from '../types/grail';
@@ -107,7 +107,7 @@ describe('When the grail detection pipeline runs', () => {
     it('Then its parsed items are analyzed and the character is recorded with the items found', async () => {
       // Arrange
       const file = D2SaveFileBuilder.new().withName('TestCharacter').build();
-      const parsedItems = [{ fingerprint: 'fp-1' }] as unknown as ParsedInventoryItem[];
+      const parsedItems = [{ fingerprint: 'fp-1' }] as unknown as ParsedInventoryItemWithRaw[];
       const foundItem = {
         type: 'item-found',
         item: D2ItemBuilder.new().withCharacterName('TestCharacter').build(),
