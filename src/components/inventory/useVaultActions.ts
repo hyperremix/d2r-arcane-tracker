@@ -1,11 +1,17 @@
-import type { VaultItemUpsertInput } from 'electron/types/grail';
-import { useCallback, useState } from 'react';
+import type { VaultItem, VaultItemUpsertInput } from 'electron/types/grail';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { toast } from 'sonner';
 import {
   isModernStashReadOnlyError,
   showInventoryOperationErrorToast,
   showModernStashReadOnlyToast,
 } from '@/components/inventory/operationErrors';
+import {
+  isVaultedFromSaveFile,
+  resolveVaultRestoreTarget,
+} from '@/components/inventory/vaultRestore';
+import { translations } from '@/i18n/translations';
 
 export interface VaultActionsOptions {
   loadInventorySearch: () => Promise<void>;
@@ -17,12 +23,17 @@ export interface VaultActions {
   isUnvaulting: boolean;
   /** Fingerprints being vaulted right now; their tiles already count as vaulted. */
   pendingVaultFingerprints: Set<string>;
+  /**
+   * Vaults an item. When it was taken out of a save file, a success toast says so and offers to
+   * undo the change while the original position is known.
+   */
   vaultItem: (itemInput: VaultItemUpsertInput) => Promise<void>;
   /**
-   * Moves a vaulted item back to its original save file position. `onUnvaulted` runs after the
-   * write succeeded and before the inventory reloads.
+   * Takes an item out of the vault: an item that was taken out of a save file goes back to its
+   * original position (see `resolveVaultRestoreTarget`), any other row is only marked unvaulted.
+   * `onUnvaulted` runs after the write succeeded and before the inventory reloads.
    */
-  unvaultItem: (vaultItemId: string, onUnvaulted: () => void) => Promise<void>;
+  unvaultItem: (vaultItem: VaultItem, onUnvaulted: () => void) => Promise<void>;
 }
 
 /**
@@ -39,6 +50,81 @@ export function useVaultActions({
   const [isVaulting, setIsVaulting] = useState(false);
   const [isUnvaulting, setIsUnvaulting] = useState(false);
   const [pendingVaultFingerprints, setPendingVaultFingerprints] = useState<Set<string>>(new Set());
+  // The undo action of a toast runs long after the render that created it, so the in-flight guard
+  // must not depend on render state.
+  const isUnvaultInFlightRef = useRef(false);
+
+  const unvaultItem = useCallback(
+    async (vaultItem: VaultItem, onUnvaulted: () => void): Promise<void> => {
+      if (isUnvaultInFlightRef.current) {
+        return;
+      }
+
+      const fromSaveFile = isVaultedFromSaveFile(vaultItem);
+      const restoreTarget = fromSaveFile ? resolveVaultRestoreTarget(vaultItem) : undefined;
+      if (fromSaveFile && !restoreTarget) {
+        toast.error(t(translations.inventoryBrowser.operationErrors.unvaultNeedsPosition));
+        return;
+      }
+
+      isUnvaultInFlightRef.current = true;
+      setIsUnvaulting(true);
+      try {
+        if (restoreTarget) {
+          await window.electronAPI.vault.unvaultItem(vaultItem.id, restoreTarget);
+          toast.success(
+            t(translations.inventoryBrowser.vaultFeedback.restored, {
+              itemName: vaultItem.itemName,
+            }),
+          );
+        } else {
+          await window.electronAPI.vault.unvaultItem(vaultItem.id);
+        }
+        onUnvaulted();
+        await reloadInventoryAfterSaveWrite();
+      } catch (error) {
+        if (isModernStashReadOnlyError(error)) {
+          showModernStashReadOnlyToast(t);
+          return;
+        }
+        console.error('Failed to unvault item', error);
+        showInventoryOperationErrorToast(error, t);
+        await loadInventorySearch();
+      } finally {
+        isUnvaultInFlightRef.current = false;
+        setIsUnvaulting(false);
+      }
+    },
+    [loadInventorySearch, reloadInventoryAfterSaveWrite, t],
+  );
+
+  // The undo action uses the latest unvault function, so it reloads with the current filters.
+  const latestUnvaultItemRef = useRef(unvaultItem);
+  useEffect(() => {
+    latestUnvaultItemRef.current = unvaultItem;
+  }, [unvaultItem]);
+
+  const showVaultedFromSaveFileToast = useCallback(
+    (itemName: string, savedItem: VaultItem | undefined): void => {
+      const message = t(translations.inventoryBrowser.vaultFeedback.vaulted, { itemName });
+      const canUndo = savedItem !== undefined && resolveVaultRestoreTarget(savedItem) !== undefined;
+
+      if (!canUndo) {
+        toast.success(message);
+        return;
+      }
+
+      toast.success(message, {
+        action: {
+          label: t(translations.inventoryBrowser.vaultFeedback.undo),
+          onClick: () => {
+            void latestUnvaultItemRef.current(savedItem, () => undefined);
+          },
+        },
+      });
+    },
+    [t],
+  );
 
   const vaultItem = useCallback(
     async (itemInput: VaultItemUpsertInput): Promise<void> => {
@@ -54,7 +140,10 @@ export function useVaultActions({
       });
 
       try {
-        await window.electronAPI.vault.addItem(itemInput);
+        const savedItem = await window.electronAPI.vault.addItem(itemInput);
+        if (isVaultedFromSaveFile(itemInput)) {
+          showVaultedFromSaveFileToast(itemInput.itemName, savedItem ?? undefined);
+        }
         await loadInventorySearch();
       } catch (error) {
         if (isModernStashReadOnlyError(error)) {
@@ -77,33 +166,13 @@ export function useVaultActions({
         setIsVaulting(false);
       }
     },
-    [isVaulting, loadInventorySearch, reloadInventoryAfterSaveWrite, t],
-  );
-
-  const unvaultItem = useCallback(
-    async (vaultItemId: string, onUnvaulted: () => void): Promise<void> => {
-      if (isUnvaulting) {
-        return;
-      }
-
-      setIsUnvaulting(true);
-      try {
-        await window.electronAPI.vault.unvaultItem(vaultItemId);
-        onUnvaulted();
-        await reloadInventoryAfterSaveWrite();
-      } catch (error) {
-        if (isModernStashReadOnlyError(error)) {
-          showModernStashReadOnlyToast(t);
-          return;
-        }
-        console.error('Failed to unvault item', error);
-        showInventoryOperationErrorToast(error, t);
-        await loadInventorySearch();
-      } finally {
-        setIsUnvaulting(false);
-      }
-    },
-    [isUnvaulting, loadInventorySearch, reloadInventoryAfterSaveWrite, t],
+    [
+      isVaulting,
+      loadInventorySearch,
+      reloadInventoryAfterSaveWrite,
+      showVaultedFromSaveFileToast,
+      t,
+    ],
   );
 
   return { isVaulting, isUnvaulting, pendingVaultFingerprints, vaultItem, unvaultItem };

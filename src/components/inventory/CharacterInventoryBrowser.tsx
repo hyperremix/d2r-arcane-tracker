@@ -14,7 +14,9 @@ import {
   type TypeFilter,
   toVaultUpsertInput,
 } from '@/components/inventory/inventoryItems';
+import { SaveWriteNotice } from '@/components/inventory/SaveWriteNotice';
 import { SelectedItemCard } from '@/components/inventory/SelectedItemCard';
+import { SelectedVaultItemPanel } from '@/components/inventory/SelectedVaultItemPanel';
 import {
   type SnapshotBoardTileProps,
   SnapshotInventoryCard,
@@ -29,7 +31,6 @@ import { useStackPickup } from '@/components/inventory/useStackPickup';
 import { useVaultActions } from '@/components/inventory/useVaultActions';
 import { VaultDropzone } from '@/components/inventory/VaultDropzone';
 import { VaultedItemTile } from '@/components/inventory/VaultedItemTile';
-import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { translations } from '@/i18n/translations';
 
@@ -202,15 +203,11 @@ export function CharacterInventoryBrowser({
     setSelectedItemFingerprint(item.fingerprint);
   }, []);
 
-  const handleUnvault = (): void => {
-    if (!selectedVaultItemId) {
-      return;
-    }
-
-    void unvaultItem(selectedVaultItemId, () => setSelectedVaultItemId(undefined));
+  const handleUnvault = (item: VaultItem): void => {
+    void unvaultItem(item, () => setSelectedVaultItemId(undefined));
   };
 
-  const handleVaultDrop = async (event: DragEvent<HTMLButtonElement>) => {
+  const handleVaultDrop = async (event: DragEvent<HTMLElement>) => {
     const itemInput = resolveVaultDropInput(event, visibleItems);
     if (!itemInput) {
       return;
@@ -255,6 +252,8 @@ export function CharacterInventoryBrowser({
     >
       {cursorPickupState && <StackPickupCursor pickupState={cursorPickupState} />}
       <div className="flex w-full flex-col gap-4">
+        <SaveWriteNotice />
+
         {!isSnapshotMode && (
           <InventoryFilterBar
             searchText={searchText}
@@ -291,18 +290,11 @@ export function CharacterInventoryBrowser({
                 ))}
               </div>
               {selectedVaultItem && (
-                <div className="border-t pt-3">
-                  <div className="mb-2 font-medium text-sm">{selectedVaultItem.itemName}</div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="w-full"
-                    disabled={isUnvaulting}
-                    onClick={handleUnvault}
-                  >
-                    {t(translations.vault.unvaultAction)}
-                  </Button>
-                </div>
+                <SelectedVaultItemPanel
+                  item={selectedVaultItem}
+                  isUnvaulting={isUnvaulting}
+                  onUnvault={handleUnvault}
+                />
               )}
             </CardContent>
           </Card>

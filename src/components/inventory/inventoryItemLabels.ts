@@ -10,6 +10,15 @@ import { getRawItemLocation, isRawBeltItem } from '@/lib/rawItemLocation';
 
 export type EquipmentUnplacedReason = UnplacedReason | 'unknownEquippedSlot';
 
+const SHARED_STASH_FILE_TYPES: ReadonlySet<string> = new Set(['d2i', 'sss', 'd2x']);
+
+const KNOWN_QUALITIES = ['normal', 'magic', 'rare', 'set', 'unique', 'crafted'] as const;
+type KnownQuality = (typeof KNOWN_QUALITIES)[number];
+
+function isKnownQuality(quality: string): quality is KnownQuality {
+  return (KNOWN_QUALITIES as readonly string[]).includes(quality);
+}
+
 export function formatLocation(
   item: ParsedInventoryItem,
   t: (key: string, options?: Record<string, unknown>) => string,
@@ -27,15 +36,49 @@ export function formatLocation(
   return t(translations.inventoryBrowser.location[item.locationContext]);
 }
 
+/**
+ * Plain-language kind of save file an item or snapshot comes from: a character save (`.d2s`) or a
+ * shared stash (`.d2i`, `.sss`, `.d2x`).
+ */
 export function formatSourceFileTypeLabel(
   sourceFileType: string | undefined,
   t: (key: string, options?: Record<string, unknown>) => string,
 ): string {
-  if (!sourceFileType?.trim()) {
-    return t(translations.inventoryBrowser.unknownSourceFileType);
+  const normalizedType = sourceFileType?.trim().toLowerCase();
+  if (normalizedType === 'd2s') {
+    return t(translations.inventoryBrowser.sourceFileTypes.character);
   }
 
-  return sourceFileType.toUpperCase();
+  if (normalizedType && SHARED_STASH_FILE_TYPES.has(normalizedType)) {
+    return t(translations.inventoryBrowser.sourceFileTypes.sharedStash);
+  }
+
+  return t(translations.inventoryBrowser.unknownSourceFileType);
+}
+
+/** Translated item quality; qualities the app does not know are shown as they are. */
+export function formatQuality(
+  quality: string,
+  t: (key: string, options?: Record<string, unknown>) => string,
+): string {
+  const normalizedQuality = quality.trim().toLowerCase();
+  if (isKnownQuality(normalizedQuality)) {
+    return t(translations.inventoryBrowser.qualities[normalizedQuality]);
+  }
+
+  return quality;
+}
+
+/** Accessible name of an inventory tile: item name, quality and location. */
+export function formatInventoryTileLabel(
+  item: ParsedInventoryItem,
+  t: (key: string, options?: Record<string, unknown>) => string,
+): string {
+  return t(translations.inventoryBrowser.tileAriaLabel, {
+    itemName: item.itemName,
+    quality: formatQuality(item.quality, t),
+    location: formatLocation(item, t),
+  });
 }
 
 export function getCoordinatesLabel(
