@@ -3,12 +3,14 @@ import { Clock, Download, Target, TrendingUp, Trophy } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
+import { RunDurationCard } from '@/components/statistics/RunDurationChart';
+import { StatTile } from '@/components/statistics/StatTile';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { translations } from '@/i18n/translations';
 import { escapeCsvCell } from '@/lib/csv';
-import { formatDuration, formatLocalizedDate } from '@/lib/date';
+import { formatDuration, formatLocalizedDate, HOUR_MS } from '@/lib/date';
 import { getFileName } from '@/lib/path';
 
 /**
@@ -46,15 +48,18 @@ export function RunAnalytics() {
     loadAnalyticsData();
   }, [loadAnalyticsData]);
 
-  // Format time helper
-  const formatTime = useCallback((ms: number): string => {
-    const hours = Math.floor(ms / 3600000);
-    const minutes = Math.floor((ms % 3600000) / 60000);
-    if (hours > 0) {
-      return `${hours}h ${minutes}m`;
-    }
-    return `${minutes}m`;
-  }, []);
+  // Formats a total time in hours and minutes
+  const formatTime = useCallback(
+    (ms: number): string => {
+      const hours = Math.floor(ms / HOUR_MS);
+      const minutes = Math.floor((ms % HOUR_MS) / 60000);
+      if (hours > 0) {
+        return t(translations.statistics.runAnalytics.hoursMinutes, { hours, minutes });
+      }
+      return t(translations.statistics.runAnalytics.minutes, { minutes });
+    },
+    [t],
+  );
 
   // Export functionality
   const exportData = useCallback(async () => {
@@ -64,10 +69,7 @@ export function RunAnalytics() {
         [t(analyticsT.csvHeaders.metric), t(analyticsT.csvHeaders.value)],
         [t(analyticsT.totalSessions), overallStats?.totalSessions || 0],
         [t(analyticsT.csvHeaders.totalRuns), overallStats?.totalRuns || 0],
-        [
-          t(analyticsT.totalTime),
-          overallStats?.totalTime ? formatTime(overallStats.totalTime) : '0m',
-        ],
+        [t(analyticsT.totalTime), formatTime(overallStats?.totalTime ?? 0)],
         [
           t(analyticsT.csvHeaders.averageRunDuration),
           formatDuration(overallStats?.averageRunDuration),
@@ -104,9 +106,12 @@ export function RunAnalytics() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center p-8">
-        <div className="text-center">
-          <div className="mb-4 h-8 w-8 animate-spin rounded-full border-4 border-muted border-t-primary" />
+      <div className="flex min-h-64 items-center justify-center">
+        <div className="flex flex-col items-center text-center">
+          <div
+            className="mb-4 h-8 w-8 animate-spin rounded-full border-4 border-muted border-t-primary motion-reduce:animate-none"
+            aria-hidden="true"
+          />
           <p className="text-muted-foreground">
             {t(translations.statistics.runAnalytics.loadingAnalytics)}
           </p>
@@ -117,13 +122,13 @@ export function RunAnalytics() {
 
   if (error) {
     return (
-      <div className="flex items-center justify-center p-8">
+      <div className="flex min-h-64 items-center justify-center">
         <Card className="w-full max-w-md">
           <CardContent className="flex flex-col items-center gap-4 p-6 text-center">
             <div className="text-center text-muted-foreground">
-              <h3 className="mb-2 font-semibold">
+              <h2 className="mb-2 font-semibold">
                 {t(translations.statistics.runAnalytics.errorLoadingAnalytics)}
-              </h3>
+              </h2>
               <p className="mb-4 text-sm">{error}</p>
               <Button onClick={loadAnalyticsData} variant="outline">
                 {t(translations.common.retry)}
@@ -137,13 +142,13 @@ export function RunAnalytics() {
 
   if (!overallStats || overallStats.totalRuns === 0) {
     return (
-      <div className="flex items-center justify-center p-8">
+      <div className="flex min-h-64 items-center justify-center">
         <Card className="w-full max-w-md">
           <CardContent className="flex flex-col items-center gap-4 p-6 text-center">
             <div className="text-center text-muted-foreground">
-              <h3 className="mb-2 font-semibold">
+              <h2 className="mb-2 font-semibold">
                 {t(translations.statistics.runAnalytics.noDataAvailable)}
-              </h3>
+              </h2>
               <p className="mb-4 text-sm">
                 {t(translations.statistics.runAnalytics.startTrackingRuns)}
               </p>
@@ -155,7 +160,7 @@ export function RunAnalytics() {
   }
 
   return (
-    <div className="space-y-6 p-6">
+    <div className="space-y-6">
       {/* Header */}
       <div className="flex justify-end gap-2">
         <Button onClick={exportData} variant="outline" size="sm">
@@ -164,82 +169,52 @@ export function RunAnalytics() {
         </Button>
       </div>
 
-      {/* Overview Cards */}
+      {/* Headline statistics */}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle variant="label">
-              {t(translations.statistics.runAnalytics.totalSessions)}
-            </CardTitle>
-            <Trophy className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="font-bold text-2xl">{overallStats.totalSessions}</div>
-            <p className="text-muted-foreground text-xs">
-              {t(translations.statistics.runAnalytics.totalRuns, { count: overallStats.totalRuns })}
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle variant="label">
-              {t(translations.statistics.runAnalytics.totalTime)}
-            </CardTitle>
-            <Clock className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="font-bold text-2xl">{formatTime(overallStats.totalTime)}</div>
-            <p className="text-muted-foreground text-xs">
-              {t(translations.statistics.runAnalytics.acrossAllSessions)}
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle variant="label">
-              {t(translations.statistics.runAnalytics.avgRunDuration)}
-            </CardTitle>
-            <Target className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="font-bold text-2xl">
-              {formatDuration(overallStats.averageRunDuration)}
-            </div>
-            <p className="text-muted-foreground text-xs">
-              {t(translations.statistics.runAnalytics.perRunAverage)}
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle variant="label">
-              {t(translations.statistics.runAnalytics.itemsPerRun)}
-            </CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="font-bold text-2xl">{overallStats.itemsPerRun.toFixed(2)}</div>
-            <p className="text-muted-foreground text-xs">
-              {t(translations.statistics.runAnalytics.averageEfficiency)}
-            </p>
-          </CardContent>
-        </Card>
+        <StatTile
+          label={t(translations.statistics.runAnalytics.totalSessions)}
+          icon={Trophy}
+          value={overallStats.totalSessions}
+          hint={t(translations.statistics.runAnalytics.totalRuns, {
+            count: overallStats.totalRuns,
+          })}
+        />
+        <StatTile
+          label={t(translations.statistics.runAnalytics.totalTime)}
+          icon={Clock}
+          value={formatTime(overallStats.totalTime)}
+          hint={t(translations.statistics.runAnalytics.acrossAllSessions)}
+        />
+        <StatTile
+          label={t(translations.statistics.runAnalytics.avgRunDuration)}
+          icon={Target}
+          value={formatDuration(overallStats.averageRunDuration)}
+          hint={t(translations.statistics.runAnalytics.perRunAverage)}
+        />
+        <StatTile
+          label={t(translations.statistics.runAnalytics.itemsPerRun)}
+          icon={TrendingUp}
+          value={overallStats.itemsPerRun.toFixed(2)}
+          hint={t(translations.statistics.runAnalytics.itemsPerRunHint)}
+        />
       </div>
+
+      <RunDurationCard />
+
       {/* Performance Highlights (only once at least one run has been completed) */}
       {overallStats.fastestRun && overallStats.slowestRun && (
         <Card>
           <CardHeader>
-            <CardTitle>{t(translations.statistics.runAnalytics.performanceHighlights)}</CardTitle>
+            <CardTitle>
+              <h2>{t(translations.statistics.runAnalytics.performanceHighlights)}</h2>
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <div className="space-y-2">
-                <h4 className="font-medium">
+                <h3 className="font-medium">
                   {t(translations.statistics.runAnalytics.fastestRun)}
-                </h4>
+                </h3>
                 <div className="flex items-center gap-2">
                   <Badge variant="secondary">
                     {formatDuration(overallStats.fastestRun.duration)}
@@ -250,9 +225,9 @@ export function RunAnalytics() {
                 </div>
               </div>
               <div className="space-y-2">
-                <h4 className="font-medium">
+                <h3 className="font-medium">
                   {t(translations.statistics.runAnalytics.slowestRun)}
-                </h4>
+                </h3>
                 <div className="flex items-center gap-2">
                   <Badge variant="secondary">
                     {formatDuration(overallStats.slowestRun.duration)}

@@ -2,11 +2,11 @@ import { useTranslation } from 'react-i18next';
 import { useSearchParams } from 'react-router';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { PageShell } from '@/components/layout/PageShell';
+import { RunAnalytics } from '@/components/statistics/RunAnalytics';
+import { StatsDashboard } from '@/components/statistics/StatsDashboard';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { translations } from '@/i18n/translations';
-import { RunAnalytics } from './RunAnalytics';
-import { StatsDashboard } from './StatsDashboard';
 
 /**
  * Tabs available on the statistics page.
@@ -79,12 +79,15 @@ export function Statistics() {
             </TabsList>
           </div>
           <TabsContent value="grail" className="m-0">
-            <div className="space-y-6 p-6">
+            <div className="p-6">
               <StatsDashboard />
             </div>
           </TabsContent>
           <TabsContent value="runs" className="m-0">
-            <RunAnalytics />
+            {/* The loading, error, empty and loaded states all get this padding */}
+            <div className="p-6">
+              <RunAnalytics />
+            </div>
           </TabsContent>
         </Tabs>
       </PageShell>
