@@ -1,5 +1,6 @@
 import type { GrailDatabase } from '../database/database';
 import type { Run, Session, Settings } from '../types/grail';
+import { getRunElapsedMs, pauseRunClock, resumeRunClock } from '../utils/runClock';
 import { createServiceLogger } from '../utils/serviceLogger';
 import type { EventBus } from './EventBus';
 import type { MemoryReader } from './memoryReader';
@@ -19,7 +20,6 @@ const RUN_TRACKER_SETTING_KEYS: readonly (keyof Settings)[] = [
 export class RunTrackerService {
   private currentSession: Session | null = null;
   private currentRun: Run | null = null;
-  private paused = false;
   private memoryReader: MemoryReader | null = null;
   private autoModeEnabled = false;
   private eventUnsubscribers: Array<() => void> = [];
@@ -144,6 +144,8 @@ export class RunTrackerService {
       this.memoryReader.startPolling();
     }
 
+    this.resumePausedRunForAutoTracking();
+
     // If auto mode was just disabled, stop memory reading
     if (!this.autoModeEnabled && wasAutoModeEnabled && this.memoryReader) {
       log.info('updateSettings', 'Auto mode disabled, stopping memory reader');
@@ -152,12 +154,28 @@ export class RunTrackerService {
   }
 
   /**
+   * Resumes a paused run once runs are tracked automatically, which needs auto mode and working
+   * memory reading. Runs can only be paused and resumed manually, and the run controls stay
+   * visible while memory reading is unavailable, so a run paused before that point is left alone.
+   * @private
+   */
+  private resumePausedRunForAutoTracking(): void {
+    if (this.autoModeEnabled && this.isPaused() && this.isMemoryReadingAvailable()) {
+      log.info('resumePausedRunForAutoTracking', 'Runs are tracked automatically, resuming run');
+      this.resumeRun();
+    }
+  }
+
+  /**
    * Handles game-entered event from memory reader.
    * Starts a new run when player enters a game (auto mode only).
    */
   handleGameEntered(characterId?: string): void {
+    // A game event means memory reading works, so a run paused while it was unavailable is resumed
+    this.resumePausedRunForAutoTracking();
+
     // Skip if paused or auto mode not enabled
-    if (this.paused || !this.autoModeEnabled) {
+    if (this.isPaused() || !this.autoModeEnabled) {
       return;
     }
 
@@ -195,8 +213,10 @@ export class RunTrackerService {
    * Ends the current run when player exits a game.
    */
   handleGameExited(_characterId?: string): void {
+    this.resumePausedRunForAutoTracking();
+
     // Skip if paused
-    if (this.paused) {
+    if (this.isPaused()) {
       return;
     }
 
@@ -271,9 +291,19 @@ export class RunTrackerService {
 
   /**
    * Archives a session.
+   * @throws If a run of the session is in progress
    */
   archiveSession(sessionId: string): void {
+    // The session of the run in progress keeps being updated, so it can only be archived between runs
+    if (this.currentRun?.sessionId === sessionId) {
+      throw new Error('Cannot archive a session while one of its runs is in progress');
+    }
+
     this.database.archiveSession(sessionId);
+    // Keep the in-memory session in step, otherwise its next save would clear the archived flag
+    if (this.currentSession?.id === sessionId) {
+      this.currentSession = { ...this.currentSession, archived: true };
+    }
     log.info('archiveSession', `Session archived: ${sessionId}`);
   }
 
@@ -353,10 +383,12 @@ export class RunTrackerService {
     }
 
     const now = new Date();
-    const run = {
-      ...this.currentRun,
+    // The pause bookkeeping only applies to the in-progress run; the duration already excludes it
+    const { pausedAt: _pausedAt, pausedDuration: _pausedDuration, ...endedRun } = this.currentRun;
+    const run: Run = {
+      ...endedRun,
       endTime: now,
-      duration: now.getTime() - this.currentRun.startTime.getTime(),
+      duration: getRunElapsedMs(this.currentRun, now.getTime()),
       lastUpdated: now,
     };
 
@@ -382,19 +414,22 @@ export class RunTrackerService {
   }
 
   /**
-   * Pauses automatic tracking.
-   * Manual commands still work.
+   * Whether the current run is paused.
+   */
+  private isPaused(): boolean {
+    return this.currentRun?.pausedAt !== undefined;
+  }
+
+  /**
+   * Pauses the current run: stops its clock, so the paused time is not counted in its duration,
+   * and suppresses automatic run detection until it is resumed. Manual commands still work.
    */
   pauseRun(): void {
-    if (this.paused || !this.currentRun) {
+    if (!this.currentRun || !this.currentSession || this.isPaused()) {
       return;
     }
 
-    if (!this.currentSession) {
-      return;
-    }
-
-    this.paused = true;
+    this.currentRun = pauseRunClock(this.currentRun, Date.now());
 
     this.eventBus.emit('run-paused', { run: this.currentRun, session: this.currentSession });
 
@@ -402,23 +437,17 @@ export class RunTrackerService {
   }
 
   /**
-   * Resumes automatic tracking.
+   * Resumes the paused current run: its clock continues where it was paused.
    */
   resumeRun(): void {
-    if (!this.paused) {
+    if (!this.currentRun || !this.currentSession || !this.isPaused()) {
       return;
     }
 
-    if (!this.currentSession) {
-      return;
-    }
+    this.currentRun = resumeRunClock(this.currentRun, Date.now());
 
-    this.paused = false;
-
-    if (this.currentRun) {
-      this.eventBus.emit('run-resumed', { run: this.currentRun, session: this.currentSession });
-      log.info('resumeRun', 'Run resumed');
-    }
+    this.eventBus.emit('run-resumed', { run: this.currentRun, session: this.currentSession });
+    log.info('resumeRun', 'Run resumed');
   }
 
   /**
@@ -448,7 +477,7 @@ export class RunTrackerService {
   getState() {
     const state = {
       isRunning: this.currentRun !== null,
-      isPaused: this.paused,
+      isPaused: this.isPaused(),
       activeSession: this.currentSession,
       activeRun: this.currentRun,
     };

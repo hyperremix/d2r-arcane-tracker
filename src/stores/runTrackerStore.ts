@@ -1,4 +1,5 @@
 import type { GrailProgress, Run, RunItem, Session, SessionStats } from 'electron/types/grail';
+import { getRunElapsedMs, pauseRunClock, resumeRunClock } from 'electron/utils/runClock';
 import { MAX_SESSION_NOTES_LENGTH } from 'electron/utils/sessionNotes';
 import { useCallback, useMemo } from 'react';
 import { create } from 'zustand';
@@ -90,13 +91,15 @@ interface RunTrackerState {
   // Actions - Session Management
   startSession: () => Promise<void>;
   endSession: () => Promise<void>;
-  archiveSession: (sessionId: string) => Promise<void>;
+  /** @returns Whether the session was archived */
+  archiveSession: (sessionId: string) => Promise<boolean>;
   /** @returns Whether the notes were saved */
   updateSessionNotes: (sessionId: string, notes: string) => Promise<boolean>;
 
   // Actions - Run Management
   startRun: (characterId?: string) => Promise<void>;
-  endRun: () => Promise<void>;
+  /** @returns Whether the run was ended */
+  endRun: () => Promise<boolean>;
   pauseRun: () => Promise<void>;
   resumeRun: () => Promise<void>;
 
@@ -121,8 +124,8 @@ interface RunTrackerState {
   handleSessionEnded: () => void;
   handleRunStarted: (run: Run, session: Session) => void;
   handleRunEnded: (run: Run, session: Session) => void;
-  handleRunPaused: (session: Session) => void;
-  handleRunResumed: (session: Session) => void;
+  handleRunPaused: (run: Run, session: Session) => void;
+  handleRunResumed: (run: Run, session: Session) => void;
 
   // Computed/Helper Methods
   getCurrentRunDuration: () => number;
@@ -327,12 +330,11 @@ export const useRunTrackerStore = create<RunTrackerState>()(
       });
     },
 
-    archiveSession: async (sessionId) => {
-      await runAction('archiveSession', 'archiveSessionFailed', async () => {
+    archiveSession: (sessionId) =>
+      runAction('archiveSession', 'archiveSessionFailed', async () => {
         await window.electronAPI?.runTracker.archiveSession(sessionId);
         console.log('[RunTrackerStore] Session archived:', sessionId);
-      });
-    },
+      }),
 
     updateSessionNotes: (sessionId, notes) =>
       runAction(
@@ -374,18 +376,23 @@ export const useRunTrackerStore = create<RunTrackerState>()(
       });
     },
 
-    endRun: async () => {
-      await runAction('endRun', 'endRunFailed', async () => {
+    endRun: () =>
+      runAction('endRun', 'endRunFailed', async () => {
         await window.electronAPI?.runTracker.endRun();
         set({ activeRun: null, isPaused: false });
         console.log('[RunTrackerStore] Run ended');
-      });
-    },
+      }),
 
+    // The run-paused/run-resumed events carry the main process's pause times; until they arrive the
+    // run clock is stopped or restarted locally so the timers react immediately
     pauseRun: async () => {
       await runAction('pauseRun', 'pauseRunFailed', async () => {
         await window.electronAPI?.runTracker.pauseRun();
-        set({ isPaused: true });
+        const { activeRun } = get();
+        set({
+          isPaused: true,
+          activeRun: activeRun ? pauseRunClock(activeRun, Date.now()) : activeRun,
+        });
         console.log('[RunTrackerStore] Run paused');
       });
     },
@@ -393,7 +400,11 @@ export const useRunTrackerStore = create<RunTrackerState>()(
     resumeRun: async () => {
       await runAction('resumeRun', 'resumeRunFailed', async () => {
         await window.electronAPI?.runTracker.resumeRun();
-        set({ isPaused: false });
+        const { activeRun } = get();
+        set({
+          isPaused: false,
+          activeRun: activeRun ? resumeRunClock(activeRun, Date.now()) : activeRun,
+        });
         console.log('[RunTrackerStore] Run resumed');
       });
     },
@@ -699,13 +710,13 @@ export const useRunTrackerStore = create<RunTrackerState>()(
       }
     },
 
-    handleRunPaused: (session) => {
-      set({ activeSession: session, isPaused: true });
+    handleRunPaused: (run, session) => {
+      set({ activeRun: run, activeSession: session, isPaused: true });
       console.log('[RunTrackerStore] Run paused event');
     },
 
-    handleRunResumed: (session) => {
-      set({ activeSession: session, isPaused: false });
+    handleRunResumed: (run, session) => {
+      set({ activeRun: run, activeSession: session, isPaused: false });
       console.log('[RunTrackerStore] Run resumed event');
     },
 
@@ -713,7 +724,7 @@ export const useRunTrackerStore = create<RunTrackerState>()(
     getCurrentRunDuration: () => {
       const { activeRun } = get();
       if (!activeRun || activeRun.endTime) return 0;
-      return Date.now() - activeRun.startTime.getTime();
+      return getRunElapsedMs(activeRun, Date.now());
     },
 
     // Error handling methods
@@ -798,10 +809,10 @@ export function initRunTrackerSync(): () => void {
       get().handleRunEnded(payload.run, payload.session);
     }),
     onMainEvent('run-tracker:run-paused', (payload) => {
-      get().handleRunPaused(payload.session);
+      get().handleRunPaused(payload.run, payload.session);
     }),
     onMainEvent('run-tracker:run-resumed', (payload) => {
-      get().handleRunResumed(payload.session);
+      get().handleRunResumed(payload.run, payload.session);
     }),
     onMainEvent('run-tracker:run-item-added', (payload) => {
       // Refresh the items of the affected run so the UI shows newly found items

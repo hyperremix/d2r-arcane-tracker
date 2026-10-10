@@ -1,6 +1,6 @@
 import '@testing-library/jest-dom';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import type { Session } from 'electron/types/grail';
+import type { Run, Session } from 'electron/types/grail';
 import { MAX_SESSION_NOTES_LENGTH } from 'electron/utils/sessionNotes';
 import i18n from 'i18next';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -34,13 +34,14 @@ const mockSession: Session = {
   lastUpdated: new Date('2024-01-01T11:00:00Z'),
 };
 
-const mockArchiveSession = vi.fn().mockResolvedValue(undefined);
+const mockArchiveSession = vi.fn().mockResolvedValue(true);
 
 const createStoreState = (overrides: Record<string, unknown> = {}) =>
   ({
     sessions: [mockSession],
     activeSession: null,
     runs: new Map([['session-1', []]]),
+    activeRun: null,
     sessionsLoading: false,
     pendingActions: {},
     archiveSession: mockArchiveSession,
@@ -95,6 +96,95 @@ describe('SessionDetailView', () => {
       });
       expect(mockArchiveSession).not.toHaveBeenCalled();
       expect(onBack).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('If archiving fails', () => {
+    it('Then the view stays open instead of navigating back', async () => {
+      // Arrange
+      mockArchiveSession.mockResolvedValueOnce(false);
+      const onBack = vi.fn();
+      render(<SessionDetailView sessionId="session-1" onBack={onBack} />);
+      fireEvent.click(screen.getByRole('button', { name: 'Archive Session' }));
+      const dialog = await screen.findByRole('alertdialog');
+
+      // Act
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Archive' }));
+
+      // Assert
+      await waitFor(() => {
+        expect(mockArchiveSession).toHaveBeenCalledWith('session-1');
+        expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+      });
+      expect(onBack).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('If a run of the session is in progress', () => {
+    const activeRun: Run = {
+      id: 'run-1',
+      sessionId: 'session-1',
+      runNumber: 1,
+      startTime: new Date('2024-01-01T10:10:00Z'),
+      created: new Date('2024-01-01T10:10:00Z'),
+      lastUpdated: new Date('2024-01-01T10:10:00Z'),
+    };
+    const activeSession: Session = { ...mockSession, endTime: undefined };
+
+    it('Then the Archive Session button is disabled with a hint to end the run first', () => {
+      // Arrange
+      mockStoreState(
+        mockUseRunTrackerStore,
+        createStoreState({ activeSession, activeRun, sessions: [activeSession] }),
+      );
+
+      // Act
+      render(<SessionDetailView sessionId="session-1" onBack={vi.fn()} />);
+
+      // Assert
+      const button = screen.getByRole('button', { name: 'Archive Session' });
+      expect(button).toBeDisabled();
+      expect(button).toHaveAttribute('title', 'End the current run before archiving the session');
+    });
+
+    it('If the run starts while the confirmation is open, Then confirming does not archive the session', async () => {
+      // Arrange
+      const onBack = vi.fn();
+      const { rerender } = render(<SessionDetailView sessionId="session-1" onBack={onBack} />);
+      fireEvent.click(screen.getByRole('button', { name: 'Archive Session' }));
+      const dialog = await screen.findByRole('alertdialog');
+      mockStoreState(
+        mockUseRunTrackerStore,
+        createStoreState({ activeSession, activeRun, sessions: [activeSession] }),
+      );
+      rerender(<SessionDetailView sessionId="session-1" onBack={onBack} />);
+
+      // Act
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Archive' }));
+
+      // Assert
+      await waitFor(() => {
+        expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+      });
+      expect(mockArchiveSession).not.toHaveBeenCalled();
+      expect(onBack).not.toHaveBeenCalled();
+    });
+
+    it('If the active run belongs to another session, Then the button stays enabled', () => {
+      // Arrange
+      mockStoreState(
+        mockUseRunTrackerStore,
+        createStoreState({
+          activeSession: { ...mockSession, id: 'session-other' },
+          activeRun: { ...activeRun, sessionId: 'session-other' },
+        }),
+      );
+
+      // Act
+      render(<SessionDetailView sessionId="session-1" onBack={vi.fn()} />);
+
+      // Assert
+      expect(screen.getByRole('button', { name: 'Archive Session' })).toBeEnabled();
     });
   });
 

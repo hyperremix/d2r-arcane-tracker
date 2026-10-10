@@ -1,6 +1,9 @@
+import type { Run } from 'electron/types/grail';
+import { getRunElapsedMs } from 'electron/utils/runClock';
 import { AlertTriangle, Loader2, Timer } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { toast } from 'sonner';
 import { useShallow } from 'zustand/react/shallow';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
@@ -57,6 +60,19 @@ function _hasRunsInSession(
   return sessionRuns !== undefined && sessionRuns.length > 0;
 }
 
+/**
+ * Live elapsed time of the current run, excluding paused time. Ticks only while a run is in
+ * progress and stays frozen while it is paused.
+ * @returns The elapsed time in milliseconds, or undefined without a run
+ */
+function useRunElapsed(activeRun: Run | null, isPaused: boolean): number | undefined {
+  const isTicking = Boolean(activeRun) && !isPaused;
+  // Re-renders the timer every second; its value can be stale on the render that follows a resume
+  const tickedNow = useNow(isTicking);
+  const now = isTicking ? Math.max(tickedNow, Date.now()) : tickedNow;
+  return activeRun ? getRunElapsedMs(activeRun, now) : undefined;
+}
+
 interface PendingLabelProps {
   pending: boolean;
   label: string;
@@ -70,7 +86,7 @@ function PendingLabel({ pending, label, pendingLabel }: PendingLabelProps) {
   }
   return (
     <>
-      <Loader2 className="h-4 w-4 animate-spin" />
+      <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
       {pendingLabel}
     </>
   );
@@ -140,7 +156,8 @@ export function SessionControls() {
   const autoModeEnabled = (settings.runTrackerMemoryReading ?? false) && isWindows;
   const globalHotkeysActive = isGlobalHotkeysActive(useGlobalHotkeyStatus());
 
-  const [showEndRunDialog, setShowEndRunDialog] = useState(false);
+  const autoModeLabelId = useId();
+  const autoModeDescriptionId = useId();
   const [showEndSessionDialog, setShowEndSessionDialog] = useState(false);
   const [memoryStatus, setMemoryStatus] = useState<{
     available: boolean;
@@ -199,14 +216,19 @@ export function SessionControls() {
     }
   }, [resumeRun]);
 
+  // Ending a run is routine between games, so it happens right away without a confirmation;
+  // a failure is reported by the error banner
   const handleEndRun = useCallback(async () => {
+    const runNumber = activeRun?.runNumber;
     try {
-      await endRun();
-      setShowEndRunDialog(false);
+      const ended = await endRun();
+      if (ended && runNumber !== undefined) {
+        toast.success(t(translations.runTracker.controls.runEnded, { number: runNumber }));
+      }
     } catch (error) {
       console.error('Failed to end run:', error);
     }
-  }, [endRun]);
+  }, [activeRun, endRun, t]);
 
   const handleEndSession = useCallback(async () => {
     try {
@@ -257,10 +279,10 @@ export function SessionControls() {
     (event: KeyboardEvent) => {
       event.preventDefault();
       if (activeRun && !controlsBusy && !autoTrackingActive) {
-        setShowEndRunDialog(true);
+        handleEndRun();
       }
     },
-    [activeRun, controlsBusy, autoTrackingActive],
+    [activeRun, controlsBusy, autoTrackingActive, handleEndRun],
   );
 
   const handleEndSessionShortcut = useCallback(
@@ -325,9 +347,7 @@ export function SessionControls() {
   const canEndSession = Boolean(activeSession && !controlsBusy);
   const canStartSession = Boolean(!activeSession && !controlsBusy);
 
-  // Live current-run timer; only ticks while a run is in progress
-  const now = useNow(Boolean(activeRun));
-  const runElapsed = activeRun ? Math.max(0, now - activeRun.startTime.getTime()) : undefined;
+  const runElapsed = useRunElapsed(activeRun, isPaused);
   const liveState = getLiveSessionState({
     hasSession: Boolean(activeSession),
     hasActiveRun: Boolean(activeRun),
@@ -351,7 +371,11 @@ export function SessionControls() {
           <div className="flex flex-col gap-6">
             {/* Live top row: current run timer and the state-dependent actions */}
             <div className="flex flex-wrap items-end justify-between gap-4">
-              <LiveRunTimer elapsedMs={runElapsed} runNumber={activeRun?.runNumber} />
+              <LiveRunTimer
+                elapsedMs={runElapsed}
+                runNumber={activeRun?.runNumber}
+                paused={isPaused}
+              />
               <ControlButtons
                 shortcuts={shortcuts}
                 hasSession={Boolean(activeSession)}
@@ -368,7 +392,7 @@ export function SessionControls() {
                 onStartRun={handleStartRun}
                 onPauseRun={handlePauseRun}
                 onResumeRun={handleResumeRun}
-                onEndRun={() => setShowEndRunDialog(true)}
+                onEndRun={handleEndRun}
                 onEndSession={() => setShowEndSessionDialog(true)}
               />
             </div>
@@ -383,15 +407,20 @@ export function SessionControls() {
             {isWindows && activeSession && (
               <div className="flex items-center justify-between rounded-md border p-3">
                 <div className="flex items-center gap-2">
-                  <Timer className="h-4 w-4" />
-                  <span className="font-medium text-sm">
+                  <Timer className="h-4 w-4" aria-hidden="true" />
+                  <span id={autoModeLabelId} className="font-medium text-sm">
                     {t(translations.runTracker.controls.autoMode)}
                   </span>
-                  <span className="text-muted-foreground text-xs">
+                  <span id={autoModeDescriptionId} className="text-muted-foreground text-xs">
                     {t(translations.runTracker.controls.memoryReading)}
                   </span>
                 </div>
-                <Switch checked={autoModeEnabled} onCheckedChange={toggleAutoMode} />
+                <Switch
+                  checked={autoModeEnabled}
+                  onCheckedChange={toggleAutoMode}
+                  aria-labelledby={autoModeLabelId}
+                  aria-describedby={autoModeDescriptionId}
+                />
               </div>
             )}
 
@@ -419,36 +448,6 @@ export function SessionControls() {
           </div>
         </CardContent>
       </Card>
-
-      {/* End Run Confirmation Dialog */}
-      <AlertDialog open={showEndRunDialog} onOpenChange={setShowEndRunDialog}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              {t(translations.runTracker.controls.endCurrentRunTitle)}
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              {t(translations.runTracker.controls.endCurrentRunDescription)}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={pending.endRun}>
-              {t(translations.common.cancel)}
-            </AlertDialogCancel>
-            <AlertDialogAction
-              variant="destructive"
-              onClick={handleEndRun}
-              disabled={pending.endRun}
-            >
-              <PendingLabel
-                pending={pending.endRun}
-                label={t(translations.runTracker.controls.endRun)}
-                pendingLabel={t(translations.runTracker.controls.ending)}
-              />
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
 
       {/* End Session Confirmation Dialog */}
       <AlertDialog open={showEndSessionDialog} onOpenChange={setShowEndSessionDialog}>

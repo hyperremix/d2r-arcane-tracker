@@ -8,13 +8,16 @@ interface LiveRunTimerProps {
   elapsedMs: number | undefined;
   /** Number of the in-progress run, if any. */
   runNumber?: number;
+  /** Whether the in-progress run is paused; the elapsed time is then frozen. */
+  paused?: boolean;
 }
 
 /**
  * Large, glanceable current-run timer with tabular numerals so digits do not shift while ticking.
- * The timer is intentionally not a live region; state changes are announced by the session state badge.
+ * A paused run's timer is shown in the paused state color. The timer is intentionally not a live
+ * region; state changes are announced by the session state badge.
  */
-export function LiveRunTimer({ elapsedMs, runNumber }: LiveRunTimerProps) {
+export function LiveRunTimer({ elapsedMs, runNumber, paused = false }: LiveRunTimerProps) {
   const { t } = useTranslation();
   const hasRun = elapsedMs !== undefined;
 
@@ -31,7 +34,8 @@ export function LiveRunTimer({ elapsedMs, runNumber }: LiveRunTimerProps) {
       <p
         className={cn(
           'font-mono font-semibold text-5xl tabular-nums leading-none tracking-tight',
-          !hasRun && 'text-muted-foreground/60',
+          !hasRun && 'text-muted-foreground',
+          hasRun && paused && 'text-warning',
         )}
       >
         {formatClockDuration(elapsedMs ?? 0)}

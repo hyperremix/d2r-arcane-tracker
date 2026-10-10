@@ -93,6 +93,18 @@ describe('When using the session export dialog', () => {
     });
   });
 
+  it('When the dialog opens, Then the format select shows the label of the selected format', async () => {
+    // Arrange
+    renderDialog();
+
+    // Act
+    const formatSelect = await screen.findByRole('combobox', { name: 'Export Format' });
+
+    // Assert
+    expect(formatSelect).toHaveTextContent('CSV (Spreadsheet)');
+    expect(formatSelect).not.toHaveTextContent(/^csv$/);
+  });
+
   it('If saving to a file succeeds, Then the file is written, a success toast is shown and the dialog closes', async () => {
     // Arrange
     mockElectronAPI.dialog.showSaveDialog.mockResolvedValue({

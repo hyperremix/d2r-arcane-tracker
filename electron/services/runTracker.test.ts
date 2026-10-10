@@ -370,6 +370,77 @@ describe('When RunTrackerService is instantiated', () => {
     });
   });
 
+  describe('If a run is paused and resumed before it ends', () => {
+    it('Then the paused time is excluded from the run duration and the session run time', () => {
+      // Arrange
+      service.startSession();
+      vi.setSystemTime(new Date('2024-01-01T10:00:00Z'));
+      service.startRun();
+      vi.setSystemTime(new Date('2024-01-01T10:02:00Z'));
+      service.pauseRun();
+      vi.setSystemTime(new Date('2024-01-01T10:05:00Z'));
+      service.resumeRun();
+      vi.setSystemTime(new Date('2024-01-01T10:07:00Z'));
+      vi.clearAllMocks();
+
+      // Act
+      service.endRun();
+
+      // Assert
+      expect(mockDatabase.upsertRun).toHaveBeenCalledWith(
+        expect.objectContaining({ duration: 4 * 60_000 }),
+      );
+      expect(service.getActiveSession()?.totalRunTime).toBe(4 * 60_000);
+    });
+  });
+
+  describe('If a run is ended while it is paused', () => {
+    it('Then its duration stops at the pause and the next run is not paused', () => {
+      // Arrange
+      service.startSession();
+      vi.setSystemTime(new Date('2024-01-01T10:00:00Z'));
+      service.startRun();
+      vi.setSystemTime(new Date('2024-01-01T10:03:00Z'));
+      service.pauseRun();
+      vi.setSystemTime(new Date('2024-01-01T10:10:00Z'));
+      vi.clearAllMocks();
+
+      // Act
+      service.endRun();
+      service.startRun();
+
+      // Assert
+      const endedRun = vi.mocked(mockDatabase.upsertRun as GrailDatabase['upsertRun']).mock
+        .calls[0][0];
+      expect(endedRun.duration).toBe(3 * 60_000);
+      expect(endedRun.pausedAt).toBeUndefined();
+      expect(service.getState().isPaused).toBe(false);
+    });
+  });
+
+  describe('If the state is read while a run is paused', () => {
+    it('Then the active run carries its pause time so the renderer can freeze its timer', () => {
+      // Arrange
+      service.startSession();
+      vi.setSystemTime(new Date('2024-01-01T10:00:00Z'));
+      service.startRun();
+      const pausedAt = new Date('2024-01-01T10:01:00Z');
+      vi.setSystemTime(pausedAt);
+      service.pauseRun();
+
+      // Act
+      const state = service.getState();
+
+      // Assert
+      expect(state.isPaused).toBe(true);
+      expect(state.activeRun?.pausedAt).toEqual(pausedAt);
+      expect(mockEventBus.emit).toHaveBeenCalledWith(
+        'run-paused',
+        expect.objectContaining({ run: expect.objectContaining({ pausedAt }) }),
+      );
+    });
+  });
+
   // Save file event handling tests removed - auto mode now uses memory reading only
 
   describe('If archiveSession is called', () => {
@@ -383,6 +454,64 @@ describe('When RunTrackerService is instantiated', () => {
 
       // Assert
       expect(mockDatabase.archiveSession).toHaveBeenCalledWith(sessionId);
+    });
+
+    it('If the session has a run in progress, Then it refuses to archive it', () => {
+      // Arrange
+      const session = service.startSession();
+      service.startRun();
+      vi.clearAllMocks();
+
+      // Act
+      const archive = () => service.archiveSession(session.id);
+
+      // Assert
+      expect(archive).toThrow('Cannot archive a session while one of its runs is in progress');
+      expect(mockDatabase.archiveSession).not.toHaveBeenCalled();
+    });
+
+    it('If the run in progress is paused, Then it still refuses to archive the session', () => {
+      // Arrange
+      const session = service.startSession();
+      service.startRun();
+      service.pauseRun();
+      vi.clearAllMocks();
+
+      // Act
+      const archive = () => service.archiveSession(session.id);
+
+      // Assert
+      expect(archive).toThrow('Cannot archive a session while one of its runs is in progress');
+      expect(mockDatabase.archiveSession).not.toHaveBeenCalled();
+    });
+
+    it('If another session than the one with the run is archived, Then it is archived', () => {
+      // Arrange
+      service.startSession();
+      service.startRun();
+      vi.clearAllMocks();
+
+      // Act
+      service.archiveSession('session-old');
+
+      // Assert
+      expect(mockDatabase.archiveSession).toHaveBeenCalledWith('session-old');
+    });
+
+    it('If the active session is archived between runs, Then later saves keep it archived', () => {
+      // Arrange
+      const session = service.startSession();
+      vi.clearAllMocks();
+
+      // Act
+      service.archiveSession(session.id);
+      service.startRun();
+
+      // Assert
+      expect(mockDatabase.archiveSession).toHaveBeenCalledWith(session.id);
+      expect(mockDatabase.upsertSession).toHaveBeenLastCalledWith(
+        expect.objectContaining({ id: session.id, archived: true }),
+      );
     });
   });
 
@@ -464,6 +593,7 @@ describe('When the auto mode setting changes while the app runs', () => {
     startPolling: ReturnType<typeof vi.fn>;
     stopPolling: ReturnType<typeof vi.fn>;
     updatePollingInterval: ReturnType<typeof vi.fn>;
+    isOffsetsValid: ReturnType<typeof vi.fn>;
   };
   let service: RunTrackerService;
 
@@ -472,10 +602,18 @@ describe('When the auto mode setting changes while the app runs', () => {
     Object.defineProperty(process, 'platform', { value: 'win32' });
     settings = { runTrackerMemoryReading: false, runTrackerMemoryPollingInterval: 500 };
     eventBus = new EventBus();
-    memoryReader = { startPolling: vi.fn(), stopPolling: vi.fn(), updatePollingInterval: vi.fn() };
+    memoryReader = {
+      startPolling: vi.fn(),
+      stopPolling: vi.fn(),
+      updatePollingInterval: vi.fn(),
+      isOffsetsValid: vi.fn(() => true),
+    };
     const database = {
       getAllSettings: vi.fn(() => settings),
       getActiveSession: vi.fn(() => null),
+      getRunsBySession: vi.fn(() => []),
+      upsertRun: vi.fn(),
+      upsertSession: vi.fn(),
     } as unknown as GrailDatabase;
     service = new RunTrackerService(eventBus, database, memoryReader as unknown as MemoryReader);
   });
@@ -508,6 +646,56 @@ describe('When the auto mode setting changes while the app runs', () => {
 
     // Assert
     expect(memoryReader.stopPolling).toHaveBeenCalledTimes(1);
+  });
+
+  it('If auto mode is turned on while a run is paused and memory reading is available, Then the run is resumed', () => {
+    // Arrange
+    service.startSession();
+    service.startRun(undefined, true);
+    service.pauseRun();
+    const resumed = vi.fn();
+    eventBus.on('run-resumed', resumed);
+
+    // Act
+    settings = { ...settings, runTrackerMemoryReading: true };
+    eventBus.emit('settings-updated', { runTrackerMemoryReading: true });
+
+    // Assert
+    expect(service.getState().isPaused).toBe(false);
+    expect(resumed).toHaveBeenCalledTimes(1);
+  });
+
+  it('If auto mode is turned on while a run is paused and memory reading is unavailable, Then the run stays paused', () => {
+    // Arrange: the controls stay visible in this case, so the user can resume the run themselves
+    memoryReader.isOffsetsValid.mockReturnValue(false);
+    service.startSession();
+    service.startRun(undefined, true);
+    service.pauseRun();
+
+    // Act
+    settings = { ...settings, runTrackerMemoryReading: true };
+    eventBus.emit('settings-updated', { runTrackerMemoryReading: true });
+
+    // Assert
+    expect(service.getState().isPaused).toBe(true);
+  });
+
+  it('If memory reading becomes available while auto mode is on and a run is paused, Then the next game event resumes the run', () => {
+    // Arrange
+    memoryReader.isOffsetsValid.mockReturnValue(false);
+    service.startSession();
+    service.startRun(undefined, true);
+    service.pauseRun();
+    settings = { ...settings, runTrackerMemoryReading: true };
+    eventBus.emit('settings-updated', { runTrackerMemoryReading: true });
+    memoryReader.isOffsetsValid.mockReturnValue(true);
+
+    // Act
+    eventBus.emit('game-exited', {});
+
+    // Assert
+    expect(service.getState().isPaused).toBe(false);
+    expect(service.getActiveRun()).toBeNull();
   });
 
   it('If an unrelated setting changes, Then memory reading is left alone', () => {

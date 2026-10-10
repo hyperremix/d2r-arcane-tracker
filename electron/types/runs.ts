@@ -30,7 +30,11 @@ export interface Run {
   runNumber: number;
   startTime: Date;
   endTime?: Date;
-  duration?: number; // milliseconds
+  duration?: number; // milliseconds, excluding paused time
+  /** When the in-progress run was paused; set only while it is paused. Not persisted. */
+  pausedAt?: Date;
+  /** Paused time of the in-progress run in milliseconds before `pausedAt`. Not persisted. */
+  pausedDuration?: number;
   created: Date;
   lastUpdated: Date;
 }
