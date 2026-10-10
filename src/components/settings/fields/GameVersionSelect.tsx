@@ -28,15 +28,19 @@ interface GameVersionSelectProps {
  */
 export function GameVersionSelect({ id, value, onValueChange }: GameVersionSelectProps) {
   const { t } = useTranslation();
-  const labelKey = gameVersionLabelKeys[value] as string | undefined;
+  const items = gameVersionValues.map((version) => ({
+    value: version,
+    label: t(gameVersionLabelKeys[version]),
+  }));
 
   return (
     <Select
+      items={items}
       value={value}
       onValueChange={(selected) => selected && onValueChange(selected as GameVersion)}
     >
       <SelectTrigger id={id}>
-        <SelectValue>{labelKey ? t(labelKey) : null}</SelectValue>
+        <SelectValue />
       </SelectTrigger>
       <SelectContent>
         {gameVersionValues.map((version) => (

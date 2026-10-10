@@ -1,4 +1,3 @@
-import { Target } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { translations } from '@/i18n/translations';
 import { GameModeStep } from './GameModeStep';
@@ -16,13 +15,8 @@ export function TrackingStep() {
 
   return (
     <div className="space-y-6">
-      <div className="space-y-2">
-        <div className="flex items-center gap-2">
-          <Target className="h-6 w-6" aria-hidden="true" />
-          <h2 className="font-bold text-2xl">{t(translations.wizard.tracking.title)}</h2>
-        </div>
-        <p className="text-muted-foreground">{t(translations.wizard.tracking.description)}</p>
-      </div>
+      {/* The step title is shown in the wizard header */}
+      <p className="text-muted-foreground">{t(translations.wizard.tracking.description)}</p>
 
       <GameModeStep />
       <hr className="border-border" />

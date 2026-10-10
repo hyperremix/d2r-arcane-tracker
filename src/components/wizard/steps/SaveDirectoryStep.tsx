@@ -20,7 +20,9 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { useDatabaseBackup } from '@/hooks/useDatabaseBackup';
 import {
+  type ExistingUserDataCounts,
   normalizeDirectoryForComparison,
   type SaveDirectoryChangeAction,
 } from '@/hooks/useSaveDirectoryChange';
@@ -39,11 +41,20 @@ export const SAVE_DIRECTORY_STEP_ID = 'saveDirectory';
 export const SAVE_DIRECTORY_INSPECTION_DEBOUNCE_MS = 400;
 
 /**
- * A requested save directory change awaiting application.
+ * A requested save directory change.
  */
-interface PendingDirectoryChange {
+interface DirectoryChangeRequest {
   action: SaveDirectoryChangeAction;
   directory: string;
+}
+
+/**
+ * A save directory change awaiting confirmation, with what it would replace and delete.
+ */
+interface PendingDirectoryChange extends DirectoryChangeRequest {
+  /** Directory applied when the change was requested ('' if none). */
+  currentDirectory: string;
+  existingData: ExistingUserDataCounts;
 }
 
 /**
@@ -86,15 +97,24 @@ function isUnappliedDraft(trimmedDraft: string, saveDir: string): boolean {
 }
 
 /**
- * Checks whether the database currently holds characters or grail progress.
- * @returns {Promise<boolean>} True if any user data exists
+ * Counts the characters and grail progress entries currently in the database.
+ * @returns {Promise<ExistingUserDataCounts>} The number of characters and progress entries
  */
-async function hasExistingUserData(): Promise<boolean> {
+async function countExistingUserData(): Promise<ExistingUserDataCounts> {
   const [characters, progress] = await Promise.all([
     window.electronAPI?.grail.getCharacters(),
     window.electronAPI?.grail.getProgress(),
   ]);
-  return (characters?.length ?? 0) > 0 || (progress?.length ?? 0) > 0;
+  return { characters: characters?.length ?? 0, progress: progress?.length ?? 0 };
+}
+
+/**
+ * Checks whether a directory change would delete characters or grail progress.
+ * @param {ExistingUserDataCounts} existingData - Current database counts
+ * @returns {boolean} True if any user data exists
+ */
+function hasExistingUserData(existingData: ExistingUserDataCounts): boolean {
+  return existingData.characters > 0 || existingData.progress > 0;
 }
 
 /**
@@ -493,6 +513,8 @@ export function SaveDirectoryStep() {
   const [pendingChange, setPendingChange] = useState<PendingDirectoryChange | undefined>(undefined);
   const [hasError, setHasError] = useState(false);
   const [continueAnyway, setContinueAnyway] = useState(false);
+  const [hasBackedUp, setHasBackedUp] = useState(false);
+  const { backup, isBackingUp } = useDatabaseBackup();
 
   const isBusy = isLoading || isApplying;
   const trimmedDraft = draftDir.trim();
@@ -543,7 +565,7 @@ export function SaveDirectoryStep() {
   }, []);
 
   const applyDirectoryChange = useCallback(
-    async (change: PendingDirectoryChange) => {
+    async (change: DirectoryChangeRequest) => {
       setIsApplying(true);
       setHasError(false);
 
@@ -593,8 +615,9 @@ export function SaveDirectoryStep() {
   );
 
   const requestDirectoryChange = useCallback(
-    async (change: PendingDirectoryChange) => {
+    async (change: DirectoryChangeRequest) => {
       setHasError(false);
+      setHasBackedUp(false);
       try {
         // `saveDir` is the directory the monitor is actually using (monitoring status), which is
         // the same effective directory (saveDir setting, else platform default) the main process
@@ -602,10 +625,13 @@ export function SaveDirectoryStep() {
         // IPCs, so a match here means main will not truncate. When the status is unknown,
         // `saveDir` falls back to '' or the stored setting, which errs toward asking for
         // confirmation.
-        if (!isSameDirectory(saveDir, change.directory) && (await hasExistingUserData())) {
-          // Require explicit confirmation before wiping existing progress
-          setPendingChange(change);
-          return;
+        if (!isSameDirectory(saveDir, change.directory)) {
+          const existingData = await countExistingUserData();
+          if (hasExistingUserData(existingData)) {
+            // Require explicit confirmation before wiping existing progress
+            setPendingChange({ ...change, currentDirectory: saveDir, existingData });
+            return;
+          }
         }
 
         await applyDirectoryChange(change);
@@ -676,12 +702,18 @@ export function SaveDirectoryStep() {
 
   const handleConfirmDialogOpenChange = useCallback(
     (open: boolean) => {
-      if (!open && !isApplying) {
+      if (!open && !isApplying && !isBackingUp) {
         setPendingChange(undefined);
       }
     },
-    [isApplying],
+    [isApplying, isBackingUp],
   );
+
+  const handleBackupFirst = useCallback(async () => {
+    if (await backup()) {
+      setHasBackedUp(true);
+    }
+  }, [backup]);
 
   const handleConfirmChange = useCallback(() => {
     if (pendingChange) {
@@ -695,10 +727,7 @@ export function SaveDirectoryStep() {
 
   return (
     <div className="space-y-6">
-      <div className="space-y-2">
-        <h2 className="font-bold text-2xl">{t(translations.wizard.saveDirectory.title)}</h2>
-        <p className="text-muted-foreground">{t(translations.wizard.saveDirectory.description)}</p>
-      </div>
+      <p className="text-muted-foreground">{t(translations.wizard.saveDirectory.description)}</p>
 
       <div className="space-y-4">
         <div className="space-y-2">
@@ -791,6 +820,12 @@ export function SaveDirectoryStep() {
         action={pendingChange?.action ?? 'change'}
         isProcessing={isApplying}
         onConfirm={handleConfirmChange}
+        currentDirectory={pendingChange?.currentDirectory}
+        newDirectory={pendingChange?.directory}
+        existingData={pendingChange?.existingData}
+        onBackup={handleBackupFirst}
+        isBackingUp={isBackingUp}
+        hasBackedUp={hasBackedUp}
       />
     </div>
   );

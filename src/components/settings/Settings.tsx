@@ -168,14 +168,16 @@ function renderSectionContent(id: SettingsSectionId): ReactNode {
         <>
           <SaveFileMonitor />
           <D2RInstallationSettings />
-          <GameModeSettings />
-          <GameVersionSettings />
+          <SetupWizardCard />
         </>
       );
     case 'tracking':
+      // Same grouping as the setup wizard's "What to Track" step
       return (
         <>
+          <GameModeSettings />
           <GrailSettings />
+          <GameVersionSettings />
           <RunTrackerSettings />
         </>
       );
@@ -189,12 +191,7 @@ function renderSectionContent(id: SettingsSectionId): ReactNode {
         </>
       );
     case 'data':
-      return (
-        <>
-          <DatabaseCard />
-          <SetupWizardCard />
-        </>
-      );
+      return <DatabaseCard />;
     case 'about':
       return (
         <>

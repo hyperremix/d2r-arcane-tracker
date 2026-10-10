@@ -7,6 +7,8 @@ import { mockStoreState } from '@/test/storeMock';
 import { SAVE_DIRECTORY_INSPECTION_DEBOUNCE_MS, SaveDirectoryStep } from './SaveDirectoryStep';
 
 vi.mock('@/stores/grailStore');
+// Shared toast spies: the step's backup hook must not bind to the real `sonner` for later suites
+vi.mock('sonner', () => import('@/test/sonnerMock'));
 
 const mockUseGrailStore = vi.mocked(useGrailStore);
 
@@ -21,8 +23,12 @@ const SAVE_FILE = { name: 'Sorceress', path: `${CURRENT_DIR}/Sorceress.d2s` };
 
 interface MockElectronAPI {
   platform: string;
-  dialog: { showOpenDialog: ReturnType<typeof vi.fn> };
-  grail: { getCharacters: ReturnType<typeof vi.fn>; getProgress: ReturnType<typeof vi.fn> };
+  dialog: { showOpenDialog: ReturnType<typeof vi.fn>; showSaveDialog: ReturnType<typeof vi.fn> };
+  grail: {
+    getCharacters: ReturnType<typeof vi.fn>;
+    getProgress: ReturnType<typeof vi.fn>;
+    backup: ReturnType<typeof vi.fn>;
+  };
   saveFile: {
     getMonitoringStatus: ReturnType<typeof vi.fn>;
     getSaveFiles: ReturnType<typeof vi.fn>;
@@ -41,10 +47,12 @@ function createElectronAPI(options: {
     platform: 'darwin',
     dialog: {
       showOpenDialog: vi.fn().mockResolvedValue({ canceled: false, filePaths: [NEW_DIR] }),
+      showSaveDialog: vi.fn().mockResolvedValue({ canceled: true }),
     },
     grail: {
       getCharacters: vi.fn().mockResolvedValue(options.hasUserData ? [{ id: 'char-1' }] : []),
       getProgress: vi.fn().mockResolvedValue(options.hasUserData ? [{ id: 'progress-1' }] : []),
+      backup: vi.fn().mockResolvedValue({ success: true }),
     },
     saveFile: {
       getMonitoringStatus: vi
@@ -108,11 +116,43 @@ describe('When SaveDirectoryStep is rendered', () => {
       const dialog = await screen.findByRole('alertdialog');
       expect(
         within(dialog).getByText(
-          'This action will permanently delete all characters and progress data.',
+          'This permanently deletes 1 character and 1 recorded grail find from the app.',
         ),
       ).toBeInTheDocument();
+      expect(within(dialog).getByText(CURRENT_DIR)).toBeInTheDocument();
+      expect(within(dialog).getByText(NEW_DIR)).toBeInTheDocument();
+      expect(within(dialog).getByRole('button', { name: 'Back up first' })).toBeInTheDocument();
       expect(electronAPI.saveFile.updateSaveDirectory).not.toHaveBeenCalled();
       expect(reloadData).not.toHaveBeenCalled();
+    });
+
+    it('Then "Back up first" creates a backup before the directory is changed', async () => {
+      // Arrange
+      electronAPI.dialog.showSaveDialog.mockResolvedValue({
+        canceled: false,
+        filePath: '/backups/holy-grail-backup.db',
+      });
+      await renderStep();
+      fireEvent.click(screen.getByRole('button', { name: /browse/i }));
+      const dialog = await screen.findByRole('alertdialog');
+
+      // Act
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Back up first' }));
+      await within(dialog).findByText(
+        'Backup created. You can now continue with the directory change.',
+      );
+      fireEvent.click(
+        within(dialog).getByRole('button', { name: 'Delete progress and switch folder' }),
+      );
+
+      // Assert
+      await waitFor(() =>
+        expect(electronAPI.saveFile.updateSaveDirectory).toHaveBeenCalledWith(NEW_DIR),
+      );
+      expect(electronAPI.grail.backup).toHaveBeenCalledWith('/backups/holy-grail-backup.db');
+      expect(electronAPI.grail.backup.mock.invocationCallOrder[0]).toBeLessThan(
+        electronAPI.saveFile.updateSaveDirectory.mock.invocationCallOrder[0],
+      );
     });
 
     it('Then confirming applies the directory and reloads grail data', async () => {
@@ -122,7 +162,9 @@ describe('When SaveDirectoryStep is rendered', () => {
       const dialog = await screen.findByRole('alertdialog');
 
       // Act
-      fireEvent.click(within(dialog).getByRole('button', { name: 'Change Directory' }));
+      fireEvent.click(
+        within(dialog).getByRole('button', { name: 'Delete progress and switch folder' }),
+      );
 
       // Assert
       await waitFor(() =>
@@ -190,7 +232,9 @@ describe('When SaveDirectoryStep is rendered', () => {
       const dialog = await screen.findByRole('alertdialog');
 
       // Act
-      fireEvent.click(within(dialog).getByRole('button', { name: 'Restore Default' }));
+      fireEvent.click(
+        within(dialog).getByRole('button', { name: 'Delete progress and use default folder' }),
+      );
 
       // Assert
       await waitFor(() => expect(electronAPI.saveFile.restoreDefaultDirectory).toHaveBeenCalled());
@@ -730,7 +774,7 @@ describe('When SaveDirectoryStep validates the selected folder', () => {
       const dialog = await screen.findByRole('alertdialog');
       expect(
         within(dialog).getByText(
-          'This action will permanently delete all characters and progress data.',
+          'This permanently deletes 1 character and 1 recorded grail find from the app.',
         ),
       ).toBeInTheDocument();
       expect(electronAPI.saveFile.updateSaveDirectory).not.toHaveBeenCalled();

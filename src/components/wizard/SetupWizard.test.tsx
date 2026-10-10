@@ -39,6 +39,7 @@ describe('SetupWizard', () => {
     vi.clearAllMocks();
     mockStoreState(mockUseGrailStore, {
       setSettings: vi.fn().mockResolvedValue({ success: true }),
+      characters: [],
     } as unknown as ReturnType<typeof useGrailStore>);
     useWizardStore.setState({ isOpen: false, currentStep: 0, stepValidity: {} });
   });
@@ -58,6 +59,7 @@ describe('SetupWizard', () => {
     expect(wizardSteps).toHaveLength(6);
     expect(useWizardStore.getState().totalSteps).toBe(wizardSteps.length);
     expect(screen.getByText('Step 1 of 6')).toBeInTheDocument();
+    expect(screen.queryByText('17%')).not.toBeInTheDocument();
     expect(screen.getByText('WelcomeContent')).toBeInTheDocument();
   });
 
@@ -197,7 +199,7 @@ describe('When SetupWizard is open', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     setSettings = vi.fn().mockResolvedValue({ success: true });
-    mockStoreState(mockUseGrailStore, { setSettings } as unknown as ReturnType<
+    mockStoreState(mockUseGrailStore, { setSettings, characters: [] } as unknown as ReturnType<
       typeof useGrailStore
     >);
     openWizardAt(0);
@@ -374,6 +376,74 @@ describe('When SetupWizard is open', () => {
       await waitFor(() => expect(useWizardStore.getState().isOpen).toBe(false));
       expect(setSettings).toHaveBeenCalledTimes(2);
       expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    });
+  });
+
+  describe('If the user skips setup without a usable save folder', () => {
+    const noSaveFolderWarning =
+      "No save folder is set up yet, so automatic tracking won't work until you choose one in Settings.";
+
+    it('Then the skip confirmation warns that automatic tracking will not work', async () => {
+      // Arrange
+      render(<SetupWizard />);
+      const wizard = await screen.findByRole('dialog');
+
+      // Act
+      fireEvent.click(within(wizard).getByRole('button', { name: 'Skip Setup' }));
+
+      // Assert
+      const confirm = await screen.findByRole('alertdialog');
+      expect(within(confirm).getByText(noSaveFolderWarning)).toBeVisible();
+    });
+
+    it('If the save folder step reported a usable folder, Then the warning is not shown', async () => {
+      // Arrange
+      openWizardAt(2, { saveDirectory: true });
+      render(<SetupWizard />);
+      const wizard = await screen.findByRole('dialog');
+
+      // Act
+      fireEvent.click(within(wizard).getByRole('button', { name: 'Skip Setup' }));
+
+      // Assert
+      const confirm = await screen.findByRole('alertdialog');
+      expect(within(confirm).queryByText(noSaveFolderWarning)).not.toBeInTheDocument();
+      expect(within(confirm).getByText('You can run setup later from Settings.')).toBeVisible();
+    });
+
+    it('If the save folder step was not visited but characters are tracked, Then the warning is not shown', async () => {
+      // Arrange
+      mockStoreState(mockUseGrailStore, {
+        setSettings,
+        characters: [{ id: 'char-1' }],
+      } as unknown as ReturnType<typeof useGrailStore>);
+      render(<SetupWizard />);
+      const wizard = await screen.findByRole('dialog');
+
+      // Act
+      fireEvent.click(within(wizard).getByRole('button', { name: 'Skip Setup' }));
+
+      // Assert
+      const confirm = await screen.findByRole('alertdialog');
+      expect(within(confirm).queryByText(noSaveFolderWarning)).not.toBeInTheDocument();
+    });
+
+    it('If the save folder step reported an unusable folder, Then the warning is shown even when characters are tracked', async () => {
+      // Arrange
+      mockStoreState(mockUseGrailStore, {
+        setSettings,
+        characters: [{ id: 'char-1' }],
+      } as unknown as ReturnType<typeof useGrailStore>);
+      openWizardAt(1, { saveDirectory: false });
+      render(<SetupWizard />);
+      const wizard = await screen.findByRole('dialog');
+
+      // Act
+      fireEvent.click(within(wizard).getByRole('button', { name: 'Skip Setup' }));
+
+      // Assert
+      const confirm = await screen.findByRole('alertdialog');
+      expect(within(confirm).getByText(noSaveFolderWarning)).toBeVisible();
     });
   });
 

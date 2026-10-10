@@ -99,10 +99,11 @@ describe('Settings', () => {
     const general = screen.getByRole('region', { name: 'General' });
     expect(within(general).getByText('SaveFileMonitorCard')).toBeInTheDocument();
     expect(within(general).getByText('D2RInstallationCard')).toBeInTheDocument();
-    expect(within(general).getByText('GameModeCard')).toBeInTheDocument();
-    expect(within(general).getByText('GameVersionCard')).toBeInTheDocument();
+    expect(within(general).getByRole('button', { name: 'Run Setup Wizard' })).toBeInTheDocument();
 
     const tracking = screen.getByRole('region', { name: 'Tracking' });
+    expect(within(tracking).getByText('GameModeCard')).toBeInTheDocument();
+    expect(within(tracking).getByText('GameVersionCard')).toBeInTheDocument();
     expect(within(tracking).getByText('GrailCard')).toBeInTheDocument();
     expect(within(tracking).getByText('RunTrackerCard')).toBeInTheDocument();
 
@@ -114,7 +115,9 @@ describe('Settings', () => {
 
     const data = screen.getByRole('region', { name: 'Data' });
     expect(within(data).getByText('DatabaseCard')).toBeInTheDocument();
-    expect(within(data).getByRole('button', { name: 'Run Setup Wizard' })).toBeInTheDocument();
+    expect(
+      within(data).queryByRole('button', { name: 'Run Setup Wizard' }),
+    ).not.toBeInTheDocument();
 
     const about = screen.getByRole('region', { name: 'About' });
     expect(within(about).getByText('UpdateCard')).toBeInTheDocument();

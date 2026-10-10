@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { toast } from 'sonner';
 import {
   afterAll,
@@ -212,6 +212,20 @@ describe('When managing database backups', () => {
     expect(await screen.findByRole('button', { name: 'Restore Database' })).toBeEnabled();
     expect(screen.getByRole('button', { name: 'Cancel' })).toBeEnabled();
     expect(screen.getByRole('button', { name: 'Back up first' })).toBeEnabled();
+  });
+
+  it('When a backup file is chosen for restore, Then the confirmation names the file and states what is replaced', async () => {
+    // Arrange
+    render(<DatabaseCard />);
+
+    // Act
+    await openRestoreConfirmation();
+
+    // Assert
+    const dialog = screen.getByRole('alertdialog');
+    expect(within(dialog).getByText('holy-grail-backup.db')).toBeInTheDocument();
+    expect(dialog).toHaveTextContent('vaulted items');
+    expect(dialog).not.toHaveTextContent('⚠️');
   });
 
   it('If a restore fails, Then a translated error is shown', async () => {

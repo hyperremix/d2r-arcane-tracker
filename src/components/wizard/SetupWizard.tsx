@@ -105,6 +105,7 @@ export function SetupWizard() {
     })),
   );
   const setSettings = useGrailStore((state) => state.setSettings);
+  const hasCharacters = useGrailStore((state) => state.characters.length > 0);
   const [showSkipConfirm, setShowSkipConfirm] = useState(false);
   // Set when persisting the wizard outcome fails; the wizard then stays open so it can be retried
   const [saveFailed, setSaveFailed] = useState(false);
@@ -126,6 +127,11 @@ export function SetupWizard() {
   }, [step, stepValidity]);
 
   const showValidationMessage = !canProceed && Boolean(step?.validationMessageKey);
+
+  // The save folder step reports its validity once visited. Before that, tracked characters show
+  // that a working save folder was set up earlier (e.g. when re-running the wizard).
+  const saveFolderValidity = stepValidity[SAVE_DIRECTORY_STEP_ID];
+  const hasUsableSaveFolder = saveFolderValidity ?? hasCharacters;
 
   // Offer to jump straight to the summary when every step before it is optional
   const remainingSteps = wizardSteps.slice(currentStep + 1, totalSteps - 1);
@@ -214,12 +220,9 @@ export function SetupWizard() {
 
         {/* Progress Indicator */}
         <div className="space-y-2">
-          <div className="flex items-center justify-between text-muted-foreground text-sm">
-            <span>
-              {t(translations.wizard.progress, { current: currentStep + 1, total: totalSteps })}
-            </span>
-            <span>{t(translations.wizard.progressPercent, { percent: Math.round(progress) })}</span>
-          </div>
+          <p className="text-muted-foreground text-sm">
+            {t(translations.wizard.progress, { current: currentStep + 1, total: totalSteps })}
+          </p>
           <Progress
             value={progress}
             className="h-2"
@@ -293,8 +296,13 @@ export function SetupWizard() {
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle>{t(translations.wizard.skipConfirm.title)}</AlertDialogTitle>
-              <AlertDialogDescription>
-                {t(translations.wizard.skipConfirm.description)}
+              <AlertDialogDescription render={<div />}>
+                {!hasUsableSaveFolder && (
+                  <p className="mb-2 font-medium text-warning">
+                    {t(translations.wizard.skipConfirm.noSaveFolderWarning)}
+                  </p>
+                )}
+                <p>{t(translations.wizard.skipConfirm.description)}</p>
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>

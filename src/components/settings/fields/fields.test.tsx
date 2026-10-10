@@ -48,6 +48,26 @@ describe('When a shared settings select is rendered', () => {
       expect(document.getElementById('theme')).toHaveTextContent('System');
     });
   });
+
+  describe('If the value changes', () => {
+    it('Then the trigger shows the label of the new value', () => {
+      // Arrange
+      const onValueChange = vi.fn();
+      const { rerender } = render(
+        <GameModeSelect id="mode" value={GameMode.Both} onValueChange={onValueChange} />,
+      );
+
+      // Act
+      rerender(
+        <GameModeSelect id="mode" value={GameMode.Softcore} onValueChange={onValueChange} />,
+      );
+
+      // Assert
+      const trigger = document.getElementById('mode');
+      expect(trigger).toHaveTextContent('Softcore Only');
+      expect(trigger).not.toHaveTextContent('softcore');
+    });
+  });
 });
 
 describe('When GrailTrackingFields is rendered', () => {
