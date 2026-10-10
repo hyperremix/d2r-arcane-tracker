@@ -169,7 +169,7 @@ export const itemCategoryOrder: readonly ItemCategory[] = [
 /**
  * Returns the position of a value in a defined order; unknown values are placed last.
  */
-const getRank = <T>(order: readonly T[], value: T): number => {
+export const getRank = <T>(order: readonly T[], value: T): number => {
   const index = order.indexOf(value);
   return index === -1 ? order.length : index;
 };

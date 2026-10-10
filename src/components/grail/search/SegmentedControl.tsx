@@ -8,18 +8,16 @@ interface SegmentButtonProps {
   pressed: boolean;
   onClick: () => void;
   children: ReactNode;
-  ariaLabel?: string;
 }
 
 /**
  * A single button inside a segmented control. Uses aria-pressed to expose its state.
  */
-export function SegmentButton({ pressed, onClick, children, ariaLabel }: SegmentButtonProps) {
+export function SegmentButton({ pressed, onClick, children }: SegmentButtonProps) {
   return (
     <button
       type="button"
       aria-pressed={pressed}
-      aria-label={ariaLabel}
       onClick={onClick}
       className={cn(
         'inline-flex h-7 items-center justify-center gap-1.5 rounded-[5px] px-2.5 font-medium text-muted-foreground text-sm outline-none transition-colors',

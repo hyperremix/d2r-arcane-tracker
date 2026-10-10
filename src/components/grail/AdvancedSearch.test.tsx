@@ -201,6 +201,22 @@ describe('When AdvancedSearch toolbar is rendered', () => {
     });
   });
 
+  describe('If user clicks the fuzzy search label in the filters popover', () => {
+    it('Then toggles the fuzzy search switch', async () => {
+      // Arrange
+      render(<AdvancedSearch />);
+      openFiltersPopover();
+      const fuzzySwitch = await screen.findByRole('switch', { name: 'Fuzzy Search' });
+
+      // Act
+      fireEvent.click(screen.getByText('Fuzzy Search', { selector: 'label' }));
+
+      // Assert
+      expect(useGrailStore.getState().advancedFilter.fuzzySearch).toBe(true);
+      expect(fuzzySwitch).toHaveAttribute('aria-checked', 'true');
+    });
+  });
+
   describe('If user turns on fuzzy search in the filters popover', () => {
     it('Then enables fuzzy search in the store and shows a fuzzy search chip', async () => {
       // Arrange

@@ -93,6 +93,7 @@ export function FiltersPopover({
 }: FiltersPopoverProps) {
   const { t } = useTranslation();
   const idPrefix = useId();
+  const fuzzySearchId = `${idPrefix}-fuzzy`;
   const fuzzySearchLabelId = `${idPrefix}-fuzzy-label`;
   const fuzzySearchDescriptionId = `${idPrefix}-fuzzy-description`;
   const activeCount = selectedCategories.length + selectedSubCategories.length;
@@ -119,14 +120,15 @@ export function FiltersPopover({
       <PopoverContent align="start" className="max-h-[min(70vh,36rem)] w-96 overflow-y-auto">
         <div className="flex items-center justify-between gap-4">
           <div className="space-y-1">
-            <span id={fuzzySearchLabelId} className="font-medium text-sm">
+            <Label id={fuzzySearchLabelId} htmlFor={fuzzySearchId} className="font-medium text-sm">
               {t(translations.grail.advancedSearch.fuzzySearch)}
-            </span>
+            </Label>
             <p id={fuzzySearchDescriptionId} className="text-muted-foreground text-xs">
               {t(translations.grail.advancedSearch.fuzzySearchDescription)}
             </p>
           </div>
           <Switch
+            id={fuzzySearchId}
             checked={fuzzySearch}
             onCheckedChange={onFuzzySearchChange}
             aria-labelledby={fuzzySearchLabelId}

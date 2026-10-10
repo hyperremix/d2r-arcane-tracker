@@ -2,13 +2,11 @@ import { useVirtualizer } from '@tanstack/react-virtual';
 import type { Character, Item, Settings } from 'electron/types/grail';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import type { GroupMode, ViewMode } from '@/components/grail/search/options';
 import { useProgressLookup } from '@/hooks/useProgressLookup';
 import { translations } from '@/i18n/translations';
-import {
-  filterItemsByTrackedVersions,
-  shouldShowEtherealStatus,
-  shouldShowNormalStatus,
-} from '@/lib/ethereal';
+import { filterItemsByTrackedVersions } from '@/lib/ethereal';
+import { getEtherealGroupKey, getEtherealGroupRank } from '@/lib/etherealGroups';
 import { countActiveFilters, getItemCategoryRank, getItemTypeRank } from '@/lib/grailFilters';
 import { itemCategoryLabelKeys, itemTypeLabelKeys } from '@/lib/labelKeys';
 import { useFilteredItems, useGrailStore } from '@/stores/grailStore';
@@ -16,73 +14,6 @@ import { ItemDetailsDialog } from './ItemDetailsDialog';
 import { getItemGridEmptyStateVariant, ItemGridEmptyState } from './ItemGridEmptyState';
 import type { ItemGridGroup } from './VirtualItemGrid';
 import { GroupHeader, ItemCardCell, VirtualItemGrid } from './VirtualItemGrid';
-
-/**
- * Translation keys of the ethereal status groups, in the order the groups are shown: items with
- * both versions tracked first (from fully to not found), then items without an ethereal version,
- * then items without a tracked normal version.
- */
-const etherealGroupKeyOrder: readonly string[] = [
-  translations.grail.itemGrid.bothFound,
-  translations.grail.itemGrid.normalOnly,
-  translations.grail.itemGrid.etherealOnly,
-  translations.grail.itemGrid.neitherFound,
-  translations.grail.itemGrid.normalFound,
-  translations.grail.itemGrid.normalNotFound,
-  translations.grail.itemGrid.etherealFound,
-  translations.grail.itemGrid.etherealNotFound,
-  translations.grail.itemGrid.notApplicable,
-];
-
-/**
- * Determines the ethereal grouping key for an item based on its ethereal status and progress.
- * @param {Item} itemData - The Holy Grail item data
- * @param {{ normalFound: boolean; etherealFound: boolean } | undefined} itemProgress - The progress data for the item
- * @returns {string} The translation key of the item's ethereal status group
- */
-function getEtherealGroupKey(
-  itemData: Item,
-  itemProgress: { normalFound: boolean; etherealFound: boolean } | undefined,
-  settings: Settings,
-): string {
-  const hasEthereal = itemProgress?.etherealFound;
-  const hasNormal = itemProgress?.normalFound;
-  const canBeEthereal = shouldShowEtherealStatus(itemData, settings);
-  const canBeNormal = shouldShowNormalStatus(itemData, settings);
-
-  if (!canBeEthereal && !canBeNormal) {
-    return translations.grail.itemGrid.notApplicable;
-  }
-  if (!canBeEthereal) {
-    return hasNormal
-      ? translations.grail.itemGrid.normalFound
-      : translations.grail.itemGrid.normalNotFound;
-  }
-  if (!canBeNormal) {
-    return hasEthereal
-      ? translations.grail.itemGrid.etherealFound
-      : translations.grail.itemGrid.etherealNotFound;
-  }
-  if (hasEthereal && hasNormal) {
-    return translations.grail.itemGrid.bothFound;
-  }
-  if (hasEthereal) {
-    return translations.grail.itemGrid.etherealOnly;
-  }
-  if (hasNormal) {
-    return translations.grail.itemGrid.normalOnly;
-  }
-  return translations.grail.itemGrid.neitherFound;
-}
-
-/**
- * Type representing the available view modes for displaying items.
- */
-type ViewMode = 'grid' | 'list';
-/**
- * Type representing the available grouping modes for organizing items.
- */
-type GroupMode = 'none' | 'category' | 'type' | 'ethereal';
 
 /**
  * The group an item belongs to: the translation key of the group title and the group's position.
@@ -112,7 +43,7 @@ function getItemGroupPlacement(
       return { titleKey: itemTypeLabelKeys[itemData.type], rank: getItemTypeRank(itemData.type) };
     case 'ethereal': {
       const titleKey = getEtherealGroupKey(itemData, progressLookup.get(itemData.id), settings);
-      return { titleKey, rank: etherealGroupKeyOrder.indexOf(titleKey) };
+      return { titleKey, rank: getEtherealGroupRank(titleKey) };
     }
   }
 }
