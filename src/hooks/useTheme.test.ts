@@ -3,29 +3,30 @@ import type { Settings } from 'electron/types/grail';
 import type { Mock } from 'vitest';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-// Mock the grail store
-vi.mock('@/stores/grailStore', () => ({
-  useGrailStore: vi.fn(),
-}));
-
 import type { ResolvedTheme } from '@/lib/theme';
 import { THEME_CHROME_COLORS, THEME_PREFERENCE_STORAGE_KEY } from '@/lib/theme';
 import { useGrailStore } from '@/stores/grailStore';
 import { useResolvedTheme, useTheme } from './useTheme';
 
-interface MockStoreState {
-  settings: Pick<Settings, 'theme'>;
-  settingsHydrated: boolean;
-}
+const initialGrailState = useGrailStore.getInitialState();
 
 /**
- * Makes the mocked store answer selectors from the given theme state.
+ * Puts the given theme state into the real grail store. The store is not mocked: test files
+ * share one module registry (isolate: false), so a store mock would not reach this hook if
+ * another suite loaded it first (e.g. through a window root or the Toaster).
  */
 function mockStore(theme: Settings['theme'], settingsHydrated = true): void {
-  const state: MockStoreState = { settings: { theme }, settingsHydrated };
-  vi.mocked(useGrailStore).mockImplementation(((selector: (s: MockStoreState) => unknown) =>
-    selector(state)) as unknown as typeof useGrailStore);
+  act(() => {
+    useGrailStore.setState({
+      settings: { ...initialGrailState.settings, theme },
+      settingsHydrated,
+    });
+  });
 }
+
+afterEach(() => {
+  useGrailStore.setState(initialGrailState, true);
+});
 
 describe('When useTheme hook is used', () => {
   let mockMatchMedia: Mock<(query: string) => Partial<MediaQueryList>>;

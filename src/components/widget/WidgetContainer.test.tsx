@@ -2,9 +2,10 @@ import { act, render, waitFor } from '@testing-library/react';
 import type { GrailProgress, Item, Settings } from 'electron/types/grail';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { GrailProgressBuilder, HolyGrailItemBuilder } from '@/fixtures';
+import { THEME_PREFERENCE_STORAGE_KEY } from '@/lib/theme';
 import { useGrailStore } from '@/stores/grailStore';
 import { initRunTrackerSync } from '@/stores/runTrackerStore';
-import { WidgetContainer } from './WidgetContainer';
+import WidgetApp from '@/WidgetApp';
 
 const widgetProps = vi.hoisted(() => ({
   last: undefined as { statistics: { foundItems: number; totalItems: number } | null } | undefined,
@@ -32,6 +33,10 @@ vi.mock('@/stores/runTrackerStore', () => {
 
 type IpcHandler = (payload: unknown) => Promise<void> | void;
 
+/**
+ * Renders the container through the widget window root, which loads the grail data and follows
+ * the settings saved in the main window.
+ */
 describe('WidgetContainer native window sizing', () => {
   const originalElectronAPI = window.electronAPI;
   const initialGrailState = useGrailStore.getInitialState();
@@ -67,7 +72,7 @@ describe('WidgetContainer native window sizing', () => {
       configurable: true,
       writable: true,
     });
-    const result = render(<WidgetContainer />);
+    const result = render(<WidgetApp />);
     await waitFor(() => {
       expect(handlers.has('settings-updated')).toBe(true);
       expect(useGrailStore.getState().settingsHydrated).toBe(true);
@@ -96,6 +101,8 @@ describe('WidgetContainer native window sizing', () => {
 
   afterEach(() => {
     useGrailStore.setState(initialGrailState, true);
+    // The widget root caches the loaded theme preference for the next startup
+    localStorage.removeItem(THEME_PREFERENCE_STORAGE_KEY);
     Object.defineProperty(window, 'electronAPI', {
       value: originalElectronAPI,
       configurable: true,

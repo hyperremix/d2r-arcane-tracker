@@ -12,18 +12,3 @@ import { twMerge } from 'tailwind-merge';
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
-
-// Re-export date utilities from date.ts for backward compatibility
-export {
-  formatClockDuration,
-  formatDate,
-  formatDuration,
-  formatLongDate,
-  formatSessionDate,
-  formatSessionDateRelative,
-  formatShortDate,
-  formatTime,
-  formatTimeAgo,
-  formatTimestamp,
-  isRecentFind,
-} from './date';

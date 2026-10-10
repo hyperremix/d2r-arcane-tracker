@@ -1,10 +1,11 @@
 import type { InventorySnapshotWindowTarget, VaultSourceFileType } from 'electron/types/grail';
 import { VALID_SOURCE_FILE_TYPES } from 'electron/utils/vaultState';
 import type { JSX } from 'react';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { CharacterInventoryBrowser } from '@/components/inventory/CharacterInventoryBrowser';
-import { useTheme } from '@/hooks/useTheme';
+import { TitleBarFrame } from '@/components/TitleBarFrame';
+import { useWindowBootstrap } from '@/hooks/useWindowBootstrap';
 import { translations } from '@/i18n/translations';
 import logoUrl from '/logo.png';
 
@@ -38,40 +39,23 @@ function parseSnapshotTargetFromHash(hash: string): InventorySnapshotWindowTarge
 
 function SnapshotTitleBar({ title }: { title: string }): JSX.Element {
   const { t } = useTranslation();
-  const [platform, setPlatform] = useState<'darwin' | 'win32' | 'linux'>('darwin');
-
-  useEffect(() => {
-    if (window.electronAPI) {
-      setPlatform(window.electronAPI.platform);
-    }
-  }, []);
-
-  const isMac = platform === 'darwin';
 
   return (
-    <div
-      className="titlebar flex h-12 min-h-12 w-full select-none items-center border-border border-b px-4"
-      style={
-        {
-          WebkitAppRegion: 'drag',
-          appRegion: 'drag',
-        } as React.CSSProperties
-      }
-    >
-      {isMac ? <div className="w-20" /> : <div className="w-8" />}
+    <TitleBarFrame centered>
       <div className="flex flex-1 items-center justify-center gap-2 px-2">
         <img src={logoUrl} alt={t(translations.app.title)} className="h-5 w-5" />
         <span className="truncate font-semibold text-sm tracking-wide">{title}</span>
       </div>
-      {isMac ? <div className="w-20" /> : <div className="w-36" />}
-    </div>
+    </TitleBarFrame>
   );
 }
 
 export default function InventorySnapshotWindowApp(): JSX.Element {
   const { t } = useTranslation();
 
-  useTheme();
+  // Load the grail data (also used for the item icons), follow settings saved in the main window
+  // and apply theme and language based on user settings
+  useWindowBootstrap({ followSettingsUpdates: true });
   const locationHash = window.location.hash;
 
   const snapshotTarget = useMemo(() => parseSnapshotTargetFromHash(locationHash), [locationHash]);

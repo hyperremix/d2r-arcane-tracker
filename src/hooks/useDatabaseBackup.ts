@@ -1,8 +1,8 @@
-import dayjs from 'dayjs';
 import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { translations } from '@/i18n/translations';
+import { toLocalIsoDate } from '@/lib/date';
 import { getFileName } from '@/lib/path';
 
 /**
@@ -37,7 +37,7 @@ export function useDatabaseBackup(): DatabaseBackupState {
       // Show save dialog to let user choose backup location
       const result = await window.electronAPI?.dialog.showSaveDialog({
         title: t(translations.settings.database.backupDatabase),
-        defaultPath: `holy-grail-backup-${dayjs().format('YYYY-MM-DD')}.db`,
+        defaultPath: `holy-grail-backup-${toLocalIsoDate()}.db`,
         filters: [
           { name: t(translations.settings.database.sqliteDatabaseFilter), extensions: ['db'] },
           { name: t(translations.common.allFiles), extensions: ['*'] },

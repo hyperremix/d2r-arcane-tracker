@@ -2,7 +2,8 @@ import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import type { Item, Settings } from 'electron/types/grail';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { HolyGrailItemBuilder } from '@/fixtures/HolyGrailItemBuilder';
-import { filterAndSortItems, useGrailStore } from '@/stores/grailStore';
+import { filterAndSortItems } from '@/lib/grailFilters';
+import { useGrailStore } from '@/stores/grailStore';
 import { AdvancedSearch } from './AdvancedSearch';
 
 const SEARCH_DEBOUNCE_MS = 150;

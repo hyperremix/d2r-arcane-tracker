@@ -12,7 +12,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { translations } from '@/i18n/translations';
-import { formatShortDate } from '@/lib/utils';
+import { formatShortDate } from '@/lib/date';
 
 interface UpdateDialogProps {
   open: boolean;

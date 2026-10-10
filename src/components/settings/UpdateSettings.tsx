@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { translations } from '@/i18n/translations';
+import { downloadUpdate, installUpdate } from '@/lib/updateActions';
 import { UpdateDialog } from './UpdateDialog';
 
 /**
@@ -29,29 +30,12 @@ export function UpdateSettings() {
 
   const handleDownloadUpdate = useCallback(async () => {
     setShowUpdateDialog(false);
-    try {
-      await window.electronAPI.update.downloadUpdate();
-      toast.info(t(translations.settings.update.downloadingUpdate), {
-        description: t(translations.settings.update.downloadStarted),
-      });
-    } catch (error) {
-      console.error('Failed to download update:', error);
-      toast.error(t(translations.settings.update.downloadFailed), {
-        description: t(translations.settings.update.downloadFailedDescription),
-      });
-    }
+    await downloadUpdate(t);
   }, [t]);
 
   const handleInstallUpdate = useCallback(async () => {
     setShowInstallDialog(false);
-    try {
-      await window.electronAPI.update.quitAndInstall();
-    } catch (error) {
-      console.error('Failed to install update:', error);
-      toast.error(t(translations.settings.update.installFailed), {
-        description: t(translations.settings.update.installFailedDescription),
-      });
-    }
+    await installUpdate(t);
   }, [t]);
 
   const handleManualUpdateStatus = useCallback(

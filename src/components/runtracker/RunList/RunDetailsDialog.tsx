@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { translations } from '@/i18n/translations';
-import { formatDuration } from '@/lib/utils';
+import { formatDuration } from '@/lib/date';
 
 export interface RunDetailsDialogProps {
   open: boolean;

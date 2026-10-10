@@ -3,8 +3,9 @@ import { Check, CheckCheck } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { translations } from '@/i18n/translations';
+import { formatShortDate, isRecentFind } from '@/lib/date';
 import { isEtherealOnly, shouldShowEtherealStatus, shouldShowNormalStatus } from '@/lib/ethereal';
-import { cn, formatShortDate, isRecentFind } from '@/lib/utils';
+import { cn } from '@/lib/utils';
 import { CharacterIcon, RecentDiscoveryIndicator } from '../StatusIcons';
 import { getTooltipTriggerRender } from '../tooltipTriggerRender';
 

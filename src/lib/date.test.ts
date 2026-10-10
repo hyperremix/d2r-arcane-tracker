@@ -5,14 +5,16 @@ import {
   formatDate,
   formatDuration,
   formatLocalizedDate,
-  formatLongDate,
   formatRelativeTime,
+  formatSessionDate,
   formatSessionDateRelative,
   formatShortDate,
   formatTime,
   formatTimeAgo,
   formatTimestamp,
   isRecentFind,
+  parseLocalIsoDate,
+  toLocalIsoDate,
 } from './date';
 
 describe('formatClockDuration', () => {
@@ -202,33 +204,51 @@ describe('When formatSessionDateRelative is called', () => {
 });
 
 describe('formatDate', () => {
-  it('should return "Never" for undefined input', () => {
-    expect(formatDate(undefined)).toBe('Never');
+  it('If there is no date, Then the translated "Never" is returned', () => {
+    expect(formatDate(undefined)).toBe(i18n.t('common.never'));
   });
 
-  it('should format date with default format', () => {
-    const date = new Date('2024-01-15T12:00:00Z');
+  it('If no locale is given, Then the date and time are formatted in the active UI language', () => {
+    // Arrange
+    const date = new Date(2024, 0, 15, 14, 30);
+
+    // Act
     const result = formatDate(date);
-    expect(result).toContain('Jan');
-    expect(result).toContain('2024');
+
+    // Assert
+    expect(result).toBe(
+      new Intl.DateTimeFormat(i18n.language, { dateStyle: 'medium', timeStyle: 'short' }).format(
+        date,
+      ),
+    );
+    expect(result).toContain('Jan 15, 2024');
   });
 
-  it('should format date with custom format', () => {
-    const date = new Date('2024-01-15T12:00:00Z');
-    const result = formatDate(date, 'YYYY-MM-DD');
-    expect(result).toBe('2024-01-15');
+  it('If a locale is given, Then the date and time are formatted for that locale', () => {
+    // Arrange
+    const date = new Date(2024, 0, 15, 14, 30);
+
+    // Act
+    const result = formatDate(date, 'de');
+
+    // Assert
+    expect(result).toBe('15.01.2024, 14:30');
   });
 });
 
 describe('formatShortDate', () => {
-  it('should return "Never" for undefined input', () => {
-    expect(formatShortDate(undefined)).toBe('Never');
+  it('If there is no date, Then the translated "Never" is returned', () => {
+    expect(formatShortDate(undefined)).toBe(i18n.t('common.never'));
   });
 
-  it('should format short date correctly', () => {
-    const date = new Date('2024-01-15T12:00:00Z');
+  it('If a date is given, Then the short date is formatted in the active UI language', () => {
+    const date = new Date(2024, 0, 15, 12);
     const result = formatShortDate(date);
     expect(result).toBe('Jan 15, 2024');
+  });
+
+  it('If a locale is given, Then the short date is formatted for that locale', () => {
+    expect(formatShortDate(new Date(2024, 0, 15, 12), 'de')).toBe('15.01.2024');
   });
 });
 
@@ -267,17 +287,14 @@ describe('formatLocalizedDate', () => {
   });
 });
 
-describe('formatLongDate', () => {
-  it('should return "Never" for undefined input', () => {
-    expect(formatLongDate(undefined)).toBe('Never');
+describe('formatSessionDate', () => {
+  it('If there is no date, Then the translated "Never" is returned', () => {
+    expect(formatSessionDate(undefined)).toBe(i18n.t('common.never'));
   });
 
-  it('should format long date correctly', () => {
-    const date = new Date('2024-01-15T12:00:00Z');
-    const result = formatLongDate(date);
-    expect(result).toContain('Monday');
-    expect(result).toContain('January');
-    expect(result).toContain('2024');
+  it('If a date is given, Then the full date is formatted in the active UI language', () => {
+    const result = formatSessionDate(new Date(2024, 0, 15, 12));
+    expect(result).toBe('Monday, January 15, 2024');
   });
 });
 
@@ -292,6 +309,10 @@ describe('formatTime', () => {
     // Result depends on timezone, but should contain time format
     expect(result).toMatch(/\d{1,2}:\d{2}\s(AM|PM)/);
   });
+
+  it('If a locale is given, Then the time is formatted for that locale', () => {
+    expect(formatTime(new Date(2024, 0, 15, 14, 30), 'de')).toBe('14:30');
+  });
 });
 
 describe('formatTimestamp', () => {
@@ -305,11 +326,15 @@ describe('formatTimestamp', () => {
     // Result depends on timezone, but should contain time format with seconds
     expect(result).toMatch(/\d{1,2}:\d{2}:\d{2}\s(AM|PM)/);
   });
+
+  it('If a locale is given, Then the timestamp is formatted for that locale', () => {
+    expect(formatTimestamp(new Date(2024, 0, 15, 14, 30, 45), 'de')).toBe('14:30:45');
+  });
 });
 
-describe('isRecentFind', () => {
+describe('When isRecentFind function is called', () => {
   beforeEach(() => {
-    // Mock dayjs to return a fixed time
+    // Fix the current time
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2024-01-15T12:00:00Z'));
   });
@@ -318,67 +343,477 @@ describe('isRecentFind', () => {
     vi.useRealTimers();
   });
 
-  it('should return false for undefined input', () => {
-    expect(isRecentFind(undefined)).toBe(false);
+  describe('If foundDate is undefined', () => {
+    it('Then should return false', () => {
+      // Arrange
+      const foundDate = undefined;
+
+      // Act
+      const result = isRecentFind(foundDate);
+
+      // Assert
+      expect(result).toBe(false);
+    });
   });
 
-  it('should return true for date within default threshold (7 days)', () => {
-    const foundDate = new Date('2024-01-10T12:00:00Z'); // 5 days ago
-    expect(isRecentFind(foundDate)).toBe(true);
+  describe('If foundDate is null', () => {
+    it('Then should return false', () => {
+      // Arrange
+      const foundDate = null as unknown as Date;
+
+      // Act
+      const result = isRecentFind(foundDate);
+
+      // Assert
+      expect(result).toBe(false);
+    });
   });
 
-  it('should return false for date exactly at default threshold (7 days)', () => {
-    const foundDate = new Date('2024-01-08T12:00:00Z'); // Exactly 7 days ago
-    expect(isRecentFind(foundDate)).toBe(false);
+  describe('If foundDate is within default threshold (7 days)', () => {
+    it('Then should return true', () => {
+      // Arrange
+      const foundDate = new Date('2024-01-10T12:00:00Z'); // 5 days ago
+
+      // Act
+      const result = isRecentFind(foundDate);
+
+      // Assert
+      expect(result).toBe(true);
+    });
   });
 
-  it('should return false for date beyond default threshold (7 days)', () => {
-    const foundDate = new Date('2024-01-07T12:00:00Z'); // 8 days ago
-    expect(isRecentFind(foundDate)).toBe(false);
+  describe('If foundDate is exactly at default threshold (7 days)', () => {
+    it('Then should return false', () => {
+      // Arrange
+      const foundDate = new Date('2024-01-08T12:00:00Z'); // Exactly 7 days ago
+
+      // Act
+      const result = isRecentFind(foundDate);
+
+      // Assert
+      expect(result).toBe(false);
+    });
   });
 
-  it('should return true for date in the future', () => {
-    const foundDate = new Date('2024-01-20T12:00:00Z'); // 5 days in the future
-    expect(isRecentFind(foundDate)).toBe(true);
+  describe('If foundDate is beyond default threshold (7 days)', () => {
+    it('Then should return false', () => {
+      // Arrange
+      const foundDate = new Date('2024-01-07T12:00:00Z'); // 8 days ago
+
+      // Act
+      const result = isRecentFind(foundDate);
+
+      // Assert
+      expect(result).toBe(false);
+    });
   });
 
-  it('should use custom threshold when provided', () => {
-    const foundDate = new Date('2024-01-05T12:00:00Z'); // 10 days ago
-    expect(isRecentFind(foundDate, 15)).toBe(true);
+  describe('If foundDate is in the future', () => {
+    it('Then should return true', () => {
+      // Arrange
+      const foundDate = new Date('2024-01-20T12:00:00Z'); // 5 days in the future
+
+      // Act
+      const result = isRecentFind(foundDate);
+
+      // Assert
+      expect(result).toBe(true);
+    });
   });
 
-  it('should return false when date is beyond custom threshold', () => {
-    const foundDate = new Date('2024-01-10T12:00:00Z'); // 5 days ago
-    expect(isRecentFind(foundDate, 3)).toBe(false);
+  describe('If custom threshold is provided', () => {
+    it('Then should use custom threshold instead of default', () => {
+      // Arrange
+      const foundDate = new Date('2024-01-05T12:00:00Z'); // 10 days ago
+      const customThreshold = 15; // 15 days
+
+      // Act
+      const result = isRecentFind(foundDate, customThreshold);
+
+      // Assert
+      expect(result).toBe(true);
+    });
   });
 
-  it('should return false for zero threshold', () => {
-    const foundDate = new Date('2024-01-15T11:59:59Z'); // 1 second ago
-    expect(isRecentFind(foundDate, 0)).toBe(false);
+  describe('If custom threshold is smaller than default', () => {
+    it('Then should use custom threshold', () => {
+      // Arrange
+      const foundDate = new Date('2024-01-10T12:00:00Z'); // 5 days ago
+      const customThreshold = 3; // 3 days
+
+      // Act
+      const result = isRecentFind(foundDate, customThreshold);
+
+      // Assert
+      expect(result).toBe(false);
+    });
   });
 
-  it('should return false for negative threshold', () => {
-    const foundDate = new Date('2024-01-15T11:59:59Z'); // 1 second ago
-    expect(isRecentFind(foundDate, -1)).toBe(false);
+  describe('If custom threshold is zero', () => {
+    it('Then should return false for any past date', () => {
+      // Arrange
+      const foundDate = new Date('2024-01-15T11:59:59Z'); // 1 second ago
+      const customThreshold = 0;
+
+      // Act
+      const result = isRecentFind(foundDate, customThreshold);
+
+      // Assert
+      expect(result).toBe(false);
+    });
   });
 
-  it('should return false for date exactly at custom threshold', () => {
-    const foundDate = new Date('2024-01-10T12:00:00Z'); // 5 days ago
-    expect(isRecentFind(foundDate, 5)).toBe(false);
+  describe('If custom threshold is negative', () => {
+    it('Then should return false for any past date', () => {
+      // Arrange
+      const foundDate = new Date('2024-01-15T11:59:59Z'); // 1 second ago
+      const customThreshold = -1;
+
+      // Act
+      const result = isRecentFind(foundDate, customThreshold);
+
+      // Assert
+      expect(result).toBe(false);
+    });
   });
 
-  it('should return true for very recent date (within 1 day)', () => {
-    const foundDate = new Date('2024-01-14T12:00:00Z'); // 1 day ago
-    expect(isRecentFind(foundDate)).toBe(true);
+  describe('If foundDate is exactly at custom threshold', () => {
+    it('Then should return false', () => {
+      // Arrange
+      const foundDate = new Date('2024-01-10T12:00:00Z'); // 5 days ago
+      const customThreshold = 5;
+
+      // Act
+      const result = isRecentFind(foundDate, customThreshold);
+
+      // Assert
+      expect(result).toBe(false);
+    });
   });
 
-  it('should return false for very old date (months ago)', () => {
-    const foundDate = new Date('2023-01-15T12:00:00Z'); // 1 year ago
-    expect(isRecentFind(foundDate)).toBe(false);
+  describe('If foundDate is just beyond custom threshold', () => {
+    it('Then should return false', () => {
+      // Arrange
+      const foundDate = new Date('2024-01-09T12:00:00Z'); // 6 days ago
+      const customThreshold = 5;
+
+      // Act
+      const result = isRecentFind(foundDate, customThreshold);
+
+      // Assert
+      expect(result).toBe(false);
+    });
   });
 
-  it('should return true for date at exact current time', () => {
-    const foundDate = new Date('2024-01-15T12:00:00Z'); // Exact current time
-    expect(isRecentFind(foundDate)).toBe(true);
+  describe('If foundDate is very recent (within 1 day)', () => {
+    it('Then should return true', () => {
+      // Arrange
+      const foundDate = new Date('2024-01-14T12:00:00Z'); // 1 day ago
+
+      // Act
+      const result = isRecentFind(foundDate);
+
+      // Assert
+      expect(result).toBe(true);
+    });
+  });
+
+  describe('If foundDate is very old (months ago)', () => {
+    it('Then should return false', () => {
+      // Arrange
+      const foundDate = new Date('2023-01-15T12:00:00Z'); // 1 year ago
+
+      // Act
+      const result = isRecentFind(foundDate);
+
+      // Assert
+      expect(result).toBe(false);
+    });
+  });
+
+  describe('If foundDate is at the exact current time', () => {
+    it('Then should return true', () => {
+      // Arrange
+      const foundDate = new Date('2024-01-15T12:00:00Z'); // Exact current time
+
+      // Act
+      const result = isRecentFind(foundDate);
+
+      // Assert
+      expect(result).toBe(true);
+    });
+  });
+});
+
+describe('When local ISO dates are formatted and parsed', () => {
+  it('If a date is formatted, Then its local calendar day is returned as YYYY-MM-DD', () => {
+    expect(toLocalIsoDate(new Date(2024, 0, 5, 23, 59))).toBe('2024-01-05');
+  });
+
+  it('If a YYYY-MM-DD value is parsed, Then local midnight of that day is returned', () => {
+    // Arrange & Act
+    const result = parseLocalIsoDate('2024-06-15');
+
+    // Assert
+    expect(result).toEqual(new Date(2024, 5, 15));
+    expect(toLocalIsoDate(result)).toBe('2024-06-15');
+  });
+
+  it('If the value is malformed, Then an invalid date is returned', () => {
+    expect(Number.isNaN(parseLocalIsoDate('not a date').getTime())).toBe(true);
+  });
+});
+
+describe('When day counts cross a daylight-saving transition', () => {
+  // America/New_York in 2024: clocks jump forward on Mar 10 at 07:00 UTC and back on Nov 3 at 06:00 UTC.
+  // The runner's own time zone is not switchable inside a vitest worker, so the zone's UTC offset is
+  // simulated on top of absolute instants, which keeps these tests independent of the machine's zone.
+  const SPRING_FORWARD_UTC = Date.UTC(2024, 2, 10, 7);
+  const FALL_BACK_UTC = Date.UTC(2024, 10, 3, 6);
+
+  // Captured before fake timers replace the global Date, so dates created in any phase share it.
+  const nativeDatePrototype = Date.prototype;
+
+  function simulateNewYorkOffset() {
+    return vi.spyOn(nativeDatePrototype, 'getTimezoneOffset').mockImplementation(function (
+      this: Date,
+    ) {
+      const time = this.getTime();
+      const isDaylightTime = time >= SPRING_FORWARD_UTC && time < FALL_BACK_UTC;
+      return isDaylightTime ? 240 : 300;
+    });
+  }
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    simulateNewYorkOffset();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.useRealTimers();
+  });
+
+  // Local noon, 7 calendar days apart, but only 167 hours of elapsed time (the day in between is 23h long).
+  const foundBeforeSpringForward = new Date(Date.UTC(2024, 2, 5, 17)); // Mar 5 12:00 EST
+  const nowAfterSpringForward = new Date(Date.UTC(2024, 2, 12, 16)); // Mar 12 12:00 EDT
+
+  // Local 13:00 to local 12:00 a week later: 168 hours of elapsed time, but only 6 calendar days and 23 hours.
+  const foundBeforeFallBack = new Date(Date.UTC(2024, 9, 29, 17)); // Oct 29 13:00 EDT
+  const nowAfterFallBack = new Date(Date.UTC(2024, 10, 5, 17)); // Nov 5 12:00 EST
+
+  it('If a find is 7 calendar days old across spring-forward, Then it is not recent (167 elapsed hours)', () => {
+    // Arrange
+    vi.setSystemTime(nowAfterSpringForward);
+
+    // Act
+    const result = isRecentFind(foundBeforeSpringForward);
+
+    // Assert
+    expect(result).toBe(false);
+  });
+
+  it('If a find is 6 calendar days old across spring-forward, Then it is still recent', () => {
+    // Arrange
+    vi.setSystemTime(nowAfterSpringForward);
+    const found = new Date(Date.UTC(2024, 2, 6, 17)); // Mar 6 12:00 EST
+
+    // Act
+    const result = isRecentFind(found);
+
+    // Assert
+    expect(result).toBe(true);
+  });
+
+  it('If a find is under 7 calendar days old across fall-back (168 elapsed hours), Then it is recent', () => {
+    // Arrange
+    vi.setSystemTime(nowAfterFallBack);
+
+    // Act
+    const result = isRecentFind(foundBeforeFallBack);
+
+    // Assert
+    expect(result).toBe(true);
+  });
+
+  it('If a find is 7 calendar days old across fall-back, Then it is not recent', () => {
+    // Arrange
+    vi.setSystemTime(nowAfterFallBack);
+    const found = new Date(Date.UTC(2024, 9, 29, 16)); // Oct 29 12:00 EDT
+
+    // Act
+    const result = isRecentFind(found);
+
+    // Assert
+    expect(result).toBe(false);
+  });
+
+  it('If a session is 7 calendar days old across spring-forward, Then the full date is shown instead of a relative time', () => {
+    // Arrange
+    vi.setSystemTime(nowAfterSpringForward);
+
+    // Act
+    const result = formatSessionDateRelative(foundBeforeSpringForward, i18n.t, 'en');
+
+    // Assert
+    expect(result).toBe(formatLocalizedDate(foundBeforeSpringForward, 'en', { dateStyle: 'full' }));
+  });
+
+  it('If a session is under 7 calendar days old across fall-back, Then a relative time is shown', () => {
+    // Arrange
+    vi.setSystemTime(nowAfterFallBack);
+
+    // Act
+    const result = formatSessionDateRelative(foundBeforeFallBack, i18n.t, 'en');
+
+    // Assert
+    expect(result).toBe(formatTimeAgo(foundBeforeFallBack, i18n.t, 'en'));
+  });
+});
+
+describe('When a date-only (YYYY-MM-DD) string is formatted or compared', () => {
+  // A date-only string must be read as local midnight rather than UTC midnight. On a runner whose
+  // zone is UTC the two are the same instant, so the machine's zone cannot be relied on (and a
+  // vitest worker cannot switch it). Instead the zone is simulated: multi-argument `new Date(...)`
+  // reads its components as local time in the simulated zone, the local getters and the UTC offset
+  // report it, and `new Date()` / `Date.now()` return a fixed instant.
+  const MINUTE = 60_000;
+
+  type LocalParts = Parameters<typeof Date.UTC>;
+
+  function simulateLocalZone(offsetMinutes: number, nowLocal: LocalParts) {
+    // Captured before the global Date is replaced, so the simulation itself reads the real one.
+    const NativeDate = Date;
+    const localToInstant = (parts: LocalParts) => NativeDate.UTC(...parts) + offsetMinutes * MINUTE;
+    const now = localToInstant(nowLocal);
+    const shifted = (date: Date) => new NativeDate(date.getTime() - offsetMinutes * MINUTE);
+
+    vi.stubGlobal(
+      'Date',
+      new Proxy(NativeDate, {
+        construct(target, args) {
+          if (args.length === 0) return new target(now);
+          if (args.length === 1) return new target(args[0]);
+          return new target(localToInstant(args as LocalParts));
+        },
+        get(target, property, receiver) {
+          if (property === 'now') return () => now;
+          return Reflect.get(target, property, receiver);
+        },
+      }),
+    );
+    vi.spyOn(NativeDate.prototype, 'getTimezoneOffset').mockReturnValue(offsetMinutes);
+    vi.spyOn(NativeDate.prototype, 'getFullYear').mockImplementation(function (this: Date) {
+      return shifted(this).getUTCFullYear();
+    });
+    vi.spyOn(NativeDate.prototype, 'getMonth').mockImplementation(function (this: Date) {
+      return shifted(this).getUTCMonth();
+    });
+    vi.spyOn(NativeDate.prototype, 'getDate').mockImplementation(function (this: Date) {
+      return shifted(this).getUTCDate();
+    });
+    return now;
+  }
+
+  // Etc/GMT+5 is UTC-05:00 all year (the sign of Etc/GMT zones is inverted).
+  const WEST_OFFSET_MINUTES = 300;
+  const WEST_TIME_ZONE = 'Etc/GMT+5';
+  // UTC+09:00, Asia/Tokyo's offset.
+  const EAST_OFFSET_MINUTES = -540;
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it('If it is formatted, Then it is read as local midnight rather than UTC midnight', () => {
+    // Arrange
+    simulateLocalZone(WEST_OFFSET_MINUTES, [2024, 0, 15, 12]);
+    const options: Intl.DateTimeFormatOptions = {
+      hour: '2-digit',
+      minute: '2-digit',
+      hourCycle: 'h23',
+      timeZone: WEST_TIME_ZONE,
+    };
+
+    // Act
+    const result = formatLocalizedDate('2024-01-15', 'en', options);
+
+    // Assert
+    expect(result).toBe('00:00');
+  });
+
+  it('If it is today, Then the session is shown as "Today"', () => {
+    // Arrange
+    simulateLocalZone(WEST_OFFSET_MINUTES, [2024, 0, 15, 12]);
+
+    // Act
+    const result = formatSessionDateRelative('2024-01-15', i18n.t, 'en');
+
+    // Assert
+    expect(result).toBe('Today');
+  });
+
+  it('If it is yesterday, Then the session is shown as "Yesterday"', () => {
+    // Arrange
+    simulateLocalZone(WEST_OFFSET_MINUTES, [2024, 0, 15, 12]);
+
+    // Act
+    const result = formatSessionDateRelative('2024-01-14', i18n.t, 'en');
+
+    // Assert
+    expect(result).toBe('Yesterday');
+  });
+
+  it('If it is 6 days ago late in the local day, Then the find is recent', () => {
+    // Arrange: local 23:00 is already the next day in UTC, which would make the find 7 days old.
+    simulateLocalZone(WEST_OFFSET_MINUTES, [2024, 0, 15, 23]);
+
+    // Act
+    const result = isRecentFind('2024-01-09');
+
+    // Assert
+    expect(result).toBe(true);
+  });
+
+  it('If it is 7 days ago early in the local day, Then the find is not recent', () => {
+    // Arrange: local 02:00 is still the previous day in UTC, which would make the find 6 days old.
+    simulateLocalZone(EAST_OFFSET_MINUTES, [2024, 0, 15, 2]);
+
+    // Act
+    const result = isRecentFind('2024-01-08');
+
+    // Assert
+    expect(result).toBe(false);
+  });
+
+  it('If its relative time is formatted, Then the elapsed time counts from local midnight', () => {
+    // Arrange: 12 hours after local midnight, but 17 hours after UTC midnight.
+    const now = simulateLocalZone(WEST_OFFSET_MINUTES, [2024, 0, 15, 12]);
+
+    // Act
+    const relativeTime = formatRelativeTime('2024-01-15', 'en', now);
+    const timeAgo = formatTimeAgo('2024-01-15', i18n.t, 'en');
+
+    // Assert
+    expect(relativeTime).toBe('12 hours ago');
+    expect(timeAgo).toBe('12 hours ago');
+  });
+
+  it('If it is a full timestamp, Then it is still parsed as an instant', () => {
+    // Arrange
+    simulateLocalZone(WEST_OFFSET_MINUTES, [2024, 0, 15, 12]);
+    const options: Intl.DateTimeFormatOptions = {
+      hour: '2-digit',
+      minute: '2-digit',
+      hourCycle: 'h23',
+      timeZone: WEST_TIME_ZONE,
+    };
+
+    // Act
+    const result = formatLocalizedDate('2024-01-15T00:00:00Z', 'en', options);
+
+    // Assert
+    expect(result).toBe('19:00');
   });
 });

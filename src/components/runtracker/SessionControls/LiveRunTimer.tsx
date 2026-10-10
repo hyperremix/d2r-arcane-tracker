@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { translations } from '@/i18n/translations';
-import { cn, formatClockDuration } from '@/lib/utils';
+import { formatClockDuration } from '@/lib/date';
+import { cn } from '@/lib/utils';
 
 interface LiveRunTimerProps {
   /** Elapsed time of the in-progress run in milliseconds, or undefined when no run is active. */

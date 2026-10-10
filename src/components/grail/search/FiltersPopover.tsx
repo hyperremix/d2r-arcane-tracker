@@ -8,9 +8,9 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { translations } from '@/i18n/translations';
+import { toSubCategoryFilterValue } from '@/lib/grailFilters';
 import { itemCategoryLabelKeys } from '@/lib/labelKeys';
 import { cn } from '@/lib/utils';
-import { toSubCategoryFilterValue } from '@/stores/grailStore';
 import { categoryValues } from './options';
 import {
   compareSubCategoryOptions,

@@ -1,5 +1,4 @@
-import dayjs from 'dayjs';
-import type { TFunction } from 'i18next';
+import i18n, { type TFunction } from 'i18next';
 import { translations } from '@/i18n/translations';
 
 const SECOND_MS = 1000;
@@ -8,6 +7,14 @@ const HOUR_MS = 60 * MINUTE_MS;
 export const DAY_MS = 24 * HOUR_MS;
 const MONTH_MS = 30 * DAY_MS;
 const YEAR_MS = 365 * DAY_MS;
+
+/**
+ * Returns the locale of the active UI language, used when no locale is passed to the formatters.
+ * @returns {string | undefined} The active i18n language, if i18n is initialised
+ */
+export function getActiveLocale(): string | undefined {
+  return i18n.resolvedLanguage ?? i18n.language;
+}
 
 /** Units for relative times, largest first; the largest unit that fits the difference is used. */
 const RELATIVE_TIME_UNITS: readonly [Intl.RelativeTimeFormatUnit, number][] = [
@@ -26,7 +33,7 @@ const RELATIVE_TIME_UNITS: readonly [Intl.RelativeTimeFormatUnit, number][] = [
 export function formatDuration(durationMs?: number): string {
   if (durationMs === undefined || durationMs === null || durationMs < 0) return '0s';
 
-  // Use total hours: dayjs duration components wrap at day/month boundaries (24h would become 0).
+  // Use total hours so durations of a day or longer do not wrap (24h must not become 0h).
   const totalSeconds = Math.floor(durationMs / 1000);
   const hours = Math.floor(totalSeconds / 3600);
   const minutes = Math.floor((totalSeconds % 3600) / 60);
@@ -73,16 +80,16 @@ export function formatClockDuration(durationMs?: number): string {
  * Formats the time between a date and now in the given locale (e.g. "2 days ago", "in 5 hours",
  * "yesterday"), using the largest unit that fits.
  * @param {Date | string | number} date - The date to format
- * @param {string} [locale] - BCP 47 locale to format with (e.g. the app's `i18n.language`)
+ * @param {string} [locale] - BCP 47 locale to format with (defaults to the active UI language)
  * @param {number} [now=Date.now()] - Reference time
  * @returns {string} The localized relative time
  */
 export function formatRelativeTime(
   date: Date | string | number,
-  locale?: string,
+  locale: string | undefined = getActiveLocale(),
   now: number = Date.now(),
 ): string {
-  const difference = new Date(date).getTime() - now;
+  const difference = toDate(date).getTime() - now;
   const [unit, unitMs] = RELATIVE_TIME_UNITS.find(([, size]) => Math.abs(difference) >= size) ?? [
     'second',
     SECOND_MS,
@@ -101,7 +108,7 @@ export function formatRelativeTime(
  * Formats a date as a localized relative time string (e.g. "2 days ago", "5 hours ago").
  * @param {Date | string | number | undefined} date - The date to format
  * @param {TFunction} t - Translation function, used when there is no date
- * @param {string} [locale] - BCP 47 locale to format with (e.g. the app's `i18n.language`)
+ * @param {string} [locale] - BCP 47 locale to format with (defaults to the active UI language)
  * @returns {string} A human-readable relative time string, or the translated "Never"
  */
 export function formatTimeAgo(
@@ -114,27 +121,25 @@ export function formatTimeAgo(
 }
 
 /**
- * Formats a date for display in a consistent format.
+ * Formats a date and time in the given locale (e.g. "Jan 15, 2024, 2:30 PM" in English).
  * @param {Date | string | number | undefined} date - The date to format
- * @param {string} [format='MMM D, YYYY h:mm A'] - The format string (default: "MMM D, YYYY h:mm A")
- * @returns {string} Formatted date string or "Never" if date is undefined
+ * @param {string} [locale] - BCP 47 locale to format with (defaults to the active UI language)
+ * @returns {string} Formatted date and time, or the translated "Never" if there is no date
  */
-export function formatDate(
-  date: Date | string | number | undefined,
-  format: string = 'MMM D, YYYY h:mm A',
-): string {
-  if (!date) return 'Never';
-  return dayjs(date).format(format);
+export function formatDate(date: Date | string | number | undefined, locale?: string): string {
+  if (!date) return i18n.t(translations.common.never);
+  return formatLocalizedDate(date, locale, { dateStyle: 'medium', timeStyle: 'short' });
 }
 
 /**
- * Formats a date as a short date string (e.g., "Jan 15, 2024").
+ * Formats a date as a short date in the given locale (e.g. "Jan 15, 2024" in English).
  * @param {Date | string | number | undefined} date - The date to format
- * @returns {string} Formatted date string or "Never" if date is undefined
+ * @param {string} [locale] - BCP 47 locale to format with (defaults to the active UI language)
+ * @returns {string} Formatted date, or the translated "Never" if there is no date
  */
-export function formatShortDate(date: Date | string | number | undefined): string {
-  if (!date) return 'Never';
-  return dayjs(date).format('MMM D, YYYY');
+export function formatShortDate(date: Date | string | number | undefined, locale?: string): string {
+  if (!date) return i18n.t(translations.common.never);
+  return formatLocalizedDate(date, locale);
 }
 
 /**
@@ -142,17 +147,17 @@ export function formatShortDate(date: Date | string | number | undefined): strin
  * (e.g. "Jan 15, 2024" for "en", "15.01.2024" for "de").
  * Falls back to the runtime default locale if the given locale is not supported.
  * @param {Date | string | number | undefined} date - The date to format
- * @param {string} [locale] - BCP 47 locale to format with (e.g. the app's `i18n.language`)
+ * @param {string} [locale] - BCP 47 locale to format with (defaults to the active UI language)
  * @param {Intl.DateTimeFormatOptions} [options={ dateStyle: 'medium' }] - Intl formatting options
  * @returns {string} Localized date string or "-" if the date is undefined or invalid
  */
 export function formatLocalizedDate(
   date: Date | string | number | undefined,
-  locale?: string,
+  locale: string | undefined = getActiveLocale(),
   options: Intl.DateTimeFormatOptions = { dateStyle: 'medium' },
 ): string {
   if (date === undefined) return '-';
-  const value = date instanceof Date ? date : new Date(date);
+  const value = toDate(date);
   if (Number.isNaN(value.getTime())) return '-';
 
   try {
@@ -163,43 +168,94 @@ export function formatLocalizedDate(
 }
 
 /**
- * Formats a date as a long date string (e.g., "Monday, January 15, 2024").
+ * Formats a time as a short time string in the given locale (e.g. "2:30 PM" in English).
  * @param {Date | string | number | undefined} date - The date to format
- * @returns {string} Formatted date string or "Never" if date is undefined
- */
-export function formatLongDate(date: Date | string | number | undefined): string {
-  if (!date) return 'Never';
-  return dayjs(date).format('dddd, MMMM D, YYYY');
-}
-
-/**
- * Formats a time as a short time string (e.g., "2:30 PM").
- * @param {Date | string | number | undefined} date - The date to format
+ * @param {string} [locale] - BCP 47 locale to format with (defaults to the active UI language)
  * @returns {string} Formatted time string or "-" if date is undefined
  */
-export function formatTime(date: Date | string | number | undefined): string {
+export function formatTime(date: Date | string | number | undefined, locale?: string): string {
   if (!date) return '-';
-  return dayjs(date).format('h:mm A');
+  return formatLocalizedDate(date, locale, { timeStyle: 'short' });
 }
 
 /**
- * Formats a timestamp for display in tables (e.g., "2:30:45 PM").
+ * Formats a timestamp with seconds for display in tables (e.g. "2:30:45 PM" in English).
  * @param {Date | string | number | undefined} date - The date to format
+ * @param {string} [locale] - BCP 47 locale to format with (defaults to the active UI language)
  * @returns {string} Formatted timestamp string or "-" if date is undefined
  */
-export function formatTimestamp(date: Date | string | number | undefined): string {
+export function formatTimestamp(date: Date | string | number | undefined, locale?: string): string {
   if (!date) return '-';
-  return dayjs(date).format('h:mm:ss A');
+  return formatLocalizedDate(date, locale, { timeStyle: 'medium' });
 }
 
 /**
- * Formats a date for session display (e.g., "Monday, January 15, 2024").
+ * Formats a date for session display (e.g. "Monday, January 15, 2024" in English).
  * @param {Date | string | number | undefined} date - The date to format
- * @returns {string} Formatted date string
+ * @param {string} [locale] - BCP 47 locale to format with (defaults to the active UI language)
+ * @returns {string} Formatted date string, or the translated "Never" if there is no date
  */
-export function formatSessionDate(date: Date | string | number | undefined): string {
-  if (!date) return 'Never';
-  return dayjs(date).format('dddd, MMMM D, YYYY');
+export function formatSessionDate(
+  date: Date | string | number | undefined,
+  locale?: string,
+): string {
+  if (!date) return i18n.t(translations.common.never);
+  return formatLocalizedDate(date, locale, { dateStyle: 'full' });
+}
+
+/**
+ * Formats a date as `YYYY-MM-DD` in local time: the value format of `<input type="date">`, also
+ * used to date file names.
+ * @param {Date} [date=new Date()] - The date to format
+ * @returns {string} The local calendar date, e.g. "2024-01-15"
+ */
+export function toLocalIsoDate(date: Date = new Date()): string {
+  const year = String(date.getFullYear()).padStart(4, '0');
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+/**
+ * Parses a `YYYY-MM-DD` value (e.g. from `<input type="date">`) as midnight in local time;
+ * the inverse of {@link toLocalIsoDate}. `new Date(value)` would parse it as UTC instead.
+ * @param {string} value - The local calendar date
+ * @returns {Date} Local midnight of that day (an invalid date if the value is malformed)
+ */
+export function parseLocalIsoDate(value: string): Date {
+  const [year, month, day] = value.split('-').map(Number);
+  return new Date(year, month - 1, day);
+}
+
+const DATE_ONLY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * Converts a date value to a `Date`. A date-only `YYYY-MM-DD` string is read as local midnight
+ * (as dayjs did), whereas `new Date(value)` would read it as UTC midnight. Every other string
+ * form is parsed by `new Date(value)`.
+ */
+function toDate(value: Date | string | number): Date {
+  if (value instanceof Date) return value;
+  if (typeof value === 'string' && DATE_ONLY_PATTERN.test(value)) return parseLocalIsoDate(value);
+  return new Date(value);
+}
+
+/**
+ * Returns local midnight of the day a date falls on.
+ */
+function startOfLocalDay(date: Date): Date {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+}
+
+/**
+ * Number of whole local calendar days (truncated towards zero) from one date to another. The
+ * elapsed time is corrected for a change of UTC offset between the two dates, so a day that is
+ * 23 or 25 hours long because of daylight saving time still counts as one day (as dayjs's
+ * `diff(..., 'day')` did).
+ */
+function wholeDaysBetween(from: Date, to: Date): number {
+  const offsetChangeMs = (to.getTimezoneOffset() - from.getTimezoneOffset()) * MINUTE_MS;
+  return Math.trunc((to.getTime() - from.getTime() - offsetChangeMs) / DAY_MS);
 }
 
 /**
@@ -214,9 +270,7 @@ export function isRecentFind(
 ): boolean {
   if (!foundDate) return false;
 
-  const now = dayjs();
-  const found = dayjs(foundDate);
-  return now.diff(found, 'day') < recentThresholdDays;
+  return wholeDaysBetween(toDate(foundDate), new Date()) < recentThresholdDays;
 }
 
 /**
@@ -224,7 +278,7 @@ export function isRecentFind(
  * the last week (e.g. "3 days ago"), and the full localized date before that.
  * @param {Date | string | number | undefined} date - Start of the session
  * @param {TFunction} t - Translation function
- * @param {string} [locale] - BCP 47 locale to format with (e.g. the app's `i18n.language`)
+ * @param {string} [locale] - BCP 47 locale to format with (defaults to the active UI language)
  * @returns {string} The localized session day
  */
 export function formatSessionDateRelative(
@@ -233,16 +287,18 @@ export function formatSessionDateRelative(
   locale?: string,
 ): string {
   if (!date) return t(translations.common.never);
-  const now = dayjs();
-  const sessionDay = dayjs(date);
+  const now = new Date();
+  const sessionStart = toDate(date);
+  const sessionDay = startOfLocalDay(sessionStart).getTime();
 
-  if (sessionDay.isSame(now, 'day')) {
+  if (sessionDay === startOfLocalDay(now).getTime()) {
     return t(translations.common.today);
   }
-  if (sessionDay.isSame(now.subtract(1, 'day'), 'day')) {
+  const yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+  if (sessionDay === yesterday.getTime()) {
     return t(translations.common.yesterday);
   }
-  if (now.diff(sessionDay, 'day') < 7) {
+  if (wholeDaysBetween(sessionStart, now) < 7) {
     return formatTimeAgo(date, t, locale);
   }
   return formatLocalizedDate(date, locale, { dateStyle: 'full' });

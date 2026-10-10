@@ -463,7 +463,12 @@
       "upToDate": "You are up to date",
       "percentDownloaded": "{{percent}}% downloaded",
       "note": "The app automatically checks for updates on startup. A toast notification will appear in the bottom-left corner if an update is available. Manual checks show a detailed dialog with release notes.",
-      "errorPrefix": "Error: {{error}}"
+      "errorPrefix": "Error: {{error}}",
+      "versionReadyToDownload": "Version {{version}} is ready to download",
+      "download": "Download",
+      "dismiss": "Dismiss",
+      "updateReady": "Update Ready",
+      "restartToInstall": "Restart to install the update"
     },
     "updateDialog": {
       "updateReadyToInstall": "Update Ready to Install",

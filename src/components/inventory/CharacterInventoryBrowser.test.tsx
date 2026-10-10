@@ -301,7 +301,7 @@ describe('When CharacterInventoryBrowser is rendered', () => {
   });
 
   describe('If grail items are not loaded and grail API is available', () => {
-    it('Then it hydrates grail items for inventory icon lookup fallbacks', async () => {
+    it('Then it leaves loading the grail items to the window root instead of fetching them itself', async () => {
       // Arrange
       const grailItems: Item[] = [
         {
@@ -343,12 +343,9 @@ describe('When CharacterInventoryBrowser is rendered', () => {
       render(<CharacterInventoryBrowser />);
 
       // Assert
-      await waitFor(() => {
-        expect(grailGetItemsMock).toHaveBeenCalledTimes(1);
-      });
-      await waitFor(() => {
-        expect(useGrailStore.getState().items).toEqual(grailItems);
-      });
+      await waitFor(() => screen.getByTestId('inventory-board-snap-1'));
+      expect(grailGetItemsMock).not.toHaveBeenCalled();
+      expect(useGrailStore.getState().items).toEqual([]);
     });
   });
 

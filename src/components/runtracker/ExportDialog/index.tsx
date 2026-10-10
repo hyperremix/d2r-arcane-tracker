@@ -1,4 +1,3 @@
-import dayjs from 'dayjs';
 import type { Run, RunItem, Session } from 'electron/types/grail';
 import { CopyIcon, DownloadIcon, EyeIcon, EyeOffIcon } from 'lucide-react';
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
@@ -24,6 +23,7 @@ import {
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { translations } from '@/i18n/translations';
+import { toLocalIsoDate } from '@/lib/date';
 import { getFileName } from '@/lib/path';
 import { formatSessionAsCSV, formatSessionAsJSON, formatSessionAsTextSummary } from './formatters';
 
@@ -212,7 +212,7 @@ export function ExportDialog({ sessionId, open, onOpenChange }: ExportDialogProp
       // Show save dialog
       const result = await window.electronAPI?.dialog.showSaveDialog({
         title: t(exportT.title),
-        defaultPath: `session-${sessionId.slice(0, 8)}-${dayjs().format('YYYY-MM-DD')}.${format}`,
+        defaultPath: `session-${sessionId.slice(0, 8)}-${toLocalIsoDate()}.${format}`,
         filters: [
           { name: t(exportT.fileFilter, { format: format.toUpperCase() }), extensions: [format] },
           { name: t(translations.common.allFiles), extensions: ['*'] },

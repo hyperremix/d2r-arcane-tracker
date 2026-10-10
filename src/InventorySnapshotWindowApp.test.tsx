@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { useWindowBootstrap } from '@/hooks/useWindowBootstrap';
 import InventorySnapshotWindowApp from './InventorySnapshotWindowApp';
 
 const characterInventoryBrowserMock = vi.fn();
@@ -11,8 +12,8 @@ vi.mock('@/components/inventory/CharacterInventoryBrowser', () => ({
   },
 }));
 
-vi.mock('@/hooks/useTheme', () => ({
-  useTheme: vi.fn(),
+vi.mock('@/hooks/useWindowBootstrap', () => ({
+  useWindowBootstrap: vi.fn(),
 }));
 
 vi.mock('/logo.png', () => ({
@@ -56,6 +57,19 @@ describe('When InventorySnapshotWindowApp is rendered', () => {
           characterName: 'Sorc',
         },
       });
+    });
+  });
+
+  describe('If the window mounts', () => {
+    it('Then it bootstraps the window and follows settings saved in the main window', () => {
+      // Arrange
+      window.history.replaceState({}, '', '#/inventory-snapshot?foo=bar');
+
+      // Act
+      render(<InventorySnapshotWindowApp />);
+
+      // Assert
+      expect(useWindowBootstrap).toHaveBeenCalledWith({ followSettingsUpdates: true });
     });
   });
 

@@ -2,7 +2,8 @@ import { act, fireEvent, render, screen } from '@testing-library/react';
 import i18n from 'i18next';
 import { toast } from 'sonner';
 import { afterEach, beforeEach, describe, expect, it, type MockInstance, vi } from 'vitest';
-import { resetSettingsWriteTracking, useGrailStore } from '@/stores/grailStore';
+import { useGrailStore } from '@/stores/grailStore';
+import { resetSettingsWriteTracking } from '@/stores/settingsStore';
 import { WidgetSettings } from './WidgetSettings';
 
 describe('WidgetSettings', () => {

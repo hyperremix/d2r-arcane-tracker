@@ -19,6 +19,7 @@ import { translations } from '@/i18n/translations';
 import { cn } from '@/lib/utils';
 import logoUrl from '/logo.png';
 import { NotificationButton } from './grail/NotificationButton';
+import { TitleBarFrame } from './TitleBarFrame';
 
 /**
  * Describes a single top-level destination in the title bar navigation.
@@ -128,27 +129,17 @@ function HistoryButton({
 }
 
 /**
- * TitleBar component that provides a custom draggable title bar for the Electron app.
- * Works across macOS, Linux, and Windows with platform-specific styling.
- * Interactive elements (buttons and links) are excluded from the drag region by the
- * `.titlebar` rules in `index.css`; all remaining empty space stays draggable.
- * Follows Electron best practices from: https://www.electronjs.org/docs/latest/tutorial/custom-title-bar
+ * TitleBar component that provides a custom draggable title bar for the main window.
+ * The draggable frame and the platform-specific spacing come from {@link TitleBarFrame}; all
+ * empty space stays draggable.
  * @returns {JSX.Element} A custom title bar with history controls, app name and navigation
  */
 export function TitleBar() {
   const { t } = useTranslation();
-  const [platform, setPlatform] = useState<'darwin' | 'win32' | 'linux'>('darwin');
   const [historyIndex, setHistoryIndex] = useState(0);
   const [historyLength, setHistoryLength] = useState(1);
   const navigate = useNavigate();
   const location = useLocation();
-
-  useEffect(() => {
-    // Get platform from Electron API (will be 'darwin', 'win32', or 'linux')
-    if (window.electronAPI) {
-      setPlatform(window.electronAPI.platform);
-    }
-  }, []);
 
   // Track navigation history position
   // biome-ignore lint/correctness/useExhaustiveDependencies: location is used as a trigger dependency
@@ -159,7 +150,6 @@ export function TitleBar() {
     setHistoryLength(window.history.length);
   }, [location]);
 
-  const isMac = platform === 'darwin';
   const canGoBack = historyIndex > 0;
   const canGoForward = historyIndex < historyLength - 1;
 
@@ -176,22 +166,7 @@ export function TitleBar() {
   };
 
   return (
-    <header
-      className={cn(
-        'flex h-12 min-h-12 w-full select-none items-center gap-2 border-border border-b px-4',
-        'titlebar', // Custom class for Electron dragging
-      )}
-      style={
-        {
-          // Make the entire title bar draggable (Electron-specific CSS property)
-          WebkitAppRegion: 'drag',
-          appRegion: 'drag',
-        } as React.CSSProperties
-      }
-    >
-      {/* Left section - macOS traffic lights spacing */}
-      {isMac && <div className="w-20 shrink-0" />}
-
+    <TitleBarFrame className="gap-2">
       {/* History buttons */}
       <div className="flex shrink-0 items-center gap-1">
         <HistoryButton
@@ -231,9 +206,6 @@ export function TitleBar() {
           </ul>
         </nav>
       </div>
-
-      {/* Spacing for Windows/Linux native controls overlay */}
-      {!isMac && <div className="w-36 shrink-0" />}
-    </header>
+    </TitleBarFrame>
   );
 }
