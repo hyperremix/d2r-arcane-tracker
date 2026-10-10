@@ -13,7 +13,7 @@ Terror zones are areas that rotate on a schedule, with monsters scaled up and be
 
 ## Usage
 
-Open **Terror Zone Configuration** from the title bar. The page checks your installation path and the game file, then lists every zone with a switch. Once the page is set up, a short reminder at the top lists the launch flags and links back to this guide.
+Open **Terror Zone Configuration** from the title bar. The page checks your installation path and the game file, then lists every zone with a switch, grouped by act. A warning at the top explains that the page edits your game files. Once the page is set up, the same warning also lists the launch flags and links back to this guide.
 
 - Toggle zones one at a time, or use **Enable All** or **Disable All**. **Disable All** asks for confirmation first, because it saves a game file with no terror zones.
 - Search zones by name. The counter shows how many are enabled.
@@ -21,7 +21,7 @@ Open **Terror Zone Configuration** from the title bar. The page checks your inst
 
 Each change is written to the game file right away. The switch you toggled shows a spinner until the write finishes, while the other switches stay usable. A *Terror zones saved* notification confirms each save. If a save fails, the switch goes back to its previous state and an error is shown. The error clears after the next successful save.
 
-Changes don't reach a running game. Restart D2R with `-direct -txt` for them to take effect.
+Changes don't reach a running game. Restart D2R with `-direct -txt` for them to take effect. After you save a change or restore the original file, *Restart D2R to apply your changes* is shown next to the counter until you close the app.
 
 ## How it works
 
@@ -33,7 +33,7 @@ Changes don't reach a running game. Restart D2R with `-direct -txt` for them to 
 
 | Problem | Fix |
 | --- | --- |
-| *D2R installation path is not configured* | Set **Settings → D2R Installation** to the main D2R folder, not a subfolder. |
+| *D2R installation path is not configured* | Click **Open D2R Installation settings** and set **Settings → D2R Installation** to the main D2R folder, not a subfolder. |
 | *Game files must be extracted* or file not found | [Extract all game files](EXTRACTING_GAME_FILES.md) and check that `Data/hd/global/excel/desecratedzones.json` exists. |
 | Changes have no effect in game | Start D2R with `-direct -txt` and restart it after each change. |
 | Invalid file structure, or D2R won't start | Click **Restore Original**. If that fails, repair D2R through Battle.net and extract the files again. |

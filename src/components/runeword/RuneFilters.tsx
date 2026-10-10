@@ -1,4 +1,5 @@
 import { runes } from 'electron/items/runes';
+import { useId } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -22,7 +23,7 @@ interface RuneFiltersProps {
   onRuneSelectionChange: (runeIds: string[]) => void;
   /** Available rune counts from save files */
   availableRunes: Record<string, number>;
-  /** Optional className for styling */
+  /** Optional className for the root flex column */
   className?: string;
 }
 
@@ -38,6 +39,7 @@ export function RuneFilters({
   className,
 }: RuneFiltersProps) {
   const { t } = useTranslation();
+  const headingId = useId();
   const { icons: runeImages, isLoading: imagesLoading } = useIconsByFilename(RUNE_IMAGE_FILENAMES);
 
   /**
@@ -59,11 +61,12 @@ export function RuneFilters({
   };
 
   return (
-    <div className="space-y-4">
+    // A bounded, shrinkable flex column so the rune list below gets the remaining height and scrolls
+    <div className={cn('flex min-h-0 flex-1 flex-col gap-4', className)}>
       {/* Header with match-all hint and Clear selection */}
-      <div className="space-y-1 border-border border-b pb-3">
+      <div className="shrink-0 space-y-1 border-border border-b pb-3">
         <div className="flex items-center justify-between gap-2">
-          <h3 className="font-semibold text-lg">
+          <h3 id={headingId} className="font-semibold text-lg">
             {t(translations.runeword.filters.filterByRunes)}
           </h3>
           <Button
@@ -81,8 +84,11 @@ export function RuneFilters({
         </p>
       </div>
 
-      {/* Rune checkboxes in a scrollable grid */}
-      <div className={cn('space-y-2 overflow-y-auto pr-2', className)}>
+      {/* Rune checkboxes in a scrollable list */}
+      <fieldset
+        aria-labelledby={headingId}
+        className="min-h-0 min-w-0 flex-1 space-y-2 overflow-y-auto pr-2"
+      >
         {runes.map((rune) => {
           const count = getRuneCount(rune.id);
           const isSelected = selectedRunes.includes(rune.id);
@@ -136,11 +142,11 @@ export function RuneFilters({
             </div>
           );
         })}
-      </div>
+      </fieldset>
 
       {/* Selection summary */}
       {selectedRunes.length > 0 && (
-        <div className="border-border border-t pt-3 text-muted-foreground text-sm">
+        <div className="shrink-0 border-border border-t pt-3 text-muted-foreground text-sm">
           {t(translations.runeword.filters.runesSelected, { count: selectedRunes.length })}
         </div>
       )}

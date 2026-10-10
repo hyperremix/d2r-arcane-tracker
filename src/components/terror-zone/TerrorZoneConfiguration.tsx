@@ -1,17 +1,19 @@
-import type { TerrorZoneValidationErrorCode } from 'electron/types/grail';
+import type { TerrorZone, TerrorZoneValidationErrorCode } from 'electron/types/grail';
 import {
   AlertCircle,
   AlertTriangle,
   ExternalLink,
-  Info,
   Loader2,
+  RefreshCw,
   RotateCcw,
   Search,
+  Settings,
   XCircle,
 } from 'lucide-react';
 import type { MouseEvent } from 'react';
 import { useCallback, useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { PageShell } from '@/components/layout/PageShell';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -32,6 +34,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { translations } from '@/i18n/translations';
+import { groupTerrorZonesByAct } from './terrorZoneActs';
 import { useTerrorZoneConfig } from './useTerrorZoneConfig';
 
 /**
@@ -47,6 +50,14 @@ const validationErrorKeys: Record<TerrorZoneValidationErrorCode, string> = {
 };
 
 /**
+ * Validation errors that are fixed by changing the D2R installation path in Settings.
+ */
+const installationPathErrorCodes: ReadonlySet<TerrorZoneValidationErrorCode> = new Set([
+  'pathNotConfigured',
+  'directoryNotFound',
+]);
+
+/**
  * User guide for this page, opened in the system browser.
  */
 const TERROR_ZONE_GUIDE_URL =
@@ -59,8 +70,11 @@ const TERROR_ZONE_GUIDE_URL =
  */
 export function TerrorZoneConfiguration() {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const zoneLabelIdPrefix = useId();
   const zoneSwitchIdPrefix = useId();
+  const actHeadingIdPrefix = useId();
+  const searchInputId = useId();
   const {
     zones,
     config,
@@ -70,6 +84,7 @@ export function TerrorZoneConfiguration() {
     isRestoring,
     validationStatus,
     error,
+    hasChangesToApply,
     toggleZone,
     runBulkUpdate,
     restoreOriginal,
@@ -96,12 +111,15 @@ export function TerrorZoneConfiguration() {
     void window.electronAPI?.shell.openExternal(TERROR_ZONE_GUIDE_URL);
   }, []);
 
-  // Filter zones based on search term
+  // Filter zones based on search term, then group them by act
   const filteredZones = zones.filter(
     (zone) =>
       zone.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       zone.id.toString().includes(searchTerm),
   );
+  const zoneGroups = groupTerrorZonesByAct(filteredZones);
+  // Zones without a known act only get an "Other zones" heading when acts are shown next to them
+  const showGroupHeadings = zoneGroups.some((group) => group.act !== undefined);
 
   // Count enabled zones (default to enabled when config flag is undefined)
   const enabledCount = zones.reduce((count, zone) => {
@@ -113,9 +131,40 @@ export function TerrorZoneConfiguration() {
     ? undefined
     : t(validationErrorKeys[validationStatus.errorCode]);
   const showExtractionGuide = validationStatus.errorCode === 'gameFileNotFound';
+  const showInstallationSettingsAction =
+    !validationStatus.valid && installationPathErrorCodes.has(validationStatus.errorCode);
   const isBulkSaving = bulkAction !== undefined;
   const isWriteInProgress = isBulkSaving || isRestoring || pendingZoneIds.size > 0;
   const areActionsDisabled = isWriteInProgress || !validationStatus.valid;
+
+  const renderZoneSwitch = (zone: TerrorZone) => {
+    const isPending = isBulkSaving || pendingZoneIds.has(zone.id);
+    return (
+      <div key={zone.id} className="flex flex-1 items-center gap-4">
+        <Switch
+          id={`${zoneSwitchIdPrefix}-${zone.id}`}
+          aria-labelledby={`${zoneLabelIdPrefix}-${zone.id}`}
+          aria-busy={isPending || undefined}
+          checked={config[zone.id] ?? true}
+          onCheckedChange={(checked: boolean) => toggleZone(zone.id, checked)}
+          disabled={isPending || isRestoring || !validationStatus.valid}
+        />
+        <Label
+          id={`${zoneLabelIdPrefix}-${zone.id}`}
+          htmlFor={`${zoneSwitchIdPrefix}-${zone.id}`}
+          className="font-medium"
+        >
+          {zone.name}
+        </Label>
+        {isPending && (
+          <Loader2
+            className="h-3.5 w-3.5 shrink-0 animate-spin text-muted-foreground"
+            aria-hidden="true"
+          />
+        )}
+      </div>
+    );
+  };
 
   const pageHeader = (
     <PageHeader
@@ -150,43 +199,42 @@ export function TerrorZoneConfiguration() {
           {pageHeader}
           <Card>
             <CardContent className="space-y-4">
-              {/* Warning Alert */}
-              <Alert>
-                <AlertTriangle className="h-4 w-4" />
-                <AlertDescription>
-                  <strong>{t(translations.common.warning)}</strong>{' '}
-                  {t(translations.terrorZone.warning)}
+              {/* Warning and, once the installation is valid, what changes need to show up in game */}
+              <Alert variant="warning" live="polite">
+                <AlertTriangle aria-hidden="true" />
+                <AlertDescription className="gap-2">
+                  <p>
+                    <strong>{t(translations.common.warning)}</strong>{' '}
+                    {t(translations.terrorZone.warning)}
+                  </p>
+                  {validationStatus.valid && (
+                    <>
+                      <p className="font-semibold">
+                        {t(translations.terrorZone.requirements.title)}
+                      </p>
+                      <ul className="ml-4 list-disc space-y-1">
+                        <li>
+                          {t(translations.terrorZone.requirements.launchWithFlags)}{' '}
+                          <code className="rounded bg-muted px-1 text-foreground">
+                            {t(translations.terrorZone.flagsValue)}
+                          </code>
+                        </li>
+                        <li>{t(translations.terrorZone.requirements.restartAfterChanges)}</li>
+                      </ul>
+                      <a
+                        href={TERROR_ZONE_GUIDE_URL}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={handleOpenGuide}
+                        className="inline-flex items-center gap-1 text-primary underline-offset-4 hover:underline"
+                      >
+                        {t(translations.terrorZone.requirements.openGuide)}
+                        <ExternalLink className="h-3 w-3" aria-hidden="true" />
+                      </a>
+                    </>
+                  )}
                 </AlertDescription>
               </Alert>
-
-              {/* Requirements for changes to take effect in game */}
-              {validationStatus.valid && (
-                <Alert live="polite">
-                  <Info className="h-4 w-4" />
-                  <AlertTitle>{t(translations.terrorZone.requirements.title)}</AlertTitle>
-                  <AlertDescription>
-                    <ul className="ml-4 list-disc space-y-1">
-                      <li>
-                        {t(translations.terrorZone.requirements.launchWithFlags)}{' '}
-                        <code className="rounded bg-muted px-1 text-foreground">
-                          {t(translations.terrorZone.flagsValue)}
-                        </code>
-                      </li>
-                      <li>{t(translations.terrorZone.requirements.restartAfterChanges)}</li>
-                    </ul>
-                    <a
-                      href={TERROR_ZONE_GUIDE_URL}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      onClick={handleOpenGuide}
-                      className="inline-flex items-center gap-1 text-primary underline-offset-4 hover:underline"
-                    >
-                      {t(translations.terrorZone.requirements.openGuide)}
-                      <ExternalLink className="h-3 w-3" aria-hidden="true" />
-                    </a>
-                  </AlertDescription>
-                </Alert>
-              )}
 
               {/* Validation Status */}
               {!validationStatus.valid && (
@@ -197,6 +245,17 @@ export function TerrorZoneConfiguration() {
                   </AlertTitle>
                   <AlertDescription className="space-y-2 text-destructive">
                     <p>{validationErrorMessage}</p>
+                    {showInstallationSettingsAction && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => navigate('/settings')}
+                      >
+                        <Settings aria-hidden="true" />
+                        {t(translations.terrorZone.openInstallationSettings)}
+                      </Button>
+                    )}
                     {showExtractionGuide && (
                       <div>
                         <p className="font-semibold text-sm">
@@ -265,8 +324,12 @@ export function TerrorZoneConfiguration() {
               {/* Search and Controls */}
               <div className="space-y-4">
                 <div className="flex items-center gap-2">
-                  <Search className="h-4 w-4 text-muted-foreground" />
+                  <Label htmlFor={searchInputId} className="sr-only">
+                    {t(translations.terrorZone.searchLabel)}
+                  </Label>
+                  <Search className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
                   <Input
+                    id={searchInputId}
                     placeholder={t(translations.terrorZone.searchPlaceholder)}
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
@@ -274,12 +337,25 @@ export function TerrorZoneConfiguration() {
                   />
                 </div>
 
-                <div className="flex items-center justify-between">
-                  <div className="text-muted-foreground text-sm">
-                    {t(translations.terrorZone.zonesEnabled, {
-                      enabled: enabledCount,
-                      total: totalCount,
-                    })}
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+                    <span className="text-muted-foreground">
+                      {t(translations.terrorZone.zonesEnabled, {
+                        enabled: enabledCount,
+                        total: totalCount,
+                      })}
+                    </span>
+                    {/* Stays mounted so the restart reminder is announced when it appears */}
+                    <output aria-live="polite" className="inline-flex items-center gap-1.5">
+                      {hasChangesToApply && (
+                        <>
+                          <RefreshCw className="h-4 w-4 text-warning" aria-hidden="true" />
+                          <span className="font-medium text-warning">
+                            {t(translations.terrorZone.restartPending)}
+                          </span>
+                        </>
+                      )}
+                    </output>
                   </div>
                   <div className="flex gap-2">
                     <Button
@@ -317,34 +393,28 @@ export function TerrorZoneConfiguration() {
                 </div>
               </div>
 
-              {/* Zone List */}
-              <div className="grid grid-cols-2 gap-4 lg:grid-cols-3 xl:grid-cols-4">
-                {filteredZones.map((zone) => {
-                  const isPending = isBulkSaving || pendingZoneIds.has(zone.id);
+              {/* Zone List, grouped by act */}
+              <div className="space-y-6">
+                {zoneGroups.map((group) => {
+                  const groupKey = group.act ?? 'other';
+                  const headingId = `${actHeadingIdPrefix}-${groupKey}`;
                   return (
-                    <div key={zone.id} className="flex flex-1 items-center gap-4">
-                      <Switch
-                        id={`${zoneSwitchIdPrefix}-${zone.id}`}
-                        aria-labelledby={`${zoneLabelIdPrefix}-${zone.id}`}
-                        aria-busy={isPending || undefined}
-                        checked={config[zone.id] ?? true}
-                        onCheckedChange={(checked: boolean) => toggleZone(zone.id, checked)}
-                        disabled={isPending || isRestoring || !validationStatus.valid}
-                      />
-                      <Label
-                        id={`${zoneLabelIdPrefix}-${zone.id}`}
-                        htmlFor={`${zoneSwitchIdPrefix}-${zone.id}`}
-                        className="font-medium"
-                      >
-                        {zone.name}
-                      </Label>
-                      {isPending && (
-                        <Loader2
-                          className="h-3.5 w-3.5 shrink-0 animate-spin text-muted-foreground"
-                          aria-hidden="true"
-                        />
+                    <section
+                      key={groupKey}
+                      aria-labelledby={showGroupHeadings ? headingId : undefined}
+                      className="space-y-3"
+                    >
+                      {showGroupHeadings && (
+                        <h2 id={headingId} className="font-semibold text-muted-foreground text-sm">
+                          {group.act === undefined
+                            ? t(translations.terrorZone.otherZones)
+                            : t(translations.terrorZone.actHeading, { act: group.act })}
+                        </h2>
                       )}
-                    </div>
+                      <div className="grid grid-cols-[repeat(auto-fill,minmax(16rem,1fr))] gap-4">
+                        {group.zones.map(renderZoneSwitch)}
+                      </div>
+                    </section>
                   );
                 })}
               </div>
@@ -354,11 +424,6 @@ export function TerrorZoneConfiguration() {
                   {t(translations.terrorZone.noZonesFound, { searchTerm })}
                 </div>
               )}
-
-              {/* Info Text */}
-              <div className="border-t pt-2 text-muted-foreground text-xs">
-                {t(translations.terrorZone.infoText)}
-              </div>
             </CardContent>
           </Card>
         </div>
