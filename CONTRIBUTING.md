@@ -13,13 +13,13 @@ bun install
 bun run dev       # start Vite and Electron
 ```
 
-The native modules (`better-sqlite3` and `koffi`) ship Node-API prebuilds that load in both Node (tests) and any Electron version, so no manual native rebuild or C++ toolchain is needed and `NODE_MODULE_VERSION` mismatches do not occur. The `rebuild` scripts that `bun run dev` and the test scripts still call are kept for now. For how the native modules are packaged, see [docs/RELEASE.md](docs/RELEASE.md).
+The native modules (`better-sqlite3` and `koffi`) ship Node-API prebuilds that load in both Node (tests) and any Electron version, so no manual native rebuild or C++ toolchain is needed to run, test or package the app and `NODE_MODULE_VERSION` mismatches do not occur. `bun install` may still run an implicit `node-gyp` step for `better-sqlite3`; it leaves a `build/` folder in `node_modules/better-sqlite3` without compiling a binary. If that step reports an error on a fresh machine, see the `node-gyp` prerequisites. For how the native modules are packaged, see [docs/RELEASE.md](docs/RELEASE.md).
 
 For attaching a debugger, see [docs/DEBUGGING.md](docs/DEBUGGING.md).
 
 ### Development database
 
-`grail.db` in the repo root holds sample characters and progress. To use it, restore it via **Settings → Database → Restore**, or copy it over the development database while the app is closed:
+`grail.db` in the repo root holds sample characters, grail progress and run history. It has no save folder or D2R install path set, so choose your own in Settings after loading it. To use it, restore it via **Settings → Database → Restore**, or copy it over the development database while the app is closed:
 
 | OS | Development database path |
 | --- | --- |
@@ -43,8 +43,8 @@ electron/            Main process
   database/          SQLite (better-sqlite3 + drizzle-orm)
   items/             Holy Grail item data
   config/            D2R build and memory pattern tables
-scripts/             debugging and memory-research helpers
-config/              shared build-tool config (d2s source aliases for Vite and Vitest)
+scripts/             test-item injection and memory-research helpers
+config/              shared build-tool config (import and d2s source aliases for Vite and Vitest)
 docs/                user guides, developer docs, GitHub Pages site
 ```
 
@@ -54,9 +54,8 @@ Stack: Electron 44, React 18, TypeScript, Vite, Tailwind CSS v4, shadcn/ui (Base
 
 | Command | Purpose |
 | --- | --- |
-| `bun run dev` | Run the app in development |
-| `bun run dev:debug` | Same, plus debugger setup ([DEBUGGING.md](docs/DEBUGGING.md)) |
-| `bun run typecheck` | TypeScript, renderer and main |
+| `bun run dev` | Run the app in development, with the debugger port open ([DEBUGGING.md](docs/DEBUGGING.md)) |
+| `bun run typecheck` | TypeScript for all projects (`tsc -b`): renderer and tests (`tsconfig.web.json`), main process without DOM types (`tsconfig.main.json`), build configs (`tsconfig.node.json`) |
 | `bun run lint` / `lint:fix` | Biome lint |
 | `bun run format` / `format:fix` | Biome format |
 | `bun run check` / `check:fix` | Biome lint, format and import sorting |

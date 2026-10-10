@@ -10,11 +10,8 @@
     "includes": [
       "**",
       "!**/node_modules",
-      "!**/dist",
-      "!**/release",
       "!**/.tsbuildinfo",
       "!**/*.d.ts",
-      "!desecratedzones.json",
       "!electron/database/migrations/meta"
     ]
   },
@@ -198,9 +195,6 @@
       "includes": ["**/src/**/*.tsx", "**/src/**/*.ts"],
       "linter": {
         "rules": {
-          "a11y": {
-            "recommended": true
-          },
           "correctness": {
             "useExhaustiveDependencies": "warn",
             "useHookAtTopLevel": "error"

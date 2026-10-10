@@ -24,11 +24,11 @@ Releases ship as a Windows NSIS installer on [GitHub Releases](https://github.co
 
 ## Build configuration
 
-`electron-builder.json5` defines a per-user x64 NSIS installer that lets the user change the install folder and keeps app data on uninstall. `better-sqlite3` and `@dschu012/d2s` are unpacked from the ASAR (`asarUnpack`) so their files can be loaded at runtime. The native modules (`better-sqlite3`, `koffi`) ship Node-API prebuilds that work with any Electron version, so `npmRebuild` is off and no C++ toolchain is needed to package. The icon is `build/logo.ico`.
+`electron-builder.json5` defines a per-user x64 NSIS installer that lets the user change the install folder and keeps app data on uninstall. `better-sqlite3` and `@dschu012/d2s` are unpacked from the ASAR (`asarUnpack`) so their files can be loaded at runtime. The `files` patterns ship only the Windows x64 prebuild of `better-sqlite3` and leave out its other platforms' prebuilds and its SQLite and C++ sources. The native modules (`better-sqlite3`, `koffi`) ship Node-API prebuilds that work with any Electron version, so `npmRebuild` is off and no C++ toolchain is needed to package. The icon is `build/logo.ico`.
 
 Builds aren't code-signed, so Windows SmartScreen warns on first run. The [README](../README.md#install) tells users how to get past it.
 
-If the packaged app fails with `Cannot find module 'better-sqlite3'` or cannot load its `.node` file, make sure the module is still listed in `asarUnpack` and that `node_modules/better-sqlite3/prebuilds/win32-x64.node` exists.
+If the packaged app fails with `Cannot find module 'better-sqlite3'` or cannot load its `.node` file, make sure the module is still listed in `asarUnpack`, that `node_modules/better-sqlite3/prebuilds/win32-x64.node` exists, and that the `files` exclusions don't drop it.
 
 ## Manual checks
 

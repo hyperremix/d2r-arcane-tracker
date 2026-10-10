@@ -1,0 +1,11 @@
+{
+  // Electron main process and preload, checked with the Node.js types and without the DOM types.
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.main.tsbuildinfo",
+    "lib": ["ES2020"],
+    "types": ["node"]
+  },
+  "include": ["electron"],
+  "exclude": ["electron/**/*.test.ts", "electron/test"]
+}

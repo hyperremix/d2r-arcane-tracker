@@ -1,28 +1,39 @@
 # Debugging
 
-In development (`bun run dev`), Electron exposes the Chrome DevTools Protocol on port **9222**. The scripts below find the renderer's CDP URL and write it into your editor's debug config.
+In development (`bun run dev`), Electron exposes the Chrome DevTools Protocol (CDP) on port **9222** (see `electron/main.ts`). Packaged builds don't open the port.
 
-## Setup
+## Attach from VS Code or Cursor
 
-```bash
-bun run dev:debug   # start the app, wait ~5 s, then update the debug configs
+Add this configuration to `.vscode/launch.json` (the folder is gitignored, so each contributor keeps their own copy):
+
+```json
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Attach to renderer",
+      "type": "chrome",
+      "request": "attach",
+      "port": 9222,
+      "webRoot": "${workspaceFolder}"
+    }
+  ]
+}
 ```
 
-To do it in two steps instead, run `bun run dev`, then `bun run debug:update` in a second terminal once the window is open.
+1. Run `bun run dev` and wait for the window to open.
+2. Start **Attach to renderer** from the Run and Debug view.
 
-| Script | Purpose |
-| --- | --- |
-| `bun run dev:debug` | Run `dev`, then `debug:update` |
-| `bun run debug:url` | Print the current CDP WebSocket URL |
-| `bun run debug:update` | Write the URL into Cursor and VS Code configs |
+By default the debugger attaches to every open app window (the main window, the widget, ...). To choose one window instead, add `"targetSelection": "pick"` to the configuration.
 
-`debug:update` writes to:
+The port is fixed, so the configuration keeps working across app restarts.
 
-- **VS Code**: `.vscode/launch.json` in the project.
-- **Cursor**: the browser-extension setting in Cursor's `state.vscdb` (under `User/globalStorage`; the path is picked per OS).
+## Other ways to debug
+
+- **DevTools**: press `Ctrl+Shift+I` (Windows/Linux) or `Cmd+Option+I` (macOS) in the main window. This also works in packaged builds.
+- **Chrome**: open `chrome://inspect`, add `localhost:9222` under **Configure…**, and inspect the "D2R Arcane Tracker" page.
+- **Targets**: `curl -s http://localhost:9222/json` lists the targets with their `webSocketDebuggerUrl`.
 
 ## Troubleshooting
 
-- **No CDP URL found**: the app must be running via `bun run dev`. Wait a few seconds after the window opens, and check that nothing else is using port 9222.
-- **Debugger won't attach**: restart the editor after `debug:update`, and check the URL with `bun run debug:url`. The URL changes every time the app restarts. In Cursor, make sure the browser extension is enabled.
-- **Without the scripts**: `curl -s http://localhost:9222/json` lists the targets. Use the `webSocketDebuggerUrl` of the page titled "D2R Arcane Tracker". You can also open DevTools from the app window.
+- **Debugger won't attach**: the app must be running via `bun run dev`, and nothing else may use port 9222. Wait until the window has opened before attaching.
