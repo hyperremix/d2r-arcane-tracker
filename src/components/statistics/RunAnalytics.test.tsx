@@ -1,5 +1,5 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import type { RunStatistics } from 'electron/types/grail';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import type { RunStatistics, Session } from 'electron/types/grail';
 import i18n from 'i18next';
 import { toast } from 'sonner';
 import {
@@ -12,6 +12,7 @@ import {
   type MockInstance,
   vi,
 } from 'vitest';
+import { RunBuilder } from '@/fixtures';
 import { translations } from '@/i18n/translations';
 import { RunAnalytics } from './RunAnalytics';
 
@@ -33,6 +34,8 @@ const mockStats: RunStatistics = {
 const mockElectronAPI = {
   runTracker: {
     getOverallStatistics: vi.fn(),
+    getAllSessions: vi.fn(),
+    getRunsBySession: vi.fn(),
   },
   dialog: {
     showSaveDialog: vi.fn(),
@@ -45,6 +48,21 @@ const originalElectronAPI: unknown = window.electronAPI;
 // Assign rather than redefine: other suites define `window.electronAPI` as non-configurable.
 function setElectronAPI(value: unknown) {
   (window as unknown as { electronAPI: unknown }).electronAPI = value;
+  // No sessions by default, so the run duration chart shows its empty state
+  mockElectronAPI.runTracker.getAllSessions.mockResolvedValue([]);
+}
+
+function buildSession(id: string, startTime: Date, runCount: number): Session {
+  return {
+    id,
+    startTime,
+    totalRunTime: 0,
+    totalSessionTime: 0,
+    runCount,
+    archived: false,
+    created: startTime,
+    lastUpdated: startTime,
+  };
 }
 
 async function renderAndClickExport() {
@@ -261,5 +279,115 @@ describe('When displaying run analytics', () => {
     expect(screen.getByText('3m')).toBeInTheDocument();
     expect(screen.getByText('1.50')).toBeInTheDocument();
     expect(screen.queryByText('Overall Efficiency')).not.toBeInTheDocument();
+  });
+});
+
+describe('When run analytics show their headline statistics', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    setElectronAPI(mockElectronAPI);
+    mockElectronAPI.runTracker.getOverallStatistics.mockResolvedValue(mockStats);
+  });
+
+  afterAll(() => {
+    setElectronAPI(originalElectronAPI);
+  });
+
+  it('If statistics are loaded, Then items per run is described as an average of items found', async () => {
+    // Arrange & Act
+    render(<RunAnalytics />);
+
+    // Assert
+    expect(await screen.findByText('Average items found per run')).toBeInTheDocument();
+    expect(screen.queryByText('Average efficiency')).not.toBeInTheDocument();
+  });
+
+  it('If the language changes the time units, Then the total time uses the translated units', async () => {
+    // Arrange
+    const key = translations.statistics.runAnalytics.hoursMinutes;
+    const original = i18n.t(key);
+    i18n.addResource('en', 'common', key, '{{hours}} Std. {{minutes}} Min.');
+
+    try {
+      // Act
+      render(<RunAnalytics />);
+
+      // Assert
+      expect(await screen.findByText('1 Std. 5 Min.')).toBeInTheDocument();
+    } finally {
+      i18n.addResource('en', 'common', key, original);
+    }
+  });
+});
+
+describe('When run analytics show the run durations by session', () => {
+  let consoleErrorSpy: MockInstance;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    setElectronAPI(mockElectronAPI);
+    mockElectronAPI.runTracker.getOverallStatistics.mockResolvedValue(mockStats);
+  });
+
+  afterEach(() => {
+    consoleErrorSpy.mockRestore();
+  });
+
+  afterAll(() => {
+    setElectronAPI(originalElectronAPI);
+  });
+
+  it('If sessions have completed runs, Then the chart summarizes the median trend of the most recent sessions', async () => {
+    // Arrange
+    mockElectronAPI.runTracker.getAllSessions.mockResolvedValue([
+      buildSession('newer', new Date(2026, 9, 9, 20), 2),
+      buildSession('empty', new Date(2026, 9, 10, 20), 0),
+      buildSession('older', new Date(2026, 9, 1, 20), 2),
+    ]);
+    mockElectronAPI.runTracker.getRunsBySession.mockImplementation(async (sessionId: string) =>
+      (sessionId === 'older' ? [100_000, 140_000] : [80_000, 100_000]).map((duration, index) =>
+        RunBuilder.new().withId(`${sessionId}-${index}`).withDuration(duration).build(),
+      ),
+    );
+
+    // Act
+    render(<RunAnalytics />);
+
+    // Assert
+    expect(
+      await screen.findByRole('img', {
+        name: 'Run durations of your last 2 sessions: the median run went from 2:00 in the earliest to 1:30 in the latest',
+      }),
+    ).toBeInTheDocument();
+    expect(mockElectronAPI.runTracker.getAllSessions).toHaveBeenCalledWith(false);
+    expect(mockElectronAPI.runTracker.getRunsBySession).not.toHaveBeenCalledWith('empty');
+    const table = screen.getByRole('table', { name: 'Run Durations by Session' });
+    expect(within(table).getAllByRole('row')).toHaveLength(3);
+  });
+
+  it('If no session has a completed run, Then the chart shows an empty state', async () => {
+    // Arrange
+    mockElectronAPI.runTracker.getAllSessions.mockResolvedValue([]);
+
+    // Act
+    render(<RunAnalytics />);
+
+    // Assert
+    expect(await screen.findByText('No completed runs yet')).toBeInTheDocument();
+    expect(screen.queryByRole('img')).not.toBeInTheDocument();
+  });
+
+  it('If loading the run durations fails, Then only the chart shows an error with a retry', async () => {
+    // Arrange
+    mockElectronAPI.runTracker.getAllSessions.mockRejectedValue(new Error('database locked'));
+
+    // Act
+    render(<RunAnalytics />);
+
+    // Assert
+    expect(await screen.findByText('Could not load the run durations')).toBeInTheDocument();
+    expect(screen.getByText('Total Sessions')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
   });
 });

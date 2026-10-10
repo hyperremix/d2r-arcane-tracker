@@ -79,12 +79,15 @@ export function Statistics() {
             </TabsList>
           </div>
           <TabsContent value="grail" className="m-0">
-            <div className="space-y-6 p-6">
+            <div className="p-6">
               <StatsDashboard />
             </div>
           </TabsContent>
           <TabsContent value="runs" className="m-0">
-            <RunAnalytics />
+            {/* Same padding for the loading, error, empty and loaded states, so content does not jump */}
+            <div className="p-6">
+              <RunAnalytics />
+            </div>
           </TabsContent>
         </Tabs>
       </PageShell>
