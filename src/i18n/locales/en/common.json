@@ -44,15 +44,11 @@
       "normal": "Normal",
       "moreDiscoveries": "+{{count}} more discoveries",
       "foundBy": "Found by:",
-      "allVersionsFound": "All versions found",
-      "itemFound": "Item found",
-      "someVersionsMissing": "Some versions missing",
-      "itemNotFound": "Item not found",
-      "normalCount": "Normal: {{count}}x",
       "etherealOnly": "Ethereal Only",
-      "etherealCount": "Ethereal: {{count}}x",
       "setName": "Set: {{name}}",
-      "cardLabel": "{{name}}, {{status}}"
+      "cardLabel": "{{name}}, {{status}}",
+      "versionFound": "{{version}} found",
+      "versionMissing": "{{version}} missing"
     },
     "statusIcons": {
       "recentlyFound": "Recently Found!"

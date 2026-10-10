@@ -2,6 +2,8 @@ import type { Character, GrailProgress, Item } from 'electron/types/grail';
 import { memo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { translations } from '@/i18n/translations';
+import { useGrailStore } from '@/stores/grailStore';
+import { getCardStatusLabel, getRecentFindDate, getTrackedVersionStatuses } from './cardState';
 import { GridView, type InteractiveCardProps } from './GridView';
 import { ListView } from './ListView';
 
@@ -44,7 +46,9 @@ interface ItemCardProps {
 
 /**
  * ItemCard component that displays a Holy Grail item with its discovery status and information.
- * Supports both grid and list view modes, showing progress, character attribution, and version counts.
+ * Supports both grid and list view modes. Found items light up in their quality color, missing
+ * items stay dim and neutral; when ethereal tracking applies, one pill per tracked version shows
+ * which versions are still missing.
  */
 export const ItemCard = memo(function ItemCard({
   item,
@@ -57,12 +61,23 @@ export const ItemCard = memo(function ItemCard({
   withoutStatusIndicators = false,
 }: ItemCardProps) {
   const { t } = useTranslation();
+  // Only subscribe to settings so unrelated store updates (filters, progress of other items, ...)
+  // don't re-render every card
+  const settings = useGrailStore((state) => state.settings);
 
   // Calculate discovery metadata for both normal and ethereal versions
   const { allProgress, mostRecentDiscovery } = getDiscoveryMetadata(
     normalProgress,
     etherealProgress,
   );
+  const isFound = allProgress.length > 0;
+  const versionStatuses = getTrackedVersionStatuses(
+    item,
+    settings,
+    normalProgress,
+    etherealProgress,
+  );
+  const recentFindDate = getRecentFindDate(mostRecentDiscovery);
 
   // Get character info for discoveries from both versions
   const discoveringCharacters = getDiscoveringCharacters(allProgress, characters);
@@ -98,15 +113,19 @@ export const ItemCard = memo(function ItemCard({
     spacePressedRef.current = false;
   };
 
-  // Clickable cards are focusable buttons named after the item and its found status
+  // Clickable cards are focusable buttons named after the item, the found state of each tracked
+  // version and whether it was found recently
   const interactiveProps: InteractiveCardProps | undefined = onClick
     ? {
         role: 'button',
         tabIndex: 0,
         'aria-label': t(translations.grail.itemCard.cardLabel, {
           name: item.name,
-          status: t(
-            allProgress.length > 0 ? translations.common.found : translations.common.notFound,
+          status: getCardStatusLabel(
+            isFound,
+            versionStatuses,
+            !withoutStatusIndicators && recentFindDate !== undefined,
+            t,
           ),
         }),
         onClick,
@@ -116,37 +135,20 @@ export const ItemCard = memo(function ItemCard({
       }
     : undefined;
 
-  // Render list view if viewMode is 'list'
-  if (viewMode === 'list') {
-    return (
-      <ListView
-        item={item}
-        allProgress={allProgress}
-        characters={characters}
-        normalProgress={normalProgress}
-        etherealProgress={etherealProgress}
-        discoveringCharacters={discoveringCharacters}
-        mostRecentDiscovery={mostRecentDiscovery}
-        className={className}
-        interactiveProps={interactiveProps}
-        withoutStatusIndicators={withoutStatusIndicators}
-      />
-    );
-  }
+  const View = viewMode === 'list' ? ListView : GridView;
 
-  // Default grid view
   return (
-    <GridView
+    <View
       item={item}
+      isFound={isFound}
       allProgress={allProgress}
       characters={characters}
       discoveringCharacters={discoveringCharacters}
-      normalProgress={normalProgress}
-      etherealProgress={etherealProgress}
-      mostRecentDiscovery={mostRecentDiscovery}
+      versionStatuses={versionStatuses}
+      recentFindDate={withoutStatusIndicators ? undefined : recentFindDate}
+      showItemIcons={settings.showItemIcons}
       className={className}
       interactiveProps={interactiveProps}
-      withoutStatusIndicators={withoutStatusIndicators}
     />
   );
 });

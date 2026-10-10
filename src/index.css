@@ -155,7 +155,8 @@
   --ethereal-foreground: oklch(0.985 0 0);
   /*
    * Item qualities (D2: unique gold, set green, rune orange, runeword purple, magic blue, rare yellow).
-   * Also used as item name text color, so they must stay >= 4.5:1 on card, muted and background.
+   * Also used as item name text color, so they must stay >= 4.5:1 on card, muted and background,
+   * and on their own /10 tint over card (found version pills on grail cards).
    */
   --item-unique: oklch(0.52 0.11 75);
   --item-set: oklch(0.48 0.14 145);

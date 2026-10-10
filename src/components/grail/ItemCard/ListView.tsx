@@ -1,37 +1,22 @@
-import type { Character, GrailProgress, Item } from 'electron/types/grail';
+import type { Item } from 'electron/types/grail';
+import { useTranslation } from 'react-i18next';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useItemIcon } from '@/hooks/useItemIcon';
+import { translations } from '@/i18n/translations';
 import { cn } from '@/lib/utils';
-import { useGrailStore } from '@/stores/grailStore';
-import placeholderUrl from '/images/placeholder-item.svg';
 import { RuneImages } from '../RuneImages';
-import { ItemTypeIcon } from '../StatusIcons';
+import { ItemTypeIcon, RecentDiscoveryIndicator } from '../StatusIcons';
 import { getTooltipTriggerRender } from '../tooltipTriggerRender';
-import type { InteractiveCardProps } from './GridView';
-import { ItemCategoryLabel } from './ItemCategoryLabel';
-import { DiscoveryAttribution, DiscoveryInfo, StatusIndicators, VersionCounts } from './indicators';
+import { getItemSubtitle } from './cardState';
+import type { ItemCardViewProps } from './GridView';
+import { DiscoveryAttribution, VersionPills } from './indicators';
+import { CardStatusText, handleArtworkError, ItemTooltipBody } from './shared';
 import {
   getCardStateClasses,
-  getItemQualityTextClass,
+  getItemNameClasses,
   interactiveCardStyles,
   missingArtworkStyles,
 } from './styles';
-
-/**
- * Props interface for the ListView component.
- */
-export interface ListViewProps {
-  item: Item;
-  allProgress: GrailProgress[];
-  characters: Character[];
-  normalProgress: GrailProgress[];
-  etherealProgress: GrailProgress[];
-  discoveringCharacters: Character[];
-  mostRecentDiscovery: GrailProgress | undefined;
-  className: string | undefined;
-  interactiveProps?: InteractiveCardProps;
-  withoutStatusIndicators?: boolean;
-}
 
 /**
  * Props interface for the ListArtwork component.
@@ -44,7 +29,7 @@ interface ListArtworkProps {
 }
 
 /**
- * Renders the item icon, rune images or type icon for a list row.
+ * Renders the item icon, rune images or, when item icons are off, the type icon for a list row.
  * Artwork is dimmed and grayscale while the item is missing.
  */
 function ListArtwork({ item, isFound, showItemIcons, focusableTriggers }: ListArtworkProps) {
@@ -52,17 +37,21 @@ function ListArtwork({ item, isFound, showItemIcons, focusableTriggers }: ListAr
 
   if (item.type === 'runeword' && item.runes && item.runes.length > 0) {
     return (
-      <div className="relative flex-shrink-0">
-        <div data-testid="item-artwork" className={cn(!isFound && missingArtworkStyles)}>
-          <RuneImages runeIds={item.runes} viewMode="list" focusableTriggers={focusableTriggers} />
-        </div>
-        <ItemTypeIcon type={item.type} className="absolute -right-2 -bottom-1 h-4 w-4" />
+      <div
+        data-testid="item-artwork"
+        className={cn('flex-shrink-0', !isFound && missingArtworkStyles)}
+      >
+        <RuneImages runeIds={item.runes} viewMode="list" focusableTriggers={focusableTriggers} />
       </div>
     );
   }
 
   if (!showItemIcons || item.type === 'runeword') {
-    return <ItemTypeIcon type={item.type} className="h-6 w-6 flex-shrink-0" />;
+    return (
+      <div className={cn('flex-shrink-0', !isFound && missingArtworkStyles)}>
+        <ItemTypeIcon type={item.type} className="h-6 w-6" />
+      </div>
+    );
   }
 
   return (
@@ -75,46 +64,47 @@ function ListArtwork({ item, isFound, showItemIcons, focusableTriggers }: ListAr
           src={iconUrl}
           alt={item.name}
           className={cn(isLoading && 'opacity-0', 'h-full w-full object-contain')}
-          onError={(e) => {
-            // Prevent infinite loops
-            if (e.currentTarget.src !== `${window.location.origin}${placeholderUrl}`) {
-              e.currentTarget.src = placeholderUrl;
-            }
-          }}
+          onError={handleArtworkError}
         />
       </div>
       {isLoading && <div className="absolute inset-0 animate-pulse rounded bg-muted" />}
-      <ItemTypeIcon type={item.type} className="absolute right-0 bottom-0 h-4 w-4" />
     </div>
   );
 }
 
 /**
- * ListView component that renders an item in list view mode.
+ * ListView component that renders an item in list view mode, using the same found / missing
+ * language as the grid: lit in its quality color when found, dim and neutral while missing.
  * When interactive props are provided the row is a focusable button-like element
  * that can be activated with Enter or Space.
  */
 export function ListView({
   item,
+  isFound,
   allProgress,
   characters,
-  normalProgress,
-  etherealProgress,
   discoveringCharacters,
-  mostRecentDiscovery,
+  versionStatuses,
+  recentFindDate,
+  showItemIcons,
   className,
   interactiveProps,
-  withoutStatusIndicators = false,
-}: ListViewProps) {
-  // Only subscribe to settings so unrelated store updates (filters, progress of other items, ...)
-  // don't re-render every row
-  const settings = useGrailStore((state) => state.settings);
-  const isFound = allProgress.length > 0;
+}: ItemCardViewProps) {
+  const { t } = useTranslation();
   // Tooltip triggers are only taken out of the tab order when the row itself is the focusable button.
-  // Trade-off: on clickable cards the tooltip content (name, status, character, recent find) is
+  // Trade-off: on clickable rows the tooltip content (category, characters, find dates) is
   // mouse-only by design: nested focusable elements are invalid inside a button, and keyboard and
-  // screen reader users reach the same details through the item details dialog the card opens.
+  // screen reader users reach the same details through the item details dialog the row opens.
+  // The found state, the per-version state and the recent find are part of the row's label.
   const focusableTriggers = !interactiveProps;
+  // Clickable rows are named by their aria-label and version pills carry their own status text
+  const showStatusText = !interactiveProps && versionStatuses.length === 0;
+  const subtitle = [
+    getItemSubtitle(item),
+    item.setName && t(translations.grail.itemCard.setName, { name: item.setName }),
+  ]
+    .filter(Boolean)
+    .join(' • ');
 
   return (
     <div
@@ -122,7 +112,7 @@ export function ListView({
       data-found={isFound}
       className={cn(
         'relative flex w-full items-center gap-3 p-3',
-        'rounded-lg border-2',
+        'rounded-lg border',
         getCardStateClasses(item.type, isFound, !!interactiveProps),
         interactiveProps && interactiveCardStyles,
         className,
@@ -132,46 +122,34 @@ export function ListView({
       <ListArtwork
         item={item}
         isFound={isFound}
-        showItemIcons={settings.showItemIcons}
+        showItemIcons={showItemIcons}
         focusableTriggers={focusableTriggers}
       />
 
-      {/* Status indicators */}
-      {!withoutStatusIndicators && (
-        <StatusIndicators
-          mostRecentDiscovery={mostRecentDiscovery}
-          item={item}
-          normalProgress={normalProgress}
-          etherealProgress={etherealProgress}
-          settings={settings}
-          focusableTriggers={focusableTriggers}
-        />
-      )}
-
-      {/* Item Name (quality colored, never dimmed regardless of found state) */}
-      <Tooltip>
-        <TooltipTrigger
-          render={getTooltipTriggerRender(focusableTriggers)}
-          className="block flex-1 truncate text-left"
-        >
-          <h3 className={cn('truncate font-semibold text-sm', getItemQualityTextClass(item.type))}>
-            {item.name}
-          </h3>
-        </TooltipTrigger>
-        <TooltipContent side="top" className="max-w-sm">
-          <div className="space-y-1">
-            <p className="font-semibold">
+      {/* Item Name (lit when found, muted while missing) and base item / set */}
+      <div className="min-w-0 flex-1">
+        <Tooltip>
+          <TooltipTrigger
+            render={getTooltipTriggerRender(focusableTriggers)}
+            className="block max-w-full truncate text-left"
+          >
+            <h3 className={cn('truncate text-sm', getItemNameClasses(item.type, isFound))}>
               {item.name}
-              {item.itemBase && ` • ${item.itemBase}`}
-            </p>
-            <p className="text-muted-foreground text-xs">
-              <ItemCategoryLabel item={item} />
-            </p>
+            </h3>
+          </TooltipTrigger>
+          <TooltipContent side="top" className="max-w-sm">
+            <ItemTooltipBody item={item} allProgress={allProgress} characters={characters} />
+          </TooltipContent>
+        </Tooltip>
+        {subtitle && <p className="truncate text-muted-foreground text-xs">{subtitle}</p>}
+        {showStatusText && <CardStatusText isFound={isFound} />}
+      </div>
 
-            <DiscoveryInfo allProgress={allProgress} characters={characters} />
-          </div>
-        </TooltipContent>
-      </Tooltip>
+      {/* Recent find */}
+      {recentFindDate && <RecentDiscoveryIndicator focusableTriggers={focusableTriggers} />}
+
+      {/* Found state per tracked version */}
+      <VersionPills item={item} versionStatuses={versionStatuses} className="flex-nowrap" />
 
       {/* Character attribution */}
       {allProgress.length > 0 && (
@@ -181,14 +159,6 @@ export function ListView({
           focusableTriggers={focusableTriggers}
         />
       )}
-
-      {/* Version counts */}
-      <VersionCounts
-        item={item}
-        normalProgress={normalProgress}
-        etherealProgress={etherealProgress}
-        settings={settings}
-      />
     </div>
   );
 }

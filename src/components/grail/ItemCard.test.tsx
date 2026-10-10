@@ -29,9 +29,7 @@ vi.mock('./StatusIcons', () => ({
     <span data-testid="character-icon">{characterClass}</span>
   ),
   ItemTypeIcon: ({ type }: { type: string }) => <span data-testid="item-type-icon">{type}</span>,
-  RecentDiscoveryIndicator: ({ foundDate }: { foundDate: Date }) => (
-    <span data-testid="recent-discovery-indicator">{foundDate.toISOString()}</span>
-  ),
+  RecentDiscoveryIndicator: () => <span data-testid="recent-discovery-indicator" />,
 }));
 
 // Import after mocks
@@ -87,7 +85,7 @@ describe('When ItemCard is rendered', () => {
       expect(screen.getByText('Windforce')).toBeInTheDocument();
     });
 
-    it('Then renders item type icon', () => {
+    it('Then does not render a redundant item type icon', () => {
       // Arrange
       const item = HolyGrailItemBuilder.new().withType('unique').build();
 
@@ -95,7 +93,55 @@ describe('When ItemCard is rendered', () => {
       render(<ItemCard item={item} />);
 
       // Assert
-      expect(screen.getByTestId('item-type-icon')).toBeInTheDocument();
+      expect(screen.queryByTestId('item-type-icon')).not.toBeInTheDocument();
+    });
+
+    it('Then lets long item names wrap to two lines instead of truncating them', () => {
+      // Arrange
+      const item = HolyGrailItemBuilder.new().withName("Immortal King's Stone Crusher").build();
+
+      // Act
+      render(<ItemCard item={item} />);
+
+      // Assert
+      const name = screen.getByRole('heading', { name: "Immortal King's Stone Crusher" });
+      expect(name).toHaveClass('line-clamp-2');
+      expect(name).not.toHaveClass('truncate');
+    });
+  });
+
+  describe('If the item has a base item', () => {
+    it.each([
+      'grid',
+      'list',
+    ] as const)('Then the %s card shows the base item as a subtitle', (viewMode) => {
+      // Arrange
+      const item = HolyGrailItemBuilder.new()
+        .withType('unique')
+        .withName('Harlequin Crest')
+        .withItemBase('Shako')
+        .build();
+
+      // Act
+      render(<ItemCard item={item} viewMode={viewMode} />);
+
+      // Assert
+      expect(screen.getByText('Shako')).toHaveClass('text-muted-foreground');
+    });
+
+    it('Then a rune card does not repeat its name as a subtitle', () => {
+      // Arrange
+      const item = HolyGrailItemBuilder.new()
+        .withType('rune')
+        .withName('El')
+        .withItemBase('El Rune')
+        .build();
+
+      // Act
+      render(<ItemCard item={item} />);
+
+      // Assert
+      expect(screen.queryByText('El Rune')).not.toBeInTheDocument();
     });
   });
 
@@ -172,7 +218,7 @@ describe('When ItemCard is rendered', () => {
       expect(screen.getByText('Found by:')).toBeInTheDocument();
     });
 
-    it('Then shows Normal version count badge', () => {
+    it('Then shows no version pills when only normal items are tracked', () => {
       // Arrange
       const item = HolyGrailItemBuilder.new().withId('item-1').withEtherealType('optional').build();
       const normalProgress = GrailProgressBuilder.new()
@@ -181,18 +227,67 @@ describe('When ItemCard is rendered', () => {
         .asNormal()
         .build();
 
-      setupStoreMock({ grailNormal: true });
+      setupStoreMock({ grailNormal: true, grailEthereal: false });
 
       // Act
-      render(<ItemCard item={item} normalProgress={[normalProgress]} />);
+      const { container } = render(<ItemCard item={item} normalProgress={[normalProgress]} />);
 
       // Assert
-      expect(screen.getByText(/Normal: 1x/)).toBeInTheDocument();
+      expect(container.querySelector('[data-version]')).not.toBeInTheDocument();
+      expect(screen.queryByText(/\dx/)).not.toBeInTheDocument();
+    });
+
+    it.each([
+      'grid',
+      'list',
+    ] as const)('Then the %s card shows a found Normal pill and a missing Ethereal pill when ethereal tracking applies', (viewMode) => {
+      // Arrange
+      const item = HolyGrailItemBuilder.new().withId('item-1').withEtherealType('optional').build();
+      const normalProgress = GrailProgressBuilder.new()
+        .withCharacterId('char-1')
+        .withItemId('item-1')
+        .asNormal()
+        .build();
+
+      setupStoreMock({ grailNormal: true, grailEthereal: true });
+
+      // Act
+      const { container } = render(
+        <ItemCard item={item} normalProgress={[normalProgress]} viewMode={viewMode} />,
+      );
+
+      // Assert
+      const normalPill = container.querySelector('[data-version="normal"]');
+      const etherealPill = container.querySelector('[data-version="ethereal"]');
+      expect(normalPill).toHaveAttribute('data-found', 'true');
+      expect(normalPill).toHaveClass('border-solid', 'text-item-unique');
+      expect(normalPill).toHaveTextContent('Normal found');
+      expect(etherealPill).toHaveAttribute('data-found', 'false');
+      expect(etherealPill).toHaveClass('border-dashed', 'text-muted-foreground');
+      expect(etherealPill).toHaveTextContent('Ethereal missing');
+    });
+  });
+
+  describe('If an ethereal-only item is tracked', () => {
+    it('Then shows a single missing "Ethereal Only" pill until it is found', () => {
+      // Arrange
+      const item = HolyGrailItemBuilder.new().withId('item-1').withEtherealType('only').build();
+      setupStoreMock({ grailNormal: true, grailEthereal: true });
+
+      // Act
+      const { container } = render(<ItemCard item={item} />);
+
+      // Assert
+      const pills = container.querySelectorAll('[data-version]');
+      expect(pills).toHaveLength(1);
+      expect(pills[0]).toHaveAttribute('data-version', 'ethereal');
+      expect(pills[0]).toHaveAttribute('data-found', 'false');
+      expect(screen.getByText('Ethereal Only')).toBeInTheDocument();
     });
   });
 
   describe('If item has both normal and ethereal progress', () => {
-    it('Then shows both version count badges', () => {
+    it('Then shows both version pills as found without per-character counts', () => {
       // Arrange
       const item = HolyGrailItemBuilder.new().withId('item-1').withEtherealType('optional').build();
       const normalProgress = GrailProgressBuilder.new()
@@ -220,8 +315,9 @@ describe('When ItemCard is rendered', () => {
       );
 
       // Assert
-      expect(screen.getByText(/Normal: 1x/)).toBeInTheDocument();
-      expect(screen.getByText(/Ethereal: 1x/)).toBeInTheDocument();
+      expect(screen.getByText('Normal found')).toBeInTheDocument();
+      expect(screen.getByText('Ethereal found')).toBeInTheDocument();
+      expect(screen.queryByText(/\dx/)).not.toBeInTheDocument();
     });
   });
 
@@ -288,20 +384,30 @@ describe('When ItemCard is rendered', () => {
   });
 
   describe('If withoutStatusIndicators is true', () => {
-    it('Then no StatusIndicators rendered', () => {
+    it('Then a recent find shows no "New" badge and is not announced as recent', () => {
       // Arrange
-      const item = HolyGrailItemBuilder.new().build();
+      const item = HolyGrailItemBuilder.new().withName('Quiet').build();
       const normalProgress = GrailProgressBuilder.new()
         .withCharacterId('char-1')
         .withItemId('default-item')
+        .withFoundDate(new Date())
+        .withFromInitialScan(false)
         .asNormal()
         .build();
 
       // Act
-      render(<ItemCard item={item} normalProgress={[normalProgress]} withoutStatusIndicators />);
+      render(
+        <ItemCard
+          item={item}
+          normalProgress={[normalProgress]}
+          onClick={vi.fn()}
+          withoutStatusIndicators
+        />,
+      );
 
-      // Assert — no recent discovery indicator or status icons expected
+      // Assert
       expect(screen.queryByTestId('recent-discovery-indicator')).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Quiet, Found' })).toBeInTheDocument();
     });
   });
 
@@ -549,6 +655,28 @@ describe('When ItemCard is rendered', () => {
     });
   });
 
+  describe('If the item image fails to load', () => {
+    it.each([
+      'grid',
+      'list',
+    ] as const)('Then the %s card swaps in the placeholder image once', (viewMode) => {
+      // Arrange
+      const item = HolyGrailItemBuilder.new().withName('Broken').build();
+      setupStoreMock({ showItemIcons: true });
+      render(<ItemCard item={item} viewMode={viewMode} />);
+      const image = screen.getByRole('img', { name: 'Broken' });
+
+      // Act
+      fireEvent.error(image);
+      const swappedSrc = image.getAttribute('src');
+      fireEvent.error(image);
+
+      // Assert
+      expect(swappedSrc).toBe('/mock-placeholder.png');
+      expect(image.getAttribute('src')).toBe(swappedSrc);
+    });
+  });
+
   describe('If onClick is not provided', () => {
     it('Then the card is not exposed as a focusable button', () => {
       // Arrange
@@ -564,7 +692,58 @@ describe('When ItemCard is rendered', () => {
     it.each([
       'grid',
       'list',
-    ] as const)('Then the %s card keeps item, status and character tooltip triggers keyboard focusable', (viewMode) => {
+    ] as const)('Then the %s card announces Not Found / Found to screen readers', (viewMode) => {
+      // Arrange
+      const item = HolyGrailItemBuilder.new().withId('item-1').withName('Silent').build();
+      const normalProgress = GrailProgressBuilder.new()
+        .withCharacterId('char-1')
+        .withItemId('item-1')
+        .asNormal()
+        .build();
+
+      // Act
+      const missing = render(<ItemCard item={item} viewMode={viewMode} />);
+      const missingText = screen.getByText('Not Found');
+      missing.unmount();
+      render(<ItemCard item={item} normalProgress={[normalProgress]} viewMode={viewMode} />);
+
+      // Assert
+      expect(missingText).toHaveClass('sr-only');
+      expect(screen.getByText('Found')).toHaveClass('sr-only');
+    });
+
+    it.each([
+      'grid',
+      'list',
+    ] as const)('Then the %s card does not repeat the status when version pills carry it', (viewMode) => {
+      // Arrange
+      const item = HolyGrailItemBuilder.new().withId('item-1').withEtherealType('optional').build();
+      setupStoreMock({ grailNormal: true, grailEthereal: true });
+
+      // Act
+      render(<ItemCard item={item} viewMode={viewMode} />);
+
+      // Assert
+      expect(screen.queryByText('Not Found')).not.toBeInTheDocument();
+      expect(screen.getByText('Normal missing')).toHaveClass('sr-only');
+    });
+
+    it('Then a clickable card relies on its accessible name instead of extra status text', () => {
+      // Arrange
+      const item = HolyGrailItemBuilder.new().withName('Named').build();
+
+      // Act
+      render(<ItemCard item={item} onClick={vi.fn()} />);
+
+      // Assert
+      expect(screen.queryByText('Not Found')).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Named, Not Found' })).toBeInTheDocument();
+    });
+
+    it.each([
+      'grid',
+      'list',
+    ] as const)('Then the %s card keeps item and character tooltip triggers keyboard focusable', (viewMode) => {
       // Arrange
       const item = HolyGrailItemBuilder.new().withId('item-1').withName('Static').build();
       const normalProgress = GrailProgressBuilder.new()
@@ -590,7 +769,7 @@ describe('When ItemCard is rendered', () => {
         container.querySelectorAll('[data-slot="tooltip-trigger"]'),
         (trigger) => trigger.tagName,
       );
-      expect(triggerTagNames).toEqual(['BUTTON', 'BUTTON', 'BUTTON']);
+      expect(triggerTagNames).toEqual(['BUTTON', 'BUTTON']);
     });
 
     it('Then rune tooltip triggers stay focusable on a runeword card', () => {
@@ -613,7 +792,7 @@ describe('When ItemCard is rendered', () => {
     it.each([
       'grid',
       'list',
-    ] as const)('Then the %s card does not dim the item name with opacity', (viewMode) => {
+    ] as const)('Then the %s card shows a muted, neutral name without dimming it with opacity', (viewMode) => {
       // Arrange
       const item = HolyGrailItemBuilder.new().withType('unique').withName('Missing Item').build();
 
@@ -627,7 +806,8 @@ describe('When ItemCard is rendered', () => {
         if (/(^|\s)opacity-\d+/.test(element.className)) ancestorsWithOpacity.push(element);
       }
       expect(ancestorsWithOpacity).toHaveLength(0);
-      expect(name).toHaveClass('text-item-unique');
+      expect(name).toHaveClass('text-muted-foreground');
+      expect(name).not.toHaveClass('text-item-unique');
     });
 
     it.each([
@@ -642,28 +822,49 @@ describe('When ItemCard is rendered', () => {
       render(<ItemCard item={item} viewMode={viewMode} />);
 
       // Assert
-      expect(screen.getByTestId('item-artwork')).toHaveClass('grayscale', 'opacity-50');
+      expect(screen.getByTestId('item-artwork')).toHaveClass('grayscale', 'opacity-40');
     });
 
-    it('Then the card uses a neutral muted surface with a dashed type border', () => {
+    it.each([
+      'grid',
+      'list',
+    ] as const)('Then the %s card uses a neutral border and muted surface without any quality color', (viewMode) => {
       // Arrange
-      const item = HolyGrailItemBuilder.new().withType('unique').withName('Dashed').build();
+      const item = HolyGrailItemBuilder.new().withType('unique').withName('Neutral').build();
 
       // Act
-      render(<ItemCard item={item} onClick={vi.fn()} />);
+      render(<ItemCard item={item} onClick={vi.fn()} viewMode={viewMode} />);
 
       // Assert
-      const surface = screen
-        .getByRole('button', { name: 'Dashed, Not Found' })
-        .querySelector('[data-found]');
+      const card = screen.getByRole('button', { name: 'Neutral, Not Found' });
+      const surface = viewMode === 'grid' ? card.querySelector('[data-found]') : card;
       expect(surface).toHaveAttribute('data-found', 'false');
-      expect(surface).toHaveClass('border-dashed', 'bg-muted/40');
-      expect(surface?.className).not.toMatch(/bg-yellow/);
+      expect(surface).toHaveClass('border-border', 'bg-muted/40');
+      expect(surface?.className).not.toMatch(/item-unique/);
+    });
+
+    it('Then the set name is muted rather than set-colored', () => {
+      // Arrange
+      const item = HolyGrailItemBuilder.new()
+        .withType('set')
+        .withSetName("Tal Rasha's Wrappings")
+        .build();
+
+      // Act
+      render(<ItemCard item={item} />);
+
+      // Assert
+      const setName = screen.getByText("Set: Tal Rasha's Wrappings");
+      expect(setName).toHaveClass('text-muted-foreground');
+      expect(setName).not.toHaveClass('text-item-set');
     });
   });
 
   describe('If item is found', () => {
-    it('Then the card uses a solid type border on a neutral card surface with colored artwork', () => {
+    it.each([
+      'grid',
+      'list',
+    ] as const)('Then the %s card is lit with a quality border, a quality-colored name and colored artwork', (viewMode) => {
       // Arrange
       setupStoreMock({ showItemIcons: true });
       const item = HolyGrailItemBuilder.new()
@@ -678,19 +879,29 @@ describe('When ItemCard is rendered', () => {
         .build();
 
       // Act
-      render(<ItemCard item={item} normalProgress={[normalProgress]} onClick={vi.fn()} />);
+      render(
+        <ItemCard
+          item={item}
+          normalProgress={[normalProgress]}
+          onClick={vi.fn()}
+          viewMode={viewMode}
+        />,
+      );
 
       // Assert
-      const surface = screen
-        .getByRole('button', { name: 'Found Item, Found' })
-        .querySelector('[data-found]');
+      const card = screen.getByRole('button', { name: 'Found Item, Found' });
+      const surface = viewMode === 'grid' ? card.querySelector('[data-found]') : card;
       expect(surface).toHaveAttribute('data-found', 'true');
-      expect(surface).toHaveClass('border-solid', 'bg-card', 'border-item-unique');
+      expect(surface).toHaveClass('bg-card', 'border-item-unique/60');
+      expect(screen.getByRole('heading', { name: 'Found Item' })).toHaveClass(
+        'text-item-unique',
+        'font-semibold',
+      );
       expect(screen.getByTestId('item-artwork')).not.toHaveClass('grayscale');
     });
   });
 
-  describe('If the item has a quality type', () => {
+  describe('If the item has a quality type and is found', () => {
     it.each([
       ['grid', 'unique', 'text-item-unique'],
       ['grid', 'set', 'text-item-set'],
@@ -702,18 +913,25 @@ describe('When ItemCard is rendered', () => {
       ['list', 'runeword', 'text-item-runeword'],
     ] as const)('Then the %s card colors a %s item name with %s', (viewMode, type, expected) => {
       // Arrange
-      const item = HolyGrailItemBuilder.new().withType(type).withName('Quality Item').build();
+      const item = HolyGrailItemBuilder.new()
+        .withId('item-1')
+        .withType(type)
+        .withName('Quality Item')
+        .build();
+      const normalProgress = GrailProgressBuilder.new().withItemId('item-1').asNormal().build();
 
       // Act
-      render(<ItemCard item={item} viewMode={viewMode} />);
+      render(<ItemCard item={item} normalProgress={[normalProgress]} viewMode={viewMode} />);
 
       // Assert
       const name = screen.getByRole('heading', { name: 'Quality Item' });
       expect(name).toHaveClass(expected);
       expect(name).not.toHaveClass('text-foreground');
     });
+  });
 
-    it('Then the grid card does not scale on hover, so it never overlaps its gutters', () => {
+  describe('If the card is hovered', () => {
+    it('Then the grid card does not scale or show a colored ring, so it never overlaps its gutters', () => {
       // Arrange
       const item = HolyGrailItemBuilder.new().withType('unique').withName('Steady').build();
 
@@ -725,13 +943,13 @@ describe('When ItemCard is rendered', () => {
       const surface = card.querySelector('[data-found]');
       expect(card.className).not.toMatch(/scale-/);
       expect(surface?.className).not.toMatch(/scale-/);
-      expect(surface).toHaveClass('hover:ring-item-unique/40');
+      expect(surface?.className).not.toMatch(/hover:ring/);
     });
 
     it.each([
       'grid',
       'list',
-    ] as const)('Then the non-clickable %s card has no hover ring or shadow, so it does not look interactive', (viewMode) => {
+    ] as const)('Then the non-clickable %s card has no hover styles, so it does not look interactive', (viewMode) => {
       // Arrange
       const item = HolyGrailItemBuilder.new().withType('unique').withName('Static').build();
 
@@ -749,18 +967,61 @@ describe('When ItemCard is rendered', () => {
     it.each([
       'grid',
       'list',
-    ] as const)('Then the clickable %s card keeps its hover ring and focus styling', (viewMode) => {
+    ] as const)('Then the clickable found %s card strengthens its quality border and keeps its focus styling', (viewMode) => {
       // Arrange
-      const item = HolyGrailItemBuilder.new().withType('unique').withName('Clickable').build();
+      const item = HolyGrailItemBuilder.new()
+        .withId('item-1')
+        .withType('unique')
+        .withName('Clickable')
+        .build();
+      const normalProgress = GrailProgressBuilder.new().withItemId('item-1').asNormal().build();
 
       // Act
-      render(<ItemCard item={item} viewMode={viewMode} onClick={vi.fn()} />);
+      render(
+        <ItemCard
+          item={item}
+          normalProgress={[normalProgress]}
+          viewMode={viewMode}
+          onClick={vi.fn()}
+        />,
+      );
 
       // Assert
-      const card = screen.getByRole('button', { name: 'Clickable, Not Found' });
+      const card = screen.getByRole('button', { name: 'Clickable, Found' });
       const surface = viewMode === 'grid' ? card.querySelector('[data-found]') : card;
-      expect(surface).toHaveClass('hover:ring-2', 'hover:ring-item-unique/40');
+      expect(surface).toHaveClass('hover:border-item-unique', 'hover:shadow-md');
       expect(card).toHaveClass('cursor-pointer', 'focus-visible:ring-[3px]');
+    });
+  });
+
+  describe('If the card is clickable and ethereal tracking applies', () => {
+    it.each([
+      'grid',
+      'list',
+    ] as const)('Then the %s card label names the status of every tracked version', (viewMode) => {
+      // Arrange
+      const item = HolyGrailItemBuilder.new()
+        .withId('item-1')
+        .withName('Labeled')
+        .withEtherealType('optional')
+        .build();
+      const normalProgress = GrailProgressBuilder.new().withItemId('item-1').asNormal().build();
+      setupStoreMock({ grailNormal: true, grailEthereal: true });
+
+      // Act
+      render(
+        <ItemCard
+          item={item}
+          normalProgress={[normalProgress]}
+          onClick={vi.fn()}
+          viewMode={viewMode}
+        />,
+      );
+
+      // Assert
+      expect(
+        screen.getByRole('button', { name: 'Labeled, Normal found, Ethereal missing' }),
+      ).toBeInTheDocument();
     });
   });
 
@@ -789,7 +1050,7 @@ describe('When ItemCard is rendered', () => {
   });
 
   describe('If > 3 progress records', () => {
-    it('Then version count badge shows correct count', () => {
+    it('Then the found pill shows no misleading copy count', () => {
       // Arrange
       const item = HolyGrailItemBuilder.new().withId('item-1').withEtherealType('optional').build();
       const character = CharacterBuilder.new().withId('char-1').withName('Sorc').build();
@@ -802,18 +1063,28 @@ describe('When ItemCard is rendered', () => {
           .build(),
       );
 
-      setupStoreMock({ grailNormal: true });
+      setupStoreMock({ grailNormal: true, grailEthereal: true });
 
       // Act
-      render(<ItemCard item={item} normalProgress={progressRecords} characters={[character]} />);
+      const { container } = render(
+        <ItemCard item={item} normalProgress={progressRecords} characters={[character]} />,
+      );
 
-      // Assert — shows the correct number of normal versions found
-      expect(screen.getByText(/Normal: 4x/)).toBeInTheDocument();
+      // Assert
+      expect(container.querySelector('[data-version="normal"]')).toHaveAttribute(
+        'data-found',
+        'true',
+      );
+      expect(screen.queryByText(/4x/)).not.toBeInTheDocument();
+      expect(screen.getAllByTestId('character-icon')).toHaveLength(1);
     });
   });
 
   describe('If recent find (not initial scan)', () => {
-    it('Then renders RecentDiscoveryIndicator', () => {
+    it.each([
+      'grid',
+      'list',
+    ] as const)('Then the %s card renders the "New" indicator', (viewMode) => {
       // Arrange
       const item = HolyGrailItemBuilder.new().withId('item-1').build();
       const recentDate = new Date(); // Now is always "recent"
@@ -827,10 +1098,43 @@ describe('When ItemCard is rendered', () => {
         .build();
 
       // Act
-      render(<ItemCard item={item} normalProgress={[normalProgress]} />);
+      render(<ItemCard item={item} normalProgress={[normalProgress]} viewMode={viewMode} />);
 
       // Assert
       expect(screen.getByTestId('recent-discovery-indicator')).toBeInTheDocument();
+    });
+
+    it('Then the partial version state stays visible and both are part of the card label', () => {
+      // Arrange
+      const item = HolyGrailItemBuilder.new()
+        .withId('item-1')
+        .withName('Fresh')
+        .withEtherealType('optional')
+        .build();
+      const normalProgress = GrailProgressBuilder.new()
+        .withItemId('item-1')
+        .withFoundDate(new Date())
+        .withFromInitialScan(false)
+        .asNormal()
+        .build();
+      setupStoreMock({ grailNormal: true, grailEthereal: true });
+
+      // Act
+      const { container } = render(
+        <ItemCard item={item} normalProgress={[normalProgress]} onClick={vi.fn()} />,
+      );
+
+      // Assert
+      expect(screen.getByTestId('recent-discovery-indicator')).toBeInTheDocument();
+      expect(container.querySelector('[data-version="ethereal"]')).toHaveAttribute(
+        'data-found',
+        'false',
+      );
+      expect(
+        screen.getByRole('button', {
+          name: 'Fresh, Normal found, Ethereal missing, Recently Found!',
+        }),
+      ).toBeInTheDocument();
     });
   });
 
