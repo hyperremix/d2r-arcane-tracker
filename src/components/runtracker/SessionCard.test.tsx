@@ -103,6 +103,32 @@ describe('SessionCard', () => {
       });
     });
 
+    it('If a run starts while the confirmation is open, Then confirming does not archive the session', async () => {
+      // Arrange
+      const { rerender } = render(<SessionCard session={mockSession} />);
+      fireEvent.click(screen.getByRole('button', { name: 'Archive Session' }));
+      const dialog = await screen.findByRole('alertdialog');
+      const activeRun: Run = {
+        id: 'run-1',
+        sessionId: 'session-1',
+        runNumber: 1,
+        startTime: new Date('2024-01-01T10:10:00Z'),
+        created: new Date('2024-01-01T10:10:00Z'),
+        lastUpdated: new Date('2024-01-01T10:10:00Z'),
+      };
+      mockStoreState(mockUseRunTrackerStore, createStoreState({ activeRun }));
+      rerender(<SessionCard session={mockSession} />);
+
+      // Act
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Archive' }));
+
+      // Assert
+      await waitFor(() => {
+        expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+      });
+      expect(mockArchiveSession).not.toHaveBeenCalled();
+    });
+
     it('If the confirmation is cancelled, Then the session is not archived', async () => {
       // Arrange
       render(<SessionCard session={mockSession} />);

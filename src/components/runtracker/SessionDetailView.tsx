@@ -333,7 +333,7 @@ export function SessionDetailView({ sessionId, onBack }: SessionDetailViewProps)
                 className="flex-1"
               >
                 {isArchiving ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
                 ) : (
                   <Archive className="mr-2 h-4 w-4" />
                 )}

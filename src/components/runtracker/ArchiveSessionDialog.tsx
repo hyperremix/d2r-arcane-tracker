@@ -43,7 +43,7 @@ export function ArchiveSessionDialog({
         <AlertDialogFooter>
           <AlertDialogCancel disabled={pending}>{t(translations.common.cancel)}</AlertDialogCancel>
           <AlertDialogAction variant="destructive" onClick={onConfirm} disabled={pending}>
-            {pending && <Loader2 className="h-4 w-4 animate-spin" />}
+            {pending && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
             {pending
               ? t(translations.runTracker.archiveDialog.archiving)
               : t(translations.runTracker.archiveDialog.confirm)}

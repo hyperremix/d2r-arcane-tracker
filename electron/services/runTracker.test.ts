@@ -455,6 +455,64 @@ describe('When RunTrackerService is instantiated', () => {
       // Assert
       expect(mockDatabase.archiveSession).toHaveBeenCalledWith(sessionId);
     });
+
+    it('If the session has a run in progress, Then it refuses to archive it', () => {
+      // Arrange
+      const session = service.startSession();
+      service.startRun();
+      vi.clearAllMocks();
+
+      // Act
+      const archive = () => service.archiveSession(session.id);
+
+      // Assert
+      expect(archive).toThrow('Cannot archive a session while one of its runs is in progress');
+      expect(mockDatabase.archiveSession).not.toHaveBeenCalled();
+    });
+
+    it('If the run in progress is paused, Then it still refuses to archive the session', () => {
+      // Arrange
+      const session = service.startSession();
+      service.startRun();
+      service.pauseRun();
+      vi.clearAllMocks();
+
+      // Act
+      const archive = () => service.archiveSession(session.id);
+
+      // Assert
+      expect(archive).toThrow('Cannot archive a session while one of its runs is in progress');
+      expect(mockDatabase.archiveSession).not.toHaveBeenCalled();
+    });
+
+    it('If another session than the one with the run is archived, Then it is archived', () => {
+      // Arrange
+      service.startSession();
+      service.startRun();
+      vi.clearAllMocks();
+
+      // Act
+      service.archiveSession('session-old');
+
+      // Assert
+      expect(mockDatabase.archiveSession).toHaveBeenCalledWith('session-old');
+    });
+
+    it('If the active session is archived between runs, Then later saves keep it archived', () => {
+      // Arrange
+      const session = service.startSession();
+      vi.clearAllMocks();
+
+      // Act
+      service.archiveSession(session.id);
+      service.startRun();
+
+      // Assert
+      expect(mockDatabase.archiveSession).toHaveBeenCalledWith(session.id);
+      expect(mockDatabase.upsertSession).toHaveBeenLastCalledWith(
+        expect.objectContaining({ id: session.id, archived: true }),
+      );
+    });
   });
 
   describe('When the notes of the active session are updated', () => {
@@ -535,6 +593,7 @@ describe('When the auto mode setting changes while the app runs', () => {
     startPolling: ReturnType<typeof vi.fn>;
     stopPolling: ReturnType<typeof vi.fn>;
     updatePollingInterval: ReturnType<typeof vi.fn>;
+    isOffsetsValid: ReturnType<typeof vi.fn>;
   };
   let service: RunTrackerService;
 
@@ -543,7 +602,12 @@ describe('When the auto mode setting changes while the app runs', () => {
     Object.defineProperty(process, 'platform', { value: 'win32' });
     settings = { runTrackerMemoryReading: false, runTrackerMemoryPollingInterval: 500 };
     eventBus = new EventBus();
-    memoryReader = { startPolling: vi.fn(), stopPolling: vi.fn(), updatePollingInterval: vi.fn() };
+    memoryReader = {
+      startPolling: vi.fn(),
+      stopPolling: vi.fn(),
+      updatePollingInterval: vi.fn(),
+      isOffsetsValid: vi.fn(() => true),
+    };
     const database = {
       getAllSettings: vi.fn(() => settings),
       getActiveSession: vi.fn(() => null),
@@ -584,7 +648,7 @@ describe('When the auto mode setting changes while the app runs', () => {
     expect(memoryReader.stopPolling).toHaveBeenCalledTimes(1);
   });
 
-  it('If auto mode is turned on while a run is paused, Then the run is resumed', () => {
+  it('If auto mode is turned on while a run is paused and memory reading is available, Then the run is resumed', () => {
     // Arrange
     service.startSession();
     service.startRun(undefined, true);
@@ -599,6 +663,39 @@ describe('When the auto mode setting changes while the app runs', () => {
     // Assert
     expect(service.getState().isPaused).toBe(false);
     expect(resumed).toHaveBeenCalledTimes(1);
+  });
+
+  it('If auto mode is turned on while a run is paused and memory reading is unavailable, Then the run stays paused', () => {
+    // Arrange: the controls stay visible in this case, so the user can resume the run themselves
+    memoryReader.isOffsetsValid.mockReturnValue(false);
+    service.startSession();
+    service.startRun(undefined, true);
+    service.pauseRun();
+
+    // Act
+    settings = { ...settings, runTrackerMemoryReading: true };
+    eventBus.emit('settings-updated', { runTrackerMemoryReading: true });
+
+    // Assert
+    expect(service.getState().isPaused).toBe(true);
+  });
+
+  it('If memory reading becomes available while auto mode is on and a run is paused, Then the next game event resumes the run', () => {
+    // Arrange
+    memoryReader.isOffsetsValid.mockReturnValue(false);
+    service.startSession();
+    service.startRun(undefined, true);
+    service.pauseRun();
+    settings = { ...settings, runTrackerMemoryReading: true };
+    eventBus.emit('settings-updated', { runTrackerMemoryReading: true });
+    memoryReader.isOffsetsValid.mockReturnValue(true);
+
+    // Act
+    eventBus.emit('game-exited', {});
+
+    // Assert
+    expect(service.getState().isPaused).toBe(false);
+    expect(service.getActiveRun()).toBeNull();
   });
 
   it('If an unrelated setting changes, Then memory reading is left alone', () => {

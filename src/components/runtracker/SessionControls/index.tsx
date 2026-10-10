@@ -66,7 +66,10 @@ function _hasRunsInSession(
  * @returns The elapsed time in milliseconds, or undefined without a run
  */
 function useRunElapsed(activeRun: Run | null, isPaused: boolean): number | undefined {
-  const now = useNow(Boolean(activeRun) && !isPaused);
+  const isTicking = Boolean(activeRun) && !isPaused;
+  // Re-renders the timer every second; its value can be stale on the render that follows a resume
+  const tickedNow = useNow(isTicking);
+  const now = isTicking ? Math.max(tickedNow, Date.now()) : tickedNow;
   return activeRun ? getRunElapsedMs(activeRun, now) : undefined;
 }
 

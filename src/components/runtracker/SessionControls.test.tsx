@@ -223,6 +223,48 @@ describe('SessionControls', () => {
       }
     });
 
+    it('When a paused run is resumed, Then the timer never shows a stale value before the next tick', () => {
+      // Arrange
+      vi.useFakeTimers({ toFake: ['Date'] });
+      vi.setSystemTime(new Date('2024-01-01T00:12:34Z'));
+      mockStoreState(mockUseRunTrackerStore, {
+        ...defaultStoreState,
+        activeSession: mockSession,
+        activeRun: { ...mockRun, pausedAt: new Date('2024-01-01T00:02:05Z') },
+        isPaused: true,
+      });
+      const { container, rerender } = render(<SessionControls />);
+      const observer = new MutationObserver(() => undefined);
+      observer.observe(container, {
+        childList: true,
+        subtree: true,
+        characterData: true,
+        characterDataOldValue: true,
+      });
+
+      try {
+        // Act: the run is resumed 17:55 after it was paused, long after the last render
+        vi.setSystemTime(new Date('2024-01-01T00:20:00Z'));
+        mockStoreState(mockUseRunTrackerStore, {
+          ...defaultStoreState,
+          activeSession: mockSession,
+          activeRun: { ...mockRun, pausedAt: undefined, pausedDuration: 17 * 60_000 + 55_000 },
+          isPaused: false,
+        });
+        rerender(<SessionControls />);
+
+        // Assert: no intermediate render showed the elapsed time computed from the old clock
+        // (a changed text node reports the value it replaced)
+        const replacedTexts = observer.takeRecords().map((record) => record.oldValue);
+        expect(replacedTexts).not.toContain('2:05');
+        expect(replacedTexts).not.toContain('0:00');
+        expect(screen.getByText('2:05')).toBeInTheDocument();
+      } finally {
+        observer.disconnect();
+        vi.useRealTimers();
+      }
+    });
+
     it('When a run is active, Then the large timer shows its elapsed time outside the live region', () => {
       // Arrange
       vi.useFakeTimers({ toFake: ['Date'] });

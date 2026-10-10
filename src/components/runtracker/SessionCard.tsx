@@ -137,6 +137,11 @@ export function SessionCard({ session, onViewAllRuns }: SessionCardProps) {
   // Button handlers
   const handleArchiveSession = useCallback(async () => {
     if (!currentSession) return;
+    // A run may have started while the confirmation was open; the archive button is disabled then
+    if (hasActiveRun) {
+      setShowArchiveDialog(false);
+      return;
+    }
     try {
       await archiveSession(currentSession.id);
     } catch (error) {
@@ -144,7 +149,7 @@ export function SessionCard({ session, onViewAllRuns }: SessionCardProps) {
     } finally {
       setShowArchiveDialog(false);
     }
-  }, [archiveSession, currentSession]);
+  }, [archiveSession, currentSession, hasActiveRun]);
 
   const handleExportClick = useCallback(() => {
     if (currentSession) {

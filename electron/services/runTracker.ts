@@ -144,12 +144,7 @@ export class RunTrackerService {
       this.memoryReader.startPolling();
     }
 
-    // Runs can only be paused and resumed manually, so a run paused before auto mode was turned on
-    // would never be resumed and would keep auto-detection suppressed
-    if (this.autoModeEnabled && !wasAutoModeEnabled && this.isPaused()) {
-      log.info('updateSettings', 'Auto mode enabled, resuming paused run');
-      this.resumeRun();
-    }
+    this.resumePausedRunForAutoTracking();
 
     // If auto mode was just disabled, stop memory reading
     if (!this.autoModeEnabled && wasAutoModeEnabled && this.memoryReader) {
@@ -159,10 +154,26 @@ export class RunTrackerService {
   }
 
   /**
+   * Resumes a paused run once runs are tracked automatically, which needs auto mode and working
+   * memory reading. Runs can only be paused and resumed manually, and the run controls stay
+   * visible while memory reading is unavailable, so a run paused before that point is left alone.
+   * @private
+   */
+  private resumePausedRunForAutoTracking(): void {
+    if (this.autoModeEnabled && this.isPaused() && this.isMemoryReadingAvailable()) {
+      log.info('resumePausedRunForAutoTracking', 'Runs are tracked automatically, resuming run');
+      this.resumeRun();
+    }
+  }
+
+  /**
    * Handles game-entered event from memory reader.
    * Starts a new run when player enters a game (auto mode only).
    */
   handleGameEntered(characterId?: string): void {
+    // A game event means memory reading works, so a run paused while it was unavailable is resumed
+    this.resumePausedRunForAutoTracking();
+
     // Skip if paused or auto mode not enabled
     if (this.isPaused() || !this.autoModeEnabled) {
       return;
@@ -202,6 +213,8 @@ export class RunTrackerService {
    * Ends the current run when player exits a game.
    */
   handleGameExited(_characterId?: string): void {
+    this.resumePausedRunForAutoTracking();
+
     // Skip if paused
     if (this.isPaused()) {
       return;
@@ -278,9 +291,19 @@ export class RunTrackerService {
 
   /**
    * Archives a session.
+   * @throws If a run of the session is in progress
    */
   archiveSession(sessionId: string): void {
+    // The session of the run in progress keeps being updated, so it can only be archived between runs
+    if (this.currentRun?.sessionId === sessionId) {
+      throw new Error('Cannot archive a session while one of its runs is in progress');
+    }
+
     this.database.archiveSession(sessionId);
+    // Keep the in-memory session in step, otherwise its next save would clear the archived flag
+    if (this.currentSession?.id === sessionId) {
+      this.currentSession = { ...this.currentSession, archived: true };
+    }
     log.info('archiveSession', `Session archived: ${sessionId}`);
   }
 
