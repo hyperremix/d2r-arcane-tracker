@@ -563,3 +563,158 @@ describe('When local ISO dates are formatted and parsed', () => {
     expect(Number.isNaN(parseLocalIsoDate('not a date').getTime())).toBe(true);
   });
 });
+
+describe('When day counts cross a daylight-saving transition', () => {
+  // America/New_York in 2024: clocks jump forward on Mar 10 at 07:00 UTC and back on Nov 3 at 06:00 UTC.
+  // The runner's own time zone is not switchable inside a vitest worker, so the zone's UTC offset is
+  // simulated on top of absolute instants, which keeps these tests independent of the machine's zone.
+  const SPRING_FORWARD_UTC = Date.UTC(2024, 2, 10, 7);
+  const FALL_BACK_UTC = Date.UTC(2024, 10, 3, 6);
+
+  // Captured before fake timers replace the global Date, so dates created in any phase share it.
+  const nativeDatePrototype = Date.prototype;
+
+  function simulateNewYorkOffset() {
+    return vi.spyOn(nativeDatePrototype, 'getTimezoneOffset').mockImplementation(function (
+      this: Date,
+    ) {
+      const time = this.getTime();
+      const isDaylightTime = time >= SPRING_FORWARD_UTC && time < FALL_BACK_UTC;
+      return isDaylightTime ? 240 : 300;
+    });
+  }
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    simulateNewYorkOffset();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.useRealTimers();
+  });
+
+  // Local noon, 7 calendar days apart, but only 167 hours of elapsed time (the day in between is 23h long).
+  const foundBeforeSpringForward = new Date(Date.UTC(2024, 2, 5, 17)); // Mar 5 12:00 EST
+  const nowAfterSpringForward = new Date(Date.UTC(2024, 2, 12, 16)); // Mar 12 12:00 EDT
+
+  // Local 13:00 to local 12:00 a week later: 168 hours of elapsed time, but only 6 calendar days and 23 hours.
+  const foundBeforeFallBack = new Date(Date.UTC(2024, 9, 29, 17)); // Oct 29 13:00 EDT
+  const nowAfterFallBack = new Date(Date.UTC(2024, 10, 5, 17)); // Nov 5 12:00 EST
+
+  it('If a find is 7 calendar days old across spring-forward, Then it is not recent (167 elapsed hours)', () => {
+    // Arrange
+    vi.setSystemTime(nowAfterSpringForward);
+
+    // Act
+    const result = isRecentFind(foundBeforeSpringForward);
+
+    // Assert
+    expect(result).toBe(false);
+  });
+
+  it('If a find is 6 calendar days old across spring-forward, Then it is still recent', () => {
+    // Arrange
+    vi.setSystemTime(nowAfterSpringForward);
+    const found = new Date(Date.UTC(2024, 2, 6, 17)); // Mar 6 12:00 EST
+
+    // Act
+    const result = isRecentFind(found);
+
+    // Assert
+    expect(result).toBe(true);
+  });
+
+  it('If a find is under 7 calendar days old across fall-back (168 elapsed hours), Then it is recent', () => {
+    // Arrange
+    vi.setSystemTime(nowAfterFallBack);
+
+    // Act
+    const result = isRecentFind(foundBeforeFallBack);
+
+    // Assert
+    expect(result).toBe(true);
+  });
+
+  it('If a find is 7 calendar days old across fall-back, Then it is not recent', () => {
+    // Arrange
+    vi.setSystemTime(nowAfterFallBack);
+    const found = new Date(Date.UTC(2024, 9, 29, 16)); // Oct 29 12:00 EDT
+
+    // Act
+    const result = isRecentFind(found);
+
+    // Assert
+    expect(result).toBe(false);
+  });
+
+  it('If a session is 7 calendar days old across spring-forward, Then the full date is shown instead of a relative time', () => {
+    // Arrange
+    vi.setSystemTime(nowAfterSpringForward);
+
+    // Act
+    const result = formatSessionDateRelative(foundBeforeSpringForward, i18n.t, 'en');
+
+    // Assert
+    expect(result).toBe(formatLocalizedDate(foundBeforeSpringForward, 'en', { dateStyle: 'full' }));
+  });
+
+  it('If a session is under 7 calendar days old across fall-back, Then a relative time is shown', () => {
+    // Arrange
+    vi.setSystemTime(nowAfterFallBack);
+
+    // Act
+    const result = formatSessionDateRelative(foundBeforeFallBack, i18n.t, 'en');
+
+    // Assert
+    expect(result).toBe(formatTimeAgo(foundBeforeFallBack, i18n.t, 'en'));
+  });
+});
+
+describe('When a date-only (YYYY-MM-DD) string is formatted or compared', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2024, 0, 15, 12));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('If it is formatted, Then it is read as local midnight rather than UTC midnight', () => {
+    // Arrange
+    const options: Intl.DateTimeFormatOptions = {
+      hour: '2-digit',
+      minute: '2-digit',
+      hourCycle: 'h23',
+    };
+
+    // Act
+    const result = formatLocalizedDate('2024-01-15', 'en', options);
+
+    // Assert
+    expect(result).toBe('00:00');
+  });
+
+  it('If it is today, Then the session is shown as "Today"', () => {
+    // Arrange & Act
+    const result = formatSessionDateRelative('2024-01-15', i18n.t, 'en');
+
+    // Assert
+    expect(result).toBe('Today');
+  });
+
+  it('If it is 7 days ago, Then the find is not recent', () => {
+    expect(isRecentFind('2024-01-08')).toBe(false);
+  });
+
+  it('If it is 6 days ago, Then the find is recent', () => {
+    expect(isRecentFind('2024-01-09')).toBe(true);
+  });
+
+  it('If it is a full timestamp, Then it is still parsed as an instant', () => {
+    expect(formatLocalizedDate('2024-01-15T00:00:00Z', 'en', { timeStyle: 'short' })).toBe(
+      formatLocalizedDate(new Date('2024-01-15T00:00:00Z'), 'en', { timeStyle: 'short' }),
+    );
+  });
+});

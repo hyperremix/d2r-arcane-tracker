@@ -157,7 +157,7 @@ export function formatLocalizedDate(
   options: Intl.DateTimeFormatOptions = { dateStyle: 'medium' },
 ): string {
   if (date === undefined) return '-';
-  const value = date instanceof Date ? date : new Date(date);
+  const value = toDate(date);
   if (Number.isNaN(value.getTime())) return '-';
 
   try {
@@ -227,6 +227,18 @@ export function parseLocalIsoDate(value: string): Date {
   return new Date(year, month - 1, day);
 }
 
+const DATE_ONLY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * Converts a date value to a `Date`. A date-only `YYYY-MM-DD` string is read as local midnight
+ * (as dayjs did), whereas `new Date(value)` would read it as UTC midnight.
+ */
+function toDate(value: Date | string | number): Date {
+  if (value instanceof Date) return value;
+  if (typeof value === 'string' && DATE_ONLY_PATTERN.test(value)) return parseLocalIsoDate(value);
+  return new Date(value);
+}
+
 /**
  * Returns local midnight of the day a date falls on.
  */
@@ -235,10 +247,14 @@ function startOfLocalDay(date: Date): Date {
 }
 
 /**
- * Number of whole days (truncated towards zero) from one date to another.
+ * Number of whole local calendar days (truncated towards zero) from one date to another. The
+ * elapsed time is corrected for a change of UTC offset between the two dates, so a day that is
+ * 23 or 25 hours long because of daylight saving time still counts as one day (as dayjs's
+ * `diff(..., 'day')` did).
  */
 function wholeDaysBetween(from: Date, to: Date): number {
-  return Math.trunc((to.getTime() - from.getTime()) / DAY_MS);
+  const offsetChangeMs = (to.getTimezoneOffset() - from.getTimezoneOffset()) * MINUTE_MS;
+  return Math.trunc((to.getTime() - from.getTime() - offsetChangeMs) / DAY_MS);
 }
 
 /**
@@ -253,7 +269,7 @@ export function isRecentFind(
 ): boolean {
   if (!foundDate) return false;
 
-  return wholeDaysBetween(new Date(foundDate), new Date()) < recentThresholdDays;
+  return wholeDaysBetween(toDate(foundDate), new Date()) < recentThresholdDays;
 }
 
 /**
@@ -271,7 +287,7 @@ export function formatSessionDateRelative(
 ): string {
   if (!date) return t(translations.common.never);
   const now = new Date();
-  const sessionStart = new Date(date);
+  const sessionStart = toDate(date);
   const sessionDay = startOfLocalDay(sessionStart).getTime();
 
   if (sessionDay === startOfLocalDay(now).getTime()) {
