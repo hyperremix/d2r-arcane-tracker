@@ -153,7 +153,7 @@ describe('When getCardStatusLabel is called', () => {
     const label = getCardStatusLabel(true, [...versionStatuses], true, t);
 
     // Assert
-    expect(label).toBe('Normal found, Ethereal missing, Recently found');
+    expect(label).toBe('Normal found, Ethereal missing, Recently Found!');
   });
 });
 

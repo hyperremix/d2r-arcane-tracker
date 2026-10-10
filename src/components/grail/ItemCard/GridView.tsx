@@ -6,13 +6,12 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { useItemIcon } from '@/hooks/useItemIcon';
 import { translations } from '@/i18n/translations';
 import { cn } from '@/lib/utils';
-import placeholderUrl from '/images/placeholder-item.svg';
 import { RuneImages } from '../RuneImages';
 import { RecentDiscoveryIndicator } from '../StatusIcons';
 import { getTooltipTriggerRender } from '../tooltipTriggerRender';
 import { getItemSubtitle, type VersionStatus } from './cardState';
-import { ItemCategoryLabel } from './ItemCategoryLabel';
-import { DiscoveryAttribution, DiscoveryInfo, VersionPills } from './indicators';
+import { DiscoveryAttribution, VersionPills } from './indicators';
+import { CardStatusText, handleArtworkError, ItemTooltipBody } from './shared';
 import {
   getCardStateClasses,
   getItemNameClasses,
@@ -84,12 +83,7 @@ function GridArtwork({ item, isFound, showItemIcons, focusableTriggers }: GridAr
         src={iconUrl}
         alt={item.name}
         className={cn('h-full w-full object-contain', isLoading && 'opacity-0')}
-        onError={(e) => {
-          // Prevent infinite loops
-          if (e.currentTarget.src !== `${window.location.origin}${placeholderUrl}`) {
-            e.currentTarget.src = placeholderUrl;
-          }
-        }}
+        onError={handleArtworkError}
       />
       {isLoading && <div className="absolute inset-0 animate-pulse rounded bg-muted" />}
     </div>
@@ -122,6 +116,8 @@ export function GridView({
   // The found state, the per-version state and the recent find are part of the card's label.
   const focusableTriggers = !interactiveProps;
   const subtitle = getItemSubtitle(item);
+  // Clickable cards are named by their aria-label and version pills carry their own status text
+  const showStatusText = !interactiveProps && versionStatuses.length === 0;
 
   return (
     <div
@@ -141,10 +137,7 @@ export function GridView({
       >
         {recentFindDate && (
           <div className="absolute top-2 right-2 z-10">
-            <RecentDiscoveryIndicator
-              foundDate={recentFindDate}
-              focusableTriggers={focusableTriggers}
-            />
+            <RecentDiscoveryIndicator focusableTriggers={focusableTriggers} />
           </div>
         )}
 
@@ -162,7 +155,7 @@ export function GridView({
             <TooltipTrigger
               render={getTooltipTriggerRender(focusableTriggers)}
               // Keeps the name clear of the "New" badge in the top-right corner
-              className={cn('block w-full text-center', recentFindDate && 'px-9')}
+              className={cn('block w-full text-center', recentFindDate && 'px-10')}
             >
               <h3
                 className={cn(
@@ -174,19 +167,7 @@ export function GridView({
               </h3>
             </TooltipTrigger>
             <TooltipContent side="top" className="max-w-sm">
-              <div className="space-y-1">
-                <p className="font-semibold">
-                  {item.name}
-                  {item.itemBase && ` • ${item.itemBase}`}
-                </p>
-                <p className="text-muted-foreground text-xs">
-                  <ItemCategoryLabel item={item} />
-                </p>
-
-                {allProgress.length > 0 && (
-                  <DiscoveryInfo allProgress={allProgress} characters={characters} />
-                )}
-              </div>
+              <ItemTooltipBody item={item} allProgress={allProgress} characters={characters} />
             </TooltipContent>
           </Tooltip>
 
@@ -202,6 +183,7 @@ export function GridView({
 
           {/* Found state per tracked version */}
           <VersionPills item={item} versionStatuses={versionStatuses} className="pt-2" />
+          {showStatusText && <CardStatusText isFound={isFound} />}
 
           {/* Discovery attribution */}
           {allProgress.length > 0 && (

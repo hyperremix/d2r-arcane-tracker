@@ -48,8 +48,7 @@
       "setName": "Set: {{name}}",
       "cardLabel": "{{name}}, {{status}}",
       "versionFound": "{{version}} found",
-      "versionMissing": "{{version}} missing",
-      "recentlyFound": "Recently found"
+      "versionMissing": "{{version}} missing"
     },
     "statusIcons": {
       "recentlyFound": "Recently Found!"

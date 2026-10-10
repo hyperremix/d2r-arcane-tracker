@@ -17,7 +17,6 @@ import {
 import { useTranslation } from 'react-i18next';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { translations } from '@/i18n/translations';
-import { isRecentFind } from '@/lib/date';
 import { cn } from '@/lib/utils';
 import { getTooltipTriggerRender } from './tooltipTriggerRender';
 
@@ -100,35 +99,33 @@ export function ItemTypeIcon({ type, className }: ItemTypeIconProps) {
  * Props interface for the RecentDiscoveryIndicator component.
  */
 interface RecentDiscoveryProps {
-  foundDate: Date;
   className?: string;
   focusableTriggers?: boolean;
 }
 
 /**
  * RecentDiscoveryIndicator component that displays a small "New" badge for recently found items.
- * The badge uses the neutral foreground color, never an item-quality color, so it cannot be
+ * Whether a find is recent is decided once, by `getRecentFindDate` in `ItemCard/cardState.ts`;
+ * callers render this badge only for a recent find, so the badge and the card's accessible name
+ * cannot disagree. The badge uses the neutral foreground color, never an item-quality color, so it cannot be
  * confused with an item's quality; its meaning is carried by its text.
  * @param {RecentDiscoveryProps} props - Component props
- * @param {Date} props.foundDate - The date when the item was found
  * @param {string} [props.className] - Optional additional CSS classes
  * @param {boolean} [props.focusableTriggers] - Whether the tooltip trigger is a focusable button
- * @returns {JSX.Element | null} A "New" badge if the find is recent, null otherwise
+ * @returns {JSX.Element} A "New" badge
  */
 export function RecentDiscoveryIndicator({
-  foundDate,
   className,
   focusableTriggers = true,
 }: RecentDiscoveryProps) {
   const { t } = useTranslation();
-  if (!isRecentFind(foundDate)) return null;
 
   return (
     <Tooltip>
       <TooltipTrigger render={getTooltipTriggerRender(focusableTriggers)} className="inline-flex">
         <span
           className={cn(
-            'rounded-sm bg-foreground px-1.5 font-semibold text-[0.625rem] text-background uppercase leading-4 tracking-wider',
+            'rounded-sm bg-foreground px-1.5 font-semibold text-[0.6875rem] text-background uppercase leading-4 tracking-wider',
             className,
           )}
         >

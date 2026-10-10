@@ -109,7 +109,7 @@ Keyboard shortcuts:
 | `/` or Ctrl+F (Cmd+F on macOS) | Focus the search field |
 | Esc (in the search field) | Clear the search; press again to leave the field |
 
-The grail works like a collection wall. Found items light up: as in the game, the name is colored by quality (gold for uniques, green for sets, orange for runes and purple for runewords), in bold, with a thin frame in the same color. Missing items stay dim and neutral, with a gray name, a plain frame and grayed-out artwork. Under the name, uniques and set items show their base item (for example "Shako"), and set items also show their set.
+The grail works like a collection wall. Found items light up: as in the game, the name is colored by quality (gold for uniques, green for sets, orange for runes and purple for runewords), in a heavier weight, with a thin frame in a softer shade of the same color. Missing items stay dim and neutral, with a gray name, a plain frame and grayed-out artwork. Under the name, items that have a base item show it (for example "Shako"), and set items also show their set.
 
 When you track ethereal items, cards for items that can be ethereal show one pill per tracked version, **Normal** and **Ethereal** (or **Ethereal Only**). A found version has a solid pill with a check mark; a missing version has a dashed pill with an empty circle, so you can see which version you still need. Items found in the last 7 days while the tracker was running have a **New** badge. Screen readers announce the same information: the item name, whether it is found (or the status of each version, such as "Normal found, Ethereal missing") and whether it was found recently.
 

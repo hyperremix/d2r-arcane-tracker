@@ -78,7 +78,7 @@ export function getCardStatusLabel(
     versionStatuses.length > 0
       ? versionStatuses.map((status) => getVersionStatusLabel(status, t))
       : [t(isFound ? translations.common.found : translations.common.notFound)];
-  if (isRecent) parts.push(t(translations.grail.itemCard.recentlyFound));
+  if (isRecent) parts.push(t(translations.grail.statusIcons.recentlyFound));
   return parts.join(', ');
 }
 

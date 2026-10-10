@@ -29,9 +29,7 @@ vi.mock('./StatusIcons', () => ({
     <span data-testid="character-icon">{characterClass}</span>
   ),
   ItemTypeIcon: ({ type }: { type: string }) => <span data-testid="item-type-icon">{type}</span>,
-  RecentDiscoveryIndicator: ({ foundDate }: { foundDate: Date }) => (
-    <span data-testid="recent-discovery-indicator">{foundDate.toISOString()}</span>
-  ),
+  RecentDiscoveryIndicator: () => <span data-testid="recent-discovery-indicator" />,
 }));
 
 // Import after mocks
@@ -657,6 +655,28 @@ describe('When ItemCard is rendered', () => {
     });
   });
 
+  describe('If the item image fails to load', () => {
+    it.each([
+      'grid',
+      'list',
+    ] as const)('Then the %s card swaps in the placeholder image once', (viewMode) => {
+      // Arrange
+      const item = HolyGrailItemBuilder.new().withName('Broken').build();
+      setupStoreMock({ showItemIcons: true });
+      render(<ItemCard item={item} viewMode={viewMode} />);
+      const image = screen.getByRole('img', { name: 'Broken' });
+
+      // Act
+      fireEvent.error(image);
+      const swappedSrc = image.getAttribute('src');
+      fireEvent.error(image);
+
+      // Assert
+      expect(swappedSrc).toBe('/mock-placeholder.png');
+      expect(image.getAttribute('src')).toBe(swappedSrc);
+    });
+  });
+
   describe('If onClick is not provided', () => {
     it('Then the card is not exposed as a focusable button', () => {
       // Arrange
@@ -667,6 +687,57 @@ describe('When ItemCard is rendered', () => {
 
       // Assert
       expect(screen.queryByRole('button', { name: 'Static, Not Found' })).not.toBeInTheDocument();
+    });
+
+    it.each([
+      'grid',
+      'list',
+    ] as const)('Then the %s card announces Not Found / Found to screen readers', (viewMode) => {
+      // Arrange
+      const item = HolyGrailItemBuilder.new().withId('item-1').withName('Silent').build();
+      const normalProgress = GrailProgressBuilder.new()
+        .withCharacterId('char-1')
+        .withItemId('item-1')
+        .asNormal()
+        .build();
+
+      // Act
+      const missing = render(<ItemCard item={item} viewMode={viewMode} />);
+      const missingText = screen.getByText('Not Found');
+      missing.unmount();
+      render(<ItemCard item={item} normalProgress={[normalProgress]} viewMode={viewMode} />);
+
+      // Assert
+      expect(missingText).toHaveClass('sr-only');
+      expect(screen.getByText('Found')).toHaveClass('sr-only');
+    });
+
+    it.each([
+      'grid',
+      'list',
+    ] as const)('Then the %s card does not repeat the status when version pills carry it', (viewMode) => {
+      // Arrange
+      const item = HolyGrailItemBuilder.new().withId('item-1').withEtherealType('optional').build();
+      setupStoreMock({ grailNormal: true, grailEthereal: true });
+
+      // Act
+      render(<ItemCard item={item} viewMode={viewMode} />);
+
+      // Assert
+      expect(screen.queryByText('Not Found')).not.toBeInTheDocument();
+      expect(screen.getByText('Normal missing')).toHaveClass('sr-only');
+    });
+
+    it('Then a clickable card relies on its accessible name instead of extra status text', () => {
+      // Arrange
+      const item = HolyGrailItemBuilder.new().withName('Named').build();
+
+      // Act
+      render(<ItemCard item={item} onClick={vi.fn()} />);
+
+      // Assert
+      expect(screen.queryByText('Not Found')).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Named, Not Found' })).toBeInTheDocument();
     });
 
     it.each([
@@ -1061,7 +1132,7 @@ describe('When ItemCard is rendered', () => {
       );
       expect(
         screen.getByRole('button', {
-          name: 'Fresh, Normal found, Ethereal missing, Recently found',
+          name: 'Fresh, Normal found, Ethereal missing, Recently Found!',
         }),
       ).toBeInTheDocument();
     });

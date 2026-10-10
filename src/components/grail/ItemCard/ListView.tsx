@@ -4,14 +4,13 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { useItemIcon } from '@/hooks/useItemIcon';
 import { translations } from '@/i18n/translations';
 import { cn } from '@/lib/utils';
-import placeholderUrl from '/images/placeholder-item.svg';
 import { RuneImages } from '../RuneImages';
 import { ItemTypeIcon, RecentDiscoveryIndicator } from '../StatusIcons';
 import { getTooltipTriggerRender } from '../tooltipTriggerRender';
 import { getItemSubtitle } from './cardState';
 import type { ItemCardViewProps } from './GridView';
-import { ItemCategoryLabel } from './ItemCategoryLabel';
-import { DiscoveryAttribution, DiscoveryInfo, VersionPills } from './indicators';
+import { DiscoveryAttribution, VersionPills } from './indicators';
+import { CardStatusText, handleArtworkError, ItemTooltipBody } from './shared';
 import {
   getCardStateClasses,
   getItemNameClasses,
@@ -65,12 +64,7 @@ function ListArtwork({ item, isFound, showItemIcons, focusableTriggers }: ListAr
           src={iconUrl}
           alt={item.name}
           className={cn(isLoading && 'opacity-0', 'h-full w-full object-contain')}
-          onError={(e) => {
-            // Prevent infinite loops
-            if (e.currentTarget.src !== `${window.location.origin}${placeholderUrl}`) {
-              e.currentTarget.src = placeholderUrl;
-            }
-          }}
+          onError={handleArtworkError}
         />
       </div>
       {isLoading && <div className="absolute inset-0 animate-pulse rounded bg-muted" />}
@@ -103,6 +97,8 @@ export function ListView({
   // screen reader users reach the same details through the item details dialog the row opens.
   // The found state, the per-version state and the recent find are part of the row's label.
   const focusableTriggers = !interactiveProps;
+  // Clickable rows are named by their aria-label and version pills carry their own status text
+  const showStatusText = !interactiveProps && versionStatuses.length === 0;
   const subtitle = [
     getItemSubtitle(item),
     item.setName && t(translations.grail.itemCard.setName, { name: item.setName }),
@@ -142,29 +138,15 @@ export function ListView({
             </h3>
           </TooltipTrigger>
           <TooltipContent side="top" className="max-w-sm">
-            <div className="space-y-1">
-              <p className="font-semibold">
-                {item.name}
-                {item.itemBase && ` • ${item.itemBase}`}
-              </p>
-              <p className="text-muted-foreground text-xs">
-                <ItemCategoryLabel item={item} />
-              </p>
-
-              <DiscoveryInfo allProgress={allProgress} characters={characters} />
-            </div>
+            <ItemTooltipBody item={item} allProgress={allProgress} characters={characters} />
           </TooltipContent>
         </Tooltip>
         {subtitle && <p className="truncate text-muted-foreground text-xs">{subtitle}</p>}
+        {showStatusText && <CardStatusText isFound={isFound} />}
       </div>
 
       {/* Recent find */}
-      {recentFindDate && (
-        <RecentDiscoveryIndicator
-          foundDate={recentFindDate}
-          focusableTriggers={focusableTriggers}
-        />
-      )}
+      {recentFindDate && <RecentDiscoveryIndicator focusableTriggers={focusableTriggers} />}
 
       {/* Found state per tracked version */}
       <VersionPills item={item} versionStatuses={versionStatuses} className="flex-nowrap" />

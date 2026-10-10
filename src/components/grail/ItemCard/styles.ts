@@ -73,13 +73,13 @@ export function getCardStateClasses(
   const frame = foundFrameStyles[itemType];
   const classes: string[] = [];
   if (isFound) {
-    classes.push(frame ? frame.border : 'border-border', foundStateStyles.found);
+    classes.push(frame.border, foundStateStyles.found);
   } else {
     classes.push(foundStateStyles.missing);
   }
   if (isInteractive) {
     if (isFound) {
-      classes.push(frame ? frame.hover : 'hover:border-foreground/30', 'hover:shadow-md');
+      classes.push(frame.hover, 'hover:shadow-md');
     } else {
       classes.push('hover:border-muted-foreground/50');
     }
@@ -106,7 +106,7 @@ const foundVersionPillClasses: Record<ItemType, string> = {
  */
 export function getVersionPillClasses(itemType: ItemType, isFound: boolean): string {
   if (!isFound) return 'border-dashed border-muted-foreground/50 text-muted-foreground';
-  return `border-solid ${foundVersionPillClasses[itemType] ?? 'border-border text-foreground'}`;
+  return `border-solid ${foundVersionPillClasses[itemType]}`;
 }
 
 /**
