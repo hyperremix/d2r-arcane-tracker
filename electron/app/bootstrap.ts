@@ -35,6 +35,7 @@ import { SettingsService } from '../services/settingsService';
 import { TerrorZoneService } from '../services/terrorZoneService';
 import { UpdateService } from '../services/updateService';
 import { VaultService } from '../services/vaultService';
+import type { WindowsMemoryReaderImpl } from '../services/win32/processMemory';
 import { setErrorForwarder } from '../utils/serviceLogger';
 import { getWidgetSizeSettingKey } from '../utils/widgetDisplay';
 import { createMainWindow, getMainWindow } from '../window/mainWindow';
@@ -70,7 +71,7 @@ async function startWindowsServices(eventBus: EventBus): Promise<{
 
   // Loaded before the process monitor starts, so the memory reader subscribes before the first
   // d2r-started event
-  let processMemory: typeof import('../services/win32/processMemory') | undefined;
+  let processMemory: { WindowsMemoryReaderImpl: typeof WindowsMemoryReaderImpl } | undefined;
   try {
     processMemory = await import('../services/win32/processMemory');
   } catch (error) {

@@ -366,12 +366,12 @@ function getOptionalStringValue(
   return undefined;
 }
 
-// Frozen copies of the location and icon resolvers the legacy backfill needs.
+// Frozen rewrites of the location and icon resolvers the legacy backfill needs.
 //
 // They reproduce `resolveSpatialLocation` (utils/spatialLocationResolver.ts) and
 // `resolveCanonicalIconFilename` (utils/iconFilenameResolver.ts) as they were when migrations
 // replaced the legacy script. This upgrade step must produce the same result whenever it runs,
-// so it must not change when the live resolvers do. Do not update or reuse these copies. The
+// so it must not change when the live resolvers do. Do not update or reuse this code. The
 // icon lookup still reads the bundled item catalog, which is data rather than resolver logic.
 
 interface LegacySpatialLocation {

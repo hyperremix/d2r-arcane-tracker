@@ -199,6 +199,7 @@ vi.mock('../window/widgetWindow', () => ({
 
 import { initializeUpdateHandlers } from '../ipc-handlers/updateHandlers';
 import { EventBus } from '../services/EventBus';
+import { createGameProcessGuard } from '../services/gameProcessGuard';
 import { MemoryReader } from '../services/memoryReader';
 import { ProcessMonitor } from '../services/processMonitor';
 import { RunTrackerService } from '../services/runTracker';
@@ -449,10 +450,9 @@ describe('When the app starts', () => {
 
     // Act
     await startApp(env);
-    await Promise.resolve();
 
     // Assert
-    expect(mocks.calls).toContain('memoryReader.receivedD2rStarted');
+    await vi.waitFor(() => expect(mocks.calls).toContain('memoryReader.receivedD2rStarted'));
     expect(mocks.calls.indexOf('memoryReader.subscribe')).toBeLessThan(
       mocks.calls.indexOf('memoryReader.receivedD2rStarted'),
     );
@@ -509,8 +509,11 @@ describe('When the app starts', () => {
     });
 
     it('Then the startup does not throw and the error is logged', async () => {
-      // Arrange / Act
-      const runningApp = await startApp(env);
+      // Arrange
+      const startup = startApp(env);
+
+      // Act
+      const runningApp = await startup;
 
       // Assert
       expect(runningApp).toBeDefined();
@@ -522,8 +525,11 @@ describe('When the app starts', () => {
     });
 
     it('Then the memory reader is disabled', async () => {
-      // Arrange / Act
-      await startApp(env);
+      // Arrange
+      const startup = startApp(env);
+
+      // Act
+      await startup;
 
       // Assert
       expect(mocks.WindowsMemoryReaderImpl).not.toHaveBeenCalled();
@@ -532,14 +538,30 @@ describe('When the app starts', () => {
     });
 
     it('Then the process monitor still starts and the rest of the app comes up', async () => {
-      // Arrange / Act
-      await startApp(env);
+      // Arrange
+      const startup = startApp(env);
+
+      // Act
+      await startup;
 
       // Assert
       expect(ProcessMonitor).toHaveBeenCalledTimes(1);
       expect(mocks.calls).toContain('processMonitor.start');
       expect(mocks.calls).toContain('saveFileMonitor.start');
       expect(mocks.calls).toContain('detectionPipeline.start');
+    });
+
+    it('Then the started process monitor is handed to the game process guard and stopped on shutdown', async () => {
+      // Arrange
+      const runningApp = await startApp(env);
+      const processMonitor = vi.mocked(ProcessMonitor).mock.results[0].value;
+
+      // Act
+      await runningApp.shutdown();
+
+      // Assert
+      expect(createGameProcessGuard).toHaveBeenCalledWith({ processMonitor });
+      expect(processMonitor.shutdown).toHaveBeenCalledTimes(1);
     });
   });
 });
