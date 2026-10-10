@@ -226,6 +226,7 @@
                       "!electron/utils/iconFilename",
                       "!electron/utils/objects",
                       "!electron/utils/rawItemJson",
+                      "!electron/utils/sessionNotes",
                       "!electron/utils/settingsCodec",
                       "!electron/utils/vaultState",
                       "!electron/utils/widgetDisplay",
