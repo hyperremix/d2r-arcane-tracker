@@ -3,6 +3,7 @@ import { PackagePlus } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import {
   formatLocation,
+  formatQuality,
   formatSourceFileTypeLabel,
   getCoordinatesLabel,
   getDimensionsLabel,
@@ -48,12 +49,8 @@ export function SelectedItemCard({
             <div>
               <div className="font-medium">{item.itemName}</div>
               <div className="mt-1 flex flex-wrap gap-1">
-                <Badge variant="outline" className="capitalize">
-                  {item.quality}
-                </Badge>
-                <Badge variant="outline" className="capitalize">
-                  {formatLocation(item, t)}
-                </Badge>
+                <Badge variant="outline">{formatQuality(item.quality, t)}</Badge>
+                <Badge variant="outline">{formatLocation(item, t)}</Badge>
                 <Badge variant="outline">{formatSourceFileTypeLabel(item.sourceFileType, t)}</Badge>
                 <Badge
                   variant={

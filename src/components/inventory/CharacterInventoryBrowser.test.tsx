@@ -390,7 +390,11 @@ describe('When CharacterInventoryBrowser is rendered', () => {
       expect(equippedBoard.style.minHeight).toBe('calc(8 * var(--inv-cell-size) + 7px + 16px)');
       expect(equippedBoard.style.maxHeight).toBe('calc(8 * var(--inv-cell-size) + 7px + 16px)');
 
-      expect(screen.getByText('Drop inventory items here to vault')).toBeInTheDocument();
+      expect(
+        screen.getByText(
+          'Drop an item here to remove it from its save file and keep it in the vault',
+        ),
+      ).toBeInTheDocument();
     });
 
     it('Then it renders extended stash cells in the same stash board without a separate overflow board', async () => {
@@ -877,7 +881,7 @@ describe('When CharacterInventoryBrowser is rendered', () => {
       expect(screen.getByText('Runes')).toBeInTheDocument();
       expect(screen.getAllByTestId('inventory-item-stack-count')[0]).toHaveTextContent('7');
 
-      const gemsTile = screen.getByLabelText('Inventory item Perfect Ruby');
+      const gemsTile = screen.getByLabelText(/^Perfect Ruby, /);
       expect(gemsTile).toHaveAttribute('draggable', 'false');
     });
 
@@ -1118,8 +1122,8 @@ describe('When CharacterInventoryBrowser is rendered', () => {
       render(<CharacterInventoryBrowser />);
 
       // Assert
-      expect(await screen.findByLabelText('Inventory item El Rune')).toBeInTheDocument();
-      expect(screen.getByLabelText('Inventory item Eld Rune')).toBeInTheDocument();
+      expect(await screen.findByLabelText(/^El Rune, /)).toBeInTheDocument();
+      expect(screen.getByLabelText(/^Eld Rune, /)).toBeInTheDocument();
     });
   });
 
@@ -1209,7 +1213,7 @@ describe('When CharacterInventoryBrowser is rendered', () => {
       // Assert
       const mercenaryBoard = await waitFor(() => screen.getByTestId('mercenary-board-merc-snap'));
       expect(within(mercenaryBoard).getAllByTestId('mercenary-slot-frame')).toHaveLength(4);
-      expect(screen.getByLabelText('Inventory item Insight')).toBeInTheDocument();
+      expect(screen.getByLabelText(/^Insight, /)).toBeInTheDocument();
     });
 
     it('Then it appends only occupied modded extra slots beyond the default four', async () => {
@@ -1255,7 +1259,7 @@ describe('When CharacterInventoryBrowser is rendered', () => {
       // Assert
       const mercenaryBoard = await waitFor(() => screen.getByTestId('mercenary-board-merc-modded'));
       expect(within(mercenaryBoard).getAllByTestId('mercenary-slot-frame')).toHaveLength(5);
-      expect(screen.getByLabelText('Inventory item Modded Amulet')).toBeInTheDocument();
+      expect(screen.getByLabelText(/^Modded Amulet, /)).toBeInTheDocument();
     });
 
     it('Then items with unknown mercenary slot IDs are shown in mercenary unplaced output', async () => {
@@ -1305,9 +1309,7 @@ describe('When CharacterInventoryBrowser is rendered', () => {
       );
       expect(within(mercenaryBoard).getAllByTestId('mercenary-slot-frame')).toHaveLength(4);
       const unplacedMercenaryItems = screen.getByTestId('mercenary-board-merc-unknown-unplaced');
-      expect(
-        within(unplacedMercenaryItems).getByLabelText('Inventory item Modded Relic'),
-      ).toBeInTheDocument();
+      expect(within(unplacedMercenaryItems).getByLabelText(/^Modded Relic, /)).toBeInTheDocument();
     });
   });
 
@@ -1393,7 +1395,7 @@ describe('When CharacterInventoryBrowser is rendered', () => {
       });
 
       // Act
-      const runeTile = screen.getByLabelText('Inventory item Fal Rune');
+      const runeTile = screen.getByLabelText(/^Fal Rune, /);
       fireEvent.click(runeTile);
       fireEvent.click(runeTile);
 
@@ -1638,7 +1640,7 @@ describe('When CharacterInventoryBrowser is rendered', () => {
       await waitFor(() => {
         expect(invokeMock).toHaveBeenCalled();
       });
-      expect(screen.queryByLabelText('Inventory item Fal Rune')).not.toBeInTheDocument();
+      expect(screen.queryByLabelText(/^Fal Rune, /)).not.toBeInTheDocument();
 
       // Assert
       await waitFor(() => {
@@ -1836,7 +1838,7 @@ describe('When CharacterInventoryBrowser is rendered', () => {
       });
 
       // Act
-      const runeTile = screen.getByLabelText('Inventory item Fal Rune');
+      const runeTile = screen.getByLabelText(/^Fal Rune, /);
       fireEvent.click(runeTile);
       fireEvent.click(runeTile);
       fireEvent.click(runeTile);
@@ -1845,9 +1847,7 @@ describe('When CharacterInventoryBrowser is rendered', () => {
       // Assert
       const runesBoard = screen.getByTestId('stash-board-modern-pickup-full-stack-7');
       await waitFor(() => {
-        expect(
-          within(runesBoard).queryByLabelText('Inventory item Fal Rune'),
-        ).not.toBeInTheDocument();
+        expect(within(runesBoard).queryByLabelText(/^Fal Rune, /)).not.toBeInTheDocument();
       });
       expect(splitStackMock).not.toHaveBeenCalled();
     });
@@ -1933,7 +1933,7 @@ describe('When CharacterInventoryBrowser is rendered', () => {
       });
 
       // Act
-      const runeTile = screen.getByLabelText('Inventory item Fal Rune');
+      const runeTile = screen.getByLabelText(/^Fal Rune, /);
       fireEvent.click(runeTile);
       fireEvent.click(runeTile);
       fireEvent.click(runeTile);
@@ -1941,9 +1941,7 @@ describe('When CharacterInventoryBrowser is rendered', () => {
 
       const runesBoard = screen.getByTestId('stash-board-modern-pickup-return-to-source-7');
       await waitFor(() => {
-        expect(
-          within(runesBoard).queryByLabelText('Inventory item Fal Rune'),
-        ).not.toBeInTheDocument();
+        expect(within(runesBoard).queryByLabelText(/^Fal Rune, /)).not.toBeInTheDocument();
       });
 
       const emptySourceSlot = getRuneBoardCell(runesBoard, 'r19');
@@ -1953,7 +1951,7 @@ describe('When CharacterInventoryBrowser is rendered', () => {
 
       // Assert
       await waitFor(() => {
-        expect(within(runesBoard).getByLabelText('Inventory item Fal Rune')).toBeInTheDocument();
+        expect(within(runesBoard).getByLabelText(/^Fal Rune, /)).toBeInTheDocument();
       });
       expect(splitStackMock).not.toHaveBeenCalled();
     });
@@ -2084,7 +2082,7 @@ describe('When CharacterInventoryBrowser is rendered', () => {
       });
 
       // Act
-      const runeTile = screen.getByLabelText('Inventory item Fal Rune');
+      const runeTile = screen.getByLabelText(/^Fal Rune, /);
       fireEvent.click(runeTile);
       fireEvent.click(runeTile);
 
@@ -2139,7 +2137,7 @@ describe('When CharacterInventoryBrowser is rendered', () => {
       });
 
       // Act
-      fireEvent.mouseEnter(screen.getByLabelText('Inventory item Shako'));
+      fireEvent.mouseEnter(screen.getByLabelText(/^Shako, /));
 
       // Assert
       await waitFor(() => {
@@ -2222,11 +2220,11 @@ describe('When CharacterInventoryBrowser is rendered', () => {
       await waitFor(() => {
         expect(screen.getByText('Socketed Circlet')).toBeInTheDocument();
       });
-      const inventoryTile = screen.getByLabelText('Inventory item Socketed Circlet');
+      const inventoryTile = screen.getByLabelText(/^Socketed Circlet, /);
       expect(within(inventoryTile).queryByTestId('item-socket-overlay')).not.toBeInTheDocument();
 
       // Act
-      fireEvent.mouseEnter(screen.getByLabelText('Inventory item Socketed Circlet'));
+      fireEvent.mouseEnter(screen.getByLabelText(/^Socketed Circlet, /));
 
       // Assert
       await waitFor(() => {
@@ -2249,7 +2247,7 @@ describe('When CharacterInventoryBrowser is rendered', () => {
       });
 
       // Act
-      fireEvent.mouseEnter(screen.getByLabelText('Inventory item Overlap Item'));
+      fireEvent.mouseEnter(screen.getByLabelText(/^Overlap Item, /));
 
       // Assert
       await waitFor(() => {
@@ -2539,7 +2537,7 @@ describe('When CharacterInventoryBrowser is rendered', () => {
         );
       });
       await waitFor(() => {
-        expect(screen.queryByLabelText('Inventory item Page Two Match')).not.toBeInTheDocument();
+        expect(screen.queryByLabelText(/^Page Two Match, /)).not.toBeInTheDocument();
       });
     });
   });
@@ -2641,7 +2639,7 @@ describe('When CharacterInventoryBrowser is rendered', () => {
         expect(searchAllMock).toHaveBeenCalledTimes(2);
       });
       await waitFor(() => {
-        expect(screen.queryByLabelText('Inventory item Success Item')).not.toBeInTheDocument();
+        expect(screen.queryByLabelText(/^Success Item, /)).not.toBeInTheDocument();
       });
     });
 
@@ -2720,7 +2718,7 @@ describe('When CharacterInventoryBrowser is rendered', () => {
 
       // Assert — item disappears immediately before the API responds
       await waitFor(() => {
-        expect(screen.queryByLabelText('Inventory item Optimistic Item')).not.toBeInTheDocument();
+        expect(screen.queryByLabelText(/^Optimistic Item, /)).not.toBeInTheDocument();
       });
 
       // Cleanup — resolve so pending promises don't leak
@@ -2873,8 +2871,10 @@ describe('When CharacterInventoryBrowser is rendered', () => {
         expect(screen.getByText('Stash Shako')).toBeInTheDocument();
       });
 
-      const draggedTile = screen.getByLabelText('Inventory item Stash Shako');
-      const dropzone = screen.getByText('Drop inventory items here to vault');
+      const draggedTile = screen.getByLabelText(/^Stash Shako, /);
+      const dropzone = screen.getByText(
+        'Drop an item here to remove it from its save file and keep it in the vault',
+      );
       const dataTransfer = createDragDataTransfer();
 
       // Act
@@ -2961,8 +2961,10 @@ describe('When CharacterInventoryBrowser is rendered', () => {
         expect(screen.getByText('Stash Arach')).toBeInTheDocument();
       });
 
-      const draggedTile = screen.getByLabelText('Inventory item Stash Arach');
-      const dropzone = screen.getByText('Drop inventory items here to vault');
+      const draggedTile = screen.getByLabelText(/^Stash Arach, /);
+      const dropzone = screen.getByText(
+        'Drop an item here to remove it from its save file and keep it in the vault',
+      );
       const blockedDataTransfer = createBlockedDragDataTransfer();
 
       // Act
@@ -3366,7 +3368,7 @@ describe('When CharacterInventoryBrowser is rendered', () => {
       });
 
       render(<CharacterInventoryBrowser />);
-      const draggedTile = await screen.findByLabelText('Inventory item Move Me');
+      const draggedTile = await screen.findByLabelText(/^Move Me, /);
       const inventoryBoard = await screen.findByTestId('inventory-board-move-snap-1');
       const dataTransfer = createDragDataTransfer();
 
@@ -3462,7 +3464,7 @@ describe('When CharacterInventoryBrowser is rendered', () => {
       });
 
       render(<CharacterInventoryBrowser />);
-      const draggedTile = await screen.findByLabelText('Inventory item Move Me');
+      const draggedTile = await screen.findByLabelText(/^Move Me, /);
       const inventoryBoard = await screen.findByTestId('inventory-board-move-readonly-toast');
       const dataTransfer = createDragDataTransfer();
 
@@ -3599,7 +3601,7 @@ describe('When CharacterInventoryBrowser is rendered', () => {
       });
 
       render(<CharacterInventoryBrowser />);
-      const draggedTile = await screen.findByLabelText('Inventory item Source Item');
+      const draggedTile = await screen.findByLabelText(/^Source Item, /);
       const targetBoard = await screen.findByTestId('inventory-board-move-target');
       const dataTransfer = createDragDataTransfer();
 
@@ -3735,7 +3737,7 @@ describe('When CharacterInventoryBrowser is rendered', () => {
       });
 
       render(<CharacterInventoryBrowser />);
-      const draggedTile = await screen.findByLabelText('Inventory item Shared Chipped Topaz');
+      const draggedTile = await screen.findByLabelText(/^Shared Chipped Topaz, /);
       const gemsBoard = await screen.findByTestId('stash-board-modern-drop-resource-5');
       const dataTransfer = createDragDataTransfer();
 
@@ -3832,7 +3834,7 @@ describe('When CharacterInventoryBrowser is rendered', () => {
       });
 
       render(<CharacterInventoryBrowser />);
-      const draggedTile = await screen.findByLabelText('Inventory item Magic Amulet');
+      const draggedTile = await screen.findByLabelText(/^Magic Amulet, /);
       const equippedSlots = await screen.findAllByTestId('equipped-slot-frame');
       const amuletSlot = equippedSlots[1];
       const dataTransfer = createDragDataTransfer();
@@ -3924,7 +3926,7 @@ describe('When CharacterInventoryBrowser is rendered', () => {
       });
 
       render(<CharacterInventoryBrowser />);
-      const draggedTile = await screen.findByLabelText('Inventory item Magic Amulet');
+      const draggedTile = await screen.findByLabelText(/^Magic Amulet, /);
       const equippedSlots = await screen.findAllByTestId('equipped-slot-frame');
       const amuletSlot = equippedSlots[1];
       const dataTransfer = createDragDataTransfer();
@@ -4019,7 +4021,7 @@ describe('When CharacterInventoryBrowser is rendered', () => {
       });
 
       render(<CharacterInventoryBrowser />);
-      const draggedTile = await screen.findByLabelText('Inventory item Magic Amulet');
+      const draggedTile = await screen.findByLabelText(/^Magic Amulet, /);
       const equippedSlots = await screen.findAllByTestId('equipped-slot-frame');
       const amuletSlot = equippedSlots[1];
       const dataTransfer = createDragDataTransfer();
@@ -4118,7 +4120,7 @@ describe('When CharacterInventoryBrowser is rendered', () => {
       // Arrange
       mockHelmSearchResponse();
       render(<CharacterInventoryBrowser />);
-      const draggedTile = await screen.findByLabelText('Inventory item Harlequin Crest');
+      const draggedTile = await screen.findByLabelText(/^Harlequin Crest, /);
       const headSlot = (await screen.findAllByTestId('equipped-slot-frame'))[0];
       const dataTransfer = createDragDataTransfer();
 
@@ -4142,7 +4144,7 @@ describe('When CharacterInventoryBrowser is rendered', () => {
       // Arrange
       mockHelmSearchResponse();
       render(<CharacterInventoryBrowser />);
-      const draggedTile = await screen.findByLabelText('Inventory item Harlequin Crest');
+      const draggedTile = await screen.findByLabelText(/^Harlequin Crest, /);
       const amuletSlot = (await screen.findAllByTestId('equipped-slot-frame'))[1];
       const dataTransfer = createDragDataTransfer();
 
@@ -4267,6 +4269,26 @@ describe('When CharacterInventoryBrowser is rendered', () => {
         );
       });
       getComputedStyleSpy.mockRestore();
+    });
+  });
+
+  describe('If a character is opened in its own window', () => {
+    it('Then the notice says that changes are written to the save files', async () => {
+      // Arrange
+      const snapshotTarget = {
+        sourceFilePath: '/tmp/sorc.d2s',
+        sourceFileType: 'd2s' as const,
+        characterName: 'Sorc',
+      };
+
+      // Act
+      render(<CharacterInventoryBrowser mode="snapshot" snapshotTarget={snapshotTarget} />);
+
+      // Assert
+      const notice = await screen.findByTestId('save-write-notice');
+      expect(notice).toHaveTextContent('Changes are written to your save files');
+      expect(notice).toHaveTextContent('Close Diablo II: Resurrected first');
+      expect(screen.queryByTestId('vault-dropzone')).not.toBeInTheDocument();
     });
   });
 });

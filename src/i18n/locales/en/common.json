@@ -841,6 +841,7 @@
   },
   "inventoryBrowser": {
     "title": "Inventory Browser",
+    "description": "See what is in your save files, move items between characters and stashes, and keep items in the vault.",
     "searchPlaceholder": "Search items, codes, or quality...",
     "character": "Character",
     "locationFilter": "Location",
@@ -850,11 +851,24 @@
     "allTypes": "All Types",
     "groupHeader": "{{characterName}} \u00b7 {{sourceFileType}}",
     "unknownSourceFileType": "Unknown source file",
+    "sourceFileTypes": {
+      "character": "Character",
+      "sharedStash": "Shared stash"
+    },
     "capturedAt": "Captured: {{date}}",
-    "itemsCount": "{{count}} items",
+    "itemsCount_one": "{{count}} item",
+    "itemsCount_other": "{{count}} items",
     "empty": "No inventory items match your filters.",
     "unplaced": "Unplaced",
-    "tileAriaLabel": "Inventory item {{itemName}}",
+    "tileAriaLabel": "{{itemName}}, {{quality}}, {{location}}",
+    "qualities": {
+      "normal": "Normal",
+      "magic": "Magic",
+      "rare": "Rare",
+      "set": "Set",
+      "unique": "Unique",
+      "crafted": "Crafted"
+    },
     "vaultedTileAriaLabel": "Vaulted item {{itemName}}",
     "vaultedTileStackCountLabel": "Stack count: {{count}}",
     "vaultUntracked": "Untracked",
@@ -942,8 +956,21 @@
     },
     "vaultAction": "Vault",
     "vaulted": "Vaulted",
-    "dropToVault": "Drop inventory items here to vault",
+    "dropToVault": "Drop an item here to remove it from its save file and keep it in the vault",
     "vaultedItems": "Vaulted Items",
+    "saveWriteNotice": {
+      "title": "Changes are written to your save files",
+      "description": "Moving, vaulting and unvaulting items edits your save files directly. Close Diablo II: Resurrected first, or the game will overwrite your changes. A backup is made before every change."
+    },
+    "vaultFeedback": {
+      "vaulted": "{{itemName}} was removed from its save file and is now in the vault.",
+      "undo": "Undo",
+      "restored": "{{itemName}} is back in its original spot.",
+      "unvaultBusy": "Another unvault is still running. Try again in a moment.",
+      "restoreAction": "Put back where it was",
+      "restoreHint": "This puts the item back into its original spot. To place it somewhere else, open a character or stash and drag the item onto a free spot.",
+      "dragHint": "To take this item out of the vault, open a character or stash and drag the item onto a free spot."
+    },
     "modernStashReadOnlyError": "Modern shared stash is read-only in this version.",
     "operationErrors": {
       "gameRunning": "Close Diablo II: Resurrected first. The game would overwrite the change and the item could be lost. Nothing was changed.",

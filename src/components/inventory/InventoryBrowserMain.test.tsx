@@ -1,5 +1,7 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import type { VaultItem } from 'electron/types/grail';
+import { toast } from 'sonner';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { serializeInventoryTextPayload } from '@/components/inventory/dragPayloads';
 import { useGrailStore } from '@/stores/grailStore';
 import { InventoryBrowserMain } from './InventoryBrowserMain';
@@ -8,6 +10,33 @@ const searchAllMock = vi.fn();
 const searchVaultMock = vi.fn();
 const addItemMock = vi.fn();
 const openSnapshotWindowMock = vi.fn();
+const unvaultItemMock = vi.fn();
+
+const EMPTY_INVENTORY = { snapshots: [], totalSnapshots: 0, totalItems: 0 };
+
+function createVaultItem(overrides: Partial<VaultItem>): VaultItem {
+  return {
+    id: 'vault-1',
+    fingerprint: 'vfp-1',
+    itemName: 'Shako',
+    quality: 'unique',
+    ethereal: false,
+    rawItemJson: '{}',
+    sourceFileType: 'd2s',
+    locationContext: 'inventory',
+    isPresentInLatestScan: false,
+    created: new Date('2024-01-01T00:00:00.000Z'),
+    lastUpdated: new Date('2024-01-01T00:00:00.000Z'),
+    ...overrides,
+  };
+}
+
+function mockVaultOnly(items: VaultItem[]): void {
+  searchAllMock.mockResolvedValue({
+    inventory: EMPTY_INVENTORY,
+    vault: { items, total: items.length, page: 1, pageSize: 200 },
+  });
+}
 
 describe('When InventoryBrowserMain is rendered', () => {
   beforeEach(() => {
@@ -28,7 +57,7 @@ describe('When InventoryBrowserMain is rendered', () => {
         vault: {
           search: searchVaultMock,
           addItem: addItemMock,
-          unvaultItem: vi.fn(),
+          unvaultItem: unvaultItemMock,
         },
         saveFile: {
           refreshSaveFiles: vi.fn().mockResolvedValue({ success: true }),
@@ -105,6 +134,170 @@ describe('When InventoryBrowserMain is rendered', () => {
 
     addItemMock.mockResolvedValue({ id: 'vault-1' });
     openSnapshotWindowMock.mockResolvedValue({ success: true });
+    unvaultItemMock.mockResolvedValue({ success: true });
+    for (const method of ['success', 'error'] as const) {
+      vi.spyOn(toast, method).mockImplementation(() => 'toast-id');
+    }
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  describe('If the page is shown', () => {
+    it('Then it has the shared page heading and the save file notice', async () => {
+      // Arrange
+
+      // Act
+      render(<InventoryBrowserMain />);
+
+      // Assert
+      expect(
+        await screen.findByRole('heading', { level: 1, name: 'Inventory Browser' }),
+      ).toBeInTheDocument();
+      expect(screen.getByTestId('save-write-notice')).toHaveTextContent(
+        'Changes are written to your save files',
+      );
+    });
+
+    it('Then each filter dropdown has a label and shows the selected option', async () => {
+      // Arrange
+
+      // Act
+      render(<InventoryBrowserMain />);
+
+      // Assert
+      expect(await screen.findByRole('combobox', { name: 'Character' })).toHaveTextContent(
+        'All Characters',
+      );
+      expect(screen.getByRole('combobox', { name: 'Location' })).toHaveTextContent('All Locations');
+      expect(screen.getByRole('combobox', { name: 'Type' })).toHaveTextContent('All Types');
+    });
+
+    it('Then the vault drop area is a labelled region and not a button', async () => {
+      // Arrange
+      const dropText = 'Drop an item here to remove it from its save file and keep it in the vault';
+
+      // Act
+      render(<InventoryBrowserMain />);
+
+      // Assert
+      expect(await screen.findByRole('region', { name: dropText })).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: dropText })).not.toBeInTheDocument();
+    });
+  });
+
+  describe('If the inventory is still loading', () => {
+    it('Then a loading status is shown instead of an empty list', async () => {
+      // Arrange
+      searchAllMock.mockReturnValue(new Promise(() => undefined));
+
+      // Act
+      render(<InventoryBrowserMain />);
+
+      // Assert
+      const loadingText = await screen.findByText('Loading...');
+      expect(loadingText.closest('output')).not.toBeNull();
+      expect(
+        screen.queryByText('No character or stash snapshots match your current filters.'),
+      ).not.toBeInTheDocument();
+    });
+  });
+
+  describe('If a snapshot holds a single item', () => {
+    it('Then its count uses the singular form and the row names the file kind in plain words', async () => {
+      // Arrange
+
+      // Act
+      render(<InventoryBrowserMain />);
+
+      // Assert
+      const row = await screen.findByRole('button', { name: /Sorc · Character/ });
+      expect(within(row).getByText('1 item')).toBeInTheDocument();
+      expect(within(row).queryByText(/Captured/)).not.toBeInTheDocument();
+    });
+  });
+
+  describe('If a vaulted item is shown', () => {
+    it('Then its tile is named after the item', async () => {
+      // Arrange
+      mockVaultOnly([createVaultItem({})]);
+
+      // Act
+      render(<InventoryBrowserMain />);
+
+      // Assert
+      expect(await screen.findByRole('button', { name: 'Vaulted item Shako' })).toBeInTheDocument();
+    });
+  });
+
+  describe('If a vaulted item that came from an inventory cell is selected', () => {
+    it('Then putting it back writes it to its original cell', async () => {
+      // Arrange
+      mockVaultOnly([createVaultItem({ sourceFilePath: '/tmp/sorc.d2s', gridX: 4, gridY: 2 })]);
+      render(<InventoryBrowserMain />);
+      fireEvent.click(await screen.findByRole('button', { name: 'Vaulted item Shako' }));
+
+      // Act
+      fireEvent.click(screen.getByRole('button', { name: 'Put back where it was' }));
+
+      // Assert
+      await waitFor(() => {
+        expect(unvaultItemMock).toHaveBeenCalledWith('vault-1', {
+          targetFilePath: '/tmp/sorc.d2s',
+          targetFileType: 'd2s',
+          targetLocationContext: 'inventory',
+          targetGridX: 4,
+          targetGridY: 2,
+        });
+      });
+      expect(screen.queryByRole('button', { name: 'Unvault' })).not.toBeInTheDocument();
+    });
+  });
+
+  describe('If a vaulted item that came from an equipped slot is selected', () => {
+    it('Then there is no unvault button, only how to drag it into a character', async () => {
+      // Arrange
+      mockVaultOnly([
+        createVaultItem({
+          sourceFilePath: '/tmp/sorc.d2s',
+          locationContext: 'equipped',
+          equippedSlotId: 1,
+        }),
+      ]);
+      render(<InventoryBrowserMain />);
+
+      // Act
+      fireEvent.click(await screen.findByRole('button', { name: 'Vaulted item Shako' }));
+
+      // Assert
+      expect(
+        screen.getByText(
+          'To take this item out of the vault, open a character or stash and drag the item onto a free spot.',
+        ),
+      ).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Unvault' })).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole('button', { name: 'Put back where it was' }),
+      ).not.toBeInTheDocument();
+    });
+  });
+
+  describe('If a vaulted item that was not taken out of a save file is selected', () => {
+    it('Then the unvault button unvaults it without a target', async () => {
+      // Arrange
+      mockVaultOnly([createVaultItem({})]);
+      render(<InventoryBrowserMain />);
+      fireEvent.click(await screen.findByRole('button', { name: 'Vaulted item Shako' }));
+
+      // Act
+      fireEvent.click(screen.getByRole('button', { name: 'Unvault' }));
+
+      // Assert
+      await waitFor(() => {
+        expect(unvaultItemMock).toHaveBeenCalledWith('vault-1');
+      });
+    });
   });
 
   describe('If snapshot data is available', () => {
@@ -118,7 +311,7 @@ describe('When InventoryBrowserMain is rendered', () => {
       await waitFor(() => {
         expect(screen.getByText('Characters & Stashes')).toBeInTheDocument();
       });
-      expect(screen.getByText('Sorc · D2S')).toBeInTheDocument();
+      expect(screen.getByText('Sorc · Character')).toBeInTheDocument();
       expect(screen.queryByTestId('inventory-board-snap-1')).not.toBeInTheDocument();
     });
   });
@@ -130,7 +323,7 @@ describe('When InventoryBrowserMain is rendered', () => {
 
       // Act
       const snapshotButton = await screen.findByRole('button', {
-        name: /Sorc · D2S/i,
+        name: /Sorc · Character/i,
       });
       fireEvent.click(snapshotButton);
 
@@ -150,7 +343,7 @@ describe('When InventoryBrowserMain is rendered', () => {
       // Arrange
       render(<InventoryBrowserMain />);
       const snapshotButton = await screen.findByRole('button', {
-        name: /Sorc · D2S/i,
+        name: /Sorc · Character/i,
       });
       vi.useFakeTimers();
 
@@ -199,7 +392,7 @@ describe('When InventoryBrowserMain is rendered', () => {
       // Arrange
       render(<InventoryBrowserMain />);
       const snapshotButton = await screen.findByRole('button', {
-        name: /Sorc · D2S/i,
+        name: /Sorc · Character/i,
       });
       vi.useFakeTimers();
 
@@ -362,8 +555,8 @@ describe('When InventoryBrowserMain is rendered', () => {
       render(<InventoryBrowserMain />);
 
       // Assert
-      expect(await screen.findByText('Sorc · D2S')).toBeInTheDocument();
-      expect(screen.getByText('Barb · D2S')).toBeInTheDocument();
+      expect(await screen.findByText('Sorc · Character')).toBeInTheDocument();
+      expect(screen.getByText('Barb · Character')).toBeInTheDocument();
     });
   });
 
@@ -382,7 +575,9 @@ describe('When InventoryBrowserMain is rendered', () => {
         sourceFilePath: '/tmp/sorc.d2s',
         locationContext: 'inventory' as const,
       };
-      const dropzone = await screen.findByText('Drop inventory items here to vault');
+      const dropzone = await screen.findByText(
+        'Drop an item here to remove it from its save file and keep it in the vault',
+      );
 
       // Act
       fireEvent.drop(dropzone, {

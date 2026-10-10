@@ -5,6 +5,7 @@ import { GameItemTooltipContent } from '@/components/inventory/GameItemTooltipCo
 import { ItemSocketOverlay } from '@/components/inventory/ItemSocketOverlay';
 import {
   type EquipmentUnplacedReason,
+  formatInventoryTileLabel,
   formatLocation,
   formatSourceFileTypeLabel,
   getCoordinatesLabel,
@@ -76,7 +77,7 @@ export function InventoryTile({
             type="button"
             draggable={!disableInteractions && !!onDragStart}
             data-testid="inventory-item-tile"
-            aria-label={t(translations.inventoryBrowser.tileAriaLabel, { itemName: item.itemName })}
+            aria-label={formatInventoryTileLabel(item, t)}
             className={cn(
               'relative h-full w-full overflow-hidden rounded-[2px] border bg-card/75 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70',
               selected ? 'border-primary ring-1 ring-primary/70' : 'border-border/70',
