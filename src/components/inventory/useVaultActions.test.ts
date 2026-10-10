@@ -232,6 +232,24 @@ describe('When an item is vaulted out of a save file', () => {
     );
   });
 
+  it('If a natively stackable item without a sent stack count became its own row, Then the success toast offers an undo', async () => {
+    // Arrange
+    const rawItemJson = '{"code":"key","quantity":12}';
+    const keyInput = { ...SAVE_FILE_INPUT, rawItemJson } as VaultItemUpsertInput;
+    addItem.mockResolvedValue({ ...SAVE_FILE_VAULT_ITEM, rawItemJson, stackCount: 12 });
+    const { result } = renderVaultActions();
+
+    // Act
+    await act(async () => {
+      await result.current.vaultItem(keyInput);
+    });
+
+    // Assert
+    expect(getSuccessToastOptions()?.action?.label).toBe(
+      i18n.t(translations.inventoryBrowser.vaultFeedback.undo),
+    );
+  });
+
   it('If the origin cannot be restored, Then the success toast has no undo', async () => {
     // Arrange
     addItem.mockResolvedValue({

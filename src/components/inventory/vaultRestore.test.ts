@@ -151,6 +151,41 @@ describe('When it is checked whether a vault row was created by an add', () => {
   });
 });
 
+describe('When it is checked whether a vault row was created by an add of an unsent stack count', () => {
+  const KEY_RAW = '{"code":"key","quantity":12}';
+  const KEY_INPUT = {
+    ...INVENTORY_ORIGIN,
+    fingerprint: 'fp-key',
+    rawItemJson: KEY_RAW,
+  } as VaultItemUpsertInput;
+
+  it('If a natively stackable item from a save file became its own row, Then it was created by the add', () => {
+    // Arrange
+    const row = { ...KEY_INPUT, id: 'v1', stackCount: 12 } as VaultItem;
+
+    // Act
+    const result = isVaultRowCreatedByAdd(KEY_INPUT, row);
+
+    // Assert
+    expect(result).toBe(true);
+  });
+
+  it.each([
+    ['one stack merged into another single unit', '{"code":"r01"}', 2],
+    ['a key stack merged into another key stack', KEY_RAW, 20],
+  ])('If %s, Then the returned row is an existing row', (_case, rawItemJson, rowCount) => {
+    // Arrange
+    const input = { ...KEY_INPUT, rawItemJson } as VaultItemUpsertInput;
+    const row = { ...input, id: 'v1', stackCount: rowCount } as VaultItem;
+
+    // Act
+    const result = isVaultRowCreatedByAdd(input, row);
+
+    // Assert
+    expect(result).toBe(false);
+  });
+});
+
 describe('When it is checked whether a vault row came from a save file', () => {
   it.each([
     ['/saves/Sorc.d2s', true],

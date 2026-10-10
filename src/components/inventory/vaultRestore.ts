@@ -10,6 +10,12 @@ export type VaultItemOrigin = Pick<
 > &
   Partial<Pick<VaultItem, 'stackCount' | 'rawItemJson'>>;
 
+/** The stack count recorded in the item data itself (a missing or unreadable one counts as 1). */
+function resolveRawItemStackCount(rawItemJson: string): number {
+  const parsed = parseRawItemJson<StackCountSource>(rawItemJson);
+  return parsed ? resolveStackCount(parsed) : 1;
+}
+
 /**
  * True when a stack row no longer holds the stack it was taken from. Vaulting a resource stack
  * merges it into the existing row for that item code, which keeps the first stack's item data and
@@ -20,18 +26,21 @@ function isMergedStack({ stackCount, rawItemJson }: VaultItemOrigin): boolean {
     return false;
   }
 
-  const parsed = parseRawItemJson<StackCountSource>(rawItemJson);
-  return stackCount !== (parsed ? resolveStackCount(parsed) : 1);
+  return stackCount !== resolveRawItemStackCount(rawItemJson);
 }
 
 /**
  * True when the row returned by `vault.addItem` is the row this add created. A resource stack that
  * was merged into an existing vault row comes back as that row: its count is the sum of both and
  * its origin is the first stack's, neither of which describes the item that was just vaulted.
+ *
+ * The vault stores the stack count sent with the input, else the one in the item data, and a merge
+ * always adds at least one unit to the existing row, so a merged row never has that count.
  */
 export function isVaultRowCreatedByAdd(input: VaultItemOrigin, row: VaultItemOrigin): boolean {
+  const addedCount = input.stackCount ?? resolveRawItemStackCount(input.rawItemJson ?? '');
   return (
-    (row.stackCount ?? 1) === (input.stackCount ?? 1) &&
+    (row.stackCount ?? 1) === addedCount &&
     row.sourceFilePath === input.sourceFilePath &&
     row.locationContext === input.locationContext &&
     row.stashTab === input.stashTab &&
