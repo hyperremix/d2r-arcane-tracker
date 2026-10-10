@@ -193,8 +193,49 @@ describe('When an item is vaulted out of a save file', () => {
       expect.anything(),
     );
     expect(action?.label).toBe(i18n.t(translations.inventoryBrowser.vaultFeedback.undo));
-    await waitFor(() => expect(unvaultItem).toHaveBeenCalledWith('vault-save', RESTORE_TARGET));
+    await waitFor(() => expect(unvaultItem).toHaveBeenCalledWith('vault-save', RESTORE_TARGET, 1));
     await waitFor(() => expect(reloadInventoryAfterSaveWrite).toHaveBeenCalledTimes(1));
+  });
+
+  it('If a stack became its own row and the row grew before the undo, Then the undo only takes out the units this vault added', async () => {
+    // Arrange
+    // Another stack of the same item merges into the row after this toast (the toast still holds
+    // the snapshot with the original count), so a whole-row withdraw would write both stacks.
+    const stackInput = { ...SAVE_FILE_INPUT, stackCount: 2 } as VaultItemUpsertInput;
+    addItem.mockResolvedValue({ ...SAVE_FILE_VAULT_ITEM, stackCount: 2 });
+    const { result } = renderVaultActions();
+    await act(async () => {
+      await result.current.vaultItem(stackInput);
+    });
+    const action = getSuccessToastOptions()?.action;
+
+    // Act
+    await act(async () => {
+      action?.onClick();
+    });
+
+    // Assert
+    await waitFor(() => expect(unvaultItem).toHaveBeenCalledWith('vault-save', RESTORE_TARGET, 2));
+  });
+
+  it('If a natively stackable item is undone, Then the undo takes out the whole stack it added', async () => {
+    // Arrange
+    const rawItemJson = '{"code":"key","quantity":12}';
+    const keyInput = { ...SAVE_FILE_INPUT, rawItemJson } as VaultItemUpsertInput;
+    addItem.mockResolvedValue({ ...SAVE_FILE_VAULT_ITEM, rawItemJson, stackCount: 12 });
+    const { result } = renderVaultActions();
+    await act(async () => {
+      await result.current.vaultItem(keyInput);
+    });
+    const action = getSuccessToastOptions()?.action;
+
+    // Act
+    await act(async () => {
+      action?.onClick();
+    });
+
+    // Assert
+    await waitFor(() => expect(unvaultItem).toHaveBeenCalledWith('vault-save', RESTORE_TARGET, 12));
   });
 
   it('If the item was merged into an existing vaulted stack, Then the success toast has no undo', async () => {

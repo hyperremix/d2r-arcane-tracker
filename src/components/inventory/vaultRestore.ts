@@ -29,6 +29,13 @@ function isMergedStack({ stackCount, rawItemJson }: VaultItemOrigin): boolean {
   return stackCount !== resolveRawItemStackCount(rawItemJson);
 }
 
+/** The number of stack units an add puts into the vault: the count sent with it, else the item data's. */
+export function resolveAddedStackCount(
+  input: Pick<VaultItemOrigin, 'stackCount' | 'rawItemJson'>,
+): number {
+  return input.stackCount ?? resolveRawItemStackCount(input.rawItemJson ?? '');
+}
+
 /**
  * True when the row returned by `vault.addItem` is the row this add created. A resource stack that
  * was merged into an existing vault row comes back as that row: its count is the sum of both and
@@ -38,9 +45,8 @@ function isMergedStack({ stackCount, rawItemJson }: VaultItemOrigin): boolean {
  * always adds at least one unit to the existing row, so a merged row never has that count.
  */
 export function isVaultRowCreatedByAdd(input: VaultItemOrigin, row: VaultItemOrigin): boolean {
-  const addedCount = input.stackCount ?? resolveRawItemStackCount(input.rawItemJson ?? '');
   return (
-    (row.stackCount ?? 1) === addedCount &&
+    (row.stackCount ?? 1) === resolveAddedStackCount(input) &&
     row.sourceFilePath === input.sourceFilePath &&
     row.locationContext === input.locationContext &&
     row.stashTab === input.stashTab &&

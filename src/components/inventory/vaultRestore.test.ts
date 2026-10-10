@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   isVaultedFromSaveFile,
   isVaultRowCreatedByAdd,
+  resolveAddedStackCount,
   resolveVaultRestoreTarget,
   type VaultItemOrigin,
 } from './vaultRestore';
@@ -183,6 +184,25 @@ describe('When it is checked whether a vault row was created by an add of an uns
 
     // Assert
     expect(result).toBe(false);
+  });
+});
+
+describe('When the number of units an add puts into the vault is resolved', () => {
+  it.each([
+    ['a sent stack count', { stackCount: 4, rawItemJson: '{"code":"key","quantity":12}' }, 4],
+    ['the count in the item data', { rawItemJson: '{"code":"key","quantity":12}' }, 12],
+    ['an item without a stack', { rawItemJson: '{"code":"cap"}' }, 1],
+    ['unreadable item data', { rawItemJson: 'not json' }, 1],
+    ['no item data', {}, 1],
+  ])('If the add has %s, Then it is counted correctly', (_name, input, expected) => {
+    // Arrange
+    // (the input comes from the table)
+
+    // Act
+    const count = resolveAddedStackCount(input);
+
+    // Assert
+    expect(count).toBe(expected);
   });
 });
 

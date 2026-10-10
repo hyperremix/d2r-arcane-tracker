@@ -1,3 +1,4 @@
+import type { UnvaultTargetOptions } from 'electron/ipc/contract';
 import type { VaultItem, VaultItemUpsertInput } from 'electron/types/grail';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -10,6 +11,7 @@ import {
 import {
   isVaultedFromSaveFile,
   isVaultRowCreatedByAdd,
+  resolveAddedStackCount,
   resolveVaultRestoreTarget,
 } from '@/components/inventory/vaultRestore';
 import { translations } from '@/i18n/translations';
@@ -33,9 +35,25 @@ export interface VaultActions {
   /**
    * Takes an item out of the vault: an item that was taken out of a save file goes back to its
    * original position (see `resolveVaultRestoreTarget`), any other row is only marked unvaulted.
-   * `onUnvaulted` runs after the write succeeded and before the inventory reloads.
+   * `onUnvaulted` runs after the write succeeded and before the inventory reloads. `withdrawCount`
+   * limits a restore to that many units of the row (the service refuses more than the row holds).
    */
-  unvaultItem: (vaultItem: VaultItem, onUnvaulted: () => void) => Promise<void>;
+  unvaultItem: (
+    vaultItem: VaultItem,
+    onUnvaulted: () => void,
+    withdrawCount?: number,
+  ) => Promise<void>;
+}
+
+/** Writes a vault row back to a save file position; without a count the whole row is withdrawn. */
+function restoreVaultRow(
+  rowId: string,
+  target: UnvaultTargetOptions,
+  withdrawCount: number | undefined,
+): Promise<unknown> {
+  return withdrawCount === undefined
+    ? window.electronAPI.vault.unvaultItem(rowId, target)
+    : window.electronAPI.vault.unvaultItem(rowId, target, withdrawCount);
 }
 
 /**
@@ -57,7 +75,11 @@ export function useVaultActions({
   const isUnvaultInFlightRef = useRef(false);
 
   const unvaultItem = useCallback(
-    async (vaultItem: VaultItem, onUnvaulted: () => void): Promise<void> => {
+    async (
+      vaultItem: VaultItem,
+      onUnvaulted: () => void,
+      withdrawCount?: number,
+    ): Promise<void> => {
       if (isUnvaultInFlightRef.current) {
         toast.info(t(translations.inventoryBrowser.vaultFeedback.unvaultBusy));
         return;
@@ -74,7 +96,7 @@ export function useVaultActions({
       setIsUnvaulting(true);
       try {
         if (restoreTarget) {
-          await window.electronAPI.vault.unvaultItem(vaultItem.id, restoreTarget);
+          await restoreVaultRow(vaultItem.id, restoreTarget, withdrawCount);
           toast.success(
             t(translations.inventoryBrowser.vaultFeedback.restored, {
               itemName: vaultItem.itemName,
@@ -126,7 +148,13 @@ export function useVaultActions({
         action: {
           label: t(translations.inventoryBrowser.vaultFeedback.undo),
           onClick: () => {
-            void latestUnvaultItemRef.current(savedItem, () => undefined);
+            // `savedItem` is the row as it was when vaulting. The row may hold more units by now
+            // (a later stack merged into it), so only take out the units this vault added.
+            void latestUnvaultItemRef.current(
+              savedItem,
+              () => undefined,
+              resolveAddedStackCount(itemInput),
+            );
           },
         },
       });
