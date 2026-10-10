@@ -1,6 +1,6 @@
 import type {
-  D2Item,
   D2SaveFile,
+  D2SItem,
   GrailProgress,
   Item,
   ItemDetectionEvent,
@@ -8,7 +8,11 @@ import type {
 } from '../types/grail';
 import { createServiceLogger } from '../utils/serviceLogger';
 import type { EventBus } from './EventBus';
-import { selectDetectionCandidates, toDetectedItem } from './itemNormalizer';
+import {
+  resolveGrailLookupName,
+  selectDetectionCandidates,
+  toDetectedItem,
+} from './itemNormalizer';
 
 const log = createServiceLogger('ItemDetection');
 
@@ -18,7 +22,7 @@ const log = createServiceLogger('ItemDetection');
  * identify found items, and tracks previously seen items to prevent duplicate notifications.
  */
 class ItemDetectionService {
-  private grailItems: Item[] = [];
+  private grailItemsById: Map<string, Item> = new Map();
   private eventBus: EventBus;
   private previouslySeenItems: Set<string> = new Set();
 
@@ -35,7 +39,7 @@ class ItemDetectionService {
    * @param {Item[]} items - Array of Holy Grail items to match against.
    */
   setGrailItems(items: Item[]): void {
-    this.grailItems = items;
+    this.grailItemsById = new Map(items.map((item) => [item.id, item]));
   }
 
   /**
@@ -73,9 +77,9 @@ class ItemDetectionService {
     try {
       // Track items to prevent duplicate notifications globally
       for (const candidate of selectDetectionCandidates(parsedItems)) {
-        const item = toDetectedItem(candidate, saveFile);
-        const grailMatch = this.findGrailMatch(item);
+        const grailMatch = this.findGrailMatch(candidate.rawParsedItem);
         if (grailMatch) {
+          const item = toDetectedItem(candidate, saveFile);
           // Create unique key for this item using stable properties
           // Uses grailMatch.id (grail item ID) to match database initialization format
           const itemKey = `${grailMatch.id}_${item.ethereal}`;
@@ -103,14 +107,15 @@ class ItemDetectionService {
   }
 
   /**
-   * Finds a matching Holy Grail item for a detected D2 item.
+   * Finds the Holy Grail item of a raw d2s item by its grail lookup name: the grail item id
+   * (which repairs the d2s "Love" -> "Lore" runeword name), otherwise the simplified unique or
+   * set name. This is the same key the detection candidates are selected and grouped by.
    * @private
-   * @param {D2Item} item - The detected D2 item to match.
+   * @param {D2SItem} rawItem - The raw d2s item to match.
    * @returns {Item | null} The matching Holy Grail item, or null if no match is found.
    */
-  private findGrailMatch(item: D2Item): Item | null {
-    // Simple exact name matching - no complex algorithms
-    return this.grailItems.find((grailItem) => grailItem.id === item.name) || null;
+  private findGrailMatch(rawItem: D2SItem): Item | null {
+    return this.grailItemsById.get(resolveGrailLookupName(rawItem)) ?? null;
   }
 
   /**

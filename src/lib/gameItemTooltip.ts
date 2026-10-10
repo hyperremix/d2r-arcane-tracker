@@ -33,13 +33,6 @@ interface ParsedSocketedRawItem {
 
 interface ParsedRawItem {
   runeword_name?: unknown;
-  unique_name?: unknown;
-  set_name?: unknown;
-  rare_name?: unknown;
-  rare_name2?: unknown;
-  magic_prefix_name?: unknown;
-  magic_suffix_name?: unknown;
-  name?: unknown;
   type_name?: unknown;
   type?: unknown;
   code?: unknown;
@@ -81,7 +74,8 @@ export interface GameItemTooltipModel {
 
 interface BuildGameItemTooltipModelArgs {
   rawItemJson: string;
-  fallbackName: string;
+  /** Display name the main process resolved for the item (`itemName`), used as the title. */
+  itemName: string;
   quality: string;
   type?: string;
   socketCount?: number;
@@ -186,51 +180,6 @@ function getAffixLines(raw: ParsedRawItem): string[] {
       return description ? [description] : [];
     })
     .filter((line, index, all) => all.indexOf(line) === index);
-}
-
-function resolveMagicOrRareName(raw: ParsedRawItem): string | undefined {
-  const rareParts = [toOptionalString(raw.rare_name), toOptionalString(raw.rare_name2)].filter(
-    (value): value is string => Boolean(value),
-  );
-  if (rareParts.length > 0) {
-    return rareParts.join(' ');
-  }
-
-  const prefix = toOptionalString(raw.magic_prefix_name);
-  const suffix = toOptionalString(raw.magic_suffix_name);
-  if (!prefix && !suffix) {
-    return undefined;
-  }
-
-  const baseName =
-    toOptionalString(raw.type_name) ??
-    toOptionalString(raw.name) ??
-    toOptionalString(raw.type) ??
-    toOptionalString(raw.code);
-
-  const resolved = [prefix, baseName, suffix].filter((value): value is string => Boolean(value));
-  return resolved.length > 0 ? resolved.join(' ') : undefined;
-}
-
-function getName(raw: ParsedRawItem, fallbackName: string): string {
-  const fallbackDisplayName = toOptionalString(fallbackName);
-  const candidates = [
-    raw.runeword_name,
-    raw.unique_name,
-    raw.set_name,
-    resolveMagicOrRareName(raw),
-    fallbackDisplayName,
-    raw.name,
-  ];
-
-  for (const candidate of candidates) {
-    const parsed = toOptionalString(candidate);
-    if (parsed) {
-      return parsed;
-    }
-  }
-
-  return fallbackName;
 }
 
 function getBaseType(raw: ParsedRawItem): string | undefined {
@@ -437,7 +386,7 @@ function buildSocketEntries(
 
 function resolveNameAndBaseType(
   raw: ParsedRawItem,
-  fallbackName: string,
+  itemName: string,
 ): [
   name: string,
   baseTypeLine: string | undefined,
@@ -448,16 +397,15 @@ function resolveNameAndBaseType(
   if (itemCode && materialDisplayNameByCode[itemCode]) {
     return [materialDisplayNameByCode[itemCode], undefined, true, true];
   }
-  const rawName = getName(raw, fallbackName);
-  // When the base type line already contains the raw name (e.g. "vex" + "Vex Rune",
-  // or "flaweddiamond" + "Flawed Diamond"), the raw name is a redundant internal
+  // When the base type line already contains the item name (e.g. "vex" + "Vex Rune",
+  // or "flaweddiamond" + "Flawed Diamond"), the item name is a redundant internal
   // code — promote baseTypeLine to the title. Compare after stripping spaces so
   // multi-word type names like "Flawed Diamond" match their concatenated form.
   const rawBaseTypeLine = getBaseType(raw);
-  const rawNameNormalized = rawName.toLowerCase().replace(/\s+/g, '');
-  return rawBaseTypeLine?.toLowerCase().replace(/\s+/g, '').includes(rawNameNormalized)
+  const itemNameNormalized = itemName.toLowerCase().replace(/\s+/g, '');
+  return rawBaseTypeLine?.toLowerCase().replace(/\s+/g, '').includes(itemNameNormalized)
     ? [rawBaseTypeLine, undefined, true, false]
-    : [rawName, rawBaseTypeLine, Boolean(rawBaseTypeLine), false];
+    : [itemName, rawBaseTypeLine, Boolean(rawBaseTypeLine), false];
 }
 
 export function buildGameItemTooltipModel(
@@ -470,7 +418,7 @@ export function buildGameItemTooltipModel(
 
   const [name, baseTypeLine, hasBaseType, isMaterialOverride] = resolveNameAndBaseType(
     raw,
-    args.fallbackName,
+    args.itemName,
   );
   const coreLines: string[] = [];
 

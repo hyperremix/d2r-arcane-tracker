@@ -1,5 +1,5 @@
 import type * as d2s from '@dschu012/d2s';
-import { runesByCode, runewordsByNameSimple } from '../items/indexes';
+import { runewordsByNameSimple } from '../items/indexes';
 import type {
   D2Item,
   D2SaveFile,
@@ -9,8 +9,7 @@ import type {
   VaultLocationContext,
   VaultSourceFileType,
 } from '../types/grail';
-import { normalizeItemCodeKey } from '../utils/d2rFormat';
-import { getGrailItemId, resolveRainbowFacetName } from '../utils/grailItemUtils';
+import { getGrailItemId } from '../utils/grailItemUtils';
 import { normalizeIconFilename, resolveCanonicalIconFilename } from '../utils/iconFilenameResolver';
 import { isRune, simplifyItemName } from '../utils/objects';
 import { resolveSpatialLocation } from '../utils/spatialLocationResolver';
@@ -343,22 +342,11 @@ export function normalizeItemsWithSocketedItems(
 }
 
 /**
- * Name the grail detection matches against grail item ids: the simplified unique or set name,
- * the rune name, or the simplified runeword name. Unlike `getGrailItemId` it does not repair the
- * d2s "Love" runeword name and falls back to the parser's item name.
+ * Name of the grail detection view: the grail lookup name the detection matches grail item ids
+ * against (so a d2s "Love" runeword is named "lore"), otherwise the parser's item name.
  */
-export function resolveDetectionName(item: D2SItem): string {
-  let name = simplifyItemName(item.unique_name || item.set_name || '');
-
-  if (name.includes('rainbowfacet')) {
-    name = resolveRainbowFacetName(item, name);
-  } else if (runesByCode[normalizeItemCodeKey(item.type) ?? '']) {
-    name = runesByCode[normalizeItemCodeKey(item.type) ?? ''].name.toLowerCase();
-  } else if (item.runeword_name) {
-    name = simplifyItemName(item.runeword_name);
-  }
-
-  return name || item.name || item.type_name || item.code || 'Unknown Item';
+function resolveDetectionName(item: D2SItem): string {
+  return resolveGrailLookupName(item) || item.name || item.type_name || item.code || 'Unknown Item';
 }
 
 /** Item type as the grail detection reports it: lower-cased d2s type, or "misc". */

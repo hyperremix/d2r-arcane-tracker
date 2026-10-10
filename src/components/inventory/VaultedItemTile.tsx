@@ -43,7 +43,7 @@ export function VaultedItemTile({
     () =>
       buildGameItemTooltipModel({
         rawItemJson: item.rawItemJson,
-        fallbackName: item.itemName,
+        itemName: item.itemName,
         quality: item.quality,
         type: item.type,
         socketCount: item.socketCount,

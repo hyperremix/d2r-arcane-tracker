@@ -47,4 +47,26 @@ describe('When getGrailItemId is called for a non-rune item', () => {
     // Assert
     expect(result).toBe('harlequincrest');
   });
+
+  it('If a unique shares its name with a runeword, Then returns the unique, not the runeword', () => {
+    // Arrange
+    const item = { type: 'amu', unique_name: 'Crescent Moon' };
+
+    // Act
+    const result = getGrailItemId(item);
+
+    // Assert
+    expect(result).toBe('crescentmoon-amulet');
+  });
+
+  it('If the runeword name is the d2s "Love" bug, Then returns the Lore runeword', () => {
+    // Arrange
+    const item = { type: 'cap', runeword_name: 'Love' };
+
+    // Act
+    const result = getGrailItemId(item);
+
+    // Assert
+    expect(result).toBe('lore');
+  });
 });
