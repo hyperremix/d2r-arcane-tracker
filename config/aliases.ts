@@ -2,7 +2,7 @@ import path from 'node:path';
 import type { D2sAlias } from './d2sAliases';
 
 /**
- * Resolve aliases for the repository's own source folders, matching the `paths` in tsconfig.json:
+ * Resolve aliases for the repository's own source folders, matching the `paths` in tsconfig.base.json:
  *
  * - `@/...` resolves to `src/...`.
  * - `electron/...` resolves to `electron/...` (main-process code shared with the renderer).
