@@ -91,7 +91,8 @@ interface RunTrackerState {
   // Actions - Session Management
   startSession: () => Promise<void>;
   endSession: () => Promise<void>;
-  archiveSession: (sessionId: string) => Promise<void>;
+  /** @returns Whether the session was archived */
+  archiveSession: (sessionId: string) => Promise<boolean>;
   /** @returns Whether the notes were saved */
   updateSessionNotes: (sessionId: string, notes: string) => Promise<boolean>;
 
@@ -329,12 +330,11 @@ export const useRunTrackerStore = create<RunTrackerState>()(
       });
     },
 
-    archiveSession: async (sessionId) => {
-      await runAction('archiveSession', 'archiveSessionFailed', async () => {
+    archiveSession: (sessionId) =>
+      runAction('archiveSession', 'archiveSessionFailed', async () => {
         await window.electronAPI?.runTracker.archiveSession(sessionId);
         console.log('[RunTrackerStore] Session archived:', sessionId);
-      });
-    },
+      }),
 
     updateSessionNotes: (sessionId, notes) =>
       runAction(

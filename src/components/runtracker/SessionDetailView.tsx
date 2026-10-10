@@ -29,6 +29,35 @@ const TIME_FORMAT_OPTIONS: Intl.DateTimeFormatOptions = {
   second: '2-digit',
 };
 
+interface ArchiveButtonProps {
+  isArchiving: boolean;
+  hasActiveRun: boolean;
+  onClick: () => void;
+}
+
+/** Archive action; unavailable while a run of the session is in progress. */
+function ArchiveButton({ isArchiving, hasActiveRun, onClick }: ArchiveButtonProps) {
+  const { t } = useTranslation();
+  return (
+    <Button
+      variant="outline"
+      size="sm"
+      onClick={onClick}
+      disabled={isArchiving || hasActiveRun}
+      aria-busy={isArchiving}
+      title={hasActiveRun ? t(translations.runTracker.sessionCard.archiveEndRunFirst) : undefined}
+      className="flex-1"
+    >
+      {isArchiving ? (
+        <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
+      ) : (
+        <Archive className="mr-2 h-4 w-4" />
+      )}
+      {t(translations.runTracker.sessionCard.archiveSession)}
+    </Button>
+  );
+}
+
 /**
  * SessionDetailView component that displays detailed information about a specific session
  * including session stats, notes, controls (if active), and the list of runs.
@@ -38,6 +67,7 @@ export function SessionDetailView({ sessionId, onBack }: SessionDetailViewProps)
   const {
     sessions,
     activeSession,
+    activeRun,
     runs,
     sessionsLoading,
     pendingActions,
@@ -48,6 +78,7 @@ export function SessionDetailView({ sessionId, onBack }: SessionDetailViewProps)
     useShallow((state) => ({
       sessions: state.sessions,
       activeSession: state.activeSession,
+      activeRun: state.activeRun,
       runs: state.runs,
       sessionsLoading: state.sessionsLoading,
       pendingActions: state.pendingActions,
@@ -74,6 +105,9 @@ export function SessionDetailView({ sessionId, onBack }: SessionDetailViewProps)
   const isActiveSession = useMemo(() => {
     return activeSession?.id === sessionId;
   }, [activeSession?.id, sessionId]);
+
+  // A session can't be archived in the middle of one of its runs
+  const hasActiveRun = Boolean(session && activeRun?.sessionId === session.id);
 
   const sessionStats = useSessionStats(session);
   const { notes, isSavingNotes, handleNotesChange, handleNotesBlur } = useSessionNotes(
@@ -119,16 +153,18 @@ export function SessionDetailView({ sessionId, onBack }: SessionDetailViewProps)
   // Handle archive session
   const handleArchiveSession = useCallback(async () => {
     if (!session) return;
-    try {
-      await archiveSession(session.id);
+    // A run may have started while the confirmation was open; the archive button is disabled then
+    if (hasActiveRun) {
       setShowArchiveDialog(false);
-      // Navigate back after archiving
-      onBack();
-    } catch (error) {
-      console.error('Error archiving session:', error);
-      setShowArchiveDialog(false);
+      return;
     }
-  }, [archiveSession, session, onBack]);
+    const archived = await archiveSession(session.id);
+    setShowArchiveDialog(false);
+    // Stay on the session when archiving failed; the store reports the error
+    if (archived) {
+      onBack();
+    }
+  }, [archiveSession, session, hasActiveRun, onBack]);
 
   // Handle export
   const handleExportClick = useCallback(() => {
@@ -324,21 +360,11 @@ export function SessionDetailView({ sessionId, onBack }: SessionDetailViewProps)
           {/* Action Buttons */}
           <div className="flex gap-2 pt-2">
             {!session.archived && (
-              <Button
-                variant="outline"
-                size="sm"
+              <ArchiveButton
+                isArchiving={isArchiving}
+                hasActiveRun={hasActiveRun}
                 onClick={() => setShowArchiveDialog(true)}
-                disabled={isArchiving}
-                aria-busy={isArchiving}
-                className="flex-1"
-              >
-                {isArchiving ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
-                ) : (
-                  <Archive className="mr-2 h-4 w-4" />
-                )}
-                {t(translations.runTracker.sessionCard.archiveSession)}
-              </Button>
+              />
             )}
             <Button
               variant="outline"

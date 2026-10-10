@@ -29,7 +29,7 @@ const mockSession: Session = {
   lastUpdated: new Date('2024-01-01T10:00:00Z'),
 };
 
-const mockArchiveSession = vi.fn().mockResolvedValue(undefined);
+const mockArchiveSession = vi.fn().mockResolvedValue(true);
 const mockEndSession = vi.fn().mockResolvedValue(undefined);
 const mockStartSession = vi.fn().mockResolvedValue(undefined);
 

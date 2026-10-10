@@ -23,6 +23,7 @@ const mockElectronAPI = {
   runTracker: {
     startSession: vi.fn(),
     endSession: vi.fn(),
+    archiveSession: vi.fn(),
     updateSessionNotes: vi.fn(),
     startRun: vi.fn(),
     endRun: vi.fn(),
@@ -1072,6 +1073,43 @@ describe('When the user pauses, resumes and ends a run', () => {
     expect(ended).toBe(false);
     expect(useRunTrackerStore.getState().activeRun).toEqual(run);
     expect(useRunTrackerStore.getState().error).toEqual({ code: 'endRunFailed' });
+  });
+});
+
+describe('When a session is archived', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    useRunTrackerStore.setState({ error: null });
+  });
+
+  it('If archiving succeeds, Then archiveSession reports success', async () => {
+    // Arrange
+    mockElectronAPI.runTracker.archiveSession.mockResolvedValue({ success: true });
+
+    // Act
+    let archived = false;
+    await act(async () => {
+      archived = await useRunTrackerStore.getState().archiveSession('session-1');
+    });
+
+    // Assert
+    expect(archived).toBe(true);
+    expect(mockElectronAPI.runTracker.archiveSession).toHaveBeenCalledWith('session-1');
+  });
+
+  it('If archiving is rejected, Then archiveSession reports failure and the error is shown', async () => {
+    // Arrange
+    mockElectronAPI.runTracker.archiveSession.mockRejectedValue(new Error('Run in progress'));
+
+    // Act
+    let archived = true;
+    await act(async () => {
+      archived = await useRunTrackerStore.getState().archiveSession('session-1');
+    });
+
+    // Assert
+    expect(archived).toBe(false);
+    expect(useRunTrackerStore.getState().error).toEqual({ code: 'archiveSessionFailed' });
   });
 });
 
