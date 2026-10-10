@@ -39,14 +39,21 @@ export function SegmentButton({ pressed, onClick, children, ariaLabel }: Segment
 interface SegmentedControlProps {
   legend: string;
   children: ReactNode;
+  /** Stretches the control to the available width, sharing it equally between the buttons. */
+  fullWidth?: boolean;
 }
 
 /**
  * A group of mutually exclusive toggle buttons rendered as a labeled fieldset.
  */
-export function SegmentedControl({ legend, children }: SegmentedControlProps) {
+export function SegmentedControl({ legend, children, fullWidth = false }: SegmentedControlProps) {
   return (
-    <fieldset className="inline-flex items-center rounded-md border border-border bg-muted p-0.5">
+    <fieldset
+      className={cn(
+        'inline-flex items-center rounded-md border border-border bg-muted p-0.5',
+        fullWidth && 'flex w-full *:flex-1',
+      )}
+    >
       <legend className="sr-only">{legend}</legend>
       {children}
     </fieldset>

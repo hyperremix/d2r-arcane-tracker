@@ -376,6 +376,36 @@ describe('When VirtualItemGrid is rendered', () => {
       expect(screen.getByText('1/2')).toBeDefined();
     });
 
+    it('Then should render a labelled progress bar of the found share', () => {
+      // Arrange
+      const groupedItems = [
+        {
+          title: 'Unique Armor',
+          items: [
+            createMockItem({ id: 'item-1', name: 'Harlequin Crest' }),
+            createMockItem({ id: 'item-2', name: "Tyrael's Might" }),
+          ],
+          foundCount: 1,
+        },
+      ];
+
+      // Act
+      render(
+        <VirtualItemGrid
+          groupedItems={groupedItems}
+          showGroupHeaders
+          progressLookup={createMockProgressLookup()}
+          characters={[]}
+          onItemClick={vi.fn()}
+        />,
+      );
+
+      // Assert
+      const progressBar = screen.getByRole('progressbar', { name: 'Unique Armor progress' });
+      expect(progressBar).toHaveAttribute('aria-valuenow', '50');
+      expect(progressBar).toHaveAttribute('aria-valuetext', '1/2 (50.0%)');
+    });
+
     it('Then should render all items in the group', () => {
       // Arrange
       const groupedItems = [

@@ -1,4 +1,11 @@
-import type { AdvancedGrailFilter, GrailFilter, GrailProgress, Item } from 'electron/types/grail';
+import type {
+  AdvancedGrailFilter,
+  GrailFilter,
+  GrailProgress,
+  Item,
+  ItemCategory,
+  ItemType,
+} from 'electron/types/grail';
 import { itemMatchesSearch, tokenizeSearchQuery } from '@/lib/itemSearch';
 
 /**
@@ -142,6 +149,47 @@ const buildFoundDateMap = (progress: GrailProgress[]): Map<string, number> => {
 };
 
 /**
+ * Item types in Diablo's quality order, used to sort and group by type.
+ */
+export const itemTypeOrder: readonly ItemType[] = ['unique', 'set', 'rune', 'runeword'];
+
+/**
+ * Item categories in display order (equipment first, then runes and runewords), used to sort and
+ * group by category. Matches the category order of the filters popover.
+ */
+export const itemCategoryOrder: readonly ItemCategory[] = [
+  'weapons',
+  'armor',
+  'jewelry',
+  'charms',
+  'runes',
+  'runewords',
+];
+
+/**
+ * Returns the position of a value in a defined order; unknown values are placed last.
+ */
+const getRank = <T>(order: readonly T[], value: T): number => {
+  const index = order.indexOf(value);
+  return index === -1 ? order.length : index;
+};
+
+/**
+ * Returns the sort position of an item type (see {@link itemTypeOrder}).
+ * @param {ItemType} type - The item type
+ * @returns {number} The rank; unknown types rank last
+ */
+export const getItemTypeRank = (type: ItemType): number => getRank(itemTypeOrder, type);
+
+/**
+ * Returns the sort position of an item category (see {@link itemCategoryOrder}).
+ * @param {ItemCategory} category - The item category
+ * @returns {number} The rank; unknown categories rank last
+ */
+export const getItemCategoryRank = (category: ItemCategory): number =>
+  getRank(itemCategoryOrder, category);
+
+/**
  * Collator used for name comparisons. Reusing one instance is much faster than calling
  * `String.prototype.localeCompare` for every comparison.
  */
@@ -161,9 +209,9 @@ const compareBySortKey = (
     case 'name':
       return nameCollator.compare(a.name, b.name);
     case 'category':
-      return a.category.localeCompare(b.category);
+      return getItemCategoryRank(a.category) - getItemCategoryRank(b.category);
     case 'type':
-      return a.type.localeCompare(b.type);
+      return getItemTypeRank(a.type) - getItemTypeRank(b.type);
     case 'found_date':
       return (foundDateMap?.get(a.id) ?? 0) - (foundDateMap?.get(b.id) ?? 0);
     default:
@@ -173,6 +221,8 @@ const compareBySortKey = (
 
 /**
  * Sorts items based on the specified criteria and order.
+ * Types follow Diablo's quality order and categories the display order (see {@link itemTypeOrder}
+ * and {@link itemCategoryOrder}) instead of their alphabetical internal keys.
  * Items with equal sort keys (e.g. all missing items when sorting by found date) are ordered
  * by name A–Z and then by ID, regardless of the sort order, so the result is always stable.
  * @param {Item[]} items - Array of items to sort

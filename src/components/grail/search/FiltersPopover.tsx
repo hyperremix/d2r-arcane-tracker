@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Switch } from '@/components/ui/switch';
 import { translations } from '@/i18n/translations';
 import { toSubCategoryFilterValue } from '@/lib/grailFilters';
 import { itemCategoryLabelKeys } from '@/lib/labelKeys';
@@ -72,11 +73,14 @@ interface FiltersPopoverProps {
   subCategoryGroups: SubCategoryGroup[];
   onToggleCategory: (category: ItemCategory) => void;
   onToggleSubCategory: (subCategory: string) => void;
+  fuzzySearch: boolean;
+  onFuzzySearchChange: (fuzzySearch: boolean) => void;
 }
 
 /**
- * Popover with category and sub-category filters. Sub-categories are grouped by category.
- * The trigger shows the number of active filters inside the popover.
+ * Popover with the fuzzy search switch and the category and sub-category filters. Sub-categories
+ * are grouped by category. The trigger shows the number of active category and sub-category
+ * filters.
  */
 export function FiltersPopover({
   selectedCategories,
@@ -84,9 +88,13 @@ export function FiltersPopover({
   subCategoryGroups,
   onToggleCategory,
   onToggleSubCategory,
+  fuzzySearch,
+  onFuzzySearchChange,
 }: FiltersPopoverProps) {
   const { t } = useTranslation();
   const idPrefix = useId();
+  const fuzzySearchLabelId = `${idPrefix}-fuzzy-label`;
+  const fuzzySearchDescriptionId = `${idPrefix}-fuzzy-description`;
   const activeCount = selectedCategories.length + selectedSubCategories.length;
   const filtersLabel = t(translations.grail.advancedSearch.filters);
 
@@ -109,6 +117,22 @@ export function FiltersPopover({
         )}
       </PopoverTrigger>
       <PopoverContent align="start" className="max-h-[min(70vh,36rem)] w-96 overflow-y-auto">
+        <div className="flex items-center justify-between gap-4">
+          <div className="space-y-1">
+            <span id={fuzzySearchLabelId} className="font-medium text-sm">
+              {t(translations.grail.advancedSearch.fuzzySearch)}
+            </span>
+            <p id={fuzzySearchDescriptionId} className="text-muted-foreground text-xs">
+              {t(translations.grail.advancedSearch.fuzzySearchDescription)}
+            </p>
+          </div>
+          <Switch
+            checked={fuzzySearch}
+            onCheckedChange={onFuzzySearchChange}
+            aria-labelledby={fuzzySearchLabelId}
+            aria-describedby={fuzzySearchDescriptionId}
+          />
+        </div>
         <FilterCheckboxGroup
           legend={t(translations.grail.advancedSearch.categories)}
           idPrefix={`${idPrefix}-category`}

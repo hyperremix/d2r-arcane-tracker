@@ -547,6 +547,7 @@ vi.mock('./ItemDetailsDialog', () => ({
     open ? <div data-testid="item-details-dialog">{itemId}</div> : null,
 }));
 vi.mock('./VirtualItemGrid', () => ({
+  GroupHeader: ({ title }: { title: string }) => <h3>{title}</h3>,
   ItemCardCell: ({ item }: { item: Item }) => <div data-testid="item-card">{item.name}</div>,
   VirtualItemGrid: ({
     groupedItems,
@@ -704,6 +705,46 @@ describe('When ItemGrid component is rendered', () => {
       // Assert
       const titles = screen.getAllByTestId('group-title').map((el) => el.textContent);
       expect(titles).toEqual(['Unique', 'Runeword']);
+    });
+
+    it('Then the groups follow the quality order regardless of the item order', () => {
+      // Arrange
+      const items = [
+        HolyGrailItemBuilder.new().withId('a').withType('runeword').build(),
+        HolyGrailItemBuilder.new().withId('b').withType('rune').build(),
+        HolyGrailItemBuilder.new().withId('c').withType('set').build(),
+        HolyGrailItemBuilder.new().withId('d').withType('unique').build(),
+      ];
+      setupComponentMocks({ filteredItems: items, viewMode: 'grid', groupMode: 'type' });
+
+      // Act
+      render(<ItemGrid />);
+
+      // Assert
+      const titles = screen.getAllByTestId('group-title').map((el) => el.textContent);
+      expect(titles).toEqual(['Unique', 'Set', 'Rune', 'Runeword']);
+    });
+  });
+
+  describe('If viewMode "grid", groupMode "category" and items arrive in any order', () => {
+    it('Then the groups follow the defined category order', () => {
+      // Arrange
+      const items = [
+        HolyGrailItemBuilder.new().withId('a').withCategory('runewords').build(),
+        HolyGrailItemBuilder.new().withId('b').withCategory('charms').build(),
+        HolyGrailItemBuilder.new().withId('c').withCategory('armor').build(),
+        HolyGrailItemBuilder.new().withId('d').withCategory('weapons').build(),
+        HolyGrailItemBuilder.new().withId('e').withCategory('runes').build(),
+        HolyGrailItemBuilder.new().withId('f').withCategory('jewelry').build(),
+      ];
+      setupComponentMocks({ filteredItems: items, viewMode: 'grid', groupMode: 'category' });
+
+      // Act
+      render(<ItemGrid />);
+
+      // Assert
+      const titles = screen.getAllByTestId('group-title').map((el) => el.textContent);
+      expect(titles).toEqual(['Weapons', 'Armor', 'Jewelry', 'Charms', 'Runes', 'Runewords']);
     });
   });
 
@@ -1021,7 +1062,7 @@ describe('When ItemGrid component is rendered', () => {
   });
 
   describe('If ethereal tracking is enabled and group mode is ethereal', () => {
-    it('Then keeps the ethereal group mode and groups items by translated ethereal status', () => {
+    it('Then keeps the ethereal group mode and groups items by translated ethereal status in a fixed order', () => {
       // Arrange
       const bothFoundItem = HolyGrailItemBuilder.new()
         .withId('both-found')
@@ -1062,7 +1103,8 @@ describe('When ItemGrid component is rendered', () => {
         ],
       ]);
       setupComponentMocks({
-        filteredItems: [bothFoundItem, neitherFoundItem, normalOnlyTypeItem, etherealOnlyTypeItem],
+        // Reverse of the group order, so the groups cannot simply follow the item order
+        filteredItems: [etherealOnlyTypeItem, normalOnlyTypeItem, neitherFoundItem, bothFoundItem],
         settings: { grailNormal: true, grailEthereal: true },
         viewMode: 'grid',
         groupMode: 'ethereal',
@@ -1075,10 +1117,10 @@ describe('When ItemGrid component is rendered', () => {
       // Assert
       expect(mockSetGroupMode).not.toHaveBeenCalled();
       expect(screen.getAllByTestId('group').map((group) => group.textContent)).toEqual([
-        'Both Found: 1',
-        'Neither Found: 1',
-        'Normal Found: 1',
-        'Ethereal Not Found: 1',
+        'Both versions found: 1',
+        'Missing both versions: 1',
+        'No ethereal version: found: 1',
+        'Ethereal version missing: 1',
       ]);
     });
   });
