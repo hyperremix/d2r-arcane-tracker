@@ -357,7 +357,7 @@ describe('When run analytics show the run durations by session', () => {
     // Assert
     expect(
       await screen.findByRole('img', {
-        name: 'Run durations of your last 2 sessions: the median run went from 2:00 in the earliest to 1:30 in the latest',
+        name: 'Run durations of your last 2 sessions with completed runs: the median run went from 2:00 in the earliest to 1:30 in the latest',
       }),
     ).toBeInTheDocument();
     expect(mockElectronAPI.runTracker.getAllSessions).toHaveBeenCalledWith(false);

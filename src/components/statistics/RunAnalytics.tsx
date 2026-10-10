@@ -3,6 +3,8 @@ import { Clock, Download, Target, TrendingUp, Trophy } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
+import { RunDurationCard } from '@/components/statistics/RunDurationChart';
+import { StatTile } from '@/components/statistics/StatTile';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,8 +12,6 @@ import { translations } from '@/i18n/translations';
 import { escapeCsvCell } from '@/lib/csv';
 import { formatDuration, formatLocalizedDate } from '@/lib/date';
 import { getFileName } from '@/lib/path';
-import { RunDurationCard } from './RunDurationChart';
-import { StatTile } from './StatTile';
 
 /**
  * RunAnalytics component that displays overall run statistics and highlights.
@@ -106,7 +106,7 @@ export function RunAnalytics() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-8">
+      <div className="flex min-h-64 items-center justify-center">
         <div className="flex flex-col items-center text-center">
           <div
             className="mb-4 h-8 w-8 animate-spin rounded-full border-4 border-muted border-t-primary motion-reduce:animate-none"
@@ -122,7 +122,7 @@ export function RunAnalytics() {
 
   if (error) {
     return (
-      <div className="flex items-center justify-center py-8">
+      <div className="flex min-h-64 items-center justify-center">
         <Card className="w-full max-w-md">
           <CardContent className="flex flex-col items-center gap-4 p-6 text-center">
             <div className="text-center text-muted-foreground">
@@ -142,7 +142,7 @@ export function RunAnalytics() {
 
   if (!overallStats || overallStats.totalRuns === 0) {
     return (
-      <div className="flex items-center justify-center py-8">
+      <div className="flex min-h-64 items-center justify-center">
         <Card className="w-full max-w-md">
           <CardContent className="flex flex-col items-center gap-4 p-6 text-center">
             <div className="text-center text-muted-foreground">

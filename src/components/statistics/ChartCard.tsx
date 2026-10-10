@@ -4,10 +4,13 @@ import {
   type ReactNode,
   type RefCallback,
   useEffect,
+  useId,
   useRef,
   useState,
 } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { translations } from '@/i18n/translations';
 import { cn } from '@/lib/utils';
 
 /**
@@ -41,10 +44,17 @@ export function ChartCard({ title, description, children, className }: ChartCard
 }
 
 /**
+ * Props for the ChartEmptyState component.
+ */
+interface ChartEmptyStateProps {
+  children: ReactNode;
+}
+
+/**
  * Message shown in place of a chart that has no data yet.
  * @returns {JSX.Element} The empty state
  */
-export function ChartEmptyState({ children }: { children: ReactNode }) {
+export function ChartEmptyState({ children }: ChartEmptyStateProps) {
   return (
     <p className="flex min-h-40 items-center justify-center px-4 text-center text-muted-foreground text-sm">
       {children}
@@ -53,19 +63,19 @@ export function ChartEmptyState({ children }: { children: ReactNode }) {
 }
 
 /** One line of a chart tooltip: the value leads, the label follows. */
-export interface ChartTooltipRow {
+interface ChartTooltipRow {
   label: string;
   value: string;
 }
 
 /** Content of a chart tooltip. */
-export interface ChartTooltipContent {
+interface ChartTooltipContent {
   heading: string;
   rows: ChartTooltipRow[];
 }
 
 /** Position of a data point in chart coordinates. */
-export interface ChartPoint {
+interface ChartPoint {
   x: number;
   y: number;
 }
@@ -122,14 +132,22 @@ export function InteractiveChart({
   children,
   table,
 }: InteractiveChartProps) {
+  const { t } = useTranslation();
+  const hintId = useId();
   const svgRef = useRef<SVGSVGElement>(null);
-  const [activeIndex, setActiveIndex] = useState<number | undefined>(undefined);
+  const [requestedIndex, setActiveIndex] = useState<number | undefined>(undefined);
+  // True while the pointer drives the tooltip; its changes are not announced on every hover
+  const [pointerActive, setPointerActive] = useState(false);
   const lastIndex = points.length - 1;
+  // The data may shrink while a position is active (e.g. a setting is toggled), so keep it in range
+  const activeIndex =
+    requestedIndex === undefined || lastIndex < 0 ? undefined : Math.min(requestedIndex, lastIndex);
 
   const handlePointerMove = (event: PointerEvent<SVGSVGElement>) => {
     const rect = svgRef.current?.getBoundingClientRect();
     if (!rect || rect.width === 0 || points.length === 0) return;
     const x = ((event.clientX - rect.left) / rect.width) * width;
+    setPointerActive(true);
     setActiveIndex(findClosestIndex(points, x));
   };
 
@@ -148,6 +166,7 @@ export function InteractiveChart({
     }
     if (event.key in next) {
       event.preventDefault();
+      setPointerActive(false);
       setActiveIndex(next[event.key]);
     }
   };
@@ -163,18 +182,25 @@ export function InteractiveChart({
         viewBox={`0 0 ${width} ${height}`}
         role="img"
         aria-label={label}
+        aria-describedby={hintId}
         // biome-ignore lint/a11y/noNoninteractiveTabindex: the chart is focusable so keyboard users can move its tooltip with the arrow keys
         tabIndex={0}
         className="block h-auto w-full overflow-visible rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         onPointerMove={handlePointerMove}
-        onPointerLeave={() => setActiveIndex(undefined)}
+        onPointerLeave={() => {
+          setPointerActive(false);
+          setActiveIndex(undefined);
+        }}
         onFocus={() => setActiveIndex((index) => index ?? lastIndex)}
         onBlur={() => setActiveIndex(undefined)}
         onKeyDown={handleKeyDown}
       >
         {children(activeIndex)}
       </svg>
-      <div aria-live="polite">
+      <p id={hintId} className="sr-only">
+        {t(translations.statistics.charts.keyboardHint)}
+      </p>
+      <div aria-live={pointerActive ? 'off' : 'polite'}>
         {active && tooltip && (
           <div
             data-testid="chart-tooltip"
@@ -210,12 +236,20 @@ export function InteractiveChart({
 }
 
 /**
+ * A row of the ChartDataTable component.
+ */
+interface ChartDataTableRow {
+  key: string;
+  cells: string[];
+}
+
+/**
  * Props for the ChartDataTable component.
  */
 interface ChartDataTableProps {
   caption: string;
   columns: string[];
-  rows: { key: string; cells: string[] }[];
+  rows: ChartDataTableRow[];
 }
 
 /**
@@ -281,7 +315,7 @@ export function useChartWidth(): [RefCallback<HTMLDivElement>, number] {
 }
 
 /** Margins around the plot area of a chart, in chart coordinates. */
-export interface ChartMargin {
+interface ChartMargin {
   top: number;
   right: number;
   bottom: number;
@@ -289,12 +323,15 @@ export interface ChartMargin {
 }
 
 /** Plot area of a chart, in chart coordinates. */
-export interface PlotArea {
+interface PlotArea {
   left: number;
   right: number;
   top: number;
   bottom: number;
 }
+
+/** Margins of charts with their value labels on the left only. */
+export const CHART_MARGIN: ChartMargin = { top: 16, right: 16, bottom: 28, left: 44 };
 
 /**
  * Returns the plot area inside the chart margins.

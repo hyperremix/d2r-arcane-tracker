@@ -1,6 +1,4 @@
 import { useTranslation } from 'react-i18next';
-import { translations } from '@/i18n/translations';
-import { formatLocalizedDate } from '@/lib/date';
 import {
   CHART_HEIGHT,
   CHART_TEXT_CLASS,
@@ -12,8 +10,13 @@ import {
   InteractiveChart,
   linearScale,
   useChartWidth,
-} from './ChartCard';
-import { type CumulativeFindsPoint, dayIndexToUtcDate, niceTicks } from './chartData';
+} from '@/components/statistics/ChartCard';
+import {
+  type CumulativeFindsPoint,
+  formatDayIndex,
+  niceTicks,
+} from '@/components/statistics/chartData';
+import { translations } from '@/i18n/translations';
 
 /** Days shown before the first find when every find was made on the same day. */
 const MIN_DAY_SPAN = 7;
@@ -52,11 +55,8 @@ export function GrailProgressChart({ points, today, totalItems }: GrailProgressC
     );
   }
 
-  const formatDay = (day: number) =>
-    formatLocalizedDate(dayIndexToUtcDate(day), i18n.language, {
-      dateStyle: 'medium',
-      timeZone: 'UTC',
-    });
+  const formatDay = (day: number) => formatDayIndex(day, i18n.language, { dateStyle: 'medium' });
+  const formatCount = (value: number) => value.toLocaleString(i18n.language);
 
   const plot = getPlotArea(MARGIN, width);
   const firstDay = points[0].day;
@@ -85,11 +85,8 @@ export function GrailProgressChart({ points, today, totalItems }: GrailProgressC
     return {
       heading: formatDay(point.day),
       rows: [
-        { label: t(translations.common.found), value: point.total.toLocaleString(i18n.language) },
-        {
-          label: t(chartT.newOnDay),
-          value: (point.total - previousTotal).toLocaleString(i18n.language),
-        },
+        { label: t(translations.common.found), value: formatCount(point.total) },
+        { label: t(chartT.newOnDay), value: formatCount(point.total - previousTotal) },
       ],
     };
   };
@@ -117,8 +114,8 @@ export function GrailProgressChart({ points, today, totalItems }: GrailProgressC
               key: String(point.day),
               cells: [
                 formatDay(point.day),
-                String(point.total),
-                String(point.total - (index > 0 ? points[index - 1].total : 0)),
+                formatCount(point.total),
+                formatCount(point.total - (index > 0 ? points[index - 1].total : 0)),
               ],
             }))}
           />
@@ -126,12 +123,7 @@ export function GrailProgressChart({ points, today, totalItems }: GrailProgressC
       >
         {(activeIndex) => (
           <>
-            <ChartGrid
-              ticks={ticks}
-              toY={toY}
-              plot={plot}
-              format={(value) => value.toLocaleString(i18n.language)}
-            />
+            <ChartGrid ticks={ticks} toY={toY} plot={plot} format={formatCount} />
             <path d={areaPath} className="fill-chart-1/10" />
             <path
               d={linePath}
@@ -155,7 +147,7 @@ export function GrailProgressChart({ points, today, totalItems }: GrailProgressC
               dy="0.32em"
               className="fill-foreground font-medium text-[11px] tabular-nums"
             >
-              {latest.total.toLocaleString(i18n.language)}
+              {formatCount(latest.total)}
             </text>
             <text x={plot.left} y={CHART_HEIGHT - 8} className={CHART_TEXT_CLASS}>
               {formatDay(startDay)}

@@ -3,6 +3,14 @@ import { BarChart3, Clock, Target, TrendingUp, Trophy, Users, Zap } from 'lucide
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ItemCard } from '@/components/grail/ItemCard';
+import {
+  buildCumulativeFinds,
+  buildWeeklyFinds,
+  toLocalDayIndex,
+} from '@/components/statistics/chartData';
+import { GrailProgressChart } from '@/components/statistics/GrailProgressChart';
+import { StatTile } from '@/components/statistics/StatTile';
+import { WeeklyFindsChart } from '@/components/statistics/WeeklyFindsChart';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress, ProgressLabel } from '@/components/ui/progress';
@@ -12,16 +20,20 @@ import { translations } from '@/i18n/translations';
 import { formatTimeAgo } from '@/lib/date';
 import { itemCategoryLabelKeys, itemSubCategoryLabelKeys } from '@/lib/labelKeys';
 import { useGrailStatistics, useGrailStore } from '@/stores/grailStore';
-import { buildCumulativeFinds, buildWeeklyFinds, toLocalDayIndex } from './chartData';
-import { GrailProgressChart } from './GrailProgressChart';
-import { StatTile } from './StatTile';
-import { WeeklyFindsChart } from './WeeklyFindsChart';
+
+/**
+ * Props for the SectionTitle component.
+ */
+interface SectionTitleProps {
+  icon: LucideIcon;
+  children: string;
+}
 
 /**
  * Card heading of a dashboard section, rendered as an `h2` with a decorative icon.
  * @returns {JSX.Element} The section heading
  */
-function SectionTitle({ icon: Icon, children }: { icon: LucideIcon; children: string }) {
+function SectionTitle({ icon: Icon, children }: SectionTitleProps) {
   return (
     <CardTitle>
       <h2 className="flex items-center gap-2">

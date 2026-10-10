@@ -1,10 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button } from '@/components/ui/button';
-import { translations } from '@/i18n/translations';
-import { formatClockDuration, formatLocalizedDate } from '@/lib/date';
 import {
   CHART_HEIGHT,
+  CHART_MARGIN,
   CHART_TEXT_CLASS,
   ChartCard,
   ChartDataTable,
@@ -14,38 +12,52 @@ import {
   InteractiveChart,
   linearScale,
   useChartWidth,
-} from './ChartCard';
+} from '@/components/statistics/ChartCard';
 import {
   buildSessionDurations,
   durationTicks,
   RUN_DURATION_SESSIONS,
   type SessionDurationSummary,
-} from './chartData';
-
-const MARGIN = { top: 16, right: 16, bottom: 28, left: 44 };
+  type SessionRuns,
+} from '@/components/statistics/chartData';
+import { Button } from '@/components/ui/button';
+import { translations } from '@/i18n/translations';
+import { formatClockDuration, formatLocalizedDate } from '@/lib/date';
 
 /** Width of the bar that spans the middle half of a session's runs. */
 const RANGE_BAR_WIDTH = 10;
 
 /**
- * Loads the completed run durations of the most recent sessions that have runs. Like the other run
- * statistics, archived sessions are left out.
+ * Loads the completed run durations of the most recent sessions that have a completed run. Like the
+ * other run statistics, archived sessions are left out. A session's run count includes the run in
+ * progress, so sessions are read newest first, in batches, until enough of them have a completed run.
  * @returns The duration summaries (oldest session first)
  */
 async function loadSessionDurations(): Promise<SessionDurationSummary[]> {
   const sessions = await window.electronAPI.runTracker.getAllSessions(false);
-  const recentSessions = sessions
+  const candidates = sessions
     .filter((session) => session.runCount > 0)
-    .sort((a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime())
-    .slice(0, RUN_DURATION_SESSIONS);
-  const sessionsWithRuns = await Promise.all(
-    recentSessions.map(async (session) => ({
-      id: session.id,
-      startTime: session.startTime,
-      runs: await window.electronAPI.runTracker.getRunsBySession(session.id),
-    })),
-  );
-  return buildSessionDurations(sessionsWithRuns);
+    .sort((a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime());
+  const summaries: SessionDurationSummary[] = [];
+  for (
+    let start = 0;
+    start < candidates.length && summaries.length < RUN_DURATION_SESSIONS;
+    start += RUN_DURATION_SESSIONS
+  ) {
+    const batch: SessionRuns[] = await Promise.all(
+      candidates.slice(start, start + RUN_DURATION_SESSIONS).map(async (session) => ({
+        id: session.id,
+        startTime: session.startTime,
+        runs: await window.electronAPI.runTracker.getRunsBySession(session.id),
+      })),
+    );
+    summaries.push(...buildSessionDurations(batch));
+  }
+  // Batches are newest first, so the sessions to drop are the oldest ones
+  return summaries
+    .sort((a, b) => b.startTime.getTime() - a.startTime.getTime())
+    .slice(0, RUN_DURATION_SESSIONS)
+    .reverse();
 }
 
 /**
@@ -133,13 +145,14 @@ export function RunDurationChart({ summaries }: RunDurationChartProps) {
 
   const formatSessionDate = (summary: SessionDurationSummary) =>
     formatLocalizedDate(summary.startTime, i18n.language, { dateStyle: 'medium' });
+  const formatCount = (value: number) => value.toLocaleString(i18n.language);
   const formatRange = (summary: SessionDurationSummary) =>
     t(chartT.range, {
       from: formatClockDuration(summary.lowerQuartile),
       to: formatClockDuration(summary.upperQuartile),
     });
 
-  const plot = getPlotArea(MARGIN, width);
+  const plot = getPlotArea(CHART_MARGIN, width);
   const ticks = durationTicks(Math.max(...summaries.map((summary) => summary.upperQuartile)));
   const toY = linearScale([0, ticks[ticks.length - 1]], [plot.bottom, plot.top]);
   const slotWidth = (plot.right - plot.left) / summaries.length;
@@ -163,7 +176,7 @@ export function RunDurationChart({ summaries }: RunDurationChartProps) {
         { label: t(chartT.middleHalf), value: formatRange(summary) },
         { label: t(analyticsT.fastestRun), value: formatClockDuration(summary.fastest) },
         { label: t(analyticsT.slowestRun), value: formatClockDuration(summary.slowest) },
-        { label: t(chartT.completedRuns), value: summary.runCount.toLocaleString(i18n.language) },
+        { label: t(chartT.completedRuns), value: formatCount(summary.runCount) },
       ],
     };
   };
@@ -187,7 +200,10 @@ export function RunDurationChart({ summaries }: RunDurationChartProps) {
           {t(chartT.medianRun)}
         </li>
         <li className="flex items-center gap-1.5">
-          <span className="h-3 w-2.5 rounded-sm bg-chart-1/25" aria-hidden="true" />
+          <span
+            className="h-3 w-2.5 rounded-sm border border-chart-1 bg-chart-1/20"
+            aria-hidden="true"
+          />
           {t(chartT.middleHalf)}
         </li>
       </ul>
@@ -217,7 +233,7 @@ export function RunDurationChart({ summaries }: RunDurationChartProps) {
                 formatRange(summary),
                 formatClockDuration(summary.fastest),
                 formatClockDuration(summary.slowest),
-                String(summary.runCount),
+                formatCount(summary.runCount),
               ],
             }))}
           />
@@ -248,7 +264,9 @@ export function RunDurationChart({ summaries }: RunDurationChartProps) {
                   width={RANGE_BAR_WIDTH}
                   height={height}
                   rx={Math.min(4, height / 2)}
-                  className="fill-chart-1/25"
+                  className="fill-chart-1/20 stroke-chart-1"
+                  strokeWidth={1.5}
+                  vectorEffect="non-scaling-stroke"
                 />
               );
             })}

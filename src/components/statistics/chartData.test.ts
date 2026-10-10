@@ -5,6 +5,7 @@ import {
   buildSessionDurations,
   buildWeeklyFinds,
   durationTicks,
+  formatDayIndex,
   niceTicks,
   toLocalDayIndex,
 } from './chartData';
@@ -182,5 +183,25 @@ describe('When computing axis ticks', () => {
     // Arrange & Act & Assert
     expect(durationTicks(80_000)).toEqual([0, 30_000, 60_000, 90_000]);
     expect(durationTicks(0)).toEqual([0, 5_000]);
+  });
+});
+
+describe('When formatting a day index', () => {
+  it('If the local day is the 10th, Then the date shows the 10th regardless of the time zone', () => {
+    // Arrange
+    const day = toLocalDayIndex(new Date(2026, 9, 10, 23, 30));
+
+    // Act
+    const formatted = formatDayIndex(day, 'en', { dateStyle: 'medium' });
+
+    // Assert
+    expect(formatted).toBe('Oct 10, 2026');
+  });
+
+  it('If durations exceed an hour, Then the ticks step in whole hours', () => {
+    // Arrange & Act & Assert
+    expect(durationTicks(4 * 3_600_000 * 2)).toEqual([
+      0, 7_200_000, 14_400_000, 21_600_000, 28_800_000,
+    ]);
   });
 });

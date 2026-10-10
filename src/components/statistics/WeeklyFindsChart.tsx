@@ -1,8 +1,7 @@
 import { useTranslation } from 'react-i18next';
-import { translations } from '@/i18n/translations';
-import { formatLocalizedDate } from '@/lib/date';
 import {
   CHART_HEIGHT,
+  CHART_MARGIN,
   CHART_TEXT_CLASS,
   ChartCard,
   ChartDataTable,
@@ -12,10 +11,9 @@ import {
   InteractiveChart,
   linearScale,
   useChartWidth,
-} from './ChartCard';
-import { dayIndexToUtcDate, niceTicks, type WeeklyFinds } from './chartData';
-
-const MARGIN = { top: 16, right: 16, bottom: 28, left: 44 };
+} from '@/components/statistics/ChartCard';
+import { formatDayIndex, niceTicks, type WeeklyFinds } from '@/components/statistics/chartData';
+import { translations } from '@/i18n/translations';
 
 /** Widest a bar may be; the rest of its slot stays empty. */
 const MAX_BAR_WIDTH = 24;
@@ -68,7 +66,7 @@ export function WeeklyFindsChart({ weeks }: WeeklyFindsChartProps) {
   }
 
   const formatDay = (day: number, options: Intl.DateTimeFormatOptions) =>
-    formatLocalizedDate(dayIndexToUtcDate(day), i18n.language, { ...options, timeZone: 'UTC' });
+    formatDayIndex(day, i18n.language, options);
   const formatWeek = (week: WeeklyFinds) =>
     t(chartT.range, {
       from: formatDay(week.startDay, { dateStyle: 'medium' }),
@@ -76,7 +74,7 @@ export function WeeklyFindsChart({ weeks }: WeeklyFindsChartProps) {
     });
   const formatCount = (value: number) => value.toLocaleString(i18n.language);
 
-  const plot = getPlotArea(MARGIN, width);
+  const plot = getPlotArea(CHART_MARGIN, width);
   const ticks = niceTicks(Math.max(...weeks.map((week) => week.count)));
   const toY = linearScale([0, ticks[ticks.length - 1]], [plot.bottom, plot.top]);
   const slotWidth = (plot.right - plot.left) / weeks.length;
@@ -113,7 +111,7 @@ export function WeeklyFindsChart({ weeks }: WeeklyFindsChartProps) {
             columns={[t(chartT.week), t(chartT.finds)]}
             rows={weeks.map((week) => ({
               key: String(week.startDay),
-              cells: [formatWeek(week), String(week.count)],
+              cells: [formatWeek(week), formatCount(week.count)],
             }))}
           />
         }

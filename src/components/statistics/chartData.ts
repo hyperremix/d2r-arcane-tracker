@@ -1,5 +1,5 @@
 import type { GrailProgress, Item, Run } from 'electron/types/grail';
-import { DAY_MS } from '@/lib/date';
+import { DAY_MS, formatLocalizedDate, HOUR_MS } from '@/lib/date';
 import type { GrailStatisticsSettings } from '@/lib/grailStatistics';
 import { findFirstDiscoveries } from '@/lib/sessionStats';
 
@@ -29,6 +29,21 @@ export function toLocalDayIndex(date: Date): number {
  */
 export function dayIndexToUtcDate(dayIndex: number): Date {
   return new Date(dayIndex * DAY_MS);
+}
+
+/**
+ * Formats a day index as a date. Day indexes are UTC midnights, so the date is formatted in UTC.
+ * @param dayIndex - Day index from {@link toLocalDayIndex}
+ * @param locale - Locale of the formatted date
+ * @param options - Date format options
+ * @returns The formatted date
+ */
+export function formatDayIndex(
+  dayIndex: number,
+  locale: string,
+  options: Intl.DateTimeFormatOptions,
+): string {
+  return formatLocalizedDate(dayIndexToUtcDate(dayIndex), locale, { ...options, timeZone: 'UTC' });
 }
 
 /** Number of grail entries found by the end of a day. */
@@ -131,15 +146,20 @@ function quantile(sorted: number[], fraction: number): number {
   return sorted[lower] + (sorted[upper] - sorted[lower]) * (position - lower);
 }
 
+/** A session with its runs. */
+export interface SessionRuns {
+  id: string;
+  startTime: Date;
+  runs: Run[];
+}
+
 /**
  * Summarizes the completed run durations of each session. Sessions without a completed run are
  * left out.
  * @param sessions - Sessions with their runs
  * @returns One summary per session with completed runs, in chronological order
  */
-export function buildSessionDurations(
-  sessions: { id: string; startTime: Date; runs: Run[] }[],
-): SessionDurationSummary[] {
+export function buildSessionDurations(sessions: SessionRuns[]): SessionDurationSummary[] {
   const summaries: SessionDurationSummary[] = [];
   for (const session of sessions) {
     const durations = session.runs
@@ -187,7 +207,17 @@ export function niceTicks(max: number, targetCount = 4): number[] {
 
 /** Round duration steps for the duration axis, in milliseconds. */
 const DURATION_STEPS_MS = [
-  5_000, 10_000, 15_000, 30_000, 60_000, 120_000, 300_000, 600_000, 900_000, 1_800_000, 3_600_000,
+  5_000,
+  10_000,
+  15_000,
+  30_000,
+  60_000,
+  120_000,
+  300_000,
+  600_000,
+  900_000,
+  1_800_000,
+  HOUR_MS,
 ];
 
 /**
@@ -202,7 +232,7 @@ export function durationTicks(maxMs: number, targetCount = 4): number[] {
   const roughStep = maxMs / targetCount;
   const step =
     DURATION_STEPS_MS.find((value) => value >= roughStep) ??
-    Math.ceil(roughStep / 3_600_000) * 3_600_000;
+    Math.ceil(roughStep / HOUR_MS) * HOUR_MS;
   const ticks: number[] = [];
   for (let value = 0; ; value += step) {
     ticks.push(value);
