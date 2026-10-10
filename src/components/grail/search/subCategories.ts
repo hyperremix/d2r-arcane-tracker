@@ -1,8 +1,8 @@
 import type { Item, ItemCategory, ItemSubCategory } from 'electron/types/grail';
 import type { TFunction } from 'i18next';
 import { translations } from '@/i18n/translations';
+import { parseSubCategoryFilterValue } from '@/lib/grailFilters';
 import { itemCategoryLabelKeys, subCategoryLabelKeys } from '@/lib/labelKeys';
-import { parseSubCategoryFilterValue } from '@/stores/grailStore';
 import { categoryValues } from './options';
 
 /**
