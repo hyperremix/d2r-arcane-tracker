@@ -14,8 +14,34 @@ import {
   type ResourceStashTabKind,
   resolveResourceStashTabKind,
   resolveStackCount,
+  SAVE_FILE_EXTENSIONS,
+  saveFileTypeFromExtension,
   toFiniteNumber,
 } from './d2rFormat';
+
+describe('When saveFileTypeFromExtension is called', () => {
+  it('Then supported extensions map to their file type regardless of case or dot', () => {
+    // Arrange
+    const extensions = ['.d2s', '.SSS', 'd2x', '.D2I', '.txt', ''];
+
+    // Act
+    const fileTypes = extensions.map((extension) => saveFileTypeFromExtension(extension));
+
+    // Assert
+    expect(fileTypes).toEqual(['d2s', 'sss', 'd2x', 'd2i', undefined, undefined]);
+  });
+
+  it('Then the save file extensions are the dotted file types', () => {
+    // Arrange
+    const expected = ['.d2s', '.d2i', '.sss', '.d2x'];
+
+    // Act
+    const extensions = [...SAVE_FILE_EXTENSIONS];
+
+    // Assert
+    expect(extensions).toEqual(expected);
+  });
+});
 
 describe('When isModernStashVersion is called', () => {
   it('Then only versions from 105 on count as modern', () => {

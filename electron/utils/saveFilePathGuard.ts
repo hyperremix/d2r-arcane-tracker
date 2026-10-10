@@ -1,7 +1,6 @@
 import { realpathSync } from 'node:fs';
 import { basename, dirname, extname, join, resolve } from 'node:path';
-
-const ALLOWED_SAVE_FILE_EXTENSIONS = new Set(['.d2s', '.d2i', '.sss', '.d2x']);
+import { SAVE_FILE_EXTENSIONS } from './d2rFormat';
 
 function normalizeForComparison(filePath: string): string {
   return process.platform === 'win32' ? filePath.toLowerCase() : filePath;
@@ -43,8 +42,10 @@ export function assertSaveFilePathAllowed(
     throw new Error(`${fieldName} must be a valid file path`);
   }
 
-  if (!ALLOWED_SAVE_FILE_EXTENSIONS.has(extname(filePath).toLowerCase())) {
-    throw new Error(`${fieldName} must point to a Diablo II save file (.d2s, .d2i, .sss, .d2x)`);
+  if (!SAVE_FILE_EXTENSIONS.has(extname(filePath).toLowerCase())) {
+    throw new Error(
+      `${fieldName} must point to a Diablo II save file (${[...SAVE_FILE_EXTENSIONS].join(', ')})`,
+    );
   }
 
   if (typeof saveDirectory !== 'string' || saveDirectory.trim().length === 0) {
@@ -56,7 +57,7 @@ export function assertSaveFilePathAllowed(
 
   if (
     normalizeForComparison(dirname(realFilePath)) !== normalizeForComparison(realSaveDirectory) ||
-    !ALLOWED_SAVE_FILE_EXTENSIONS.has(extname(realFilePath).toLowerCase())
+    !SAVE_FILE_EXTENSIONS.has(extname(realFilePath).toLowerCase())
   ) {
     throw new Error(`${fieldName} must be a save file inside the configured save directory`);
   }

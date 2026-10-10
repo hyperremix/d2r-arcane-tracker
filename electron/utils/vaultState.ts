@@ -1,12 +1,8 @@
-import type { VaultItem, VaultLocationContext, VaultSourceFileType } from '../types/grail';
+import type { VaultItem, VaultLocationContext } from '../types/grail';
+import { SAVE_FILE_TYPES } from './d2rFormat';
 
 /** Save file types the vault and inventory features understand. Shared by main and renderer. */
-export const VALID_SOURCE_FILE_TYPES: ReadonlySet<string> = new Set<VaultSourceFileType>([
-  'd2s',
-  'sss',
-  'd2x',
-  'd2i',
-]);
+export const VALID_SOURCE_FILE_TYPES: ReadonlySet<string> = new Set<string>(SAVE_FILE_TYPES);
 
 /** Keyed by the union so adding a {@link VaultLocationContext} member without listing it fails to compile. */
 const VAULT_LOCATION_CONTEXT_LOOKUP: Record<VaultLocationContext, true> = {

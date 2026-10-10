@@ -1,57 +1,17 @@
-import { readFile } from 'node:fs/promises';
-import { extname, resolve } from 'node:path';
+import { resolve } from 'node:path';
 import type { types as d2sTypes } from '@dschu012/d2s';
 import * as d2s from '@dschu012/d2s';
 import * as d2stash from '@dschu012/d2s/lib/d2/stash';
-import { constants as constants96 } from '@dschu012/d2s/lib/data/versions/96_constant_data';
-import { constants as constants99 } from '@dschu012/d2s/lib/data/versions/99_constant_data';
 import type { VaultSourceFileType } from '../../types/grail';
 import { writeFileAtomic } from '../../utils/atomicWrite';
-import { isModernStashVersion } from '../../utils/d2rFormat';
 import { backupSaveFile } from '../saveFileBackup';
-import { readD2iMetadata } from '../stashFormat';
+import type { ClassicStashCodec } from '../saveFormat/saveFormat';
 
 /**
  * Writes save files safely: backs them up, serializes character saves and classic stashes,
- * re-reads the result and refuses to write when an item would be lost. Also guards against
- * writing to read-only modern stash parts and detects when two paths are the same file.
+ * re-reads the result and refuses to write when an item would be lost. Also detects when two paths
+ * are the same file.
  */
-
-interface StashConstants {
-  constants: d2sTypes.IConstantData;
-  version: number;
-}
-
-export function getStashConstants(ext: string): StashConstants {
-  if (ext === '.d2i') {
-    return { constants: constants99, version: 99 };
-  }
-
-  return { constants: constants96, version: 96 };
-}
-
-export function assertWritableD2iBuffer(ext: string, buffer: Buffer): void {
-  if (ext !== '.d2i') {
-    return;
-  }
-
-  const metadata = readD2iMetadata(buffer);
-  if (isModernStashVersion(metadata.version)) {
-    throw new Error('MODERN_STASH_READ_ONLY');
-  }
-}
-
-export async function assertWritableStashMutationTarget(
-  filePath: string,
-  fileType: VaultSourceFileType,
-): Promise<void> {
-  if (fileType !== 'd2i') {
-    return;
-  }
-
-  const buffer = await readFile(filePath);
-  assertWritableD2iBuffer(extname(filePath), buffer);
-}
 
 /** Backs up the existing save file, then atomically replaces it. */
 export async function writeSaveFile(filePath: string, data: Buffer): Promise<void> {
@@ -115,13 +75,11 @@ function countStashItems(data: d2sTypes.IStash): number {
 export async function writeClassicStashFile(
   filePath: string,
   data: d2sTypes.IStash,
-  stashConstants: StashConstants,
+  codec: ClassicStashCodec,
 ): Promise<void> {
   const expectedItemCount = countStashItems(data);
-  const bytes = Buffer.from(
-    await d2stash.write(data, stashConstants.constants, stashConstants.version),
-  );
-  const reparsed = await d2stash.read(bytes, stashConstants.constants);
+  const bytes = Buffer.from(await d2stash.write(data, codec.constants, codec.version));
+  const reparsed = await d2stash.read(bytes, codec.constants);
   const actualItemCount = countStashItems(reparsed);
 
   if (actualItemCount !== expectedItemCount) {
@@ -131,16 +89,4 @@ export async function writeClassicStashFile(
   }
 
   await writeSaveFile(filePath, bytes);
-}
-
-export async function isModernD2iFile(
-  filePath: string,
-  fileType: VaultSourceFileType,
-): Promise<boolean> {
-  if (fileType !== 'd2i' || extname(filePath) !== '.d2i') {
-    return false;
-  }
-  const buffer = await readFile(filePath);
-  const metadata = readD2iMetadata(buffer);
-  return isModernStashVersion(metadata.version);
 }

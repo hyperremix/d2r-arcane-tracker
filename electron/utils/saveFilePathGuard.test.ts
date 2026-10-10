@@ -95,7 +95,9 @@ describe('When validating renderer-supplied save file paths', () => {
       const run = () => assertSaveFilePathAllowed(notSave, saveDir, 'sourceFilePath');
 
       // Assert
-      expect(run).toThrow('must point to a Diablo II save file');
+      expect(run).toThrow(
+        'sourceFilePath must point to a Diablo II save file (.d2s, .d2i, .sss, .d2x)',
+      );
     });
   });
 
