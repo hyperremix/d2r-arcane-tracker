@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { MAX_SESSION_NOTES_LENGTH } from '../utils/sessionNotes';
 import type { InvokeChannel } from './contract';
 import { IpcValidationError } from './validation';
 import { invokeArgValidators, isRendererWritableSetting } from './validators';
@@ -27,6 +28,13 @@ describe('When renderer arguments are validated against the IPC contract', () =>
     ['grail:backup', [''], 'Invalid backup path'],
     ['saveFile:inspectDirectory', [undefined], 'Invalid save directory: expected a string'],
     ['run-tracker:archive-session', [''], 'Invalid session ID'],
+    ['run-tracker:update-session-notes', ['', 'Cows'], 'Invalid session ID'],
+    ['run-tracker:update-session-notes', ['session-1', 42], 'Invalid session notes'],
+    [
+      'run-tracker:update-session-notes',
+      ['session-1', 'x'.repeat(MAX_SESSION_NOTES_LENGTH + 1)],
+      'Invalid session notes: longer than',
+    ],
     ['run-tracker:get-session-by-id', [{ id: 'x' }], 'Invalid session ID'],
     ['run-tracker:get-runs-by-session', [undefined], 'Invalid session ID'],
     ['run-tracker:get-session-items', [7], 'Invalid session ID'],
@@ -74,6 +82,17 @@ describe('When renderer arguments are validated against the IPC contract', () =>
     // Assert
     expect(error).toBeInstanceOf(IpcValidationError);
     expect((error as IpcValidationError).message).toContain(message);
+  });
+
+  it('If the session notes have exactly the maximum length, Then they are accepted', () => {
+    // Arrange
+    const notes = 'x'.repeat(MAX_SESSION_NOTES_LENGTH);
+
+    // Act
+    const result = validate('run-tracker:update-session-notes', 'session-1', notes);
+
+    // Assert
+    expect(result).toEqual(['session-1', notes]);
   });
 
   it('Then valid arguments are returned in contract order and extra arguments are dropped', () => {

@@ -65,6 +65,23 @@ export function archiveSession(ctx: DatabaseContext, sessionId: string): void {
   ctx.db.update(sessions).set({ archived: true }).where(eq(sessions.id, sessionId)).run();
 }
 
+/**
+ * Replaces the notes of a session. Empty notes are stored as no notes.
+ * @returns Whether a session with the ID exists
+ */
+export function updateSessionNotes(
+  ctx: DatabaseContext,
+  sessionId: string,
+  notes: string,
+): boolean {
+  const result = ctx.db
+    .update(sessions)
+    .set({ notes: notes === '' ? null : notes })
+    .where(eq(sessions.id, sessionId))
+    .run();
+  return result.changes > 0;
+}
+
 export function deleteSession(ctx: DatabaseContext, sessionId: string): void {
   ctx.db.delete(sessions).where(eq(sessions.id, sessionId)).run();
 }

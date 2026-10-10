@@ -234,6 +234,9 @@ export function createElectronAPI(bridge: IpcBridge, platform: ElectronPlatform)
       startSession: () => invoke('run-tracker:start-session'),
       endSession: () => invoke('run-tracker:end-session'),
       archiveSession: (sessionId: string) => invoke('run-tracker:archive-session', sessionId),
+      /** @returns The session with the saved notes */
+      updateSessionNotes: (sessionId: string, notes: string) =>
+        invoke('run-tracker:update-session-notes', sessionId, notes),
       startRun: (characterId?: string) => invoke('run-tracker:start-run', characterId),
       endRun: () => invoke('run-tracker:end-run'),
       pauseRun: () => invoke('run-tracker:pause'),

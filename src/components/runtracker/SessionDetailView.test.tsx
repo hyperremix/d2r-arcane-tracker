@@ -1,6 +1,7 @@
 import '@testing-library/jest-dom';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import type { Session } from 'electron/types/grail';
+import { MAX_SESSION_NOTES_LENGTH } from 'electron/utils/sessionNotes';
 import i18n from 'i18next';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useRunTrackerStore, useSessionStats } from '@/stores/runTrackerStore';
@@ -43,7 +44,7 @@ const createStoreState = (overrides: Record<string, unknown> = {}) =>
     sessionsLoading: false,
     pendingActions: {},
     archiveSession: mockArchiveSession,
-    updateSessionNotes: vi.fn().mockResolvedValue(undefined),
+    updateSessionNotes: vi.fn().mockResolvedValue(true),
     loadSessionRuns: vi.fn().mockResolvedValue(undefined),
     ...overrides,
   }) as unknown as ReturnType<typeof useRunTrackerStore>;
@@ -207,6 +208,60 @@ describe('SessionDetailView', () => {
       // Assert
       expect(screen.getByText('Session Information')).toBeInTheDocument();
       expect(screen.queryByText('Session Not Found')).not.toBeInTheDocument();
+    });
+  });
+
+  describe('When edited session notes lose focus', () => {
+    it('Then the notes are saved for the session', async () => {
+      // Arrange
+      const updateSessionNotes = vi.fn().mockResolvedValue(true);
+      mockStoreState(mockUseRunTrackerStore, createStoreState({ updateSessionNotes }));
+      render(<SessionDetailView sessionId="session-1" onBack={vi.fn()} />);
+      const textarea = screen.getByLabelText('Session Notes');
+
+      // Act
+      fireEvent.change(textarea, { target: { value: 'Cow runs' } });
+      fireEvent.blur(textarea);
+
+      // Assert
+      await waitFor(() => {
+        expect(updateSessionNotes).toHaveBeenCalledWith('session-1', 'Cow runs');
+      });
+      expect(textarea).toHaveValue('Cow runs');
+    });
+
+    it('If saving fails, Then the saved notes are shown again', async () => {
+      // Arrange
+      const updateSessionNotes = vi.fn().mockResolvedValue(false);
+      mockStoreState(mockUseRunTrackerStore, createStoreState({ updateSessionNotes }));
+      render(<SessionDetailView sessionId="session-1" onBack={vi.fn()} />);
+      const textarea = screen.getByLabelText('Session Notes');
+
+      // Act
+      fireEvent.change(textarea, { target: { value: 'Cow runs' } });
+      fireEvent.blur(textarea);
+
+      // Assert
+      await waitFor(() => {
+        expect(textarea).toHaveValue('');
+      });
+      expect(updateSessionNotes).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('When the notes editor is shown', () => {
+    it('Then it limits the notes to the maximum length the main process accepts', () => {
+      // Arrange
+      mockStoreState(mockUseRunTrackerStore, createStoreState());
+
+      // Act
+      render(<SessionDetailView sessionId="session-1" onBack={vi.fn()} />);
+
+      // Assert
+      expect(screen.getByLabelText('Session Notes')).toHaveAttribute(
+        'maxlength',
+        String(MAX_SESSION_NOTES_LENGTH),
+      );
     });
   });
 

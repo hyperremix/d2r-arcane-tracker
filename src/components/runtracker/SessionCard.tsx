@@ -1,6 +1,7 @@
 import type { Run, Session } from 'electron/types/grail';
+import { MAX_SESSION_NOTES_LENGTH } from 'electron/utils/sessionNotes';
 import { ChevronDown, FileDownIcon, Loader2 } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useShallow } from 'zustand/react/shallow';
 import { Button } from '@/components/ui/button';
@@ -15,6 +16,7 @@ import { ArchiveSessionDialog } from './ArchiveSessionDialog';
 import { ExportDialog } from './ExportDialog';
 import { calculateLiveEfficiency } from './liveSession';
 import { RecentRuns } from './RecentRuns';
+import { useSessionNotes } from './useSessionNotes';
 
 interface SessionCardProps {
   session: Session | null;
@@ -114,25 +116,20 @@ export function SessionCard({ session, onViewAllRuns }: SessionCardProps) {
       })),
     );
 
-  const [notes, setNotes] = useState<string>(session?.notes || '');
-  const [isSavingNotes, setIsSavingNotes] = useState<boolean>(false);
   const [showExportDialog, setShowExportDialog] = useState<boolean>(false);
   const [showArchiveDialog, setShowArchiveDialog] = useState<boolean>(false);
   const isArchiving = Boolean(pendingActions.archiveSession);
 
   const currentSession = activeSession || session;
+  const { notes, isSavingNotes, handleNotesChange, handleNotesBlur } = useSessionNotes(
+    currentSession,
+    updateSessionNotes,
+  );
 
   const sessionRuns = useMemo(
     () => (currentSession ? (runs.get(currentSession.id) ?? []) : []),
     [currentSession, runs],
   );
-
-  // Update notes when session changes
-  useEffect(() => {
-    if (currentSession?.notes !== undefined) {
-      setNotes(currentSession.notes || '');
-    }
-  }, [currentSession?.notes]);
 
   // Button handlers
   const handleArchiveSession = useCallback(async () => {
@@ -145,25 +142,6 @@ export function SessionCard({ session, onViewAllRuns }: SessionCardProps) {
       setShowArchiveDialog(false);
     }
   }, [archiveSession, currentSession]);
-
-  const handleNotesChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setNotes(e.target.value);
-  }, []);
-
-  const handleNotesBlur = useCallback(async () => {
-    if (!currentSession || notes === (currentSession.notes || '')) return;
-
-    setIsSavingNotes(true);
-    try {
-      await updateSessionNotes(currentSession.id, notes);
-    } catch (error) {
-      console.error('Error updating session notes:', error);
-      // Revert notes on error
-      setNotes(currentSession.notes || '');
-    } finally {
-      setIsSavingNotes(false);
-    }
-  }, [currentSession, notes, updateSessionNotes]);
 
   const handleExportClick = useCallback(() => {
     if (currentSession) {
@@ -212,6 +190,7 @@ export function SessionCard({ session, onViewAllRuns }: SessionCardProps) {
                   value={notes}
                   onChange={handleNotesChange}
                   onBlur={handleNotesBlur}
+                  maxLength={MAX_SESSION_NOTES_LENGTH}
                   className="min-h-[80px] resize-none"
                 />
                 {isSavingNotes && (

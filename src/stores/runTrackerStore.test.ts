@@ -1,15 +1,29 @@
 import { act, renderHook } from '@testing-library/react';
+import type { EventChannel } from 'electron/ipc/contract';
 import type { Run, RunItem, Session } from 'electron/types/grail';
+import { MAX_SESSION_NOTES_LENGTH } from 'electron/utils/sessionNotes';
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { GrailProgressBuilder, HolyGrailItemBuilder } from '@/fixtures';
+import { createMainEventsMock } from '@/test/mainEventsMock';
 import { useGrailStore } from './grailStore';
-import { useRunTrackerStore, useSessionStats, useSessionStatsLookup } from './runTrackerStore';
+import {
+  initRunTrackerSync,
+  useRunTrackerStore,
+  useSessionStats,
+  useSessionStatsLookup,
+} from './runTrackerStore';
+
+type RunTrackerStore = ReturnType<typeof useRunTrackerStore.getState>;
+
+const mainEvents = createMainEventsMock();
 
 // Mock the electron API
 const mockElectronAPI = {
+  on: mainEvents.on,
   runTracker: {
     startSession: vi.fn(),
     endSession: vi.fn(),
+    updateSessionNotes: vi.fn(),
     startRun: vi.fn(),
     endRun: vi.fn(),
     pauseRun: vi.fn(),
@@ -513,7 +527,7 @@ describe('runTrackerStore loading and error state', () => {
       sessionsLoading: false,
       error: null,
       errorType: null,
-      retryCount: 0,
+      lastFailedAction: undefined,
       loadingSessions: new Set(),
       loadingRunItems: new Set(),
     });
@@ -611,7 +625,7 @@ describe('runTrackerStore loading and error state', () => {
       const state = useRunTrackerStore.getState();
       expect(state.initialLoadStatus).toBe('success');
       expect(state.initialLoadError).toBeUndefined();
-      expect(state.error).toBe('Database offline');
+      expect(state.error).toEqual({ code: 'loadFailed' });
     });
   });
 
@@ -620,7 +634,7 @@ describe('runTrackerStore loading and error state', () => {
       // Arrange
       useRunTrackerStore.setState({
         initialLoadStatus: 'success',
-        error: 'Previous action failed',
+        error: { code: 'pauseRunFailed' },
       });
       let resolveItems: (items: unknown[]) => void = () => undefined;
       mockElectronAPI.runTracker.getRunItems.mockReturnValue(
@@ -647,7 +661,7 @@ describe('runTrackerStore loading and error state', () => {
       const state = useRunTrackerStore.getState();
       expect(state.loadingRunItems.has('run-1')).toBe(false);
       expect(state.runItems.get('run-1')).toEqual([]);
-      expect(state.error).toBe('Previous action failed');
+      expect(state.error).toEqual({ code: 'pauseRunFailed' });
     });
   });
 
@@ -689,10 +703,420 @@ describe('runTrackerStore loading and error state', () => {
 
       // Assert
       const state = useRunTrackerStore.getState();
-      expect(state.error).toBe('IPC failed');
+      expect(state.error).toEqual({ code: 'pauseRunFailed' });
+      expect(state.errorType).toBe('unknown');
       expect(state.pendingActions.pauseRun).toBe(false);
       expect(state.initialLoadStatus).toBe('success');
     });
+  });
+
+  describe('If a failed user action is retried', () => {
+    it('Then the same action runs again and the error is cleared on success', async () => {
+      // Arrange
+      mockElectronAPI.runTracker.pauseRun
+        .mockRejectedValueOnce(new Error('IPC failed'))
+        .mockResolvedValueOnce({ success: true });
+      await act(async () => {
+        await useRunTrackerStore.getState().pauseRun();
+      });
+      const failedState = useRunTrackerStore.getState();
+
+      // Act
+      await act(async () => {
+        await useRunTrackerStore.getState().retryLastAction();
+      });
+
+      // Assert
+      expect(failedState.lastFailedAction).toBeDefined();
+      expect(mockElectronAPI.runTracker.pauseRun).toHaveBeenCalledTimes(2);
+      const state = useRunTrackerStore.getState();
+      expect(state.error).toBeNull();
+      expect(state.lastFailedAction).toBeUndefined();
+      expect(state.isPaused).toBe(true);
+    });
+
+    it('If the retry fails again, Then the error is reported and can be retried again', async () => {
+      // Arrange
+      mockElectronAPI.runTracker.endSession.mockRejectedValue(new Error('IPC failed'));
+      await act(async () => {
+        await useRunTrackerStore.getState().endSession();
+      });
+
+      // Act
+      await act(async () => {
+        await useRunTrackerStore.getState().retryLastAction();
+      });
+
+      // Assert
+      expect(mockElectronAPI.runTracker.endSession).toHaveBeenCalledTimes(2);
+      const state = useRunTrackerStore.getState();
+      expect(state.error).toEqual({ code: 'endSessionFailed' });
+      expect(state.lastFailedAction).toBeDefined();
+    });
+  });
+
+  describe('If a background load fails after a user action failed', () => {
+    it.each([
+      ['loadSessions', 'getAllSessions', (store: RunTrackerStore) => store.loadSessions()],
+      ['loadAllSessions', 'getAllSessions', (store: RunTrackerStore) => store.loadAllSessions()],
+      ['loadSessionById', 'getSessionById', (store: RunTrackerStore) => store.loadSessionById('s')],
+      [
+        'loadSessionRuns',
+        'getRunsBySession',
+        (store: RunTrackerStore) => store.loadSessionRuns('s'),
+      ],
+      ['loadRunItems', 'getRunItems', (store: RunTrackerStore) => store.loadRunItems('run-1')],
+      ['refreshActiveRun', 'getState', (store: RunTrackerStore) => store.refreshActiveRun()],
+      [
+        'a background loadInitialData',
+        'getAllSessions',
+        (store: RunTrackerStore) => store.loadInitialData(),
+      ],
+    ])('Then %s drops the retry of the failed action', async (_name, failingApi, load) => {
+      // Arrange
+      useRunTrackerStore.setState({ initialLoadStatus: 'success' });
+      mockElectronAPI.runTracker.endSession.mockRejectedValue(new Error('IPC failed'));
+      mockElectronAPI.runTracker.getState.mockResolvedValue(undefined);
+      const loadApi =
+        mockElectronAPI.runTracker[failingApi as keyof typeof mockElectronAPI.runTracker];
+      loadApi.mockRejectedValue(new Error('Database offline'));
+      await act(async () => {
+        await useRunTrackerStore.getState().endSession();
+      });
+      const failedActionState = useRunTrackerStore.getState();
+
+      // Act
+      await act(async () => {
+        await load(useRunTrackerStore.getState());
+      });
+      await act(async () => {
+        await useRunTrackerStore.getState().retryLastAction();
+      });
+
+      // Assert
+      expect(failedActionState.lastFailedAction).toBeDefined();
+      const state = useRunTrackerStore.getState();
+      expect(state.error).toEqual({ code: 'loadFailed' });
+      expect(state.lastFailedAction).toBeUndefined();
+      expect(mockElectronAPI.runTracker.endSession).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('If a manual item is added without a run to add it to', () => {
+    it('Then a validation error is reported that cannot be retried', async () => {
+      // Act
+      await act(async () => {
+        await useRunTrackerStore.getState().addManualRunItem('Shako');
+      });
+
+      // Assert
+      const state = useRunTrackerStore.getState();
+      expect(state.error).toEqual({ code: 'noRunForManualItem' });
+      expect(state.errorType).toBe('validation');
+      expect(state.lastFailedAction).toBeUndefined();
+      expect(state.pendingActions.addManualRunItem).toBe(false);
+      expect(mockElectronAPI.runTracker.addRunItem).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('If a manual item without a name is added', () => {
+    it('Then a validation error is reported', async () => {
+      // Act
+      await act(async () => {
+        await useRunTrackerStore.getState().addManualRunItem('   ');
+      });
+
+      // Assert
+      const state = useRunTrackerStore.getState();
+      expect(state.error).toEqual({ code: 'itemNameEmpty' });
+      expect(state.errorType).toBe('validation');
+    });
+  });
+
+  describe('If no session can be started', () => {
+    it('Then a validation error is reported', async () => {
+      // Arrange
+      mockElectronAPI.runTracker.startSession.mockResolvedValue(undefined);
+
+      // Act
+      await act(async () => {
+        await useRunTrackerStore.getState().startSession();
+      });
+
+      // Assert
+      const state = useRunTrackerStore.getState();
+      expect(state.error).toEqual({ code: 'sessionStartUnavailable' });
+      expect(state.errorType).toBe('validation');
+      expect(state.isTracking).toBe(false);
+    });
+  });
+});
+
+describe('When session notes are updated', () => {
+  const activeSession: Session = {
+    id: 'session-1',
+    startTime: new Date('2024-01-01T10:00:00Z'),
+    totalRunTime: 1000,
+    totalSessionTime: 2000,
+    runCount: 2,
+    archived: false,
+    created: new Date('2024-01-01T10:00:00Z'),
+    lastUpdated: new Date('2024-01-01T10:00:00Z'),
+  };
+  const savedSession: Session = {
+    ...activeSession,
+    totalRunTime: 0,
+    runCount: 0,
+    notes: 'Cow runs',
+    lastUpdated: new Date('2024-01-01T10:30:00Z'),
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    useRunTrackerStore.setState({
+      activeSession,
+      sessions: [{ ...activeSession }],
+      error: null,
+      errorType: null,
+      lastFailedAction: undefined,
+      pendingActions: {},
+    });
+  });
+
+  it('Then the notes are saved through the main process and stored', async () => {
+    // Arrange
+    mockElectronAPI.runTracker.updateSessionNotes.mockResolvedValue(savedSession);
+
+    // Act
+    let saved = false;
+    await act(async () => {
+      saved = await useRunTrackerStore.getState().updateSessionNotes('session-1', 'Cow runs');
+    });
+
+    // Assert
+    expect(saved).toBe(true);
+    expect(mockElectronAPI.runTracker.updateSessionNotes).toHaveBeenCalledWith(
+      'session-1',
+      'Cow runs',
+    );
+    const state = useRunTrackerStore.getState();
+    expect(state.sessions[0]).toEqual(savedSession);
+    expect(state.activeSession?.notes).toBe('Cow runs');
+    // The live counters of the active session are kept
+    expect(state.activeSession?.runCount).toBe(2);
+  });
+
+  it('If saving fails, Then the notes are unchanged and the error cannot be retried', async () => {
+    // Arrange
+    mockElectronAPI.runTracker.updateSessionNotes.mockRejectedValue(new Error('IPC failed'));
+
+    // Act
+    let saved = true;
+    await act(async () => {
+      saved = await useRunTrackerStore.getState().updateSessionNotes('session-1', 'Cow runs');
+    });
+
+    // Assert
+    expect(saved).toBe(false);
+    const state = useRunTrackerStore.getState();
+    expect(state.sessions[0].notes).toBeUndefined();
+    expect(state.error).toEqual({ code: 'updateSessionNotesFailed' });
+    expect(state.errorType).toBe('unknown');
+    expect(state.lastFailedAction).toBeUndefined();
+  });
+
+  it('If saving fails, Then Retry has nothing to run and the captured notes are not sent again', async () => {
+    // Arrange
+    mockElectronAPI.runTracker.updateSessionNotes.mockRejectedValue(new Error('IPC failed'));
+    await act(async () => {
+      await useRunTrackerStore.getState().updateSessionNotes('session-1', 'Cow runs');
+    });
+    mockElectronAPI.runTracker.updateSessionNotes.mockClear();
+
+    // Act
+    await act(async () => {
+      await useRunTrackerStore.getState().retryLastAction();
+    });
+
+    // Assert
+    expect(mockElectronAPI.runTracker.updateSessionNotes).not.toHaveBeenCalled();
+  });
+
+  it('If the main process returns no saved session, Then saving is reported as failed and cannot be retried', async () => {
+    // Arrange
+    mockElectronAPI.runTracker.updateSessionNotes.mockResolvedValue(undefined);
+
+    // Act
+    let saved = true;
+    await act(async () => {
+      saved = await useRunTrackerStore.getState().updateSessionNotes('session-1', 'Cow runs');
+    });
+
+    // Assert
+    expect(saved).toBe(false);
+    const state = useRunTrackerStore.getState();
+    expect(state.sessions[0].notes).toBeUndefined();
+    expect(state.error).toEqual({ code: 'updateSessionNotesFailed' });
+    expect(state.errorType).toBe('unknown');
+    expect(state.lastFailedAction).toBeUndefined();
+  });
+
+  it('If the notes have exactly the maximum length, Then they are saved', async () => {
+    // Arrange
+    const notes = 'x'.repeat(MAX_SESSION_NOTES_LENGTH);
+    mockElectronAPI.runTracker.updateSessionNotes.mockResolvedValue({ ...savedSession, notes });
+
+    // Act
+    let saved = false;
+    await act(async () => {
+      saved = await useRunTrackerStore.getState().updateSessionNotes('session-1', notes);
+    });
+
+    // Assert
+    expect(saved).toBe(true);
+    expect(mockElectronAPI.runTracker.updateSessionNotes).toHaveBeenCalledWith('session-1', notes);
+    expect(useRunTrackerStore.getState().error).toBeNull();
+  });
+
+  it('If the notes are longer than the maximum, Then a validation error is reported that cannot be retried', async () => {
+    // Arrange
+    const notes = 'x'.repeat(MAX_SESSION_NOTES_LENGTH + 1);
+
+    // Act
+    let saved = true;
+    await act(async () => {
+      saved = await useRunTrackerStore.getState().updateSessionNotes('session-1', notes);
+    });
+
+    // Assert
+    expect(saved).toBe(false);
+    expect(mockElectronAPI.runTracker.updateSessionNotes).not.toHaveBeenCalled();
+    const state = useRunTrackerStore.getState();
+    expect(state.error).toEqual({ code: 'sessionNotesTooLong' });
+    expect(state.errorType).toBe('validation');
+    expect(state.lastFailedAction).toBeUndefined();
+    expect(state.pendingActions.updateSessionNotes).toBe(false);
+  });
+});
+
+describe('When the run tracker sync is started', () => {
+  const session: Session = {
+    id: 'session-sync',
+    startTime: new Date('2024-01-01T10:00:00Z'),
+    totalRunTime: 0,
+    totalSessionTime: 0,
+    runCount: 0,
+    archived: false,
+    created: new Date('2024-01-01T10:00:00Z'),
+    lastUpdated: new Date('2024-01-01T10:00:00Z'),
+  };
+  const channels: EventChannel[] = [
+    'run-tracker:session-started',
+    'run-tracker:session-ended',
+    'run-tracker:run-started',
+    'run-tracker:run-ended',
+    'run-tracker:run-paused',
+    'run-tracker:run-resumed',
+    'run-tracker:run-item-added',
+  ];
+  let dispose: () => void = () => undefined;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mainEvents.reset();
+    act(() => {
+      useRunTrackerStore.getState().handleSessionEnded();
+    });
+  });
+
+  afterEach(() => {
+    dispose();
+  });
+
+  it('Then every run tracker event is subscribed once', () => {
+    // Act
+    dispose = initRunTrackerSync();
+
+    // Assert
+    expect(channels.map((channel) => mainEvents.listenerCount(channel))).toEqual(
+      channels.map(() => 1),
+    );
+  });
+
+  it('Then the session, run, pause and resume events update the store', async () => {
+    // Arrange
+    const run: Run = {
+      id: 'run-sync',
+      sessionId: session.id,
+      runNumber: 1,
+      startTime: new Date('2024-01-01T10:01:00Z'),
+      created: new Date('2024-01-01T10:01:00Z'),
+      lastUpdated: new Date('2024-01-01T10:01:00Z'),
+    };
+    dispose = initRunTrackerSync();
+    const state = () => useRunTrackerStore.getState();
+
+    // Act and assert: each event applies its change
+    act(() => {
+      mainEvents.emit('run-tracker:session-started', { session });
+    });
+    expect(state().activeSession).toEqual(session);
+    expect(state().isTracking).toBe(true);
+
+    act(() => {
+      mainEvents.emit('run-tracker:run-started', { run, session });
+    });
+    expect(state().activeRun).toEqual(run);
+    expect(state().runs.get(session.id)).toEqual([run]);
+
+    act(() => {
+      mainEvents.emit('run-tracker:run-paused', { session });
+    });
+    expect(state().isPaused).toBe(true);
+
+    act(() => {
+      mainEvents.emit('run-tracker:run-resumed', { session });
+    });
+    expect(state().isPaused).toBe(false);
+
+    await act(async () => {
+      mainEvents.emit('run-tracker:run-ended', { run, session });
+    });
+    expect(state().activeRun).toBeNull();
+    expect(state().runs.get(session.id)).toEqual([run]);
+
+    act(() => {
+      mainEvents.emit('run-tracker:session-ended', { session });
+    });
+    expect(state().activeSession).toBeNull();
+    expect(state().isTracking).toBe(false);
+  });
+
+  it('Then an added run item refreshes the items of its run', async () => {
+    // Arrange
+    mockElectronAPI.runTracker.getRunItems.mockResolvedValue([]);
+    dispose = initRunTrackerSync();
+
+    // Act
+    await act(async () => {
+      mainEvents.emit('run-tracker:run-item-added', { runId: 'run-1' });
+    });
+
+    // Assert
+    expect(mockElectronAPI.runTracker.getRunItems).toHaveBeenCalledWith('run-1');
+  });
+
+  it('If the cleanup is called, Then every subscription is removed', () => {
+    // Arrange
+    const cleanup = initRunTrackerSync();
+
+    // Act
+    cleanup();
+
+    // Assert
+    expect(channels.map((channel) => mainEvents.listenerCount(channel))).toEqual(
+      channels.map(() => 0),
+    );
   });
 });
 

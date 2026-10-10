@@ -7,6 +7,7 @@ import type {
   VaultItemFilter,
   VaultItemUpsertInput,
 } from '../types/grail';
+import { MAX_SESSION_NOTES_LENGTH } from '../utils/sessionNotes';
 import type { WidgetDisplayMode } from '../utils/widgetDisplay';
 import {
   type AddRunItemInput,
@@ -117,6 +118,15 @@ const addRunItemInput: FieldValidator<AddRunItemInput> = (value) => {
 };
 
 const sessionId = nonEmptyString('Invalid session ID');
+
+const sessionNotes: FieldValidator<string> = (value) => {
+  const notes = string('Invalid session notes')(value);
+  ensure(
+    notes.length <= MAX_SESSION_NOTES_LENGTH,
+    `Invalid session notes: longer than ${MAX_SESSION_NOTES_LENGTH} characters`,
+  );
+  return notes;
+};
 
 /**
  * Whether the renderer may write a setting through `grail:updateSettings`. The mapped type forces a
@@ -351,6 +361,7 @@ export const invokeArgValidators: { [C in InvokeChannel]: ArgsValidator<InvokeAr
   'run-tracker:start-session': noArgs,
   'run-tracker:end-session': noArgs,
   'run-tracker:archive-session': args(sessionId),
+  'run-tracker:update-session-notes': args(sessionId, sessionNotes),
   'run-tracker:start-run': args(optional(nonEmptyString('Invalid character ID'))),
   'run-tracker:end-run': noArgs,
   'run-tracker:pause': noArgs,

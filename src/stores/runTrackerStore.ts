@@ -1,7 +1,9 @@
 import type { GrailProgress, Run, RunItem, Session, SessionStats } from 'electron/types/grail';
+import { MAX_SESSION_NOTES_LENGTH } from 'electron/utils/sessionNotes';
 import { useCallback, useMemo } from 'react';
 import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
+import { combineUnsubscribers, onMainEvent } from '@/lib/ipcEvents';
 import { computeSessionStats, findFirstDiscoveries } from '@/lib/sessionStats';
 import { useGrailStore } from '@/stores/grailStore';
 
@@ -13,11 +15,46 @@ export type RunTrackerAction =
   | 'startSession'
   | 'endSession'
   | 'archiveSession'
+  | 'updateSessionNotes'
   | 'startRun'
   | 'endRun'
   | 'pauseRun'
   | 'resumeRun'
   | 'addManualRunItem';
+
+/**
+ * Errors shown inline on the run tracker page. Each code is a translation key under
+ * `runTracker.errors`, so the store never holds UI copy.
+ */
+export type RunTrackerErrorCode =
+  | 'sessionStartUnavailable'
+  | 'startSessionFailed'
+  | 'endSessionFailed'
+  | 'archiveSessionFailed'
+  | 'updateSessionNotesFailed'
+  | 'sessionNotesTooLong'
+  | 'startRunFailed'
+  | 'endRunFailed'
+  | 'pauseRunFailed'
+  | 'resumeRunFailed'
+  | 'loadFailed'
+  | 'itemNameEmpty'
+  | 'noRunForManualItem'
+  | 'addManualRunItemFailed';
+
+/**
+ * Kind of an inline error: `validation` errors come from the user's input or the current state
+ * and can't be retried; `unknown` errors are backend failures.
+ */
+export type RunTrackerErrorType = 'validation' | 'unknown';
+
+/**
+ * An inline run tracker error. Only the code is stored: technical details of a failure are logged
+ * to the console, never shown, so the banner stays fully translated.
+ */
+export interface RunTrackerError {
+  code: RunTrackerErrorCode;
+}
 
 /**
  * Lifecycle of the first data load of the run tracker page.
@@ -43,9 +80,10 @@ interface RunTrackerState {
   initialLoadError: string | undefined;
   pendingActions: Partial<Record<RunTrackerAction, boolean>>;
   sessionsLoading: boolean;
-  error: string | null;
-  errorType: 'network' | 'validation' | 'permission' | 'unknown' | null;
-  retryCount: number;
+  error: RunTrackerError | null;
+  errorType: RunTrackerErrorType | null;
+  /** Runs the user action that failed last again; undefined if the current error can't be retried. */
+  lastFailedAction: (() => Promise<void>) | undefined;
   loadingSessions: Set<string>; // sessionId -> tracks in-flight loads
   loadingRunItems: Set<string>; // runId -> tracks in-flight item loads
 
@@ -53,7 +91,8 @@ interface RunTrackerState {
   startSession: () => Promise<void>;
   endSession: () => Promise<void>;
   archiveSession: (sessionId: string) => Promise<void>;
-  updateSessionNotes: (sessionId: string, notes: string) => Promise<void>;
+  /** @returns Whether the notes were saved */
+  updateSessionNotes: (sessionId: string, notes: string) => Promise<boolean>;
 
   // Actions - Run Management
   startRun: (characterId?: string) => Promise<void>;
@@ -74,10 +113,6 @@ interface RunTrackerState {
   addManualRunItem: (name: string) => Promise<void>;
 
   // Actions - State Management
-  setError: (
-    error: string | null,
-    errorType?: 'network' | 'validation' | 'permission' | 'unknown',
-  ) => void;
   clearError: () => void;
   retryLastAction: () => Promise<void>;
 
@@ -215,6 +250,33 @@ function setActionPending(action: RunTrackerAction, pending: boolean) {
   });
 }
 
+/**
+ * Thrown inside a user action to report an expected failure with its own error code instead of
+ * the action's generic failure code.
+ */
+class RunTrackerActionError extends Error {
+  constructor(
+    readonly code: RunTrackerErrorCode,
+    readonly errorType: RunTrackerErrorType,
+  ) {
+    super(code);
+    this.name = 'RunTrackerActionError';
+  }
+}
+
+function toErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+/**
+ * Returns the state update that reports a failed data load inline. A load has no retry of its own,
+ * so the update also drops the retry of an earlier failed user action, which the banner no longer
+ * describes.
+ */
+function loadFailed(): Pick<RunTrackerState, 'error' | 'errorType' | 'lastFailedAction'> {
+  return { error: { code: 'loadFailed' }, errorType: 'unknown', lastFailedAction: undefined };
+}
+
 // Tracks the first (blocking) initial load so overlapping calls share one request
 let initialLoadInFlight: Promise<void> | undefined;
 
@@ -238,169 +300,102 @@ export const useRunTrackerStore = create<RunTrackerState>()(
     sessionsLoading: false,
     error: null,
     errorType: null,
-    retryCount: 0,
+    lastFailedAction: undefined,
     loadingSessions: new Set(),
     loadingRunItems: new Set(),
 
     // Session management actions
     startSession: async () => {
-      set({ error: null, errorType: null });
-      set(setActionPending('startSession', true));
-      try {
+      await runAction('startSession', 'startSessionFailed', async () => {
         const session = await window.electronAPI?.runTracker.startSession();
-        if (session) {
-          // Initialize runs Map entry for this session
-          const { runs } = get();
-          const updatedRuns = new Map(runs);
-          updatedRuns.set(session.id, []);
-
-          set({
-            activeSession: session,
-            isTracking: true,
-            runs: updatedRuns,
-          });
-          console.log('[RunTrackerStore] Session started:', session.id);
-        } else {
-          set({
-            error: 'Unable to start session. Please ensure a character is selected.',
-            errorType: 'validation',
-          });
+        if (!session) {
+          throw new RunTrackerActionError('sessionStartUnavailable', 'validation');
         }
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        const errorType =
-          errorMessage.includes('network') || errorMessage.includes('connection')
-            ? 'network'
-            : 'unknown';
-        set({ error: `Failed to start session: ${errorMessage}`, errorType });
-        console.error('[RunTrackerStore] Error starting session:', error);
-      } finally {
-        set(setActionPending('startSession', false));
-      }
+        // Initialize runs Map entry for this session
+        const updatedRuns = new Map(get().runs);
+        updatedRuns.set(session.id, []);
+        set({ activeSession: session, isTracking: true, runs: updatedRuns });
+        console.log('[RunTrackerStore] Session started:', session.id);
+      });
     },
 
     endSession: async () => {
-      set({ error: null, errorType: null });
-      set(setActionPending('endSession', true));
-      try {
+      await runAction('endSession', 'endSessionFailed', async () => {
         await window.electronAPI?.runTracker.endSession();
-        set({
-          activeSession: null,
-          activeRun: null,
-          isTracking: false,
-          isPaused: false,
-        });
+        set({ activeSession: null, activeRun: null, isTracking: false, isPaused: false });
         console.log('[RunTrackerStore] Session ended');
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        set({
-          error: `Failed to end session: ${errorMessage}. Your progress has been saved.`,
-          errorType: 'network',
-        });
-        console.error('[RunTrackerStore] Error ending session:', error);
-      } finally {
-        set(setActionPending('endSession', false));
-      }
+      });
     },
 
     archiveSession: async (sessionId) => {
-      set({ error: null });
-      set(setActionPending('archiveSession', true));
-      try {
+      await runAction('archiveSession', 'archiveSessionFailed', async () => {
         await window.electronAPI?.runTracker.archiveSession(sessionId);
         console.log('[RunTrackerStore] Session archived:', sessionId);
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        set({ error: errorMessage });
-        console.error('[RunTrackerStore] Error archiving session:', error);
-      } finally {
-        set(setActionPending('archiveSession', false));
-      }
+      });
     },
 
-    updateSessionNotes: async (sessionId, notes) => {
-      set({ error: null });
-      try {
-        // Note: This would need to be implemented in the IPC handlers if not already available
-        // For now, we'll update the local state
-        const { sessions } = get();
-        const updatedSessions = sessions.map((session) =>
-          session.id === sessionId ? { ...session, notes, lastUpdated: new Date() } : session,
-        );
-        set({ sessions: updatedSessions });
-        console.log('[RunTrackerStore] Session notes updated:', sessionId);
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        set({ error: errorMessage });
-        console.error('[RunTrackerStore] Error updating session notes:', error);
-      }
-    },
+    updateSessionNotes: (sessionId, notes) =>
+      runAction(
+        'updateSessionNotes',
+        'updateSessionNotesFailed',
+        async () => {
+          if (notes.length > MAX_SESSION_NOTES_LENGTH) {
+            // The main process would reject these notes; resubmitting them can never succeed
+            throw new RunTrackerActionError('sessionNotesTooLong', 'validation');
+          }
+          const updated = await window.electronAPI?.runTracker.updateSessionNotes(sessionId, notes);
+          if (!updated) {
+            throw new RunTrackerActionError('updateSessionNotesFailed', 'unknown');
+          }
+          const { sessions, activeSession } = get();
+          set({
+            sessions: sessions.map((session) => (session.id === sessionId ? updated : session)),
+            // The active session keeps its live counters; only the notes come from the saved session
+            activeSession:
+              activeSession?.id === sessionId
+                ? { ...activeSession, notes: updated.notes, lastUpdated: updated.lastUpdated }
+                : activeSession,
+          });
+          console.log('[RunTrackerStore] Session notes updated:', sessionId);
+        },
+        // Retry would replay the captured text, possibly over the notes of a session the user has
+        // since left; the saved notes are shown again and can be edited and saved anew
+        { retryable: false },
+      ),
 
     // Run management actions
     startRun: async (characterId) => {
-      set({ error: null });
-      set(setActionPending('startRun', true));
-      try {
+      await runAction('startRun', 'startRunFailed', async () => {
         const run = await window.electronAPI?.runTracker.startRun(characterId);
         if (run) {
           set({ activeRun: run, isPaused: false });
           console.log('[RunTrackerStore] Run started:', run.id);
         }
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        set({ error: errorMessage });
-        console.error('[RunTrackerStore] Error starting run:', error);
-      } finally {
-        set(setActionPending('startRun', false));
-      }
+      });
     },
 
     endRun: async () => {
-      set({ error: null });
-      set(setActionPending('endRun', true));
-      try {
+      await runAction('endRun', 'endRunFailed', async () => {
         await window.electronAPI?.runTracker.endRun();
         set({ activeRun: null, isPaused: false });
         console.log('[RunTrackerStore] Run ended');
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        set({ error: errorMessage });
-        console.error('[RunTrackerStore] Error ending run:', error);
-      } finally {
-        set(setActionPending('endRun', false));
-      }
+      });
     },
 
     pauseRun: async () => {
-      set({ error: null });
-      set(setActionPending('pauseRun', true));
-      try {
+      await runAction('pauseRun', 'pauseRunFailed', async () => {
         await window.electronAPI?.runTracker.pauseRun();
         set({ isPaused: true });
         console.log('[RunTrackerStore] Run paused');
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        set({ error: errorMessage });
-        console.error('[RunTrackerStore] Error pausing run:', error);
-      } finally {
-        set(setActionPending('pauseRun', false));
-      }
+      });
     },
 
     resumeRun: async () => {
-      set({ error: null });
-      set(setActionPending('resumeRun', true));
-      try {
+      await runAction('resumeRun', 'resumeRunFailed', async () => {
         await window.electronAPI?.runTracker.resumeRun();
         set({ isPaused: false });
         console.log('[RunTrackerStore] Run resumed');
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        set({ error: errorMessage });
-        console.error('[RunTrackerStore] Error resuming run:', error);
-      } finally {
-        set(setActionPending('resumeRun', false));
-      }
+      });
     },
 
     // Data loading actions
@@ -431,8 +426,7 @@ export const useRunTrackerStore = create<RunTrackerState>()(
           console.log(`[RunTrackerStore] Loaded ${sessions.length} sessions`);
         }
       } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        set({ error: errorMessage });
+        set(loadFailed());
         console.error('[RunTrackerStore] Error loading sessions:', error);
       } finally {
         set({ sessionsLoading: false });
@@ -449,8 +443,7 @@ export const useRunTrackerStore = create<RunTrackerState>()(
           console.log(`[RunTrackerStore] Loaded ${sessions.length} sessions (all characters)`);
         }
       } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        set({ error: errorMessage });
+        set(loadFailed());
         console.error('[RunTrackerStore] Error loading all sessions:', error);
       } finally {
         set({ sessionsLoading: false });
@@ -469,8 +462,7 @@ export const useRunTrackerStore = create<RunTrackerState>()(
           }
         }
       } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        set({ error: errorMessage });
+        set(loadFailed());
         console.error('[RunTrackerStore] Error loading session by ID:', error);
       }
     },
@@ -555,12 +547,11 @@ export const useRunTrackerStore = create<RunTrackerState>()(
           set({ loadingSessions: newLoadingSessions });
         }
       } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : String(error);
         // Remove from loading set on error
         const { loadingSessions: currentLoadingSessions } = get();
         const newLoadingSessions = new Set(currentLoadingSessions);
         newLoadingSessions.delete(sessionId);
-        set({ error: errorMessage, loadingSessions: newLoadingSessions });
+        set({ ...loadFailed(), loadingSessions: newLoadingSessions });
         console.error('[RunTrackerStore] Error loading session runs:', error);
       }
     },
@@ -579,8 +570,7 @@ export const useRunTrackerStore = create<RunTrackerState>()(
           console.log(`[RunTrackerStore] Loaded ${items.length} items for run:`, runId);
         }
       } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        set({ error: errorMessage });
+        set(loadFailed());
         console.error('[RunTrackerStore] Error loading run items:', error);
       } finally {
         const newLoadingRunItems = new Set(get().loadingRunItems);
@@ -602,54 +592,38 @@ export const useRunTrackerStore = create<RunTrackerState>()(
           console.log('[RunTrackerStore] Active run refreshed');
         }
       } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        set({ error: errorMessage });
+        set(loadFailed());
         console.error('[RunTrackerStore] Error refreshing active run:', error);
       }
     },
 
     addManualRunItem: async (name) => {
       if (!name || name.trim() === '') {
-        set({ error: 'Item name cannot be empty', errorType: 'validation' });
+        set({
+          error: { code: 'itemNameEmpty' },
+          errorType: 'validation',
+          lastFailedAction: undefined,
+        });
         return;
       }
 
-      set({ error: null, errorType: null });
-      set(setActionPending('addManualRunItem', true));
-      try {
+      await runAction('addManualRunItem', 'addManualRunItemFailed', async () => {
         const targetRunId = getTargetRunId(get());
         if (!targetRunId) {
-          set({
-            error: 'No active run or finished run found. Please start a run first.',
-            errorType: 'validation',
-          });
-          return;
+          throw new RunTrackerActionError('noRunForManualItem', 'validation');
         }
 
         const result = await window.electronAPI?.runTracker.addRunItem({
           runId: targetRunId,
           name: name.trim(),
         });
-
-        if (result?.success) {
-          await get().loadRunItems(targetRunId);
-          console.log('[RunTrackerStore] Manual run item added:', name);
-        } else {
-          set({
-            error: 'Failed to add manual run item',
-            errorType: 'unknown',
-          });
+        if (!result?.success) {
+          throw new RunTrackerActionError('addManualRunItemFailed', 'unknown');
         }
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        set({
-          error: `Failed to add manual run item: ${errorMessage}`,
-          errorType: 'unknown',
-        });
-        console.error('[RunTrackerStore] Error adding manual run item:', error);
-      } finally {
-        set(setActionPending('addManualRunItem', false));
-      }
+
+        await get().loadRunItems(targetRunId);
+        console.log('[RunTrackerStore] Manual run item added:', name);
+      });
     },
 
     // Internal event handlers (called from components)
@@ -743,37 +717,98 @@ export const useRunTrackerStore = create<RunTrackerState>()(
     },
 
     // Error handling methods
-    setError: (error, errorType = 'unknown') => {
-      set({ error, errorType, retryCount: 0 });
-    },
-
     clearError: () => {
-      set({ error: null, errorType: null, retryCount: 0 });
+      set({ error: null, errorType: null, lastFailedAction: undefined });
     },
 
     retryLastAction: async () => {
-      const { retryCount } = get();
-      if (retryCount >= 3) {
-        set({
-          error: 'Maximum retry attempts reached. Please try again later.',
-          errorType: 'network',
-        });
-        return;
-      }
-
-      set({ retryCount: retryCount + 1, error: null });
-
-      // Simple retry logic - in a real app, you'd store the last action
-      try {
-        await new Promise((resolve) => setTimeout(resolve, 1000 * retryCount)); // Exponential backoff
-        // Here you would retry the last failed action
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        set({ error: errorMessage, errorType: 'network' });
+      const { lastFailedAction } = get();
+      if (lastFailedAction) {
+        await lastFailedAction();
       }
     },
   })),
 );
+
+/**
+ * Runs a user action: clears the previous error, marks the action as pending and reports a
+ * failure inline. A failure that is not a validation error is recorded so `retryLastAction` can
+ * run the same action again, unless the action is not retryable.
+ * @param action - The action, tracked in `pendingActions`
+ * @param failureCode - Error code reported when the action throws an unexpected error
+ * @param perform - The action itself; throws a `RunTrackerActionError` for expected failures
+ * @param options - `retryable: false` reports a failure without recording it for retry
+ * @returns Whether the action succeeded
+ */
+async function runAction(
+  action: RunTrackerAction,
+  failureCode: RunTrackerErrorCode,
+  perform: () => Promise<void>,
+  { retryable = true }: { retryable?: boolean } = {},
+): Promise<boolean> {
+  const { setState: set } = useRunTrackerStore;
+  const retry = async () => {
+    await runAction(action, failureCode, perform);
+  };
+
+  set({ error: null, errorType: null, lastFailedAction: undefined });
+  set(setActionPending(action, true));
+  try {
+    await perform();
+    return true;
+  } catch (error) {
+    if (error instanceof RunTrackerActionError) {
+      set({
+        error: { code: error.code },
+        errorType: error.errorType,
+        lastFailedAction: error.errorType === 'validation' || !retryable ? undefined : retry,
+      });
+    } else {
+      console.error(`[RunTrackerStore] Action ${action} failed:`, error);
+      set({
+        error: { code: failureCode },
+        errorType: 'unknown',
+        lastFailedAction: retryable ? retry : undefined,
+      });
+    }
+    return false;
+  } finally {
+    set(setActionPending(action, false));
+  }
+}
+
+/**
+ * Keeps the run tracker store in sync with the run tracker events of the main process for as long
+ * as the returned cleanup was not called. Started by every view that shows run tracker data.
+ * @returns Cleanup that removes the main-process subscriptions
+ */
+export function initRunTrackerSync(): () => void {
+  const { getState: get } = useRunTrackerStore;
+  return combineUnsubscribers([
+    onMainEvent('run-tracker:session-started', (payload) => {
+      get().handleSessionStarted(payload.session);
+    }),
+    onMainEvent('run-tracker:session-ended', () => {
+      get().handleSessionEnded();
+    }),
+    onMainEvent('run-tracker:run-started', (payload) => {
+      get().handleRunStarted(payload.run, payload.session);
+    }),
+    onMainEvent('run-tracker:run-ended', (payload) => {
+      get().handleRunEnded(payload.run, payload.session);
+    }),
+    onMainEvent('run-tracker:run-paused', (payload) => {
+      get().handleRunPaused(payload.session);
+    }),
+    onMainEvent('run-tracker:run-resumed', (payload) => {
+      get().handleRunResumed(payload.session);
+    }),
+    onMainEvent('run-tracker:run-item-added', (payload) => {
+      // Refresh the items of the affected run so the UI shows newly found items
+      void get().loadRunItems(payload.runId);
+    }),
+  ]);
+}
 
 /**
  * Fetches sessions and tracker state, then the active session's runs.
@@ -793,16 +828,15 @@ async function runInitialLoad(isFirstLoad: boolean): Promise<void> {
     ]);
     set({ ...buildInitialDataUpdate(sessions, trackerState), sessionsLoading: false });
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
     console.error('[RunTrackerStore] Error loading initial data:', error);
     set(
       isFirstLoad
         ? {
             initialLoadStatus: 'error',
-            initialLoadError: errorMessage,
+            initialLoadError: toErrorMessage(error),
             sessionsLoading: false,
           }
-        : { error: errorMessage, errorType: 'unknown', sessionsLoading: false },
+        : { ...loadFailed(), sessionsLoading: false },
     );
     return;
   }

@@ -1,9 +1,7 @@
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import type { EventChannel } from 'electron/ipc/contract';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { Run, Session } from 'electron/types/grail';
-import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { useRunTrackerStore } from '@/stores/runTrackerStore';
-import { createMainEventsMock } from '@/test/mainEventsMock';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { initRunTrackerSync, useRunTrackerStore } from '@/stores/runTrackerStore';
 import { mockStoreState } from '@/test/storeMock';
 import { RunTracker } from './RunTracker';
 
@@ -11,16 +9,8 @@ import { RunTracker } from './RunTracker';
 vi.mock('@/stores/runTrackerStore');
 const mockUseRunTrackerStore = vi.mocked(useRunTrackerStore);
 
-// Mock main-process events. Assigned rather than redefined (other suites define a
-// non-configurable `window.electronAPI`) and restored afterwards because test files share one window
-const mainEvents = createMainEventsMock();
-const windowGlobals = window as unknown as { electronAPI: unknown };
-const originalElectronAPI = windowGlobals.electronAPI;
-windowGlobals.electronAPI = { on: mainEvents.on };
-
-afterAll(() => {
-  windowGlobals.electronAPI = originalElectronAPI;
-});
+const mockInitRunTrackerSync = vi.mocked(initRunTrackerSync);
+const mockStopRunTrackerSync = vi.fn();
 
 // Mock child components
 vi.mock('./SessionCard', () => ({
@@ -107,27 +97,15 @@ describe('RunTracker', () => {
     loadingRunItems: new Set(),
     error: null,
     errorType: null,
-    retryCount: 0,
+    lastFailedAction: undefined,
     loadInitialData: vi.fn().mockResolvedValue(undefined),
-    loadRunItems: vi.fn().mockResolvedValue(undefined),
-    handleSessionStarted: vi.fn(),
-    handleSessionEnded: vi.fn(),
-    handleRunStarted: vi.fn(),
-    handleRunEnded: vi.fn(),
-    handleRunPaused: vi.fn(),
-    handleRunResumed: vi.fn(),
     clearError: vi.fn(),
     retryLastAction: vi.fn(),
   };
 
-  const getIpcHandler = (channel: string) => {
-    const call = mainEvents.on.mock.calls.find(([registered]) => registered === channel);
-    return call?.[1];
-  };
-
   beforeEach(() => {
     vi.clearAllMocks();
-    mainEvents.reset();
+    mockInitRunTrackerSync.mockReturnValue(mockStopRunTrackerSync);
     mockStoreState(mockUseRunTrackerStore, defaultStoreState);
   });
 
@@ -240,7 +218,7 @@ describe('RunTracker', () => {
       mockStoreState(mockUseRunTrackerStore, {
         ...defaultStoreState,
         activeSession: mockSession,
-        error: 'Failed to end session: boom',
+        error: { code: 'endSessionFailed' },
         errorType: 'unknown',
       });
 
@@ -248,11 +226,32 @@ describe('RunTracker', () => {
       render(<RunTracker />);
 
       // Assert
-      expect(screen.getByText('Failed to end session: boom')).toBeDefined();
+      expect(
+        screen.getByText('Failed to end session. Your progress has been saved.', { exact: false }),
+      ).toBeDefined();
       expect(screen.queryByText('Error Loading Run Tracker')).toBeNull();
       expect(screen.getByTestId('session-card')).toBeDefined();
       expect(screen.getByTestId('session-controls')).toBeDefined();
       expect(screen.getByTestId('sessions-list')).toBeDefined();
+    });
+
+    it('If the action can be retried, Then Retry runs the failed action again', () => {
+      // Arrange
+      const retryLastAction = vi.fn();
+      mockStoreState(mockUseRunTrackerStore, {
+        ...defaultStoreState,
+        error: { code: 'endSessionFailed' },
+        errorType: 'unknown',
+        lastFailedAction: vi.fn(),
+        retryLastAction,
+      });
+      render(<RunTracker />);
+
+      // Act
+      fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+
+      // Assert
+      expect(retryLastAction).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -272,41 +271,6 @@ describe('RunTracker', () => {
       expect(screen.queryByText('Loading run tracker data...')).toBeNull();
       expect(screen.getByTestId('session-card')).toBeDefined();
       expect(screen.getByTestId('session-controls')).toBeDefined();
-    });
-  });
-
-  describe('When a run item is added in the background', () => {
-    it('Then run items are refreshed without blanking the page', async () => {
-      // Arrange
-      const mockLoadRunItems = vi.fn().mockResolvedValue(undefined);
-      mockStoreState(mockUseRunTrackerStore, {
-        ...defaultStoreState,
-        activeSession: mockSession,
-        loadRunItems: mockLoadRunItems,
-      });
-      const { rerender } = render(<RunTracker />);
-      const handler = getIpcHandler('run-tracker:run-item-added');
-
-      // Act
-      act(() => {
-        handler?.({ runId: 'run-1' });
-      });
-      mockStoreState(mockUseRunTrackerStore, {
-        ...defaultStoreState,
-        activeSession: mockSession,
-        loadRunItems: mockLoadRunItems,
-        loadingRunItems: new Set(['run-1']),
-      });
-      rerender(<RunTracker />);
-
-      // Assert
-      expect(handler).toBeDefined();
-      await waitFor(() => {
-        expect(mockLoadRunItems).toHaveBeenCalledWith('run-1');
-      });
-      expect(screen.queryByText('Loading run tracker data...')).toBeNull();
-      expect(screen.getByTestId('session-card')).toBeDefined();
-      expect(screen.getByTestId('sessions-list')).toBeDefined();
     });
   });
 
@@ -353,40 +317,24 @@ describe('RunTracker', () => {
     });
   });
 
-  it('sets up IPC event listeners on mount', () => {
+  it('When the page mounts, Then the run tracker sync is started once', () => {
+    // Act
     render(<RunTracker />);
 
-    expect(mainEvents.on).toHaveBeenCalledWith('run-tracker:session-started', expect.any(Function));
-    expect(mainEvents.on).toHaveBeenCalledWith('run-tracker:session-ended', expect.any(Function));
-    expect(mainEvents.on).toHaveBeenCalledWith('run-tracker:run-started', expect.any(Function));
-    expect(mainEvents.on).toHaveBeenCalledWith('run-tracker:run-ended', expect.any(Function));
-    expect(mainEvents.on).toHaveBeenCalledWith('run-tracker:run-paused', expect.any(Function));
-    expect(mainEvents.on).toHaveBeenCalledWith('run-tracker:run-resumed', expect.any(Function));
+    // Assert
+    expect(mockInitRunTrackerSync).toHaveBeenCalledTimes(1);
+    expect(mockStopRunTrackerSync).not.toHaveBeenCalled();
   });
 
-  it('When the component unmounts, Then every IPC event listener is removed', () => {
+  it('When the page unmounts, Then the run tracker sync is stopped', () => {
     // Arrange
     const { unmount } = render(<RunTracker />);
-    const channels: EventChannel[] = [
-      'run-tracker:session-started',
-      'run-tracker:session-ended',
-      'run-tracker:run-started',
-      'run-tracker:run-ended',
-      'run-tracker:run-paused',
-      'run-tracker:run-resumed',
-      'run-tracker:run-item-added',
-    ];
-    expect(channels.map((channel) => mainEvents.listenerCount(channel))).toEqual(
-      channels.map(() => 1),
-    );
 
     // Act
     unmount();
 
     // Assert
-    expect(channels.map((channel) => mainEvents.listenerCount(channel))).toEqual(
-      channels.map(() => 0),
-    );
+    expect(mockStopRunTrackerSync).toHaveBeenCalledTimes(1);
   });
 
   it('passes correct props to child components', () => {
