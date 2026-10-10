@@ -1,4 +1,3 @@
-// @vitest-environment node
 import type { Database as DatabaseType } from 'better-sqlite3';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createInMemoryDatabase, initializeDatabaseSchema } from '../test/helpers/databaseHelpers';

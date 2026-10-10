@@ -1,4 +1,3 @@
-// @vitest-environment node
 import type { Database as DatabaseType } from 'better-sqlite3';
 import type { Mock } from 'vitest';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';

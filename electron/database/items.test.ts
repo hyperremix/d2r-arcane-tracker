@@ -1,4 +1,3 @@
-// @vitest-environment node
 import { afterEach, beforeEach, describe, expect, it, type MockInstance, vi } from 'vitest';
 import { items as grailItems } from '../items';
 import { createInMemoryDatabase } from '../test/helpers/databaseHelpers';
