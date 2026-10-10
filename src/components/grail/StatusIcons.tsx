@@ -107,8 +107,8 @@ interface RecentDiscoveryProps {
  * RecentDiscoveryIndicator component that displays a small "New" badge for recently found items.
  * Whether a find is recent is decided once, by `getRecentFindDate` in `ItemCard/cardState.ts`;
  * callers render this badge only for a recent find, so the badge and the card's accessible name
- * cannot disagree. The badge uses the neutral foreground color, never an item-quality color, so it cannot be
- * confused with an item's quality; its meaning is carried by its text.
+ * cannot disagree. The badge uses the neutral foreground color, never an item-quality color, so it
+ * cannot be confused with an item's quality; its meaning is carried by its text.
  * @param {RecentDiscoveryProps} props - Component props
  * @param {string} [props.className] - Optional additional CSS classes
  * @param {boolean} [props.focusableTriggers] - Whether the tooltip trigger is a focusable button
