@@ -29,7 +29,7 @@ export interface RunTrackerHandlerDependencies {
 /**
  * Registers the run tracker IPC handlers and forwards run tracker events to the renderers.
  * @param deps - The run tracker, the database and the event bus
- * @returns Function that stops forwarding the run tracker events
+ * @returns Function that removes the handlers and stops forwarding the run tracker events
  */
 export function initializeRunTrackerHandlers({
   runTracker,
@@ -37,7 +37,7 @@ export function initializeRunTrackerHandlers({
   eventBus,
   broadcastToRenderers,
 }: RunTrackerHandlerDependencies): () => void {
-  const { handle } = createIpcMainRegistry(ipcMain);
+  const { handle, dispose } = createIpcMainRegistry(ipcMain);
 
   // Session management handlers
   handle('run-tracker:start-session', () => runTracker.startSession());
@@ -156,6 +156,7 @@ export function initializeRunTrackerHandlers({
   console.log('[runTrackerHandlers] IPC handlers initialized');
 
   return () => {
+    dispose();
     for (const unsubscribe of eventUnsubscribers) {
       unsubscribe();
     }

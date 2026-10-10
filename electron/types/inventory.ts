@@ -44,26 +44,12 @@ export type D2SItem = {
   magic_attributes?: Array<{ name: string; value?: unknown }>;
 };
 
+/**
+ * An item of a save file as the inventory browser shows it. This is the shape sent to renderer
+ * windows; the main process keeps the parsed d2s item as well ({@link ParsedInventoryItemWithRaw}).
+ */
 export interface ParsedInventoryItem {
   fingerprint: string;
-  fingerprintInputs: {
-    sourceFileType: VaultSourceFileType;
-    characterName: string;
-    locationContext: VaultLocationContext;
-    itemCode?: string;
-    quality: string;
-    ethereal: boolean;
-    socketCount: number;
-    stashTab?: number;
-    gridX?: number;
-    gridY?: number;
-    gridWidth?: number;
-    gridHeight?: number;
-    equippedSlotId?: number;
-    iconFileName?: string;
-    isSocketedItem?: boolean;
-    itemName: string;
-  };
   characterName: string;
   characterId?: string;
   sourceFileType: VaultSourceFileType;
@@ -87,11 +73,21 @@ export interface ParsedInventoryItem {
   stackCount?: number;
   grailItemId?: string;
   rawItemJson: string;
-  rawParsedItem: d2s.types.IItem;
   seenAt: Date;
 }
 
-export interface CharacterInventorySnapshot {
+/** A parsed save file item in the main process, together with the d2s item it was parsed from. */
+export interface ParsedInventoryItemWithRaw extends ParsedInventoryItem {
+  rawParsedItem: d2s.types.IItem;
+}
+
+/**
+ * The items of one save file. Renderer windows receive {@link ParsedInventoryItem}s; the main
+ * process keeps {@link ParsedInventoryItemWithRaw}s.
+ */
+export interface CharacterInventorySnapshot<
+  TItem extends ParsedInventoryItem = ParsedInventoryItem,
+> {
   snapshotId: string;
   characterName: string;
   characterId?: string;
@@ -100,11 +96,16 @@ export interface CharacterInventorySnapshot {
   sourceFileVersion?: number;
   readOnly?: boolean;
   capturedAt: Date;
-  items: ParsedInventoryItem[];
+  items: TItem[];
 }
 
-export interface InventorySearchResult {
-  snapshots: CharacterInventorySnapshot[];
+/** Inventory snapshots as the main process keeps them. */
+export type ParsedInventorySnapshot = CharacterInventorySnapshot<ParsedInventoryItemWithRaw>;
+
+export interface InventorySearchResult<
+  TSnapshot extends CharacterInventorySnapshot = CharacterInventorySnapshot,
+> {
+  snapshots: TSnapshot[];
   totalSnapshots: number;
   totalItems: number;
 }

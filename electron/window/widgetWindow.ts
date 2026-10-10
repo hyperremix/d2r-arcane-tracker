@@ -326,3 +326,52 @@ export function updateWidgetWindowOpacity(_opacity: number): void {
   // Opacity is now controlled via CSS background color, not window-level opacity
   // This prevents the gauge and content from becoming transparent
 }
+
+/** How long to wait after the last resize event before the widget size is saved. */
+const WIDGET_SIZE_SAVE_DELAY_MS = 500;
+
+/** Saves widget sizes once resizing stops, so a drag-resize does not write on every event. */
+export interface DebouncedWidgetSizeSaver {
+  /** Schedules saving a size; replaces a save that is still pending. */
+  save: (display: WidgetDisplayMode, size: WidgetSize) => void;
+  /** Saves a pending size right away (e.g. on shutdown, before the database closes). */
+  flush: () => void;
+}
+
+/**
+ * Creates the debounced saver for the widget size.
+ *
+ * @param persist - Stores a size; errors are logged, not thrown
+ * @param delayMs - How long to wait after the last resize event
+ * @returns The saver; pass `save` to the widget window as its size change callback
+ */
+export function createDebouncedWidgetSizeSaver(
+  persist: (display: WidgetDisplayMode, size: WidgetSize) => void,
+  delayMs = WIDGET_SIZE_SAVE_DELAY_MS,
+): DebouncedWidgetSizeSaver {
+  let timeout: NodeJS.Timeout | undefined;
+  let pendingSave: (() => void) | undefined;
+
+  const flush = () => {
+    clearTimeout(timeout);
+    timeout = undefined;
+    const save = pendingSave;
+    pendingSave = undefined;
+    save?.();
+  };
+
+  return {
+    save(display, size) {
+      clearTimeout(timeout);
+      pendingSave = () => {
+        try {
+          persist(display, size);
+        } catch (error) {
+          console.error('Failed to save widget size:', error);
+        }
+      };
+      timeout = setTimeout(flush, delayMs);
+    },
+    flush,
+  };
+}

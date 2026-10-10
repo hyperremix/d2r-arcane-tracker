@@ -5,7 +5,7 @@
  */
 import type * as d2s from '@dschu012/d2s';
 import type { CharacterClass, Item } from './catalog';
-import type { ParsedInventoryItem } from './inventory';
+import type { ParsedInventoryItemWithRaw } from './inventory';
 import type { VaultLocationContext } from './vault';
 
 /**
@@ -124,7 +124,7 @@ export type SaveFileEvent = {
    * read the file again. Only present in the main process: it is stripped before the event is
    * forwarded to renderer windows.
    */
-  parsedItems?: ParsedInventoryItem[];
+  parsedItems?: ParsedInventoryItemWithRaw[];
   /**
    * When true, suppresses all user-facing notifications for this event.
    * Used during initial startup parsing to prevent notification spam for

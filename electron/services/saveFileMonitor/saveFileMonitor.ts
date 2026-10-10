@@ -5,9 +5,9 @@ import type { FSWatcher } from 'chokidar';
 import { app } from 'electron';
 import type { GrailDatabase } from '../../database/database';
 import type {
-  CharacterInventorySnapshot,
   D2SaveFile,
   InventorySearchResult,
+  ParsedInventorySnapshot,
   SaveFileEvent,
   SaveFileState,
   VaultSourceFileType,
@@ -69,7 +69,7 @@ function createForcedParseRequest(): ForcedParseRequest {
  * a database of found items for Holy Grail tracking.
  */
 class SaveFileMonitor {
-  private inventorySnapshots: CharacterInventorySnapshot[] = [];
+  private inventorySnapshots: ParsedInventorySnapshot[] = [];
   private fileWatcher: FSWatcher | null;
   private watchPath: string | null;
   private fileChangeCounter: number = 0;
@@ -531,7 +531,7 @@ class SaveFileMonitor {
       // Update save file state after successful parsing
       await this.updateSaveFileState(filePath, mtime);
 
-      const inventorySnapshot: CharacterInventorySnapshot = {
+      const inventorySnapshot: ParsedInventorySnapshot = {
         snapshotId: `${saveName}-${Date.now()}`,
         characterName: saveName,
         characterId,
@@ -863,7 +863,7 @@ class SaveFileMonitor {
     log.info('updateSaveDirectory', 'Complete');
   }
 
-  getInventorySearchResult(): InventorySearchResult {
+  getInventorySearchResult(): InventorySearchResult<ParsedInventorySnapshot> {
     return {
       snapshots: this.inventorySnapshots,
       totalSnapshots: this.inventorySnapshots.length,

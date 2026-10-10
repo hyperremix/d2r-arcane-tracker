@@ -87,7 +87,15 @@ describe('When the vault IPC handlers are initialized', () => {
   describe('If vault:addItem is invoked', () => {
     it('Then the item is passed to the vault service and the stored item returned', async () => {
       // Arrange
-      const item = { fingerprint: 'fp-1' };
+      const item = {
+        fingerprint: 'fp-1',
+        itemName: 'Shako',
+        quality: 'unique',
+        ethereal: false,
+        rawItemJson: '{}',
+        sourceFileType: 'd2s',
+        locationContext: 'inventory',
+      };
 
       // Act
       const result = await invoke('vault:addItem', item);
@@ -98,16 +106,41 @@ describe('When the vault IPC handlers are initialized', () => {
     });
   });
 
+  describe('If vault:addItem receives an item without a fingerprint', () => {
+    it('Then the invoke rejects before the vault service runs', async () => {
+      // Arrange
+      const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+      // Act
+      const result = invoke('vault:addItem', { itemName: 'Shako' });
+
+      // Assert
+      await expect(result).rejects.toThrow();
+      expect(vault.addItem).not.toHaveBeenCalled();
+      consoleError.mockRestore();
+    });
+  });
+
   describe('If vault:unvaultItem is invoked', () => {
     it('Then the item, target and withdraw count are passed on and success is reported', async () => {
       // Arrange
-      const target = { targetFilePath: '/tmp/sorc.d2s' };
+      const target = {
+        targetFilePath: ' /tmp/sorc.d2s ',
+        targetFileType: 'd2s',
+        targetLocationContext: 'inventory',
+        targetGridX: 1,
+        targetGridY: 2,
+      };
 
       // Act
       const result = await invoke('vault:unvaultItem', 'row-1', target, 3);
 
       // Assert
-      expect(vault.unvaultItem).toHaveBeenCalledWith('row-1', target, 3);
+      expect(vault.unvaultItem).toHaveBeenCalledWith(
+        'row-1',
+        { ...target, targetFilePath: '/tmp/sorc.d2s' },
+        3,
+      );
       expect(result).toEqual({ success: true });
     });
   });
@@ -132,8 +165,33 @@ describe('When the vault IPC handlers are initialized', () => {
   describe('If inventory:moveItem and inventory:splitStack are invoked', () => {
     it('Then the inputs are passed to the vault service and success is reported', async () => {
       // Arrange
-      const moveInput = { sourceFilePath: '/tmp/a.d2s' };
-      const splitInput = { sourceFilePath: '/tmp/b.d2i' };
+      const moveInput = {
+        sourceFilePath: '/tmp/a.d2s',
+        sourceFileType: 'd2s',
+        rawItemJson: '{"id":1}',
+        targetFilePath: '/tmp/a.d2s',
+        targetFileType: 'd2s',
+        targetLocationContext: 'inventory',
+        targetGridX: 0,
+        targetGridY: 0,
+      };
+      const splitInput = {
+        sourceFilePath: '/tmp/b.d2i',
+        sourceFileType: 'd2i',
+        sourceStashTab: 5,
+        sourceItemCode: 'r01',
+        splitCount: 1,
+        targets: [
+          {
+            targetFilePath: '/tmp/b.d2i',
+            targetFileType: 'd2i',
+            targetLocationContext: 'stash',
+            targetStashTab: 0,
+            targetGridX: 0,
+            targetGridY: 0,
+          },
+        ],
+      };
 
       // Act
       const moveResult = await invoke('inventory:moveItem', moveInput);

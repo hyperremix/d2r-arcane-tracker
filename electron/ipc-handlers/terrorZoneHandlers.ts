@@ -14,12 +14,13 @@ export interface TerrorZoneHandlerDependencies {
  * Initializes IPC handlers for terror zone configuration operations.
  * Sets up handlers for reading zones, managing configuration, and file operations.
  * @param deps - The terror zone service and the settings storing the configuration
+ * @returns Function that removes the handlers
  */
 export function initializeTerrorZoneHandlers({
   terrorZoneService,
   settings: settingsService,
-}: TerrorZoneHandlerDependencies): void {
-  const { handle } = createIpcMainRegistry(ipcMain);
+}: TerrorZoneHandlerDependencies): () => void {
+  const { handle, dispose } = createIpcMainRegistry(ipcMain);
   console.log('[initializeTerrorZoneHandlers] Starting initialization');
 
   /**
@@ -158,4 +159,6 @@ export function initializeTerrorZoneHandlers({
   });
 
   console.log('[initializeTerrorZoneHandlers] Initialization complete');
+
+  return dispose;
 }

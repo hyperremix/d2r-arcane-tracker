@@ -2,7 +2,7 @@ import * as d2s from '@dschu012/d2s';
 import * as d2stash from '@dschu012/d2s/lib/d2/stash';
 import type {
   D2SItem,
-  ParsedInventoryItem,
+  ParsedInventoryItemWithRaw,
   StashTabKind,
   VaultLocationContext,
   VaultSourceFileType,
@@ -27,7 +27,7 @@ export type SaveParseStatus = 'parsed' | 'partial' | 'skipped' | 'errored';
 
 /** Items of one save file plus what the parse learned about its header. */
 export interface SaveParseResult {
-  items: ParsedInventoryItem[];
+  items: ParsedInventoryItemWithRaw[];
   status: SaveParseStatus;
   /** Hardcore flag read from a stash header (.sss/.d2x/.d2i), when the parser got that far. */
   stashHardcore?: boolean;
@@ -64,7 +64,7 @@ export async function parseSaveContent(
   { saveName, filePath, content, extension }: SaveFileContent,
   readGameMode: GameModeReader | undefined,
 ): Promise<SaveParseResult> {
-  const items: ParsedInventoryItem[] = [];
+  const items: ParsedInventoryItemWithRaw[] = [];
   let stashHardcore: boolean | undefined;
 
   const sourceFileType = extension.replace('.', '') as VaultSourceFileType;

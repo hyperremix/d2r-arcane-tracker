@@ -2,7 +2,11 @@ import { chmodSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { CharacterInventorySnapshot, D2SItem, ParsedInventoryItem } from '../../types/grail';
+import type {
+  D2SItem,
+  ParsedInventoryItemWithRaw,
+  ParsedInventorySnapshot,
+} from '../../types/grail';
 import { normalizeInventoryItem } from '../itemNormalizer';
 import type { SingleFileParseResult } from './types';
 import {
@@ -24,7 +28,7 @@ function asDatabase(database: ReturnType<typeof createDatabase>): VaultPresenceD
   return database as unknown as VaultPresenceDatabase;
 }
 
-function parseStashItem(item: Partial<D2SItem>): ParsedInventoryItem {
+function parseStashItem(item: Partial<D2SItem>): ParsedInventoryItemWithRaw {
   return normalizeInventoryItem({
     filePath: '/tmp/SharedStash.d2i',
     saveName: 'Shared',
@@ -35,7 +39,7 @@ function parseStashItem(item: Partial<D2SItem>): ParsedInventoryItem {
   });
 }
 
-function createSnapshot(sourceFilePath: string): CharacterInventorySnapshot {
+function createSnapshot(sourceFilePath: string): ParsedInventorySnapshot {
   return {
     snapshotId: `${sourceFilePath}-1`,
     characterName: 'Hero',

@@ -3,7 +3,7 @@ import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { D2SaveFileBuilder, D2SItemBuilder } from '@/fixtures';
 import { items as catalogItems } from '../items/index';
-import type { D2SItem, ItemDetectionEvent, ParsedInventoryItem } from '../types/grail';
+import type { D2SItem, ItemDetectionEvent, ParsedInventoryItemWithRaw } from '../types/grail';
 import { getGrailItemId } from '../utils/grailItemUtils';
 import { EventBus } from './EventBus';
 import { ItemDetectionService } from './itemDetection';
@@ -29,7 +29,7 @@ const saveFile = D2SaveFileBuilder.new()
   .withPath('/test/TestChar.d2s')
   .build();
 
-const toParsedItems = (d2sItems: D2SItem[]): ParsedInventoryItem[] =>
+const toParsedItems = (d2sItems: D2SItem[]): ParsedInventoryItemWithRaw[] =>
   normalizeItemsWithSocketedItems(d2sItems, {
     filePath: saveFile.path,
     saveName: saveFile.name,
@@ -43,7 +43,7 @@ const resolveDetectedType = (item: D2SItem): string =>
 const resolveDetectedName = (item: D2SItem): string =>
   toDetectedItem(toParsedItems([item])[0], saveFile).name;
 
-const detectionKeys = (items: ParsedInventoryItem[]) =>
+const detectionKeys = (items: ParsedInventoryItemWithRaw[]) =>
   selectDetectionCandidates(items).map(
     (item) => `${resolveGrailLookupName(item.rawParsedItem)}${item.ethereal ? '+eth' : ''}`,
   );

@@ -21,6 +21,11 @@ export class UpdateService {
 
   private statusCallback?: (status: UpdateStatus) => void;
 
+  /** Removes the auto-updater listeners this service registered. */
+  private readonly listenerRemovers: Array<() => void> = [];
+
+  private startupCheckTimeout: NodeJS.Timeout | undefined;
+
   /**
    * Initializes the update service with event handlers and configuration.
    * @param {boolean} checkOnStartup - Whether to check for updates immediately after initialization
@@ -44,7 +49,8 @@ export class UpdateService {
     // Check for updates on startup if enabled
     if (checkOnStartup) {
       // Delay the check slightly to ensure the app is fully initialized
-      setTimeout(() => {
+      this.startupCheckTimeout = setTimeout(() => {
+        this.startupCheckTimeout = undefined;
         log.info('initialize', 'Checking for updates on startup...');
         this.checkForUpdates().catch((error) => {
           log.error('initialize', 'Startup update check failed', error);
@@ -54,10 +60,32 @@ export class UpdateService {
   }
 
   /**
+   * Stops the service: cancels a pending startup check and removes the auto-updater listeners and
+   * the status callback. Safe to call more than once.
+   */
+  dispose(): void {
+    clearTimeout(this.startupCheckTimeout);
+    this.startupCheckTimeout = undefined;
+    for (const removeListener of this.listenerRemovers.splice(0)) {
+      removeListener();
+    }
+    this.statusCallback = undefined;
+  }
+
+  /**
+   * Registers an auto-updater listener that {@link dispose} removes again.
+   */
+  private listen: typeof autoUpdater.on = (event, listener) => {
+    autoUpdater.on(event, listener);
+    this.listenerRemovers.push(() => autoUpdater.removeListener(event, listener));
+    return autoUpdater;
+  };
+
+  /**
    * Registers all auto-updater event handlers.
    */
   private registerEventHandlers() {
-    autoUpdater.on('checking-for-update', () => {
+    this.listen('checking-for-update', () => {
       log.info('registerEventHandlers', 'Checking for updates...');
       this.updateStatus = {
         checking: true,
@@ -68,7 +96,7 @@ export class UpdateService {
       this.notifyStatusChange();
     });
 
-    autoUpdater.on('update-available', (info: ElectronUpdaterInfo) => {
+    this.listen('update-available', (info: ElectronUpdaterInfo) => {
       log.info('registerEventHandlers', `Update available: ${info.version}`);
       this.updateStatus = {
         checking: false,
@@ -80,7 +108,7 @@ export class UpdateService {
       this.notifyStatusChange();
     });
 
-    autoUpdater.on('update-not-available', (info: ElectronUpdaterInfo) => {
+    this.listen('update-not-available', (info: ElectronUpdaterInfo) => {
       log.info('registerEventHandlers', `Update not available. Current version: ${info.version}`);
       this.updateStatus = {
         checking: false,
@@ -92,7 +120,7 @@ export class UpdateService {
       this.notifyStatusChange();
     });
 
-    autoUpdater.on('download-progress', (progressObj) => {
+    this.listen('download-progress', (progressObj) => {
       log.info('registerEventHandlers', `Download progress: ${progressObj.percent.toFixed(2)}%`);
       this.updateStatus = {
         ...this.updateStatus,
@@ -105,7 +133,7 @@ export class UpdateService {
       this.notifyStatusChange();
     });
 
-    autoUpdater.on('update-downloaded', (info: ElectronUpdaterInfo) => {
+    this.listen('update-downloaded', (info: ElectronUpdaterInfo) => {
       log.info('registerEventHandlers', `Update downloaded: ${info.version}`);
       this.updateStatus = {
         checking: false,
@@ -117,7 +145,7 @@ export class UpdateService {
       this.notifyStatusChange();
     });
 
-    autoUpdater.on('error', (error) => {
+    this.listen('error', (error) => {
       log.error('registerEventHandlers', error);
       this.updateStatus = {
         checking: false,

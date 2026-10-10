@@ -72,6 +72,22 @@ describe('When renderer arguments are validated against the IPC contract', () =>
     ],
     ['shell:openExternal', ['javascript:alert(1)'], 'Only http(s) URLs can be opened'],
     ['shell:openExternal', ['not a url'], 'Invalid URL'],
+    ['grail:updateProgress', [{ id: 'p-1' }], 'Invalid grail progress payload'],
+    [
+      'grail:updateSettings',
+      [{ runTrackerGlobalHotkeys: 'yes' }],
+      'Invalid runTrackerGlobalHotkeys setting',
+    ],
+    ['grail:updateSettings', [{ runTrackerShortcuts: {} }], 'Invalid runTrackerShortcuts setting'],
+    ['saveFile:updateSaveDirectory', ['saves'], 'expected a non-empty absolute path'],
+    ['dialog:writeFile', ['export.csv', 'data'], 'Invalid file path'],
+    ['dialog:writeFile', ['/tmp/export.csv', 42], 'Invalid file content'],
+    ['vault:removeItem', [''], 'itemId is required'],
+    ['vault:unvaultItem', ['row-1', undefined, 1.5], 'withdrawCount must be a positive integer'],
+    ['inventory:searchAll', [{ vaultedState: 'gone' }], 'vaultedState must be one of'],
+    ['inventory:moveItem', [null], 'Move input is required'],
+    ['inventory:splitStack', [{}], 'sourceFilePath is required'],
+    ['inventory:openSnapshotWindow', [{ sourceFilePath: ' ' }], 'sourceFilePath is required'],
   ])('If %s receives %j, Then it is rejected with "%s"', (channel, rawArgs, message) => {
     // Arrange
     const run = () => validate(channel, ...rawArgs);
@@ -123,6 +139,91 @@ describe('When renderer arguments are validated against the IPC contract', () =>
         },
       ],
     ]);
+  });
+});
+
+describe('When the renderer sends a grail progress record, save directory or export path', () => {
+  it('If the progress record has unknown fields, Then only the record fields are passed on', () => {
+    // Arrange
+    const foundDate = new Date('2024-05-01');
+    const record = {
+      id: 'p-1',
+      characterId: 'c-1',
+      itemId: 'shako',
+      foundDate,
+      foundBy: 'me',
+      manuallyAdded: true,
+      difficulty: 'hell',
+      notes: 'drop',
+      isEthereal: false,
+      fromInitialScan: false,
+      injected: 'value',
+    };
+
+    // Act
+    const [validated] = validate('grail:updateProgress', record);
+
+    // Assert
+    expect(validated).toEqual({
+      id: 'p-1',
+      characterId: 'c-1',
+      itemId: 'shako',
+      foundDate,
+      foundBy: 'me',
+      manuallyAdded: true,
+      difficulty: 'hell',
+      notes: 'drop',
+      isEthereal: false,
+      fromInitialScan: false,
+    });
+    expect(validated).not.toHaveProperty('injected');
+  });
+
+  it('If the progress record has only the required fields, Then the optional fields stay undefined', () => {
+    // Arrange
+    const record = {
+      id: 'p-1',
+      characterId: 'c-1',
+      itemId: 'shako',
+      manuallyAdded: false,
+      isEthereal: true,
+    };
+
+    // Act
+    const [validated] = validate('grail:updateProgress', record);
+
+    // Assert
+    expect(validated).toEqual({ ...record });
+    expect(validated).toMatchObject({
+      foundDate: undefined,
+      foundBy: undefined,
+      difficulty: undefined,
+      notes: undefined,
+      fromInitialScan: undefined,
+    });
+  });
+
+  it('If the save directory has surrounding whitespace, Then the trimmed absolute path is passed on', () => {
+    // Arrange
+    const directory = '  /Users/hero/Saved Games/Diablo II Resurrected  ';
+
+    // Act
+    const [validated] = validate('saveFile:updateSaveDirectory', directory);
+
+    // Assert
+    expect(validated).toBe('/Users/hero/Saved Games/Diablo II Resurrected');
+  });
+
+  it('If the export path is absolute, Then the path and the content are passed on unchanged', () => {
+    // Arrange
+    const filePath = '/tmp/export.csv';
+    const content = 'a,b\n1,2';
+
+    // Act
+    const validated = validate('dialog:writeFile', filePath, content);
+
+    // Assert
+    expect(validated).toEqual([filePath, content]);
   });
 });
 

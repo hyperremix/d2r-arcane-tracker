@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { CharacterInventorySnapshot, VaultItemSearchResult } from '../types/grail';
+import type { InvokeArgs, InvokeChannel } from '../ipc/contract';
+import { invokeArgValidators } from '../ipc/validators';
+import type { ParsedInventorySnapshot, VaultItemSearchResult } from '../types/grail';
 import { type VaultDatabase, type VaultSaveFileEditor, VaultService } from './vaultService';
 
 const mocks = {
@@ -27,23 +29,42 @@ interface MonitorStub {
   getInventorySearchResult?: () => { snapshots: unknown[] };
 }
 
-/** Renderer input is untrusted, so the tests call the service with loosely typed payloads. */
-type UntrustedCalls<T> = {
-  [K in keyof T]: T[K] extends (...args: never[]) => infer R ? (...args: unknown[]) => R : T[K];
-};
+/** Validates raw renderer arguments with the IPC validator of a channel, as `handle()` does. */
+function validateArgs<C extends InvokeChannel>(channel: C, rawArgs: unknown[]): InvokeArgs<C> {
+  return invokeArgValidators[channel](rawArgs);
+}
 
-function createService(
-  getMonitor: () => MonitorStub | undefined = () => undefined,
-): UntrustedCalls<VaultService> {
-  return new VaultService({
+/**
+ * Creates the vault service and calls it the way the IPC layer does: renderer input is untrusted,
+ * so the tests pass loosely typed payloads, which the channel validators check before the service
+ * runs.
+ */
+function createService(getMonitor: () => MonitorStub | undefined = () => undefined) {
+  const service = new VaultService({
     database: mocks.grailDatabaseMock as unknown as VaultDatabase,
     saveFileEditor: mocks.saveFileEditorMock as unknown as VaultSaveFileEditor,
     assertGameNotRunning: mocks.assertGameNotRunning,
     getMonitoredSaveDirectory: () => getMonitor()?.getSaveDirectory?.() ?? undefined,
     getConfiguredSaveDirectory: () => mocks.configuredSaveDirectory(),
     getInventorySnapshots: () =>
-      (getMonitor()?.getInventorySearchResult?.().snapshots ?? []) as CharacterInventorySnapshot[],
-  }) as unknown as UntrustedCalls<VaultService>;
+      (getMonitor()?.getInventorySearchResult?.().snapshots ?? []) as ParsedInventorySnapshot[],
+  });
+
+  return {
+    addItem: async (...rawArgs: unknown[]) =>
+      service.addItem(...validateArgs('vault:addItem', rawArgs)),
+    removeItem: (...rawArgs: unknown[]) =>
+      service.removeItem(...validateArgs('vault:removeItem', rawArgs)),
+    unvaultItem: async (...rawArgs: unknown[]) =>
+      service.unvaultItem(...validateArgs('vault:unvaultItem', rawArgs)),
+    search: (...rawArgs: unknown[]) => service.search(...validateArgs('vault:search', rawArgs)),
+    searchAll: (...rawArgs: unknown[]) =>
+      service.searchAll(...validateArgs('inventory:searchAll', rawArgs)),
+    moveItem: async (...rawArgs: unknown[]) =>
+      service.moveItem(...validateArgs('inventory:moveItem', rawArgs)),
+    splitStack: async (...rawArgs: unknown[]) =>
+      service.splitStack(...validateArgs('inventory:splitStack', rawArgs)),
+  };
 }
 
 function makeVaultItem(overrides: Record<string, unknown>) {
@@ -300,7 +321,7 @@ describe('When the vault service handles a renderer request', () => {
   });
 
   describe('If inventory:searchAll is invoked', () => {
-    it('Then it returns combined inventory and vault search results', async () => {
+    it('Then it returns combined inventory and vault search results without the parsed d2s items', async () => {
       // Arrange
       const snapshots = [
         {
@@ -312,15 +333,6 @@ describe('When the vault service handles a renderer request', () => {
           items: [
             {
               fingerprint: 'fp-1',
-              fingerprintInputs: {
-                sourceFileType: 'd2s',
-                characterName: 'Sorc',
-                locationContext: 'inventory',
-                quality: 'unique',
-                ethereal: false,
-                socketCount: 0,
-                itemName: 'Shako',
-              },
               characterName: 'Sorc',
               sourceFileType: 'd2s',
               sourceFilePath: '/tmp/sorc.d2s',
@@ -364,14 +376,16 @@ describe('When the vault service handles a renderer request', () => {
         page: 1,
         pageSize: 20,
       });
+      const { rawParsedItem: _rawParsedItem, ...rendererItem } = snapshots[0].items[0];
       expect(result).toEqual({
         inventory: {
-          snapshots,
+          snapshots: [{ ...snapshots[0], items: [rendererItem] }],
           totalSnapshots: 1,
           totalItems: 1,
         },
         vault: vaultResult,
       });
+      expect(result.inventory.snapshots[0].items[0]).not.toHaveProperty('rawParsedItem');
     });
   });
 
@@ -389,15 +403,6 @@ describe('When the vault service handles a renderer request', () => {
           items: [
             {
               fingerprint: 'fp-1',
-              fingerprintInputs: {
-                sourceFileType: 'd2s',
-                characterName: 'Sorc',
-                locationContext: 'inventory',
-                quality: 'unique',
-                ethereal: false,
-                socketCount: 0,
-                itemName: 'Shako',
-              },
               characterName: 'Sorc',
               characterId: 'char-1',
               sourceFileType: 'd2s',
@@ -413,15 +418,6 @@ describe('When the vault service handles a renderer request', () => {
             },
             {
               fingerprint: 'fp-2',
-              fingerprintInputs: {
-                sourceFileType: 'd2s',
-                characterName: 'Barb',
-                locationContext: 'inventory',
-                quality: 'unique',
-                ethereal: false,
-                socketCount: 0,
-                itemName: 'Arreat',
-              },
               characterName: 'Barb',
               characterId: 'char-2',
               sourceFileType: 'd2s',

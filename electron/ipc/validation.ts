@@ -137,8 +137,8 @@ export function plainObject<T extends object>(message: string): FieldValidator<T
 }
 
 /**
- * Passes the value through unchanged. Only for arguments that the handler validates in full
- * itself (the vault and inventory handlers normalize every field and report precise errors).
+ * Passes the value through unchanged. Only for arguments whose handler validates them itself
+ * because it reports invalid input as a failed result instead of rejecting (the widget handlers).
  */
 export function validatedByHandler<T>(): FieldValidator<T> {
   return (value) => value as T;

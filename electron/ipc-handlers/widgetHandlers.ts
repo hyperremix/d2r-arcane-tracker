@@ -58,14 +58,15 @@ function getSettingsForWidgetWindow(
  * @param paths - Locations of the preload script and the renderer
  * @param onPositionChange - Callback when widget position changes (for saving to settings)
  * @param onSizeChange - Callback when widget size changes (for saving to settings)
+ * @returns Function that removes the handlers
  */
 export function initializeWidgetHandlers(
   settingsService: SettingsService,
   paths: AppPaths,
   onPositionChange?: (position: { x: number; y: number }) => void,
   onSizeChange?: (display: WidgetDisplayMode, size: WidgetSize) => void,
-): void {
-  const { handle } = createIpcMainRegistry(ipcMain);
+): () => void {
+  const { handle, dispose } = createIpcMainRegistry(ipcMain);
   /**
    * Toggle widget visibility based on settings.
    */
@@ -187,4 +188,6 @@ export function initializeWidgetHandlers(
       return { success: false, error: String(error), position: null };
     }
   });
+
+  return dispose;
 }

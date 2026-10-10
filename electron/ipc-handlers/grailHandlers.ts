@@ -3,87 +3,7 @@ import type { GrailDatabase } from '../database/database';
 import type { BroadcastToRenderers } from '../ipc/broadcast';
 import { createIpcMainRegistry } from '../ipc/handle';
 import type { SettingsService } from '../services/settingsService';
-import type { Difficulty, GrailProgress, Settings } from '../types/grail';
-import { RUN_TRACKER_SHORTCUT_ACTIONS } from '../utils/runTrackerShortcuts';
-
-/**
- * Validates renderer-provided settings whose type affects main-process behavior.
- * @param settings - The partial settings received over IPC
- * @throws Error if a validated setting has an invalid type
- */
-function validateSettingsUpdate(settings: Partial<Settings>): void {
-  if (
-    settings.runTrackerGlobalHotkeys !== undefined &&
-    typeof settings.runTrackerGlobalHotkeys !== 'boolean'
-  ) {
-    throw new Error('Invalid runTrackerGlobalHotkeys setting: expected a boolean');
-  }
-
-  if (
-    settings.runTrackerShortcuts !== undefined &&
-    !isValidRunTrackerShortcuts(settings.runTrackerShortcuts)
-  ) {
-    throw new Error(
-      'Invalid runTrackerShortcuts setting: expected an object with a non-empty string for each shortcut action',
-    );
-  }
-}
-
-/**
- * Checks that a renderer-provided shortcut mapping has a non-empty string for every action.
- * @param value - The untrusted runTrackerShortcuts value received over IPC
- * @returns True if the value is a complete shortcut mapping
- */
-function isValidRunTrackerShortcuts(value: unknown): boolean {
-  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
-    return false;
-  }
-
-  const shortcuts = value as Record<string, unknown>;
-  return RUN_TRACKER_SHORTCUT_ACTIONS.every((action) => isNonEmptyString(shortcuts[action]));
-}
-
-const VALID_DIFFICULTIES: readonly Difficulty[] = ['normal', 'nightmare', 'hell'];
-
-function isNonEmptyString(value: unknown): value is string {
-  return typeof value === 'string' && value.trim().length > 0;
-}
-
-function isOptionalString(value: unknown): boolean {
-  return value === undefined || typeof value === 'string';
-}
-
-function isOptionalBoolean(value: unknown): boolean {
-  return value === undefined || typeof value === 'boolean';
-}
-
-/**
- * Validates a renderer-provided grail progress payload before it is persisted.
- * @param value - The untrusted payload received over IPC
- * @returns True if the payload has the shape of a GrailProgress record
- */
-export function isValidGrailProgress(value: unknown): value is GrailProgress {
-  if (typeof value !== 'object' || value === null) {
-    return false;
-  }
-
-  const progress = value as Record<string, unknown>;
-  const { foundDate, difficulty } = progress;
-
-  return (
-    isNonEmptyString(progress.id) &&
-    isNonEmptyString(progress.characterId) &&
-    isNonEmptyString(progress.itemId) &&
-    typeof progress.isEthereal === 'boolean' &&
-    typeof progress.manuallyAdded === 'boolean' &&
-    isOptionalBoolean(progress.fromInitialScan) &&
-    isOptionalString(progress.foundBy) &&
-    isOptionalString(progress.notes) &&
-    (foundDate === undefined ||
-      (foundDate instanceof Date && !Number.isNaN(foundDate.getTime()))) &&
-    (difficulty === undefined || VALID_DIFFICULTIES.includes(difficulty as Difficulty))
-  );
-}
+import type { GrailProgress } from '../types/grail';
 
 /**
  * Enforces in the main process the rules the renderer applies when recording a find manually.
@@ -136,13 +56,14 @@ export interface GrailHandlerDependencies {
  * Initializes IPC handlers for Holy Grail tracking operations.
  * Sets up handlers for characters, items, progress, settings, statistics, and backup operations.
  * @param deps - The grail database, the settings service and the renderer broadcast
+ * @returns Function that removes the handlers
  */
 export function initializeGrailHandlers({
   database: grailDB,
   settings: settingsService,
   broadcastToRenderers,
-}: GrailHandlerDependencies): void {
-  const { handle } = createIpcMainRegistry(ipcMain);
+}: GrailHandlerDependencies): () => void {
+  const { handle, dispose } = createIpcMainRegistry(ipcMain);
 
   /** Notifies all renderer windows that grail progress changed so they can reload it. */
   const notifyProgressUpdated = () => broadcastToRenderers('grail-progress-updated');
@@ -204,11 +125,7 @@ export function initializeGrailHandlers({
    * @param _ - IPC event (unused)
    * @param progress - Grail progress data to update
    */
-  handle('grail:updateProgress', async (_, progress: unknown) => {
-    if (!isValidGrailProgress(progress)) {
-      throw new Error('Invalid grail progress payload');
-    }
-
+  handle('grail:updateProgress', async (_, progress) => {
     assertManualProgressAllowed(grailDB, progress);
 
     grailDB.upsertProgress(progress);
@@ -259,8 +176,6 @@ export function initializeGrailHandlers({
    * @param settings - Partial settings object to update
    */
   handle('grail:updateSettings', async (_, settings) => {
-    validateSettingsUpdate(settings);
-
     // Stores the values and notifies main-process listeners (run tracker, global hotkeys)
     settingsService.update(settings);
 
@@ -304,4 +219,6 @@ export function initializeGrailHandlers({
   });
 
   console.log('Grail IPC handlers initialized');
+
+  return dispose;
 }

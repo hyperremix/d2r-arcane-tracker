@@ -13,9 +13,13 @@ export interface IconHandlerDependencies {
 /**
  * Initializes IPC handlers for icon-related operations.
  * @param deps - The icon service and the settings storing the D2R path and conversion status
+ * @returns Function that removes the handlers
  */
-export function initializeIconHandlers({ iconService, settings }: IconHandlerDependencies): void {
-  const { handle } = createIpcMainRegistry(ipcMain);
+export function initializeIconHandlers({
+  iconService,
+  settings,
+}: IconHandlerDependencies): () => void {
+  const { handle, dispose } = createIpcMainRegistry(ipcMain);
   /**
    * Sets the D2R installation path
    */
@@ -164,4 +168,6 @@ export function initializeIconHandlers({ iconService, settings }: IconHandlerDep
   );
 
   console.log('Icon IPC handlers initialized');
+
+  return dispose;
 }

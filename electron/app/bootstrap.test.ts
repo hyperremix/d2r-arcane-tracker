@@ -22,6 +22,16 @@ const mocks = vi.hoisted(() => {
     initializeSaveFileHandlers: disposer('saveFileHandlers'),
     initializeRunTrackerHandlers: disposer('runTrackerHandlers'),
     initializeGlobalHotkeyHandlers: disposer('globalHotkeyHandlers'),
+    initializeAppWindowHandlers: disposer('appWindowHandlers'),
+    initializeDialogHandlers: disposer('dialogHandlers'),
+    initializeGrailHandlers: disposer('grailHandlers'),
+    initializeIconHandlers: disposer('iconHandlers'),
+    initializeInventoryWindowHandlers: disposer('inventoryWindowHandlers'),
+    initializeShellHandlers: disposer('shellHandlers'),
+    initializeTerrorZoneHandlers: disposer('terrorZoneHandlers'),
+    initializeUpdateHandlers: disposer('updateHandlers'),
+    initializeVaultHandlers: disposer('vaultHandlers'),
+    initializeWidgetHandlers: disposer('widgetHandlers'),
   };
 });
 
@@ -33,18 +43,24 @@ vi.mock('electron', () => ({
 
 vi.mock('../database/database', () => ({ GrailDatabase: mocks.GrailDatabase }));
 
-vi.mock('../ipc-handlers/appWindowHandlers', () => ({ initializeAppWindowHandlers: vi.fn() }));
-vi.mock('../ipc-handlers/dialogHandlers', () => ({ initializeDialogHandlers: vi.fn() }));
+vi.mock('../ipc-handlers/appWindowHandlers', () => ({
+  initializeAppWindowHandlers: mocks.initializeAppWindowHandlers,
+}));
+vi.mock('../ipc-handlers/dialogHandlers', () => ({
+  initializeDialogHandlers: mocks.initializeDialogHandlers,
+}));
 vi.mock('../ipc-handlers/globalHotkeyHandlers', () => ({
   initializeGlobalHotkeyHandlers: mocks.initializeGlobalHotkeyHandlers,
 }));
 vi.mock('../ipc-handlers/grailHandlers', () => ({
   addSettingsUpdatedListener: vi.fn(),
-  initializeGrailHandlers: vi.fn(),
+  initializeGrailHandlers: mocks.initializeGrailHandlers,
 }));
-vi.mock('../ipc-handlers/iconHandlers', () => ({ initializeIconHandlers: vi.fn() }));
+vi.mock('../ipc-handlers/iconHandlers', () => ({
+  initializeIconHandlers: mocks.initializeIconHandlers,
+}));
 vi.mock('../ipc-handlers/inventoryWindowHandlers', () => ({
-  initializeInventoryWindowHandlers: vi.fn(),
+  initializeInventoryWindowHandlers: mocks.initializeInventoryWindowHandlers,
 }));
 vi.mock('../ipc-handlers/runTrackerHandlers', () => ({
   initializeRunTrackerHandlers: mocks.initializeRunTrackerHandlers,
@@ -52,11 +68,21 @@ vi.mock('../ipc-handlers/runTrackerHandlers', () => ({
 vi.mock('../ipc-handlers/saveFileHandlers', () => ({
   initializeSaveFileHandlers: mocks.initializeSaveFileHandlers,
 }));
-vi.mock('../ipc-handlers/shellHandlers', () => ({ initializeShellHandlers: vi.fn() }));
-vi.mock('../ipc-handlers/terrorZoneHandlers', () => ({ initializeTerrorZoneHandlers: vi.fn() }));
-vi.mock('../ipc-handlers/updateHandlers', () => ({ initializeUpdateHandlers: vi.fn() }));
-vi.mock('../ipc-handlers/vaultHandlers', () => ({ initializeVaultHandlers: vi.fn() }));
-vi.mock('../ipc-handlers/widgetHandlers', () => ({ initializeWidgetHandlers: vi.fn() }));
+vi.mock('../ipc-handlers/shellHandlers', () => ({
+  initializeShellHandlers: mocks.initializeShellHandlers,
+}));
+vi.mock('../ipc-handlers/terrorZoneHandlers', () => ({
+  initializeTerrorZoneHandlers: mocks.initializeTerrorZoneHandlers,
+}));
+vi.mock('../ipc-handlers/updateHandlers', () => ({
+  initializeUpdateHandlers: mocks.initializeUpdateHandlers,
+}));
+vi.mock('../ipc-handlers/vaultHandlers', () => ({
+  initializeVaultHandlers: mocks.initializeVaultHandlers,
+}));
+vi.mock('../ipc-handlers/widgetHandlers', () => ({
+  initializeWidgetHandlers: mocks.initializeWidgetHandlers,
+}));
 
 vi.mock('../services/gameProcessGuard', () => ({ createGameProcessGuard: vi.fn(() => vi.fn()) }));
 vi.mock('../services/globalHotkeys', () => ({
@@ -93,7 +119,11 @@ vi.mock('../services/saveFileMonitor', () => ({
   }),
 }));
 vi.mock('../services/terrorZoneService', () => ({ TerrorZoneService: vi.fn() }));
-vi.mock('../services/updateService', () => ({ UpdateService: vi.fn() }));
+vi.mock('../services/updateService', () => ({
+  UpdateService: vi.fn(function UpdateService() {
+    return { dispose: mocks.log('updateService.dispose') };
+  }),
+}));
 vi.mock('../utils/serviceLogger', () => ({
   createServiceLogger: () => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn() }),
   setErrorForwarder: vi.fn(),
@@ -102,7 +132,13 @@ vi.mock('../window/mainWindow', () => ({
   createMainWindow: vi.fn(),
   getMainWindow: vi.fn(),
 }));
-vi.mock('../window/widgetWindow', () => ({ showWidgetWindow: vi.fn() }));
+vi.mock('../window/widgetWindow', () => ({
+  createDebouncedWidgetSizeSaver: vi.fn(() => ({
+    save: vi.fn(),
+    flush: vi.fn(mocks.log('widgetSizeSaver.flush')),
+  })),
+  showWidgetWindow: vi.fn(),
+}));
 
 import { initializeUpdateHandlers } from '../ipc-handlers/updateHandlers';
 import { RunTrackerService } from '../services/runTracker';
@@ -214,6 +250,52 @@ describe('When the app is bootstrapped', () => {
       expect(order('globalHotkeyHandlers.dispose')).toBeGreaterThanOrEqual(0);
       expect(order('saveFileHandlers.dispose')).toBeLessThan(order('runTracker.shutdown'));
       expect(order('runTrackerHandlers.dispose')).toBeLessThan(order('runTracker.shutdown'));
+    });
+
+    it('Then every IPC handler module and the update service are unregistered before the database closes', async () => {
+      // Arrange
+      const runningApp = await startApp(env);
+      const teardowns = [
+        'grailHandlers.dispose',
+        'saveFileHandlers.dispose',
+        'vaultHandlers.dispose',
+        'runTrackerHandlers.dispose',
+        'globalHotkeyHandlers.dispose',
+        'dialogHandlers.dispose',
+        'shellHandlers.dispose',
+        'iconHandlers.dispose',
+        'inventoryWindowHandlers.dispose',
+        'terrorZoneHandlers.dispose',
+        'updateHandlers.dispose',
+        'widgetHandlers.dispose',
+        'appWindowHandlers.dispose',
+        'updateService.dispose',
+      ];
+
+      // Act
+      await runningApp.shutdown();
+
+      // Assert
+      const order = (call: string) => mocks.calls.indexOf(call);
+      for (const teardown of teardowns) {
+        expect(order(teardown), teardown).toBeGreaterThanOrEqual(0);
+        expect(order(teardown), teardown).toBeLessThan(order('database.close'));
+      }
+      expect(order('updateHandlers.dispose')).toBeLessThan(order('updateService.dispose'));
+    });
+
+    it('Then a pending widget size is flushed once before the windows close', async () => {
+      // Arrange
+      const runningApp = await startApp(env);
+
+      // Act
+      await runningApp.shutdown();
+
+      // Assert
+      const order = (call: string) => mocks.calls.indexOf(call);
+      expect(mocks.calls.filter((call) => call === 'widgetSizeSaver.flush')).toHaveLength(1);
+      expect(order('widgetSizeSaver.flush')).toBeLessThan(order('window.close'));
+      expect(order('window.close')).toBeLessThan(order('database.close'));
     });
 
     it('If shutdown is requested again, Then nothing is closed twice', async () => {

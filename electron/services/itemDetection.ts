@@ -4,7 +4,7 @@ import type {
   GrailProgress,
   Item,
   ItemDetectionEvent,
-  ParsedInventoryItem,
+  ParsedInventoryItemWithRaw,
 } from '../types/grail';
 import { createServiceLogger } from '../utils/serviceLogger';
 import type { EventBus } from './EventBus';
@@ -62,14 +62,14 @@ class ItemDetectionService {
    * Matches the items the save file monitor parsed from a save file against the Holy Grail
    * database and emits an `item-detection` event for every grail item seen for the first time.
    * @param {D2SaveFile} saveFile - The save file the items come from.
-   * @param {ParsedInventoryItem[]} parsedItems - Items the save file monitor already parsed from the file.
+   * @param {ParsedInventoryItemWithRaw[]} parsedItems - Items the save file monitor already parsed from the file.
    * @param {boolean} [silent=false] - If true, suppress notifications for detected items.
    * @param {boolean} [isInitialScan=false] - If true, marks items as being from initial scan for statistics exclusion.
    * @returns {Promise<ItemDetectionEvent[]>} The items found for the first time (also emitted as `item-detection` events).
    */
   async analyzeSaveFile(
     saveFile: D2SaveFile,
-    parsedItems: ParsedInventoryItem[],
+    parsedItems: ParsedInventoryItemWithRaw[],
     silent: boolean = false,
     isInitialScan: boolean = false,
   ): Promise<ItemDetectionEvent[]> {

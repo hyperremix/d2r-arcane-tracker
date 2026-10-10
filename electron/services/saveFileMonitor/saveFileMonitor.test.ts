@@ -44,10 +44,14 @@ import type { FSWatcher } from 'chokidar';
 import chokidar from 'chokidar';
 import { app } from 'electron';
 import { D2SaveFileBuilder } from '@/fixtures';
-import { GameMode, type ParsedInventoryItem, type SaveFileEvent } from '../../types/grail';
+import { GameMode, type SaveFileEvent } from '../../types/grail';
 import * as d2sConstants from '../d2s/constants';
 import { EventBus } from '../EventBus';
-import { createItemFingerprint, normalizeInventoryItem } from '../itemNormalizer';
+import {
+  createItemFingerprint,
+  type ItemFingerprintFields,
+  normalizeInventoryItem,
+} from '../itemNormalizer';
 import * as modernStashParser from '../modernStashParser';
 import { SaveFileMonitor } from './saveFileMonitor';
 import * as saveFileParser from './saveFileParser';
@@ -1541,7 +1545,7 @@ describe('When SaveFileMonitor is used', () => {
       expect(parsed.gridHeight).toBe(3);
       expect(parsed.equippedSlotId).toBe(4);
       expect(parsed.iconFileName).toBe('cap_hat.png');
-      expect(parsed.fingerprintInputs.iconFileName).toBe('invhamm.png');
+      expect(parsed.fingerprint).toContain('|invhamm.png|');
       expect(parsed.isSocketedItem).toBe(true);
     });
 
@@ -1566,7 +1570,7 @@ describe('When SaveFileMonitor is used', () => {
 
       // Assert
       expect(parsed.iconFileName).toBe('cap_hat.png');
-      expect(parsed.fingerprintInputs.iconFileName).toBe('invhamm.png');
+      expect(parsed.fingerprint).toContain('|invhamm.png|');
     });
 
     it('Then magic items keep their generated prefix/suffix display name', () => {
@@ -2100,19 +2104,17 @@ describe('When SaveFileMonitor is used', () => {
 
     it('Then createItemFingerprint returns deterministic output for the same inputs', () => {
       // Arrange
-      const item = {
-        fingerprintInputs: {
-          sourceFileType: 'd2s',
-          characterName: 'Sorc',
-          locationContext: 'inventory',
-          itemCode: 'uap',
-          quality: 'unique',
-          ethereal: false,
-          socketCount: 0,
-          stashTab: 1,
-          itemName: 'Shako',
-        },
-      } as unknown as ParsedInventoryItem;
+      const item: ItemFingerprintFields = {
+        sourceFileType: 'd2s',
+        characterName: 'Sorc',
+        locationContext: 'inventory',
+        itemCode: 'uap',
+        quality: 'unique',
+        ethereal: false,
+        socketCount: 0,
+        stashTab: 1,
+        itemName: 'Shako',
+      };
 
       // Act
       const first = createItemFingerprint(item);

@@ -35,10 +35,9 @@ import { TerrorZoneService } from '../services/terrorZoneService';
 import { UpdateService } from '../services/updateService';
 import { VaultService } from '../services/vaultService';
 import { setErrorForwarder } from '../utils/serviceLogger';
-import type { WidgetDisplayMode, WidgetSize } from '../utils/widgetDisplay';
 import { getWidgetSizeSettingKey } from '../utils/widgetDisplay';
 import { createMainWindow, getMainWindow } from '../window/mainWindow';
-import { showWidgetWindow } from '../window/widgetWindow';
+import { createDebouncedWidgetSizeSaver, showWidgetWindow } from '../window/widgetWindow';
 import { AppLifecycle, closeWindowAndWait } from './lifecycle';
 import type { AppPaths } from './paths';
 
@@ -122,21 +121,15 @@ function startServices(paths: AppPaths, lifecycle: AppLifecycle): RunningApp {
   const database = new GrailDatabase();
   lifecycle.onShutdown('database', () => database.close());
 
-  // Debounce widget size changes to avoid excessive database writes during resize
-  let widgetSizeChangeTimeout: NodeJS.Timeout | null = null;
-  let pendingWidgetSize: (() => void) | undefined;
-  const flushPendingWidgetSize = () => {
-    if (widgetSizeChangeTimeout) {
-      clearTimeout(widgetSizeChangeTimeout);
-      widgetSizeChangeTimeout = null;
-    }
-    pendingWidgetSize?.();
-    pendingWidgetSize = undefined;
-  };
+  // Debounce widget size changes to avoid excessive database writes during resize. A size can only
+  // be pending once the widget exists, which is after the settings service below.
+  const widgetSizeSaver = createDebouncedWidgetSizeSaver((display, size) =>
+    settings.set(getWidgetSizeSettingKey(display), size),
+  );
 
   // Windows are closed while the database is still open: closing saves their bounds
   lifecycle.onShutdown('windows', async () => {
-    flushPendingWidgetSize();
+    widgetSizeSaver.flush();
     await Promise.all(BrowserWindow.getAllWindows().map((window) => closeWindowAndWait(window)));
   });
 
@@ -188,6 +181,7 @@ function startServices(paths: AppPaths, lifecycle: AppLifecycle): RunningApp {
   const iconService = new IconService();
   const terrorZoneService = new TerrorZoneService();
   const updateService = new UpdateService();
+  lifecycle.onShutdown('update service', () => updateService.dispose());
 
   // Widget window persistence
   const onWidgetPositionChange = (position: { x: number; y: number }) => {
@@ -198,23 +192,11 @@ function startServices(paths: AppPaths, lifecycle: AppLifecycle): RunningApp {
     }
   };
 
-  const onWidgetSizeChange = (display: WidgetDisplayMode, size: WidgetSize) => {
-    if (widgetSizeChangeTimeout) {
-      clearTimeout(widgetSizeChangeTimeout);
-    }
-
-    pendingWidgetSize = () => {
-      try {
-        settings.set(getWidgetSizeSettingKey(display), size);
-      } catch (error) {
-        console.error('Failed to save widget size:', error);
-      }
-    };
-    widgetSizeChangeTimeout = setTimeout(flushPendingWidgetSize, 500); // Wait 500ms after resize stops before saving
-  };
-
-  // IPC handlers
-  initializeGrailHandlers({ database, settings, broadcastToRenderers });
+  // IPC handlers (each returns the teardown that unregisters it)
+  lifecycle.onShutdown(
+    'grail handlers',
+    initializeGrailHandlers({ database, settings, broadcastToRenderers }),
+  );
   const disposeSaveFileHandlers = initializeSaveFileHandlers({
     database,
     settings,
@@ -225,7 +207,7 @@ function startServices(paths: AppPaths, lifecycle: AppLifecycle): RunningApp {
     broadcastToRenderers,
   });
   lifecycle.onShutdown('save file handlers', disposeSaveFileHandlers);
-  initializeVaultHandlers(vault);
+  lifecycle.onShutdown('vault handlers', initializeVaultHandlers(vault));
   lifecycle.onShutdown(
     'run tracker handlers',
     initializeRunTrackerHandlers({
@@ -245,14 +227,29 @@ function startServices(paths: AppPaths, lifecycle: AppLifecycle): RunningApp {
     disposeGlobalHotkeyHandlers();
     hotkeys.dispose();
   });
-  initializeDialogHandlers();
-  initializeShellHandlers();
-  initializeIconHandlers({ iconService, settings });
-  initializeInventoryWindowHandlers(paths, () => saveFileMonitor.getSaveDirectory() ?? undefined);
-  initializeTerrorZoneHandlers({ terrorZoneService, settings });
-  initializeUpdateHandlers({ updateService, getMainWindow });
-  initializeWidgetHandlers(settings, paths, onWidgetPositionChange, onWidgetSizeChange);
-  initializeAppWindowHandlers({ getMainWindow, paths });
+  lifecycle.onShutdown('dialog handlers', initializeDialogHandlers());
+  lifecycle.onShutdown('shell handlers', initializeShellHandlers());
+  lifecycle.onShutdown('icon handlers', initializeIconHandlers({ iconService, settings }));
+  lifecycle.onShutdown(
+    'inventory window handlers',
+    initializeInventoryWindowHandlers(paths, () => saveFileMonitor.getSaveDirectory() ?? undefined),
+  );
+  lifecycle.onShutdown(
+    'terror zone handlers',
+    initializeTerrorZoneHandlers({ terrorZoneService, settings }),
+  );
+  lifecycle.onShutdown(
+    'update handlers',
+    initializeUpdateHandlers({ updateService, getMainWindow }),
+  );
+  lifecycle.onShutdown(
+    'widget handlers',
+    initializeWidgetHandlers(settings, paths, onWidgetPositionChange, widgetSizeSaver.save),
+  );
+  lifecycle.onShutdown(
+    'app window handlers',
+    initializeAppWindowHandlers({ getMainWindow, paths }),
+  );
 
   loadGrailItemsIntoDetection(itemDetection, database);
 
@@ -267,7 +264,7 @@ function startServices(paths: AppPaths, lifecycle: AppLifecycle): RunningApp {
   try {
     const storedSettings = settings.getAll();
     if (storedSettings.widgetEnabled) {
-      showWidgetWindow(storedSettings, paths, onWidgetPositionChange, onWidgetSizeChange);
+      showWidgetWindow(storedSettings, paths, onWidgetPositionChange, widgetSizeSaver.save);
     }
   } catch (error) {
     console.error('Failed to initialize widget window:', error);

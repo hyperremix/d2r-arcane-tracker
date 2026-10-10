@@ -9,6 +9,9 @@ vi.mock('electron', () => ({
     handle: vi.fn((channel: string, handler: (...args: unknown[]) => unknown) => {
       mocks.handlers.set(channel, handler);
     }),
+    removeHandler: vi.fn((channel: string) => {
+      mocks.handlers.delete(channel);
+    }),
   },
 }));
 
@@ -132,6 +135,18 @@ describe('When the run tracker IPC handlers are initialized', () => {
 
       // Assert
       expect(broadcastToRenderers).not.toHaveBeenCalled();
+    });
+
+    it('Then the IPC handlers are removed', () => {
+      // Arrange
+      const registeredBefore = mocks.handlers.size;
+
+      // Act
+      dispose();
+
+      // Assert
+      expect(registeredBefore).toBeGreaterThan(0);
+      expect(mocks.handlers.size).toBe(0);
     });
   });
 });

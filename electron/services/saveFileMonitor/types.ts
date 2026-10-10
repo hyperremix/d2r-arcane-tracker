@@ -1,18 +1,18 @@
 import type {
-  CharacterInventorySnapshot,
   D2SaveFile,
-  ParsedInventoryItem,
+  ParsedInventoryItemWithRaw,
+  ParsedInventorySnapshot,
 } from '../../types/grail';
 import type { SaveParseStatus } from './saveFileParser';
 
 export interface FileParseSuccess {
   saveName: string;
   success: true;
-  inventorySnapshot: CharacterInventorySnapshot;
+  inventorySnapshot: ParsedInventorySnapshot;
   /** Header data of the file, read from the same buffer the items came from. */
   saveFile: D2SaveFile;
   /** Every item of the file, including socketed ones the snapshot omits. */
-  parsedItems: ParsedInventoryItem[];
+  parsedItems: ParsedInventoryItemWithRaw[];
 }
 
 /** A complete parse: the only result vault reconciliation may act on. */

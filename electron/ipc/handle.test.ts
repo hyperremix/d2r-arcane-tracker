@@ -124,14 +124,107 @@ describe('When handlers and renderer message listeners are removed', () => {
     // Arrange
     const ipcMain = createFakeIpcMain();
     const { onRendererMessage } = createIpcMainRegistry(ipcMain as unknown as IpcMainLike);
-    const listener = vi.fn();
-    const unsubscribe = onRendererMessage('inventory:vault-drag-state', listener);
+    const unsubscribe = onRendererMessage('inventory:vault-drag-state', vi.fn());
+    const registeredListener = ipcMain.on.mock.calls[0]?.[1];
 
     // Act
     unsubscribe();
 
     // Assert
-    expect(ipcMain.on).toHaveBeenCalledWith('inventory:vault-drag-state', listener);
-    expect(ipcMain.removeListener).toHaveBeenCalledWith('inventory:vault-drag-state', listener);
+    expect(ipcMain.on).toHaveBeenCalledWith('inventory:vault-drag-state', expect.any(Function));
+    expect(ipcMain.removeListener).toHaveBeenCalledWith(
+      'inventory:vault-drag-state',
+      registeredListener,
+    );
+  });
+
+  it('Then dispose removes every handler and listener registered through the registry', () => {
+    // Arrange
+    const ipcMain = createFakeIpcMain();
+    const { handle, onRendererMessage, dispose } = createIpcMainRegistry(
+      ipcMain as unknown as IpcMainLike,
+    );
+    handle('grail:getItems', vi.fn());
+    handle('grail:getCharacters', vi.fn());
+    onRendererMessage('inventory:item-drag-state', vi.fn());
+    const registeredListener = ipcMain.on.mock.calls[0]?.[1];
+
+    // Act
+    dispose();
+
+    // Assert
+    expect(ipcMain.removeHandler).toHaveBeenCalledWith('grail:getItems');
+    expect(ipcMain.removeHandler).toHaveBeenCalledWith('grail:getCharacters');
+    expect(ipcMain.removeListener).toHaveBeenCalledWith(
+      'inventory:item-drag-state',
+      registeredListener,
+    );
+  });
+
+  it('If a listener was already removed, Then dispose does not remove it again', () => {
+    // Arrange
+    const ipcMain = createFakeIpcMain();
+    const { onRendererMessage, dispose } = createIpcMainRegistry(ipcMain as unknown as IpcMainLike);
+    const unsubscribe = onRendererMessage('inventory:vault-drag-state', vi.fn());
+    unsubscribe();
+
+    // Act
+    dispose();
+
+    // Assert
+    expect(ipcMain.removeListener).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('When a renderer sends a message on a send channel', () => {
+  let consoleWarn: MockInstance;
+
+  beforeEach(() => {
+    consoleWarn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+  });
+
+  afterEach(() => {
+    consoleWarn.mockRestore();
+  });
+
+  function registerListener() {
+    const ipcMain = createFakeIpcMain();
+    const { onRendererMessage } = createIpcMainRegistry(ipcMain as unknown as IpcMainLike);
+    const listener = vi.fn();
+    onRendererMessage('inventory:vault-drag-state', listener);
+    const registeredListener = ipcMain.on.mock.calls[0]?.[1] as (
+      event: unknown,
+      payload: unknown,
+    ) => void;
+    return { listener, registeredListener };
+  }
+
+  it('Then the listener receives the validated payload', () => {
+    // Arrange
+    const { listener, registeredListener } = registerListener();
+    const event = { sender: { id: 1 } };
+
+    // Act
+    registeredListener(event, { active: true, id: ' vault-1 ', gridWidth: 2 });
+
+    // Assert
+    expect(listener).toHaveBeenCalledWith(event, {
+      active: true,
+      id: 'vault-1',
+      gridWidth: 2,
+      gridHeight: 1,
+    });
+  });
+
+  it('If the payload is invalid, Then it is dropped and logged', () => {
+    // Arrange
+    const { listener, registeredListener } = registerListener();
+
+    // Act
+    registeredListener({ sender: { id: 1 } }, { active: true, id: '' });
+
+    // Assert
+    expect(listener).not.toHaveBeenCalled();
+    expect(consoleWarn).toHaveBeenCalled();
   });
 });

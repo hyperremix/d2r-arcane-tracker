@@ -4,9 +4,10 @@ import { createIpcMainRegistry } from '../ipc/handle';
 /**
  * Initializes IPC handlers for shell operations.
  * Sets up handlers for opening external URLs and other shell-related functionality.
+ * @returns Function that removes the handlers
  */
-export function initializeShellHandlers(): void {
-  const { handle } = createIpcMainRegistry(ipcMain);
+export function initializeShellHandlers(): () => void {
+  const { handle, dispose } = createIpcMainRegistry(ipcMain);
   // Open external URL handler
   handle('shell:openExternal', async (_, url) => {
     try {
@@ -19,4 +20,6 @@ export function initializeShellHandlers(): void {
   });
 
   console.log('Shell IPC handlers initialized');
+
+  return dispose;
 }
