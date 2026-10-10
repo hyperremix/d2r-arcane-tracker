@@ -77,8 +77,10 @@ const cases: FingerprintCase[] = [
   {
     scenario: 'the parser icon name is a path',
     item: helm({ inv_file: 'C:\\x\\..\\Inv_Foo.PNG' }),
+    // The icon name keeps only the last path segment on every platform, as `node:path` basename
+    // always did on Windows, where the app runs; so recorded fingerprints are unchanged.
     fingerprint:
-      'd2s|TestChar|inventory|armo|unique|false|0|||||||c:\\x\\..\\inv_foo.png|false|Harlequin Crest',
+      'd2s|TestChar|inventory|armo|unique|false|0|||||||inv_foo.png|false|Harlequin Crest',
   },
   {
     scenario: 'the parser icon name is a number',
