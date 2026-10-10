@@ -234,6 +234,7 @@ describe('When managing database backups', () => {
       canceled: false,
       filePath: '/backups/pre-restore.db',
     });
+    mockElectronAPI.grail.backup.mockResolvedValue({ success: true });
     render(<DatabaseCard />);
 
     // Act

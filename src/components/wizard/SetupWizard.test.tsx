@@ -410,9 +410,10 @@ describe('When SetupWizard is open', () => {
       return confirm;
     }
 
-    const originalElectronAPI = window.electronAPI;
+    let originalElectronAPI: unknown;
 
     beforeEach(() => {
+      originalElectronAPI = window.electronAPI;
       vi.spyOn(console, 'error').mockImplementation(() => undefined);
     });
 
@@ -545,6 +546,34 @@ describe('When SetupWizard is open', () => {
 
       // Assert
       expect(within(confirm).queryByText(noSaveFolderWarning)).not.toBeInTheDocument();
+    });
+
+    it('If the monitoring status fails after the confirmation is closed, Then the error is not logged', async () => {
+      // Arrange
+      let rejectStatus: (error: Error) => void = () => undefined;
+      const getMonitoringStatus = vi.fn().mockReturnValue(
+        new Promise((_resolve, reject) => {
+          rejectStatus = reject;
+        }),
+      );
+      installMonitoringStatus(getMonitoringStatus);
+      const { unmount } = render(<SetupWizard />);
+      const wizard = await screen.findByRole('dialog');
+      fireEvent.click(within(wizard).getByRole('button', { name: 'Skip Setup' }));
+      await screen.findByRole('alertdialog');
+      await waitFor(() => expect(getMonitoringStatus).toHaveBeenCalledTimes(1));
+
+      // Act
+      unmount();
+      await act(async () => {
+        rejectStatus(new Error('ipc failed'));
+      });
+
+      // Assert
+      expect(console.error).not.toHaveBeenCalledWith(
+        expect.stringContaining('Failed to load monitoring status'),
+        expect.anything(),
+      );
     });
 
     it('If the game mode is Manual, Then no warning is shown because nothing is monitored on purpose', async () => {

@@ -100,7 +100,9 @@ function useNoSaveFolderWarning(isConfirmOpen: boolean): boolean {
           setIsMonitoring(status?.isMonitoring);
         }
       } catch (error) {
-        console.error('Failed to load monitoring status for the skip confirmation:', error);
+        if (!cancelled) {
+          console.error('Failed to load monitoring status for the skip confirmation:', error);
+        }
       }
     };
 

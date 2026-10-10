@@ -137,6 +137,21 @@ describe('SaveDirectoryChangeDialog', () => {
     );
   });
 
+  it('If a backup was created, Then Back up first is a secondary action instead of the primary one', () => {
+    // Arrange & Act
+    const { unmount } = renderDialog({ onBackup: vi.fn() });
+
+    // Assert
+    expect(screen.getByRole('button', { name: 'Back up first' })).toHaveClass('bg-primary');
+
+    // Act
+    unmount();
+    renderDialog({ onBackup: vi.fn(), hasBackedUp: true });
+
+    // Assert
+    expect(screen.getByRole('button', { name: 'Back up first' })).not.toHaveClass('bg-primary');
+  });
+
   it('If a backup was created, then the success note is shown', () => {
     // Arrange & Act
     renderDialog({ onBackup: vi.fn(), hasBackedUp: true });
