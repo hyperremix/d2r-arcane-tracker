@@ -844,6 +844,20 @@ describe('When TerrorZoneConfiguration is configured', () => {
     expect(screen.getAllByText(/restart/i)).toHaveLength(1);
   });
 
+  it('Then the merged warning callout is a polite live region rather than an assertive alert', async () => {
+    // Arrange
+    setupValidTerrorZoneApi();
+
+    // Act
+    renderTerrorZoneConfiguration();
+
+    // Assert
+    const requirementsTitle = await screen.findByText('Before your changes show up in game');
+    const callout = requirementsTitle.closest('[data-slot="alert"]');
+    expect(callout).toHaveAttribute('role', 'status');
+    expect(callout).not.toHaveAttribute('role', 'alert');
+  });
+
   describe('If the guide link is clicked', () => {
     it('Then the guide is opened in the system browser', async () => {
       // Arrange
