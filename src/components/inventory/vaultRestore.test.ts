@@ -117,6 +117,24 @@ describe('When the restore target of a stack row is resolved', () => {
   });
 });
 
+describe('When the restore target of a row that was part of a merge is resolved', () => {
+  it('If the row count equals the count in its item data again, Then the rule is count-based and the target is its origin', () => {
+    // Arrange
+    // The row of rune A (count 1) took in rune B (count 2), then Undo withdrew A's unit (count 1 again).
+    const origin = {
+      ...INVENTORY_ORIGIN,
+      stackCount: 1,
+      rawItemJson: '{"code":"r01"}',
+    };
+
+    // Act
+    const target = resolveVaultRestoreTarget(origin);
+
+    // Assert
+    expect(target).toMatchObject({ targetGridX: 2, targetGridY: 3 });
+  });
+});
+
 describe('When it is checked whether a vault row was created by an add', () => {
   const INPUT = {
     ...INVENTORY_ORIGIN,
