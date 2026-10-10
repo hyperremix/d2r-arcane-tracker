@@ -91,8 +91,8 @@ export function WeeklyFindsChart({ weeks }: WeeklyFindsChartProps) {
 
   const label = t(chartT.weeklyFindsSummary, {
     weeks: weeks.length,
-    count: totalFinds,
-    latest: latest.count,
+    total: formatCount(totalFinds),
+    latest: formatCount(latest.count),
   });
   const shortDate: Intl.DateTimeFormatOptions = { month: 'short', day: 'numeric' };
 

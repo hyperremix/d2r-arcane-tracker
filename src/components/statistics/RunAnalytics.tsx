@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { translations } from '@/i18n/translations';
 import { escapeCsvCell } from '@/lib/csv';
-import { formatDuration, formatLocalizedDate } from '@/lib/date';
+import { formatDuration, formatLocalizedDate, HOUR_MS } from '@/lib/date';
 import { getFileName } from '@/lib/path';
 
 /**
@@ -51,8 +51,8 @@ export function RunAnalytics() {
   // Formats a total time in hours and minutes
   const formatTime = useCallback(
     (ms: number): string => {
-      const hours = Math.floor(ms / 3600000);
-      const minutes = Math.floor((ms % 3600000) / 60000);
+      const hours = Math.floor(ms / HOUR_MS);
+      const minutes = Math.floor((ms % HOUR_MS) / 60000);
       if (hours > 0) {
         return t(translations.statistics.runAnalytics.hoursMinutes, { hours, minutes });
       }

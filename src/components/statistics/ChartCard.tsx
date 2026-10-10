@@ -135,20 +135,34 @@ export function InteractiveChart({
   const { t } = useTranslation();
   const hintId = useId();
   const svgRef = useRef<SVGSVGElement>(null);
-  const [requestedIndex, setActiveIndex] = useState<number | undefined>(undefined);
-  // True while the pointer drives the tooltip; its changes are not announced on every hover
-  const [pointerActive, setPointerActive] = useState(false);
+  // Position chosen with the keyboard (it survives the pointer leaving) and the one under the pointer
+  const [keyboardIndex, setKeyboardIndex] = useState<number | undefined>(undefined);
+  const [pointerIndex, setPointerIndex] = useState<number | undefined>(undefined);
+  // Text of the latest keyboard change; pointer hover never writes to the live region
+  const [announcement, setAnnouncement] = useState('');
   const lastIndex = points.length - 1;
+  const requestedIndex = pointerIndex ?? keyboardIndex;
   // The data may shrink while a position is active (e.g. a setting is toggled), so keep it in range
   const activeIndex =
     requestedIndex === undefined || lastIndex < 0 ? undefined : Math.min(requestedIndex, lastIndex);
+
+  // Write the clamped positions back, so growing data later does not jump back to a stale position
+  useEffect(() => {
+    const clamp = (index: number | undefined) =>
+      index === undefined || index <= lastIndex ? index : lastIndex < 0 ? undefined : lastIndex;
+    setKeyboardIndex(clamp);
+    setPointerIndex(clamp);
+  }, [lastIndex]);
+
+  const formatAnnouncement = (tooltip: ChartTooltipContent) =>
+    `${tooltip.heading}: ${tooltip.rows.map((row) => `${row.value} ${row.label}`).join(', ')}`;
 
   const handlePointerMove = (event: PointerEvent<SVGSVGElement>) => {
     const rect = svgRef.current?.getBoundingClientRect();
     if (!rect || rect.width === 0 || points.length === 0) return;
     const x = ((event.clientX - rect.left) / rect.width) * width;
-    setPointerActive(true);
-    setActiveIndex(findClosestIndex(points, x));
+    setAnnouncement('');
+    setPointerIndex(findClosestIndex(points, x));
   };
 
   const handleKeyDown = (event: KeyboardEvent<SVGSVGElement>) => {
@@ -161,13 +175,17 @@ export function InteractiveChart({
       End: lastIndex,
     };
     if (event.key === 'Escape') {
-      setActiveIndex(undefined);
+      setKeyboardIndex(undefined);
+      setPointerIndex(undefined);
+      setAnnouncement('');
       return;
     }
     if (event.key in next) {
+      const target = next[event.key] as number;
       event.preventDefault();
-      setPointerActive(false);
-      setActiveIndex(next[event.key]);
+      setPointerIndex(undefined);
+      setKeyboardIndex(target);
+      setAnnouncement(formatAnnouncement(getTooltip(target)));
     }
   };
 
@@ -187,12 +205,14 @@ export function InteractiveChart({
         tabIndex={0}
         className="block h-auto w-full overflow-visible rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         onPointerMove={handlePointerMove}
-        onPointerLeave={() => {
-          setPointerActive(false);
-          setActiveIndex(undefined);
+        onPointerLeave={() => setPointerIndex(undefined)}
+        onFocus={() =>
+          setKeyboardIndex((index) => index ?? (lastIndex < 0 ? undefined : lastIndex))
+        }
+        onBlur={() => {
+          setKeyboardIndex(undefined);
+          setAnnouncement('');
         }}
-        onFocus={() => setActiveIndex((index) => index ?? lastIndex)}
-        onBlur={() => setActiveIndex(undefined)}
         onKeyDown={handleKeyDown}
       >
         {children(activeIndex)}
@@ -200,7 +220,15 @@ export function InteractiveChart({
       <p id={hintId} className="sr-only">
         {t(translations.statistics.charts.keyboardHint)}
       </p>
-      <div aria-live={pointerActive ? 'off' : 'polite'}>
+      <div
+        aria-live="polite"
+        aria-atomic="true"
+        className="sr-only"
+        data-testid="chart-announcement"
+      >
+        {announcement}
+      </div>
+      <div aria-hidden="true">
         {active && tooltip && (
           <div
             data-testid="chart-tooltip"
@@ -294,7 +322,8 @@ const MIN_CHART_WIDTH = 320;
 
 /**
  * Measures the width of a chart container, so the chart is drawn at its real size and its text
- * keeps the same size at every width.
+ * keeps its size as the card is resized, as long as the chart is at least
+ * {@link MIN_CHART_WIDTH} pixels wide (below that, the chart is scaled down).
  * @returns The callback ref for the container and its width in pixels
  */
 export function useChartWidth(): [RefCallback<HTMLDivElement>, number] {

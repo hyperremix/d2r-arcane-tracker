@@ -10,6 +10,29 @@ function buildPoints(totals: number[]): CumulativeFindsPoint[] {
 }
 
 describe('When the grail progress chart is rendered', () => {
+  it('If no item was found yet, Then the empty text replaces the chart', () => {
+    // Arrange & Act
+    render(<GrailProgressChart points={[]} today={today} totalItems={10} />);
+
+    // Assert
+    expect(screen.getByText('No items found yet')).toBeInTheDocument();
+    expect(
+      screen.queryByRole('img', { name: /^Grail progress over time/ }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('If the totals have thousands, Then the chart summary uses localized numbers', () => {
+    // Arrange & Act
+    render(
+      <GrailProgressChart points={buildPoints([1_000, 1_234])} today={today} totalItems={2_000} />,
+    );
+
+    // Assert
+    expect(screen.getByRole('img', { name: /^Grail progress over time/ })).toHaveAccessibleName(
+      /1,234 of 2,000 found since/,
+    );
+  });
+
   it('If a total has thousands, Then the data table digits are localized like the tooltip', () => {
     // Arrange & Act
     render(

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   CHART_HEIGHT,
@@ -71,11 +71,17 @@ export function RunDurationCard() {
   const [summaries, setSummaries] = useState<SessionDurationSummary[] | undefined>(undefined);
   const [failed, setFailed] = useState(false);
 
+  // Number of the latest request; results of older requests and of an unmounted card are ignored
+  const latestRequest = useRef(0);
+
   const load = useCallback(async () => {
+    const request = ++latestRequest.current;
     setFailed(false);
     try {
-      setSummaries(await loadSessionDurations());
+      const loaded = await loadSessionDurations();
+      if (request === latestRequest.current) setSummaries(loaded);
     } catch (error) {
+      if (request !== latestRequest.current) return;
       console.error('[Analytics] Error loading run durations:', error);
       setFailed(true);
     }
@@ -83,6 +89,9 @@ export function RunDurationCard() {
 
   useEffect(() => {
     void load();
+    return () => {
+      latestRequest.current++;
+    };
   }, [load]);
 
   const title = t(chartT.runDurationsTitle);

@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import type { Session } from 'electron/types/grail';
+import { StrictMode } from 'react';
 import {
   afterAll,
   afterEach,
@@ -156,9 +157,98 @@ describe('When the run duration card loads its sessions', () => {
     expect(screen.queryByRole('button', { name: 'Retry' })).not.toBeInTheDocument();
     await waitFor(() => expect(mockElectronAPI.runTracker.getAllSessions).toHaveBeenCalledTimes(2));
   });
+
+  it('If the 12 most recent sessions are spread over two batches, Then the 12 newest are drawn from oldest to newest', async () => {
+    // Arrange: the newest 12 sessions only have 8 with completed runs, the next batch adds more
+    const sessions = Array.from({ length: 24 }, (_, index) =>
+      buildSession(`s${index}`, new Date(2026, 8, index + 1, 12), 1),
+    );
+    mockElectronAPI.runTracker.getAllSessions.mockResolvedValue(sessions);
+    // s12-s15 (batch 1) are in progress, so batch 1 only yields 8 summaries (s16-s23)
+    mockRuns(
+      Object.fromEntries(
+        sessions.filter((_, index) => index < 12 || index >= 16).map((s) => [s.id, [60_000]]),
+      ),
+    );
+
+    // Act
+    render(<RunDurationCard />);
+
+    // Assert
+    const table = await screen.findByRole('table', { name: 'Run Durations by Session' });
+    const rows = within(table).getAllByRole('row');
+    expect(rows).toHaveLength(13);
+    expect(rows[1]).toHaveTextContent('Sep 9, 2026');
+    expect(rows[4]).toHaveTextContent('Sep 12, 2026');
+    expect(rows[5]).toHaveTextContent('Sep 17, 2026');
+    expect(rows[12]).toHaveTextContent('Sep 24, 2026');
+    expect(mockElectronAPI.runTracker.getRunsBySession).toHaveBeenCalledTimes(24);
+  });
+
+  it('If the card unmounts while sessions are loading, Then the late failure is ignored', async () => {
+    // Arrange
+    let rejectSessions: (error: Error) => void = () => undefined;
+    mockElectronAPI.runTracker.getAllSessions.mockReturnValue(
+      new Promise<Session[]>((_, reject) => {
+        rejectSessions = reject;
+      }),
+    );
+    const { unmount } = render(<RunDurationCard />);
+    unmount();
+
+    // Act
+    rejectSessions(new Error('database locked'));
+    await Promise.resolve();
+    await Promise.resolve();
+
+    // Assert
+    expect(consoleErrorSpy).not.toHaveBeenCalled();
+  });
+
+  it('If an older request finishes after a newer one, Then the older result is ignored', async () => {
+    // Arrange: strict mode starts two requests; the first one is slow
+    let resolveFirst: (sessions: Session[]) => void = () => undefined;
+    mockElectronAPI.runTracker.getAllSessions.mockReturnValueOnce(
+      new Promise<Session[]>((resolve) => {
+        resolveFirst = resolve;
+      }),
+    );
+    mockElectronAPI.runTracker.getAllSessions.mockResolvedValue([
+      buildSession('new', new Date(2026, 9, 2, 12), 1),
+    ]);
+    mockRuns({ old: [60_000], new: [95_000] });
+    render(
+      <StrictMode>
+        <RunDurationCard />
+      </StrictMode>,
+    );
+    await screen.findByRole('table', { name: 'Run Durations by Session' });
+
+    // Act
+    resolveFirst([buildSession('old', new Date(2026, 9, 1, 12), 1)]);
+    await waitFor(() =>
+      expect(mockElectronAPI.runTracker.getRunsBySession).toHaveBeenCalledWith('old'),
+    );
+
+    // Assert
+    const rows = within(
+      screen.getByRole('table', { name: 'Run Durations by Session' }),
+    ).getAllByRole('row');
+    expect(rows).toHaveLength(2);
+    expect(rows[1]).toHaveTextContent('Oct 2, 2026');
+  });
 });
 
 describe('When the run duration chart is rendered', () => {
+  it('If a session has thousands of runs, Then the data table count is localized', () => {
+    // Arrange & Act
+    render(<RunDurationChart summaries={[{ ...buildSummary(0, 60_000), runCount: 1_234 }]} />);
+
+    // Assert
+    const table = screen.getByRole('table', { name: 'Run Durations by Session' });
+    expect(within(table).getAllByRole('row')[1]).toHaveTextContent('1,234');
+  });
+
   it('If the user moves through the chart with the keyboard, Then the tooltip follows Home, End, ArrowLeft, ArrowRight and Escape', () => {
     // Arrange
     render(

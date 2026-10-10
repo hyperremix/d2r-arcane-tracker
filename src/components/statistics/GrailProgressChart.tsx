@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import {
   CHART_HEIGHT,
+  CHART_MARGIN,
   CHART_TEXT_CLASS,
   ChartCard,
   ChartDataTable,
@@ -21,7 +22,8 @@ import { translations } from '@/i18n/translations';
 /** Days shown before the first find when every find was made on the same day. */
 const MIN_DAY_SPAN = 7;
 
-const MARGIN = { top: 16, right: 44, bottom: 28, left: 44 };
+/** The latest total is labelled to the right of the line, so the right margin is wider. */
+const MARGIN: typeof CHART_MARGIN = { ...CHART_MARGIN, right: 44 };
 
 /**
  * Props for the GrailProgressChart component.
@@ -92,8 +94,8 @@ export function GrailProgressChart({ points, today, totalItems }: GrailProgressC
   };
 
   const label = t(chartT.grailProgressSummary, {
-    count: latest.total,
-    total: totalItems,
+    found: formatCount(latest.total),
+    total: formatCount(totalItems),
     date: formatDay(firstDay),
   });
 

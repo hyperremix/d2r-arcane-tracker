@@ -19,6 +19,25 @@ function renderChart(counts: number[]) {
 }
 
 describe('When the finds per week chart is rendered', () => {
+  it('If no week has finds, Then the empty text replaces the chart', () => {
+    // Arrange & Act
+    render(<WeeklyFindsChart weeks={buildWeeks([0, 0, 0])} />);
+
+    // Assert
+    expect(screen.getByText('No finds in the last 3 weeks')).toBeInTheDocument();
+    expect(screen.queryByRole('img', { name: /^Finds per week/ })).not.toBeInTheDocument();
+  });
+
+  it('If the totals have thousands, Then the chart summary uses localized numbers', () => {
+    // Arrange & Act
+    const chart = renderChart([1_000, 2_500]);
+
+    // Assert
+    expect(chart).toHaveAccessibleName(
+      'Finds per week over the last 2 weeks: 3,500 in total, 2,500 in the latest week',
+    );
+  });
+
   it('If weeks have finds, Then the data table lists every week with its finds', () => {
     // Arrange & Act
     renderChart([2, 0, 1_500]);
