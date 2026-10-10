@@ -672,21 +672,68 @@ describe('When day counts cross a daylight-saving transition', () => {
 });
 
 describe('When a date-only (YYYY-MM-DD) string is formatted or compared', () => {
-  beforeEach(() => {
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date(2024, 0, 15, 12));
-  });
+  // A date-only string must be read as local midnight rather than UTC midnight. On a runner whose
+  // zone is UTC the two are the same instant, so the machine's zone cannot be relied on (and a
+  // vitest worker cannot switch it). Instead the zone is simulated: multi-argument `new Date(...)`
+  // reads its components as local time in the simulated zone, the local getters and the UTC offset
+  // report it, and `new Date()` / `Date.now()` return a fixed instant.
+  const MINUTE = 60_000;
+
+  type LocalParts = Parameters<typeof Date.UTC>;
+
+  function simulateLocalZone(offsetMinutes: number, nowLocal: LocalParts) {
+    // Captured before the global Date is replaced, so the simulation itself reads the real one.
+    const NativeDate = Date;
+    const localToInstant = (parts: LocalParts) => NativeDate.UTC(...parts) + offsetMinutes * MINUTE;
+    const now = localToInstant(nowLocal);
+    const shifted = (date: Date) => new NativeDate(date.getTime() - offsetMinutes * MINUTE);
+
+    vi.stubGlobal(
+      'Date',
+      new Proxy(NativeDate, {
+        construct(target, args) {
+          if (args.length === 0) return new target(now);
+          if (args.length === 1) return new target(args[0]);
+          return new target(localToInstant(args as LocalParts));
+        },
+        get(target, property, receiver) {
+          if (property === 'now') return () => now;
+          return Reflect.get(target, property, receiver);
+        },
+      }),
+    );
+    vi.spyOn(NativeDate.prototype, 'getTimezoneOffset').mockReturnValue(offsetMinutes);
+    vi.spyOn(NativeDate.prototype, 'getFullYear').mockImplementation(function (this: Date) {
+      return shifted(this).getUTCFullYear();
+    });
+    vi.spyOn(NativeDate.prototype, 'getMonth').mockImplementation(function (this: Date) {
+      return shifted(this).getUTCMonth();
+    });
+    vi.spyOn(NativeDate.prototype, 'getDate').mockImplementation(function (this: Date) {
+      return shifted(this).getUTCDate();
+    });
+    return now;
+  }
+
+  // Etc/GMT+5 is UTC-05:00 all year (the sign of Etc/GMT zones is inverted).
+  const WEST_OFFSET_MINUTES = 300;
+  const WEST_TIME_ZONE = 'Etc/GMT+5';
+  // UTC+09:00, Asia/Tokyo's offset.
+  const EAST_OFFSET_MINUTES = -540;
 
   afterEach(() => {
-    vi.useRealTimers();
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
   });
 
   it('If it is formatted, Then it is read as local midnight rather than UTC midnight', () => {
     // Arrange
+    simulateLocalZone(WEST_OFFSET_MINUTES, [2024, 0, 15, 12]);
     const options: Intl.DateTimeFormatOptions = {
       hour: '2-digit',
       minute: '2-digit',
       hourCycle: 'h23',
+      timeZone: WEST_TIME_ZONE,
     };
 
     // Act
@@ -697,24 +744,76 @@ describe('When a date-only (YYYY-MM-DD) string is formatted or compared', () => 
   });
 
   it('If it is today, Then the session is shown as "Today"', () => {
-    // Arrange & Act
+    // Arrange
+    simulateLocalZone(WEST_OFFSET_MINUTES, [2024, 0, 15, 12]);
+
+    // Act
     const result = formatSessionDateRelative('2024-01-15', i18n.t, 'en');
 
     // Assert
     expect(result).toBe('Today');
   });
 
-  it('If it is 7 days ago, Then the find is not recent', () => {
-    expect(isRecentFind('2024-01-08')).toBe(false);
+  it('If it is yesterday, Then the session is shown as "Yesterday"', () => {
+    // Arrange
+    simulateLocalZone(WEST_OFFSET_MINUTES, [2024, 0, 15, 12]);
+
+    // Act
+    const result = formatSessionDateRelative('2024-01-14', i18n.t, 'en');
+
+    // Assert
+    expect(result).toBe('Yesterday');
   });
 
-  it('If it is 6 days ago, Then the find is recent', () => {
-    expect(isRecentFind('2024-01-09')).toBe(true);
+  it('If it is 6 days ago late in the local day, Then the find is recent', () => {
+    // Arrange: local 23:00 is already the next day in UTC, which would make the find 7 days old.
+    simulateLocalZone(WEST_OFFSET_MINUTES, [2024, 0, 15, 23]);
+
+    // Act
+    const result = isRecentFind('2024-01-09');
+
+    // Assert
+    expect(result).toBe(true);
+  });
+
+  it('If it is 7 days ago early in the local day, Then the find is not recent', () => {
+    // Arrange: local 02:00 is still the previous day in UTC, which would make the find 6 days old.
+    simulateLocalZone(EAST_OFFSET_MINUTES, [2024, 0, 15, 2]);
+
+    // Act
+    const result = isRecentFind('2024-01-08');
+
+    // Assert
+    expect(result).toBe(false);
+  });
+
+  it('If its relative time is formatted, Then the elapsed time counts from local midnight', () => {
+    // Arrange: 12 hours after local midnight, but 17 hours after UTC midnight.
+    const now = simulateLocalZone(WEST_OFFSET_MINUTES, [2024, 0, 15, 12]);
+
+    // Act
+    const relativeTime = formatRelativeTime('2024-01-15', 'en', now);
+    const timeAgo = formatTimeAgo('2024-01-15', i18n.t, 'en');
+
+    // Assert
+    expect(relativeTime).toBe('12 hours ago');
+    expect(timeAgo).toBe('12 hours ago');
   });
 
   it('If it is a full timestamp, Then it is still parsed as an instant', () => {
-    expect(formatLocalizedDate('2024-01-15T00:00:00Z', 'en', { timeStyle: 'short' })).toBe(
-      formatLocalizedDate(new Date('2024-01-15T00:00:00Z'), 'en', { timeStyle: 'short' }),
-    );
+    // Arrange
+    simulateLocalZone(WEST_OFFSET_MINUTES, [2024, 0, 15, 12]);
+    const options: Intl.DateTimeFormatOptions = {
+      hour: '2-digit',
+      minute: '2-digit',
+      hourCycle: 'h23',
+      timeZone: WEST_TIME_ZONE,
+    };
+
+    // Act
+    const result = formatLocalizedDate('2024-01-15T00:00:00Z', 'en', options);
+
+    // Assert
+    expect(result).toBe('19:00');
   });
 });

@@ -89,7 +89,7 @@ export function formatRelativeTime(
   locale: string | undefined = getActiveLocale(),
   now: number = Date.now(),
 ): string {
-  const difference = new Date(date).getTime() - now;
+  const difference = toDate(date).getTime() - now;
   const [unit, unitMs] = RELATIVE_TIME_UNITS.find(([, size]) => Math.abs(difference) >= size) ?? [
     'second',
     SECOND_MS,
@@ -231,7 +231,8 @@ const DATE_ONLY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
 /**
  * Converts a date value to a `Date`. A date-only `YYYY-MM-DD` string is read as local midnight
- * (as dayjs did), whereas `new Date(value)` would read it as UTC midnight.
+ * (as dayjs did), whereas `new Date(value)` would read it as UTC midnight. Every other string
+ * form is parsed by `new Date(value)`.
  */
 function toDate(value: Date | string | number): Date {
   if (value instanceof Date) return value;
