@@ -49,7 +49,6 @@ describe('When the real SaveDirectoryStep is rendered inside SetupWizard', () =>
     restoreDefaultDirectory = vi.fn().mockResolvedValue({ success: true });
     mockStoreState(mockUseGrailStore, {
       setSettings,
-      characters: [{ id: 'char-1' }],
       settings: { saveDir: CURRENT_DIR },
       reloadData: vi.fn().mockResolvedValue(undefined),
     } as unknown as ReturnType<typeof useGrailStore>);

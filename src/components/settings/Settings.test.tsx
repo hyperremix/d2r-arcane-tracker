@@ -124,6 +124,35 @@ describe('Settings', () => {
     expect(within(about).getByText('ReportIssuesCard')).toBeInTheDocument();
   });
 
+  it('When the page renders, Then the General and Tracking sections list their cards in order with matching descriptions', () => {
+    // Arrange
+    const ui = <Settings />;
+
+    // Act
+    render(ui);
+
+    // Assert
+    const general = screen.getByRole('region', { name: 'General' });
+    expect(
+      within(general).getByText('Save files, D2R installation and the setup wizard'),
+    ).toBeVisible();
+    expect(
+      within(general)
+        .getAllByText(/Card$|Run Setup Wizard/)
+        .map((element) => element.textContent),
+    ).toEqual(['SaveFileMonitorCard', 'D2RInstallationCard', 'Run Setup Wizard']);
+
+    const tracking = screen.getByRole('region', { name: 'Tracking' });
+    expect(
+      within(tracking).getByText('Game mode, game version, Holy Grail and run tracking'),
+    ).toBeVisible();
+    expect(
+      within(tracking)
+        .getAllByText(/Card$/)
+        .map((element) => element.textContent),
+    ).toEqual(['GameModeCard', 'GrailCard', 'GameVersionCard', 'RunTrackerCard']);
+  });
+
   it('When the page renders, Then the first section is marked as current', () => {
     // Arrange
     const ui = <Settings />;

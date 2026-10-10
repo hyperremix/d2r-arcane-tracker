@@ -104,6 +104,14 @@ describe('When SaveDirectoryStep is rendered', () => {
     installElectronAPI(originalElectronAPI);
   });
 
+  it('When rendered, Then it does not repeat the step title as a heading', async () => {
+    // Arrange & Act
+    await renderStep();
+
+    // Assert
+    expect(screen.queryByRole('heading', { level: 2 })).not.toBeInTheDocument();
+  });
+
   describe('If the user browses to a different directory while progress exists', () => {
     it('Then a destructive confirmation is shown and no IPC change is made yet', async () => {
       // Arrange
@@ -124,6 +132,24 @@ describe('When SaveDirectoryStep is rendered', () => {
       expect(within(dialog).getByRole('button', { name: 'Back up first' })).toBeInTheDocument();
       expect(electronAPI.saveFile.updateSaveDirectory).not.toHaveBeenCalled();
       expect(reloadData).not.toHaveBeenCalled();
+    });
+
+    it('If counting the existing data fails, Then the generic destructive confirmation is shown instead of an error', async () => {
+      // Arrange
+      electronAPI.grail.getCharacters.mockRejectedValue(new Error('db unavailable'));
+      await renderStep();
+
+      // Act
+      fireEvent.click(screen.getByRole('button', { name: /browse/i }));
+
+      // Assert
+      const dialog = await screen.findByRole('alertdialog');
+      expect(
+        within(dialog).getByText(
+          'This action will permanently delete all characters and progress data.',
+        ),
+      ).toBeInTheDocument();
+      expect(electronAPI.saveFile.updateSaveDirectory).not.toHaveBeenCalled();
     });
 
     it('Then "Back up first" creates a backup before the directory is changed', async () => {

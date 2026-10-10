@@ -77,6 +77,18 @@ describe('D2RInstallationStep', () => {
     expect(api.icon.setD2RPath).not.toHaveBeenCalled();
   });
 
+  it('When rendered, Then it does not repeat the step title as a heading', async () => {
+    // Arrange
+    installElectronApi(createElectronApiMock(null));
+
+    // Act
+    render(<D2RInstallationStep />);
+
+    // Assert
+    await screen.findByRole('button', { name: 'Use this' });
+    expect(screen.queryByRole('heading', { level: 2 })).not.toBeInTheDocument();
+  });
+
   it('If the default location does not exist, Then no suggestion is offered but browsing is', async () => {
     // Arrange
     const api = createElectronApiMock(null);

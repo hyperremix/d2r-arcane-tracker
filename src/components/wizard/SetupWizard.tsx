@@ -1,6 +1,7 @@
+import { GameMode } from 'electron/types/grail';
 import { ArrowLeft, ArrowRight, Check, FastForward } from 'lucide-react';
 import type { ComponentType } from 'react';
-import { useCallback, useId, useMemo, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useShallow } from 'zustand/react/shallow';
 import {
@@ -74,6 +75,45 @@ export const wizardSteps: WizardStep[] = [
 ];
 
 /**
+ * Decides whether the skip confirmation should warn that no save folder is being monitored.
+ * Reads the main process's actual monitoring status each time the confirmation opens, so it
+ * reflects the configured folder rather than wizard progress or tracked characters. Nothing is
+ * claimed while the status is loading or unavailable, and Manual mode never monitors by design.
+ * @param {boolean} isConfirmOpen - Whether the skip confirmation is open
+ * @returns {boolean} True if automatic tracking cannot work because no save folder is monitored
+ */
+function useNoSaveFolderWarning(isConfirmOpen: boolean): boolean {
+  const gameMode = useGrailStore((state) => state.settings.gameMode);
+  const [isMonitoring, setIsMonitoring] = useState<boolean | undefined>(undefined);
+
+  useEffect(() => {
+    if (!isConfirmOpen) {
+      setIsMonitoring(undefined);
+      return;
+    }
+
+    let cancelled = false;
+    const loadMonitoringStatus = async () => {
+      try {
+        const status = await window.electronAPI?.saveFile.getMonitoringStatus();
+        if (!cancelled) {
+          setIsMonitoring(status?.isMonitoring);
+        }
+      } catch (error) {
+        console.error('Failed to load monitoring status for the skip confirmation:', error);
+      }
+    };
+
+    void loadMonitoringStatus();
+    return () => {
+      cancelled = true;
+    };
+  }, [isConfirmOpen]);
+
+  return isMonitoring === false && gameMode !== GameMode.Manual;
+}
+
+/**
  * SetupWizard component - Main wizard dialog that guides users through app configuration.
  * Displays a multi-step modal with navigation controls and progress indicator.
  * @returns {JSX.Element} Setup wizard dialog
@@ -105,10 +145,10 @@ export function SetupWizard() {
     })),
   );
   const setSettings = useGrailStore((state) => state.setSettings);
-  const hasCharacters = useGrailStore((state) => state.characters.length > 0);
   const [showSkipConfirm, setShowSkipConfirm] = useState(false);
   // Set when persisting the wizard outcome fails; the wizard then stays open so it can be retried
   const [saveFailed, setSaveFailed] = useState(false);
+  const showNoSaveFolderWarning = useNoSaveFolderWarning(showSkipConfirm);
 
   const step = wizardSteps[currentStep];
   const CurrentStepComponent = step?.component;
@@ -127,11 +167,6 @@ export function SetupWizard() {
   }, [step, stepValidity]);
 
   const showValidationMessage = !canProceed && Boolean(step?.validationMessageKey);
-
-  // The save folder step reports its validity once visited. Before that, tracked characters show
-  // that a working save folder was set up earlier (e.g. when re-running the wizard).
-  const saveFolderValidity = stepValidity[SAVE_DIRECTORY_STEP_ID];
-  const hasUsableSaveFolder = saveFolderValidity ?? hasCharacters;
 
   // Offer to jump straight to the summary when every step before it is optional
   const remainingSteps = wizardSteps.slice(currentStep + 1, totalSteps - 1);
@@ -297,7 +332,7 @@ export function SetupWizard() {
             <AlertDialogHeader>
               <AlertDialogTitle>{t(translations.wizard.skipConfirm.title)}</AlertDialogTitle>
               <AlertDialogDescription render={<div />}>
-                {!hasUsableSaveFolder && (
+                {showNoSaveFolderWarning && (
                   <p className="mb-2 font-medium text-warning">
                     {t(translations.wizard.skipConfirm.noSaveFolderWarning)}
                   </p>

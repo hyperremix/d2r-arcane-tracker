@@ -228,6 +228,29 @@ describe('When managing database backups', () => {
     expect(dialog).not.toHaveTextContent('⚠️');
   });
 
+  it('If no backup has been made, Then Back up first is the focused primary action and becomes secondary after a backup', async () => {
+    // Arrange
+    mockElectronAPI.dialog.showSaveDialog.mockResolvedValue({
+      canceled: false,
+      filePath: '/backups/pre-restore.db',
+    });
+    render(<DatabaseCard />);
+
+    // Act
+    const backupFirstButton = await openRestoreConfirmation();
+
+    // Assert
+    await waitFor(() => expect(backupFirstButton).toHaveFocus());
+    expect(backupFirstButton).toHaveClass('bg-primary');
+
+    // Act
+    fireEvent.click(backupFirstButton);
+
+    // Assert
+    await screen.findByText('Backup created. You can now continue with the restore.');
+    expect(screen.getByRole('button', { name: 'Back up first' })).not.toHaveClass('bg-primary');
+  });
+
   it('If a restore fails, Then a translated error is shown', async () => {
     // Arrange
     mockElectronAPI.grail.restore.mockResolvedValue({ success: false });

@@ -80,7 +80,7 @@ describe('SaveDirectoryChangeDialog', () => {
     ).toBeDisabled();
   });
 
-  it('When the change is confirmed, then the destructive action names what it does', () => {
+  it('When the change is confirmed, Then the destructive action names what it does', () => {
     // Arrange
     const onConfirm = vi.fn();
     renderDialog({ onConfirm });
@@ -92,7 +92,7 @@ describe('SaveDirectoryChangeDialog', () => {
     expect(onConfirm).toHaveBeenCalledTimes(1);
   });
 
-  it('If the default directory is restored, then the destructive action names the default folder', () => {
+  it('If the default directory is restored, Then the destructive action names the default folder', () => {
     // Arrange & Act
     renderDialog({ action: 'restore' });
 
@@ -102,7 +102,7 @@ describe('SaveDirectoryChangeDialog', () => {
     ).toBeInTheDocument();
   });
 
-  it('If the existing data is known, then the warning states how many characters and finds are deleted', () => {
+  it('If the existing data is known, Then the warning states how many characters and finds are deleted', () => {
     // Arrange & Act
     renderDialog({ existingData: { characters: 3, progress: 1 } });
 
@@ -117,7 +117,7 @@ describe('SaveDirectoryChangeDialog', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('If the existing data is unknown, then the generic delete warning is shown', () => {
+  it('If the existing data is unknown, Then the generic delete warning is shown', () => {
     // Arrange & Act
     renderDialog();
 
@@ -127,7 +127,7 @@ describe('SaveDirectoryChangeDialog', () => {
     ).toBeInTheDocument();
   });
 
-  it('If a backup can be made, then Back up first is focused when the dialog opens', async () => {
+  it('If a backup can be made, Then Back up first is focused when the dialog opens', async () => {
     // Arrange & Act
     renderDialog({ onBackup: vi.fn() });
 

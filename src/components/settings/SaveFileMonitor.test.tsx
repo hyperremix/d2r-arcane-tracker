@@ -262,7 +262,7 @@ describe('SaveFileMonitor', () => {
       consoleErrorSpy.mockRestore();
     });
 
-    it('When the card renders, then the folder actions warn that switching folders deletes progress', async () => {
+    it('When the card renders, Then the folder actions warn that switching folders deletes progress', async () => {
       // Arrange
       arrangeMonitoredDirectory(true);
 

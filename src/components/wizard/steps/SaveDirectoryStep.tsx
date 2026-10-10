@@ -22,9 +22,11 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useDatabaseBackup } from '@/hooks/useDatabaseBackup';
 import {
-  type ExistingUserDataCounts,
+  countExistingUserData,
+  hasExistingUserData,
   normalizeDirectoryForComparison,
-  type SaveDirectoryChangeAction,
+  type PendingSaveDirectoryChange,
+  type SaveDirectoryChangeRequest,
 } from '@/hooks/useSaveDirectoryChange';
 import { translations } from '@/i18n/translations';
 import { useGrailStore } from '@/stores/grailStore';
@@ -39,23 +41,6 @@ export const SAVE_DIRECTORY_STEP_ID = 'saveDirectory';
  * Delay after the last keystroke before a typed/pasted path is inspected.
  */
 export const SAVE_DIRECTORY_INSPECTION_DEBOUNCE_MS = 400;
-
-/**
- * A requested save directory change.
- */
-interface DirectoryChangeRequest {
-  action: SaveDirectoryChangeAction;
-  directory: string;
-}
-
-/**
- * A save directory change awaiting confirmation, with what it would replace and delete.
- */
-interface PendingDirectoryChange extends DirectoryChangeRequest {
-  /** Directory applied when the change was requested ('' if none). */
-  currentDirectory: string;
-  existingData: ExistingUserDataCounts;
-}
 
 /**
  * Inspection outcome for a specific directory path.
@@ -94,27 +79,6 @@ function isSameDirectory(a: string, b: string): boolean {
  */
 function isUnappliedDraft(trimmedDraft: string, saveDir: string): boolean {
   return trimmedDraft !== '' && !isSameDirectory(trimmedDraft, saveDir);
-}
-
-/**
- * Counts the characters and grail progress entries currently in the database.
- * @returns {Promise<ExistingUserDataCounts>} The number of characters and progress entries
- */
-async function countExistingUserData(): Promise<ExistingUserDataCounts> {
-  const [characters, progress] = await Promise.all([
-    window.electronAPI?.grail.getCharacters(),
-    window.electronAPI?.grail.getProgress(),
-  ]);
-  return { characters: characters?.length ?? 0, progress: progress?.length ?? 0 };
-}
-
-/**
- * Checks whether a directory change would delete characters or grail progress.
- * @param {ExistingUserDataCounts} existingData - Current database counts
- * @returns {boolean} True if any user data exists
- */
-function hasExistingUserData(existingData: ExistingUserDataCounts): boolean {
-  return existingData.characters > 0 || existingData.progress > 0;
 }
 
 /**
@@ -510,7 +474,9 @@ export function SaveDirectoryStep() {
   const [saveFiles, setSaveFiles] = useState<D2SaveFile[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isApplying, setIsApplying] = useState(false);
-  const [pendingChange, setPendingChange] = useState<PendingDirectoryChange | undefined>(undefined);
+  const [pendingChange, setPendingChange] = useState<PendingSaveDirectoryChange | undefined>(
+    undefined,
+  );
   const [hasError, setHasError] = useState(false);
   const [continueAnyway, setContinueAnyway] = useState(false);
   const [hasBackedUp, setHasBackedUp] = useState(false);
@@ -565,7 +531,7 @@ export function SaveDirectoryStep() {
   }, []);
 
   const applyDirectoryChange = useCallback(
-    async (change: DirectoryChangeRequest) => {
+    async (change: SaveDirectoryChangeRequest) => {
       setIsApplying(true);
       setHasError(false);
 
@@ -615,7 +581,7 @@ export function SaveDirectoryStep() {
   );
 
   const requestDirectoryChange = useCallback(
-    async (change: DirectoryChangeRequest) => {
+    async (change: SaveDirectoryChangeRequest) => {
       setHasError(false);
       setHasBackedUp(false);
       try {
@@ -626,6 +592,7 @@ export function SaveDirectoryStep() {
         // `saveDir` falls back to '' or the stored setting, which errs toward asking for
         // confirmation.
         if (!isSameDirectory(saveDir, change.directory)) {
+          // If the check fails, existing data is assumed so the user is asked to confirm
           const existingData = await countExistingUserData();
           if (hasExistingUserData(existingData)) {
             // Require explicit confirmation before wiping existing progress

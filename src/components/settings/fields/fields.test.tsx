@@ -67,6 +67,48 @@ describe('When a shared settings select is rendered', () => {
       expect(trigger).toHaveTextContent('Softcore Only');
       expect(trigger).not.toHaveTextContent('softcore');
     });
+
+    it('Then the game version trigger shows the label of the new value', () => {
+      // Arrange
+      const onValueChange = vi.fn();
+      const { rerender } = render(
+        <GameVersionSelect
+          id="version"
+          value={GameVersion.Classic}
+          onValueChange={onValueChange}
+        />,
+      );
+
+      // Act
+      rerender(
+        <GameVersionSelect
+          id="version"
+          value={GameVersion.Resurrected}
+          onValueChange={onValueChange}
+        />,
+      );
+
+      // Assert
+      const trigger = document.getElementById('version');
+      expect(trigger).toHaveTextContent('Diablo II: Resurrected');
+      expect(trigger).not.toHaveTextContent('Classic');
+    });
+
+    it('Then the theme trigger shows the label of the new value', () => {
+      // Arrange
+      const onValueChange = vi.fn();
+      const { rerender } = render(
+        <ThemeSelect id="theme" value="system" onValueChange={onValueChange} />,
+      );
+
+      // Act
+      rerender(<ThemeSelect id="theme" value="dark" onValueChange={onValueChange} />);
+
+      // Assert
+      const trigger = document.getElementById('theme');
+      expect(trigger).toHaveTextContent('Dark');
+      expect(trigger).not.toHaveTextContent('System');
+    });
   });
 });
 

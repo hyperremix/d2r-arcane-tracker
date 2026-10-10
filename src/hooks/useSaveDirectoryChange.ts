@@ -87,7 +87,7 @@ export function normalizeDirectoryForComparison(directory: string): string {
  * Counts the characters and grail progress entries currently in the database.
  * @returns {Promise<ExistingUserDataCounts | undefined>} The counts, or undefined if the check failed
  */
-async function countExistingUserData(): Promise<ExistingUserDataCounts | undefined> {
+export async function countExistingUserData(): Promise<ExistingUserDataCounts | undefined> {
   try {
     const [characters, progress] = await Promise.all([
       window.electronAPI?.grail.getCharacters(),
@@ -98,6 +98,16 @@ async function countExistingUserData(): Promise<ExistingUserDataCounts | undefin
     console.error('Failed to check for existing user data:', error);
     return undefined;
   }
+}
+
+/**
+ * Checks whether a directory change would delete characters or grail progress.
+ * If the counts could not be determined, existing data is assumed so the user is asked to confirm.
+ * @param {ExistingUserDataCounts | undefined} existingData - Counts from {@link countExistingUserData}
+ * @returns {boolean} True if user data exists or its presence is unknown
+ */
+export function hasExistingUserData(existingData: ExistingUserDataCounts | undefined): boolean {
+  return !existingData || existingData.characters > 0 || existingData.progress > 0;
 }
 
 /**
@@ -184,9 +194,8 @@ export function useSaveDirectoryChange({
         return 'unchanged';
       }
 
-      // If the check fails, existing data is assumed so the user is asked to confirm
       const existingData = await countExistingUserData();
-      if (!existingData || existingData.characters > 0 || existingData.progress > 0) {
+      if (hasExistingUserData(existingData)) {
         // Require explicit confirmation before wiping existing progress
         setPendingChange({ ...change, currentDirectory: resolvedDirectory, existingData });
         return 'confirmationRequired';
