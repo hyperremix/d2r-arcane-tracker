@@ -11,6 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { translations } from '@/i18n/translations';
+import { createRunItemLookup, resolveRunItem } from '@/lib/runItems';
 import { formatTimestamp } from '@/lib/utils';
 import { useGrailStore } from '@/stores/grailStore';
 import { useRunTrackerStore } from '@/stores/runTrackerStore';
@@ -181,6 +182,9 @@ export function RunList({ runs }: RunListProps) {
     [],
   );
 
+  // Index the grail data once, so resolving run items doesn't search the full arrays each time
+  const lookup = useMemo(() => createRunItemLookup(items, progress), [items, progress]);
+
   // Helper function to get item information
   const getItemInfo = useCallback(
     (runItem: RunItem) => {
@@ -200,9 +204,7 @@ export function RunList({ runs }: RunListProps) {
         };
       }
 
-      const progressRecord = progress.find((p) => p.id === runItem.grailProgressId);
-      // Then use the progress record's itemId to find the actual item
-      const item = progressRecord ? items.find((i) => i.id === progressRecord.itemId) : undefined;
+      const { progress: progressRecord, item } = resolveRunItem(runItem, lookup);
       return {
         name: item?.name || t(translations.runTracker.runList.unknownItem),
         isNewGrail: Boolean(
@@ -210,7 +212,7 @@ export function RunList({ runs }: RunListProps) {
         ),
       };
     },
-    [items, progress, t],
+    [lookup, t],
   );
 
   // Helper function to get ItemCard data from RunItem
@@ -221,14 +223,8 @@ export function RunList({ runs }: RunListProps) {
         return { item: undefined, normalProgress: [], etherealProgress: [] };
       }
 
-      // First find the progress record by matching the grailProgressId
-      const progressRecord = progress.find((p) => p.id === runItem.grailProgressId);
-      if (!progressRecord) {
-        return { item: undefined, normalProgress: [], etherealProgress: [] };
-      }
-
-      // Find the actual item using the progress record's itemId
-      const item = items.find((i) => i.id === progressRecord.itemId);
+      // The progress record links the run item to the actual item
+      const { item } = resolveRunItem(runItem, lookup);
       if (!item) {
         return { item: undefined, normalProgress: [], etherealProgress: [] };
       }
@@ -242,7 +238,7 @@ export function RunList({ runs }: RunListProps) {
 
       return { item, normalProgress, etherealProgress };
     },
-    [items, progress],
+    [lookup, progress],
   );
 
   // Show loading state if runs are undefined

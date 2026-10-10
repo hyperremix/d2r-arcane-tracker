@@ -1,10 +1,11 @@
-import type { GrailProgress, Item, Run, RunItem } from 'electron/types/grail';
+import type { Run } from 'electron/types/grail';
 import { ChevronRight } from 'lucide-react';
 import { useId, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useShallow } from 'zustand/react/shallow';
 import { Button } from '@/components/ui/button';
 import { translations } from '@/i18n/translations';
+import { createRunItemLookup, resolveRunItemName } from '@/lib/runItems';
 import { formatDuration } from '@/lib/utils';
 import { useGrailStore } from '@/stores/grailStore';
 import { useRunTrackerStore } from '@/stores/runTrackerStore';
@@ -14,22 +15,6 @@ interface RecentRunsProps {
   runs: Run[];
   onViewAllRuns?: () => void;
   limit?: number;
-}
-
-// Resolves a run item to its display name: manual entries carry a name, detected ones link to grail progress
-function resolveRunItemName(
-  runItem: RunItem,
-  progress: GrailProgress[],
-  items: Item[],
-): string | undefined {
-  if (runItem.name) {
-    return runItem.name;
-  }
-  if (!runItem.grailProgressId) {
-    return undefined;
-  }
-  const progressRecord = progress.find((p) => p.id === runItem.grailProgressId);
-  return progressRecord ? items.find((i) => i.id === progressRecord.itemId)?.name : undefined;
 }
 
 /**
@@ -45,6 +30,7 @@ export function RecentRuns({ runs, onViewAllRuns, limit = RECENT_RUNS_LIMIT }: R
   );
 
   const recentRuns = useMemo(() => getRecentRuns(runs, limit), [runs, limit]);
+  const lookup = useMemo(() => createRunItemLookup(items, progress), [items, progress]);
 
   return (
     <section aria-labelledby={headingId} className="space-y-2">
@@ -71,7 +57,7 @@ export function RecentRuns({ runs, onViewAllRuns, limit = RECENT_RUNS_LIMIT }: R
             const itemNames = foundItems
               .map(
                 (runItem) =>
-                  resolveRunItemName(runItem, progress, items) ??
+                  resolveRunItemName(runItem, lookup) ??
                   t(translations.runTracker.runList.unknownItem),
               )
               .join(', ');

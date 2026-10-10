@@ -19,6 +19,7 @@ import { Label } from '@/components/ui/label';
 import { Progress } from '@/components/ui/progress';
 import { Switch } from '@/components/ui/switch';
 import { translations } from '@/i18n/translations';
+import { forgetMissingIcons } from '@/lib/iconLoader';
 import { onMainEvent } from '@/lib/ipcEvents';
 import { useGrailStore } from '@/stores/grailStore';
 
@@ -90,6 +91,8 @@ export function ItemIconSettings() {
         errors: [{ file: 'N/A', error: String(error) }],
       });
     } finally {
+      // Icons that were missing before may exist now, even if the conversion stopped part-way
+      forgetMissingIcons();
       setIsConverting(false);
     }
   }, []);

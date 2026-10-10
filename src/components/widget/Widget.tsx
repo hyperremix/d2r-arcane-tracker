@@ -16,6 +16,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { ProgressGauge } from '@/components/grail/ProgressGauge';
 import { Input } from '@/components/ui/input';
 import { translations } from '@/i18n/translations';
+import { createRunItemLookup, resolveRunItem } from '@/lib/runItems';
 import { formatDuration } from '@/lib/utils';
 import { clampWidgetOpacity, resolveWidgetDisplayMode } from '@/lib/widget';
 import { useGrailStore } from '@/stores/grailStore';
@@ -77,15 +78,7 @@ function buildRunItemNameLookup(
     return [];
   }
 
-  const itemsById = new Map<string, Item>();
-  for (const item of items) {
-    itemsById.set(item.id, item);
-  }
-
-  const progressById = new Map<string, GrailProgress>();
-  for (const entry of progress) {
-    progressById.set(entry.id, entry);
-  }
+  const lookup = createRunItemLookup(items, progress);
 
   // Deduplicate runs by ID to prevent duplicate entries in the widget
   // This is a safety measure in case duplicate runs exist in the store
@@ -105,22 +98,10 @@ function buildRunItemNameLookup(
 
     const names: string[] = [];
     for (const runItem of runItemEntries) {
-      // If this is a manual entry with a name, use it directly
-      if (runItem.name) {
-        names.push(runItem.name);
-        continue;
-      }
-
-      // Otherwise, try to find the item through grail progress
-      if (!runItem.grailProgressId) {
-        continue;
-      }
-
-      const progressEntry = progressById.get(runItem.grailProgressId);
-      if (!progressEntry) continue;
-
-      const item = itemsById.get(progressEntry.itemId);
-      if (!item) {
+      const { name, progress: progressEntry, item } = resolveRunItem(runItem, lookup);
+      if (name) {
+        names.push(name);
+      } else if (progressEntry && !item) {
         // This should be rare once the grail store is hydrated for the widget
         // but we log it to help diagnose any future data mismatches.
         console.warn(
@@ -129,10 +110,7 @@ function buildRunItemNameLookup(
           '-> itemId:',
           progressEntry.itemId,
         );
-        continue;
       }
-
-      names.push(item.name);
     }
 
     return {
