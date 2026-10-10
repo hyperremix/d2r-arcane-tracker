@@ -41,4 +41,25 @@ describe('When the grail progress chart is rendered', () => {
     // Assert
     expect(screen.getByTestId('chart-tooltip')).toHaveTextContent('Found1');
   });
+
+  it('If the user moves through the chart with the keyboard, Then the tooltip follows Home, End, ArrowLeft, ArrowRight and Escape', () => {
+    // Arrange
+    render(<GrailProgressChart points={buildPoints([1, 3, 6])} today={today} totalItems={10} />);
+    const chart = screen.getByRole('img', { name: /^Grail progress over time/ });
+    const tooltip = () => screen.getByTestId('chart-tooltip');
+
+    // Act & Assert
+    fireEvent.focus(chart);
+    expect(tooltip()).toHaveTextContent('Found6');
+    fireEvent.keyDown(chart, { key: 'Home' });
+    expect(tooltip()).toHaveTextContent('Found1');
+    fireEvent.keyDown(chart, { key: 'ArrowRight' });
+    expect(tooltip()).toHaveTextContent('Found3');
+    fireEvent.keyDown(chart, { key: 'ArrowLeft' });
+    expect(tooltip()).toHaveTextContent('Found1');
+    fireEvent.keyDown(chart, { key: 'End' });
+    expect(tooltip()).toHaveTextContent('Found6');
+    fireEvent.keyDown(chart, { key: 'Escape' });
+    expect(screen.queryByTestId('chart-tooltip')).not.toBeInTheDocument();
+  });
 });
