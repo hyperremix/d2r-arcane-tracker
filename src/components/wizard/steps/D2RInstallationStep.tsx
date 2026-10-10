@@ -229,11 +229,9 @@ export function D2RInstallationStep() {
   return (
     <div className="space-y-6">
       <div className="text-center">
-        <HardDrive className="mx-auto h-12 w-12 text-muted-foreground" />
-        <h2 className="mt-4 font-semibold text-xl">
-          {t(translations.wizard.d2rInstallation.title)}
-        </h2>
-        <p className="mt-2 text-muted-foreground">
+        <HardDrive className="mx-auto h-12 w-12 text-muted-foreground" aria-hidden="true" />
+        {/* The step title is shown in the wizard header */}
+        <p className="mt-4 text-muted-foreground">
           {t(translations.wizard.d2rInstallation.description)}
         </p>
       </div>

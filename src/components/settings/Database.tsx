@@ -1,5 +1,5 @@
 import { AlertTriangle, Database, Download, Upload } from 'lucide-react';
-import { useCallback, useState } from 'react';
+import { useCallback, useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
@@ -27,6 +27,7 @@ import { useGrailStore } from '@/stores/grailStore';
  */
 export function DatabaseCard() {
   const { t } = useTranslation();
+  const backupFirstButtonId = useId();
   // Backup state
   const { isBackingUp, lastBackupPath, backup: handleBackup } = useDatabaseBackup();
 
@@ -40,6 +41,7 @@ export function DatabaseCard() {
   const [restoreSuccess, setRestoreSuccess] = useState(false);
   const [backedUpBeforeRestore, setBackedUpBeforeRestore] = useState(false);
   const reloadData = useGrailStore((state) => state.reloadData);
+  const selectedFileName = selectedFilePath ? getFileName(selectedFilePath) : selectedFile?.name;
 
   const handleBackupBeforeRestore = async () => {
     const backedUp = await handleBackup();
@@ -243,18 +245,31 @@ export function DatabaseCard() {
 
         {/* Confirmation Dialog */}
         <AlertDialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
-          <AlertDialogContent>
+          <AlertDialogContent
+            // Focus the safe "Back up first" path when the dialog opens
+            initialFocus={() => document.getElementById(backupFirstButtonId) ?? true}
+          >
             <AlertDialogHeader>
               <AlertDialogTitle className="flex items-center gap-2">
-                <AlertTriangle className="h-5 w-5 text-warning" />
+                <AlertTriangle className="h-5 w-5 text-destructive" aria-hidden="true" />
                 {t(translations.settings.database.restoreDatabase)}
               </AlertDialogTitle>
-              <AlertDialogDescription>
+              <AlertDialogDescription render={<div />}>
                 <span className="mb-2 block">
                   {t(translations.settings.database.confirmRestore)}
                 </span>
-                <span className="mb-2 block font-medium text-warning">
-                  ⚠️ {t(translations.settings.database.replaceWarning)}
+                {selectedFileName && (
+                  <dl className="mb-2 text-sm">
+                    <dt className="font-medium">
+                      {t(translations.settings.database.restoreFileLabel)}
+                    </dt>
+                    <dd className="break-all rounded bg-muted p-2 font-mono text-muted-foreground text-xs">
+                      {selectedFileName}
+                    </dd>
+                  </dl>
+                )}
+                <span className="mb-2 block font-medium text-destructive">
+                  {t(translations.settings.database.replaceWarning)}
                 </span>
                 <span className="block text-sm">
                   {t(translations.settings.database.keepCurrentWarning)}
@@ -271,7 +286,8 @@ export function DatabaseCard() {
                 {t(translations.common.cancel)}
               </AlertDialogCancel>
               <Button
-                variant="outline"
+                id={backupFirstButtonId}
+                variant={backedUpBeforeRestore ? 'outline' : 'default'}
                 onClick={handleBackupBeforeRestore}
                 disabled={isRestoring || isBackingUp}
                 className="gap-2"

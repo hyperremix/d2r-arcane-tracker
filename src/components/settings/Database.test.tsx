@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { toast } from 'sonner';
 import {
   afterAll,
@@ -212,6 +212,44 @@ describe('When managing database backups', () => {
     expect(await screen.findByRole('button', { name: 'Restore Database' })).toBeEnabled();
     expect(screen.getByRole('button', { name: 'Cancel' })).toBeEnabled();
     expect(screen.getByRole('button', { name: 'Back up first' })).toBeEnabled();
+  });
+
+  it('When a backup file is chosen for restore, Then the confirmation names the file and states what is replaced', async () => {
+    // Arrange
+    render(<DatabaseCard />);
+
+    // Act
+    await openRestoreConfirmation();
+
+    // Assert
+    const dialog = screen.getByRole('alertdialog');
+    expect(within(dialog).getByText('holy-grail-backup.db')).toBeInTheDocument();
+    expect(dialog).toHaveTextContent('vaulted items');
+    expect(dialog).not.toHaveTextContent('⚠️');
+  });
+
+  it('If no backup has been made, Then Back up first is the focused primary action and becomes secondary after a backup', async () => {
+    // Arrange
+    mockElectronAPI.dialog.showSaveDialog.mockResolvedValue({
+      canceled: false,
+      filePath: '/backups/pre-restore.db',
+    });
+    mockElectronAPI.grail.backup.mockResolvedValue({ success: true });
+    render(<DatabaseCard />);
+
+    // Act
+    const backupFirstButton = await openRestoreConfirmation();
+
+    // Assert
+    await waitFor(() => expect(backupFirstButton).toHaveFocus());
+    expect(backupFirstButton).toHaveClass('bg-primary');
+
+    // Act
+    fireEvent.click(backupFirstButton);
+
+    // Assert
+    await screen.findByText('Backup created. You can now continue with the restore.');
+    expect(screen.getByRole('button', { name: 'Back up first' })).not.toHaveClass('bg-primary');
   });
 
   it('If a restore fails, Then a translated error is shown', async () => {

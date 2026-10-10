@@ -16,7 +16,7 @@ describe('PreferencesStep', () => {
     }));
   });
 
-  it('When rendered, Then it combines the theme, notification and widget preferences', () => {
+  it('When rendered, Then it combines the theme, notification and widget preferences without repeating the step title', () => {
     // Arrange
     const ui = <PreferencesStep />;
 
@@ -24,7 +24,7 @@ describe('PreferencesStep', () => {
     render(ui);
 
     // Assert
-    expect(screen.getByRole('heading', { level: 2, name: 'Preferences' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { level: 2 })).not.toBeInTheDocument();
     expect(screen.getByRole('region', { name: 'Appearance' })).toBeInTheDocument();
     expect(screen.getByRole('region', { name: 'Notification Settings' })).toBeInTheDocument();
     expect(screen.getByRole('region', { name: 'Widget Settings' })).toBeInTheDocument();

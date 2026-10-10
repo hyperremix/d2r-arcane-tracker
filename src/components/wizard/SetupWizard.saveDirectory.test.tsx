@@ -4,6 +4,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { mockStoreState } from '@/test/storeMock';
 
 vi.mock('@/stores/grailStore');
+// Shared toast spies: the step's backup hook must not bind to the real `sonner` for later suites
+vi.mock('sonner', () => import('@/test/sonnerMock'));
 // The real module imports grailStore, so it would be cached bound to this file's mock
 vi.mock('@/components/wizard/wizardSettingsSave', () => import('@/test/wizardSettingsSaveStub'));
 // Only SaveDirectoryStep is rendered for real. The other steps are stubbed so they aren't cached
@@ -94,7 +96,7 @@ describe('When the real SaveDirectoryStep is rendered inside SetupWizard', () =>
       const destructiveDialog = await screen.findByRole('alertdialog');
       expect(
         within(destructiveDialog).getByText(
-          'This action will permanently delete all characters and progress data.',
+          'This permanently deletes 1 character and 1 recorded grail find from the app.',
         ),
       ).toBeInTheDocument();
 

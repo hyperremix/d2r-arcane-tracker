@@ -3,6 +3,7 @@ import type { D2SaveFile, MonitoringStatus, SaveFileEvent } from 'electron/types
 import { GameMode } from 'electron/types/grail';
 import {
   AlertCircle,
+  AlertTriangle,
   CheckCircle,
   FileText,
   FolderOpen,
@@ -382,6 +383,10 @@ export function SaveFileMonitor() {
               {t(translations.settings.saveFileMonitor.noDirectorySelected)}
             </div>
           )}
+          <p className="mt-2 flex items-center gap-1 text-muted-foreground text-xs">
+            <AlertTriangle className="h-3 w-3 shrink-0 text-warning" aria-hidden="true" />
+            {t(translations.settings.saveFileMonitor.directoryChangeHint)}
+          </p>
         </div>
 
         {/* Last Event */}
@@ -449,6 +454,7 @@ export function SaveFileMonitor() {
         onConfirm={handleConfirmChange}
         currentDirectory={pendingChange?.currentDirectory}
         newDirectory={pendingChange?.directory}
+        existingData={pendingChange?.existingData}
         onBackup={handleBackupFirst}
         isBackingUp={isBackingUp}
         hasBackedUp={hasBackedUp}

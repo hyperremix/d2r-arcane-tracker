@@ -262,6 +262,21 @@ describe('SaveFileMonitor', () => {
       consoleErrorSpy.mockRestore();
     });
 
+    it('When the card renders, Then the folder actions warn that switching folders deletes progress', async () => {
+      // Arrange
+      arrangeMonitoredDirectory(true);
+
+      // Act
+      await renderWithLoadedDirectory();
+
+      // Assert
+      expect(
+        screen.getByText(
+          'Switching to a different folder deletes all characters and grail progress in the app.',
+        ),
+      ).toBeInTheDocument();
+    });
+
     it('When the picked folder is already monitored, then no confirmation is shown and an info toast explains nothing changed', async () => {
       // Arrange
       arrangeMonitoredDirectory(true);
@@ -309,6 +324,11 @@ describe('SaveFileMonitor', () => {
       expect(within(dialog).getByText(CURRENT_DIRECTORY)).toBeInTheDocument();
       expect(within(dialog).getByText('New folder')).toBeInTheDocument();
       expect(within(dialog).getByText(NEW_DIRECTORY)).toBeInTheDocument();
+      expect(
+        within(dialog).getByText(
+          'This permanently deletes 1 character and 0 recorded grail finds from the app.',
+        ),
+      ).toBeInTheDocument();
       expect(getElectronAPI().saveFile.updateSaveDirectory).not.toHaveBeenCalled();
     });
 
@@ -335,7 +355,9 @@ describe('SaveFileMonitor', () => {
       const dialog = await screen.findByRole('alertdialog');
 
       // Act
-      fireEvent.click(within(dialog).getByRole('button', { name: 'Change Directory' }));
+      fireEvent.click(
+        within(dialog).getByRole('button', { name: 'Delete progress and switch folder' }),
+      );
 
       // Assert
       await waitFor(() =>
@@ -356,7 +378,9 @@ describe('SaveFileMonitor', () => {
       const dialog = await screen.findByRole('alertdialog');
 
       // Act
-      fireEvent.click(within(dialog).getByRole('button', { name: 'Restore Default' }));
+      fireEvent.click(
+        within(dialog).getByRole('button', { name: 'Delete progress and use default folder' }),
+      );
 
       // Assert
       await waitFor(() =>
@@ -385,7 +409,9 @@ describe('SaveFileMonitor', () => {
       await within(dialog).findByText(
         'Backup created. You can now continue with the directory change.',
       );
-      fireEvent.click(within(dialog).getByRole('button', { name: 'Change Directory' }));
+      fireEvent.click(
+        within(dialog).getByRole('button', { name: 'Delete progress and switch folder' }),
+      );
 
       // Assert
       await waitFor(() => expect(api.saveFile.updateSaveDirectory).toHaveBeenCalled());
@@ -489,7 +515,12 @@ describe('SaveFileMonitor', () => {
       pickFolder(NEW_DIRECTORY);
 
       // Assert
-      await screen.findByRole('alertdialog');
+      const dialog = await screen.findByRole('alertdialog');
+      expect(
+        within(dialog).getByText(
+          'This action will permanently delete all characters and progress data.',
+        ),
+      ).toBeInTheDocument();
       expect(getElectronAPI().saveFile.updateSaveDirectory).not.toHaveBeenCalled();
     });
 
@@ -502,7 +533,9 @@ describe('SaveFileMonitor', () => {
       const dialog = await screen.findByRole('alertdialog');
 
       // Act
-      fireEvent.click(within(dialog).getByRole('button', { name: 'Change Directory' }));
+      fireEvent.click(
+        within(dialog).getByRole('button', { name: 'Delete progress and switch folder' }),
+      );
 
       // Assert
       await waitFor(() => expect(toast.error).toHaveBeenCalledWith('Failed to change directory'));

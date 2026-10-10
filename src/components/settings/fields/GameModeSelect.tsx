@@ -33,15 +33,19 @@ interface GameModeSelectProps {
  */
 export function GameModeSelect({ id, value, onValueChange }: GameModeSelectProps) {
   const { t } = useTranslation();
-  const labelKey = gameModeLabelKeys[value] as string | undefined;
+  const items = gameModeOptions.map(({ value: mode }) => ({
+    value: mode,
+    label: t(gameModeLabelKeys[mode]),
+  }));
 
   return (
     <Select
+      items={items}
       value={value}
       onValueChange={(selected) => selected && onValueChange(selected as GameMode)}
     >
       <SelectTrigger id={id}>
-        <SelectValue>{labelKey ? t(labelKey) : null}</SelectValue>
+        <SelectValue />
       </SelectTrigger>
       <SelectContent>
         {gameModeOptions.map(({ value: mode, Icon }) => (

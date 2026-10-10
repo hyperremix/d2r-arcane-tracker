@@ -53,6 +53,22 @@ describe('When CompletionStep is rendered', () => {
     installElectronAPI(originalElectronAPI);
   });
 
+  it('When rendered, Then the finish hint says settings are already saved', async () => {
+    // Arrange
+    installElectronAPI(createElectronApiMock(MONITORED_DIR, 1));
+
+    // Act
+    render(<CompletionStep />);
+
+    // Assert
+    expect(
+      screen.getByText(
+        'Your settings were saved as you went. Click Finish to close setup and start using D2R Arcane Tracker!',
+      ),
+    ).toBeInTheDocument();
+    await waitFor(() => expect(getSummaryValue('Character Files:')).toHaveTextContent('1'));
+  });
+
   it('If a save folder is monitored, Then the summary shows its path and character file count', async () => {
     // Arrange
     installElectronAPI(createElectronApiMock(MONITORED_DIR, 3));

@@ -297,13 +297,13 @@
     "nav": {
       "label": "Settings sections",
       "general": "General",
-      "generalDescription": "Save files, D2R installation, game mode and game version",
+      "generalDescription": "Save files, D2R installation and the setup wizard",
       "tracking": "Tracking",
-      "trackingDescription": "Holy Grail and run tracking",
+      "trackingDescription": "Game mode, game version, Holy Grail and run tracking",
       "display": "Display",
       "displayDescription": "Theme, item icons, overlay widget and notifications",
       "data": "Data",
-      "dataDescription": "Database backups and the setup wizard",
+      "dataDescription": "Database backups and restore",
       "about": "About",
       "aboutDescription": "Application updates and issue reporting"
     },
@@ -391,7 +391,15 @@
       "confirmChangeDirectory": "Are you sure you want to change the monitored save file directory?",
       "confirmRestoreDirectory": "Are you sure you want to restore the monitored directory to the default location?",
       "deleteWarning": "This action will permanently delete all characters and progress data.",
-      "backupWarning": "Make sure you have created a backup before proceeding if you want to keep your current progress.",
+      "deleteWarningCounts": "This permanently deletes {{characters}} and {{progress}} from the app.",
+      "deletedCharacters_one": "{{count}} character",
+      "deletedCharacters_other": "{{count}} characters",
+      "deletedProgress_one": "{{count}} recorded grail find",
+      "deletedProgress_other": "{{count}} recorded grail finds",
+      "backupWarning": "Back up first if you want to be able to restore your current progress later.",
+      "confirmChangeAction": "Delete progress and switch folder",
+      "confirmRestoreAction": "Delete progress and use default folder",
+      "directoryChangeHint": "Switching to a different folder deletes all characters and grail progress in the app.",
       "changing": "Changing...",
       "restoring": "Restoring...",
       "selectSaveFileDirectory": "Select Save File Directory",
@@ -421,8 +429,9 @@
       "invalidFileError": "Please select a valid database file (.db)",
       "restoreSuccess": "Database restored successfully! All data has been refreshed and is now up to date.",
       "restoreDatabase": "Restore Database",
-      "confirmRestore": "Are you sure you want to restore the database from the backup?",
-      "replaceWarning": "This action will permanently replace all current data.",
+      "confirmRestore": "Restore the database from this backup?",
+      "restoreFileLabel": "Backup file",
+      "replaceWarning": "Everything in the app is replaced with the contents of this backup, including characters, grail progress, run history, settings and vaulted items. Vaulted items are stored only in the database, so any that aren't in this backup will be lost.",
       "keepCurrentWarning": "Make sure you have created a backup of your current progress if you want to keep it.",
       "restoring": "Restoring...",
       "backupSuccess": "Database backed up",
@@ -677,7 +686,6 @@
       "complete": "Complete"
     },
     "progress": "Step {{current}} of {{total}}",
-    "progressPercent": "{{percent}}%",
     "optional": "Optional",
     "back": "Back",
     "skipSetup": "Skip Setup",
@@ -685,6 +693,7 @@
     "skipConfirm": {
       "title": "Skip setup?",
       "description": "You can run setup later from Settings.",
+      "noSaveFolderWarning": "No save folder is set up yet, so automatic tracking won't work until you choose one in Settings.",
       "confirm": "Skip Setup",
       "continue": "Continue Setup"
     },
@@ -703,7 +712,6 @@
       "skipHint": "You can skip this wizard and configure settings later, or click Next to get started."
     },
     "saveDirectory": {
-      "title": "Save File Directory",
       "description": "Select the directory where your Diablo II: Resurrected save files are located.",
       "pathLabel": "Save Directory Path",
       "placeholder": "Select your save directory...",
@@ -735,11 +743,9 @@
       "typicalLocationMac": "~/Library/Application Support/Diablo II Resurrected"
     },
     "tracking": {
-      "title": "What to Track",
       "description": "Choose which characters and items count toward your Holy Grail. The defaults suit most players, and you can change them later in Settings."
     },
     "d2rInstallation": {
-      "title": "D2R Installation Path",
       "description": "Configure the path to your Diablo II: Resurrected installation. This setting is used by both item icon management and terror zone configuration features.",
       "pathHint": "This path will be used to access game files for item icons and terror zone configuration.",
       "dialogTitle": "Select D2R Installation Directory",
@@ -803,7 +809,7 @@
       "nextStepMonitor": "The tracker will automatically monitor your save files",
       "nextStepProgress": "View your progress in the main tracker interface",
       "nextStepStatistics": "Check statistics to see your completion percentage",
-      "finishHint": "Click Finish to save your settings and start using D2R Arcane Tracker!"
+      "finishHint": "Your settings were saved as you went. Click Finish to close setup and start using D2R Arcane Tracker!"
     }
   },
   "inventoryBrowser": {

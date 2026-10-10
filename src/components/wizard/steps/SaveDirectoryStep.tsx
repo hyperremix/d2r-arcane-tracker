@@ -20,9 +20,13 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { useDatabaseBackup } from '@/hooks/useDatabaseBackup';
 import {
+  countExistingUserData,
+  hasExistingUserData,
   normalizeDirectoryForComparison,
-  type SaveDirectoryChangeAction,
+  type PendingSaveDirectoryChange,
+  type SaveDirectoryChangeRequest,
 } from '@/hooks/useSaveDirectoryChange';
 import { translations } from '@/i18n/translations';
 import { useGrailStore } from '@/stores/grailStore';
@@ -37,14 +41,6 @@ export const SAVE_DIRECTORY_STEP_ID = 'saveDirectory';
  * Delay after the last keystroke before a typed/pasted path is inspected.
  */
 export const SAVE_DIRECTORY_INSPECTION_DEBOUNCE_MS = 400;
-
-/**
- * A requested save directory change awaiting application.
- */
-interface PendingDirectoryChange {
-  action: SaveDirectoryChangeAction;
-  directory: string;
-}
 
 /**
  * Inspection outcome for a specific directory path.
@@ -83,18 +79,6 @@ function isSameDirectory(a: string, b: string): boolean {
  */
 function isUnappliedDraft(trimmedDraft: string, saveDir: string): boolean {
   return trimmedDraft !== '' && !isSameDirectory(trimmedDraft, saveDir);
-}
-
-/**
- * Checks whether the database currently holds characters or grail progress.
- * @returns {Promise<boolean>} True if any user data exists
- */
-async function hasExistingUserData(): Promise<boolean> {
-  const [characters, progress] = await Promise.all([
-    window.electronAPI?.grail.getCharacters(),
-    window.electronAPI?.grail.getProgress(),
-  ]);
-  return (characters?.length ?? 0) > 0 || (progress?.length ?? 0) > 0;
 }
 
 /**
@@ -490,9 +474,13 @@ export function SaveDirectoryStep() {
   const [saveFiles, setSaveFiles] = useState<D2SaveFile[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isApplying, setIsApplying] = useState(false);
-  const [pendingChange, setPendingChange] = useState<PendingDirectoryChange | undefined>(undefined);
+  const [pendingChange, setPendingChange] = useState<PendingSaveDirectoryChange | undefined>(
+    undefined,
+  );
   const [hasError, setHasError] = useState(false);
   const [continueAnyway, setContinueAnyway] = useState(false);
+  const [hasBackedUp, setHasBackedUp] = useState(false);
+  const { backup, isBackingUp } = useDatabaseBackup();
 
   const isBusy = isLoading || isApplying;
   const trimmedDraft = draftDir.trim();
@@ -543,7 +531,7 @@ export function SaveDirectoryStep() {
   }, []);
 
   const applyDirectoryChange = useCallback(
-    async (change: PendingDirectoryChange) => {
+    async (change: SaveDirectoryChangeRequest) => {
       setIsApplying(true);
       setHasError(false);
 
@@ -593,8 +581,9 @@ export function SaveDirectoryStep() {
   );
 
   const requestDirectoryChange = useCallback(
-    async (change: PendingDirectoryChange) => {
+    async (change: SaveDirectoryChangeRequest) => {
       setHasError(false);
+      setHasBackedUp(false);
       try {
         // `saveDir` is the directory the monitor is actually using (monitoring status), which is
         // the same effective directory (saveDir setting, else platform default) the main process
@@ -602,10 +591,14 @@ export function SaveDirectoryStep() {
         // IPCs, so a match here means main will not truncate. When the status is unknown,
         // `saveDir` falls back to '' or the stored setting, which errs toward asking for
         // confirmation.
-        if (!isSameDirectory(saveDir, change.directory) && (await hasExistingUserData())) {
-          // Require explicit confirmation before wiping existing progress
-          setPendingChange(change);
-          return;
+        if (!isSameDirectory(saveDir, change.directory)) {
+          // If the check fails, existing data is assumed so the user is asked to confirm
+          const existingData = await countExistingUserData();
+          if (hasExistingUserData(existingData)) {
+            // Require explicit confirmation before wiping existing progress
+            setPendingChange({ ...change, currentDirectory: saveDir, existingData });
+            return;
+          }
         }
 
         await applyDirectoryChange(change);
@@ -676,12 +669,18 @@ export function SaveDirectoryStep() {
 
   const handleConfirmDialogOpenChange = useCallback(
     (open: boolean) => {
-      if (!open && !isApplying) {
+      if (!open && !isApplying && !isBackingUp) {
         setPendingChange(undefined);
       }
     },
-    [isApplying],
+    [isApplying, isBackingUp],
   );
+
+  const handleBackupFirst = useCallback(async () => {
+    if (await backup()) {
+      setHasBackedUp(true);
+    }
+  }, [backup]);
 
   const handleConfirmChange = useCallback(() => {
     if (pendingChange) {
@@ -695,10 +694,7 @@ export function SaveDirectoryStep() {
 
   return (
     <div className="space-y-6">
-      <div className="space-y-2">
-        <h2 className="font-bold text-2xl">{t(translations.wizard.saveDirectory.title)}</h2>
-        <p className="text-muted-foreground">{t(translations.wizard.saveDirectory.description)}</p>
-      </div>
+      <p className="text-muted-foreground">{t(translations.wizard.saveDirectory.description)}</p>
 
       <div className="space-y-4">
         <div className="space-y-2">
@@ -791,6 +787,12 @@ export function SaveDirectoryStep() {
         action={pendingChange?.action ?? 'change'}
         isProcessing={isApplying}
         onConfirm={handleConfirmChange}
+        currentDirectory={pendingChange?.currentDirectory}
+        newDirectory={pendingChange?.directory}
+        existingData={pendingChange?.existingData}
+        onBackup={handleBackupFirst}
+        isBackingUp={isBackingUp}
+        hasBackedUp={hasBackedUp}
       />
     </div>
   );

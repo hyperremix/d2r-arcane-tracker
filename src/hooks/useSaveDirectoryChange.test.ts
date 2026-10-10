@@ -184,6 +184,7 @@ describe('useSaveDirectoryChange', () => {
         action: 'change',
         directory: OTHER,
         currentDirectory: CURRENT,
+        existingData: { characters: 1, progress: 0 },
       });
     });
 
@@ -239,6 +240,7 @@ describe('useSaveDirectoryChange', () => {
 
       // Assert
       expect(outcome).toBe('confirmationRequired');
+      expect(result.current.pendingChange?.existingData).toEqual({ characters: 0, progress: 1 });
       expect(api().saveFile.updateSaveDirectory).not.toHaveBeenCalled();
     });
 
@@ -256,6 +258,7 @@ describe('useSaveDirectoryChange', () => {
       // Assert
       expect(outcome).toBe('confirmationRequired');
       expect(result.current.pendingChange?.directory).toBe(OTHER);
+      expect(result.current.pendingChange?.existingData).toBeUndefined();
       expect(api().saveFile.updateSaveDirectory).not.toHaveBeenCalled();
     });
 

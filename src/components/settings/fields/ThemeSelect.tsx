@@ -36,17 +36,19 @@ interface ThemeSelectProps {
  */
 export function ThemeSelect({ id, value, onValueChange, triggerClassName }: ThemeSelectProps) {
   const { t } = useTranslation();
-  const labelKey = themeLabelKeys[value] as string | undefined;
+  const items = themeOptions.map(({ value: theme }) => ({
+    value: theme,
+    label: t(themeLabelKeys[theme]),
+  }));
 
   return (
     <Select
+      items={items}
       value={value}
       onValueChange={(selected) => selected && onValueChange(selected as Theme)}
     >
       <SelectTrigger id={id} className={triggerClassName}>
-        <SelectValue placeholder={t(translations.settings.theme.selectThemePlaceholder)}>
-          {labelKey ? t(labelKey) : null}
-        </SelectValue>
+        <SelectValue placeholder={t(translations.settings.theme.selectThemePlaceholder)} />
       </SelectTrigger>
       <SelectContent>
         {themeOptions.map(({ value: theme, Icon }) => (

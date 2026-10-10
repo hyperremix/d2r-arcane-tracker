@@ -1,6 +1,7 @@
+import { GameMode } from 'electron/types/grail';
 import { ArrowLeft, ArrowRight, Check, FastForward } from 'lucide-react';
 import type { ComponentType } from 'react';
-import { useCallback, useId, useMemo, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useShallow } from 'zustand/react/shallow';
 import {
@@ -74,6 +75,47 @@ export const wizardSteps: WizardStep[] = [
 ];
 
 /**
+ * Decides whether the skip confirmation should warn that no save folder is being monitored.
+ * Reads the main process's actual monitoring status each time the confirmation opens, so it
+ * reflects the configured folder rather than wizard progress or tracked characters. Nothing is
+ * claimed while the status is loading or unavailable, and Manual mode never monitors by design.
+ * @param {boolean} isConfirmOpen - Whether the skip confirmation is open
+ * @returns {boolean} True if automatic tracking cannot work because no save folder is monitored
+ */
+function useNoSaveFolderWarning(isConfirmOpen: boolean): boolean {
+  const gameMode = useGrailStore((state) => state.settings.gameMode);
+  const [isMonitoring, setIsMonitoring] = useState<boolean | undefined>(undefined);
+
+  useEffect(() => {
+    if (!isConfirmOpen) {
+      setIsMonitoring(undefined);
+      return;
+    }
+
+    let cancelled = false;
+    const loadMonitoringStatus = async () => {
+      try {
+        const status = await window.electronAPI?.saveFile.getMonitoringStatus();
+        if (!cancelled) {
+          setIsMonitoring(status?.isMonitoring);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          console.error('Failed to load monitoring status for the skip confirmation:', error);
+        }
+      }
+    };
+
+    void loadMonitoringStatus();
+    return () => {
+      cancelled = true;
+    };
+  }, [isConfirmOpen]);
+
+  return isMonitoring === false && gameMode !== GameMode.Manual;
+}
+
+/**
  * SetupWizard component - Main wizard dialog that guides users through app configuration.
  * Displays a multi-step modal with navigation controls and progress indicator.
  * @returns {JSX.Element} Setup wizard dialog
@@ -108,6 +150,7 @@ export function SetupWizard() {
   const [showSkipConfirm, setShowSkipConfirm] = useState(false);
   // Set when persisting the wizard outcome fails; the wizard then stays open so it can be retried
   const [saveFailed, setSaveFailed] = useState(false);
+  const showNoSaveFolderWarning = useNoSaveFolderWarning(showSkipConfirm);
 
   const step = wizardSteps[currentStep];
   const CurrentStepComponent = step?.component;
@@ -214,12 +257,9 @@ export function SetupWizard() {
 
         {/* Progress Indicator */}
         <div className="space-y-2">
-          <div className="flex items-center justify-between text-muted-foreground text-sm">
-            <span>
-              {t(translations.wizard.progress, { current: currentStep + 1, total: totalSteps })}
-            </span>
-            <span>{t(translations.wizard.progressPercent, { percent: Math.round(progress) })}</span>
-          </div>
+          <p className="text-muted-foreground text-sm">
+            {t(translations.wizard.progress, { current: currentStep + 1, total: totalSteps })}
+          </p>
           <Progress
             value={progress}
             className="h-2"
@@ -293,8 +333,13 @@ export function SetupWizard() {
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle>{t(translations.wizard.skipConfirm.title)}</AlertDialogTitle>
-              <AlertDialogDescription>
-                {t(translations.wizard.skipConfirm.description)}
+              <AlertDialogDescription render={<div />}>
+                {showNoSaveFolderWarning && (
+                  <p className="mb-2 font-medium text-warning">
+                    {t(translations.wizard.skipConfirm.noSaveFolderWarning)}
+                  </p>
+                )}
+                <p>{t(translations.wizard.skipConfirm.description)}</p>
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>

@@ -1,5 +1,5 @@
 import '@testing-library/jest-dom';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import {
   SaveDirectoryChangeDialog,
@@ -75,7 +75,81 @@ describe('SaveDirectoryChangeDialog', () => {
     // Assert
     expect(screen.getByRole('button', { name: 'Creating Backup...' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Cancel' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Change Directory' })).toBeDisabled();
+    expect(
+      screen.getByRole('button', { name: 'Delete progress and switch folder' }),
+    ).toBeDisabled();
+  });
+
+  it('When the change is confirmed, Then the destructive action names what it does', () => {
+    // Arrange
+    const onConfirm = vi.fn();
+    renderDialog({ onConfirm });
+
+    // Act
+    fireEvent.click(screen.getByRole('button', { name: 'Delete progress and switch folder' }));
+
+    // Assert
+    expect(onConfirm).toHaveBeenCalledTimes(1);
+  });
+
+  it('If the default directory is restored, Then the destructive action names the default folder', () => {
+    // Arrange & Act
+    renderDialog({ action: 'restore' });
+
+    // Assert
+    expect(
+      screen.getByRole('button', { name: 'Delete progress and use default folder' }),
+    ).toBeInTheDocument();
+  });
+
+  it('If the existing data is known, Then the warning states how many characters and finds are deleted', () => {
+    // Arrange & Act
+    renderDialog({ existingData: { characters: 3, progress: 1 } });
+
+    // Assert
+    expect(
+      screen.getByText(
+        'This permanently deletes 3 characters and 1 recorded grail find from the app.',
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText('This action will permanently delete all characters and progress data.'),
+    ).not.toBeInTheDocument();
+  });
+
+  it('If the existing data is unknown, Then the generic delete warning is shown', () => {
+    // Arrange & Act
+    renderDialog();
+
+    // Assert
+    expect(
+      screen.getByText('This action will permanently delete all characters and progress data.'),
+    ).toBeInTheDocument();
+  });
+
+  it('If a backup can be made, Then Back up first is focused when the dialog opens', async () => {
+    // Arrange & Act
+    renderDialog({ onBackup: vi.fn() });
+
+    // Assert
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Back up first' })).toHaveFocus(),
+    );
+  });
+
+  it('If a backup was created, Then Back up first is a secondary action instead of the primary one', () => {
+    // Arrange & Act
+    const { unmount } = renderDialog({ onBackup: vi.fn() });
+
+    // Assert
+    expect(screen.getByRole('button', { name: 'Back up first' })).toHaveClass('bg-primary');
+
+    // Act
+    unmount();
+    renderDialog({ onBackup: vi.fn(), hasBackedUp: true });
+
+    // Assert
+    expect(screen.getByRole('button', { name: 'Back up first' })).not.toHaveClass('bg-primary');
   });
 
   it('If a backup was created, then the success note is shown', () => {

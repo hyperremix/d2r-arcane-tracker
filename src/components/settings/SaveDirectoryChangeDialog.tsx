@@ -1,4 +1,5 @@
-import { AlertCircle, Download } from 'lucide-react';
+import { AlertTriangle, Download } from 'lucide-react';
+import { useId } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   AlertDialog,
@@ -11,7 +12,10 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
-import type { SaveDirectoryChangeAction } from '@/hooks/useSaveDirectoryChange';
+import type {
+  ExistingUserDataCounts,
+  SaveDirectoryChangeAction,
+} from '@/hooks/useSaveDirectoryChange';
 import { translations } from '@/i18n/translations';
 
 /**
@@ -27,6 +31,8 @@ export interface SaveDirectoryChangeDialogProps {
   currentDirectory?: string;
   /** Directory the change would switch to, shown when provided. */
   newDirectory?: string;
+  /** What the change would delete; shown as counts when provided, otherwise a generic warning. */
+  existingData?: ExistingUserDataCounts;
   /** Starts a database backup; the "Back up first" action is only shown when provided. */
   onBackup?: () => void;
   /** Whether a backup started from this dialog is in progress. */
@@ -72,9 +78,25 @@ function DirectoryChangePaths({
 }
 
 /**
+ * Returns the label of the destructive confirm button, which names what confirming does.
+ * @param {SaveDirectoryChangeAction} action - The pending change
+ * @param {boolean} isProcessing - Whether the change is being applied
+ * @returns {string} Translation key of the button label
+ */
+function getConfirmLabelKey(action: SaveDirectoryChangeAction, isProcessing: boolean): string {
+  const labels = translations.settings.saveFileMonitor;
+  if (action === 'restore') {
+    return isProcessing ? labels.restoring : labels.confirmRestoreAction;
+  }
+  return isProcessing ? labels.changing : labels.confirmChangeAction;
+}
+
+/**
  * Destructive confirmation dialog shown before changing the monitored save directory.
- * Warns that switching directories permanently deletes characters and grail progress,
- * optionally showing the current and new directory and offering to back up first.
+ * Warns that switching directories permanently deletes characters and grail progress
+ * (with counts when known), optionally showing the current and new directory. When a backup
+ * action is provided, "Back up first" is the primary, initially focused action until a backup
+ * was created; the confirm action is destructive and names what it does.
  * @param {SaveDirectoryChangeDialogProps} props - Dialog state and callbacks
  * @returns {JSX.Element} An alert dialog asking the user to confirm the directory change
  */
@@ -86,28 +108,39 @@ export function SaveDirectoryChangeDialog({
   onConfirm,
   currentDirectory,
   newDirectory,
+  existingData,
   onBackup,
   isBackingUp = false,
   hasBackedUp = false,
 }: SaveDirectoryChangeDialogProps) {
   const { t } = useTranslation();
+  const backupButtonId = useId();
   const isRestore = action === 'restore';
   const isBusy = isProcessing || isBackingUp;
+  const isBackupSuggested = onBackup !== undefined && !hasBackedUp;
 
-  const confirmLabel = isProcessing
-    ? isRestore
-      ? t(translations.settings.saveFileMonitor.restoring)
-      : t(translations.settings.saveFileMonitor.changing)
-    : isRestore
-      ? t(translations.settings.saveFileMonitor.restoreDefault)
-      : t(translations.settings.saveFileMonitor.changeDirectory);
+  const deleteWarning = existingData
+    ? t(translations.settings.saveFileMonitor.deleteWarningCounts, {
+        characters: t(translations.settings.saveFileMonitor.deletedCharacters, {
+          count: existingData.characters,
+        }),
+        progress: t(translations.settings.saveFileMonitor.deletedProgress, {
+          count: existingData.progress,
+        }),
+      })
+    : t(translations.settings.saveFileMonitor.deleteWarning);
 
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
-      <AlertDialogContent>
+      <AlertDialogContent
+        // Focus the safe "Back up first" path instead of the first button
+        initialFocus={
+          isBackupSuggested ? () => document.getElementById(backupButtonId) ?? true : undefined
+        }
+      >
         <AlertDialogHeader>
           <AlertDialogTitle className="flex items-center gap-2">
-            <AlertCircle className="h-5 w-5 text-warning" />
+            <AlertTriangle className="h-5 w-5 text-destructive" aria-hidden="true" />
             {isRestore
               ? t(translations.settings.saveFileMonitor.restoreDefaultDirectory)
               : t(translations.settings.saveFileMonitor.changeSaveFileDirectory)}
@@ -118,9 +151,7 @@ export function SaveDirectoryChangeDialog({
                 ? t(translations.settings.saveFileMonitor.confirmRestoreDirectory)
                 : t(translations.settings.saveFileMonitor.confirmChangeDirectory)}
             </span>
-            <span className="mb-2 block font-medium text-warning">
-              {t(translations.settings.saveFileMonitor.deleteWarning)}
-            </span>
+            <span className="mb-2 block font-medium text-destructive">{deleteWarning}</span>
             <span className="block text-sm">
               {t(translations.settings.saveFileMonitor.backupWarning)}
             </span>
@@ -140,7 +171,13 @@ export function SaveDirectoryChangeDialog({
         <AlertDialogFooter>
           <AlertDialogCancel disabled={isBusy}>{t(translations.common.cancel)}</AlertDialogCancel>
           {onBackup && (
-            <Button variant="outline" onClick={onBackup} disabled={isBusy} className="gap-2">
+            <Button
+              id={backupButtonId}
+              variant={isBackupSuggested ? 'default' : 'outline'}
+              onClick={onBackup}
+              disabled={isBusy}
+              className="gap-2"
+            >
               <Download className="h-3 w-3" />
               {isBackingUp
                 ? t(translations.settings.database.creatingBackup)
@@ -148,7 +185,7 @@ export function SaveDirectoryChangeDialog({
             </Button>
           )}
           <AlertDialogAction onClick={onConfirm} disabled={isBusy} variant="destructive">
-            {confirmLabel}
+            {t(getConfirmLabelKey(action, isProcessing))}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

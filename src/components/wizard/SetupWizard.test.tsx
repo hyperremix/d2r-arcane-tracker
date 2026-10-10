@@ -1,5 +1,6 @@
 import '@testing-library/jest-dom';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { GameMode } from 'electron/types/grail';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useGrailStore } from '@/stores/grailStore';
 import { useWizardStore } from '@/stores/wizardStore';
@@ -39,6 +40,7 @@ describe('SetupWizard', () => {
     vi.clearAllMocks();
     mockStoreState(mockUseGrailStore, {
       setSettings: vi.fn().mockResolvedValue({ success: true }),
+      settings: { gameMode: GameMode.Both },
     } as unknown as ReturnType<typeof useGrailStore>);
     useWizardStore.setState({ isOpen: false, currentStep: 0, stepValidity: {} });
   });
@@ -58,6 +60,7 @@ describe('SetupWizard', () => {
     expect(wizardSteps).toHaveLength(6);
     expect(useWizardStore.getState().totalSteps).toBe(wizardSteps.length);
     expect(screen.getByText('Step 1 of 6')).toBeInTheDocument();
+    expect(screen.queryByText('17%')).not.toBeInTheDocument();
     expect(screen.getByText('WelcomeContent')).toBeInTheDocument();
   });
 
@@ -197,9 +200,10 @@ describe('When SetupWizard is open', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     setSettings = vi.fn().mockResolvedValue({ success: true });
-    mockStoreState(mockUseGrailStore, { setSettings } as unknown as ReturnType<
-      typeof useGrailStore
-    >);
+    mockStoreState(mockUseGrailStore, {
+      setSettings,
+      settings: { gameMode: GameMode.Both },
+    } as unknown as ReturnType<typeof useGrailStore>);
     openWizardAt(0);
   });
 
@@ -374,6 +378,221 @@ describe('When SetupWizard is open', () => {
       await waitFor(() => expect(useWizardStore.getState().isOpen).toBe(false));
       expect(setSettings).toHaveBeenCalledTimes(2);
       expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    });
+  });
+
+  describe('When the user skips setup', () => {
+    const noSaveFolderWarning =
+      "No save folder is set up yet, so automatic tracking won't work until you choose one in Settings.";
+
+    /**
+     * Installs the monitoring status the main process would report.
+     */
+    function installMonitoringStatus(getMonitoringStatus: ReturnType<typeof vi.fn>): void {
+      (window as unknown as { electronAPI: unknown }).electronAPI = {
+        saveFile: { getMonitoringStatus },
+      };
+    }
+
+    /**
+     * Opens the skip confirmation and waits until the monitoring status request has settled.
+     */
+    async function openSkipConfirmation(
+      getMonitoringStatus: ReturnType<typeof vi.fn>,
+    ): Promise<HTMLElement> {
+      const wizard = await screen.findByRole('dialog');
+      fireEvent.click(within(wizard).getByRole('button', { name: 'Skip Setup' }));
+      const confirm = await screen.findByRole('alertdialog');
+      await waitFor(() => expect(getMonitoringStatus).toHaveBeenCalledTimes(1));
+      await act(async () => {
+        await Promise.resolve();
+      });
+      return confirm;
+    }
+
+    let originalElectronAPI: unknown;
+
+    beforeEach(() => {
+      originalElectronAPI = window.electronAPI;
+      vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    });
+
+    afterEach(() => {
+      vi.restoreAllMocks();
+      (window as unknown as { electronAPI: unknown }).electronAPI = originalElectronAPI;
+    });
+
+    it('If no save folder is being monitored, Then the confirmation warns that automatic tracking will not work', async () => {
+      // Arrange
+      const getMonitoringStatus = vi
+        .fn()
+        .mockResolvedValue({ isMonitoring: false, directory: '/missing/dir' });
+      installMonitoringStatus(getMonitoringStatus);
+      render(<SetupWizard />);
+
+      // Act
+      const confirm = await openSkipConfirmation(getMonitoringStatus);
+
+      // Assert
+      expect(within(confirm).getByText(noSaveFolderWarning)).toBeVisible();
+    });
+
+    it('If the wizard is reopened with a monitored folder that has no characters yet, Then the warning is not shown', async () => {
+      // Arrange
+      const getMonitoringStatus = vi
+        .fn()
+        .mockResolvedValue({ isMonitoring: true, directory: '/saves' });
+      installMonitoringStatus(getMonitoringStatus);
+      openWizardAt(0, {});
+      render(<SetupWizard />);
+
+      // Act
+      const confirm = await openSkipConfirmation(getMonitoringStatus);
+
+      // Assert
+      expect(within(confirm).queryByText(noSaveFolderWarning)).not.toBeInTheDocument();
+      expect(within(confirm).getByText('You can run setup later from Settings.')).toBeVisible();
+    });
+
+    it('If characters are still tracked but the folder is no longer monitored, Then the warning is shown', async () => {
+      // Arrange
+      const getMonitoringStatus = vi
+        .fn()
+        .mockResolvedValue({ isMonitoring: false, directory: '/gone' });
+      installMonitoringStatus(getMonitoringStatus);
+      mockStoreState(mockUseGrailStore, {
+        setSettings,
+        characters: [{ id: 'char-1' }],
+        settings: { gameMode: GameMode.Both },
+      } as unknown as ReturnType<typeof useGrailStore>);
+      render(<SetupWizard />);
+
+      // Act
+      const confirm = await openSkipConfirmation(getMonitoringStatus);
+
+      // Assert
+      expect(within(confirm).getByText(noSaveFolderWarning)).toBeVisible();
+    });
+
+    it('If the save folder step reports itself not valid yet but the folder is monitored, Then the warning is not shown', async () => {
+      // Arrange
+      const getMonitoringStatus = vi
+        .fn()
+        .mockResolvedValue({ isMonitoring: true, directory: '/saves' });
+      installMonitoringStatus(getMonitoringStatus);
+      openWizardAt(1, { saveDirectory: false });
+      render(<SetupWizard />);
+
+      // Act
+      const confirm = await openSkipConfirmation(getMonitoringStatus);
+
+      // Assert
+      expect(within(confirm).queryByText(noSaveFolderWarning)).not.toBeInTheDocument();
+    });
+
+    it('If the save folder step reports a valid folder that is not monitored, Then the warning is shown', async () => {
+      // Arrange
+      const getMonitoringStatus = vi
+        .fn()
+        .mockResolvedValue({ isMonitoring: false, directory: '/saves' });
+      installMonitoringStatus(getMonitoringStatus);
+      openWizardAt(2, { saveDirectory: true });
+      render(<SetupWizard />);
+
+      // Act
+      const confirm = await openSkipConfirmation(getMonitoringStatus);
+
+      // Assert
+      expect(within(confirm).getByText(noSaveFolderWarning)).toBeVisible();
+    });
+
+    it('If the monitoring status is still loading, Then no warning is shown until it resolves', async () => {
+      // Arrange
+      let resolveStatus: (status: { isMonitoring: boolean; directory: string }) => void = () =>
+        undefined;
+      const getMonitoringStatus = vi.fn().mockReturnValue(
+        new Promise((resolve) => {
+          resolveStatus = resolve;
+        }),
+      );
+      installMonitoringStatus(getMonitoringStatus);
+      render(<SetupWizard />);
+      const wizard = await screen.findByRole('dialog');
+
+      // Act
+      fireEvent.click(within(wizard).getByRole('button', { name: 'Skip Setup' }));
+      const confirm = await screen.findByRole('alertdialog');
+
+      // Assert
+      expect(within(confirm).queryByText(noSaveFolderWarning)).not.toBeInTheDocument();
+
+      // Act
+      await act(async () => {
+        resolveStatus({ isMonitoring: false, directory: '/missing/dir' });
+      });
+
+      // Assert
+      expect(await within(confirm).findByText(noSaveFolderWarning)).toBeVisible();
+    });
+
+    it('If the monitoring status cannot be read, Then no warning is shown', async () => {
+      // Arrange
+      const getMonitoringStatus = vi.fn().mockRejectedValue(new Error('ipc failed'));
+      installMonitoringStatus(getMonitoringStatus);
+      render(<SetupWizard />);
+
+      // Act
+      const confirm = await openSkipConfirmation(getMonitoringStatus);
+
+      // Assert
+      expect(within(confirm).queryByText(noSaveFolderWarning)).not.toBeInTheDocument();
+    });
+
+    it('If the monitoring status fails after the confirmation is closed, Then the error is not logged', async () => {
+      // Arrange
+      let rejectStatus: (error: Error) => void = () => undefined;
+      const getMonitoringStatus = vi.fn().mockReturnValue(
+        new Promise((_resolve, reject) => {
+          rejectStatus = reject;
+        }),
+      );
+      installMonitoringStatus(getMonitoringStatus);
+      const { unmount } = render(<SetupWizard />);
+      const wizard = await screen.findByRole('dialog');
+      fireEvent.click(within(wizard).getByRole('button', { name: 'Skip Setup' }));
+      await screen.findByRole('alertdialog');
+      await waitFor(() => expect(getMonitoringStatus).toHaveBeenCalledTimes(1));
+
+      // Act
+      unmount();
+      await act(async () => {
+        rejectStatus(new Error('ipc failed'));
+      });
+
+      // Assert
+      expect(console.error).not.toHaveBeenCalledWith(
+        expect.stringContaining('Failed to load monitoring status'),
+        expect.anything(),
+      );
+    });
+
+    it('If the game mode is Manual, Then no warning is shown because nothing is monitored on purpose', async () => {
+      // Arrange
+      const getMonitoringStatus = vi
+        .fn()
+        .mockResolvedValue({ isMonitoring: false, directory: '/saves' });
+      installMonitoringStatus(getMonitoringStatus);
+      mockStoreState(mockUseGrailStore, {
+        setSettings,
+        settings: { gameMode: GameMode.Manual },
+      } as unknown as ReturnType<typeof useGrailStore>);
+      render(<SetupWizard />);
+
+      // Act
+      const confirm = await openSkipConfirmation(getMonitoringStatus);
+
+      // Assert
+      expect(within(confirm).queryByText(noSaveFolderWarning)).not.toBeInTheDocument();
     });
   });
 

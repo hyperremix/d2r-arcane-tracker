@@ -16,11 +16,21 @@ export interface SaveDirectoryChangeRequest {
 }
 
 /**
+ * Number of characters and grail progress entries a save directory change would delete.
+ */
+export interface ExistingUserDataCounts {
+  characters: number;
+  progress: number;
+}
+
+/**
  * A change awaiting confirmation, with the directory it would switch away from.
  */
 export interface PendingSaveDirectoryChange extends SaveDirectoryChangeRequest {
   /** The directory that was being monitored when the change was requested, if known. */
   currentDirectory: string | undefined;
+  /** What the change would delete, or undefined if it could not be determined. */
+  existingData?: ExistingUserDataCounts;
 }
 
 /**
@@ -74,21 +84,30 @@ export function normalizeDirectoryForComparison(directory: string): string {
 }
 
 /**
- * Checks whether the database currently holds characters or grail progress.
- * If the check fails, existing data is assumed so the user is asked to confirm.
- * @returns {Promise<boolean>} True if any user data exists (or it cannot be determined)
+ * Counts the characters and grail progress entries currently in the database.
+ * @returns {Promise<ExistingUserDataCounts | undefined>} The counts, or undefined if the check failed
  */
-async function hasExistingUserData(): Promise<boolean> {
+export async function countExistingUserData(): Promise<ExistingUserDataCounts | undefined> {
   try {
     const [characters, progress] = await Promise.all([
       window.electronAPI?.grail.getCharacters(),
       window.electronAPI?.grail.getProgress(),
     ]);
-    return (characters?.length ?? 0) > 0 || (progress?.length ?? 0) > 0;
+    return { characters: characters?.length ?? 0, progress: progress?.length ?? 0 };
   } catch (error) {
     console.error('Failed to check for existing user data:', error);
-    return true;
+    return undefined;
   }
+}
+
+/**
+ * Checks whether a directory change would delete characters or grail progress.
+ * If the counts could not be determined, existing data is assumed so the user is asked to confirm.
+ * @param {ExistingUserDataCounts | undefined} existingData - Counts from {@link countExistingUserData}
+ * @returns {boolean} True if user data exists or its presence is unknown
+ */
+export function hasExistingUserData(existingData: ExistingUserDataCounts | undefined): boolean {
+  return !existingData || existingData.characters > 0 || existingData.progress > 0;
 }
 
 /**
@@ -175,9 +194,10 @@ export function useSaveDirectoryChange({
         return 'unchanged';
       }
 
-      if (await hasExistingUserData()) {
+      const existingData = await countExistingUserData();
+      if (hasExistingUserData(existingData)) {
         // Require explicit confirmation before wiping existing progress
-        setPendingChange({ ...change, currentDirectory: resolvedDirectory });
+        setPendingChange({ ...change, currentDirectory: resolvedDirectory, existingData });
         return 'confirmationRequired';
       }
 
