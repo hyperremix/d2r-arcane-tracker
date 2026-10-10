@@ -136,6 +136,32 @@ describe('SessionCard', () => {
     });
   });
 
+  describe('If the session has a run in progress', () => {
+    it('Then the Archive Session button is disabled and explains that the run must end first', () => {
+      // Arrange
+      const activeRun: Run = {
+        id: 'run-1',
+        sessionId: 'session-1',
+        runNumber: 1,
+        startTime: new Date('2024-01-01T10:10:00Z'),
+        created: new Date('2024-01-01T10:10:00Z'),
+        lastUpdated: new Date('2024-01-01T10:10:00Z'),
+      };
+      mockStoreState(mockUseRunTrackerStore, createStoreState({ activeRun }));
+
+      // Act
+      render(<SessionCard session={mockSession} />);
+
+      // Assert
+      const archiveButton = screen.getByRole('button', { name: 'Archive Session' });
+      expect(archiveButton).toBeDisabled();
+      expect(archiveButton).toHaveAttribute(
+        'title',
+        'End the current run before archiving the session',
+      );
+    });
+  });
+
   describe('If no session is active', () => {
     it('Then the card renders nothing because starting a session lives in the session controls', () => {
       // Arrange
@@ -179,6 +205,37 @@ describe('SessionCard', () => {
       // Assert
       expect(screen.getByText('50.0%')).toBeInTheDocument();
       expect(screen.getByText('20m')).toBeInTheDocument();
+    });
+
+    it('If the run in progress is paused, Then its paused time does not count towards efficiency', () => {
+      // Arrange
+      vi.useFakeTimers({ toFake: ['Date'] });
+      vi.setSystemTime(new Date('2024-01-01T10:20:00Z'));
+      const freshSession: Session = {
+        ...mockSession,
+        totalRunTime: 0,
+        totalSessionTime: 0,
+        runCount: 1,
+      };
+      const pausedRun: Run = {
+        id: 'run-1',
+        sessionId: 'session-1',
+        runNumber: 1,
+        startTime: new Date('2024-01-01T10:10:00Z'),
+        pausedAt: new Date('2024-01-01T10:15:00Z'),
+        created: new Date('2024-01-01T10:10:00Z'),
+        lastUpdated: new Date('2024-01-01T10:10:00Z'),
+      };
+      mockStoreState(
+        mockUseRunTrackerStore,
+        createStoreState({ activeSession: freshSession, activeRun: pausedRun }),
+      );
+
+      // Act
+      render(<SessionCard session={freshSession} />);
+
+      // Assert: 5 of 20 minutes were spent running
+      expect(screen.getByText('25.0%')).toBeInTheDocument();
     });
 
     it('If runs have finished, Then efficiency uses the live session time instead of the last backend snapshot', () => {

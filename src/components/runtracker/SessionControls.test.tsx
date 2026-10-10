@@ -1,5 +1,6 @@
 import '@testing-library/jest-dom';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { toast } from 'sonner';
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useGrailStore } from '@/stores/grailStore';
 import { useRunTrackerStore } from '@/stores/runTrackerStore';
@@ -7,6 +8,7 @@ import { mockStoreState } from '@/test/storeMock';
 import { SessionControls } from './SessionControls';
 
 // Mock the stores
+vi.mock('sonner', () => import('@/test/sonnerMock'));
 vi.mock('@/stores/runTrackerStore');
 vi.mock('@/stores/grailStore');
 
@@ -193,7 +195,32 @@ describe('SessionControls', () => {
       // Assert
       expect(screen.getByRole('status')).toHaveTextContent('Idle');
       expect(screen.getByText('No run in progress')).toBeInTheDocument();
-      expect(screen.getByText('0:00')).toBeInTheDocument();
+      // The idle timer uses the full muted color, not a faded one, to keep a readable contrast
+      expect(screen.getByText('0:00')).toHaveClass('text-muted-foreground');
+      expect(screen.getByText('0:00')).not.toHaveClass('text-muted-foreground/60');
+    });
+
+    it('When the run is paused, Then the timer stays frozen at the time it was paused', () => {
+      // Arrange
+      vi.useFakeTimers({ toFake: ['Date'] });
+      vi.setSystemTime(new Date('2024-01-01T00:12:34Z'));
+      mockStoreState(mockUseRunTrackerStore, {
+        ...defaultStoreState,
+        activeSession: mockSession,
+        activeRun: { ...mockRun, runNumber: 7, pausedAt: new Date('2024-01-01T00:02:05Z') },
+        isPaused: true,
+      });
+
+      try {
+        // Act
+        render(<SessionControls />);
+
+        // Assert
+        expect(screen.getByText('2:05')).toHaveClass('text-warning');
+        expect(screen.queryByText('12:34')).not.toBeInTheDocument();
+      } finally {
+        vi.useRealTimers();
+      }
     });
 
     it('When a run is active, Then the large timer shows its elapsed time outside the live region', () => {
@@ -420,20 +447,41 @@ describe('SessionControls', () => {
       expect(mockStoreActions.resumeRun).toHaveBeenCalled();
     });
 
-    it('opens end run dialog when end run button is clicked', () => {
+    it('When End Run is clicked, Then the run ends right away and a success toast is shown', async () => {
+      // Arrange
+      mockStoreActions.endRun.mockResolvedValue(true);
       mockStoreState(mockUseRunTrackerStore, {
         ...defaultStoreState,
         activeSession: mockSession,
-        activeRun: mockRun,
+        activeRun: { ...mockRun, runNumber: 3 },
       });
-
       render(<SessionControls />);
 
-      const endRunButton = screen.getByText('End Run');
-      fireEvent.click(endRunButton);
+      // Act
+      fireEvent.click(screen.getByRole('button', { name: 'End Run' }));
 
-      // Dialog might not render in test environment, so just verify button click works
-      expect(endRunButton).toBeDefined();
+      // Assert
+      expect(mockStoreActions.endRun).toHaveBeenCalledTimes(1);
+      expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+      await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Run #3 ended'));
+    });
+
+    it('If ending the run fails, Then no success toast is shown', async () => {
+      // Arrange
+      mockStoreActions.endRun.mockResolvedValue(false);
+      mockStoreState(mockUseRunTrackerStore, {
+        ...defaultStoreState,
+        activeSession: mockSession,
+        activeRun: { ...mockRun, runNumber: 3 },
+      });
+      render(<SessionControls />);
+
+      // Act
+      fireEvent.click(screen.getByRole('button', { name: 'End Run' }));
+
+      // Assert
+      await waitFor(() => expect(mockStoreActions.endRun).toHaveBeenCalledTimes(1));
+      expect(toast.success).not.toHaveBeenCalled();
     });
 
     it('opens end session dialog when end session button is clicked', () => {
@@ -660,7 +708,7 @@ describe('SessionControls', () => {
       expect(mockStoreActions.resumeRun).toHaveBeenCalled();
     });
 
-    it('triggers end run dialog on Ctrl+E', () => {
+    it('When Ctrl+E is pressed, Then the run ends right away without a confirmation', () => {
       mockStoreState(mockUseRunTrackerStore, {
         ...defaultStoreState,
         activeSession: mockSession,
@@ -680,10 +728,12 @@ describe('SessionControls', () => {
       });
       Object.defineProperty(event, 'target', { value: document.body });
 
-      keyboardHandler(event);
+      act(() => {
+        keyboardHandler(event);
+      });
 
-      // Verify the keyboard handler was called (dialog might not render in test environment)
-      expect(keyboardHandler).toBeDefined();
+      expect(mockStoreActions.endRun).toHaveBeenCalledTimes(1);
+      expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
     });
 
     it('triggers end session dialog on Ctrl+Shift+E', () => {
@@ -883,7 +933,7 @@ describe('SessionControls', () => {
 
       // Assert
       expect(mockStoreActions.pauseRun).not.toHaveBeenCalled();
-      expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+      expect(mockStoreActions.endRun).not.toHaveBeenCalled();
     });
 
     it('If auto mode is enabled, Then the end session shortcut still opens the confirmation', async () => {
@@ -1103,6 +1153,22 @@ describe('SessionControls', () => {
       expect(screen.queryByText('Runs are tracked automatically')).not.toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Start Run' })).toBeEnabled();
       expect(screen.getByRole('switch')).toBeInTheDocument();
+    });
+
+    it('When the Auto Mode switch is shown, Then it is named by its visible label', async () => {
+      // Arrange
+      setUnavailableMemoryReading();
+      mockStoreState(mockUseRunTrackerStore, { ...defaultStoreState, activeSession: mockSession });
+
+      // Act
+      render(<SessionControls />);
+      await waitFor(() => {
+        expect(window.electronAPI?.runTracker.getMemoryStatus).toHaveBeenCalled();
+      });
+
+      // Assert
+      const autoModeSwitch = screen.getByRole('switch', { name: 'Auto Mode' });
+      expect(autoModeSwitch).toHaveAccessibleDescription('(Memory Reading)');
     });
   });
 

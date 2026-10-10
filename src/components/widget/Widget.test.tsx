@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import type {
   GrailProgress,
   GrailStatistics,
@@ -13,7 +13,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useRunTrackerStore } from '@/stores/runTrackerStore';
 import { Widget } from './Widget';
 
-const widgetTestState = vi.hoisted(() => ({ hideSession: false }));
+const widgetTestState = vi.hoisted(() => ({
+  hideSession: false,
+  activeRun: null as Run | null,
+  isPaused: false,
+}));
 
 // Minimal mocks for zustand stores used by Widget
 vi.mock('@/stores/runTrackerStore', () => {
@@ -74,7 +78,8 @@ vi.mock('@/stores/runTrackerStore', () => {
   const loadRunItems = vi.fn();
 
   const getState = () => ({
-    activeRun: null,
+    activeRun: widgetTestState.activeRun,
+    isPaused: widgetTestState.isPaused,
     activeSession: widgetTestState.hideSession ? null : session,
     sessions: [],
     runs,
@@ -337,6 +342,73 @@ describe('Widget run-only item list', () => {
   });
 });
 
+describe('When the run-only widget shows the current run', () => {
+  const settings: Partial<Settings> = { widgetDisplay: 'run-only', widgetRunOnlyShowItems: false };
+  const runStart = new Date('2024-01-01T10:00:00Z');
+  const makeRun = (overrides: Partial<Run> = {}): Run => ({
+    id: 'run-3',
+    sessionId: 'session-1',
+    runNumber: 3,
+    startTime: runStart,
+    created: runStart,
+    lastUpdated: runStart,
+    ...overrides,
+  });
+
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2024-01-01T10:01:05Z'));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    widgetTestState.activeRun = null;
+    widgetTestState.isPaused = false;
+  });
+
+  it('If a run is in progress, Then its clock-formatted time is the dominant element with a running state', () => {
+    // Arrange
+    widgetTestState.activeRun = makeRun();
+
+    // Act
+    render(<Widget statistics={null} settings={settings} />);
+
+    // Assert
+    const timer = screen.getByText('1:05');
+    expect(timer).toHaveClass('tabular-nums', 'text-4xl');
+    const state = screen.getByTestId('widget-run-state');
+    expect(state).toHaveAttribute('data-state', 'running');
+    expect(within(state).getByText('Running')).toBeInTheDocument();
+    expect(screen.getByText('Run #3')).toBeInTheDocument();
+  });
+
+  it('If the run is paused, Then the timer is frozen at the pause and the paused state is shown', () => {
+    // Arrange
+    widgetTestState.activeRun = makeRun({ pausedAt: new Date('2024-01-01T10:00:30Z') });
+    widgetTestState.isPaused = true;
+
+    // Act
+    render(<Widget statistics={null} settings={settings} />);
+
+    // Assert
+    expect(screen.getByText('0:30')).toBeInTheDocument();
+    expect(screen.queryByText('1:05')).not.toBeInTheDocument();
+    expect(screen.getByTestId('widget-run-state')).toHaveAttribute('data-state', 'paused');
+  });
+
+  it('If no run is in progress, Then the timer shows zero and the idle state', () => {
+    // Arrange
+    widgetTestState.activeRun = null;
+
+    // Act
+    render(<Widget statistics={null} settings={settings} />);
+
+    // Assert
+    expect(screen.getByText('0:00')).toBeInTheDocument();
+    expect(screen.getByTestId('widget-run-state')).toHaveAttribute('data-state', 'idle');
+  });
+});
+
 describe('Widget display and legibility', () => {
   const statistics: GrailStatistics = {
     totalItems: 100,
@@ -491,13 +563,15 @@ describe('Widget localization', () => {
         grail: { itemCard: { normal: 'tr:normal' } },
         settings: { widget: { overall: 'tr:overall' } },
         runTracker: {
-          controls: { startRunFirst: 'tr:startRunFirst' },
-          sessionCard: { noActiveSession: 'tr:noActiveSession' },
+          controls: { startRunFirst: 'tr:startRunFirst', idle: 'tr:idle' },
+          sessionCard: {
+            noActiveSession: 'tr:noActiveSession',
+            runNumber: 'tr:runNumber {{number}}',
+          },
         },
         widget: {
           ethereal: 'tr:ethereal',
           startSessionPrompt: 'tr:startSessionPrompt',
-          run: 'tr:run',
           current: 'tr:current',
           fastest: 'tr:fastest',
           average: 'tr:average',
@@ -551,7 +625,8 @@ describe('Widget localization', () => {
     );
 
     // Assert
-    expect(getByText('tr:run')).toBeDefined();
+    expect(getByText('tr:idle')).toBeDefined();
+    expect(getByText('tr:runNumber 2')).toBeDefined();
     expect(getByText('tr:current')).toBeDefined();
     expect(getByText('tr:fastest')).toBeDefined();
     expect(getByText('tr:average')).toBeDefined();

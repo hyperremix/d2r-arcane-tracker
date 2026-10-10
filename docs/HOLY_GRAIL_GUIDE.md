@@ -168,7 +168,7 @@ If a background task fails, for example a save file can't be read or a database 
 - **Overall**: total progress.
 - **Split**: normal and ethereal progress. Requires ethereal tracking.
 - **All**: all three gauges. Requires ethereal tracking.
-- **Run Only**: the current run counter, and optionally a list of items found in this run. Turning the item list on or off switches the widget to the matching default height.
+- **Run Only**: a large timer for the current run with its number and whether it's running, paused or idle, the session's fastest and average run, and optionally a list of items found in this session's runs. Turning the item list on or off switches the widget to the matching default height.
 
 The progress gauges show the same numbers as the progress summary on the Holy Grail page. Only the versions you track count towards the totals: with **Include Ethereal Items** off there is no ethereal total, and with **Include Normal Items** off there is no normal total. The normal and ethereal split in the progress summary is only shown while both versions are tracked.
 

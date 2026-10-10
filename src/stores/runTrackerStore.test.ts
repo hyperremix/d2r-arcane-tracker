@@ -676,7 +676,7 @@ describe('runTrackerStore loading and error state', () => {
       );
 
       // Act
-      let endRunPromise: Promise<void> = Promise.resolve();
+      let endRunPromise: Promise<boolean> = Promise.resolve(true);
       act(() => {
         endRunPromise = useRunTrackerStore.getState().endRun();
       });
@@ -999,6 +999,82 @@ describe('When session notes are updated', () => {
   });
 });
 
+describe('When the user pauses, resumes and ends a run', () => {
+  const run: Run = {
+    id: 'run-clock',
+    sessionId: 'session-clock',
+    runNumber: 1,
+    startTime: new Date('2024-01-01T10:00:00Z'),
+    created: new Date('2024-01-01T10:00:00Z'),
+    lastUpdated: new Date('2024-01-01T10:00:00Z'),
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.useFakeTimers({ toFake: ['Date'] });
+    useRunTrackerStore.setState({ activeRun: run, isPaused: false, error: null });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('If the run is paused, Then its current duration stays frozen until it is resumed', async () => {
+    // Arrange
+    mockElectronAPI.runTracker.pauseRun.mockResolvedValue({ success: true });
+    mockElectronAPI.runTracker.resumeRun.mockResolvedValue({ success: true });
+    vi.setSystemTime(new Date('2024-01-01T10:02:00Z'));
+
+    // Act
+    await act(async () => {
+      await useRunTrackerStore.getState().pauseRun();
+    });
+    vi.setSystemTime(new Date('2024-01-01T10:10:00Z'));
+    const pausedDuration = useRunTrackerStore.getState().getCurrentRunDuration();
+    await act(async () => {
+      await useRunTrackerStore.getState().resumeRun();
+    });
+    vi.setSystemTime(new Date('2024-01-01T10:11:00Z'));
+    const resumedDuration = useRunTrackerStore.getState().getCurrentRunDuration();
+
+    // Assert
+    expect(pausedDuration).toBe(2 * 60_000);
+    expect(resumedDuration).toBe(3 * 60_000);
+    expect(useRunTrackerStore.getState().isPaused).toBe(false);
+  });
+
+  it('If ending the run succeeds, Then endRun reports success', async () => {
+    // Arrange
+    mockElectronAPI.runTracker.endRun.mockResolvedValue({ success: true });
+
+    // Act
+    let ended = false;
+    await act(async () => {
+      ended = await useRunTrackerStore.getState().endRun();
+    });
+
+    // Assert
+    expect(ended).toBe(true);
+    expect(useRunTrackerStore.getState().activeRun).toBeNull();
+  });
+
+  it('If ending the run fails, Then endRun reports failure and the run stays active', async () => {
+    // Arrange
+    mockElectronAPI.runTracker.endRun.mockRejectedValue(new Error('IPC failed'));
+
+    // Act
+    let ended = true;
+    await act(async () => {
+      ended = await useRunTrackerStore.getState().endRun();
+    });
+
+    // Assert
+    expect(ended).toBe(false);
+    expect(useRunTrackerStore.getState().activeRun).toEqual(run);
+    expect(useRunTrackerStore.getState().error).toEqual({ code: 'endRunFailed' });
+  });
+});
+
 describe('When the run tracker sync is started', () => {
   const session: Session = {
     id: 'session-sync',
@@ -1069,15 +1145,19 @@ describe('When the run tracker sync is started', () => {
     expect(state().activeRun).toEqual(run);
     expect(state().runs.get(session.id)).toEqual([run]);
 
+    const pausedRun: Run = { ...run, pausedAt: new Date('2024-01-01T10:02:00Z') };
     act(() => {
-      mainEvents.emit('run-tracker:run-paused', { session });
+      mainEvents.emit('run-tracker:run-paused', { run: pausedRun, session });
     });
     expect(state().isPaused).toBe(true);
+    expect(state().activeRun).toEqual(pausedRun);
 
+    const resumedRun: Run = { ...run, pausedDuration: 30_000 };
     act(() => {
-      mainEvents.emit('run-tracker:run-resumed', { session });
+      mainEvents.emit('run-tracker:run-resumed', { run: resumedRun, session });
     });
     expect(state().isPaused).toBe(false);
+    expect(state().activeRun).toEqual(resumedRun);
 
     await act(async () => {
       mainEvents.emit('run-tracker:run-ended', { run, session });

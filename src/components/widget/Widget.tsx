@@ -8,6 +8,7 @@ import type {
   SessionStats,
   Settings,
 } from 'electron/types/grail';
+import { getRunElapsedMs } from 'electron/utils/runClock';
 import { GripHorizontal } from 'lucide-react';
 import type { ComponentProps, CSSProperties } from 'react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -16,8 +17,9 @@ import { useShallow } from 'zustand/react/shallow';
 import { ProgressGauge } from '@/components/grail/ProgressGauge';
 import { Input } from '@/components/ui/input';
 import { translations } from '@/i18n/translations';
-import { formatDuration } from '@/lib/date';
+import { formatClockDuration, formatDuration } from '@/lib/date';
 import { createRunItemLookup, resolveRunItem } from '@/lib/runItems';
+import { cn } from '@/lib/utils';
 import { clampWidgetOpacity, resolveWidgetDisplayMode } from '@/lib/widget';
 import { useGrailStore } from '@/stores/grailStore';
 import { useRunTrackerStore, useSessionStats } from '@/stores/runTrackerStore';
@@ -46,6 +48,9 @@ const NO_DRAG_STYLE: WidgetRootStyle = { WebkitAppRegion: 'no-drag' };
  */
 interface RunOnlyDisplayProps {
   activeSession: Session | null;
+  /** Number of the in-progress run, if any. */
+  activeRunNumber: number | undefined;
+  isPaused: boolean;
   runDuration: number;
   sessionStats: SessionStats | undefined;
   runItemsByRun: RunItemsByRun[];
@@ -136,6 +141,32 @@ function WidgetDragGrip() {
   );
 }
 
+/** State of the current run shown by the run-only widget. */
+type WidgetRunState = 'running' | 'paused' | 'idle';
+
+/**
+ * Indicator dot colors per run state, matching the run tracker's state badge. The widget window
+ * always uses the dark theme tokens, so the state colors stay light on its dark backdrop.
+ */
+const RUN_STATE_DOT: Record<WidgetRunState, string> = {
+  running: 'bg-success',
+  paused: 'bg-warning',
+  idle: 'bg-white/60',
+};
+
+/** Current-run timer colors per run state; a paused timer takes the paused indicator's color. */
+const RUN_STATE_TIMER: Record<WidgetRunState, string> = {
+  running: 'text-white',
+  paused: 'text-warning',
+  idle: 'text-white/70',
+};
+
+const RUN_STATE_LABEL_KEYS: Record<WidgetRunState, string> = {
+  running: translations.runTracker.controls.running,
+  paused: translations.runTracker.controls.paused,
+  idle: translations.runTracker.controls.idle,
+};
+
 /**
  * Progress gauge styled for the widget: labelled, with light text that stays legible on the
  * widget's always-dark background.
@@ -150,6 +181,8 @@ function WidgetGauge(props: Omit<ComponentProps<typeof ProgressGauge>, 'showLabe
  */
 function RunOnlyDisplay({
   activeSession,
+  activeRunNumber,
+  isPaused,
   runDuration,
   sessionStats,
   runItemsByRun,
@@ -197,18 +230,43 @@ function RunOnlyDisplay({
     );
   }
 
+  let runState: WidgetRunState = 'idle';
+  if (activeRunNumber !== undefined) {
+    runState = isPaused ? 'paused' : 'running';
+  }
+
   return (
     <div className="flex min-h-0 w-full flex-1 flex-col gap-3 overflow-hidden px-4">
-      {/* Top Row: Run # and Current Duration */}
-      <div className="grid grid-cols-2 gap-4">
-        <div className="text-center">
-          <p className="text-white/85 text-xs">{t(translations.widget.run)}</p>
-          <p className="font-bold text-white text-xl">#{activeSession?.runCount ?? 0}</p>
-        </div>
-        <div className="text-center">
-          <p className="text-white/85 text-xs">{t(translations.widget.current)}</p>
-          <p className="font-mono text-lg text-white">{formatDuration(runDuration)}</p>
-        </div>
+      {/* Top: run state and number above the dominant current-run timer */}
+      <div className="flex flex-col items-center gap-1 text-center">
+        <p className="flex items-center gap-2 text-white/85 text-xs">
+          <span
+            data-testid="widget-run-state"
+            data-state={runState}
+            className="inline-flex items-center gap-1.5"
+          >
+            <span
+              aria-hidden="true"
+              className={cn('size-2 rounded-full', RUN_STATE_DOT[runState])}
+            />
+            {t(RUN_STATE_LABEL_KEYS[runState])}
+          </span>
+          <span aria-hidden="true">·</span>
+          <span>
+            {t(translations.runTracker.sessionCard.runNumber, {
+              number: activeRunNumber ?? activeSession.runCount,
+            })}
+          </span>
+        </p>
+        <p
+          className={cn(
+            'font-mono font-semibold text-4xl tabular-nums leading-none',
+            RUN_STATE_TIMER[runState],
+          )}
+        >
+          <span className="sr-only">{t(translations.widget.current)} </span>
+          {formatClockDuration(runDuration)}
+        </p>
       </div>
 
       {/* Bottom Row: Session Stats */}
@@ -228,7 +286,7 @@ function RunOnlyDisplay({
       {/* Per-run item list */}
       {showItemList && (
         <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden">
-          <p className="font-bold text-md text-white/85">{t(translations.widget.runItems)}</p>
+          <p className="font-bold text-base text-white/85">{t(translations.widget.runItems)}</p>
 
           {/* Manual Item Entry */}
           {onAddManualItem && (
@@ -307,6 +365,7 @@ export function Widget({ statistics, settings }: WidgetProps) {
   const {
     activeRun,
     activeSession,
+    isPaused,
     runs,
     runItems,
     loadSessionRuns,
@@ -316,6 +375,7 @@ export function Widget({ statistics, settings }: WidgetProps) {
     useShallow((state) => ({
       activeRun: state.activeRun,
       activeSession: state.activeSession,
+      isPaused: state.isPaused,
       runs: state.runs,
       runItems: state.runItems,
       loadSessionRuns: state.loadSessionRuns,
@@ -330,7 +390,7 @@ export function Widget({ statistics, settings }: WidgetProps) {
     useShallow((state) => ({ items: state.items, progress: state.progress })),
   );
 
-  // Real-time timer for run duration updates
+  // Real-time timer for run duration updates; a paused run's time is frozen, so it stops ticking
   useEffect(() => {
     if (!activeRun || displayMode !== 'run-only') {
       setRunDuration(0);
@@ -338,19 +398,21 @@ export function Widget({ statistics, settings }: WidgetProps) {
     }
 
     const updateTimer = () => {
-      const now = Date.now();
-      const elapsed = now - activeRun.startTime.getTime();
-      setRunDuration(elapsed);
+      setRunDuration(getRunElapsedMs(activeRun, Date.now()));
     };
 
     // Update immediately
     updateTimer();
 
+    if (isPaused) {
+      return;
+    }
+
     // Set up interval for updates
     const interval = setInterval(updateTimer, 1000);
 
     return () => clearInterval(interval);
-  }, [activeRun, displayMode]);
+  }, [activeRun, displayMode, isPaused]);
 
   // Ensure runs and run items are loaded for the active session in run-only mode
   useEffect(() => {
@@ -424,6 +486,8 @@ export function Widget({ statistics, settings }: WidgetProps) {
         {!locked && <WidgetDragGrip />}
         <RunOnlyDisplay
           activeSession={activeSession}
+          activeRunNumber={activeRun?.runNumber}
+          isPaused={isPaused}
           runDuration={runDuration}
           sessionStats={sessionStats}
           runItemsByRun={runItemsByRun}

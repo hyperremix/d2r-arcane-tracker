@@ -1,12 +1,11 @@
 import { useVirtualizer } from '@tanstack/react-virtual';
 import type { Run, RunItem } from 'electron/types/grail';
-import { ChevronLeft, ChevronRight as ChevronRightIcon } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useShallow } from 'zustand/react/shallow';
+import { PageNavigation } from '@/components/runtracker/PageNavigation';
 import { SortableTableHead, type SortOrder } from '@/components/runtracker/SortableTableHead';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -433,56 +432,11 @@ export function RunList({ runs }: RunListProps) {
                         total: sortedRuns.length,
                       })}
                     </div>
-                    <div className="flex items-center gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => goToPage(currentPage - 1)}
-                        disabled={currentPage === 1}
-                      >
-                        <ChevronLeft className="h-4 w-4" />
-                        {t(translations.common.previous)}
-                      </Button>
-                      <div className="flex items-center gap-1">
-                        {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                          const page = i + 1;
-                          const isCurrentPage = page === currentPage;
-                          return (
-                            <Button
-                              key={page}
-                              variant={isCurrentPage ? 'default' : 'outline'}
-                              size="sm"
-                              className="h-8 w-8 p-0"
-                              onClick={() => goToPage(page)}
-                            >
-                              {page}
-                            </Button>
-                          );
-                        })}
-                        {totalPages > 5 && (
-                          <>
-                            <span className="text-muted-foreground text-sm">...</span>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="h-8 w-8 p-0"
-                              onClick={() => goToPage(totalPages)}
-                            >
-                              {totalPages}
-                            </Button>
-                          </>
-                        )}
-                      </div>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => goToPage(currentPage + 1)}
-                        disabled={currentPage === totalPages}
-                      >
-                        {t(translations.common.next)}
-                        <ChevronRightIcon className="h-4 w-4" />
-                      </Button>
-                    </div>
+                    <PageNavigation
+                      currentPage={currentPage}
+                      totalPages={totalPages}
+                      onPageChange={goToPage}
+                    />
                   </div>
                 )}
               </>

@@ -1,6 +1,6 @@
 import type { Run, RunItem, Session } from 'electron/types/grail';
 import { CopyIcon, DownloadIcon, EyeIcon, EyeOffIcon } from 'lucide-react';
-import { useCallback, useEffect, useId, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -37,6 +37,33 @@ type ExportFormat = 'csv' | 'json' | 'text';
 type TextDetailLevel = 'basic' | 'detailed';
 
 const exportT = translations.runTracker.exportDialog;
+
+interface SelectOption<T extends string> {
+  value: T;
+  label: string;
+}
+
+const FORMAT_LABEL_KEYS: Record<ExportFormat, string> = {
+  csv: exportT.formatCsv,
+  json: exportT.formatJson,
+  text: exportT.formatText,
+};
+
+const DETAIL_LEVEL_LABEL_KEYS: Record<TextDetailLevel, string> = {
+  basic: exportT.detailBasic,
+  detailed: exportT.detailDetailed,
+};
+
+/**
+ * Builds translated select options from a value -> label key map. Base UI needs the options on the
+ * `Select` itself so the trigger can show the selected option's label instead of its raw value.
+ */
+function toSelectOptions<T extends string>(
+  labelKeys: Record<T, string>,
+  t: (key: string) => string,
+): SelectOption<T>[] {
+  return (Object.keys(labelKeys) as T[]).map((value) => ({ value, label: t(labelKeys[value]) }));
+}
 
 interface ExportError {
   message: string;
@@ -105,6 +132,8 @@ export function ExportDialog({ sessionId, open, onOpenChange }: ExportDialogProp
   const [textDetailLevel, setTextDetailLevel] = useState<TextDetailLevel>('basic');
   const [includeItems, setIncludeItems] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
+  const formatOptions = useMemo(() => toSelectOptions(FORMAT_LABEL_KEYS, t), [t]);
+  const detailLevelOptions = useMemo(() => toSelectOptions(DETAIL_LEVEL_LABEL_KEYS, t), [t]);
 
   // Export content
   const [exportContent, setExportContent] = useState<string>('');
@@ -298,6 +327,7 @@ export function ExportDialog({ sessionId, open, onOpenChange }: ExportDialogProp
             <div className="space-y-2">
               <Label htmlFor={formatId}>{t(exportT.format)}</Label>
               <Select
+                items={formatOptions}
                 value={format}
                 onValueChange={(value) => value && setFormat(value as ExportFormat)}
               >
@@ -305,9 +335,11 @@ export function ExportDialog({ sessionId, open, onOpenChange }: ExportDialogProp
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="csv">{t(exportT.formatCsv)}</SelectItem>
-                  <SelectItem value="json">{t(exportT.formatJson)}</SelectItem>
-                  <SelectItem value="text">{t(exportT.formatText)}</SelectItem>
+                  {formatOptions.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -316,6 +348,7 @@ export function ExportDialog({ sessionId, open, onOpenChange }: ExportDialogProp
               <div className="space-y-2">
                 <Label htmlFor={detailLevelId}>{t(exportT.detailLevel)}</Label>
                 <Select
+                  items={detailLevelOptions}
                   value={textDetailLevel}
                   onValueChange={(value) => value && setTextDetailLevel(value as TextDetailLevel)}
                 >
@@ -323,8 +356,11 @@ export function ExportDialog({ sessionId, open, onOpenChange }: ExportDialogProp
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="basic">{t(exportT.detailBasic)}</SelectItem>
-                    <SelectItem value="detailed">{t(exportT.detailDetailed)}</SelectItem>
+                    {detailLevelOptions.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>

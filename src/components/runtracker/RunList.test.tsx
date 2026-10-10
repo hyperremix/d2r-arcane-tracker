@@ -358,6 +358,27 @@ describe('When RunList is rendered', () => {
       // Assert
       expect(screen.getByText(/Showing 11-15 of 15/)).toBeInTheDocument();
     });
+
+    it('If the current page is beyond the first five, Then it is listed and marked as the current page', () => {
+      // Arrange
+      const runs = createRuns(100);
+      render(<RunList runs={runs} />);
+
+      // Act
+      for (let page = 1; page < 7; page++) {
+        fireEvent.click(screen.getByRole('button', { name: /Next/ }));
+      }
+
+      // Assert
+      expect(screen.getByText(/Showing 61-70 of 100/)).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Page 7 of 10' })).toHaveAttribute(
+        'aria-current',
+        'page',
+      );
+      expect(screen.getByRole('button', { name: 'Page 1 of 10' })).not.toHaveAttribute(
+        'aria-current',
+      );
+    });
   });
 
   describe('If run row clicked', () => {

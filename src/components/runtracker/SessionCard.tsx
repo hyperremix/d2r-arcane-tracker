@@ -1,4 +1,5 @@
 import type { Run, Session } from 'electron/types/grail';
+import { getRunElapsedMs } from 'electron/utils/runClock';
 import { MAX_SESSION_NOTES_LENGTH } from 'electron/utils/sessionNotes';
 import { ChevronDown, FileDownIcon, Loader2 } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
@@ -54,8 +55,8 @@ function SessionStatsRow({ session, activeRun }: SessionStatsRowProps) {
   const now = useNow(isLive);
   const sessionEnd = session.endTime?.getTime() ?? now;
   const sessionElapsed = Math.max(0, sessionEnd - session.startTime.getTime());
-  const currentRunElapsed =
-    isLive && activeRun ? Math.max(0, now - activeRun.startTime.getTime()) : 0;
+  // Paused time of the current run is not run time
+  const currentRunElapsed = isLive && activeRun ? getRunElapsedMs(activeRun, now) : 0;
   const efficiencyPercentage = calculateLiveEfficiency({
     completedRunTime: session.totalRunTime,
     currentRunElapsed,
@@ -121,6 +122,8 @@ export function SessionCard({ session, onViewAllRuns }: SessionCardProps) {
   const isArchiving = Boolean(pendingActions.archiveSession);
 
   const currentSession = activeSession || session;
+  // A session can't be archived in the middle of one of its runs
+  const hasActiveRun = Boolean(currentSession && activeRun?.sessionId === currentSession.id);
   const { notes, isSavingNotes, handleNotesChange, handleNotesBlur } = useSessionNotes(
     currentSession,
     updateSessionNotes,
@@ -202,17 +205,19 @@ export function SessionCard({ session, onViewAllRuns }: SessionCardProps) {
             </CollapsibleContent>
           </Collapsible>
 
-          {/* Action Buttons */}
-          <div className="flex gap-2">
+          {/* Secondary session actions */}
+          <div className="flex justify-end gap-2">
             <Button
               variant="outline"
               size="sm"
               onClick={() => setShowArchiveDialog(true)}
-              disabled={isArchiving}
+              disabled={isArchiving || hasActiveRun}
               aria-busy={isArchiving}
-              className="flex-1"
+              title={
+                hasActiveRun ? t(translations.runTracker.sessionCard.archiveEndRunFirst) : undefined
+              }
             >
-              {isArchiving && <Loader2 className="h-4 w-4 animate-spin" />}
+              {isArchiving && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
               {t(translations.runTracker.sessionCard.archiveSession)}
             </Button>
             <Button

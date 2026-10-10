@@ -1,9 +1,8 @@
 import type { Session } from 'electron/types/grail';
-import { Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Calendar } from 'lucide-react';
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useShallow } from 'zustand/react/shallow';
-import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
@@ -18,6 +17,7 @@ import {
 import { translations } from '@/i18n/translations';
 import { formatDuration, formatSessionDateRelative, formatTime } from '@/lib/date';
 import { useRunTrackerStore, useSessionStatsLookup } from '@/stores/runTrackerStore';
+import { PageNavigation } from './PageNavigation';
 import { SortableTableHead, type SortOrder } from './SortableTableHead';
 
 interface SessionsListProps {
@@ -425,56 +425,11 @@ export function SessionsList({ onSessionSelect }: SessionsListProps) {
                     total: sortedSessions.length,
                   })}
                 </div>
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => goToPage(currentPage - 1)}
-                    disabled={currentPage === 1}
-                  >
-                    <ChevronLeft className="h-4 w-4" />
-                    {t(translations.common.previous)}
-                  </Button>
-                  <div className="flex items-center gap-1">
-                    {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                      const page = i + 1;
-                      const isCurrentPage = page === currentPage;
-                      return (
-                        <Button
-                          key={page}
-                          variant={isCurrentPage ? 'default' : 'outline'}
-                          size="sm"
-                          className="h-8 w-8 p-0"
-                          onClick={() => goToPage(page)}
-                        >
-                          {page}
-                        </Button>
-                      );
-                    })}
-                    {totalPages > 5 && (
-                      <>
-                        <span className="text-muted-foreground text-sm">...</span>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="h-8 w-8 p-0"
-                          onClick={() => goToPage(totalPages)}
-                        >
-                          {totalPages}
-                        </Button>
-                      </>
-                    )}
-                  </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => goToPage(currentPage + 1)}
-                    disabled={currentPage === totalPages}
-                  >
-                    {t(translations.common.next)}
-                    <ChevronRight className="h-4 w-4" />
-                  </Button>
-                </div>
+                <PageNavigation
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  onPageChange={goToPage}
+                />
               </div>
             )}
           </>
