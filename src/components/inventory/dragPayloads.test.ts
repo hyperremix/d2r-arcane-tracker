@@ -174,6 +174,21 @@ describe('When drag-state payloads from another window are parsed', () => {
     // Assert
     expect(parsed).toBeUndefined();
   });
+
+  it.each([
+    ['an unknown location', 'belt'],
+    ['a padded location', ' stash '],
+    ['a wrong-case location', 'Stash'],
+  ])('If the source location context is %s, Then the inventory payload is rejected', (_label, sourceLocationContext) => {
+    // Arrange
+    const payload = { ...inventoryDragItem, active: true, sourceLocationContext };
+
+    // Act
+    const parsed = parseInventoryDragStatePayload(payload);
+
+    // Assert
+    expect(parsed).toBeUndefined();
+  });
 });
 
 describe('When the dragged item of a drop event is resolved', () => {

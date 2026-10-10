@@ -9,22 +9,11 @@ import {
   resolveStackCount,
   type StackCountSource,
 } from './d2rFormat';
+import { parseRawItemJson } from './rawItemJson';
 
 interface RawItemJson extends StackCountSource {
   code?: unknown;
   type?: unknown;
-}
-
-function parseRawItem(rawItemJson: string): RawItemJson | undefined {
-  try {
-    const parsed = JSON.parse(rawItemJson);
-    if (typeof parsed === 'object' && parsed !== null) {
-      return parsed as RawItemJson;
-    }
-  } catch {
-    // Ignore
-  }
-  return undefined;
 }
 
 /**
@@ -39,7 +28,7 @@ export function isResourceStackFromRawJson(rawItemJson: string, itemCode?: strin
     return true;
   }
 
-  const parsed = parseRawItem(rawItemJson);
+  const parsed = parseRawItemJson<RawItemJson>(rawItemJson);
   if (!parsed) {
     return false;
   }
@@ -59,6 +48,6 @@ export function isResourceStackFromRawJson(rawItemJson: string, itemCode?: strin
 }
 
 export function resolveStackCountFromRawJson(rawItemJson: string): number {
-  const parsed = parseRawItem(rawItemJson);
+  const parsed = parseRawItemJson<RawItemJson>(rawItemJson);
   return parsed ? resolveStackCount(parsed) : 1;
 }

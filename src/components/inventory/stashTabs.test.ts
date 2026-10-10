@@ -8,7 +8,6 @@ import {
   buildStashTabsToRender,
   canDropItemCodeInModernResourceTab,
   isStashSourceFileType,
-  normalizeResourceItemCode,
   resolveWithdrawCountForGridDrop,
 } from './stashTabs';
 
@@ -33,6 +32,9 @@ describe('When items are dropped on modern resource tabs', () => {
     ['a rune on the gems tab', 'r01', 5, false],
     ['a helm on the materials tab', 'uap', 6, false],
     ['a rune on a shared tab', 'r01', 0, false],
+    ['the last base game rune on the runes tab', 'r33', 7, true],
+    ['a rune code above the base game runes on the runes tab', 'r39', 7, true],
+    ['a code past the rune range on the runes tab', 'r40', 7, false],
   ])('Then %s is allowed: %s', (_label, code, stashTab, expected) => {
     // Arrange / Act
     const allowed = canDropItemCodeInModernResourceTab(code, stashTab);
@@ -41,11 +43,27 @@ describe('When items are dropped on modern resource tabs', () => {
     expect(allowed).toBe(expected);
   });
 
-  it('Then item codes are trimmed and lower-cased', () => {
-    // Arrange / Act / Assert
-    expect(normalizeResourceItemCode(' R01 ')).toBe('r01');
-    expect(normalizeResourceItemCode('  ')).toBeUndefined();
-    expect(normalizeResourceItemCode(7)).toBeUndefined();
+  it('Then item codes are matched trimmed and case-insensitively', () => {
+    // Arrange
+    const paddedUpperCaseRune = ' R01 ';
+
+    // Act
+    const allowed = canDropItemCodeInModernResourceTab(paddedUpperCaseRune, 7);
+
+    // Assert
+    expect(allowed).toBe(true);
+  });
+
+  it.each([
+    ['a blank code', '  '],
+    ['a non-string code', 7],
+    ['a missing code', undefined],
+  ])('If the item has %s, Then it is not allowed on a resource tab', (_label, code) => {
+    // Arrange / Act
+    const allowed = canDropItemCodeInModernResourceTab(code, 7);
+
+    // Assert
+    expect(allowed).toBe(false);
   });
 });
 
@@ -59,6 +77,36 @@ describe('When a vaulted item is withdrawn onto a grid', () => {
 
     // Assert
     expect(count).toBe(1);
+  });
+
+  it.each([
+    ...Array.from({ length: 6 }, (_unused, index) => {
+      const code = `r${34 + index}`;
+      return [`the rune code ${code}`, code];
+    }),
+    ['the lowest rune code', 'r00'],
+    ['a rune code at the top of the accepted range', 'r39'],
+    ['an upper-case padded rune code', ' R34 '],
+  ])('If the vaulted stack holds %s, Then it gives up exactly one unit', (_label, itemCode) => {
+    // Arrange
+    const vaultItem = { itemCode, stackCount: 5 } as VaultItem;
+
+    // Act
+    const count = resolveWithdrawCountForGridDrop(vaultItem);
+
+    // Assert
+    expect(count).toBe(1);
+  });
+
+  it('If the vaulted stack has a code past the rune range, Then the whole item is withdrawn', () => {
+    // Arrange
+    const vaultItem = { itemCode: 'r40', stackCount: 5 } as VaultItem;
+
+    // Act
+    const count = resolveWithdrawCountForGridDrop(vaultItem);
+
+    // Assert
+    expect(count).toBeUndefined();
   });
 
   it.each([

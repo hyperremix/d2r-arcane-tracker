@@ -203,6 +203,49 @@
       }
     },
     {
+      "includes": ["src/**/*.ts", "src/**/*.tsx"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "paths": {
+                  "electron": "The renderer is sandboxed: reach the main process through window.electronAPI (electron/ipc/api)."
+                },
+                "patterns": [
+                  {
+                    "group": [
+                      "electron/**",
+                      "!electron/types/**",
+                      "!electron/items",
+                      "!electron/items/**",
+                      "!electron/ipc/contract",
+                      "!electron/utils/d2rFormat",
+                      "!electron/utils/equipSlots",
+                      "!electron/utils/iconFilename",
+                      "!electron/utils/objects",
+                      "!electron/utils/rawItemJson",
+                      "!electron/utils/sessionNotes",
+                      "!electron/utils/settingsCodec",
+                      "!electron/utils/vaultState",
+                      "!electron/utils/widgetDisplay",
+                      "!electron/window/mainWindowTheme"
+                    ],
+                    "message": "Renderer code may only import the renderer-safe main-process modules allowlisted in biome.json (shared types, item catalog, IPC contract and pure utils). Keep new shared code free of Node/Electron imports and add it to the allowlist."
+                  },
+                  {
+                    "group": ["../**/electron/**"],
+                    "message": "Import main-process modules through the `electron/...` path alias so the renderer allowlist in biome.json applies."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
       "includes": ["src/index.css"],
       "linter": {
         "rules": {

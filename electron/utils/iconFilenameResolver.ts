@@ -1,62 +1,9 @@
-import { basename } from 'node:path';
 import { items } from '../items';
+import { normalizeItemCodeKey } from './d2rFormat';
+import { normalizeIconFilename, toSnakeCaseIconFilename } from './iconFilename';
+import { simplifyItemName } from './objects';
 
-function normalizeLookupKey(value: string): string {
-  return value
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]/g, '');
-}
-
-function normalizeCodeKey(value: string): string {
-  return value.trim().toLowerCase();
-}
-
-function stripKnownImageExtension(value: string): string {
-  return value.replace(/\.(png|sprite|dc6|dds|jpg|jpeg|webp)$/i, '');
-}
-
-export function normalizeIconFilename(value: unknown): string | undefined {
-  if (typeof value === 'number' && Number.isFinite(value)) {
-    return `${value}.png`;
-  }
-
-  if (typeof value !== 'string') {
-    return undefined;
-  }
-
-  const trimmed = value.trim();
-  if (!trimmed) {
-    return undefined;
-  }
-
-  const safeBasename = basename(trimmed);
-  const withoutExtension = stripKnownImageExtension(safeBasename).trim().toLowerCase();
-  if (!withoutExtension) {
-    return undefined;
-  }
-
-  return `${withoutExtension}.png`;
-}
-
-export function toSnakeCaseIconFilename(value: unknown): string | undefined {
-  if (typeof value !== 'string') {
-    return undefined;
-  }
-
-  const slug = value
-    .trim()
-    .toLowerCase()
-    .replace(/['`]/g, '')
-    .replace(/[^a-z0-9]+/g, '_')
-    .replace(/^_+|_+$/g, '');
-
-  if (!slug) {
-    return undefined;
-  }
-
-  return `${slug}.png`;
-}
+export { normalizeIconFilename } from './iconFilename';
 
 const iconByGrailItemId = new Map<string, string>();
 const iconByItemCode = new Map<string, string>();
@@ -72,7 +19,7 @@ for (const item of items) {
   iconByGrailItemId.set(item.id, iconFilename);
 
   if (item.code) {
-    const codeKey = normalizeCodeKey(item.code);
+    const codeKey = normalizeItemCodeKey(item.code);
     if (codeKey && !iconByItemCode.has(codeKey)) {
       iconByItemCode.set(codeKey, iconFilename);
     }
@@ -84,7 +31,7 @@ for (const item of items) {
       continue;
     }
 
-    const lookupKey = normalizeLookupKey(nameCandidate);
+    const lookupKey = simplifyItemName(nameCandidate);
     if (lookupKey && !iconByNameKey.has(lookupKey)) {
       iconByNameKey.set(lookupKey, iconFilename);
     }
@@ -97,7 +44,7 @@ function resolveIconByName(candidates: Array<string | null | undefined>): string
       continue;
     }
 
-    const lookupKey = normalizeLookupKey(candidate);
+    const lookupKey = simplifyItemName(candidate);
     if (!lookupKey) {
       continue;
     }
@@ -116,12 +63,11 @@ function resolveIconByCode(input: {
   grailItemId?: string;
   nameIcon?: string;
 }): string | undefined {
-  const code = input.itemCode?.trim();
-  if (!code) {
+  const normalizedCode = normalizeItemCodeKey(input.itemCode);
+  if (!normalizedCode) {
     return undefined;
   }
 
-  const normalizedCode = normalizeCodeKey(code);
   const hasExplicitUniqueSignal = Boolean(input.grailItemId) || Boolean(input.nameIcon);
   const skipAmbiguousCharmCodeLookup =
     ambiguousCharmCodeKeys.has(normalizedCode) && !hasExplicitUniqueSignal;

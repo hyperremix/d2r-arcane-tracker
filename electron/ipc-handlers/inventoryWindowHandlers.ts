@@ -13,7 +13,7 @@ import { createIpcMainRegistry } from '../ipc/handle';
 import type { InventorySnapshotWindowTarget, VaultSourceFileType } from '../types/grail';
 import { assert } from '../utils/assert';
 import { assertSaveFilePathAllowed } from '../utils/saveFilePathGuard';
-import { VALID_SOURCE_FILE_TYPES } from '../utils/vaultState';
+import { isVaultLocationContext, VALID_SOURCE_FILE_TYPES } from '../utils/vaultState';
 import { openInventorySnapshotWindow } from '../window/inventorySnapshotWindow';
 
 let activeVaultDragState: VaultDragStatePayload | undefined;
@@ -81,10 +81,11 @@ function normalizeInventoryDragStatePayload(
     return undefined;
   }
 
-  if (
-    typeof rawPayload.sourceLocationContext !== 'string' ||
-    rawPayload.sourceLocationContext.trim().length === 0
-  ) {
+  const sourceLocationContext =
+    typeof rawPayload.sourceLocationContext === 'string'
+      ? rawPayload.sourceLocationContext.trim()
+      : undefined;
+  if (!isVaultLocationContext(sourceLocationContext)) {
     return undefined;
   }
 
@@ -112,7 +113,7 @@ function normalizeInventoryDragStatePayload(
     fingerprint: rawPayload.fingerprint.trim(),
     sourceFilePath: rawPayload.sourceFilePath.trim(),
     sourceFileType: rawPayload.sourceFileType as VaultSourceFileType,
-    sourceLocationContext: rawPayload.sourceLocationContext.trim(),
+    sourceLocationContext,
     rawItemJson: rawPayload.rawItemJson,
     itemCode:
       typeof rawPayload.itemCode === 'string' && rawPayload.itemCode.trim().length > 0

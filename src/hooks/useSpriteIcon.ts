@@ -1,3 +1,4 @@
+import { getPathBasename, stripKnownImageExtension } from 'electron/utils/iconFilename';
 import { useEffect, useMemo, useState } from 'react';
 import { useGrailStore } from '@/stores/grailStore';
 import placeholderUrl from '/images/placeholder-item.svg';
@@ -10,17 +11,8 @@ interface UseSpriteIconOptions {
   forceEnabled?: boolean;
 }
 
-function basename(input: string): string {
-  const segments = input.split(/[\\/]/);
-  return segments[segments.length - 1] ?? input;
-}
-
 function withPngExtension(input: string): string {
   return input.toLowerCase().endsWith('.png') ? input : `${input}.png`;
-}
-
-function stripImageExtension(input: string): string {
-  return input.replace(/\.(png|sprite|dc6|dds|jpg|jpeg|webp)$/i, '');
 }
 
 function normalizeSingleFilename(filename: string): string[] {
@@ -29,8 +21,8 @@ function normalizeSingleFilename(filename: string): string[] {
     return [];
   }
 
-  const base = basename(trimmed);
-  const withoutExtension = stripImageExtension(base);
+  const base = getPathBasename(trimmed);
+  const withoutExtension = stripKnownImageExtension(base);
   const values = [trimmed, base, withoutExtension, trimmed.toLowerCase(), base.toLowerCase()];
   const candidates = values.flatMap((value) => [value, withPngExtension(value)]);
 

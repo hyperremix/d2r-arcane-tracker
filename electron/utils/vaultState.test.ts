@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { assert } from './assert';
-import { isCurrentlyVaulted, isGrailBookmark, VALID_SOURCE_FILE_TYPES } from './vaultState';
+import {
+  isCurrentlyVaulted,
+  isGrailBookmark,
+  isVaultLocationContext,
+  VALID_SOURCE_FILE_TYPES,
+} from './vaultState';
 
 describe('When resolving whether a vault row is currently vaulted', () => {
   describe('If the row was never vaulted', () => {
@@ -94,6 +99,22 @@ describe('When using the shared vault validation helpers', () => {
       // Assert
       expect(valid).toBe(true);
       expect(VALID_SOURCE_FILE_TYPES.has('exe')).toBe(false);
+    });
+  });
+
+  describe('If a location context is checked', () => {
+    it('Then only the known vault location contexts are accepted', () => {
+      // Arrange
+      const knownContexts = ['equipped', 'inventory', 'stash', 'mercenary', 'corpse', 'unknown'];
+      const invalidValues: unknown[] = ['belt', 'Stash', '', undefined, 3];
+
+      // Act
+      const knownResults = knownContexts.map(isVaultLocationContext);
+      const invalidResults = invalidValues.map(isVaultLocationContext);
+
+      // Assert
+      expect(knownResults.every(Boolean)).toBe(true);
+      expect(invalidResults.some(Boolean)).toBe(false);
     });
   });
 

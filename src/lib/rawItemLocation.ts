@@ -1,4 +1,6 @@
 import type { ParsedInventoryItem, VaultItem } from 'electron/types/grail';
+import { toFiniteNumber } from 'electron/utils/d2rFormat';
+import { parseRawItemJson } from 'electron/utils/rawItemJson';
 
 export interface RawItemLocation {
   locationId?: number;
@@ -22,29 +24,21 @@ interface ParsedRawItem {
   inv_height?: unknown;
 }
 
-function toOptionalNumber(value: unknown): number | undefined {
-  return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
-}
-
 function parseRawItemLocation(rawItemJson: string): RawItemLocation | undefined {
-  try {
-    const parsed = JSON.parse(rawItemJson) as ParsedRawItem;
-    if (!parsed || typeof parsed !== 'object') {
-      return undefined;
-    }
-
-    return {
-      locationId: toOptionalNumber(parsed.location_id),
-      altPositionId: toOptionalNumber(parsed.alt_position_id),
-      equippedId: toOptionalNumber(parsed.equipped_id),
-      positionX: toOptionalNumber(parsed.position_x),
-      positionY: toOptionalNumber(parsed.position_y),
-      width: toOptionalNumber(parsed.inv_width),
-      height: toOptionalNumber(parsed.inv_height),
-    };
-  } catch {
+  const parsed = parseRawItemJson<ParsedRawItem>(rawItemJson);
+  if (!parsed) {
     return undefined;
   }
+
+  return {
+    locationId: toFiniteNumber(parsed.location_id),
+    altPositionId: toFiniteNumber(parsed.alt_position_id),
+    equippedId: toFiniteNumber(parsed.equipped_id),
+    positionX: toFiniteNumber(parsed.position_x),
+    positionY: toFiniteNumber(parsed.position_y),
+    width: toFiniteNumber(parsed.inv_width),
+    height: toFiniteNumber(parsed.inv_height),
+  };
 }
 
 export function getRawItemLocation(item: ItemWithRawJson): RawItemLocation | undefined {

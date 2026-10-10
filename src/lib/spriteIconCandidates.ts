@@ -1,4 +1,8 @@
 import type { Item, ParsedInventoryItem, VaultItem } from 'electron/types/grail';
+import { normalizeItemCodeKey } from 'electron/utils/d2rFormat';
+import { normalizeIconFilename, toSnakeCaseIconFilename } from 'electron/utils/iconFilename';
+import { simplifyItemName } from 'electron/utils/objects';
+import { parseRawItemJson } from 'electron/utils/rawItemJson';
 
 type SpatialIconItemLike = Pick<
   ParsedInventoryItem | VaultItem,
@@ -34,83 +38,12 @@ function addCandidate(candidates: Set<string>, value: unknown): void {
   }
 }
 
-function normalizeLookupKey(value: string): string {
-  return value
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]/g, '');
-}
-
-function normalizeCodeKey(value: string): string {
-  return value.trim().toLowerCase();
-}
-
-function basename(input: string): string {
-  const segments = input.split(/[\\/]/);
-  return segments[segments.length - 1] ?? input;
-}
-
-function stripImageExtension(input: string): string {
-  return input.replace(/\.(png|sprite|dc6|dds|jpg|jpeg|webp)$/i, '');
-}
-
-function toParserInvFilePng(value: unknown): string | undefined {
-  if (typeof value === 'number' && Number.isFinite(value)) {
-    return `${value}.png`;
-  }
-
-  if (typeof value !== 'string') {
-    return undefined;
-  }
-
-  const trimmed = value.trim();
-  if (!trimmed) {
-    return undefined;
-  }
-
-  const base = basename(trimmed);
-  const withoutExtension = stripImageExtension(base).trim().toLowerCase();
-  if (!withoutExtension) {
-    return undefined;
-  }
-
-  return `${withoutExtension}.png`;
-}
-
 function addParserInvFileCandidates(candidates: Set<string>, value: unknown): void {
   if (typeof value === 'string') {
     addCandidate(candidates, value);
   }
 
-  addCandidate(candidates, toParserInvFilePng(value));
-}
-
-function toSnakeCaseFilename(value: string): string | undefined {
-  const slug = value
-    .trim()
-    .toLowerCase()
-    .replace(/['`]/g, '')
-    .replace(/[^a-z0-9]+/g, '_')
-    .replace(/^_+|_+$/g, '');
-
-  if (!slug) {
-    return undefined;
-  }
-
-  return `${slug}.png`;
-}
-
-function parseRawItem(rawItemJson: string): RawItemShape | undefined {
-  try {
-    const parsed = JSON.parse(rawItemJson);
-    if (typeof parsed === 'object' && parsed !== null) {
-      return parsed as RawItemShape;
-    }
-  } catch {
-    return undefined;
-  }
-
-  return undefined;
+  addCandidate(candidates, normalizeIconFilename(value));
 }
 
 function addLookupCandidate(
@@ -122,7 +55,7 @@ function addLookupCandidate(
     return;
   }
 
-  const key = normalizeLookupKey(value);
+  const key = simplifyItemName(value);
   if (!key) {
     return;
   }
@@ -135,7 +68,7 @@ function hasLookupNameMatch(lookup: SpriteIconLookupIndex, value: unknown): bool
     return false;
   }
 
-  const key = normalizeLookupKey(value);
+  const key = simplifyItemName(value);
   if (!key) {
     return false;
   }
@@ -153,9 +86,11 @@ function addCodeLookupCandidate(
     return;
   }
 
-  const normalizedCode = normalizeCodeKey(code);
+  const normalizedCode = normalizeItemCodeKey(code);
   const skipAmbiguousCharmCodeLookup =
-    ambiguousCharmCodeKeys.has(normalizedCode) && !hasExplicitUniqueSignal;
+    normalizedCode !== undefined &&
+    ambiguousCharmCodeKeys.has(normalizedCode) &&
+    !hasExplicitUniqueSignal;
   if (skipAmbiguousCharmCodeLookup) {
     return;
   }
@@ -169,7 +104,7 @@ function addNameDerivedCandidates(candidates: Set<string>, value: unknown): void
   }
 
   addCandidate(candidates, value);
-  addCandidate(candidates, toSnakeCaseFilename(value));
+  addCandidate(candidates, toSnakeCaseIconFilename(value));
 }
 
 export function createSpriteIconLookupIndex(items: Item[]): SpriteIconLookupIndex {
@@ -185,13 +120,13 @@ export function createSpriteIconLookupIndex(items: Item[]): SpriteIconLookupInde
     byItemId.set(item.id, item.imageFilename);
 
     if (item.code) {
-      const codeKey = normalizeLookupKey(item.code);
+      const codeKey = simplifyItemName(item.code);
       if (codeKey && !byCode.has(codeKey)) {
         byCode.set(codeKey, item.imageFilename);
       }
     }
 
-    const nameKey = normalizeLookupKey(item.name);
+    const nameKey = simplifyItemName(item.name);
     if (nameKey && !byName.has(nameKey)) {
       byName.set(nameKey, item.imageFilename);
     }
@@ -205,7 +140,7 @@ export function createSpatialIconCandidates(
   lookup: SpriteIconLookupIndex,
 ): string[] {
   const candidates = new Set<string>();
-  const rawItem = parseRawItem(item.rawItemJson);
+  const rawItem = parseRawItemJson<RawItemShape>(item.rawItemJson);
   addParserInvFileCandidates(candidates, rawItem?.inv_file);
 
   const hasItemLevelUniqueSignal =

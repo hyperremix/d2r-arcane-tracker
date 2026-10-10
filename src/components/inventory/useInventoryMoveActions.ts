@@ -26,7 +26,6 @@ import {
 } from '@/components/inventory/stackPickupDragState';
 import {
   canDropItemCodeInModernResourceTab,
-  normalizeResourceItemCode,
   resolveWithdrawCountForGridDrop,
 } from '@/components/inventory/stashTabs';
 import type { InventoryDragSync } from '@/components/inventory/useInventoryDragSync';
@@ -208,11 +207,7 @@ export function useInventoryMoveActions({
         return;
       }
 
-      const normalizedItemCode = normalizeResourceItemCode(inventoryItem.itemCode);
-      if (
-        !normalizedItemCode ||
-        !canDropItemCodeInModernResourceTab(normalizedItemCode, targetStashTab)
-      ) {
+      if (!canDropItemCodeInModernResourceTab(inventoryItem.itemCode, targetStashTab)) {
         return;
       }
 
