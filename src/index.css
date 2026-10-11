@@ -37,8 +37,9 @@
 }
 
 /*
- * The display serif is reserved for page titles (PageHeader), the app brand and item names, which
- * opt in with `font-display`. Section, card and dialog headings stay in Inter.
+ * The display serif is reserved for page titles (PageHeader), the app brand, the setup wizard
+ * headings and the item details dialog name, which opt in with `font-display`. Section, card and
+ * dialog headings stay in Inter.
  * `font-ui` opts inline content (counts, badges, meta text) inside a display-serif heading back out.
  */
 @utility font-ui {
