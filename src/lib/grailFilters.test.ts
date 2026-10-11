@@ -19,6 +19,7 @@ describe('When filterAndSortItems is called', () => {
     fuzzySearch: false,
   };
   const noFilter: GrailFilter = { foundStatus: 'all' };
+  const allTracked = { grailNormal: true, grailEthereal: true };
 
   describe('If sorting by found date and several items are missing', () => {
     it('Then found items come first and missing items are ordered by name', () => {
@@ -38,7 +39,7 @@ describe('When filterAndSortItems is called', () => {
       ];
 
       // Act
-      const result = filterAndSortItems(items, progress, noFilter, defaultSort);
+      const result = filterAndSortItems(items, progress, noFilter, defaultSort, allTracked);
 
       // Assert
       expect(result.map((item) => item.id)).toEqual(['f', 'a', 'b', 'c']);
@@ -56,16 +57,28 @@ describe('When filterAndSortItems is called', () => {
       ];
 
       // Act
-      const ascending = filterAndSortItems(items, [], noFilter, {
-        ...defaultSort,
-        sortBy: 'type',
-        sortOrder: 'asc',
-      });
-      const descending = filterAndSortItems([...items].reverse(), [], noFilter, {
-        ...defaultSort,
-        sortBy: 'type',
-        sortOrder: 'desc',
-      });
+      const ascending = filterAndSortItems(
+        items,
+        [],
+        noFilter,
+        {
+          ...defaultSort,
+          sortBy: 'type',
+          sortOrder: 'asc',
+        },
+        allTracked,
+      );
+      const descending = filterAndSortItems(
+        [...items].reverse(),
+        [],
+        noFilter,
+        {
+          ...defaultSort,
+          sortBy: 'type',
+          sortOrder: 'desc',
+        },
+        allTracked,
+      );
 
       // Assert
       expect(ascending.map((item) => item.id)).toEqual(['b', 'm', 'a', 'z']);
@@ -84,16 +97,28 @@ describe('When filterAndSortItems is called', () => {
       ];
 
       // Act
-      const ascending = filterAndSortItems(items, [], noFilter, {
-        ...defaultSort,
-        sortBy: 'type',
-        sortOrder: 'asc',
-      });
-      const descending = filterAndSortItems(items, [], noFilter, {
-        ...defaultSort,
-        sortBy: 'type',
-        sortOrder: 'desc',
-      });
+      const ascending = filterAndSortItems(
+        items,
+        [],
+        noFilter,
+        {
+          ...defaultSort,
+          sortBy: 'type',
+          sortOrder: 'asc',
+        },
+        allTracked,
+      );
+      const descending = filterAndSortItems(
+        items,
+        [],
+        noFilter,
+        {
+          ...defaultSort,
+          sortBy: 'type',
+          sortOrder: 'desc',
+        },
+        allTracked,
+      );
 
       // Assert
       expect(ascending.map((item) => item.id)).toEqual(['unique', 'set', 'rune', 'runeword']);
@@ -114,11 +139,17 @@ describe('When filterAndSortItems is called', () => {
       ];
 
       // Act
-      const result = filterAndSortItems(items, [], noFilter, {
-        ...defaultSort,
-        sortBy: 'category',
-        sortOrder: 'asc',
-      });
+      const result = filterAndSortItems(
+        items,
+        [],
+        noFilter,
+        {
+          ...defaultSort,
+          sortBy: 'category',
+          sortOrder: 'asc',
+        },
+        allTracked,
+      );
 
       // Assert
       expect(result.map((item) => item.id)).toEqual([
@@ -159,6 +190,7 @@ describe('When filterAndSortItems is called', () => {
         [],
         { ...noFilter, subCategories: ['helms', '1h_swords'] },
         { ...defaultSort, sortBy: 'name', sortOrder: 'asc' },
+        allTracked,
       );
 
       // Assert
@@ -184,6 +216,7 @@ describe('When filterAndSortItems is called', () => {
         [],
         { ...noFilter, subCategories: ['weapons:sorceress'] },
         { ...defaultSort, sortBy: 'name', sortOrder: 'asc' },
+        allTracked,
       );
 
       // Assert
@@ -213,6 +246,7 @@ describe('When filterAndSortItems is called', () => {
         [],
         { ...noFilter, searchTerm: 'shako' },
         defaultSort,
+        allTracked,
       );
 
       // Assert
@@ -244,6 +278,7 @@ describe('When filterAndSortItems is called', () => {
           ...defaultSort,
           fuzzySearch,
         },
+        allTracked,
       );
 
       // Assert
@@ -266,6 +301,7 @@ describe('When filterAndSortItems is called', () => {
           ...defaultSort,
           fuzzySearch,
         },
+        allTracked,
       );
 
       // Assert
@@ -382,6 +418,38 @@ describe('When filterAndSortItems is called', () => {
       // Assert
       expect(found.map((item) => item.id)).toEqual(['needle']);
       expect(sorted.map((item) => item.id)).toEqual(['needle', 'a']);
+    });
+  });
+
+  describe('If an item has several tracked finds', () => {
+    const items = [
+      HolyGrailItemBuilder.new().withId('twice').withName('Found Twice').build(),
+      HolyGrailItemBuilder.new().withId('once').withName('Found Once').build(),
+    ];
+    const findOf = (id: string, itemId: string, date: string) =>
+      GrailProgressBuilder.new()
+        .withId(id)
+        .withItemId(itemId)
+        .withFoundDate(new Date(date))
+        .asNormal()
+        .build();
+
+    it.each([
+      ['the newer find comes first', ['2026-03-01', '2024-01-01']],
+      ['the older find comes first', ['2024-01-01', '2026-03-01']],
+    ])('Then the latest find decides the found date sort when %s', (_label, [first, second]) => {
+      // Arrange
+      const progress = [
+        findOf('p-twice-1', 'twice', first),
+        findOf('p-once', 'once', '2025-06-01'),
+        findOf('p-twice-2', 'twice', second),
+      ];
+
+      // Act
+      const result = filterAndSortItems(items, progress, noFilter, defaultSort, allTracked);
+
+      // Assert
+      expect(result.map((item) => item.id)).toEqual(['twice', 'once']);
     });
   });
 

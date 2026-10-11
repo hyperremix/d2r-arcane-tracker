@@ -275,11 +275,6 @@ const sortItems = (
 };
 
 /**
- * Tracking settings used when none are given: every version of every item is tracked.
- */
-const ALL_VERSIONS_TRACKED: GrailTrackingSettings = { grailNormal: true, grailEthereal: true };
-
-/**
  * Filters and sorts items according to the given filter and sort settings.
  * Uses pre-built lookup maps for O(1) access instead of O(N) array searches, and tokenizes the
  * search query once per call instead of once per item.
@@ -289,7 +284,7 @@ const ALL_VERSIONS_TRACKED: GrailTrackingSettings = { grailNormal: true, grailEt
  * @param {GrailProgress[]} progress - All progress records
  * @param {GrailFilter} filter - The active filter
  * @param {AdvancedGrailFilter} advancedFilter - The active sort and search options
- * @param {GrailTrackingSettings} [trackedVersions] - The grail tracking settings; every version is tracked if omitted
+ * @param {GrailTrackingSettings} trackedVersions - The grail tracking settings
  * @returns {Item[]} The filtered and sorted items
  */
 export const filterAndSortItems = (
@@ -297,7 +292,7 @@ export const filterAndSortItems = (
   progress: GrailProgress[],
   filter: GrailFilter,
   advancedFilter: AdvancedGrailFilter,
-  trackedVersions: GrailTrackingSettings = ALL_VERSIONS_TRACKED,
+  trackedVersions: GrailTrackingSettings,
 ): Item[] => {
   // Build the found date lookup once for O(1) access during filtering and sorting, and only when
   // the found filter or the found date sort needs it

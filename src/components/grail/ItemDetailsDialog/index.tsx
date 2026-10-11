@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/dialog';
 import { useItemIcon } from '@/hooks/useItemIcon';
 import { translations } from '@/i18n/translations';
+import { canItemHaveVersion, getProgressVersion } from '@/lib/ethereal';
 import { cn } from '@/lib/utils';
 import { useGrailStore } from '@/stores/grailStore';
 import placeholderUrl from '/images/placeholder-item.svg';
@@ -101,11 +102,19 @@ export function ItemDetailsDialog({ itemId, open, onOpenChange }: ItemDetailsDia
     return items.find((i) => i.id === itemId) || null;
   }, [items, itemId]);
 
-  // All progress records of this item, including finds of versions that aren't tracked
-  const itemProgress = useMemo(
-    () => (item ? progress.filter((p) => p.itemId === item.id) : []),
-    [item, progress],
-  );
+  // The progress records of this item, including finds of versions that aren't tracked. Records
+  // of deleted characters or of versions the item can't have are left out, so the status line
+  // and the character table always describe the same finds.
+  const itemProgress = useMemo(() => {
+    if (!item) return [];
+    const characterIds = new Set(characters.map((character) => character.id));
+    return progress.filter(
+      (p) =>
+        p.itemId === item.id &&
+        characterIds.has(p.characterId) &&
+        canItemHaveVersion(item, getProgressVersion(p)),
+    );
+  }, [item, progress, characters]);
 
   // Hook must be called before early return
   const { linkedBookmark, isBookmarkActionPending, toggleBookmark } = useGrailBookmark(item, open);

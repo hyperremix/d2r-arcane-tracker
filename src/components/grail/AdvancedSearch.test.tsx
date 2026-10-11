@@ -357,9 +357,10 @@ describe('When AdvancedSearch toolbar is rendered', () => {
       expect(filter.subCategories).toEqual(['weapons:sorceress']);
       expect(within(weaponGroup).getByLabelText('Sorceress')).toBeChecked();
       expect(within(armorGroup).getByLabelText('Sorceress')).not.toBeChecked();
-      expect(filterAndSortItems(items, [], filter, advancedFilter).map((item) => item.id)).toEqual([
-        'lidlesseye',
-      ]);
+      const allTracked = { grailNormal: true, grailEthereal: true };
+      expect(
+        filterAndSortItems(items, [], filter, advancedFilter, allTracked).map((item) => item.id),
+      ).toEqual(['lidlesseye']);
       expect(
         screen.getByRole('button', { name: 'Remove filter: Weapons: Sorceress' }),
       ).toBeInTheDocument();

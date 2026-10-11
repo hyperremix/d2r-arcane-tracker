@@ -102,6 +102,27 @@ export function getProgressVersion(progress: GrailProgress): ItemVersion {
 }
 
 /**
+ * Checks whether an item can have a version at all, e.g. a unique that can't be ethereal has no
+ * ethereal version.
+ * @param {Item} item - The Holy Grail item
+ * @param {ItemVersion} version - The version to check
+ * @returns {boolean} True if the item can be found in this version
+ */
+export function canItemHaveVersion(item: Item, version: ItemVersion): boolean {
+  return version === 'ethereal' ? canItemBeEthereal(item) : canItemBeNormal(item);
+}
+
+/**
+ * Checks whether a progress record is a find, i.e. it has a found date, whether or not its
+ * version is tracked.
+ * @param {GrailProgress} progress - The progress record
+ * @returns {boolean} True if the record has a found date
+ */
+export function isFind(progress: GrailProgress): boolean {
+  return progress.foundDate !== undefined;
+}
+
+/**
  * Checks whether a version of an item is tracked by the grail settings.
  * @param {Item} item - The Holy Grail item
  * @param {ItemVersion} version - The version to check
@@ -132,10 +153,7 @@ export function isTrackedFind(
   progress: GrailProgress,
   settings: GrailTrackingSettings,
 ): boolean {
-  return (
-    progress.foundDate !== undefined &&
-    isVersionTracked(item, getProgressVersion(progress), settings)
-  );
+  return isFind(progress) && isVersionTracked(item, getProgressVersion(progress), settings);
 }
 
 /**
@@ -163,17 +181,14 @@ export function getVersionFindStatuses(
   itemProgress: GrailProgress[],
   settings: GrailTrackingSettings,
 ): VersionFindStatus[] {
-  const versions: ItemVersion[] = [];
-  if (canItemBeNormal(item)) versions.push('normal');
-  if (canItemBeEthereal(item)) versions.push('ethereal');
+  const versions: ItemVersion[] = ['normal', 'ethereal'];
 
   return versions
+    .filter((version) => canItemHaveVersion(item, version))
     .map((version) => ({
       version,
       tracked: isVersionTracked(item, version, settings),
-      found: itemProgress.some(
-        (p) => p.foundDate !== undefined && getProgressVersion(p) === version,
-      ),
+      found: itemProgress.some((p) => isFind(p) && getProgressVersion(p) === version),
     }))
     .filter((status) => status.tracked || status.found);
 }
