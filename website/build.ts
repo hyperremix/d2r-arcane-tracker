@@ -15,6 +15,7 @@ import { createLastModified } from './src/guides/lastModified';
  * 4. Renders each guide from docs/ into dist/guides/<slug>/index.html, with its own title,
  *    description and canonical URL.
  * 5. Writes dist/sitemap.xml listing the home page and the guide pages.
+ * 6. Writes dist/robots.txt, which points crawlers at the sitemap.
  */
 const websiteDir = import.meta.dirname;
 const repositoryDir = path.resolve(websiteDir, '..');
@@ -51,6 +52,7 @@ async function main(): Promise<void> {
       renderGuide,
       guidePages,
       applyPageMeta,
+      renderRobotsTxt,
       renderSitemap,
       sitemapEntries,
       SITE_URL,
@@ -76,6 +78,7 @@ async function main(): Promise<void> {
 
     const sitemap = renderSitemap(sitemapEntries(SITE_URL, guidePages, lastModified));
     await writeFile(path.join(distDir, 'sitemap.xml'), sitemap);
+    await writeFile(path.join(distDir, 'robots.txt'), renderRobotsTxt(`${SITE_URL}sitemap.xml`));
   } finally {
     await rm(ssrDir, { recursive: true, force: true });
   }

@@ -9,7 +9,7 @@ import { renderGuideMarkdown } from './guides/renderGuideMarkdown';
 import { reservedHeadingIds } from './guides/reservedIds';
 
 export { applyPageMeta } from './guides/pageMeta';
-export { renderSitemap, sitemapEntries } from './guides/sitemap';
+export { renderRobotsTxt, renderSitemap, sitemapEntries } from './guides/sitemap';
 export { SITE_URL };
 
 /** Renders the home page to HTML for the prerendered build (website/build.ts). */

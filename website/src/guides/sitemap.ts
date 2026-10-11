@@ -22,6 +22,14 @@ export function renderSitemap(entries: readonly SitemapEntry[]): string {
   ].join('\n');
 }
 
+/**
+ * Renders a robots.txt that lets every crawler in and points them at the sitemap, so search engines
+ * the site isn't submitted to find it too.
+ */
+export function renderRobotsTxt(sitemapUrl: string): string {
+  return ['User-agent: *', 'Allow: /', '', `Sitemap: ${sitemapUrl}`, ''].join('\n');
+}
+
 /** The repository paths (relative to its root) that make up the home page */
 const HOME_PAGE_PATHS = ['website', 'docs/screenshots'];
 

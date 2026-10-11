@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { renderSitemap, sitemapEntries } from './sitemap';
+import { renderRobotsTxt, renderSitemap, sitemapEntries } from './sitemap';
 
 function parseSitemap(xml: string): Document {
   return new DOMParser().parseFromString(xml, 'application/xml');
@@ -97,5 +97,24 @@ describe('When the sitemap entries are composed', () => {
 
     // Assert
     expect(entries).toEqual([{ url: siteUrl, lastmod: '2026-10-01' }]);
+  });
+});
+
+describe('When the robots.txt is rendered', () => {
+  it('Then it allows every crawler and points them at the sitemap', () => {
+    // Arrange
+    const sitemapUrl = 'https://d2rarcanetracker.com/sitemap.xml';
+
+    // Act
+    const robotsTxt = renderRobotsTxt(sitemapUrl);
+
+    // Assert
+    expect(robotsTxt.split('\n')).toEqual([
+      'User-agent: *',
+      'Allow: /',
+      '',
+      'Sitemap: https://d2rarcanetracker.com/sitemap.xml',
+      '',
+    ]);
   });
 });

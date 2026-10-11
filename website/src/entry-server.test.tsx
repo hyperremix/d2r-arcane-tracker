@@ -78,13 +78,14 @@ describe('When the server entry renders a guide page', () => {
 });
 
 describe('When the server entry exposes what the build needs', () => {
-  it('Then it re-exports the site URL, the page metadata and the sitemap helpers', () => {
+  it('Then it re-exports the site URL, the page metadata and the sitemap and robots.txt helpers', () => {
     // Arrange / Act
     const exported = entryServer;
 
     // Assert
     expect(exported.SITE_URL).toBe(SITE_URL);
     expect(typeof exported.applyPageMeta).toBe('function');
+    expect(typeof exported.renderRobotsTxt).toBe('function');
     expect(typeof exported.renderSitemap).toBe('function');
     expect(typeof exported.sitemapEntries).toBe('function');
   });
