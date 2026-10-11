@@ -12,6 +12,7 @@ import { CharacterBuilder, GrailProgressBuilder, HolyGrailItemBuilder } from '@/
 import { useGrailStatistics, useGrailStore } from '@/stores/grailStore';
 import { mockStoreState } from '@/test/storeMock';
 import { StatsDashboard } from './StatsDashboard';
+import { buildRune } from './testFixtures';
 
 vi.mock('@/stores/grailStore', () => ({
   useGrailStatistics: vi.fn(),
@@ -74,13 +75,6 @@ function getTile(label: string): HTMLElement {
   const tile = screen.getByText(label).closest<HTMLElement>('[data-slot="card"]');
   expect(tile).not.toBeNull();
   return tile as HTMLElement;
-}
-
-function buildRune(id: string, name: string, code: string): Item {
-  return {
-    ...HolyGrailItemBuilder.new().withId(id).withName(name).withType('rune').build(),
-    code,
-  };
 }
 
 function buildCharacter(id: string, name: string, characterClass: CharacterClass) {
@@ -445,9 +439,9 @@ describe('When StatsDashboard shows the progress charts', () => {
 
     // Assert
     expect(latestTooltip).toContain('Oct 9, 2026');
-    expect(latestTooltip).toContain('Found2');
+    expect(latestTooltip).toMatch(/Found2(?!\d)/);
     expect(firstTooltip).toContain('Oct 1, 2026');
-    expect(firstTooltip).toContain('Found1');
+    expect(firstTooltip).toMatch(/Found1(?!\d)/);
     expect(screen.queryByTestId('chart-tooltip')).not.toBeInTheDocument();
   });
 });

@@ -2,6 +2,7 @@ import type { Item } from 'electron/types/grail';
 import { describe, expect, it } from 'vitest';
 import { GrailProgressBuilder, HolyGrailItemBuilder } from '@/fixtures';
 import { findLastTrackedFind, summarizeRunes, summarizeSets } from './dashboardHighlights';
+import { buildRune } from './testFixtures';
 
 const NORMAL_ONLY = { grailNormal: true, grailEthereal: false };
 const ETHEREAL_ONLY = { grailNormal: false, grailEthereal: true };
@@ -9,19 +10,6 @@ const BOTH_VERSIONS = { grailNormal: true, grailEthereal: true };
 
 function buildSetItem(id: string, setName: string): Item {
   return HolyGrailItemBuilder.new().withId(id).withType('set').withSetName(setName).build();
-}
-
-function buildRune(id: string, name: string, code: string): Item {
-  return {
-    ...HolyGrailItemBuilder.new()
-      .withId(id)
-      .withName(name)
-      .withType('rune')
-      .withCategory('runes')
-      .withoutSetName()
-      .build(),
-    code,
-  };
 }
 
 function buildFind(itemId: string, foundDate = new Date(2026, 0, 1)) {
