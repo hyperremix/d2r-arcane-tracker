@@ -69,6 +69,19 @@ describe('When CompletionStep is rendered', () => {
     await waitFor(() => expect(getSummaryValue('Character Files:')).toHaveTextContent('1'));
   });
 
+  it('Then the completion heading keeps the display serif as the brand moment', async () => {
+    // Arrange
+    const api = createElectronApiMock(MONITORED_DIR, 1);
+    installElectronAPI(api);
+
+    // Act
+    render(<CompletionStep />);
+
+    // Assert
+    expect(screen.getByRole('heading', { level: 2 })).toHaveClass('font-display');
+    await waitFor(() => expect(getSummaryValue('Character Files:')).toHaveTextContent('1'));
+  });
+
   it('If a save folder is monitored, Then the summary shows its path and character file count', async () => {
     // Arrange
     installElectronAPI(createElectronApiMock(MONITORED_DIR, 3));

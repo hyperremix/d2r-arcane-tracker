@@ -145,7 +145,9 @@ export function CompletionStep() {
         <div className="rounded-full bg-success p-4">
           <CheckCircle2 className="h-12 w-12 text-success-foreground" />
         </div>
-        <h2 className="font-bold text-2xl">{t(translations.wizard.completion.title)}</h2>
+        <h2 className="font-bold font-display text-2xl">
+          {t(translations.wizard.completion.title)}
+        </h2>
         <p className="max-w-lg text-muted-foreground">
           {t(translations.wizard.completion.description)}
         </p>
