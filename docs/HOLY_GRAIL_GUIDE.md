@@ -148,7 +148,7 @@ The **Runeword Calculator** reads the runes in your save files and shows which r
 - Search by name in the toolbar above the results, or select runes in the sidebar to show only runewords that use **all** of the selected runes. **Clear selection** removes them. The sidebar also shows how many of each rune you have.
 - **Refresh runes** rescans your save files after you pick up or use runes in the game. In **Manual Entry** mode save files are not rescanned, so the counts stay as they were at the last scan.
 - Each card shows how many of its runes you have (for example, "3/4 runes", green when you have them all) and marks missing runes with a cross, including when a runeword needs the same rune more than once. The card footer shows how many sockets the runeword needs (one per rune) and links to the runeword's details.
-- The sidebar stays in place while you scroll through the runewords.
+- The sidebar stays in place while you scroll through the runewords. In short windows (roughly under 830px tall), the rune list scrolls inside the sidebar instead.
 
 The calculator works whether or not you track runewords in your grail.
 

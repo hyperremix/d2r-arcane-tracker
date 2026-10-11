@@ -306,7 +306,7 @@ describe('RunewordCalculator', () => {
       expect(within(steelCard).queryByText(/All runes available/)).not.toBeInTheDocument();
     });
 
-    it('When runewords are shown, Then each card footer shows the sockets the base item needs', async () => {
+    it('When runewords are shown, Then each card footer shows one socket per rune', async () => {
       // Arrange
       stubElectronApi();
       await renderCalculator();

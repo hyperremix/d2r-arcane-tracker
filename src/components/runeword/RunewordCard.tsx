@@ -85,7 +85,7 @@ export function RunewordCard({ runeword, availableRunes, className }: RunewordCa
         )}
       </div>
 
-      {/* Footer: sockets the base item needs, and a link to the full runeword details */}
+      {/* Footer: one socket per rune, and a link to the full runeword details */}
       <div className="flex items-end justify-between gap-2 border-border border-t pt-3 text-xs">
         {socketCount > 0 && (
           <span className="text-muted-foreground">

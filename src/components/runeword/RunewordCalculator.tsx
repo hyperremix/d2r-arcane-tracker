@@ -262,7 +262,7 @@ export function RunewordCalculator() {
           </div>
         </div>
 
-        {/* Page scroll container; the sidebar rune list only scrolls in short windows */}
+        {/* Runeword grid scroll container */}
         <div
           data-testid="runeword-scroll-area"
           className="min-h-0 flex-1 overflow-y-auto pr-6 pb-6"
