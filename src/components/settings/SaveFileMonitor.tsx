@@ -68,7 +68,6 @@ export function SaveFileMonitor() {
   const [saveFiles, setSaveFiles] = useState<D2SaveFile[]>([]);
   const [lastEvent, setLastEvent] = useState<SaveFileEvent | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [saveFileCount, setSaveFileCount] = useState<number>(0);
   const [isSelectingDirectory, setIsSelectingDirectory] = useState(false);
   const [hasBackedUp, setHasBackedUp] = useState(false);
   const { reloadData, settings } = useGrailStore(
@@ -121,7 +120,8 @@ export function SaveFileMonitor() {
       return (
         <Badge variant="default" className="flex items-center gap-1">
           <CheckCircle className="h-3 w-3" />
-          {t(translations.settings.saveFileMonitor.active, { count: saveFileCount })}
+          {/* Counted from the listed save files so the badge matches "Detected Characters" */}
+          {t(translations.settings.saveFileMonitor.active, { count: saveFiles.length })}
         </Badge>
       );
     }
@@ -132,7 +132,7 @@ export function SaveFileMonitor() {
         {t(translations.settings.saveFileMonitor.inactive)}
       </Badge>
     );
-  }, [error, monitoringStatus.isMonitoring, saveFileCount, settings.gameMode, t]);
+  }, [error, monitoringStatus.isMonitoring, saveFiles.length, settings.gameMode, t]);
 
   const refreshAfterDirectoryChange = useCallback(async () => {
     // Reload data, monitoring status and save files to reflect the new directory
@@ -266,13 +266,13 @@ export function SaveFileMonitor() {
 
       if (status.status === 'error') {
         setError(status.error || t(translations.settings.saveFileMonitor.unknownError));
-        setSaveFileCount(status.saveFileCount || 0);
-      } else if (status.status === 'started') {
-        setError(null);
-        setSaveFileCount(status.saveFileCount || 0);
       } else {
         setError(null);
-        setSaveFileCount(0);
+      }
+
+      if (status.status === 'started') {
+        // Monitoring may have started on a different directory; refresh the listed save files
+        loadSaveFiles();
       }
     };
 

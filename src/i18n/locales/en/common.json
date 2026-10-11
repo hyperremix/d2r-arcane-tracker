@@ -370,7 +370,8 @@
       "title": "Save File Monitoring",
       "error": "Error",
       "disabledManualMode": "Disabled (Manual Mode)",
-      "active": "Active ({{count}} files)",
+      "active_one": "Active ({{count}} file)",
+      "active_other": "Active ({{count}} files)",
       "inactive": "Inactive",
       "manualModeNotice": "Save file monitoring is disabled because you have selected Manual Entry mode. Items must be entered manually when using this mode.",
       "manualModeActive": "Manual Mode Active:",
@@ -446,7 +447,10 @@
       "title": "D2R Installation",
       "installationPath": "Installation Path",
       "browseForDirectory": "Browse for directory",
-      "pathDescription": "Path to your Diablo II: Resurrected installation directory. This setting is used by both item icon management and terror zone configuration."
+      "pathDescription": "Path to your Diablo II: Resurrected installation directory. This setting is used by both item icon management and terror zone configuration.",
+      "notConfigured": "No installation path saved",
+      "notConfiguredHint": "Item icons and terror zone configuration need this path. Browse to your Diablo II: Resurrected folder.",
+      "useSuggestion": "Use this path"
     },
     "update": {
       "title": "Application Updates",

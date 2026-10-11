@@ -207,6 +207,69 @@ describe('SaveFileMonitor', () => {
     });
   });
 
+  describe('status badge', () => {
+    function createSaveFiles(count: number) {
+      return Array.from({ length: count }, (_, index) => ({
+        name: `Character ${index + 1}`,
+        path: `${CURRENT_DIRECTORY}/Character${index + 1}.d2s`,
+        lastModified: new Date('2026-01-01T00:00:00Z'),
+        characterClass: 'sorceress',
+        level: 90,
+        hardcore: false,
+        expansion: true,
+      }));
+    }
+
+    it('When Settings opens while monitoring is already active, Then the badge counts the listed save files', async () => {
+      // Arrange
+      mockGameMode(GameMode.Both);
+      arrangeMonitoredDirectory(false);
+      getElectronAPI().saveFile.getSaveFiles.mockResolvedValue(createSaveFiles(3));
+
+      // Act
+      render(<SaveFileMonitor />);
+
+      // Assert
+      expect(await screen.findByText('Detected Characters (3):')).toBeInTheDocument();
+      expect(screen.getByText('Active (3 files)')).toBeInTheDocument();
+    });
+
+    it('If exactly one save file is listed, Then the badge uses the singular', async () => {
+      // Arrange
+      mockGameMode(GameMode.Both);
+      arrangeMonitoredDirectory(false);
+      getElectronAPI().saveFile.getSaveFiles.mockResolvedValue(createSaveFiles(1));
+
+      // Act
+      render(<SaveFileMonitor />);
+
+      // Assert
+      expect(await screen.findByText('Active (1 file)')).toBeInTheDocument();
+    });
+
+    it('When monitoring starts, Then the save files are reloaded and the badge follows the list', async () => {
+      // Arrange
+      mockGameMode(GameMode.Both);
+      render(<SaveFileMonitor />);
+      await waitFor(() => expect(getElectronAPI().saveFile.getSaveFiles).toHaveBeenCalledTimes(1));
+      getElectronAPI().saveFile.getSaveFiles.mockResolvedValue(createSaveFiles(2));
+
+      // Act
+      act(() => {
+        mainEvents.emit('monitoring-status-changed', {
+          status: 'started',
+          directory: CURRENT_DIRECTORY,
+          saveFileCount: 5,
+        });
+      });
+
+      // Assert
+      expect(await screen.findByText('Active (2 files)')).toBeInTheDocument();
+      expect(screen.getByText('Detected Characters (2):')).toBeInTheDocument();
+      expect(getElectronAPI().saveFile.getSaveFiles).toHaveBeenCalledTimes(2);
+    });
+  });
+
   describe('latest activity', () => {
     function emitSaveFileEvent(type: string) {
       act(() => {
