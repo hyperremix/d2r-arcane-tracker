@@ -52,6 +52,27 @@ describe('When useTerrorZoneConfig is used', () => {
     });
   });
 
+  describe('If the installation is valid but reading the zones fails', () => {
+    it('Then the load error is set apart from write errors and reload clears it', async () => {
+      // Arrange
+      const getZones = vi.fn().mockRejectedValueOnce(new Error('EIO')).mockResolvedValue(zones);
+      setupTerrorZoneApi({ getZones });
+      const { result } = renderHook(() => useTerrorZoneConfig());
+      await waitFor(() => expect(result.current.isLoading).toBe(false));
+      expect(result.current.loadError).toBe('Failed to load terror zone data');
+      expect(result.current.error).toBeUndefined();
+
+      // Act
+      await act(async () => {
+        await result.current.reload();
+      });
+
+      // Assert
+      expect(result.current.loadError).toBeUndefined();
+      expect(result.current.zones).toEqual(zones);
+    });
+  });
+
   describe('If a zone is toggled and the write fails', () => {
     it('Then the zone is rolled back and the error is set', async () => {
       // Arrange

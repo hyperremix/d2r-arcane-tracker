@@ -34,7 +34,8 @@ function buildConfig(
  * Loads the terror zones and their configuration, and writes changes to the game file.
  * Changes are shown optimistically; writes run one after another and roll back the zones they
  * covered if they fail. Successful writes show a toast and are remembered for the app session
- * (`hasChangesToApply`), failures set `error`.
+ * (`hasChangesToApply`), failures set `error`. Reading the zones from a valid installation can
+ * fail separately, which sets `loadError` until a later load (`reload`) succeeds.
  */
 export function useTerrorZoneConfig() {
   const { t } = useTranslation();
@@ -49,6 +50,7 @@ export function useTerrorZoneConfig() {
     errorCode: 'pathNotConfigured',
   });
   const [error, setError] = useState<string | undefined>(undefined);
+  const [loadError, setLoadError] = useState<string | undefined>(undefined);
   const hasChangesToApply = useTerrorZoneSessionStore((state) => state.hasChangesToApply);
   const markChangesToApply = useTerrorZoneSessionStore((state) => state.markChangesToApply);
 
@@ -72,6 +74,7 @@ export function useTerrorZoneConfig() {
     try {
       setIsLoading(true);
       setError(undefined);
+      setLoadError(undefined);
 
       // Validate path first
       const validation = await window.electronAPI.terrorZone.validatePath();
@@ -97,7 +100,7 @@ export function useTerrorZoneConfig() {
       return true;
     } catch (err) {
       console.error('Failed to load terror zone data:', err);
-      setError(t(translations.terrorZone.errors.loadFailed));
+      setLoadError(t(translations.terrorZone.errors.loadFailed));
       return false;
     } finally {
       setIsLoading(false);
@@ -251,7 +254,10 @@ export function useTerrorZoneConfig() {
     isRestoring,
     validationStatus,
     error,
+    loadError,
     hasChangesToApply,
+    /** Loads the validation status, zones and configuration again, e.g. after a load error. */
+    reload: loadData,
     toggleZone,
     runBulkUpdate,
     restoreOriginal,

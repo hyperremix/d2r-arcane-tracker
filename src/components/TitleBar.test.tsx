@@ -147,6 +147,16 @@ describe('When TitleBar is rendered', () => {
     }
   });
 
+  it('Then the Terror zones link shows a skull icon rather than a map pin', () => {
+    // Arrange & Act
+    renderTitleBar();
+
+    // Assert
+    const link = within(getNavigation()).getByRole('link', { name: 'Terror zones' });
+    expect(link.querySelector('svg.lucide-skull')).not.toBeNull();
+    expect(link.querySelector('svg.lucide-map-pinned')).toBeNull();
+  });
+
   it('Then Terror zones and Settings are icon-only links with an accessible name at every width', () => {
     // Arrange & Act
     renderTitleBar();

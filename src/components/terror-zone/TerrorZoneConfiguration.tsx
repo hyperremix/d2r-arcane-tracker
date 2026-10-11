@@ -3,6 +3,7 @@ import {
   AlertCircle,
   AlertTriangle,
   ExternalLink,
+  FolderCog,
   Loader2,
   RefreshCw,
   RotateCcw,
@@ -64,6 +65,123 @@ const TERROR_ZONE_GUIDE_URL =
   'https://github.com/hyperremix/d2r-arcane-tracker/blob/main/docs/TERROR_ZONE_CONFIGURATION.md';
 
 /**
+ * Props for the installation states shown instead of the zone list.
+ */
+interface InstallationStateProps {
+  onOpenInstallationSettings: () => void;
+}
+
+/**
+ * Empty state shown when no D2R installation folder is set: says what is needed and offers the
+ * one action that fixes it.
+ */
+function InstallationPathNotConfigured({ onOpenInstallationSettings }: InstallationStateProps) {
+  const { t } = useTranslation();
+  return (
+    <div
+      data-testid="terror-zone-not-configured"
+      className="flex flex-col items-center justify-center gap-3 px-6 py-12 text-center"
+    >
+      <FolderCog aria-hidden="true" className="size-10 text-muted-foreground" />
+      <h2 className="font-semibold text-foreground text-lg">
+        {t(translations.terrorZone.notConfigured.title)}
+      </h2>
+      <p className="max-w-md text-muted-foreground text-sm">
+        {t(translations.terrorZone.notConfigured.description)}
+      </p>
+      <Button type="button" onClick={onOpenInstallationSettings} className="mt-2">
+        <Settings aria-hidden="true" />
+        {t(translations.terrorZone.openInstallationSettings)}
+      </Button>
+    </div>
+  );
+}
+
+/**
+ * Props for the InstallationErrorAlert component.
+ */
+interface InstallationErrorAlertProps extends InstallationStateProps {
+  errorCode: TerrorZoneValidationErrorCode;
+}
+
+/**
+ * Error shown when a D2R installation folder is set but the terror zone game file can't be used,
+ * with the steps or settings link that fix it.
+ */
+function InstallationErrorAlert({
+  errorCode,
+  onOpenInstallationSettings,
+}: InstallationErrorAlertProps) {
+  const { t } = useTranslation();
+  return (
+    <Alert className="border-destructive/30 bg-destructive/10">
+      <AlertCircle className="h-4 w-4 text-destructive" />
+      <AlertTitle className="font-bold text-destructive">{t(translations.common.error)}</AlertTitle>
+      <AlertDescription className="space-y-2 text-destructive">
+        <p>{t(validationErrorKeys[errorCode])}</p>
+        {installationPathErrorCodes.has(errorCode) && (
+          <Button type="button" variant="outline" size="sm" onClick={onOpenInstallationSettings}>
+            <Settings aria-hidden="true" />
+            {t(translations.terrorZone.openInstallationSettings)}
+          </Button>
+        )}
+        {errorCode === 'gameFileNotFound' && (
+          <div>
+            <p className="font-semibold text-sm">
+              {t(translations.terrorZone.gameFilesMustBeExtracted)}
+            </p>
+            <p className="text-sm">
+              {t(translations.terrorZone.cascDescription)}
+              <strong> {t(translations.terrorZone.allFilesMustBeExtracted)}</strong>{' '}
+              {t(translations.terrorZone.launchFlags)}{' '}
+              <code className="rounded bg-background/60 px-1">
+                {t(translations.terrorZone.flagsValue)}
+              </code>{' '}
+              {t(translations.terrorZone.flagsSuffix)}
+            </p>
+            <div className="mt-2">
+              <p className="font-semibold text-sm">{t(translations.terrorZone.extractionSteps)}</p>
+              <ol className="mt-1 ml-4 list-decimal space-y-1 text-sm">
+                <li>
+                  {t(translations.settings.itemIcons.downloadCascViewer)}{' '}
+                  <a
+                    href="https://www.hiveworkshop.com/threads/ladiks-casc-viewer.331540/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="underline hover:decoration-2"
+                  >
+                    {t(translations.settings.itemIcons.ladiksCascViewer)}
+                  </a>
+                </li>
+                <li>{t(translations.settings.itemIcons.openX64Version)}</li>
+                <li>{t(translations.settings.itemIcons.openStorage)}</li>
+                <li>{t(translations.settings.itemIcons.selectD2rFolder)}</li>
+                <li>{t(translations.settings.itemIcons.clickData)}</li>
+                <li>{t(translations.settings.itemIcons.clickDataExtract)}</li>
+                <li>{t(translations.settings.itemIcons.waitForExtraction)}</li>
+                <li>{t(translations.settings.itemIcons.moveFolders)}</li>
+                <li>
+                  {t(translations.terrorZone.createShortcut)}{' '}
+                  <code className="rounded bg-background/60 px-1 text-xs">
+                    {t(translations.terrorZone.flagsValue)}
+                  </code>{' '}
+                  {t(translations.terrorZone.toTheTarget)}
+                </li>
+                <li>{t(translations.terrorZone.alwaysLaunchShortcut)}</li>
+              </ol>
+            </div>
+            <p className="mt-2 text-xs">
+              <strong>{t(translations.common.note)}</strong>{' '}
+              {t(translations.terrorZone.extractionNote)}
+            </p>
+          </div>
+        )}
+      </AlertDescription>
+    </Alert>
+  );
+}
+
+/**
  * TerrorZoneConfiguration component that serves as the main terror zone configuration page.
  * Allows users to enable/disable specific terror zones by modifying the game's desecratedzones.json file.
  * @returns {JSX.Element} The main terror zone configuration interface
@@ -84,7 +202,9 @@ export function TerrorZoneConfiguration() {
     isRestoring,
     validationStatus,
     error,
+    loadError,
     hasChangesToApply,
+    reload,
     toggleZone,
     runBulkUpdate,
     restoreOriginal,
@@ -127,12 +247,10 @@ export function TerrorZoneConfiguration() {
   }, 0);
   const totalCount = zones.length;
 
-  const validationErrorMessage = validationStatus.valid
-    ? undefined
-    : t(validationErrorKeys[validationStatus.errorCode]);
-  const showExtractionGuide = validationStatus.errorCode === 'gameFileNotFound';
-  const showInstallationSettingsAction =
-    !validationStatus.valid && installationPathErrorCodes.has(validationStatus.errorCode);
+  const isPathNotConfigured =
+    !validationStatus.valid && validationStatus.errorCode === 'pathNotConfigured';
+  // Zones can be edited once they were read from a valid installation
+  const canEditZones = validationStatus.valid && loadError === undefined;
   const isBulkSaving = bulkAction !== undefined;
   const isWriteInProgress = isBulkSaving || isRestoring || pendingZoneIds.size > 0;
   const areActionsDisabled = isWriteInProgress || !validationStatus.valid;
@@ -173,6 +291,8 @@ export function TerrorZoneConfiguration() {
     />
   );
 
+  const openInstallationSettings = () => navigate('/settings');
+
   if (isLoading) {
     return (
       <TooltipProvider>
@@ -192,6 +312,23 @@ export function TerrorZoneConfiguration() {
     );
   }
 
+  if (isPathNotConfigured) {
+    return (
+      <TooltipProvider>
+        <PageShell>
+          {pageHeader}
+          <Card>
+            <CardContent>
+              <InstallationPathNotConfigured
+                onOpenInstallationSettings={openInstallationSettings}
+              />
+            </CardContent>
+          </Card>
+        </PageShell>
+      </TooltipProvider>
+    );
+  }
+
   return (
     <TooltipProvider>
       <PageShell padded={false}>
@@ -199,16 +336,38 @@ export function TerrorZoneConfiguration() {
           {pageHeader}
           <Card>
             <CardContent className="space-y-4">
-              {/* Warning and, once the installation is valid, what changes need to show up in game */}
-              <Alert variant="warning" live="polite">
-                <AlertTriangle aria-hidden="true" />
-                <AlertDescription className="gap-2">
-                  <p>
-                    <strong>{t(translations.common.warning)}</strong>{' '}
-                    {t(translations.terrorZone.warning)}
-                  </p>
-                  {validationStatus.valid && (
-                    <>
+              {/* Validation Status */}
+              {!validationStatus.valid && (
+                <InstallationErrorAlert
+                  errorCode={validationStatus.errorCode}
+                  onOpenInstallationSettings={openInstallationSettings}
+                />
+              )}
+
+              {/* Reading the zones failed even though the installation is valid */}
+              {loadError && (
+                <Alert className="border-destructive/30 bg-destructive/10">
+                  <XCircle className="h-4 w-4 text-destructive" />
+                  <AlertDescription className="space-y-2 text-destructive">
+                    <p>{loadError}</p>
+                    <Button type="button" variant="outline" size="sm" onClick={() => void reload()}>
+                      <RefreshCw aria-hidden="true" />
+                      {t(translations.common.retry)}
+                    </Button>
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              {canEditZones && (
+                <>
+                  {/* Risk warning and what changes need to show up in game, once zones can be edited */}
+                  <Alert variant="warning" live="polite">
+                    <AlertTriangle aria-hidden="true" />
+                    <AlertDescription className="gap-2">
+                      <p>
+                        <strong>{t(translations.common.warning)}</strong>{' '}
+                        {t(translations.terrorZone.warning)}
+                      </p>
                       <p className="font-semibold">
                         {t(translations.terrorZone.requirements.title)}
                       </p>
@@ -231,198 +390,124 @@ export function TerrorZoneConfiguration() {
                         {t(translations.terrorZone.requirements.openGuide)}
                         <ExternalLink className="h-3 w-3" aria-hidden="true" />
                       </a>
-                    </>
+                    </AlertDescription>
+                  </Alert>
+
+                  {/* Error Display */}
+                  {error && (
+                    <Alert className="border-destructive/30 bg-destructive/10">
+                      <XCircle className="h-4 w-4 text-destructive" />
+                      <AlertDescription className="text-destructive">{error}</AlertDescription>
+                    </Alert>
                   )}
-                </AlertDescription>
-              </Alert>
 
-              {/* Validation Status */}
-              {!validationStatus.valid && (
-                <Alert className="border-destructive/30 bg-destructive/10">
-                  <AlertCircle className="h-4 w-4 text-destructive" />
-                  <AlertTitle className="font-bold text-destructive">
-                    {t(translations.common.error)}
-                  </AlertTitle>
-                  <AlertDescription className="space-y-2 text-destructive">
-                    <p>{validationErrorMessage}</p>
-                    {showInstallationSettingsAction && (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => navigate('/settings')}
-                      >
-                        <Settings aria-hidden="true" />
-                        {t(translations.terrorZone.openInstallationSettings)}
-                      </Button>
-                    )}
-                    {showExtractionGuide && (
-                      <div>
-                        <p className="font-semibold text-sm">
-                          {t(translations.terrorZone.gameFilesMustBeExtracted)}
-                        </p>
-                        <p className="text-sm">
-                          {t(translations.terrorZone.cascDescription)}
-                          <strong> {t(translations.terrorZone.allFilesMustBeExtracted)}</strong>{' '}
-                          {t(translations.terrorZone.launchFlags)}{' '}
-                          <code className="rounded bg-background/60 px-1">
-                            {t(translations.terrorZone.flagsValue)}
-                          </code>{' '}
-                          {t(translations.terrorZone.flagsSuffix)}
-                        </p>
-                        <div className="mt-2">
-                          <p className="font-semibold text-sm">
-                            {t(translations.terrorZone.extractionSteps)}
-                          </p>
-                          <ol className="mt-1 ml-4 list-decimal space-y-1 text-sm">
-                            <li>
-                              {t(translations.settings.itemIcons.downloadCascViewer)}{' '}
-                              <a
-                                href="https://www.hiveworkshop.com/threads/ladiks-casc-viewer.331540/"
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="underline hover:decoration-2"
-                              >
-                                {t(translations.settings.itemIcons.ladiksCascViewer)}
-                              </a>
-                            </li>
-                            <li>{t(translations.settings.itemIcons.openX64Version)}</li>
-                            <li>{t(translations.settings.itemIcons.openStorage)}</li>
-                            <li>{t(translations.settings.itemIcons.selectD2rFolder)}</li>
-                            <li>{t(translations.settings.itemIcons.clickData)}</li>
-                            <li>{t(translations.settings.itemIcons.clickDataExtract)}</li>
-                            <li>{t(translations.settings.itemIcons.waitForExtraction)}</li>
-                            <li>{t(translations.settings.itemIcons.moveFolders)}</li>
-                            <li>
-                              {t(translations.terrorZone.createShortcut)}{' '}
-                              <code className="rounded bg-background/60 px-1 text-xs">
-                                {t(translations.terrorZone.flagsValue)}
-                              </code>{' '}
-                              {t(translations.terrorZone.toTheTarget)}
-                            </li>
-                            <li>{t(translations.terrorZone.alwaysLaunchShortcut)}</li>
-                          </ol>
-                        </div>
-                        <p className="mt-2 text-xs">
-                          <strong>{t(translations.common.note)}</strong>{' '}
-                          {t(translations.terrorZone.extractionNote)}
-                        </p>
+                  {/* Search and Controls */}
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-2">
+                      <Label htmlFor={searchInputId} className="sr-only">
+                        {t(translations.terrorZone.searchLabel)}
+                      </Label>
+                      <Search className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                      <Input
+                        id={searchInputId}
+                        placeholder={t(translations.terrorZone.searchPlaceholder)}
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="flex-1"
+                      />
+                    </div>
+
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+                        <span className="text-muted-foreground">
+                          {t(translations.terrorZone.zonesEnabled, {
+                            enabled: enabledCount,
+                            total: totalCount,
+                          })}
+                        </span>
+                        {/* Stays mounted so the restart reminder is announced when it appears */}
+                        <output aria-live="polite" className="inline-flex items-center gap-1.5">
+                          {hasChangesToApply && (
+                            <>
+                              <RefreshCw className="h-4 w-4 text-warning" aria-hidden="true" />
+                              <span className="font-medium text-warning">
+                                {t(translations.terrorZone.restartPending)}
+                              </span>
+                            </>
+                          )}
+                        </output>
                       </div>
-                    )}
-                  </AlertDescription>
-                </Alert>
-              )}
-
-              {/* Error Display */}
-              {error && (
-                <Alert className="border-destructive/30 bg-destructive/10">
-                  <XCircle className="h-4 w-4 text-destructive" />
-                  <AlertDescription className="text-destructive">{error}</AlertDescription>
-                </Alert>
-              )}
-
-              {/* Search and Controls */}
-              <div className="space-y-4">
-                <div className="flex items-center gap-2">
-                  <Label htmlFor={searchInputId} className="sr-only">
-                    {t(translations.terrorZone.searchLabel)}
-                  </Label>
-                  <Search className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
-                  <Input
-                    id={searchInputId}
-                    placeholder={t(translations.terrorZone.searchPlaceholder)}
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="flex-1"
-                  />
-                </div>
-
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
-                    <span className="text-muted-foreground">
-                      {t(translations.terrorZone.zonesEnabled, {
-                        enabled: enabledCount,
-                        total: totalCount,
-                      })}
-                    </span>
-                    {/* Stays mounted so the restart reminder is announced when it appears */}
-                    <output aria-live="polite" className="inline-flex items-center gap-1.5">
-                      {hasChangesToApply && (
-                        <>
-                          <RefreshCw className="h-4 w-4 text-warning" aria-hidden="true" />
-                          <span className="font-medium text-warning">
-                            {t(translations.terrorZone.restartPending)}
-                          </span>
-                        </>
-                      )}
-                    </output>
-                  </div>
-                  <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={handleEnableAll}
-                      disabled={areActionsDisabled}
-                    >
-                      {bulkAction === 'enableAll' && (
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
-                      )}
-                      {t(translations.terrorZone.enableAll)}
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setShowDisableAllDialog(true)}
-                      disabled={areActionsDisabled}
-                    >
-                      {bulkAction === 'disableAll' && (
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
-                      )}
-                      {t(translations.terrorZone.disableAll)}
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setShowRestoreDialog(true)}
-                      disabled={areActionsDisabled}
-                    >
-                      <RotateCcw className="mr-2 h-4 w-4" />
-                      {t(translations.terrorZone.restoreOriginal)}
-                    </Button>
-                  </div>
-                </div>
-              </div>
-
-              {/* Zone List, grouped by act */}
-              <div className="space-y-6">
-                {zoneGroups.map((group) => {
-                  const groupKey = group.act ?? 'other';
-                  const headingId = `${actHeadingIdPrefix}-${groupKey}`;
-                  return (
-                    <section
-                      key={groupKey}
-                      aria-labelledby={showGroupHeadings ? headingId : undefined}
-                      className="space-y-3"
-                    >
-                      {showGroupHeadings && (
-                        <h2 id={headingId} className="font-semibold text-muted-foreground text-sm">
-                          {group.act === undefined
-                            ? t(translations.terrorZone.otherZones)
-                            : t(translations.terrorZone.actHeading, { act: group.act })}
-                        </h2>
-                      )}
-                      <div className="grid grid-cols-[repeat(auto-fill,minmax(16rem,1fr))] gap-4">
-                        {group.zones.map(renderZoneSwitch)}
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={handleEnableAll}
+                          disabled={areActionsDisabled}
+                        >
+                          {bulkAction === 'enableAll' && (
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
+                          )}
+                          {t(translations.terrorZone.enableAll)}
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setShowDisableAllDialog(true)}
+                          disabled={areActionsDisabled}
+                        >
+                          {bulkAction === 'disableAll' && (
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
+                          )}
+                          {t(translations.terrorZone.disableAll)}
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setShowRestoreDialog(true)}
+                          disabled={areActionsDisabled}
+                        >
+                          <RotateCcw className="mr-2 h-4 w-4" />
+                          {t(translations.terrorZone.restoreOriginal)}
+                        </Button>
                       </div>
-                    </section>
-                  );
-                })}
-              </div>
+                    </div>
+                  </div>
 
-              {filteredZones.length === 0 && searchTerm && (
-                <div className="py-8 text-center text-muted-foreground">
-                  {t(translations.terrorZone.noZonesFound, { searchTerm })}
-                </div>
+                  {/* Zone List, grouped by act */}
+                  <div className="space-y-6">
+                    {zoneGroups.map((group) => {
+                      const groupKey = group.act ?? 'other';
+                      const headingId = `${actHeadingIdPrefix}-${groupKey}`;
+                      return (
+                        <section
+                          key={groupKey}
+                          aria-labelledby={showGroupHeadings ? headingId : undefined}
+                          className="space-y-3"
+                        >
+                          {showGroupHeadings && (
+                            <h2
+                              id={headingId}
+                              className="font-semibold text-muted-foreground text-sm"
+                            >
+                              {group.act === undefined
+                                ? t(translations.terrorZone.otherZones)
+                                : t(translations.terrorZone.actHeading, { act: group.act })}
+                            </h2>
+                          )}
+                          <div className="grid grid-cols-[repeat(auto-fill,minmax(16rem,1fr))] gap-4">
+                            {group.zones.map(renderZoneSwitch)}
+                          </div>
+                        </section>
+                      );
+                    })}
+                  </div>
+
+                  {filteredZones.length === 0 && searchTerm && (
+                    <div className="py-8 text-center text-muted-foreground">
+                      {t(translations.terrorZone.noZonesFound, { searchTerm })}
+                    </div>
+                  )}
+                </>
               )}
             </CardContent>
           </Card>
