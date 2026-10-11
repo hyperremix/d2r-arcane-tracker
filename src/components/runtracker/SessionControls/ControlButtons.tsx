@@ -1,5 +1,6 @@
 import { Globe, Loader2, Pause, Play, Square, StopCircle, Timer } from 'lucide-react';
 import type { ReactNode } from 'react';
+import { useId } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -73,6 +74,7 @@ function ActionButton({
   pending,
   onClick,
 }: ActionButtonProps) {
+  const shortcutId = useId();
   return (
     <Button
       variant={variant}
@@ -81,11 +83,12 @@ function ActionButton({
       disabled={disabled || pending}
       aria-busy={pending}
       aria-keyshortcuts={ariaShortcut}
+      aria-describedby={shortcut ? shortcutId : undefined}
       className={size === 'lg' ? 'min-w-36 gap-2 px-4' : 'gap-2'}
     >
       {pending ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : icon}
       {label}
-      {shortcut && <ShortcutKey shortcut={shortcut} className="ml-1" />}
+      {shortcut && <ShortcutKey shortcut={shortcut} id={shortcutId} className="ml-1" />}
     </Button>
   );
 }

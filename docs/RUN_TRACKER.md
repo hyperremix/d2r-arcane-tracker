@@ -18,7 +18,7 @@ Open the Run Tracker from **Runs** in the title bar. The page is built to be rea
 - **Active session**: a compact row of session time, run count, average and fastest run, efficiency, items found and new grail items, then **Recent Runs** and the session actions. Recent Runs lists the last five finished runs, newest first, with each run's duration and the items found in it. **View all runs** opens the full run history of the active session. **Session Notes** are collapsed by default; select the toggle to open them. Notes are saved with the session when you leave the field, and you can also edit them from a session's detail view. Notes can be up to 10,000 characters long. Archive and export are at the bottom. **Archive Session** is unavailable while a run of the session is in progress (paused included), both here and in the session's detail view; end the run first. The app refuses to archive such a session even if the request doesn't come from the button.
 - **Sessions list**: past sessions. Sessions from the last week show a relative day (**Today**, **Yesterday**, *3 days ago*), older ones a short date. Select one to see its runs, the items in each run, and summary stats. The stats start with what you found (items found and new grail items), then your pace (run count, average and fastest run, efficiency), then the start, end and total time of the session.
 
-Efficiency is the share of the session spent in runs. It updates live and counts the run in progress, so it is correct before your first run ends.
+Efficiency is the share of the session spent in runs. While a session is running, it updates live and counts the run in progress, both on the page and in the session's detail view, so it is correct before your first run ends.
 
 ### Pausing a run
 

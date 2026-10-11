@@ -1149,13 +1149,36 @@ describe('SessionControls', () => {
       expect(getShortcutKey('End Run')).toHaveTextContent('Ctrl+E');
       expect(getShortcutKey('Pause')).toHaveTextContent('Ctrl+Space');
       expect(getShortcutKey('End Session')).toHaveTextContent('Ctrl+Shift+E');
+      expect(screen.getByRole('button', { name: 'End Run' })).toHaveAttribute(
+        'aria-keyshortcuts',
+        'Control+E',
+      );
+      expect(screen.getByRole('button', { name: 'Pause' })).toHaveAttribute(
+        'aria-keyshortcuts',
+        'Control+Space',
+      );
       expect(screen.getByRole('button', { name: 'End Session' })).toHaveAttribute(
         'aria-keyshortcuts',
         'Control+Shift+E',
       );
     });
 
-    it('When a shortcut is shown as a key chip, Then the chip is hidden from assistive technology and the button announces the shortcut instead', () => {
+    it('If a session has no active run on Windows, Then Start Run announces Control+R', () => {
+      // Arrange
+      setPlatform('win32');
+      mockStoreState(mockUseRunTrackerStore, { ...defaultStoreState, activeSession: mockSession });
+
+      // Act
+      render(<SessionControls />);
+
+      // Assert
+      expect(screen.getByRole('button', { name: 'Start Run' })).toHaveAttribute(
+        'aria-keyshortcuts',
+        'Control+R',
+      );
+    });
+
+    it('When a shortcut is shown as a key chip, Then the chip is hidden from assistive technology and the button exposes the shortcut instead', () => {
       // Arrange
       setPlatform('darwin');
       mockStoreState(mockUseRunTrackerStore, {
@@ -1178,6 +1201,15 @@ describe('SessionControls', () => {
       expect(screen.getByRole('button', { name: 'End Session' })).toHaveAttribute(
         'aria-keyshortcuts',
         'Meta+Shift+E',
+      );
+      // The accessible name is unchanged; the shortcut is the accessible description
+      expect(endRunButton).toHaveAccessibleName('End Run');
+      expect(endRunButton).toHaveAccessibleDescription('\u2318E');
+      expect(screen.getByRole('button', { name: 'Pause' })).toHaveAccessibleDescription(
+        '\u2318Space',
+      );
+      expect(screen.getByRole('button', { name: 'End Session' })).toHaveAccessibleDescription(
+        '\u21E7\u2318E',
       );
     });
 

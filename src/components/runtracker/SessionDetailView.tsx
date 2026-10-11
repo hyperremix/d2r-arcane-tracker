@@ -1,4 +1,5 @@
-import type { Session } from 'electron/types/grail';
+import type { Run, Session } from 'electron/types/grail';
+import { getRunElapsedMs } from 'electron/utils/runClock';
 import { MAX_SESSION_NOTES_LENGTH } from 'electron/utils/sessionNotes';
 import { Archive, ArrowLeft, FileDown, Loader2 } from 'lucide-react';
 import type { ReactNode } from 'react';
@@ -10,12 +11,14 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
+import { useNow } from '@/hooks/useNow';
 import { translations } from '@/i18n/translations';
 import { formatDuration, formatSessionDate } from '@/lib/date';
 import { cn } from '@/lib/utils';
 import { useRunTrackerStore, useSessionStats } from '@/stores/runTrackerStore';
 import { ArchiveSessionDialog } from './ArchiveSessionDialog';
 import { ExportDialog } from './ExportDialog';
+import { calculateLiveEfficiency } from './liveSession';
 import { RunList } from './RunList';
 import { SessionControls } from './SessionControls';
 import { useSessionNotes } from './useSessionNotes';
@@ -56,6 +59,40 @@ function DetailStat({ label, value, description, size = 'md' }: DetailStatProps)
       {description && <dd className="text-muted-foreground text-xs">{description}</dd>}
     </div>
   );
+}
+
+const isSessionRunning = (session: Session | undefined) => Boolean(session && !session.endTime);
+
+// Time from the start of the session to its end, or to `now` while it is still running
+const getSessionDuration = (session: Session | undefined, now: number) =>
+  session ? (session.endTime?.getTime() ?? now) - session.startTime.getTime() : 0;
+
+interface EfficiencyInput {
+  session: Session | undefined;
+  /** The in-progress run of the session, if any. */
+  inProgressRun: Run | null;
+  now: number;
+  sessionDuration: number;
+}
+
+// Share of the session spent in runs. A running session counts its in-progress run (paused time
+// excluded), because the stored totals only change when a run ends; a finished session uses them.
+function getEfficiencyPercentage({
+  session,
+  inProgressRun,
+  now,
+  sessionDuration,
+}: EfficiencyInput): number {
+  if (!session) return 0;
+  if (!session.endTime) {
+    return calculateLiveEfficiency({
+      completedRunTime: session.totalRunTime,
+      currentRunElapsed: inProgressRun ? getRunElapsedMs(inProgressRun, now) : 0,
+      sessionElapsed: sessionDuration,
+    });
+  }
+  if (session.totalSessionTime === 0) return 0;
+  return (session.totalRunTime / session.totalSessionTime) * 100;
 }
 
 interface ArchiveButtonProps {
@@ -159,19 +196,16 @@ export function SessionDetailView({ sessionId, onBack }: SessionDetailViewProps)
     }
   }, [sessionId, loadSessionRuns, runs]);
 
-  // Calculate session duration
-  const getSessionDuration = useCallback((session: Session) => {
-    if (session.endTime) {
-      return session.endTime.getTime() - session.startTime.getTime();
-    }
-    return Date.now() - session.startTime.getTime();
-  }, []);
+  // Live clock for the duration and efficiency of a session that is still running
+  const now = useNow(isSessionRunning(session));
+  const sessionDuration = getSessionDuration(session, now);
 
-  // Calculate efficiency percentage
-  const efficiencyPercentage = useMemo(() => {
-    if (!session || session.totalSessionTime === 0) return 0;
-    return (session.totalRunTime / session.totalSessionTime) * 100;
-  }, [session]);
+  const efficiencyPercentage = getEfficiencyPercentage({
+    session,
+    inProgressRun: hasActiveRun ? activeRun : null,
+    now,
+    sessionDuration,
+  });
 
   // Calculate average run time
   const averageRunTime = useMemo(() => {
@@ -246,8 +280,6 @@ export function SessionDetailView({ sessionId, onBack }: SessionDetailViewProps)
       </div>
     );
   }
-
-  const sessionDuration = getSessionDuration(session);
 
   return (
     <div className="space-y-6">

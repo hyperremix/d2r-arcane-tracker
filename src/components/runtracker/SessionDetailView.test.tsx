@@ -1,5 +1,5 @@
 import '@testing-library/jest-dom';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import type { Run, Session } from 'electron/types/grail';
 import { MAX_SESSION_NOTES_LENGTH } from 'electron/utils/sessionNotes';
 import i18n from 'i18next';
@@ -55,6 +55,10 @@ describe('SessionDetailView', () => {
     vi.clearAllMocks();
     vi.mocked(useSessionStats).mockReturnValue(undefined);
     mockStoreState(mockUseRunTrackerStore, createStoreState());
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   describe('When Archive Session is clicked', () => {
@@ -358,6 +362,8 @@ describe('SessionDetailView', () => {
   describe('When the active session also exists in the loaded sessions list as a stale snapshot', () => {
     it('Then the live active session values are shown instead of the stale snapshot', () => {
       // Arrange
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2024-01-01T10:00:00Z').getTime() + 1000000);
       const staleSession: Session = {
         ...mockSession,
         id: 'session-live',
@@ -388,6 +394,88 @@ describe('SessionDetailView', () => {
       expect(within(runCountStat).queryByText('3')).not.toBeInTheDocument();
       expect(screen.getByText('90.0%')).toBeInTheDocument();
       expect(screen.getByLabelText('Session Notes')).toHaveValue('live notes');
+    });
+  });
+
+  describe('If the session is still running', () => {
+    const startTime = new Date('2024-01-01T10:00:00Z');
+    const liveSession: Session = {
+      ...mockSession,
+      id: 'session-live',
+      startTime,
+      endTime: undefined,
+      runCount: 0,
+      totalRunTime: 0,
+      totalSessionTime: 0,
+    };
+
+    beforeEach(() => {
+      vi.useFakeTimers();
+    });
+
+    it('When its first run is still in progress, Then efficiency counts that run although no totals are stored yet', () => {
+      // Arrange
+      vi.setSystemTime(startTime.getTime() + 100000);
+      const activeRun = {
+        id: 'run-1',
+        sessionId: 'session-live',
+        runNumber: 1,
+        startTime: new Date(startTime.getTime() + 20000),
+      };
+      mockStoreState(
+        mockUseRunTrackerStore,
+        createStoreState({ sessions: [], activeSession: liveSession, activeRun }),
+      );
+
+      // Act
+      render(<SessionDetailView sessionId="session-live" onBack={vi.fn()} />);
+
+      // Assert
+      const efficiencyStat = screen.getByText('Efficiency').parentElement as HTMLElement;
+      expect(within(efficiencyStat).getByText('80.0%')).toBeInTheDocument();
+    });
+
+    it('When no run is in progress, Then efficiency is the stored run time over the session time so far', () => {
+      // Arrange
+      vi.setSystemTime(startTime.getTime() + 100000);
+      mockStoreState(
+        mockUseRunTrackerStore,
+        createStoreState({
+          sessions: [],
+          activeSession: { ...liveSession, totalRunTime: 25000 },
+        }),
+      );
+
+      // Act
+      render(<SessionDetailView sessionId="session-live" onBack={vi.fn()} />);
+
+      // Assert
+      const efficiencyStat = screen.getByText('Efficiency').parentElement as HTMLElement;
+      expect(within(efficiencyStat).getByText('25.0%')).toBeInTheDocument();
+    });
+
+    it('When time passes, Then the session duration and efficiency keep updating', () => {
+      // Arrange
+      vi.setSystemTime(startTime.getTime() + 100000);
+      mockStoreState(
+        mockUseRunTrackerStore,
+        createStoreState({
+          sessions: [],
+          activeSession: { ...liveSession, totalRunTime: 25000 },
+        }),
+      );
+      render(<SessionDetailView sessionId="session-live" onBack={vi.fn()} />);
+
+      // Act
+      act(() => {
+        vi.advanceTimersByTime(100000);
+      });
+
+      // Assert
+      const efficiencyStat = screen.getByText('Efficiency').parentElement as HTMLElement;
+      expect(within(efficiencyStat).getByText('12.5%')).toBeInTheDocument();
+      const durationStat = screen.getByText('Session Duration').parentElement as HTMLElement;
+      expect(within(durationStat).getByText('3m 20s')).toBeInTheDocument();
     });
   });
 
