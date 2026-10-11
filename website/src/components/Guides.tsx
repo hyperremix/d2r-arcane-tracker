@@ -1,8 +1,8 @@
-import { ExternalLink, FileText } from 'lucide-react';
+import { ChevronRight, FileText } from 'lucide-react';
 import { guides, guideUrl, links } from '../content';
 
 /**
- * Links to the guides in the repository, as rows like the app's inventory list.
+ * Links to the guide pages, as rows like the app's inventory list.
  */
 export function Guides() {
   return (
@@ -41,7 +41,7 @@ export function Guides() {
                   <span className="block font-medium text-foreground text-sm">{guide.title}</span>
                   <span className="block text-muted-foreground text-xs">{guide.description}</span>
                 </span>
-                <ExternalLink
+                <ChevronRight
                   className="size-4 shrink-0 text-muted-foreground group-hover:text-foreground"
                   aria-hidden="true"
                 />

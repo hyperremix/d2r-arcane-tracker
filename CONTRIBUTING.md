@@ -63,7 +63,7 @@ Stack: Electron 44, React 18, TypeScript, Vite, Tailwind CSS v4, shadcn/ui (Base
 | `bun run test` / `test:run` | Vitest in watch mode, or a single run |
 | `bun run test:coverage` | Tests with coverage (what CI runs) |
 | `bun run build` | Typecheck and build the Windows installer ([RELEASE.md](docs/RELEASE.md)) |
-| `bun run website:dev` / `website:build` | Run the website locally, or build and prerender it into `website/dist` |
+| `bun run website:dev` / `website:build` | Run the website locally (home page only), or build and prerender it into `website/dist`, with a page for each guide listed in `website/src/content.ts` (rendered from `docs/`) and a `sitemap.xml`. A new guide needs an entry in `guides` with its `file` in `docs/`, a `title` that is the h1 of that file, a `description` for the link cards, a `slug` for the URL (`guides/<slug>/`), and a `pageTitle` and `metaDescription` (51 to 160 characters) for search results and link previews |
 | `bun run db:generate` | Generate a database migration from the drizzle schema ([Changing the database schema](#changing-the-database-schema)) |
 
 A pre-commit hook runs `typecheck` and Biome on staged files.

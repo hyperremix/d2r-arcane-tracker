@@ -27,7 +27,7 @@ function FeaturePanel({ feature }: { feature: Feature }) {
           ))}
         </ul>
         <a
-          href={guideUrl(feature.guide.file)}
+          href={guideUrl(feature.guide.file, feature.guide.hash)}
           className="inline-block text-primary text-sm underline-offset-4 hover:underline"
         >
           {feature.guide.label}

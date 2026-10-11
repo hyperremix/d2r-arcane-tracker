@@ -6,6 +6,7 @@ import { Install } from './components/Install';
 import { MoreFeatures } from './components/MoreFeatures';
 import { SiteFooter } from './components/SiteFooter';
 import { SiteTitleBar } from './components/SiteTitleBar';
+import { SkipLink } from './components/SkipLink';
 import { StructuredData } from './components/StructuredData';
 
 /**
@@ -14,12 +15,7 @@ import { StructuredData } from './components/StructuredData';
 export function App() {
   return (
     <>
-      <a
-        href="#main"
-        className="sr-only z-50 rounded-md bg-primary px-3 py-2 text-primary-foreground focus:not-sr-only focus:fixed focus:top-2 focus:left-2"
-      >
-        Skip to content
-      </a>
+      <SkipLink />
       <SiteTitleBar />
       <main id="main">
         <Hero />

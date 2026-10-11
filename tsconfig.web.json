@@ -2,11 +2,19 @@
   // Renderer (src) and all tests. Tests run in jsdom, and some main-process tests import renderer
   // fixtures and modules, so they are checked here with the DOM types. The electron/ declaration
   // files are listed because their ambient types (e.g. the @dschu012/d2s typings) aren't imported.
+  // website/build.ts is here too, because it imports types from the website source (JSX, assets).
   "extends": "./tsconfig.base.json",
   "compilerOptions": {
     "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.web.tsbuildinfo",
     "lib": ["ES2020", "DOM", "DOM.Iterable"],
     "jsx": "react-jsx"
   },
-  "include": ["src", "website/src", "electron/**/*.d.ts", "electron/**/*.test.ts", "electron/test"]
+  "include": [
+    "src",
+    "website/src",
+    "website/build.ts",
+    "electron/**/*.d.ts",
+    "electron/**/*.test.ts",
+    "electron/test"
+  ]
 }
