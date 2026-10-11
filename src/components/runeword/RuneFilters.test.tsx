@@ -111,6 +111,12 @@ describe('When RuneFilters shows long rune names or counts', () => {
   });
 });
 
+/** Finds the count shown in the row of the rune whose label matches. */
+function getCountOf(runeLabel: RegExp, count: string): HTMLElement {
+  const row = screen.getByLabelText(runeLabel).closest('div') as HTMLElement;
+  return within(row).getByText(count);
+}
+
 describe('When RuneFilters shows owned counts', () => {
   beforeEach(() => {
     setElectronAPI({ icon: { getByFilename: vi.fn().mockResolvedValue(undefined) } });
@@ -127,10 +133,8 @@ describe('When RuneFilters shows owned counts', () => {
     );
 
     // Assert
-    const zodCount = within(screen.getByLabelText(/^Zod/).closest('div') as HTMLElement).getByText(
-      '0',
-    );
-    expect(zodCount).toHaveClass('text-muted-foreground');
+    const zodCount = getCountOf(/^Zod/, '0');
+    expect(zodCount.closest('label')).toHaveClass('text-muted-foreground');
     expect(zodCount).not.toHaveClass('text-missing', 'bg-missing/15', 'bg-info/15');
   });
 
@@ -141,9 +145,7 @@ describe('When RuneFilters shows owned counts', () => {
     );
 
     // Assert
-    const elCount = within(
-      screen.getByLabelText(/^El\s*2$/).closest('div') as HTMLElement,
-    ).getByText('2');
+    const elCount = getCountOf(/^El\s*2$/, '2');
     expect(elCount).toHaveClass('bg-info/15', 'text-info');
   });
 });

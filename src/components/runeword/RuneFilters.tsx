@@ -136,11 +136,12 @@ export function RuneFilters({
                   {rune.name}
                 </span>
                 {/* Not owning a rune is normal, not an error: zero is plain muted text, while
-                    owned counts sit in a filled pill, so the two differ in shape, not only color */}
+                    owned counts sit in a filled pill, so the two differ in shape, not only color. The zero
+                    takes its muted color from the label. */}
                 <span
                   className={cn(
                     'shrink-0 rounded-full px-1.5 py-0.5 font-mono text-xs',
-                    hasNone ? 'text-muted-foreground' : 'bg-info/15 text-info',
+                    !hasNone && 'bg-info/15 text-info',
                   )}
                 >
                   {count}

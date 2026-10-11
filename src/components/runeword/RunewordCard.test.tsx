@@ -107,6 +107,18 @@ describe('RunewordCard', () => {
     expect(screen.getByRole('link', { name: expectedName })).toHaveAttribute('href', link);
   });
 
+  it('When the footer is narrow, Then the socket count and link stay unbroken and the link wraps below', () => {
+    // Arrange & Act
+    renderCard(['tir', 'el'], 'https://d2runewizard.com/runewords/Steel');
+
+    // Assert
+    const sockets = screen.getByText('2 sockets');
+    const link = screen.getByRole('link', { name: 'View on d2runewizard' });
+    expect(sockets).toHaveClass('whitespace-nowrap');
+    expect(link).toHaveClass('whitespace-nowrap');
+    expect(sockets.parentElement).toHaveClass('flex-wrap');
+  });
+
   it('If the runeword has no link, Then no external link is shown', () => {
     // Arrange & Act
     renderCard(['tir', 'el']);
