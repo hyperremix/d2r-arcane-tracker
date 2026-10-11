@@ -449,8 +449,7 @@
       "browseForDirectory": "Browse for directory",
       "pathDescription": "Path to your Diablo II: Resurrected installation directory. This setting is used by both item icon management and terror zone configuration.",
       "notConfigured": "No installation path saved",
-      "notConfiguredHint": "Item icons and terror zone configuration need this path. Browse to your Diablo II: Resurrected folder.",
-      "useSuggestion": "Use this path"
+      "notConfiguredHint": "Item icons and terror zone configuration need this path. Browse to your Diablo II: Resurrected folder."
     },
     "update": {
       "title": "Application Updates",

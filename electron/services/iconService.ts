@@ -42,7 +42,8 @@ interface SpriteHeader {
 
 /**
  * Battle.net's default D2R installation directory on Windows.
- * Mirrored by getDefaultD2RPath in src/components/wizard/steps/D2RInstallationStep.tsx.
+ * Mirrored by getDefaultD2RPath in src/components/wizard/steps/D2RInstallationStep.tsx and
+ * src/components/settings/D2RInstallationSettings.tsx.
  */
 export const WINDOWS_DEFAULT_D2R_INSTALL_PATH = 'C:\\Program Files (x86)\\Diablo II Resurrected';
 

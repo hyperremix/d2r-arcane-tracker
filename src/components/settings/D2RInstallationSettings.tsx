@@ -1,5 +1,5 @@
 import { AlertTriangle, FolderOpen, HardDrive } from 'lucide-react';
-import { useCallback, useEffect, useId, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -24,8 +24,9 @@ function getDefaultD2RPath(): string {
 /**
  * D2RInstallationSettings component that provides controls for configuring the D2R installation path.
  * This setting is shared between item icon management and terror zone configuration.
- * The field only ever shows the saved path. When none is saved, a notice says so and offers to
- * browse, or to use the default location if it exists on disk.
+ * The field only ever shows the path stored in the settings, which is also what Terror Zones reads.
+ * When none is saved, a notice says so and offers the default location if it exists on disk.
+ * The path is persisted on blur, Enter, Browse or when accepting the suggestion - never per keystroke.
  * @returns {JSX.Element} A settings card with D2R installation path configuration
  */
 export function D2RInstallationSettings() {
@@ -33,22 +34,32 @@ export function D2RInstallationSettings() {
   const d2rPathInputId = useId();
   const pathDescriptionId = useId();
   const saveErrorId = useId();
+  const notConfiguredId = useId();
 
   const [d2rPath, setD2rPath] = useState<string>('');
+  // The saved path was read successfully; the "not saved" notice must not show before that
   const [hasLoaded, setHasLoaded] = useState(false);
+  const [hasSavedPath, setHasSavedPath] = useState(false);
   // Default install path, only set if the main process confirmed it exists on disk
   const [suggestedPath, setSuggestedPath] = useState<string | undefined>(undefined);
   const [saveFailed, setSaveFailed] = useState(false);
+  // Last path known to be persisted, restored when a save fails
+  const savedPathRef = useRef('');
+  // Path currently being saved, so Enter followed by blur does not save it twice
+  const savingPathRef = useRef<string | undefined>(undefined);
   const defaultPath = getDefaultD2RPath();
 
-  // Load the saved D2R path on mount; nothing is filled in when no path is saved
+  // Load the stored path on mount (the same setting Terror Zones reads); nothing is filled in
+  // when none is saved. icon:getD2RPath is not used because it auto-detects and persists a path.
   useEffect(() => {
     const loadD2RPath = async () => {
       try {
-        const path = await window.electronAPI?.icon.getD2RPath();
-        if (path) {
-          setD2rPath(path);
-        }
+        const settings = await window.electronAPI?.grail.getSettings();
+        const path = settings?.d2rInstallPath ?? '';
+        savedPathRef.current = path;
+        setHasSavedPath(path.trim() !== '');
+        setD2rPath(path);
+        setHasLoaded(true);
       } catch (error) {
         console.error('Failed to load D2R path:', error);
       }
@@ -58,8 +69,6 @@ export function D2RInstallationSettings() {
         setSuggestedPath(suggestion || undefined);
       } catch (error) {
         console.error('Failed to get suggested D2R path:', error);
-      } finally {
-        setHasLoaded(true);
       }
     };
 
@@ -67,13 +76,25 @@ export function D2RInstallationSettings() {
   }, []);
 
   const savePath = useCallback(async (newPath: string) => {
-    setD2rPath(newPath);
+    const trimmedPath = newPath.trim();
+    setD2rPath(trimmedPath);
+    if (trimmedPath === savedPathRef.current || savingPathRef.current === trimmedPath) {
+      return;
+    }
+
+    savingPathRef.current = trimmedPath;
     try {
-      await window.electronAPI?.icon.setD2RPath(newPath);
+      await window.electronAPI?.icon.setD2RPath(trimmedPath);
+      savedPathRef.current = trimmedPath;
+      setHasSavedPath(trimmedPath !== '');
       setSaveFailed(false);
     } catch (error) {
       console.error('Failed to save D2R path:', error);
+      // Nothing was persisted, so the field and the notice go back to what is saved
+      setD2rPath(savedPathRef.current);
       setSaveFailed(true);
+    } finally {
+      savingPathRef.current = undefined;
     }
   }, []);
 
@@ -93,8 +114,12 @@ export function D2RInstallationSettings() {
     }
   }, [d2rPath, defaultPath, savePath, suggestedPath, t]);
 
-  const isNotConfigured = hasLoaded && !d2rPath.trim();
-  const describedBy = [pathDescriptionId, saveFailed ? saveErrorId : undefined]
+  const isNotConfigured = hasLoaded && !hasSavedPath;
+  const describedBy = [
+    pathDescriptionId,
+    isNotConfigured ? notConfiguredId : undefined,
+    saveFailed ? saveErrorId : undefined,
+  ]
     .filter(Boolean)
     .join(' ');
 
@@ -117,7 +142,14 @@ export function D2RInstallationSettings() {
               id={d2rPathInputId}
               type="text"
               value={d2rPath}
-              onChange={(e) => savePath(e.target.value)}
+              onChange={(e) => setD2rPath(e.target.value)}
+              onBlur={(e) => void savePath(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  void savePath(e.currentTarget.value);
+                }
+              }}
               placeholder={defaultPath}
               aria-invalid={saveFailed || undefined}
               aria-describedby={describedBy}
@@ -150,7 +182,10 @@ export function D2RInstallationSettings() {
 
         {/* No saved path: say so, and only suggest the default location if it exists */}
         {isNotConfigured && (
-          <div className="flex items-start gap-3 rounded-lg border border-dashed bg-muted/50 p-4">
+          <output
+            id={notConfiguredId}
+            className="flex items-start gap-3 rounded-lg border border-dashed bg-muted/50 p-4"
+          >
             <AlertTriangle
               className="mt-0.5 h-5 w-5 shrink-0 text-muted-foreground"
               aria-hidden="true"
@@ -171,19 +206,13 @@ export function D2RInstallationSettings() {
                   {t(translations.settings.d2rInstallation.notConfiguredHint)}
                 </p>
               )}
-              <div className="flex flex-wrap gap-2">
-                {suggestedPath && (
-                  <Button size="sm" variant="outline" onClick={() => savePath(suggestedPath)}>
-                    {t(translations.settings.d2rInstallation.useSuggestion)}
-                  </Button>
-                )}
-                <Button size="sm" variant="ghost" onClick={handleBrowseDirectory}>
-                  <FolderOpen className="mr-2 h-4 w-4" aria-hidden="true" />
-                  {t(translations.settings.d2rInstallation.browseForDirectory)}
+              {suggestedPath && (
+                <Button size="sm" variant="outline" onClick={() => savePath(suggestedPath)}>
+                  {t(translations.wizard.d2rInstallation.useSuggestion)}
                 </Button>
-              </div>
+              )}
             </div>
-          </div>
+          </output>
         )}
       </CardContent>
     </Card>
