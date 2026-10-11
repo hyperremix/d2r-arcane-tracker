@@ -13,6 +13,16 @@ describe('When PageHeader is rendered', () => {
     expect(container.querySelector('p')).not.toBeInTheDocument();
   });
 
+  it('Then the page title is set in the display serif', () => {
+    // Arrange & Act
+    render(<PageHeader title="Statistics" />);
+
+    // Assert
+    expect(screen.getByRole('heading', { level: 1, name: 'Statistics' })).toHaveClass(
+      'font-display',
+    );
+  });
+
   it('If a description and actions are given, Then both are rendered next to the title', () => {
     // Arrange & Act
     render(

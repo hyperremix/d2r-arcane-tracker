@@ -20,6 +20,7 @@ export interface PageHeaderProps {
 /**
  * Shared page header that renders the page title as an `h1` with an optional description
  * and actions slot, using consistent spacing and typography across all pages.
+ * The title is one of the few places set in the display serif (`font-display`).
  * @returns {JSX.Element} The page header
  */
 export function PageHeader({
@@ -39,7 +40,9 @@ export function PageHeader({
       )}
     >
       <div className="min-w-0 space-y-1">
-        <h1 className="font-semibold text-2xl text-foreground tracking-tight">{title}</h1>
+        <h1 className="font-display font-semibold text-2xl text-foreground tracking-tight">
+          {title}
+        </h1>
         {description && <p className="text-muted-foreground text-sm">{description}</p>}
       </div>
       {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
