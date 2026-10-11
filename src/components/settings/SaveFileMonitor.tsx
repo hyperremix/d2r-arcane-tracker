@@ -343,6 +343,10 @@ export function SaveFileMonitor() {
     void applyMonitoringAction();
   }, [settings.gameMode, monitoringStatus.isMonitoring, loadMonitoringStatus]);
 
+  const visibleSaveFiles = showAllCharacters
+    ? saveFiles
+    : saveFiles.slice(0, COLLAPSED_CHARACTER_COUNT);
+
   return (
     <Card>
       <CardHeader>
@@ -450,28 +454,24 @@ export function SaveFileMonitor() {
               })}
             </h4>
             <ul id={characterListId} className="space-y-2">
-              {(showAllCharacters ? saveFiles : saveFiles.slice(0, COLLAPSED_CHARACTER_COUNT)).map(
-                (file, index) => (
-                  <li
-                    key={`${file.path}-${index}`}
-                    className="flex items-center justify-between rounded bg-muted p-2 text-xs"
-                  >
-                    <div>
-                      <div className="font-medium">{file.name}</div>
-                      <div className="text-muted-foreground">
-                        {t(translations.settings.saveFileMonitor.levelClass, {
-                          level: file.level,
-                          characterClass: file.characterClass,
-                        })}
-                        {file.hardcore && ` ${t(translations.settings.saveFileMonitor.hc)}`}
-                      </div>
-                    </div>
+              {visibleSaveFiles.map((file, index) => (
+                <li
+                  key={`${file.path}-${index}`}
+                  className="flex items-center justify-between rounded bg-muted p-2 text-xs"
+                >
+                  <div>
+                    <div className="font-medium">{file.name}</div>
                     <div className="text-muted-foreground">
-                      {formatShortDate(file.lastModified)}
+                      {t(translations.settings.saveFileMonitor.levelClass, {
+                        level: file.level,
+                        characterClass: file.characterClass,
+                      })}
+                      {file.hardcore && ` ${t(translations.settings.saveFileMonitor.hc)}`}
                     </div>
-                  </li>
-                ),
-              )}
+                  </div>
+                  <div className="text-muted-foreground">{formatShortDate(file.lastModified)}</div>
+                </li>
+              ))}
             </ul>
             {saveFiles.length > COLLAPSED_CHARACTER_COUNT && (
               <Button

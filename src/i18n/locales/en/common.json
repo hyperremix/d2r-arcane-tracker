@@ -442,11 +442,9 @@
       "title": "D2R Installation",
       "installationPath": "Installation Path",
       "browseForDirectory": "Browse for directory",
-      "browse": "Browse",
       "pathDescription": "Path to your Diablo II: Resurrected installation directory. This setting is used by both item icon management and terror zone configuration.",
       "notConfigured": "No installation path saved",
       "notConfiguredHint": "Item icons and terror zone configuration need this path. Select Browse to choose your Diablo II: Resurrected folder, or type its path above.",
-      "suggestion": "Diablo II: Resurrected was found in this folder:",
       "useSuggestion": "Use this folder",
       "suggestionHint": "Or select Browse to choose a different folder."
     },

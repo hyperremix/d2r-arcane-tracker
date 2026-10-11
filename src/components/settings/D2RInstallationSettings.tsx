@@ -201,7 +201,7 @@ export function D2RInstallationSettings() {
             />
             <Button variant="outline" onClick={handleBrowseDirectory}>
               <FolderOpen className="h-4 w-4" aria-hidden="true" />
-              {t(translations.settings.d2rInstallation.browse)}
+              {t(translations.wizard.saveDirectory.browse)}
             </Button>
           </div>
           <p id={pathDescriptionId} className="text-muted-foreground text-xs">
@@ -236,7 +236,7 @@ export function D2RInstallationSettings() {
               {suggestedPath ? (
                 <>
                   <p className="text-muted-foreground text-xs">
-                    {t(translations.settings.d2rInstallation.suggestion)}
+                    {t(translations.wizard.d2rInstallation.suggestion)}
                   </p>
                   <p className="break-all font-mono text-xs">{suggestedPath}</p>
                   <Button size="sm" onClick={() => void savePath(suggestedPath)}>

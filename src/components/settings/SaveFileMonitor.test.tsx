@@ -398,7 +398,7 @@ describe('SaveFileMonitor', () => {
 
       // Assert
       expect(await screen.findByText('Character 5')).toBeInTheDocument();
-      expect(screen.getAllByRole('listitem')).toHaveLength(5);
+      expect(within(screen.getByRole('list')).getAllByRole('listitem')).toHaveLength(5);
       expect(screen.queryByRole('button', { name: /^Show / })).not.toBeInTheDocument();
     });
 
@@ -433,12 +433,12 @@ describe('SaveFileMonitor', () => {
       fireEvent.click(toggle);
 
       // Assert
-      expect(screen.getAllByRole('listitem')).toHaveLength(15);
-      expect(screen.getByText('Character 15')).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: 'Show fewer characters' })).toHaveAttribute(
-        'aria-expanded',
-        'true',
-      );
+      const list = screen.getByRole('list');
+      expect(within(list).getAllByRole('listitem')).toHaveLength(15);
+      expect(within(list).getByText('Character 15')).toBeInTheDocument();
+      const fewerToggle = screen.getByRole('button', { name: 'Show fewer characters' });
+      expect(fewerToggle).toHaveAttribute('aria-expanded', 'true');
+      expect(fewerToggle).toHaveAttribute('aria-controls', list.id);
     });
 
     it('When "Show fewer" is clicked, Then only the first five characters are listed again', async () => {
@@ -453,7 +453,7 @@ describe('SaveFileMonitor', () => {
       fireEvent.click(screen.getByRole('button', { name: 'Show fewer characters' }));
 
       // Assert
-      expect(screen.getAllByRole('listitem')).toHaveLength(5);
+      expect(within(screen.getByRole('list')).getAllByRole('listitem')).toHaveLength(5);
       expect(screen.getByRole('button', { name: 'Show all 15 characters' })).toHaveAttribute(
         'aria-expanded',
         'false',
