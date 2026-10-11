@@ -14,7 +14,7 @@ The rest of the app works without this step.
 3. In the left panel, click **data**, then **data** again, then **Extract**.
 4. Wait for it to finish. It extracts about 40 GB (`global`, `hd`, `local`) into a `work` folder next to `CascView.exe`.
 5. Move the three folders into the top-level `Data` folder of your D2R install, for example `C:\Program Files (x86)\Diablo II Resurrected\Data`. There is another `data` folder inside it. Don't use that one.
-6. In the app, set **Settings → D2R Installation** to your D2R folder: type the path and press Enter or click away, or use **Browse for directory**. The card only shows a path you saved. If none is saved and the app finds D2R at the default location, it offers that folder with a **Use this** button instead of filling it in.
+6. In the app, set **Settings → D2R Installation** to your D2R folder: type the path and press Enter or click away, or click **Browse**. The field only shows a path you saved; while it's empty, a notice says no installation path is saved. If the app finds D2R at the default location, the notice shows that folder with a **Use this folder** button instead of filling it in.
 
 Extraction doesn't modify the game. Repeat it after a patch if you need new item icons or the patch changed terror zones.
 

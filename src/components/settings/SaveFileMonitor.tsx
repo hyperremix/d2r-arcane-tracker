@@ -11,7 +11,7 @@ import {
   RotateCcw,
   XCircle,
 } from 'lucide-react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { useShallow } from 'zustand/react/shallow';
@@ -31,6 +31,9 @@ import { combineUnsubscribers, onMainEvent } from '@/lib/ipcEvents';
 import { saveFileEventTypeLabelKeys } from '@/lib/labelKeys';
 import { useGrailStore } from '@/stores/grailStore';
 import { SaveDirectoryChangeDialog } from './SaveDirectoryChangeDialog';
+
+/** Characters listed before the rest is hidden behind a "Show all" toggle. */
+const COLLAPSED_CHARACTER_COUNT = 5;
 
 /**
  * Decides whether save file monitoring must be stopped (Manual mode) or resumed (after leaving
@@ -73,6 +76,9 @@ export function SaveFileMonitor() {
   const saveFilesRequestRef = useRef(0);
   const [isSelectingDirectory, setIsSelectingDirectory] = useState(false);
   const [hasBackedUp, setHasBackedUp] = useState(false);
+  // The character list flows with the page; long lists are collapsed instead of scrolling inside it
+  const [showAllCharacters, setShowAllCharacters] = useState(false);
+  const characterListId = useId();
   const { reloadData, settings } = useGrailStore(
     useShallow((state) => ({ reloadData: state.reloadData, settings: state.settings })),
   );
@@ -443,26 +449,46 @@ export function SaveFileMonitor() {
                 count: saveFiles.length,
               })}
             </h4>
-            <div className="max-h-32 space-y-2 overflow-y-auto">
-              {saveFiles.map((file, index) => (
-                <div
-                  key={`${file.path}-${index}`}
-                  className="flex items-center justify-between rounded bg-muted p-2 text-xs"
-                >
-                  <div>
-                    <div className="font-medium">{file.name}</div>
-                    <div className="text-muted-foreground">
-                      {t(translations.settings.saveFileMonitor.levelClass, {
-                        level: file.level,
-                        characterClass: file.characterClass,
-                      })}
-                      {file.hardcore && ` ${t(translations.settings.saveFileMonitor.hc)}`}
+            <ul id={characterListId} className="space-y-2">
+              {(showAllCharacters ? saveFiles : saveFiles.slice(0, COLLAPSED_CHARACTER_COUNT)).map(
+                (file, index) => (
+                  <li
+                    key={`${file.path}-${index}`}
+                    className="flex items-center justify-between rounded bg-muted p-2 text-xs"
+                  >
+                    <div>
+                      <div className="font-medium">{file.name}</div>
+                      <div className="text-muted-foreground">
+                        {t(translations.settings.saveFileMonitor.levelClass, {
+                          level: file.level,
+                          characterClass: file.characterClass,
+                        })}
+                        {file.hardcore && ` ${t(translations.settings.saveFileMonitor.hc)}`}
+                      </div>
                     </div>
-                  </div>
-                  <div className="text-muted-foreground">{formatShortDate(file.lastModified)}</div>
-                </div>
-              ))}
-            </div>
+                    <div className="text-muted-foreground">
+                      {formatShortDate(file.lastModified)}
+                    </div>
+                  </li>
+                ),
+              )}
+            </ul>
+            {saveFiles.length > COLLAPSED_CHARACTER_COUNT && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="mt-2"
+                aria-expanded={showAllCharacters}
+                aria-controls={characterListId}
+                onClick={() => setShowAllCharacters((showAll) => !showAll)}
+              >
+                {showAllCharacters
+                  ? t(translations.settings.saveFileMonitor.showFewerCharacters)
+                  : t(translations.settings.saveFileMonitor.showAllCharacters, {
+                      count: saveFiles.length,
+                    })}
+              </Button>
+            )}
           </div>
         )}
       </CardContent>

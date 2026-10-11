@@ -379,6 +379,8 @@
       "levelClass": "Level {{level}} {{characterClass}}",
       "hc": "(HC)",
       "detectedCharacters": "Detected Characters ({{count}}):",
+      "showAllCharacters": "Show all {{count}} characters",
+      "showFewerCharacters": "Show fewer characters",
       "changeSaveFileDirectory": "Change Save File Directory",
       "restoreDefaultDirectory": "Restore Default Directory",
       "confirmChangeDirectory": "Are you sure you want to change the monitored save file directory?",
@@ -440,9 +442,13 @@
       "title": "D2R Installation",
       "installationPath": "Installation Path",
       "browseForDirectory": "Browse for directory",
+      "browse": "Browse",
       "pathDescription": "Path to your Diablo II: Resurrected installation directory. This setting is used by both item icon management and terror zone configuration.",
       "notConfigured": "No installation path saved",
-      "notConfiguredHint": "Item icons and terror zone configuration need this path. Browse to your Diablo II: Resurrected folder."
+      "notConfiguredHint": "Item icons and terror zone configuration need this path. Select Browse to choose your Diablo II: Resurrected folder, or type its path above.",
+      "suggestion": "Diablo II: Resurrected was found in this folder:",
+      "useSuggestion": "Use this folder",
+      "suggestionHint": "Or select Browse to choose a different folder."
     },
     "update": {
       "title": "Application Updates",

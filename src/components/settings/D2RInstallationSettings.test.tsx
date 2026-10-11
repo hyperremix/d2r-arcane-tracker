@@ -61,7 +61,7 @@ describe('When D2RInstallationSettings is rendered', () => {
     window.electronAPI = originalElectronAPI;
   });
 
-  it('If the card is shown, Then the icon-only browse button is exposed with its translated name', async () => {
+  it('If the card is shown, Then the browse button shows its translated label', async () => {
     // Arrange
     arrangeElectronAPI({ savedPath: '/games/d2r' });
 
@@ -70,7 +70,7 @@ describe('When D2RInstallationSettings is rendered', () => {
 
     // Assert
     expect(await screen.findByDisplayValue('/games/d2r')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Browse for directory' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Browse' })).toBeInTheDocument();
   });
 
   it('If a path is saved, Then the field shows it, no notice is shown and nothing is auto-detected', async () => {
@@ -88,7 +88,7 @@ describe('When D2RInstallationSettings is rendered', () => {
     expect(api.icon.setD2RPath).not.toHaveBeenCalled();
   });
 
-  it('If no path is saved and none is found, Then the field stays empty and the notice explains how to set one', async () => {
+  it('If no path is saved and none is found, Then the field is empty without an example path and the notice explains how to set one', async () => {
     // Arrange
     const api = arrangeElectronAPI();
 
@@ -98,29 +98,33 @@ describe('When D2RInstallationSettings is rendered', () => {
     // Assert
     const notice = await screen.findByRole('status');
     expect(notice).toHaveTextContent(NOT_SAVED_NOTICE);
-    expect(notice).toHaveTextContent('Browse to your Diablo II: Resurrected folder.');
+    expect(notice).toHaveTextContent('Select Browse to choose your Diablo II: Resurrected folder');
     const input = screen.getByLabelText('Installation Path');
     expect(input).toHaveValue('');
-    expect(input).toHaveAttribute('placeholder', MAC_DEFAULT_PATH);
+    expect(input).not.toHaveAttribute('placeholder');
+    expect(screen.queryByText(MAC_DEFAULT_PATH)).not.toBeInTheDocument();
     expect(input.getAttribute('aria-describedby')).toContain(notice.id);
     expect(api.icon.setD2RPath).not.toHaveBeenCalled();
-    expect(screen.queryByRole('button', { name: 'Use this' })).not.toBeInTheDocument();
-    expect(screen.getAllByRole('button', { name: 'Browse for directory' })).toHaveLength(1);
+    expect(screen.queryByRole('button', { name: 'Use this folder' })).not.toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: 'Browse' })).toHaveLength(1);
   });
 
-  it('If the platform is Windows, Then the placeholder is the Battle.net default path', async () => {
+  it('If the platform is Windows and D2R exists at the Battle.net default, Then that folder is offered as a suggestion', async () => {
     // Arrange
-    arrangeElectronAPI({ platform: 'win32' });
+    arrangeElectronAPI({ platform: 'win32', suggestedPath: WINDOWS_DEFAULT_PATH });
 
     // Act
     render(<D2RInstallationSettings />);
 
     // Assert
-    expect(await screen.findByText(NOT_SAVED_NOTICE)).toBeInTheDocument();
-    expect(screen.getByLabelText('Installation Path')).toHaveAttribute(
-      'placeholder',
-      WINDOWS_DEFAULT_PATH,
-    );
+    const notice = await screen.findByRole('status');
+    expect(notice).toHaveTextContent(NOT_SAVED_NOTICE);
+    expect(notice).toHaveTextContent(WINDOWS_DEFAULT_PATH);
+    expect(notice).toHaveTextContent('Or select Browse to choose a different folder.');
+    expect(screen.getByRole('button', { name: 'Use this folder' })).toBeInTheDocument();
+    const input = screen.getByLabelText('Installation Path');
+    expect(input).toHaveValue('');
+    expect(input).not.toHaveAttribute('placeholder');
   });
 
   it('If no path is saved but D2R exists at the default location, Then it is only suggested and not auto-filled', async () => {
@@ -131,7 +135,7 @@ describe('When D2RInstallationSettings is rendered', () => {
     render(<D2RInstallationSettings />);
 
     // Assert
-    expect(await screen.findByRole('button', { name: 'Use this' })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Use this folder' })).toBeInTheDocument();
     expect(screen.getByText(MAC_DEFAULT_PATH)).toBeInTheDocument();
     expect(screen.getByText(NOT_SAVED_NOTICE)).toBeInTheDocument();
     expect(screen.getByLabelText('Installation Path')).toHaveValue('');
@@ -143,7 +147,7 @@ describe('When D2RInstallationSettings is rendered', () => {
     // Arrange
     const api = arrangeElectronAPI({ suggestedPath: MAC_DEFAULT_PATH });
     render(<D2RInstallationSettings />);
-    const useButton = await screen.findByRole('button', { name: 'Use this' });
+    const useButton = await screen.findByRole('button', { name: 'Use this folder' });
 
     // Act
     fireEvent.click(useButton);
@@ -259,7 +263,7 @@ describe('When D2RInstallationSettings is rendered', () => {
     render(<D2RInstallationSettings />);
 
     // Act
-    fireEvent.click(await screen.findByRole('button', { name: 'Use this' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Use this folder' }));
 
     // Assert
     expect(await screen.findByRole('alert')).toHaveTextContent(SAVE_ERROR);
@@ -476,7 +480,7 @@ describe('When D2RInstallationSettings is rendered', () => {
     );
     const input = screen.getByLabelText('Installation Path');
     expect(input).toHaveValue('');
-    expect(input).toHaveAttribute('placeholder', MAC_DEFAULT_PATH);
+    expect(input).not.toHaveAttribute('placeholder');
     expect(screen.queryByText(NOT_SAVED_NOTICE)).not.toBeInTheDocument();
   });
 
@@ -489,7 +493,7 @@ describe('When D2RInstallationSettings is rendered', () => {
 
     // Assert
     expect(await screen.findByText(NOT_SAVED_NOTICE)).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Use this' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Use this folder' })).not.toBeInTheDocument();
     await waitFor(() =>
       expect(console.error).toHaveBeenCalledWith(
         'Failed to get suggested D2R path:',
@@ -507,7 +511,7 @@ describe('When D2RInstallationSettings is rendered', () => {
       await screen.findByDisplayValue('/games/d2r');
 
       // Act
-      fireEvent.click(screen.getByRole('button', { name: 'Browse for directory' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Browse' }));
 
       // Assert
       await waitFor(() => expect(api.icon.setD2RPath).toHaveBeenCalledWith('/games/new'));
@@ -521,7 +525,7 @@ describe('When D2RInstallationSettings is rendered', () => {
       await screen.findByDisplayValue('/games/d2r');
 
       // Act
-      fireEvent.click(screen.getByRole('button', { name: 'Browse for directory' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Browse' }));
 
       // Assert
       await waitFor(() => expect(api.dialog.showOpenDialog).toHaveBeenCalledTimes(1));
@@ -539,7 +543,7 @@ describe('When D2RInstallationSettings is rendered', () => {
       await screen.findByDisplayValue('/games/d2r');
 
       // Act
-      fireEvent.click(screen.getByRole('button', { name: 'Browse for directory' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Browse' }));
 
       // Assert
       expect(await screen.findByRole('alert')).toHaveTextContent(SAVE_ERROR);
@@ -553,7 +557,7 @@ describe('When D2RInstallationSettings is rendered', () => {
       await screen.findByDisplayValue('/games/d2r');
 
       // Act
-      fireEvent.click(screen.getByRole('button', { name: 'Browse for directory' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Browse' }));
 
       // Assert
       await waitFor(() =>
@@ -567,10 +571,10 @@ describe('When D2RInstallationSettings is rendered', () => {
       // Arrange
       const api = arrangeElectronAPI({ suggestedPath: '/suggested/d2r' });
       render(<D2RInstallationSettings />);
-      await screen.findByRole('button', { name: 'Use this' });
+      await screen.findByRole('button', { name: 'Use this folder' });
 
       // Act
-      fireEvent.click(screen.getByRole('button', { name: 'Browse for directory' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Browse' }));
 
       // Assert
       await waitFor(() =>
@@ -587,7 +591,7 @@ describe('When D2RInstallationSettings is rendered', () => {
       await screen.findByText(NOT_SAVED_NOTICE);
 
       // Act
-      fireEvent.click(screen.getByRole('button', { name: 'Browse for directory' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Browse' }));
 
       // Assert
       await waitFor(() =>
@@ -607,7 +611,7 @@ describe('When D2RInstallationSettings is rendered', () => {
       await screen.findByText(NOT_SAVED_NOTICE);
 
       // Act
-      fireEvent.click(screen.getByRole('button', { name: 'Browse for directory' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Browse' }));
 
       // Assert
       expect(await screen.findByRole('alert')).toHaveTextContent(SAVE_ERROR);
@@ -623,7 +627,7 @@ describe('When D2RInstallationSettings is rendered', () => {
       fireEvent.change(input, { target: { value: '/games/draft' } });
 
       // Act
-      fireEvent.click(screen.getByRole('button', { name: 'Browse for directory' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Browse' }));
 
       // Assert
       await waitFor(() =>
@@ -641,7 +645,7 @@ describe('When D2RInstallationSettings is rendered', () => {
       await screen.findByDisplayValue('/games/d2r');
 
       // Act
-      fireEvent.click(screen.getByRole('button', { name: 'Browse for directory' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Browse' }));
 
       // Assert
       await waitFor(() =>
