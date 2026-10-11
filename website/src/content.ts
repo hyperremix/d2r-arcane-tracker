@@ -23,7 +23,13 @@ export function guideUrl(file: string): string {
   return `${REPOSITORY_URL}/blob/main/docs/${file}`;
 }
 
-export type FeatureId = 'grail' | 'statistics' | 'runs' | 'runewords' | 'inventory';
+/** Doubles as the feature's anchor on the page (`#run-tracker`), so keep these stable. */
+export type FeatureId =
+  | 'holy-grail'
+  | 'statistics'
+  | 'run-tracker'
+  | 'runeword-calculator'
+  | 'inventory-browser';
 
 export interface Feature {
   id: FeatureId;
@@ -31,6 +37,8 @@ export interface Feature {
   label: string;
   icon: LucideIcon;
   title: string;
+  /** One sentence for the always-visible feature overview */
+  summary: string;
   description: string;
   points: string[];
   screenshot: string;
@@ -41,12 +49,14 @@ export interface Feature {
 
 export const features: Feature[] = [
   {
-    id: 'grail',
+    id: 'holy-grail',
     label: 'Grail',
     icon: Trophy,
     title: 'Holy Grail',
+    summary:
+      'Checks off every unique, set item, rune and runeword you find, straight from your save files.',
     description:
-      'Every unique, set item, rune and runeword on one wall. Found items light up in their item color; missing ones stay dim.',
+      'Every unique, set item, rune and runeword in Diablo 2 Resurrected on one wall. Found items light up in their item color; missing ones stay dim.',
     points: [
       'Detects finds from characters and shared stashes, including the v105+ stash',
       'Tracks normal and ethereal versions, for softcore, hardcore or both',
@@ -62,6 +72,7 @@ export const features: Feature[] = [
     label: 'Statistics',
     icon: BarChart3,
     title: 'Statistics',
+    summary: 'Sums up your grail progress, latest finds, closest set and the runes you still need.',
     description:
       'See how far you are, what you found last, which set is closest to complete and which runes you still need.',
     points: [
@@ -75,10 +86,11 @@ export const features: Feature[] = [
     guide: { label: 'Read about the statistics', file: 'HOLY_GRAIL_GUIDE.md#statistics' },
   },
   {
-    id: 'runs',
+    id: 'run-tracker',
     label: 'Runs',
     icon: Timer,
     title: 'Run Tracker',
+    summary: 'Times your farming runs and adds each find to the run it dropped in.',
     description:
       'Time your farming sessions run by run. Items you find are added to the run they dropped in.',
     points: [
@@ -91,10 +103,11 @@ export const features: Feature[] = [
     guide: { label: 'Read the Run Tracker guide', file: 'RUN_TRACKER.md' },
   },
   {
-    id: 'runewords',
+    id: 'runeword-calculator',
     label: 'Runewords',
     icon: Calculator,
     title: 'Runeword Calculator',
+    summary: 'Shows which runewords you can make with the runes you have.',
     description:
       'Reads the runes in your save files and shows which runewords you can make right now.',
     points: [
@@ -111,10 +124,12 @@ export const features: Feature[] = [
     },
   },
   {
-    id: 'inventory',
+    id: 'inventory-browser',
     label: 'Inventory',
     icon: PackageSearch,
     title: 'Inventory Browser',
+    summary:
+      'Opens your characters and shared stashes outside the game and moves items between them.',
     description:
       'Look inside every character and shared stash without starting the game, and move items between them.',
     points: [

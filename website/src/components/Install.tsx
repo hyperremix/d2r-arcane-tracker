@@ -55,7 +55,7 @@ export function Install() {
       <div className="grid gap-8 lg:grid-cols-[minmax(0,22rem)_minmax(0,1fr)] lg:gap-12">
         <div className="space-y-5">
           <h2 className="font-display font-semibold text-3xl text-foreground tracking-tight sm:text-4xl">
-            Install
+            Install D2R Arcane Tracker
           </h2>
           <p className="text-muted-foreground leading-relaxed">
             Needs Windows 10 or later (64-bit) and Diablo II: Resurrected.

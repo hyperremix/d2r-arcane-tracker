@@ -10,8 +10,11 @@ export function Guides() {
       <div className="mx-auto grid max-w-7xl gap-8 px-4 py-20 sm:px-6 sm:py-28 lg:grid-cols-[minmax(0,22rem)_minmax(0,1fr)] lg:gap-12">
         <div className="space-y-5">
           <h2 className="font-display font-semibold text-3xl text-foreground tracking-tight sm:text-4xl">
-            Guides
+            Holy Grail guides
           </h2>
+          <p className="text-muted-foreground leading-relaxed">
+            How the grail tracker works, from your first grail to farming runs and terror zones.
+          </p>
           <p className="text-muted-foreground leading-relaxed">
             Something not working? Search the{' '}
             <a href={links.issues} className="text-primary underline-offset-4 hover:underline">

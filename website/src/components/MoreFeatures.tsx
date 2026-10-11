@@ -43,7 +43,7 @@ export function MoreFeatures() {
           id="more-features"
           className="font-display font-semibold text-2xl text-foreground tracking-tight"
         >
-          Also in the app
+          Overlay, notifications and more
         </h2>
         <ul className="divide-y divide-border rounded-xl border border-border bg-card">
           {moreFeatures.map((feature) => {
