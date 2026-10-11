@@ -163,16 +163,21 @@ describe('When TerrorZoneConfiguration validates the game installation', () => {
       expect(screen.queryByText('-direct -txt')).not.toBeInTheDocument();
     });
 
-    it('Then the game file risk warning, search, counter and bulk actions are hidden', async () => {
+    it.each([
+      ['corruptedFile', 'desecratedzones.json file is corrupted or invalid'],
+      ['invalidStructure', 'Invalid desecratedzones.json file structure'],
+      ['unknown', 'Unable to validate the D2R installation'],
+    ] as const)('Then the %s error is shown and the game file risk warning, search, counter and bulk actions are hidden', async (errorCode, message) => {
       // Arrange
-      setupTerrorZoneApi({ valid: false, errorCode: 'corruptedFile' });
+      setupTerrorZoneApi({ valid: false, errorCode });
 
       // Act
       renderTerrorZoneConfiguration();
 
       // Assert
-      await screen.findByText('desecratedzones.json file is corrupted or invalid');
+      await screen.findByText(message);
       expectZoneControlsHidden();
+      expect(screen.queryByRole('button', { name: 'Retry' })).not.toBeInTheDocument();
     });
   });
 

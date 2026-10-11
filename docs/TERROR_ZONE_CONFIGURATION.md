@@ -42,11 +42,12 @@ Changes don't reach a running game. Restart D2R with `-direct -txt` for them to 
 | Problem | Fix |
 | --- | --- |
 | *Set your D2R installation folder* | Click **Open D2R Installation settings** and set **Settings → D2R Installation** to the main D2R folder, not a subfolder. |
-| *Failed to load terror zone data* | Check that D2R is closed and the app can read the D2R folder, then click **Retry**. |
+| *Failed to load terror zone data* | The app couldn't read the zones. Click **Retry**, or reopen the page. |
 | *D2R installation directory does not exist* | Click **Open D2R Installation settings** and choose the main D2R folder again. |
 | *Game Files Must Be Extracted*, or *desecratedzones.json file not found in D2R installation* | [Extract all game files](EXTRACTING_GAME_FILES.md) and check that `Data/hd/global/excel/desecratedzones.json` exists. |
-| *Invalid desecratedzones.json file structure*, or *desecratedzones.json file is corrupted or invalid* | The game file can't be read as a terror zone file, and **Restore Original** isn't offered while this is shown. [Extract the game files](EXTRACTING_GAME_FILES.md) again so a fresh `desecratedzones.json` replaces it, or repair D2R through Battle.net, then reopen the page. If you have a `desecratedzones.json.original` in the app's data folder, you can also copy it over the game file. |
+| *Invalid desecratedzones.json file structure*, or *desecratedzones.json file is corrupted or invalid* | The game file can't be read as a terror zone file, and **Restore Original** isn't offered while this is shown. [Extract the game files](EXTRACTING_GAME_FILES.md) again so a fresh `desecratedzones.json` replaces it, or repair D2R through Battle.net, then reopen the page. |
 | *Unable to validate the D2R installation* | Check that the D2R folder exists and the app can read it, then reopen the page. |
+| *Failed to update terror zone configuration*, *Failed to enable all zones*, *Failed to disable all zones* or *Failed to restore original file* | The change wasn't made, and any switches you changed go back to their previous state. Close D2R, check that the app has write access to the D2R folder (see [Requirements](#requirements)) and try again. |
 | Changes have no effect in game | Start D2R with `-direct -txt` and restart it after each change. |
 | D2R won't start after you changed zones | If the zone list is shown, click **Restore Original**. If the page shows a problem with the game file instead, follow the fix for that message above. If it still fails, repair D2R through Battle.net and extract the files again. |
 | Zones are wrong after a D2R patch | The backup is from the old version. Extract the game files again, delete `desecratedzones.json.original` from the app's data folder, reopen the page so the app backs up the new file, then set your zones again. |
