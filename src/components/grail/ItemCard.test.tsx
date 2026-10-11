@@ -14,12 +14,18 @@ vi.mock('/images/placeholder-item.svg', () => ({ default: '/mock-placeholder.png
 vi.mock('./RuneImages', () => ({
   RuneImages: ({
     runeIds,
+    className,
     focusableTriggers = true,
   }: {
     runeIds: string[];
+    className?: string;
     focusableTriggers?: boolean;
   }) => (
-    <div data-testid="rune-images" data-focusable-triggers={String(focusableTriggers)}>
+    <div
+      data-testid="rune-images"
+      className={className}
+      data-focusable-triggers={String(focusableTriggers)}
+    >
       {runeIds.join(',')}
     </div>
   ),
@@ -29,7 +35,9 @@ vi.mock('./StatusIcons', () => ({
     <span data-testid="character-icon">{characterClass}</span>
   ),
   ItemTypeIcon: ({ type }: { type: string }) => <span data-testid="item-type-icon">{type}</span>,
-  RecentDiscoveryIndicator: () => <span data-testid="recent-discovery-indicator" />,
+  RecentDiscoveryIndicator: ({ className }: { className?: string }) => (
+    <span data-testid="recent-discovery-indicator" className={className} />
+  ),
 }));
 
 // Import after mocks
@@ -368,6 +376,28 @@ describe('When ItemCard is rendered', () => {
       // Assert
       expect(screen.getByTestId('rune-images')).toBeInTheDocument();
     });
+
+    it.each([
+      [3, 'items-center', '[&_img]:size-[18px]'],
+      [6, 'items-end', '[&_img]:size-4'],
+    ])('Then %i runes sit in a slot aligned %s with %s runes', (runeCount, alignment, runeSize) => {
+      // Arrange
+      const item = HolyGrailItemBuilder.new()
+        .withType('runeword')
+        .withRunewordSubCategory('runewords')
+        .build();
+      (item as { runes: string[] }).runes = Array.from(
+        { length: runeCount },
+        (_, i) => `r0${i + 1}`,
+      );
+
+      // Act
+      render(<ItemCard item={item} />);
+
+      // Assert
+      expect(screen.getByTestId('item-artwork')).toHaveClass('h-10', alignment);
+      expect(screen.getByTestId('rune-images')).toHaveClass(runeSize);
+    });
   });
 
   describe('If showItemIcons enabled and not runeword', () => {
@@ -546,7 +576,8 @@ describe('When ItemCard is rendered', () => {
       expect(pills).toHaveLength(2);
       for (const pill of pills) {
         expect(pill).toHaveClass('px-1', 'text-[0.625rem]');
-        expect(pill).not.toHaveClass('px-1.5', 'px-2');
+        expect(pill).not.toHaveClass('px-1.5');
+        expect(pill).not.toHaveClass('px-2');
       }
       expect(container.querySelector('ul')).toHaveClass('flex-nowrap', 'gap-0.5');
     });
@@ -1294,6 +1325,25 @@ describe('When ItemCard is rendered', () => {
 
       // Assert
       expect(screen.getByTestId('recent-discovery-indicator')).toBeInTheDocument();
+    });
+
+    it('Then the grid "New" badge is a small corner tab that stays above the artwork content', () => {
+      // Arrange
+      const item = HolyGrailItemBuilder.new().withId('item-1').build();
+      const normalProgress = GrailProgressBuilder.new()
+        .withItemId('item-1')
+        .withFoundDate(new Date())
+        .withFromInitialScan(false)
+        .asNormal()
+        .build();
+
+      // Act
+      render(<ItemCard item={item} normalProgress={[normalProgress]} viewMode="grid" />);
+
+      // Assert
+      // The 12px high tab ends 13px below the card top, the 4+ rune artwork starts 15px below it
+      expect(screen.getByTestId('recent-badge-slot')).toHaveClass('absolute', 'top-0', 'right-0');
+      expect(screen.getByTestId('recent-discovery-indicator')).toHaveClass('leading-3', 'px-1');
     });
 
     it('Then the partial version state stays visible and both are part of the card label', () => {

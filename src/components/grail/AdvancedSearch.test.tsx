@@ -457,6 +457,7 @@ describe('When AdvancedSearch toolbar is rendered', () => {
       // users can say what they see
       const uniqueToggle = within(types).getByRole('button', { name: /^Unique 1\/2/ });
       expect(uniqueToggle).toHaveTextContent('Unique 1/2');
+      expect(uniqueToggle).toHaveAccessibleName(/^Unique 1\/2\s?Found$/);
       expect(uniqueToggle).toHaveAttribute('aria-pressed', 'false');
       expect(within(types).getByRole('button', { name: /^Set 0\/1/ })).toHaveTextContent('Set 0/1');
     });

@@ -162,9 +162,6 @@ export function VersionPills({
   const { t } = useTranslation();
   if (versionStatuses.length === 0) return null;
 
-  // Compact width at the 128px minimum column (110px tile content), with a pessimistic 0.6em per
-  // glyph at 10px (wider than Arial and Verdana): Normal 2 border + 8 padding + 8 icon + 1 gap +
-  // 36 text = 55px, Eth 2 + 8 + 8 + 1 + 18 = 37px, plus 2px between pills = 94px, 16px to spare.
   return (
     <ul
       className={cn(
@@ -182,6 +179,9 @@ export function VersionPills({
             data-found={status.isFound}
             className={cn(
               'inline-flex items-center rounded-full border font-medium',
+              // Compact sizing, with an estimated 0.6em per glyph at 10px, needs about 94px of the 110px
+              // tile content in the narrowest (128px) column: about 15% to spare. The app font
+              // (bundled Inter Variable) is narrower than that estimate.
               compact ? 'min-w-0 px-1 text-[0.625rem] leading-4' : 'px-2 py-0.5 text-xs leading-4',
               getVersionPillClasses(item.type, status.isFound),
             )}

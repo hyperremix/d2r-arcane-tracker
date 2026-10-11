@@ -71,16 +71,23 @@ function GridArtwork({ item, isFound, showItemIcons, focusableTriggers }: GridAr
   const { iconUrl, isLoading } = useItemIcon(item);
 
   if (item.type === 'runeword' && item.runes && item.runes.length > 0) {
+    // Up to three runes sit in one centered row. Longer runewords wrap into two rows of three:
+    // smaller runes (34px high) sit at the bottom of the 40px slot, so the top 6px of the slot
+    // stay free for the corner "New" badge.
+    const isOneRow = item.runes.length <= 3;
     return (
       <div
         data-testid="item-artwork"
-        className={cn('flex h-10 items-center justify-center', !isFound && missingArtworkStyles)}
+        className={cn(
+          'flex h-10 justify-center',
+          isOneRow ? 'items-center' : 'items-end',
+          !isFound && missingArtworkStyles,
+        )}
       >
-        {/* Up to three runes sit in one row, longer runewords wrap into two rows of three */}
         <RuneImages
           runeIds={item.runes}
-          viewMode={item.runes.length <= 3 ? 'list' : 'grid'}
-          className="gap-0.5 [&_img]:size-[18px]"
+          viewMode={isOneRow ? 'list' : 'grid'}
+          className={cn('gap-0.5', isOneRow ? '[&_img]:size-[18px]' : '[&_img]:size-4')}
           focusableTriggers={focusableTriggers}
         />
       </div>
@@ -150,9 +157,13 @@ export function GridView({
           getCardStateClasses(item.type, isFound, !!interactiveProps),
         )}
       >
+        {/* Corner tab: 12px high and above the artwork slot's content, so it covers no artwork */}
         {recentFindDate && (
-          <div className="absolute top-1 right-1 z-10">
-            <RecentDiscoveryIndicator focusableTriggers={focusableTriggers} />
+          <div data-testid="recent-badge-slot" className="absolute top-0 right-0 z-10">
+            <RecentDiscoveryIndicator
+              className="rounded-none rounded-bl-md px-1 text-[0.625rem] leading-3 tracking-normal"
+              focusableTriggers={focusableTriggers}
+            />
           </div>
         )}
 
