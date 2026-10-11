@@ -2,7 +2,7 @@ import React, { lazy, Suspense } from 'react';
 import ReactDOM from 'react-dom/client';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import './i18n';
-import './index.css';
+import './app.css';
 import logoUrl from '/logo.png';
 import { applyInitialTheme } from './lib/theme';
 
