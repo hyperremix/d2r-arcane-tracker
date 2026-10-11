@@ -1,4 +1,4 @@
-import { renderHook } from '@testing-library/react';
+import { act, renderHook } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { useActiveSection } from './useActiveSection';
 
@@ -40,18 +40,67 @@ describe('When the active section hook is mounted', () => {
     const { unmount } = renderHook(() => useActiveSection(['features']));
     const scrollListener = addEventListener.mock.calls.find(([type]) => type === 'scroll')?.[1];
     const resizeListener = addEventListener.mock.calls.find(([type]) => type === 'resize')?.[1];
-    window.dispatchEvent(new Event('scroll'));
-    expect(requestAnimationFrame).toHaveBeenCalledTimes(1);
 
     // Act
+    window.dispatchEvent(new Event('scroll'));
     unmount();
 
     // Assert
+    expect(requestAnimationFrame).toHaveBeenCalledTimes(1);
     expect(scrollListener).toBeDefined();
     expect(resizeListener).toBeDefined();
     expect(removeEventListener).toHaveBeenCalledWith('scroll', scrollListener);
     expect(removeEventListener).toHaveBeenCalledWith('resize', resizeListener);
     expect(cancelAnimationFrame).toHaveBeenCalledWith(frameId);
+  });
+
+  it('If scroll and resize events fire while a measurement is already pending, then only one frame is requested and one measurement is taken', () => {
+    // Arrange
+    document.body.innerHTML = '<section id="features"></section>';
+    const section = document.getElementById('features') as HTMLElement;
+    const getBoundingClientRect = vi.spyOn(section, 'getBoundingClientRect');
+    let runFrame: FrameRequestCallback | undefined;
+    const requestAnimationFrame = vi
+      .spyOn(window, 'requestAnimationFrame')
+      .mockImplementation((callback) => {
+        runFrame = callback;
+        return 1;
+      });
+    renderHook(() => useActiveSection(['features']));
+    getBoundingClientRect.mockClear();
+
+    // Act
+    window.dispatchEvent(new Event('scroll'));
+    window.dispatchEvent(new Event('scroll'));
+    window.dispatchEvent(new Event('resize'));
+    const measurementsBeforeFrame = getBoundingClientRect.mock.calls.length;
+    act(() => runFrame?.(0));
+
+    // Assert
+    expect(requestAnimationFrame).toHaveBeenCalledTimes(1);
+    expect(measurementsBeforeFrame).toBe(0);
+    expect(getBoundingClientRect).toHaveBeenCalledTimes(1);
+  });
+
+  it('If a measurement frame has run, then the next scroll event requests a new frame', () => {
+    // Arrange
+    document.body.innerHTML = '<section id="features"></section>';
+    let runFrame: FrameRequestCallback | undefined;
+    const requestAnimationFrame = vi
+      .spyOn(window, 'requestAnimationFrame')
+      .mockImplementation((callback) => {
+        runFrame = callback;
+        return 1;
+      });
+    renderHook(() => useActiveSection(['features']));
+    window.dispatchEvent(new Event('scroll'));
+    act(() => runFrame?.(0));
+
+    // Act
+    window.dispatchEvent(new Event('scroll'));
+
+    // Assert
+    expect(requestAnimationFrame).toHaveBeenCalledTimes(2);
   });
 
   it('If the hook is unmounted with no measurement pending, then no frame is cancelled', () => {
