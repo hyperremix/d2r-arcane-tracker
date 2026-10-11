@@ -215,7 +215,7 @@ describe('When InventoryBrowserMain is rendered', () => {
   });
 
   describe('If the page is shown', () => {
-    it('Then it has the shared page heading and a one-line save file notice', async () => {
+    it('Then it has the shared page heading and a short save file notice', async () => {
       // Arrange
 
       // Act
@@ -365,6 +365,46 @@ describe('When InventoryBrowserMain is rendered', () => {
     });
   });
 
+  describe('If a stack pickup was already running when the page opened', () => {
+    it('Then no vault drop area is shown but dragging over a snapshot still opens its window', async () => {
+      // Arrange
+      getActiveDragStateMock.mockResolvedValue({
+        inventory: {
+          active: true,
+          ...REMOTE_INVENTORY_DRAG,
+          itemCode: 'r01',
+          stackPickup: true,
+          stackPickupCount: 2,
+          stackPickupMaxCount: 5,
+        },
+      });
+      render(<InventoryBrowserMain />);
+      const snapshotButton = await screen.findByRole('button', { name: /^Sorc Character/ });
+      await waitFor(() => expect(getActiveDragStateMock).toHaveBeenCalled());
+      await act(async () => {
+        await Promise.resolve();
+      });
+      vi.useFakeTimers();
+
+      // Act
+      fireEvent.dragOver(snapshotButton, { dataTransfer: { types: [], getData: () => '' } });
+      try {
+        await vi.advanceTimersByTimeAsync(650);
+        await Promise.resolve();
+
+        // Assert
+        expect(openSnapshotWindowMock).toHaveBeenCalledWith({
+          sourceFilePath: '/tmp/sorc.d2s',
+          sourceFileType: 'd2s',
+          characterName: 'Sorc',
+        });
+        expect(screen.queryByTestId('vault-dropzone')).not.toBeInTheDocument();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+  });
+
   describe('If a drag with inventory item data enters the window', () => {
     it('Then the vault drop area is shown even without a drag state from another window', async () => {
       // Arrange
@@ -416,6 +456,38 @@ describe('When InventoryBrowserMain is rendered', () => {
 
       // Assert
       expect(screen.getByTestId('vault-dropzone')).toBeInTheDocument();
+    });
+
+    it('Then the vault drop area stays when the drag moves between elements at the left or top edge', async () => {
+      // Arrange
+      render(<InventoryBrowserMain />);
+      const row = await screen.findByRole('button', { name: /^Sorc Character/ });
+      enterWindowWithInventoryDrag();
+
+      // Act
+      dragLeave(row, { relatedTarget: null, clientX: 0, clientY: 80 });
+      dragLeave(row, { relatedTarget: null, clientX: 120, clientY: 0 });
+
+      // Assert
+      expect(screen.getByTestId('vault-dropzone')).toBeInTheDocument();
+    });
+
+    it.each([
+      ['left', -1, 80],
+      ['top', 120, -1],
+      ['right', window.innerWidth, 80],
+      ['bottom', 120, window.innerHeight],
+    ])('Then the vault drop area goes away when the drag leaves past the %s edge', async (_edge, clientX, clientY) => {
+      // Arrange
+      render(<InventoryBrowserMain />);
+      const row = await screen.findByRole('button', { name: /^Sorc Character/ });
+      enterWindowWithInventoryDrag();
+
+      // Act
+      dragLeave(row, { relatedTarget: null, clientX, clientY });
+
+      // Assert
+      expect(screen.queryByTestId('vault-dropzone')).not.toBeInTheDocument();
     });
 
     it('Then a drag another window reported stays when a drag leaves this window', async () => {
@@ -635,6 +707,56 @@ describe('When InventoryBrowserMain is rendered', () => {
       ).toBeInTheDocument();
       expect(screen.getByText('Vaulted Items')).toBeInTheDocument();
       expect(screen.getByText('No inventory items match your filters.')).toBeInTheDocument();
+    });
+  });
+
+  describe('If the inventory reloads while the vault shows that nothing matches', () => {
+    it('Then the vault card stays in place instead of being removed and added again', async () => {
+      // Arrange
+      mockVaultOnly([createVaultItem({})]);
+      render(<InventoryBrowserMain />);
+      await screen.findByRole('button', { name: 'Vaulted item Shako' });
+      mockVaultOnly([]);
+      fireEvent.change(screen.getByRole('textbox', { name: 'Search' }), {
+        target: { value: 'nothing like this' },
+      });
+      const vaultTitle = await screen.findByText('Vaulted Items');
+      const vaultCard = vaultTitle.closest('[data-slot="card"]');
+      await waitFor(() => expect(searchAllMock).toHaveBeenCalledTimes(2));
+      searchAllMock.mockReturnValue(new Promise(() => undefined));
+
+      // Act
+      act(() => {
+        mainEvents.emit('save-file-event');
+      });
+      await waitFor(() => expect(searchAllMock).toHaveBeenCalledTimes(3));
+
+      // Assert
+      const cardDuringReload = screen.getByText('Vaulted Items').closest('[data-slot="card"]');
+      expect(cardDuringReload).not.toBeNull();
+      expect(cardDuringReload).toBe(vaultCard);
+    });
+  });
+
+  describe('If the first inventory load fails while a filter is active', () => {
+    it('Then no vault card is shown', async () => {
+      // Arrange
+      vi.spyOn(console, 'error').mockImplementation(() => undefined);
+      searchAllMock.mockRejectedValue(new Error('search failed'));
+      render(<InventoryBrowserMain />);
+      await screen.findByRole('textbox', { name: 'Search' });
+
+      // Act
+      fireEvent.change(screen.getByRole('textbox', { name: 'Search' }), {
+        target: { value: 'shako' },
+      });
+      await waitFor(() => expect(searchAllMock).toHaveBeenCalledTimes(2));
+      await act(async () => {
+        await Promise.resolve();
+      });
+
+      // Assert
+      expect(screen.queryByText('Vaulted Items')).not.toBeInTheDocument();
     });
   });
 

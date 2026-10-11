@@ -49,13 +49,18 @@ function isDragLeavingWindow(event: globalThis.DragEvent): boolean {
     return false;
   }
 
-  // Some browsers report no related element for moves inside the page; those have a position
-  return (
-    event.clientX <= 0 ||
-    event.clientY <= 0 ||
+  // Some browsers report no related element for moves inside the page, so the position decides.
+  // Pixels 0 to innerWidth/innerHeight - 1 are inside the window, so only a position past those
+  // edges is a leave. Chromium reports (0, 0) when a drag leaves the window, so that pair counts
+  // as a leave too; a single coordinate of 0 is just an element at the edge.
+  const isOutsideViewport =
+    event.clientX < 0 ||
+    event.clientY < 0 ||
     event.clientX >= window.innerWidth ||
-    event.clientY >= window.innerHeight
-  );
+    event.clientY >= window.innerHeight;
+  const isUnknownPosition = event.clientX === 0 && event.clientY === 0;
+
+  return isOutsideViewport || isUnknownPosition;
 }
 
 export function InventoryBrowserMain() {
@@ -67,9 +72,10 @@ export function InventoryBrowserMain() {
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('all');
   // The vault drop area is only shown while an inventory item can be dropped on it: another window
   // reports its drags over IPC, and a drag that enters this window with inventory drag data counts
-  // too. The ref below is wider: it also covers stack pickups, which keep snapshot windows
-  // auto-opening on hover but can't be dropped on the vault. It is a ref because the drag
-  // handlers read it without needing a render.
+  // too. `hasCrossWindowInventoryDragRef` (declared below) is wider than the remote state: it is
+  // set for every active drag another window reports, stack pickups included. A pickup keeps
+  // snapshot windows auto-opening on hover but can't be dropped on the vault. Refs hold the
+  // cross-window flags because the drag handlers read them without needing a render.
   const [hasRemoteInventoryDrag, setHasRemoteInventoryDrag] = useState(false);
   const [hasInventoryDragInWindow, setHasInventoryDragInWindow] = useState(false);
   const characters = useGrailStore((state) => state.characters);
@@ -146,8 +152,12 @@ export function InventoryBrowserMain() {
           }
 
           const rawPayload: { inventory?: unknown } = payload;
-          if (isVaultableInventoryDrag(parseInventoryDragStatePayload(rawPayload.inventory))) {
+          const inventoryPayload = parseInventoryDragStatePayload(rawPayload.inventory);
+          // Same as the live handler: any active drag counts for hover, only a vaultable one shows the area
+          if (inventoryPayload?.active === true) {
             hasCrossWindowInventoryDragRef.current = true;
+          }
+          if (isVaultableInventoryDrag(inventoryPayload)) {
             setHasRemoteInventoryDrag(true);
           }
         })
@@ -178,8 +188,9 @@ export function InventoryBrowserMain() {
       resetSnapshotHoverSession();
     };
 
-    // Fallback for a missed IPC drag state. `dragend` only fires in the window the drag started
-    // in, so here it ends with a drop, with the drag leaving this window, or with the IPC state.
+    // Fallback for a missed IPC drag state, for a drag that carries inventory data into this
+    // window. It ends with a drop, with the drag leaving this window, with `dragend` or with the
+    // IPC state. A drag another window reports over IPC ends only when that window reports it.
     const trackInventoryDragEnter = (event: globalThis.DragEvent) => {
       if (event.dataTransfer?.types.includes(INVENTORY_DRAG_MIME)) {
         setHasInventoryDragInWindow(true);
@@ -363,9 +374,11 @@ export function InventoryBrowserMain() {
     locationContext !== 'all' ||
     typeFilter !== 'all';
   const isVaultDropzoneVisible = hasRemoteInventoryDrag || hasInventoryDragInWindow;
-  // With filters on, an empty vault can mean "nothing matches", so say so instead of hiding it
+  // With filters on, an empty vault can mean "nothing matches", so say so instead of hiding it.
+  // Not tied to `isLoading`, so the card stays mounted while a reload is in flight; before the
+  // first response (or after a failed first load) there is no response and nothing is claimed.
   const isVaultCardVisible =
-    vaultItems.length > 0 || (hasActiveFilters && !isLoading && inventoryResponse !== null);
+    vaultItems.length > 0 || (hasActiveFilters && inventoryResponse !== null);
 
   return (
     <PageShell>

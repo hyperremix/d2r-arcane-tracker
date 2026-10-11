@@ -4273,7 +4273,7 @@ describe('When CharacterInventoryBrowser is rendered', () => {
   });
 
   describe('If a character is opened in its own window', () => {
-    it('Then the one-line notice says to close the game because changes are written to the save files', async () => {
+    it('Then the short notice says to close the game because changes are written to the save files', async () => {
       // Arrange
       const snapshotTarget = {
         sourceFilePath: '/tmp/sorc.d2s',
