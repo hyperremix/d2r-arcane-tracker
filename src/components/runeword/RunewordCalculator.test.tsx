@@ -53,6 +53,10 @@ function stubElectronApi({
   return api;
 }
 
+function getCard(name: string): HTMLElement {
+  return screen.getByRole('heading', { name }).closest('[data-slot="card"]') as HTMLElement;
+}
+
 function getCardTitles(): string[] {
   return screen.getAllByRole('heading', { level: 3 }).map((heading) => heading.textContent ?? '');
 }
@@ -282,17 +286,85 @@ describe('RunewordCalculator', () => {
       fireEvent.click(screen.getByRole('button', { name: 'All' }));
 
       // Assert
-      const infinityCard = screen
-        .getByRole('heading', { name: 'Infinity' })
-        .closest('[data-slot="card"]');
-      const steelCard = screen
-        .getByRole('heading', { name: 'Steel' })
-        .closest('[data-slot="card"]');
-      expect(within(infinityCard as HTMLElement).getByText('2/4 runes')).toBeInTheDocument();
-      expect(
-        within(infinityCard as HTMLElement).getByText('2 of 4 runes available'),
-      ).toBeInTheDocument();
-      expect(within(steelCard as HTMLElement).getByText('2/2 runes')).toBeInTheDocument();
+      const infinityCard = getCard('Infinity');
+      const steelCard = getCard('Steel');
+      expect(within(infinityCard).getByText('2/4 runes')).toBeInTheDocument();
+      expect(within(infinityCard).getByText('2 of 4 runes available')).toBeInTheDocument();
+      expect(within(steelCard).getByText('2/2 runes')).toBeInTheDocument();
+    });
+
+    it('If a runeword is craftable, Then the badge is the only completion signal on its card', async () => {
+      // Arrange
+      stubElectronApi();
+
+      // Act
+      await renderCalculator();
+
+      // Assert
+      const steelCard = getCard('Steel');
+      expect(within(steelCard).getByText('2/2 runes')).toBeInTheDocument();
+      expect(within(steelCard).queryByText(/All runes available/)).not.toBeInTheDocument();
+    });
+
+    it('When runewords are shown, Then each card footer shows one socket per rune', async () => {
+      // Arrange
+      stubElectronApi();
+      await renderCalculator();
+
+      // Act
+      fireEvent.click(screen.getByRole('button', { name: 'All' }));
+
+      // Assert
+      const infinityCard = getCard('Infinity');
+      const steelCard = getCard('Steel');
+      expect(within(infinityCard).getByText('4 sockets')).toBeInTheDocument();
+      expect(within(steelCard).getByText('2 sockets')).toBeInTheDocument();
+    });
+
+    it('If a runeword has a details link, Then the link is part of that runeword card', async () => {
+      // Arrange
+      const link = 'https://d2runewizard.com/runewords/Steel';
+      stubElectronApi({
+        runewords: [
+          { ...steel, link },
+          { ...stealth, link: '' },
+        ],
+      });
+
+      // Act
+      await renderCalculator();
+
+      // Assert
+      const steelCard = getCard('Steel');
+      const stealthCard = getCard('Stealth');
+      expect(within(steelCard).getByRole('link', { name: 'View details' })).toBeInTheDocument();
+      expect(within(stealthCard).queryByRole('link')).not.toBeInTheDocument();
+    });
+
+    it('When the details link is clicked, Then it opens externally instead of navigating in the app', async () => {
+      // Arrange
+      const link = 'https://d2runewizard.com/runewords/Steel';
+      const api = stubElectronApi({ runewords: [{ ...steel, link }] });
+      await renderCalculator();
+
+      // Act
+      const notPrevented = fireEvent.click(screen.getByRole('link', { name: 'View details' }));
+
+      // Assert
+      expect(notPrevented).toBe(false);
+      expect(api.shell.openExternal).toHaveBeenCalledWith(link);
+    });
+
+    it('When runewords are shown, Then each card is a subgrid that shares its rows with the grid row', async () => {
+      // Arrange
+      stubElectronApi();
+
+      // Act
+      await renderCalculator();
+
+      // Assert
+      const steelCard = getCard('Steel');
+      expect(steelCard).toHaveClass('row-span-3', 'grid-rows-subgrid');
     });
   });
 
@@ -306,9 +378,7 @@ describe('RunewordCalculator', () => {
       fireEvent.click(screen.getByRole('button', { name: 'Missing ≤ 1' }));
 
       // Assert
-      const enigmaCard = screen
-        .getByRole('heading', { name: 'Enigma' })
-        .closest('[data-slot="card"]') as HTMLElement;
+      const enigmaCard = getCard('Enigma');
       await waitFor(() =>
         expect(within(enigmaCard).getAllByTestId('missing-rune-marker')).toHaveLength(1),
       );
@@ -380,7 +450,57 @@ describe('RunewordCalculator', () => {
     });
   });
 
-  describe('sidebar layout', () => {
+  describe('page layout', () => {
+    it('When the page loads, Then search, view and refresh sit in the toolbar and the sidebar holds only the rune filters', async () => {
+      // Arrange
+      stubElectronApi();
+
+      // Act
+      await renderCalculator();
+
+      // Assert
+      const toolbar = screen.getByTestId('runeword-toolbar');
+      const sidebar = screen.getByTestId('runeword-sidebar');
+      expect(
+        within(toolbar).getByRole('textbox', { name: 'Search runewords' }),
+      ).toBeInTheDocument();
+      expect(within(toolbar).getByRole('group', { name: 'Show runewords' })).toBeInTheDocument();
+      expect(within(toolbar).getByRole('button', { name: 'Refresh runes' })).toBeInTheDocument();
+      expect(within(sidebar).queryByRole('textbox')).not.toBeInTheDocument();
+      expect(within(sidebar).getByRole('group', { name: 'Filter by Runes' })).toBeInTheDocument();
+    });
+
+    it('When the page loads, Then the runeword grid scrolls in its own container and the sidebar stays outside it', async () => {
+      // Arrange
+      stubElectronApi();
+
+      // Act
+      render(<RunewordCalculator />);
+      await waitFor(() => expect(screen.getByTestId('runeword-grid')).toBeInTheDocument());
+
+      // Assert
+      const scrollArea = screen.getByTestId('runeword-scroll-area');
+      expect(scrollArea).toHaveClass('overflow-y-auto');
+      expect(scrollArea).toContainElement(screen.getByTestId('runeword-grid'));
+      expect(scrollArea).not.toContainElement(screen.getByTestId('runeword-sidebar'));
+      expect(scrollArea).not.toContainElement(screen.getByTestId('runeword-toolbar'));
+    });
+
+    it('When the page loads, Then the view options never wrap onto a second line', async () => {
+      // Arrange
+      stubElectronApi();
+
+      // Act
+      await renderCalculator();
+
+      // Assert
+      for (const name of ['Craftable now', 'Missing ≤ 1', 'All']) {
+        expect(screen.getByRole('button', { name })).toHaveClass('whitespace-nowrap');
+      }
+    });
+  });
+
+  describe('toolbar', () => {
     it('When the page loads, then the search field has an accessible label and comes before the other filters', async () => {
       // Arrange
       stubElectronApi();

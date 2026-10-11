@@ -63,18 +63,16 @@ describe('When RuneFilters is placed in a height-bounded sidebar', () => {
     setElectronAPI(originalElectronAPI);
   });
 
-  it('Then the root is a shrinkable flex column and the rune list is the scroll container', () => {
+  it('Then the rune list is a two-column list that scrolls only as a fallback', () => {
     // Arrange & Act
-    const { container } = renderRuneFilters([]);
+    renderRuneFilters([]);
 
     // Assert
-    // The root must shrink to the space left in the sidebar so the list below gets a bounded height
-    expect(container.firstElementChild).toHaveClass('flex', 'min-h-0', 'flex-1', 'flex-col');
     const runeList = screen.getByRole('group', { name: 'Filter by Runes' });
-    expect(runeList).toHaveClass('min-h-0', 'flex-1', 'overflow-y-auto');
+    expect(runeList).toHaveClass('grid-cols-2', 'overflow-y-auto');
   });
 
-  it('Then every rune, including the highest runes, is inside the scrollable list', () => {
+  it('Then every rune, including the highest runes, is inside the rune list', () => {
     // Arrange & Act
     renderRuneFilters([]);
 
@@ -83,5 +81,32 @@ describe('When RuneFilters is placed in a height-bounded sidebar', () => {
     expect(within(runeList).getAllByRole('checkbox')).toHaveLength(runes.length);
     expect(within(runeList).getByLabelText(/^Zod/)).toBeInTheDocument();
     expect(within(runeList).getByLabelText(/^Cham/)).toBeInTheDocument();
+  });
+});
+
+describe('When RuneFilters shows long rune names or counts', () => {
+  beforeEach(() => {
+    setElectronAPI({ icon: { getByFilename: vi.fn().mockResolvedValue(undefined) } });
+  });
+
+  afterAll(() => {
+    setElectronAPI(originalElectronAPI);
+  });
+
+  it('Then each rune name is truncated rather than overflowing and keeps its full name as a title', () => {
+    // Arrange & Act
+    render(
+      <RuneFilters
+        selectedRunes={[]}
+        onRuneSelectionChange={vi.fn()}
+        availableRunes={{ cham: 123 }}
+      />,
+    );
+
+    // Assert
+    const name = screen.getByTitle('Cham');
+    expect(name).toHaveTextContent('Cham');
+    expect(name).toHaveClass('truncate', 'min-w-0');
+    expect(screen.getByLabelText(/^Cham\s*123$/)).toBeInTheDocument();
   });
 });

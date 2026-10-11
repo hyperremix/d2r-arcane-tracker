@@ -61,7 +61,8 @@ export function RuneFilters({
   };
 
   return (
-    // A bounded, shrinkable flex column so the rune list below gets the remaining height and scrolls
+    // A bounded, shrinkable flex column: the rune list gets the remaining height and only scrolls
+    // when the window is too short to show every rune
     <div className={cn('flex min-h-0 flex-1 flex-col gap-4', className)}>
       {/* Header with match-all hint and Clear selection */}
       <div className="shrink-0 space-y-1 border-border border-b pb-3">
@@ -84,10 +85,11 @@ export function RuneFilters({
         </p>
       </div>
 
-      {/* Rune checkboxes in a scrollable list */}
+      {/* Two-column rune list. The sidebar card is about 607px tall with every rune shown (about
+          656px with the selection summary), so the list only scrolls in windows below ~830px tall */}
       <fieldset
         aria-labelledby={headingId}
-        className="min-h-0 min-w-0 flex-1 space-y-2 overflow-y-auto pr-2"
+        className="grid min-h-32 min-w-0 flex-1 grid-cols-2 content-start gap-1 overflow-y-auto pb-1"
       >
         {runes.map((rune) => {
           const count = getRuneCount(rune.id);
@@ -99,7 +101,7 @@ export function RuneFilters({
             <div
               key={rune.id}
               className={cn(
-                'flex items-center gap-2 rounded p-2 transition-colors hover:bg-muted',
+                'flex min-w-0 items-center gap-1.5 rounded px-2 py-0.5 transition-colors hover:bg-muted',
                 isSelected && 'bg-muted',
               )}
             >
@@ -110,7 +112,7 @@ export function RuneFilters({
               />
 
               {/* Rune image */}
-              <div className="flex h-6 w-6 shrink-0 items-center justify-center">
+              <div className="flex h-5 w-5 shrink-0 items-center justify-center">
                 {imagesLoading ? (
                   <div className="h-full w-full animate-pulse rounded bg-muted" />
                 ) : imageUrl ? (
@@ -125,14 +127,17 @@ export function RuneFilters({
               <Label
                 htmlFor={`rune-${rune.id}`}
                 className={cn(
-                  'flex flex-1 cursor-pointer items-center justify-between',
+                  'flex min-w-0 flex-1 cursor-pointer items-center justify-between gap-1',
                   hasNone && 'text-muted-foreground',
                 )}
               >
-                <span className="font-medium">{rune.name}</span>
+                {/* Long names are cut with an ellipsis instead of spilling into the next column */}
+                <span className="min-w-0 truncate font-medium" title={rune.name}>
+                  {rune.name}
+                </span>
                 <span
                   className={cn(
-                    'rounded-full px-2 py-0.5 font-mono text-xs',
+                    'shrink-0 rounded-full px-1.5 py-0.5 font-mono text-xs',
                     hasNone ? 'bg-missing/15 text-missing' : 'bg-info/15 text-info',
                   )}
                 >

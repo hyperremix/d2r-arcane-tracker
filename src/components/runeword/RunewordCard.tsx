@@ -1,7 +1,8 @@
 import type { Item } from 'electron/types/grail';
+import { ExternalLink } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 import { translations } from '@/i18n/translations';
 import { getRunewordCompletionStatus } from '@/lib/runeword-utils';
 import { cn } from '@/lib/utils';
@@ -21,75 +22,92 @@ interface RunewordCardProps {
 
 /**
  * RunewordCard component that displays a runeword with its required runes and completion status.
- * Shows visual indicators for complete, partial, or missing runes.
+ * The owned/total badge is the single completion signal; missing runes are crossed out.
+ *
+ * The card spans three rows of its parent grid (header, runes, footer) and shares them through
+ * a subgrid, so headers, rune rows and footers line up across every card in the same grid row
+ * even when a long name wraps. The card sets `gap-[normal]`, which makes the subgrid inherit its
+ * row gap from the parent grid, so the gap is defined in one place (the grid).
+ *
+ * The card is `relative` so the badge's absolutely positioned `sr-only` text is contained by the
+ * card instead of the page, where it would stretch the document's scrollable height.
  */
 export function RunewordCard({ runeword, availableRunes, className }: RunewordCardProps) {
   const { t } = useTranslation();
   const completionStatus = getRunewordCompletionStatus(runeword, availableRunes);
+  const runeIds = runeword.runes ?? [];
+  // A runeword needs one socket per rune
+  const socketCount = runeIds.length;
 
   return (
-    <Card className={cn('relative transition-all hover:shadow-md', className)}>
-      <CardContent className="flex flex-col gap-4">
-        {/* Header with name and status */}
-        <div className="flex items-start justify-between gap-2">
-          <div className="flex-1">
-            <h3 className="font-semibold text-lg leading-tight">{runeword.name}</h3>
-            {runeword.link && (
-              <a
-                href={runeword.link}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-primary text-xs hover:underline"
-                onClick={(e) => {
-                  e.preventDefault();
-                  window.electronAPI?.shell.openExternal(runeword.link);
-                }}
-              >
-                {t(translations.runeword.card.viewDetails)}
-              </a>
-            )}
-          </div>
-          <Badge
-            variant={completionStatus.complete ? 'default' : 'outline'}
-            className={cn(
-              'font-mono',
-              completionStatus.complete && 'bg-success text-success-foreground',
-            )}
-          >
-            <span aria-hidden="true">
-              {t(translations.runeword.card.runesOwned, {
-                available: completionStatus.availableCount,
-                total: completionStatus.totalCount,
-              })}
-            </span>
-            <span className="sr-only">
-              {t(translations.runeword.card.runesOwnedLabel, {
-                available: completionStatus.availableCount,
-                total: completionStatus.totalCount,
-              })}
-            </span>
-          </Badge>
-        </div>
+    <Card
+      className={cn(
+        'relative row-span-3 grid grid-rows-subgrid gap-[normal] px-6 transition-all hover:shadow-md',
+        className,
+      )}
+    >
+      {/* Header with name and completion badge */}
+      <div className="flex items-start justify-between gap-2">
+        <h3 className="min-w-0 flex-1 break-words font-semibold text-lg leading-tight">
+          {runeword.name}
+        </h3>
+        <Badge
+          variant={completionStatus.complete ? 'default' : 'outline'}
+          className={cn(
+            'shrink-0 font-mono',
+            completionStatus.complete && 'bg-success text-success-foreground',
+          )}
+        >
+          <span aria-hidden="true">
+            {t(translations.runeword.card.runesOwned, {
+              available: completionStatus.availableCount,
+              total: completionStatus.totalCount,
+            })}
+          </span>
+          <span className="sr-only">
+            {t(translations.runeword.card.runesOwnedLabel, {
+              available: completionStatus.availableCount,
+              total: completionStatus.totalCount,
+            })}
+          </span>
+        </Badge>
+      </div>
 
-        {/* Required runes */}
-        {runeword.runes && runeword.runes.length > 0 && (
+      {/* Required runes; the wrapper keeps the row in place even without runes */}
+      <div>
+        {runeIds.length > 0 && (
           <RuneImages
-            runeIds={runeword.runes}
+            runeIds={runeIds}
             viewMode="grid"
             showRuneNames
             completionStatus={completionStatus}
           />
         )}
+      </div>
 
-        {/* Complete status message */}
-        {completionStatus.complete && (
-          <div className="border-border border-t pt-3">
-            <p className="text-center font-medium text-sm text-success">
-              ✓ {t(translations.runeword.card.allRunesAvailable)}
-            </p>
-          </div>
+      {/* Footer: one socket per rune, and a link to the full runeword details */}
+      <div className="flex items-end justify-between gap-2 border-border border-t pt-3 text-xs">
+        {socketCount > 0 && (
+          <span className="text-muted-foreground">
+            {t(translations.runeword.card.sockets, { count: socketCount })}
+          </span>
         )}
-      </CardContent>
+        {runeword.link && (
+          <a
+            href={runeword.link}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="ml-auto inline-flex items-center gap-1 text-primary hover:underline"
+            onClick={(e) => {
+              e.preventDefault();
+              window.electronAPI?.shell.openExternal(runeword.link);
+            }}
+          >
+            {t(translations.runeword.card.viewDetails)}
+            <ExternalLink aria-hidden="true" className="size-3" />
+          </a>
+        )}
+      </div>
     </Card>
   );
 }
