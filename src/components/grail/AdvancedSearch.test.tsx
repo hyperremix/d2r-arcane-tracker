@@ -1,6 +1,7 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import type { Item, Settings } from 'electron/types/grail';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { GrailProgressBuilder } from '@/fixtures/GrailProgressBuilder';
 import { HolyGrailItemBuilder } from '@/fixtures/HolyGrailItemBuilder';
 import { filterAndSortItems } from '@/lib/grailFilters';
 import { useGrailStore } from '@/stores/grailStore';
@@ -419,6 +420,90 @@ describe('When AdvancedSearch toolbar is rendered', () => {
       // Assert
       expect(useGrailStore.getState().filter.types).toEqual([]);
       expect(setToggle).toHaveAttribute('aria-pressed', 'false');
+    });
+  });
+
+  describe('If the grail has items and progress', () => {
+    const progressItems: Item[] = [
+      HolyGrailItemBuilder.new()
+        .withId('shako')
+        .withType('unique')
+        .withEtherealType('optional')
+        .build(),
+      HolyGrailItemBuilder.new().withId('soj').withType('unique').withEtherealType('none').build(),
+      HolyGrailItemBuilder.new()
+        .withId('tal-armor')
+        .withType('set')
+        .withEtherealType('none')
+        .build(),
+    ];
+    const shakoFind = GrailProgressBuilder.new()
+      .withId('p1')
+      .withItemId('shako')
+      .withFoundDate(new Date(2024, 0, 1))
+      .asNormal()
+      .build();
+
+    it('Then each type chip shows its found and total count and names it accessibly', () => {
+      // Arrange
+      useGrailStore.setState({ items: progressItems, progress: [shakoFind] });
+
+      // Act
+      render(<AdvancedSearch />);
+
+      // Assert
+      const types = screen.getByRole('group', { name: 'Types' });
+      const uniqueToggle = within(types).getByRole('button', { name: 'Unique, 1 of 2 found' });
+      expect(uniqueToggle).toHaveTextContent('Unique1/2');
+      expect(uniqueToggle).toHaveAttribute('aria-pressed', 'false');
+      expect(within(types).getByRole('button', { name: 'Set, 0 of 1 found' })).toHaveTextContent(
+        'Set0/1',
+      );
+    });
+
+    it('Then the counts include tracked ethereal versions, like the overall progress', () => {
+      // Arrange
+      resetStore({ grailEthereal: true });
+      useGrailStore.setState({ items: progressItems, progress: [shakoFind] });
+
+      // Act
+      render(<AdvancedSearch />);
+
+      // Assert
+      expect(screen.getByRole('button', { name: 'Unique, 1 of 3 found' })).toBeInTheDocument();
+    });
+
+    it('Then the counts do not change when filters narrow the shown items', () => {
+      // Arrange
+      useGrailStore.setState({ items: progressItems, progress: [shakoFind] });
+      useGrailStore.getState().setFilter({ foundStatus: 'missing', types: ['set'] });
+
+      // Act
+      render(<AdvancedSearch />);
+
+      // Assert
+      expect(screen.getByRole('button', { name: 'Unique, 1 of 2 found' })).toHaveAttribute(
+        'aria-pressed',
+        'false',
+      );
+      expect(screen.getByRole('button', { name: 'Set, 0 of 1 found' })).toHaveAttribute(
+        'aria-pressed',
+        'true',
+      );
+    });
+
+    it('Then a counter chip still toggles its type filter', () => {
+      // Arrange
+      useGrailStore.setState({ items: progressItems, progress: [shakoFind] });
+      render(<AdvancedSearch />);
+      const uniqueToggle = screen.getByRole('button', { name: 'Unique, 1 of 2 found' });
+
+      // Act
+      fireEvent.click(uniqueToggle);
+
+      // Assert
+      expect(useGrailStore.getState().filter.types).toEqual(['unique']);
+      expect(uniqueToggle).toHaveAttribute('aria-pressed', 'true');
     });
   });
 

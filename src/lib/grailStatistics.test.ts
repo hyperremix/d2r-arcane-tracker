@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { CharacterBuilder, GrailProgressBuilder, HolyGrailItemBuilder } from '@/fixtures';
-import { calculateFindStreaks, computeGrailStatistics } from './grailStatistics';
+import {
+  calculateFindStreaks,
+  computeGrailStatistics,
+  computeTypeProgress,
+} from './grailStatistics';
 
 const NOW = new Date(2024, 5, 15, 12, 0, 0);
 const NORMAL_ONLY = { grailNormal: true, grailEthereal: false };
@@ -232,6 +236,82 @@ describe('When computeGrailStatistics is called', () => {
         { character: pala, totalFound: 2, recentFinds: 1 },
         { character: sorc, totalFound: 1, recentFinds: 0 },
       ]);
+    });
+  });
+});
+
+describe('When computeTypeProgress is called', () => {
+  describe('If items of several types are tracked', () => {
+    it('Then each type counts its own tracked versions and the types add up to the overall progress', () => {
+      // Arrange
+      const items = [
+        HolyGrailItemBuilder.new()
+          .withId('shako')
+          .withType('unique')
+          .withEtherealType('optional')
+          .build(),
+        HolyGrailItemBuilder.new()
+          .withId('soj')
+          .withType('unique')
+          .withEtherealType('none')
+          .build(),
+        HolyGrailItemBuilder.new()
+          .withId('tal-armor')
+          .withType('set')
+          .withEtherealType('none')
+          .build(),
+        HolyGrailItemBuilder.new().withId('ber').withType('rune').withEtherealType('none').build(),
+      ];
+      const progress = [
+        find('p1', 'shako', daysAgo(30)).asEthereal().build(),
+        find('p2', 'soj', daysAgo(30)).asNormal().build(),
+        find('p3', 'ber', daysAgo(2)).asNormal().build(),
+        GrailProgressBuilder.new().withItemId('tal-armor').withoutFoundDate().build(),
+      ];
+
+      // Act
+      const typeProgress = computeTypeProgress({
+        items,
+        progress,
+        settings: NORMAL_AND_ETHEREAL,
+      });
+      const stats = computeGrailStatistics({
+        items,
+        progress,
+        characters: [],
+        settings: NORMAL_AND_ETHEREAL,
+        now: NOW,
+      });
+
+      // Assert
+      expect(typeProgress).toEqual({
+        unique: { total: 3, found: 2, percentage: (2 / 3) * 100 },
+        set: { total: 1, found: 0, percentage: 0 },
+        rune: { total: 1, found: 1, percentage: 100 },
+      });
+      const types = Object.values(typeProgress);
+      expect(types.reduce((sum, type) => sum + type.total, 0)).toBe(stats.totalItems);
+      expect(types.reduce((sum, type) => sum + type.found, 0)).toBe(stats.foundItems);
+    });
+  });
+
+  describe('If only normal versions are tracked', () => {
+    it('Then ethereal finds do not count towards the type progress', () => {
+      // Arrange
+      const items = [
+        HolyGrailItemBuilder.new()
+          .withId('shako')
+          .withType('unique')
+          .withEtherealType('optional')
+          .build(),
+      ];
+      const progress = [find('p1', 'shako', daysAgo(30)).asEthereal().build()];
+
+      // Act
+      const typeProgress = computeTypeProgress({ items, progress, settings: NORMAL_ONLY });
+
+      // Assert
+      expect(typeProgress).toEqual({ unique: { total: 1, found: 0, percentage: 0 } });
     });
   });
 });

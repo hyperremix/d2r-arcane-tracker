@@ -4,6 +4,7 @@ import { GrailProgressBuilder, HolyGrailItemBuilder } from '@/fixtures';
 import i18n from '@/i18n';
 import {
   getCardStatusLabel,
+  getGridSubtitle,
   getItemSubtitle,
   getRecentFindDate,
   getTrackedVersionStatuses,
@@ -175,6 +176,45 @@ describe('When getItemSubtitle is called', () => {
 
     // Act
     const subtitle = getItemSubtitle(item);
+
+    // Assert
+    expect(subtitle).toBeUndefined();
+  });
+});
+
+describe('When getGridSubtitle is called', () => {
+  it('If a set item has a set name and a base, Then the set name is returned', () => {
+    // Arrange
+    const item = HolyGrailItemBuilder.new()
+      .withType('set')
+      .withSetName("Tal Rasha's Wrappings")
+      .withItemBase('Lacquered Plate')
+      .build();
+
+    // Act
+    const subtitle = getGridSubtitle(item);
+
+    // Assert
+    expect(subtitle).toBe("Tal Rasha's Wrappings");
+  });
+
+  it('If a unique item has no set name, Then the base item is returned', () => {
+    // Arrange
+    const item = HolyGrailItemBuilder.new().withType('unique').withItemBase('Shako').build();
+
+    // Act
+    const subtitle = getGridSubtitle(item);
+
+    // Assert
+    expect(subtitle).toBe('Shako');
+  });
+
+  it('If the item is a rune, Then no subtitle is returned', () => {
+    // Arrange
+    const item = HolyGrailItemBuilder.new().withType('rune').withItemBase('El Rune').build();
+
+    // Act
+    const subtitle = getGridSubtitle(item);
 
     // Assert
     expect(subtitle).toBeUndefined();

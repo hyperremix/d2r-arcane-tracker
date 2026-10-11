@@ -4,6 +4,7 @@ import type {
   GrailStatistics,
   Item,
   ItemCategory,
+  ItemType,
   Settings,
 } from 'electron/types/grail';
 import { DAY_MS } from '@/lib/date';
@@ -155,6 +156,53 @@ function countTrackedVersions(
 }
 
 /**
+ * Maps every item id to the versions (normal / ethereal) that have a found progress record.
+ */
+function collectFoundVersions(progress: GrailProgress[]): Map<string, FoundVersions> {
+  const foundVersions = new Map<string, FoundVersions>();
+  for (const p of progress) {
+    if (p.foundDate === undefined) continue;
+    const versions = foundVersions.get(p.itemId) ?? { normal: false, ethereal: false };
+    if (p.isEthereal) {
+      versions.ethereal = true;
+    } else {
+      versions.normal = true;
+    }
+    foundVersions.set(p.itemId, versions);
+  }
+  return foundVersions;
+}
+
+/**
+ * Computes the grail progress of each item type (unique, set, rune, runeword). It counts the same
+ * tracked versions as the overall progress of {@link computeGrailStatistics}, so the counts of all
+ * types add up to the overall found and total counts. Types without tracked items are omitted.
+ * @param input - Items, progress and settings
+ * @returns The progress per item type
+ */
+export function computeTypeProgress({
+  items,
+  progress,
+  settings,
+}: Pick<GrailStatisticsInput, 'items' | 'progress' | 'settings'>): Partial<
+  Record<ItemType, ProgressCount>
+> {
+  const foundVersions = collectFoundVersions(progress);
+  const itemsByType = new Map<ItemType, Item[]>();
+  for (const item of items) {
+    const typeItems = itemsByType.get(item.type) ?? [];
+    typeItems.push(item);
+    itemsByType.set(item.type, typeItems);
+  }
+
+  const typeProgress: Partial<Record<ItemType, ProgressCount>> = {};
+  for (const [type, typeItems] of itemsByType) {
+    typeProgress[type] = countTrackedVersions(typeItems, foundVersions, settings).overall;
+  }
+  return typeProgress;
+}
+
+/**
  * Computes the Holy Grail statistics. Pure, so callers can memoize it on its inputs.
  *
  * Only the tracked versions of the tracked items count towards completion. Finds from the
@@ -175,17 +223,7 @@ export function computeGrailStatistics({
     (p): p is GrailProgress & { foundDate: Date } => p.foundDate !== undefined,
   );
 
-  const foundVersions = new Map<string, FoundVersions>();
-  for (const p of foundProgress) {
-    const versions = foundVersions.get(p.itemId) ?? { normal: false, ethereal: false };
-    if (p.isEthereal) {
-      versions.ethereal = true;
-    } else {
-      versions.normal = true;
-    }
-    foundVersions.set(p.itemId, versions);
-  }
-
+  const foundVersions = collectFoundVersions(foundProgress);
   const counts = countTrackedVersions(items, foundVersions, settings);
 
   // Finds made while the tracker was running

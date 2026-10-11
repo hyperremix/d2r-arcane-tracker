@@ -1,4 +1,5 @@
 import type { Character, GrailProgress, Item } from 'electron/types/grail';
+import type { TFunction } from 'i18next';
 import { Check, Circle } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
@@ -124,7 +125,26 @@ export function DiscoveryAttribution({
 export interface VersionPillsProps {
   item: Item;
   versionStatuses: VersionStatus[];
+  /**
+   * Smaller pills on one line for narrow grid tiles; the ethereal pill reads "Eth". The screen
+   * reader text keeps the full version name.
+   */
+  compact?: boolean;
   className?: string;
+}
+
+/**
+ * Returns the visible label of a version pill.
+ */
+function getPillLabel(
+  item: Item,
+  version: VersionStatus['version'],
+  compact: boolean,
+  t: TFunction,
+) {
+  if (version === 'ethereal' && isEtherealOnly(item)) return t(etherealTypeLabelKeys.only);
+  if (version === 'ethereal' && compact) return t(translations.grail.itemCard.eth);
+  return getVersionLabel(version, t);
 }
 
 /**
@@ -133,34 +153,51 @@ export interface VersionPillsProps {
  * muted while still missing. Each pill also carries its status as screen reader text, so the state
  * never depends on color or shape alone.
  */
-export function VersionPills({ item, versionStatuses, className }: VersionPillsProps) {
+export function VersionPills({
+  item,
+  versionStatuses,
+  compact = false,
+  className,
+}: VersionPillsProps) {
   const { t } = useTranslation();
   if (versionStatuses.length === 0) return null;
 
   return (
-    <ul className={cn('flex flex-wrap items-center justify-center gap-1.5', className)}>
+    <ul
+      className={cn(
+        'flex items-center justify-center',
+        compact ? 'flex-nowrap gap-1' : 'flex-wrap gap-1.5',
+        className,
+      )}
+    >
       {versionStatuses.map((status) => {
-        const pillLabel =
-          status.version === 'ethereal' && isEtherealOnly(item)
-            ? t(etherealTypeLabelKeys.only)
-            : getVersionLabel(status.version, t);
+        const pillLabel = getPillLabel(item, status.version, compact, t);
         return (
           <li
             key={status.version}
             data-version={status.version}
             data-found={status.isFound}
             className={cn(
-              'inline-flex items-center rounded-full border px-2 py-0.5 font-medium text-xs leading-4',
+              'inline-flex items-center rounded-full border font-medium',
+              compact
+                ? 'min-w-0 px-1.5 text-[0.6875rem] leading-4'
+                : 'px-2 py-0.5 text-xs leading-4',
               getVersionPillClasses(item.type, status.isFound),
             )}
           >
-            <span aria-hidden="true" className="inline-flex items-center gap-1">
+            <span
+              aria-hidden="true"
+              className={cn('inline-flex min-w-0 items-center', compact ? 'gap-0.5' : 'gap-1')}
+            >
               {status.isFound ? (
-                <Check className="size-3" strokeWidth={3} />
+                <Check
+                  className={cn('shrink-0', compact ? 'size-2.5' : 'size-3')}
+                  strokeWidth={3}
+                />
               ) : (
-                <Circle className="size-2.5" />
+                <Circle className={cn('shrink-0', compact ? 'size-2' : 'size-2.5')} />
               )}
-              {pillLabel}
+              <span className="truncate">{pillLabel}</span>
             </span>
             <span className="sr-only">{getVersionStatusLabel(status, t)}</span>
           </li>

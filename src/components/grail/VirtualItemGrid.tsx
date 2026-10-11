@@ -96,14 +96,14 @@ export function GroupHeader({ title, foundCount, itemCount, className }: GroupHe
 /**
  * Gap between grid columns (and, via the row padding, between grid rows) in pixels.
  */
-export const COLUMN_GUTTER = 16;
+export const COLUMN_GUTTER = 8;
 
 /**
  * Minimum width of a single grid column in pixels.
- * Columns stretch to fill the remaining space, which keeps cards roughly 180-230px wide
- * once a few columns fit.
+ * Columns stretch to fill the remaining space, which keeps the compact tiles roughly 128-140px
+ * wide once a few columns fit.
  */
-export const MIN_COLUMN_WIDTH = 180;
+export const MIN_COLUMN_WIDTH = 128;
 
 /**
  * Gets the number of columns that fit into the given container width.
@@ -124,10 +124,10 @@ export function getColumnCount(containerWidth: number): number {
 const HEADER_ROW_HEIGHT_ESTIMATE = 60;
 
 /**
- * Estimated height of a row of grid cards in pixels, including the row gap
- * (refined by measuring rendered rows).
+ * Estimated height of a row of grid tiles in pixels, including the row gap: a tile without the
+ * version pill row is 112px tall (refined by measuring rendered rows).
  */
-const ITEM_ROW_HEIGHT_ESTIMATE = 180;
+const ITEM_ROW_HEIGHT_ESTIMATE = 120;
 
 /**
  * A group of items shown in the grid. `foundCount` is the number of items of the group that have
@@ -233,8 +233,9 @@ interface VirtualItemGridProps {
  * VirtualItemGrid component that renders items in a virtualized, responsive card grid.
  * Groups are flattened into optional header rows and rows of cards, with as many equally wide
  * columns as fit into the grid width (see {@link getColumnCount}). Only rows near the viewport are
- * mounted; row heights are measured after rendering because card heights vary (set name, discovery
- * attribution, rune images), so each row is as tall as its tallest card.
+ * mounted. Tiles have a fixed height, so item rows are equally tall; rows are still measured after
+ * rendering because the tile height depends on settings (the version pill row) and header rows
+ * differ from item rows.
  */
 export const VirtualItemGrid = memo(function VirtualItemGrid({
   groupedItems,

@@ -103,12 +103,25 @@ describe('When getColumnCount is called', () => {
       const twoColumnThreshold = 2 * MIN_COLUMN_WIDTH + COLUMN_GUTTER;
 
       // Act
-      const narrowColumnCount = getColumnCount(320);
+      const narrowColumnCount = getColumnCount(200);
       const justBelowThresholdColumnCount = getColumnCount(twoColumnThreshold - 1);
 
       // Assert
       expect(narrowColumnCount).toBe(1);
       expect(justBelowThresholdColumnCount).toBe(1);
+    });
+  });
+
+  describe('If the grid fills a 1440px wide window', () => {
+    it('Then at least ten compact tiles fit into a row', () => {
+      // Arrange
+      const gridWidth = 1376;
+
+      // Act
+      const columnCount = getColumnCount(gridWidth);
+
+      // Assert
+      expect(columnCount).toBeGreaterThanOrEqual(10);
     });
   });
 

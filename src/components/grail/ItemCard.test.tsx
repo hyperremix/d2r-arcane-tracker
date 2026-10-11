@@ -198,7 +198,7 @@ describe('When ItemCard is rendered', () => {
   });
 
   describe('If item has normal progress', () => {
-    it('Then shows attribution', () => {
+    it('Then the list row shows attribution', () => {
       // Arrange
       const item = HolyGrailItemBuilder.new().withId('item-1').withEtherealType('optional').build();
       const character = CharacterBuilder.new().withId('char-1').withName('TestSorc').build();
@@ -212,10 +212,41 @@ describe('When ItemCard is rendered', () => {
       setupStoreMock({ grailNormal: true });
 
       // Act
-      render(<ItemCard item={item} normalProgress={[normalProgress]} characters={[character]} />);
+      render(
+        <ItemCard
+          item={item}
+          normalProgress={[normalProgress]}
+          characters={[character]}
+          viewMode="list"
+        />,
+      );
 
       // Assert
       expect(screen.getByText('Found by:')).toBeInTheDocument();
+    });
+
+    it('Then the grid tile leaves attribution to the name tooltip', async () => {
+      // Arrange
+      const item = HolyGrailItemBuilder.new().withId('item-1').withName('Shako').build();
+      const character = CharacterBuilder.new().withId('char-1').withName('TestSorc').build();
+      const normalProgress = GrailProgressBuilder.new()
+        .withId('prog-1')
+        .withCharacterId('char-1')
+        .withItemId('item-1')
+        .asNormal()
+        .build();
+      render(<ItemCard item={item} normalProgress={[normalProgress]} characters={[character]} />);
+      expect(screen.queryByText('Found by:')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('character-icon')).not.toBeInTheDocument();
+
+      // Act
+      fireEvent.focus(
+        screen.getByText('Shako').closest('[data-slot="tooltip-trigger"]') as Element,
+      );
+
+      // Assert
+      expect(await screen.findByText('TestSorc')).toBeInTheDocument();
+      expect(screen.getByTestId('character-icon')).toBeInTheDocument();
     });
 
     it('Then shows no version pills when only normal items are tracked', () => {
@@ -368,18 +399,114 @@ describe('When ItemCard is rendered', () => {
   });
 
   describe('If set item with setName', () => {
-    it('Then renders set name text in grid view', () => {
+    it('Then the grid tile shows the set name instead of the base item on one truncated line', () => {
       // Arrange
       const item = HolyGrailItemBuilder.new()
         .withType('set')
         .withSetName("Tal Rasha's Wrappings")
+        .withItemBase('Lacquered Plate')
         .build();
 
       // Act
       render(<ItemCard item={item} />);
 
       // Assert
-      expect(screen.getByText("Set: Tal Rasha's Wrappings")).toBeInTheDocument();
+      expect(screen.getByText("Tal Rasha's Wrappings")).toHaveClass('truncate');
+      expect(screen.queryByText('Lacquered Plate')).not.toBeInTheDocument();
+    });
+
+    it('Then the grid tile tooltip shows the set and the base item', async () => {
+      // Arrange
+      const item = HolyGrailItemBuilder.new()
+        .withType('set')
+        .withName("Tal Rasha's Guardianship")
+        .withSetName("Tal Rasha's Wrappings")
+        .withItemBase('Lacquered Plate')
+        .build();
+      render(<ItemCard item={item} />);
+
+      // Act
+      fireEvent.focus(
+        screen
+          .getByRole('heading', { name: "Tal Rasha's Guardianship" })
+          .closest('[data-slot="tooltip-trigger"]') as Element,
+      );
+
+      // Assert
+      expect(await screen.findByText("Set: Tal Rasha's Wrappings")).toBeInTheDocument();
+      expect(screen.getByText("Tal Rasha's Guardianship • Lacquered Plate")).toBeInTheDocument();
+    });
+
+    it('Then the list row shows the base item and set name', () => {
+      // Arrange
+      const item = HolyGrailItemBuilder.new()
+        .withType('set')
+        .withSetName("Tal Rasha's Wrappings")
+        .withItemBase('Lacquered Plate')
+        .build();
+
+      // Act
+      render(<ItemCard item={item} viewMode="list" />);
+
+      // Assert
+      expect(screen.getByText("Lacquered Plate • Set: Tal Rasha's Wrappings")).toBeInTheDocument();
+    });
+  });
+
+  describe('If the tile layout is checked', () => {
+    it('Then every grid row has a fixed height so tiles line up', () => {
+      // Arrange
+      const item = HolyGrailItemBuilder.new().withName('Shako').withItemBase('Shako').build();
+
+      // Act
+      render(<ItemCard item={item} />);
+
+      // Assert
+      expect(screen.getByRole('heading', { name: 'Shako' })).toHaveClass('line-clamp-2', 'h-8');
+      expect(screen.getByText('Shako', { selector: 'p' })).toHaveClass('h-4', 'truncate');
+    });
+
+    it('Then a tile without artwork or subtitle keeps the same rows', () => {
+      // Arrange
+      const item = HolyGrailItemBuilder.new().withType('rune').withName('Ber Rune').build();
+
+      // Act
+      const { container } = render(<ItemCard item={item} />);
+
+      // Assert
+      const content = container.querySelector('[data-slot="card-content"]');
+      expect(content?.firstElementChild).toHaveClass('h-10');
+      expect(content?.querySelector('p.h-4')).toBeEmptyDOMElement();
+    });
+
+    it.each([
+      [true, 1],
+      [false, 0],
+    ])('Then the version pill row is reserved on every tile if ethereal tracking is %s', (grailEthereal, rows) => {
+      // Arrange
+      setupStoreMock({ grailEthereal });
+      const item = HolyGrailItemBuilder.new().withEtherealType('none').build();
+
+      // Act
+      render(<ItemCard item={item} />);
+
+      // Assert
+      expect(screen.queryAllByTestId('version-row')).toHaveLength(rows);
+      expect(screen.queryByRole('list')).not.toBeInTheDocument();
+    });
+
+    it('Then the grid tile uses short version labels and keeps the full status for screen readers', () => {
+      // Arrange
+      setupStoreMock({ grailEthereal: true });
+      const item = HolyGrailItemBuilder.new().withEtherealType('optional').build();
+
+      // Act
+      const { container } = render(<ItemCard item={item} />);
+
+      // Assert
+      const ethereal = container.querySelector('[data-version="ethereal"]');
+      expect(ethereal).toHaveTextContent('Eth');
+      expect(ethereal).toHaveTextContent('Ethereal missing');
     });
   });
 
@@ -741,9 +868,9 @@ describe('When ItemCard is rendered', () => {
     });
 
     it.each([
-      'grid',
-      'list',
-    ] as const)('Then the %s card keeps item and character tooltip triggers keyboard focusable', (viewMode) => {
+      ['grid', ['BUTTON']],
+      ['list', ['BUTTON', 'BUTTON']],
+    ] as const)('Then the %s card keeps its tooltip triggers keyboard focusable', (viewMode, expectedTriggers) => {
       // Arrange
       const item = HolyGrailItemBuilder.new().withId('item-1').withName('Static').build();
       const normalProgress = GrailProgressBuilder.new()
@@ -769,7 +896,8 @@ describe('When ItemCard is rendered', () => {
         container.querySelectorAll('[data-slot="tooltip-trigger"]'),
         (trigger) => trigger.tagName,
       );
-      expect(triggerTagNames).toEqual(['BUTTON', 'BUTTON']);
+      // The grid tile has only the name tooltip, the list row also has a character tooltip
+      expect(triggerTagNames).toEqual(expectedTriggers);
     });
 
     it('Then rune tooltip triggers stay focusable on a runeword card', () => {
@@ -854,7 +982,7 @@ describe('When ItemCard is rendered', () => {
       render(<ItemCard item={item} />);
 
       // Assert
-      const setName = screen.getByText("Set: Tal Rasha's Wrappings");
+      const setName = screen.getByText("Tal Rasha's Wrappings");
       expect(setName).toHaveClass('text-muted-foreground');
       expect(setName).not.toHaveClass('text-item-set');
     });
@@ -1040,7 +1168,14 @@ describe('When ItemCard is rendered', () => {
       );
 
       // Act
-      render(<ItemCard item={item} normalProgress={progressRecords} characters={characters} />);
+      render(
+        <ItemCard
+          item={item}
+          normalProgress={progressRecords}
+          characters={characters}
+          viewMode="list"
+        />,
+      );
 
       // Assert
       const characterIcons = screen.getAllByTestId('character-icon');
@@ -1076,7 +1211,6 @@ describe('When ItemCard is rendered', () => {
         'true',
       );
       expect(screen.queryByText(/4x/)).not.toBeInTheDocument();
-      expect(screen.getAllByTestId('character-icon')).toHaveLength(1);
     });
   });
 

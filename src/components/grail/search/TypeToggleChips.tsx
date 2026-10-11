@@ -1,6 +1,7 @@
 import type { ItemType } from 'electron/types/grail';
 import { useTranslation } from 'react-i18next';
 import { translations } from '@/i18n/translations';
+import type { ProgressCount } from '@/lib/grailStatistics';
 import { itemTypeLabelKeys } from '@/lib/labelKeys';
 import { cn } from '@/lib/utils';
 
@@ -21,12 +22,21 @@ interface TypeToggleChipsProps {
   typeValues: ItemType[];
   selectedTypes: ItemType[];
   onToggleType: (type: ItemType) => void;
+  /** Grail progress per item type, shown as a found/total counter on each chip */
+  typeProgress: Partial<Record<ItemType, ProgressCount>>;
 }
 
 /**
- * Inline toggle chips for the tracked item types, colored like the item cards.
+ * Inline toggle chips for the tracked item types, colored like the item cards. Each chip doubles
+ * as a progress counter ("Unique 142/385"), so the per-type breakdown of the grail is visible
+ * next to the filter it belongs to.
  */
-export function TypeToggleChips({ typeValues, selectedTypes, onToggleType }: TypeToggleChipsProps) {
+export function TypeToggleChips({
+  typeValues,
+  selectedTypes,
+  onToggleType,
+  typeProgress,
+}: TypeToggleChipsProps) {
   const { t } = useTranslation();
 
   return (
@@ -34,11 +44,23 @@ export function TypeToggleChips({ typeValues, selectedTypes, onToggleType }: Typ
       <legend className="sr-only">{t(translations.grail.advancedSearch.types)}</legend>
       {typeValues.map((type) => {
         const pressed = selectedTypes.includes(type);
+        const label = t(itemTypeLabelKeys[type]);
+        const progress = typeProgress[type];
         return (
           <button
             key={type}
             type="button"
             aria-pressed={pressed}
+            // The visible "142/385" counter is read out as "142 of 385 found"
+            aria-label={
+              progress
+                ? t(translations.grail.advancedSearch.typeChipLabel, {
+                    type: label,
+                    found: progress.found,
+                    total: progress.total,
+                  })
+                : undefined
+            }
             onClick={() => onToggleType(type)}
             className={cn(
               'inline-flex h-9 items-center gap-1.5 rounded-full border border-border px-3 font-medium text-muted-foreground text-sm outline-none transition-colors',
@@ -50,7 +72,17 @@ export function TypeToggleChips({ typeValues, selectedTypes, onToggleType }: Typ
               aria-hidden="true"
               className={cn('size-2 shrink-0 rounded-full', typeChipStyles[type].dot)}
             />
-            {t(itemTypeLabelKeys[type])}
+            {label}
+            {progress && (
+              <span
+                className={cn(
+                  'text-muted-foreground text-xs tabular-nums',
+                  pressed && 'text-foreground',
+                )}
+              >
+                {progress.found}/{progress.total}
+              </span>
+            )}
           </button>
         );
       })}

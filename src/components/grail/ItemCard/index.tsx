@@ -147,6 +147,7 @@ export const ItemCard = memo(function ItemCard({
       versionStatuses={versionStatuses}
       recentFindDate={withoutStatusIndicators ? undefined : recentFindDate}
       showItemIcons={settings.showItemIcons}
+      reserveVersionRow={settings.grailEthereal}
       className={className}
       interactiveProps={interactiveProps}
     />
