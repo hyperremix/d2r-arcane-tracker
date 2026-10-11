@@ -36,6 +36,12 @@ export function formatLocation(
   return t(translations.inventoryBrowser.location[item.locationContext]);
 }
 
+/** Whether a save file type is one of the shared stash formats (`.d2i`, `.sss`, `.d2x`). */
+export function isSharedStashFileType(sourceFileType: string | undefined): boolean {
+  const normalizedType = sourceFileType?.trim().toLowerCase();
+  return normalizedType !== undefined && SHARED_STASH_FILE_TYPES.has(normalizedType);
+}
+
 /**
  * Plain-language kind of save file an item or snapshot comes from: a character save (`.d2s`) or a
  * shared stash (`.d2i`, `.sss`, `.d2x`).
@@ -49,7 +55,7 @@ export function formatSourceFileTypeLabel(
     return t(translations.inventoryBrowser.sourceFileTypes.character);
   }
 
-  if (normalizedType && SHARED_STASH_FILE_TYPES.has(normalizedType)) {
+  if (isSharedStashFileType(sourceFileType)) {
     return t(translations.inventoryBrowser.sourceFileTypes.sharedStash);
   }
 

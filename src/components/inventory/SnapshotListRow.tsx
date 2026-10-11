@@ -3,7 +3,10 @@ import { ExternalLink } from 'lucide-react';
 import { type DragEvent, useId } from 'react';
 import { useTranslation } from 'react-i18next';
 import { CharacterIcon } from '@/components/grail/StatusIcons';
-import { formatSourceFileTypeLabel } from '@/components/inventory/inventoryItemLabels';
+import {
+  formatSourceFileTypeLabel,
+  isSharedStashFileType,
+} from '@/components/inventory/inventoryItemLabels';
 import { Badge } from '@/components/ui/badge';
 import { translations } from '@/i18n/translations';
 import { itemSubCategoryLabelKeys } from '@/lib/labelKeys';
@@ -57,7 +60,8 @@ export function SnapshotListRow({
   const countId = useId();
 
   const iconClass =
-    character?.characterClass ?? (snapshot.sourceFileType === 'd2i' ? 'shared_stash' : '');
+    character?.characterClass ??
+    (isSharedStashFileType(snapshot.sourceFileType) ? 'shared_stash' : '');
   const details = character
     ? t(translations.inventoryBrowser.snapshotList.classLevel, {
         characterClass: t(itemSubCategoryLabelKeys[character.characterClass]),
