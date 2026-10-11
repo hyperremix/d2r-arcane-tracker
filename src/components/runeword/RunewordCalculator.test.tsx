@@ -329,26 +329,45 @@ describe('RunewordCalculator', () => {
       expect(within(steelCard).getByText('2 sockets')).toBeInTheDocument();
     });
 
-    it('If a runeword has a details link, Then it opens externally from the card footer', async () => {
+    it('If a runeword has a details link, Then the link is part of that runeword card', async () => {
+      // Arrange
+      const link = 'https://d2runewizard.com/runewords/Steel';
+      stubElectronApi({
+        runewords: [
+          { ...steel, link },
+          { ...stealth, link: '' },
+        ],
+      });
+
+      // Act
+      await renderCalculator();
+
+      // Assert
+      const steelCard = screen
+        .getByRole('heading', { name: 'Steel' })
+        .closest('[data-slot="card"]') as HTMLElement;
+      const stealthCard = screen
+        .getByRole('heading', { name: 'Stealth' })
+        .closest('[data-slot="card"]') as HTMLElement;
+      expect(within(steelCard).getByRole('link', { name: 'View details' })).toBeInTheDocument();
+      expect(within(stealthCard).queryByRole('link')).not.toBeInTheDocument();
+    });
+
+    it('When the details link is clicked, Then it opens externally instead of navigating in the app', async () => {
       // Arrange
       const link = 'https://d2runewizard.com/runewords/Steel';
       const api = stubElectronApi({ runewords: [{ ...steel, link }] });
       await renderCalculator();
 
       // Act
-      fireEvent.click(screen.getByRole('link', { name: 'View details' }));
+      const notPrevented = fireEvent.click(screen.getByRole('link', { name: 'View details' }));
 
       // Assert
+      expect(notPrevented).toBe(false);
       expect(api.shell.openExternal).toHaveBeenCalledWith(link);
-      const steelCard = screen
-        .getByRole('heading', { name: 'Steel' })
-        .closest('[data-slot="card"]') as HTMLElement;
-      expect(steelCard.lastElementChild).toContainElement(
-        screen.getByRole('link', { name: 'View details' }),
-      );
     });
 
-    it('When runewords are shown, Then each card shares header, rune and footer rows with its grid row', async () => {
+    it('When runewords are shown, Then each card is a subgrid that shares its rows with the grid row', async () => {
       // Arrange
       stubElectronApi();
 
@@ -359,11 +378,7 @@ describe('RunewordCalculator', () => {
       const steelCard = screen
         .getByRole('heading', { name: 'Steel' })
         .closest('[data-slot="card"]') as HTMLElement;
-      expect(steelCard).toHaveClass('row-span-3', 'grid', 'grid-rows-subgrid', 'gap-4');
-      expect(steelCard).not.toHaveClass('flex');
-      expect(steelCard).not.toHaveClass('gap-6');
-      expect(steelCard.children).toHaveLength(3);
-      expect(screen.getByTestId('runeword-grid')).toHaveClass('gap-4');
+      expect(steelCard).toHaveClass('row-span-3', 'grid-rows-subgrid');
     });
   });
 
@@ -471,25 +486,20 @@ describe('RunewordCalculator', () => {
       expect(within(sidebar).getByRole('group', { name: 'Filter by Runes' })).toBeInTheDocument();
     });
 
-    it('When the page loads, Then the runeword grid is inside the only page scroll container', async () => {
+    it('When the page loads, Then the runeword grid scrolls in its own container and the sidebar stays outside it', async () => {
       // Arrange
       stubElectronApi();
 
       // Act
-      const { container } = render(<RunewordCalculator />);
+      render(<RunewordCalculator />);
       await waitFor(() => expect(screen.getByTestId('runeword-grid')).toBeInTheDocument());
 
       // Assert
       const scrollArea = screen.getByTestId('runeword-scroll-area');
-      expect(scrollArea).toHaveClass('min-h-0', 'flex-1', 'overflow-y-auto');
+      expect(scrollArea).toHaveClass('overflow-y-auto');
       expect(scrollArea).toContainElement(screen.getByTestId('runeword-grid'));
-      // Besides the grid, only the rune list may scroll, as a fallback for short windows
-      const scrollers = Array.from(container.querySelectorAll('.overflow-y-auto'));
-      expect(scrollers).toEqual([
-        screen.getByRole('group', { name: 'Filter by Runes' }),
-        scrollArea,
-      ]);
-      expect(screen.getByTestId('runeword-sidebar')).not.toHaveClass('flex-1');
+      expect(scrollArea).not.toContainElement(screen.getByTestId('runeword-sidebar'));
+      expect(scrollArea).not.toContainElement(screen.getByTestId('runeword-toolbar'));
     });
 
     it('When the page loads, Then the view options never wrap onto a second line', async () => {

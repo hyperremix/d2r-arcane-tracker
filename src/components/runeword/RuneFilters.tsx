@@ -85,10 +85,11 @@ export function RuneFilters({
         </p>
       </div>
 
-      {/* Two-column rune list: all runes fit a typical window, it only scrolls in short windows */}
+      {/* Two-column rune list. The sidebar card is about 610px tall with every rune shown (about
+          655px with the selection summary), so the list only scrolls in windows below ~830px tall */}
       <fieldset
         aria-labelledby={headingId}
-        className="grid min-h-0 min-w-0 flex-1 grid-cols-2 content-start gap-1 overflow-y-auto"
+        className="grid min-h-32 min-w-0 flex-1 grid-cols-2 content-start gap-1 overflow-y-auto pb-1"
       >
         {runes.map((rune) => {
           const count = getRuneCount(rune.id);
@@ -100,7 +101,7 @@ export function RuneFilters({
             <div
               key={rune.id}
               className={cn(
-                'flex min-w-0 items-center gap-1.5 rounded px-2 py-1 transition-colors hover:bg-muted',
+                'flex min-w-0 items-center gap-1.5 rounded px-2 py-0.5 transition-colors hover:bg-muted',
                 isSelected && 'bg-muted',
               )}
             >
@@ -130,10 +131,13 @@ export function RuneFilters({
                   hasNone && 'text-muted-foreground',
                 )}
               >
-                <span className="font-medium">{rune.name}</span>
+                {/* Long names are cut with an ellipsis instead of spilling into the next column */}
+                <span className="min-w-0 truncate font-medium" title={rune.name}>
+                  {rune.name}
+                </span>
                 <span
                   className={cn(
-                    'rounded-full px-1.5 py-0.5 font-mono text-xs',
+                    'shrink-0 rounded-full px-1.5 py-0.5 font-mono text-xs',
                     hasNone ? 'bg-missing/15 text-missing' : 'bg-info/15 text-info',
                   )}
                 >

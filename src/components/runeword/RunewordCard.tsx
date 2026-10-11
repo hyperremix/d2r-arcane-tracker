@@ -26,17 +26,20 @@ interface RunewordCardProps {
  *
  * The card spans three rows of its parent grid (header, runes, footer) and shares them through
  * a subgrid, so headers, rune rows and footers line up across every card in the same grid row
- * even when a long name wraps. The parent grid must use the same row gap as the card (`gap-4`).
+ * even when a long name wraps. The card sets `gap-[normal]`, which makes the subgrid inherit its
+ * row gap from the parent grid, so the gap is defined in one place (the grid).
  */
 export function RunewordCard({ runeword, availableRunes, className }: RunewordCardProps) {
   const { t } = useTranslation();
   const completionStatus = getRunewordCompletionStatus(runeword, availableRunes);
   const runeIds = runeword.runes ?? [];
+  // A runeword needs one socket per rune
+  const socketCount = runeIds.length;
 
   return (
     <Card
       className={cn(
-        'row-span-3 grid grid-rows-subgrid gap-4 px-6 transition-all hover:shadow-md',
+        'row-span-3 grid grid-rows-subgrid gap-[normal] px-6 transition-all hover:shadow-md',
         className,
       )}
     >
@@ -81,15 +84,17 @@ export function RunewordCard({ runeword, availableRunes, className }: RunewordCa
 
       {/* Footer: sockets the base item needs, and a link to the full runeword details */}
       <div className="flex items-end justify-between gap-2 border-border border-t pt-3 text-xs">
-        <span className="text-muted-foreground">
-          {t(translations.runeword.card.sockets, { count: runeIds.length })}
-        </span>
+        {socketCount > 0 && (
+          <span className="text-muted-foreground">
+            {t(translations.runeword.card.sockets, { count: socketCount })}
+          </span>
+        )}
         {runeword.link && (
           <a
             href={runeword.link}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-1 text-primary hover:underline"
+            className="ml-auto inline-flex items-center gap-1 text-primary hover:underline"
             onClick={(e) => {
               e.preventDefault();
               window.electronAPI?.shell.openExternal(runeword.link);

@@ -197,9 +197,11 @@ export function RunewordCalculator() {
 
   return (
     // The page fits the window: the sidebar stays in place and only the runeword grid scrolls.
-    // The grid's scroll container reaches the right and bottom window edges, so its scrollbar
-    // reads as the page scrollbar.
-    <div className="grid min-h-0 flex-1 grid-cols-[20rem_minmax(0,1fr)] grid-rows-[auto_minmax(0,1fr)] gap-6 pt-6 pl-6">
+    // Padding is split on purpose: the root pads the top and left, while the header, toolbar and
+    // scroll area pad their own right side and the sidebar and scroll area their own bottom. That
+    // way the grid's scroll container itself reaches the right and bottom window edges and its
+    // scrollbar reads as the page scrollbar.
+    <div className="grid min-h-0 flex-1 grid-cols-[22rem_minmax(0,1fr)] grid-rows-[auto_minmax(0,1fr)] gap-6 pt-6 pl-6">
       <PageHeader
         className="col-span-2 pr-6"
         title={t(translations.runeword.calculator.title)}
@@ -285,7 +287,7 @@ export function RunewordCalculator() {
           )}
 
           {/* Runeword Grid: columns follow the available width, not the viewport. Each card spans
-            three rows (header, runes, footer) via subgrid; the row gap must match the card's gap. */}
+            three rows (header, runes, footer) via subgrid and takes its row gap from this grid. */}
           {!isLoading && filteredRunewords.length > 0 && (
             <div
               data-testid="runeword-grid"
