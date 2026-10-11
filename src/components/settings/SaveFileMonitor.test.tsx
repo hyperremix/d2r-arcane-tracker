@@ -207,6 +207,185 @@ describe('SaveFileMonitor', () => {
     });
   });
 
+  describe('status badge', () => {
+    function createSaveFiles(count: number) {
+      return Array.from({ length: count }, (_, index) => ({
+        name: `Character ${index + 1}`,
+        path: `${CURRENT_DIRECTORY}/Character${index + 1}.d2s`,
+        lastModified: new Date('2026-01-01T00:00:00Z'),
+        characterClass: 'sorceress',
+        level: 90,
+        hardcore: false,
+        expansion: true,
+      }));
+    }
+
+    it('When Settings opens while monitoring is already active, Then the badge counts the listed save files', async () => {
+      // Arrange
+      mockGameMode(GameMode.Both);
+      arrangeMonitoredDirectory(false);
+      getElectronAPI().saveFile.getSaveFiles.mockResolvedValue(createSaveFiles(3));
+
+      // Act
+      render(<SaveFileMonitor />);
+
+      // Assert
+      expect(await screen.findByText('Detected Characters (3):')).toBeInTheDocument();
+      expect(screen.getByText('Active (3 files)')).toBeInTheDocument();
+    });
+
+    it('If exactly one save file is listed, Then the badge uses the singular', async () => {
+      // Arrange
+      mockGameMode(GameMode.Both);
+      arrangeMonitoredDirectory(false);
+      getElectronAPI().saveFile.getSaveFiles.mockResolvedValue(createSaveFiles(1));
+
+      // Act
+      render(<SaveFileMonitor />);
+
+      // Assert
+      expect(await screen.findByText('Active (1 file)')).toBeInTheDocument();
+    });
+
+    type SaveFiles = ReturnType<typeof createSaveFiles>;
+
+    function createPendingSaveFiles() {
+      let resolve: (files: SaveFiles) => void = () => undefined;
+      let reject: (reason: Error) => void = () => undefined;
+      const promise = new Promise<SaveFiles>((res, rej) => {
+        resolve = res;
+        reject = rej;
+      });
+      return { promise, resolve, reject };
+    }
+
+    function emitMonitoringStarted() {
+      act(() => {
+        mainEvents.emit('monitoring-status-changed', {
+          status: 'started',
+          directory: NEW_DIRECTORY,
+          saveFileCount: 1,
+        });
+      });
+    }
+
+    it('If the save files are still loading, Then the badge shows no count instead of 0 files', async () => {
+      // Arrange
+      mockGameMode(GameMode.Both);
+      arrangeMonitoredDirectory(false);
+      getElectronAPI().saveFile.getSaveFiles.mockReturnValue(createPendingSaveFiles().promise);
+
+      // Act
+      render(<SaveFileMonitor />);
+      await screen.findByText(CURRENT_DIRECTORY);
+
+      // Assert
+      expect(screen.getByText('Active')).toBeInTheDocument();
+      expect(screen.queryByText(/Active \(/)).not.toBeInTheDocument();
+    });
+
+    it('When the pending save files finish loading, Then the badge shows their count', async () => {
+      // Arrange
+      mockGameMode(GameMode.Both);
+      arrangeMonitoredDirectory(false);
+      const pending = createPendingSaveFiles();
+      getElectronAPI().saveFile.getSaveFiles.mockReturnValue(pending.promise);
+      render(<SaveFileMonitor />);
+      await screen.findByText(CURRENT_DIRECTORY);
+
+      // Act
+      await act(async () => {
+        pending.resolve(createSaveFiles(2));
+      });
+
+      // Assert
+      expect(screen.getByText('Active (2 files)')).toBeInTheDocument();
+    });
+
+    it('If monitoring restarts, Then the badge drops the old count until the list is reloaded', async () => {
+      // Arrange
+      mockGameMode(GameMode.Both);
+      arrangeMonitoredDirectory(false);
+      getElectronAPI().saveFile.getSaveFiles.mockResolvedValue(createSaveFiles(3));
+      render(<SaveFileMonitor />);
+      await screen.findByText('Active (3 files)');
+      getElectronAPI().saveFile.getSaveFiles.mockReturnValue(createPendingSaveFiles().promise);
+
+      // Act
+      emitMonitoringStarted();
+
+      // Assert
+      expect(await screen.findByText('Active')).toBeInTheDocument();
+      expect(screen.queryByText('Active (3 files)')).not.toBeInTheDocument();
+    });
+
+    it('If an earlier load resolves after monitoring restarted, Then its stale list is ignored', async () => {
+      // Arrange
+      mockGameMode(GameMode.Both);
+      arrangeMonitoredDirectory(false);
+      const mountLoad = createPendingSaveFiles();
+      const restartLoad = createPendingSaveFiles();
+      getElectronAPI().saveFile.getSaveFiles.mockReturnValueOnce(mountLoad.promise);
+      render(<SaveFileMonitor />);
+      await screen.findByText(CURRENT_DIRECTORY);
+      getElectronAPI().saveFile.getSaveFiles.mockReturnValueOnce(restartLoad.promise);
+      emitMonitoringStarted();
+      await act(async () => {
+        restartLoad.resolve(createSaveFiles(1));
+      });
+
+      // Act
+      await act(async () => {
+        mountLoad.resolve(createSaveFiles(3));
+      });
+
+      // Assert
+      expect(screen.getByText('Active (1 file)')).toBeInTheDocument();
+      expect(screen.getByText('Detected Characters (1):')).toBeInTheDocument();
+    });
+
+    it('If loading the save files fails, Then the error is logged and the badge shows the empty list', async () => {
+      // Arrange
+      const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+      try {
+        mockGameMode(GameMode.Both);
+        arrangeMonitoredDirectory(false);
+        getElectronAPI().saveFile.getSaveFiles.mockRejectedValue(new Error('ipc down'));
+
+        // Act
+        render(<SaveFileMonitor />);
+
+        // Assert
+        expect(await screen.findByText('Active (0 files)')).toBeInTheDocument();
+        expect(consoleError).toHaveBeenCalledWith('Failed to load save files:', expect.any(Error));
+      } finally {
+        consoleError.mockRestore();
+      }
+    });
+
+    it('When monitoring starts, Then the save files are reloaded and the badge follows the list', async () => {
+      // Arrange
+      mockGameMode(GameMode.Both);
+      render(<SaveFileMonitor />);
+      await waitFor(() => expect(getElectronAPI().saveFile.getSaveFiles).toHaveBeenCalledTimes(1));
+      getElectronAPI().saveFile.getSaveFiles.mockResolvedValue(createSaveFiles(2));
+
+      // Act
+      act(() => {
+        mainEvents.emit('monitoring-status-changed', {
+          status: 'started',
+          directory: CURRENT_DIRECTORY,
+          saveFileCount: 5,
+        });
+      });
+
+      // Assert
+      expect(await screen.findByText('Active (2 files)')).toBeInTheDocument();
+      expect(screen.getByText('Detected Characters (2):')).toBeInTheDocument();
+      expect(getElectronAPI().saveFile.getSaveFiles).toHaveBeenCalledTimes(2);
+    });
+  });
+
   describe('latest activity', () => {
     function emitSaveFileEvent(type: string) {
       act(() => {

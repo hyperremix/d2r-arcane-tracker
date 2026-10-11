@@ -20,6 +20,23 @@ export function initializeIconHandlers({
   settings,
 }: IconHandlerDependencies): () => void {
   const { handle, dispose } = createIpcMainRegistry(ipcMain);
+
+  /**
+   * Returns the icon service's D2R path, loading the saved setting into the service first when
+   * the service has none (it starts empty after every app start).
+   * @returns The D2R installation path, or null if none is known
+   */
+  const getConfiguredD2RPath = (): string | null => {
+    let d2rPath = iconService.getD2RPath();
+    if (!d2rPath) {
+      d2rPath = settings.get('d2rInstallPath') || null;
+      if (d2rPath) {
+        iconService.setD2RPath(d2rPath);
+      }
+    }
+    return d2rPath;
+  };
+
   /**
    * Sets the D2R installation path
    */
@@ -34,16 +51,8 @@ export function initializeIconHandlers({
    */
   handle('icon:getD2RPath', async (): Promise<string | null> => {
     try {
-      // Try to get from service first
-      let d2rPath = iconService.getD2RPath();
-
-      // If not set, try to load from settings
-      if (!d2rPath) {
-        d2rPath = settings.get('d2rInstallPath') || null;
-        if (d2rPath) {
-          iconService.setD2RPath(d2rPath);
-        }
-      }
+      // Try the service first, then the saved setting
+      let d2rPath = getConfiguredD2RPath();
 
       // If still not set, try to auto-detect
       if (!d2rPath) {
@@ -78,8 +87,8 @@ export function initializeIconHandlers({
    */
   handle('icon:convertSprites', async (): Promise<ConversionResult> => {
     try {
-      // Get D2R path
-      const d2rPath = iconService.getD2RPath();
+      // Get D2R path; the service is empty after a restart, so fall back to the saved setting
+      const d2rPath = getConfiguredD2RPath();
       if (!d2rPath) {
         throw new Error('D2R installation path not set');
       }

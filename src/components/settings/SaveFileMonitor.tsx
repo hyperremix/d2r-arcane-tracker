@@ -66,9 +66,11 @@ export function SaveFileMonitor() {
     directory: null,
   });
   const [saveFiles, setSaveFiles] = useState<D2SaveFile[]>([]);
+  // False until the save file list has loaded, so the badge never shows a count for an empty placeholder list
+  const [saveFilesLoaded, setSaveFilesLoaded] = useState(false);
   const [lastEvent, setLastEvent] = useState<SaveFileEvent | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [saveFileCount, setSaveFileCount] = useState<number>(0);
+  const saveFilesRequestRef = useRef(0);
   const [isSelectingDirectory, setIsSelectingDirectory] = useState(false);
   const [hasBackedUp, setHasBackedUp] = useState(false);
   const { reloadData, settings } = useGrailStore(
@@ -88,13 +90,21 @@ export function SaveFileMonitor() {
   }, []);
 
   const loadSaveFiles = useCallback(async () => {
+    // Only the latest load applies, so an older one resolving late cannot set a stale list
+    saveFilesRequestRef.current += 1;
+    const requestId = saveFilesRequestRef.current;
     try {
       const files = await window.electronAPI?.saveFile.getSaveFiles();
-      if (files) {
+      if (files && requestId === saveFilesRequestRef.current) {
         setSaveFiles(files);
       }
     } catch (error) {
       console.error('Failed to load save files:', error);
+    } finally {
+      // Settled either way, so the badge never stays without a count
+      if (requestId === saveFilesRequestRef.current) {
+        setSaveFilesLoaded(true);
+      }
     }
   }, []);
 
@@ -121,7 +131,10 @@ export function SaveFileMonitor() {
       return (
         <Badge variant="default" className="flex items-center gap-1">
           <CheckCircle className="h-3 w-3" />
-          {t(translations.settings.saveFileMonitor.active, { count: saveFileCount })}
+          {/* Counted from the listed save files so the badge matches "Detected Characters" */}
+          {saveFilesLoaded
+            ? t(translations.settings.saveFileMonitor.active, { count: saveFiles.length })
+            : t(translations.settings.saveFileMonitor.activeLoading)}
         </Badge>
       );
     }
@@ -132,7 +145,14 @@ export function SaveFileMonitor() {
         {t(translations.settings.saveFileMonitor.inactive)}
       </Badge>
     );
-  }, [error, monitoringStatus.isMonitoring, saveFileCount, settings.gameMode, t]);
+  }, [
+    error,
+    monitoringStatus.isMonitoring,
+    saveFiles.length,
+    saveFilesLoaded,
+    settings.gameMode,
+    t,
+  ]);
 
   const refreshAfterDirectoryChange = useCallback(async () => {
     // Reload data, monitoring status and save files to reflect the new directory
@@ -266,13 +286,15 @@ export function SaveFileMonitor() {
 
       if (status.status === 'error') {
         setError(status.error || t(translations.settings.saveFileMonitor.unknownError));
-        setSaveFileCount(status.saveFileCount || 0);
-      } else if (status.status === 'started') {
-        setError(null);
-        setSaveFileCount(status.saveFileCount || 0);
       } else {
         setError(null);
-        setSaveFileCount(0);
+      }
+
+      if (status.status === 'started') {
+        // Monitoring may have started on a different directory; refresh the listed save files
+        // and show no count until they have loaded
+        setSaveFilesLoaded(false);
+        loadSaveFiles();
       }
     };
 
