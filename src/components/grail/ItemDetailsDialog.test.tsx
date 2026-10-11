@@ -209,6 +209,47 @@ describe('When ItemDetailsDialog is rendered', () => {
       expect(dialog).not.toHaveClass('sm:max-w-md');
     });
 
+    it('Then the header, including the item name, is centred', () => {
+      // Arrange
+      const item = HolyGrailItemBuilder.new()
+        .withId('item-1')
+        .withName("Aldur's Deception")
+        .build();
+      setupStoreMock({ items: [item] });
+
+      // Act
+      render(<ItemDetailsDialog itemId="item-1" open={true} onOpenChange={vi.fn()} />);
+
+      // Assert
+      const header = screen.getByRole('heading', { name: "Aldur's Deception" }).parentElement;
+      expect(header).toHaveClass('items-center', 'text-center');
+    });
+
+    it('Then the dialog is capped to the viewport and only the body scrolls', () => {
+      // Arrange
+      const item = HolyGrailItemBuilder.new().withId('item-1').withName('Windforce').build();
+      const character = CharacterBuilder.new().withId('char-1').withName('TestSorc').build();
+      setupStoreMock({ items: [item], characters: [character] });
+
+      // Act
+      render(<ItemDetailsDialog itemId="item-1" open={true} onOpenChange={vi.fn()} />);
+
+      // Assert
+      const dialog = screen.getByRole('dialog', { name: 'Windforce' });
+      const heading = screen.getByRole('heading', { name: 'Windforce' });
+      const footerButtons = screen.getAllByRole('button', { name: 'Close' });
+      const body = screen
+        .getByRole('region', { name: 'Character progress' })
+        .closest('.overflow-y-auto');
+      expect(dialog).toHaveClass('flex', 'flex-col', 'max-h-[calc(100vh-2rem)]');
+      expect(body).toHaveClass('min-h-0', 'flex-1');
+      expect(body).toContainElement(screen.getByText('TestSorc'));
+      expect(body).not.toContainElement(heading);
+      for (const button of footerButtons) {
+        expect(body).not.toContainElement(button);
+      }
+    });
+
     it('Then the item facts are plain text lines, not badges or nested cards', () => {
       // Arrange
       const item = HolyGrailItemBuilder.new()
@@ -334,7 +375,7 @@ describe('When ItemDetailsDialog is rendered', () => {
   });
 
   describe('If item has setName', () => {
-    it('Then shows set name badge', () => {
+    it('Then shows the set name as a labelled line in the set colour', () => {
       // Arrange
       const item = HolyGrailItemBuilder.new()
         .withId('item-1')
@@ -347,7 +388,8 @@ describe('When ItemDetailsDialog is rendered', () => {
       render(<ItemDetailsDialog itemId="item-1" open={true} onOpenChange={vi.fn()} />);
 
       // Assert
-      expect(screen.getByText("Tal Rasha's Wrappings")).toBeInTheDocument();
+      expect(screen.getByText('Set:').tagName).toBe('DT');
+      expect(screen.getByText("Tal Rasha's Wrappings")).toHaveClass('text-item-set');
     });
   });
 
@@ -398,6 +440,44 @@ describe('When ItemDetailsDialog is rendered', () => {
       // Assert
       expect(screen.getByTestId('rune-images')).toBeInTheDocument();
       expect(screen.getByText('El + Eld + Tir')).toBeInTheDocument();
+    });
+
+    it('Then the required runes line uses the rune colour', () => {
+      // Arrange
+      const item = HolyGrailItemBuilder.new()
+        .withId('item-1')
+        .withType('runeword')
+        .withRunewordSubCategory('runewords')
+        .build();
+      (item as { runes: string[] }).runes = ['r01', 'r02'];
+      setupStoreMock({ items: [item] });
+
+      // Act
+      render(<ItemDetailsDialog itemId="item-1" open={true} onOpenChange={vi.fn()} />);
+
+      // Assert
+      expect(screen.getByText('Required runes:').tagName).toBe('DT');
+      expect(screen.getByText('El + Eld')).toHaveClass('text-item-rune');
+    });
+  });
+
+  describe('If item is a runeword without runes', () => {
+    it('Then no artwork is rendered, even when item icons are enabled', () => {
+      // Arrange
+      const item = HolyGrailItemBuilder.new()
+        .withId('item-1')
+        .withType('runeword')
+        .withRunewordSubCategory('runewords')
+        .build();
+      (item as { runes: string[] }).runes = [];
+      setupStoreMock({ items: [item], settings: { showItemIcons: true } });
+
+      // Act
+      render(<ItemDetailsDialog itemId="item-1" open={true} onOpenChange={vi.fn()} />);
+
+      // Assert
+      expect(screen.queryByTestId('rune-images')).not.toBeInTheDocument();
+      expect(screen.getByRole('dialog').querySelector('img')).toBeNull();
     });
   });
 
@@ -498,7 +578,7 @@ describe('When ItemDetailsDialog is rendered', () => {
       { normalFound: false, etherealFound: true, normal: missing, ethereal: found },
       { normalFound: true, etherealFound: true, normal: found, ethereal: found },
       { normalFound: false, etherealFound: false, normal: missing, ethereal: missing },
-    ])('Then Normal found=$normalFound and Ethereal found=$etherealFound use the matching status badge', ({
+    ])('Then Normal found=$normalFound and Ethereal found=$etherealFound show the matching status', ({
       normalFound,
       etherealFound,
       normal,
@@ -526,14 +606,30 @@ describe('When ItemDetailsDialog is rendered', () => {
       render(<ItemDetailsDialog itemId="item-1" open={true} onOpenChange={vi.fn()} />);
 
       // Assert
-      const normalBadge = screen.getByText('Normal:').nextElementSibling;
-      const etherealBadge = screen.getByText('Ethereal:').nextElementSibling;
-      expect(normalBadge).toHaveTextContent(normal.text);
-      expect(normalBadge).toHaveClass(normal.present);
-      expect(normalBadge).not.toHaveClass(normal.absent);
-      expect(etherealBadge).toHaveTextContent(ethereal.text);
-      expect(etherealBadge).toHaveClass(ethereal.present);
-      expect(etherealBadge).not.toHaveClass(ethereal.absent);
+      const normalStatus = screen.getByText('Normal:').nextElementSibling;
+      const etherealStatus = screen.getByText('Ethereal:').nextElementSibling;
+      expect(normalStatus).toHaveTextContent(normal.text);
+      expect(normalStatus).toHaveClass(normal.present);
+      expect(normalStatus).not.toHaveClass(normal.absent);
+      expect(etherealStatus).toHaveTextContent(ethereal.text);
+      expect(etherealStatus).toHaveClass(ethereal.present);
+      expect(etherealStatus).not.toHaveClass(ethereal.absent);
+    });
+  });
+
+  describe('If an item with optional ethereal type is shown', () => {
+    it('Then the Normal and Ethereal statuses sit side by side in one row', () => {
+      // Arrange
+      const item = HolyGrailItemBuilder.new().withId('item-1').withEtherealType('optional').build();
+      setupStoreMock({ items: [item] });
+
+      // Act
+      render(<ItemDetailsDialog itemId="item-1" open={true} onOpenChange={vi.fn()} />);
+
+      // Assert
+      const statuses = screen.getByText('Normal:').closest('dl');
+      expect(statuses).toContainElement(screen.getByText('Ethereal:'));
+      expect(statuses).toHaveClass('flex', 'flex-wrap', 'justify-center');
     });
   });
 
@@ -573,7 +669,9 @@ describe('When ItemDetailsDialog is rendered', () => {
 
       // Assert
       const section = screen.getByRole('region', { name: 'Character progress' });
-      expect(within(section).getByRole('heading', { name: 'Character progress' })).toBeVisible();
+      const heading = within(section).getByRole('heading', { name: 'Character progress' });
+      expect(heading).toBeVisible();
+      expect(heading).toHaveClass('font-display');
       expect(within(section).getByText('TestSorc')).toBeInTheDocument();
     });
   });
@@ -696,7 +794,7 @@ describe('When ItemDetailsDialog is rendered', () => {
   });
 
   describe('If etherealType "optional"', () => {
-    it('Then both Normal and Ethereal rows are shown', () => {
+    it('Then both the Normal and Ethereal statuses are shown', () => {
       // Arrange
       const item = HolyGrailItemBuilder.new().withId('item-1').withEtherealType('optional').build();
       setupStoreMock({ items: [item] });

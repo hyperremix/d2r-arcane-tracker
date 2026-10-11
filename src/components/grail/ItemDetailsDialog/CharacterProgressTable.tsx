@@ -185,7 +185,7 @@ export function CharacterProgressTable({
   return (
     <section aria-labelledby={headingId} className="grid gap-2">
       <div className="flex items-baseline gap-2">
-        <h3 id={headingId} className="font-medium">
+        <h3 id={headingId} className="font-display font-semibold leading-none tracking-wide">
           {t(translations.grail.itemDetails.characterProgress)}
         </h3>
         {totalPages > 1 && (

@@ -121,8 +121,8 @@ export function ItemDetailsDialog({ itemId, open, onOpenChange }: ItemDetailsDia
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-2xl">
-        <DialogHeader className="items-center gap-1 text-center">
+      <DialogContent className="flex max-h-[calc(100vh-2rem)] flex-col sm:max-w-2xl">
+        <DialogHeader className="shrink-0 items-center gap-1 text-center">
           <div className="mb-2 flex justify-center empty:hidden">
             <ItemArtwork item={item} showItemIcons={settings.showItemIcons} />
           </div>
@@ -144,7 +144,7 @@ export function ItemDetailsDialog({ itemId, open, onOpenChange }: ItemDetailsDia
           </div>
         </DialogHeader>
 
-        <div className="-mx-6 max-h-[60vh] overflow-y-auto">
+        <div className="-mx-6 min-h-0 flex-1 overflow-y-auto">
           <div className="grid gap-6 px-6">
             <ItemInfoSection item={item} />
 
@@ -161,7 +161,7 @@ export function ItemDetailsDialog({ itemId, open, onOpenChange }: ItemDetailsDia
           </div>
         </div>
 
-        <DialogFooter>
+        <DialogFooter className="shrink-0">
           <BookmarkAction
             linkedBookmark={linkedBookmark}
             isPending={isBookmarkActionPending}
