@@ -382,8 +382,9 @@ export function SessionControls() {
         <CardContent>
           <div className="flex flex-col gap-6">
             {/* Live top row: the current run timer (or, without a session, a short invitation to
-                start one) and the state-dependent actions. The row keeps the timer's height in
-                both states so the card does not jump when a session starts. */}
+                start one) and the state-dependent actions. The row keeps its minimum height in
+                both states; starting a session still adds the Auto Mode toggle and manual item
+                entry below it. */}
             <div className="flex min-h-24 flex-wrap items-end justify-between gap-4">
               {activeSession ? (
                 <LiveRunTimer

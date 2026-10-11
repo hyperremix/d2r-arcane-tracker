@@ -45,9 +45,9 @@ const MAC_SHIFT_SYMBOL = '\u21E7';
 const MAC_COMMAND_SYMBOL = '\u2318';
 
 /**
- * Whether the app runs on macOS. Prefers the platform reported by the main process, which also
- * decides how global hotkeys bind ("CommandOrControl" is Command on macOS), and falls back to
- * the browser's platform string.
+ * Whether the app runs on macOS. Prefers the platform exposed by the preload script
+ * (process.platform), which agrees with how Electron resolves "CommandOrControl" (Command on
+ * macOS), and falls back to the browser's platform string.
  */
 const isPlatformMac = () => {
   const electronPlatform = typeof window === 'undefined' ? undefined : window.electronAPI?.platform;

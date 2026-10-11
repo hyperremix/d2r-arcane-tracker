@@ -72,4 +72,18 @@ describe('When ShortcutRecorder shows a shortcut', () => {
     // Assert
     expect(onChange).toHaveBeenCalledWith('Ctrl+R');
   });
+
+  it('When Ctrl+R is recorded on Windows, Then the stored Ctrl+R form is reported', () => {
+    // Arrange
+    setPlatform('win32');
+    const onChange = vi.fn();
+    render(<ShortcutRecorder id="value" label="Value" value="Ctrl+E" onChange={onChange} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
+
+    // Act
+    fireEvent.keyDown(window, { key: 'r', ctrlKey: true });
+
+    // Assert
+    expect(onChange).toHaveBeenCalledWith('Ctrl+R');
+  });
 });
