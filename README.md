@@ -8,11 +8,13 @@ A desktop Holy Grail tracker for Diablo II: Resurrected. It reads your save file
 
 [Website](https://hyperremix.github.io/d2r-arcane-tracker/) · [Download](https://github.com/hyperremix/d2r-arcane-tracker/releases/latest)
 
-![Grail Tracker](docs/screenshots/grail-tracker.jpg)
+![The Holy Grail page: every grail item as a card, found items in their item color](docs/screenshots/grail-tracker.webp)
 
 | Item details | Statistics |
 | --- | --- |
-| ![Item Dialog](docs/screenshots/item-dialog.jpg) | ![Statistics](docs/screenshots/statistics.jpg) |
+| ![Item details with the characters that found the item](docs/screenshots/item-dialog.webp) | ![Statistics with progress tiles and a progress chart](docs/screenshots/statistics.webp) |
+| **Runeword Calculator** | **Inventory Browser** |
+| ![Runeword Calculator with rune counts and craftable runewords](docs/screenshots/runeword-calculator.webp) | ![Inventory Browser listing characters and shared stashes](docs/screenshots/inventory-browser.webp) |
 
 ## Features
 
@@ -20,6 +22,7 @@ A desktop Holy Grail tracker for Diablo II: Resurrected. It reads your save file
 - **Configurable grail**: track normal and ethereal items, runes and runewords, for softcore, hardcore or both.
 - **Run Tracker**: farming sessions with per-run timing and loot, started automatically or with keyboard shortcuts. CSV, JSON and text export.
 - **Runeword Calculator**: shows which runewords you can make with the runes you have.
+- **Inventory Browser**: see what's in every character and shared stash, move items between them and keep items in a vault.
 - **Terror Zone Configuration**: choose which terror zones the game rotates through.
 - **Overlay widget, statistics and notifications**.
 - **Local only**: data lives in a SQLite database on your machine.

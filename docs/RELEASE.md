@@ -1,6 +1,6 @@
 # Releasing
 
-Releases ship as a Windows NSIS installer on [GitHub Releases](https://github.com/hyperremix/d2r-arcane-tracker/releases). Installed apps use `electron-updater` to update themselves from there. CI (`.github/workflows/ci.yml`) runs checks and deploys the website from `docs/`. It doesn't build releases.
+Releases ship as a Windows NSIS installer on [GitHub Releases](https://github.com/hyperremix/d2r-arcane-tracker/releases). Installed apps use `electron-updater` to update themselves from there. CI (`.github/workflows/ci.yml`) runs checks and builds and deploys the website from `website/`. It doesn't build releases.
 
 ## Steps
 

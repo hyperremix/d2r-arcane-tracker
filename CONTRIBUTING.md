@@ -45,7 +45,8 @@ electron/            Main process
   config/            D2R build and memory pattern tables
 scripts/             test-item injection and memory-research helpers
 config/              shared build-tool config (import and d2s source aliases for Vite and Vitest)
-docs/                user guides, developer docs, GitHub Pages site
+docs/                user guides, developer docs, app screenshots (screenshots/)
+website/             GitHub Pages site (React, prerendered; reuses the app's theme and src/components/ui)
 ```
 
 Stack: Electron 44, React 18, TypeScript, Vite, Tailwind CSS v4, shadcn/ui (Base UI), Zustand, i18next, Biome and Vitest.
@@ -62,6 +63,7 @@ Stack: Electron 44, React 18, TypeScript, Vite, Tailwind CSS v4, shadcn/ui (Base
 | `bun run test` / `test:run` | Vitest in watch mode, or a single run |
 | `bun run test:coverage` | Tests with coverage (what CI runs) |
 | `bun run build` | Typecheck and build the Windows installer ([RELEASE.md](docs/RELEASE.md)) |
+| `bun run website:dev` / `website:build` | Run the website locally, or build and prerender it into `website/dist` |
 | `bun run db:generate` | Generate a database migration from the drizzle schema ([Changing the database schema](#changing-the-database-schema)) |
 
 A pre-commit hook runs `typecheck` and Biome on staged files.

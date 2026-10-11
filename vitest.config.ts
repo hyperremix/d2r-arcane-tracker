@@ -51,7 +51,7 @@ export default defineConfig({
         plugins: [publicDirAssetUrls()],
         test: {
           name: 'renderer',
-          include: ['src/**/*.test.{ts,tsx}'],
+          include: ['src/**/*.test.{ts,tsx}', 'website/src/**/*.test.{ts,tsx}'],
           environment: 'jsdom',
           setupFiles: ['./src/test/setup.ts'],
           // Renderer suites share one jsdom and module registry: isolating each file (fresh jsdom

@@ -9,5 +9,12 @@
     "allowSyntheticDefaultImports": true,
     "strict": true
   },
-  "include": ["vite.config.ts", "vitest.config.ts", "drizzle.config.ts", "config"]
+  "include": [
+    "vite.config.ts",
+    "vitest.config.ts",
+    "drizzle.config.ts",
+    "config",
+    "website/vite.config.ts",
+    "website/build.ts"
+  ]
 }

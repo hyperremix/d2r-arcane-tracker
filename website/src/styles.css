@@ -1,0 +1,36 @@
+/* The app's theme tokens, fonts and base styles, so the site matches the app. */
+@import '../../src/index.css';
+
+/* index.css lets Tailwind detect sources from the Vite root (website/); the shared shadcn
+   components live in the app's source. */
+@source '../../src/components/ui';
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+    /* Keeps anchored sections clear of the sticky title bar */
+    scroll-padding-top: 4.5rem;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+  }
+}
+
+/* The one orchestrated moment: the hero progress bar fills once when the page loads. */
+@keyframes grail-fill {
+  from {
+    transform: scaleX(0);
+  }
+}
+
+@utility animate-grail-fill {
+  transform-origin: left;
+  animation: grail-fill 1.4s cubic-bezier(0.22, 1, 0.36, 1) 0.25s both;
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}

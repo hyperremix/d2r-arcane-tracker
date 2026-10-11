@@ -94,3 +94,6 @@ BUGS.md
 !.agents/skills/pr-review/
 !.agents/skills/resolving-merge-conflicts/
 !.agents/skills/shepherd-pr/
+
+# Website build output (website/build.ts)
+website/.ssr
