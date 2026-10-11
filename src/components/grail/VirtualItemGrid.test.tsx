@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   COLUMN_GUTTER,
   createGridRows,
+  GroupHeader,
   getColumnCount,
   getItemRowHeightEstimate,
   MIN_COLUMN_WIDTH,
@@ -1023,6 +1024,20 @@ describe('When VirtualItemGrid rows are measured', () => {
 
       // Assert
       expect(contentObserver.disconnect).toHaveBeenCalledTimes(1);
+    });
+  });
+});
+
+describe('When GroupHeader is rendered', () => {
+  describe('If some items of the group are found', () => {
+    it('Then shows the group title with its found and total count and a labelled progress bar', () => {
+      // Arrange & Act
+      render(<GroupHeader title="Armor" foundCount={12} itemCount={40} />);
+
+      // Assert
+      expect(screen.getByRole('heading', { name: 'Armor' })).toBeInTheDocument();
+      expect(screen.getByText('12/40')).toBeInTheDocument();
+      expect(screen.getByRole('progressbar', { name: 'Armor progress' })).toBeInTheDocument();
     });
   });
 });

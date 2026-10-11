@@ -120,6 +120,37 @@ describe('When useGrailStore is used', () => {
     resetFullStoreState();
   });
 
+  describe('If the store is created for a new session', () => {
+    it('Then groups the items by category and sorts them by found date by default', () => {
+      // Arrange & Act
+      const initialState = useGrailStore.getInitialState();
+
+      // Assert
+      expect(initialState.groupMode).toBe('category');
+      expect(initialState.viewMode).toBe('grid');
+      expect(initialState.advancedFilter).toEqual(
+        expect.objectContaining({ sortBy: 'found_date', sortOrder: 'desc' }),
+      );
+    });
+  });
+
+  describe('If the user picks a grouping and then resets the filters', () => {
+    it('Then keeps the picked grouping', () => {
+      // Arrange
+      act(() => {
+        useGrailStore.getState().setGroupMode('type');
+      });
+
+      // Act
+      act(() => {
+        useGrailStore.getState().resetFilters();
+      });
+
+      // Assert
+      expect(useGrailStore.getState().groupMode).toBe('type');
+    });
+  });
+
   describe('If setting items', () => {
     it('Then should update items state', () => {
       // Arrange
