@@ -17,7 +17,7 @@ export const faqs: FaqEntry[] = [
   {
     question: 'Is it safe to use? Can I get banned?',
     answer: [
-      "The app isn't affiliated with Blizzard, so it can't promise how Blizzard treats third-party tools. What it does: item tracking only reads your save files, and the app never writes to the game process. Two optional features change files: the Inventory Browser edits your save files and backs up each one first, and Terror Zone Configuration edits a game file and keeps a copy of the original.",
+      "The app isn't affiliated with Blizzard, so it can't promise how Blizzard treats third-party tools. What it does: item tracking only reads your save files, and the app never writes to the game process. Two optional features edit game or save files: the Inventory Browser edits your save files and backs up each one first, and Terror Zone Configuration edits a game file and keeps a copy of the original.",
     ],
   },
   {
@@ -77,7 +77,7 @@ export const faqs: FaqEntry[] = [
   {
     question: 'How does it compare to other grail trackers?',
     answer: [
-      "It's a Windows desktop app that keeps reading your save files while you play, works offline and needs no account. It also has a run tracker and a terror zone editor. Other trackers support classic D2, more operating systems or an OBS feed. See the ",
+      "It's a Windows desktop app that keeps watching your save folder, works offline and needs no account. It also has a run tracker and a terror zone editor. Other trackers support classic D2, more operating systems or an OBS feed. See the ",
       { text: 'tracker comparison', href: guideUrl('COMPARISON.md') },
       '.',
     ],
@@ -162,7 +162,7 @@ export function FAQ() {
                     {entry.question}
                   </h3>
                   <ChevronDown
-                    className="size-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180"
+                    className="size-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180 motion-reduce:transition-none"
                     aria-hidden="true"
                   />
                 </summary>

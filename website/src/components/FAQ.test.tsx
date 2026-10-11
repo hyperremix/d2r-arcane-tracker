@@ -29,6 +29,15 @@ function readVisibleEntries(container: HTMLElement) {
   }));
 }
 
+/** The FAQ row whose question contains the given text. */
+function findDetails(container: HTMLElement, questionText: string): HTMLElement {
+  const details = Array.from(container.querySelectorAll('details')).find((element) =>
+    element.querySelector('summary')?.textContent?.includes(questionText),
+  );
+  if (!details) throw new Error(`FAQ question not found: ${questionText}`);
+  return details;
+}
+
 describe('When the FAQ is rendered', () => {
   it('Then every question is a heading inside a disclosure and its answer is in the page', () => {
     // Arrange / Act
@@ -81,6 +90,35 @@ describe('When the FAQ is rendered', () => {
 
     // Assert
     expect(link).toHaveAttribute('href', guideUrl('COMPARISON.md'));
+  });
+
+  it('Then the macOS and Linux question says the app is Windows-only and links to the tracker comparison guide', () => {
+    // Arrange
+    const { container } = render(<FAQ />);
+    const details = findDetails(container, 'macOS or Linux');
+
+    // Act
+    const link = within(details).getByRole('link', { name: 'tracker comparison' });
+
+    // Assert
+    expect(details.querySelector('p')?.textContent).toContain(
+      'only released for Windows 10 or later',
+    );
+    expect(link).toHaveAttribute('href', guideUrl('COMPARISON.md'));
+  });
+
+  it('Then the safety and memory answers say the app never writes to the game process', () => {
+    // Arrange
+    const { container } = render(<FAQ />);
+
+    // Act
+    const safety = findDetails(container, 'Can I get banned');
+    const memory = findDetails(container, 'game memory');
+
+    // Assert
+    expect(safety.querySelector('p')?.textContent).toContain('never writes to the game process');
+    expect(memory.querySelector('p')?.textContent).toContain('(Windows only)');
+    expect(memory.querySelector('p')?.textContent).toContain('It never writes to the game.');
   });
 
   it('If it is prerendered to HTML, then the answers and the structured data are in the markup', () => {
