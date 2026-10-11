@@ -97,14 +97,27 @@ describe('RunewordCard', () => {
   });
 
   it.each([
-    ['d2runewizard', 'https://d2runewizard.com/runewords/Steel', 'View on d2runewizard'],
-    ['diablo2.io', 'https://diablo2.io/runewords/steel-t1.html', 'View on diablo2.io'],
-  ])('If the runeword links to %s, Then the link names that site', (_site, link, expectedName) => {
+    [
+      'd2runewizard',
+      'https://d2runewizard.com/runewords/Steel',
+      'View on d2runewizard',
+      'd2runewizard',
+    ],
+    [
+      'diablo2.io',
+      'https://diablo2.io/runewords/steel-t1.html',
+      'View on diablo2.io',
+      'diablo2.io',
+    ],
+  ])('If the runeword links to %s, Then the link shows the site name and its accessible name says where it goes', (_site, link, accessibleName, visibleText) => {
     // Arrange & Act
     renderCard(['tir', 'el'], link);
 
     // Assert
-    expect(screen.getByRole('link', { name: expectedName })).toHaveAttribute('href', link);
+    const anchor = screen.getByRole('link', { name: accessibleName });
+    expect(anchor).toHaveAttribute('href', link);
+    expect(anchor).toHaveTextContent(visibleText);
+    expect(anchor).not.toHaveTextContent('View on');
   });
 
   it('When the footer is narrow, Then the socket count and link stay unbroken and the link wraps below', () => {

@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { translations } from '@/i18n/translations';
-import { getExternalLinkLabelKey } from '@/lib/links';
+import { getExternalLinkLabelKey, getExternalLinkSiteKey } from '@/lib/links';
 import { getRunewordCompletionStatus } from '@/lib/runeword-utils';
 import { cn } from '@/lib/utils';
 import { RuneImages } from '../grail/RuneImages';
@@ -87,7 +87,7 @@ export function RunewordCard({ runeword, availableRunes, className }: RunewordCa
       </div>
 
       {/* Footer: one socket per rune, and a link to the runeword's page on an external site. Both
-          stay on one line each; on a narrow card the link wraps to its own line instead. */}
+          stay on one line each; on a card too narrow for both, the link wraps to its own line. */}
       <div className="flex flex-wrap items-end justify-between gap-x-2 gap-y-1 border-border border-t pt-3 text-xs">
         {socketCount > 0 && (
           <span className="whitespace-nowrap text-muted-foreground">
@@ -99,14 +99,16 @@ export function RunewordCard({ runeword, availableRunes, className }: RunewordCa
             href={runeword.link}
             target="_blank"
             rel="noopener noreferrer"
+            aria-label={t(getExternalLinkLabelKey(runeword.link))}
             className="ml-auto inline-flex items-center gap-1 whitespace-nowrap text-primary hover:underline"
             onClick={(e) => {
               e.preventDefault();
               window.electronAPI?.shell.openExternal(runeword.link);
             }}
           >
-            {/* Name the external site the link opens, like the item details dialog does */}
-            {t(getExternalLinkLabelKey(runeword.link))}
+            {/* The footer shows just the site name so it fits on one row; the accessible name is
+                the full "View on ..." label the item details dialog uses and contains the text */}
+            {t(getExternalLinkSiteKey(runeword.link))}
             <ExternalLink aria-hidden="true" className="size-3" />
           </a>
         )}
