@@ -12,7 +12,7 @@ interface SectionLink {
 }
 
 // In page order: the active section is the last one scrolled past
-const SECTION_LINKS: SectionLink[] = [
+export const SECTION_LINKS: SectionLink[] = [
   { id: 'features', label: 'Features', icon: LayoutGrid },
   { id: 'install', label: 'Install', icon: Download },
   { id: 'faq', label: 'FAQ', icon: CircleHelp },
@@ -32,7 +32,15 @@ const navLinkActive =
  * Link to a section of the page. Like the app's title bar links it shows its label on wider
  * screens and only its icon, with a tooltip, on phones.
  */
-function SectionNavLink({ section, isActive }: { section: SectionLink; isActive: boolean }) {
+function SectionNavLink({
+  section,
+  isActive,
+  homeUrl,
+}: {
+  section: SectionLink;
+  isActive: boolean;
+  homeUrl: string;
+}) {
   const Icon = section.icon;
   return (
     <Tooltip>
@@ -40,7 +48,7 @@ function SectionNavLink({ section, isActive }: { section: SectionLink; isActive:
         render={
           // biome-ignore lint/a11y/useAnchorContent: TooltipTrigger renders its children (icon and label) inside this link
           <a
-            href={`#${section.id}`}
+            href={`${homeUrl}#${section.id}`}
             aria-current={isActive ? 'location' : undefined}
             className={cn(
               navLinkBase,
@@ -63,15 +71,16 @@ function SectionNavLink({ section, isActive }: { section: SectionLink; isActive:
 /**
  * The site navigation, styled like the app's title bar: brand on the left, links to the page's
  * sections on the right. The link of the section being read is marked like the app's active page.
+ * On other pages (the guides), pass the home page's URL as `homeUrl` so the links go to its sections.
  */
-export function SiteTitleBar() {
+export function SiteTitleBar({ homeUrl = '' }: { homeUrl?: string }) {
   const activeSection = useActiveSection(SECTION_IDS);
 
   return (
     <header className="sticky top-0 z-40 border-border border-b bg-background/90 backdrop-blur-md supports-backdrop-filter:bg-background/75">
       <div className="mx-auto flex h-12 max-w-7xl items-center gap-2 px-4 sm:px-6">
         <a
-          href="#top"
+          href={`${homeUrl}#top`}
           className="flex min-w-0 items-center gap-2 rounded-md outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
         >
           <img
@@ -92,7 +101,11 @@ export function SiteTitleBar() {
           <ul className="flex items-center gap-1">
             {SECTION_LINKS.map((section) => (
               <li key={section.id}>
-                <SectionNavLink section={section} isActive={section.id === activeSection} />
+                <SectionNavLink
+                  section={section}
+                  isActive={section.id === activeSection}
+                  homeUrl={homeUrl}
+                />
               </li>
             ))}
           </ul>

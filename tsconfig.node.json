@@ -14,7 +14,6 @@
     "vitest.config.ts",
     "drizzle.config.ts",
     "config",
-    "website/vite.config.ts",
-    "website/build.ts"
+    "website/vite.config.ts"
   ]
 }

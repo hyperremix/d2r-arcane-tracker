@@ -173,6 +173,9 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v5
+        with:
+          # Full history: the sitemap's lastmod dates come from the commits that changed each page
+          fetch-depth: 0
 
       - uses: actions/setup-node@v5
         with:
