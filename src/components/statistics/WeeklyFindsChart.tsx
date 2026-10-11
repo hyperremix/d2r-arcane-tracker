@@ -12,7 +12,12 @@ import {
   linearScale,
   useChartWidth,
 } from '@/components/statistics/ChartCard';
-import { formatDayIndex, niceTicks, type WeeklyFinds } from '@/components/statistics/chartData';
+import {
+  formatDayIndex,
+  hasWeeklyFinds,
+  niceTicks,
+  type WeeklyFinds,
+} from '@/components/statistics/chartData';
 import { translations } from '@/i18n/translations';
 
 /** Widest a bar may be; the rest of its slot stays empty. */
@@ -55,14 +60,14 @@ export function WeeklyFindsChart({ weeks }: WeeklyFindsChartProps) {
   const chartT = translations.statistics.charts;
   const title = t(chartT.weeklyFindsTitle);
   const description = t(chartT.weeklyFindsDescription, { count: weeks.length });
-  const totalFinds = weeks.reduce((sum, week) => sum + week.count, 0);
 
-  if (totalFinds === 0) {
+  if (!hasWeeklyFinds(weeks)) {
     return (
       <EmptyChartCard title={title} message={t(chartT.weeklyFindsEmpty, { count: weeks.length })} />
     );
   }
 
+  const totalFinds = weeks.reduce((sum, week) => sum + week.count, 0);
   const formatDay = (day: number, options: Intl.DateTimeFormatOptions) =>
     formatDayIndex(day, i18n.language, options);
   const formatWeek = (week: WeeklyFinds) =>

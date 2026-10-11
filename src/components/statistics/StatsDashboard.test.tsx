@@ -70,6 +70,20 @@ function getTile(label: string): HTMLElement {
   return tile as HTMLElement;
 }
 
+/** Returns the row that holds the two progress charts. */
+function getChartsRow(): HTMLElement {
+  return screen.getByTestId('stats-charts');
+}
+
+/** Returns the card of the chart with the given heading. */
+function getChartCard(name: string): HTMLElement {
+  const card = screen
+    .getByRole('heading', { level: 2, name })
+    .closest<HTMLElement>('[data-slot="card"]');
+  expect(card).not.toBeNull();
+  return card as HTMLElement;
+}
+
 function buildCharacter(id: string, name: string, characterClass: CharacterClass) {
   return CharacterBuilder.new()
     .withId(id)
@@ -196,15 +210,16 @@ describe('When StatsDashboard shows the headline statistics', () => {
     setupStatistics({ items, progress });
 
     // Act
-    render(<StatsDashboard />);
+    const { container } = render(<StatsDashboard />);
 
     // Assert
     expect(screen.getAllByText(/last find/i)).toHaveLength(1);
+    expect(screen.queryByText('Last Find')).not.toBeInTheDocument();
     expect(
       within(getTile('Last Find While Tracking')).getByText('Vampire Gaze'),
     ).toBeInTheDocument();
-    expect(screen.queryByText("Mara's Kaleidoscope")).not.toBeInTheDocument();
-    expect(screen.queryByRole('heading', { name: 'Recent Activity' })).not.toBeInTheDocument();
+    expect(container).not.toHaveTextContent("Mara's Kaleidoscope");
+    expect(container).not.toHaveTextContent('Recent Activity');
   });
 
   it('If no sets or runes are tracked, Then their tiles are hidden', () => {
@@ -398,7 +413,34 @@ describe('When StatsDashboard shows the progress charts', () => {
     expect(screen.getByText('No finds in the last 12 weeks')).toBeInTheDocument();
   });
 
-  it('If nothing was found in the last 12 weeks, Then the progress chart takes the whole row and the weekly chart is a single line', () => {
+  it('If both charts have finds, Then they share the row and neither is compact', () => {
+    // Arrange
+    const items = [HolyGrailItemBuilder.new().withId('a').build()];
+    setupStatistics({
+      items,
+      progress: [
+        GrailProgressBuilder.new()
+          .withId('p1')
+          .withItemId('a')
+          .withFoundDate(new Date(2026, 9, 9, 9))
+          .build(),
+      ],
+    });
+
+    // Act
+    render(<StatsDashboard />);
+
+    // Assert
+    expect(getChartsRow()).toHaveAttribute('data-layout', 'side-by-side');
+    expect(getChartCard('Grail Progress Over Time')).not.toHaveAttribute(
+      'data-chart-state',
+      'empty',
+    );
+    expect(getChartCard('Finds per Week')).not.toHaveAttribute('data-chart-state', 'empty');
+    expect(screen.getAllByRole('img')).toHaveLength(2);
+  });
+
+  it('If nothing was found in the last 12 weeks, Then the progress chart takes the whole row and the weekly chart is compact', () => {
     // Arrange
     const items = [HolyGrailItemBuilder.new().withId('a').build()];
     setupStatistics({
@@ -416,11 +458,58 @@ describe('When StatsDashboard shows the progress charts', () => {
     render(<StatsDashboard />);
 
     // Assert
-    const progressChart = screen.getByRole('img', { name: /^Grail progress over time/ });
-    expect(progressChart.closest('.grid')).not.toHaveClass('lg:grid-cols-2');
-    expect(screen.getByRole('heading', { level: 2, name: 'Finds per Week' })).toBeVisible();
-    expect(screen.getByText('No finds in the last 12 weeks')).toBeInTheDocument();
-    expect(screen.queryByRole('img', { name: /^Finds per week/ })).not.toBeInTheDocument();
+    expect(getChartsRow()).toHaveAttribute('data-layout', 'stacked');
+    expect(screen.getByRole('img', { name: /^Grail progress over time/ })).toBeInTheDocument();
+    expect(getChartCard('Grail Progress Over Time')).not.toHaveAttribute(
+      'data-chart-state',
+      'empty',
+    );
+    const weekly = getChartCard('Finds per Week');
+    expect(weekly).toHaveAttribute('data-chart-state', 'empty');
+    expect(within(weekly).getByText('No finds in the last 12 weeks')).toBeInTheDocument();
+    expect(within(weekly).queryByRole('img')).not.toBeInTheDocument();
+    expect(within(weekly).queryByText(/the latest week ending today/)).not.toBeInTheDocument();
+  });
+
+  it('If finds were made but no tracked grail entry was found, Then the weekly chart takes the whole row and the progress chart is compact', () => {
+    // Arrange
+    setupStatistics({
+      items: [],
+      progress: [
+        GrailProgressBuilder.new()
+          .withId('p1')
+          .withItemId('untracked')
+          .withFoundDate(new Date(2026, 9, 9, 9))
+          .build(),
+      ],
+    });
+
+    // Act
+    render(<StatsDashboard />);
+
+    // Assert
+    expect(getChartsRow()).toHaveAttribute('data-layout', 'stacked');
+    expect(screen.getByRole('img', { name: /^Finds per week/ })).toBeInTheDocument();
+    expect(getChartCard('Finds per Week')).not.toHaveAttribute('data-chart-state', 'empty');
+    const progress = getChartCard('Grail Progress Over Time');
+    expect(progress).toHaveAttribute('data-chart-state', 'empty');
+    expect(within(progress).getByText('No items found yet')).toBeInTheDocument();
+    expect(within(progress).queryByRole('img')).not.toBeInTheDocument();
+    expect(within(progress).queryByText(/counted on the day each was first found/)).toBeNull();
+  });
+
+  it('If neither chart has finds, Then both are compact and stacked', () => {
+    // Arrange
+    setupStatistics();
+
+    // Act
+    render(<StatsDashboard />);
+
+    // Assert
+    expect(getChartsRow()).toHaveAttribute('data-layout', 'stacked');
+    expect(getChartCard('Grail Progress Over Time')).toHaveAttribute('data-chart-state', 'empty');
+    expect(getChartCard('Finds per Week')).toHaveAttribute('data-chart-state', 'empty');
+    expect(screen.queryByRole('img')).not.toBeInTheDocument();
   });
 
   it('If items were found, Then the charts summarize the finds and list them in a table', () => {
@@ -458,8 +547,7 @@ describe('When StatsDashboard shows the progress charts', () => {
     ).toBeInTheDocument();
     const progressTable = screen.getByRole('table', { name: 'Grail Progress Over Time' });
     expect(within(progressTable).getAllByRole('row')).toHaveLength(3);
-    const progressChart = screen.getByRole('img', { name: /^Grail progress over time/ });
-    expect(progressChart.closest('.grid')).toHaveClass('lg:grid-cols-2');
+    expect(getChartsRow()).toHaveAttribute('data-layout', 'side-by-side');
   });
 
   it('If the user moves through a chart with the keyboard, Then the tooltip shows the focused value', () => {

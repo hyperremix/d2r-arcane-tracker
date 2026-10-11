@@ -5,6 +5,8 @@ import { useTranslation } from 'react-i18next';
 import {
   buildCumulativeFinds,
   buildWeeklyFinds,
+  hasProgressFinds,
+  hasWeeklyFinds,
   toLocalDayIndex,
 } from '@/components/statistics/chartData';
 import {
@@ -87,8 +89,9 @@ export const StatsDashboard = memo(function StatsDashboard() {
     };
   }, [items, progress, grailNormal, grailEthereal]);
   const { lastTrackedFind, sets, runes } = highlights;
-  const hasProgressPoints = chartData.cumulativeFinds.points.length > 0;
-  const hasWeeklyFinds = chartData.weeklyFinds.some((week) => week.count > 0);
+  // An empty chart shrinks to a compact card, so the other one gets the whole row
+  const chartsSideBySide =
+    hasProgressFinds(chartData.cumulativeFinds.points) && hasWeeklyFinds(chartData.weeklyFinds);
 
   // Shared stashes are not characters, so they are not compared
   const characterStats = stats.characterStats.filter(
@@ -153,12 +156,11 @@ export const StatsDashboard = memo(function StatsDashboard() {
         )}
       </div>
 
-      {/* Progress over time; an empty chart shrinks to one line, so the other gets the whole row */}
+      {/* Progress over time */}
       <div
-        className={cn(
-          'grid grid-cols-1 gap-4',
-          hasProgressPoints && hasWeeklyFinds && 'lg:grid-cols-2',
-        )}
+        data-testid="stats-charts"
+        data-layout={chartsSideBySide ? 'side-by-side' : 'stacked'}
+        className={cn('grid grid-cols-1 gap-4', chartsSideBySide && 'lg:grid-cols-2')}
       >
         <GrailProgressChart
           points={chartData.cumulativeFinds.points}

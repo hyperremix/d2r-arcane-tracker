@@ -10,7 +10,7 @@ function buildPoints(totals: number[]): CumulativeFindsPoint[] {
 }
 
 describe('When the grail progress chart is rendered', () => {
-  it('If no item was found yet, Then a single line with the heading and the empty text replaces the chart', () => {
+  it('If no item was found yet, Then a compact card with the heading and the empty text replaces the chart', () => {
     // Arrange & Act
     render(<GrailProgressChart points={[]} today={today} totalItems={10} />);
 
@@ -18,6 +18,11 @@ describe('When the grail progress chart is rendered', () => {
     expect(
       screen.getByRole('heading', { level: 2, name: 'Grail Progress Over Time' }),
     ).toBeInTheDocument();
+    expect(
+      screen
+        .getByRole('heading', { level: 2, name: 'Grail Progress Over Time' })
+        .closest('[data-slot="card"]'),
+    ).toHaveAttribute('data-chart-state', 'empty');
     expect(screen.getByText('No items found yet')).toBeInTheDocument();
     expect(screen.queryByText(/counted on the day each was first found/)).not.toBeInTheDocument();
     expect(
