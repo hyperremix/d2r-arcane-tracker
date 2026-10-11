@@ -6,6 +6,7 @@ import type {
   ItemCategory,
   ItemType,
 } from 'electron/types/grail';
+import { type GrailTrackingSettings, isTrackedFind } from '@/lib/ethereal';
 import { itemMatchesSearch, tokenizeSearchQuery } from '@/lib/itemSearch';
 
 /**
@@ -107,45 +108,71 @@ const buildProgressMap = (progress: GrailProgress[]): Map<string, GrailProgress[
 };
 
 /**
+ * Returns the latest date an item was found, counting only finds of tracked versions (see
+ * {@link isTrackedFind}), or undefined if no tracked version was found. This is what makes an
+ * item "found" for the found filter and the found date sort, matching the item cards.
+ * @param {Item} item - The item
+ * @param {GrailProgress[]} itemProgress - The progress records of the item
+ * @param {GrailTrackingSettings} trackedVersions - The grail tracking settings
+ * @returns {number | undefined} The latest tracked found date as a timestamp
+ */
+const getLatestTrackedFindTime = (
+  item: Item,
+  itemProgress: GrailProgress[],
+  trackedVersions: GrailTrackingSettings,
+): number | undefined => {
+  let latest: number | undefined;
+  for (const p of itemProgress) {
+    if (!p.foundDate || !isTrackedFind(item, p, trackedVersions)) continue;
+    const time = p.foundDate.getTime();
+    if (latest === undefined || time > latest) latest = time;
+  }
+  return latest;
+};
+
+/**
+ * Builds a map of item ID to the latest tracked found date timestamp. Items without a find of a
+ * tracked version are left out, so the map doubles as the set of found items.
+ * @param {Item[]} items - The items to index
+ * @param {Map<string, GrailProgress[]>} progressMap - Pre-built progress lookup map
+ * @param {GrailTrackingSettings} trackedVersions - The grail tracking settings
+ * @returns {Map<string, number>} Map with item IDs as keys and latest found date timestamps as values
+ */
+const buildFoundDateMap = (
+  items: Item[],
+  progressMap: Map<string, GrailProgress[]>,
+  trackedVersions: GrailTrackingSettings,
+): Map<string, number> => {
+  const map = new Map<string, number>();
+  for (const item of items) {
+    const itemProgress = progressMap.get(item.id);
+    if (!itemProgress) continue;
+    const time = getLatestTrackedFindTime(item, itemProgress, trackedVersions);
+    if (time !== undefined) map.set(item.id, time);
+  }
+  return map;
+};
+
+/**
  * Checks if an item matches the specified found status filter.
  * @param {Item} item - The item to check
  * @param {string} [foundStatus] - Optional found status ('all', 'found', 'missing')
- * @param {Map<string, GrailProgress[]>} [progressMap] - Pre-built progress lookup map for O(1) access
+ * @param {Map<string, number>} foundDateMap - Latest tracked found date of every found item
  * @returns {boolean} True if item matches the found status, false otherwise
  */
 const matchesFoundStatus = (
   item: Item,
-  foundStatus?: string,
-  progressMap?: Map<string, GrailProgress[]>,
+  foundStatus: string | undefined,
+  foundDateMap: Map<string, number>,
 ): boolean => {
   // Always show all items by default, regardless of found status
   if (!foundStatus || foundStatus === 'all') return true;
 
-  const itemProgress = progressMap?.get(item.id);
-  const isFound = itemProgress?.some((p) => p.foundDate !== undefined) ?? false;
+  const isFound = foundDateMap.has(item.id);
 
   if (foundStatus === 'found') return isFound;
   if (foundStatus === 'missing') return !isFound;
   return true;
-};
-
-/**
- * Builds a map of item ID to latest found date timestamp for efficient sorting.
- * @param {GrailProgress[]} progress - Progress records to index
- * @returns {Map<string, number>} Map with item IDs as keys and latest found date timestamps as values
- */
-const buildFoundDateMap = (progress: GrailProgress[]): Map<string, number> => {
-  const map = new Map<string, number>();
-  for (const p of progress) {
-    if (p.foundDate) {
-      const time = p.foundDate.getTime();
-      const existing = map.get(p.itemId);
-      if (existing === undefined || time > existing) {
-        map.set(p.itemId, time);
-      }
-    }
-  }
-  return map;
 };
 
 /**
@@ -203,7 +230,7 @@ const compareBySortKey = (
   a: Item,
   b: Item,
   sortBy: string,
-  foundDateMap?: Map<string, number>,
+  foundDateMap: Map<string, number>,
 ): number => {
   switch (sortBy) {
     case 'name':
@@ -213,7 +240,7 @@ const compareBySortKey = (
     case 'type':
       return getItemTypeRank(a.type) - getItemTypeRank(b.type);
     case 'found_date':
-      return (foundDateMap?.get(a.id) ?? 0) - (foundDateMap?.get(b.id) ?? 0);
+      return (foundDateMap.get(a.id) ?? 0) - (foundDateMap.get(b.id) ?? 0);
     default:
       return 0;
   }
@@ -228,14 +255,14 @@ const compareBySortKey = (
  * @param {Item[]} items - Array of items to sort
  * @param {string} sortBy - Property to sort by ('name', 'category', 'type', 'found_date')
  * @param {string} sortOrder - Sort order ('asc' or 'desc')
- * @param {Map<string, number>} [foundDateMap] - Pre-built map of item ID to found date timestamp for found_date sorting
+ * @param {Map<string, number>} foundDateMap - Pre-built map of item ID to tracked found date timestamp for found_date sorting
  * @returns {Item[]} Sorted array of items
  */
 const sortItems = (
   items: Item[],
   sortBy: string,
   sortOrder: string,
-  foundDateMap?: Map<string, number>,
+  foundDateMap: Map<string, number>,
 ): Item[] => {
   const direction = sortOrder === 'desc' ? -1 : 1;
   return [...items].sort((a, b) => {
@@ -248,13 +275,21 @@ const sortItems = (
 };
 
 /**
+ * Tracking settings used when none are given: every version of every item is tracked.
+ */
+const ALL_VERSIONS_TRACKED: GrailTrackingSettings = { grailNormal: true, grailEthereal: true };
+
+/**
  * Filters and sorts items according to the given filter and sort settings.
  * Uses pre-built lookup maps for O(1) access instead of O(N) array searches, and tokenizes the
  * search query once per call instead of once per item.
+ * An item counts as found (for the found filter and the found date sort) only through finds of a
+ * tracked version, the same rule the item cards and the progress counts use.
  * @param {Item[]} items - All Holy Grail items
  * @param {GrailProgress[]} progress - All progress records
  * @param {GrailFilter} filter - The active filter
  * @param {AdvancedGrailFilter} advancedFilter - The active sort and search options
+ * @param {GrailTrackingSettings} [trackedVersions] - The grail tracking settings; every version is tracked if omitted
  * @returns {Item[]} The filtered and sorted items
  */
 export const filterAndSortItems = (
@@ -262,11 +297,16 @@ export const filterAndSortItems = (
   progress: GrailProgress[],
   filter: GrailFilter,
   advancedFilter: AdvancedGrailFilter,
+  trackedVersions: GrailTrackingSettings = ALL_VERSIONS_TRACKED,
 ): Item[] => {
-  // Build lookup maps once for O(1) access during filtering and sorting
-  const progressMap = buildProgressMap(progress);
-  const foundDateMap =
-    advancedFilter.sortBy === 'found_date' ? buildFoundDateMap(progress) : undefined;
+  // Build the found date lookup once for O(1) access during filtering and sorting, and only when
+  // the found filter or the found date sort needs it
+  const needsFoundDates =
+    advancedFilter.sortBy === 'found_date' ||
+    (filter.foundStatus !== undefined && filter.foundStatus !== 'all');
+  const foundDateMap = needsFoundDates
+    ? buildFoundDateMap(items, buildProgressMap(progress), trackedVersions)
+    : new Map<string, number>();
   const searchTerm = filter.searchTerm ?? '';
   const searchTokens = tokenizeSearchQuery(searchTerm);
   // A query made only of unsearchable characters (e.g. "龙" or "???") can never match an item;
@@ -278,7 +318,7 @@ export const filterAndSortItems = (
       matchesCategories(item, filter.categories) &&
       matchesSubCategories(item, filter.subCategories) &&
       matchesTypes(item, filter.types) &&
-      matchesFoundStatus(item, filter.foundStatus, progressMap) &&
+      matchesFoundStatus(item, filter.foundStatus, foundDateMap) &&
       itemMatchesSearch(item, searchTokens, advancedFilter.fuzzySearch)
     );
   });

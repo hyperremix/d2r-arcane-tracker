@@ -11,7 +11,6 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { useItemIcon } from '@/hooks/useItemIcon';
-import { useProgressLookup } from '@/hooks/useProgressLookup';
 import { translations } from '@/i18n/translations';
 import { cn } from '@/lib/utils';
 import { useGrailStore } from '@/stores/grailStore';
@@ -102,11 +101,10 @@ export function ItemDetailsDialog({ itemId, open, onOpenChange }: ItemDetailsDia
     return items.find((i) => i.id === itemId) || null;
   }, [items, itemId]);
 
-  // Get progress lookup for this item
-  const progressLookup = useProgressLookup(item ? [item] : [], progress, settings);
+  // All progress records of this item, including finds of versions that aren't tracked
   const itemProgress = useMemo(
-    () => (item ? progressLookup.get(item.id) : null),
-    [item, progressLookup],
+    () => (item ? progress.filter((p) => p.itemId === item.id) : []),
+    [item, progress],
   );
 
   // Hook must be called before early return
@@ -140,7 +138,7 @@ export function ItemDetailsDialog({ itemId, open, onOpenChange }: ItemDetailsDia
             </DialogDescription>
           )}
           <div className="mt-2">
-            <ProgressStatusSection item={item} itemProgress={itemProgress} />
+            <ProgressStatusSection item={item} itemProgress={itemProgress} settings={settings} />
           </div>
         </DialogHeader>
 
@@ -152,7 +150,7 @@ export function ItemDetailsDialog({ itemId, open, onOpenChange }: ItemDetailsDia
               <div className="border-t pt-4">
                 <CharacterProgressTable
                   characters={characters}
-                  progress={progress}
+                  itemProgress={itemProgress}
                   item={item}
                   onRemoveProgress={removeProgress}
                 />

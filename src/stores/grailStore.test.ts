@@ -1,6 +1,6 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { toast } from 'sonner';
-import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
 import { CharacterBuilder, GrailProgressBuilder, HolyGrailItemBuilder } from '@/fixtures';
 import { createMainEventsMock } from '@/test/mainEventsMock';
 import {
@@ -1571,6 +1571,46 @@ describe('When useFilteredItems is used', () => {
       // Assert
       expect(result.current).toHaveLength(1);
       expect(result.current[0].name).toBe('Sword of Power');
+    });
+  });
+
+  describe('If filtering by missing status and an item was only found as an untracked ethereal', () => {
+    it('Then the item is missing until ethereal tracking is turned on', () => {
+      // Arrange
+      resetStoreState();
+      const initialSettings = useGrailStore.getState().settings;
+      onTestFinished(() => useGrailStore.setState({ settings: initialSettings }));
+      const items = [
+        HolyGrailItemBuilder.new().withId('needle').withEtherealType('optional').build(),
+      ];
+      const progress = [
+        GrailProgressBuilder.new()
+          .withId('prog1')
+          .withItemId('needle')
+          .withFoundDate(new Date('2026-01-31'))
+          .asEthereal()
+          .build(),
+      ];
+      act(() => {
+        useGrailStore.getState().setItems(items);
+        useGrailStore.setState((state) => ({
+          progress,
+          settings: { ...state.settings, grailNormal: true, grailEthereal: false },
+        }));
+        useGrailStore.getState().setFilter({ foundStatus: 'missing', searchTerm: '' });
+      });
+      const { result } = renderHook(() => useFilteredItems());
+      expect(result.current.map((item) => item.id)).toEqual(['needle']);
+
+      // Act
+      act(() => {
+        useGrailStore.setState((state) => ({
+          settings: { ...state.settings, grailEthereal: true },
+        }));
+      });
+
+      // Assert
+      expect(result.current).toEqual([]);
     });
   });
 });

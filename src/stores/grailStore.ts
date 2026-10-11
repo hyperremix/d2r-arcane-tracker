@@ -336,6 +336,8 @@ let lastFilteredItems:
       progress: GrailProgress[];
       filter: GrailFilter;
       advancedFilter: AdvancedGrailFilter;
+      grailNormal: boolean;
+      grailEthereal: boolean;
       result: Item[];
     }
   | undefined;
@@ -348,6 +350,8 @@ const getFilteredItems = (
   progress: GrailProgress[],
   filter: GrailFilter,
   advancedFilter: AdvancedGrailFilter,
+  grailNormal: boolean,
+  grailEthereal: boolean,
 ): Item[] => {
   const cached = lastFilteredItems;
   if (
@@ -355,20 +359,33 @@ const getFilteredItems = (
     cached.items === items &&
     cached.progress === progress &&
     cached.filter === filter &&
-    cached.advancedFilter === advancedFilter
+    cached.advancedFilter === advancedFilter &&
+    cached.grailNormal === grailNormal &&
+    cached.grailEthereal === grailEthereal
   ) {
     return cached.result;
   }
 
-  const result = filterAndSortItems(items, progress, filter, advancedFilter);
-  lastFilteredItems = { items, progress, filter, advancedFilter, result };
+  const result = filterAndSortItems(items, progress, filter, advancedFilter, {
+    grailNormal,
+    grailEthereal,
+  });
+  lastFilteredItems = {
+    items,
+    progress,
+    filter,
+    advancedFilter,
+    grailNormal,
+    grailEthereal,
+    result,
+  };
   return result;
 };
 
 /**
  * Custom hook that returns filtered and sorted items based on current filter and sort settings.
  * The result is shared between all components using the hook and only recalculated when the
- * items, progress, filter or sort settings change.
+ * items, progress, filter, sort or tracking settings change.
  * @returns {Item[]} Array of filtered and sorted Holy Grail items
  */
 export const useFilteredItems = () => {
@@ -377,7 +394,9 @@ export const useFilteredItems = () => {
   const progress = useGrailStore((state) => state.progress);
   const filter = useGrailStore((state) => state.filter);
   const advancedFilter = useGrailStore((state) => state.advancedFilter);
-  return getFilteredItems(items, progress, filter, advancedFilter);
+  const grailNormal = useGrailStore((state) => state.settings.grailNormal);
+  const grailEthereal = useGrailStore((state) => state.settings.grailEthereal);
+  return getFilteredItems(items, progress, filter, advancedFilter, grailNormal, grailEthereal);
 };
 
 /**
@@ -401,7 +420,14 @@ export const useItemResultCount = (): ItemResultCount => {
   const advancedFilter = useGrailStore((state) => state.advancedFilter);
   const grailNormal = useGrailStore((state) => state.settings.grailNormal);
   const grailEthereal = useGrailStore((state) => state.settings.grailEthereal);
-  const filteredItems = getFilteredItems(items, progress, filter, advancedFilter);
+  const filteredItems = getFilteredItems(
+    items,
+    progress,
+    filter,
+    advancedFilter,
+    grailNormal,
+    grailEthereal,
+  );
 
   return useMemo(() => {
     const settings = { grailNormal, grailEthereal };

@@ -272,6 +272,143 @@ describe('When filterAndSortItems is called', () => {
       expect(result).toHaveLength(2);
     });
   });
+
+  describe('If ethereal tracking is off and an item was only found as ethereal', () => {
+    const trackedVersions = { grailNormal: true, grailEthereal: false };
+    const arrange = () => {
+      const items = [
+        HolyGrailItemBuilder.new()
+          .withId('needle')
+          .withName("Arioc's Needle")
+          .withEtherealType('optional')
+          .build(),
+        HolyGrailItemBuilder.new().withId('shako').withName('Harlequin Crest').build(),
+        HolyGrailItemBuilder.new().withId('windforce').withName('Windforce').build(),
+      ];
+      const progress = [
+        GrailProgressBuilder.new()
+          .withId('p-needle')
+          .withItemId('needle')
+          .withFoundDate(new Date('2026-01-31'))
+          .asEthereal()
+          .build(),
+        GrailProgressBuilder.new()
+          .withId('p-shako')
+          .withItemId('shako')
+          .withFoundDate(new Date('2024-01-01'))
+          .asNormal()
+          .build(),
+      ];
+      return { items, progress };
+    };
+
+    it('Then the Missing filter includes the item', () => {
+      // Arrange
+      const { items, progress } = arrange();
+
+      // Act
+      const result = filterAndSortItems(
+        items,
+        progress,
+        { foundStatus: 'missing' },
+        { ...defaultSort, sortBy: 'name', sortOrder: 'asc' },
+        trackedVersions,
+      );
+
+      // Assert
+      expect(result.map((item) => item.id)).toEqual(['needle', 'windforce']);
+    });
+
+    it('Then the Found filter excludes the item', () => {
+      // Arrange
+      const { items, progress } = arrange();
+
+      // Act
+      const result = filterAndSortItems(
+        items,
+        progress,
+        { foundStatus: 'found' },
+        defaultSort,
+        trackedVersions,
+      );
+
+      // Assert
+      expect(result.map((item) => item.id)).toEqual(['shako']);
+    });
+
+    it('Then sorting by found date places the item among the missing items', () => {
+      // Arrange
+      const { items, progress } = arrange();
+
+      // Act
+      const result = filterAndSortItems(items, progress, noFilter, defaultSort, trackedVersions);
+
+      // Assert
+      expect(result.map((item) => item.id)).toEqual(['shako', 'needle', 'windforce']);
+    });
+  });
+
+  describe('If ethereal tracking is on and an item was only found as ethereal', () => {
+    it('Then the item counts as found for the filter and the found date sort', () => {
+      // Arrange
+      const items = [
+        HolyGrailItemBuilder.new().withId('a').withName('Arreat').build(),
+        HolyGrailItemBuilder.new()
+          .withId('needle')
+          .withName("Arioc's Needle")
+          .withEtherealType('optional')
+          .build(),
+      ];
+      const progress = [
+        GrailProgressBuilder.new()
+          .withId('p-needle')
+          .withItemId('needle')
+          .withFoundDate(new Date('2026-01-31'))
+          .asEthereal()
+          .build(),
+      ];
+      const trackedVersions = { grailNormal: true, grailEthereal: true };
+
+      // Act
+      const found = filterAndSortItems(
+        items,
+        progress,
+        { foundStatus: 'found' },
+        defaultSort,
+        trackedVersions,
+      );
+      const sorted = filterAndSortItems(items, progress, noFilter, defaultSort, trackedVersions);
+
+      // Assert
+      expect(found.map((item) => item.id)).toEqual(['needle']);
+      expect(sorted.map((item) => item.id)).toEqual(['needle', 'a']);
+    });
+  });
+
+  describe('If only ethereal versions are tracked and an item was found as normal', () => {
+    it('Then the Missing filter includes the item', () => {
+      // Arrange
+      const items = [
+        HolyGrailItemBuilder.new().withId('needle').withEtherealType('optional').build(),
+      ];
+      const progress = [
+        GrailProgressBuilder.new()
+          .withItemId('needle')
+          .withFoundDate(new Date('2026-01-31'))
+          .asNormal()
+          .build(),
+      ];
+
+      // Act
+      const result = filterAndSortItems(items, progress, { foundStatus: 'missing' }, defaultSort, {
+        grailNormal: false,
+        grailEthereal: true,
+      });
+
+      // Assert
+      expect(result.map((item) => item.id)).toEqual(['needle']);
+    });
+  });
 });
 
 describe('When toSubCategoryFilterValue and parseSubCategoryFilterValue are used', () => {
