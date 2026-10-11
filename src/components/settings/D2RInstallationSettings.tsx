@@ -36,6 +36,7 @@ export function D2RInstallationSettings() {
   const savingPathRef = useRef<string | undefined>(undefined);
   // Incremented on every commit and keystroke, so only the latest save updates the UI
   const saveRequestRef = useRef(0);
+  const intendedPathRef = useRef('');
   const defaultPath = getDefaultD2RPath();
 
   // Load the stored path on mount (the same setting Terror Zones reads); nothing is filled in
@@ -64,23 +65,12 @@ export function D2RInstallationSettings() {
     loadD2RPath();
   }, []);
 
-  const savePath = useCallback(async (newPath: string) => {
-    const trimmedPath = newPath.trim();
-    setD2rPath(trimmedPath);
-
-    if (savingPathRef.current === trimmedPath) {
-      return;
-    }
-
-    // Any newer commit or typing makes the outcome of older saves irrelevant to the UI
-    saveRequestRef.current += 1;
-    const requestId = saveRequestRef.current;
-
-    if (trimmedPath === savedPathRef.current) {
-      setSaveFailed(false);
-      return;
-    }
-
+  /**
+   * Persists the path and records it as saved. Only the latest request updates the error state
+   * and rolls the field back, so an older save cannot overwrite newer text.
+   * @returns {Promise<boolean>} Whether the path was saved
+   */
+  const persistPath = useCallback(async (trimmedPath: string, requestId: number) => {
     savingPathRef.current = trimmedPath;
     try {
       await window.electronAPI?.icon.setD2RPath(trimmedPath);
@@ -89,6 +79,7 @@ export function D2RInstallationSettings() {
       if (requestId === saveRequestRef.current) {
         setSaveFailed(false);
       }
+      return true;
     } catch (error) {
       console.error('Failed to save D2R path:', error);
       if (requestId === saveRequestRef.current) {
@@ -96,12 +87,54 @@ export function D2RInstallationSettings() {
         setD2rPath(savedPathRef.current);
         setSaveFailed(true);
       }
+      return false;
     } finally {
       if (savingPathRef.current === trimmedPath) {
         savingPathRef.current = undefined;
       }
     }
   }, []);
+
+  const commitPath = useCallback(
+    async (trimmedPath: string) => {
+      // The latest path the user committed, which the saved path must end up matching
+      intendedPathRef.current = trimmedPath;
+
+      if (savingPathRef.current === trimmedPath) {
+        return;
+      }
+
+      // Any newer commit or typing makes the outcome of older saves irrelevant to the UI
+      saveRequestRef.current += 1;
+
+      if (trimmedPath === savedPathRef.current) {
+        setSaveFailed(false);
+        return;
+      }
+
+      const saved = await persistPath(trimmedPath, saveRequestRef.current);
+
+      // A newer commit that needed no save (it matched the old saved path) was skipped while this
+      // one was in flight, so the saved path now differs from what the user last committed
+      if (
+        saved &&
+        savingPathRef.current === undefined &&
+        intendedPathRef.current !== savedPathRef.current
+      ) {
+        await commitPath(intendedPathRef.current);
+      }
+    },
+    [persistPath],
+  );
+
+  const savePath = useCallback(
+    async (newPath: string) => {
+      const trimmedPath = newPath.trim();
+      setD2rPath(trimmedPath);
+      await commitPath(trimmedPath);
+    },
+    [commitPath],
+  );
 
   const handlePathChange = useCallback((newPath: string) => {
     // Typing supersedes any save still in flight, so a late failure cannot overwrite the text

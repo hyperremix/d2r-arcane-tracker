@@ -70,6 +70,7 @@ export function SaveFileMonitor() {
   const [saveFilesLoaded, setSaveFilesLoaded] = useState(false);
   const [lastEvent, setLastEvent] = useState<SaveFileEvent | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const saveFilesRequestRef = useRef(0);
   const [isSelectingDirectory, setIsSelectingDirectory] = useState(false);
   const [hasBackedUp, setHasBackedUp] = useState(false);
   const { reloadData, settings } = useGrailStore(
@@ -89,14 +90,21 @@ export function SaveFileMonitor() {
   }, []);
 
   const loadSaveFiles = useCallback(async () => {
+    // Only the latest load applies, so an older one resolving late cannot set a stale list
+    saveFilesRequestRef.current += 1;
+    const requestId = saveFilesRequestRef.current;
     try {
       const files = await window.electronAPI?.saveFile.getSaveFiles();
-      if (files) {
+      if (files && requestId === saveFilesRequestRef.current) {
         setSaveFiles(files);
-        setSaveFilesLoaded(true);
       }
     } catch (error) {
       console.error('Failed to load save files:', error);
+    } finally {
+      // Settled either way, so the badge never stays without a count
+      if (requestId === saveFilesRequestRef.current) {
+        setSaveFilesLoaded(true);
+      }
     }
   }, []);
 
