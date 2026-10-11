@@ -18,12 +18,6 @@ vi.mock('@/stores/grailStore', () => ({
   useGrailStatistics: vi.fn(),
   useGrailStore: vi.fn(),
 }));
-vi.mock('@/hooks/useProgressLookup', () => ({
-  useProgressLookup: () => new Map(),
-}));
-vi.mock('@/components/grail/ItemCard', () => ({
-  ItemCard: () => <div data-testid="item-card" />,
-}));
 
 interface SetupOptions {
   categories?: ItemCategory[];
@@ -54,7 +48,6 @@ function setupStatistics({
     currentStreak: 0,
     maxStreak: 0,
     averageItemsPerDay: 0,
-    lastFind: undefined,
     categoryStats: categories.map((category) => ({
       category,
       total: 4,
@@ -179,6 +172,39 @@ describe('When StatsDashboard shows the headline statistics', () => {
     expect(runesMissing.getByText('0')).toBeInTheDocument();
     expect(runesMissing.getByText('All runes found')).toBeInTheDocument();
     expect(screen.queryByText(/by the first scan/)).not.toBeInTheDocument();
+  });
+
+  it('If the startup scan found an item after the last tracked find, Then the page shows one last find, the tracked one', () => {
+    // Arrange
+    const items = [
+      HolyGrailItemBuilder.new().withId('tracked').withName('Vampire Gaze').build(),
+      HolyGrailItemBuilder.new().withId('scanned').withName("Mara's Kaleidoscope").build(),
+    ];
+    const progress = [
+      GrailProgressBuilder.new()
+        .withId('p1')
+        .withItemId('tracked')
+        .withFoundDate(new Date(2026, 9, 5, 12))
+        .build(),
+      GrailProgressBuilder.new()
+        .withId('p2')
+        .withItemId('scanned')
+        .withFoundDate(new Date(2026, 9, 8, 12))
+        .asFromInitialScan()
+        .build(),
+    ];
+    setupStatistics({ items, progress });
+
+    // Act
+    render(<StatsDashboard />);
+
+    // Assert
+    expect(screen.getAllByText(/last find/i)).toHaveLength(1);
+    expect(
+      within(getTile('Last Find While Tracking')).getByText('Vampire Gaze'),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Mara's Kaleidoscope")).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Recent Activity' })).not.toBeInTheDocument();
   });
 
   it('If no sets or runes are tracked, Then their tiles are hidden', () => {
@@ -372,6 +398,31 @@ describe('When StatsDashboard shows the progress charts', () => {
     expect(screen.getByText('No finds in the last 12 weeks')).toBeInTheDocument();
   });
 
+  it('If nothing was found in the last 12 weeks, Then the progress chart takes the whole row and the weekly chart is a single line', () => {
+    // Arrange
+    const items = [HolyGrailItemBuilder.new().withId('a').build()];
+    setupStatistics({
+      items,
+      progress: [
+        GrailProgressBuilder.new()
+          .withId('p1')
+          .withItemId('a')
+          .withFoundDate(new Date(2026, 0, 15, 9))
+          .build(),
+      ],
+    });
+
+    // Act
+    render(<StatsDashboard />);
+
+    // Assert
+    const progressChart = screen.getByRole('img', { name: /^Grail progress over time/ });
+    expect(progressChart.closest('.grid')).not.toHaveClass('lg:grid-cols-2');
+    expect(screen.getByRole('heading', { level: 2, name: 'Finds per Week' })).toBeVisible();
+    expect(screen.getByText('No finds in the last 12 weeks')).toBeInTheDocument();
+    expect(screen.queryByRole('img', { name: /^Finds per week/ })).not.toBeInTheDocument();
+  });
+
   it('If items were found, Then the charts summarize the finds and list them in a table', () => {
     // Arrange
     const items = ['a', 'b'].map((id) => HolyGrailItemBuilder.new().withId(id).build());
@@ -407,6 +458,8 @@ describe('When StatsDashboard shows the progress charts', () => {
     ).toBeInTheDocument();
     const progressTable = screen.getByRole('table', { name: 'Grail Progress Over Time' });
     expect(within(progressTable).getAllByRole('row')).toHaveLength(3);
+    const progressChart = screen.getByRole('img', { name: /^Grail progress over time/ });
+    expect(progressChart.closest('.grid')).toHaveClass('lg:grid-cols-2');
   });
 
   it('If the user moves through a chart with the keyboard, Then the tooltip shows the focused value', () => {

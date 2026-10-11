@@ -5,8 +5,8 @@ import {
   CHART_TEXT_CLASS,
   ChartCard,
   ChartDataTable,
-  ChartEmptyState,
   ChartGrid,
+  EmptyChartCard,
   getPlotArea,
   InteractiveChart,
   linearScale,
@@ -61,9 +61,10 @@ export function GrailProgressChart({
 
   if (points.length === 0) {
     return (
-      <ChartCard title={title} description={description}>
-        <ChartEmptyState>{t(translations.statistics.dashboard.noItemsFoundYet)}</ChartEmptyState>
-      </ChartCard>
+      <EmptyChartCard
+        title={title}
+        message={t(translations.statistics.dashboard.noItemsFoundYet)}
+      />
     );
   }
 

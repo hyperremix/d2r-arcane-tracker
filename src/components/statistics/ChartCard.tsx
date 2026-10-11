@@ -44,6 +44,34 @@ export function ChartCard({ title, description, children, className }: ChartCard
 }
 
 /**
+ * Props for the EmptyChartCard component.
+ */
+interface EmptyChartCardProps {
+  /** Section heading, rendered as an `h2` */
+  title: string;
+  /** Why the chart has nothing to show */
+  message: string;
+}
+
+/**
+ * Compact card shown in place of a chart without data: the heading and the message on a single
+ * line, so an empty chart takes little room on the page.
+ * @returns {JSX.Element} The empty chart card
+ */
+export function EmptyChartCard({ title, message }: EmptyChartCardProps) {
+  return (
+    <Card className="py-4">
+      <CardContent className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+        <CardTitle>
+          <h2>{title}</h2>
+        </CardTitle>
+        <p className="text-muted-foreground text-sm">{message}</p>
+      </CardContent>
+    </Card>
+  );
+}
+
+/**
  * Props for the ChartEmptyState component.
  */
 interface ChartEmptyStateProps {

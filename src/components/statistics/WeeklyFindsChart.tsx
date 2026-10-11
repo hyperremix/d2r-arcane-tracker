@@ -5,8 +5,8 @@ import {
   CHART_TEXT_CLASS,
   ChartCard,
   ChartDataTable,
-  ChartEmptyState,
   ChartGrid,
+  EmptyChartCard,
   getPlotArea,
   InteractiveChart,
   linearScale,
@@ -59,9 +59,7 @@ export function WeeklyFindsChart({ weeks }: WeeklyFindsChartProps) {
 
   if (totalFinds === 0) {
     return (
-      <ChartCard title={title} description={description}>
-        <ChartEmptyState>{t(chartT.weeklyFindsEmpty, { count: weeks.length })}</ChartEmptyState>
-      </ChartCard>
+      <EmptyChartCard title={title} message={t(chartT.weeklyFindsEmpty, { count: weeks.length })} />
     );
   }
 
