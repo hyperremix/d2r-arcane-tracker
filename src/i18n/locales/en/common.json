@@ -36,7 +36,8 @@
       "normalItems": "Normal Items",
       "etherealItems": "Ethereal Items",
       "progressSummary": "Grail progress",
-      "foundOfTotal": "{{found}} of {{total}} found"
+      "foundOfTotal": "{{found}} of {{total}} found",
+      "typeLedger": "Filter by item type"
     },
     "itemCard": {
       "discoveryInfo": "Discovery Info:",

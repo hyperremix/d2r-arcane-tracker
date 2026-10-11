@@ -1,4 +1,4 @@
-import type { ItemCategory, ItemType } from 'electron/types/grail';
+import type { ItemCategory } from 'electron/types/grail';
 import { RotateCcw } from 'lucide-react';
 import { useId, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -19,18 +19,16 @@ import { ResultCount } from './search/ResultCount';
 import { SearchField } from './search/SearchField';
 import { SegmentButton, SegmentedControl } from './search/SegmentedControl';
 import { getSubCategoryGroups } from './search/subCategories';
-import { TypeToggleChips } from './search/TypeToggleChips';
 import { useFocusSearchShortcut } from './search/useFocusSearchShortcut';
 import { useSearchInput } from './search/useSearchInput';
-import { useTypeProgress } from './search/useTypeProgress';
 import { ViewOptionsPopover } from './search/ViewOptionsPopover';
 
 /**
  * AdvancedSearch renders the Holy Grail toolbar shown above the item grid.
- * It provides search (with a `/` / Ctrl+F shortcut), a found-status segmented control, item type
- * toggle chips that also show the progress of each type, a filters popover (fuzzy search,
- * categories and sub-categories), a view popover (grid/list, sorting and grouping) and a live
- * result count.
+ * It provides search (with a `/` / Ctrl+F shortcut), a found-status segmented control, a filters
+ * popover (fuzzy search, categories and sub-categories), a view popover (grid/list, sorting and
+ * grouping) and a live result count. The item type filter lives in the progress ledger
+ * (ProgressSummary) above the toolbar.
  * The grail store is the single source of truth for all filter values.
  * @returns {JSX.Element} The grail toolbar with active filter chips
  */
@@ -59,22 +57,8 @@ export function AdvancedSearch() {
   const selectedTypes = filter.types ?? [];
   const { sortBy, sortOrder, fuzzySearch } = advancedFilter;
   const subCategoryGroups = useMemo(() => getSubCategoryGroups(items), [items]);
-  const typeProgress = useTypeProgress();
 
   useFocusSearchShortcut(searchId);
-
-  /**
-   * Available item types for filtering, filtered based on grail settings.
-   */
-  const typeValues = useMemo<ItemType[]>(
-    () => [
-      'unique',
-      'set',
-      ...(settings.grailRunes ? (['rune'] as const) : []),
-      ...(settings.grailRunewords ? (['runeword'] as const) : []),
-    ],
-    [settings.grailRunes, settings.grailRunewords],
-  );
 
   const { searchInput, changeSearchInput, discardSearchInput } = useSearchInput({
     searchTerm,
@@ -92,8 +76,6 @@ export function AdvancedSearch() {
 
   const toggleSubCategory = (subCategory: string) =>
     setFilter({ subCategories: toggleValue(selectedSubCategories, subCategory) });
-
-  const toggleType = (type: ItemType) => setFilter({ types: toggleValue(selectedTypes, type) });
 
   const resetAll = () => {
     discardSearchInput();
@@ -143,14 +125,6 @@ export function AdvancedSearch() {
             </SegmentButton>
           ))}
         </SegmentedControl>
-
-        {/* Item type toggles */}
-        <TypeToggleChips
-          typeValues={typeValues}
-          selectedTypes={selectedTypes}
-          onToggleType={toggleType}
-          typeProgress={typeProgress}
-        />
 
         {/* Fuzzy search, category and sub-category filters */}
         <FiltersPopover

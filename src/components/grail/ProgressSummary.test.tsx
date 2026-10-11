@@ -1,6 +1,9 @@
-import { render, screen } from '@testing-library/react';
-import type { GrailStatistics } from 'electron/types/grail';
-import { describe, expect, it } from 'vitest';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
+import type { GrailStatistics, Item, Settings } from 'electron/types/grail';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { GrailProgressBuilder } from '@/fixtures/GrailProgressBuilder';
+import { HolyGrailItemBuilder } from '@/fixtures/HolyGrailItemBuilder';
+import { useGrailStore } from '@/stores/grailStore';
 import { ProgressSummary } from './ProgressSummary';
 
 const statistics: GrailStatistics = {
@@ -14,54 +17,235 @@ const statistics: GrailStatistics = {
   maxStreak: 0,
 };
 
+const ledgerItems: Item[] = [
+  HolyGrailItemBuilder.new()
+    .withId('shako')
+    .withType('unique')
+    .withEtherealType('optional')
+    .build(),
+  HolyGrailItemBuilder.new().withId('soj').withType('unique').withEtherealType('none').build(),
+  HolyGrailItemBuilder.new().withId('griffon').withType('unique').withEtherealType('none').build(),
+  HolyGrailItemBuilder.new().withId('tal-armor').withType('set').withEtherealType('none').build(),
+  HolyGrailItemBuilder.new().withId('ber').withType('rune').withEtherealType('none').build(),
+  HolyGrailItemBuilder.new().withId('enigma').withType('runeword').withEtherealType('none').build(),
+];
+
+const shakoFind = GrailProgressBuilder.new()
+  .withId('p1')
+  .withItemId('shako')
+  .withFoundDate(new Date(2024, 0, 1))
+  .asNormal()
+  .build();
+
+const initialStoreState = useGrailStore.getInitialState();
+
+function resetStore(settings: Partial<Settings> = {}) {
+  useGrailStore.setState(
+    {
+      ...initialStoreState,
+      filter: { foundStatus: 'all' },
+      settings: {
+        ...initialStoreState.settings,
+        grailNormal: true,
+        grailEthereal: false,
+        grailRunes: false,
+        grailRunewords: false,
+        ...settings,
+      },
+    },
+    true,
+  );
+}
+
+function getLedger() {
+  return screen.getByRole('group', { name: 'Filter by item type' });
+}
+
+function getFill(segment: HTMLElement) {
+  return segment.querySelector<HTMLElement>('[data-slot="ledger-fill"]');
+}
+
 describe('When ProgressSummary is rendered', () => {
+  beforeEach(() => {
+    resetStore();
+  });
+
+  afterEach(() => {
+    resetStore();
+  });
+
   describe('If ethereal tracking is disabled', () => {
-    it('Then shows only the total progress with percentage and found/total', () => {
+    it('Then shows the overall percentage and found count without a normal/ethereal split', () => {
       // Arrange & Act
       render(<ProgressSummary statistics={statistics} showEtherealBreakdown={false} />);
 
       // Assert
-      expect(screen.getByRole('progressbar', { name: 'Total Progress' })).toBeInTheDocument();
+      expect(screen.getByRole('region', { name: 'Grail progress' })).toBeInTheDocument();
       expect(screen.getByText('19.5%')).toBeInTheDocument();
       expect(screen.getByText('190 of 975 found')).toBeInTheDocument();
-      expect(screen.getAllByRole('progressbar')).toHaveLength(1);
       expect(screen.queryByText('Normal Items')).not.toBeInTheDocument();
       expect(screen.queryByText('Ethereal Items')).not.toBeInTheDocument();
     });
   });
 
+  describe('If runes and runewords are not tracked', () => {
+    it('Then the ledger has a segment for uniques and sets only', () => {
+      // Arrange
+      useGrailStore.setState({ items: ledgerItems.slice(0, 4), progress: [shakoFind] });
+
+      // Act
+      render(<ProgressSummary statistics={statistics} showEtherealBreakdown={false} />);
+
+      // Assert
+      const segments = within(getLedger()).getAllByRole('button');
+      expect(segments.map((segment) => segment.textContent)).toEqual([
+        'Unique 1/3 Found',
+        'Set 0/1 Found',
+      ]);
+    });
+  });
+
+  describe('If runes and runewords are tracked', () => {
+    beforeEach(() => {
+      resetStore({ grailRunes: true, grailRunewords: true });
+      useGrailStore.setState({ items: ledgerItems, progress: [shakoFind] });
+    });
+
+    it('Then shows a segment per type in quality order whose name starts with its visible text', () => {
+      // Arrange & Act
+      render(<ProgressSummary statistics={statistics} showEtherealBreakdown={false} />);
+
+      // Assert
+      const ledger = getLedger();
+      const unique = within(ledger).getByRole('button', { name: /^Unique 1\/3/ });
+      expect(unique).toHaveAccessibleName(/^Unique 1\/3\s?Found$/);
+      expect(unique).toHaveAttribute('aria-pressed', 'false');
+      expect(
+        within(ledger)
+          .getAllByRole('button')
+          .map((b) => b.textContent),
+      ).toEqual(['Unique 1/3 Found', 'Set 0/1 Found', 'Rune 0/1 Found', 'Runeword 0/1 Found']);
+    });
+
+    it('Then sizes each segment by its share of the grail and fills it to its found share', () => {
+      // Arrange & Act
+      render(<ProgressSummary statistics={statistics} showEtherealBreakdown={false} />);
+
+      // Assert
+      const unique = screen.getByRole('button', { name: /^Unique/ });
+      const set = screen.getByRole('button', { name: /^Set/ });
+      expect(unique).toHaveStyle({ flexGrow: '3' });
+      expect(set).toHaveStyle({ flexGrow: '1' });
+      expect(getFill(unique)?.style.width).toBe(`${(1 / 3) * 100}%`);
+      expect(getFill(set)?.style.width).toBe('0%');
+    });
+
+    it('Then clicking a segment toggles its type filter and marks it as pressed', () => {
+      // Arrange
+      render(<ProgressSummary statistics={statistics} showEtherealBreakdown={false} />);
+      const set = screen.getByRole('button', { name: /^Set/ });
+
+      // Act
+      fireEvent.click(set);
+
+      // Assert
+      expect(useGrailStore.getState().filter.types).toEqual(['set']);
+      expect(set).toHaveAttribute('aria-pressed', 'true');
+      expect(screen.getByRole('button', { name: /^Unique/ })).toHaveAttribute(
+        'aria-pressed',
+        'false',
+      );
+    });
+
+    it('Then clicking a pressed segment removes its type from the filter again', () => {
+      // Arrange
+      useGrailStore.getState().setFilter({ types: ['set', 'rune'] });
+      render(<ProgressSummary statistics={statistics} showEtherealBreakdown={false} />);
+      const set = screen.getByRole('button', { name: /^Set/ });
+
+      // Act
+      fireEvent.click(set);
+
+      // Assert
+      expect(useGrailStore.getState().filter.types).toEqual(['rune']);
+      expect(set).toHaveAttribute('aria-pressed', 'false');
+    });
+
+    it('Then the segments are native buttons, so Enter and Space toggle them', () => {
+      // Arrange & Act
+      render(<ProgressSummary statistics={statistics} showEtherealBreakdown={false} />);
+
+      // Assert
+      for (const segment of within(getLedger()).getAllByRole('button')) {
+        expect(segment.tagName).toBe('BUTTON');
+        expect(segment).toHaveAttribute('type', 'button');
+      }
+    });
+
+    it('Then the counts do not change when filters narrow the shown items', () => {
+      // Arrange
+      useGrailStore.getState().setFilter({ foundStatus: 'missing', types: ['set'] });
+
+      // Act
+      render(<ProgressSummary statistics={statistics} showEtherealBreakdown={false} />);
+
+      // Assert
+      expect(screen.getByRole('button', { name: /^Unique 1\/3/ })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /^Set 0\/1/ })).toHaveAttribute(
+        'aria-pressed',
+        'true',
+      );
+    });
+  });
+
+  describe('If a selected type stops being tracked', () => {
+    it('Then its segment disappears and the type is removed from the filter', () => {
+      // Arrange
+      resetStore({ grailRunes: true });
+      useGrailStore.getState().setFilter({ types: ['rune'] });
+      render(<ProgressSummary statistics={statistics} showEtherealBreakdown={false} />);
+      expect(screen.getByRole('button', { name: /^Rune/ })).toHaveAttribute('aria-pressed', 'true');
+
+      // Act
+      act(() => {
+        useGrailStore.getState().hydrateSettings({ grailRunes: false });
+      });
+
+      // Assert
+      expect(useGrailStore.getState().filter.types).toEqual([]);
+      expect(screen.queryByRole('button', { name: /^Rune/ })).not.toBeInTheDocument();
+    });
+  });
+
   describe('If ethereal tracking is enabled', () => {
-    it('Then splits the bar into a normal and an ethereal lane while keeping the total', () => {
+    it('Then lists the normal and ethereal progress below the segments and keeps the total', () => {
       // Arrange & Act
       render(<ProgressSummary statistics={statistics} showEtherealBreakdown />);
 
       // Assert
-      const progressBars = screen.getAllByRole('progressbar');
-      expect(progressBars).toHaveLength(2);
-      expect(screen.getByRole('progressbar', { name: 'Normal Items' })).toBeInTheDocument();
-      expect(screen.getByRole('progressbar', { name: 'Ethereal Items' })).toBeInTheDocument();
+      expect(screen.getByText('Normal Items')).toBeInTheDocument();
+      expect(screen.getByText('Ethereal Items')).toBeInTheDocument();
       expect(screen.getByText('184/628')).toBeInTheDocument();
       expect(screen.getByText('6/347')).toBeInTheDocument();
       expect(screen.getByText('19.5%')).toBeInTheDocument();
       expect(screen.getByText('190 of 975 found')).toBeInTheDocument();
     });
 
-    it('Then sizes each lane by its share of the grail', () => {
-      // Arrange & Act
+    it('Then the segment counts include the tracked ethereal versions', () => {
+      // Arrange
+      resetStore({ grailEthereal: true });
+      useGrailStore.setState({ items: ledgerItems.slice(0, 4), progress: [shakoFind] });
+
+      // Act
       render(<ProgressSummary statistics={statistics} showEtherealBreakdown />);
 
       // Assert
-      expect(screen.getByRole('progressbar', { name: 'Normal Items' })).toHaveStyle({
-        flexGrow: '628',
-      });
-      expect(screen.getByRole('progressbar', { name: 'Ethereal Items' })).toHaveStyle({
-        flexGrow: '347',
-      });
+      expect(screen.getByRole('button', { name: /^Unique 1\/4/ })).toBeInTheDocument();
     });
   });
 
   describe('If ethereal tracking is enabled but there are no ethereal items', () => {
-    it('Then shows a single total bar instead of lanes', () => {
+    it('Then does not show the normal/ethereal split', () => {
       // Arrange
       const noEtherealStatistics: GrailStatistics = {
         ...statistics,
@@ -72,13 +256,13 @@ describe('When ProgressSummary is rendered', () => {
       render(<ProgressSummary statistics={noEtherealStatistics} showEtherealBreakdown />);
 
       // Assert
-      expect(screen.getAllByRole('progressbar')).toHaveLength(1);
-      expect(screen.getByRole('progressbar', { name: 'Total Progress' })).toBeInTheDocument();
+      expect(screen.queryByText('Normal Items')).not.toBeInTheDocument();
+      expect(screen.queryByText('Ethereal Items')).not.toBeInTheDocument();
     });
   });
 
   describe('If there are no items to track', () => {
-    it('Then shows 0% instead of dividing by zero', () => {
+    it('Then shows 0% and empty segments of equal width instead of dividing by zero', () => {
       // Arrange
       const emptyStatistics: GrailStatistics = { ...statistics, totalItems: 0, foundItems: 0 };
 
@@ -87,7 +271,10 @@ describe('When ProgressSummary is rendered', () => {
 
       // Assert
       expect(screen.getByText('0.0%')).toBeInTheDocument();
-      expect(screen.getByRole('progressbar', { name: 'Total Progress' })).toBeInTheDocument();
+      for (const segment of within(getLedger()).getAllByRole('button')) {
+        expect(segment).toHaveStyle({ flexGrow: '1' });
+        expect(getFill(segment)?.style.width).toBe('0%');
+      }
     });
   });
 });
