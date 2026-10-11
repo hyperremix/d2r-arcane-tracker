@@ -964,8 +964,15 @@
     "dropToVault": "Drop an item here to remove it from its save file and keep it in the vault",
     "vaultedItems": "Vaulted Items",
     "saveWriteNotice": {
-      "title": "Changes are written to your save files",
-      "description": "Moving, vaulting and unvaulting items edits your save files directly. Close Diablo II: Resurrected first, or the game will overwrite your changes. A backup is made before every change."
+      "title": "Close Diablo II: Resurrected first. Changes here are written to your save files.",
+      "description": "Moving, vaulting and unvaulting items edits your save files directly. Close Diablo II: Resurrected first, or the game will overwrite your changes. A backup is made before every change.",
+      "showDetails": "Details",
+      "hideDetails": "Hide details"
+    },
+    "filters": {
+      "legend": "Filter items",
+      "scope": "Narrows the list to characters and stashes with matching items, and the vault to matching items. Counts show the matches. Opened windows always show all items.",
+      "vaultFiltered": "Showing only vaulted items that match your filters."
     },
     "vaultFeedback": {
       "vaulted": "{{itemName}} was removed from its save file and is now in the vault.",
@@ -1005,8 +1012,9 @@
     },
     "snapshotList": {
       "title": "Characters & Stashes",
-      "description": "Open a character or stash in a separate window. Drag and drop between that window and this vault view.",
-      "empty": "No character or stash snapshots match your current filters."
+      "description": "Open a character or stash in its own window to move its items. To vault an item, drag it from that window onto the vault area that appears here.",
+      "empty": "No character or stash snapshots match your current filters.",
+      "classLevel": "Level {{level}} {{characterClass}}"
     },
     "snapshotWindow": {
       "invalidTarget": "Unable to open inventory snapshot. Missing or invalid snapshot target.",

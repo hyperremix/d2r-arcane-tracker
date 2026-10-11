@@ -2,7 +2,6 @@ import type { VaultLocationContext } from 'electron/types/grail';
 import { useId } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { TypeFilter } from '@/components/inventory/inventoryItems';
-import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -37,7 +36,11 @@ interface FilterOption {
   label: string;
 }
 
-/** Search box and character, location and type filters of the inventory browser. */
+/**
+ * Search box and character, location and type filters of the inventory browser. They narrow the
+ * characters and stashes list and the vaulted items of the main view; the windows opened from the
+ * list always show every item. Grouped in a fieldset whose legend and description name that scope.
+ */
 export function InventoryFilterBar({
   searchText,
   onSearchTextChange,
@@ -54,6 +57,7 @@ export function InventoryFilterBar({
   const characterSelectId = useId();
   const locationSelectId = useId();
   const typeSelectId = useId();
+  const scopeId = useId();
 
   // Base UI renders the selected label in the trigger only when it gets the options as `items`.
   const characterItems: FilterOption[] = [
@@ -76,8 +80,14 @@ export function InventoryFilterBar({
   ];
 
   return (
-    <Card>
-      <CardContent className="grid grid-cols-1 gap-3 md:grid-cols-5">
+    <fieldset aria-describedby={scopeId} className="rounded-md border border-border/60 p-3">
+      <legend className="px-1 font-medium text-sm">
+        {t(translations.inventoryBrowser.filters.legend)}
+      </legend>
+      <p id={scopeId} className="mb-3 text-muted-foreground text-xs">
+        {t(translations.inventoryBrowser.filters.scope)}
+      </p>
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-5">
         <div className="grid gap-2 md:col-span-2">
           <Label htmlFor={searchId}>{t(translations.common.search)}</Label>
           <Input
@@ -108,8 +118,8 @@ export function InventoryFilterBar({
           value={typeFilter}
           onValueChange={(value) => onTypeFilterChange(value as TypeFilter)}
         />
-      </CardContent>
-    </Card>
+      </div>
+    </fieldset>
   );
 }
 

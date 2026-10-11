@@ -1,9 +1,14 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import type { VaultItem } from 'electron/types/grail';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { INVENTORY_DRAG_STATE_CHANNEL } from 'electron/ipc/contract';
+import type { Character, VaultItem } from 'electron/types/grail';
 import { toast } from 'sonner';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { serializeInventoryTextPayload } from '@/components/inventory/dragPayloads';
+import {
+  INVENTORY_DRAG_MIME,
+  serializeInventoryTextPayload,
+} from '@/components/inventory/dragPayloads';
 import { useGrailStore } from '@/stores/grailStore';
+import { createMainEventsMock } from '@/test/mainEventsMock';
 import { InventoryBrowserMain } from './InventoryBrowserMain';
 
 const searchAllMock = vi.fn();
@@ -11,6 +16,43 @@ const searchVaultMock = vi.fn();
 const addItemMock = vi.fn();
 const openSnapshotWindowMock = vi.fn();
 const unvaultItemMock = vi.fn();
+const getActiveDragStateMock = vi.fn();
+const mainEvents = createMainEventsMock();
+const DROP_TEXT = 'Drop an item here to remove it from its save file and keep it in the vault';
+
+/** Drag state another window relays while it drags an inventory item. */
+const REMOTE_INVENTORY_DRAG = {
+  fingerprint: 'fp-remote',
+  sourceFilePath: '/tmp/sorc.d2s',
+  sourceFileType: 'd2s',
+  sourceLocationContext: 'inventory',
+  rawItemJson: '{"id":7}',
+};
+
+function createCharacter(overrides: Partial<Character>): Character {
+  return {
+    id: 'char-1',
+    name: 'Sorc',
+    characterClass: 'sorceress',
+    level: 90,
+    hardcore: false,
+    expansion: true,
+    lastUpdated: new Date('2024-01-01T00:00:00.000Z'),
+    created: new Date('2024-01-01T00:00:00.000Z'),
+    ...overrides,
+  };
+}
+
+async function reportRemoteInventoryDrag(extra: Record<string, unknown> = {}): Promise<void> {
+  await waitFor(() => expect(mainEvents.listenerCount(INVENTORY_DRAG_STATE_CHANNEL)).toBe(1));
+  act(() => {
+    mainEvents.emit(INVENTORY_DRAG_STATE_CHANNEL, {
+      active: true,
+      ...REMOTE_INVENTORY_DRAG,
+      ...extra,
+    });
+  });
+}
 
 const EMPTY_INVENTORY = { snapshots: [], totalSnapshots: 0, totalItems: 0 };
 
@@ -41,18 +83,23 @@ function mockVaultOnly(items: VaultItem[]): void {
 describe('When InventoryBrowserMain is rendered', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    useGrailStore.setState({ items: [] });
+    mainEvents.reset();
+    getActiveDragStateMock.mockResolvedValue({});
+    useGrailStore.setState({ items: [], characters: [] });
 
     Object.defineProperty(window, 'electronAPI', {
       configurable: true,
       writable: true,
       value: {
+        on: mainEvents.on,
         grail: {
           getItems: vi.fn().mockResolvedValue([]),
         },
         inventory: {
           searchAll: searchAllMock,
           openSnapshotWindow: openSnapshotWindowMock,
+          getActiveDragState: getActiveDragStateMock,
+          sendVaultDragState: vi.fn(),
         },
         vault: {
           search: searchVaultMock,
@@ -145,7 +192,7 @@ describe('When InventoryBrowserMain is rendered', () => {
   });
 
   describe('If the page is shown', () => {
-    it('Then it has the shared page heading and the save file notice', async () => {
+    it('Then it has the shared page heading and a one-line save file notice', async () => {
       // Arrange
 
       // Act
@@ -155,8 +202,36 @@ describe('When InventoryBrowserMain is rendered', () => {
       expect(
         await screen.findByRole('heading', { level: 1, name: 'Inventory Browser' }),
       ).toBeInTheDocument();
-      expect(screen.getByTestId('save-write-notice')).toHaveTextContent(
-        'Changes are written to your save files',
+      const notice = screen.getByTestId('save-write-notice');
+      expect(notice).toHaveTextContent(
+        'Close Diablo II: Resurrected first. Changes here are written to your save files.',
+      );
+      expect(within(notice).getByRole('button', { name: 'Details' })).toHaveAttribute(
+        'aria-expanded',
+        'false',
+      );
+      expect(screen.getByText(/the game will overwrite your changes/)).not.toBeVisible();
+    });
+
+    it('Then the characters and stashes list comes before the vault and the filters sit inside it', async () => {
+      // Arrange
+      mockVaultOnly([createVaultItem({})]);
+
+      // Act
+      render(<InventoryBrowserMain />);
+
+      // Assert
+      const listTitle = await screen.findByText('Characters & Stashes');
+      const vaultTitle = await screen.findByText('Vaulted Items');
+      const filters = screen.getByRole('group', { name: 'Filter items' });
+      expect(
+        listTitle.compareDocumentPosition(vaultTitle) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+      expect(
+        listTitle.compareDocumentPosition(filters) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+      expect(filters).toHaveAccessibleDescription(
+        'Narrows the list to characters and stashes with matching items, and the vault to matching items. Counts show the matches. Opened windows always show all items.',
       );
     });
 
@@ -174,16 +249,162 @@ describe('When InventoryBrowserMain is rendered', () => {
       expect(screen.getByRole('combobox', { name: 'Type' })).toHaveTextContent('All Types');
     });
 
-    it('Then the vault drop area is a labelled region and not a button', async () => {
+    it('Then the vault drop area is hidden while nothing is dragged', async () => {
       // Arrange
-      const dropText = 'Drop an item here to remove it from its save file and keep it in the vault';
 
       // Act
       render(<InventoryBrowserMain />);
 
       // Assert
-      expect(await screen.findByRole('region', { name: dropText })).toBeInTheDocument();
-      expect(screen.queryByRole('button', { name: dropText })).not.toBeInTheDocument();
+      await screen.findByText('Characters & Stashes');
+      expect(screen.queryByTestId('vault-dropzone')).not.toBeInTheDocument();
+    });
+  });
+
+  describe('If the details of the save file notice are opened', () => {
+    it('Then the full safety message is shown and the toggle says so', async () => {
+      // Arrange
+      render(<InventoryBrowserMain />);
+      const toggle = await screen.findByRole('button', { name: 'Details' });
+
+      // Act
+      fireEvent.click(toggle);
+
+      // Assert
+      expect(toggle).toHaveAttribute('aria-expanded', 'true');
+      expect(toggle).toHaveAccessibleName('Hide details');
+      expect(
+        screen.getByText(
+          'Moving, vaulting and unvaulting items edits your save files directly. Close Diablo II: Resurrected first, or the game will overwrite your changes. A backup is made before every change.',
+        ),
+      ).toBeVisible();
+    });
+  });
+
+  describe('If another window reports that it drags an inventory item', () => {
+    it('Then the vault drop area appears as a labelled region and not a button', async () => {
+      // Arrange
+      render(<InventoryBrowserMain />);
+
+      // Act
+      await reportRemoteInventoryDrag();
+
+      // Assert
+      expect(screen.getByRole('region', { name: DROP_TEXT })).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: DROP_TEXT })).not.toBeInTheDocument();
+    });
+
+    it('Then the vault drop area goes away once that window reports the drag ended', async () => {
+      // Arrange
+      render(<InventoryBrowserMain />);
+      await reportRemoteInventoryDrag();
+
+      // Act
+      act(() => {
+        mainEvents.emit(INVENTORY_DRAG_STATE_CHANNEL, { active: false, ...REMOTE_INVENTORY_DRAG });
+      });
+
+      // Assert
+      expect(screen.queryByTestId('vault-dropzone')).not.toBeInTheDocument();
+    });
+  });
+
+  describe('If another window reports a stack pickup', () => {
+    it('Then no vault drop area is shown, because a pickup is placed by clicking', async () => {
+      // Arrange
+      render(<InventoryBrowserMain />);
+
+      // Act
+      await reportRemoteInventoryDrag({
+        itemCode: 'r01',
+        stackPickup: true,
+        stackPickupCount: 2,
+        stackPickupMaxCount: 5,
+      });
+
+      // Assert
+      expect(screen.queryByTestId('vault-dropzone')).not.toBeInTheDocument();
+    });
+  });
+
+  describe('If an inventory drag was already running when the page opened', () => {
+    it('Then the vault drop area is shown', async () => {
+      // Arrange
+      getActiveDragStateMock.mockResolvedValue({
+        inventory: { active: true, ...REMOTE_INVENTORY_DRAG },
+      });
+
+      // Act
+      render(<InventoryBrowserMain />);
+
+      // Assert
+      expect(await screen.findByTestId('vault-dropzone')).toBeInTheDocument();
+    });
+  });
+
+  describe('If a drag with inventory item data enters the window', () => {
+    it('Then the vault drop area is shown even without a drag state from another window', async () => {
+      // Arrange
+      render(<InventoryBrowserMain />);
+      await screen.findByText('Characters & Stashes');
+
+      // Act
+      fireEvent.dragEnter(document.body, {
+        dataTransfer: { types: [INVENTORY_DRAG_MIME], getData: () => '' },
+      });
+
+      // Assert
+      expect(screen.getByTestId('vault-dropzone')).toBeInTheDocument();
+    });
+  });
+
+  describe('If a type is chosen in the filters', () => {
+    it('Then the vault only shows items of that type and says that it is filtered', async () => {
+      // Arrange
+      mockVaultOnly([
+        createVaultItem({ id: 'vault-unique', type: 'unique', itemName: 'Shako' }),
+        createVaultItem({
+          id: 'vault-set',
+          fingerprint: 'vfp-2',
+          type: 'set',
+          itemName: 'Tal Rasha Wrappings',
+        }),
+      ]);
+      render(<InventoryBrowserMain />);
+      await screen.findByRole('button', { name: 'Vaulted item Shako' });
+
+      // Act
+      fireEvent.click(screen.getByRole('combobox', { name: 'Type' }));
+      const option = await screen.findByRole('option', { name: 'Set' });
+      fireEvent.mouseMove(option);
+      fireEvent.click(option);
+
+      // Assert
+      await waitFor(() => {
+        expect(
+          screen.queryByRole('button', { name: 'Vaulted item Shako' }),
+        ).not.toBeInTheDocument();
+      });
+      expect(
+        screen.getByRole('button', { name: 'Vaulted item Tal Rasha Wrappings' }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText('Showing only vaulted items that match your filters.'),
+      ).toBeInTheDocument();
+    });
+  });
+
+  describe('If the character of a snapshot is tracked', () => {
+    it('Then its row shows the class and level', async () => {
+      // Arrange
+      useGrailStore.setState({ characters: [createCharacter({})] });
+
+      // Act
+      render(<InventoryBrowserMain />);
+
+      // Assert
+      const row = await screen.findByRole('button', { name: 'Sorc Level 90 Sorceress 1 item' });
+      expect(within(row).getByText('Level 90 Sorceress')).toBeInTheDocument();
     });
   });
 
@@ -212,7 +433,7 @@ describe('When InventoryBrowserMain is rendered', () => {
       render(<InventoryBrowserMain />);
 
       // Assert
-      const row = await screen.findByRole('button', { name: /Sorc · Character/ });
+      const row = await screen.findByRole('button', { name: 'Sorc Character 1 item' });
       expect(within(row).getByText('1 item')).toBeInTheDocument();
       expect(within(row).queryByText(/Captured/)).not.toBeInTheDocument();
     });
@@ -311,7 +532,7 @@ describe('When InventoryBrowserMain is rendered', () => {
       await waitFor(() => {
         expect(screen.getByText('Characters & Stashes')).toBeInTheDocument();
       });
-      expect(screen.getByText('Sorc · Character')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Sorc Character 1 item' })).toBeInTheDocument();
       expect(screen.queryByTestId('inventory-board-snap-1')).not.toBeInTheDocument();
     });
   });
@@ -323,7 +544,7 @@ describe('When InventoryBrowserMain is rendered', () => {
 
       // Act
       const snapshotButton = await screen.findByRole('button', {
-        name: /Sorc · Character/i,
+        name: /^Sorc Character/,
       });
       fireEvent.click(snapshotButton);
 
@@ -343,7 +564,7 @@ describe('When InventoryBrowserMain is rendered', () => {
       // Arrange
       render(<InventoryBrowserMain />);
       const snapshotButton = await screen.findByRole('button', {
-        name: /Sorc · Character/i,
+        name: /^Sorc Character/,
       });
       vi.useFakeTimers();
 
@@ -392,7 +613,7 @@ describe('When InventoryBrowserMain is rendered', () => {
       // Arrange
       render(<InventoryBrowserMain />);
       const snapshotButton = await screen.findByRole('button', {
-        name: /Sorc · Character/i,
+        name: /^Sorc Character/,
       });
       vi.useFakeTimers();
 
@@ -555,8 +776,8 @@ describe('When InventoryBrowserMain is rendered', () => {
       render(<InventoryBrowserMain />);
 
       // Assert
-      expect(await screen.findByText('Sorc · Character')).toBeInTheDocument();
-      expect(screen.getByText('Barb · Character')).toBeInTheDocument();
+      expect(await screen.findByRole('button', { name: /^Sorc Character/ })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /^Barb Character/ })).toBeInTheDocument();
     });
   });
 
@@ -575,9 +796,8 @@ describe('When InventoryBrowserMain is rendered', () => {
         sourceFilePath: '/tmp/sorc.d2s',
         locationContext: 'inventory' as const,
       };
-      const dropzone = await screen.findByText(
-        'Drop an item here to remove it from its save file and keep it in the vault',
-      );
+      await reportRemoteInventoryDrag();
+      const dropzone = screen.getByText(DROP_TEXT);
 
       // Act
       fireEvent.drop(dropzone, {
@@ -591,6 +811,7 @@ describe('When InventoryBrowserMain is rendered', () => {
       await waitFor(() => {
         expect(addItemMock).toHaveBeenCalledWith(payload);
       });
+      expect(screen.queryByTestId('vault-dropzone')).not.toBeInTheDocument();
     });
   });
 });

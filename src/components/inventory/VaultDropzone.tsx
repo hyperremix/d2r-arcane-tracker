@@ -1,10 +1,12 @@
 import { type DragEvent, useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { translations } from '@/i18n/translations';
+import { cn } from '@/lib/utils';
 
 export interface VaultDropzoneProps {
   /** Called with the drop event; the dropzone has already prevented the default action. */
   onDropItem: (event: DragEvent<HTMLElement>) => void | Promise<void>;
+  className?: string;
 }
 
 /**
@@ -12,7 +14,7 @@ export interface VaultDropzoneProps {
  * is a labelled region rather than a button; keyboard users vault an item with the **Vault** button
  * of the selected item card in a character window.
  */
-export function VaultDropzone({ onDropItem }: VaultDropzoneProps) {
+export function VaultDropzone({ onDropItem, className }: VaultDropzoneProps) {
   const { t } = useTranslation();
   const [isDragOver, setIsDragOver] = useState(false);
   const labelId = useId();
@@ -21,10 +23,11 @@ export function VaultDropzone({ onDropItem }: VaultDropzoneProps) {
     <section
       aria-labelledby={labelId}
       data-testid="vault-dropzone"
-      className={[
+      className={cn(
         'rounded-lg border border-dashed p-3 text-center text-sm transition-colors',
         isDragOver ? 'border-primary bg-primary/10' : 'border-border text-muted-foreground',
-      ].join(' ')}
+        className,
+      )}
       onDragOver={(event) => {
         event.preventDefault();
         setIsDragOver(true);
