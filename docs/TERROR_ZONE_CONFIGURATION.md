@@ -13,7 +13,7 @@ Terror zones are areas that rotate on a schedule, with monsters scaled up and be
 
 ## Usage
 
-Open **Terror Zone Configuration** from the title bar. The page checks your installation path and the game file, then lists every zone with a switch, grouped by act. A warning at the top explains that the page edits your game files. Once the page is set up, the same warning also lists the launch flags and links back to this guide.
+Open **Terror Zone Configuration** with the map pin icon (**Terror zones**) next to the settings icon on the right of the title bar. The page checks your installation path and the game file, then lists every zone with a switch, grouped by act. A warning at the top explains that the page edits your game files. Once the page is set up, the same warning also lists the launch flags and links back to this guide.
 
 - Toggle zones one at a time, or use **Enable All** or **Disable All**. **Disable All** asks for confirmation first, because it saves a game file with no terror zones.
 - Search zones by name. The counter shows how many are enabled.

@@ -29,12 +29,19 @@ function renderTitleBar(initialPath = '/') {
     </>
   );
   const router = createMemoryRouter(
-    ['/', '/statistics', '/runs', '/runs/:id', '/runewords', '/terror-zones', '/settings'].map(
-      (path) => ({
-        path,
-        element: layout,
-      }),
-    ),
+    [
+      '/',
+      '/statistics',
+      '/runs',
+      '/runs/:id',
+      '/runewords',
+      '/inventory-browser',
+      '/terror-zones',
+      '/settings',
+    ].map((path) => ({
+      path,
+      element: layout,
+    })),
     { initialEntries: [initialPath] },
   );
   return render(<RouterProvider router={router} />);
@@ -65,8 +72,28 @@ function getNavigation() {
   return screen.getByRole('navigation', { name: 'Main navigation' });
 }
 
+const originalElectronAPI = window.electronAPI;
+
+function setPlatform(platform: 'darwin' | 'win32' | 'linux') {
+  Object.defineProperty(window, 'electronAPI', {
+    value: { platform },
+    configurable: true,
+    writable: true,
+  });
+}
+
+/** Returns the visually hidden or visible label element inside a nav link. */
+function getLinkLabel(name: string) {
+  return within(within(getNavigation()).getByRole('link', { name })).getByText(name);
+}
+
 describe('When TitleBar is rendered', () => {
   afterEach(() => {
+    Object.defineProperty(window, 'electronAPI', {
+      value: originalElectronAPI,
+      configurable: true,
+      writable: true,
+    });
     vi.restoreAllMocks();
     for (const router of browserRouters.splice(0)) {
       router.dispose();
@@ -86,18 +113,86 @@ describe('When TitleBar is rendered', () => {
       'Statistics',
       'Runs',
       'Runewords',
-      'Inventory Browser',
-      'Terror Zones',
+      'Inventory',
+      'Terror zones',
       'Settings',
     ]);
   });
 
-  it('Then the app name uses the display font', () => {
+  it('Then the daily destinations come first and Terror zones and Settings follow as a separate group', () => {
     // Arrange & Act
     renderTitleBar();
 
     // Assert
+    const [primary, secondary] = within(getNavigation()).getAllByRole('list');
+    expect(
+      within(primary)
+        .getAllByRole('link')
+        .map((link) => link.textContent),
+    ).toEqual(['Grail', 'Statistics', 'Runs', 'Runewords', 'Inventory']);
+    expect(
+      within(secondary)
+        .getAllByRole('link')
+        .map((link) => link.textContent),
+    ).toEqual(['Terror zones', 'Settings']);
+  });
+
+  it('Then primary link labels are visible from the lg breakpoint and hidden text below it', () => {
+    // Arrange & Act
+    renderTitleBar();
+
+    // Assert
+    for (const name of ['Grail', 'Statistics', 'Runs', 'Runewords', 'Inventory']) {
+      expect(getLinkLabel(name)).toHaveClass('sr-only', 'lg:not-sr-only');
+    }
+  });
+
+  it('Then Terror zones and Settings are icon-only links with an accessible name at every width', () => {
+    // Arrange & Act
+    renderTitleBar();
+
+    // Assert
+    for (const name of ['Terror zones', 'Settings']) {
+      const label = getLinkLabel(name);
+      expect(label).toHaveClass('sr-only');
+      expect(label).not.toHaveClass('lg:not-sr-only');
+    }
+  });
+
+  it('Then the logo is always shown and the app name uses the display font', () => {
+    // Arrange & Act
+    renderTitleBar();
+
+    // Assert
+    const banner = screen.getByRole('banner');
+    const logo = banner.querySelector('img');
+    expect(logo).toBeInTheDocument();
+    expect(logo).not.toHaveClass('hidden');
     expect(screen.getByText('D2R Arcane Tracker')).toHaveClass('font-display');
+  });
+
+  it('If the platform is macOS, then the app name is shown from the lg breakpoint', () => {
+    // Arrange
+    setPlatform('darwin');
+
+    // Act
+    renderTitleBar();
+
+    // Assert
+    expect(screen.getByText('D2R Arcane Tracker')).toHaveClass('hidden', 'lg:block');
+  });
+
+  it('If the platform is Windows, then the app name waits for the xl breakpoint to leave room for the window controls', () => {
+    // Arrange
+    setPlatform('win32');
+
+    // Act
+    renderTitleBar();
+
+    // Assert
+    const name = screen.getByText('D2R Arcane Tracker');
+    expect(name).toHaveClass('hidden', 'xl:block');
+    expect(name).not.toHaveClass('lg:block');
   });
 
   it('If there is no history, then the labeled back and forward buttons are disabled', () => {
@@ -151,15 +246,26 @@ describe('When TitleBar is rendered', () => {
     const nav = getNavigation();
 
     // Act
-    fireEvent.click(within(nav).getByRole('link', { name: 'Terror Zones' }));
+    fireEvent.click(within(nav).getByRole('link', { name: 'Terror zones' }));
 
     // Assert
     expect(screen.getByTestId('location')).toHaveTextContent('/terror-zones');
-    expect(within(nav).getByRole('link', { name: 'Terror Zones' })).toHaveAttribute(
+    expect(within(nav).getByRole('link', { name: 'Terror zones' })).toHaveAttribute(
       'aria-current',
       'page',
     );
     expect(within(nav).getByRole('link', { name: 'Grail' })).not.toHaveAttribute('aria-current');
+  });
+
+  it('If the current route is /inventory-browser, then the Inventory link is the active page', () => {
+    // Arrange & Act
+    renderTitleBar('/inventory-browser');
+
+    // Assert
+    expect(within(getNavigation()).getByRole('link', { name: 'Inventory' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
   });
 
   it('If the current route is a nested path like /runs/123, then the Runs link stays active', () => {

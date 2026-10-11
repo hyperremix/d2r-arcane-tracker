@@ -1,6 +1,6 @@
 # Inventory Browser
 
-The **Inventory Browser** (title bar → **Inventory Browser**, route `/inventory-browser`) shows what is in your save files and lets you move items around without starting the game. For the grail itself, see the [Holy Grail Guide](HOLY_GRAIL_GUIDE.md).
+The **Inventory Browser** (title bar → **Inventory**, route `/inventory-browser`) shows what is in your save files and lets you move items around without starting the game. For the grail itself, see the [Holy Grail Guide](HOLY_GRAIL_GUIDE.md).
 
 ## What you see
 
