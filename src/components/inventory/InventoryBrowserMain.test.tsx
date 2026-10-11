@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { INVENTORY_DRAG_STATE_CHANNEL } from 'electron/ipc/contract';
+import { INVENTORY_DRAG_STATE_CHANNEL, VAULT_DRAG_STATE_CHANNEL } from 'electron/ipc/contract';
 import type { Character, VaultItem } from 'electron/types/grail';
 import { toast } from 'sonner';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -51,6 +51,29 @@ async function reportRemoteInventoryDrag(extra: Record<string, unknown> = {}): P
       ...REMOTE_INVENTORY_DRAG,
       ...extra,
     });
+  });
+}
+
+/** A drag that carries inventory item data enters the window, as when dragged from a snapshot window. */
+function enterWindowWithInventoryDrag(): void {
+  fireEvent.dragEnter(document.body, {
+    dataTransfer: { types: [INVENTORY_DRAG_MIME], getData: () => '' },
+  });
+}
+
+/** jsdom has no DragEvent, so a mouse event stands in for one that carries a pointer position. */
+function dragLeave(
+  target: Element,
+  {
+    relatedTarget,
+    clientX,
+    clientY,
+  }: { relatedTarget: Element | null; clientX: number; clientY: number },
+): void {
+  act(() => {
+    target.dispatchEvent(
+      new MouseEvent('dragleave', { bubbles: true, relatedTarget, clientX, clientY }),
+    );
   });
 }
 
@@ -349,12 +372,179 @@ describe('When InventoryBrowserMain is rendered', () => {
       await screen.findByText('Characters & Stashes');
 
       // Act
-      fireEvent.dragEnter(document.body, {
-        dataTransfer: { types: [INVENTORY_DRAG_MIME], getData: () => '' },
-      });
+      enterWindowWithInventoryDrag();
 
       // Assert
       expect(screen.getByTestId('vault-dropzone')).toBeInTheDocument();
+    });
+
+    it('Then the vault drop area goes away when the drag ends', async () => {
+      // Arrange
+      render(<InventoryBrowserMain />);
+      await screen.findByText('Characters & Stashes');
+      enterWindowWithInventoryDrag();
+
+      // Act
+      fireEvent.dragEnd(document.body);
+
+      // Assert
+      expect(screen.queryByTestId('vault-dropzone')).not.toBeInTheDocument();
+    });
+
+    it('Then the vault drop area goes away when the drag leaves the window', async () => {
+      // Arrange
+      render(<InventoryBrowserMain />);
+      await screen.findByText('Characters & Stashes');
+      enterWindowWithInventoryDrag();
+
+      // Act
+      dragLeave(document.body, { relatedTarget: null, clientX: 0, clientY: 0 });
+
+      // Assert
+      expect(screen.queryByTestId('vault-dropzone')).not.toBeInTheDocument();
+    });
+
+    it('Then the vault drop area stays while the drag only moves between elements of the window', async () => {
+      // Arrange
+      render(<InventoryBrowserMain />);
+      const row = await screen.findByRole('button', { name: /^Sorc Character/ });
+      enterWindowWithInventoryDrag();
+
+      // Act
+      dragLeave(document.body, { relatedTarget: row, clientX: 0, clientY: 0 });
+      dragLeave(row, { relatedTarget: null, clientX: 120, clientY: 80 });
+
+      // Assert
+      expect(screen.getByTestId('vault-dropzone')).toBeInTheDocument();
+    });
+
+    it('Then a drag another window reported stays when a drag leaves this window', async () => {
+      // Arrange
+      render(<InventoryBrowserMain />);
+      await reportRemoteInventoryDrag();
+
+      // Act
+      dragLeave(document.body, { relatedTarget: null, clientX: 0, clientY: 0 });
+
+      // Assert
+      expect(screen.getByTestId('vault-dropzone')).toBeInTheDocument();
+    });
+
+    it('Then it can be dropped on the vault drop area, which then goes away', async () => {
+      // Arrange
+      render(<InventoryBrowserMain />);
+      await screen.findByText('Characters & Stashes');
+      enterWindowWithInventoryDrag();
+      const payload = {
+        fingerprint: 'fp-local',
+        itemName: 'Harlequin Crest',
+        quality: 'unique',
+        ethereal: false,
+        socketCount: 0,
+        rawItemJson: '{"id":5}',
+        sourceFileType: 'd2s' as const,
+        sourceFilePath: '/tmp/sorc.d2s',
+        locationContext: 'inventory' as const,
+      };
+
+      // Act
+      fireEvent.drop(screen.getByText(DROP_TEXT), {
+        dataTransfer: {
+          getData: (format: string) =>
+            format === 'text/plain' ? serializeInventoryTextPayload(payload) : '',
+        },
+      });
+
+      // Assert
+      await waitFor(() => {
+        expect(addItemMock).toHaveBeenCalledWith(payload);
+      });
+      expect(screen.queryByTestId('vault-dropzone')).not.toBeInTheDocument();
+    });
+  });
+
+  describe('If the page is closed', () => {
+    it('Then every window and drag state listener it added is removed again', async () => {
+      // Arrange
+      const addSpy = vi.spyOn(window, 'addEventListener');
+      const removeSpy = vi.spyOn(window, 'removeEventListener');
+      const { unmount } = render(<InventoryBrowserMain />);
+      await screen.findByText('Characters & Stashes');
+      await waitFor(() => expect(mainEvents.listenerCount(INVENTORY_DRAG_STATE_CHANNEL)).toBe(1));
+
+      // Act
+      unmount();
+
+      // Assert
+      for (const type of ['dragenter', 'dragleave', 'dragend', 'drop']) {
+        const added = addSpy.mock.calls.filter(([addedType]) => addedType === type);
+        expect(added).toHaveLength(1);
+        expect(removeSpy).toHaveBeenCalledWith(type, added[0]?.[1]);
+      }
+      expect(mainEvents.listenerCount(INVENTORY_DRAG_STATE_CHANNEL)).toBe(0);
+      expect(mainEvents.listenerCount(VAULT_DRAG_STATE_CHANNEL)).toBe(0);
+    });
+  });
+
+  describe('If the active drag state cannot be read when the page opens', () => {
+    it('Then the page still works without a vault drop area and logs a warning', async () => {
+      // Arrange
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+      const failure = new Error('ipc failed');
+      getActiveDragStateMock.mockRejectedValue(failure);
+
+      // Act
+      render(<InventoryBrowserMain />);
+
+      // Assert
+      expect(await screen.findByRole('button', { name: /^Sorc Character/ })).toBeInTheDocument();
+      await waitFor(() => {
+        expect(warnSpy).toHaveBeenCalledWith('Failed to get active inventory drag state', failure);
+      });
+      expect(screen.queryByTestId('vault-dropzone')).not.toBeInTheDocument();
+
+      // Act
+      await reportRemoteInventoryDrag();
+
+      // Assert
+      expect(screen.getByTestId('vault-dropzone')).toBeInTheDocument();
+    });
+  });
+
+  describe('If the Other type is chosen in the filters', () => {
+    it('Then the vault only shows items of types other than unique, set, runeword and rune', async () => {
+      // Arrange
+      mockVaultOnly([
+        createVaultItem({ id: 'vault-unique', type: 'unique', itemName: 'Shako' }),
+        createVaultItem({ id: 'vault-rune', fingerprint: 'vfp-2', type: 'rune', itemName: 'Ber' }),
+        createVaultItem({ id: 'vault-none', fingerprint: 'vfp-3', itemName: 'Mystery Charm' }),
+        createVaultItem({
+          id: 'vault-charm',
+          fingerprint: 'vfp-4',
+          type: 'charm',
+          itemName: 'Annihilus',
+        }),
+      ]);
+      render(<InventoryBrowserMain />);
+      await screen.findByRole('button', { name: 'Vaulted item Shako' });
+
+      // Act
+      fireEvent.click(screen.getByRole('combobox', { name: 'Type' }));
+      const option = await screen.findByRole('option', { name: 'Other' });
+      fireEvent.mouseMove(option);
+      fireEvent.click(option);
+
+      // Assert
+      await waitFor(() => {
+        expect(
+          screen.queryByRole('button', { name: 'Vaulted item Shako' }),
+        ).not.toBeInTheDocument();
+      });
+      expect(screen.queryByRole('button', { name: 'Vaulted item Ber' })).not.toBeInTheDocument();
+      expect(
+        screen.getByRole('button', { name: 'Vaulted item Mystery Charm' }),
+      ).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Vaulted item Annihilus' })).toBeInTheDocument();
     });
   });
 
@@ -391,6 +581,76 @@ describe('When InventoryBrowserMain is rendered', () => {
       expect(
         screen.getByText('Showing only vaulted items that match your filters.'),
       ).toBeInTheDocument();
+    });
+  });
+
+  describe('If the type filter excludes every vaulted item', () => {
+    it('Then the vault still says it is filtered and that nothing matches', async () => {
+      // Arrange
+      mockVaultOnly([createVaultItem({ type: 'unique', itemName: 'Shako' })]);
+      render(<InventoryBrowserMain />);
+      await screen.findByRole('button', { name: 'Vaulted item Shako' });
+
+      // Act
+      fireEvent.click(screen.getByRole('combobox', { name: 'Type' }));
+      const option = await screen.findByRole('option', { name: 'Set' });
+      fireEvent.mouseMove(option);
+      fireEvent.click(option);
+
+      // Assert
+      await waitFor(() => {
+        expect(
+          screen.queryByRole('button', { name: 'Vaulted item Shako' }),
+        ).not.toBeInTheDocument();
+      });
+      const vaultCard = screen.getByText('Vaulted Items').closest('[data-slot="card"]');
+      expect(vaultCard).not.toBeNull();
+      expect(
+        within(vaultCard as HTMLElement).getByText(
+          'Showing only vaulted items that match your filters.',
+        ),
+      ).toBeInTheDocument();
+      expect(
+        within(vaultCard as HTMLElement).getByText('No inventory items match your filters.'),
+      ).toBeInTheDocument();
+    });
+  });
+
+  describe('If the search matches no vaulted item', () => {
+    it('Then the vault still says it is filtered and that nothing matches', async () => {
+      // Arrange
+      mockVaultOnly([createVaultItem({})]);
+      render(<InventoryBrowserMain />);
+      await screen.findByRole('button', { name: 'Vaulted item Shako' });
+      mockVaultOnly([]);
+
+      // Act
+      fireEvent.change(screen.getByRole('textbox', { name: 'Search' }), {
+        target: { value: 'nothing like this' },
+      });
+
+      // Assert
+      expect(
+        await screen.findByText('Showing only vaulted items that match your filters.'),
+      ).toBeInTheDocument();
+      expect(screen.getByText('Vaulted Items')).toBeInTheDocument();
+      expect(screen.getByText('No inventory items match your filters.')).toBeInTheDocument();
+    });
+  });
+
+  describe('If no filter is active and the vault is empty', () => {
+    it('Then no vault section is shown', async () => {
+      // Arrange
+
+      // Act
+      render(<InventoryBrowserMain />);
+
+      // Assert
+      await screen.findByRole('button', { name: /^Sorc Character/ });
+      expect(screen.queryByText('Vaulted Items')).not.toBeInTheDocument();
+      expect(
+        screen.queryByText('Showing only vaulted items that match your filters.'),
+      ).not.toBeInTheDocument();
     });
   });
 

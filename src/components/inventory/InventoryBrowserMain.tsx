@@ -7,6 +7,7 @@ import { useTranslation } from 'react-i18next';
 import {
   hasInventoryOrVaultDragData,
   INVENTORY_DRAG_MIME,
+  type InventoryDragStatePayload,
   parseInventoryDragStatePayload,
   parseInventoryTextPayload,
   parseVaultDragStatePayload,
@@ -37,11 +38,24 @@ function getSnapshotWindowTargetKey(snapshot: CharacterInventorySnapshot): strin
 }
 
 /** Whether a drag state reported by another window is an inventory item that could be vaulted. */
-function isVaultableInventoryDrag(payload: unknown): boolean {
-  const parsedPayload = parseInventoryDragStatePayload(payload);
-
+function isVaultableInventoryDrag(payload: InventoryDragStatePayload | undefined): boolean {
   // A stack pickup is placed by clicking, not dropped, so the vault drop area can't take it
-  return parsedPayload?.active === true && parsedPayload.stackPickup !== true;
+  return payload?.active === true && payload.stackPickup !== true;
+}
+
+/** Whether a `dragleave` means the pointer left this window, not just moved between elements. */
+function isDragLeavingWindow(event: globalThis.DragEvent): boolean {
+  if (event.relatedTarget !== null) {
+    return false;
+  }
+
+  // Some browsers report no related element for moves inside the page; those have a position
+  return (
+    event.clientX <= 0 ||
+    event.clientY <= 0 ||
+    event.clientX >= window.innerWidth ||
+    event.clientY >= window.innerHeight
+  );
 }
 
 export function InventoryBrowserMain() {
@@ -51,8 +65,11 @@ export function InventoryBrowserMain() {
   const [characterId, setCharacterId] = useState('all');
   const [locationContext, setLocationContext] = useState<LocationFilter>('all');
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('all');
-  // The vault drop area is only shown while an inventory item is dragged: another window reports
-  // its drags over IPC, and a drag that enters this window with inventory drag data counts too.
+  // The vault drop area is only shown while an inventory item can be dropped on it: another window
+  // reports its drags over IPC, and a drag that enters this window with inventory drag data counts
+  // too. The ref below is wider: it also covers stack pickups, which keep snapshot windows
+  // auto-opening on hover but can't be dropped on the vault. It is a ref because the drag
+  // handlers read it without needing a render.
   const [hasRemoteInventoryDrag, setHasRemoteInventoryDrag] = useState(false);
   const [hasInventoryDragInWindow, setHasInventoryDragInWindow] = useState(false);
   const characters = useGrailStore((state) => state.characters);
@@ -111,7 +128,7 @@ export function InventoryBrowserMain() {
       }
 
       hasCrossWindowInventoryDragRef.current = parsedPayload.active;
-      setHasRemoteInventoryDrag(isVaultableInventoryDrag(payload));
+      setHasRemoteInventoryDrag(isVaultableInventoryDrag(parsedPayload));
       if (!parsedPayload.active) {
         setHasInventoryDragInWindow(false);
         resetIfRemoteDragInactive();
@@ -129,7 +146,7 @@ export function InventoryBrowserMain() {
           }
 
           const rawPayload: { inventory?: unknown } = payload;
-          if (isVaultableInventoryDrag(rawPayload.inventory)) {
+          if (isVaultableInventoryDrag(parseInventoryDragStatePayload(rawPayload.inventory))) {
             hasCrossWindowInventoryDragRef.current = true;
             setHasRemoteInventoryDrag(true);
           }
@@ -161,19 +178,28 @@ export function InventoryBrowserMain() {
       resetSnapshotHoverSession();
     };
 
-    // Fallback for a missed IPC drag state; it ends with a drop here or the other window's dragend
+    // Fallback for a missed IPC drag state. `dragend` only fires in the window the drag started
+    // in, so here it ends with a drop, with the drag leaving this window, or with the IPC state.
     const trackInventoryDragEnter = (event: globalThis.DragEvent) => {
       if (event.dataTransfer?.types.includes(INVENTORY_DRAG_MIME)) {
         setHasInventoryDragInWindow(true);
       }
     };
 
+    const trackInventoryDragLeave = (event: globalThis.DragEvent) => {
+      if (isDragLeavingWindow(event)) {
+        setHasInventoryDragInWindow(false);
+      }
+    };
+
     window.addEventListener('dragenter', trackInventoryDragEnter);
+    window.addEventListener('dragleave', trackInventoryDragLeave);
     window.addEventListener('dragend', resetDragSession);
     window.addEventListener('drop', resetDragSession);
 
     return () => {
       window.removeEventListener('dragenter', trackInventoryDragEnter);
+      window.removeEventListener('dragleave', trackInventoryDragLeave);
       window.removeEventListener('dragend', resetDragSession);
       window.removeEventListener('drop', resetDragSession);
       resetDragSession();
@@ -337,6 +363,9 @@ export function InventoryBrowserMain() {
     locationContext !== 'all' ||
     typeFilter !== 'all';
   const isVaultDropzoneVisible = hasRemoteInventoryDrag || hasInventoryDragInWindow;
+  // With filters on, an empty vault can mean "nothing matches", so say so instead of hiding it
+  const isVaultCardVisible =
+    vaultItems.length > 0 || (hasActiveFilters && !isLoading && inventoryResponse !== null);
 
   return (
     <PageShell>
@@ -400,7 +429,7 @@ export function InventoryBrowserMain() {
         </CardContent>
       </Card>
 
-      {vaultItems.length > 0 && (
+      {isVaultCardVisible && (
         <Card>
           <CardHeader>
             <div className="space-y-1">
@@ -415,6 +444,11 @@ export function InventoryBrowserMain() {
             </div>
           </CardHeader>
           <CardContent className="space-y-3">
+            {vaultItems.length === 0 && (
+              <div className="text-muted-foreground text-sm">
+                {t(translations.inventoryBrowser.empty)}
+              </div>
+            )}
             <div className="flex flex-wrap gap-2">
               {vaultItems.map((item) => (
                 <VaultedItemTile

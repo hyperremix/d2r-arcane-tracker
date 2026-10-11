@@ -1,15 +1,20 @@
-import type { Character, CharacterInventorySnapshot } from 'electron/types/grail';
+import type { Character, CharacterClass, CharacterInventorySnapshot } from 'electron/types/grail';
 import { ExternalLink } from 'lucide-react';
 import { type DragEvent, useId } from 'react';
 import { useTranslation } from 'react-i18next';
 import { CharacterIcon } from '@/components/grail/StatusIcons';
 import {
   formatSourceFileTypeLabel,
+  isCharacterFileType,
   isSharedStashFileType,
 } from '@/components/inventory/inventoryItemLabels';
 import { Badge } from '@/components/ui/badge';
 import { translations } from '@/i18n/translations';
 import { itemSubCategoryLabelKeys } from '@/lib/labelKeys';
+
+const SHARED_STASH_CLASS: CharacterClass = 'shared_stash';
+/** Icon class that makes `CharacterIcon` fall back to the generic person icon. */
+const GENERIC_ICON_CLASS = '';
 
 export interface SnapshotListRowProps {
   snapshot: CharacterInventorySnapshot;
@@ -29,11 +34,13 @@ export function findSnapshotCharacter(
   snapshot: CharacterInventorySnapshot,
   characters: Character[],
 ): Character | undefined {
-  if (snapshot.sourceFileType !== 'd2s') {
+  if (!isCharacterFileType(snapshot.sourceFileType)) {
     return undefined;
   }
 
-  const playable = characters.filter((character) => character.characterClass !== 'shared_stash');
+  const playable = characters.filter(
+    (character) => character.characterClass !== SHARED_STASH_CLASS,
+  );
   return (
     (snapshot.characterId
       ? playable.find((character) => character.id === snapshot.characterId)
@@ -61,7 +68,7 @@ export function SnapshotListRow({
 
   const iconClass =
     character?.characterClass ??
-    (isSharedStashFileType(snapshot.sourceFileType) ? 'shared_stash' : '');
+    (isSharedStashFileType(snapshot.sourceFileType) ? SHARED_STASH_CLASS : GENERIC_ICON_CLASS);
   const details = character
     ? t(translations.inventoryBrowser.snapshotList.classLevel, {
         characterClass: t(itemSubCategoryLabelKeys[character.characterClass]),

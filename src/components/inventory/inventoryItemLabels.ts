@@ -36,6 +36,11 @@ export function formatLocation(
   return t(translations.inventoryBrowser.location[item.locationContext]);
 }
 
+/** Whether a save file type is a character save (`.d2s`), ignoring case and spacing. */
+export function isCharacterFileType(sourceFileType: string | undefined): boolean {
+  return sourceFileType?.trim().toLowerCase() === 'd2s';
+}
+
 /** Whether a save file type is one of the shared stash formats (`.d2i`, `.sss`, `.d2x`). */
 export function isSharedStashFileType(sourceFileType: string | undefined): boolean {
   const normalizedType = sourceFileType?.trim().toLowerCase();
@@ -50,8 +55,7 @@ export function formatSourceFileTypeLabel(
   sourceFileType: string | undefined,
   t: (key: string, options?: Record<string, unknown>) => string,
 ): string {
-  const normalizedType = sourceFileType?.trim().toLowerCase();
-  if (normalizedType === 'd2s') {
+  if (isCharacterFileType(sourceFileType)) {
     return t(translations.inventoryBrowser.sourceFileTypes.character);
   }
 
