@@ -1,4 +1,9 @@
-import type { TerrorZone, TerrorZoneValidationErrorCode } from 'electron/types/grail';
+import type {
+  TerrorZone,
+  TerrorZoneValidationErrorCode,
+  TerrorZoneValidationResult,
+} from 'electron/types/grail';
+import type { LucideIcon } from 'lucide-react';
 import {
   AlertCircle,
   AlertTriangle,
@@ -11,7 +16,7 @@ import {
   Settings,
   XCircle,
 } from 'lucide-react';
-import type { MouseEvent } from 'react';
+import type { MouseEvent, ReactNode } from 'react';
 import { useCallback, useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router';
@@ -39,10 +44,14 @@ import { groupTerrorZonesByAct } from './terrorZoneActs';
 import { useTerrorZoneConfig } from './useTerrorZoneConfig';
 
 /**
+ * Validation error codes shown as an error. `pathNotConfigured` has its own empty state instead.
+ */
+type InstallationErrorCode = Exclude<TerrorZoneValidationErrorCode, 'pathNotConfigured'>;
+
+/**
  * Maps validation error codes from the main process to translation keys.
  */
-const validationErrorKeys: Record<TerrorZoneValidationErrorCode, string> = {
-  pathNotConfigured: translations.terrorZone.pathNotConfigured,
+const validationErrorKeys: Record<InstallationErrorCode, string> = {
   directoryNotFound: translations.terrorZone.validationErrors.directoryNotFound,
   gameFileNotFound: translations.terrorZone.validationErrors.gameFileNotFound,
   invalidStructure: translations.terrorZone.validationErrors.invalidStructure,
@@ -53,8 +62,7 @@ const validationErrorKeys: Record<TerrorZoneValidationErrorCode, string> = {
 /**
  * Validation errors that are fixed by changing the D2R installation path in Settings.
  */
-const installationPathErrorCodes: ReadonlySet<TerrorZoneValidationErrorCode> = new Set([
-  'pathNotConfigured',
+const installationPathErrorCodes: ReadonlySet<InstallationErrorCode> = new Set([
   'directoryNotFound',
 ]);
 
@@ -63,6 +71,40 @@ const installationPathErrorCodes: ReadonlySet<TerrorZoneValidationErrorCode> = n
  */
 const TERROR_ZONE_GUIDE_URL =
   'https://github.com/hyperremix/d2r-arcane-tracker/blob/main/docs/TERROR_ZONE_CONFIGURATION.md';
+
+/**
+ * The error to show for a failed validation, if any. Not being configured has its own empty state.
+ */
+function getInstallationErrorCode(
+  validation: TerrorZoneValidationResult | undefined,
+): InstallationErrorCode | undefined {
+  if (validation?.valid !== false || validation.errorCode === 'pathNotConfigured') {
+    return undefined;
+  }
+  return validation.errorCode;
+}
+
+/**
+ * Props for the DestructiveAlert component.
+ */
+interface DestructiveAlertProps {
+  icon: LucideIcon;
+  title?: string;
+  children: ReactNode;
+}
+
+/**
+ * Error callout in the destructive colors, with an optional title.
+ */
+function DestructiveAlert({ icon: Icon, title, children }: DestructiveAlertProps) {
+  return (
+    <Alert className="border-destructive/30 bg-destructive/10">
+      <Icon className="h-4 w-4 text-destructive" />
+      {title && <AlertTitle className="font-bold text-destructive">{title}</AlertTitle>}
+      <AlertDescription className="space-y-2 text-destructive">{children}</AlertDescription>
+    </Alert>
+  );
+}
 
 /**
  * Props for the installation states shown instead of the zone list.
@@ -101,7 +143,7 @@ function InstallationPathNotConfigured({ onOpenInstallationSettings }: Installat
  * Props for the InstallationErrorAlert component.
  */
 interface InstallationErrorAlertProps extends InstallationStateProps {
-  errorCode: TerrorZoneValidationErrorCode;
+  errorCode: InstallationErrorCode;
 }
 
 /**
@@ -114,70 +156,66 @@ function InstallationErrorAlert({
 }: InstallationErrorAlertProps) {
   const { t } = useTranslation();
   return (
-    <Alert className="border-destructive/30 bg-destructive/10">
-      <AlertCircle className="h-4 w-4 text-destructive" />
-      <AlertTitle className="font-bold text-destructive">{t(translations.common.error)}</AlertTitle>
-      <AlertDescription className="space-y-2 text-destructive">
-        <p>{t(validationErrorKeys[errorCode])}</p>
-        {installationPathErrorCodes.has(errorCode) && (
-          <Button type="button" variant="outline" size="sm" onClick={onOpenInstallationSettings}>
-            <Settings aria-hidden="true" />
-            {t(translations.terrorZone.openInstallationSettings)}
-          </Button>
-        )}
-        {errorCode === 'gameFileNotFound' && (
-          <div>
-            <p className="font-semibold text-sm">
-              {t(translations.terrorZone.gameFilesMustBeExtracted)}
-            </p>
-            <p className="text-sm">
-              {t(translations.terrorZone.cascDescription)}
-              <strong> {t(translations.terrorZone.allFilesMustBeExtracted)}</strong>{' '}
-              {t(translations.terrorZone.launchFlags)}{' '}
-              <code className="rounded bg-background/60 px-1">
-                {t(translations.terrorZone.flagsValue)}
-              </code>{' '}
-              {t(translations.terrorZone.flagsSuffix)}
-            </p>
-            <div className="mt-2">
-              <p className="font-semibold text-sm">{t(translations.terrorZone.extractionSteps)}</p>
-              <ol className="mt-1 ml-4 list-decimal space-y-1 text-sm">
-                <li>
-                  {t(translations.settings.itemIcons.downloadCascViewer)}{' '}
-                  <a
-                    href="https://www.hiveworkshop.com/threads/ladiks-casc-viewer.331540/"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="underline hover:decoration-2"
-                  >
-                    {t(translations.settings.itemIcons.ladiksCascViewer)}
-                  </a>
-                </li>
-                <li>{t(translations.settings.itemIcons.openX64Version)}</li>
-                <li>{t(translations.settings.itemIcons.openStorage)}</li>
-                <li>{t(translations.settings.itemIcons.selectD2rFolder)}</li>
-                <li>{t(translations.settings.itemIcons.clickData)}</li>
-                <li>{t(translations.settings.itemIcons.clickDataExtract)}</li>
-                <li>{t(translations.settings.itemIcons.waitForExtraction)}</li>
-                <li>{t(translations.settings.itemIcons.moveFolders)}</li>
-                <li>
-                  {t(translations.terrorZone.createShortcut)}{' '}
-                  <code className="rounded bg-background/60 px-1 text-xs">
-                    {t(translations.terrorZone.flagsValue)}
-                  </code>{' '}
-                  {t(translations.terrorZone.toTheTarget)}
-                </li>
-                <li>{t(translations.terrorZone.alwaysLaunchShortcut)}</li>
-              </ol>
-            </div>
-            <p className="mt-2 text-xs">
-              <strong>{t(translations.common.note)}</strong>{' '}
-              {t(translations.terrorZone.extractionNote)}
-            </p>
+    <DestructiveAlert icon={AlertCircle} title={t(translations.common.error)}>
+      <p>{t(validationErrorKeys[errorCode])}</p>
+      {installationPathErrorCodes.has(errorCode) && (
+        <Button type="button" variant="outline" size="sm" onClick={onOpenInstallationSettings}>
+          <Settings aria-hidden="true" />
+          {t(translations.terrorZone.openInstallationSettings)}
+        </Button>
+      )}
+      {errorCode === 'gameFileNotFound' && (
+        <div>
+          <p className="font-semibold text-sm">
+            {t(translations.terrorZone.gameFilesMustBeExtracted)}
+          </p>
+          <p className="text-sm">
+            {t(translations.terrorZone.cascDescription)}
+            <strong> {t(translations.terrorZone.allFilesMustBeExtracted)}</strong>{' '}
+            {t(translations.terrorZone.launchFlags)}{' '}
+            <code className="rounded bg-background/60 px-1">
+              {t(translations.terrorZone.flagsValue)}
+            </code>{' '}
+            {t(translations.terrorZone.flagsSuffix)}
+          </p>
+          <div className="mt-2">
+            <p className="font-semibold text-sm">{t(translations.terrorZone.extractionSteps)}</p>
+            <ol className="mt-1 ml-4 list-decimal space-y-1 text-sm">
+              <li>
+                {t(translations.settings.itemIcons.downloadCascViewer)}{' '}
+                <a
+                  href="https://www.hiveworkshop.com/threads/ladiks-casc-viewer.331540/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="underline hover:decoration-2"
+                >
+                  {t(translations.settings.itemIcons.ladiksCascViewer)}
+                </a>
+              </li>
+              <li>{t(translations.settings.itemIcons.openX64Version)}</li>
+              <li>{t(translations.settings.itemIcons.openStorage)}</li>
+              <li>{t(translations.settings.itemIcons.selectD2rFolder)}</li>
+              <li>{t(translations.settings.itemIcons.clickData)}</li>
+              <li>{t(translations.settings.itemIcons.clickDataExtract)}</li>
+              <li>{t(translations.settings.itemIcons.waitForExtraction)}</li>
+              <li>{t(translations.settings.itemIcons.moveFolders)}</li>
+              <li>
+                {t(translations.terrorZone.createShortcut)}{' '}
+                <code className="rounded bg-background/60 px-1 text-xs">
+                  {t(translations.terrorZone.flagsValue)}
+                </code>{' '}
+                {t(translations.terrorZone.toTheTarget)}
+              </li>
+              <li>{t(translations.terrorZone.alwaysLaunchShortcut)}</li>
+            </ol>
           </div>
-        )}
-      </AlertDescription>
-    </Alert>
+          <p className="mt-2 text-xs">
+            <strong>{t(translations.common.note)}</strong>{' '}
+            {t(translations.terrorZone.extractionNote)}
+          </p>
+        </div>
+      )}
+    </DestructiveAlert>
   );
 }
 
@@ -248,12 +286,12 @@ export function TerrorZoneConfiguration() {
   const totalCount = zones.length;
 
   const isPathNotConfigured =
-    !validationStatus.valid && validationStatus.errorCode === 'pathNotConfigured';
+    validationStatus?.valid === false && validationStatus.errorCode === 'pathNotConfigured';
+  const installationErrorCode = getInstallationErrorCode(validationStatus);
   // Zones can be edited once they were read from a valid installation
-  const canEditZones = validationStatus.valid && loadError === undefined;
+  const canEditZones = validationStatus?.valid === true && loadError === undefined;
   const isBulkSaving = bulkAction !== undefined;
   const isWriteInProgress = isBulkSaving || isRestoring || pendingZoneIds.size > 0;
-  const areActionsDisabled = isWriteInProgress || !validationStatus.valid;
 
   const renderZoneSwitch = (zone: TerrorZone) => {
     const isPending = isBulkSaving || pendingZoneIds.has(zone.id);
@@ -265,7 +303,7 @@ export function TerrorZoneConfiguration() {
           aria-busy={isPending || undefined}
           checked={config[zone.id] ?? true}
           onCheckedChange={(checked: boolean) => toggleZone(zone.id, checked)}
-          disabled={isPending || isRestoring || !validationStatus.valid}
+          disabled={isPending || isRestoring}
         />
         <Label
           id={`${zoneLabelIdPrefix}-${zone.id}`}
@@ -337,25 +375,22 @@ export function TerrorZoneConfiguration() {
           <Card>
             <CardContent className="space-y-4">
               {/* Validation Status */}
-              {!validationStatus.valid && (
+              {installationErrorCode && (
                 <InstallationErrorAlert
-                  errorCode={validationStatus.errorCode}
+                  errorCode={installationErrorCode}
                   onOpenInstallationSettings={openInstallationSettings}
                 />
               )}
 
               {/* Reading the zones failed even though the installation is valid */}
               {loadError && (
-                <Alert className="border-destructive/30 bg-destructive/10">
-                  <XCircle className="h-4 w-4 text-destructive" />
-                  <AlertDescription className="space-y-2 text-destructive">
-                    <p>{loadError}</p>
-                    <Button type="button" variant="outline" size="sm" onClick={() => void reload()}>
-                      <RefreshCw aria-hidden="true" />
-                      {t(translations.common.retry)}
-                    </Button>
-                  </AlertDescription>
-                </Alert>
+                <DestructiveAlert icon={XCircle}>
+                  <p>{loadError}</p>
+                  <Button type="button" variant="outline" size="sm" onClick={() => void reload()}>
+                    <RefreshCw aria-hidden="true" />
+                    {t(translations.common.retry)}
+                  </Button>
+                </DestructiveAlert>
               )}
 
               {canEditZones && (
@@ -394,12 +429,7 @@ export function TerrorZoneConfiguration() {
                   </Alert>
 
                   {/* Error Display */}
-                  {error && (
-                    <Alert className="border-destructive/30 bg-destructive/10">
-                      <XCircle className="h-4 w-4 text-destructive" />
-                      <AlertDescription className="text-destructive">{error}</AlertDescription>
-                    </Alert>
-                  )}
+                  {error && <DestructiveAlert icon={XCircle}>{error}</DestructiveAlert>}
 
                   {/* Search and Controls */}
                   <div className="space-y-4">
@@ -442,7 +472,7 @@ export function TerrorZoneConfiguration() {
                           variant="outline"
                           size="sm"
                           onClick={handleEnableAll}
-                          disabled={areActionsDisabled}
+                          disabled={isWriteInProgress}
                         >
                           {bulkAction === 'enableAll' && (
                             <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
@@ -453,7 +483,7 @@ export function TerrorZoneConfiguration() {
                           variant="outline"
                           size="sm"
                           onClick={() => setShowDisableAllDialog(true)}
-                          disabled={areActionsDisabled}
+                          disabled={isWriteInProgress}
                         >
                           {bulkAction === 'disableAll' && (
                             <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
@@ -464,7 +494,7 @@ export function TerrorZoneConfiguration() {
                           variant="outline"
                           size="sm"
                           onClick={() => setShowRestoreDialog(true)}
-                          disabled={areActionsDisabled}
+                          disabled={isWriteInProgress}
                         >
                           <RotateCcw className="mr-2 h-4 w-4" />
                           {t(translations.terrorZone.restoreOriginal)}

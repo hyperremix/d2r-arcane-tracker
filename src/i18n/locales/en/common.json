@@ -1120,7 +1120,6 @@
     "description": "Choose which terror zones can appear in your game",
     "loadingTerrorZones": "Loading terror zones...",
     "warning": "This feature modifies game files in your D2R installation. The original file is backed up automatically and can be restored at any time, but any issues caused by these changes are your own responsibility.",
-    "pathNotConfigured": "D2R installation path is not configured",
     "openInstallationSettings": "Open D2R Installation settings",
     "notConfigured": {
       "title": "Set your D2R installation folder",

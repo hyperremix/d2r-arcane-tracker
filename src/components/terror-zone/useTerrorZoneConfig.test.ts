@@ -48,7 +48,7 @@ describe('When useTerrorZoneConfig is used', () => {
       await waitFor(() => expect(result.current.isLoading).toBe(false));
       expect(result.current.zones).toEqual(zones);
       expect(result.current.config).toEqual({ '1': true, '2': false });
-      expect(result.current.validationStatus.valid).toBe(true);
+      expect(result.current.validationStatus?.valid).toBe(true);
     });
   });
 
@@ -69,6 +69,31 @@ describe('When useTerrorZoneConfig is used', () => {
 
       // Assert
       expect(result.current.loadError).toBeUndefined();
+      expect(result.current.zones).toEqual(zones);
+    });
+  });
+
+  describe('If validating the path fails', () => {
+    it('Then the load error is set without a validation status and reload recovers', async () => {
+      // Arrange
+      const validatePath = vi
+        .fn()
+        .mockRejectedValueOnce(new Error('EIO'))
+        .mockResolvedValue({ valid: true, path: '/d2r' });
+      setupTerrorZoneApi({ validatePath });
+      const { result } = renderHook(() => useTerrorZoneConfig());
+      await waitFor(() => expect(result.current.isLoading).toBe(false));
+      expect(result.current.loadError).toBe('Failed to load terror zone data');
+      expect(result.current.validationStatus).toBeUndefined();
+
+      // Act
+      await act(async () => {
+        await result.current.reload();
+      });
+
+      // Assert
+      expect(result.current.loadError).toBeUndefined();
+      expect(result.current.validationStatus?.valid).toBe(true);
       expect(result.current.zones).toEqual(zones);
     });
   });

@@ -45,10 +45,11 @@ export function useTerrorZoneConfig() {
   const [pendingZoneIds, setPendingZoneIds] = useState<ReadonlySet<string>>(() => new Set());
   const [bulkAction, setBulkAction] = useState<BulkAction | undefined>(undefined);
   const [isRestoring, setIsRestoring] = useState(false);
-  const [validationStatus, setValidationStatus] = useState<TerrorZoneValidationResult>({
-    valid: false,
-    errorCode: 'pathNotConfigured',
-  });
+  // Undefined until the installation has been validated, so a failed validation is not mistaken
+  // for an installation that isn't set up.
+  const [validationStatus, setValidationStatus] = useState<TerrorZoneValidationResult | undefined>(
+    undefined,
+  );
   const [error, setError] = useState<string | undefined>(undefined);
   const [loadError, setLoadError] = useState<string | undefined>(undefined);
   const hasChangesToApply = useTerrorZoneSessionStore((state) => state.hasChangesToApply);
@@ -75,6 +76,7 @@ export function useTerrorZoneConfig() {
       setIsLoading(true);
       setError(undefined);
       setLoadError(undefined);
+      setValidationStatus(undefined);
 
       // Validate path first
       const validation = await window.electronAPI.terrorZone.validatePath();

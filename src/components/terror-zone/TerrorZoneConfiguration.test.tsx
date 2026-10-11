@@ -83,6 +83,18 @@ function createDeferred<T>(): Deferred<T> {
 
 const saveSuccess = { success: true, requiresRestart: true };
 
+/**
+ * Asserts that the risk warning, search, counter and bulk actions are not rendered.
+ */
+function expectZoneControlsHidden() {
+  expect(screen.queryByText(/modifies game files/)).not.toBeInTheDocument();
+  expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
+  expect(screen.queryByText(/zones enabled/)).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Enable All' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Disable All' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: 'Restore Original' })).not.toBeInTheDocument();
+}
+
 describe('When TerrorZoneConfiguration validates the game installation', () => {
   afterEach(() => {
     window.electronAPI = originalElectronAPI;
@@ -160,12 +172,7 @@ describe('When TerrorZoneConfiguration validates the game installation', () => {
 
       // Assert
       await screen.findByText('desecratedzones.json file is corrupted or invalid');
-      expect(screen.queryByText(/modifies game files/)).not.toBeInTheDocument();
-      expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
-      expect(screen.queryByText(/zones enabled/)).not.toBeInTheDocument();
-      expect(screen.queryByRole('button', { name: 'Enable All' })).not.toBeInTheDocument();
-      expect(screen.queryByRole('button', { name: 'Disable All' })).not.toBeInTheDocument();
-      expect(screen.queryByRole('button', { name: 'Restore Original' })).not.toBeInTheDocument();
+      expectZoneControlsHidden();
     });
   });
 
@@ -215,14 +222,9 @@ describe('When TerrorZoneConfiguration validates the game installation', () => {
 
       // Assert
       await screen.findByTestId('terror-zone-not-configured');
-      expect(screen.queryByText(/modifies game files/)).not.toBeInTheDocument();
+      expectZoneControlsHidden();
       expect(screen.queryByText('Error')).not.toBeInTheDocument();
       expect(screen.queryByText('Game Files Must Be Extracted')).not.toBeInTheDocument();
-      expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
-      expect(screen.queryByText(/zones enabled/)).not.toBeInTheDocument();
-      expect(screen.queryByRole('button', { name: 'Enable All' })).not.toBeInTheDocument();
-      expect(screen.queryByRole('button', { name: 'Disable All' })).not.toBeInTheDocument();
-      expect(screen.queryByRole('button', { name: 'Restore Original' })).not.toBeInTheDocument();
     });
   });
 
@@ -242,9 +244,7 @@ describe('When TerrorZoneConfiguration validates the game installation', () => {
       // Assert
       expect(await screen.findByText('Failed to load terror zone data')).toBeInTheDocument();
       expect(screen.queryByTestId('terror-zone-not-configured')).not.toBeInTheDocument();
-      expect(screen.queryByText(/modifies game files/)).not.toBeInTheDocument();
-      expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
-      expect(screen.queryByRole('button', { name: 'Enable All' })).not.toBeInTheDocument();
+      expectZoneControlsHidden();
     });
 
     it('Then Retry loads the zones again and shows them once reading succeeds', async () => {
@@ -263,6 +263,65 @@ describe('When TerrorZoneConfiguration validates the game installation', () => {
       expect(screen.queryByText('Failed to load terror zone data')).not.toBeInTheDocument();
       expect(screen.getByText(/modifies game files/)).toBeInTheDocument();
       expect(getZones).toHaveBeenCalledTimes(2);
+    });
+  });
+  describe('If validating the path fails', () => {
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    it('Then the load failure and Retry are shown instead of the not-configured state', async () => {
+      // Arrange
+      vi.spyOn(console, 'error').mockImplementation(() => undefined);
+      setupValidTerrorZoneApi({ validatePath: vi.fn().mockRejectedValue(new Error('EIO')) });
+
+      // Act
+      renderTerrorZoneConfiguration();
+
+      // Assert
+      expect(await screen.findByText('Failed to load terror zone data')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
+      expect(screen.queryByTestId('terror-zone-not-configured')).not.toBeInTheDocument();
+      expectZoneControlsHidden();
+    });
+
+    it('Then Retry validates again and shows the zones once validating succeeds', async () => {
+      // Arrange
+      vi.spyOn(console, 'error').mockImplementation(() => undefined);
+      const validatePath = vi
+        .fn()
+        .mockRejectedValueOnce(new Error('EIO'))
+        .mockResolvedValue({ valid: true, path: '/d2r' });
+      setupValidTerrorZoneApi({ validatePath });
+      renderTerrorZoneConfiguration();
+      const retry = await screen.findByRole('button', { name: 'Retry' });
+
+      // Act
+      fireEvent.click(retry);
+
+      // Assert
+      expect(await screen.findByRole('switch', { name: 'Blood Moor' })).toBeInTheDocument();
+      expect(screen.queryByText('Failed to load terror zone data')).not.toBeInTheDocument();
+      expect(validatePath).toHaveBeenCalledTimes(2);
+    });
+
+    it('Then Retry shows the not-configured state if validating then reports no path', async () => {
+      // Arrange
+      vi.spyOn(console, 'error').mockImplementation(() => undefined);
+      const validatePath = vi
+        .fn()
+        .mockRejectedValueOnce(new Error('EIO'))
+        .mockResolvedValue({ valid: false, errorCode: 'pathNotConfigured' });
+      setupValidTerrorZoneApi({ validatePath });
+      renderTerrorZoneConfiguration();
+      const retry = await screen.findByRole('button', { name: 'Retry' });
+
+      // Act
+      fireEvent.click(retry);
+
+      // Assert
+      expect(await screen.findByTestId('terror-zone-not-configured')).toBeInTheDocument();
+      expect(screen.queryByText('Failed to load terror zone data')).not.toBeInTheDocument();
     });
   });
 });
