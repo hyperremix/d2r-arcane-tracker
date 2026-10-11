@@ -36,6 +36,7 @@ If any command fails, fix the issue and re-run from the failing step onward.
 - All user-facing frontend strings must be internationalized.
 - Do not add inline UI copy; use `t(...)` with keys from `src/i18n/translations.ts` and keep locale files in sync.
 - Reuse existing translation keys whenever possible.
+- `website/` (the GitHub Pages site) is an English-only static page outside the app renderer; it is exempt from the `t(...)` and translation-key rules.
 - Preserve accessibility behavior (semantic elements, keyboard support, ARIA where needed).
 
 ## Testing rules

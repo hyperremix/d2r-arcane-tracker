@@ -4,7 +4,7 @@ import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vite';
 import { getSourceAliases } from '../config/aliases';
 
-const rootDir = path.resolve(__dirname, '..');
+const rootDir = path.resolve(import.meta.dirname, '..');
 
 /**
  * The project website (GitHub Pages). It reuses the app's theme tokens and shadcn components from
@@ -14,7 +14,7 @@ const rootDir = path.resolve(__dirname, '..');
  * asset URLs, and a relative base would make the server build emit root-relative ones.
  */
 export default defineConfig({
-  root: __dirname,
+  root: import.meta.dirname,
   base: '/d2r-arcane-tracker/',
   resolve: {
     alias: getSourceAliases(rootDir),

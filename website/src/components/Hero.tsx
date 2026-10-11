@@ -68,7 +68,9 @@ function GrailPreview() {
           height={714}
           // On phones the full wall is too small to read, so show its left part at a larger size
           className="block h-auto w-full max-sm:w-[220%] max-sm:max-w-none"
-          fetchPriority="high"
+          // React 18 doesn't know the camelCase `fetchPriority` prop (added in React 19) and warns
+          // about it; the lowercase attribute is passed through to the HTML, also when prerendered.
+          {...{ fetchpriority: 'high' }}
         />
       </div>
     </figure>

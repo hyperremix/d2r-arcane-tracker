@@ -1,0 +1,4 @@
+/* The app's stylesheet entry. The theme lives in index.css, which the project website (website/)
+   shares; keep the website out of the app's Tailwind class detection. */
+@import './index.css';
+@source not '../website';
