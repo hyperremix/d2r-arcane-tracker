@@ -102,7 +102,8 @@ export class GrailDetectionPipeline {
     // Store the character and the progress of the found items in one transaction
     const recorded = grailProgress.recordSaveFile(event.file, foundItems);
     if (!recorded) {
-      // Nothing was written: let a later scan of the file find the items again
+      // Nothing was written: let a later scan of the file find the items again. The "found"
+      // notifications were already emitted by analyzeSaveFile, so a retry notifies again.
       itemDetection.forgetFoundItems(foundItems);
     }
   }
