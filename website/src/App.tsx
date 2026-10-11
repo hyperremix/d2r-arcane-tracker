@@ -5,6 +5,7 @@ import { Install } from './components/Install';
 import { MoreFeatures } from './components/MoreFeatures';
 import { SiteFooter } from './components/SiteFooter';
 import { SiteTitleBar } from './components/SiteTitleBar';
+import { StructuredData } from './components/StructuredData';
 
 /**
  * The project website: one page that looks like the app.
@@ -27,6 +28,7 @@ export function App() {
         <Guides />
       </main>
       <SiteFooter />
+      <StructuredData />
     </>
   );
 }
