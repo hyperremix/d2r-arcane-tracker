@@ -68,8 +68,10 @@ function GrailPreview() {
         <img
           src={grailWallUrl}
           srcSet={`${grailWall1380Url} 1380w, ${grailWall1840Url} 1840w, ${grailWallUrl} 2760w`}
-          // The rendered width: the section's content box (max-w-7xl minus padding), and 220% of it
-          // on phones (see className)
+          // The rendered width: the section's content box, and 220% of it on phones (see className).
+          // >=1280px: max-w-7xl (1280px) - 2 * 24px (sm:px-6) = 1232px; 640-1279px: 100vw - 48px.
+          // Phones: the box is 100vw - 32px (px-4), so 220% of it is 220vw - 70.4px; 71px rounds up
+          // so the browser never picks a too-small candidate.
           sizes="(min-width: 1280px) 1232px, (min-width: 640px) calc(100vw - 48px), calc(220vw - 71px)"
           alt="A wall of grail item cards: found items in their item color, missing items dimmed"
           width={1380}
