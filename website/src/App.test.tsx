@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { App } from './App';
-import { links } from './content';
+import { features, links } from './content';
 
 interface PageScroll {
   innerHeight: number;
@@ -27,9 +27,37 @@ async function scrollPage({ innerHeight, scrollY, scrollHeight, sectionTops }: P
   });
 }
 
+/** Sets the URL hash without the browser's hashchange event (as when the page is opened). */
+function setHash(hash: string) {
+  window.history.replaceState(null, '', `${window.location.pathname}${hash}`);
+}
+
 describe('When the website is rendered', () => {
+  const scrollIntoViewMock = vi.fn();
+  const originalScrollIntoView = Element.prototype.scrollIntoView;
+
+  beforeEach(() => {
+    scrollIntoViewMock.mockClear();
+    Element.prototype.scrollIntoView = scrollIntoViewMock;
+  });
+
   afterEach(() => {
+    Element.prototype.scrollIntoView = originalScrollIntoView;
+    setHash('');
     vi.restoreAllMocks();
+  });
+
+  it('Then the main heading names the app and what it is', () => {
+    // Arrange / Act
+    render(<App />);
+
+    // Assert
+    expect(
+      screen.getByRole('heading', {
+        level: 1,
+        name: 'D2R Arcane Tracker – Holy Grail tracker for Diablo II: Resurrected',
+      }),
+    ).toBeInTheDocument();
   });
 
   it('Then the main download button links to the latest release', () => {
@@ -69,6 +97,77 @@ describe('When the website is rendered', () => {
       'true',
     );
     expect(screen.getByRole('heading', { name: 'Statistics', level: 3 })).toBeVisible();
+  });
+
+  it('Then every feature is summarized outside the tabs and links to its own anchor', () => {
+    // Arrange / Act
+    render(<App />);
+
+    // Assert
+    for (const feature of features) {
+      const summary = screen.getByText(feature.summary);
+      expect(summary).toBeVisible();
+      expect(summary.closest('[role="tabpanel"]')).toBeNull();
+      expect(summary.closest('a')).toHaveAttribute('href', `#${feature.id}`);
+      expect(document.getElementById(feature.id)).not.toBeNull();
+    }
+  });
+
+  it('If a feature in the summary is clicked, then its tab is selected and scrolled into view', () => {
+    // Arrange
+    render(<App />);
+    const runTracker = features.find((feature) => feature.id === 'run-tracker');
+    if (!runTracker) throw new Error('Run Tracker feature not found');
+
+    // Act
+    fireEvent.click(screen.getByText(runTracker.summary));
+
+    // Assert
+    expect(screen.getByRole('tab', { name: 'Runs' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('heading', { name: 'Run Tracker', level: 3 })).toBeVisible();
+    expect(scrollIntoViewMock.mock.contexts).toContain(document.getElementById('run-tracker'));
+  });
+
+  it('If the page is opened with the anchor of a feature, then its tab is selected and scrolled into view', () => {
+    // Arrange
+    setHash('#runeword-calculator');
+
+    // Act
+    render(<App />);
+
+    // Assert
+    expect(screen.getByRole('tab', { name: 'Runewords' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('heading', { name: 'Runeword Calculator', level: 3 })).toBeVisible();
+    expect(scrollIntoViewMock.mock.contexts).toContain(
+      document.getElementById('runeword-calculator'),
+    );
+  });
+
+  it('If the URL hash changes to the anchor of a feature, then its tab is selected', () => {
+    // Arrange
+    render(<App />);
+
+    // Act
+    act(() => {
+      setHash('#inventory-browser');
+      window.dispatchEvent(new HashChangeEvent('hashchange'));
+    });
+
+    // Assert
+    expect(screen.getByRole('tab', { name: 'Inventory' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('heading', { name: 'Inventory Browser', level: 3 })).toBeVisible();
+  });
+
+  it('If the page is opened with the anchor of a section, then the first feature tab stays selected and nothing is scrolled', () => {
+    // Arrange
+    setHash('#install');
+
+    // Act
+    render(<App />);
+
+    // Assert
+    expect(screen.getByRole('tab', { name: 'Grail' })).toHaveAttribute('aria-selected', 'true');
+    expect(scrollIntoViewMock).not.toHaveBeenCalled();
   });
 
   it('If a section heading has scrolled into view, then its title bar link is marked as current', async () => {

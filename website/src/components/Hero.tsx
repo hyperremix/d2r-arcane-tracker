@@ -95,11 +95,15 @@ export function Hero() {
     <section id="top" className="mx-auto max-w-7xl px-4 pt-16 sm:px-6 sm:pt-24">
       <div className="max-w-3xl">
         <h1 className="font-display font-semibold text-4xl text-foreground leading-[1.1] tracking-tight sm:text-6xl">
-          D2R Arcane Tracker
+          {/* Read as one title: "D2R Arcane Tracker – Holy Grail tracker for …" */}
+          D2R Arcane Tracker <span className="sr-only">–</span>{' '}
+          <span className="mt-3 block text-balance font-medium text-2xl text-muted-foreground leading-tight sm:text-4xl">
+            Holy Grail tracker for Diablo II: Resurrected
+          </span>
         </h1>
-        <p className="mt-5 max-w-[56ch] text-lg text-muted-foreground leading-relaxed sm:text-xl">
-          A Holy Grail tracker for Diablo II: Resurrected. It reads your save files and records
-          every unique, set item, rune and runeword you find, so you never have to type one in.
+        <p className="mt-6 max-w-[56ch] text-lg text-muted-foreground leading-relaxed sm:text-xl">
+          It reads your Diablo 2 Resurrected save files and records every unique, set item, rune and
+          runeword you find, so you never have to type one in.
         </p>
         <div className="mt-8 flex flex-wrap items-center gap-3">
           <a
