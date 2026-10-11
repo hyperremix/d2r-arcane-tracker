@@ -1,12 +1,37 @@
 import type { GrailProgress, Item } from 'electron/types/grail';
-import { Calendar, Shield } from 'lucide-react';
+import { Calendar, Check, Circle } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { translations } from '@/i18n/translations';
 import { formatDate } from '@/lib/date';
+import { cn } from '@/lib/utils';
 
-// Component for progress status section
+function getStatusClasses(isFound: boolean): string {
+  return cn('inline-flex items-center gap-1 font-medium', isFound ? 'text-found' : 'text-missing');
+}
+
+/**
+ * "Found" / "Not Found" text with a matching icon. Color, icon and text all carry the state, so
+ * it doesn't rely on hue alone.
+ */
+function StatusText({ isFound }: { isFound: boolean }) {
+  const { t } = useTranslation();
+
+  return (
+    <>
+      {isFound ? (
+        <Check className="h-4 w-4" aria-hidden="true" />
+      ) : (
+        <Circle className="h-3.5 w-3.5" aria-hidden="true" />
+      )}
+      {isFound ? t(translations.common.found) : t(translations.common.notFound)}
+    </>
+  );
+}
+
+/**
+ * The item's found status as a single line under its name. Items that can be ethereal show the
+ * status of the normal and the ethereal version side by side instead.
+ */
 export function ProgressStatusSection({
   item,
   itemProgress,
@@ -22,46 +47,31 @@ export function ProgressStatusSection({
   const normalFound = itemProgress?.normalFound || false;
   const etherealFound = itemProgress?.etherealFound || false;
 
+  if (item.etherealType === 'none') {
+    return (
+      <p className={getStatusClasses(isFound)}>
+        <StatusText isFound={isFound} />
+      </p>
+    );
+  }
+
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Shield className="h-5 w-5" />
-          {t(translations.grail.itemDetails.progressStatus)}
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-3">
-          {/* Overall Status */}
-          <span className="font-medium">{t(translations.grail.itemDetails.overallStatus)}</span>
-          <Badge variant={isFound ? 'found' : 'missing'} className="w-fit">
-            {isFound ? t(translations.common.found) : t(translations.common.notFound)}
-          </Badge>
-
-          {/* Normal Status */}
-          {item.etherealType !== 'none' && (
-            <>
-              <span className="font-medium">{t(translations.grail.itemDetails.normalStatus)}</span>
-              <Badge variant={normalFound ? 'found' : 'missing'} className="w-fit">
-                {normalFound ? t(translations.common.found) : t(translations.common.notFound)}
-              </Badge>
-            </>
-          )}
-
-          {/* Ethereal Status */}
-          {item.etherealType !== 'none' && (
-            <>
-              <span className="font-medium">
-                {t(translations.grail.itemDetails.etherealStatus)}
-              </span>
-              <Badge variant={etherealFound ? 'found' : 'missing'} className="w-fit">
-                {etherealFound ? t(translations.common.found) : t(translations.common.notFound)}
-              </Badge>
-            </>
-          )}
-        </div>
-      </CardContent>
-    </Card>
+    <dl className="flex flex-wrap justify-center gap-x-4 gap-y-1">
+      <div className="flex items-center gap-1">
+        <dt className="text-muted-foreground">{t(translations.grail.itemDetails.normalStatus)}</dt>
+        <dd className={getStatusClasses(normalFound)}>
+          <StatusText isFound={normalFound} />
+        </dd>
+      </div>
+      <div className="flex items-center gap-1">
+        <dt className="text-muted-foreground">
+          {t(translations.grail.itemDetails.etherealStatus)}
+        </dt>
+        <dd className={getStatusClasses(etherealFound)}>
+          <StatusText isFound={etherealFound} />
+        </dd>
+      </div>
+    </dl>
   );
 }
 

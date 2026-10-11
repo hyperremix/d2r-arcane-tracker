@@ -1,6 +1,6 @@
 import type { Character, GrailProgress, Item } from 'electron/types/grail';
-import { ChevronLeft, ChevronRight, Trash2, User } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { ChevronLeft, ChevronRight, Trash2 } from 'lucide-react';
+import { useId, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   AlertDialog,
@@ -13,7 +13,6 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Table,
   TableBody,
@@ -99,6 +98,7 @@ export function CharacterProgressTable({
   onRemoveProgress: (progressId: string) => Promise<void>;
 }) {
   const { t } = useTranslation();
+  const headingId = useId();
   const [currentPage, setCurrentPage] = useState(1);
   const [pendingRemoval, setPendingRemoval] = useState<PendingRemoval | undefined>(undefined);
   const [removing, setRemoving] = useState(false);
@@ -183,23 +183,22 @@ export function CharacterProgressTable({
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <User className="h-5 w-5" />
+    <section aria-labelledby={headingId} className="grid gap-2">
+      <div className="flex items-baseline gap-2">
+        <h3 id={headingId} className="font-medium">
           {t(translations.grail.itemDetails.characterProgress)}
-          {totalPages > 1 && (
-            <span className="ml-auto font-normal font-ui text-muted-foreground text-sm">
-              {t(translations.common.paginationRange, {
-                start: startIndex + 1,
-                end: Math.min(endIndex, sortedCharacters.length),
-                total: sortedCharacters.length,
-              })}
-            </span>
-          )}
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
+        </h3>
+        {totalPages > 1 && (
+          <span className="ml-auto text-muted-foreground text-sm">
+            {t(translations.common.paginationRange, {
+              start: startIndex + 1,
+              end: Math.min(endIndex, sortedCharacters.length),
+              total: sortedCharacters.length,
+            })}
+          </span>
+        )}
+      </div>
+      <div>
         <Table>
           <TableHeader>
             <TableRow>
@@ -254,7 +253,7 @@ export function CharacterProgressTable({
             </Button>
           </div>
         )}
-      </CardContent>
+      </div>
 
       <AlertDialog
         open={pendingRemoval !== undefined}
@@ -297,6 +296,6 @@ export function CharacterProgressTable({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </Card>
+    </section>
   );
 }

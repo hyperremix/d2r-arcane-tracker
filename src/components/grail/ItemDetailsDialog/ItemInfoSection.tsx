@@ -1,9 +1,8 @@
 import { runes } from 'electron/items/runes';
 import type { Item } from 'electron/types/grail';
-import { Package } from 'lucide-react';
+import { ExternalLink } from 'lucide-react';
+import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { translations } from '@/i18n/translations';
 import {
   etherealTypeLabelKeys,
@@ -11,103 +10,82 @@ import {
   itemTreasureClassLabelKeys,
   itemTypeLabelKeys,
 } from '@/lib/labelKeys';
+import { cn } from '@/lib/utils';
 
-// Component for item information section
+/**
+ * One "Label: value" line of the item facts, laid out like a line of an in-game item tooltip.
+ */
+function FactLine({
+  label,
+  valueClassName,
+  children,
+}: {
+  label: string;
+  valueClassName?: string;
+  children: ReactNode;
+}) {
+  return (
+    <div>
+      <dt className="inline text-muted-foreground">{label}</dt>{' '}
+      <dd className={cn('inline', valueClassName)}>{children}</dd>
+    </div>
+  );
+}
+
+function getRuneNames(runeIds: string[]): string {
+  return runeIds.map((runeId) => runes.find((r) => r.id === runeId)?.name || runeId).join(' + ');
+}
+
+/**
+ * The item's facts (type, category, treasure class, set, runes, ethereal type) as plain centered
+ * text lines, followed by the link to the item's page on diablo2.io or d2runewizard.
+ */
 export function ItemInfoSection({ item }: { item: Item }) {
   const { t } = useTranslation();
+  const keys = translations.grail.itemDetails;
+  const hasRunes = item.type === 'runeword' && item.runes && item.runes.length > 0;
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Package className="h-5 w-5" />
-          {t(translations.grail.itemDetails.itemInformation)}
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-3">
-          {/* Type */}
-          <span className="font-medium">{t(translations.grail.itemDetails.type)}</span>
-          <Badge variant="secondary" className="w-fit">
-            {t(itemTypeLabelKeys[item.type])}
-          </Badge>
+    <div className="grid gap-3 text-center">
+      <dl className="grid gap-1">
+        <FactLine label={t(keys.type)}>{t(itemTypeLabelKeys[item.type])}</FactLine>
+        <FactLine label={t(keys.category)}>{t(itemCategoryLabelKeys[item.category])}</FactLine>
+        <FactLine label={t(keys.treasureClass)}>
+          {t(itemTreasureClassLabelKeys[item.treasureClass])}
+        </FactLine>
+        {item.setName && (
+          <FactLine label={t(keys.set)} valueClassName="text-item-set">
+            {item.setName}
+          </FactLine>
+        )}
+        {hasRunes && item.runes && (
+          <FactLine label={t(keys.requiredRunes)} valueClassName="text-item-rune">
+            {getRuneNames(item.runes)}
+          </FactLine>
+        )}
+        <FactLine
+          label={t(keys.etherealType)}
+          valueClassName={item.etherealType === 'none' ? undefined : 'text-ethereal'}
+        >
+          {t(etherealTypeLabelKeys[item.etherealType])}
+        </FactLine>
+      </dl>
 
-          {/* Category */}
-          <span className="font-medium">{t(translations.grail.itemDetails.category)}</span>
-          <Badge variant="secondary" className="w-fit">
-            {t(itemCategoryLabelKeys[item.category])}
-          </Badge>
-
-          {/* Treasure Class */}
-          <span className="font-medium">{t(translations.grail.itemDetails.treasureClass)}</span>
-          <Badge variant="secondary" className="w-fit">
-            {t(itemTreasureClassLabelKeys[item.treasureClass])}
-          </Badge>
-
-          {/* Item Base */}
-          {item.itemBase && (
-            <>
-              <span className="font-medium">{t(translations.grail.itemDetails.base)}</span>
-              <Badge variant="secondary" className="w-fit">
-                {item.itemBase}
-              </Badge>
-            </>
-          )}
-
-          {/* Set Name */}
-          {item.setName && (
-            <>
-              <span className="font-medium">{t(translations.grail.itemDetails.set)}</span>
-              <Badge variant="secondary" className="w-fit">
-                {item.setName}
-              </Badge>
-            </>
-          )}
-
-          {/* Required Runes */}
-          {item.type === 'runeword' && item.runes && item.runes.length > 0 && (
-            <>
-              <span className="font-medium">{t(translations.grail.itemDetails.requiredRunes)}</span>
-              <div className="flex flex-col gap-2">
-                <Badge variant="secondary">
-                  {item.runes
-                    .map((runeId) => {
-                      const rune = runes.find((r) => r.id === runeId);
-                      return rune?.name || runeId;
-                    })
-                    .join(' + ')}
-                </Badge>
-              </div>
-            </>
-          )}
-
-          {/* Ethereal Type */}
-          <span className="font-medium">{t(translations.grail.itemDetails.etherealType)}</span>
-          <Badge
-            variant={item.etherealType === 'none' ? 'secondary' : 'ethereal'}
-            className="w-fit"
+      {item.link && (
+        <p>
+          <a
+            href={item.link}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 text-primary underline underline-offset-4 hover:text-primary/80"
           >
-            {t(etherealTypeLabelKeys[item.etherealType])}
-          </Badge>
-
-          {/* Link */}
-          {item.link && (
-            <>
-              <span className="font-medium">{t(translations.grail.itemDetails.link)}</span>
-              <a
-                href={item.link}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-primary underline hover:text-primary/80"
-              >
-                {item.link.includes('diablo2.io')
-                  ? t(translations.grail.itemDetails.viewOnDiablo2io)
-                  : t(translations.grail.itemDetails.viewOnD2runewizard)}
-              </a>
-            </>
-          )}
-        </div>
-      </CardContent>
-    </Card>
+            {item.link.includes('diablo2.io')
+              ? t(keys.viewOnDiablo2io)
+              : t(keys.viewOnD2runewizard)}
+            <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
+          </a>
+        </p>
+      )}
+    </div>
   );
 }
