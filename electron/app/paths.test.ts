@@ -1,6 +1,11 @@
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { getAppIconPath, getNotificationIconPath, resolveAppPaths } from './paths';
+import {
+  getAppIconPath,
+  getNotificationIconPath,
+  resolveAppPaths,
+  resolveUserDataPath,
+} from './paths';
 
 const mainDist = path.join('/app', 'dist-electron');
 const resourcesPath = path.join('/install', 'resources');
@@ -64,5 +69,18 @@ describe('When the app icon is resolved', () => {
     // Assert
     expect(windowIcon).toBe(path.join('/app', 'public', 'logo.png'));
     expect(notificationIcon).toBe('/logo.png');
+  });
+});
+
+describe('When the user data directory is resolved', () => {
+  it('If the app data directory is given, Then the folder used by earlier releases is returned', () => {
+    // Arrange
+    const appDataPath = path.join('/Users', 'player', 'Library', 'Application Support');
+
+    // Act
+    const userDataPath = resolveUserDataPath(appDataPath);
+
+    // Assert
+    expect(userDataPath).toBe(path.join(appDataPath, '@hyperremix', 'd2r-arcane-tracker'));
   });
 });
