@@ -56,6 +56,28 @@ function insertProgress(ctx: DatabaseContext, id: string, characterId: string): 
     .run(id, characterId, 'shako');
 }
 
+function insertVaultItem(ctx: DatabaseContext, id: string, sourceCharacterId: string): void {
+  ctx.rawDb
+    .prepare(
+      `INSERT INTO vault_items (id, fingerprint, item_name, quality, raw_item_json, source_character_id, source_file_type)
+       VALUES (?, ?, 'Shako', 'unique', '{}', ?, 'd2s')`,
+    )
+    .run(id, `fingerprint-${id}`, sourceCharacterId);
+}
+
+function getVaultItemOwners(ctx: DatabaseContext): Record<string, string> {
+  const rows = ctx.rawDb
+    .prepare('SELECT id, source_character_id FROM vault_items ORDER BY id')
+    .all() as Array<{ id: string; source_character_id: string }>;
+  return Object.fromEntries(rows.map((row) => [row.id, row.source_character_id]));
+}
+
+function getAllCharacterRows(ctx: DatabaseContext): StoredCharacterRow[] {
+  return ctx.rawDb
+    .prepare('SELECT id, name, hardcore, deleted_at FROM characters ORDER BY id')
+    .all() as StoredCharacterRow[];
+}
+
 function getCharacterRow(ctx: DatabaseContext, id: string): StoredCharacterRow {
   return ctx.rawDb
     .prepare('SELECT id, name, hardcore, deleted_at FROM characters WHERE id = ?')
@@ -167,6 +189,39 @@ describe('When the character record repair migration runs', () => {
     });
   });
 
+  describe('If a backup copy with progress is kept next to the stash it copies', () => {
+    it('Then the backup keeps its name and hardcore flag', () => {
+      // Arrange
+      insertCharacter(ctx, {
+        id: 'live-stash',
+        name: 'Shared Stash Softcore',
+        character_class: 'shared_stash',
+        save_file_path: `${SAVE_DIR}/SharedStashHardCoreV2.d2i`,
+      });
+      insertCharacter(ctx, {
+        id: 'kept-backup',
+        name: 'Shared Stash Softcore',
+        character_class: 'shared_stash',
+        save_file_path: `${SAVE_DIR}/SharedStashHardCoreV2_Backup.d2i`,
+      });
+      insertProgress(ctx, 'progress-in-backup', 'kept-backup');
+
+      // Act
+      runMigrations(ctx);
+
+      // Assert
+      expect(getCharacterRow(ctx, 'live-stash')).toMatchObject({
+        name: 'Shared Stash Hardcore',
+        hardcore: 1,
+      });
+      expect(getCharacterRow(ctx, 'kept-backup')).toMatchObject({
+        name: 'Shared Stash Softcore',
+        hardcore: 0,
+        deleted_at: null,
+      });
+    });
+  });
+
   describe('If records without a save file duplicate a character with one', () => {
     it('Then their progress and runs move to that character and they are hidden', () => {
       // Arrange
@@ -232,6 +287,114 @@ describe('When the character record repair migration runs', () => {
       // Assert
       expect(getProgressOwners(ctx)).toEqual({ 'progress-1': 'sc-stash' });
       expect(getCharacterRow(ctx, 'stash-orphan').deleted_at).not.toBeNull();
+    });
+  });
+
+  describe('If a merged record without a save file owns vault items', () => {
+    it('Then the vault items move to the character with the save file', () => {
+      // Arrange
+      insertCharacter(ctx, {
+        id: 'barb',
+        name: 'Barb',
+        character_class: 'barbarian',
+        save_file_path: `${SAVE_DIR}/Barb.d2s`,
+      });
+      insertCharacter(ctx, { id: 'barb-orphan', name: 'Barb', character_class: 'barbarian' });
+      insertCharacter(ctx, { id: 'lonely-orphan', name: 'Gone', character_class: 'druid' });
+      insertVaultItem(ctx, 'vault-orphan', 'barb-orphan');
+      insertVaultItem(ctx, 'vault-barb', 'barb');
+      insertVaultItem(ctx, 'vault-lonely', 'lonely-orphan');
+
+      // Act
+      runMigrations(ctx);
+
+      // Assert
+      expect(getVaultItemOwners(ctx)).toEqual({
+        'vault-barb': 'barb',
+        'vault-lonely': 'lonely-orphan',
+        'vault-orphan': 'barb',
+      });
+    });
+  });
+
+  describe('If both records of a merge have a progress row for the same item', () => {
+    it('Then both rows are kept', () => {
+      // Arrange
+      insertCharacter(ctx, {
+        id: 'barb',
+        name: 'Barb',
+        character_class: 'barbarian',
+        save_file_path: `${SAVE_DIR}/Barb.d2s`,
+      });
+      insertCharacter(ctx, { id: 'barb-orphan', name: 'Barb', character_class: 'barbarian' });
+      insertProgress(ctx, 'progress-orphan', 'barb-orphan');
+      insertProgress(ctx, 'progress-barb', 'barb');
+
+      // Act
+      runMigrations(ctx);
+
+      // Assert
+      expect(getProgressOwners(ctx)).toEqual({
+        'progress-barb': 'barb',
+        'progress-orphan': 'barb',
+      });
+    });
+  });
+
+  describe('If the repair SQL runs a second time', () => {
+    it('Then the records, progress and vault items stay the same', () => {
+      // Arrange
+      insertCharacter(ctx, {
+        id: 'hc-stash',
+        name: 'Shared Stash Softcore',
+        character_class: 'shared_stash',
+        save_file_path: `${SAVE_DIR}/SharedStashHardCoreV2.d2i`,
+      });
+      insertCharacter(ctx, {
+        id: 'empty-backup',
+        name: 'Shared Stash Hardcore',
+        character_class: 'shared_stash',
+        save_file_path: `${SAVE_DIR}/SharedStashSoftCoreV2_Backup.d2i`,
+      });
+      insertCharacter(ctx, {
+        id: 'kept-backup',
+        name: 'Shared Stash Hardcore',
+        character_class: 'shared_stash',
+        save_file_path: `${SAVE_DIR}/SharedStashHardCoreV2.bak.d2i`,
+      });
+      insertCharacter(ctx, {
+        id: 'barb',
+        name: 'Barb',
+        character_class: 'barbarian',
+        save_file_path: `${SAVE_DIR}/Barb.d2s`,
+      });
+      insertCharacter(ctx, { id: 'barb-orphan', name: 'Barb', character_class: 'barbarian' });
+      insertProgress(ctx, 'progress-backup', 'kept-backup');
+      insertProgress(ctx, 'progress-orphan', 'barb-orphan');
+      insertVaultItem(ctx, 'vault-orphan', 'barb-orphan');
+      runMigrations(ctx);
+      const afterFirstRun = {
+        characters: getAllCharacterRows(ctx),
+        progress: getProgressOwners(ctx),
+        vaultItems: getVaultItemOwners(ctx),
+      };
+      const repairSql = readFileSync(
+        path.join(resolveMigrationsFolder(), `${REPAIR_MIGRATION_TAG}.sql`),
+        'utf8',
+      );
+
+      // Act
+      ctx.rawDb.exec(repairSql);
+
+      // Assert
+      expect(afterFirstRun.characters.find(({ id }) => id === 'barb-orphan')?.deleted_at).not.toBe(
+        null,
+      );
+      expect({
+        characters: getAllCharacterRows(ctx),
+        progress: getProgressOwners(ctx),
+        vaultItems: getVaultItemOwners(ctx),
+      }).toEqual(afterFirstRun);
     });
   });
 

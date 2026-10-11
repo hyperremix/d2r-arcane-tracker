@@ -382,6 +382,31 @@ describe('When ItemDetectionService is used', () => {
     });
   });
 
+  describe('If forgetFoundItems is called for items that could not be recorded', () => {
+    it('Then the items are detected again by the next analysis', async () => {
+      // Arrange
+      const saveFile = D2SaveFileBuilder.new()
+        .withPath('/test/char.d2s')
+        .withName('TestChar')
+        .build();
+      const d2sItem = D2SItemBuilder.new()
+        .withId('1234')
+        .asUniqueHelm()
+        .withUniqueName('shako') // Must match mockGrailItems ID
+        .build();
+      service.setGrailItems(mockGrailItems);
+      const firstFound = await service.analyzeSaveFile(saveFile, toParsedItems([d2sItem]));
+
+      // Act
+      service.forgetFoundItems(firstFound);
+      const secondFound = await service.analyzeSaveFile(saveFile, toParsedItems([d2sItem]));
+
+      // Assert
+      expect(secondFound).toHaveLength(1);
+      expect(secondFound[0]).toMatchObject({ grailItem: { id: 'shako' } });
+    });
+  });
+
   describe('If clearSeenItems is called', () => {
     it('Then should clear all tracking and allow re-detection', async () => {
       // Arrange

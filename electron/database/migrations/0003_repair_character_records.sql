@@ -29,6 +29,8 @@ WHERE id IN (
 --    "Shared Stash Hardcore"). D2R tells its stashes apart by file name, so the hardcore flag and the
 --    name are set from the file name. The "Modern" prefix came from the stash version, which was
 --    read correctly, and D2R names modern stashes ModernSharedStash*.d2i.
+--    A backup copy that step 1 kept because grail progress belongs to it is left as it is, so it
+--    does not take the name of the stash it is a copy of.
 UPDATE characters SET hardcore = stash.hardcore, name = stash.name
 FROM (
     SELECT
@@ -52,6 +54,12 @@ FROM (
         )
       )
       WHERE file_name LIKE '%.d2i'
+        AND NOT (
+          file_name LIKE '%\_backup%' ESCAPE '\'
+          OR file_name LIKE '%.bak.d2i'
+          OR file_name LIKE '%\_bak.d2i' ESCAPE '\'
+          OR file_name LIKE '%-bak.d2i'
+        )
     )
   ) AS stash
 WHERE characters.id = stash.id
@@ -63,6 +71,8 @@ WHERE characters.id = stash.id
 --    does: its grail progress, runs and vault items are moved there and it is hidden. The id of a
 --    moved progress row still starts with the id of the record it came from. Records with no such
 --    unambiguous match are left as they are.
+--    If both records have a progress row for the same item, both rows are kept (nothing is deleted),
+--    so a character can end up with two rows for one item.
 CREATE TEMP TABLE character_merges AS
 SELECT
   orphan.id AS orphan_id,

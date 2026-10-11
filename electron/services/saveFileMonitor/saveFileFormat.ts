@@ -41,7 +41,9 @@ const CHARACTER_CLASSES = [
  * @param filePath - Path or file name of the stash
  */
 export function isHardcoreStashFileName(filePath: string): boolean {
-  return basename(filePath).toLowerCase().includes('hardcore');
+  // Split on both separators, as the repair migration does: path.basename only knows the separator of this platform
+  const fileName = filePath.split(/[\\/]/).pop() ?? filePath;
+  return fileName.toLowerCase().includes('hardcore');
 }
 
 /** True for backup copies of a .d2i stash (`_backup`, `.bak`, `_bak`, `-bak`), which are not scanned. */

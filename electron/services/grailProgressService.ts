@@ -103,8 +103,9 @@ export class GrailProgressService {
    * stored, nothing of the save file is written and the failure is surfaced.
    * @param saveFile - The parsed save file
    * @param foundItems - Grail items found in the save file for the first time
+   * @returns Whether the save file was written; false if nothing of it was
    */
-  recordSaveFile(saveFile: D2SaveFile, foundItems: ItemDetectionEvent[]): void {
+  recordSaveFile(saveFile: D2SaveFile, foundItems: ItemDetectionEvent[]): boolean {
     const recordedFinds: RecordedFind[] = [];
     let characterChanged = false;
 
@@ -125,10 +126,11 @@ export class GrailProgressService {
       });
     } catch (error) {
       log.error('recordSaveFile', error, { saveFile: saveFile.name }, SURFACE_WRITE_FAILURE);
-      return;
+      return false;
     }
 
     this.announce(recordedFinds, characterChanged);
+    return true;
   }
 
   /**

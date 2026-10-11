@@ -121,6 +121,21 @@ describe('When a parsed save file is recorded in the database', () => {
     });
   });
 
+  describe('If the save file is recorded', () => {
+    it('Then recordSaveFile reports that it was stored', () => {
+      // Arrange
+      const saveFile = sorceressSaveFile('Sorc').withPath('/saves/Sorc.d2s').build();
+
+      // Act
+      const recorded = service.recordSaveFile(saveFile, [
+        createFoundItem({ characterName: 'Sorc' }),
+      ]);
+
+      // Assert
+      expect(recorded).toBe(true);
+    });
+  });
+
   describe('If the save file contains no new grail items', () => {
     it('Then only the character is stored', () => {
       // Arrange
@@ -364,9 +379,12 @@ describe('When a parsed save file is recorded in the database', () => {
 
       try {
         // Act
-        service.recordSaveFile(saveFile, [createFoundItem({ characterName: 'Broken' })]);
+        const recorded = service.recordSaveFile(saveFile, [
+          createFoundItem({ characterName: 'Broken' }),
+        ]);
 
         // Assert
+        expect(recorded).toBe(false);
         expect(characters.getAllCharacters(ctx)).toEqual([]);
         expect(progress.getAllProgress(ctx)).toEqual([]);
         expect(forwardError).toHaveBeenCalledWith(

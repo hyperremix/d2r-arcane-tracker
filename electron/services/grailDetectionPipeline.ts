@@ -14,7 +14,7 @@ export interface GrailDetectionPipelineDependencies {
   eventBus: EventBus;
   settings: Pick<SettingsService, 'get' | 'onUpdated'>;
   saveFileMonitor: Pick<SaveFileMonitor, 'startMonitoring' | 'stopMonitoringIfActive'>;
-  itemDetection: Pick<ItemDetectionService, 'analyzeSaveFile'>;
+  itemDetection: Pick<ItemDetectionService, 'analyzeSaveFile' | 'forgetFoundItems'>;
   grailProgress: Pick<GrailProgressService, 'recordSaveFile'>;
 }
 
@@ -100,7 +100,11 @@ export class GrailDetectionPipeline {
         : [];
 
     // Store the character and the progress of the found items in one transaction
-    grailProgress.recordSaveFile(event.file, foundItems);
+    const recorded = grailProgress.recordSaveFile(event.file, foundItems);
+    if (!recorded) {
+      // Nothing was written: let a later scan of the file find the items again
+      itemDetection.forgetFoundItems(foundItems);
+    }
   }
 
   private async startMonitoringUnlessManual(): Promise<void> {

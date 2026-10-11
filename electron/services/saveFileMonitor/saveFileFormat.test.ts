@@ -5,6 +5,7 @@ import {
   buildSaveFileHeader,
   getCharacterClass,
   getSaveNameFromPath,
+  isHardcoreStashFileName,
   readD2iHeaderInfo,
   shouldIncludeSaveFile,
 } from './saveFileFormat';
@@ -149,6 +150,38 @@ describe('When a save name is derived from a file path', () => {
 
       // Assert
       expect(result).toBe('MyCharacter'); // Hardcore parameter only applies to .d2i files
+    });
+  });
+});
+
+describe('When the game mode of a stash is read from its file name', () => {
+  describe('If the path uses Windows separators', () => {
+    it('Then only the file name decides, not a folder name', () => {
+      // Arrange
+      const softcoreInHardcoreFolder =
+        'C:\\Users\\hardcore\\Saved Games\\SharedStashSoftCoreV2.d2i';
+      const hardcoreStash = 'C:\\Users\\x\\Saved Games\\SharedStashHardCoreV2.d2i';
+
+      // Act
+      const softcoreResult = isHardcoreStashFileName(softcoreInHardcoreFolder);
+      const hardcoreResult = isHardcoreStashFileName(hardcoreStash);
+
+      // Assert
+      expect(softcoreResult).toBe(false);
+      expect(hardcoreResult).toBe(true);
+    });
+  });
+
+  describe('If the path uses POSIX separators', () => {
+    it('Then only the file name decides, not a folder name', () => {
+      // Arrange
+      const softcoreInHardcoreFolder = '/saves/hardcore/SharedStashSoftCoreV2.d2i';
+
+      // Act
+      const result = isHardcoreStashFileName(softcoreInHardcoreFolder);
+
+      // Assert
+      expect(result).toBe(false);
     });
   });
 });
