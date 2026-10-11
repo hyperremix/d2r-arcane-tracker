@@ -22,19 +22,30 @@ interface ItemTooltipBodyProps {
   item: Item;
   allProgress: GrailProgress[];
   characters: Character[];
+  /** Adds the set of a set item; the grid tile only shows the set truncated on its card */
+  showSetName?: boolean;
 }
 
 /**
- * ItemTooltipBody component that renders the name tooltip of a card: name and base item,
- * category and, when the item has been found, who found it and when.
+ * ItemTooltipBody component that renders the name tooltip of a card: name and base item, optionally
+ * the set, category and, when the item has been found, who found it and when.
  */
-export function ItemTooltipBody({ item, allProgress, characters }: ItemTooltipBodyProps) {
+export function ItemTooltipBody({
+  item,
+  allProgress,
+  characters,
+  showSetName = false,
+}: ItemTooltipBodyProps) {
+  const { t } = useTranslation();
   return (
     <div className="space-y-1">
       <p className="font-semibold">
         {item.name}
         {item.itemBase && ` • ${item.itemBase}`}
       </p>
+      {showSetName && item.setName && (
+        <p className="text-xs">{t(translations.grail.itemCard.setName, { name: item.setName })}</p>
+      )}
       <p className="text-muted-foreground text-xs">
         <ItemCategoryLabel item={item} />
       </p>

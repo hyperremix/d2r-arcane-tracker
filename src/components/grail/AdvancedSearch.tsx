@@ -22,13 +22,15 @@ import { getSubCategoryGroups } from './search/subCategories';
 import { TypeToggleChips } from './search/TypeToggleChips';
 import { useFocusSearchShortcut } from './search/useFocusSearchShortcut';
 import { useSearchInput } from './search/useSearchInput';
+import { useTypeProgress } from './search/useTypeProgress';
 import { ViewOptionsPopover } from './search/ViewOptionsPopover';
 
 /**
  * AdvancedSearch renders the Holy Grail toolbar shown above the item grid.
  * It provides search (with a `/` / Ctrl+F shortcut), a found-status segmented control, item type
- * toggle chips, a filters popover (fuzzy search, categories and sub-categories), a view popover
- * (grid/list, sorting and grouping) and a live result count.
+ * toggle chips that also show the progress of each type, a filters popover (fuzzy search,
+ * categories and sub-categories), a view popover (grid/list, sorting and grouping) and a live
+ * result count.
  * The grail store is the single source of truth for all filter values.
  * @returns {JSX.Element} The grail toolbar with active filter chips
  */
@@ -57,6 +59,7 @@ export function AdvancedSearch() {
   const selectedTypes = filter.types ?? [];
   const { sortBy, sortOrder, fuzzySearch } = advancedFilter;
   const subCategoryGroups = useMemo(() => getSubCategoryGroups(items), [items]);
+  const typeProgress = useTypeProgress();
 
   useFocusSearchShortcut(searchId);
 
@@ -146,6 +149,7 @@ export function AdvancedSearch() {
           typeValues={typeValues}
           selectedTypes={selectedTypes}
           onToggleType={toggleType}
+          typeProgress={typeProgress}
         />
 
         {/* Fuzzy search, category and sub-category filters */}

@@ -89,3 +89,11 @@ export function getCardStatusLabel(
 export function getItemSubtitle(item: Item): string | undefined {
   return item.type === 'rune' ? undefined : item.itemBase;
 }
+
+/**
+ * Returns the single truncated subtitle line of a grid tile: the set name of set items, otherwise
+ * the base item. The base of a set item stays available in the name tooltip.
+ */
+export function getGridSubtitle(item: Item): string | undefined {
+  return item.setName || getItemSubtitle(item);
+}

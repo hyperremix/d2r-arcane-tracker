@@ -7,6 +7,7 @@ import { Progress } from '@/components/ui/progress';
 import type { useProgressLookup } from '@/hooks/useProgressLookup';
 import { translations } from '@/i18n/translations';
 import { cn } from '@/lib/utils';
+import { useGrailStore } from '@/stores/grailStore';
 import { ItemCard } from './ItemCard';
 
 // Stable empty arrays to avoid breaking memoization
@@ -96,14 +97,14 @@ export function GroupHeader({ title, foundCount, itemCount, className }: GroupHe
 /**
  * Gap between grid columns (and, via the row padding, between grid rows) in pixels.
  */
-export const COLUMN_GUTTER = 16;
+export const COLUMN_GUTTER = 8;
 
 /**
  * Minimum width of a single grid column in pixels.
- * Columns stretch to fill the remaining space, which keeps cards roughly 180-230px wide
- * once a few columns fit.
+ * Columns stretch to fill the remaining space, which keeps the compact tiles roughly 128-140px
+ * wide once a few columns fit.
  */
-export const MIN_COLUMN_WIDTH = 180;
+export const MIN_COLUMN_WIDTH = 128;
 
 /**
  * Gets the number of columns that fit into the given container width.
@@ -124,10 +125,19 @@ export function getColumnCount(containerWidth: number): number {
 const HEADER_ROW_HEIGHT_ESTIMATE = 60;
 
 /**
- * Estimated height of a row of grid cards in pixels, including the row gap
- * (refined by measuring rendered rows).
+ * Height of a grid tile in pixels: 112px without the version pill row. While ethereal tracking is
+ * on, every tile also reserves the pill row (6px margin + 18px row, see GridView), making it 136px.
  */
-const ITEM_ROW_HEIGHT_ESTIMATE = 180;
+const TILE_HEIGHT = 112;
+const VERSION_ROW_HEIGHT = 6 + 18;
+
+/**
+ * Estimated height of a row of grid tiles in pixels, including the row gap (refined by measuring
+ * rendered rows). With ethereal tracking on, the tile reserves the version pill row.
+ */
+export function getItemRowHeightEstimate(reserveVersionRow: boolean): number {
+  return TILE_HEIGHT + (reserveVersionRow ? VERSION_ROW_HEIGHT : 0) + COLUMN_GUTTER;
+}
 
 /**
  * A group of items shown in the grid. `foundCount` is the number of items of the group that have
@@ -233,8 +243,8 @@ interface VirtualItemGridProps {
  * VirtualItemGrid component that renders items in a virtualized, responsive card grid.
  * Groups are flattened into optional header rows and rows of cards, with as many equally wide
  * columns as fit into the grid width (see {@link getColumnCount}). Only rows near the viewport are
- * mounted; row heights are measured after rendering because card heights vary (set name, discovery
- * attribution, rune images), so each row is as tall as its tallest card.
+ * mounted. Tiles have a fixed height (taller while ethereal tracking reserves the version pill row),
+ * so item rows are equally tall; rows are still measured after rendering to refine the estimate.
  */
 export const VirtualItemGrid = memo(function VirtualItemGrid({
   groupedItems,
@@ -245,6 +255,8 @@ export const VirtualItemGrid = memo(function VirtualItemGrid({
 }: VirtualItemGridProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [contentRef, columnCount] = useElementColumnCount();
+  // Tiles reserve the version pill row while ethereal tracking is on (see ItemCard)
+  const reserveVersionRow = useGrailStore((state) => state.settings.grailEthereal);
 
   const rows = useMemo(
     () => createGridRows(groupedItems, columnCount, showGroupHeaders),
@@ -255,8 +267,10 @@ export const VirtualItemGrid = memo(function VirtualItemGrid({
   const getScrollElement = useCallback(() => scrollRef.current, []);
   const estimateSize = useCallback(
     (index: number) =>
-      rows[index]?.type === 'header' ? HEADER_ROW_HEIGHT_ESTIMATE : ITEM_ROW_HEIGHT_ESTIMATE,
-    [rows],
+      rows[index]?.type === 'header'
+        ? HEADER_ROW_HEIGHT_ESTIMATE
+        : getItemRowHeightEstimate(reserveVersionRow),
+    [rows, reserveVersionRow],
   );
   const getItemKey = useCallback((index: number) => rows[index].key, [rows]);
 

@@ -1,6 +1,7 @@
 import type { ItemType } from 'electron/types/grail';
 import { useTranslation } from 'react-i18next';
 import { translations } from '@/i18n/translations';
+import type { ProgressCount } from '@/lib/grailStatistics';
 import { itemTypeLabelKeys } from '@/lib/labelKeys';
 import { cn } from '@/lib/utils';
 
@@ -21,12 +22,21 @@ interface TypeToggleChipsProps {
   typeValues: ItemType[];
   selectedTypes: ItemType[];
   onToggleType: (type: ItemType) => void;
+  /** Grail progress per item type, shown as a found/total counter on each chip */
+  typeProgress: Partial<Record<ItemType, ProgressCount>>;
 }
 
 /**
- * Inline toggle chips for the tracked item types, colored like the item cards.
+ * Inline toggle chips for the tracked item types, colored like the item cards. Each chip doubles
+ * as a progress counter ("Unique 142/385"), so the per-type breakdown of the grail is visible
+ * next to the filter it belongs to.
  */
-export function TypeToggleChips({ typeValues, selectedTypes, onToggleType }: TypeToggleChipsProps) {
+export function TypeToggleChips({
+  typeValues,
+  selectedTypes,
+  onToggleType,
+  typeProgress,
+}: TypeToggleChipsProps) {
   const { t } = useTranslation();
 
   return (
@@ -34,6 +44,8 @@ export function TypeToggleChips({ typeValues, selectedTypes, onToggleType }: Typ
       <legend className="sr-only">{t(translations.grail.advancedSearch.types)}</legend>
       {typeValues.map((type) => {
         const pressed = selectedTypes.includes(type);
+        const label = t(itemTypeLabelKeys[type]);
+        const progress = typeProgress[type];
         return (
           <button
             key={type}
@@ -50,7 +62,22 @@ export function TypeToggleChips({ typeValues, selectedTypes, onToggleType }: Typ
               aria-hidden="true"
               className={cn('size-2 shrink-0 rounded-full', typeChipStyles[type].dot)}
             />
-            {t(itemTypeLabelKeys[type])}
+            {label}
+            {progress && (
+              <>
+                {/* Plain space between label and counter keeps the accessible name readable */}{' '}
+                <span
+                  className={cn(
+                    'text-muted-foreground text-xs tabular-nums',
+                    pressed && 'text-foreground',
+                  )}
+                >
+                  {progress.found}/{progress.total}
+                  {/* Extra word for screen readers; the name still contains the visible counter */}
+                  <span className="sr-only"> {t(translations.common.found)}</span>
+                </span>
+              </>
+            )}
           </button>
         );
       })}

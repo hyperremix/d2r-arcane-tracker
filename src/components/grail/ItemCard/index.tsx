@@ -79,9 +79,6 @@ export const ItemCard = memo(function ItemCard({
   );
   const recentFindDate = getRecentFindDate(mostRecentDiscovery);
 
-  // Get character info for discoveries from both versions
-  const discoveringCharacters = getDiscoveringCharacters(allProgress, characters);
-
   // Tracks a Space keydown that started on the card so a stray keyup does not activate it
   const spacePressedRef = useRef(false);
 
@@ -135,18 +132,36 @@ export const ItemCard = memo(function ItemCard({
       }
     : undefined;
 
-  const View = viewMode === 'list' ? ListView : GridView;
+  const recentFind = withoutStatusIndicators ? undefined : recentFindDate;
+
+  if (viewMode === 'list') {
+    return (
+      <ListView
+        item={item}
+        isFound={isFound}
+        allProgress={allProgress}
+        characters={characters}
+        // Character info for discoveries from both versions
+        discoveringCharacters={getDiscoveringCharacters(allProgress, characters)}
+        versionStatuses={versionStatuses}
+        recentFindDate={recentFind}
+        showItemIcons={settings.showItemIcons}
+        className={className}
+        interactiveProps={interactiveProps}
+      />
+    );
+  }
 
   return (
-    <View
+    <GridView
       item={item}
       isFound={isFound}
       allProgress={allProgress}
       characters={characters}
-      discoveringCharacters={discoveringCharacters}
       versionStatuses={versionStatuses}
-      recentFindDate={withoutStatusIndicators ? undefined : recentFindDate}
+      recentFindDate={recentFind}
       showItemIcons={settings.showItemIcons}
+      reserveVersionRow={settings.grailEthereal}
       className={className}
       interactiveProps={interactiveProps}
     />
