@@ -1,3 +1,4 @@
+import { FAQ } from './components/FAQ';
 import { FeatureTabs } from './components/FeatureTabs';
 import { Guides } from './components/Guides';
 import { Hero } from './components/Hero';
@@ -25,6 +26,7 @@ export function App() {
         <FeatureTabs />
         <MoreFeatures />
         <Install />
+        <FAQ />
         <Guides />
       </main>
       <SiteFooter />

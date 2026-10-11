@@ -77,7 +77,7 @@ describe('When the website is rendered', () => {
     const nav = screen.getByRole('navigation', { name: 'Main navigation' });
 
     // Assert
-    for (const name of ['Features', 'Install', 'Guides']) {
+    for (const name of ['Features', 'Install', 'FAQ', 'Guides']) {
       const href = within(nav).getByRole('link', { name }).getAttribute('href') ?? '';
       expect(href).toMatch(/^#/);
       expect(document.getElementById(href.slice(1))).not.toBeNull();
@@ -180,7 +180,7 @@ describe('When the website is rendered', () => {
       innerHeight: 1000,
       scrollY: 3000,
       scrollHeight: 6000,
-      sectionTops: { features: -2000, install: 600, guides: 1500 },
+      sectionTops: { features: -2000, install: 600, faq: 1200, guides: 1500 },
     });
 
     // Assert
@@ -189,6 +189,28 @@ describe('When the website is rendered', () => {
       'location',
     );
     expect(within(nav).getByRole('link', { name: 'Features' })).not.toHaveAttribute('aria-current');
+    expect(within(nav).getByRole('link', { name: 'Guides' })).not.toHaveAttribute('aria-current');
+  });
+
+  it('If the FAQ heading has scrolled into view, then the FAQ title bar link is marked as current', async () => {
+    // Arrange
+    render(<App />);
+    const nav = screen.getByRole('navigation', { name: 'Main navigation' });
+
+    // Act: the FAQ starts in the upper two thirds of the viewport, guides below them
+    await scrollPage({
+      innerHeight: 1000,
+      scrollY: 4000,
+      scrollHeight: 7000,
+      sectionTops: { features: -3000, install: -1000, faq: 500, guides: 2000 },
+    });
+
+    // Assert
+    expect(within(nav).getByRole('link', { name: 'FAQ' })).toHaveAttribute(
+      'aria-current',
+      'location',
+    );
+    expect(within(nav).getByRole('link', { name: 'Install' })).not.toHaveAttribute('aria-current');
     expect(within(nav).getByRole('link', { name: 'Guides' })).not.toHaveAttribute('aria-current');
   });
 
@@ -202,7 +224,7 @@ describe('When the website is rendered', () => {
       innerHeight: 1000,
       scrollY: 5000,
       scrollHeight: 6000,
-      sectionTops: { features: -4000, install: -1500, guides: 800 },
+      sectionTops: { features: -4000, install: -1500, faq: -500, guides: 800 },
     });
 
     // Assert
@@ -223,11 +245,11 @@ describe('When the website is rendered', () => {
       innerHeight: 1000,
       scrollY: 100,
       scrollHeight: 6000,
-      sectionTops: { features: 900, install: 3000, guides: 4000 },
+      sectionTops: { features: 900, install: 3000, faq: 3500, guides: 4000 },
     });
 
     // Assert
-    for (const name of ['Features', 'Install', 'Guides']) {
+    for (const name of ['Features', 'Install', 'FAQ', 'Guides']) {
       expect(within(nav).getByRole('link', { name })).not.toHaveAttribute('aria-current');
     }
   });
