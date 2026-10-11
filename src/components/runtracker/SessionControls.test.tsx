@@ -94,6 +94,21 @@ const defaultGrailStoreState = {
   },
 };
 
+function setPlatform(platform: string) {
+  Object.defineProperty(window, 'electronAPI', {
+    value: {
+      platform,
+      runTracker: {
+        getMemoryStatus: vi.fn().mockResolvedValue({ available: true, reason: null }),
+        getGlobalHotkeyStatus: vi.fn().mockResolvedValue({ enabled: false, registrations: [] }),
+        onGlobalHotkeyStatus: vi.fn(() => vi.fn()),
+      },
+    },
+    writable: true,
+    configurable: true,
+  });
+}
+
 describe('SessionControls', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -198,6 +213,24 @@ describe('SessionControls', () => {
       // The idle timer uses the full muted color, not a faded one, to keep a readable contrast
       expect(screen.getByText('0:00')).toHaveClass('text-muted-foreground');
       expect(screen.getByText('0:00')).not.toHaveClass('text-muted-foreground/60');
+    });
+
+    it('If no session is active, Then the timer is hidden and a one-line invitation sits next to the start button', () => {
+      // Arrange
+      mockStoreState(mockUseRunTrackerStore, defaultStoreState);
+
+      // Act
+      render(<SessionControls />);
+
+      // Assert
+      expect(screen.queryByText('0:00')).not.toBeInTheDocument();
+      expect(screen.queryByText('Current Run')).not.toBeInTheDocument();
+      expect(screen.queryByText('No run in progress')).not.toBeInTheDocument();
+      expect(
+        screen.getByText('Start a session to track your runs and the items you find.'),
+      ).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Start New Session' })).toBeInTheDocument();
+      expect(screen.getByText('Keyboard Shortcuts:')).toBeInTheDocument();
     });
 
     it('When the run is paused, Then the timer stays frozen at the time it was paused', () => {
@@ -838,6 +871,7 @@ describe('SessionControls', () => {
       Object.defineProperty(navigator, 'platform', {
         value: 'MacIntel',
         writable: true,
+        configurable: true,
       });
 
       mockStoreState(mockUseRunTrackerStore, {
@@ -866,6 +900,7 @@ describe('SessionControls', () => {
       Object.defineProperty(navigator, 'platform', {
         value: originalPlatform,
         writable: true,
+        configurable: true,
       });
     });
 
@@ -1029,6 +1064,121 @@ describe('SessionControls', () => {
 
       // Assert
       expect(mockStoreActions.startRun).toHaveBeenCalled();
+    });
+  });
+
+  describe('Shortcut labels', () => {
+    const originalElectronAPI = window.electronAPI;
+
+    afterEach(() => {
+      Object.defineProperty(window, 'electronAPI', {
+        value: originalElectronAPI,
+        writable: true,
+        configurable: true,
+      });
+    });
+
+    it('When the app runs on macOS, Then the shortcut hint shows the Command key that actually fires', () => {
+      // Arrange
+      setPlatform('darwin');
+
+      // Act
+      render(<SessionControls />);
+
+      // Assert
+      expect(
+        screen.getByText(
+          '\u2318R (Start), \u2318Space (Pause/Resume), \u2318E (End Run), \u21E7\u2318E (End Session)',
+        ),
+      ).toBeInTheDocument();
+    });
+
+    it('When the app runs on Windows, Then the shortcut hint shows Ctrl', () => {
+      // Arrange
+      setPlatform('win32');
+
+      // Act
+      render(<SessionControls />);
+
+      // Assert
+      expect(
+        screen.getByText(
+          'Ctrl+R (Start), Ctrl+Space (Pause/Resume), Ctrl+E (End Run), Ctrl+Shift+E (End Session)',
+        ),
+      ).toBeInTheDocument();
+    });
+  });
+
+  describe('Shortcut tooltips on macOS', () => {
+    const originalElectronAPI = window.electronAPI;
+
+    const focusAndFindTooltip = async (buttonName: string, tooltipText: string) => {
+      fireEvent.focus(screen.getByRole('button', { name: buttonName }));
+      return screen.findByText(tooltipText);
+    };
+
+    beforeEach(() => {
+      setPlatform('darwin');
+    });
+
+    afterEach(() => {
+      Object.defineProperty(window, 'electronAPI', {
+        value: originalElectronAPI,
+        writable: true,
+        configurable: true,
+      });
+    });
+
+    it('If a session has no active run, Then the Start Run tooltip shows the Command shortcut', async () => {
+      // Arrange
+      mockStoreState(mockUseRunTrackerStore, { ...defaultStoreState, activeSession: mockSession });
+      render(<SessionControls />);
+
+      // Act
+      const tooltip = await focusAndFindTooltip('Start Run', 'Start a new run (\u2318R)');
+
+      // Assert
+      expect(tooltip).toBeInTheDocument();
+    });
+
+    it('If a run is active, Then the End Run, Pause and End Session tooltips show Command shortcuts', async () => {
+      // Arrange
+      mockStoreState(mockUseRunTrackerStore, {
+        ...defaultStoreState,
+        activeSession: mockSession,
+        activeRun: mockRun,
+      });
+      render(<SessionControls />);
+
+      // Act
+      const endRunTooltip = await focusAndFindTooltip('End Run', 'End current run (\u2318E)');
+      const pauseTooltip = await focusAndFindTooltip('Pause', 'Pause run (\u2318Space)');
+      const endSessionTooltip = await focusAndFindTooltip(
+        'End Session',
+        'End current session (\u21E7\u2318E)',
+      );
+
+      // Assert
+      expect(endRunTooltip).toBeInTheDocument();
+      expect(pauseTooltip).toBeInTheDocument();
+      expect(endSessionTooltip).toBeInTheDocument();
+    });
+
+    it('If the run is paused, Then the Resume tooltip shows the Command shortcut', async () => {
+      // Arrange
+      mockStoreState(mockUseRunTrackerStore, {
+        ...defaultStoreState,
+        activeSession: mockSession,
+        activeRun: { ...mockRun, isPaused: true },
+        isPaused: true,
+      });
+      render(<SessionControls />);
+
+      // Act
+      const tooltip = await focusAndFindTooltip('Resume', 'Resume run (\u2318Space)');
+
+      // Assert
+      expect(tooltip).toBeInTheDocument();
     });
   });
 

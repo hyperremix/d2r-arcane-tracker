@@ -1,5 +1,12 @@
-import { describe, expect, it } from 'vitest';
-import { matchesShortcut, normalizeShortcut, parseShortcut, shortcutFromEvent } from './hotkeys';
+import { afterEach, describe, expect, it } from 'vitest';
+import {
+  formatShortcutForDisplay,
+  getModifierKeyNames,
+  matchesShortcut,
+  normalizeShortcut,
+  parseShortcut,
+  shortcutFromEvent,
+} from './hotkeys';
 
 describe('hotkeys helpers', () => {
   describe('normalizeShortcut', () => {
@@ -146,6 +153,154 @@ describe('hotkeys helpers', () => {
       // Assert
       expect(stored).toBe('Ctrl+Shift++');
       expect(result).toBe(true);
+    });
+  });
+
+  describe('formatShortcutForDisplay', () => {
+    const originalElectronAPI = window.electronAPI;
+
+    afterEach(() => {
+      window.electronAPI = originalElectronAPI;
+    });
+
+    it.each([
+      ['Ctrl+R', '\u2318R'],
+      ['Ctrl+Space', '\u2318Space'],
+      ['Ctrl+E', '\u2318E'],
+      ['Ctrl+Shift+E', '\u21E7\u2318E'],
+      ['Ctrl+Alt+N', '\u2325\u2318N'],
+      ['Ctrl+Shift+Alt+F5', '\u2325\u21E7\u2318F5'],
+    ])('When %s is shown on macOS, Then it reads %s with the Command symbol', (stored, expected) => {
+      // Arrange & Act
+      const result = formatShortcutForDisplay(stored, { isMac: true });
+
+      // Assert
+      expect(result).toBe(expected);
+    });
+
+    it.each([
+      ['Ctrl+R', 'Ctrl+R'],
+      ['ctrl + shift + e', 'Ctrl+Shift+E'],
+      ['Ctrl+Space', 'Ctrl+Space'],
+    ])('When %s is shown on Windows or Linux, Then it reads %s', (stored, expected) => {
+      // Arrange & Act
+      const result = formatShortcutForDisplay(stored, { isMac: false });
+
+      // Assert
+      expect(result).toBe(expected);
+    });
+
+    it('If the shortcut has no usable key, Then it is shown unchanged', () => {
+      // Arrange & Act
+      const result = formatShortcutForDisplay('Ctrl+Shift', { isMac: true });
+
+      // Assert
+      expect(result).toBe('Ctrl+Shift');
+    });
+
+    it('If the main process reports macOS, Then the label uses the Command symbol without an override', () => {
+      // Arrange
+      window.electronAPI = { platform: 'darwin' } as unknown as typeof window.electronAPI;
+
+      // Act
+      const result = formatShortcutForDisplay('Ctrl+Shift+E');
+
+      // Assert
+      expect(result).toBe('\u21E7\u2318E');
+    });
+
+    it('If the main process reports Windows, Then the label keeps Ctrl', () => {
+      // Arrange
+      window.electronAPI = { platform: 'win32' } as unknown as typeof window.electronAPI;
+
+      // Act
+      const result = formatShortcutForDisplay('Ctrl+Shift+E');
+
+      // Assert
+      expect(result).toBe('Ctrl+Shift+E');
+    });
+  });
+
+  describe('platform detection without a platform from the main process', () => {
+    const originalElectronAPI = window.electronAPI;
+    const originalNavigatorPlatform = navigator.platform;
+
+    const setNavigatorPlatform = (platform: string) => {
+      Object.defineProperty(navigator, 'platform', { value: platform, configurable: true });
+    };
+
+    afterEach(() => {
+      window.electronAPI = originalElectronAPI;
+      Object.defineProperty(navigator, 'platform', {
+        value: originalNavigatorPlatform,
+        configurable: true,
+      });
+    });
+
+    it('If electronAPI is missing and navigator reports a Mac, Then labels use the Command symbol', () => {
+      // Arrange
+      window.electronAPI = undefined as unknown as typeof window.electronAPI;
+      setNavigatorPlatform('MacIntel');
+
+      // Act
+      const result = formatShortcutForDisplay('Ctrl+Shift+E');
+
+      // Assert
+      expect(result).toBe('\u21E7\u2318E');
+    });
+
+    it('If electronAPI has no platform and navigator reports Windows, Then labels keep Ctrl', () => {
+      // Arrange
+      window.electronAPI = {} as unknown as typeof window.electronAPI;
+      setNavigatorPlatform('Win32');
+
+      // Act
+      const result = formatShortcutForDisplay('Ctrl+Shift+E');
+
+      // Assert
+      expect(result).toBe('Ctrl+Shift+E');
+    });
+
+    it('If the main process reports Windows but navigator says Mac, Then the main process wins', () => {
+      // Arrange
+      window.electronAPI = { platform: 'win32' } as unknown as typeof window.electronAPI;
+      setNavigatorPlatform('MacIntel');
+
+      // Act
+      const result = formatShortcutForDisplay('Ctrl+R');
+
+      // Assert
+      expect(result).toBe('Ctrl+R');
+    });
+
+    it('If navigator reports a Mac, Then the Command key matches and records as the stored Ctrl modifier', () => {
+      // Arrange
+      window.electronAPI = undefined as unknown as typeof window.electronAPI;
+      setNavigatorPlatform('MacIntel');
+      const event = new KeyboardEvent('keydown', { key: 'r', metaKey: true });
+
+      // Act
+      const matches = matchesShortcut(event, 'Ctrl+R');
+      const recorded = shortcutFromEvent(event);
+
+      // Assert
+      expect(matches).toBe(true);
+      expect(recorded).toBe('Ctrl+R');
+    });
+
+    it.each([
+      ['darwin', { primaryModifier: 'Command', altModifier: 'Option' }],
+      ['win32', { primaryModifier: 'Ctrl', altModifier: 'Alt' }],
+      ['linux', { primaryModifier: 'Ctrl', altModifier: 'Alt' }],
+    ])('When the main process reports %s, Then the modifier key names are %j', (platform, expected) => {
+      // Arrange
+      window.electronAPI = { platform } as unknown as typeof window.electronAPI;
+
+      // Act
+      const result = getModifierKeyNames();
+
+      // Assert
+      expect(result).toEqual(expected);
     });
   });
 });

@@ -39,12 +39,36 @@ const DISPLAY_KEY_OVERRIDES: Record<string, string> = {
   arrowright: 'ArrowRight',
 };
 
+// macOS modifier symbols, in Apple's standard order (Option, Shift, Command)
+const MAC_ALT_SYMBOL = '\u2325';
+const MAC_SHIFT_SYMBOL = '\u21E7';
+const MAC_COMMAND_SYMBOL = '\u2318';
+
+/**
+ * Whether the app runs on macOS. Prefers the platform exposed by the preload script
+ * (process.platform), which agrees with how Electron resolves "CommandOrControl" (Command on
+ * macOS), and falls back to the browser's platform string.
+ */
 const isPlatformMac = () => {
+  const electronPlatform = typeof window === 'undefined' ? undefined : window.electronAPI?.platform;
+  if (electronPlatform) {
+    return electronPlatform === 'darwin';
+  }
   if (typeof navigator === 'undefined') {
     return false;
   }
   return navigator.platform.toLowerCase().includes('mac');
 };
+
+/**
+ * Names of the keys the stored "Ctrl" and "Alt" modifiers map to on the current platform, for
+ * use in sentences (e.g. "Command" and "Option" on macOS).
+ * @returns The primary and alt modifier key names
+ */
+export const getModifierKeyNames = () =>
+  isPlatformMac()
+    ? { primaryModifier: 'Command', altModifier: 'Option' }
+    : { primaryModifier: 'Ctrl', altModifier: 'Alt' };
 
 const normalizeToken = (token: string) => token.replace(/\s+/g, '').toLowerCase();
 
@@ -120,7 +144,11 @@ const buildShortcutString = (parsed: ParsedShortcut) => {
   return parts.join('+');
 };
 
-const resolveIsMac = (options?: { isMac?: boolean }) => options?.isMac ?? isPlatformMac();
+interface PlatformOptions {
+  isMac?: boolean;
+}
+
+const resolveIsMac = (options?: PlatformOptions) => options?.isMac ?? isPlatformMac();
 
 const eventHasPrimaryModifier = (event: KeyboardEventLike, isMac: boolean) =>
   isMac ? event.metaKey : event.ctrlKey;
@@ -168,6 +196,30 @@ export const normalizeShortcut = (shortcut: string) => {
   return buildShortcutString(parsed);
 };
 
+/**
+ * Formats a stored shortcut (e.g. "Ctrl+Shift+E") for display on the current platform. The stored
+ * "Ctrl" modifier fires as Command on macOS, both in the app window and as a global hotkey, so
+ * macOS shows the native symbols (e.g. "⇧⌘E"); Windows and Linux keep the "Ctrl+Shift+E" form.
+ * @param shortcut - The stored shortcut
+ * @param options - Optional platform override
+ * @returns The display label, or the input unchanged if it has no usable key
+ */
+export const formatShortcutForDisplay = (shortcut: string, options?: PlatformOptions) => {
+  const parsed = parseShortcut(shortcut);
+  if (!parsed.key) {
+    return shortcut;
+  }
+  if (!resolveIsMac(options)) {
+    return buildShortcutString(parsed);
+  }
+  return [
+    parsed.alt ? MAC_ALT_SYMBOL : '',
+    parsed.shift ? MAC_SHIFT_SYMBOL : '',
+    parsed.ctrl ? MAC_COMMAND_SYMBOL : '',
+    formatKeyForDisplay(parsed.key),
+  ].join('');
+};
+
 const parseEvent = (event: KeyboardEventLike, isMac: boolean): ParsedShortcut => {
   const rawKey = event.key ?? '';
   const normalizedKey = normalizeKeyForComparison(rawKey);
@@ -181,7 +233,7 @@ const parseEvent = (event: KeyboardEventLike, isMac: boolean): ParsedShortcut =>
   };
 };
 
-export const shortcutFromEvent = (event: KeyboardEventLike, options?: { isMac?: boolean }) => {
+export const shortcutFromEvent = (event: KeyboardEventLike, options?: PlatformOptions) => {
   const isMac = resolveIsMac(options);
   const parsed = parseEvent(event, isMac);
   if (!parsed.key) {
@@ -193,7 +245,7 @@ export const shortcutFromEvent = (event: KeyboardEventLike, options?: { isMac?: 
 export const matchesShortcut = (
   event: KeyboardEventLike,
   shortcut: string,
-  options?: { isMac?: boolean },
+  options?: PlatformOptions,
 ) => {
   if (!shortcut) {
     return false;

@@ -53,11 +53,11 @@ export function RunRow({ run, itemsCount, onViewDetails, formatTimestamp }: RunR
       aria-label={t(translations.runTracker.runList.viewRunDetails, { number: run.runNumber })}
     >
       <TableCell className="font-medium">#{run.runNumber}</TableCell>
-      <TableCell className="font-mono text-sm">{formatTimestamp(run.startTime)}</TableCell>
-      <TableCell className="font-mono text-sm">
+      <TableCell className="text-sm tabular-nums">{formatTimestamp(run.startTime)}</TableCell>
+      <TableCell className="text-sm tabular-nums">
         {run.endTime ? formatTimestamp(run.endTime) : '-'}
       </TableCell>
-      <TableCell className="font-mono text-sm">
+      <TableCell className="text-sm tabular-nums">
         {run.duration ? formatDuration(run.duration) : '-'}
       </TableCell>
       <TableCell className="text-center">

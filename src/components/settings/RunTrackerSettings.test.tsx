@@ -50,6 +50,15 @@ describe('When RunTrackerSettings is rendered on Windows with auto mode enabled'
     expect(screen.getAllByLabelText('Memory Polling Interval')).toContain(slider);
   });
 
+  it('Then the shortcut fields show the stored shortcuts with Ctrl', () => {
+    // Arrange & Act
+    render(<RunTrackerSettings />);
+
+    // Assert
+    expect(screen.getByLabelText('Start Run:')).toHaveValue('Ctrl+R');
+    expect(screen.getByLabelText('End Session:')).toHaveValue('Ctrl+Shift+E');
+  });
+
   it('Then the shortcut edit buttons use translated text', () => {
     // Arrange & Act
     render(<RunTrackerSettings />);
@@ -60,11 +69,11 @@ describe('When RunTrackerSettings is rendered on Windows with auto mode enabled'
 });
 
 describe('When RunTrackerSettings renders the global hotkeys option', () => {
-  function setupElectronAPI(status: GlobalHotkeyStatus) {
+  function setupElectronAPI(status: GlobalHotkeyStatus, platform = 'darwin') {
     window.electronAPI = {
-      platform: 'darwin',
+      platform,
       runTracker: {
-        getMemoryStatus: vi.fn(),
+        getMemoryStatus: vi.fn().mockResolvedValue({ available: true, reason: null }),
         getGlobalHotkeyStatus: vi.fn().mockResolvedValue(status),
         onGlobalHotkeyStatus: vi.fn(() => vi.fn()),
       },
@@ -113,11 +122,64 @@ describe('When RunTrackerSettings renders the global hotkeys option', () => {
     expect(await screen.findByRole('alert')).toBeInTheDocument();
     expect(
       screen.getByText(
-        'End Run: Ctrl+E is already used by another app or action. Choose a different shortcut.',
+        'End Run: \u2318E is already used by another app or action. Choose a different shortcut.',
       ),
     ).toBeInTheDocument();
     expect(screen.getByText(/End Session: E can't be used globally/)).toBeInTheDocument();
-    expect(screen.queryByText(/Start Run: Ctrl\+R/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Start Run: \u2318R/)).not.toBeInTheDocument();
+  });
+
+  it('When the app runs on macOS, Then the shortcut fields show the Command key', () => {
+    // Arrange
+    setupElectronAPI({ enabled: false, registrations: [] });
+    setupGrailStore({});
+
+    // Act
+    render(<RunTrackerSettings />);
+
+    // Assert
+    expect(screen.getByLabelText('Start Run:')).toHaveValue('\u2318R');
+    expect(screen.getByLabelText('Pause/Resume Run:')).toHaveValue('\u2318Space');
+    expect(screen.getByLabelText('End Session:')).toHaveValue('\u21E7\u2318E');
+  });
+
+  it('If an unsupported shortcut is reported on macOS, Then the hint names the Command and Option keys', async () => {
+    // Arrange
+    setupElectronAPI({
+      enabled: true,
+      registrations: [{ action: 'endSession', shortcut: 'E', state: 'unsupported' }],
+    });
+    setupGrailStore({ runTrackerGlobalHotkeys: true });
+
+    // Act
+    render(<RunTrackerSettings />);
+
+    // Assert
+    expect(
+      await screen.findByText(/Include Command or Option, or use a function key/),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/Ctrl or Alt/)).not.toBeInTheDocument();
+  });
+
+  it('If an unsupported shortcut is reported on Windows, Then the hint names the Ctrl and Alt keys', async () => {
+    // Arrange
+    setupElectronAPI(
+      {
+        enabled: true,
+        registrations: [{ action: 'endSession', shortcut: 'E', state: 'unsupported' }],
+      },
+      'win32',
+    );
+    setupGrailStore({ runTrackerGlobalHotkeys: true });
+
+    // Act
+    render(<RunTrackerSettings />);
+
+    // Assert
+    expect(
+      await screen.findByText(/Include Ctrl or Alt, or use a function key/),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/Command or Option/)).not.toBeInTheDocument();
   });
 
   it('If all shortcuts are registered, Then no error is shown', async () => {

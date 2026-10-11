@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import type { Session } from 'electron/types/grail';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useRunTrackerStore, useSessionStatsLookup } from '@/stores/runTrackerStore';
 import { SessionsList } from './SessionsList';
 
@@ -105,6 +105,65 @@ describe('When SessionsList is rendered with previous sessions', () => {
 
     // Assert
     expect(screen.getAllByRole('row', { name: /^View session from .+ details$/ })).toHaveLength(2);
+  });
+
+  it('Then sessions older than a week show a compact date instead of the full weekday date', () => {
+    // Arrange & Act
+    render(<SessionsList onSessionSelect={vi.fn()} />);
+
+    // Assert
+    expect(screen.getAllByRole('cell', { name: 'Jan 1, 2024' })).toHaveLength(2);
+    expect(screen.queryByText('Monday, January 1, 2024')).not.toBeInTheDocument();
+  });
+
+  it('Then time columns use tabular numerals instead of a monospace font', () => {
+    // Arrange & Act
+    render(<SessionsList onSessionSelect={vi.fn()} />);
+
+    // Assert
+    const [firstRow] = screen.getAllByRole('row', { name: /^View session from .+ details$/ });
+    const [, startCell, endCell, durationCell] = within(firstRow).getAllByRole('cell');
+    expect(startCell).toHaveClass('tabular-nums');
+    expect(startCell).not.toHaveClass('font-mono');
+    expect(endCell).toHaveClass('tabular-nums');
+    expect(endCell).not.toHaveClass('font-mono');
+    expect(durationCell).toHaveClass('tabular-nums');
+    expect(durationCell).not.toHaveClass('font-mono');
+  });
+});
+
+describe('When SessionsList shows the day of a recent session', () => {
+  // A fixed "now" (local time) keeps the relative day labels deterministic
+  const now = new Date(2024, 0, 15, 12, 0, 0);
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(now);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it.each([
+    ['earlier today', new Date(2024, 0, 15, 8, 0, 0), 'Today'],
+    ['the previous calendar day', new Date(2024, 0, 14, 20, 0, 0), 'Yesterday'],
+    ['3 days ago', new Date(2024, 0, 12, 12, 0, 0), '3 days ago'],
+    ['6 days ago (last day with a relative label)', new Date(2024, 0, 9, 12, 0, 0), '6 days ago'],
+    ['7 days ago (first day with a compact date)', new Date(2024, 0, 8, 12, 0, 0), 'Jan 8, 2024'],
+  ])('If the session started %s, Then the date cell reads "%s"', (_name, startTime, expected) => {
+    // Arrange
+    const session = createSession('s-recent', 0, 30);
+    session.startTime = startTime;
+    session.endTime = new Date(startTime.getTime() + 30 * 60_000);
+    setupRunTrackerStore([session]);
+
+    // Act
+    render(<SessionsList onSessionSelect={vi.fn()} />);
+
+    // Assert
+    expect(screen.getByRole('cell', { name: expected })).toBeInTheDocument();
   });
 });
 

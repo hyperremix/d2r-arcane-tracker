@@ -8,6 +8,9 @@ export const DAY_MS = 24 * HOUR_MS;
 const MONTH_MS = 30 * DAY_MS;
 const YEAR_MS = 365 * DAY_MS;
 
+/** Sessions younger than this many days show a relative day ("3 days ago") instead of a date. */
+export const SESSION_RELATIVE_DAYS = 7;
+
 /**
  * Returns the locale of the active UI language, used when no locale is passed to the formatters.
  * @returns {string | undefined} The active i18n language, if i18n is initialised
@@ -275,7 +278,9 @@ export function isRecentFind(
 
 /**
  * Formats the day of a session relative to today: "Today", "Yesterday", the relative time within
- * the last week (e.g. "3 days ago"), and the full localized date before that.
+ * the last `SESSION_RELATIVE_DAYS` days (e.g. "3 days ago"), and the full localized date before
+ * that. Callers that want a compact date past the cutoff (such as the sessions list) check
+ * `isRecentFind(date, SESSION_RELATIVE_DAYS)` first.
  * @param {Date | string | number | undefined} date - Start of the session
  * @param {TFunction} t - Translation function
  * @param {string} [locale] - BCP 47 locale to format with (defaults to the active UI language)
@@ -298,7 +303,7 @@ export function formatSessionDateRelative(
   if (sessionDay === yesterday.getTime()) {
     return t(translations.common.yesterday);
   }
-  if (wholeDaysBetween(sessionStart, now) < 7) {
+  if (wholeDaysBetween(sessionStart, now) < SESSION_RELATIVE_DAYS) {
     return formatTimeAgo(date, t, locale);
   }
   return formatLocalizedDate(date, locale, { dateStyle: 'full' });
