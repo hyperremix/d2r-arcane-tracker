@@ -8,7 +8,7 @@ import { useGrailStore } from '@/stores/grailStore';
  * items and tracked versions as the overall grail progress, independent of the current filters.
  */
 export function useTypeProgress(): Partial<Record<ItemType, ProgressCount>> {
-  // Individual selectors so the toolbar only recomputes when these slices change
+  // Individual selectors so the progress only recomputes when these slices change
   const items = useGrailStore((state) => state.items);
   const progress = useGrailStore((state) => state.progress);
   const grailNormal = useGrailStore((state) => state.settings.grailNormal);

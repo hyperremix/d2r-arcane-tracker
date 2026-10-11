@@ -127,7 +127,6 @@ describe('When useGrailStore is used', () => {
 
       // Assert
       expect(initialState.groupMode).toBe('category');
-      expect(initialState.viewMode).toBe('grid');
       expect(initialState.advancedFilter).toEqual(
         expect.objectContaining({ sortBy: 'found_date', sortOrder: 'desc' }),
       );

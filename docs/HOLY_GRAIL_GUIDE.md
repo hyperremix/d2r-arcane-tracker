@@ -102,7 +102,7 @@ The search and filter bar lets you:
   - Group by category (the default when you open the app), type or ethereal status (available when ethereal tracking is on), or turn grouping off. Groups always appear in a fixed order, whatever the sort field or direction (the sort only orders the items inside each group): category groups as weapons, armor, jewelry, charms, runes, runewords; type groups as unique, set, rune, runeword; ethereal groups from both versions found down to not tracked. Ethereal groups read, for example, "Both versions found", "Missing both versions" or "No ethereal version: found". Each group has a header with its found and total count (for example "Armor 12/40") and a small progress bar.
 - In the grid, items are shown as compact tiles of equal height in rows that read left to right and wrap to the next row, with as many columns as fit the window width.
 
-Below the bar, removable chips show the search text, fuzzy search and the categories and sub-categories picked in **Filters**; the status control and the ledger segments already show their own state. **Clear all** resets the search, filters, fuzzy search and sorting. The count next to them shows how many items match your filters out of all tracked items.
+Below the bar, removable chips show the search text, fuzzy search and the categories and sub-categories picked in **Filters**; the status control and the ledger segments already show their own state. **Clear all** resets the search, filters, fuzzy search and sorting, and clears any selected ledger segments (type filters). The count next to them shows how many items match your filters out of all tracked items.
 
 Keyboard shortcuts:
 

@@ -548,6 +548,33 @@ describe('When VirtualItemGrid is rendered', () => {
     });
   });
 
+  describe('If groupedItems has multiple groups and group headers are shown', () => {
+    it('Then only the headers after the first one get extra top padding', () => {
+      // Arrange
+      const groupedItems = [
+        { title: 'Unique Armor', items: [createMockItem({ id: 'item-1' })], foundCount: 1 },
+        { title: 'Unique Weapons', items: [createMockItem({ id: 'item-2' })], foundCount: 0 },
+      ];
+
+      // Act
+      render(
+        <VirtualItemGrid
+          groupedItems={groupedItems}
+          showGroupHeaders
+          progressLookup={createMockProgressLookup()}
+          characters={[]}
+          onItemClick={vi.fn()}
+        />,
+      );
+
+      // Assert
+      const first = screen.getByRole('heading', { name: 'Unique Armor' }).parentElement;
+      const second = screen.getByRole('heading', { name: 'Unique Weapons' }).parentElement;
+      expect(first).toHaveClass('pt-0');
+      expect(second).toHaveClass('pt-10');
+    });
+  });
+
   describe('If item click handler is provided', () => {
     it('Then should call onItemClick when item is clicked', () => {
       // Arrange

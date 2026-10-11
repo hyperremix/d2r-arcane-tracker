@@ -32,7 +32,6 @@
   "grail": {
     "title": "Holy Grail",
     "tracker": {
-      "totalProgress": "Total Progress",
       "normalItems": "Normal Items",
       "etherealItems": "Ethereal Items",
       "progressSummary": "Grail progress",
@@ -193,7 +192,6 @@
       "categoryCharms": "Charms",
       "categoryRunes": "Runes",
       "categoryRunewords": "Runewords",
-      "types": "Types",
       "typeUnique": "Unique",
       "typeSet": "Set",
       "typeRune": "Rune",

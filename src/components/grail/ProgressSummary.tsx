@@ -50,7 +50,10 @@ interface LedgerSegmentProps {
   pressed: boolean;
   /** Whether any type filter is active, so the segments that are not selected recede */
   filtering: boolean;
-  /** Flex grow factor, so the segment is as wide as its share of the grail */
+  /**
+   * Flex grow factor, so the segment is as wide as its share of the grail. Narrow segments are
+   * widened to fit their label and count (`min-w-fit`), so widths are only proportional above that.
+   */
   grow: number;
   onToggle: (type: ItemType) => void;
 }
@@ -76,7 +79,7 @@ function LedgerSegment({ type, progress, pressed, filtering, grow, onToggle }: L
         pressed ? segmentStyles[type].pressed : 'hover:bg-muted/60',
       )}
     >
-      <span className="flex items-baseline justify-between gap-2 whitespace-nowrap text-xs">
+      <span className="flex items-baseline justify-between gap-4 whitespace-nowrap text-xs">
         <span className="font-medium text-foreground">{t(itemTypeLabelKeys[type])}</span>
         {/* Plain space between label and counter keeps the accessible name readable */}{' '}
         <span className="text-muted-foreground tabular-nums">

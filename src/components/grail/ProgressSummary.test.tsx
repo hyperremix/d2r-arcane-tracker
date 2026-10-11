@@ -171,7 +171,7 @@ describe('When ProgressSummary is rendered', () => {
       expect(set).toHaveAttribute('aria-pressed', 'false');
     });
 
-    it('Then the segments are native buttons, so Enter and Space toggle them', () => {
+    it('Then the segments are native buttons, which browsers activate with Enter and Space', () => {
       // Arrange & Act
       render(<ProgressSummary statistics={statistics} showEtherealBreakdown={false} />);
 
