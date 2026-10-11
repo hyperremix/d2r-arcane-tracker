@@ -9,7 +9,7 @@ import statisticsUrl from '../../docs/screenshots/statistics.webp';
 const REPOSITORY_URL = 'https://github.com/hyperremix/d2r-arcane-tracker';
 
 /** Where the site is published (GitHub Pages); canonical and sitemap URLs start with it. */
-export const SITE_URL = 'https://hyperremix.github.io/d2r-arcane-tracker/';
+export const SITE_URL = 'https://d2rarcanetracker.com/';
 
 export const links = {
   repository: REPOSITORY_URL,

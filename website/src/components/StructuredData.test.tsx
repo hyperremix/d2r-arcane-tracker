@@ -45,7 +45,7 @@ describe('When the structured data is rendered', () => {
       offers: { '@type': 'Offer', price: '0' },
     });
     expect(findNode(data['@graph'], 'WebSite')).toMatchObject({
-      url: 'https://hyperremix.github.io/d2r-arcane-tracker/',
+      url: 'https://d2rarcanetracker.com/',
     });
   });
 

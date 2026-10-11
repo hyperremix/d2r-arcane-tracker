@@ -1,7 +1,7 @@
 import { version } from '../../../package.json';
 import { links } from '../content';
 
-const SITE_URL = 'https://hyperremix.github.io/d2r-arcane-tracker/';
+const SITE_URL = 'https://d2rarcanetracker.com/';
 const AUTHOR_URL = 'https://github.com/hyperremix';
 
 /**

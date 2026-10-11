@@ -17,7 +17,7 @@ const holyGrailGuide = requireGuide('holy-grail');
 const meta: PageMeta = {
   title: 'Run Tracker Guide – D2R Arcane Tracker',
   description: 'Time your "runs" & more',
-  url: 'https://hyperremix.github.io/d2r-arcane-tracker/guides/run-tracker/',
+  url: 'https://d2rarcanetracker.com/guides/run-tracker/',
 };
 
 function parseHead(html: string): Document {

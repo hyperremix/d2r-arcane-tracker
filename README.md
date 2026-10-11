@@ -6,7 +6,7 @@
 
 A desktop Holy Grail tracker for Diablo II: Resurrected. It reads your save files and records every unique, set item, rune and runeword you find, without you having to enter anything.
 
-[Website](https://hyperremix.github.io/d2r-arcane-tracker/) · [Download](https://github.com/hyperremix/d2r-arcane-tracker/releases/latest)
+[Website](https://d2rarcanetracker.com/) · [Download](https://github.com/hyperremix/d2r-arcane-tracker/releases/latest)
 
 ![The Holy Grail page: every grail item as a card, found items in their item color](docs/screenshots/grail-tracker.webp)
 

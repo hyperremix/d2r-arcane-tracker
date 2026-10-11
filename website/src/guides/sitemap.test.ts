@@ -9,9 +9,9 @@ describe('When the sitemap is rendered', () => {
   it('Then it lists every page with its last modification date', () => {
     // Arrange
     const entries = [
-      { url: 'https://hyperremix.github.io/d2r-arcane-tracker/', lastmod: '2026-10-01' },
+      { url: 'https://d2rarcanetracker.com/', lastmod: '2026-10-01' },
       {
-        url: 'https://hyperremix.github.io/d2r-arcane-tracker/guides/holy-grail/',
+        url: 'https://d2rarcanetracker.com/guides/holy-grail/',
         lastmod: '2026-09-15',
       },
     ];
