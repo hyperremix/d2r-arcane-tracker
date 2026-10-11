@@ -35,7 +35,15 @@ ReactDOM.createRoot(rootElement).render(
     <ErrorBoundary>
       {/* The transparent widget shows nothing while its chunk loads; the other windows show the
           logo as a decorative splash */}
-      <Suspense fallback={isWidget ? null : <img src={logoUrl} alt="" />}>
+      <Suspense
+        fallback={
+          isWidget ? null : (
+            <div className="fixed inset-0 flex items-center justify-center">
+              <img src={logoUrl} alt="" className="max-h-full max-w-full object-contain" />
+            </div>
+          )
+        }
+      >
         <AppComponent />
       </Suspense>
     </ErrorBoundary>
