@@ -74,3 +74,20 @@ export function getNotificationIconPath(
 ): string {
   return paths.viteDevServerUrl ? '/logo.png' : getAppIconPath(paths, platform, resourcesPath);
 }
+
+/**
+ * Folder name under the OS app data directory that holds the database, item icons and backups.
+ * Electron derives the default from the package name, and earlier releases stored their data
+ * there, so it stays fixed even though the app name is changed for notifications.
+ */
+export const USER_DATA_DIR_NAME = '@hyperremix/d2r-arcane-tracker';
+
+/**
+ * Resolves the user data directory: the fixed {@link USER_DATA_DIR_NAME} folder in the app data
+ * directory.
+ * @param appDataPath - The OS app data directory (`app.getPath('appData')`)
+ * @returns The user data directory
+ */
+export function resolveUserDataPath(appDataPath: string): string {
+  return path.join(appDataPath, USER_DATA_DIR_NAME);
+}

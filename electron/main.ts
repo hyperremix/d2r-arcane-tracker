@@ -3,7 +3,7 @@ import { fileURLToPath } from 'node:url';
 import { app, BrowserWindow, session } from 'electron';
 import { type RunningApp, startApp } from './app/bootstrap';
 import { deferQuitUntilShutdown, shutdownWhenStarted } from './app/lifecycle';
-import { resolveAppPaths } from './app/paths';
+import { resolveAppPaths, resolveUserDataPath } from './app/paths';
 
 /**
  * The directory name of the current module.
@@ -52,6 +52,10 @@ app.on('activate', () => {
     runningApp?.createMainWindow();
   }
 });
+
+// Pin the user data folder before renaming the app: app.setName also changes the default
+// folder, which would leave the database and item icons from earlier releases behind.
+app.setPath('userData', resolveUserDataPath(app.getPath('appData')));
 
 // Set the app name to ensure native notifications display correctly
 app.setName('D2R Arcane Tracker');
